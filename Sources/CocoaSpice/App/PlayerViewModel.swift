@@ -173,8 +173,12 @@ final class PlayerViewModel {
     var selectedTrackID: TrackItem.ID?
     var selectedTrackIDs: Set<TrackItem.ID> = []
     var playlist: [TrackItem] = [] {
-        didSet { refreshPlaylistTotalDurationReadout() }
+        didSet {
+            playlistContentRevision &+= 1
+            refreshPlaylistTotalDurationReadout()
+        }
     }
+    private(set) var playlistContentRevision = 0
     var metadataCache: [String: TrackMetadata] = [:]
     private(set) var playlistTotalDurationReadout = "0:00"
     private var playlistDurationSecondsByTrackID: [TrackItem.ID: Int] = [:]
@@ -3091,6 +3095,9 @@ final class PlayerViewModel {
         refreshPlaylistTotalDurationReadout()
         playlistColumnWidthHints = nil
         refreshPlaylistMetadata(limit: 128)
+        if session.deferredTrackCount > 0 {
+            statusText = "Restored (session.tracks.count.formatted()) queue tracks; (session.deferredTrackCount.formatted()) deferred to keep startup responsive"
+        }
     }
 
     private func orderedSelectedPlaylistTracks() -> [TrackItem] {
