@@ -9,6 +9,7 @@ COCOASPICE_DIR="$SCRIPT_DIR/../CocoaSpice"
 LIBVGM_BUILD="$COCOASPICE_DIR/.build/libvgm/bin/libvgm-player.a"
 VGMSTREAM_BUILD="$COCOASPICE_DIR/.build/vgmstream/src/libvgmstream.a"
 LAZYUSF_BUILD="$COCOASPICE_DIR/.build/lazyusf/liblazyusf.a"
+PLAYPSF_BUILD="$COCOASPICE_DIR/.build/play-psf/libcocoaspice_play_psf.a"
 
 if [[ ! -f "$LIBVGM_BUILD" ]]; then
     echo "libvgm not built; building it from CocoaSpice's vendor copy..." >&2
@@ -23,6 +24,11 @@ fi
 if [[ ! -f "$LAZYUSF_BUILD" ]]; then
     echo "lazyusf not built; building it from CocoaSpice's vendor copy..." >&2
     "$COCOASPICE_DIR/scripts/build-lazyusf.sh"
+fi
+
+if [[ ! -f "$PLAYPSF_BUILD" ]]; then
+    echo "Play! PSF not built; building it from CocoaSpice's vendor copy..." >&2
+    "$COCOASPICE_DIR/scripts/build-play-psf.sh"
 fi
 
 rm -rf "$BUILD_DIR"

@@ -17,6 +17,7 @@ enum LazyUSFDecoderError: LocalizedError {
 /// and the family is flagged `hasNaturalEnding == false`, forcing the session
 /// to always apply a capped window. Tempo is unsupported.
 final class LazyUSFDecoder: AudioDecoder, @unchecked Sendable {
+    var appliesFadeInternally: Bool { false }
     let sampleRate: Int
     private let handle: lazyusf_player_handle_t
 

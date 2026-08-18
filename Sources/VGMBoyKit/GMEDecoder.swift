@@ -22,6 +22,7 @@ enum GMEDecoderError: LocalizedError {
 /// emulator instance. All calls must happen on the owning session's serial
 /// queue; the audio render thread never touches this type directly.
 final class GMEDecoder: AudioDecoder, @unchecked Sendable {
+    var appliesFadeInternally: Bool { true }
     let sampleRate: Int
     private let emu: OpaquePointer
     private var absoluteFrames: Int64 = 0

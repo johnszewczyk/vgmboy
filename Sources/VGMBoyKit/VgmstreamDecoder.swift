@@ -20,6 +20,7 @@ enum VgmstreamDecoderError: LocalizedError {
 /// the bridge's internal resampler/downmix to stereo. Subsongs are 1-based in
 /// the bridge, 0-based here.
 final class VgmstreamDecoder: AudioDecoder, @unchecked Sendable {
+    var appliesFadeInternally: Bool { false }
     let sampleRate: Int
     private let handle: vgmstream_player_handle_t
     private let sourceRate: Int

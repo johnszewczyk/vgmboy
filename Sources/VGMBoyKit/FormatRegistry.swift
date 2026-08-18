@@ -42,6 +42,12 @@ public enum FormatRegistry {
         hasNaturalEnding: false
     )
 
+    public static let playpsfFamily = DecoderFamily(
+        id: "playpsf",
+        supportsLongPlay: true,
+        supportsTempo: false
+    )
+
     public static let libgmeExtensions: Set<String> = [
         "ay", "gbs", "hes", "kss", "nsf", "nsfe", "sap", "spc"
     ]
@@ -61,6 +67,10 @@ public enum FormatRegistry {
         "usf", "miniusf"
     ]
 
+    public static let playpsfExtensions: Set<String> = [
+        "psf", "minipsf", "psf2", "minipsf2"
+    ]
+
     public static func family(for path: String) -> DecoderFamily? {
         let ext = (path as NSString).pathExtension.lowercased()
         if libgmeExtensions.contains(ext) {
@@ -74,6 +84,9 @@ public enum FormatRegistry {
         }
         if lazyusfExtensions.contains(ext) {
             return lazyusfFamily
+        }
+        if playpsfExtensions.contains(ext) {
+            return playpsfFamily
         }
         return nil
     }

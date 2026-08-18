@@ -13,6 +13,8 @@ let vgmstreamVendorDirectory = "\(cocoaspiceRoot)/vendor/vgmstream/src"
 let vgmstreamBuildDirectory = "\(cocoaspiceRoot)/.build/vgmstream"
 let lazyUSFVendorDirectory = "\(cocoaspiceRoot)/vendor/lazyusf2"
 let lazyUSFBuildDirectory = "\(cocoaspiceRoot)/.build/lazyusf"
+let playPSFBuildDirectory = "\(cocoaspiceRoot)/.build/play-psf"
+let playPSFVendorDirectory = "\(cocoaspiceRoot)/vendor/play/tools/PsfPlayer/Source"
 
 let package = Package(
     name: "VGMBoy",
@@ -91,8 +93,30 @@ let package = Package(
             ]
         ),
         .target(
+            name: "CPlayPSF",
+            path: "Sources/CPlayPSF",
+            publicHeadersPath: "include",
+            cxxSettings: [
+                .unsafeFlags([
+                    "-std=c++17",
+                    "-I\(playPSFVendorDirectory)",
+                    "-I\(cocoaspiceRoot)/vendor/play/Source",
+                    "-I\(cocoaspiceRoot)/vendor/play/Source/app_shared",
+                    "-I\(cocoaspiceRoot)/vendor/play/deps/CodeGen/src",
+                    "-I\(cocoaspiceRoot)/vendor/play/deps/CodeGen/include",
+                    "-I\(cocoaspiceRoot)/vendor/play/deps/Framework/include",
+                    "-I\(cocoaspiceRoot)/vendor/play/deps/Dependencies/ghc_filesystem/include"
+                ])
+            ],
+            linkerSettings: [
+                .unsafeFlags(["\(playPSFBuildDirectory)/libcocoaspice_play_psf.a"]),
+                .linkedLibrary("z"),
+                .linkedLibrary("bz2")
+            ]
+        ),
+        .target(
             name: "VGMBoyKit",
-            dependencies: ["CGameMusicEmu", "CLibVGM", "CVGmstream", "CLazyUSF"],
+            dependencies: ["CGameMusicEmu", "CLibVGM", "CVGmstream", "CLazyUSF", "CPlayPSF"],
             linkerSettings: [
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("AudioToolbox")

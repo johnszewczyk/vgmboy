@@ -9,7 +9,7 @@ struct FormatRegistryTests {
             let path = "/tmp/example.\(ext)"
             #expect(FormatRegistry.family(for: path)?.id == "libgme")
         }
-        #expect(FormatRegistry.family(for: "/tmp/example.psf2") == nil)
+        #expect(FormatRegistry.family(for: "/tmp/example.unknown") == nil)
     }
 
     @Test("routes libvgm extensions to the libvgm family")
@@ -33,6 +33,14 @@ struct FormatRegistryTests {
         for ext in FormatRegistry.lazyusfExtensions {
             let path = "/tmp/example.\(ext)"
             #expect(FormatRegistry.family(for: path)?.id == "lazyusf")
+        }
+    }
+
+    @Test("routes PSF extensions to the playpsf family")
+    func routesPlayPSF() {
+        for ext in FormatRegistry.playpsfExtensions {
+            let path = "/tmp/example.\(ext)"
+            #expect(FormatRegistry.family(for: path)?.id == "playpsf")
         }
     }
 
@@ -63,6 +71,33 @@ struct FormatRegistryTests {
         #expect(family.supportsLongPlay)
         #expect(!family.supportsTempo)
         #expect(!family.hasNaturalEnding)
+    }
+
+    @Test("playpsf supports long play, no tempo, and a natural ending")
+    func playPSFCapabilities() {
+        let family = FormatRegistry.playpsfFamily
+        #expect(family.supportsLongPlay)
+        #expect(!family.supportsTempo)
+        #expect(family.hasNaturalEnding)
+    }
+}
+
+@Suite("SessionFade")
+struct SessionFadeTests {
+    @Test("fade gain ramps from 1 down to 0 across the fade window")
+    func fadeRamp() {
+        let cap: Int64 = 10_000
+        let fade: Int64 = 2_000
+        #expect(PlaybackSession.fadeGain(position: 7_999, capFrames: cap, fadeFrames: fade) == 1.0)
+        let mid = PlaybackSession.fadeGain(position: 9_000, capFrames: cap, fadeFrames: fade)
+        #expect(mid > 0 && mid < 1)
+        #expect(PlaybackSession.fadeGain(position: 10_000, capFrames: cap, fadeFrames: fade) == 0.0)
+        #expect(PlaybackSession.fadeGain(position: 20_000, capFrames: cap, fadeFrames: fade) == 0.0)
+    }
+
+    @Test("no fade window means full gain")
+    func noFade() {
+        #expect(PlaybackSession.fadeGain(position: 9_500, capFrames: 10_000, fadeFrames: 0) == 1.0)
     }
 }
 

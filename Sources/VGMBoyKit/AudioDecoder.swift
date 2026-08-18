@@ -9,6 +9,10 @@ protocol AudioDecoder: AnyObject {
     var systemName: String { get }
     var absolutePlayedFrames: Int64 { get }
     var trackEnded: Bool { get }
+    /// Whether the decoder applies its own fade-out (libgme/libvgm configure
+    /// a native fade). Decoders that only stream real PCM (vgmstream, lazyusf,
+    /// Play! PSF) report false so the session applies the fade DSP.
+    var appliesFadeInternally: Bool { get }
 
     func startTrack(_ index: Int) throws
     func metadata(for index: Int) throws -> TrackMetadata
@@ -42,6 +46,8 @@ enum DecoderFactory {
             return try VgmstreamDecoder(path: path, sampleRate: sampleRate)
         case "lazyusf":
             return try LazyUSFDecoder(path: path, sampleRate: sampleRate)
+        case "playpsf":
+            return try PlayPSFDecoder(path: path, sampleRate: sampleRate)
         default:
             throw DecoderFactoryError.unsupportedFamily(family.id)
         }

@@ -21,6 +21,7 @@ enum VGMDecoderError: LocalizedError {
 /// Wraps the libvgm core (VGM/VGZ/GYM/S98/DRO) through the CLibVGM bridge.
 /// Single-track. The bridge handles VGZ gzip decompression internally.
 final class VGMDecoder: AudioDecoder, @unchecked Sendable {
+    var appliesFadeInternally: Bool { true }
     let sampleRate: Int
     private let handle: libvgm_player_handle_t
     private var absoluteFrames: Int64 = 0

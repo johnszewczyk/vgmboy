@@ -28,6 +28,7 @@ public final class PlaybackSession: @unchecked Sendable {
     private let output: AudioOutput
     private var decoder: (any AudioDecoder)?
     private var capFrames: Int64 = 0
+    private var fadeFrames: Int64 = 0
     private var currentTrackIndex = 0
     private var reachedEnd = false
     private var isLoaded = false
@@ -78,12 +79,16 @@ public final class PlaybackSession: @unchecked Sendable {
                     decoder.configureNativeEnding(playMs: 0, fadeMs: 0)
                     capFrames = Int64(plan.preFadeSeconds) * Int64(sampleRate)
                 }
+                fadeFrames = 0
             } else {
                 decoder.configureFade(
                     playMs: plan.preFadeSeconds * 1000,
                     fadeMs: plan.fadeSeconds * 1000
                 )
                 capFrames = Int64(plan.totalSeconds) * Int64(sampleRate)
+                fadeFrames = decoder.appliesFadeInternally
+                    ? 0
+                    : Int64(plan.fadeSeconds) * Int64(sampleRate)
             }
 
             self.decoder = decoder
@@ -193,8 +198,10 @@ public final class PlaybackSession: @unchecked Sendable {
                 reachedEnd = true
                 break
             }
+            let chunkStart = decoder.absolutePlayedFrames
             let frames = decoder.readFrames(chunkFrameCount)
-            if output.ringBuffer.write(left: frames.left, right: frames.right) == 0 {
+            let faded = applyFadeIfNeeded(decoder, chunkStart: chunkStart, left: frames.left, right: frames.right)
+            if output.ringBuffer.write(left: faded.left, right: faded.right) == 0 {
                 break
             }
         }
@@ -224,17 +231,46 @@ public final class PlaybackSession: @unchecked Sendable {
                 reachedEnd = true
                 break
             }
+            let chunkStart = decoder.absolutePlayedFrames
             let frames = decoder.readFrames(chunkFrameCount)
-            if output.ringBuffer.write(left: frames.left, right: frames.right) == 0 {
+            let faded = applyFadeIfNeeded(decoder, chunkStart: chunkStart, left: frames.left, right: frames.right)
+            if output.ringBuffer.write(left: faded.left, right: faded.right) == 0 {
                 break
             }
         }
+    }
+
+    /// Applies a linear fade-out across the final `fadeFrames` before the cap.
+    /// Only for decoders that cannot fade internally; the decoder's own
+    /// position must be sampled before the read so gains line up with the
+    /// real (not padded) frames.
+    private func applyFadeIfNeeded(_ decoder: any AudioDecoder, chunkStart: Int64, left: [Float], right: [Float]) -> (left: [Float], right: [Float]) {
+        guard !decoder.appliesFadeInternally, fadeFrames > 0, capFrames > 0 else { return (left, right) }
+        let fadeStart = capFrames - fadeFrames
+        var fadedLeft = left
+        var fadedRight = right
+        for index in 0..<left.count {
+            let position = chunkStart + Int64(index)
+            guard position >= fadeStart else { continue }
+            let gain = Self.fadeGain(position: position, capFrames: capFrames, fadeFrames: fadeFrames)
+            fadedLeft[index] = gain * left[index]
+            fadedRight[index] = gain * right[index]
+        }
+        return (fadedLeft, fadedRight)
+    }
+
+    static func fadeGain(position: Int64, capFrames: Int64, fadeFrames: Int64) -> Float {
+        guard fadeFrames > 0 else { return 1 }
+        let remaining = capFrames - position
+        let gain = Double(remaining) / Double(fadeFrames)
+        return Float(min(1, max(0, gain)))
     }
 
     private func releaseCurrent() {
         stopRefillTimer()
         decoder = nil
         capFrames = 0
+        fadeFrames = 0
         reachedEnd = false
         isLoaded = false
         output.ringBuffer.clear()
