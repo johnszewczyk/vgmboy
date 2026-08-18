@@ -25,12 +25,25 @@ public enum FormatRegistry {
         supportsTempo: true
     )
 
+    public static let vgmstreamFamily = DecoderFamily(
+        id: "vgmstream",
+        supportsLongPlay: true,
+        supportsTempo: false
+    )
+
     public static let libgmeExtensions: Set<String> = [
         "ay", "gbs", "hes", "kss", "nsf", "nsfe", "sap", "spc"
     ]
 
     public static let libvgmExtensions: Set<String> = [
         "vgm", "vgz", "gym", "s98", "dro"
+    ]
+
+    public static let vgmstreamExtensions: Set<String> = [
+        "aa3", "adx", "ads", "aifc", "at3", "aus", "bnk", "dvi",
+        "fsb", "genh", "hd", "hbd", "iecs", "int", "mib", "msf",
+        "mtaf", "ogg", "rws", "ss2", "stream", "svag", "txtp",
+        "vag", "xa"
     ]
 
     public static func family(for path: String) -> DecoderFamily? {
@@ -40,6 +53,9 @@ public enum FormatRegistry {
         }
         if libvgmExtensions.contains(ext) {
             return libvgmFamily
+        }
+        if vgmstreamExtensions.contains(ext) {
+            return vgmstreamFamily
         }
         return nil
     }

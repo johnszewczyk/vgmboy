@@ -9,13 +9,15 @@ let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().pa
 let cocoaspiceRoot = "\(packageRoot)/../CocoaSpice"
 let libVGMVendorDirectory = "\(cocoaspiceRoot)/vendor/libvgm"
 let libVGMBuildDirectory = "\(cocoaspiceRoot)/.build/libvgm"
+let vgmstreamVendorDirectory = "\(cocoaspiceRoot)/vendor/vgmstream/src"
+let vgmstreamBuildDirectory = "\(cocoaspiceRoot)/.build/vgmstream"
 
 let package = Package(
     name: "VGMBoy",
     platforms: [.macOS("26.0")],
     products: [
         .library(name: "VGMBoyKit", targets: ["VGMBoyKit"]),
-        .executable(name: "vgmboy", targets: ["vgmboy"]),
+        .executable(name: "vgmboy-cli", targets: ["vgmboy"]),
         .executable(name: "VGMBoy", targets: ["VGMBoyApp"])
     ],
     targets: [
@@ -44,8 +46,32 @@ let package = Package(
             ]
         ),
         .target(
+            name: "CVGmstream",
+            path: "Sources/CVGmstream",
+            publicHeadersPath: "include",
+            cxxSettings: [
+                .unsafeFlags(["-I\(vgmstreamVendorDirectory)", "-std=c++17"])
+            ],
+            linkerSettings: [
+                .unsafeFlags([
+                    "\(vgmstreamBuildDirectory)/src/libvgmstream.a",
+                    "-L/opt/homebrew/opt/ffmpeg/lib",
+                    "-L/opt/homebrew/opt/libvorbis/lib",
+                    "-L/opt/homebrew/opt/libogg/lib"
+                ]),
+                .linkedLibrary("avcodec"),
+                .linkedLibrary("avformat"),
+                .linkedLibrary("avutil"),
+                .linkedLibrary("swresample"),
+                .linkedLibrary("vorbisfile"),
+                .linkedLibrary("vorbis"),
+                .linkedLibrary("ogg"),
+                .linkedLibrary("z")
+            ]
+        ),
+        .target(
             name: "VGMBoyKit",
-            dependencies: ["CGameMusicEmu", "CLibVGM"],
+            dependencies: ["CGameMusicEmu", "CLibVGM", "CVGmstream"],
             linkerSettings: [
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("AudioToolbox")

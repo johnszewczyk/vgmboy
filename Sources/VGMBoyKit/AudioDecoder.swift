@@ -38,6 +38,8 @@ enum DecoderFactory {
             return try GMEDecoder(path: path, sampleRate: sampleRate)
         case "libvgm":
             return try VGMDecoder(path: path, sampleRate: sampleRate)
+        case "vgmstream":
+            return try VgmstreamDecoder(path: path, sampleRate: sampleRate)
         default:
             throw DecoderFactoryError.unsupportedFamily(family.id)
         }

@@ -29,7 +29,7 @@ struct VGMBoyCommand {
 
         Usage:
           vgmboy inspect <path>                     Inspect routing, system, and per-track timing (JSON).
-          vgmboy play <path> [options]              Play a file through the audio core.
+          vgmboy-cli play <path> [options]              Play a file through the audio core.
 
         Play options:
           --track <n>       Zero-based track index (default 0).

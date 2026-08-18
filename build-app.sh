@@ -7,10 +7,16 @@ MODULE_CACHE="$BUILD_DIR/module-cache"
 APP_DIR="$BUILD_DIR/app/VGMBoy.app"
 COCOASPICE_DIR="$SCRIPT_DIR/../CocoaSpice"
 LIBVGM_BUILD="$COCOASPICE_DIR/.build/libvgm/bin/libvgm-player.a"
+VGMSTREAM_BUILD="$COCOASPICE_DIR/.build/vgmstream/src/libvgmstream.a"
 
 if [[ ! -f "$LIBVGM_BUILD" ]]; then
     echo "libvgm not built; building it from CocoaSpice's vendor copy..." >&2
     "$COCOASPICE_DIR/scripts/build-libvgm.sh"
+fi
+
+if [[ ! -f "$VGMSTREAM_BUILD" ]]; then
+    echo "vgmstream not built; building it from CocoaSpice's vendor copy..." >&2
+    "$COCOASPICE_DIR/scripts/build-vgmstream.sh"
 fi
 
 rm -rf "$BUILD_DIR"

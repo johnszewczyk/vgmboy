@@ -20,6 +20,14 @@ struct FormatRegistryTests {
         }
     }
 
+    @Test("routes vgmstream extensions to the vgmstream family")
+    func routesVgmstream() {
+        for ext in FormatRegistry.vgmstreamExtensions {
+            let path = "/tmp/example.\(ext)"
+            #expect(FormatRegistry.family(for: path)?.id == "vgmstream")
+        }
+    }
+
     @Test("libgme supports long play and tempo")
     func libGmeCapabilities() {
         let family = FormatRegistry.libgmeFamily
@@ -32,6 +40,13 @@ struct FormatRegistryTests {
         let family = FormatRegistry.libvgmFamily
         #expect(family.supportsLongPlay)
         #expect(family.supportsTempo)
+    }
+
+    @Test("vgmstream supports long play but not tempo")
+    func vgmstreamCapabilities() {
+        let family = FormatRegistry.vgmstreamFamily
+        #expect(family.supportsLongPlay)
+        #expect(!family.supportsTempo)
     }
 }
 
