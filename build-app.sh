@@ -5,6 +5,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="$SCRIPT_DIR/.build"
 MODULE_CACHE="$BUILD_DIR/module-cache"
 APP_DIR="$BUILD_DIR/app/VGMBoy.app"
+COCOASPICE_DIR="$SCRIPT_DIR/../CocoaSpice"
+LIBVGM_BUILD="$COCOASPICE_DIR/.build/libvgm/bin/libvgm-player.a"
+
+if [[ ! -f "$LIBVGM_BUILD" ]]; then
+    echo "libvgm not built; building it from CocoaSpice's vendor copy..." >&2
+    "$COCOASPICE_DIR/scripts/build-libvgm.sh"
+fi
 
 rm -rf "$BUILD_DIR"
 mkdir -p "$MODULE_CACHE" "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"

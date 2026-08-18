@@ -21,7 +21,7 @@ enum GMEDecoderError: LocalizedError {
 /// Wraps the game-music-emu (libgme) core for one loaded file. Owns the
 /// emulator instance. All calls must happen on the owning session's serial
 /// queue; the audio render thread never touches this type directly.
-final class GMEDecoder: @unchecked Sendable {
+final class GMEDecoder: AudioDecoder, @unchecked Sendable {
     let sampleRate: Int
     private let emu: OpaquePointer
     private var absoluteFrames: Int64 = 0
@@ -95,6 +95,13 @@ final class GMEDecoder: @unchecked Sendable {
     /// `playMs + fadeMs` and `trackEnded` becomes true after the fade.
     func configureFade(playMs: Int, fadeMs: Int) {
         if playMs > 0 && fadeMs >= 0 {
+            gme_set_fade_msecs(emu, Int32(playMs), Int32(fadeMs))
+        }
+    }
+
+    /// Natural ending: let libgme end at its own tagged length and fade.
+    func configureNativeEnding(playMs: Int, fadeMs: Int) {
+        if playMs > 0 {
             gme_set_fade_msecs(emu, Int32(playMs), Int32(fadeMs))
         }
     }

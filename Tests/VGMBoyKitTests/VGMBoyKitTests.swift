@@ -12,9 +12,24 @@ struct FormatRegistryTests {
         #expect(FormatRegistry.family(for: "/tmp/example.psf2") == nil)
     }
 
+    @Test("routes libvgm extensions to the libvgm family")
+    func routesLibVGM() {
+        for ext in FormatRegistry.libvgmExtensions {
+            let path = "/tmp/example.\(ext)"
+            #expect(FormatRegistry.family(for: path)?.id == "libvgm")
+        }
+    }
+
     @Test("libgme supports long play and tempo")
     func libGmeCapabilities() {
         let family = FormatRegistry.libgmeFamily
+        #expect(family.supportsLongPlay)
+        #expect(family.supportsTempo)
+    }
+
+    @Test("libvgm supports long play and tempo")
+    func libVgmCapabilities() {
+        let family = FormatRegistry.libvgmFamily
         #expect(family.supportsLongPlay)
         #expect(family.supportsTempo)
     }

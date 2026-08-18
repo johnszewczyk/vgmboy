@@ -19,12 +19,28 @@ public enum FormatRegistry {
         supportsTempo: true
     )
 
+    public static let libvgmFamily = DecoderFamily(
+        id: "libvgm",
+        supportsLongPlay: true,
+        supportsTempo: true
+    )
+
     public static let libgmeExtensions: Set<String> = [
         "ay", "gbs", "hes", "kss", "nsf", "nsfe", "sap", "spc"
     ]
 
+    public static let libvgmExtensions: Set<String> = [
+        "vgm", "vgz", "gym", "s98", "dro"
+    ]
+
     public static func family(for path: String) -> DecoderFamily? {
         let ext = (path as NSString).pathExtension.lowercased()
-        return libgmeExtensions.contains(ext) ? libgmeFamily : nil
+        if libgmeExtensions.contains(ext) {
+            return libgmeFamily
+        }
+        if libvgmExtensions.contains(ext) {
+            return libvgmFamily
+        }
+        return nil
     }
 }

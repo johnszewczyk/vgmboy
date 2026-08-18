@@ -16,7 +16,7 @@ public enum AudioInspector {
     /// Reads routing, system identity, and per-track timing metadata without
     /// starting playback. The one public inspect entry point for the kit.
     public static func inspect(path: String) throws -> TrackInspection {
-        let decoder = try GMEDecoder(path: path)
+        let decoder = try DecoderFactory.make(path: path)
         let trackCount = decoder.trackCount
         var tracks: [TrackMetadata] = []
         tracks.reserveCapacity(trackCount)

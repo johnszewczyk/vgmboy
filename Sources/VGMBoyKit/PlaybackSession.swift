@@ -26,7 +26,7 @@ public final class PlaybackSession: @unchecked Sendable {
     private let sampleRate = 44_100
     private let chunkFrameCount = 4096
     private let output: AudioOutput
-    private var decoder: GMEDecoder?
+    private var decoder: (any AudioDecoder)?
     private var capFrames: Int64 = 0
     private var currentTrackIndex = 0
     private var reachedEnd = false
@@ -57,16 +57,27 @@ public final class PlaybackSession: @unchecked Sendable {
         try queue.sync {
             releaseCurrent()
             generation += 1
-            let decoder = try GMEDecoder(path: path, sampleRate: sampleRate)
+            guard let family = FormatRegistry.family(for: path) else {
+                throw DecoderFactoryError.unsupportedFamily(
+                    (path as NSString).pathExtension
+                )
+            }
+            let decoder = try DecoderFactory.make(family: family, path: path, sampleRate: sampleRate)
             try decoder.startTrack(trackIndex)
             decoder.setTempo(tempo)
 
+            let metadata = try decoder.metadata(for: trackIndex)
             if plan.usesNativeEnding {
-                if let metadata = try? decoder.metadata(for: trackIndex),
-                   metadata.playMs > 0 {
-                    decoder.configureFade(playMs: metadata.playMs, fadeMs: max(0, metadata.fadeMs))
+                if metadata.hasTiming {
+                    decoder.configureNativeEnding(
+                        playMs: metadata.naturalPlayMs,
+                        fadeMs: max(0, metadata.fadeMs)
+                    )
+                    capFrames = 0
+                } else {
+                    decoder.configureNativeEnding(playMs: 0, fadeMs: 0)
+                    capFrames = Int64(plan.preFadeSeconds) * Int64(sampleRate)
                 }
-                capFrames = 0
             } else {
                 decoder.configureFade(
                     playMs: plan.preFadeSeconds * 1000,
@@ -81,7 +92,6 @@ public final class PlaybackSession: @unchecked Sendable {
             isLoaded = true
             output.ringBuffer.clear()
             try prime(to: output.primeFrameCount)
-            let metadata = try decoder.metadata(for: trackIndex)
             publishStatus()
             return metadata
         }

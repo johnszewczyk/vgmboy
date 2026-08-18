@@ -37,6 +37,18 @@ public struct TrackMetadata: Sendable, Codable {
     }
 
     public var hasTiming: Bool {
-        lengthMs > 0 || introMs > 0 || loopMs > 0 || playMs > 0
+        naturalPlayMs > 0
+    }
+
+    /// Best-known natural play length: the tagged play length, else
+    /// intro + one loop (or the loop alone when no intro is tagged).
+    public var naturalPlayMs: Int {
+        if playMs > 0 {
+            return playMs
+        }
+        if introMs > 0 || loopMs > 0 {
+            return max(introMs + loopMs, loopMs)
+        }
+        return 0
     }
 }
