@@ -8,6 +8,7 @@ APP_DIR="$BUILD_DIR/app/VGMBoy.app"
 COCOASPICE_DIR="$SCRIPT_DIR/../CocoaSpice"
 LIBVGM_BUILD="$COCOASPICE_DIR/.build/libvgm/bin/libvgm-player.a"
 VGMSTREAM_BUILD="$COCOASPICE_DIR/.build/vgmstream/src/libvgmstream.a"
+LAZYUSF_BUILD="$COCOASPICE_DIR/.build/lazyusf/liblazyusf.a"
 
 if [[ ! -f "$LIBVGM_BUILD" ]]; then
     echo "libvgm not built; building it from CocoaSpice's vendor copy..." >&2
@@ -17,6 +18,11 @@ fi
 if [[ ! -f "$VGMSTREAM_BUILD" ]]; then
     echo "vgmstream not built; building it from CocoaSpice's vendor copy..." >&2
     "$COCOASPICE_DIR/scripts/build-vgmstream.sh"
+fi
+
+if [[ ! -f "$LAZYUSF_BUILD" ]]; then
+    echo "lazyusf not built; building it from CocoaSpice's vendor copy..." >&2
+    "$COCOASPICE_DIR/scripts/build-lazyusf.sh"
 fi
 
 rm -rf "$BUILD_DIR"

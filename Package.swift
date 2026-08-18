@@ -11,6 +11,8 @@ let libVGMVendorDirectory = "\(cocoaspiceRoot)/vendor/libvgm"
 let libVGMBuildDirectory = "\(cocoaspiceRoot)/.build/libvgm"
 let vgmstreamVendorDirectory = "\(cocoaspiceRoot)/vendor/vgmstream/src"
 let vgmstreamBuildDirectory = "\(cocoaspiceRoot)/.build/vgmstream"
+let lazyUSFVendorDirectory = "\(cocoaspiceRoot)/vendor/lazyusf2"
+let lazyUSFBuildDirectory = "\(cocoaspiceRoot)/.build/lazyusf"
 
 let package = Package(
     name: "VGMBoy",
@@ -70,8 +72,27 @@ let package = Package(
             ]
         ),
         .target(
+            name: "CLazyUSF",
+            path: "Sources/CLazyUSF",
+            publicHeadersPath: "include",
+            cSettings: [
+                .unsafeFlags([
+                    "-I\(lazyUSFVendorDirectory)",
+                    "-I\(cocoaspiceRoot)/vendor/psflib"
+                ])
+            ],
+            linkerSettings: [
+                .unsafeFlags([
+                    "\(lazyUSFBuildDirectory)/liblazyusf.a",
+                    "\(lazyUSFBuildDirectory)/libpsflib.a"
+                ]),
+                .linkedLibrary("z"),
+                .linkedLibrary("m")
+            ]
+        ),
+        .target(
             name: "VGMBoyKit",
-            dependencies: ["CGameMusicEmu", "CLibVGM", "CVGmstream"],
+            dependencies: ["CGameMusicEmu", "CLibVGM", "CVGmstream", "CLazyUSF"],
             linkerSettings: [
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("AudioToolbox")

@@ -28,6 +28,14 @@ struct FormatRegistryTests {
         }
     }
 
+    @Test("routes USF extensions to the lazyusf family")
+    func routesLazyUSF() {
+        for ext in FormatRegistry.lazyusfExtensions {
+            let path = "/tmp/example.\(ext)"
+            #expect(FormatRegistry.family(for: path)?.id == "lazyusf")
+        }
+    }
+
     @Test("libgme supports long play and tempo")
     func libGmeCapabilities() {
         let family = FormatRegistry.libgmeFamily
@@ -47,6 +55,14 @@ struct FormatRegistryTests {
         let family = FormatRegistry.vgmstreamFamily
         #expect(family.supportsLongPlay)
         #expect(!family.supportsTempo)
+    }
+
+    @Test("lazyusf supports long play, no tempo, and no natural ending")
+    func lazyUSFCapabilities() {
+        let family = FormatRegistry.lazyusfFamily
+        #expect(family.supportsLongPlay)
+        #expect(!family.supportsTempo)
+        #expect(!family.hasNaturalEnding)
     }
 }
 
@@ -118,5 +134,30 @@ struct TimingPolicyTests {
         )
         #expect(plan.preFadeSeconds == 150)
         #expect(plan.usesNativeEnding)
+    }
+
+    @Test("no-natural-ending family always gets a capped window")
+    func noNaturalEndingAlwaysCapped() {
+        let withMetadata = TimingPolicy.plan(
+            supportsLongPlay: true,
+            metadata: metadata,
+            longPlayEnabled: false,
+            manualSeconds: 60,
+            fadeSeconds: 0,
+            hasNaturalEnding: false
+        )
+        #expect(!withMetadata.usesNativeEnding)
+        #expect(withMetadata.preFadeSeconds == 150)
+
+        let withoutMetadata = TimingPolicy.plan(
+            supportsLongPlay: true,
+            metadata: nil,
+            longPlayEnabled: false,
+            manualSeconds: 60,
+            fadeSeconds: 0,
+            hasNaturalEnding: false
+        )
+        #expect(!withoutMetadata.usesNativeEnding)
+        #expect(withoutMetadata.preFadeSeconds == 150)
     }
 }

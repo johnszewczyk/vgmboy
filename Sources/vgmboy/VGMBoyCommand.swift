@@ -126,7 +126,8 @@ struct VGMBoyCommand {
             metadata: metadata,
             longPlayEnabled: longPlay,
             manualSeconds: max(1, playMs / 1000),
-            fadeSeconds: max(0, fadeMs / 1000)
+            fadeSeconds: max(0, fadeMs / 1000),
+            hasNaturalEnding: family.hasNaturalEnding
         )
 
         print("VGMBoy — \(inspection.system)")

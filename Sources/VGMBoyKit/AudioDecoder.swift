@@ -40,6 +40,8 @@ enum DecoderFactory {
             return try VGMDecoder(path: path, sampleRate: sampleRate)
         case "vgmstream":
             return try VgmstreamDecoder(path: path, sampleRate: sampleRate)
+        case "lazyusf":
+            return try LazyUSFDecoder(path: path, sampleRate: sampleRate)
         default:
             throw DecoderFactoryError.unsupportedFamily(family.id)
         }

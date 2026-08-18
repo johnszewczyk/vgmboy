@@ -4,11 +4,15 @@ public struct DecoderFamily: Sendable, Codable {
     public var id: String
     public var supportsLongPlay: Bool
     public var supportsTempo: Bool
+    /// Whether the decoder reaches a natural end (USF loops forever, so it
+    /// always needs a capped window; everything else ends on its own).
+    public var hasNaturalEnding: Bool
 
-    public init(id: String, supportsLongPlay: Bool, supportsTempo: Bool) {
+    public init(id: String, supportsLongPlay: Bool, supportsTempo: Bool, hasNaturalEnding: Bool = true) {
         self.id = id
         self.supportsLongPlay = supportsLongPlay
         self.supportsTempo = supportsTempo
+        self.hasNaturalEnding = hasNaturalEnding
     }
 }
 
@@ -31,6 +35,13 @@ public enum FormatRegistry {
         supportsTempo: false
     )
 
+    public static let lazyusfFamily = DecoderFamily(
+        id: "lazyusf",
+        supportsLongPlay: true,
+        supportsTempo: false,
+        hasNaturalEnding: false
+    )
+
     public static let libgmeExtensions: Set<String> = [
         "ay", "gbs", "hes", "kss", "nsf", "nsfe", "sap", "spc"
     ]
@@ -46,6 +57,10 @@ public enum FormatRegistry {
         "vag", "xa"
     ]
 
+    public static let lazyusfExtensions: Set<String> = [
+        "usf", "miniusf"
+    ]
+
     public static func family(for path: String) -> DecoderFamily? {
         let ext = (path as NSString).pathExtension.lowercased()
         if libgmeExtensions.contains(ext) {
@@ -56,6 +71,9 @@ public enum FormatRegistry {
         }
         if vgmstreamExtensions.contains(ext) {
             return vgmstreamFamily
+        }
+        if lazyusfExtensions.contains(ext) {
+            return lazyusfFamily
         }
         return nil
     }

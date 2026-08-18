@@ -133,7 +133,8 @@ final class PlayerViewModel {
             metadata: metadata,
             longPlayEnabled: longPlayEnabled,
             manualSeconds: manualSeconds,
-            fadeSeconds: fadeSeconds
+            fadeSeconds: fadeSeconds,
+            hasNaturalEnding: family?.hasNaturalEnding ?? true
         )
         do {
             let loaded = try session.load(path: filePath, trackIndex: selectedTrack, plan: plan, tempo: tempo)
