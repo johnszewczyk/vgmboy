@@ -69,11 +69,10 @@ private struct PlaybackPage: View {
         VStack(alignment: .leading, spacing: 16) {
             PanelCard("Now Playing") {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(model.currentSong?.song.isEmpty == false ? model.currentSong!.song : "No file open")
+                    Text(model.filePath == nil ? "No file open" : URL(fileURLWithPath: model.filePath!).lastPathComponent)
                         .font(.title3.weight(.semibold)).foregroundStyle(.white).lineLimit(1)
-                    Text(model.currentSong?.game.isEmpty == false ? model.currentSong!.game : model.filePath ?? "Choose an audio file to start.")
+                    Text(model.filePath ?? "Choose an audio file to start.")
                         .foregroundStyle(.secondary).lineLimit(1)
-                    if !model.systemName.isEmpty { Text(model.systemName).font(.caption).foregroundStyle(.secondary) }
                 }
                 HStack(spacing: 12) {
                     Button(model.isPlaying ? "Pause" : "Play", systemImage: model.isPlaying ? "pause.fill" : "play.fill", action: model.togglePlay)
@@ -110,14 +109,7 @@ private struct PlaybackPage: View {
             .disabled(model.filePath == nil)
 
             PanelCard("Track") {
-                if model.trackCount > 1 {
-                    Picker("Subsong", selection: $model.selectedTrack) {
-                        ForEach(0..<model.trackCount, id: \.self) { index in Text(trackLabel(index)).tag(index) }
-                    }
-                    .onChange(of: model.selectedTrack) { _, index in model.selectTrack(index) }
-                } else {
-                    Text(model.filePath == nil ? "No file open." : "This file has one track.").foregroundStyle(.secondary)
-                }
+                Text(model.filePath == nil ? "No file open." : "The frontend catalog owns subtrack labels and selection.").foregroundStyle(.secondary)
             }
 
             PanelCard("Tempo") {
@@ -137,12 +129,6 @@ private struct PlaybackPage: View {
     }
 
     private var family: DecoderFamily? { model.filePath.flatMap(FormatRegistry.family) }
-
-    private func trackLabel(_ index: Int) -> String {
-        guard index < model.tracks.count else { return "Track \(index + 1)" }
-        let song = model.tracks[index].song
-        return song.isEmpty ? "Track \(index + 1)" : "\(index + 1). \(song)"
-    }
 
     private func time(_ seconds: Double) -> String {
         guard seconds.isFinite, seconds >= 0 else { return "0:00" }
@@ -210,6 +196,7 @@ private struct DiagnosticsPage: View {
 private struct CorePage: View {
     private let families: [DecoderFamily] = [
         FormatRegistry.libgmeFamily, FormatRegistry.sidplayfpFamily, FormatRegistry.libvgmFamily,
+        FormatRegistry.openMPTFamily,
         FormatRegistry.highlyCompleteFamily, FormatRegistry.twoSFFamily, FormatRegistry.vgmstreamFamily,
         FormatRegistry.lazyusfFamily, FormatRegistry.playpsfFamily
     ]

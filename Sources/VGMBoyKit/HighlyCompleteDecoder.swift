@@ -148,23 +148,6 @@ final class HighlyCompleteDecoder: AudioDecoder, @unchecked Sendable {
         return Self.metadata(from: raw)
     }
 
-    static func inspect(path: String) throws -> TrackInspection {
-        var raw = highlycomplete_metadata_t()
-        defer { highlycomplete_metadata_clear(&raw) }
-        var trackCount: Int32 = 0
-        var error: UnsafeMutablePointer<CChar>?
-        let status = HighlyCompleteBridgeGate.withLock {
-            path.withCString { highlycomplete_inspect_file($0, &raw, &trackCount, &error) }
-        }
-        try throwIfFailed(status, error: error)
-        let metadata = Self.metadata(from: raw)
-        return TrackInspection(
-            system: metadata.system.isEmpty ? "Game Boy Advance" : metadata.system,
-            trackCount: max(1, Int(trackCount)),
-            tracks: [metadata]
-        )
-    }
-
     private static func metadata(from raw: highlycomplete_metadata_t) -> TrackMetadata {
         let playMs = Int(raw.play_length_ms)
         return TrackMetadata(

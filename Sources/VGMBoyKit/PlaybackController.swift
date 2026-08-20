@@ -77,11 +77,6 @@ public final class PlaybackController: @unchecked Sendable {
             throw PlaybackControlError.invalidPayload("Unsupported control API version \(request.version).")
         }
         switch request.command {
-        case .inspect:
-            guard let path = request.payload.path, !path.isEmpty else {
-                throw PlaybackControlError.invalidPayload("Inspect requires a path.")
-            }
-            return PlaybackControlEvent(requestID: request.requestID, kind: .response, inspection: try AudioInspector.inspect(path: path))
         case .load:
             try load(request.payload)
         case .play:
@@ -142,12 +137,10 @@ public final class PlaybackController: @unchecked Sendable {
         if payload.playbackMode != nil || payload.playMilliseconds != nil || payload.fadeMilliseconds != nil {
             try configurePlaybackMode(payload, reloadCurrent: false)
         }
-        let inspection = try AudioInspector.inspect(path: path)
-        guard inspection.tracks.indices.contains(trackIndex),
-              let family = FormatRegistry.family(for: path) else {
-            throw PlaybackControlError.invalidPayload("Track index is not available for this file.")
+        guard trackIndex >= 0, let family = FormatRegistry.family(for: path) else {
+            throw PlaybackControlError.invalidPayload("Track index must be non-negative and the file format must be supported.")
         }
-        let plan = makePlan(family: family, metadata: inspection.tracks[trackIndex])
+        let plan = makePlan(family: family)
         _ = try session.load(path: path, trackIndex: trackIndex, plan: plan, tempo: tempo)
         lock.lock(); loaded = LoadedTrack(path: path, trackIndex: trackIndex, tempo: tempo); lock.unlock()
     }
@@ -171,28 +164,30 @@ public final class PlaybackController: @unchecked Sendable {
         if previousStatus.isPlaying { try session.play() }
     }
 
-    private func makePlan(family: DecoderFamily, metadata: TrackMetadata) -> PlaybackPlan {
+    private func makePlan(family: DecoderFamily) -> PlaybackPlan {
         lock.lock()
         let mode = self.mode
         let play = explicitPlayMilliseconds ?? 150_000
-        let fade = explicitFadeMilliseconds ?? metadata.fadeMs
+        let fade = explicitFadeMilliseconds ?? 6_000
         lock.unlock()
         switch mode {
         case .fileDefault:
-            return TimingPolicy.plan(
-                supportsLongPlay: family.supportsLongPlay, metadata: metadata,
-                longPlayEnabled: false, manualSeconds: play / 1_000,
-                fadeSeconds: max(0, fade / 1_000), hasNaturalEnding: family.hasNaturalEnding
+            return PlaybackPlan(
+                preFadeSeconds: max(1, play / 1_000),
+                fadeSeconds: max(0, fade / 1_000),
+                isLongPlay: false,
+                usesNativeEnding: family.hasNaturalEnding
             )
         case .longPlay:
-            return TimingPolicy.plan(
-                supportsLongPlay: family.supportsLongPlay, metadata: metadata,
-                longPlayEnabled: true, manualSeconds: max(1, play / 1_000),
-                fadeSeconds: max(0, fade / 1_000), hasNaturalEnding: family.hasNaturalEnding
-            )
+            guard family.supportsLongPlay else { return makeFileDefaultPlan(play: play, fade: fade, family: family) }
+            return PlaybackPlan(preFadeSeconds: max(1, play / 1_000), fadeSeconds: max(0, fade / 1_000), isLongPlay: true, usesNativeEnding: false)
         case .timed:
             return PlaybackPlan(preFadeSeconds: max(1, play / 1_000), fadeSeconds: max(0, fade / 1_000), isLongPlay: false, usesNativeEnding: false)
         }
+    }
+
+    private func makeFileDefaultPlan(play: Int, fade: Int, family: DecoderFamily) -> PlaybackPlan {
+        PlaybackPlan(preFadeSeconds: max(1, play / 1_000), fadeSeconds: max(0, fade / 1_000), isLongPlay: false, usesNativeEnding: family.hasNaturalEnding)
     }
 
     private func emit(_ event: PlaybackControlEvent) {

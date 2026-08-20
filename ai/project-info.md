@@ -14,9 +14,8 @@ database-free: it decodes files and plays them.
 
 - `Sources/VGMBoyKit` — the audio core: `FormatRegistry` (family/extensions/capabilities),
   `DecoderFactory` + `AudioDecoder` protocol, `TimingPolicy`/`PlaybackPlan`, `PCMRingBuffer`,
-  `AudioOutput` (AVAudioEngine + AVAudioSourceNode), `PlaybackSession` (transport home),
-  `AudioInspector`.
-- `Sources/vgmboy` — the command-line core: `inspect` (JSON) and `play`.
+  `AudioOutput` (AVAudioEngine + AVAudioSourceNode), and `PlaybackSession` (transport home).
+- `Sources/vgmboy` — the command-line playback harness: `play`.
 - `PlaybackControl v1` — versioned in-process control and event API used by CocoaSpice, the CLI,
   and the test GUI over the same playback session shape.
 - `Sources/VGMBoyApp` — native test GUI, organized as CocoaSpice-style Playback, Audio,

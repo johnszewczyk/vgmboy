@@ -6,7 +6,6 @@ public enum PlaybackControlProtocol {
 }
 
 public enum PlaybackControlCommand: String, Codable, Sendable {
-    case inspect
     case load
     case play
     case pause
@@ -31,7 +30,7 @@ public struct PlaybackControlSurface: Sendable {
 
     public func supports(_ command: PlaybackControlCommand) -> Bool {
         switch command {
-        case .inspect, .load, .play, .pause, .stop, .seek, .setTempo,
+        case .load, .play, .pause, .stop, .seek, .setTempo,
              .setPlaybackMode, .setEqualizer, .setOutputVolume, .setMonoEnabled,
              .status, .subscribe:
             true
@@ -152,21 +151,18 @@ public struct PlaybackControlEvent: Codable, Sendable, Equatable {
     public var requestID: String?
     public var kind: PlaybackControlEventKind
     public var status: PlaybackStatus?
-    public var inspection: TrackInspection?
     public var message: String?
 
     public init(
         requestID: String? = nil,
         kind: PlaybackControlEventKind,
         status: PlaybackStatus? = nil,
-        inspection: TrackInspection? = nil,
         message: String? = nil
     ) {
         version = PlaybackControlProtocol.version
         self.requestID = requestID
         self.kind = kind
         self.status = status
-        self.inspection = inspection
         self.message = message
     }
 }

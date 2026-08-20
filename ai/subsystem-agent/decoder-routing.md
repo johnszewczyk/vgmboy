@@ -9,9 +9,9 @@ Extension-based routing of files to the correct upstream decoder core, and the u
 
 `FormatRegistry` maps a path extension to a `DecoderFamily` (`id`, `supportsLongPlay`,
 `supportsTempo`, `hasNaturalEnding`). `DecoderFactory.make` builds the matching decoder through the
-`AudioDecoder` protocol. `AudioInspector` routes GSF/miniGSF through the bridge's metadata-only
-inspection entry point, without booting mGBA. Extensions are deliberately exclusive to one family; `wav` is not
-registered because vgmstream's Nintendo DS SWAV content sniffing is not implemented here.
+internal `AudioDecoder` protocol. Decoder headers are read only inside a live playback session for
+subtrack validation and timing; the core does not expose inspection or catalog metadata. Extensions
+are deliberately exclusive to one family.
 
 ## Invariants
 

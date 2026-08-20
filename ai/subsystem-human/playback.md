@@ -7,11 +7,6 @@ Diagnostics, and Core pages exercise the reusable control surface without becomi
 The Core page is informational: VGMBoyKit is embedded into each frontend at build time. There is no
 runtime core executable to browse for or launch.
 
-## Inspect
-
-`vgmboy-cli inspect <path>` prints the detected format family, system name, track count, and
-per-track timing (length, intro, loop, fade) as JSON.
-
 ## Play
 
 `vgmboy-cli play <path>` plays a file through the core's own audio output and reports the system,

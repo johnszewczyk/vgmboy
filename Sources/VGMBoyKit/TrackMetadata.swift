@@ -1,18 +1,18 @@
 import Foundation
 
-public struct TrackMetadata: Sendable, Codable, Equatable {
-    public var index: Int
-    public var song: String
-    public var game: String
-    public var author: String
-    public var system: String
-    public var lengthMs: Int
-    public var introMs: Int
-    public var loopMs: Int
-    public var playMs: Int
-    public var fadeMs: Int
+struct TrackMetadata: Sendable, Codable, Equatable {
+    var index: Int
+    var song: String
+    var game: String
+    var author: String
+    var system: String
+    var lengthMs: Int
+    var introMs: Int
+    var loopMs: Int
+    var playMs: Int
+    var fadeMs: Int
 
-    public init(
+    init(
         index: Int,
         song: String,
         game: String,
@@ -36,13 +36,13 @@ public struct TrackMetadata: Sendable, Codable, Equatable {
         self.fadeMs = fadeMs
     }
 
-    public var hasTiming: Bool {
+    var hasTiming: Bool {
         naturalPlayMs > 0
     }
 
     /// Best-known natural play length: the tagged play length, else
     /// intro + one loop (or the loop alone when no intro is tagged).
-    public var naturalPlayMs: Int {
+    var naturalPlayMs: Int {
         if playMs > 0 {
             return playMs
         }

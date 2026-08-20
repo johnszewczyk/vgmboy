@@ -15,7 +15,7 @@ rows, and macOS Now Playing registration. The CLI is one client of this same bou
 
 - Typed control values declare `version: 1`; they are in-process API values, not socket or JSONL
   messages.
-- `PlaybackController` executes `inspect`, `load`, `play`, `pause`, `stop`, `seek`, timing/tempo/EQ,
+- `PlaybackController` executes `load`, `play`, `pause`, `stop`, `seek`, timing/tempo/EQ,
   volume, and mono controls. `PlaybackControlSurface` advertises those embedded capabilities so a
   frontend can bind an Options panel without probing private core objects. The core is not located
   or launched by filesystem path.
@@ -26,8 +26,8 @@ rows, and macOS Now Playing registration. The CLI is one client of this same bou
   250, 500, 1k, 2k, 4k, 8k, and 16k Hz, each constrained to -12...+12 dB. It lives in VGMBoy's
   output graph, so every decoder sees identical EQ behavior. Its availability must be smoke-tested
   on an audio-capable macOS host.
-- Playback-time inspection is returned as transient metadata. VGMBoy never writes it to a
-  frontend playlist or MediaScanner catalog.
+- Decoder header facts stay internal to session setup for subtrack validation and timing. VGMBoy
+  never exposes, writes, or looks up frontend playlist or MediaScanner catalog metadata.
 - Events distinguish responses, current status, natural end, and errors. A frontend makes the
   next queue decision after an `ended` event.
 - A frontend links VGMBoyKit as its sole playback implementation. Its former bridge targets and

@@ -40,26 +40,17 @@ public struct PlaybackStatus: Sendable, Codable, Equatable {
     public var isPlaying: Bool
     public var elapsedSeconds: Double
     public var reachedEnd: Bool
-    public var system: String
-    public var trackIndex: Int
-    public var trackCount: Int
     public var diagnostics: PlaybackDiagnostics
 
     public init(
         isPlaying: Bool,
         elapsedSeconds: Double,
         reachedEnd: Bool,
-        system: String,
-        trackIndex: Int,
-        trackCount: Int,
         diagnostics: PlaybackDiagnostics = .init()
     ) {
         self.isPlaying = isPlaying
         self.elapsedSeconds = elapsedSeconds
         self.reachedEnd = reachedEnd
-        self.system = system
-        self.trackIndex = trackIndex
-        self.trackCount = trackCount
         self.diagnostics = diagnostics
     }
 }
@@ -76,7 +67,7 @@ public enum PlaybackSessionError: LocalizedError {
 /// device, and serializes all control on one queue. Position is
 /// decoder-authoritative (absolute decoded frames), so seeks and long-play
 /// reconfiguration never lose the timeline.
-public final class PlaybackSession: @unchecked Sendable {
+final class PlaybackSession: @unchecked Sendable {
     private let queue = DispatchQueue(label: "VGMBoy.playback-session", qos: .userInitiated)
     private let sampleRate = 44_100
     private let chunkFrameCount = 4096
@@ -109,7 +100,7 @@ public final class PlaybackSession: @unchecked Sendable {
         trackIndex: Int,
         plan: PlaybackPlan,
         tempo: Double
-    ) throws -> TrackMetadata {
+    ) throws {
         try queue.sync {
             releaseCurrent()
             generation += 1
@@ -154,7 +145,6 @@ public final class PlaybackSession: @unchecked Sendable {
             output.ringBuffer.resetDiagnostics()
             try prime(to: output.primeFrameCount)
             publishStatus()
-            return metadata
         }
     }
 
@@ -259,9 +249,6 @@ public final class PlaybackSession: @unchecked Sendable {
             isPlaying: output.isRunning,
             elapsedSeconds: elapsed,
             reachedEnd: reachedEnd,
-            system: decoder?.systemName ?? "",
-            trackIndex: currentTrackIndex,
-            trackCount: decoder?.trackCount ?? 0,
             diagnostics: diagnostics
         )
     }

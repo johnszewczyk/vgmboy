@@ -6,11 +6,7 @@ import VGMBoyKit
 @Observable
 final class PlayerViewModel {
     var filePath: String?
-    var systemName = ""
-    var trackCount = 0
-    var tracks: [TrackMetadata] = []
     var selectedTrack = 0
-    var currentSong: TrackMetadata?
 
     var isPlaying = false
     var reachedEnd = false
@@ -25,18 +21,12 @@ final class PlayerViewModel {
     var equalizerEnabled = true
     var equalizerBandGains = Array(repeating: Float.zero, count: EqualizerConfiguration.bandCount)
 
-    private let session = PlaybackSession()
+    private let controller = PlaybackController()
 
     var displayDuration: Double {
         guard filePath != nil else { return 0 }
         if longPlayEnabled, let family = currentFamily, family.supportsLongPlay {
             return Double(manualSeconds + fadeSeconds)
-        }
-        if let song = currentSong {
-            let play = Double(song.playMs > 0 ? song.playMs : 0) / 1000.0
-            let introLoop = Double(max(song.introMs + song.loopMs, song.loopMs)) / 1000.0
-            let base = max(play, introLoop)
-            return base > 0 ? base + Double(fadeSeconds) : 150 + Double(fadeSeconds)
         }
         return 150 + Double(fadeSeconds)
     }
@@ -46,14 +36,10 @@ final class PlayerViewModel {
     }
 
     init() {
-        session.setStatusHandler { [weak self] status in
+        _ = controller.subscribe { [weak self] event in
+            guard let status = event.status else { return }
             Task { @MainActor in
                 self?.apply(status)
-            }
-        }
-        session.setCompletionHandler { [weak self] in
-            Task { @MainActor in
-                self?.isPlaying = false
             }
         }
         applyEqualizer()
@@ -73,22 +59,14 @@ final class PlayerViewModel {
             errorMessage = "Unsupported format: \(path)"
             return
         }
-        do {
-            let inspection = try AudioInspector.inspect(path: path)
-            filePath = path
-            systemName = inspection.system
-            trackCount = inspection.trackCount
-            tracks = inspection.tracks
-            selectedTrack = 0
-            errorMessage = nil
-            loadSelectedTrack()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        filePath = path
+        selectedTrack = 0
+        errorMessage = nil
+        loadSelectedTrack()
     }
 
     func selectTrack(_ index: Int) {
-        guard index != selectedTrack else { return }
+        guard index >= 0, index != selectedTrack else { return }
         selectedTrack = index
         loadSelectedTrack()
     }
@@ -96,11 +74,11 @@ final class PlayerViewModel {
     func togglePlay() {
         do {
             if isPlaying {
-                session.pause()
-                isPlaying = false
+                apply(controller.perform(.init(command: .pause)).status)
             } else {
-                try session.play()
-                isPlaying = true
+                let event = controller.perform(.init(command: .play))
+                if event.kind == .error { throw PlayerControlError.rejected(event.message) }
+                apply(event.status)
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -108,15 +86,14 @@ final class PlayerViewModel {
     }
 
     func stop() {
-        session.stop()
-        isPlaying = false
-        elapsedSeconds = 0
-        reachedEnd = false
+        apply(controller.perform(.init(command: .stop)).status)
     }
 
     func seek(to seconds: Double) {
         do {
-            try session.seek(to: seconds)
+            let event = controller.perform(.init(command: .seek, payload: .init(positionMilliseconds: Int(max(0, seconds) * 1_000))))
+            if event.kind == .error { throw PlayerControlError.rejected(event.message) }
+            apply(event.status)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -149,32 +126,28 @@ final class PlayerViewModel {
 
     private func loadSelectedTrack(resumeAt seconds: Double = 0) {
         guard let filePath else { return }
-        let metadata = selectedTrack < tracks.count ? tracks[selectedTrack] : nil
-        let family = currentFamily
-        let plan = TimingPolicy.plan(
-            supportsLongPlay: family?.supportsLongPlay ?? false,
-            metadata: metadata,
-            longPlayEnabled: longPlayEnabled,
-            manualSeconds: manualSeconds,
-            fadeSeconds: fadeSeconds,
-            hasNaturalEnding: family?.hasNaturalEnding ?? true
-        )
         do {
-            let loaded = try session.load(path: filePath, trackIndex: selectedTrack, plan: plan, tempo: tempo)
-            currentSong = loaded
+            let mode: PlaybackMode = longPlayEnabled && currentFamily?.supportsLongPlay == true ? .longPlay : .fileDefault
+            let loaded = controller.perform(.init(command: .load, payload: .init(
+                path: filePath, trackIndex: selectedTrack, tempo: tempo, playbackMode: mode,
+                playMilliseconds: manualSeconds * 1_000, fadeMilliseconds: fadeSeconds * 1_000
+            )))
+            if loaded.kind == .error { throw PlayerControlError.rejected(loaded.message) }
             if seconds > 0 {
-                try session.seek(to: seconds)
+                let seeked = controller.perform(.init(command: .seek, payload: .init(positionMilliseconds: Int(seconds * 1_000))))
+                if seeked.kind == .error { throw PlayerControlError.rejected(seeked.message) }
             }
-            try session.play()
-            isPlaying = true
-            reachedEnd = false
+            let started = controller.perform(.init(command: .play))
+            if started.kind == .error { throw PlayerControlError.rejected(started.message) }
+            apply(started.status)
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    private func apply(_ status: PlaybackStatus) {
+    private func apply(_ status: PlaybackStatus?) {
+        guard let status else { return }
         isPlaying = status.isPlaying
         elapsedSeconds = status.elapsedSeconds
         reachedEnd = status.reachedEnd
@@ -183,9 +156,20 @@ final class PlayerViewModel {
 
     private func applyEqualizer() {
         do {
-            try session.setEqualizer(.init(enabled: equalizerEnabled, gainsDecibels: equalizerBandGains))
+            let event = controller.perform(.init(command: .setEqualizer, payload: .init(equalizer: .init(enabled: equalizerEnabled, gainsDecibels: equalizerBandGains))))
+            if event.kind == .error { throw PlayerControlError.rejected(event.message) }
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private enum PlayerControlError: LocalizedError {
+    case rejected(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case .rejected(let message): return "VGMBoy rejected the control: \(message ?? "unknown error")"
         }
     }
 }

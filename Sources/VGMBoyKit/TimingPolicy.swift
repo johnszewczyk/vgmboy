@@ -1,22 +1,22 @@
 import Foundation
 
-public struct PlaybackPlan: Sendable {
-    public var preFadeSeconds: Int
-    public var fadeSeconds: Int
-    public var isLongPlay: Bool
-    public var usesNativeEnding: Bool
+struct PlaybackPlan: Sendable {
+    var preFadeSeconds: Int
+    var fadeSeconds: Int
+    var isLongPlay: Bool
+    var usesNativeEnding: Bool
 
-    public init(preFadeSeconds: Int, fadeSeconds: Int, isLongPlay: Bool, usesNativeEnding: Bool) {
+    init(preFadeSeconds: Int, fadeSeconds: Int, isLongPlay: Bool, usesNativeEnding: Bool) {
         self.preFadeSeconds = preFadeSeconds
         self.fadeSeconds = fadeSeconds
         self.isLongPlay = isLongPlay
         self.usesNativeEnding = usesNativeEnding
     }
 
-    public var totalSeconds: Int { preFadeSeconds + fadeSeconds }
+    var totalSeconds: Int { preFadeSeconds + fadeSeconds }
 }
 
-public enum TimingPolicy {
+enum TimingPolicy {
     /// Builds a decode-window plan from metadata and the requested mode.
     ///
     /// Long play caps the stream at (manual + fade) seconds in the shell;
@@ -24,7 +24,7 @@ public enum TimingPolicy {
     /// When no timing is known, a 150-second window with a native ending keeps
     /// looping formats from running forever. Families without a natural ending
     /// (USF) always get a capped window so they never run indefinitely.
-    public static func plan(
+    static func plan(
         supportsLongPlay: Bool,
         metadata: TrackMetadata?,
         longPlayEnabled: Bool,

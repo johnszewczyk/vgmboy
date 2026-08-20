@@ -8,7 +8,7 @@ extracted to `/tmp/vgmboy-test/` (not committed); see each section for the file 
 
 - Core owns the macOS audio device (AVAudioEngine + AVAudioSourceNode) and transport
   (`PlaybackSession`), with decoder-authoritative position, seek, long play, tempo, and fade.
-- Command line `vgmboy-cli inspect|play` and a minimal SwiftUI GUI (`VGMBoy`) are two thin skins.
+- Command line `vgmboy-cli play` and a minimal SwiftUI GUI (`VGMBoy`) are two thin skins.
 - Five decoder families, all end-to-end verified:
   - `libgme` — NSF (Deathbots, 22 tracks)
   - `libvgm` — VGZ (Pit Fighter)
@@ -26,7 +26,7 @@ extracted to `/tmp/vgmboy-test/` (not committed); see each section for the file 
 ## Known constraints / gotchas
 
 - **Case-insensitive filesystem collision:** the CLI product is `vgmboy-cli`, not `vgmboy`. A
-  `vgmboy` (CLI) vs `VGMBoy` (app) name collision silently overwrote one binary (the "inspect"
+  `vgmboy` (CLI) vs `VGMBoy` (app) name collision silently overwrote one binary (the command-line
   hang). Don't rename back.
 - **Upstream libs are built by CocoaSpice**, not re-vendored here. `build-app.sh` runs CocoaSpice's
   `scripts/build-*.sh` only when a static lib is missing. VGMBoy depends on CocoaSpice being

@@ -12,7 +12,8 @@ contract and serializes every bridge call through its dedicated gate.
 
 ## Invariants
 
-- Metadata inspection uses `highlycomplete_inspect_file` and never boots an mGBA core.
+- Decoder facts are read only after playback session construction; they are never surfaced as a
+  catalog or inspection API.
 - miniGSF requires its sibling `.gsflib` dependencies beside the selected file.
 - After mGBA `loadROM`, the ROM `VFile` belongs to mGBA; bridge teardown never closes it again.
 - mGBA's live native rate is resampled into the fixed VGMBoy output rate. Played frames and seek

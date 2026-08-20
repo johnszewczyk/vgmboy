@@ -113,18 +113,6 @@ final class TwoSFDecoder: AudioDecoder, @unchecked Sendable {
         return (left, right)
     }
 
-    static func inspect(path: String) throws -> TrackInspection {
-        var raw = twosf_metadata_t()
-        defer { twosf_metadata_clear(&raw) }
-        var error: UnsafeMutablePointer<CChar>?
-        let status = TwoSFBridgeGate.withLock {
-            path.withCString { twosf_inspect_metadata($0, &raw, &error) }
-        }
-        try throwIfFailed(status, error: error)
-        let metadata = Self.metadata(from: raw)
-        return TrackInspection(system: metadata.system, trackCount: 1, tracks: [metadata])
-    }
-
     private func configure(playMs: Int, fadeMs: Int) {
         guard let handle else { return }
         var error: UnsafeMutablePointer<CChar>?
