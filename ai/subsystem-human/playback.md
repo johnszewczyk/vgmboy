@@ -1,7 +1,11 @@
 # Playback
 
 VGMBoy's command line (`vgmboy-cli`) and test GUI (`VGMBoy`) play game-music files through one audio
-core.
+core. The native test GUI is organized like CocoaSpice's Options window: Playback, Audio,
+Diagnostics, and Core pages exercise the reusable control surface without becoming a playlist app.
+
+The Core page is informational: VGMBoyKit is embedded into each frontend at build time. There is no
+runtime core executable to browse for or launch.
 
 ## Inspect
 
@@ -22,6 +26,8 @@ title, and track window. Supported options:
 
 - Chip music (libgme): `.ay`, `.gbs`, `.hes`, `.kss`, `.nsf`, `.nsfe`, `.sap`, `.spc`
 - Sega/console logs (libvgm): `.vgm`, `.vgz`, `.gym`, `.s98`, `.dro`
+- Standard audio (AVFoundation): `.aac`, `.aif`, `.aiff`, `.caf`, `.flac`, `.m4a`, `.mp3`, `.wav`,
+  and `.wave`
 - Streamed game audio (vgmstream): `.adx`, `.xa`, `.at3`, `.fsb`, `.vag`, `.aifc`, `.ogg`, and the
   other registered stream/bank extensions
 - Nintendo 64 (lazyusf): `.usf`, `.miniusf` — needs its companion `.usflib` files beside it

@@ -29,6 +29,12 @@ public enum FormatRegistry {
         supportsTempo: true
     )
 
+    public static let standardAudioFamily = DecoderFamily(
+        id: "standardaudio",
+        supportsLongPlay: false,
+        supportsTempo: false
+    )
+
     public static let highlyCompleteFamily = DecoderFamily(
         id: "highlycomplete",
         supportsLongPlay: true,
@@ -60,12 +66,23 @@ public enum FormatRegistry {
         supportsTempo: false
     )
 
+    public static let sidplayfpFamily = DecoderFamily(
+        id: "sidplayfp",
+        supportsLongPlay: true,
+        supportsTempo: false,
+        hasNaturalEnding: false
+    )
+
     public static let libgmeExtensions: Set<String> = [
         "ay", "gbs", "hes", "kss", "nsf", "nsfe", "sap", "spc"
     ]
 
     public static let libvgmExtensions: Set<String> = [
         "vgm", "vgz", "gym", "s98", "dro"
+    ]
+
+    public static let standardAudioExtensions: Set<String> = [
+        "aac", "aif", "aiff", "caf", "flac", "m4a", "mp3", "wav", "wave"
     ]
 
     public static let highlyCompleteExtensions: Set<String> = [
@@ -91,13 +108,21 @@ public enum FormatRegistry {
         "psf", "minipsf", "psf2", "minipsf2"
     ]
 
+    public static let sidplayfpExtensions: Set<String> = ["sid"]
+
     public static func family(for path: String) -> DecoderFamily? {
         let ext = (path as NSString).pathExtension.lowercased()
         if libgmeExtensions.contains(ext) {
             return libgmeFamily
         }
+        if sidplayfpExtensions.contains(ext) {
+            return sidplayfpFamily
+        }
         if libvgmExtensions.contains(ext) {
             return libvgmFamily
+        }
+        if standardAudioExtensions.contains(ext) {
+            return standardAudioFamily
         }
         if highlyCompleteExtensions.contains(ext) {
             return highlyCompleteFamily

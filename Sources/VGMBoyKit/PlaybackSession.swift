@@ -1,5 +1,41 @@
 import Foundation
 
+/// Device/output health only. It deliberately contains no decoder tags,
+/// catalog values, or queue policy; a frontend may present it for diagnosis.
+public struct PlaybackDiagnostics: Sendable, Codable, Equatable {
+    public var generation: Int
+    public var bufferedFrames: Int
+    public var capacityFrames: Int
+    public var framesRequested: Int64
+    public var framesSupplied: Int64
+    public var framesWritten: Int64
+    public var underrunCount: Int64
+    public var isOutputRunning: Bool
+    public var sampleRate: Int
+
+    public init(
+        generation: Int = 0,
+        bufferedFrames: Int = 0,
+        capacityFrames: Int = 0,
+        framesRequested: Int64 = 0,
+        framesSupplied: Int64 = 0,
+        framesWritten: Int64 = 0,
+        underrunCount: Int64 = 0,
+        isOutputRunning: Bool = false,
+        sampleRate: Int = 44_100
+    ) {
+        self.generation = generation
+        self.bufferedFrames = bufferedFrames
+        self.capacityFrames = capacityFrames
+        self.framesRequested = framesRequested
+        self.framesSupplied = framesSupplied
+        self.framesWritten = framesWritten
+        self.underrunCount = underrunCount
+        self.isOutputRunning = isOutputRunning
+        self.sampleRate = sampleRate
+    }
+}
+
 public struct PlaybackStatus: Sendable, Codable, Equatable {
     public var isPlaying: Bool
     public var elapsedSeconds: Double
@@ -7,6 +43,25 @@ public struct PlaybackStatus: Sendable, Codable, Equatable {
     public var system: String
     public var trackIndex: Int
     public var trackCount: Int
+    public var diagnostics: PlaybackDiagnostics
+
+    public init(
+        isPlaying: Bool,
+        elapsedSeconds: Double,
+        reachedEnd: Bool,
+        system: String,
+        trackIndex: Int,
+        trackCount: Int,
+        diagnostics: PlaybackDiagnostics = .init()
+    ) {
+        self.isPlaying = isPlaying
+        self.elapsedSeconds = elapsedSeconds
+        self.reachedEnd = reachedEnd
+        self.system = system
+        self.trackIndex = trackIndex
+        self.trackCount = trackCount
+        self.diagnostics = diagnostics
+    }
 }
 
 public enum PlaybackSessionError: LocalizedError {
@@ -96,6 +151,7 @@ public final class PlaybackSession: @unchecked Sendable {
             reachedEnd = false
             isLoaded = true
             output.ringBuffer.clear()
+            output.ringBuffer.resetDiagnostics()
             try prime(to: output.primeFrameCount)
             publishStatus()
             return metadata
@@ -168,6 +224,17 @@ public final class PlaybackSession: @unchecked Sendable {
         }
     }
 
+    public func setOutputVolume(_ volume: Float) throws {
+        guard volume.isFinite, (0...1).contains(volume) else {
+            throw PlaybackControlError.invalidPayload("Output volume must be finite and between 0 and 1.")
+        }
+        queue.sync { output.setVolume(volume) }
+    }
+
+    public func setMonoEnabled(_ enabled: Bool) {
+        queue.sync { output.setMonoEnabled(enabled) }
+    }
+
     public func stop() {
         queue.sync {
             stopRefillTimer()
@@ -186,13 +253,16 @@ public final class PlaybackSession: @unchecked Sendable {
 
     private func makeStatus() -> PlaybackStatus {
         let elapsed = decoder.map { Double($0.absolutePlayedFrames) / Double(sampleRate) } ?? 0
+        var diagnostics = output.diagnostics()
+        diagnostics.generation = generation
         return PlaybackStatus(
             isPlaying: output.isRunning,
             elapsedSeconds: elapsed,
             reachedEnd: reachedEnd,
             system: decoder?.systemName ?? "",
             trackIndex: currentTrackIndex,
-            trackCount: decoder?.trackCount ?? 0
+            trackCount: decoder?.trackCount ?? 0,
+            diagnostics: diagnostics
         )
     }
 

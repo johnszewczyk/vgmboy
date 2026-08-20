@@ -16,11 +16,14 @@ final class PlayerViewModel {
     var reachedEnd = false
     var elapsedSeconds = 0.0
     var errorMessage: String?
+    var diagnostics = PlaybackDiagnostics()
 
     var longPlayEnabled = false
     var manualSeconds = 60
     var fadeSeconds = 6
     var tempo = 1.0
+    var equalizerEnabled = true
+    var equalizerBandGains = Array(repeating: Float.zero, count: EqualizerConfiguration.bandCount)
 
     private let session = PlaybackSession()
 
@@ -53,6 +56,7 @@ final class PlayerViewModel {
                 self?.isPlaying = false
             }
         }
+        applyEqualizer()
     }
 
     func openDocument() {
@@ -124,6 +128,25 @@ final class PlayerViewModel {
         loadSelectedTrack(resumeAt: resumeAt)
     }
 
+    func setEqualizerEnabled(_ enabled: Bool) {
+        equalizerEnabled = enabled
+        applyEqualizer()
+    }
+
+    func setEqualizerBandGain(_ gain: Float, at index: Int) {
+        guard equalizerBandGains.indices.contains(index) else { return }
+        equalizerBandGains[index] = min(
+            EqualizerConfiguration.gainRange.upperBound,
+            max(EqualizerConfiguration.gainRange.lowerBound, gain)
+        )
+        applyEqualizer()
+    }
+
+    func resetEqualizer() {
+        equalizerBandGains = Array(repeating: 0, count: EqualizerConfiguration.bandCount)
+        applyEqualizer()
+    }
+
     private func loadSelectedTrack(resumeAt seconds: Double = 0) {
         guard let filePath else { return }
         let metadata = selectedTrack < tracks.count ? tracks[selectedTrack] : nil
@@ -155,5 +178,14 @@ final class PlayerViewModel {
         isPlaying = status.isPlaying
         elapsedSeconds = status.elapsedSeconds
         reachedEnd = status.reachedEnd
+        diagnostics = status.diagnostics
+    }
+
+    private func applyEqualizer() {
+        do {
+            try session.setEqualizer(.init(enabled: equalizerEnabled, gainsDecibels: equalizerBandGains))
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }

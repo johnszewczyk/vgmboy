@@ -4,7 +4,9 @@ import Foundation
 import PackageDescription
 
 // libvgm is vendored and built by CocoaSpice (one upstream copy for the app
-// family). VGMBoy links that build output rather than forking the library.
+// family). VGMBoy links that build output rather than forking the library;
+// ordinary audio stays in VGMBoyKit through AVFoundation, so it needs no
+// frontend-local decoder target.
 let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().path
 let cocoaspiceRoot = "\(packageRoot)/../CocoaSpice"
 let libVGMVendorDirectory = "\(cocoaspiceRoot)/vendor/libvgm"
@@ -164,8 +166,20 @@ let package = Package(
             ]
         ),
         .target(
+            name: "VGMBoyCSIDPlayFP",
+            path: "Sources/CSIDPlayFP",
+            publicHeadersPath: "include",
+            cxxSettings: [
+                .unsafeFlags(["-std=c++17", "-I/opt/homebrew/opt/libsidplayfp/include"])
+            ],
+            linkerSettings: [
+                .unsafeFlags(["-L/opt/homebrew/opt/libsidplayfp/lib"]),
+                .linkedLibrary("sidplayfp")
+            ]
+        ),
+        .target(
             name: "VGMBoyKit",
-            dependencies: ["VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF"],
+            dependencies: ["VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCSIDPlayFP"],
             linkerSettings: [
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("AudioToolbox")

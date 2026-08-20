@@ -32,6 +32,10 @@ public final class PlaybackController: @unchecked Sendable {
         }
     }
 
+    public var controlSurface: PlaybackControlSurface { PlaybackControlSurface() }
+
+    public func diagnostics() -> PlaybackDiagnostics { session.status().diagnostics }
+
     @discardableResult
     public func subscribe(_ handler: @escaping EventHandler) -> UUID {
         let token = UUID()
@@ -108,6 +112,16 @@ public final class PlaybackController: @unchecked Sendable {
             }
             try session.setEqualizer(equalizer)
             lock.lock(); self.equalizer = equalizer; lock.unlock()
+        case .setOutputVolume:
+            guard let volume = request.payload.outputVolume else {
+                throw PlaybackControlError.invalidPayload("set_output_volume requires a volume.")
+            }
+            try session.setOutputVolume(volume)
+        case .setMonoEnabled:
+            guard let enabled = request.payload.monoEnabled else {
+                throw PlaybackControlError.invalidPayload("set_mono_enabled requires a boolean.")
+            }
+            session.setMonoEnabled(enabled)
         case .status:
             break
         case .subscribe, .shutdown:

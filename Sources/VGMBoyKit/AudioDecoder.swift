@@ -47,8 +47,12 @@ enum DecoderFactory {
         switch family.id {
         case "libgme":
             return try GMEDecoder(path: path, sampleRate: sampleRate)
+        case "sidplayfp":
+            return try SIDDecoder(path: path, sampleRate: sampleRate)
         case "libvgm":
             return try VGMDecoder(path: path, sampleRate: sampleRate)
+        case "standardaudio":
+            return try StandardAudioDecoder(path: path, sampleRate: sampleRate)
         case "highlycomplete":
             return try HighlyCompleteDecoder(path: path, sampleRate: sampleRate)
         case "twosf":

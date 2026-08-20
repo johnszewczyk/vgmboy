@@ -7,7 +7,7 @@ The in-process, versioned control boundary between `VGMBoyKit` and its clients.
 ## Ownership
 
 VGMBoyKit is statically bundled into every frontend process and owns one decoded audio session,
-timing, equalizer, and transport state. A frontend owns
+timing, equalizer, app-volume/mono output state, and transport state. A frontend owns
 playlist membership, queue transitions, repeat-one/all/shuffle policy, durable settings, catalog
 rows, and macOS Now Playing registration. The CLI is one client of this same boundary.
 
@@ -15,7 +15,10 @@ rows, and macOS Now Playing registration. The CLI is one client of this same bou
 
 - Typed control values declare `version: 1`; they are in-process API values, not socket or JSONL
   messages.
-- `PlaybackController` executes `inspect`, `load`, `play`, `pause`, `stop`, `seek`, timing/tempo/EQ
+- `PlaybackController` executes `inspect`, `load`, `play`, `pause`, `stop`, `seek`, timing/tempo/EQ,
+  volume, and mono controls. `PlaybackControlSurface` advertises those embedded capabilities so a
+  frontend can bind an Options panel without probing private core objects. The core is not located
+  or launched by filesystem path.
   changes, and `status`; `subscribe` is its callback-registration API rather than a command, and
   process shutdown stays with the hosting app. There are deliberately no queue, next, previous,
   repeat, shuffle, catalog-write, or playlist-mutation commands.

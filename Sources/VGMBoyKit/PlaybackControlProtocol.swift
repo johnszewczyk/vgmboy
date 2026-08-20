@@ -15,9 +15,30 @@ public enum PlaybackControlCommand: String, Codable, Sendable {
     case setTempo = "set_tempo"
     case setPlaybackMode = "set_playback_mode"
     case setEqualizer = "set_equalizer"
+    case setOutputVolume = "set_output_volume"
+    case setMonoEnabled = "set_mono_enabled"
     case status
     case subscribe
     case shutdown
+}
+
+/// Capability query for an embedded frontend. It is intentionally local and
+/// typed: VGMBoyKit is linked into the host, never discovered as a daemon.
+public struct PlaybackControlSurface: Sendable {
+    public let version: Int = PlaybackControlProtocol.version
+
+    public init() {}
+
+    public func supports(_ command: PlaybackControlCommand) -> Bool {
+        switch command {
+        case .inspect, .load, .play, .pause, .stop, .seek, .setTempo,
+             .setPlaybackMode, .setEqualizer, .setOutputVolume, .setMonoEnabled,
+             .status, .subscribe:
+            true
+        case .shutdown:
+            false
+        }
+    }
 }
 
 public enum PlaybackMode: String, Codable, Sendable {
@@ -72,6 +93,8 @@ public struct PlaybackControlPayload: Codable, Sendable, Equatable {
     public var playMilliseconds: Int?
     public var fadeMilliseconds: Int?
     public var equalizer: EqualizerConfiguration?
+    public var outputVolume: Float?
+    public var monoEnabled: Bool?
 
     public init(
         path: String? = nil,
@@ -81,7 +104,9 @@ public struct PlaybackControlPayload: Codable, Sendable, Equatable {
         playbackMode: PlaybackMode? = nil,
         playMilliseconds: Int? = nil,
         fadeMilliseconds: Int? = nil,
-        equalizer: EqualizerConfiguration? = nil
+        equalizer: EqualizerConfiguration? = nil,
+        outputVolume: Float? = nil,
+        monoEnabled: Bool? = nil
     ) {
         self.path = path
         self.trackIndex = trackIndex
@@ -91,6 +116,8 @@ public struct PlaybackControlPayload: Codable, Sendable, Equatable {
         self.playMilliseconds = playMilliseconds
         self.fadeMilliseconds = fadeMilliseconds
         self.equalizer = equalizer
+        self.outputVolume = outputVolume
+        self.monoEnabled = monoEnabled
     }
 }
 

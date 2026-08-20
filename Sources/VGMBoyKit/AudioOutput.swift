@@ -1,9 +1,15 @@
 import AVFoundation
 import Foundation
+import Synchronization
 
 /// AVAudioEngine with a source node and a fixed ten-band equalizer. This is
 /// the transport home: VGMBoy owns the macOS audio device, while a frontend
 /// only supplies the requested EQ configuration.
+private final class OutputControls: @unchecked Sendable {
+    let volumeBits = Atomic<UInt32>(Float(1).bitPattern)
+    let monoEnabled = Atomic<Bool>(false)
+}
+
 final class AudioOutput: @unchecked Sendable {
     let sampleRate: Double
     let channels: AVAudioChannelCount
@@ -14,6 +20,8 @@ final class AudioOutput: @unchecked Sendable {
     private let equalizer = AVAudioUnitEQ(numberOfBands: EqualizerConfiguration.bandCount)
     private let format: AVAudioFormat
     private let engineLock = NSLock()
+    private let transportEnvelope = TransportEnvelope()
+    private let controls = OutputControls()
 
     init(sampleRate: Double = 44_100, channels: AVAudioChannelCount = 2, capacitySeconds: Double = 2.0) {
         self.sampleRate = sampleRate
@@ -22,6 +30,8 @@ final class AudioOutput: @unchecked Sendable {
         format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: channels)!
 
         let buffer = ringBuffer
+        let envelope = transportEnvelope
+        let controls = controls
         sourceNode = AVAudioSourceNode(format: format) { _, _, frameCount, ioData -> OSStatus in
             let abl = UnsafeMutableAudioBufferListPointer(ioData)
             guard abl.count >= 2 else { return noErr }
@@ -33,6 +43,21 @@ final class AudioOutput: @unchecked Sendable {
             let left = UnsafeMutableBufferPointer(start: leftBase, count: frames)
             let right = UnsafeMutableBufferPointer(start: rightBase, count: frames)
             _ = buffer.read(into: left, right)
+            let volume = Float(bitPattern: controls.volumeBits.load(ordering: .acquiring))
+            let mono = controls.monoEnabled.load(ordering: .acquiring)
+            for index in 0..<frames {
+                let gain = envelope.nextGain() * volume
+                let leftValue = left[index] * gain
+                let rightValue = right[index] * gain
+                if mono {
+                    let mixed = (leftValue + rightValue) * 0.5
+                    left[index] = mixed
+                    right[index] = mixed
+                } else {
+                    left[index] = leftValue
+                    right[index] = rightValue
+                }
+            }
             return noErr
         }
 
@@ -57,13 +82,38 @@ final class AudioOutput: @unchecked Sendable {
     func start() throws {
         engineLock.lock()
         defer { engineLock.unlock() }
+        guard !engine.isRunning else { return }
+        _ = transportEnvelope.beginPlayback(over: transportEnvelopeFrameCount)
         try engine.start()
     }
 
     func pause() {
         engineLock.lock()
+        let running = engine.isRunning
+        engineLock.unlock()
+        guard running else { return }
+        let ticket = transportEnvelope.fadeOut(over: transportEnvelopeFrameCount)
+        waitForTransportEnvelope(ticket)
+        engineLock.lock()
         defer { engineLock.unlock() }
         engine.pause()
+    }
+
+    func diagnostics() -> PlaybackDiagnostics {
+        let buffer = ringBuffer.diagnostics()
+        engineLock.lock()
+        let running = engine.isRunning
+        engineLock.unlock()
+        return PlaybackDiagnostics(
+            bufferedFrames: buffer.bufferedFrames,
+            capacityFrames: buffer.capacityFrames,
+            framesRequested: buffer.framesRequested,
+            framesSupplied: buffer.framesSupplied,
+            framesWritten: buffer.framesWritten,
+            underrunCount: buffer.underrunCount,
+            isOutputRunning: running,
+            sampleRate: Int(sampleRate)
+        )
     }
 
     func setEqualizer(_ configuration: EqualizerConfiguration) {
@@ -74,6 +124,14 @@ final class AudioOutput: @unchecked Sendable {
             band.gain = configuration.gainsDecibels[index]
         }
         equalizer.bypass = !configuration.enabled
+    }
+
+    func setVolume(_ volume: Float) {
+        controls.volumeBits.store(volume.bitPattern, ordering: .releasing)
+    }
+
+    func setMonoEnabled(_ enabled: Bool) {
+        controls.monoEnabled.store(enabled, ordering: .releasing)
     }
 
     private func configureEqualizerBands() {
@@ -87,5 +145,16 @@ final class AudioOutput: @unchecked Sendable {
             band.bypass = true
         }
         equalizer.bypass = true
+    }
+
+    private var transportEnvelopeFrameCount: Int {
+        max(1, Int((sampleRate * 0.010).rounded(.up)))
+    }
+
+    private func waitForTransportEnvelope(_ ticket: Int) {
+        let deadline = Date().addingTimeInterval(0.050)
+        while !transportEnvelope.isComplete(ticket), Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.001)
+        }
     }
 }

@@ -19,8 +19,9 @@ database-free: it decodes files and plays them.
 - `Sources/vgmboy` — the command-line core: `inspect` (JSON) and `play`.
 - `PlaybackControl v1` — versioned in-process control and event API used by CocoaSpice, the CLI,
   and the test GUI over the same playback session shape.
-- `Sources/VGMBoyApp` — minimal SwiftUI test GUI (File Open + transport + Long Play/tempo/fade),
-  borrowed from parent-app Options UI.
+- `Sources/VGMBoyApp` — native test GUI, organized as CocoaSpice-style Playback, Audio,
+  Diagnostics, and Core pages. It exercises transport, Long Play, tempo, the shared ten-band EQ,
+  and output diagnostics without owning a catalog or playlist.
 - Bridge targets over vendored upstream cores (built by CocoaSpice, not forked here):
   `VGMBoyCGameMusicEmu` (libgme), `VGMBoyCLibVGM`, `VGMBoyCHighlyComplete` (mGBA + PSFLib),
   `VGMBoyC2SF`, `VGMBoyCVGmstream`, `VGMBoyCLazyUSF`, `VGMBoyCPlayPSF`.
@@ -30,7 +31,9 @@ database-free: it decodes files and plays them.
 | Family | Extensions | Long play | Tempo | Natural ending |
 | --- | --- | --- | --- | --- |
 | `libgme` | ay gbs hes kss nsf nsfe sap spc | yes | yes | yes |
+| `sidplayfp` | sid | yes | no | no |
 | `libvgm` | vgm vgz gym s98 dro | yes | yes | yes |
+| `standardaudio` | aac aif aiff caf flac m4a mp3 wav wave | no | no | yes |
 | `highlycomplete` | gsf minigsf | yes | no | yes |
 | `twosf` | 2sf mini2sf | yes | no | yes |
 | `vgmstream` | aa3 adx ads aifc at3 aus bnk dvi fsb genh hd hbd iecs int mib msf mtaf ogg rws ss2 stream svag txtp vag xa | yes | no | yes |
@@ -47,6 +50,7 @@ session owns the fade DSP for them (`appliesFadeInternally == false`).
   [DocMan docs-agent/documentation-method.md](/Users/john/Downloads/Code/DocMan/docs-agent/documentation-method.md)
 - Engineering constraints: `ai/subsystem-agent/`
 - Playback-control ownership and API: `ai/subsystem-agent/playback-control-v1.md`
+- Device output, de-click envelope, and diagnostics: `ai/subsystem-agent/audio-output-transport.md`
 - User-facing behavior: `ai/subsystem-human/`
 - Add a decoder core: `FormatRegistry.family(for:)` + `DecoderFactory.make` + a new
   `Sources/VGMBoyKit/<X>Decoder.swift` conforming to `AudioDecoder`.

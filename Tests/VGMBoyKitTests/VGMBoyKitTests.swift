@@ -13,6 +13,22 @@ struct FormatRegistryTests {
         #expect(FormatRegistry.family(for: "/tmp/example.unknown") == nil)
     }
 
+    @Test("routes SID extensions to the libsidplayfp family")
+    func routesSIDPlayFP() {
+        for ext in FormatRegistry.sidplayfpExtensions {
+            #expect(FormatRegistry.family(for: "/tmp/example.\(ext)")?.id == "sidplayfp")
+        }
+        #expect(!FormatRegistry.sidplayfpFamily.supportsTempo)
+        #expect(!FormatRegistry.sidplayfpFamily.hasNaturalEnding)
+    }
+
+    @Test("routes ordinary audio extensions to the standard-audio family")
+    func routesStandardAudio() {
+        for ext in FormatRegistry.standardAudioExtensions {
+            #expect(FormatRegistry.family(for: "/tmp/example.\(ext)")?.id == "standardaudio")
+        }
+    }
+
     @Test("routes libvgm extensions to the libvgm family")
     func routesLibVGM() {
         for ext in FormatRegistry.libvgmExtensions {
@@ -163,6 +179,67 @@ struct SessionFadeTests {
     @Test("no fade window means full gain")
     func noFade() {
         #expect(PlaybackSession.fadeGain(position: 9_500, capFrames: 10_000, fadeFrames: 0) == 1.0)
+    }
+}
+
+@Suite("Realtime Transport")
+struct RealtimeTransportTests {
+    @Test("ring buffer preserves wrapped producer consumer order without a lock")
+    func ringBufferWraps() {
+        let buffer = PCMRingBuffer(capacityFrames: 4)
+        #expect(buffer.write(left: [1, 2, 3], right: [11, 12, 13]) == 3)
+        #expect(read(buffer, count: 2).left == [1, 2])
+        #expect(buffer.write(left: [4, 5, 6], right: [14, 15, 16]) == 3)
+        let output = read(buffer, count: 4)
+        #expect(output.left == [3, 4, 5, 6])
+        #expect(output.right == [13, 14, 15, 16])
+        let diagnostics = buffer.diagnostics()
+        #expect(diagnostics.bufferedFrames == 0)
+        #expect(diagnostics.framesRequested == 6)
+        #expect(diagnostics.framesSupplied == 6)
+        #expect(diagnostics.underrunCount == 0)
+    }
+
+    @Test("ring clear rejects stale PCM and reports silence as an underrun")
+    func ringBufferClearAndUnderrun() {
+        let buffer = PCMRingBuffer(capacityFrames: 4)
+        #expect(buffer.write(left: [1, 2], right: [3, 4]) == 2)
+        buffer.clear()
+        let output = read(buffer, count: 2)
+        #expect(output.supplied == 0)
+        #expect(output.left == [0, 0])
+        #expect(output.right == [0, 0])
+        #expect(buffer.diagnostics().underrunCount == 1)
+    }
+
+    @Test("transport envelope starts and ends at silence without a musical fade")
+    func transportEnvelopeRamps() {
+        let envelope = TransportEnvelope()
+        let start = envelope.beginPlayback(over: 4)
+        let rise = (0..<4).map { _ in envelope.nextGain() }
+        #expect(rise[0] > 0)
+        #expect(rise[0] < rise[1])
+        #expect(rise[3] == 1)
+        #expect(envelope.isComplete(start))
+
+        let stop = envelope.fadeOut(over: 4)
+        let fall = (0..<4).map { _ in envelope.nextGain() }
+        #expect(fall[0] < 1)
+        #expect(fall[0] > fall[1])
+        #expect(fall[3] == 0)
+        #expect(envelope.isComplete(stop))
+    }
+
+    private func read(_ buffer: PCMRingBuffer, count: Int) -> (supplied: Int, left: [Float], right: [Float]) {
+        var left = [Float](repeating: -1, count: count)
+        var right = [Float](repeating: -1, count: count)
+        var supplied = 0
+        left.withUnsafeMutableBufferPointer { leftPointer in
+            right.withUnsafeMutableBufferPointer { rightPointer in
+                supplied = buffer.read(into: leftPointer, rightPointer)
+            }
+        }
+        return (supplied, left, right)
     }
 }
 
