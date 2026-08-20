@@ -24,7 +24,8 @@ database-free: it decodes files and plays them.
   and output diagnostics without owning a catalog or playlist.
 - Bridge targets over vendored upstream cores (built by CocoaSpice, not forked here):
   `VGMBoyCGameMusicEmu` (libgme), `VGMBoyCLibVGM`, `VGMBoyCHighlyComplete` (mGBA + PSFLib),
-  `VGMBoyC2SF`, `VGMBoyCVGmstream`, `VGMBoyCLazyUSF`, `VGMBoyCPlayPSF`.
+  `VGMBoyC2SF`, `VGMBoyCVGmstream`, `VGMBoyCLazyUSF`, `VGMBoyCPlayPSF`, and
+  `VGMBoyCOpenMPT` (libopenmpt).
 
 ## Decoder Families
 
@@ -32,6 +33,7 @@ database-free: it decodes files and plays them.
 | --- | --- | --- | --- | --- |
 | `libgme` | ay gbs hes kss nsf nsfe sap spc | yes | yes | yes |
 | `sidplayfp` | sid | yes | no | no |
+| `openmpt` | 669 dmf far it mod mptm mtm okt ptm s3m stm ult xm | yes | no | yes |
 | `libvgm` | vgm vgz gym s98 dro | yes | yes | yes |
 | `standardaudio` | aac aif aiff caf flac m4a mp3 wav wave | no | no | yes |
 | `highlycomplete` | gsf minigsf | yes | no | yes |

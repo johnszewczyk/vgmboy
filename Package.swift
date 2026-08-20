@@ -178,8 +178,20 @@ let package = Package(
             ]
         ),
         .target(
+            name: "VGMBoyCOpenMPT",
+            path: "Sources/COpenMPT",
+            publicHeadersPath: "include",
+            cSettings: [
+                .unsafeFlags(["-I/opt/homebrew/opt/libopenmpt/include"])
+            ],
+            linkerSettings: [
+                .unsafeFlags(["-L/opt/homebrew/opt/libopenmpt/lib"]),
+                .linkedLibrary("openmpt")
+            ]
+        ),
+        .target(
             name: "VGMBoyKit",
-            dependencies: ["VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCSIDPlayFP"],
+            dependencies: ["VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCSIDPlayFP", "VGMBoyCOpenMPT"],
             linkerSettings: [
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("AudioToolbox")

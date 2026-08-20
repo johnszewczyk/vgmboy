@@ -26,6 +26,8 @@ title, and track window. Supported options:
 
 - Chip music (libgme): `.ay`, `.gbs`, `.hes`, `.kss`, `.nsf`, `.nsfe`, `.sap`, `.spc`
 - Sega/console logs (libvgm): `.vgm`, `.vgz`, `.gym`, `.s98`, `.dro`
+- Tracker modules (libopenmpt): `.669`, `.dmf`, `.far`, `.it`, `.mod`, `.mptm`, `.mtm`, `.okt`,
+  `.ptm`, `.s3m`, `.stm`, `.ult`, and `.xm`
 - Standard audio (AVFoundation): `.aac`, `.aif`, `.aiff`, `.caf`, `.flac`, `.m4a`, `.mp3`, `.wav`,
   and `.wave`
 - Streamed game audio (vgmstream): `.adx`, `.xa`, `.at3`, `.fsb`, `.vag`, `.aifc`, `.ogg`, and the

@@ -73,6 +73,12 @@ public enum FormatRegistry {
         hasNaturalEnding: false
     )
 
+    public static let openMPTFamily = DecoderFamily(
+        id: "openmpt",
+        supportsLongPlay: true,
+        supportsTempo: false
+    )
+
     public static let libgmeExtensions: Set<String> = [
         "ay", "gbs", "hes", "kss", "nsf", "nsfe", "sap", "spc"
     ]
@@ -110,6 +116,10 @@ public enum FormatRegistry {
 
     public static let sidplayfpExtensions: Set<String> = ["sid"]
 
+    public static let openMPTExtensions: Set<String> = [
+        "669", "dmf", "far", "it", "mod", "mptm", "mtm", "okt", "ptm", "s3m", "stm", "ult", "xm"
+    ]
+
     public static func family(for path: String) -> DecoderFamily? {
         let ext = (path as NSString).pathExtension.lowercased()
         if libgmeExtensions.contains(ext) {
@@ -117,6 +127,9 @@ public enum FormatRegistry {
         }
         if sidplayfpExtensions.contains(ext) {
             return sidplayfpFamily
+        }
+        if openMPTExtensions.contains(ext) {
+            return openMPTFamily
         }
         if libvgmExtensions.contains(ext) {
             return libvgmFamily

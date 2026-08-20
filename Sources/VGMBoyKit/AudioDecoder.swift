@@ -49,6 +49,8 @@ enum DecoderFactory {
             return try GMEDecoder(path: path, sampleRate: sampleRate)
         case "sidplayfp":
             return try SIDDecoder(path: path, sampleRate: sampleRate)
+        case "openmpt":
+            return try OpenMPTDecoder(path: path, sampleRate: sampleRate)
         case "libvgm":
             return try VGMDecoder(path: path, sampleRate: sampleRate)
         case "standardaudio":

@@ -22,6 +22,16 @@ struct FormatRegistryTests {
         #expect(!FormatRegistry.sidplayfpFamily.hasNaturalEnding)
     }
 
+    @Test("routes tracker module extensions to OpenMPT")
+    func routesOpenMPT() {
+        for ext in FormatRegistry.openMPTExtensions {
+            #expect(FormatRegistry.family(for: "/tmp/example.\(ext)")?.id == "openmpt")
+        }
+        #expect(FormatRegistry.openMPTFamily.supportsLongPlay)
+        #expect(!FormatRegistry.openMPTFamily.supportsTempo)
+        #expect(FormatRegistry.openMPTFamily.hasNaturalEnding)
+    }
+
     @Test("routes ordinary audio extensions to the standard-audio family")
     func routesStandardAudio() {
         for ext in FormatRegistry.standardAudioExtensions {

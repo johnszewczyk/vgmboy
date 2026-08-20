@@ -19,8 +19,9 @@ registered because vgmstream's Nintendo DS SWAV content sniffing is not implemen
   `DecoderFactoryError.unsupportedFamily` — never an invented track.
 - `hasNaturalEnding == false` (lazyusf/USF and sidplayfp/SID) forces a capped decode window so a looping core can
   never run indefinitely. `TimingPolicy.plan` carries this through `usesNativeEnding`.
-- `appliesFadeInternally` distinguishes cores with native fade (libgme, libvgm) from real-PCM
-  streamers (Highly Complete, vgmstream, lazyusf, playpsf) that delegate the fade to `PlaybackSession`.
+- `appliesFadeInternally` distinguishes cores with native fade (libgme, libvgm) from PCM
+  streamers (Highly Complete, vgmstream, lazyusf, playpsf, OpenMPT) that delegate the fade to
+  `PlaybackSession`.
 - Highly Complete bridge calls are serialized through one gate. Its native GBA rate may change
   while mGBA runs, so the bridge resamples to VGMBoy's requested output rate and reports output-frame position.
 - 2SF bridge calls are serialized because the DS core is process-global. `PlaybackSession` calls
@@ -39,6 +40,7 @@ registered because vgmstream's Nintendo DS SWAV content sniffing is not implemen
 - [AudioDecoder.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/AudioDecoder.swift)
 - [GMEDecoder.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/GMEDecoder.swift)
 - [SIDDecoder.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/SIDDecoder.swift)
+- [OpenMPTDecoder.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/OpenMPTDecoder.swift)
 - [VGMDecoder.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/VGMDecoder.swift)
 - [HighlyCompleteDecoder.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/HighlyCompleteDecoder.swift)
 - [TwoSFDecoder.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/TwoSFDecoder.swift)
