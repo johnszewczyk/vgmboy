@@ -25,8 +25,8 @@ title, and track window. Supported options:
   `.ptm`, `.s3m`, `.stm`, `.ult`, and `.xm`
 - Standard audio (AVFoundation): `.aac`, `.aif`, `.aiff`, `.caf`, `.flac`, `.m4a`, `.mp3`, `.wav`,
   and `.wave`
-- Streamed game audio (vgmstream): `.adx`, `.xa`, `.at3`, `.fsb`, `.vag`, `.aifc`, `.ogg`, and the
-  other registered stream/bank extensions
+- Streamed game audio (vgmstream): `.adp`, `.adpcm`, `.adx`, `.at3`, `.bik`, `.bk2`, `.fsb`, `.vag`,
+  `.xvag`, `.xmd`, `.aifc`, `.ogg`, and the other registered stream/bank extensions
 - Nintendo 64 (lazyusf): `.usf`, `.miniusf` — needs its companion `.usflib` files beside it
 - Game Boy Advance (Highly Complete): `.gsf`, `.minigsf` — miniGSF needs its companion `.gsflib` files beside it
 - Nintendo DS (2sf2wav): `.2sf`, `.mini2sf` — mini2SF needs its companion library files beside it

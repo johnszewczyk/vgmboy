@@ -37,7 +37,7 @@ database-free: it decodes files and plays them.
 | `standardaudio` | aac aif aiff caf flac m4a mp3 wav wave | no | no | yes |
 | `highlycomplete` | gsf minigsf | yes | no | yes |
 | `twosf` | 2sf mini2sf | yes | no | yes |
-| `vgmstream` | aa3 adx ads aifc at3 aus bnk dvi fsb genh hd hbd iecs int mib msf mtaf ogg rws ss2 stream svag txtp vag xa | yes | no | yes |
+| `vgmstream` | aa3 adp adpcm adx ads aifc at3 aus bik bika bk2 bnk dvi fsb genh hd hbd iecs int mib msf mtaf ogg ps3 rws s14 ss2 stream strm svag swav txtp vag xa xmd xvag | yes | no | yes |
 | `lazyusf` | usf miniusf | yes | no | no |
 | `playpsf` | psf minipsf psf2 minipsf2 | yes | no | yes |
 

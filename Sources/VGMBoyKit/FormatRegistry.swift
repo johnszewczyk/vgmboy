@@ -100,10 +100,11 @@ public enum FormatRegistry {
     ]
 
     public static let vgmstreamExtensions: Set<String> = [
-        "aa3", "adx", "ads", "aifc", "at3", "aus", "bnk", "dvi",
-        "fsb", "genh", "hd", "hbd", "iecs", "int", "mib", "msf",
-        "mtaf", "ogg", "rws", "ss2", "stream", "svag", "txtp",
-        "vag", "xa"
+        "aa3", "adp", "adpcm", "adx", "ads", "aifc", "at3", "aus",
+        "bik", "bika", "bk2", "bnk", "dvi", "fsb", "genh", "hd",
+        "hbd", "iecs", "int", "mib", "msf", "mtaf", "ogg", "ps3",
+        "rws", "s14", "ss2", "stream", "strm", "svag", "swav", "txtp",
+        "vag", "xa", "xmd", "xvag"
     ]
 
     public static let lazyusfExtensions: Set<String> = [
