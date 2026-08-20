@@ -1,4 +1,4 @@
-import CVGmstream
+import VGMBoyCVGmstream
 import Foundation
 
 enum VgmstreamDecoderError: LocalizedError {

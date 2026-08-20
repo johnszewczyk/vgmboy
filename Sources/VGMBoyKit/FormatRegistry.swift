@@ -29,6 +29,18 @@ public enum FormatRegistry {
         supportsTempo: true
     )
 
+    public static let highlyCompleteFamily = DecoderFamily(
+        id: "highlycomplete",
+        supportsLongPlay: true,
+        supportsTempo: false
+    )
+
+    public static let twoSFFamily = DecoderFamily(
+        id: "twosf",
+        supportsLongPlay: true,
+        supportsTempo: false
+    )
+
     public static let vgmstreamFamily = DecoderFamily(
         id: "vgmstream",
         supportsLongPlay: true,
@@ -56,6 +68,14 @@ public enum FormatRegistry {
         "vgm", "vgz", "gym", "s98", "dro"
     ]
 
+    public static let highlyCompleteExtensions: Set<String> = [
+        "gsf", "minigsf"
+    ]
+
+    public static let twoSFExtensions: Set<String> = [
+        "2sf", "mini2sf"
+    ]
+
     public static let vgmstreamExtensions: Set<String> = [
         "aa3", "adx", "ads", "aifc", "at3", "aus", "bnk", "dvi",
         "fsb", "genh", "hd", "hbd", "iecs", "int", "mib", "msf",
@@ -78,6 +98,12 @@ public enum FormatRegistry {
         }
         if libvgmExtensions.contains(ext) {
             return libvgmFamily
+        }
+        if highlyCompleteExtensions.contains(ext) {
+            return highlyCompleteFamily
+        }
+        if twoSFExtensions.contains(ext) {
+            return twoSFFamily
         }
         if vgmstreamExtensions.contains(ext) {
             return vgmstreamFamily

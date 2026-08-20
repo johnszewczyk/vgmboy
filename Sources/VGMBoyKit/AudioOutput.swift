@@ -1,10 +1,9 @@
 import AVFoundation
 import Foundation
 
-/// AVAudioEngine with a single AVAudioSourceNode rendering from the ring
-/// buffer. This is the transport home: VGMBoy owns the macOS audio device.
-/// Later checkpoints add the equalizer, ducking, and configuration-change
-/// recovery.
+/// AVAudioEngine with a source node and a fixed ten-band equalizer. This is
+/// the transport home: VGMBoy owns the macOS audio device, while a frontend
+/// only supplies the requested EQ configuration.
 final class AudioOutput: @unchecked Sendable {
     let sampleRate: Double
     let channels: AVAudioChannelCount
@@ -12,6 +11,7 @@ final class AudioOutput: @unchecked Sendable {
 
     private let engine = AVAudioEngine()
     private let sourceNode: AVAudioSourceNode
+    private let equalizer = AVAudioUnitEQ(numberOfBands: EqualizerConfiguration.bandCount)
     private let format: AVAudioFormat
     private let engineLock = NSLock()
 
@@ -37,7 +37,10 @@ final class AudioOutput: @unchecked Sendable {
         }
 
         engine.attach(sourceNode)
-        engine.connect(sourceNode, to: engine.mainMixerNode, format: format)
+        engine.attach(equalizer)
+        configureEqualizerBands()
+        engine.connect(sourceNode, to: equalizer, format: format)
+        engine.connect(equalizer, to: engine.mainMixerNode, format: format)
         engine.prepare()
     }
 
@@ -61,5 +64,28 @@ final class AudioOutput: @unchecked Sendable {
         engineLock.lock()
         defer { engineLock.unlock() }
         engine.pause()
+    }
+
+    func setEqualizer(_ configuration: EqualizerConfiguration) {
+        engineLock.lock()
+        defer { engineLock.unlock() }
+        for (index, band) in equalizer.bands.enumerated() {
+            band.bypass = !configuration.enabled
+            band.gain = configuration.gainsDecibels[index]
+        }
+        equalizer.bypass = !configuration.enabled
+    }
+
+    private func configureEqualizerBands() {
+        // ISO octave centers. AVAudioUnitEQ runs in the engine graph, so this
+        // remains effective for every decoder instead of being a frontend DSP.
+        for (band, frequency) in zip(equalizer.bands, EqualizerConfiguration.bandFrequencies) {
+            band.filterType = .parametric
+            band.frequency = frequency
+            band.bandwidth = 1
+            band.gain = 0
+            band.bypass = true
+        }
+        equalizer.bypass = true
     }
 }

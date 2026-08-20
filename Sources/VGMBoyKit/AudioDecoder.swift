@@ -25,6 +25,13 @@ protocol AudioDecoder: AnyObject {
     func configureNativeEnding(playMs: Int, fadeMs: Int)
     func seek(milliseconds: Int)
     func readFrames(_ frameCount: Int) -> (left: [Float], right: [Float])
+    /// Gives a decoder with non-ARC native lifetime requirements an explicit
+    /// replacement boundary before the next decoder is constructed.
+    func close()
+}
+
+extension AudioDecoder {
+    func close() {}
 }
 
 enum DecoderFactoryError: LocalizedError {
@@ -42,6 +49,10 @@ enum DecoderFactory {
             return try GMEDecoder(path: path, sampleRate: sampleRate)
         case "libvgm":
             return try VGMDecoder(path: path, sampleRate: sampleRate)
+        case "highlycomplete":
+            return try HighlyCompleteDecoder(path: path, sampleRate: sampleRate)
+        case "twosf":
+            return try TwoSFDecoder(path: path, sampleRate: sampleRate)
         case "vgmstream":
             return try VgmstreamDecoder(path: path, sampleRate: sampleRate)
         case "lazyusf":

@@ -9,6 +9,10 @@ let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().pa
 let cocoaspiceRoot = "\(packageRoot)/../CocoaSpice"
 let libVGMVendorDirectory = "\(cocoaspiceRoot)/vendor/libvgm"
 let libVGMBuildDirectory = "\(cocoaspiceRoot)/.build/libvgm"
+let libMGBAVendorDirectory = "\(cocoaspiceRoot)/vendor/mgba"
+let libMGBABuildDirectory = "\(cocoaspiceRoot)/.build/mgba"
+let twoSFVendorDirectory = "\(cocoaspiceRoot)/vendor/2sf2wav"
+let twoSFBuildDirectory = "\(cocoaspiceRoot)/.build/2sf"
 let vgmstreamVendorDirectory = "\(cocoaspiceRoot)/vendor/vgmstream/src"
 let vgmstreamBuildDirectory = "\(cocoaspiceRoot)/.build/vgmstream"
 let lazyUSFVendorDirectory = "\(cocoaspiceRoot)/vendor/lazyusf2"
@@ -26,13 +30,13 @@ let package = Package(
     ],
     targets: [
         .systemLibrary(
-            name: "CGameMusicEmu",
+            name: "VGMBoyCGameMusicEmu",
             path: "Sources/CGameMusicEmu",
             pkgConfig: "libgme",
             providers: [.brew(["game-music-emu"])]
         ),
         .target(
-            name: "CLibVGM",
+            name: "VGMBoyCLibVGM",
             path: "Sources/CLibVGM",
             publicHeadersPath: "include",
             cxxSettings: [
@@ -50,7 +54,52 @@ let package = Package(
             ]
         ),
         .target(
-            name: "CVGmstream",
+            name: "VGMBoyCHighlyComplete",
+            path: "Sources/CHighlyComplete",
+            publicHeadersPath: "include",
+            cSettings: [
+                .define("M_CORE_GBA"),
+                .define("ENABLE_VFS"),
+                .define("ENABLE_DIRECTORIES"),
+                .unsafeFlags([
+                    "-I\(libMGBAVendorDirectory)/include",
+                    "-I\(libMGBABuildDirectory)/include",
+                    "-I\(libMGBAVendorDirectory)/src"
+                ])
+            ],
+            cxxSettings: [
+                .define("M_CORE_GBA"),
+                .define("ENABLE_VFS"),
+                .define("ENABLE_DIRECTORIES"),
+                .unsafeFlags([
+                    "-I\(libMGBAVendorDirectory)/include",
+                    "-I\(libMGBABuildDirectory)/include",
+                    "-I\(libMGBAVendorDirectory)/src"
+                ])
+            ],
+            linkerSettings: [
+                .unsafeFlags(["-L\(libMGBABuildDirectory)", "-lmgba"]),
+                .linkedLibrary("z")
+            ]
+        ),
+        .target(
+            name: "VGMBoyC2SF",
+            path: "Sources/C2SF",
+            publicHeadersPath: "include",
+            cxxSettings: [
+                .unsafeFlags([
+                    "-I\(twoSFVendorDirectory)",
+                    "-I\(twoSFVendorDirectory)/desmume",
+                    "-I\(twoSFVendorDirectory)/sseqplayer"
+                ])
+            ],
+            linkerSettings: [
+                .unsafeFlags(["\(twoSFBuildDirectory)/lib2sf.a"]),
+                .linkedLibrary("z")
+            ]
+        ),
+        .target(
+            name: "VGMBoyCVGmstream",
             path: "Sources/CVGmstream",
             publicHeadersPath: "include",
             cxxSettings: [
@@ -74,7 +123,7 @@ let package = Package(
             ]
         ),
         .target(
-            name: "CLazyUSF",
+            name: "VGMBoyCLazyUSF",
             path: "Sources/CLazyUSF",
             publicHeadersPath: "include",
             cSettings: [
@@ -93,7 +142,7 @@ let package = Package(
             ]
         ),
         .target(
-            name: "CPlayPSF",
+            name: "VGMBoyCPlayPSF",
             path: "Sources/CPlayPSF",
             publicHeadersPath: "include",
             cxxSettings: [
@@ -116,7 +165,7 @@ let package = Package(
         ),
         .target(
             name: "VGMBoyKit",
-            dependencies: ["CGameMusicEmu", "CLibVGM", "CVGmstream", "CLazyUSF", "CPlayPSF"],
+            dependencies: ["VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF"],
             linkerSettings: [
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("AudioToolbox")

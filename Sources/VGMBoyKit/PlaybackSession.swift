@@ -1,6 +1,6 @@
 import Foundation
 
-public struct PlaybackStatus: Sendable {
+public struct PlaybackStatus: Sendable, Codable, Equatable {
     public var isPlaying: Bool
     public var elapsedSeconds: Double
     public var reachedEnd: Bool
@@ -139,6 +139,35 @@ public final class PlaybackSession: @unchecked Sendable {
         }
     }
 
+    public func setTempo(_ tempo: Double) throws {
+        try queue.sync {
+            guard let decoder else { throw PlaybackSessionError.notLoaded }
+            guard tempo.isFinite, tempo > 0 else {
+                throw PlaybackControlError.invalidPayload("Tempo must be a positive finite value.")
+            }
+            let wasPlaying = output.isRunning
+            if wasPlaying { output.pause() }
+            stopRefillTimer()
+            decoder.setTempo(tempo)
+            output.ringBuffer.clear()
+            try prime(to: output.primeFrameCount)
+            if wasPlaying {
+                try output.start()
+                startRefillTimer()
+            }
+            publishStatus()
+        }
+    }
+
+    public func setEqualizer(_ configuration: EqualizerConfiguration) throws {
+        guard configuration.isValid else {
+            throw PlaybackControlError.invalidPayload("Equalizer requires exactly 10 finite gains.")
+        }
+        queue.sync {
+            output.setEqualizer(configuration)
+        }
+    }
+
     public func stop() {
         queue.sync {
             stopRefillTimer()
@@ -268,6 +297,7 @@ public final class PlaybackSession: @unchecked Sendable {
 
     private func releaseCurrent() {
         stopRefillTimer()
+        decoder?.close()
         decoder = nil
         capFrames = 0
         fadeFrames = 0

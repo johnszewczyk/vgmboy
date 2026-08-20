@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 @testable import VGMBoyKit
 
 @Suite("FormatRegistry")
@@ -17,6 +18,21 @@ struct FormatRegistryTests {
         for ext in FormatRegistry.libvgmExtensions {
             let path = "/tmp/example.\(ext)"
             #expect(FormatRegistry.family(for: path)?.id == "libvgm")
+        }
+    }
+
+    @Test("routes GSF extensions to the Highly Complete family")
+    func routesHighlyComplete() {
+        for ext in FormatRegistry.highlyCompleteExtensions {
+            let path = "/tmp/example.\(ext)"
+            #expect(FormatRegistry.family(for: path)?.id == "highlycomplete")
+        }
+    }
+
+    @Test("routes 2SF extensions to the 2SF family")
+    func routesTwoSF() {
+        for ext in FormatRegistry.twoSFExtensions {
+            #expect(FormatRegistry.family(for: "/tmp/example.\(ext)")?.id == "twosf")
         }
     }
 
@@ -58,6 +74,21 @@ struct FormatRegistryTests {
         #expect(family.supportsTempo)
     }
 
+    @Test("Highly Complete supports long play but not tempo")
+    func highlyCompleteCapabilities() {
+        let family = FormatRegistry.highlyCompleteFamily
+        #expect(family.supportsLongPlay)
+        #expect(!family.supportsTempo)
+        #expect(family.hasNaturalEnding)
+    }
+
+    @Test("2SF supports long play but not tempo")
+    func twoSFCapabilities() {
+        let family = FormatRegistry.twoSFFamily
+        #expect(family.supportsLongPlay)
+        #expect(!family.supportsTempo)
+    }
+
     @Test("vgmstream supports long play but not tempo")
     func vgmstreamCapabilities() {
         let family = FormatRegistry.vgmstreamFamily
@@ -80,6 +111,40 @@ struct FormatRegistryTests {
         #expect(!family.supportsTempo)
         #expect(family.hasNaturalEnding)
     }
+}
+
+@Suite("PlaybackControlProtocol")
+struct PlaybackControlProtocolTests {
+    @Test("v1 load control round-trips through Codable")
+    func loadRequestRoundTrip() throws {
+        let request = PlaybackControlRequest(
+            requestID: "request-1",
+            command: .load,
+            payload: PlaybackControlPayload(
+                path: "/tmp/example.gsf",
+                trackIndex: 0,
+                playbackMode: .longPlay,
+                playMilliseconds: 120_000,
+                fadeMilliseconds: 8_000
+            )
+        )
+        let decoded = try JSONDecoder().decode(
+            PlaybackControlRequest.self,
+            from: JSONEncoder().encode(request)
+        )
+        #expect(decoded == request)
+        #expect(decoded.version == PlaybackControlProtocol.version)
+    }
+
+    @Test("equalizer requires ten finite gains")
+    func validatesEqualizer() {
+        #expect(EqualizerConfiguration(gainsDecibels: Array(repeating: 0, count: 10)).isValid)
+        #expect(!EqualizerConfiguration(gainsDecibels: Array(repeating: 0, count: 9)).isValid)
+        #expect(!EqualizerConfiguration(gainsDecibels: [Float.nan] + Array(repeating: 0, count: 9)).isValid)
+        #expect(!EqualizerConfiguration(gainsDecibels: [12.5] + Array(repeating: 0, count: 9)).isValid)
+        #expect(EqualizerConfiguration.bandFrequencies == [31, 62, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 16_000])
+    }
+
 }
 
 @Suite("SessionFade")

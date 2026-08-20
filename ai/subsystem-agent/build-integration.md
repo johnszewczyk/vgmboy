@@ -6,16 +6,15 @@ How VGMBoy links the vendored upstream decoder libraries without re-vendoring th
 
 ## Ownership
 
-`Package.swift` derives the CocoaSpice root from the package file path and links each upstream
-static library from CocoaSpice's `.build` plus the matching vendored include directories. Bridge
-glue lives in VGMBoy (`Sources/C<Core>`); the static libraries are built by CocoaSpice's
-`scripts/build-*.sh` and consumed here.
+`Package.swift` links VGMBoy-specific bridge targets and their upstream static libraries. CocoaSpice
+links VGMBoyKit and never its former playback bridge targets, so a bundled frontend has exactly one
+copy of every bridge module.
 
 ## Invariants
 
-- `build-app.sh` checks each required static library and runs the corresponding CocoaSpice build
-  script only when it is missing, so a clean check-out self-heals from CocoaSpice's vendor copy.
-- Never fork or rebuild upstream libraries inside VGMBoy.
+- VGMBoy bridge module names are VGMBoy-specific to avoid Swift module-map collisions with a host.
+- A frontend links VGMBoyKit as its only audio-core product; duplicate native bridge objects are a linker error.
+- Never fork an upstream decoder library per frontend.
 - Executable product names must not collide on a case-insensitive filesystem. The CLI is
   `vgmboy-cli`; the GUI app is `VGMBoy`. A `vgmboy` (CLI) vs `VGMBoy` (app) collision silently
   overwrote one binary and must not recur.

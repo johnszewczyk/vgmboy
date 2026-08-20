@@ -1,4 +1,4 @@
-import CPlayPSF
+import VGMBoyCPlayPSF
 import Foundation
 
 enum PlayPSFDecoderError: LocalizedError {

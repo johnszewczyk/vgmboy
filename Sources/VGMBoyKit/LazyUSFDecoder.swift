@@ -1,4 +1,4 @@
-import CLazyUSF
+import VGMBoyCLazyUSF
 import Foundation
 
 enum LazyUSFDecoderError: LocalizedError {

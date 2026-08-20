@@ -1,4 +1,4 @@
-import CLibVGM
+import VGMBoyCLibVGM
 import Foundation
 
 enum VGMDecoderError: LocalizedError {

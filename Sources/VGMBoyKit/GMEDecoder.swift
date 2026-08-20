@@ -1,4 +1,4 @@
-import CGameMusicEmu
+import VGMBoyCGameMusicEmu
 import Foundation
 
 enum GMEDecoderError: LocalizedError {

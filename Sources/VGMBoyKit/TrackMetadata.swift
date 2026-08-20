@@ -1,6 +1,6 @@
 import Foundation
 
-public struct TrackMetadata: Sendable, Codable {
+public struct TrackMetadata: Sendable, Codable, Equatable {
     public var index: Int
     public var song: String
     public var game: String

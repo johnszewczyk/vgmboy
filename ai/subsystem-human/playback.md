@@ -25,10 +25,16 @@ title, and track window. Supported options:
 - Streamed game audio (vgmstream): `.adx`, `.xa`, `.at3`, `.fsb`, `.vag`, `.aifc`, `.ogg`, and the
   other registered stream/bank extensions
 - Nintendo 64 (lazyusf): `.usf`, `.miniusf` — needs its companion `.usflib` files beside it
+- Game Boy Advance (Highly Complete): `.gsf`, `.minigsf` — miniGSF needs its companion `.gsflib` files beside it
+- Nintendo DS (2sf2wav): `.2sf`, `.mini2sf` — mini2SF needs its companion library files beside it
 - PlayStation / PlayStation 2 (Play!): `.psf`, `.minipsf`, `.psf2`, `.minipsf2`
 
 Long play, fade, and seek work across all families. Tempo is available only where the decoder
 supports it.
+
+VGMBoyKit also exposes an in-process `PlaybackController` for native app hosts. It owns the
+decoder, transport, timing, and ten-band EQ; a host keeps its own playlist, repeat/shuffle policy,
+catalog, and macOS media-key integration.
 
 ## Files
 

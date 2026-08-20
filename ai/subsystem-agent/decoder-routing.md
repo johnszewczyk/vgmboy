@@ -9,7 +9,8 @@ Extension-based routing of files to the correct upstream decoder core, and the u
 
 `FormatRegistry` maps a path extension to a `DecoderFamily` (`id`, `supportsLongPlay`,
 `supportsTempo`, `hasNaturalEnding`). `DecoderFactory.make` builds the matching decoder through the
-`AudioDecoder` protocol. Extensions are deliberately exclusive to one family; `wav` is not
+`AudioDecoder` protocol. `AudioInspector` routes GSF/miniGSF through the bridge's metadata-only
+inspection entry point, without booting mGBA. Extensions are deliberately exclusive to one family; `wav` is not
 registered because vgmstream's Nintendo DS SWAV content sniffing is not implemented here.
 
 ## Invariants
@@ -19,7 +20,11 @@ registered because vgmstream's Nintendo DS SWAV content sniffing is not implemen
 - `hasNaturalEnding == false` (lazyusf/USF) forces a capped decode window so a looping core can
   never run indefinitely. `TimingPolicy.plan` carries this through `usesNativeEnding`.
 - `appliesFadeInternally` distinguishes cores with native fade (libgme, libvgm) from real-PCM
-  streamers (vgmstream, lazyusf, playpsf) that delegate the fade to `PlaybackSession`.
+  streamers (Highly Complete, vgmstream, lazyusf, playpsf) that delegate the fade to `PlaybackSession`.
+- Highly Complete bridge calls are serialized through one gate. Its native GBA rate may change
+  while mGBA runs, so the bridge resamples to VGMBoy's requested output rate and reports output-frame position.
+- 2SF bridge calls are serialized because the DS core is process-global. `PlaybackSession` calls
+  `close()` before constructing a replacement decoder, so teardown never depends on ARC timing.
 - Bridges are copied into VGMBoy (`Sources/C<Core>`); the upstream static libs are never re-vendored
   or built here. Symbol prefixes are per-core (`vgmboy_play_psf_*`, etc.).
 
@@ -34,6 +39,8 @@ registered because vgmstream's Nintendo DS SWAV content sniffing is not implemen
 - [AudioDecoder.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/AudioDecoder.swift)
 - [GMEDecoder.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/GMEDecoder.swift)
 - [VGMDecoder.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/VGMDecoder.swift)
+- [HighlyCompleteDecoder.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/HighlyCompleteDecoder.swift)
+- [TwoSFDecoder.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/TwoSFDecoder.swift)
 - [VgmstreamDecoder.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/VgmstreamDecoder.swift)
 - [LazyUSFDecoder.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/LazyUSFDecoder.swift)
 - [PlayPSFDecoder.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/PlayPSFDecoder.swift)
