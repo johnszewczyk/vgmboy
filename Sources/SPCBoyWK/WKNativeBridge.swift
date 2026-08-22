@@ -90,7 +90,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             setAppearanceSettings: (...args) => request("setAppearanceSettings", args),
             openOptionsWindow: () => request("openOptionsWindow"),
             closeOptionsWindow: () => request("closeOptionsWindow"),
-            showSidebarViewMenu: (...args) => request("showSidebarViewMenu", args),
             openPath: (...args) => request("openPath", args),
             chooseRootFolder: (...args) => request("chooseRootFolder", args),
             listFolder: (...args) => request("listFolder", args),
@@ -229,7 +228,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         case "endpointSurface":
             return try JSONSerialization.jsonObject(with: JSONEncoder().encode(VGMBoyEndpointSurface.v1))
         case "configureArchiveCache", "archiveCacheSummary", "clearArchiveCache",
-             "setPlaybackSettings", "setAppearanceSettings", "showSidebarViewMenu",
+             "setPlaybackSettings", "setAppearanceSettings",
              "setPlaybackPowerSaveBlocker":
             return NSNull()
         case "setRoutingPreferences":

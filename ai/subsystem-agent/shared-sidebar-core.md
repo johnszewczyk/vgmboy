@@ -15,6 +15,8 @@ rendering.
 ## Invariants
 
 - Search is a temporary catalog-console view and clearing it restores the stored mode.
+- The sidebar view button opens a flat in-app menu with `Consoles`, `Paths`, and `Disk Path`; the
+  first two are the catalog database views and the last is the explicitly opened local filesystem.
 - Game identity includes the catalog root ID, game name, and system.
 - Catalog writes, scans, decoder selection, and playback do not belong here.
 

@@ -246,6 +246,18 @@ function showSidebarContextMenu(node, event) {
   ]);
 }
 
+function showSidebarViewMenu(event) {
+  const labels = [
+    ["Consoles", "consoles"],
+    ["Paths", "paths"],
+    ["Disk Path", "diskPath"]
+  ];
+  showContextMenu(event, labels.map(([label, mode]) => [
+    mode === state.sidebarMode ? `✓ ${label}` : label,
+    () => setSidebarMode(mode)
+  ]));
+}
+
 async function activateBrowserNode(node, { playNow = true } = {}) {
   try {
     state.selectedBrowserPath = node.path;
@@ -2206,6 +2218,7 @@ uiApp.ui = {
   refreshDatabaseGamesForVisibleRoots,
   loadDatabaseFiles,
   setSidebarMode,
+  showSidebarViewMenu,
   updateSidebarSearch,
   loadDatabaseGames,
   loadDatabaseGame,

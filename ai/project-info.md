@@ -12,6 +12,7 @@
 - Read-only `CatalogReader` integration.
 - In-process VGMBoy playback integration, added behind the native bridge.
 - Shared versioned VGMBoy endpoint capability map (`VGMBoyEndpointCore`).
+- Shared VGMBoy tempo contract for libgme and libvgm playback settings.
 - Shared selected-entry archive materialization through FrontendCore.
 - Shared explicit local-folder navigation through `LocalFileBrowserCore`.
 - Separate native Settings window with an independent options-mode WKWebView.

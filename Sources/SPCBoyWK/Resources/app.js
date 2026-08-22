@@ -440,8 +440,8 @@ refs.sidebarSearchInput.addEventListener("input", (event) => {
   app.ui.updateSidebarSearch(event.target.value);
 });
 
-refs.sidebarViewMenuButton.addEventListener("click", () => {
-  window.spcBoyWK.showSidebarViewMenu().catch((error) => console.error("[SPCBoy] sidebar view menu failed", error));
+refs.sidebarViewMenuButton.addEventListener("click", (event) => {
+  app.ui.showSidebarViewMenu(event);
 });
 
 if (window.spcBoyWK?.onTransportShortcut) {
