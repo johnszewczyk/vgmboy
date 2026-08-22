@@ -1,0 +1,61 @@
+:root {
+  color-scheme: light dark;
+  font: -apple-system-body;
+}
+
+body {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 1px;
+  height: 100vh;
+  margin: 0;
+  background: color-mix(in srgb, Canvas 92%, currentColor 8%);
+  color: CanvasText;
+}
+
+.sidebar, .playlist {
+  min-width: 0;
+  padding: 12px;
+}
+
+.sidebar { background: color-mix(in srgb, Canvas 96%, currentColor 4%); }
+
+input, button {
+  font: inherit;
+}
+
+input {
+  box-sizing: border-box;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 6px 8px;
+}
+
+.modes {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.mode {
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 8px;
+  color: inherit;
+  background: transparent;
+}
+
+.mode.active {
+  background: color-mix(in srgb, AccentColor 22%, transparent);
+}
+
+.empty {
+  color: color-mix(in srgb, CanvasText 62%, transparent);
+  text-align: center;
+  padding: 24px 8px;
+}
+
+.playlist {
+  display: grid;
+  place-items: center;
+}
