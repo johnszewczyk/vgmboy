@@ -10,7 +10,7 @@ library="$build_dir/src/libvgmstream.a"
 stamp="$build_dir/cocoaspice-inputs.sha256"
 export PKG_CONFIG_PATH="/opt/homebrew/opt/ffmpeg/lib/pkgconfig:/opt/homebrew/opt/libvorbis/lib/pkgconfig:/opt/homebrew/opt/libogg/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 
-if git -C "$source_dir" rev-parse --git-dir >/dev/null 2>&1; then
+if [[ -e "$source_dir/.git" ]]; then
   if git -C "$source_dir" apply --check "$patch" >/dev/null 2>&1; then
     git -C "$source_dir" apply "$patch"
   elif ! git -C "$source_dir" apply --reverse --check "$patch" >/dev/null 2>&1; then
