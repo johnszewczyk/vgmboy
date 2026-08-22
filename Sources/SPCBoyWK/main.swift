@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let stateJSON = String(decoding: stateData, as: UTF8.self)
         let nativeBridge = WKNativeBridge()
         nativeBridge.onOpenOptionsWindow = { [weak self] in self?.showOptionsWindow() }
+        nativeBridge.onChooseRootFolder = { [weak self] in self?.chooseRootFolderPath() }
         let webView = makeWebView(bridge: nativeBridge, stateJSON: stateJSON, includeCommandDispatcher: true)
         self.webView = webView
         installApplicationMenu()
@@ -115,6 +116,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func closeOptionsWindow() {
         optionsWindow?.close()
+    }
+
+    private func chooseRootFolderPath() -> String? {
+        let panel = NSOpenPanel()
+        panel.title = "Open SPC Folder"
+        panel.prompt = "Open"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK else { return nil }
+        return panel.url?.standardizedFileURL.path
     }
 
     private func installApplicationMenu() {

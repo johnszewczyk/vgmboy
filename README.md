@@ -8,9 +8,10 @@ playback core.
 
 The current live native slice reads shared MediaScanner catalog roots, games,
 files, search results, and playlist rows, and routes loose-file playback through
-VGMBoyKit. Archive members are materialized through the shared FrontendCore
-package; direct
-filesystem browsing remains the next bridge milestone.
+VGMBoyKit. Explicitly opening a local folder uses the shared
+`LocalFileBrowserCore` for shallow navigation and ordinary supported files;
+archive-member browsing remains a later bridge milestone. The app does not
+reopen a persisted local folder during startup.
 
 Settings opens in a separate native `NSWindow` with its own `WKWebView`. The
 window uses the same renderer resources in options mode, while the root window

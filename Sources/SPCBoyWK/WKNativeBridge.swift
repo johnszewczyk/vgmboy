@@ -1,7 +1,10 @@
+import AppKit
 import CatalogReader
 import CatalogBrowserCore
 import Foundation
+import LocalFileBrowserCore
 import VGMBoyEndpointCore
+import VGMBoyKit
 import WebKit
 
 /// The only JavaScript-to-native boundary in SPCBoy WK.
@@ -15,6 +18,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
     var onOpenOptionsWindow: (() -> Void)?
     var onCloseOptionsWindow: (() -> Void)?
+    var onChooseRootFolder: (() -> String?)?
 
     init(catalogURL: URL = WKNativeBridge.defaultCatalogURL, isOptionsWindow: Bool = false) {
         self.catalogURL = catalogURL
@@ -140,6 +144,26 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return
         }
 
+        if method == "chooseRootFolder" {
+            let chooser = onChooseRootFolder
+            let catalogURL = self.catalogURL
+            Task { @MainActor in
+                guard let selectedPath = chooser?() else {
+                    await Self.reply(to: message.webView, id: id, success: true, valueJSON: "null")
+                    return
+                }
+                Task.detached(priority: .userInitiated) {
+                    do {
+                        let result = try Self.handle(method: "openPath", args: [selectedPath], catalogURL: catalogURL)
+                        await Self.reply(to: message.webView, id: id, success: true, valueJSON: Self.json(result))
+                    } catch {
+                        await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": error.localizedDescription]))
+                    }
+                }
+            }
+            return
+        }
+
         Task.detached(priority: .userInitiated) { [catalogURL] in
             do {
                 let result = try Self.handle(method: method, args: args, catalogURL: catalogURL)
@@ -161,8 +185,28 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
     nonisolated private static func handle(method: String, args: [Any], catalogURL: URL) throws -> Any {
         switch method {
-        case "bootstrap", "refreshTree", "openPath":
+        case "bootstrap":
             return emptySnapshot()
+        case "refreshTree":
+            guard let rootPath = args.first as? String, !rootPath.isEmpty else { return emptySnapshot() }
+            let selectedPath = args.dropFirst().first as? String
+            return try localSnapshot(rootPath: rootPath, selectedPath: selectedPath)
+        case "openPath":
+            guard let inputPath = args.first as? String, !inputPath.isEmpty else { return emptySnapshot() }
+            return try localSnapshotForInput(inputPath)
+        case "listFolder":
+            guard let folderPath = args.first as? String else { return [] }
+            return try localChildren(folderPath)
+        case "selectFolder":
+            guard let folderPath = args.first as? String else { return emptySelection() }
+            return try localSelection(folderPath, file: false)
+        case "selectFile":
+            guard let filePath = args.first as? String else { return emptySelection() }
+            return try localSelection(filePath, file: true)
+        case "showInFinder":
+            guard let path = args.first as? String else { return false }
+            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path).standardizedFileURL])
+            return true
         case "databaseLocation":
             return try location(catalogURL: catalogURL, reloaded: false)
         case "reloadDatabaseLibrary":
@@ -324,8 +368,142 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         ]
     }
 
+    nonisolated private static func localSnapshotForInput(_ inputPath: String) throws -> [String: Any] {
+        let inputURL = URL(fileURLWithPath: inputPath).standardizedFileURL
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: inputURL.path, isDirectory: &isDirectory) else {
+            throw LocalFileBrowserError.missingPath(inputURL.path)
+        }
+        let rootURL = isDirectory.boolValue ? inputURL : inputURL.deletingLastPathComponent()
+        let selectedPath = isDirectory.boolValue ? inputURL.path : rootURL.path
+        return try localSnapshot(rootPath: rootURL.path, selectedPath: selectedPath, playlistPath: isDirectory.boolValue ? nil : inputURL.path)
+    }
+
+    nonisolated private static func localSnapshot(rootPath: String, selectedPath: String?, playlistPath: String? = nil) throws -> [String: Any] {
+        let session = try localSession(rootPath: rootPath)
+        let root = try session.rootNode()
+        let selected = selectedPath.flatMap { try? session.resolve(path: $0) }?.path ?? session.rootURL.path
+        let playlist = playlistPath.flatMap { try? localTracks(for: $0, rootPath: session.rootURL.path) } ?? []
+        return [
+            "rootPath": session.rootURL.path,
+            "tree": try jsonNodes([root]),
+            "selectedFolderPath": selected,
+            "selectedBrowserPath": playlistPath ?? selected,
+            "playlist": playlist,
+            "sidebarMode": "diskPath",
+            "sidebarQuery": "",
+            "selectedDatabaseGameKey": NSNull()
+        ]
+    }
+
+    nonisolated private static func localChildren(_ folderPath: String) throws -> [[String: Any]] {
+        let session = try localSession(rootPath: folderPath)
+        return try jsonNodes(session.children(of: session.rootURL))
+    }
+
+    nonisolated private static func localSelection(_ path: String, file: Bool) throws -> [String: Any] {
+        let inputURL = URL(fileURLWithPath: path).standardizedFileURL
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: inputURL.path, isDirectory: &isDirectory) else {
+            throw LocalFileBrowserError.missingPath(inputURL.path)
+        }
+        if file && (isDirectory.boolValue || FormatRegistry.family(for: inputURL.path) == nil) {
+            throw LocalFileBrowserError.unsupportedTarget(inputURL.path)
+        }
+        let folderURL = isDirectory.boolValue ? inputURL : inputURL.deletingLastPathComponent()
+        let session = try localSession(rootPath: folderURL.path)
+        let playlist = try localTracks(for: isDirectory.boolValue ? folderURL.path : inputURL.path, rootPath: session.rootURL.path)
+        return [
+            "selectedFolderPath": folderURL.path,
+            "selectedBrowserPath": inputURL.path,
+            "playlist": playlist
+        ]
+    }
+
+    nonisolated private static func localSession(rootPath: String) throws -> LocalFileBrowserSession {
+        try LocalFileBrowserSession(rootURL: URL(fileURLWithPath: rootPath)) { url in
+            FormatRegistry.family(for: url.path) != nil
+        }
+    }
+
+    nonisolated private static func localTracks(for path: String, rootPath: String) throws -> [[String: Any]] {
+        let targetURL = URL(fileURLWithPath: path).standardizedFileURL
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: targetURL.path, isDirectory: &isDirectory) else {
+            throw LocalFileBrowserError.missingPath(targetURL.path)
+        }
+        let urls: [URL]
+        if isDirectory.boolValue {
+            urls = try FileManager.default.contentsOfDirectory(
+                at: targetURL,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            )
+            .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }
+            .filter { FormatRegistry.family(for: $0.path) != nil }
+            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+        } else {
+            urls = [targetURL]
+        }
+
+        return try urls.flatMap { try localTrackRows(for: $0, rootPath: rootPath) }
+    }
+
+    nonisolated private static func localTrackRows(for url: URL, rootPath: String) throws -> [[String: Any]] {
+        let structure = try? PlaybackStructureReader.read(path: url.path)
+        let trackStructures = structure?.tracks ?? [.init(index: 0, naturalPlayMilliseconds: 0, fadeMilliseconds: 0)]
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        let fileSize = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+        let modifiedAt = ((attributes?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0) * 1_000
+        let filename = url.lastPathComponent
+        let basename = url.deletingPathExtension().lastPathComponent
+        let game = url.deletingLastPathComponent().lastPathComponent
+        let system = FormatRegistry.family(for: url.path)?.id ?? ""
+        return trackStructures.map { item in
+            [
+                "playlistId": "local-\(url.path)-\(item.index)",
+                "metadataTrackId": 0,
+                "rootPath": rootPath,
+                "path": url.path,
+                "filename": filename,
+                "archivePath": NSNull(),
+                "archiveEntry": NSNull(),
+                "trackIndex": item.index,
+                "trackCount": trackStructures.count,
+                "fileSize": fileSize,
+                "modifiedAt": modifiedAt,
+                "sourceSignature": NSNull(),
+                "scanVersion": 0,
+                "title": basename,
+                "game": game,
+                "artist": "",
+                "system": system,
+                "playLengthMs": item.naturalPlayMilliseconds
+            ]
+        }
+    }
+
+    nonisolated private static func jsonNodes(_ nodes: [LocalFileBrowserNode]) throws -> [[String: Any]] {
+        try nodes.map { node in
+            [
+                "id": node.id,
+                "kind": node.kind.rawValue,
+                "name": node.name,
+                "path": node.path,
+                "parentPath": node.parentPath ?? NSNull(),
+                "children": try jsonNodes(node.children),
+                "childrenLoaded": node.childrenLoaded,
+                "alwaysExpanded": node.alwaysExpanded
+            ]
+        }
+    }
+
     nonisolated private static func emptySnapshot() -> [String: Any] {
         ["rootPath": NSNull(), "tree": [], "selectedFolderPath": NSNull(), "selectedBrowserPath": NSNull(), "playlist": []]
+    }
+
+    nonisolated private static func emptySelection() -> [String: Any] {
+        ["selectedFolderPath": NSNull(), "selectedBrowserPath": NSNull(), "playlist": []]
     }
 
     nonisolated private static func int64(_ value: Any?) -> Int64? {

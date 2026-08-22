@@ -2074,12 +2074,6 @@ async function bootstrap() {
       selectedBrowserPath: state.selectedBrowserPath,
       playlist: []
     };
-  } else if (state.rootPath) {
-    try {
-      snapshot = await window.spcBoyWK.refreshTree(state.rootPath, state.selectedFolderPath);
-    } catch {
-      snapshot = await window.spcBoyWK.bootstrap();
-    }
   } else {
     snapshot = await window.spcBoyWK.bootstrap();
   }
