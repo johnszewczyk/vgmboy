@@ -10,6 +10,8 @@ for the CocoaSpice family of frontends.
 - `CatalogReader`: schema-23 SQLite reader and canonical catalog records.
 - `CatalogBrowserCore`: UI-neutral browser state, grouping, search, identity,
   and deterministic presentation data.
+- `FrontendCommandCore`: shared semantic shortcut definitions for native and
+  WebKit hosts.
 - `CatalogReaderElectronBridge`: narrow command bridge for the archived SPCBoy
   Electron frontend.
 
