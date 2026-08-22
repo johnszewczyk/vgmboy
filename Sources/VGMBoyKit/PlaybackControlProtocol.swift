@@ -5,6 +5,74 @@ public enum PlaybackControlProtocol {
     public static let version = 1
 }
 
+/// Exact, UI-neutral tempo value shared by native and non-native frontends.
+/// Frontends may display the value as a decimal or fraction, but transport
+/// receives the same multiplier through `PlaybackControlPayload.tempo`.
+public struct PlaybackTempo: Codable, Equatable, Sendable {
+    public static let defaultValue = PlaybackTempo(numerator: 1, denominator: 1)
+    public static let maxComponent = 1_000_000
+    public static let maxDecimalPlaces = 6
+
+    public let numerator: Int
+    public let denominator: Int
+
+    public init(numerator: Int, denominator: Int) {
+        let valid = numerator >= 1 && denominator >= 1
+            && numerator <= Self.maxComponent && denominator <= Self.maxComponent
+        guard valid else {
+            self = Self.defaultValue
+            return
+        }
+        let divisor = Self.greatestCommonDivisor(numerator, denominator)
+        self.numerator = numerator / divisor
+        self.denominator = denominator / divisor
+    }
+
+    public var multiplier: Double { Double(numerator) / Double(denominator) }
+
+    public static func parse(_ value: String) -> Self? {
+        let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let slash = text.firstIndex(of: "/") {
+            guard text.firstIndex(of: "/") == text.lastIndex(of: "/"),
+                  let numerator = Int(text[..<slash].trimmingCharacters(in: .whitespaces)),
+                  let denominator = Int(text[text.index(after: slash)...].trimmingCharacters(in: .whitespaces)),
+                  numerator >= 1, denominator >= 1,
+                  numerator <= maxComponent, denominator <= maxComponent else { return nil }
+            return Self(numerator: numerator, denominator: denominator)
+        }
+
+        let parts = text.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count <= 2,
+              parts.allSatisfy({ $0.allSatisfy(\.isNumber) }),
+              !text.isEmpty else { return nil }
+        let whole = parts.first.flatMap { Int($0.isEmpty ? "0" : String($0)) } ?? 0
+        let fraction = parts.count == 2 ? String(parts[1]) : ""
+        guard fraction.count <= maxDecimalPlaces,
+              let fractional = Int(fraction.isEmpty ? "0" : fraction) else { return nil }
+        let denominator = Int(pow(10.0, Double(fraction.count)))
+        let numerator = whole * denominator + fractional
+        guard numerator >= 1, numerator <= maxComponent, denominator <= maxComponent else { return nil }
+        return Self(numerator: numerator, denominator: denominator)
+    }
+
+    public var displayString: String {
+        let scale = Int(pow(10.0, Double(Self.maxDecimalPlaces)))
+        guard scale % denominator == 0 else { return "\(numerator)/\(denominator)" }
+        let scaled = numerator * (scale / denominator)
+        let text = String(format: "%0*d", Self.maxDecimalPlaces + 1, scaled)
+        let integer = text.dropLast(Self.maxDecimalPlaces)
+        let fraction = text.suffix(Self.maxDecimalPlaces).replacingOccurrences(of: "0+$", with: "", options: .regularExpression)
+        return fraction.isEmpty ? String(integer) : "\(integer).\(fraction)"
+    }
+
+    private static func greatestCommonDivisor(_ left: Int, _ right: Int) -> Int {
+        var a = abs(left)
+        var b = abs(right)
+        while b != 0 { (a, b) = (b, a % b) }
+        return a == 0 ? 1 : a
+    }
+}
+
 public enum PlaybackControlCommand: String, Codable, Sendable {
     case load
     case play

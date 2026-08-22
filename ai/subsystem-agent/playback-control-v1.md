@@ -30,6 +30,9 @@ rows, and macOS Now Playing registration. The CLI is one client of this same bou
   changes, and `status`; `subscribe` is its callback-registration API rather than a command, and
   process shutdown stays with the hosting app. There are deliberately no queue, next, previous,
   repeat, shuffle, catalog-write, or playlist-mutation commands.
+- `PlaybackTempo` is the shared exact decimal/fraction representation for frontend settings. The
+  host converts it to the typed `set_tempo` multiplier; decoder-family capability remains owned by
+  `FormatRegistry` and currently enables native tempo for libgme and libvgm.
 - The equalizer is CocoaSpice-compatible: ten parametric bands at 31, 62, 125, 250, 500, 1k,
   2k, 4k, 8k, and 16k Hz, each constrained to -12...+12 dB. It is applied before the direct
   AudioUnit ring so every decoder sees identical EQ behavior; the transport callback applies only

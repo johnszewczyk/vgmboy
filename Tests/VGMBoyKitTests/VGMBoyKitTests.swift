@@ -162,6 +162,16 @@ struct FormatRegistryTests {
 
 @Suite("PlaybackControlProtocol")
 struct PlaybackControlProtocolTests {
+    @Test("tempo values preserve exact decimal and fraction input")
+    func tempoValuesPreserveExactInput() {
+        #expect(PlaybackTempo.parse("1.25") == PlaybackTempo(numerator: 5, denominator: 4))
+        #expect(PlaybackTempo.parse(".5") == PlaybackTempo(numerator: 1, denominator: 2))
+        #expect(PlaybackTempo.parse("15/12") == PlaybackTempo(numerator: 5, denominator: 4))
+        #expect(PlaybackTempo(numerator: 5, denominator: 4).displayString == "1.25")
+        #expect(PlaybackTempo(numerator: 1, denominator: 3).displayString == "1/3")
+        #expect(PlaybackTempo.parse("1.0000001") == nil)
+    }
+
     @Test("v1 load control round-trips through Codable")
     func loadRequestRoundTrip() throws {
         let request = PlaybackControlRequest(
