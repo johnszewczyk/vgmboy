@@ -1,5 +1,5 @@
 (() => {
-  const api = window.spcBoy;
+  const api = window.spcBoyWK;
   const summary = document.getElementById("scan-log-summary");
   const body = document.getElementById("scan-log-body");
   const copyButton = document.getElementById("scan-log-copy");

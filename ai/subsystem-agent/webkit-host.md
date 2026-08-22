@@ -2,7 +2,8 @@
 
 ## Scope
 
-The native executable owns the application window and a single WKWebView.
+The native executable owns the application window, a single WKWebView, and
+the `spcBoyWK` message bridge.
 
 ## Ownership
 
@@ -16,7 +17,7 @@ the remaining frontend commands through the narrow `SPCBoyWK` dispatcher.
 ## Failure Boundaries
 
 Missing packaged resources are fatal. The host must not silently fall back to
-Electron, raw filesystem scanning, or a second catalog implementation.
+raw filesystem scanning or a second catalog implementation.
 
 ## Files
 

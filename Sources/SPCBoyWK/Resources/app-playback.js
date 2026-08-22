@@ -33,7 +33,7 @@ async function fadeActiveOutput(durationMs = TRANSPORT_DECLICK_MS) {
   const activeTrack = activeTrackInfo();
   if (nativePlaybackInitialized && activeTrack) {
     try {
-      await window.spcBoy.nativePlaybackRampGain?.(0, durationMs);
+      await window.spcBoyWK.nativePlaybackRampGain?.(0, durationMs);
     } catch {
       // The normal stop path still has to complete if a helper exited between
       // the transition request and its short output envelope.
@@ -131,8 +131,8 @@ async function stopAllOutput({ declick = true, keepNativeOutput = false } = {}) 
   if (declick) await fadeActiveOutput();
   if (nativePlaybackInitialized) {
     try {
-      if (keepNativeOutput) await window.spcBoy.nativePlaybackUnload();
-      else await window.spcBoy.nativePlaybackStop();
+      if (keepNativeOutput) await window.spcBoyWK.nativePlaybackUnload();
+      else await window.spcBoyWK.nativePlaybackStop();
     } catch {
       // A stopped or not-yet-primed native session is already safe to replace.
     }
@@ -333,7 +333,7 @@ function handleNativePlaybackState(snapshot) {
 
 async function setPlaybackPowerSaveBlocker(enabled) {
   try {
-    await window.spcBoy.setPlaybackPowerSaveBlocker(enabled);
+    await window.spcBoyWK.setPlaybackPowerSaveBlocker(enabled);
   } catch {
     // Power-save blocker is best-effort support around playback.
   }
@@ -344,8 +344,8 @@ async function ensureNativePlaybackInitialized() {
     return;
   }
 
-  await window.spcBoy.nativePlaybackInit();
-  await window.spcBoy.nativePlaybackAudioConfig(
+  await window.spcBoyWK.nativePlaybackInit();
+  await window.spcBoyWK.nativePlaybackAudioConfig(
     state.appVolume,
     state.equalizerEnabled,
     state.equalizerBandGains
@@ -392,7 +392,7 @@ function applyNativePlaybackSnapshot(track, snapshot, generation) {
 }
 
 async function readNativePlaybackState(track, generation) {
-  const snapshot = await window.spcBoy.nativePlaybackState();
+  const snapshot = await window.spcBoyWK.nativePlaybackState();
   applyNativePlaybackSnapshot(track, snapshot, generation);
   return snapshot;
 }
@@ -487,7 +487,7 @@ async function stopPlaybackState({ declick = true, keepNativeOutput = false } = 
   await stopAllOutput({ declick, keepNativeOutput });
   // The core owns every output path; release an archive materialization only
   // after the bridge has stopped or unloaded it.
-  try { await window.spcBoy.releaseMaterializedTrack?.(); } catch {}
+  try { await window.spcBoyWK.releaseMaterializedTrack?.(); } catch {}
 
   await setPlaybackPowerSaveBlocker(false);
   state.currentTrackId = null;
@@ -545,7 +545,7 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
     // Hold the archive materialization while the bridge owns the source path.
     await setPlaybackPowerSaveBlocker(true);
     const playbackPath = track.archivePath
-      ? await window.spcBoy.materializeTrack(track.archivePath, track.archiveEntry)
+      ? await window.spcBoyWK.materializeTrack(track.archivePath, track.archiveEntry)
       : track.path;
     if (!track.metadataLoaded && playbackApp.ui?.hydrateTrackMetadata) {
       track = await playbackApp.ui.hydrateTrackMetadata(track.id, playbackPath, track.sourceFilename || track.filename) || track;
@@ -577,7 +577,7 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
       return;
     }
     await ensureNativePlaybackInitialized();
-    await window.spcBoy.nativePlaybackLoad(
+    await window.spcBoyWK.nativePlaybackLoad(
       playbackPath,
       track.trackIndex || 0,
       Math.round(requestedStartSeconds * 1000),
@@ -590,7 +590,7 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
     }
 
     await setPlaybackPowerSaveBlocker(true);
-    await window.spcBoy.nativePlaybackPlay();
+    await window.spcBoyWK.nativePlaybackPlay();
     if (generation !== playbackGeneration) {
       return;
     }
@@ -605,7 +605,7 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
     await setPlaybackPowerSaveBlocker(false);
     state.isPlaying = false;
     resetNativePlaybackSnapshot();
-    try { await window.spcBoy.nativePlaybackClose(); } catch {}
+    try { await window.spcBoyWK.nativePlaybackClose(); } catch {}
     nativePlaybackInitialized = false;
     updatePlaybackReadout();
     updateNativeDiagnostics();
@@ -697,7 +697,7 @@ async function togglePlayback() {
     clearPlaybackRuntimeState();
     try {
       await fadeActiveOutput(TRANSPORT_DECLICK_MS);
-      const snapshot = await window.spcBoy.nativePlaybackPause();
+      const snapshot = await window.spcBoyWK.nativePlaybackPause();
       await setPlaybackPowerSaveBlocker(false);
       applyNativePlaybackSnapshot(track, snapshot, playbackGeneration);
       updatePlaybackReadout();

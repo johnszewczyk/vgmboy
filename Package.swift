@@ -9,14 +9,17 @@ let package = Package(
         .executable(name: "SPCBoyWK", targets: ["SPCBoyWK"])
     ],
     dependencies: [
-        .package(path: "../CatalogReader")
+        .package(path: "../CatalogReader"),
+        .package(path: "../VGMBoy")
     ],
     targets: [
         .executableTarget(
             name: "SPCBoyWK",
             dependencies: [
                 .product(name: "CatalogBrowserCore", package: "CatalogReader"),
-                .product(name: "FrontendCommandCore", package: "CatalogReader")
+                .product(name: "FrontendCommandCore", package: "CatalogReader"),
+                .product(name: "CatalogReader", package: "CatalogReader"),
+                .product(name: "VGMBoyKit", package: "VGMBoy")
             ],
             resources: [.process("Resources")],
             linkerSettings: [

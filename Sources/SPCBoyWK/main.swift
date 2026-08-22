@@ -10,9 +10,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let configuration = WKWebViewConfiguration()
+        let nativeBridge = WKNativeBridge()
+        configuration.userContentController.add(nativeBridge, name: "spcBoyWK")
         let initialState = CatalogBrowserState()
         let stateData = try! JSONEncoder().encode(initialState)
         let stateJSON = String(decoding: stateData, as: UTF8.self)
+        configuration.userContentController.addUserScript(nativeBridge.userScript())
         configuration.userContentController.addUserScript(WKUserScript(
             source: """
             window.spcbBrowserState = \(stateJSON);
@@ -31,41 +34,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                   case "sidebarPaths": app.ui?.setSidebarMode?.("paths"); break;
                   case "sidebarConsoles": app.ui?.setSidebarMode?.("consoles"); break;
                   case "sidebarDiskPath": app.ui?.setSidebarMode?.("diskPath"); break;
-                  case "settings": window.spcBoy?.openOptionsWindow?.(); break;
+                  case "settings": window.spcBoyWK?.openOptionsWindow?.(); break;
                   default: break;
                 }
               }
               window.addEventListener("load", () => pending.splice(0).forEach(dispatch), { once: true });
               return { dispatch };
             }();
-            window.spcBoy = {
-              isOptionsWindow: false,
-              playbackBackends: [],
-              bootstrap: async () => ({ rootPath: null, tree: [], selectedFolderPath: null, selectedBrowserPath: null, playlist: [] }),
-              refreshTree: async () => ({ rootPath: null, tree: [], selectedFolderPath: null, selectedBrowserPath: null, playlist: [] }),
-              databaseLocation: async () => null,
-              databaseRoots: async () => [],
-              databaseGames: async () => [],
-              databaseFiles: async () => [],
-              databaseSearchGames: async () => [],
-              databaseGameTracks: async () => [],
-              databaseFileTracks: async () => [],
-              databaseFolderTracks: async () => [],
-              configureArchiveCache: async () => null,
-              setRoutingPreferences: async (value) => value || {},
-              setPlaybackSettings: () => undefined,
-              setAppearanceSettings: () => undefined,
-              showSidebarViewMenu: async () => undefined,
-              openPath: async () => ({ rootPath: null, tree: [], selectedFolderPath: null, selectedBrowserPath: null, playlist: [] }),
-              onCatalogReloaded: () => undefined,
-              onLibrarySnapshot: () => undefined,
-              onLibraryCommand: () => undefined,
-              onNativePlaybackState: () => undefined,
-              onPlaybackSettingsChanged: () => undefined,
-              onAppearanceSettingsChanged: () => undefined,
-              onRoutingPreferencesChanged: () => undefined,
-              onTransportShortcut: () => undefined
-            };
             """,
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true

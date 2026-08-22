@@ -2,15 +2,15 @@
 
 ## Product
 
-`SPCBoy (WK)` is the native macOS WebKit frontend track for SPCBoy. It is a
-separate successor project, not a compatibility layer inside the Electron app.
+`SPCBoy (WK)` is an independent native macOS WebKit frontend for SPCBoy.
 
 ## Major Components
 
 - AppKit window and WKWebView host.
-- The current SPCBoy renderer skin, staged from the Electron frontend.
+- The current SPCBoy renderer skin, adapted for the native WebKit bridge.
 - Shared `CatalogBrowserCore` sidebar behavior.
-- Future `CatalogReader` and VGMBoy integration.
+- Read-only `CatalogReader` integration.
+- In-process VGMBoy playback integration, added behind the native bridge.
 
 ## Task Routing
 
@@ -23,10 +23,10 @@ Agent engineering notes:
 
 - Launch through `./launch.sh`; it performs a clean release rebuild first.
 - Keep catalog access read-only and behind a narrow native bridge.
-- The current WK bridge is a startup-only placeholder; do not treat empty
-  catalog data as a working catalog integration.
+- The WK bridge is the only native capability boundary. Keep it typed by
+  named requests and keep catalog access read-only.
 - Keep playback ownership in VGMBoy; this project owns presentation and host integration.
-- Do not expand the archived Electron implementation here.
+- Do not add renderer-runtime dependencies or a second catalog implementation.
 
 ## Human Docs
 

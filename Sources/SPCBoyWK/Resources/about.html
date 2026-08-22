@@ -80,16 +80,22 @@
         <h2>Application and archive runtime</h2>
         <div class="about-dependency-grid">
           <article class="about-dependency">
-            <h3>Electron</h3>
-            <p>macOS application shell and isolated Chromium renderer.</p>
-            <p><strong>Version:</strong> 43.0.0.</p>
-            <p><strong>License:</strong> MIT · <a href="https://github.com/electron/electron">GitHub</a></p>
+            <h3>AppKit + WebKit</h3>
+            <p>Native macOS application shell and WKWebView renderer host.</p>
+            <p><strong>Version:</strong> system frameworks.</p>
+            <p><strong>License:</strong> Apple platform frameworks.</p>
           </article>
           <article class="about-dependency">
             <h3>SQLite</h3>
-            <p>Read-only access to the shared MediaScanner catalog through Node's bundled SQLite runtime.</p>
-            <p><strong>Version:</strong> system runtime; detected from the installed command.</p>
+            <p>Read-only access to the shared MediaScanner catalog through the native CatalogReader package.</p>
+            <p><strong>Version:</strong> schema 23 reader.</p>
             <p><strong>License:</strong> public domain · <a href="https://sqlite.org/">Homepage</a></p>
+          </article>
+          <article class="about-dependency">
+            <h3>VGMBoyKit</h3>
+            <p>In-process playback core shared by SPCBoy and other frontends.</p>
+            <p><strong>Version:</strong> workspace source.</p>
+            <p><strong>License:</strong> project and upstream notices.</p>
           </article>
           <article class="about-dependency">
             <h3>Archive tools</h3>

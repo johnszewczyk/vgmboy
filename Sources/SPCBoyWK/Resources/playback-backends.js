@@ -1,7 +1,7 @@
 (() => {
-  const BACKENDS = window.spcBoy?.playbackBackends;
+  const BACKENDS = window.spcBoyWK?.playbackBackends;
   if (!Array.isArray(BACKENDS)) {
-    throw new Error("Playback backend registry is unavailable from the Electron preload bridge.");
+    throw new Error("Playback backend registry is unavailable from the SPCBoy WK native bridge.");
   }
   const CANDIDATES_BY_EXTENSION = new Map();
   for (const backend of BACKENDS) {

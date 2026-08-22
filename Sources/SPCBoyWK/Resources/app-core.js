@@ -1,6 +1,6 @@
 const DEFAULT_PLAY_FADE_SECONDS = 6;
 const SAMPLE_RATE = 44_100;
-const STORAGE_KEY = "spcboy-electron-settings";
+const STORAGE_KEY = "spcboy-wk-settings";
 const DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES = 2 * 1024 * 1024 * 1024;
 const ARCHIVE_CACHE_LIMIT_CHOICES = Object.freeze([512, 1024, 2048, 4096].map((megabytes) => megabytes * 1024 * 1024));
 const COLUMN_DEFS = [

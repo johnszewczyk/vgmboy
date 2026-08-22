@@ -174,7 +174,7 @@ function scrollSelectedBrowserItemIntoView() {
 
 async function loadBrowserChildren(node) {
   if (node.kind !== "folder" || node.childrenLoaded) return;
-  node.children = await window.spcBoy.listFolder(node.path);
+  node.children = await window.spcBoyWK.listFolder(node.path);
   node.childrenLoaded = true;
 }
 
@@ -189,19 +189,19 @@ function catalogPlaylistSelection(rows, selectedPath) {
 async function loadBrowserSelection(node) {
   if (node.catalogFile) {
     return catalogPlaylistSelection(
-      await window.spcBoy.databaseFileTracks([node.catalogFile]),
+      await window.spcBoyWK.databaseFileTracks([node.catalogFile]),
       node.catalogFile.path
     );
   }
   if (node.catalogFolder) {
     return catalogPlaylistSelection(
-      await window.spcBoy.databaseFolderTracks([node.catalogFolder]),
+      await window.spcBoyWK.databaseFolderTracks([node.catalogFolder]),
       node.catalogFolder.folderPath
     );
   }
   return node.kind === "folder"
-    ? window.spcBoy.selectFolder(node.path)
-    : window.spcBoy.selectFile(node.path);
+    ? window.spcBoyWK.selectFolder(node.path)
+    : window.spcBoyWK.selectFile(node.path);
 }
 
 function hideSidebarContextMenu() {
@@ -240,7 +240,7 @@ function showSidebarContextMenu(node, event) {
   syncTreeSelection();
   const finderPath = node.catalogFile?.path || node.catalogFolder?.folderPath || node.path;
   showContextMenu(event, [
-    ["Show in Finder", async () => window.spcBoy.showInFinder(finderPath)],
+    ["Show in Finder", async () => window.spcBoyWK.showInFinder(finderPath)],
     ["Play Now", async () => activateBrowserNode(node)],
     ["Queue", async () => queueBrowserNode(node)]
   ]);
@@ -596,15 +596,15 @@ function makeDatabaseGameButton(game) {
     persistSettings();
     showContextMenu(event, [
       ["Show in Finder", async () => {
-        const rows = await window.spcBoy.databaseGameTracks([game]);
+        const rows = await window.spcBoyWK.databaseGameTracks([game]);
         const row = rows[0];
-        if (row) await window.spcBoy.showInFinder(row.archivePath || row.path);
+        if (row) await window.spcBoyWK.showInFinder(row.archivePath || row.path);
       }],
       ["Play Now", async () => {
         await loadDatabaseGame(game);
         if (state.playlist[0]) await uiApp.playback.playTrack(state.playlist[0].id, 0);
       }],
-      ["Queue", async () => appendPlaylistTracks(databaseRowsToPlaylistTracks(await window.spcBoy.databaseGameTracks([game]), [game]))]
+      ["Queue", async () => appendPlaylistTracks(databaseRowsToPlaylistTracks(await window.spcBoyWK.databaseGameTracks([game]), [game]))]
     ]);
   });
   return button;
@@ -751,7 +751,7 @@ async function loadDatabaseGames() {
 
 async function loadDatabaseFiles() {
   try {
-    state.databaseFiles = await window.spcBoy.databaseFiles();
+    state.databaseFiles = await window.spcBoyWK.databaseFiles();
     state.databaseFileTree = buildCatalogFileTree(state.databaseFiles);
     state.databaseSidebarError = "";
   } catch (error) {
@@ -776,7 +776,7 @@ async function setSidebarMode(mode) {
 async function refreshDatabaseGamesForVisibleRoots() {
   const previousSelection = state.selectedDatabaseGameKey;
   try {
-    state.databaseGames = await window.spcBoy.databaseGames();
+    state.databaseGames = await window.spcBoyWK.databaseGames();
   } catch (error) {
     reportDatabaseSidebarError("read the database sidebar", error);
     throw error;
@@ -800,9 +800,9 @@ function updateSidebarSearch(query) {
   renderSidebar();
   const requestedQuery = state.sidebarQuery.trim();
   if (!requestedQuery) return;
-  if (window.spcBoy?.databaseSearchGames) {
+  if (window.spcBoyWK?.databaseSearchGames) {
     sidebarSearchTimer = window.setTimeout(() => {
-      window.spcBoy.databaseSearchGames(requestedQuery)
+      window.spcBoyWK.databaseSearchGames(requestedQuery)
         .then((games) => {
           if (databaseGeneration !== state.databaseSearchGeneration || state.sidebarQuery.trim() !== requestedQuery) return;
           state.databaseSidebarError = "";
@@ -859,7 +859,7 @@ function databaseRowsToPlaylistTracks(rows, games) {
 
 async function loadDatabaseGamesIntoPlaylist(games) {
   const loadGeneration = ++playlistLoadGeneration;
-  const rows = await window.spcBoy.databaseGameTracks(games);
+  const rows = await window.spcBoyWK.databaseGameTracks(games);
   if (loadGeneration !== playlistLoadGeneration) return;
   state.databaseSidebarError = "";
   state.selectedDatabaseGameKey = games.length === 1 ? databaseGameKey(games[0]) : null;
@@ -1467,7 +1467,7 @@ function appearanceSettings() {
 }
 
 function broadcastAppearanceSettings() {
-  window.spcBoy?.setAppearanceSettings?.(appearanceSettings());
+  window.spcBoyWK?.setAppearanceSettings?.(appearanceSettings());
 }
 
 function formatArchiveCacheSummary(summary) {
@@ -1503,7 +1503,7 @@ function setRoutingPreference(extension, backendId) {
   else nextPreferences[extension] = backendId;
   state.routingPreferences = nextPreferences;
   persistSettings();
-  window.spcBoy?.setRoutingPreferences?.(nextPreferences).then((normalizedPreferences) => {
+  window.spcBoyWK?.setRoutingPreferences?.(nextPreferences).then((normalizedPreferences) => {
     state.routingPreferences = { ...normalizedPreferences };
     persistSettings();
     renderAll();
@@ -1644,8 +1644,8 @@ async function hydratePlaylistMetadata() {
     }
   };
   const hydrateRaw = Promise.all(Array.from({ length: Math.min(4, rawTrackIds.length) }, worker));
-  const hydrateArchives = window.spcBoy?.hydrateArchiveMetadata && archiveTracks.length
-    ? window.spcBoy.hydrateArchiveMetadata(archiveTracks.map((track) => ({
+  const hydrateArchives = window.spcBoyWK?.hydrateArchiveMetadata && archiveTracks.length
+    ? window.spcBoyWK.hydrateArchiveMetadata(archiveTracks.map((track) => ({
       id: track.id,
       path: track.path,
       archivePath: track.archivePath,
@@ -1685,9 +1685,9 @@ async function hydrateTrackMetadata(trackId, inspectionPath = null, sourceName =
   if (!track || track.metadataLoaded) return track;
 
   try {
-    const hydrateLoose = window.spcBoy.hydrateLooseMetadata
-      ? (payload) => window.spcBoy.hydrateLooseMetadata(payload)
-      : (payload) => window.spcBoy.inspectTrack(payload.inspectionPath, payload.sourceFilename);
+    const hydrateLoose = window.spcBoyWK.hydrateLooseMetadata
+      ? (payload) => window.spcBoyWK.hydrateLooseMetadata(payload)
+      : (payload) => window.spcBoyWK.inspectTrack(payload.inspectionPath, payload.sourceFilename);
     const inspection = await hydrateLoose({
       path: track.path,
       trackIndex: track.trackIndex,
@@ -1709,7 +1709,7 @@ async function hydrateTrackMetadata(trackId, inspectionPath = null, sourceName =
 function setPlayTime(nextSeconds) {
   state.manualPlayTimeSeconds = uiApp.normalizePlayTime(nextSeconds);
   persistSettings();
-  window.spcBoy?.setPlaybackSettings?.({ manualPlayTimeSeconds: state.manualPlayTimeSeconds });
+  window.spcBoyWK?.setPlaybackSettings?.({ manualPlayTimeSeconds: state.manualPlayTimeSeconds });
   uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
     console.error(error);
   });
@@ -1718,7 +1718,7 @@ function setPlayTime(nextSeconds) {
 function setSpcForceManualTime(nextEnabled) {
   state.longPlayEnabled = Boolean(nextEnabled);
   persistSettings();
-  window.spcBoy?.setPlaybackSettings?.({ longPlayEnabled: state.longPlayEnabled });
+  window.spcBoyWK?.setPlaybackSettings?.({ longPlayEnabled: state.longPlayEnabled });
   uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
     console.error(error);
   });
@@ -1750,7 +1750,7 @@ function setSpcFadeEnabled(nextEnabled) {
 function setQueuedSkipsEnabled(nextEnabled) {
   state.queuedSkipsEnabled = Boolean(nextEnabled);
   persistSettings();
-  window.spcBoy?.setPlaybackSettings?.({ queuedSkipsEnabled: state.queuedSkipsEnabled });
+  window.spcBoyWK?.setPlaybackSettings?.({ queuedSkipsEnabled: state.queuedSkipsEnabled });
   renderAll();
 }
 
@@ -1760,11 +1760,11 @@ async function applyArchiveCacheSettings() {
     limitBytes: state.archiveCacheLimitBytes
   };
   persistSettings();
-  window.spcBoy?.setPlaybackSettings?.({
+  window.spcBoyWK?.setPlaybackSettings?.({
     archiveCacheEnabled: settings.enabled,
     archiveCacheLimitBytes: settings.limitBytes
   });
-  const configured = await window.spcBoy?.configureArchiveCache?.(settings);
+  const configured = await window.spcBoyWK?.configureArchiveCache?.(settings);
   if (configured?.summary) {
     state.archiveCacheSummary = { ...configured.summary, enabled: configured.enabled, limitBytes: configured.limitBytes };
   }
@@ -1797,8 +1797,8 @@ function audioSettingsPayload() {
 
 function broadcastAudioSettings() {
   const settings = audioSettingsPayload();
-  window.spcBoy?.setPlaybackSettings?.(settings);
-  window.spcBoy?.nativePlaybackAudioConfig?.(state.appVolume, state.equalizerEnabled, state.equalizerBandGains).catch?.(() => {});
+  window.spcBoyWK?.setPlaybackSettings?.(settings);
+  window.spcBoyWK?.nativePlaybackAudioConfig?.(state.appVolume, state.equalizerEnabled, state.equalizerBandGains).catch?.(() => {});
   uiApp.playback.setAudioSettings?.(settings);
 }
 
@@ -1839,7 +1839,7 @@ function commitSpcLengthInput(rawValue) {
   const parsedSeconds = uiApp.parseDurationSeconds(rawValue);
   state.manualPlayTimeSeconds = uiApp.normalizePlayTime(parsedSeconds ?? state.manualPlayTimeSeconds);
   persistSettings();
-  window.spcBoy?.setPlaybackSettings?.({ manualPlayTimeSeconds: state.manualPlayTimeSeconds });
+  window.spcBoyWK?.setPlaybackSettings?.({ manualPlayTimeSeconds: state.manualPlayTimeSeconds });
   uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
     console.error(error);
   });
@@ -1849,7 +1849,7 @@ function commitSpcFadeInput(rawValue) {
   const parsedSeconds = uiApp.parseDurationSeconds(rawValue);
   state.spcFadeSeconds = uiApp.normalizeFadeTime(parsedSeconds ?? state.spcFadeSeconds);
   persistSettings();
-  window.spcBoy?.setPlaybackSettings?.({ spcFadeSeconds: state.spcFadeSeconds });
+  window.spcBoyWK?.setPlaybackSettings?.({ spcFadeSeconds: state.spcFadeSeconds });
   uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
     console.error(error);
   });
@@ -1870,7 +1870,7 @@ function commitPlaybackSpeedInput(backendId, rawValue) {
   }
   state[speedKey] = parsedSpeed;
   persistSettings();
-  window.spcBoy?.setPlaybackSettings?.({ [speedKey]: state[speedKey] });
+  window.spcBoyWK?.setPlaybackSettings?.({ [speedKey]: state[speedKey] });
   if (state[enabledKey]) uiApp.playback.refreshPlaybackForSpeedChange(backendId).catch((error) => console.error(error));
   renderAll();
 }
@@ -1879,7 +1879,7 @@ function setPlaybackSpeedEnabled(backendId, enabled) {
   const enabledKey = backendId === "libvgm" ? "libvgmPlaybackSpeedEnabled" : "playbackSpeedEnabled";
   state[enabledKey] = Boolean(enabled);
   persistSettings();
-  window.spcBoy?.setPlaybackSettings?.({ [enabledKey]: state[enabledKey] });
+  window.spcBoyWK?.setPlaybackSettings?.({ [enabledKey]: state[enabledKey] });
   uiApp.playback.refreshPlaybackForSpeedChange(backendId).catch((error) => console.error(error));
   renderAll();
 }
@@ -2016,12 +2016,12 @@ function commitSidebarWidthInput(rawValue) {
 }
 
 function setOptionsOpen(nextOpen) {
-  if (nextOpen && !window.spcBoy?.isOptionsWindow) {
-    window.spcBoy.openOptionsWindow().catch((error) => console.error("[SPCBoy] open options failed", error));
+  if (nextOpen && !window.spcBoyWK?.isOptionsWindow) {
+    window.spcBoyWK.openOptionsWindow().catch((error) => console.error("[SPCBoy] open options failed", error));
     return;
   }
-  if (!nextOpen && window.spcBoy?.isOptionsWindow) {
-    window.spcBoy.closeOptionsWindow();
+  if (!nextOpen && window.spcBoyWK?.isOptionsWindow) {
+    window.spcBoyWK.closeOptionsWindow();
     return;
   }
   state.optionsOpen = nextOpen;
@@ -2034,36 +2034,36 @@ function setOptionsOpen(nextOpen) {
 }
 
 async function bootstrap() {
-  if (window.spcBoy?.isOptionsWindow) {
+  if (window.spcBoyWK?.isOptionsWindow) {
     document.body.classList.add("options-window");
     state.optionsOpen = true;
   } else {
     refs.optionsOverlay.remove();
   }
-  if (!window.spcBoy?.bootstrap || !window.spcBoy?.refreshTree) {
-    const message = "Renderer bridge missing. File loading is unavailable.";
+  if (!window.spcBoyWK?.bootstrap || !window.spcBoyWK?.refreshTree) {
+    const message = "SPCBoy WK native bridge is unavailable. File loading is unavailable.";
     showStartupFailure(message);
     throw new Error(message);
   }
 
   loadSettings();
   collapsedDatabaseConsoles = new Set(state.collapsedConsoleNames);
-  state.databaseLocation = await window.spcBoy?.databaseLocation?.() || null;
+  state.databaseLocation = await window.spcBoyWK?.databaseLocation?.() || null;
   state.databaseLocationStatus = state.databaseLocation?.requiresRestart
     ? "Restart SPCBoy to use the selected database."
     : "The shared MediaScanner catalog is active and opened read-only.";
-  if (window.spcBoy?.isOptionsWindow) renderAll();
-  await window.spcBoy?.configureArchiveCache?.({
+  if (window.spcBoyWK?.isOptionsWindow) renderAll();
+  await window.spcBoyWK?.configureArchiveCache?.({
     enabled: state.archiveCacheEnabled,
     limitBytes: state.archiveCacheLimitBytes
   });
   await uiApp.ui.refreshArchiveCacheSummary();
-  if (window.spcBoy?.setRoutingPreferences) {
-    state.routingPreferences = { ...(await window.spcBoy.setRoutingPreferences(state.routingPreferences)) };
+  if (window.spcBoyWK?.setRoutingPreferences) {
+    state.routingPreferences = { ...(await window.spcBoyWK.setRoutingPreferences(state.routingPreferences)) };
     persistSettings();
   }
   let snapshot;
-  if (window.spcBoy?.isOptionsWindow) {
+  if (window.spcBoyWK?.isOptionsWindow) {
     // Options owns settings/library controls, not the raw browser. Do not
     // enumerate the persisted JoshW root just to paint this window.
     snapshot = {
@@ -2075,12 +2075,12 @@ async function bootstrap() {
     };
   } else if (state.rootPath) {
     try {
-      snapshot = await window.spcBoy.refreshTree(state.rootPath, state.selectedFolderPath);
+      snapshot = await window.spcBoyWK.refreshTree(state.rootPath, state.selectedFolderPath);
     } catch {
-      snapshot = await window.spcBoy.bootstrap();
+      snapshot = await window.spcBoyWK.bootstrap();
     }
   } else {
-    snapshot = await window.spcBoy.bootstrap();
+    snapshot = await window.spcBoyWK.bootstrap();
   }
 
   Object.assign(state, snapshot);
@@ -2089,8 +2089,8 @@ async function bootstrap() {
   state.lastSelectedTrackId = state.selectedTrackId;
   state.totalSeconds = targetPlaybackSeconds();
   persistSettings();
-  if (!window.spcBoy?.isOptionsWindow && window.spcBoy?.databaseRoots) {
-    state.libraryRoots = await window.spcBoy.databaseRoots();
+  if (!window.spcBoyWK?.isOptionsWindow && window.spcBoyWK?.databaseRoots) {
+    state.libraryRoots = await window.spcBoyWK.databaseRoots();
     await uiApp.ui.handleLibraryRootsChanged(state.libraryRoots);
   }
   renderAll();
@@ -2107,7 +2107,7 @@ async function bootstrap() {
 }
 
 async function openLibraryRoot() {
-  const snapshot = await window.spcBoy.chooseRootFolder();
+  const snapshot = await window.spcBoyWK.chooseRootFolder();
   if (!snapshot) {
     return;
   }

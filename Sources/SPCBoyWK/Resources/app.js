@@ -248,8 +248,8 @@ refs.accentColorInput.addEventListener("blur", (event) => {
   app.ui.setAccentColor(event.target.value);
 });
 
-if (window.spcBoy?.onPlaybackSettingsChanged) {
-  window.spcBoy.onPlaybackSettingsChanged((settings) => {
+if (window.spcBoyWK?.onPlaybackSettingsChanged) {
+  window.spcBoyWK.onPlaybackSettingsChanged((settings) => {
     if (typeof settings.longPlayEnabled === "boolean") {
       state.longPlayEnabled = settings.longPlayEnabled;
       app.playback.refreshPlaybackForTimingChange().catch((error) => console.error(error));
@@ -310,20 +310,20 @@ if (window.spcBoy?.onPlaybackSettingsChanged) {
   });
 }
 
-if (window.spcBoy?.onAppearanceSettingsChanged) {
-  window.spcBoy.onAppearanceSettingsChanged((settings) => {
+if (window.spcBoyWK?.onAppearanceSettingsChanged) {
+  window.spcBoyWK.onAppearanceSettingsChanged((settings) => {
     app.ui.applyAppearanceSettings(settings);
   });
 }
 
-if (window.spcBoy?.onRoutingPreferencesChanged) {
-  window.spcBoy.onRoutingPreferencesChanged((preferences) => {
+if (window.spcBoyWK?.onRoutingPreferencesChanged) {
+  window.spcBoyWK.onRoutingPreferencesChanged((preferences) => {
     app.ui.applyRoutingPreferences(preferences);
   });
 }
 
-if (window.spcBoy?.onCatalogReloaded) {
-  window.spcBoy.onCatalogReloaded((location) => {
+if (window.spcBoyWK?.onCatalogReloaded) {
+  window.spcBoyWK.onCatalogReloaded((location) => {
     app.ui.handleCatalogReloaded(location).catch((error) => console.error("[SPCBoy] catalog reload refresh failed", error));
   });
 }
@@ -431,7 +431,7 @@ document.addEventListener("drop", (event) => {
   document.body.classList.remove("is-file-drag-over");
   const inputPath = droppedPath(event);
   if (!inputPath) return;
-  window.spcBoy.openPath(inputPath)
+  window.spcBoyWK.openPath(inputPath)
     .then((snapshot) => app.ui.applyLibrarySnapshot(snapshot))
     .catch((error) => console.error("[SPCBoy] dropped path failed", error));
 });
@@ -441,13 +441,13 @@ refs.sidebarSearchInput.addEventListener("input", (event) => {
 });
 
 refs.sidebarViewMenuButton.addEventListener("click", () => {
-  window.spcBoy.showSidebarViewMenu().catch((error) => console.error("[SPCBoy] sidebar view menu failed", error));
+  window.spcBoyWK.showSidebarViewMenu().catch((error) => console.error("[SPCBoy] sidebar view menu failed", error));
 });
 
-if (window.spcBoy?.onTransportShortcut) {
-  window.spcBoy.onTransportShortcut((action) => {
+if (window.spcBoyWK?.onTransportShortcut) {
+  window.spcBoyWK.onTransportShortcut((action) => {
     if (action === "settings") {
-      window.spcBoy.openOptionsWindow().catch((error) => console.error(error));
+      window.spcBoyWK.openOptionsWindow().catch((error) => console.error(error));
       return;
     }
 
@@ -469,8 +469,8 @@ if (window.spcBoy?.onTransportShortcut) {
   });
 }
 
-if (window.spcBoy?.onLibrarySnapshot) {
-  window.spcBoy.onLibrarySnapshot((snapshot) => {
+if (window.spcBoyWK?.onLibrarySnapshot) {
+  window.spcBoyWK.onLibrarySnapshot((snapshot) => {
     if (!snapshot) {
       return;
     }
@@ -479,8 +479,8 @@ if (window.spcBoy?.onLibrarySnapshot) {
   });
 }
 
-if (window.spcBoy?.onLibraryCommand) {
-  window.spcBoy.onLibraryCommand((command) => {
+if (window.spcBoyWK?.onLibraryCommand) {
+  window.spcBoyWK.onLibraryCommand((command) => {
     if (command?.type === "sidebar-view") {
       app.ui.setSidebarMode(command.view).catch((error) => console.error("[SPCBoy] sidebar view switch failed", error));
       return;
@@ -495,8 +495,8 @@ if (window.spcBoy?.onLibraryCommand) {
   });
 }
 
-if (window.spcBoy?.onNativePlaybackState) {
-  window.spcBoy.onNativePlaybackState((snapshot) => {
+if (window.spcBoyWK?.onNativePlaybackState) {
+  window.spcBoyWK.onNativePlaybackState((snapshot) => {
     app.playback.handleNativePlaybackState(snapshot);
   });
 }
