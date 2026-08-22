@@ -15,7 +15,8 @@ let package = Package(
         .executableTarget(
             name: "SPCBoyWK",
             dependencies: [
-                .product(name: "CatalogBrowserCore", package: "CatalogReader")
+                .product(name: "CatalogBrowserCore", package: "CatalogReader"),
+                .product(name: "FrontendCommandCore", package: "CatalogReader")
             ],
             resources: [.process("Resources")],
             linkerSettings: [
