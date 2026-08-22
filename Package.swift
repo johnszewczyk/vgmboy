@@ -6,11 +6,14 @@ let package = Package(
     name: "FrontendCore",
     platforms: [.macOS(.v26)],
     products: [
-        .library(name: "ArchiveMaterializationCore", targets: ["ArchiveMaterializationCore"])
+        .library(name: "ArchiveMaterializationCore", targets: ["ArchiveMaterializationCore"]),
+        .library(name: "LocalFileBrowserCore", targets: ["LocalFileBrowserCore"])
     ],
     targets: [
         .target(name: "ArchiveMaterializationCore"),
-        .testTarget(name: "ArchiveMaterializationCoreTests", dependencies: ["ArchiveMaterializationCore"])
+        .target(name: "LocalFileBrowserCore"),
+        .testTarget(name: "ArchiveMaterializationCoreTests", dependencies: ["ArchiveMaterializationCore"]),
+        .testTarget(name: "LocalFileBrowserCoreTests", dependencies: ["LocalFileBrowserCore"])
     ],
     swiftLanguageModes: [.v6]
 )
