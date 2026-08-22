@@ -3,8 +3,9 @@
 Native macOS WebKit frontend track for SPCBoy.
 
 This project is intentionally separate from the archived Electron frontend.
-It starts with the shared sidebar behavior core and a minimal AppKit/WKWebView
-host. Catalog reading, playback, and full UI migration are added behind their
-respective narrow boundaries.
+It now launches the current SPCBoy renderer skin inside a native AppKit/
+WKWebView host. Catalog reading and playback are still startup-only bridge
+stubs; full native integration is added behind their respective narrow
+boundaries.
 
-Run `./launch.sh` to clean, rebuild, and launch a fresh release executable.
+Run `./launch.sh` to clean, rebuild, package, and launch a fresh release app.

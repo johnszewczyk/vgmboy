@@ -11,7 +11,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let stateData = try! JSONEncoder().encode(initialState)
         let stateJSON = String(decoding: stateData, as: UTF8.self)
         configuration.userContentController.addUserScript(WKUserScript(
-            source: "window.spcbBrowserState = \(stateJSON);",
+            source: """
+            window.spcbBrowserState = \(stateJSON);
+            window.spcBoy = {
+              isOptionsWindow: false,
+              playbackBackends: [],
+              bootstrap: async () => ({ rootPath: null, tree: [], selectedFolderPath: null, selectedBrowserPath: null, playlist: [] }),
+              refreshTree: async () => ({ rootPath: null, tree: [], selectedFolderPath: null, selectedBrowserPath: null, playlist: [] }),
+              databaseLocation: async () => null,
+              databaseRoots: async () => [],
+              databaseGames: async () => [],
+              databaseFiles: async () => [],
+              databaseSearchGames: async () => [],
+              databaseGameTracks: async () => [],
+              databaseFileTracks: async () => [],
+              databaseFolderTracks: async () => [],
+              configureArchiveCache: async () => null,
+              setRoutingPreferences: async (value) => value || {},
+              setPlaybackSettings: () => undefined,
+              setAppearanceSettings: () => undefined,
+              showSidebarViewMenu: async () => undefined,
+              openPath: async () => ({ rootPath: null, tree: [], selectedFolderPath: null, selectedBrowserPath: null, playlist: [] }),
+              onCatalogReloaded: () => undefined,
+              onLibrarySnapshot: () => undefined,
+              onLibraryCommand: () => undefined,
+              onNativePlaybackState: () => undefined,
+              onPlaybackSettingsChanged: () => undefined,
+              onAppearanceSettingsChanged: () => undefined,
+              onRoutingPreferencesChanged: () => undefined,
+              onTransportShortcut: () => undefined
+            };
+            """,
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         ))
