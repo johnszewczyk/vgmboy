@@ -1124,7 +1124,7 @@ function autoSizeColumns() {
   const availableWidth = refs.playlistScrollWrap?.clientWidth || table.clientWidth || totalWidth;
   const width = `${Math.max(availableWidth, totalWidth)}px`;
   table.style.width = width;
-  refs.playlistBodyTable.style.width = width;
+  table.style.minWidth = width;
   columns.forEach((column, index) => {
     state.columnWidths[column.id] = (preferredWidths[index] / totalWidth) * 100;
   });
