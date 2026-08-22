@@ -78,7 +78,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             setRoutingPreferences: (...args) => request("setRoutingPreferences", args),
             setPlaybackSettings: (...args) => request("setPlaybackSettings", args),
             setAppearanceSettings: (...args) => request("setAppearanceSettings", args),
-            openOptionsWindow: () => { window.SPCBoyApp?.ui?.setOptionsOpen?.(true); return Promise.resolve(); },
+            openOptionsWindow: () => { window.SPCBoyApp?.ui?.showOptionsOverlay?.(); return Promise.resolve(); },
             closeOptionsWindow: () => { window.SPCBoyApp?.ui?.setOptionsOpen?.(false); return Promise.resolve(); },
             showSidebarViewMenu: (...args) => request("showSidebarViewMenu", args),
             openPath: (...args) => request("openPath", args),

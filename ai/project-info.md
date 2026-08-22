@@ -12,6 +12,7 @@
 - Read-only `CatalogReader` integration.
 - In-process VGMBoy playback integration, added behind the native bridge.
 - Shared versioned VGMBoy endpoint capability map (`VGMBoyEndpointCore`).
+- Shared selected-entry archive materialization through FrontendCore.
 
 ## Task Routing
 
@@ -27,6 +28,7 @@ Agent engineering notes:
 - The WK bridge is the only native capability boundary. Keep it typed by
   named requests and keep catalog access read-only.
 - Keep playback ownership in VGMBoy; this project owns presentation and host integration.
+- Do not add a private archive extractor; use `ArchiveMaterializationCore`.
 - Do not add renderer-runtime dependencies or a second catalog implementation.
 
 ## Human Docs

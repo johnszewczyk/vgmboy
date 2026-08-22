@@ -160,7 +160,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func sidebarPaths(_ sender: Any?) { dispatch(.sidebarPaths) }
     @objc private func sidebarConsoles(_ sender: Any?) { dispatch(.sidebarConsoles) }
     @objc private func sidebarDiskPath(_ sender: Any?) { dispatch(.sidebarDiskPath) }
-    @objc private func settings(_ sender: Any?) { dispatch(.settings) }
+    @objc private func settings(_ sender: Any?) {
+        // Settings is an in-app overlay in the WK host. Invoke the loaded UI
+        // surface directly instead of routing through the legacy transport
+        // dispatcher, which may run before the renderer has installed app.ui.
+        webView?.evaluateJavaScript("window.SPCBoyApp?.ui?.showOptionsOverlay?.();", completionHandler: nil)
+    }
     @objc private func previous(_ sender: Any?) { dispatch(.previous) }
     @objc private func playPause(_ sender: Any?) { dispatch(.playPause) }
     @objc private func next(_ sender: Any?) { dispatch(.next) }

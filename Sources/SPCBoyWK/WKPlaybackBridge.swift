@@ -1,4 +1,5 @@
 import Foundation
+import ArchiveMaterializationCore
 import VGMBoyKit
 
 /// Thin WK adapter over the shared in-process VGMBoy control surface.
@@ -73,9 +74,9 @@ final class WKPlaybackBridge: @unchecked Sendable {
             guard let archivePath = args.first as? String, let entry = args.dropFirst().first as? String else {
                 throw PlaybackBridgeError.invalid("Archive playback requires a source archive and entry.")
             }
-            return try WKArchiveMaterializer.shared.materialize(archivePath: archivePath, entry: entry).path
+            return try ArchiveMaterializer.shared.materialize(archivePath: archivePath, entry: entry).path
         case "releaseMaterializedTrack":
-            WKArchiveMaterializer.shared.release()
+            ArchiveMaterializer.shared.release()
             return NSNull()
         default:
             throw PlaybackBridgeError.invalid("Unknown playback request \(method).")

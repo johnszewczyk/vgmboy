@@ -2033,12 +2033,20 @@ function setOptionsOpen(nextOpen) {
   renderAll();
 }
 
+// Native menu actions use this one-way entry point so they do not call back
+// into openOptionsWindow and recurse through the bridge.
+function showOptionsOverlay() {
+  state.optionsOpen = true;
+  state.optionsSection = "database";
+  uiApp.ui.refreshDatabaseLocation().catch((error) => console.error("[SPCBoy] database location refresh failed", error));
+  uiApp.ui.refreshArchiveCacheSummary().catch((error) => console.error("[SPCBoy] archive cache refresh failed", error));
+  renderAll();
+}
+
 async function bootstrap() {
   if (window.spcBoyWK?.isOptionsWindow) {
     document.body.classList.add("options-window");
     state.optionsOpen = true;
-  } else {
-    refs.optionsOverlay.remove();
   }
   if (!window.spcBoyWK?.bootstrap || !window.spcBoyWK?.refreshTree) {
     const message = "SPCBoy WK native bridge is unavailable. File loading is unavailable.";
@@ -2206,6 +2214,7 @@ uiApp.ui = {
   applyRoutingPreferences,
   commitSidebarWidthInput,
   setOptionsOpen,
+  showOptionsOverlay,
   setAllDatabaseConsolesCollapsed,
   setAllSidebarNodesCollapsed,
   refreshDatabaseGamesForVisibleRoots,
