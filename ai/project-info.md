@@ -11,6 +11,7 @@
 - Shared `CatalogBrowserCore` sidebar behavior.
 - Read-only `CatalogReader` integration.
 - In-process VGMBoy playback integration, added behind the native bridge.
+- Shared versioned VGMBoy endpoint capability map (`VGMBoyEndpointCore`).
 
 ## Task Routing
 

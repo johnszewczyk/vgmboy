@@ -1,6 +1,7 @@
 import CatalogReader
 import CatalogBrowserCore
 import Foundation
+import VGMBoyEndpointCore
 import WebKit
 
 /// The only JavaScript-to-native boundary in SPCBoy WK.
@@ -69,6 +70,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             databaseGameTracks: (...args) => request("databaseGameTracks", args),
             databaseFileTracks: (...args) => request("databaseFileTracks", args),
             databaseFolderTracks: (...args) => request("databaseFolderTracks", args),
+            endpointSurface: (...args) => request("endpointSurface", args),
             reloadDatabaseLibrary: (...args) => request("reloadDatabaseLibrary", args),
             configureArchiveCache: (...args) => request("configureArchiveCache", args),
             archiveCacheSummary: (...args) => request("archiveCacheSummary", args),
@@ -121,11 +123,14 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
               let method = body["method"] as? String,
               let args = body["args"] as? [Any] else { return }
 
+        print("[SPCBoy WK] request \(method)")
+
         Task.detached(priority: .userInitiated) { [catalogURL] in
             do {
                 let result = try Self.handle(method: method, args: args, catalogURL: catalogURL)
                 await Self.reply(to: message.webView, id: id, success: true, valueJSON: Self.json(result))
             } catch {
+                print("[SPCBoy WK] request \(method) failed: \(error.localizedDescription)")
                 await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": error.localizedDescription]))
             }
         }
@@ -162,6 +167,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return try fileTracks(args.first, catalogURL: catalogURL, folders: false)
         case "databaseFolderTracks":
             return try fileTracks(args.first, catalogURL: catalogURL, folders: true)
+        case "endpointSurface":
+            return try JSONSerialization.jsonObject(with: JSONEncoder().encode(VGMBoyEndpointSurface.v1))
         case "configureArchiveCache", "archiveCacheSummary", "clearArchiveCache",
              "setPlaybackSettings", "setAppearanceSettings", "showSidebarViewMenu",
              "setPlaybackPowerSaveBlocker":

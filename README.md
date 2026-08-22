@@ -8,7 +8,7 @@ playback core.
 
 The current live native slice reads shared MediaScanner catalog roots, games,
 files, search results, and playlist rows, and routes loose-file playback through
-VGMBoyKit. Direct filesystem browsing and archive materialization remain the
-next bridge milestones.
+VGMBoyKit. Archive members are materialized through the native host; direct
+filesystem browsing remains the next bridge milestone.
 
 Run `./launch.sh` to clean, rebuild, package, and launch a fresh release app.

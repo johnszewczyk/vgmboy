@@ -19,7 +19,8 @@ let package = Package(
                 .product(name: "CatalogBrowserCore", package: "CatalogReader"),
                 .product(name: "FrontendCommandCore", package: "CatalogReader"),
                 .product(name: "CatalogReader", package: "CatalogReader"),
-                .product(name: "VGMBoyKit", package: "VGMBoy")
+                .product(name: "VGMBoyKit", package: "VGMBoy"),
+                .product(name: "VGMBoyEndpointCore", package: "VGMBoy")
             ],
             resources: [.process("Resources")],
             linkerSettings: [

@@ -67,10 +67,16 @@ final class WKPlaybackBridge: @unchecked Sendable {
             let duration = max(1, int(args.count > 1 ? args[1] : nil) ?? 1)
             try perform(.rampOutputGain, payload: .init(outputGain: gain, rampMilliseconds: duration))
             return statusResponse()
-        case "setPlaybackPowerSaveBlocker", "releaseMaterializedTrack":
+        case "setPlaybackPowerSaveBlocker":
             return NSNull()
         case "materializeTrack":
-            throw PlaybackBridgeError.invalid("Archive playback materialization is not wired into SPCBoy WK yet.")
+            guard let archivePath = args.first as? String, let entry = args.dropFirst().first as? String else {
+                throw PlaybackBridgeError.invalid("Archive playback requires a source archive and entry.")
+            }
+            return try WKArchiveMaterializer.shared.materialize(archivePath: archivePath, entry: entry).path
+        case "releaseMaterializedTrack":
+            WKArchiveMaterializer.shared.release()
+            return NSNull()
         default:
             throw PlaybackBridgeError.invalid("Unknown playback request \(method).")
         }
