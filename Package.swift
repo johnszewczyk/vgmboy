@@ -26,12 +26,14 @@ let package = Package(
     platforms: [.macOS("26.0")],
     products: [
         .library(name: "VGMBoyKit", targets: ["VGMBoyKit"]),
+        .library(name: "VGMBoyEndpointCore", targets: ["VGMBoyEndpointCore"]),
         .executable(name: "vgmboy-cli", targets: ["vgmboy"]),
         .executable(name: "vgmboy-electron-bridge", targets: ["VGMBoyElectronBridge"]),
         .executable(name: "vgmboy-highly-complete-inspect", targets: ["VGMBoyHighlyCompleteInspect"]),
         .executable(name: "VGMBoy", targets: ["VGMBoyApp"])
     ],
     targets: [
+        .target(name: "VGMBoyEndpointCore", path: "Sources/VGMBoyEndpointCore"),
         .systemLibrary(
             name: "VGMBoyCGameMusicEmu",
             path: "Sources/CGameMusicEmu",

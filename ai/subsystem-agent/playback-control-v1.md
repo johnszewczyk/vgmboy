@@ -4,6 +4,12 @@
 
 The in-process, versioned control boundary between `VGMBoyKit` and its clients.
 
+`VGMBoyEndpointCore` publishes the platform-neutral endpoint names and
+operations for clients that cannot link Swift directly. Native clients may use
+the typed `PlaybackControlRequest`; WebKit, Electron, and future Windows hosts
+should expose the same endpoint map and translate their transport into those
+typed commands rather than inventing frontend-specific playback controls.
+
 ## Ownership
 
 VGMBoyKit is bundled with every frontend and owns one decoded audio session, timing, equalizer,
@@ -51,3 +57,4 @@ rows, and macOS Now Playing registration. The CLI is one client of this same bou
 - [PlaybackControlProtocol.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/PlaybackControlProtocol.swift)
 - [PlaybackSession.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/PlaybackSession.swift)
 - [PlaybackController.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/PlaybackController.swift)
+- [VGMBoyEndpointCore.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyEndpointCore/VGMBoyEndpointCore.swift)

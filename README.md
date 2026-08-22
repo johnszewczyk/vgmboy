@@ -5,10 +5,15 @@ CocoaSpice/SPCBoy/ScanSong app family. It owns format routing, decoder integrati
 tempo, fade, ten-band EQ, and the audio device. Its command-line tool, small
 SwiftUI test app, and CocoaSpice are clients of the same `VGMBoyKit` transport.
 
+`VGMBoyEndpointCore` is the small, platform-neutral endpoint map for those
+clients. It names the shared playback, audio, diagnostics, and export routes;
+the typed `PlaybackControlProtocol` remains the native Swift payload contract.
+
 VGMBoy is intentionally database-free. MediaScanner remains the sole schema-23
-catalog writer. CocoaSpice links `VGMBoyKit` in-process; SPCBoy bundles the
-same core as its private `vgmboy-electron-bridge` executable; ScanSong bundles
-the inspection executables produced by VGMBoy.
+catalog writer. CocoaSpice links `VGMBoyKit` in-process; SPCBoy WK links the
+same core directly through its native endpoint adapter. The legacy Electron
+SPCBoy path remains separate until it is retired; ScanSong bundles the
+inspection executables produced by VGMBoy.
 
 ## How the app family works
 
@@ -17,7 +22,7 @@ the inspection executables produced by VGMBoy.
 | MediaScanner | Publishes the shared SQLite catalog and stored sidebar/playlist projections; bundles VGMBoy inspection plugins for intake. |
 | CocoaSpice | Reads that catalog, owns playlist and queue policy, materializes selected archive members, and forwards playback controls to bundled VGMBoyKit. |
 | VGMBoyKit | Decodes a supplied playable path, owns timing/EQ/audio output, and reports status and natural end. |
-| SPCBoy | Reads the same catalog independently, materializes files app-side, and sends playback commands to its bundled VGMBoy bridge. |
+| SPCBoy | Reads the same catalog independently, materializes files app-side, and sends playback commands through the shared VGMBoy endpoint surface. |
 
 VGMBoy is not a daemon. Every host bundles the core into its own process. A host supplies a path
 and subtrack index through PlaybackControl v1; VGMBoy never reads or writes catalogs and never
