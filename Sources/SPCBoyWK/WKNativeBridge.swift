@@ -11,9 +11,14 @@ import WebKit
 /// independent of the renderer's former host/runtime implementation.
 final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     private let catalogURL: URL
+    private let isOptionsWindow: Bool
 
-    init(catalogURL: URL = WKNativeBridge.defaultCatalogURL) {
+    var onOpenOptionsWindow: (() -> Void)?
+    var onCloseOptionsWindow: (() -> Void)?
+
+    init(catalogURL: URL = WKNativeBridge.defaultCatalogURL, isOptionsWindow: Bool = false) {
         self.catalogURL = catalogURL
+        self.isOptionsWindow = isOptionsWindow
         super.init()
     }
 
@@ -23,7 +28,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     }
 
     func userScript() -> WKUserScript {
-        WKUserScript(source: """
+        let optionsWindowFlag = isOptionsWindow ? "true" : "false"
+        return WKUserScript(source: """
         (() => {
           const pending = new Map();
           const listeners = new Map();
@@ -58,7 +64,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
           };
 
           const api = {
-            isOptionsWindow: false,
+            isOptionsWindow: \(optionsWindowFlag),
             playbackBackends: [],
             bootstrap: (...args) => request("bootstrap", args),
             refreshTree: (...args) => request("refreshTree", args),
@@ -78,8 +84,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             setRoutingPreferences: (...args) => request("setRoutingPreferences", args),
             setPlaybackSettings: (...args) => request("setPlaybackSettings", args),
             setAppearanceSettings: (...args) => request("setAppearanceSettings", args),
-            openOptionsWindow: () => { window.SPCBoyApp?.ui?.showOptionsOverlay?.(); return Promise.resolve(); },
-            closeOptionsWindow: () => { window.SPCBoyApp?.ui?.setOptionsOpen?.(false); return Promise.resolve(); },
+            openOptionsWindow: () => request("openOptionsWindow"),
+            closeOptionsWindow: () => request("closeOptionsWindow"),
             showSidebarViewMenu: (...args) => request("showSidebarViewMenu", args),
             openPath: (...args) => request("openPath", args),
             chooseRootFolder: (...args) => request("chooseRootFolder", args),
@@ -124,6 +130,15 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
               let args = body["args"] as? [Any] else { return }
 
         print("[SPCBoy WK] request \(method)")
+
+        if method == "openOptionsWindow" || method == "closeOptionsWindow" {
+            let handler = method == "openOptionsWindow" ? onOpenOptionsWindow : onCloseOptionsWindow
+            Task { @MainActor in handler?() }
+            Task {
+                await Self.reply(to: message.webView, id: id, success: true, valueJSON: "null")
+            }
+            return
+        }
 
         Task.detached(priority: .userInitiated) { [catalogURL] in
             do {

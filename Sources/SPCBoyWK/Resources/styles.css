@@ -1043,7 +1043,7 @@ body.is-file-drag-over::after {
 .library-root-health.unknown { color: var(--status-unknown); }
 
 body.options-window .app-shell { display: none; }
-body.options-window .options-overlay { position: static; display: block; width: 100vw; height: 100vh; padding: 0; background: none; }
+body.options-window .options-overlay { position: static; display: block !important; width: 100vw; height: 100vh; padding: 0; background: none; }
 body.options-window .options-panel { width: 100vw; height: 100vh; grid-template-rows: minmax(0, 1fr); border-radius: 0; box-shadow: none; }
 body.options-window .options-header { display: none; }
 .library-root-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; }

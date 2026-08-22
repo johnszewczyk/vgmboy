@@ -6,46 +6,17 @@ import WebKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow?
+    private var optionsWindow: NSWindow?
     private weak var webView: WKWebView?
+    private weak var optionsWebView: WKWebView?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let configuration = WKWebViewConfiguration()
-        let nativeBridge = WKNativeBridge()
-        configuration.userContentController.add(nativeBridge, name: "spcBoyWK")
         let initialState = CatalogBrowserState()
         let stateData = try! JSONEncoder().encode(initialState)
         let stateJSON = String(decoding: stateData, as: UTF8.self)
-        configuration.userContentController.addUserScript(nativeBridge.userScript())
-        configuration.userContentController.addUserScript(WKUserScript(
-            source: """
-            window.spcbBrowserState = \(stateJSON);
-            window.SPCBoyWK = {
-              const pending = [];
-              function dispatch(command) {
-                const app = window.SPCBoyApp;
-                if (!app) {
-                  pending.push(command);
-                  return;
-                }
-                switch (command) {
-                  case "previous": app.playback?.playAdjacent(-1); break;
-                  case "playPause": app.playback?.togglePlayback?.(); break;
-                  case "next": app.playback?.playAdjacent(1); break;
-                  case "sidebarPaths": app.ui?.setSidebarMode?.("paths"); break;
-                  case "sidebarConsoles": app.ui?.setSidebarMode?.("consoles"); break;
-                  case "sidebarDiskPath": app.ui?.setSidebarMode?.("diskPath"); break;
-                  case "settings": window.spcBoyWK?.openOptionsWindow?.(); break;
-                  default: break;
-                }
-              }
-              window.addEventListener("load", () => pending.splice(0).forEach(dispatch), { once: true });
-              return { dispatch };
-            }();
-            """,
-            injectionTime: .atDocumentStart,
-            forMainFrameOnly: true
-        ))
-        let webView = WKWebView(frame: .zero, configuration: configuration)
+        let nativeBridge = WKNativeBridge()
+        nativeBridge.onOpenOptionsWindow = { [weak self] in self?.showOptionsWindow() }
+        let webView = makeWebView(bridge: nativeBridge, stateJSON: stateJSON, includeCommandDispatcher: true)
         self.webView = webView
         installApplicationMenu()
         guard let page = Bundle.module.url(forResource: "index", withExtension: "html") else {
@@ -65,6 +36,85 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.makeKeyAndOrderFront(nil)
         self.window = window
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func makeWebView(bridge: WKNativeBridge, stateJSON: String, includeCommandDispatcher: Bool) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.userContentController.add(bridge, name: "spcBoyWK")
+        configuration.userContentController.addUserScript(bridge.userScript())
+        if includeCommandDispatcher {
+            configuration.userContentController.addUserScript(WKUserScript(
+                source: """
+                window.spcbBrowserState = \(stateJSON);
+                window.SPCBoyWK = {
+                  const pending = [];
+                  function dispatch(command) {
+                    const app = window.SPCBoyApp;
+                    if (!app) {
+                      pending.push(command);
+                      return;
+                    }
+                    switch (command) {
+                      case "previous": app.playback?.playAdjacent(-1); break;
+                      case "playPause": app.playback?.togglePlayback?.(); break;
+                      case "next": app.playback?.playAdjacent(1); break;
+                      case "sidebarPaths": app.ui?.setSidebarMode?.("paths"); break;
+                      case "sidebarConsoles": app.ui?.setSidebarMode?.("consoles"); break;
+                      case "sidebarDiskPath": app.ui?.setSidebarMode?.("diskPath"); break;
+                      case "settings": window.spcBoyWK?.openOptionsWindow?.(); break;
+                      default: break;
+                    }
+                  }
+                  window.addEventListener("load", () => pending.splice(0).forEach(dispatch), { once: true });
+                  return { dispatch };
+                }();
+                """,
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: true
+            ))
+        } else {
+            configuration.userContentController.addUserScript(WKUserScript(
+                source: "window.spcbBrowserState = \(stateJSON);",
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: true
+            ))
+        }
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        return webView
+    }
+
+    private func showOptionsWindow() {
+        if let optionsWindow {
+            optionsWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let bridge = WKNativeBridge(isOptionsWindow: true)
+        bridge.onCloseOptionsWindow = { [weak self] in self?.closeOptionsWindow() }
+        let optionsWebView = makeWebView(bridge: bridge, stateJSON: "{}", includeCommandDispatcher: false)
+        guard let page = Bundle.module.url(forResource: "index", withExtension: "html") else { return }
+        optionsWebView.loadFileURL(page, allowingReadAccessTo: page.deletingLastPathComponent())
+
+        let optionsWindow = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 820, height: 720),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        optionsWindow.title = "SPCBoy Settings"
+        optionsWindow.contentView = optionsWebView
+        optionsWindow.center()
+        optionsWindow.isReleasedWhenClosed = false
+        optionsWindow.delegate = self
+        self.optionsWebView = optionsWebView
+        self.optionsWindow = optionsWindow
+        optionsWindow.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func closeOptionsWindow() {
+        optionsWindow?.close()
     }
 
     private func installApplicationMenu() {
@@ -161,10 +211,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func sidebarConsoles(_ sender: Any?) { dispatch(.sidebarConsoles) }
     @objc private func sidebarDiskPath(_ sender: Any?) { dispatch(.sidebarDiskPath) }
     @objc private func settings(_ sender: Any?) {
-        // Settings is an in-app overlay in the WK host. Invoke the loaded UI
-        // surface directly instead of routing through the legacy transport
-        // dispatcher, which may run before the renderer has installed app.ui.
-        webView?.evaluateJavaScript("window.SPCBoyApp?.ui?.showOptionsOverlay?.();", completionHandler: nil)
+        showOptionsWindow()
     }
     @objc private func previous(_ sender: Any?) { dispatch(.previous) }
     @objc private func playPause(_ sender: Any?) { dispatch(.playPause) }
@@ -172,6 +219,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
+    }
+}
+
+extension AppDelegate: NSWindowDelegate {
+    func windowWillClose(_ notification: Notification) {
+        guard let closingWindow = notification.object as? NSWindow, closingWindow === optionsWindow else { return }
+        optionsWebView?.configuration.userContentController.removeAllUserScripts()
+        optionsWebView = nil
+        optionsWindow = nil
     }
 }
 

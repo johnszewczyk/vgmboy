@@ -2033,20 +2033,14 @@ function setOptionsOpen(nextOpen) {
   renderAll();
 }
 
-// Native menu actions use this one-way entry point so they do not call back
-// into openOptionsWindow and recurse through the bridge.
-function showOptionsOverlay() {
-  state.optionsOpen = true;
-  state.optionsSection = "database";
-  uiApp.ui.refreshDatabaseLocation().catch((error) => console.error("[SPCBoy] database location refresh failed", error));
-  uiApp.ui.refreshArchiveCacheSummary().catch((error) => console.error("[SPCBoy] archive cache refresh failed", error));
-  renderAll();
-}
 
 async function bootstrap() {
   if (window.spcBoyWK?.isOptionsWindow) {
     document.body.classList.add("options-window");
     state.optionsOpen = true;
+    // Paint the native Settings window before any catalog/cache request can
+    // delay or reject. The controls remain usable while those values load.
+    renderAll();
   }
   if (!window.spcBoyWK?.bootstrap || !window.spcBoyWK?.refreshTree) {
     const message = "SPCBoy WK native bridge is unavailable. File loading is unavailable.";
@@ -2060,7 +2054,6 @@ async function bootstrap() {
   state.databaseLocationStatus = state.databaseLocation?.requiresRestart
     ? "Restart SPCBoy to use the selected database."
     : "The shared MediaScanner catalog is active and opened read-only.";
-  if (window.spcBoyWK?.isOptionsWindow) renderAll();
   await window.spcBoyWK?.configureArchiveCache?.({
     enabled: state.archiveCacheEnabled,
     limitBytes: state.archiveCacheLimitBytes
@@ -2214,7 +2207,6 @@ uiApp.ui = {
   applyRoutingPreferences,
   commitSidebarWidthInput,
   setOptionsOpen,
-  showOptionsOverlay,
   setAllDatabaseConsolesCollapsed,
   setAllSidebarNodesCollapsed,
   refreshDatabaseGamesForVisibleRoots,

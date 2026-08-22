@@ -13,6 +13,7 @@
 - In-process VGMBoy playback integration, added behind the native bridge.
 - Shared versioned VGMBoy endpoint capability map (`VGMBoyEndpointCore`).
 - Shared selected-entry archive materialization through FrontendCore.
+- Separate native Settings window with an independent options-mode WKWebView.
 
 ## Task Routing
 
@@ -29,6 +30,8 @@ Agent engineering notes:
   named requests and keep catalog access read-only.
 - Keep playback ownership in VGMBoy; this project owns presentation and host integration.
 - Do not add a private archive extractor; use `ArchiveMaterializationCore`.
+- Keep Settings as a separate native window; do not restore the in-pane overlay
+  as the root window's primary Settings surface.
 - Do not add renderer-runtime dependencies or a second catalog implementation.
 
 ## Human Docs

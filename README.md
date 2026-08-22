@@ -12,4 +12,8 @@ VGMBoyKit. Archive members are materialized through the shared FrontendCore
 package; direct
 filesystem browsing remains the next bridge milestone.
 
+Settings opens in a separate native `NSWindow` with its own `WKWebView`. The
+window uses the same renderer resources in options mode, while the root window
+continues to own the library and playback surface.
+
 Run `./launch.sh` to clean, rebuild, package, and launch a fresh release app.
