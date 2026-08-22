@@ -35,6 +35,12 @@ public enum FormatRegistry {
         supportsTempo: false
     )
 
+    public static let ffmpegAudioFamily = DecoderFamily(
+        id: "ffmpegaudio",
+        supportsLongPlay: false,
+        supportsTempo: false
+    )
+
     public static let highlyCompleteFamily = DecoderFamily(
         id: "highlycomplete",
         supportsLongPlay: true,
@@ -91,6 +97,8 @@ public enum FormatRegistry {
         "aac", "aif", "aiff", "caf", "flac", "m4a", "mp3", "wav", "wave"
     ]
 
+    public static let ffmpegAudioExtensions: Set<String> = ["mp2", "tak"]
+
     public static let highlyCompleteExtensions: Set<String> = [
         "gsf", "minigsf"
     ]
@@ -137,6 +145,9 @@ public enum FormatRegistry {
         }
         if standardAudioExtensions.contains(ext) {
             return standardAudioFamily
+        }
+        if ffmpegAudioExtensions.contains(ext) {
+            return ffmpegAudioFamily
         }
         if highlyCompleteExtensions.contains(ext) {
             return highlyCompleteFamily

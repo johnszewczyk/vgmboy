@@ -55,6 +55,8 @@ enum DecoderFactory {
             return try VGMDecoder(path: path, sampleRate: sampleRate)
         case "standardaudio":
             return try StandardAudioDecoder(path: path, sampleRate: sampleRate)
+        case "ffmpegaudio":
+            return try FFmpegAudioDecoder(path: path, sampleRate: sampleRate)
         case "highlycomplete":
             return try HighlyCompleteDecoder(path: path, sampleRate: sampleRate)
         case "twosf":
@@ -71,6 +73,12 @@ enum DecoderFactory {
     }
 
     static func make(path: String, sampleRate: Int = 44_100) throws -> any AudioDecoder {
+        if NDSWAVDetection.isSWAV(path) {
+            return try NDSSWAVDecoder(path: path, sampleRate: sampleRate)
+        }
+        if NDSWAVDetection.isRawPCM22(path) {
+            return try NDSRawPCMDecoder(path: path, sampleRate: sampleRate)
+        }
         guard let family = FormatRegistry.family(for: path) else {
             throw DecoderFactoryError.unsupportedFamily("unknown")
         }

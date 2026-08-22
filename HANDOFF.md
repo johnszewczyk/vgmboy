@@ -1,6 +1,7 @@
 # VGMBoy — WIP Handoff
 
-Status: **work in progress** — the shared game-music audio core for the CocoaSpice/SPCBoy family.
+Status: **active shared core** — the playback/decoder and scanner-plugin build
+boundary for the CocoaSpice/SPCBoy/ScanSong family.
 This note hands off current state and next steps. Live verification happened against fixtures
 extracted to `/tmp/vgmboy-test/` (not committed); see each section for the file used.
 
@@ -28,21 +29,25 @@ extracted to `/tmp/vgmboy-test/` (not committed); see each section for the file 
 - **Case-insensitive filesystem collision:** the CLI product is `vgmboy-cli`, not `vgmboy`. A
   `vgmboy` (CLI) vs `VGMBoy` (app) name collision silently overwrote one binary (the command-line
   hang). Don't rename back.
-- **Upstream libs are built by CocoaSpice**, not re-vendored here. `build-app.sh` runs CocoaSpice's
-  `scripts/build-*.sh` only when a static lib is missing. VGMBoy depends on CocoaSpice being
-  present at `../CocoaSpice`.
+- **VGMBoy owns compiled dependency staging.** `scripts/build-dependencies.sh`
+  prepares `.build/dependencies` for the Swift package, and
+  `scripts/build-scanner-plugins.sh` prepares ScanSong's external inspection
+  binaries. The shared upstream source checkout is VGMBoy's `vendor/` garden;
+  no CocoaSpice app, source tree, or launcher is a runtime dependency.
 - **miniusf and minipsf resolve `_lib` dependency chains** — companion `.usflib`/`.psflib` must be
   beside the file (matches CocoaSpice's complete-archive-set materialization).
 - Driver-halt PSF rips end at the halt (no audio) rather than looping silence — intended.
 
 ## Next steps
 
-- Remaining bridge cores: Highly Complete (GBA PSF-family/GSF), 2SF (Nintendo DS), OpenMPT
-  (trackers), SID.
+- Scanner-facing vgmstream and Highly Complete inspection products are now
+  built through VGMBoy. Remaining decoder breadth and fixture coverage should
+  be tracked as explicit format work, not as a repository-ownership migration.
 - Equalizer (signal stage in the core output path).
 - Export WAV→AAC (from CocoaSpice `AudioExportAAC.swift` via AVAssetWriter).
 - `playback-core v1` control-point protocol, then wire parent apps (SPCBoy, CocoaSpice) in.
-- MediaScanner stays as-is (sole schema-23 catalog writer); VGMBoy is database-free.
+- MediaScanner remains the sole schema-23 catalog writer. ScanSong consumes
+  VGMBoy-built inspection outputs, while VGMBoy remains database-free.
 
 ## Repo
 

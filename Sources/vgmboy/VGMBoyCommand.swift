@@ -85,7 +85,7 @@ struct VGMBoyCommand {
         print("VGMBoy playback — track \(track + 1), \(mode == .longPlay ? "Long Play" : "file default")")
 
         // Keep the main run loop spinning so the completion dispatch on the
-        // main queue can fire; AVAudioEngine renders on its own threads.
+        // main queue can fire; the direct AudioUnit renders on its own thread.
         while done.wait(timeout: .now()) == .timedOut {
             RunLoop.main.run(until: Date().addingTimeInterval(0.1))
         }

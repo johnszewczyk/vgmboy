@@ -1,4 +1,6 @@
 import Testing
+import AudioToolbox
+import AVFoundation
 import Foundation
 @testable import VGMBoyKit
 
@@ -37,6 +39,25 @@ struct FormatRegistryTests {
         for ext in FormatRegistry.standardAudioExtensions {
             #expect(FormatRegistry.family(for: "/tmp/example.\(ext)")?.id == "standardaudio")
         }
+    }
+
+    @Test("routes FFmpeg-only ordinary audio through the core")
+    func routesFFmpegAudio() {
+        for ext in FormatRegistry.ffmpegAudioExtensions {
+            #expect(FormatRegistry.family(for: "/tmp/example.\(ext)")?.id == "ffmpegaudio")
+        }
+        #expect(!FormatRegistry.ffmpegAudioFamily.supportsLongPlay)
+        #expect(!FormatRegistry.ffmpegAudioFamily.supportsTempo)
+    }
+
+    @Test("structure API exposes decoder timing but never catalog tags")
+    func structureValuesStayDecoderScoped() {
+        let structure = PlaybackStructure(
+            trackCount: 2,
+            tracks: [.init(index: 0, naturalPlayMilliseconds: 1_000, fadeMilliseconds: 0)]
+        )
+        #expect(structure.trackCount == 2)
+        #expect(structure.tracks[0].naturalPlayMilliseconds == 1_000)
     }
 
     @Test("routes libvgm extensions to the libvgm family")
@@ -171,6 +192,40 @@ struct PlaybackControlProtocolTests {
         #expect(EqualizerConfiguration.bandFrequencies == [31, 62, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 16_000])
     }
 
+    @Test("AAC export writes ADTS without using the live transport")
+    func exportsADTS() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let source = folder.appendingPathComponent("source.wav")
+        try writeTestWAV(to: source)
+
+        let result = try AACExporter.export(.init(
+            sourcePath: source.path,
+            outputDirectory: folder,
+            filenameStem: "Test/Track",
+            playMilliseconds: 100,
+            fadeMilliseconds: 0
+        ))
+        #expect(result.renderedFrames > 0)
+        #expect(result.outputURL.pathExtension == "aac")
+        #expect(FileManager.default.fileExists(atPath: result.outputURL.path))
+        #expect((try Data(contentsOf: result.outputURL)).count > 0)
+
+        var audioFile: AudioFileID?
+        #expect(AudioFileOpenURL(result.outputURL as CFURL, .readPermission, kAudioFileAAC_ADTSType, &audioFile) == noErr)
+        if let audioFile { AudioFileClose(audioFile) }
+    }
+
+    private func writeTestWAV(to url: URL) throws {
+        let pcm = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 2)!
+        let file = try AVAudioFile(forWriting: url, settings: pcm.settings)
+        let buffer = AVAudioPCMBuffer(pcmFormat: pcm, frameCapacity: 4_410)!
+        buffer.frameLength = 4_410
+        try file.write(from: buffer)
+    }
+
 }
 
 @Suite("SessionFade")
@@ -194,62 +249,16 @@ struct SessionFadeTests {
 
 @Suite("Realtime Transport")
 struct RealtimeTransportTests {
-    @Test("ring buffer preserves wrapped producer consumer order without a lock")
-    func ringBufferWraps() {
-        let buffer = PCMRingBuffer(capacityFrames: 4)
-        #expect(buffer.write(left: [1, 2, 3], right: [11, 12, 13]) == 3)
-        #expect(read(buffer, count: 2).left == [1, 2])
-        #expect(buffer.write(left: [4, 5, 6], right: [14, 15, 16]) == 3)
-        let output = read(buffer, count: 4)
-        #expect(output.left == [3, 4, 5, 6])
-        #expect(output.right == [13, 14, 15, 16])
-        let diagnostics = buffer.diagnostics()
-        #expect(diagnostics.bufferedFrames == 0)
-        #expect(diagnostics.framesRequested == 6)
-        #expect(diagnostics.framesSupplied == 6)
-        #expect(diagnostics.underrunCount == 0)
-    }
-
-    @Test("ring clear rejects stale PCM and reports silence as an underrun")
-    func ringBufferClearAndUnderrun() {
-        let buffer = PCMRingBuffer(capacityFrames: 4)
-        #expect(buffer.write(left: [1, 2], right: [3, 4]) == 2)
-        buffer.clear()
-        let output = read(buffer, count: 2)
-        #expect(output.supplied == 0)
-        #expect(output.left == [0, 0])
-        #expect(output.right == [0, 0])
-        #expect(buffer.diagnostics().underrunCount == 1)
-    }
-
-    @Test("transport envelope starts and ends at silence without a musical fade")
-    func transportEnvelopeRamps() {
-        let envelope = TransportEnvelope()
-        let start = envelope.beginPlayback(over: 4)
-        let rise = (0..<4).map { _ in envelope.nextGain() }
-        #expect(rise[0] > 0)
-        #expect(rise[0] < rise[1])
-        #expect(rise[3] == 1)
-        #expect(envelope.isComplete(start))
-
-        let stop = envelope.fadeOut(over: 4)
-        let fall = (0..<4).map { _ in envelope.nextGain() }
-        #expect(fall[0] < 1)
-        #expect(fall[0] > fall[1])
-        #expect(fall[3] == 0)
-        #expect(envelope.isComplete(stop))
-    }
-
-    private func read(_ buffer: PCMRingBuffer, count: Int) -> (supplied: Int, left: [Float], right: [Float]) {
-        var left = [Float](repeating: -1, count: count)
-        var right = [Float](repeating: -1, count: count)
-        var supplied = 0
-        left.withUnsafeMutableBufferPointer { leftPointer in
-            right.withUnsafeMutableBufferPointer { rightPointer in
-                supplied = buffer.read(into: leftPointer, rightPointer)
-            }
-        }
-        return (supplied, left, right)
+    @Test("direct AudioUnit transport owns the session PCM ring")
+    func directTransportBuffersAndClearsPCM() {
+        let output = AudioOutput(sampleRate: 10, capacitySeconds: 0.4)
+        #expect(output.capacityFrames == 4)
+        #expect(output.write(left: [1, 0.5, 0.25], right: [1, 0.5, 0.25]) == 3)
+        #expect(output.bufferedFrames == 3)
+        #expect(output.write(left: [0.125, 0.0625], right: [0.125, 0.0625]) == 1)
+        #expect(output.diagnostics().framesWritten == 4)
+        output.clearBuffer()
+        #expect(output.bufferedFrames == 0)
     }
 }
 

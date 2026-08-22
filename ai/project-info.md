@@ -2,29 +2,36 @@
 
 ## Identity
 
-VGMBoy is the game-music audio core for the CocoaSpice/SPCBoy app family. It owns format routing,
+VGMBoy is the game-music audio core and shared decoder/plugin owner for the CocoaSpice/SPCBoy/ScanSong
+app family. It owns format routing,
 decoder integration, timing, Long Play, tempo, fade, ten-band equalizer processing, and the macOS
-audio device. CocoaSpice bundles VGMBoyKit in-process and controls it through PlaybackControl v1;
-SPCBoy remains on its existing playback implementation until its separate migration.
+audio device. CocoaSpice links VGMBoyKit in-process and controls it through PlaybackControl v1;
+SPCBoy bundles the same core as its private `vgmboy-electron-bridge` helper.
 
-MediaScanner is left as-is and remains the sole schema-23 catalog writer. This repository is
-database-free: it decodes files and plays them.
+MediaScanner remains the sole schema-23 catalog writer. ScanSong obtains its vgmstream and Highly
+Complete inspection executables through VGMBoy's scanner-plugin build boundary. This repository is
+database-free: it decodes files, supplies inspection plugins, and plays them.
 
 ## Major Components
 
 - `Sources/VGMBoyKit` — the audio core: `FormatRegistry` (family/extensions/capabilities),
-  `DecoderFactory` + `AudioDecoder` protocol, `TimingPolicy`/`PlaybackPlan`, `PCMRingBuffer`,
-  `AudioOutput` (AVAudioEngine + AVAudioSourceNode), and `PlaybackSession` (transport home).
+  `DecoderFactory` + `AudioDecoder` protocol, `TimingPolicy`/`PlaybackPlan`,
+  `AudioOutput` (direct DefaultOutput AudioUnit host), and `PlaybackSession` (transport home).
 - `Sources/vgmboy` — the command-line playback harness: `play`.
+- `scripts/build-dependencies.sh` — stages compiled shared dependency archives under VGMBoy's
+  `.build/dependencies` directory.
+- `scripts/build-scanner-plugins.sh` — builds the scanner-facing vgmstream CLI and prepares the
+  shared Highly Complete build prerequisite used by ScanSong.
 - `PlaybackControl v1` — versioned in-process control and event API used by CocoaSpice, the CLI,
   and the test GUI over the same playback session shape.
 - `Sources/VGMBoyApp` — native test GUI, organized as CocoaSpice-style Playback, Audio,
   Diagnostics, and Core pages. It exercises transport, Long Play, tempo, the shared ten-band EQ,
   and output diagnostics without owning a catalog or playlist.
-- Bridge targets over vendored upstream cores (built by CocoaSpice, not forked here):
+- Bridge targets over shared upstream cores (staged and linked by VGMBoy, not forked here):
   `VGMBoyCGameMusicEmu` (libgme), `VGMBoyCLibVGM`, `VGMBoyCHighlyComplete` (mGBA + PSFLib),
   `VGMBoyC2SF`, `VGMBoyCVGmstream`, `VGMBoyCLazyUSF`, `VGMBoyCPlayPSF`, and
-  `VGMBoyCOpenMPT` (libopenmpt).
+  `VGMBoyCOpenMPT` (libopenmpt), `VGMBoyCFFmpeg` (MP2/TAK), and
+  `VGMBoyCAudioUnit` (the owned direct output transport).
 
 ## Decoder Families
 
@@ -60,11 +67,14 @@ session owns the fade DSP for them (`appliesFadeInternally == false`).
 
 - VGMBoy owns the macOS audio device, decoded transport, timing, and equalizer; front-ends own queue policy and their user interfaces.
 - Piece out the best bridge cores from SPCBoy and CocoaSpice; never fork the shared upstream
-  decoder libraries per app. Bridge glue is copied into VGMBoy; the static libs are built by
-  CocoaSpice and linked from its `.build`. A frontend removes its old bridge objects before
+  decoder libraries per app. Bridge glue and compiled dependency staging belong to VGMBoy. A frontend removes its old bridge objects before
   linking VGMBoyKit; duplicate bridge implementations are a deliberate linker error.
 - Use boring, simple vanilla features. Fail hard and loud: unsupported input is an explicit error,
   never an invented track.
 - Keep the kit's public API surface small and deliberate; the CLI and the SwiftUI app are two thin
   skins over one core.
-- MediaScanner remains separate and untouched; it is the catalog writer, never a VGMBoy dependency.
+- MediaScanner remains a separate catalog-writer product. ScanSong consumes
+  VGMBoy-built inspection executables, but never links VGMBoyKit or invokes a
+  player frontend.
+- ScanSong may consume VGMBoy-built inspection executables, but it does not link VGMBoyKit or
+  invoke a player frontend. Keep inspection packaging behind `build-scanner-plugins.sh`.

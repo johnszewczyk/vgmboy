@@ -104,12 +104,12 @@ final class PlaybackSession: @unchecked Sendable {
         try queue.sync {
             releaseCurrent()
             generation += 1
-            guard let family = FormatRegistry.family(for: path) else {
+            guard FormatRegistry.family(for: path) != nil else {
                 throw DecoderFactoryError.unsupportedFamily(
                     (path as NSString).pathExtension
                 )
             }
-            let decoder = try DecoderFactory.make(family: family, path: path, sampleRate: sampleRate)
+            let decoder = try DecoderFactory.make(path: path, sampleRate: sampleRate)
             try decoder.startTrack(trackIndex)
             decoder.setTempo(tempo)
 
@@ -141,8 +141,8 @@ final class PlaybackSession: @unchecked Sendable {
             currentTrackIndex = trackIndex
             reachedEnd = false
             isLoaded = true
-            output.ringBuffer.clear()
-            output.ringBuffer.resetDiagnostics()
+            output.clearBuffer()
+            output.resetDiagnostics()
             try prime(to: output.primeFrameCount)
             publishStatus()
         }
@@ -175,7 +175,7 @@ final class PlaybackSession: @unchecked Sendable {
             stopRefillTimer()
             reachedEnd = false
             decoder.seek(milliseconds: Int(seconds * 1000))
-            output.ringBuffer.clear()
+            output.clearBuffer()
             try prime(to: output.primeFrameCount)
             if wasPlaying {
                 try output.start()
@@ -195,7 +195,7 @@ final class PlaybackSession: @unchecked Sendable {
             if wasPlaying { output.pause() }
             stopRefillTimer()
             decoder.setTempo(tempo)
-            output.ringBuffer.clear()
+            output.clearBuffer()
             try prime(to: output.primeFrameCount)
             if wasPlaying {
                 try output.start()
@@ -225,11 +225,15 @@ final class PlaybackSession: @unchecked Sendable {
         queue.sync { output.setMonoEnabled(enabled) }
     }
 
+    public func rampOutputGain(to gain: Float, durationMilliseconds: Int) throws {
+        guard gain.isFinite, (0...1).contains(gain), durationMilliseconds > 0 else {
+            throw PlaybackControlError.invalidPayload("Output ramp requires a gain between zero and one and a positive duration.")
+        }
+        queue.sync { output.rampTransportGain(to: gain, durationMilliseconds: durationMilliseconds) }
+    }
+
     public func stop() {
         queue.sync {
-            stopRefillTimer()
-            output.pause()
-            reachedEnd = false
             releaseCurrent()
             publishStatus()
         }
@@ -242,9 +246,15 @@ final class PlaybackSession: @unchecked Sendable {
     }
 
     private func makeStatus() -> PlaybackStatus {
-        let elapsed = decoder.map { Double($0.absolutePlayedFrames) / Double(sampleRate) } ?? 0
         var diagnostics = output.diagnostics()
         diagnostics.generation = generation
+        // Decoder position is intentionally ahead of audible time while the
+        // producer primes/refills the ring. Report consumed PCM, not decoded
+        // PCM, so a freshly loaded track still reads 0:00 and seek remains
+        // anchored at the requested audible offset.
+        let elapsed = decoder.map {
+            Double(max(0, $0.absolutePlayedFrames - Int64(diagnostics.bufferedFrames))) / Double(sampleRate)
+        } ?? 0
         return PlaybackStatus(
             isPlaying: output.isRunning,
             elapsedSeconds: elapsed,
@@ -278,8 +288,8 @@ final class PlaybackSession: @unchecked Sendable {
 
     private func refill() {
         guard let decoder else { return }
-        let highWater = Int(Double(output.ringBuffer.capacityFrames) * 0.75)
-        while output.ringBuffer.bufferedFrames < highWater {
+        let highWater = Int(Double(output.capacityFrames) * 0.75)
+        while output.bufferedFrames < highWater {
             if decoder.trackEnded || (capFrames > 0 && decoder.absolutePlayedFrames >= capFrames) {
                 reachedEnd = true
                 break
@@ -287,12 +297,12 @@ final class PlaybackSession: @unchecked Sendable {
             let chunkStart = decoder.absolutePlayedFrames
             let frames = decoder.readFrames(chunkFrameCount)
             let faded = applyFadeIfNeeded(decoder, chunkStart: chunkStart, left: frames.left, right: frames.right)
-            if output.ringBuffer.write(left: faded.left, right: faded.right) == 0 {
+            if output.write(left: faded.left, right: faded.right) == 0 {
                 break
             }
         }
         if reachedEnd {
-            if output.ringBuffer.bufferedFrames == 0 {
+            if output.bufferedFrames == 0 {
                 finishReachedEnd()
             } else {
                 publishStatus()
@@ -312,7 +322,7 @@ final class PlaybackSession: @unchecked Sendable {
 
     private func prime(to targetBufferedFrames: Int) throws {
         guard let decoder else { return }
-        while output.ringBuffer.bufferedFrames < targetBufferedFrames {
+        while output.bufferedFrames < targetBufferedFrames {
             if decoder.trackEnded || (capFrames > 0 && decoder.absolutePlayedFrames >= capFrames) {
                 reachedEnd = true
                 break
@@ -320,7 +330,7 @@ final class PlaybackSession: @unchecked Sendable {
             let chunkStart = decoder.absolutePlayedFrames
             let frames = decoder.readFrames(chunkFrameCount)
             let faded = applyFadeIfNeeded(decoder, chunkStart: chunkStart, left: frames.left, right: frames.right)
-            if output.ringBuffer.write(left: faded.left, right: faded.right) == 0 {
+            if output.write(left: faded.left, right: faded.right) == 0 {
                 break
             }
         }
@@ -354,13 +364,16 @@ final class PlaybackSession: @unchecked Sendable {
 
     private func releaseCurrent() {
         stopRefillTimer()
+        // Preserve queued PCM while AudioOutput ramps it to silence.  Clearing
+        // first makes the source node jump from the last nonzero sample to a
+        // zero-filled buffer before the transport envelope can act.
+        output.pause()
         decoder?.close()
         decoder = nil
         capFrames = 0
         fadeFrames = 0
         reachedEnd = false
         isLoaded = false
-        output.ringBuffer.clear()
-        output.pause()
+        output.clearBuffer()
     }
 }

@@ -6,32 +6,45 @@ The in-process, versioned control boundary between `VGMBoyKit` and its clients.
 
 ## Ownership
 
-VGMBoyKit is statically bundled into every frontend process and owns one decoded audio session,
-timing, equalizer, app-volume/mono output state, and transport state. A frontend owns
+VGMBoyKit is bundled with every frontend and owns one decoded audio session, timing, equalizer,
+app-volume/mono output state, and transport state. A frontend owns
 playlist membership, queue transitions, repeat-one/all/shuffle policy, durable settings, catalog
 rows, and macOS Now Playing registration. The CLI is one client of this same boundary.
 
 ## Invariants
 
-- Typed control values declare `version: 1`; they are in-process API values, not socket or JSONL
-  messages.
+- Typed control values declare `version: 1`; they are the primary in-process API values, not
+  socket or JSONL messages. The Electron trial adapter is a packaged local child helper because
+  Electron cannot link Swift directly; it maps only this same control surface and is neither a
+  discoverable service nor a user-selected executable path.
 - `PlaybackController` executes `load`, `play`, `pause`, `stop`, `seek`, timing/tempo/EQ,
-  volume, and mono controls. `PlaybackControlSurface` advertises those embedded capabilities so a
+  volume, mono, output-ramp, and finite AAC export controls. `PlaybackControlSurface` advertises those embedded capabilities so a
   frontend can bind an Options panel without probing private core objects. The core is not located
   or launched by filesystem path.
   changes, and `status`; `subscribe` is its callback-registration API rather than a command, and
   process shutdown stays with the hosting app. There are deliberately no queue, next, previous,
   repeat, shuffle, catalog-write, or playlist-mutation commands.
-- The equalizer is CocoaSpice-compatible: ten parametric `AVAudioUnitEQ` bands at 31, 62, 125,
-  250, 500, 1k, 2k, 4k, 8k, and 16k Hz, each constrained to -12...+12 dB. It lives in VGMBoy's
-  output graph, so every decoder sees identical EQ behavior. Its availability must be smoke-tested
-  on an audio-capable macOS host.
+- The equalizer is CocoaSpice-compatible: ten parametric bands at 31, 62, 125, 250, 500, 1k,
+  2k, 4k, 8k, and 16k Hz, each constrained to -12...+12 dB. It is applied before the direct
+  AudioUnit ring so every decoder sees identical EQ behavior; the transport callback applies only
+  the final de-click envelope.
 - Decoder header facts stay internal to session setup for subtrack validation and timing. VGMBoy
   never exposes, writes, or looks up frontend playlist or MediaScanner catalog metadata.
+- `AACExporter` is a separate offline decoder session. It takes a frontend-provided naked playable
+  path, subtrack, finite playback window, output folder, and display filename; it writes ADTS AAC
+  (`.aac`) without touching the live transport/device or any catalog. VGMBoy sanitizes the stem and
+  chooses a non-overwriting collision suffix. A frontend owns its persisted destination preference
+  and archive materialization before making this call.
+- `PlaybackStructureReader` is the narrow exception for raw disk browsing: it returns only
+  subtrack count, index, natural timing, and fade facts. It returns no decoder tags and never
+  opens a catalog. The Electron bridge maps it as `player-structure`.
 - Events distinguish responses, current status, natural end, and errors. A frontend makes the
   next queue decision after an `ended` event.
-- A frontend links VGMBoyKit as its sole playback implementation. Its former bridge targets and
-  audio engine are removed in the same migration; duplicate bridge objects are unsupported.
+- A native frontend links VGMBoyKit as its sole playback implementation. Electron uses the same
+  packaged adapter as its required playback engine for every admitted family, including MP2, TAK,
+  and legacy Nintendo DS WAV payloads; there is no automatic fallback to a retired SPCBoy player,
+  renderer PCM graph, or external decoder process. Catalog and structural inspection remain
+  separate read-only services, not alternate playback engines.
 
 ## Files
 

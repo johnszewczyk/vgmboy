@@ -5,46 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="$SCRIPT_DIR/.build"
 MODULE_CACHE="$BUILD_DIR/module-cache"
 APP_DIR="$BUILD_DIR/app/VGMBoy.app"
-COCOASPICE_DIR="$SCRIPT_DIR/../CocoaSpice"
-LIBVGM_BUILD="$COCOASPICE_DIR/.build/libvgm/bin/libvgm-player.a"
-MGBA_BUILD="$COCOASPICE_DIR/.build/mgba/libmgba.a"
-TWOSF_BUILD="$COCOASPICE_DIR/.build/2sf/lib2sf.a"
-VGMSTREAM_BUILD="$COCOASPICE_DIR/.build/vgmstream/src/libvgmstream.a"
-LAZYUSF_BUILD="$COCOASPICE_DIR/.build/lazyusf/liblazyusf.a"
-PLAYPSF_BUILD="$COCOASPICE_DIR/.build/play-psf/libcocoaspice_play_psf.a"
-
-if [[ ! -f "$LIBVGM_BUILD" ]]; then
-    echo "libvgm not built; building it from CocoaSpice's vendor copy..." >&2
-    "$COCOASPICE_DIR/scripts/build-libvgm.sh"
-fi
-
-if [[ ! -f "$MGBA_BUILD" ]]; then
-    echo "mGBA not built; building it from CocoaSpice's vendor copy..." >&2
-    "$COCOASPICE_DIR/scripts/build-mgba.sh"
-fi
-
-if [[ ! -f "$TWOSF_BUILD" ]]; then
-    echo "2sf2wav not built; building it from CocoaSpice's vendor copy..." >&2
-    "$COCOASPICE_DIR/scripts/build-2sf.sh"
-fi
-
-if [[ ! -f "$VGMSTREAM_BUILD" ]]; then
-    echo "vgmstream not built; building it from CocoaSpice's vendor copy..." >&2
-    "$COCOASPICE_DIR/scripts/build-vgmstream.sh"
-fi
-
-if [[ ! -f "$LAZYUSF_BUILD" ]]; then
-    echo "lazyusf not built; building it from CocoaSpice's vendor copy..." >&2
-    "$COCOASPICE_DIR/scripts/build-lazyusf.sh"
-fi
-
-if [[ ! -f "$PLAYPSF_BUILD" ]]; then
-    echo "Play! PSF not built; building it from CocoaSpice's vendor copy..." >&2
-    "$COCOASPICE_DIR/scripts/build-play-psf.sh"
-fi
-
 rm -rf "$BUILD_DIR"
 mkdir -p "$MODULE_CACHE" "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
+"$SCRIPT_DIR/scripts/build-dependencies.sh"
 export CLANG_MODULE_CACHE_PATH="$MODULE_CACHE"
 export SWIFTPM_MODULECACHE_OVERRIDE="$MODULE_CACHE"
 export XDG_CACHE_HOME="$BUILD_DIR/cache"

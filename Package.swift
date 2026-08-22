@@ -3,24 +3,23 @@
 import Foundation
 import PackageDescription
 
-// libvgm is vendored and built by CocoaSpice (one upstream copy for the app
-// family). VGMBoy links that build output rather than forking the library;
-// ordinary audio stays in VGMBoyKit through AVFoundation, so it needs no
-// frontend-local decoder target.
+// VGMBoy is the shared upstream source and dependency garden. Frontends link
+// VGMBoyKit or call its narrow process boundary; they do not build decoders.
 let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().path
-let cocoaspiceRoot = "\(packageRoot)/../CocoaSpice"
-let libVGMVendorDirectory = "\(cocoaspiceRoot)/vendor/libvgm"
-let libVGMBuildDirectory = "\(cocoaspiceRoot)/.build/libvgm"
-let libMGBAVendorDirectory = "\(cocoaspiceRoot)/vendor/mgba"
-let libMGBABuildDirectory = "\(cocoaspiceRoot)/.build/mgba"
-let twoSFVendorDirectory = "\(cocoaspiceRoot)/vendor/2sf2wav"
-let twoSFBuildDirectory = "\(cocoaspiceRoot)/.build/2sf"
-let vgmstreamVendorDirectory = "\(cocoaspiceRoot)/vendor/vgmstream/src"
-let vgmstreamBuildDirectory = "\(cocoaspiceRoot)/.build/vgmstream"
-let lazyUSFVendorDirectory = "\(cocoaspiceRoot)/vendor/lazyusf2"
-let lazyUSFBuildDirectory = "\(cocoaspiceRoot)/.build/lazyusf"
-let playPSFBuildDirectory = "\(cocoaspiceRoot)/.build/play-psf"
-let playPSFVendorDirectory = "\(cocoaspiceRoot)/vendor/play/tools/PsfPlayer/Source"
+let dependencyRoot = "\(packageRoot)/.build/dependencies"
+let sharedVendorRoot = "\(packageRoot)/vendor"
+let libVGMVendorDirectory = "\(sharedVendorRoot)/libvgm"
+let libVGMBuildDirectory = "\(dependencyRoot)/libvgm"
+let libMGBAVendorDirectory = "\(sharedVendorRoot)/mgba"
+let libMGBABuildDirectory = "\(dependencyRoot)/mgba"
+let twoSFVendorDirectory = "\(sharedVendorRoot)/2sf2wav"
+let twoSFBuildDirectory = "\(dependencyRoot)/2sf"
+let vgmstreamVendorDirectory = "\(sharedVendorRoot)/vgmstream/src"
+let vgmstreamBuildDirectory = "\(dependencyRoot)/vgmstream"
+let lazyUSFVendorDirectory = "\(sharedVendorRoot)/lazyusf2"
+let lazyUSFBuildDirectory = "\(dependencyRoot)/lazyusf"
+let playPSFBuildDirectory = "\(dependencyRoot)/play-psf"
+let playPSFVendorDirectory = "\(sharedVendorRoot)/play/tools/PsfPlayer/Source"
 
 let package = Package(
     name: "VGMBoy",
@@ -28,6 +27,8 @@ let package = Package(
     products: [
         .library(name: "VGMBoyKit", targets: ["VGMBoyKit"]),
         .executable(name: "vgmboy-cli", targets: ["vgmboy"]),
+        .executable(name: "vgmboy-electron-bridge", targets: ["VGMBoyElectronBridge"]),
+        .executable(name: "vgmboy-highly-complete-inspect", targets: ["VGMBoyHighlyCompleteInspect"]),
         .executable(name: "VGMBoy", targets: ["VGMBoyApp"])
     ],
     targets: [
@@ -125,13 +126,28 @@ let package = Package(
             ]
         ),
         .target(
+            name: "VGMBoyCFFmpeg",
+            path: "Sources/CFFmpeg",
+            publicHeadersPath: "include",
+            cSettings: [
+                .unsafeFlags(["-I/opt/homebrew/opt/ffmpeg/include"])
+            ],
+            linkerSettings: [
+                .unsafeFlags(["-L/opt/homebrew/opt/ffmpeg/lib"]),
+                .linkedLibrary("avcodec"),
+                .linkedLibrary("avformat"),
+                .linkedLibrary("avutil"),
+                .linkedLibrary("swresample")
+            ]
+        ),
+        .target(
             name: "VGMBoyCLazyUSF",
             path: "Sources/CLazyUSF",
             publicHeadersPath: "include",
             cSettings: [
                 .unsafeFlags([
                     "-I\(lazyUSFVendorDirectory)",
-                    "-I\(cocoaspiceRoot)/vendor/psflib"
+                    "-I\(sharedVendorRoot)/psflib"
                 ])
             ],
             linkerSettings: [
@@ -151,12 +167,12 @@ let package = Package(
                 .unsafeFlags([
                     "-std=c++17",
                     "-I\(playPSFVendorDirectory)",
-                    "-I\(cocoaspiceRoot)/vendor/play/Source",
-                    "-I\(cocoaspiceRoot)/vendor/play/Source/app_shared",
-                    "-I\(cocoaspiceRoot)/vendor/play/deps/CodeGen/src",
-                    "-I\(cocoaspiceRoot)/vendor/play/deps/CodeGen/include",
-                    "-I\(cocoaspiceRoot)/vendor/play/deps/Framework/include",
-                    "-I\(cocoaspiceRoot)/vendor/play/deps/Dependencies/ghc_filesystem/include"
+                    "-I\(sharedVendorRoot)/play/Source",
+                    "-I\(sharedVendorRoot)/play/Source/app_shared",
+                    "-I\(sharedVendorRoot)/play/deps/CodeGen/src",
+                    "-I\(sharedVendorRoot)/play/deps/CodeGen/include",
+                    "-I\(sharedVendorRoot)/play/deps/Framework/include",
+                    "-I\(sharedVendorRoot)/play/deps/Dependencies/ghc_filesystem/include"
                 ])
             ],
             linkerSettings: [
@@ -190,8 +206,14 @@ let package = Package(
             ]
         ),
         .target(
+            name: "VGMBoyCAudioUnit",
+            path: "Sources/CAudioUnit",
+            publicHeadersPath: "include",
+            linkerSettings: [.linkedFramework("AudioToolbox")]
+        ),
+        .target(
             name: "VGMBoyKit",
-            dependencies: ["VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCSIDPlayFP", "VGMBoyCOpenMPT"],
+            dependencies: ["VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCFFmpeg", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCSIDPlayFP", "VGMBoyCOpenMPT", "VGMBoyCAudioUnit"],
             linkerSettings: [
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("AudioToolbox")
@@ -199,6 +221,14 @@ let package = Package(
         ),
         .executableTarget(
             name: "vgmboy",
+            dependencies: ["VGMBoyKit"]
+        ),
+        .executableTarget(
+            name: "VGMBoyElectronBridge",
+            dependencies: ["VGMBoyKit"]
+        ),
+        .executableTarget(
+            name: "VGMBoyHighlyCompleteInspect",
             dependencies: ["VGMBoyKit"]
         ),
         .executableTarget(

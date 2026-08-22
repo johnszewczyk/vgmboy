@@ -36,6 +36,12 @@ public final class PlaybackController: @unchecked Sendable {
 
     public func diagnostics() -> PlaybackDiagnostics { session.status().diagnostics }
 
+    /// Render a finite AAC file without interrupting the controller's live
+    /// session. Hosts should call this from their own background task.
+    public func exportAAC(_ request: AACExportRequest) throws -> AACExportResult {
+        try AACExporter.export(request)
+    }
+
     @discardableResult
     public func subscribe(_ handler: @escaping EventHandler) -> UUID {
         let token = UUID()
@@ -112,11 +118,34 @@ public final class PlaybackController: @unchecked Sendable {
                 throw PlaybackControlError.invalidPayload("set_output_volume requires a volume.")
             }
             try session.setOutputVolume(volume)
+        case .rampOutputGain:
+            guard let gain = request.payload.outputGain,
+                  let duration = request.payload.rampMilliseconds else {
+                throw PlaybackControlError.invalidPayload("ramp_output_gain requires a gain and duration.")
+            }
+            try session.rampOutputGain(to: gain, durationMilliseconds: duration)
         case .setMonoEnabled:
             guard let enabled = request.payload.monoEnabled else {
                 throw PlaybackControlError.invalidPayload("set_mono_enabled requires a boolean.")
             }
             session.setMonoEnabled(enabled)
+        case .exportAAC:
+            guard let path = request.payload.path,
+                  let directory = request.payload.exportDirectory,
+                  let filenameStem = request.payload.exportFilenameStem,
+                  let playMilliseconds = request.payload.playMilliseconds,
+                  let fadeMilliseconds = request.payload.fadeMilliseconds else {
+                throw PlaybackControlError.invalidPayload("export_aac requires a path, folder, filename, play length, and fade length.")
+            }
+            let result = try exportAAC(AACExportRequest(
+                sourcePath: path,
+                trackIndex: request.payload.trackIndex ?? 0,
+                outputDirectory: URL(fileURLWithPath: directory),
+                filenameStem: filenameStem,
+                playMilliseconds: playMilliseconds,
+                fadeMilliseconds: fadeMilliseconds
+            ))
+            return PlaybackControlEvent(requestID: request.requestID, kind: .response, status: session.status(), message: result.outputURL.path)
         case .status:
             break
         case .subscribe, .shutdown:

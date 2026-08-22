@@ -15,7 +15,9 @@ public enum PlaybackControlCommand: String, Codable, Sendable {
     case setPlaybackMode = "set_playback_mode"
     case setEqualizer = "set_equalizer"
     case setOutputVolume = "set_output_volume"
+    case rampOutputGain = "ramp_output_gain"
     case setMonoEnabled = "set_mono_enabled"
+    case exportAAC = "export_aac"
     case status
     case subscribe
     case shutdown
@@ -31,7 +33,8 @@ public struct PlaybackControlSurface: Sendable {
     public func supports(_ command: PlaybackControlCommand) -> Bool {
         switch command {
         case .load, .play, .pause, .stop, .seek, .setTempo,
-             .setPlaybackMode, .setEqualizer, .setOutputVolume, .setMonoEnabled,
+             .setPlaybackMode, .setEqualizer, .setOutputVolume, .rampOutputGain, .setMonoEnabled,
+             .exportAAC,
              .status, .subscribe:
             true
         case .shutdown:
@@ -93,7 +96,11 @@ public struct PlaybackControlPayload: Codable, Sendable, Equatable {
     public var fadeMilliseconds: Int?
     public var equalizer: EqualizerConfiguration?
     public var outputVolume: Float?
+    public var outputGain: Float?
+    public var rampMilliseconds: Int?
     public var monoEnabled: Bool?
+    public var exportDirectory: String?
+    public var exportFilenameStem: String?
 
     public init(
         path: String? = nil,
@@ -105,7 +112,11 @@ public struct PlaybackControlPayload: Codable, Sendable, Equatable {
         fadeMilliseconds: Int? = nil,
         equalizer: EqualizerConfiguration? = nil,
         outputVolume: Float? = nil,
-        monoEnabled: Bool? = nil
+        outputGain: Float? = nil,
+        rampMilliseconds: Int? = nil,
+        monoEnabled: Bool? = nil,
+        exportDirectory: String? = nil,
+        exportFilenameStem: String? = nil
     ) {
         self.path = path
         self.trackIndex = trackIndex
@@ -116,7 +127,11 @@ public struct PlaybackControlPayload: Codable, Sendable, Equatable {
         self.fadeMilliseconds = fadeMilliseconds
         self.equalizer = equalizer
         self.outputVolume = outputVolume
+        self.outputGain = outputGain
+        self.rampMilliseconds = rampMilliseconds
         self.monoEnabled = monoEnabled
+        self.exportDirectory = exportDirectory
+        self.exportFilenameStem = exportFilenameStem
     }
 }
 
