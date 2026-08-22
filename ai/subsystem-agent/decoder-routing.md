@@ -26,8 +26,9 @@ are deliberately exclusive to one family.
   while mGBA runs, so the bridge resamples to VGMBoy's requested output rate and reports output-frame position.
 - 2SF bridge calls are serialized because the DS core is process-global. `PlaybackSession` calls
   `close()` before constructing a replacement decoder, so teardown never depends on ARC timing.
-- Bridges are copied into VGMBoy (`Sources/C<Core>`); the upstream static libs are never re-vendored
-  or built here. Symbol prefixes are per-core (`vgmboy_play_psf_*`, etc.).
+- Bridges are owned by VGMBoy (`Sources/C<Core>`). Shared upstream source and compatibility patches
+  live in VGMBoy's `vendor/` and `patches/` inputs; dependency archives are built and staged here,
+  never separately in CocoaSpice or SPCBoy. Symbol prefixes are per-core (`vgmboy_play_psf_*`, etc.).
 
 ## Failure Boundaries
 

@@ -6,7 +6,7 @@ build="$root/.build/play-psf"
 build_jobs="${COCOASPICE_BUILD_JOBS:-4}"
 patch="$root/patches/play-psfcore-only.patch"
 
-if git -C "$root/vendor/play" rev-parse --git-dir >/dev/null 2>&1; then
+if [[ -e "$root/vendor/play/.git" ]]; then
   if git -C "$root/vendor/play" apply --check "$patch" >/dev/null 2>&1; then
     git -C "$root/vendor/play" apply "$patch"
   elif ! git -C "$root/vendor/play" apply --reverse --check "$patch" >/dev/null 2>&1; then
