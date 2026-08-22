@@ -243,7 +243,7 @@ let package = Package(
         ),
         .testTarget(
             name: "VGMBoyKitTests",
-            dependencies: ["VGMBoyKit"],
+            dependencies: ["VGMBoyKit", "VGMBoyEndpointCore"],
             path: "Tests/VGMBoyKitTests"
         )
     ],
