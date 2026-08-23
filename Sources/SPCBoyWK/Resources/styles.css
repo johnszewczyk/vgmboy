@@ -467,6 +467,15 @@ body.is-file-drag-over::after {
   overflow: visible;
 }
 
+.diagnostics-category-grid {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.diagnostics-category {
+  min-width: 0;
+}
+
 .play-stat {
   display: grid;
   gap: 0.2rem;
@@ -676,6 +685,22 @@ body.is-file-drag-over::after {
   color: var(--accent);
 }
 
+.favorite-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.favorite-toggle.is-favorite { color: rgb(255 205 90); }
+.favorite-toggle .ui-icon { width: 0.9rem; height: 0.9rem; }
+
 .list-selection-indicator {
   position: absolute;
   z-index: 0;
@@ -694,6 +719,8 @@ body.is-file-drag-over::after {
 .col-index {
   width: 48px;
 }
+
+.col-favorite { width: 32px; }
 
 .col-length {
   width: 72px;

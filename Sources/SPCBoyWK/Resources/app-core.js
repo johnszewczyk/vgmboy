@@ -4,6 +4,7 @@ const STORAGE_KEY = "spcboy-wk-settings";
 const DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES = 2 * 1024 * 1024 * 1024;
 const ARCHIVE_CACHE_LIMIT_CHOICES = Object.freeze([512, 1024, 2048, 4096].map((megabytes) => megabytes * 1024 * 1024));
 const COLUMN_DEFS = [
+  { id: "favorite", label: "", className: "col-favorite", sortable: false },
   { id: "index", label: "#", className: "mono col-index", sortable: false },
   { id: "filename", label: "File" },
   { id: "title", label: "Title" },
@@ -15,6 +16,7 @@ const COLUMN_DEFS = [
 ];
 const DEFAULT_COLUMN_ORDER = COLUMN_DEFS.map((column) => column.id);
 const DEFAULT_COLUMN_WIDTHS = Object.freeze({
+  favorite: 6,
   index: 6,
   filename: 24,
   title: 18,
@@ -33,6 +35,7 @@ const state = {
   tree: [],
   sidebarQuery: "",
   sidebarMode: "consoles",
+  favorites: [],
   databaseGames: [],
   databaseFiles: [],
   databaseFileTree: [],
@@ -92,6 +95,7 @@ const state = {
   optionsSection: "database",
   libraryRoots: [],
   archiveCacheSummary: null,
+  archiveCacheLocation: "",
   databaseLocation: null,
   databaseLocationStatus: "",
   metadataToken: 0,
@@ -163,6 +167,9 @@ const refs = {
   libraryDatabaseShowButton: document.getElementById("library-database-show-button"),
   libraryDatabaseDefaultButton: document.getElementById("library-database-default-button"),
   libraryDatabaseReloadButton: document.getElementById("library-database-reload-button"),
+  libraryCachePath: document.getElementById("library-cache-path"),
+  libraryCacheBrowseButton: document.getElementById("library-cache-browse-button"),
+  libraryCacheDefaultButton: document.getElementById("library-cache-default-button"),
   sidebarFontSizeInput: document.getElementById("sidebar-font-size-input"),
   sidebarTextColorInput: document.getElementById("sidebar-text-color-input"),
   sidebarMonospaceCheckbox: document.getElementById("sidebar-monospace-checkbox"),
@@ -245,9 +252,10 @@ function loadSettings() {
     state.rootPath = parsed.rootPath || null;
     state.selectedFolderPath = parsed.selectedFolderPath || null;
     state.selectedBrowserPath = parsed.selectedBrowserPath || state.selectedFolderPath;
-    state.sidebarMode = ["paths", "consoles", "diskPath"].includes(parsed.sidebarMode)
+    state.sidebarMode = ["paths", "consoles", "diskPath", "favorites"].includes(parsed.sidebarMode)
       ? parsed.sidebarMode
       : "consoles";
+    state.favorites = Array.isArray(parsed.favorites) ? parsed.favorites.filter((track) => track && typeof track === "object") : [];
     state.selectedDatabaseGameKey = parsed.selectedDatabaseGameKey || null;
     state.collapsedConsoleNames = Array.isArray(parsed.collapsedConsoleNames)
       ? parsed.collapsedConsoleNames.filter((name) => typeof name === "string")
@@ -300,6 +308,7 @@ function persistSettings() {
     selectedFolderPath: state.selectedFolderPath,
     selectedBrowserPath: state.selectedBrowserPath,
     sidebarMode: state.sidebarMode,
+    favorites: state.favorites,
     selectedDatabaseGameKey: state.selectedDatabaseGameKey,
     collapsedConsoleNames: state.collapsedConsoleNames,
     lastSelectedTrackId: state.lastSelectedTrackId,
@@ -449,7 +458,7 @@ function normalizeColumnOrder(value) {
     value.indexOf(columnId) === index
   ));
   const missing = DEFAULT_COLUMN_ORDER.filter((columnId) => !deduped.includes(columnId));
-  return [...deduped, ...missing];
+  return ["favorite", ...deduped.filter((columnId) => columnId !== "favorite"), ...missing.filter((columnId) => columnId !== "favorite")];
 }
 
 function normalizeColumnWidths(value) {
@@ -473,7 +482,42 @@ function normalizeColumnVisibility(value) {
 }
 
 function normalizeSortColumn(value) {
-  return DEFAULT_COLUMN_ORDER.includes(value) && value !== "index" ? value : "filename";
+  return DEFAULT_COLUMN_ORDER.includes(value) && !["index", "favorite"].includes(value) ? value : "filename";
+}
+
+function favoriteKey(track) {
+  const sourcePath = String(track?.archivePath || track?.path || "").replace(/\\/g, "/");
+  const entry = String(track?.archiveEntry || "").trim();
+  const index = Math.max(0, Number(track?.trackIndex) || 0);
+  return `fav1|${sourcePath.length}|${sourcePath}|${entry.length}|${entry}|${index}`;
+}
+
+function isFavorite(track) {
+  const key = favoriteKey(track);
+  return state.favorites.some((entry) => favoriteKey(entry) === key);
+}
+
+function toggleFavorites(tracks) {
+  const unique = [];
+  const seen = new Set();
+  for (const track of tracks || []) {
+    const key = favoriteKey(track);
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      unique.push(track);
+    }
+  }
+  if (!unique.length) return false;
+  const keys = new Set(unique.map(favoriteKey));
+  const allSelected = unique.every(isFavorite);
+  if (allSelected) {
+    state.favorites = state.favorites.filter((entry) => !keys.has(favoriteKey(entry)));
+  } else {
+    const existing = new Set(state.favorites.map(favoriteKey));
+    state.favorites = [...state.favorites, ...unique.filter((track) => !existing.has(favoriteKey(track)))];
+  }
+  persistSettings();
+  return !allSelected;
 }
 
 function normalizeSortDirection(value) {
@@ -513,6 +557,9 @@ window.SPCBoyApp = {
   SAMPLE_RATE,
   STORAGE_KEY,
   COLUMN_DEFS,
+  favoriteKey,
+  isFavorite,
+  toggleFavorites,
   DEFAULT_COLUMN_ORDER,
   state,
   audioEngine,

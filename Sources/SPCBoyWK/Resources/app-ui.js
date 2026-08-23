@@ -719,6 +719,7 @@ function setAllDatabaseConsolesCollapsed(collapsed) {
 }
 
 async function setAllSidebarNodesCollapsed(collapsed) {
+  if (currentSidebarView().contentMode === "favorites") return;
   if (currentSidebarView().contentMode === "database") {
     setAllDatabaseConsolesCollapsed(collapsed);
     return;
@@ -763,11 +764,16 @@ async function loadDatabaseFiles() {
 }
 
 async function setSidebarMode(mode) {
-  if (!["paths", "consoles", "diskPath"].includes(mode)) return;
+  if (!["paths", "consoles", "diskPath", "favorites"].includes(mode)) return;
   state.sidebarMode = mode;
   state.sidebarQuery = "";
   refs.sidebarSearchInput.value = "";
   state.databaseSearchGames = null;
+  if (mode === "favorites") {
+    state.playlist = [...state.favorites];
+    state.selectedTrackId = state.playlist[0]?.id || null;
+    state.lastSelectedTrackId = state.selectedTrackId;
+  }
   if (mode === "paths" && !state.databaseFiles.length) await loadDatabaseFiles();
   if (mode === "consoles" && !state.databaseGames.length) await loadDatabaseGames();
   persistSettings();
@@ -800,6 +806,7 @@ function updateSidebarSearch(query) {
   state.databaseSearchGames = state.sidebarQuery.trim() ? immediateDatabaseSearch(state.sidebarQuery) : null;
   window.clearTimeout(sidebarSearchTimer);
   renderSidebar();
+  if (state.sidebarMode === "favorites") return;
   const requestedQuery = state.sidebarQuery.trim();
   if (!requestedQuery) return;
   if (window.spcBoyWK?.databaseSearchGames) {
@@ -822,6 +829,29 @@ function updateSidebarSearch(query) {
 
 async function loadDatabaseGame(game) {
   await loadDatabaseGamesIntoPlaylist([game]);
+}
+
+async function toggleSelectedFavorites() {
+  const focusedInSidebar = refs.treeRoot.contains(document.activeElement);
+  if (!focusedInSidebar && state.selectedTrackId) {
+    const track = state.playlist.find((entry) => entry.id === state.selectedTrackId);
+    if (track) {
+      uiApp.toggleFavorites([track]);
+      renderSidebar();
+      renderPlaylist();
+      return;
+    }
+  }
+  const games = state.selectedDatabaseGameKey
+    ? visibleDatabaseGames().filter((game) => databaseGameKey(game) === state.selectedDatabaseGameKey)
+    : state.selectedDatabaseConsoleName
+      ? visibleDatabaseGames().filter((game) => databaseConsoleName(game) === state.selectedDatabaseConsoleName)
+      : [];
+  if (!games.length) return;
+  const rows = await window.spcBoyWK.databaseGameTracks(games);
+  uiApp.toggleFavorites(databaseRowsToPlaylistTracks(rows, games));
+  renderSidebar();
+  renderPlaylist();
 }
 
 function reportDatabaseSidebarError(action, error) {
@@ -937,7 +967,7 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
 
 function renderSidebar() {
   const view = currentSidebarView();
-  const labels = { paths: "Catalog paths", consoles: "Catalog consoles", diskPath: "Disk path" };
+  const labels = { paths: "Catalog paths", consoles: "Catalog consoles", diskPath: "Disk path", favorites: "Favorites" };
   refs.sidebarViewButtons.forEach((button) => {
     const mode = button.dataset.sidebarView;
     const selected = mode === view.storedMode;
@@ -947,7 +977,53 @@ function renderSidebar() {
     button.setAttribute("aria-label", button.title);
   });
   if (view.contentMode === "database") renderDatabaseGames();
+  else if (view.contentMode === "favorites") renderFavorites();
   else renderTree();
+}
+
+function renderFavorites() {
+  const indicator = resetSidebarContent();
+  const query = state.sidebarQuery.trim().toLowerCase();
+  const favorites = state.favorites.filter((track) => {
+    if (!query) return true;
+    return `${track.filename || ""} ${track.title || ""} ${track.game || ""} ${track.path || ""}`.toLowerCase().includes(query);
+  });
+  if (!favorites.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty sidebar-empty";
+    empty.textContent = state.favorites.length ? "No favorites match this search." : "Select a track or album and press Command-D.";
+    refs.treeRoot.appendChild(empty);
+    positionSelectionIndicator(refs.treeRoot, indicator, null);
+    return;
+  }
+  for (const track of favorites) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "database-game-row favorite-track-row";
+    button.dataset.favoriteKey = uiApp.favoriteKey(track);
+    button.innerHTML = `<span class="database-disclosure">★</span><span class="database-game-name">${escapeHtml(track.title || track.filename || "Favorite")}</span><span class="database-game-meta">${escapeHtml(track.game || "")}</span>`;
+    button.addEventListener("click", () => {
+      state.selectedTrackId = track.id;
+      state.lastSelectedTrackId = track.id;
+      persistSettings();
+      state.playlist = [...state.favorites];
+      renderPlaylist();
+      button.focus();
+      scheduleSelectionIndicators();
+    });
+    button.addEventListener("dblclick", () => uiApp.playback.playTrack(track.id, 0).catch((error) => console.error(error)));
+    button.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      showContextMenu(event, [["Remove from Favorites", () => {
+        uiApp.toggleFavorites([track]);
+        state.playlist = [...state.favorites];
+        renderSidebar();
+        renderPlaylist();
+      }]]);
+    });
+    refs.treeRoot.appendChild(button);
+  }
+  syncTreeSelection();
 }
 
 function syncAnimatedRanges() {
@@ -1012,6 +1088,7 @@ function playlistDisplayPath(track) {
 
 function playlistColumnValue(track, column, rowIndex = null) {
   if (column.id === "index") return rowIndex === null ? "" : rowIndex + 1;
+  if (column.id === "favorite") return "";
   return column.id === "path" ? playlistDisplayPath(track) : (track[column.id] ?? "");
 }
 
@@ -1283,7 +1360,28 @@ function renderPlaylistCell(track, column, rowIndex) {
   td.className = column.className || "";
   td.dataset.columnId = column.id;
   td.style.width = `${state.columnWidths[column.id]}%`;
-  td.textContent = String(playlistColumnValue(track, column, rowIndex));
+  if (column.id === "favorite") {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "favorite-toggle";
+    const favorite = uiApp.isFavorite(track);
+    button.title = favorite ? "Remove from Favorites" : "Add to Favorites";
+    button.setAttribute("aria-label", button.title);
+    button.setAttribute("aria-pressed", favorite ? "true" : "false");
+    button.classList.toggle("is-favorite", favorite);
+    button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="#icon-star"></use></svg>`;
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      uiApp.toggleFavorites([track]);
+      if (state.sidebarMode === "favorites") state.playlist = [...state.favorites];
+      renderSidebar();
+      renderPlaylist();
+    });
+    td.appendChild(button);
+  } else {
+    td.textContent = String(playlistColumnValue(track, column, rowIndex));
+  }
   return td;
 }
 
@@ -1342,7 +1440,18 @@ function refreshPlaylistRow(trackId) {
   for (const column of orderedColumns()) {
     const cell = row.querySelector(`[data-column-id="${CSS.escape(column.id)}"]`);
     if (!cell) return false;
-    cell.textContent = String(playlistColumnValue(track, column, rowIndex));
+    if (column.id === "favorite") {
+      const button = cell.querySelector("button");
+      if (button) {
+        const favorite = uiApp.isFavorite(track);
+        button.classList.toggle("is-favorite", favorite);
+        button.title = favorite ? "Remove from Favorites" : "Add to Favorites";
+        button.setAttribute("aria-label", button.title);
+        button.setAttribute("aria-pressed", favorite ? "true" : "false");
+      }
+    } else {
+      cell.textContent = String(playlistColumnValue(track, column, rowIndex));
+    }
     cell.style.width = `${state.columnWidths[column.id]}%`;
   }
   updatePlaylistRowState(row, trackId);
@@ -1595,6 +1704,7 @@ function renderAll() {
   refs.repeatButton.title = repeatTitles[state.repeatMode];
   refs.repeatButton.setAttribute("aria-label", repeatTitles[state.repeatMode]);
   refs.libraryDatabasePath.value = state.databaseLocation?.path || "";
+  if (refs.libraryCachePath) refs.libraryCachePath.value = state.archiveCacheLocation || "";
   refs.libraryDatabaseLocationStatus.textContent = state.databaseLocationStatus || "SPCBoy reads this schema-23 catalog. MediaScanner owns scan paths, scanning, link checks, and cleanup.";
   refs.libraryDatabaseReloadButton.disabled = Boolean(state.databaseLocation?.requiresRestart);
   refs.libraryClearCacheButton.disabled = false;
@@ -2133,7 +2243,11 @@ async function bootstrap() {
     await uiApp.ui.handleLibraryRootsChanged(state.libraryRoots);
   }
   renderAll();
-  if (state.sidebarMode === "consoles") {
+  if (state.sidebarMode === "favorites") {
+    state.playlist = [...state.favorites];
+    state.selectedTrackId = resolveSelectedTrackId(state.playlist);
+    state.lastSelectedTrackId = state.selectedTrackId;
+  } else if (state.sidebarMode === "consoles") {
     const selectedGame = state.databaseGames.find((game) => databaseGameKey(game) === state.selectedDatabaseGameKey);
     if (selectedGame) {
       await loadDatabaseGame(selectedGame);
@@ -2254,6 +2368,7 @@ uiApp.ui = {
   updateSidebarSearch,
   loadDatabaseGames,
   loadDatabaseGame,
+  toggleSelectedFavorites,
   activateDatabaseSelection,
   activateFocusedItem,
   renderSidebar,

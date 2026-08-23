@@ -33,6 +33,7 @@ async function handleLibraryRootsChanged(roots) {
 async function refreshArchiveCacheSummary() {
   if (!window.spcBoyWK?.archiveCacheSummary) return;
   try {
+    state.archiveCacheLocation = await window.spcBoyWK.archiveCacheLocation?.() || "";
     state.archiveCacheSummary = await window.spcBoyWK.archiveCacheSummary();
   } catch (error) {
     state.archiveCacheSummary = null;

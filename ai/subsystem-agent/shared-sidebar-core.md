@@ -14,7 +14,7 @@ rendering.
 
 ## Invariants
 
-- Search is a temporary catalog-console view and clearing it restores the stored mode.
+- Search is a temporary catalog-console view and clearing it restores the stored mode. Favorites is a separate frontend-owned track-history view and is not a CatalogReader aggregation mode.
 - The sidebar view button opens a flat in-app menu with `Consoles`, `Paths`, and `Disk Path`; the
   first two are the catalog database views and the last is the explicitly opened local filesystem.
 - Game identity includes the catalog root ID, game name, and system.
@@ -22,6 +22,7 @@ rendering.
   aggregation; empty folder tags fall through to stored metadata before the
   UI receives a row.
 - Catalog writes, scans, decoder selection, and playback do not belong here.
+- Favorite identity/order is shared through FavoriteTrackCore; persistence and rendering remain owned by each frontend.
 
 ## Files
 

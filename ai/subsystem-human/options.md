@@ -21,13 +21,16 @@ SPCBoy a catalog writer; MediaScanner remains responsible for scanning and publi
 ## Database panel layout
 
 The Database page shows the configured MediaScanner catalog path as a full-width readout.
-Database actions run as three equal-width controls across the bottom of that panel—Reload Library,
-Use Default, and Show in Finder. The catalog browse action is the folder button at the end of the
-path bar. Archive-cache actions use the same aligned toolbar treatment in their own panel, with
-Show in Finder last.
+Database actions run as three equal-width controls across the bottom of that panel—Use Default,
+Reload Library, and Show in Finder. The catalog browse action is the folder button at the end of the
+path bar. Archive Cache shows its active path in the same readout style and uses Use Default, Clear
+Cache, and Show in Finder, with Show in Finder last.
 
 Playback controls are ordered Volume, Mono, Equalizer. Volume and each equalizer band use animated range bars with live values. The transport
 seek bar remains a transport control, not a settings input.
+
+Favorites is a fourth library view beside Paths, Consoles, and Disk Path. Command-D toggles the
+selected track or selected database game/group, and the Favorites playlist preserves insertion order.
 
 ## Files
 

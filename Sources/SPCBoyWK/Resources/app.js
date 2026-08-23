@@ -397,6 +397,14 @@ refs.libraryShowCacheButton.addEventListener("click", () => {
   app.ui.showLibraryArchiveCacheInFinder().catch((error) => console.error(error));
 });
 
+refs.libraryCacheBrowseButton?.addEventListener("click", () => {
+  if (state.archiveCacheLocation) window.spcBoyWK?.showInFinder?.(state.archiveCacheLocation);
+});
+
+refs.libraryCacheDefaultButton?.addEventListener("click", () => {
+  app.ui.refreshArchiveCacheSummary().catch((error) => console.error(error));
+});
+
 refs.archiveCacheEnabledCheckbox.addEventListener("change", (event) => {
   app.ui.setArchiveCacheEnabled(event.target.checked);
 });
@@ -555,6 +563,12 @@ window.addEventListener("keydown", (event) => {
       event.preventDefault();
       app.ui.setOptionsOpen(false);
     }
+    return;
+  }
+
+  if (event.metaKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === "d" && !state.optionsOpen) {
+    event.preventDefault();
+    app.ui.toggleSelectedFavorites().catch((error) => console.error("[SPCBoy] favorite toggle failed", error));
     return;
   }
 
