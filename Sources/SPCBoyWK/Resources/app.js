@@ -572,6 +572,12 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
+  if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "a" && !state.optionsOpen && refs.playlistBody.contains(event.target)) {
+    event.preventDefault();
+    app.ui.selectAllPlaylistTracks();
+    return;
+  }
+
   if (event.key === "F7") {
     event.preventDefault();
     app.playback.playAdjacent(-1);
@@ -601,13 +607,13 @@ window.addEventListener("keydown", (event) => {
 
   if (event.key === "ArrowDown" && !state.optionsOpen) {
     event.preventDefault();
-    app.ui.moveSelection(1);
+    app.ui.moveSelection(1, { range: event.shiftKey, extend: event.metaKey || event.ctrlKey });
     return;
   }
 
   if (event.key === "ArrowUp" && !state.optionsOpen) {
     event.preventDefault();
-    app.ui.moveSelection(-1);
+    app.ui.moveSelection(-1, { range: event.shiftKey, extend: event.metaKey || event.ctrlKey });
     return;
   }
 

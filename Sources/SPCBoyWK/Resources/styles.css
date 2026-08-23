@@ -1180,6 +1180,18 @@ body.is-file-drag-over::after {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-1);
   min-width: 0;
+  padding: var(--space-1);
+  border-radius: var(--control-radius);
+  background: rgb(30 30 30);
+}
+
+.options-path-control .options-path-readout {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
 }
 
 .options-path-control .tool-button {

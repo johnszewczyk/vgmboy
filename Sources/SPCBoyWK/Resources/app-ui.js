@@ -1445,9 +1445,9 @@ function selectPlaylistTrack(trackId, { focus = false, extend = false, range = f
     nextIds = [trackId];
   }
   state.selectedTrackIds = nextIds;
-  state.selectedTrackId = track.id;
+  state.selectedTrackId = nextIds.includes(track.id) ? track.id : (nextIds.at(-1) || null);
   state.lastSelectedTrackId = track.id;
-  state.playlistSelectionAnchorId = track.id;
+  if (!range) state.playlistSelectionAnchorId = track.id;
   if (previousIds.size !== nextIds.length || nextIds.some((id) => !previousIds.has(id))) persistSettings();
 
   for (const [id, row] of playlistRowsByTrackId) updatePlaylistRowState(row, id);
@@ -1461,7 +1461,6 @@ function selectPlaylistTrack(trackId, { focus = false, extend = false, range = f
 function refreshPlaylistPlaybackState() {
   for (const [id, row] of playlistRowsByTrackId) updatePlaylistRowState(row, id);
   const nextSelectedRow = state.selectedTrackId ? playlistRowsByTrackId.get(state.selectedTrackId) || null : null;
-  nextSelectedRow?.classList.add("is-selected");
   selectedPlaylistRow = nextSelectedRow;
 
   currentPlaylistRow?.classList.remove("is-current");
@@ -1522,8 +1521,8 @@ function renderPlaylist() {
   }
   const playlistIDs = new Set(state.playlist.map((track) => track.id));
   state.selectedTrackIds = state.selectedTrackIds.filter((id) => playlistIDs.has(id));
-  if (state.selectedTrackId && !state.selectedTrackIds.includes(state.selectedTrackId)) {
-    state.selectedTrackIds.push(state.selectedTrackId);
+  if (state.selectedTrackId && state.selectedTrackIds.length && !state.selectedTrackIds.includes(state.selectedTrackId)) {
+    state.selectedTrackId = state.selectedTrackIds.at(-1) || null;
   }
   refs.playlistBody.innerHTML = "";
   playlistRowsByTrackId.clear();
@@ -1795,7 +1794,7 @@ function scrollSelectedTrackIntoView() {
   row?.scrollIntoView({ block: "nearest" });
 }
 
-function moveSelection(delta) {
+function moveSelection(delta, { range = false, extend = false } = {}) {
   if (state.playlist.length === 0) {
     return;
   }
@@ -1807,10 +1806,20 @@ function moveSelection(delta) {
 
   // Keep DOM focus and the visual selection together. Without this, Enter
   // can be routed through an old sidebar/focused row after arrow navigation.
-  selectPlaylistTrack(state.playlist[nextIndex].id, { focus: true });
+  selectPlaylistTrack(state.playlist[nextIndex].id, { focus: true, range, extend });
   uiApp.playback.updateTimingSummary();
   scrollSelectedTrackIntoView();
   uiApp.playback.preloadTrackAudio(uiApp.selectedTrack());
+}
+
+function selectAllPlaylistTracks() {
+  if (!state.playlist.length) return;
+  state.selectedTrackIds = state.playlist.map((track) => track.id);
+  state.selectedTrackId = state.playlist[0].id;
+  state.lastSelectedTrackId = state.selectedTrackId;
+  state.playlistSelectionAnchorId = state.selectedTrackId;
+  persistSettings();
+  refreshPlaylistPlaybackState();
 }
 
 function playSelectedTrack() {
@@ -2370,6 +2379,7 @@ uiApp.ui = {
   refreshPlaylistPlaybackState,
   renderAll,
   moveSelection,
+  selectAllPlaylistTracks,
   moveBrowserSelection,
   jumpFocusedListToEdge,
   playSelectedTrack,
