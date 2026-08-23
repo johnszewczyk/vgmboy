@@ -15,7 +15,6 @@ let databaseEmptyState = null;
 let databaseConsoleGroups = [];
 let collapsedDatabaseConsoles = new Set();
 let browserClickTimer = 0;
-let databaseClickTimer = 0;
 let sidebarSearchTimer = 0;
 let columnResizePointerId = null;
 
@@ -579,7 +578,6 @@ function makeDatabaseGameButton(game) {
   button.addEventListener("dblclick", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    window.clearTimeout(databaseClickTimer);
     state.selectedDatabaseGameKey = databaseGameKey(game);
     state.selectedDatabaseConsoleName = databaseConsoleName(game);
     persistSettings();
