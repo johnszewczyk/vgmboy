@@ -1046,6 +1046,12 @@ body.is-file-drag-over::after {
   background: transparent;
 }
 
+.options-diagnostics-page {
+  gap: 1rem;
+  padding: 0;
+  background: transparent;
+}
+
 .options-subpanel {
   display: grid;
   gap: 1rem;
