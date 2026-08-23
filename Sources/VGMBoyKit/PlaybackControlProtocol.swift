@@ -38,7 +38,7 @@ public struct PlaybackTempo: Codable, Equatable, Sendable {
                   let denominator = Int(text[text.index(after: slash)...].trimmingCharacters(in: .whitespaces)),
                   numerator >= 1, denominator >= 1,
                   numerator <= maxComponent, denominator <= maxComponent else { return nil }
-            return Self(numerator: numerator, denominator: denominator)
+            return Self.snappedToThirtySeconds(Self(numerator: numerator, denominator: denominator))
         }
 
         let parts = text.split(separator: ".", omittingEmptySubsequences: false)
@@ -52,7 +52,17 @@ public struct PlaybackTempo: Codable, Equatable, Sendable {
         let denominator = Int(pow(10.0, Double(fraction.count)))
         let numerator = whole * denominator + fractional
         guard numerator >= 1, numerator <= maxComponent, denominator <= maxComponent else { return nil }
-        return Self(numerator: numerator, denominator: denominator)
+        return Self.snappedToThirtySeconds(Self(numerator: numerator, denominator: denominator))
+    }
+
+    /// UI-entered tempo values use musical 1/32 steps. The stored fraction is
+    /// reduced after snapping so decimal and fractional input share one value.
+    private static func snappedToThirtySeconds(_ value: Self) -> Self {
+        let steps = min(
+            maxComponent,
+            max(1, Int((value.multiplier * 32).rounded()))
+        )
+        return Self(numerator: steps, denominator: 32)
     }
 
     public var displayString: String {
@@ -112,7 +122,8 @@ public struct PlaybackControlSurface: Sendable {
 }
 
 public enum PlaybackMode: String, Codable, Sendable {
-    /// Use tagged/native timing whenever the decoder supports it.
+    /// Use tagged/native timing when supported and no explicit fade is
+    /// requested; a nonzero fade selects the bounded shared fade path.
     case fileDefault = "file_default"
     /// Bound playback to `playMilliseconds + fadeMilliseconds`.
     case longPlay = "long_play"

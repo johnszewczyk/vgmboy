@@ -17,6 +17,12 @@ app-volume/mono output state, and transport state. A frontend owns
 playlist membership, queue transitions, repeat-one/all/shuffle policy, durable settings, catalog
 rows, and macOS Now Playing registration. The CLI is one client of this same boundary.
 
+Options follow the same boundary: catalog paths, sidebar/view state, queue policy, window/theme
+state, and frontend preferences belong to the host; decoder-family tempo enablement, playback
+mode, play/fade windows, EQ, output volume, mono, and transport diagnostics belong to VGMBoy.
+Hosts may arrange those core controls differently in their Options windows, but they must send the
+same typed endpoint operations.
+
 ## Invariants
 
 - Typed control values declare `version: 1`; they are the primary in-process API values, not
@@ -30,9 +36,14 @@ rows, and macOS Now Playing registration. The CLI is one client of this same bou
   changes, and `status`; `subscribe` is its callback-registration API rather than a command, and
   process shutdown stays with the hosting app. There are deliberately no queue, next, previous,
   repeat, shuffle, catalog-write, or playlist-mutation commands.
-- `PlaybackTempo` is the shared exact decimal/fraction representation for frontend settings. The
-  host converts it to the typed `set_tempo` multiplier; decoder-family capability remains owned by
-  `FormatRegistry` and currently enables native tempo for libgme and libvgm.
+- `PlaybackStatus.statistics` is the shared diagnostic payload for decoder family, decoder/output
+  rates, decoded frames, audible position frames, and tempo. It deliberately excludes title,
+  filename, and other frontend “now playing” presentation fields. Device counters remain in
+  `PlaybackStatus.diagnostics`.
+- `PlaybackTempo` is the shared fraction representation for frontend settings. UI parsing accepts
+  decimal or fractional input and snaps it to musical 1/32 increments before the host sends the
+  typed `set_tempo` multiplier; decoder-family capability remains owned by `FormatRegistry` and
+  currently enables native tempo for libgme and libvgm.
 - The equalizer is CocoaSpice-compatible: ten parametric bands at 31, 62, 125, 250, 500, 1k,
   2k, 4k, 8k, and 16k Hz, each constrained to -12...+12 dB. It is applied before the direct
   AudioUnit ring so every decoder sees identical EQ behavior; the transport callback applies only
@@ -57,7 +68,7 @@ rows, and macOS Now Playing registration. The CLI is one client of this same bou
 
 ## Files
 
-- [PlaybackControlProtocol.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/PlaybackControlProtocol.swift)
-- [PlaybackSession.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/PlaybackSession.swift)
-- [PlaybackController.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/PlaybackController.swift)
-- [VGMBoyEndpointCore.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyEndpointCore/VGMBoyEndpointCore.swift)
+- [PlaybackControlProtocol.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/PlaybackControlProtocol.swift)
+- [PlaybackSession.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/PlaybackSession.swift)
+- [PlaybackController.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/PlaybackController.swift)
+- [VGMBoyEndpointCore.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyEndpointCore/VGMBoyEndpointCore.swift)

@@ -107,6 +107,13 @@ struct FormatRegistryTests {
         }
     }
 
+    @Test("routes QSF extensions to the qsf family")
+    func routesQSF() {
+        for ext in FormatRegistry.qsfExtensions {
+            #expect(FormatRegistry.family(for: "/tmp/example.\(ext)")?.id == "qsf")
+        }
+    }
+
     @Test("libgme supports long play and tempo")
     func libGmeCapabilities() {
         let family = FormatRegistry.libgmeFamily
@@ -143,6 +150,14 @@ struct FormatRegistryTests {
         #expect(!family.supportsTempo)
     }
 
+    @Test("QSF supports long play but not tempo")
+    func qsfCapabilities() {
+        let family = FormatRegistry.qsfFamily
+        #expect(family.supportsLongPlay)
+        #expect(!family.supportsTempo)
+        #expect(family.hasNaturalEnding)
+    }
+
     @Test("lazyusf supports long play, no tempo, and no natural ending")
     func lazyUSFCapabilities() {
         let family = FormatRegistry.lazyusfFamily
@@ -160,6 +175,32 @@ struct FormatRegistryTests {
     }
 }
 
+@Suite("QSF playback")
+struct QSFPlaybackTests {
+    @Test("renders non-silent PCM from a real QSF fixture when provided")
+    func rendersRealFixture() throws {
+        guard let path = ProcessInfo.processInfo.environment["VGMBoy_QSF_FIXTURE"],
+              FileManager.default.fileExists(atPath: path) else {
+            return
+        }
+        let decoder = try QSFDecoder(path: path)
+        try decoder.startTrack(0)
+        let metadata = try decoder.metadata(for: 0)
+        var pcm = (left: [Float](), right: [Float]())
+        for _ in 0..<12 {
+            let chunk = decoder.readFrames(4_096)
+            pcm.left.append(contentsOf: chunk.left)
+            pcm.right.append(contentsOf: chunk.right)
+            if pcm.left.contains(where: { abs($0) > 0.0001 }) || pcm.right.contains(where: { abs($0) > 0.0001 }) {
+                break
+            }
+        }
+        #expect(decoder.sampleRate == 44_100)
+        #expect(metadata.system == "Capcom QSound")
+        #expect(pcm.left.contains { abs($0) > 0.0001 } || pcm.right.contains { abs($0) > 0.0001 })
+    }
+}
+
 @Suite("PlaybackControlProtocol")
 struct PlaybackControlProtocolTests {
     @Test("tempo values preserve exact decimal and fraction input")
@@ -167,6 +208,8 @@ struct PlaybackControlProtocolTests {
         #expect(PlaybackTempo.parse("1.25") == PlaybackTempo(numerator: 5, denominator: 4))
         #expect(PlaybackTempo.parse(".5") == PlaybackTempo(numerator: 1, denominator: 2))
         #expect(PlaybackTempo.parse("15/12") == PlaybackTempo(numerator: 5, denominator: 4))
+        #expect(PlaybackTempo.parse("1/3") == PlaybackTempo(numerator: 11, denominator: 32))
+        #expect(PlaybackTempo.parse("1.01") == PlaybackTempo(numerator: 1, denominator: 1))
         #expect(PlaybackTempo(numerator: 5, denominator: 4).displayString == "1.25")
         #expect(PlaybackTempo(numerator: 1, denominator: 3).displayString == "1/3")
         #expect(PlaybackTempo.parse("1.0000001") == nil)
@@ -329,7 +372,7 @@ struct TimingPolicyTests {
         #expect(plan.usesNativeEnding)
     }
 
-    @Test("missing timing falls back to a 150s native window")
+    @Test("missing timing falls back to a 150s bounded window when fading")
     func fallbackWithoutTiming() {
         let plan = TimingPolicy.plan(
             supportsLongPlay: true,
@@ -339,7 +382,7 @@ struct TimingPolicyTests {
             fadeSeconds: 6
         )
         #expect(plan.preFadeSeconds == 150)
-        #expect(plan.usesNativeEnding)
+        #expect(!plan.usesNativeEnding)
     }
 
     @Test("no-natural-ending family always gets a capped window")
@@ -365,5 +408,44 @@ struct TimingPolicyTests {
         )
         #expect(!withoutMetadata.usesNativeEnding)
         #expect(withoutMetadata.preFadeSeconds == 150)
+    }
+}
+
+@Suite("PlaybackController timing contract")
+struct PlaybackControllerTimingTests {
+    @Test("file default with a requested fade uses the bounded shared path")
+    func fileDefaultFadeIsNotNative() {
+        let plan = PlaybackController.plan(
+            mode: .fileDefault,
+            playMilliseconds: 150_000,
+            fadeMilliseconds: 6_000,
+            family: FormatRegistry.libgmeFamily
+        )
+        #expect(plan.preFadeSeconds == 150)
+        #expect(plan.fadeSeconds == 6)
+        #expect(!plan.usesNativeEnding)
+    }
+
+    @Test("zero fade preserves native ending for natural formats")
+    func zeroFadeRemainsNative() {
+        let plan = PlaybackController.plan(
+            mode: .fileDefault,
+            playMilliseconds: 150_000,
+            fadeMilliseconds: 0,
+            family: FormatRegistry.libgmeFamily
+        )
+        #expect(plan.usesNativeEnding)
+    }
+
+    @Test("file default fade also caps non-natural formats")
+    func fileDefaultFadeCapsNonNaturalFormat() {
+        let plan = PlaybackController.plan(
+            mode: .fileDefault,
+            playMilliseconds: 150_000,
+            fadeMilliseconds: 6_000,
+            family: FormatRegistry.lazyusfFamily
+        )
+        #expect(!plan.usesNativeEnding)
+        #expect(plan.totalSeconds == 156)
     }
 }
