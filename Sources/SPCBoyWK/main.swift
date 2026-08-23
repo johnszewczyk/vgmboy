@@ -17,6 +17,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let nativeBridge = WKNativeBridge()
         nativeBridge.onOpenOptionsWindow = { [weak self] in self?.showOptionsWindow() }
         nativeBridge.onChooseRootFolder = { [weak self] in self?.chooseRootFolderPath() }
+        nativeBridge.onAppearanceSettingsChanged = { [weak self] settings in
+            self?.broadcastAppearanceSettings(settings)
+        }
         let webView = makeWebView(bridge: nativeBridge, stateJSON: stateJSON, includeCommandDispatcher: true)
         self.webView = webView
         installApplicationMenu()
@@ -93,6 +96,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let bridge = WKNativeBridge(isOptionsWindow: true)
         bridge.onCloseOptionsWindow = { [weak self] in self?.closeOptionsWindow() }
+        bridge.onAppearanceSettingsChanged = { [weak self] settings in
+            self?.broadcastAppearanceSettings(settings)
+        }
         let optionsWebView = makeWebView(bridge: bridge, stateJSON: "{}", includeCommandDispatcher: false)
         guard let page = Bundle.module.url(forResource: "index", withExtension: "html") else { return }
         optionsWebView.loadFileURL(page, allowingReadAccessTo: page.deletingLastPathComponent())
@@ -116,6 +122,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func closeOptionsWindow() {
         optionsWindow?.close()
+    }
+
+    private func broadcastAppearanceSettings(_ settings: [String: Any]) {
+        guard JSONSerialization.isValidJSONObject(settings),
+              let data = try? JSONSerialization.data(withJSONObject: settings),
+              let json = String(data: data, encoding: .utf8) else { return }
+        let script = "window.__spcBoyWKEvent('appearanceSettingsChanged', \(json));"
+        webView?.evaluateJavaScript(script, completionHandler: nil)
+        optionsWebView?.evaluateJavaScript(script, completionHandler: nil)
     }
 
     private func chooseRootFolderPath() -> String? {

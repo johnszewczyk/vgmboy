@@ -66,6 +66,12 @@ function resetNativePlaybackSnapshot() {
     underrunCount: 0,
     framesRequested: 0,
     framesSupplied: 0,
+    decoderFamily: "",
+    decoderSampleRate: 0,
+    outputSampleRate: 0,
+    decodedFrames: 0,
+    audiblePositionFrames: 0,
+    tempo: 1,
     positionMs: 0
   };
 }
@@ -251,6 +257,11 @@ function updateNativeDiagnostics() {
   const underrunCount = Number(snapshot.underrunCount) || 0;
   const framesRequested = Number(snapshot.framesRequested) || 0;
   const framesSupplied = Number(snapshot.framesSupplied) || 0;
+  const decoderSampleRate = Number(snapshot.decoderSampleRate) || 0;
+  const outputSampleRate = Number(snapshot.outputSampleRate) || 0;
+  const decodedFrames = Number(snapshot.decodedFrames) || 0;
+  const audiblePositionFrames = Number(snapshot.audiblePositionFrames) || 0;
+  const tempo = Number(snapshot.tempo) || 1;
   const positionSeconds = Math.max(0, (Number(snapshot.positionMs) || 0) / 1000);
   const bufferFill = ringBufferFrames > 0 ? Math.round((bufferedFrames / ringBufferFrames) * 100) : null;
   const decodeError = Boolean(snapshot.decodeError);
@@ -263,6 +274,10 @@ function updateNativeDiagnostics() {
   refs.nativeBufferFillLabel.textContent = bufferFill === null ? "—" : `${bufferFill}%`;
   refs.nativeUnderrunLabel.textContent = String(underrunCount);
   refs.nativeFramesLabel.textContent = `${framesRequested.toLocaleString()} / ${framesSupplied.toLocaleString()}`;
+  refs.nativeDecoderLabel.textContent = snapshot.decoderFamily || "—";
+  refs.nativeRatesLabel.textContent = `${decoderSampleRate ? decoderSampleRate.toLocaleString() : "—"} / ${outputSampleRate ? outputSampleRate.toLocaleString() : "—"} Hz`;
+  refs.nativeDecodedLabel.textContent = `${decodedFrames.toLocaleString()} / ${audiblePositionFrames.toLocaleString()}`;
+  refs.nativeTempoLabel.textContent = `${tempo.toLocaleString(undefined, { maximumFractionDigits: 3 })}×`;
   refs.nativeDecodeLabel.textContent = decodeError ? (snapshot.errorMessage || "Error") : "OK";
 
   for (const element of [
@@ -274,6 +289,10 @@ function updateNativeDiagnostics() {
     refs.nativeBufferFillLabel,
     refs.nativeUnderrunLabel,
     refs.nativeFramesLabel,
+    refs.nativeDecoderLabel,
+    refs.nativeRatesLabel,
+    refs.nativeDecodedLabel,
+    refs.nativeTempoLabel,
     refs.nativeDecodeLabel
   ]) {
     element.className = "play-stat-value";
@@ -317,6 +336,12 @@ function handleNativePlaybackState(snapshot) {
       underrunCount: Number(snapshot?.underrun_count) || 0,
       framesRequested: Number(snapshot?.frames_requested) || 0,
       framesSupplied: Number(snapshot?.frames_supplied) || 0,
+      decoderFamily: snapshot?.decoder_family || "",
+      decoderSampleRate: Number(snapshot?.decoder_sample_rate) || 0,
+      outputSampleRate: Number(snapshot?.output_sample_rate) || 0,
+      decodedFrames: Number(snapshot?.decoded_frames) || 0,
+      audiblePositionFrames: Number(snapshot?.audible_position_frames) || 0,
+      tempo: Number(snapshot?.tempo) || 1,
       positionMs: Number(snapshot?.position_ms) || 0,
       errorMessage: snapshot?.error || ""
     };
@@ -374,6 +399,12 @@ function applyNativePlaybackSnapshot(track, snapshot, generation) {
     underrunCount: Number(snapshot?.underrun_count) || 0,
     framesRequested: Number(snapshot?.frames_requested) || 0,
     framesSupplied: Number(snapshot?.frames_supplied) || 0,
+    decoderFamily: snapshot?.decoder_family || "",
+    decoderSampleRate: Number(snapshot?.decoder_sample_rate) || 0,
+    outputSampleRate: Number(snapshot?.output_sample_rate) || 0,
+    decodedFrames: Number(snapshot?.decoded_frames) || 0,
+    audiblePositionFrames: Number(snapshot?.audible_position_frames) || 0,
+    tempo: Number(snapshot?.tempo) || 1,
     positionMs: Number(snapshot?.position_ms) || 0,
     errorMessage: snapshot?.error || ""
   };
@@ -596,6 +627,10 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
     }
 
     await readNativePlaybackState(track, generation);
+    // Position and reached-end state are supplied on demand by the native
+    // bridge. Keep the active generation polling so the transport readout
+    // advances and the next playlist item can begin at track end.
+    scheduleNativePlaybackStatePoll(track, generation);
     playbackApp.ui.refreshPlaylistPlaybackState();
   } catch (error) {
     if (generation !== playbackGeneration) {

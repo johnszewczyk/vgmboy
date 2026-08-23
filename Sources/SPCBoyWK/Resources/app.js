@@ -14,19 +14,18 @@ refs.sidebarResizeHandle?.addEventListener("pointerdown", (event) => {
 });
 
 function updateSidebarResize(event) {
-  if (!resizingSidebar) return;
+  if (!resizingSidebar || (resizePointerId !== null && event.pointerId !== resizePointerId)) return;
   const bounds = refs.workspace?.getBoundingClientRect?.();
   if (!bounds?.width) return;
   const nextPercent = ((event.clientX - bounds.left) / bounds.width) * 100;
   state.sidebarWidthPercent = app.normalizeSidebarWidth(nextPercent);
   document.documentElement.style.setProperty("--sidebar-width-percent", String(state.sidebarWidthPercent));
   refs.sidebarWidthInput && (refs.sidebarWidthInput.value = String(state.sidebarWidthPercent));
+  refs.sidebarResizeHandle?.setAttribute("aria-valuenow", String(Math.round(state.sidebarWidthPercent)));
 }
 
-refs.sidebarResizeHandle?.addEventListener("pointermove", updateSidebarResize);
-
 function finishSidebarResize(event) {
-  if (!resizingSidebar) return;
+  if (!resizingSidebar || (resizePointerId !== null && event.pointerId !== resizePointerId)) return;
   resizingSidebar = false;
   refs.sidebarResizeHandle?.releasePointerCapture?.(resizePointerId);
   resizePointerId = null;
@@ -34,8 +33,11 @@ function finishSidebarResize(event) {
   app.persistSettings();
 }
 
-refs.sidebarResizeHandle?.addEventListener("pointerup", finishSidebarResize);
-refs.sidebarResizeHandle?.addEventListener("pointercancel", finishSidebarResize);
+// Keep tracking the active pointer outside the narrow separator. WKWebView can
+// otherwise stop delivering movement when the pointer crosses the scroll view.
+document.addEventListener("pointermove", updateSidebarResize);
+document.addEventListener("pointerup", finishSidebarResize);
+document.addEventListener("pointercancel", finishSidebarResize);
 refs.sidebarResizeHandle?.addEventListener("keydown", (event) => {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
   event.preventDefault();
@@ -46,6 +48,7 @@ refs.sidebarResizeHandle?.addEventListener("keydown", (event) => {
       : event.key === "Home" ? 12 : 50;
   state.sidebarWidthPercent = app.normalizeSidebarWidth(next);
   document.documentElement.style.setProperty("--sidebar-width-percent", String(state.sidebarWidthPercent));
+  refs.sidebarResizeHandle?.setAttribute("aria-valuenow", String(Math.round(state.sidebarWidthPercent)));
   app.persistSettings();
 });
 
@@ -152,10 +155,12 @@ refs.equalizerEnabledCheckbox.addEventListener("change", (event) => {
   app.ui.setEqualizerEnabled(event.target.checked);
 });
 refs.equalizerBandInputs.forEach((input, index) => {
-  input.addEventListener("input", (event) => app.ui.setEqualizerBandGain(index, event.target.value));
+  input.addEventListener("change", (event) => app.ui.setEqualizerBandGain(index, event.target.value));
+  input.addEventListener("blur", (event) => app.ui.setEqualizerBandGain(index, event.target.value));
 });
 refs.equalizerResetButton.addEventListener("click", () => app.ui.resetEqualizer());
-refs.appVolumeInput.addEventListener("input", (event) => app.ui.setAppVolume(event.target.value));
+refs.appVolumeInput.addEventListener("change", (event) => app.ui.setAppVolume(event.target.value));
+refs.appVolumeInput.addEventListener("blur", (event) => app.ui.setAppVolume(event.target.value));
 
 refs.uiItemSpacingInput.addEventListener("change", (event) => {
   app.ui.setUiItemSpacing(event.target.value);
@@ -440,8 +445,10 @@ refs.sidebarSearchInput.addEventListener("input", (event) => {
   app.ui.updateSidebarSearch(event.target.value);
 });
 
-refs.sidebarViewMenuButton.addEventListener("click", (event) => {
-  app.ui.showSidebarViewMenu(event);
+refs.sidebarViewButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    app.ui.setSidebarMode(button.dataset.sidebarView).catch((error) => console.error("[SPCBoy] sidebar view switch failed", error));
+  });
 });
 
 if (window.spcBoyWK?.onTransportShortcut) {

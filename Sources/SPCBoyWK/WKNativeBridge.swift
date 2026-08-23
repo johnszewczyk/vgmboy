@@ -19,6 +19,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     var onOpenOptionsWindow: (() -> Void)?
     var onCloseOptionsWindow: (() -> Void)?
     var onChooseRootFolder: (() -> String?)?
+    var onAppearanceSettingsChanged: (([String: Any]) -> Void)?
 
     init(catalogURL: URL = WKNativeBridge.defaultCatalogURL, isOptionsWindow: Bool = false) {
         self.catalogURL = catalogURL
@@ -143,6 +144,16 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return
         }
 
+        if method == "setAppearanceSettings" {
+            let settings = args.first as? [String: Any] ?? [:]
+            let handler = onAppearanceSettingsChanged
+            Task { @MainActor in handler?(settings) }
+            Task {
+                await Self.reply(to: message.webView, id: id, success: true, valueJSON: "null")
+            }
+            return
+        }
+
         if method == "chooseRootFolder" {
             let chooser = onChooseRootFolder
             let catalogURL = self.catalogURL
@@ -228,7 +239,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         case "endpointSurface":
             return try JSONSerialization.jsonObject(with: JSONEncoder().encode(VGMBoyEndpointSurface.v1))
         case "configureArchiveCache", "archiveCacheSummary", "clearArchiveCache",
-             "setPlaybackSettings", "setAppearanceSettings",
+             "setPlaybackSettings",
              "setPlaybackPowerSaveBlocker":
             return NSNull()
         case "setRoutingPreferences":

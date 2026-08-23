@@ -21,5 +21,5 @@ raw filesystem scanning or a second catalog implementation.
 
 ## Files
 
-- `/Users/john/Downloads/Code/SPCBoy (WK)/Sources/SPCBoyWK/main.swift`
-- `/Users/john/Downloads/Code/SPCBoy (WK)/Package.swift`
+- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/main.swift`
+- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Package.swift`

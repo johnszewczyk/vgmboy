@@ -17,6 +17,7 @@ let collapsedDatabaseConsoles = new Set();
 let browserClickTimer = 0;
 let databaseClickTimer = 0;
 let sidebarSearchTimer = 0;
+let columnResizePointerId = null;
 
 function syncCollapsedConsolePersistence() {
   state.collapsedConsoleNames = [...collapsedDatabaseConsoles];
@@ -244,18 +245,6 @@ function showSidebarContextMenu(node, event) {
     ["Play Now", async () => activateBrowserNode(node)],
     ["Queue", async () => queueBrowserNode(node)]
   ]);
-}
-
-function showSidebarViewMenu(event) {
-  const labels = [
-    ["Consoles", "consoles"],
-    ["Paths", "paths"],
-    ["Disk Path", "diskPath"]
-  ];
-  showContextMenu(event, labels.map(([label, mode]) => [
-    mode === state.sidebarMode ? `✓ ${label}` : label,
-    () => setSidebarMode(mode)
-  ]));
 }
 
 async function activateBrowserNode(node, { playNow = true } = {}) {
@@ -947,10 +936,15 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
 
 function renderSidebar() {
   const view = currentSidebarView();
-  const title = view.view === "paths" ? "Catalog Paths" : view.view === "diskPath" ? "Disk Path" : "Catalog Consoles";
-  refs.sidebarViewMenuButton.title = `Choose sidebar view (currently ${title})`;
-  refs.sidebarViewMenuButton.setAttribute("aria-label", refs.sidebarViewMenuButton.title);
-  refs.sidebarViewMenuButton.classList.toggle("is-selected", true);
+  const labels = { paths: "Catalog paths", consoles: "Catalog consoles", diskPath: "Disk path" };
+  refs.sidebarViewButtons.forEach((button) => {
+    const mode = button.dataset.sidebarView;
+    const selected = mode === view.storedMode;
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-pressed", selected ? "true" : "false");
+    button.title = labels[mode] || "Sidebar view";
+    button.setAttribute("aria-label", button.title);
+  });
   if (view.contentMode === "database") renderDatabaseGames();
   else renderTree();
 }
@@ -1079,9 +1073,18 @@ function beginColumnResize(event, columnId, header) {
   event.preventDefault();
   event.stopPropagation();
   const startX = event.clientX;
-  const tableWidth = refs.playlistHeaderRow.closest("table").getBoundingClientRect().width;
+  const table = refs.playlistHeaderRow.closest("table");
+  const tableWidth = table?.getBoundingClientRect().width || 0;
+  const handle = event.currentTarget;
+  if (!Number.isFinite(tableWidth) || tableWidth <= 0) {
+    return;
+  }
   const startWidth = state.columnWidths[columnId];
+  const otherColumns = orderedColumns().filter((column) => column.id !== columnId);
+  const pointerId = event.pointerId;
+  columnResizePointerId = pointerId;
   const onMove = (moveEvent) => {
+    if (moveEvent.pointerId !== pointerId) return;
     const nextWidth = Math.max(4, Math.min(80, startWidth + ((moveEvent.clientX - startX) / tableWidth) * 100));
     state.columnWidths[columnId] = nextWidth;
     header.style.width = `${nextWidth}%`;
@@ -1090,11 +1093,13 @@ function beginColumnResize(event, columnId, header) {
       if (cell) cell.style.width = `${nextWidth}%`;
     }
   };
-  const onUp = () => {
+  const finish = (finishEvent) => {
+    if (finishEvent?.pointerId !== pointerId) return;
     document.removeEventListener("pointermove", onMove);
     document.removeEventListener("pointerup", onUp);
-    const columns = orderedColumns();
-    const otherColumns = columns.filter((column) => column.id !== columnId);
+    document.removeEventListener("pointercancel", finish);
+    handle?.releasePointerCapture?.(pointerId);
+    columnResizePointerId = null;
     const draggedWidth = state.columnWidths[columnId];
     const targetOtherTotal = Math.max(4 * otherColumns.length, 100 - draggedWidth);
     const otherTotal = otherColumns.reduce((sum, column) => sum + state.columnWidths[column.id], 0);
@@ -1110,8 +1115,11 @@ function beginColumnResize(event, columnId, header) {
     renderPlaylistHeader();
     syncPlaylistColumnWidths();
   };
+  const onUp = (upEvent) => finish(upEvent);
+  handle?.setPointerCapture?.(pointerId);
   document.addEventListener("pointermove", onMove);
-  document.addEventListener("pointerup", onUp, { once: true });
+  document.addEventListener("pointerup", onUp);
+  document.addEventListener("pointercancel", finish);
 }
 
 function columnContentWidth(columnId) {
@@ -1132,11 +1140,13 @@ function autoSizeColumns() {
   const preferredWidths = columns.map((column) => columnContentWidth(column.id));
   const totalWidth = preferredWidths.reduce((sum, width) => sum + width, 0);
   if (!totalWidth) return;
-  const table = refs.playlistHeaderRow.closest("table");
+  const table = refs.playlistHeaderTable;
   const availableWidth = refs.playlistScrollWrap?.clientWidth || table.clientWidth || totalWidth;
   const width = `${Math.max(availableWidth, totalWidth)}px`;
-  table.style.width = width;
-  table.style.minWidth = width;
+  [refs.playlistHeaderTable, refs.playlistBodyTable].forEach((playlistTable) => {
+    playlistTable.style.width = width;
+    playlistTable.style.minWidth = width;
+  });
   columns.forEach((column, index) => {
     state.columnWidths[column.id] = (preferredWidths[index] / totalWidth) * 100;
   });
@@ -1179,7 +1189,7 @@ function renderPlaylistHeader() {
     th.title = column.sortable === false ? "Line number" : `Sort by ${column.label}`;
 
     const label = document.createElement("span");
-    label.className = "playlist-header-label";
+    label.className = "playlist-header-label toolbar-control";
     label.textContent = column.label;
     if (state.sortColumn === column.id) {
       label.textContent += state.sortDirection === "ascending" ? " ▲" : " ▼";
@@ -1197,7 +1207,7 @@ function renderPlaylistHeader() {
     th.appendChild(resizeHandle);
 
     if (column.sortable !== false) th.addEventListener("click", (event) => {
-      if (event.target === resizeHandle) return;
+      if (event.target === resizeHandle || columnResizePointerId !== null) return;
       if (state.sortColumn === column.id) {
         state.sortDirection = state.sortDirection === "ascending" ? "descending" : "ascending";
       } else {
@@ -1343,6 +1353,10 @@ function playlistSortDependsOnMetadata() {
 }
 
 function syncPlaylistColumnWidths() {
+  for (const column of orderedColumns()) {
+    const header = refs.playlistHeaderRow.querySelector(`[data-column-id="${CSS.escape(column.id)}"]`);
+    if (header) header.style.width = `${state.columnWidths[column.id]}%`;
+  }
   for (const row of playlistRowsByTrackId.values()) {
     for (const column of orderedColumns()) {
       const cell = row.querySelector(`[data-column-id="${CSS.escape(column.id)}"]`);
@@ -1358,7 +1372,9 @@ function renderPlaylist() {
   currentPlaylistRow = null;
   sortPlaylist();
   const playlistSignature = playlistAutoSizeSignature();
-  const shouldAutoSize = state.columnAutoSize && playlistSignature !== autoSizedPlaylistSignature;
+  const shouldAutoSize = columnResizePointerId === null
+    && state.columnAutoSize
+    && playlistSignature !== autoSizedPlaylistSignature;
 
   if (state.playlist.length === 0) {
     const row = document.createElement("tr");
@@ -1435,7 +1451,7 @@ function scheduleMetadataRefresh(trackId) {
     const mustReorder = playlistSortDependsOnMetadata();
     if (mustReorder || trackIds.some((id) => !refreshPlaylistRow(id))) {
       renderPlaylist();
-    } else if (state.columnAutoSize && trackIds.length) {
+    } else if (columnResizePointerId === null && state.columnAutoSize && trackIds.length) {
       autoSizedPlaylistSignature = playlistAutoSizeSignature();
       autoSizeColumns();
       renderPlaylistHeader();
@@ -2047,6 +2063,10 @@ function setOptionsOpen(nextOpen) {
 
 
 async function bootstrap() {
+  // Load persisted appearance before the first Options-window paint. The
+  // window is native-sized and immediately visible; deferring this until
+  // after catalog/cache requests produces a distracting default-style flash.
+  loadSettings();
   if (window.spcBoyWK?.isOptionsWindow) {
     document.body.classList.add("options-window");
     state.optionsOpen = true;
@@ -2060,7 +2080,6 @@ async function bootstrap() {
     throw new Error(message);
   }
 
-  loadSettings();
   collapsedDatabaseConsoles = new Set(state.collapsedConsoleNames);
   state.databaseLocation = await window.spcBoyWK?.databaseLocation?.() || null;
   state.databaseLocationStatus = state.databaseLocation?.requiresRestart
@@ -2218,7 +2237,6 @@ uiApp.ui = {
   refreshDatabaseGamesForVisibleRoots,
   loadDatabaseFiles,
   setSidebarMode,
-  showSidebarViewMenu,
   updateSidebarSearch,
   loadDatabaseGames,
   loadDatabaseGame,

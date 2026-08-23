@@ -37,11 +37,12 @@ final class WKPlaybackBridge: @unchecked Sendable {
             let playMilliseconds = max(1, int(args.count > 3 ? args[3] : nil) ?? 150_000)
             let fadeMilliseconds = max(0, int(args.count > 4 ? args[4] : nil) ?? 6_000)
             let tempo = number(args.count > 5 ? args[5] : nil) ?? 1
+            let mode: PlaybackMode = fadeMilliseconds > 0 ? .timed : .fileDefault
             let payload = PlaybackControlPayload(
                 path: path,
                 trackIndex: index,
                 tempo: tempo,
-                playbackMode: .fileDefault,
+                playbackMode: mode,
                 playMilliseconds: playMilliseconds,
                 fadeMilliseconds: fadeMilliseconds
             )
@@ -94,9 +95,14 @@ final class WKPlaybackBridge: @unchecked Sendable {
         let event = controller.perform(.init(command: .status))
         let status = event.status
         let diagnostics = status?.diagnostics
+        let statistics = status?.statistics
         lock.lock(); let loaded = trackLoaded; lock.unlock()
         return [
-            "transport_state": status?.reachedEnd == true ? "ended" : (status?.isPlaying == true ? "playing" : "stopped"),
+            // reachedEnd means the decoder has no more source frames; output
+            // may still be draining its buffered fade. Report ended only
+            // after the audio device has stopped so the frontend does not
+            // advance over the remaining audible tail.
+            "transport_state": status?.isPlaying == true ? "playing" : (status?.reachedEnd == true ? "ended" : "stopped"),
             "output_state": diagnostics?.isOutputRunning == true ? "running" : "idle",
             "track_loaded": loaded,
             "decode_error": false,
@@ -106,6 +112,13 @@ final class WKPlaybackBridge: @unchecked Sendable {
             "underrun_count": diagnostics?.underrunCount ?? 0,
             "frames_requested": diagnostics?.framesRequested ?? 0,
             "frames_supplied": diagnostics?.framesSupplied ?? 0,
+            "decoder_family": statistics?.decoderFamily ?? NSNull(),
+            "track_index": statistics?.trackIndex ?? NSNull(),
+            "decoder_sample_rate": statistics?.decoderSampleRate ?? 0,
+            "output_sample_rate": statistics?.outputSampleRate ?? diagnostics?.sampleRate ?? 0,
+            "decoded_frames": statistics?.decodedFrames ?? 0,
+            "audible_position_frames": statistics?.audiblePositionFrames ?? 0,
+            "tempo": statistics?.tempo ?? 1,
             "position_ms": Int((status?.elapsedSeconds ?? 0) * 1_000),
             "error": NSNull()
         ]

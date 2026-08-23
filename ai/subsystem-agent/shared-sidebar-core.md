@@ -18,9 +18,12 @@ rendering.
 - The sidebar view button opens a flat in-app menu with `Consoles`, `Paths`, and `Disk Path`; the
   first two are the catalog database views and the last is the explicitly opened local filesystem.
 - Game identity includes the catalog root ID, game name, and system.
+- Game console labels come from CatalogReader's shared folder-versus-metadata
+  aggregation; empty folder tags fall through to stored metadata before the
+  UI receives a row.
 - Catalog writes, scans, decoder selection, and playback do not belong here.
 
 ## Files
 
-- `/Users/john/Downloads/Code/CatalogReader/Sources/CatalogBrowserCore/CatalogBrowserCore.swift`
-- `/Users/john/Downloads/Code/SPCBoy (WK)/Sources/SPCBoyWK/Resources/index.html`
+- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogBrowserCore/CatalogBrowserCore.swift`
+- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/index.html`
