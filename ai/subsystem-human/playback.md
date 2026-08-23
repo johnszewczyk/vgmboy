@@ -9,5 +9,8 @@ PSF music stored inside an archive plays with its required companion library
 files, so archive-backed PlayStation tracks use the same playback path as loose
 PSF files.
 
+Selecting a catalog game fills the playlist directly from indexed catalog rows;
+it does not rescan the source folders or wait for a second metadata pass.
+
 The root window's sidebar divider is draggable. Its persisted width is also available from the
 appearance settings controls, and the divider supports keyboard adjustment when focused.

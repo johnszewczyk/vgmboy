@@ -917,9 +917,18 @@ async function loadDatabaseGamesIntoPlaylist(games) {
   state.selectedTrackIds = state.selectedTrackId ? [state.selectedTrackId] : [];
   state.lastSelectedTrackId = state.selectedTrackId;
   persistSettings();
-  renderAll();
+  // Database rows already contain their catalog metadata. Keep playlist
+  // hydration independent from the 21k-entry sidebar redraw; rebuilding the
+  // sidebar here made a small indexed query wait on every database row DOM
+  // update before the playlist could paint.
+  renderPlaylist();
+  uiApp.playback.updateTimingSummary();
+  uiApp.playback.updatePlaybackReadout();
+  uiApp.playback.updateNativeDiagnostics();
   uiApp.playback.preloadPlaylistAudio(state.playlist, state.selectedTrackId);
-  void hydratePlaylistMetadata();
+  if (state.playlist.some((track) => !track.metadataLoaded)) {
+    void hydratePlaylistMetadata();
+  }
 }
 
 async function activateDatabaseSelection() {
