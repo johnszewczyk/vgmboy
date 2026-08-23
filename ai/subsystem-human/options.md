@@ -9,7 +9,8 @@ remains independent while Settings is open.
 
 Settings groups app-owned controls above VGMBoy playback controls in the same compact sidebar used
 by the current renderer skin. App controls cover theme, database location, and browser behavior.
-VGMBoy controls cover playback, routing, tempo, fade, equalizer, and archive-cache behavior.
+VGMBoy controls cover playback, routing, tempo, fade, volume, mono, equalizer, and archive-cache behavior.
+Diagnostics is its own VGMBoy page and reports live transport, buffer, output, decode, and underrun values.
 
 ## Persistence
 
@@ -20,10 +21,12 @@ SPCBoy a catalog writer; MediaScanner remains responsible for scanning and publi
 ## Database panel layout
 
 The Database page shows the configured MediaScanner catalog path as a full-width readout.
-Database actions run as equal-width controls across the bottom of that panel; archive-cache
-actions use the same full-width treatment in their own panel.
+Database actions run as three equal-width controls across the bottom of that panel—Reload Library,
+Use Default, and Show in Finder. The catalog browse action is the folder button at the end of the
+path bar. Archive-cache actions use the same aligned toolbar treatment in their own panel, with
+Show in Finder last.
 
-Playback values such as volume and equalizer gain use plain numeric text fields. The transport
+Playback controls are ordered Volume, Mono, Equalizer. Volume and each equalizer band use animated range bars with live values. The transport
 seek bar remains a transport control, not a settings input.
 
 ## Files

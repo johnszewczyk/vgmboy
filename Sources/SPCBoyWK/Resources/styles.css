@@ -1015,8 +1015,6 @@ body.is-file-drag-over::after {
 
 .options-subpanel .tool-button { background: rgb(50 50 50); }
 .options-subpanel .tool-button:hover { background: rgb(60 60 60); }
-.options-library-toolbar-single { grid-template-columns: minmax(0, 1fr); }
-
 .options-help-text { color: var(--muted); font-size: 0.9em; }
 .routing-conflicts-list { display: grid; gap: var(--space-tight); }
 .routing-conflict { display: flex; justify-content: space-between; align-items: center; gap: var(--space-1); color: var(--muted); font-size: 0.9em; }
@@ -1092,9 +1090,16 @@ body.is-file-drag-over::after {
 }
 
 .options-library-toolbar {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
   gap: 1rem;
+  width: 100%;
+  align-items: stretch;
+}
+
+.options-library-toolbar > .tool-button {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
 }
 
 .options-database-panel,
@@ -1112,6 +1117,19 @@ body.is-file-drag-over::after {
   display: block;
   width: 100%;
   min-width: 0;
+}
+
+.options-path-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.options-path-control .tool-button {
+  width: 2rem;
+  min-width: 2rem;
+  padding: 0;
 }
 
 .options-panel-actions {

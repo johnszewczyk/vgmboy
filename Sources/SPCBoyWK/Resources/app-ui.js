@@ -428,14 +428,15 @@ document.addEventListener("keydown", (event) => {
 });
 
 function filteredTree() {
-  const query = state.sidebarQuery.trim().toLowerCase();
-  if (!query) {
+  const terms = state.sidebarQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) {
     return currentSidebarView().view === "paths" ? state.databaseFileTree : state.tree;
   }
 
   function filterNode(node) {
     const filteredChildren = node.children.map(filterNode).filter(Boolean);
-    if (node.name.toLowerCase().includes(query) || filteredChildren.length > 0) {
+    const searchableText = `${node.name || ""} ${node.path || ""}`.toLowerCase();
+    if (terms.every((term) => searchableText.includes(term)) || filteredChildren.length > 0) {
       return {
         ...node,
         children: filteredChildren
@@ -546,10 +547,10 @@ function visibleDatabaseGames() {
 }
 
 function immediateDatabaseSearch(query) {
-  const terms = String(query || "").trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const terms = String(query || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (!terms.length) return null;
   return state.databaseGames.filter((game) => {
-    const text = `${game.name || ""} ${game.system || ""} ${game.rootName || ""}`.toLocaleLowerCase();
+    const text = `${game.name || ""} ${game.system || ""} ${game.rootName || ""} ${game.displayName || ""}`.toLowerCase();
     return terms.every((term) => text.includes(term));
   });
 }
@@ -1552,15 +1553,18 @@ function renderAll() {
   const databaseSelected = state.optionsSection === "database";
   const routingSelected = state.optionsSection === "routing";
   const playbackSelected = state.optionsSection === "playback";
+  const diagnosticsSelected = state.optionsSection === "diagnostics";
   const themeSelected = state.optionsSection === "theme";
   refs.optionsDatabaseTab.classList.toggle("is-selected", databaseSelected);
   refs.optionsRoutingTab.classList.toggle("is-selected", routingSelected);
   refs.optionsPlaybackTab.classList.toggle("is-selected", playbackSelected);
+  refs.optionsDiagnosticsTab.classList.toggle("is-selected", diagnosticsSelected);
   refs.optionsThemeTab.classList.toggle("is-selected", themeSelected);
   refs.optionsThemeSection.classList.toggle("is-hidden", !themeSelected);
   refs.optionsDatabaseSection.classList.toggle("is-hidden", !databaseSelected);
   refs.optionsRoutingSection.classList.toggle("is-hidden", !routingSelected);
   refs.optionsPlaybackSection.classList.toggle("is-hidden", !playbackSelected);
+  refs.optionsDiagnosticsSection.classList.toggle("is-hidden", !diagnosticsSelected);
   renderRoutingConflicts();
   refs.sidebarFontSizeInput.value = String(state.sidebarFontSizePt);
   refs.sidebarTextColorInput.value = state.sidebarTextColor;
@@ -1590,7 +1594,7 @@ function renderAll() {
   refs.repeatButton.setAttribute("aria-pressed", state.repeatMode === "off" ? "false" : "true");
   refs.repeatButton.title = repeatTitles[state.repeatMode];
   refs.repeatButton.setAttribute("aria-label", repeatTitles[state.repeatMode]);
-  refs.libraryDatabasePath.value = state.databaseLocation?.configuredPath || "";
+  refs.libraryDatabasePath.value = state.databaseLocation?.path || "";
   refs.libraryDatabaseLocationStatus.textContent = state.databaseLocationStatus || "SPCBoy reads this schema-23 catalog. MediaScanner owns scan paths, scanning, link checks, and cleanup.";
   refs.libraryDatabaseReloadButton.disabled = Boolean(state.databaseLocation?.requiresRestart);
   refs.libraryClearCacheButton.disabled = false;
@@ -1602,6 +1606,7 @@ function renderAll() {
   refs.equalizerToolbarButton.setAttribute("aria-label", refs.equalizerToolbarButton.title);
   refs.appVolumeInput.value = String(state.appVolume);
   refs.appVolumeValue.textContent = `${Math.round(state.appVolume * 100)}%`;
+  refs.monoEnabledCheckbox.checked = state.monoEnabled;
   refs.equalizerBandInputs.forEach((input, index) => {
     input.value = String(state.equalizerBandGains[index] || 0);
     refs.equalizerBandValues[index].textContent = `${(state.equalizerBandGains[index] || 0) >= 0 ? "+" : ""}${(state.equalizerBandGains[index] || 0).toFixed(1)} dB`;
@@ -1819,14 +1824,15 @@ function audioSettingsPayload() {
   return {
     equalizerEnabled: state.equalizerEnabled,
     equalizerBandGains: [...state.equalizerBandGains],
-    appVolume: state.appVolume
+    appVolume: state.appVolume,
+    monoEnabled: state.monoEnabled
   };
 }
 
 function broadcastAudioSettings() {
   const settings = audioSettingsPayload();
   window.spcBoyWK?.setPlaybackSettings?.(settings);
-  window.spcBoyWK?.nativePlaybackAudioConfig?.(state.appVolume, state.equalizerEnabled, state.equalizerBandGains).catch?.(() => {});
+  window.spcBoyWK?.nativePlaybackAudioConfig?.(state.appVolume, state.equalizerEnabled, state.equalizerBandGains, state.monoEnabled).catch?.(() => {});
   uiApp.playback.setAudioSettings?.(settings);
 }
 
@@ -1854,6 +1860,13 @@ function resetEqualizer() {
 
 function setAppVolume(volume) {
   state.appVolume = uiApp.normalizeAppVolume(volume);
+  persistSettings();
+  broadcastAudioSettings();
+  renderAll();
+}
+
+function setMonoEnabled(enabled) {
+  state.monoEnabled = Boolean(enabled);
   persistSettings();
   broadcastAudioSettings();
   renderAll();
@@ -2208,6 +2221,7 @@ uiApp.ui = {
   setEqualizerBandGain,
   resetEqualizer,
   setAppVolume,
+  setMonoEnabled,
   adjustAppVolume,
   commitSpcLengthInput,
   commitSpcFadeInput,

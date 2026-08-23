@@ -81,6 +81,7 @@ const state = {
   equalizerEnabled: false,
   equalizerBandGains: EQUALIZER_BAND_FREQUENCIES.map(() => 0),
   appVolume: 1,
+  monoEnabled: false,
   columnOrder: [...DEFAULT_COLUMN_ORDER],
   columnWidths: { ...DEFAULT_COLUMN_WIDTHS },
   columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY },
@@ -143,19 +144,23 @@ const refs = {
   optionsDatabaseTab: document.getElementById("options-database-tab"),
   optionsRoutingTab: document.getElementById("options-routing-tab"),
   optionsPlaybackTab: document.getElementById("options-playback-tab"),
+  optionsDiagnosticsTab: document.getElementById("options-diagnostics-tab"),
   optionsThemeTab: document.getElementById("options-theme-tab"),
   optionsThemeSection: document.getElementById("options-theme-section"),
   optionsDatabaseSection: document.getElementById("options-database-section"),
   optionsRoutingSection: document.getElementById("options-routing-section"),
   optionsPlaybackSection: document.getElementById("options-playback-section"),
+  optionsDiagnosticsSection: document.getElementById("options-diagnostics-section"),
   routingConflictsList: document.getElementById("routing-conflicts-list"),
   libraryClearCacheButton: document.getElementById("library-clear-cache-button"),
+  libraryShowCacheButton: document.getElementById("library-show-cache-button"),
   archiveCacheEnabledCheckbox: document.getElementById("archive-cache-enabled-checkbox"),
   archiveCacheLimitSelect: document.getElementById("archive-cache-limit-select"),
   databaseCacheSummary: document.getElementById("database-cache-summary"),
   libraryDatabasePath: document.getElementById("library-database-path"),
   libraryDatabaseLocationStatus: document.getElementById("library-database-location-status"),
   libraryDatabaseBrowseButton: document.getElementById("library-database-browse-button"),
+  libraryDatabaseShowButton: document.getElementById("library-database-show-button"),
   libraryDatabaseDefaultButton: document.getElementById("library-database-default-button"),
   libraryDatabaseReloadButton: document.getElementById("library-database-reload-button"),
   sidebarFontSizeInput: document.getElementById("sidebar-font-size-input"),
@@ -186,6 +191,7 @@ const refs = {
   equalizerBandValues: [...document.querySelectorAll("[data-equalizer-value]")],
   appVolumeInput: document.getElementById("app-volume-input"),
   appVolumeValue: document.getElementById("app-volume-value"),
+  monoEnabledCheckbox: document.getElementById("mono-enabled-checkbox"),
   previousButton: document.getElementById("previous-button"),
   playButton: document.getElementById("play-button"),
   nextButton: document.getElementById("next-button"),
@@ -234,6 +240,7 @@ function loadSettings() {
     state.equalizerEnabled = Boolean(parsed.equalizerEnabled);
     state.equalizerBandGains = EQUALIZER_BAND_FREQUENCIES.map((_, index) => normalizeEqualizerGain(parsed.equalizerBandGains?.[index]));
     state.appVolume = normalizeAppVolume(parsed.appVolume);
+    state.monoEnabled = Boolean(parsed.monoEnabled);
     state.uiItemSpacingRem = normalizeItemSpacing(parsed.uiItemSpacingRem);
     state.rootPath = parsed.rootPath || null;
     state.selectedFolderPath = parsed.selectedFolderPath || null;
@@ -282,6 +289,7 @@ function persistSettings() {
     equalizerEnabled: state.equalizerEnabled,
     equalizerBandGains: state.equalizerBandGains,
     appVolume: state.appVolume,
+    monoEnabled: state.monoEnabled,
     spcFadeSeconds: state.spcFadeSeconds,
     playbackSpeed: state.playbackSpeed,
     playbackSpeedEnabled: state.playbackSpeedEnabled,

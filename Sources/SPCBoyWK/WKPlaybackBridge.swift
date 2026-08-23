@@ -27,6 +27,9 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 let normalized = Array(gains.prefix(EqualizerConfiguration.bandCount)) + Array(repeating: 0, count: max(0, EqualizerConfiguration.bandCount - gains.count))
                 try perform(.setEqualizer, payload: .init(equalizer: .init(enabled: enabled, gainsDecibels: normalized.map(Float.init))))
             }
+            if args.count > 3, let monoEnabled = args[3] as? Bool {
+                try perform(.setMonoEnabled, payload: .init(monoEnabled: monoEnabled))
+            }
             return statusResponse()
         case "nativePlaybackLoad":
             guard let path = args.first as? String, !path.isEmpty else {

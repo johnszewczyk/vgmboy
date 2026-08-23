@@ -155,12 +155,11 @@ refs.equalizerEnabledCheckbox.addEventListener("change", (event) => {
   app.ui.setEqualizerEnabled(event.target.checked);
 });
 refs.equalizerBandInputs.forEach((input, index) => {
-  input.addEventListener("change", (event) => app.ui.setEqualizerBandGain(index, event.target.value));
-  input.addEventListener("blur", (event) => app.ui.setEqualizerBandGain(index, event.target.value));
+  input.addEventListener("input", (event) => app.ui.setEqualizerBandGain(index, event.target.value));
 });
 refs.equalizerResetButton.addEventListener("click", () => app.ui.resetEqualizer());
-refs.appVolumeInput.addEventListener("change", (event) => app.ui.setAppVolume(event.target.value));
-refs.appVolumeInput.addEventListener("blur", (event) => app.ui.setAppVolume(event.target.value));
+refs.appVolumeInput.addEventListener("input", (event) => app.ui.setAppVolume(event.target.value));
+refs.monoEnabledCheckbox.addEventListener("change", (event) => app.ui.setMonoEnabled(event.target.checked));
 
 refs.uiItemSpacingInput.addEventListener("change", (event) => {
   app.ui.setUiItemSpacing(event.target.value);
@@ -363,6 +362,11 @@ refs.libraryDatabaseBrowseButton.addEventListener("click", () => {
   });
 });
 
+refs.libraryDatabaseShowButton.addEventListener("click", () => {
+  const path = state.databaseLocation?.path;
+  if (path) window.spcBoyWK?.showInFinder?.(path).catch?.((error) => console.error(error));
+});
+
 refs.libraryDatabaseDefaultButton.addEventListener("click", () => {
   app.ui.useDefaultDatabaseLocation().catch((error) => {
     state.databaseLocationStatus = `Could not select default database • ${error.message}`;
@@ -380,8 +384,17 @@ refs.optionsPlaybackTab.addEventListener("click", () => {
   app.ui.renderAll();
 });
 
+refs.optionsDiagnosticsTab.addEventListener("click", () => {
+  state.optionsSection = "diagnostics";
+  app.ui.renderAll();
+});
+
 refs.libraryClearCacheButton.addEventListener("click", () => {
   app.ui.clearLibraryArchiveCache().catch((error) => console.error(error));
+});
+
+refs.libraryShowCacheButton.addEventListener("click", () => {
+  app.ui.showLibraryArchiveCacheInFinder().catch((error) => console.error(error));
 });
 
 refs.archiveCacheEnabledCheckbox.addEventListener("change", (event) => {

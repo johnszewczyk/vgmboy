@@ -86,6 +86,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             configureArchiveCache: (...args) => request("configureArchiveCache", args),
             archiveCacheSummary: (...args) => request("archiveCacheSummary", args),
             clearArchiveCache: (...args) => request("clearArchiveCache", args),
+            showArchiveCacheInFinder: () => request("showArchiveCacheInFinder"),
             setRoutingPreferences: (...args) => request("setRoutingPreferences", args),
             setPlaybackSettings: (...args) => request("setPlaybackSettings", args),
             setAppearanceSettings: (...args) => request("setAppearanceSettings", args),
@@ -216,6 +217,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         case "showInFinder":
             guard let path = args.first as? String else { return false }
             NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path).standardizedFileURL])
+            return true
+        case "showArchiveCacheInFinder":
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("FrontendCore", isDirectory: true)
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            NSWorkspace.shared.activateFileViewerSelecting([url.standardizedFileURL])
             return true
         case "databaseLocation":
             return try location(catalogURL: catalogURL, reloaded: false)

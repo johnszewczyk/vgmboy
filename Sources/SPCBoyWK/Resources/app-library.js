@@ -95,6 +95,10 @@ async function clearLibraryArchiveCache() {
   renderAll();
 }
 
+async function showLibraryArchiveCacheInFinder() {
+  await window.spcBoyWK?.showArchiveCacheInFinder?.();
+}
+
 Object.assign(app.ui, {
   refreshLibraryRoots,
   handleLibraryRootsChanged,
@@ -104,6 +108,7 @@ Object.assign(app.ui, {
   useDefaultDatabaseLocation,
   handleCatalogReloaded,
   reloadDatabaseLibrary,
-  clearLibraryArchiveCache
+  clearLibraryArchiveCache,
+  showLibraryArchiveCacheInFinder
 });
 })();
