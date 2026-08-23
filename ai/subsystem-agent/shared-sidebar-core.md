@@ -22,7 +22,7 @@ rendering.
   aggregation; empty folder tags fall through to stored metadata before the
   UI receives a row.
 - Catalog writes, scans, decoder selection, and playback do not belong here.
-- Favorite identity/order is shared through FavoriteTrackCore; persistence and rendering remain owned by each frontend.
+- Favorite identity/order is defined by FavoriteTrackCore. The current WebKit adapter renders a loading status while it reads the indexed catalog and uses database track queries directly for game previews; it does not walk source folders. Playlist rows support Command-click and Shift-click multi-selection. Cross-app favorite persistence still needs the planned shared sidecar store; the current local WebKit preference data is not the final shared storage contract.
 
 ## Files
 

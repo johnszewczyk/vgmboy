@@ -572,13 +572,9 @@ function makeDatabaseGameButton(game) {
     selectedDatabaseGameButton.classList.add("is-selected");
     scheduleSelectionIndicators();
     button.focus();
-    // Database game rows are final sidebar leaves. Selecting one previews its
-    // indexed tracks in the playlist; activation is still reserved for
-    // double-click or Enter.
-    window.clearTimeout(databaseClickTimer);
-    databaseClickTimer = window.setTimeout(() => {
-      loadDatabaseGame(game).catch((error) => reportDatabaseSidebarError("preview the selected game", error));
-    }, 220);
+    // Database game rows are final sidebar leaves. Read the indexed tracks
+    // immediately; this is a database preview, not a delayed filesystem scan.
+    loadDatabaseGame(game).catch((error) => reportDatabaseSidebarError("preview the selected game", error));
   });
   button.addEventListener("dblclick", (event) => {
     event.preventDefault();
@@ -613,6 +609,15 @@ function makeDatabaseGameButton(game) {
 }
 
 function renderDatabaseGames() {
+  if (state.databaseSidebarLoading) {
+    const indicator = resetSidebarContent();
+    const loading = document.createElement("div");
+    loading.className = "empty sidebar-empty sidebar-loading";
+    loading.textContent = "Loading catalog…";
+    refs.treeRoot.appendChild(loading);
+    positionSelectionIndicator(refs.treeRoot, indicator, null);
+    return;
+  }
   const gamesForView = visibleDatabaseGames();
   if (renderedDatabaseGames !== gamesForView) {
     resetSidebarContent();
@@ -748,11 +753,21 @@ async function setAllSidebarNodesCollapsed(collapsed) {
 }
 
 async function loadDatabaseGames() {
-  await refreshDatabaseGamesForVisibleRoots();
+  state.databaseSidebarLoading = true;
+  state.databaseSidebarError = "";
   renderAll();
+  try {
+    await refreshDatabaseGamesForVisibleRoots();
+  } finally {
+    state.databaseSidebarLoading = false;
+    renderAll();
+  }
 }
 
 async function loadDatabaseFiles() {
+  state.databaseSidebarLoading = true;
+  state.databaseSidebarError = "";
+  renderAll();
   try {
     state.databaseFiles = await window.spcBoyWK.databaseFiles();
     state.databaseFileTree = buildCatalogFileTree(state.databaseFiles);
@@ -760,6 +775,9 @@ async function loadDatabaseFiles() {
   } catch (error) {
     reportDatabaseSidebarError("read the catalog paths", error);
     throw error;
+  } finally {
+    state.databaseSidebarLoading = false;
+    renderAll();
   }
 }
 
@@ -772,6 +790,7 @@ async function setSidebarMode(mode) {
   if (mode === "favorites") {
     state.playlist = [...state.favorites];
     state.selectedTrackId = state.playlist[0]?.id || null;
+    state.selectedTrackIds = state.selectedTrackId ? [state.selectedTrackId] : [];
     state.lastSelectedTrackId = state.selectedTrackId;
   }
   if (mode === "paths" && !state.databaseFiles.length) await loadDatabaseFiles();
@@ -833,10 +852,10 @@ async function loadDatabaseGame(game) {
 
 async function toggleSelectedFavorites() {
   const focusedInSidebar = refs.treeRoot.contains(document.activeElement);
-  if (!focusedInSidebar && state.selectedTrackId) {
-    const track = state.playlist.find((entry) => entry.id === state.selectedTrackId);
-    if (track) {
-      uiApp.toggleFavorites([track]);
+  if (!focusedInSidebar && state.selectedTrackIds.length) {
+    const tracks = state.playlist.filter((entry) => state.selectedTrackIds.includes(entry.id));
+    if (tracks.length) {
+      uiApp.toggleFavorites(tracks);
       renderSidebar();
       renderPlaylist();
       return;
@@ -897,6 +916,7 @@ async function loadDatabaseGamesIntoPlaylist(games) {
   state.selectedDatabaseGameKey = games.length === 1 ? databaseGameKey(games[0]) : null;
   state.playlist = databaseRowsToPlaylistTracks(rows, games);
   state.selectedTrackId = state.playlist[0]?.id || null;
+  state.selectedTrackIds = state.selectedTrackId ? [state.selectedTrackId] : [];
   state.lastSelectedTrackId = state.selectedTrackId;
   persistSettings();
   renderAll();
@@ -976,6 +996,15 @@ function renderSidebar() {
     button.title = labels[mode] || "Sidebar view";
     button.setAttribute("aria-label", button.title);
   });
+  if (state.databaseSidebarLoading && view.contentMode !== "favorites") {
+    const indicator = resetSidebarContent();
+    const loading = document.createElement("div");
+    loading.className = "empty sidebar-empty sidebar-loading";
+    loading.textContent = "Loading catalog…";
+    refs.treeRoot.appendChild(loading);
+    positionSelectionIndicator(refs.treeRoot, indicator, null);
+    return;
+  }
   if (view.contentMode === "database") renderDatabaseGames();
   else if (view.contentMode === "favorites") renderFavorites();
   else renderTree();
@@ -1394,23 +1423,37 @@ function playlistAutoSizeSignature() {
 
 function updatePlaylistRowState(row, trackId) {
   if (!row) return;
-  row.classList.toggle("is-selected", state.selectedTrackId === trackId);
+  row.classList.toggle("is-selected", state.selectedTrackIds.includes(trackId));
   row.classList.toggle("is-current", state.currentTrackId === trackId);
 }
 
-function selectPlaylistTrack(trackId, { focus = false } = {}) {
+function selectPlaylistTrack(trackId, { focus = false, extend = false, range = false } = {}) {
   const track = state.playlist.find((entry) => entry.id === trackId);
   if (!track) return null;
 
-  const previousRow = selectedPlaylistRow;
-  const selectionChanged = state.selectedTrackId !== track.id;
+  const previousIds = new Set(state.selectedTrackIds);
+  let nextIds;
+  if (range && state.playlistSelectionAnchorId) {
+    const anchorIndex = state.playlist.findIndex((entry) => entry.id === state.playlistSelectionAnchorId);
+    const targetIndex = state.playlist.findIndex((entry) => entry.id === trackId);
+    const start = Math.min(anchorIndex < 0 ? targetIndex : anchorIndex, targetIndex);
+    const end = Math.max(anchorIndex < 0 ? targetIndex : anchorIndex, targetIndex);
+    nextIds = state.playlist.slice(start, end + 1).map((entry) => entry.id);
+  } else if (extend) {
+    nextIds = [...state.selectedTrackIds];
+    if (nextIds.includes(trackId)) nextIds = nextIds.filter((id) => id !== trackId);
+    else nextIds.push(trackId);
+  } else {
+    nextIds = [trackId];
+  }
+  state.selectedTrackIds = nextIds;
   state.selectedTrackId = track.id;
   state.lastSelectedTrackId = track.id;
-  if (selectionChanged) persistSettings();
+  state.playlistSelectionAnchorId = track.id;
+  if (previousIds.size !== nextIds.length || nextIds.some((id) => !previousIds.has(id))) persistSettings();
 
+  for (const [id, row] of playlistRowsByTrackId) updatePlaylistRowState(row, id);
   const nextRow = playlistRowsByTrackId.get(track.id) || null;
-  previousRow?.classList.remove("is-selected");
-  nextRow?.classList.add("is-selected");
   selectedPlaylistRow = nextRow;
   scheduleSelectionIndicators();
   if (focus) nextRow?.focus({ preventScroll: true });
@@ -1418,7 +1461,7 @@ function selectPlaylistTrack(trackId, { focus = false } = {}) {
 }
 
 function refreshPlaylistPlaybackState() {
-  selectedPlaylistRow?.classList.toggle("is-selected", selectedPlaylistRow.dataset.trackId === state.selectedTrackId);
+  for (const [id, row] of playlistRowsByTrackId) updatePlaylistRowState(row, id);
   const nextSelectedRow = state.selectedTrackId ? playlistRowsByTrackId.get(state.selectedTrackId) || null : null;
   nextSelectedRow?.classList.add("is-selected");
   selectedPlaylistRow = nextSelectedRow;
@@ -1476,6 +1519,14 @@ function syncPlaylistColumnWidths() {
 }
 
 function renderPlaylist() {
+  if (!state.selectedTrackIds.length && state.selectedTrackId) {
+    state.selectedTrackIds = [state.selectedTrackId];
+  }
+  const playlistIDs = new Set(state.playlist.map((track) => track.id));
+  state.selectedTrackIds = state.selectedTrackIds.filter((id) => playlistIDs.has(id));
+  if (state.selectedTrackId && !state.selectedTrackIds.includes(state.selectedTrackId)) {
+    state.selectedTrackIds.push(state.selectedTrackId);
+  }
   refs.playlistBody.innerHTML = "";
   playlistRowsByTrackId.clear();
   selectedPlaylistRow = null;
@@ -1500,7 +1551,7 @@ function renderPlaylist() {
     row.dataset.trackId = track.id;
     row.tabIndex = 0;
     row.setAttribute("aria-label", `${track.title || track.filename || "Track"}`);
-    row.className = `playlist-row${state.selectedTrackId === track.id ? " is-selected" : ""}${state.currentTrackId === track.id ? " is-current" : ""}`;
+    row.className = `playlist-row${state.selectedTrackIds.includes(track.id) ? " is-selected" : ""}${state.currentTrackId === track.id ? " is-current" : ""}`;
     playlistRowsByTrackId.set(track.id, row);
     if (state.selectedTrackId === track.id) selectedPlaylistRow = row;
     if (state.currentTrackId === track.id) currentPlaylistRow = row;
@@ -1509,14 +1560,14 @@ function renderPlaylist() {
       row.appendChild(renderPlaylistCell(track, column, rowIndex));
     }
 
-    row.addEventListener("click", () => {
-      const selectedTrack = selectPlaylistTrack(track.id, { focus: true });
+    row.addEventListener("click", (event) => {
+      const selectedTrack = selectPlaylistTrack(track.id, {
+        focus: true,
+        extend: event.metaKey || event.ctrlKey,
+        range: event.shiftKey
+      });
       uiApp.playback.updateTimingSummary();
       uiApp.playback.preloadTrackAudio(selectedTrack);
-    });
-
-    row.addEventListener("mousedown", () => {
-      selectPlaylistTrack(track.id);
     });
 
     row.addEventListener("dblclick", () => {

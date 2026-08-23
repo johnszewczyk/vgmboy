@@ -1125,7 +1125,7 @@ body.is-file-drag-over::after {
 
 .options-library-toolbar > .tool-button {
   flex: 1 1 0;
-  width: auto;
+  width: 0;
   min-width: 0;
 }
 
@@ -1165,7 +1165,7 @@ body.is-file-drag-over::after {
 }
 
 .options-panel-actions .tool-button {
-  width: 100%;
+  width: 0;
 }
 
 .options-library-toolbar .tool-button,

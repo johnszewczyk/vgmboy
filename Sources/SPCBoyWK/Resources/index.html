@@ -160,8 +160,8 @@
                 <div class="options-path-control"><input id="library-database-path" class="options-input options-path-readout" type="text" readonly aria-label="Database path" /><button id="library-database-browse-button" class="tool-button glyph-button" type="button" aria-label="Browse for catalog" title="Browse for catalog"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
                 <p id="library-database-location-status">SPCBoy reads the shared schema-23 catalog read-only.</p>
                 <div class="options-library-toolbar">
-                  <button id="library-database-reload-button" class="tool-button" type="button">Reload Library</button>
                   <button id="library-database-default-button" class="tool-button" type="button">Use Default</button>
+                  <button id="library-database-reload-button" class="tool-button" type="button">Reload Library</button>
                   <button id="library-database-show-button" class="tool-button" type="button">Show in Finder</button>
                 </div>
               </div>
@@ -235,8 +235,7 @@
             <div id="options-diagnostics-section" class="options-page options-diagnostics-page is-hidden">
               <div class="options-page-title">VGMBoy / Diagnostics</div>
               <div class="options-help-text">Live native playback health, buffering, output, and decode statistics.</div>
-              <div class="diagnostics-category-grid">
-                <div class="options-subpanel diagnostics-category">
+              <div class="options-subpanel diagnostics-category">
                   <div class="options-subpanel-title">Transport</div>
                   <div id="native-diagnostics" class="native-diagnostics play-stats-grid" aria-live="polite">
                   <div class="play-stat"><span>Transport</span><strong id="native-transport-label" class="play-stat-value">Idle</strong></div>
@@ -244,8 +243,8 @@
                   <div class="play-stat"><span>Output</span><strong id="native-output-label" class="play-stat-value">Idle</strong></div>
                   <div class="play-stat"><span>Position</span><strong id="native-position-label" class="play-stat-value">0:00</strong></div>
                   </div>
-                </div>
-                <div class="options-subpanel diagnostics-category">
+              </div>
+              <div class="options-subpanel diagnostics-category">
                   <div class="options-subpanel-title">Buffer</div>
                   <div class="native-diagnostics play-stats-grid" aria-live="polite">
                   <div class="play-stat"><span>Buffer</span><strong id="native-buffer-label" class="play-stat-value">0 / — frames</strong></div>
@@ -253,8 +252,8 @@
                   <div class="play-stat"><span>Underruns</span><strong id="native-underrun-label" class="play-stat-value">0</strong></div>
                   <div class="play-stat"><span>Frames requested / supplied</span><strong id="native-frames-label" class="play-stat-value">0 / 0</strong></div>
                   </div>
-                </div>
-                <div class="options-subpanel diagnostics-category">
+              </div>
+              <div class="options-subpanel diagnostics-category">
                   <div class="options-subpanel-title">Decoder</div>
                   <div class="native-diagnostics play-stats-grid" aria-live="polite">
                   <div class="play-stat"><span>Decoder</span><strong id="native-decoder-label" class="play-stat-value">—</strong></div>
@@ -263,7 +262,6 @@
                   <div class="play-stat"><span>Tempo</span><strong id="native-tempo-label" class="play-stat-value">1×</strong></div>
                   <div class="play-stat"><span>Decode</span><strong id="native-decode-label" class="play-stat-value">Ready</strong></div>
                   </div>
-                </div>
               </div>
             </div>
           </div>

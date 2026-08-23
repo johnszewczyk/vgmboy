@@ -4,7 +4,7 @@ const STORAGE_KEY = "spcboy-wk-settings";
 const DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES = 2 * 1024 * 1024 * 1024;
 const ARCHIVE_CACHE_LIMIT_CHOICES = Object.freeze([512, 1024, 2048, 4096].map((megabytes) => megabytes * 1024 * 1024));
 const COLUMN_DEFS = [
-  { id: "favorite", label: "", className: "col-favorite", sortable: false },
+  { id: "favorite", label: "★", className: "col-favorite", sortable: false },
   { id: "index", label: "#", className: "mono col-index", sortable: false },
   { id: "filename", label: "File" },
   { id: "title", label: "Title" },
@@ -42,6 +42,7 @@ const state = {
   databaseSearchGames: null,
   databaseSearchGeneration: 0,
   databaseSidebarError: "",
+  databaseSidebarLoading: false,
   collapsedConsoleNames: [],
   selectedDatabaseGameKey: null,
   selectedDatabaseConsoleName: null,
@@ -49,6 +50,8 @@ const state = {
   selectedBrowserPath: null,
   playlist: [],
   selectedTrackId: null,
+  selectedTrackIds: [],
+  playlistSelectionAnchorId: null,
   lastSelectedTrackId: null,
   currentTrackId: null,
   currentTrackInfo: null,

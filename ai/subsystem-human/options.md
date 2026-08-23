@@ -11,6 +11,7 @@ Settings groups app-owned controls above VGMBoy playback controls in the same co
 by the current renderer skin. App controls cover theme, database location, and browser behavior.
 VGMBoy controls cover playback, routing, tempo, fade, volume, mono, equalizer, and archive-cache behavior.
 Diagnostics is its own VGMBoy page and reports live transport, buffer, output, decode, and underrun values.
+Its page title and help text are page-level content; Transport, Buffer, and Decoder are separate sibling panels.
 
 ## Persistence
 
@@ -31,6 +32,10 @@ seek bar remains a transport control, not a settings input.
 
 Favorites is a fourth library view beside Paths, Consoles, and Disk Path. Command-D toggles the
 selected track or selected database game/group, and the Favorites playlist preserves insertion order.
+Both playlist headers use a visible star for the favorite column. Command-click and Shift-click select
+multiple playlist rows. The current local preference persistence is provisional; favorites must move to
+a shared database-backed sidecar adjacent to the read-only schema-23 catalog before cross-app sharing is
+considered complete.
 
 ## Files
 
