@@ -65,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                       case "sidebarPaths": app.ui?.setSidebarMode?.("paths"); break;
                       case "sidebarConsoles": app.ui?.setSidebarMode?.("consoles"); break;
                       case "sidebarDiskPath": app.ui?.setSidebarMode?.("diskPath"); break;
+                      case "sidebarFavorites": app.ui?.setSidebarMode?.("favorites"); break;
                       case "settings": window.spcBoyWK?.openOptionsWindow?.(); break;
                       default: break;
                     }
@@ -165,13 +166,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         fileMenuItem.submenu = fileMenu
         mainMenu.addItem(fileMenuItem)
 
-        let sidebarMenuItem = NSMenuItem()
-        let sidebarMenu = NSMenu(title: "Sidebar")
-        sidebarMenu.addItem(menuItem("Paths", command: .sidebarPaths, action: #selector(sidebarPaths(_:))))
-        sidebarMenu.addItem(menuItem("Consoles", command: .sidebarConsoles, action: #selector(sidebarConsoles(_:))))
-        sidebarMenu.addItem(menuItem("Disk Path", command: .sidebarDiskPath, action: #selector(sidebarDiskPath(_:))))
-        sidebarMenuItem.submenu = sidebarMenu
-        mainMenu.addItem(sidebarMenuItem)
+        let viewMenuItem = NSMenuItem()
+        let viewMenu = NSMenu(title: "View")
+        viewMenu.addItem(menuItem(FrontendSidebarView.consoles.title, command: .sidebarConsoles, action: #selector(sidebarConsoles(_:))))
+        viewMenu.addItem(menuItem(FrontendSidebarView.paths.title, command: .sidebarPaths, action: #selector(sidebarPaths(_:))))
+        viewMenu.addItem(menuItem(FrontendSidebarView.favorites.title, command: .sidebarFavorites, action: #selector(sidebarFavorites(_:))))
+        viewMenuItem.submenu = viewMenu
+        mainMenu.addItem(viewMenuItem)
 
         let playbackMenuItem = NSMenuItem()
         let playbackMenu = NSMenu(title: "Playback")
@@ -237,6 +238,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func sidebarPaths(_ sender: Any?) { dispatch(.sidebarPaths) }
     @objc private func sidebarConsoles(_ sender: Any?) { dispatch(.sidebarConsoles) }
     @objc private func sidebarDiskPath(_ sender: Any?) { dispatch(.sidebarDiskPath) }
+    @objc private func sidebarFavorites(_ sender: Any?) { dispatch(.sidebarFavorites) }
     @objc private func settings(_ sender: Any?) {
         showOptionsWindow()
     }

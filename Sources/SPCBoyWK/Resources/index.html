@@ -32,13 +32,10 @@
       <main class="workspace">
         <aside class="sidebar">
           <div class="sidebar-search-wrap toolbar">
-            <input id="sidebar-search-input" class="sidebar-search-input" type="search" placeholder="Search" />
+              <input id="sidebar-search-input" class="sidebar-search-input" type="search" placeholder="Search" />
             <div class="sidebar-search-actions">
               <div class="sidebar-view-actions" role="group" aria-label="Library view">
-                <button class="sidebar-mode-button" data-sidebar-view="paths" type="button" title="Catalog paths" aria-label="Catalog paths" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-scroll-text"></use></svg></button>
-                <button class="sidebar-mode-button" data-sidebar-view="consoles" type="button" title="Catalog consoles" aria-label="Catalog consoles" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-database"></use></svg></button>
-                <button class="sidebar-mode-button" data-sidebar-view="diskPath" type="button" title="Disk path" aria-label="Disk path" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button>
-                <button class="sidebar-mode-button" data-sidebar-view="favorites" type="button" title="Favorites" aria-label="Favorites" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-star"></use></svg></button>
+                <button id="sidebar-view-toggle-button" class="sidebar-mode-button" type="button" title="Library view" aria-label="Library view"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sidebar-views"></use></svg></button>
               </div>
               <div class="sidebar-fold-actions" role="group" aria-label="Fold current view">
                 <button id="database-expand-all-button" class="sidebar-mode-button database-tree-control" type="button" title="Expand all" aria-label="Expand all">+</button>

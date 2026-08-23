@@ -363,10 +363,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     nonisolated private static func trackResponse(_ track: CatalogTrack, rootPath: String) -> [String: Any] {
         let path = track.sourcePath
         let fileURL = URL(fileURLWithPath: path)
-        let statURL = URL(fileURLWithPath: track.archivePath ?? path)
-        let attributes = try? FileManager.default.attributesOfItem(atPath: statURL.path)
-        let fileSize = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
-        let modifiedAt = ((attributes?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0) * 1000
         return [
             "playlistId": "catalog-\(track.id)",
             "metadataTrackId": track.id,
@@ -377,8 +373,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "archiveEntry": track.archiveEntry ?? NSNull(),
             "trackIndex": track.trackIndex,
             "trackCount": track.trackCount,
-            "fileSize": fileSize,
-            "modifiedAt": modifiedAt,
+            // Catalog-backed rows already carry their metadata. Do not stat
+            // every source path during playlist hydration; archives and
+            // external roots can make that synchronous bridge work very slow.
+            "fileSize": 0,
+            "modifiedAt": 0,
             "sourceSignature": NSNull(),
             "scanVersion": 0,
             "title": track.title,

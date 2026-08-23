@@ -466,10 +466,8 @@ refs.sidebarSearchInput.addEventListener("input", (event) => {
   app.ui.updateSidebarSearch(event.target.value);
 });
 
-refs.sidebarViewButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    app.ui.setSidebarMode(button.dataset.sidebarView).catch((error) => console.error("[SPCBoy] sidebar view switch failed", error));
-  });
+refs.sidebarViewToggleButton?.addEventListener("click", () => {
+  app.ui.cycleSidebarMode().catch((error) => console.error("[SPCBoy] sidebar view switch failed", error));
 });
 
 if (window.spcBoyWK?.onTransportShortcut) {

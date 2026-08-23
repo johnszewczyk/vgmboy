@@ -43,6 +43,7 @@ const state = {
   databaseSearchGeneration: 0,
   databaseSidebarError: "",
   databaseSidebarLoading: false,
+  playlistLoading: false,
   collapsedConsoleNames: [],
   selectedDatabaseGameKey: null,
   selectedDatabaseConsoleName: null,
@@ -131,7 +132,8 @@ const audioEngine = {
 
 const refs = {
   sidebarSearchInput: document.getElementById("sidebar-search-input"),
-  sidebarViewButtons: [...document.querySelectorAll("[data-sidebar-view]")],
+  sidebarViewButtons: [],
+  sidebarViewToggleButton: document.getElementById("sidebar-view-toggle-button"),
   databaseCollapseAllButton: document.getElementById("database-collapse-all-button"),
   databaseExpandAllButton: document.getElementById("database-expand-all-button"),
   treeRoot: document.getElementById("tree-root"),

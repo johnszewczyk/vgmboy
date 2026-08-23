@@ -15,8 +15,9 @@ rendering.
 ## Invariants
 
 - Search is a temporary catalog-console view and clearing it restores the stored mode. Favorites is a separate frontend-owned track-history view and is not a CatalogReader aggregation mode.
-- The sidebar view button opens a flat in-app menu with `Consoles`, `Paths`, and `Disk Path`; the
-  first two are the catalog database views and the last is the explicitly opened local filesystem.
+- The sidebar view button is one toggle cycling `Database / Console View`, `Paths View`, and
+  `Favorites View`. `Disk Path` remains an explicitly opened local-filesystem state and is not
+  part of the library-view cycle.
 - Game identity includes the catalog root ID, game name, and system.
 - Game console labels come from CatalogReader's shared folder-versus-metadata
   aggregation; empty folder tags fall through to stored metadata before the
@@ -24,6 +25,11 @@ rendering.
 - Catalog writes, scans, decoder selection, and playback do not belong here.
 - Favorite identity/order is defined by FavoriteTrackCore. The current WebKit adapter renders a loading status while it reads the indexed catalog and uses database track queries directly for game previews; it does not walk source folders. Playlist rows support Command-click and Shift-click multi-selection. Cross-app favorite persistence still needs the planned shared sidecar store; the current local WebKit preference data is not the final shared storage contract.
 - Database game selection updates the playlist directly; it must not invoke a full sidebar redraw or deferred metadata pass when catalog rows already contain metadata.
+- Native View-menu commands use the shared `FrontendCommandCore` sidebar command contract; the
+  WebKit skin maps those commands to the same three view values.
+- Catalog-backed playlist rows must not stat source paths during hydration. CatalogReader supplies
+  the metadata required for the playlist; filesystem inspection belongs to explicit playback or
+  metadata-inspection paths.
 
 ## Files
 
