@@ -10,10 +10,27 @@ public enum FrontendCommand: String, CaseIterable, Codable, Equatable, Sendable 
     case sidebarPaths
     case sidebarConsoles
     case sidebarDiskPath
+    case sidebarFavorites
     case settings
     case previous
     case playPause
     case next
+}
+
+/// The three persistent library views exposed by the native and WebKit skins.
+/// Disk Path remains an explicit local-browser state, not a library view.
+public enum FrontendSidebarView: String, CaseIterable, Codable, Equatable, Sendable {
+    case consoles
+    case paths
+    case favorites
+
+    public var title: String {
+        switch self {
+        case .consoles: "Database / Console View"
+        case .paths: "Paths View"
+        case .favorites: "Favorites View"
+        }
+    }
 }
 
 public enum FrontendShortcutModifier: String, Codable, CaseIterable, Sendable {
@@ -44,6 +61,7 @@ public enum FrontendShortcutCatalog {
         .init(command: .sidebarPaths, key: "1", modifiers: [.command]),
         .init(command: .sidebarConsoles, key: "2", modifiers: [.command]),
         .init(command: .sidebarDiskPath, key: "3", modifiers: [.command]),
+        .init(command: .sidebarFavorites, key: "4", modifiers: [.command]),
         .init(command: .settings, key: ",", modifiers: [.command]),
         .init(command: .previous, key: "F7"),
         .init(command: .playPause, key: "F8"),
