@@ -212,14 +212,23 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
         }.sorted { Self.naturalCompare($0.path, $1.path) == .orderedAscending }
     }
 
-    public func gameBuckets() throws -> [CatalogGameBucket] {
-        try query(
+    public func gameBuckets(preferFoldersOverMetadata: Bool = true) throws -> [CatalogGameBucket] {
+        let systemExpression = preferFoldersOverMetadata
+            ? "COALESCE(NULLIF(t.browser_system, ''), NULLIF(m.system, ''), '')"
+            : "COALESCE(NULLIF(m.system, ''), NULLIF(t.browser_system, ''), '')"
+        return try query(
             """
-            SELECT b.root_id, r.path, b.browser_game, b.browser_system, b.track_count
+            SELECT b.root_id, r.path, b.browser_game, \(systemExpression), COUNT(t.id)
             FROM game_sidebar_buckets b
             INNER JOIN library_roots r ON r.id=b.root_id
+            INNER JOIN tracks t
+                ON t.root_id=b.root_id
+               AND t.browser_game=b.browser_game
+               AND t.browser_system=b.browser_system
+            LEFT JOIN track_metadata m ON m.track_id=t.id
             WHERE r.is_attached=1 AND r.is_enabled=1
-            ORDER BY lower(b.browser_game), b.browser_game, lower(b.browser_system), b.browser_system, lower(r.path), r.path;
+            GROUP BY b.root_id, r.path, b.browser_game, \(systemExpression)
+            ORDER BY lower(b.browser_game), b.browser_game, lower(\(systemExpression)), \(systemExpression), lower(r.path), r.path;
             """
         ) { statement in
             CatalogGameBucket(
@@ -300,7 +309,9 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
     /// Fetch one visible sidebar group directly. This avoids rebuilding the
     /// whole catalogue merely to activate a selected game.
     public func tracks(rootID: Int64, game: String, system: String, preferFoldersOverMetadata: Bool) throws -> [CatalogTrack] {
-        _ = preferFoldersOverMetadata // Buckets are published in the active browser preference.
+        let systemExpression = preferFoldersOverMetadata
+            ? "COALESCE(NULLIF(t.browser_system, ''), NULLIF(m.system, ''), '')"
+            : "COALESCE(NULLIF(m.system, ''), NULLIF(t.browser_system, ''), '')"
         let sql = """
         SELECT t.id, t.root_id, t.path, NULLIF(t.archive_path, ''), NULLIF(t.archive_entry, ''), t.track_index, t.track_count,
                COALESCE(m.title, ''), COALESCE(m.game, ''), COALESCE(m.author, ''),
@@ -308,14 +319,14 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
                COALESCE(t.browser_game, ''), COALESCE(t.browser_system, ''),
                COALESCE(m.intro_length_ms, 0), COALESCE(m.loop_length_ms, 0),
                COALESCE(m.play_length_ms, 0), COALESCE(m.fade_length_ms, 0)
-        FROM tracks t INDEXED BY tracks_browser_bucket_index
+        FROM tracks t
         INNER JOIN library_roots r ON r.id=t.root_id
         LEFT JOIN track_metadata m ON m.track_id=t.id
         WHERE r.is_attached=1 AND r.is_enabled=1
           AND NOT EXISTS (SELECT 1 FROM dead_sources d WHERE d.root_id=t.root_id AND d.path=t.path)
           AND t.root_id=?
           AND t.browser_game=?
-          AND t.browser_system=?
+          AND \(systemExpression)=?
         ORDER BY lower(t.path), t.path, t.archive_entry, t.track_index;
         """
         var statement: OpaquePointer?

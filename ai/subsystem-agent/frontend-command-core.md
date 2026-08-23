@@ -18,5 +18,5 @@ its own platform event layer.
 
 ## Files
 
-- `/Users/john/Downloads/Code/CatalogReader/Sources/FrontendCommandCore/FrontendCommandCore.swift`
-- `/Users/john/Downloads/Code/CatalogReader/Tests/FrontendCommandCoreTests/FrontendCommandCoreTests.swift`
+- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/FrontendCommandCore/FrontendCommandCore.swift`
+- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Tests/FrontendCommandCoreTests/FrontendCommandCoreTests.swift`

@@ -30,10 +30,12 @@ private func fixtureCatalog() throws -> URL {
         INSERT INTO library_roots VALUES (1, '/music', 1, 1, 2);
         INSERT INTO tracks VALUES (1, 1, '/music/Game', '/music/Game/Track 9.spc', 'Track 9.spc', 'Game', 'SNES', 0, 1, NULL, NULL);
         INSERT INTO tracks VALUES (2, 1, '/music/Game', '/music/Game/Track 10.spc', 'Track 10.spc', 'Game', 'SNES', 0, 1, NULL, NULL);
+        INSERT INTO tracks VALUES (3, 1, '/music/TG16', '/music/TG16/Chew-Man-Fu.tar.zst', 'Chew-Man-Fu.tar.zst', 'Chew Man Fu', '', 0, 1, '/music/TG16/Chew-Man-Fu.tar.zst', NULL);
         INSERT INTO track_metadata VALUES (1, 'Track 9', 'Game', 'Composer', 'SNES', '', 0, 0, 90000, 0);
         INSERT INTO track_metadata VALUES (2, 'Track 10', 'Game', 'Composer', 'SNES', '', 0, 0, 100000, 0);
-        INSERT INTO game_sidebar_buckets VALUES (1, 'Track 10', 'SNES', 1);
-        INSERT INTO game_sidebar_buckets VALUES (1, 'Track 9', 'SNES', 1);
+        INSERT INTO track_metadata VALUES (3, 'Chew Man Fu', 'Chew Man Fu', 'Composer', 'PC Engine', '', 0, 0, 120000, 0);
+        INSERT INTO game_sidebar_buckets VALUES (1, 'Game', 'SNES', 2);
+        INSERT INTO game_sidebar_buckets VALUES (1, 'Chew Man Fu', '', 1);
         INSERT INTO file_sidebar_buckets VALUES (1, '/music/Game', '/music/Game/Track 9.spc', 0, 1);
         INSERT INTO file_sidebar_buckets VALUES (1, '/music/Game', '/music/Game/Track 10.spc', 0, 1);
         """)
@@ -45,10 +47,12 @@ private func fixtureCatalog() throws -> URL {
     defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
     let reader = try ReadOnlyCatalog(databaseURL: url)
 
-    #expect(try reader.activeTrackCount() == 2)
+    #expect(try reader.activeTrackCount() == 3)
     #expect(try reader.deadSourceCount() == 0)
-    #expect(try reader.gameBuckets().map(\.game) == ["Track 9", "Track 10"])
+    #expect(Set(try reader.gameBuckets().map(\.game)) == Set(["Chew Man Fu", "Game"]))
     #expect(try reader.tracks(rootID: 1, game: "Game", system: "SNES", preferFoldersOverMetadata: false).count == 2)
+    #expect(try reader.gameBuckets().first(where: { $0.game == "Chew Man Fu" })?.system == "PC Engine")
+    #expect(try reader.tracks(rootID: 1, game: "Chew Man Fu", system: "PC Engine", preferFoldersOverMetadata: true).count == 1)
     #expect(try reader.tracks(rootID: 1, sourcePaths: ["/music/Game/Track 10.spc"]).map(\.title) == ["Track 10"])
     #expect(try reader.tracks(rootID: 1, folderPaths: ["/music/Game"]).map(\.title) == ["Track 9", "Track 10"])
 }
