@@ -8,6 +8,10 @@ import Foundation
 public final class ArchiveMaterializer: @unchecked Sendable {
     public static let shared = ArchiveMaterializer()
 
+    private static let psfExtensions: Set<String> = [
+        "psf", "minipsf", "psflib", "psf2", "minipsf2", "psf2lib"
+    ]
+
     private let lock = NSLock()
     private let configuration: ArchiveMaterializerConfiguration
     private var activeDirectory: URL?
@@ -29,15 +33,22 @@ public final class ArchiveMaterializer: @unchecked Sendable {
             .appendingPathComponent(configuration.temporaryDirectoryName, isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let extensionName = URL(fileURLWithPath: entry).pathExtension
-        let output = directory.appendingPathComponent("track\(extensionName.isEmpty ? "" : ".\(extensionName)")")
+        let normalizedEntry: String
+        do {
+            normalizedEntry = try normalizedArchiveEntry(entry)
+        } catch {
+            try? FileManager.default.removeItem(at: directory)
+            throw error
+        }
+        let output = directory.appendingPathComponent(normalizedEntry)
 
         do {
-            if archiveURL.path.lowercased().hasSuffix(".tar.zst") || archiveURL.path.lowercased().hasSuffix(".tar.zstd") {
-                try extractTarZstd(archiveURL: archiveURL, entry: entry, output: output)
-            } else {
-                try extractWithBSDTar(archiveURL: archiveURL, entry: entry, output: output)
-            }
+            try extractArchiveEntry(archiveURL: archiveURL, entry: normalizedEntry, output: output)
+            try materializeDependencies(
+                archiveURL: archiveURL,
+                selectedEntry: normalizedEntry,
+                directory: directory
+            )
             let attributes = try FileManager.default.attributesOfItem(atPath: output.path)
             let byteCount = (attributes[.size] as? NSNumber)?.int64Value ?? 0
             guard byteCount > 0 else { throw ArchiveMaterializationError.emptyOutput }
@@ -59,6 +70,82 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         activeDirectory = nil
         lock.unlock()
         if let directory { try? FileManager.default.removeItem(at: directory) }
+    }
+
+    private func extractArchiveEntry(archiveURL: URL, entry: String, output: URL) throws {
+        try FileManager.default.createDirectory(
+            at: output.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+
+        do {
+            try extractArchiveEntryOnce(archiveURL: archiveURL, entry: entry, output: output)
+        } catch {
+            // tar archives commonly store paths with a leading "./" even
+            // when the catalog records the normalized path.
+            guard !entry.hasPrefix("./") else { throw error }
+            try extractArchiveEntryOnce(archiveURL: archiveURL, entry: "./\(entry)", output: output)
+        }
+    }
+
+    private func extractArchiveEntryOnce(archiveURL: URL, entry: String, output: URL) throws {
+        try? FileManager.default.removeItem(at: output)
+        if archiveURL.path.lowercased().hasSuffix(".tar.zst") || archiveURL.path.lowercased().hasSuffix(".tar.zstd") {
+            try extractTarZstd(archiveURL: archiveURL, entry: entry, output: output)
+        } else {
+            try extractWithBSDTar(archiveURL: archiveURL, entry: entry, output: output)
+        }
+    }
+
+    private func materializeDependencies(archiveURL: URL, selectedEntry: String, directory: URL) throws {
+        guard Self.psfExtensions.contains(URL(fileURLWithPath: selectedEntry).pathExtension.lowercased()) else { return }
+
+        var pending = [selectedEntry]
+        var visited = Set<String>()
+        while let currentEntry = pending.first {
+            pending.removeFirst()
+            guard visited.insert(currentEntry).inserted else { continue }
+
+            let currentURL = directory.appendingPathComponent(currentEntry)
+            let data = try Data(contentsOf: currentURL)
+            for dependency in psfDependencies(in: data) {
+                let dependencyEntry = try resolveDependency(dependency, relativeTo: currentEntry)
+                guard !visited.contains(dependencyEntry) else { continue }
+                let dependencyURL = directory.appendingPathComponent(dependencyEntry)
+                try extractArchiveEntry(archiveURL: archiveURL, entry: dependencyEntry, output: dependencyURL)
+                pending.append(dependencyEntry)
+            }
+        }
+    }
+
+    private func psfDependencies(in data: Data) -> [String] {
+        let marker = Data("[TAG]".utf8)
+        guard let range = data.range(of: marker) else { return [] }
+        let tagText = String(decoding: data[range.lowerBound...], as: UTF8.self)
+        return tagText
+            .split(whereSeparator: \.isNewline)
+            .compactMap { rawLine in
+                let line = String(rawLine).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard line.hasPrefix("_lib"), let equals = line.firstIndex(of: "=") else { return nil }
+                let value = String(line[line.index(after: equals)...]).trimmingCharacters(in: .whitespaces)
+                return value.isEmpty ? nil : value
+            }
+    }
+
+    private func resolveDependency(_ dependency: String, relativeTo currentEntry: String) throws -> String {
+        guard !dependency.hasPrefix("/") else { throw ArchiveMaterializationError.invalidEntry }
+        let base = URL(fileURLWithPath: "/\(currentEntry)").deletingLastPathComponent()
+        let resolved = base.appendingPathComponent(dependency).standardizedFileURL.path
+        let relative = String(resolved.dropFirst())
+        return try normalizedArchiveEntry(relative)
+    }
+
+    private func normalizedArchiveEntry(_ entry: String) throws -> String {
+        let components = entry.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
+        guard !components.isEmpty, !components.contains("..") else {
+            throw ArchiveMaterializationError.invalidEntry
+        }
+        return components.filter { $0 != "." }.joined(separator: "/")
     }
 
     private func extractWithBSDTar(archiveURL: URL, entry: String, output: URL) throws {
