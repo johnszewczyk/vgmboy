@@ -502,6 +502,29 @@ body.is-file-drag-over::after {
 .play-stat-value.is-warning { color: rgb(255 200 120); }
 .play-stat-value.is-error { color: rgb(255 130 130); }
 
+.diagnostics-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.diagnostics-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.diagnostics-row > span {
+  min-width: 0;
+  color: var(--text);
+}
+
+.diagnostics-row > .play-stat-value {
+  text-align: right;
+  white-space: nowrap;
+}
+
 @media (max-width: 720px) {
   .play-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

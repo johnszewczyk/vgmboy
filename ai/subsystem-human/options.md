@@ -21,11 +21,12 @@ SPCBoy a catalog writer; MediaScanner remains responsible for scanning and publi
 
 ## Database panel layout
 
-The Database page shows the configured MediaScanner catalog path as a full-width readout.
+The Database page shows an empty full-width path readout with a placeholder; the native path remains
+owned by the browse and Finder actions rather than being printed into the compact field.
 Database actions run as three equal-width controls across the bottom of that panel—Use Default,
 Reload Library, and Show in Finder. The catalog browse action is the folder button at the end of the
-path bar. Archive Cache shows its active path in the same readout style and uses Use Default, Clear
-Cache, and Show in Finder, with Show in Finder last.
+path bar. Archive Cache uses the identical empty placeholder readout and uses Use Default, Clear Cache,
+and Show in Finder, with Show in Finder last.
 
 Playback controls are ordered Volume, Mono, Equalizer. Volume and each equalizer band use animated range bars with live values. The transport
 seek bar remains a transport control, not a settings input.

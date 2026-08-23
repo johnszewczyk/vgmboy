@@ -157,7 +157,7 @@
               <div class="options-page-title">SPCBoy / Database</div>
               <div class="options-subpanel options-database-panel">
                 <div class="options-subpanel-title">Database</div>
-                <div class="options-path-control"><input id="library-database-path" class="options-input options-path-readout" type="text" readonly aria-label="Database path" /><button id="library-database-browse-button" class="tool-button glyph-button" type="button" aria-label="Browse for catalog" title="Browse for catalog"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
+                <div class="options-path-control"><input id="library-database-path" class="options-input options-path-readout" type="text" readonly placeholder="MediaScanner catalog path" aria-label="Database path" /><button id="library-database-browse-button" class="tool-button glyph-button" type="button" aria-label="Browse for catalog" title="Browse for catalog"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
                 <p id="library-database-location-status">SPCBoy reads the shared schema-23 catalog read-only.</p>
                 <div class="options-library-toolbar">
                   <button id="library-database-default-button" class="tool-button" type="button">Use Default</button>
@@ -167,7 +167,7 @@
               </div>
               <div class="options-subpanel options-cache-panel">
                 <div class="options-subpanel-title">Archive Cache</div>
-                <div class="options-path-control"><input id="library-cache-path" class="options-input options-path-readout" type="text" readonly aria-label="Archive cache path" /><button id="library-cache-browse-button" class="tool-button glyph-button" type="button" aria-label="Show archive cache in Finder" title="Show archive cache in Finder"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
+                <div class="options-path-control"><input id="library-cache-path" class="options-input options-path-readout" type="text" readonly placeholder="Archive cache path" aria-label="Archive cache path" /><button id="library-cache-browse-button" class="tool-button glyph-button" type="button" aria-label="Show archive cache in Finder" title="Show archive cache in Finder"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="archive-cache-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Enable Cache</span><small>Usage: <strong id="database-cache-summary">—</strong></small><small>Decompressed files can be retained to reduce load time.</small></span></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><span class="options-checkbox-copy"><span>Cache Limit</span><small>Least-recently-used archive entries are removed automatically. Active playback is never removed.</small></span></span><span class="options-inline-trailing"><select id="archive-cache-limit-select" class="options-input" aria-label="Archive cache size limit"><option value="536870912">512 MB</option><option value="1073741824">1 GB</option><option value="2147483648" selected>2 GB</option><option value="4294967296">4 GB</option></select></span></label>
                 <p><strong>MediaScanner scratch files are separate:</strong> they are disposable and reclaimed after each source or after cancellation.</p>
@@ -236,32 +236,32 @@
               <div class="options-page-title">VGMBoy / Diagnostics</div>
               <div class="options-help-text">Live native playback health, buffering, output, and decode statistics.</div>
               <div class="options-subpanel diagnostics-category">
-                  <div class="options-subpanel-title">Transport</div>
-                  <div id="native-diagnostics" class="native-diagnostics play-stats-grid" aria-live="polite">
-                  <div class="play-stat"><span>Transport</span><strong id="native-transport-label" class="play-stat-value">Idle</strong></div>
-                  <div class="play-stat"><span>Track</span><strong id="native-track-label" class="play-stat-value">Not loaded</strong></div>
-                  <div class="play-stat"><span>Output</span><strong id="native-output-label" class="play-stat-value">Idle</strong></div>
-                  <div class="play-stat"><span>Position</span><strong id="native-position-label" class="play-stat-value">0:00</strong></div>
-                  </div>
+                <div class="options-subpanel-title">Transport</div>
+                <div id="native-diagnostics" class="diagnostics-list" aria-live="polite">
+                  <div class="diagnostics-row"><span>Transport</span><strong id="native-transport-label" class="play-stat-value">Idle</strong></div>
+                  <div class="diagnostics-row"><span>Track</span><strong id="native-track-label" class="play-stat-value">Not loaded</strong></div>
+                  <div class="diagnostics-row"><span>Output</span><strong id="native-output-label" class="play-stat-value">Idle</strong></div>
+                  <div class="diagnostics-row"><span>Position</span><strong id="native-position-label" class="play-stat-value">0:00</strong></div>
+                </div>
               </div>
               <div class="options-subpanel diagnostics-category">
-                  <div class="options-subpanel-title">Buffer</div>
-                  <div class="native-diagnostics play-stats-grid" aria-live="polite">
-                  <div class="play-stat"><span>Buffer</span><strong id="native-buffer-label" class="play-stat-value">0 / — frames</strong></div>
-                  <div class="play-stat"><span>Fill</span><strong id="native-buffer-fill-label" class="play-stat-value">—</strong></div>
-                  <div class="play-stat"><span>Underruns</span><strong id="native-underrun-label" class="play-stat-value">0</strong></div>
-                  <div class="play-stat"><span>Frames requested / supplied</span><strong id="native-frames-label" class="play-stat-value">0 / 0</strong></div>
-                  </div>
+                <div class="options-subpanel-title">Buffer</div>
+                <div class="diagnostics-list" aria-live="polite">
+                  <div class="diagnostics-row"><span>Buffer</span><strong id="native-buffer-label" class="play-stat-value">0 / — frames</strong></div>
+                  <div class="diagnostics-row"><span>Fill</span><strong id="native-buffer-fill-label" class="play-stat-value">—</strong></div>
+                  <div class="diagnostics-row"><span>Underruns</span><strong id="native-underrun-label" class="play-stat-value">0</strong></div>
+                  <div class="diagnostics-row"><span>Requested / Supplied</span><strong id="native-frames-label" class="play-stat-value">0 / 0</strong></div>
+                </div>
               </div>
               <div class="options-subpanel diagnostics-category">
-                  <div class="options-subpanel-title">Decoder</div>
-                  <div class="native-diagnostics play-stats-grid" aria-live="polite">
-                  <div class="play-stat"><span>Decoder</span><strong id="native-decoder-label" class="play-stat-value">—</strong></div>
-                  <div class="play-stat"><span>Rates</span><strong id="native-rates-label" class="play-stat-value">— / — Hz</strong></div>
-                  <div class="play-stat"><span>Decoded / audible frames</span><strong id="native-decoded-label" class="play-stat-value">0 / 0</strong></div>
-                  <div class="play-stat"><span>Tempo</span><strong id="native-tempo-label" class="play-stat-value">1×</strong></div>
-                  <div class="play-stat"><span>Decode</span><strong id="native-decode-label" class="play-stat-value">Ready</strong></div>
-                  </div>
+                <div class="options-subpanel-title">Decoder</div>
+                <div class="diagnostics-list" aria-live="polite">
+                  <div class="diagnostics-row"><span>Decoder</span><strong id="native-decoder-label" class="play-stat-value">—</strong></div>
+                  <div class="diagnostics-row"><span>Rates</span><strong id="native-rates-label" class="play-stat-value">— / — Hz</strong></div>
+                  <div class="diagnostics-row"><span>Decoded / Audible</span><strong id="native-decoded-label" class="play-stat-value">0 / 0</strong></div>
+                  <div class="diagnostics-row"><span>Tempo</span><strong id="native-tempo-label" class="play-stat-value">1×</strong></div>
+                  <div class="diagnostics-row"><span>Decode</span><strong id="native-decode-label" class="play-stat-value">Ready</strong></div>
+                </div>
               </div>
             </div>
           </div>

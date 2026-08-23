@@ -1752,8 +1752,11 @@ function renderAll() {
   refs.repeatButton.setAttribute("aria-pressed", state.repeatMode === "off" ? "false" : "true");
   refs.repeatButton.title = repeatTitles[state.repeatMode];
   refs.repeatButton.setAttribute("aria-label", repeatTitles[state.repeatMode]);
-  refs.libraryDatabasePath.value = state.databaseLocation?.path || "";
-  if (refs.libraryCachePath) refs.libraryCachePath.value = state.archiveCacheLocation || "";
+  // These are intentionally placeholder readouts. The browse controls use
+  // the native paths; the options panel should not print long filesystem
+  // paths into the compact field unless a future design explicitly asks for it.
+  refs.libraryDatabasePath.value = "";
+  if (refs.libraryCachePath) refs.libraryCachePath.value = "";
   refs.libraryDatabaseLocationStatus.textContent = state.databaseLocationStatus || "SPCBoy reads this schema-23 catalog. MediaScanner owns scan paths, scanning, link checks, and cleanup.";
   refs.libraryDatabaseReloadButton.disabled = Boolean(state.databaseLocation?.requiresRestart);
   refs.libraryClearCacheButton.disabled = false;
