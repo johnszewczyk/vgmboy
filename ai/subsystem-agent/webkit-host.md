@@ -14,6 +14,11 @@ The AppKit host owns Cmd-Q, Cmd-W, Cmd-M, and menu dispatch. Shared semantic
 shortcut names and default keys come from `FrontendCommandCore`; WebKit receives
 the remaining frontend commands through the narrow `SPCBoyWK` dispatcher.
 
+Archive-backed PSF playback must receive the selected PSF and its `_lib`/`_lib2`
+dependency chain in one temporary directory. That resolution belongs to the
+shared `ArchiveMaterializationCore`; the WK bridge must not extract a selected
+archive member directly.
+
 ## Failure Boundaries
 
 Missing packaged resources are fatal. The host must not silently fall back to

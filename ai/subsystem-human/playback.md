@@ -5,5 +5,9 @@ from the in-process VGMBoy bridge. While a track is playing, the frontend polls 
 elapsed/track/playlist readout stays current and the next playlist item can begin when playback
 ends. Playback timing remains owned by VGMBoy; SPCBoy owns queue order and presentation.
 
+PSF music stored inside an archive plays with its required companion library
+files, so archive-backed PlayStation tracks use the same playback path as loose
+PSF files.
+
 The root window's sidebar divider is draggable. Its persisted width is also available from the
 appearance settings controls, and the divider supports keyboard adjustment when focused.
