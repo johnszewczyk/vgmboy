@@ -18,13 +18,19 @@ async function refreshLibraryRoots() {
 
 async function handleLibraryRootsChanged(roots) {
   state.libraryRoots = Array.isArray(roots) ? roots : [];
-  await refreshDatabaseGamesForVisibleRoots();
-  state.databaseFiles = [];
-  state.databaseFileTree = [];
-  persistSettings();
+  state.databaseSidebarLoading = true;
+  state.databaseSidebarError = "";
   renderAll();
-  if (state.sidebarMode === "paths") {
-    await app.ui.loadDatabaseFiles();
+  try {
+    await refreshDatabaseGamesForVisibleRoots();
+    state.databaseFiles = [];
+    state.databaseFileTree = [];
+    persistSettings();
+    if (state.sidebarMode === "paths") {
+      await app.ui.loadDatabaseFiles();
+    }
+  } finally {
+    state.databaseSidebarLoading = false;
     renderAll();
   }
   app.ui.syncTreeSelection();

@@ -14,6 +14,7 @@ let databaseGameButtons = [];
 let databaseEmptyState = null;
 let databaseConsoleGroups = [];
 let collapsedDatabaseConsoles = new Set();
+let databaseRowRenderGeneration = 0;
 let browserClickTimer = 0;
 let sidebarSearchTimer = 0;
 let columnResizePointerId = null;
@@ -55,6 +56,7 @@ function resetSidebarContent() {
   // Keep the single selection surface alive across sidebar renders. Recreating
   // it on every click resets its transform, producing both flicker and stale
   // looking bars instead of one continuous 100 ms movement.
+  databaseRowRenderGeneration += 1;
   const indicator = ensureSidebarSelectionIndicator();
   refs.treeRoot.replaceChildren(indicator);
   return indicator;
@@ -606,8 +608,35 @@ function makeDatabaseGameButton(game) {
   return button;
 }
 
+function appendDatabaseGameRowsInBatches(groupedGames) {
+  const generation = databaseRowRenderGeneration;
+  const pendingRows = databaseConsoleGroups.flatMap(({ games, consoleName }) =>
+    (groupedGames.get(consoleName) || []).map((game) => ({ games, game }))
+  );
+  let offset = 0;
+
+  const appendBatch = () => {
+    if (generation !== databaseRowRenderGeneration) return;
+    const startedAt = performance.now();
+    while (offset < pendingRows.length && performance.now() - startedAt < 8) {
+      const { games, game } = pendingRows[offset++];
+      const button = makeDatabaseGameButton(game);
+      games.appendChild(button);
+      databaseGameButtons.push(button);
+    }
+    if (offset < pendingRows.length) {
+      window.requestAnimationFrame(appendBatch);
+    } else {
+      scheduleSelectionIndicators();
+    }
+  };
+
+  window.requestAnimationFrame(appendBatch);
+}
+
 function renderDatabaseGames() {
   if (state.databaseSidebarLoading) {
+    renderedDatabaseGames = null;
     const indicator = resetSidebarContent();
     const loading = document.createElement("div");
     loading.className = "empty sidebar-empty sidebar-loading";
@@ -672,11 +701,6 @@ function renderDatabaseGames() {
         state.selectedDatabaseGameKey = null;
         activateDatabaseSelection().catch((error) => reportDatabaseSidebarError("play the selected console", error));
       });
-      groupedGames.get(consoleName).forEach((game) => {
-        const button = makeDatabaseGameButton(game);
-        games.appendChild(button);
-        databaseGameButtons.push(button);
-      });
       group.append(heading, games);
       refs.treeRoot.appendChild(group);
       databaseConsoleGroups.push({ group, games, consoleName });
@@ -686,6 +710,7 @@ function renderDatabaseGames() {
     databaseEmptyState.className = "empty sidebar-empty";
     refs.treeRoot.appendChild(databaseEmptyState);
     renderedDatabaseGames = gamesForView;
+    appendDatabaseGameRowsInBatches(groupedGames);
   }
 
   const query = state.sidebarQuery.trim();
