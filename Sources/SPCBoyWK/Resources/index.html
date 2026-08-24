@@ -106,8 +106,9 @@
           <nav class="options-nav" aria-label="Options sections">
             <div class="options-nav-group" aria-labelledby="options-native-heading">
               <div id="options-native-heading" class="options-nav-group-title">SPCBoy</div>
-              <button id="options-database-tab" class="options-nav-item is-selected" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-database"></use></svg><span>Database</span></button>
-              <button id="options-theme-tab" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"></use></svg><span>Theme</span></button>
+              <button id="options-database-tab" data-app-option-section="database" class="options-nav-item is-selected" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-database"></use></svg><span>Database</span></button>
+              <button id="options-theme-tab" data-app-option-section="interface" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"></use></svg><span>Interface</span></button>
+              <button id="options-windows-tab" data-app-option-section="windows" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sidebar-views"></use></svg><span>Windows</span></button>
             </div>
             <div class="options-nav-group" aria-labelledby="options-extension-heading">
               <div id="options-extension-heading" class="options-nav-group-title">VGMBoy</div>
@@ -119,7 +120,7 @@
 
           <div class="options-content">
             <div id="options-theme-section" class="options-page options-theme-page is-hidden">
-              <div class="options-page-title">SPCBoy / Theme</div>
+              <div class="options-page-title">SPCBoy / Interface</div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Application</div>
                 <label class="options-field"><span>Accent Color</span><span class="options-inline-trailing"><input id="accent-color-input" class="options-input options-color-text-input" type="text" value="lightskyblue" placeholder="lightskyblue, #87cefa, rgb(...), oklch(...)" aria-label="Accent color CSS value" /></span></label>
@@ -148,10 +149,33 @@
                 <label class="options-field"><span>Item Spacing</span><span class="options-inline-trailing"><input id="ui-item-spacing-input" class="options-input" type="text" inputmode="decimal" value=".2" aria-label="Item spacing in rems" /></span></label>
                 <label class="options-field options-inline-field"><span>Column Auto-Size</span><input id="column-auto-size-checkbox" type="checkbox" checked /></label>
               </div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Animations</div>
+                <label class="options-field"><span>Auto-Resize</span><span class="options-inline-trailing"><input id="auto-resize-animation-input" class="options-input" type="number" min="0" max="1000" step="10" value="200" aria-label="Auto-resize animation milliseconds" /><span>ms</span></span></label>
+                <label class="options-field"><span>Selection Bar</span><span class="options-inline-trailing"><input id="selection-animation-input" class="options-input" type="number" min="0" max="1000" step="10" value="200" aria-label="Selection bar animation milliseconds" /><span>ms</span></span></label>
+              </div>
+            </div>
+
+            <div id="options-windows-section" class="options-page options-windows-page is-hidden">
+              <div class="options-page-title">SPCBoy / Windows</div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Always on Top</div>
+                <label class="options-field options-inline-field"><span>Main Window</span><input id="main-window-always-on-top-checkbox" type="checkbox" /></label>
+                <label class="options-field options-inline-field"><span>Settings Window</span><input id="settings-window-always-on-top-checkbox" type="checkbox" /></label>
+              </div>
             </div>
 
             <div id="options-database-section" class="options-page options-database-page">
               <div class="options-page-title">SPCBoy / Database</div>
+              <div class="options-subpanel options-local-files-panel">
+                <div class="options-subpanel-title">Local Files</div>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="local-browser-enabled-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Use Local Files</span><small>Browse one folder directly. The database library is disabled while this is on.</small></span></span></label>
+                <div class="database-stats-panel options-path-control"><input id="local-browser-path" class="options-input options-path-readout" type="text" readonly placeholder="No local folder selected" aria-label="Local files folder" /><button id="local-browser-browse-button" class="tool-button glyph-button" type="button" aria-label="Choose local files folder" title="Choose local files folder"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
+              </div>
+              <div class="options-subpanel options-favorites-panel">
+                <div class="options-subpanel-title">Favorites</div>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><span class="options-checkbox-copy"><span>Order</span><small>Historical preserves added order. Alphabetical changes display only.</small></span></span><span class="options-inline-trailing"><select id="favorite-sort-order-select" class="options-input" aria-label="Favorites order"><option value="historical">Historical</option><option value="alphabetical">Alphabetical</option></select></span></label>
+              </div>
               <div class="options-subpanel options-database-panel">
                 <div class="options-subpanel-title">Database</div>
                 <div class="database-stats-panel options-path-control"><input id="library-database-path" class="options-input options-path-readout" type="text" readonly placeholder="MediaScanner catalog path" aria-label="Database path" /><button id="library-database-browse-button" class="tool-button glyph-button" type="button" aria-label="Browse for catalog" title="Browse for catalog"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
@@ -266,8 +290,10 @@
     </div>
 
     <script src="./playback-speed.js"></script>
-    <script src="./sidebar-view-state.js"></script>
     <script src="./app-core.js"></script>
+    <script src="./sidebar-controller.js"></script>
+    <script src="./playlist-controller.js"></script>
+    <script src="./options-controller.js"></script>
     <script src="./playback-backends.js"></script>
     <script src="./playback-coordinator.js"></script>
     <script src="./app-playback.js"></script>

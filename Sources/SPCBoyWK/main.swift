@@ -1,26 +1,29 @@
 import AppKit
-import CatalogBrowserCore
 import FrontendCommandCore
 import WebKit
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var window: NSWindow?
     private var optionsWindow: NSWindow?
     private weak var webView: WKWebView?
     private weak var optionsWebView: WKWebView?
+    private var localBrowserEnabled = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let initialState = CatalogBrowserState()
-        let stateData = try! JSONEncoder().encode(initialState)
-        let stateJSON = String(decoding: stateData, as: UTF8.self)
+        if let iconURL = Bundle.main.url(forResource: "app-icon", withExtension: "png"),
+           let icon = NSImage(contentsOf: iconURL) {
+            NSApp.applicationIconImage = icon
+        }
         let nativeBridge = WKNativeBridge()
         nativeBridge.onOpenOptionsWindow = { [weak self] in self?.showOptionsWindow() }
-        nativeBridge.onChooseRootFolder = { [weak self] in self?.chooseRootFolderPath() }
+        nativeBridge.onChooseRootFolder = { [weak self] in self?.choosePath(allowFiles: false) }
+        nativeBridge.onChoosePath = { [weak self] in self?.choosePath(allowFiles: true) }
         nativeBridge.onAppearanceSettingsChanged = { [weak self] settings in
             self?.broadcastAppearanceSettings(settings)
         }
-        let webView = makeWebView(bridge: nativeBridge, stateJSON: stateJSON, includeCommandDispatcher: true)
+        nativeBridge.onFrontendSettingsChanged = { [weak self] settings in self?.receiveFrontendSettings(settings) }
+        let webView = makeWebView(bridge: nativeBridge, includeCommandDispatcher: true)
         self.webView = webView
         installApplicationMenu()
         guard let page = Bundle.module.url(forResource: "index", withExtension: "html") else {
@@ -39,18 +42,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.center()
         window.makeKeyAndOrderFront(nil)
         self.window = window
+        applyWindowLevels()
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func makeWebView(bridge: WKNativeBridge, stateJSON: String, includeCommandDispatcher: Bool) -> WKWebView {
+    private func makeWebView(bridge: WKNativeBridge, includeCommandDispatcher: Bool) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.userContentController.add(bridge, name: "spcBoyWK")
         configuration.userContentController.addUserScript(bridge.userScript())
         if includeCommandDispatcher {
             configuration.userContentController.addUserScript(WKUserScript(
                 source: """
-                window.spcbBrowserState = \(stateJSON);
-                window.SPCBoyWK = {
+                window.SPCBoyWK = (() => {
                   const pending = [];
                   function dispatch(command) {
                     const app = window.SPCBoyApp;
@@ -62,9 +65,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                       case "previous": app.playback?.playAdjacent(-1); break;
                       case "playPause": app.playback?.togglePlayback?.(); break;
                       case "next": app.playback?.playAdjacent(1); break;
+                      case "openPath":
+                        window.spcBoyWK?.choosePath?.().then((snapshot) => {
+                          if (snapshot) app.ui?.applyLibrarySnapshot?.(snapshot);
+                        });
+                        break;
                       case "sidebarPaths": app.ui?.setSidebarMode?.("paths"); break;
                       case "sidebarConsoles": app.ui?.setSidebarMode?.("consoles"); break;
-                      case "sidebarDiskPath": app.ui?.setSidebarMode?.("diskPath"); break;
+                      case "sidebarDiskPath":
+                        if (app.state?.localBrowserEnabled && app.state?.rootPath) {
+                          app.ui?.setSidebarMode?.("diskPath");
+                        } else {
+                          window.spcBoyWK?.choosePath?.().then((snapshot) => {
+                            if (snapshot) app.ui?.applyLibrarySnapshot?.(snapshot);
+                          });
+                        }
+                        break;
                       case "sidebarFavorites": app.ui?.setSidebarMode?.("favorites"); break;
                       case "settings": window.spcBoyWK?.openOptionsWindow?.(); break;
                       default: break;
@@ -72,14 +88,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                   }
                   window.addEventListener("load", () => pending.splice(0).forEach(dispatch), { once: true });
                   return { dispatch };
-                }();
+                })();
                 """,
-                injectionTime: .atDocumentStart,
-                forMainFrameOnly: true
-            ))
-        } else {
-            configuration.userContentController.addUserScript(WKUserScript(
-                source: "window.spcbBrowserState = \(stateJSON);",
                 injectionTime: .atDocumentStart,
                 forMainFrameOnly: true
             ))
@@ -97,10 +107,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let bridge = WKNativeBridge(isOptionsWindow: true)
         bridge.onCloseOptionsWindow = { [weak self] in self?.closeOptionsWindow() }
+        bridge.onChooseRootFolder = { [weak self] in self?.choosePath(allowFiles: false) }
+        bridge.onChoosePath = { [weak self] in self?.choosePath(allowFiles: true) }
         bridge.onAppearanceSettingsChanged = { [weak self] settings in
             self?.broadcastAppearanceSettings(settings)
         }
-        let optionsWebView = makeWebView(bridge: bridge, stateJSON: "{}", includeCommandDispatcher: false)
+        bridge.onFrontendSettingsChanged = { [weak self] settings in self?.receiveFrontendSettings(settings) }
+        let optionsWebView = makeWebView(bridge: bridge, includeCommandDispatcher: false)
         guard let page = Bundle.module.url(forResource: "index", withExtension: "html") else { return }
         optionsWebView.loadFileURL(page, allowingReadAccessTo: page.deletingLastPathComponent())
 
@@ -117,6 +130,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         optionsWindow.delegate = self
         self.optionsWebView = optionsWebView
         self.optionsWindow = optionsWindow
+        applyWindowLevels()
         optionsWindow.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -134,12 +148,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         optionsWebView?.evaluateJavaScript(script, completionHandler: nil)
     }
 
-    private func chooseRootFolderPath() -> String? {
+    private func broadcastFrontendSettings(_ settings: SPCBoyPreferencesSnapshot) {
+        guard let data = try? JSONEncoder().encode(settings),
+              let json = String(data: data, encoding: .utf8) else { return }
+        let script = "window.__spcBoyWKEvent('frontendSettingsChanged', \(json));"
+        webView?.evaluateJavaScript(script, completionHandler: nil)
+        optionsWebView?.evaluateJavaScript(script, completionHandler: nil)
+    }
+
+    private func receiveFrontendSettings(_ settings: SPCBoyPreferencesSnapshot) {
+        localBrowserEnabled = settings.localBrowserEnabled ?? false
+        if let value = settings.mainWindowAlwaysOnTop {
+            window?.level = value ? .floating : .normal
+        }
+        if let value = settings.settingsWindowAlwaysOnTop {
+            optionsWindow?.level = value ? .floating : .normal
+        }
+        NSApp.mainMenu?.update()
+        broadcastFrontendSettings(settings)
+    }
+
+    private func applyWindowLevels() {
+        guard let data = UserDefaults.standard.data(forKey: "SPCBoyWK.frontendPreferencesV2"),
+              let snapshot = try? JSONDecoder().decode(SPCBoyPreferencesSnapshot.self, from: data) else {
+            window?.level = .normal
+            optionsWindow?.level = .normal
+            return
+        }
+        window?.level = snapshot.mainWindowAlwaysOnTop == true ? .floating : .normal
+        optionsWindow?.level = snapshot.settingsWindowAlwaysOnTop == true ? .floating : .normal
+    }
+
+    private func choosePath(allowFiles: Bool) -> String? {
         let panel = NSOpenPanel()
-        panel.title = "Open SPC Folder"
+        panel.title = allowFiles ? "Open Local Path" : "Choose Local Files Folder"
         panel.prompt = "Open"
         panel.canChooseDirectories = true
-        panel.canChooseFiles = false
+        panel.canChooseFiles = allowFiles
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK else { return nil }
         return panel.url?.standardizedFileURL.path
@@ -171,6 +216,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         viewMenu.addItem(menuItem(FrontendSidebarView.consoles.title, command: .sidebarConsoles, action: #selector(sidebarConsoles(_:))))
         viewMenu.addItem(menuItem(FrontendSidebarView.paths.title, command: .sidebarPaths, action: #selector(sidebarPaths(_:))))
         viewMenu.addItem(menuItem(FrontendSidebarView.favorites.title, command: .sidebarFavorites, action: #selector(sidebarFavorites(_:))))
+        viewMenu.addItem(.separator())
+        viewMenu.addItem(menuItem("Local Files", command: .sidebarDiskPath, action: #selector(sidebarDiskPath(_:))))
         viewMenuItem.submenu = viewMenu
         mainMenu.addItem(viewMenuItem)
 
@@ -245,6 +292,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func previous(_ sender: Any?) { dispatch(.previous) }
     @objc private func playPause(_ sender: Any?) { dispatch(.playPause) }
     @objc private func next(_ sender: Any?) { dispatch(.next) }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        guard menuItem.action == #selector(sidebarConsoles(_:))
+                || menuItem.action == #selector(sidebarPaths(_:))
+                || menuItem.action == #selector(sidebarFavorites(_:)) else { return true }
+        return !localBrowserEnabled
+    }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true

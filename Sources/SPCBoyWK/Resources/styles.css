@@ -39,7 +39,8 @@
   --top-toolbar-inset: 0.5rem;
   --top-toolbar-control-height: 1.65rem;
   --top-toolbar-height: calc(var(--top-toolbar-control-height) + (2 * var(--top-toolbar-inset)));
-  --column-resize-duration: 500ms;
+  --column-resize-duration: 200ms;
+  --selection-animation-duration: 200ms;
   --column-resize-easing: ease;
   --control-glyph-size: 0.33rem;
   --status-clean: limegreen;
@@ -111,7 +112,7 @@ body.is-file-drag-over::after {
 .time-label,
 .empty,
 .empty-row {
-  color: var(--muted);
+  color: var(--playlist-text-color);
 }
 
 .about-body { overflow: auto; background: var(--bg-chrome); }
@@ -708,6 +709,15 @@ body.is-file-drag-over::after {
   color: var(--accent);
 }
 
+.playlist-virtual-spacer,
+.playlist-virtual-spacer td {
+  padding: 0 !important;
+  border: 0 !important;
+  line-height: 0 !important;
+  font-size: 0 !important;
+  overflow: hidden;
+}
+
 .favorite-toggle {
   display: inline-flex;
   align-items: center;
@@ -721,8 +731,9 @@ body.is-file-drag-over::after {
   cursor: pointer;
 }
 
-.favorite-toggle.is-favorite { color: rgb(255 205 90); }
 .favorite-toggle .ui-icon { width: 0.9rem; height: 0.9rem; }
+.favorite-toggle .ui-icon { fill: none; }
+.favorite-toggle.is-favorite .ui-icon { fill: currentColor; }
 
 .list-selection-indicator {
   position: absolute;
@@ -736,7 +747,7 @@ body.is-file-drag-over::after {
   pointer-events: none;
   opacity: 0;
   transform: translate3d(0, 0, 0);
-  transition: transform 100ms cubic-bezier(0.2, 0, 0, 1), width 100ms cubic-bezier(0.2, 0, 0, 1), height 100ms cubic-bezier(0.2, 0, 0, 1), opacity 100ms cubic-bezier(0.2, 0, 0, 1);
+  transition: transform var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1), width var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1), height var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1), opacity var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1);
 }
 
 .col-index {

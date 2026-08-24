@@ -18,7 +18,7 @@ window uses the same renderer resources in options mode, while the root window
 continues to own the library and playback surface.
 
 The library sidebar and playlist use matched toolbar/content insets. Playlist
-column resizing is bidirectional and uses a standard fixed 500ms CSS width
+column resizing is bidirectional and uses the shared configurable 200ms default CSS width
 transition with easing. The resize gesture uses the Electron structure exactly:
 matching header and body tables live inside one shared horizontal scroll surface,
 and final widths are persisted on release.

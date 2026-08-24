@@ -21,8 +21,8 @@ The root library uses a shared two-row geometry: the sidebar toolbar and
 playlist header row are each `2.65rem` tall, with `1.65rem` visible controls
 centered inside them. Header items use a `0.25rem` gap, matching sidebar
 controls; both content panes use the same `0.2rem` row padding and `1rem`
-effective text inset. Playlist column resizing uses the standard `500ms ease`
-CSS width transition. WK now uses the Electron client's proven structure: a
+effective text inset. Playlist column resizing uses the shared configurable
+`200ms` default CSS width transition. WK now uses the Electron client's proven structure: a
 header table and body table with matching column widths inside one shared
 horizontal scroll surface. Release persists the result and pointer capture
 keeps the gesture alive after it leaves the narrow divider.

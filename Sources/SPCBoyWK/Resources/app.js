@@ -1,6 +1,5 @@
 (() => {
 const app = window.SPCBoyApp;
-const sidebarViewState = window.SPCBoySidebarViewState;
 const { state, refs } = app;
 
 let resizingSidebar = false;
@@ -233,6 +232,19 @@ refs.columnAutoSizeCheckbox.addEventListener("change", (event) => {
   app.ui.setColumnAutoSize(event.target.checked);
 });
 
+refs.autoResizeAnimationInput.addEventListener("change", (event) => {
+  app.ui.setAnimationTiming("autoResizeAnimationMilliseconds", event.target.value);
+});
+refs.selectionAnimationInput.addEventListener("change", (event) => {
+  app.ui.setAnimationTiming("selectionAnimationMilliseconds", event.target.value);
+});
+refs.mainWindowAlwaysOnTopCheckbox.addEventListener("change", (event) => {
+  app.ui.setWindowAlwaysOnTop("mainWindowAlwaysOnTop", event.target.checked);
+});
+refs.settingsWindowAlwaysOnTopCheckbox.addEventListener("change", (event) => {
+  app.ui.setWindowAlwaysOnTop("settingsWindowAlwaysOnTop", event.target.checked);
+});
+
 refs.sidebarWidthInput.addEventListener("change", (event) => {
   app.ui.commitSidebarWidthInput(event.target.value);
 });
@@ -320,6 +332,42 @@ if (window.spcBoyWK?.onAppearanceSettingsChanged) {
   });
 }
 
+if (window.spcBoyWK?.onFrontendSettingsChanged) {
+  window.spcBoyWK.onFrontendSettingsChanged((settings) => {
+    const wasEnabled = state.localBrowserEnabled;
+    const previousRootPath = state.rootPath;
+    const previousFavoriteSortOrder = state.favoriteSortOrder;
+    state.rootPath = settings.rootPath || state.rootPath;
+    state.localBrowserEnabled = Boolean(settings.localBrowserEnabled && state.rootPath);
+    state.favoriteSortOrder = settings.favoriteSortOrder === "alphabetical" ? "alphabetical" : "historical";
+    if (settings.autoResizeAnimationMilliseconds !== undefined) {
+      state.autoResizeAnimationMilliseconds = app.normalizeAnimationMilliseconds(settings.autoResizeAnimationMilliseconds);
+    }
+    if (settings.selectionAnimationMilliseconds !== undefined) {
+      state.selectionAnimationMilliseconds = app.normalizeAnimationMilliseconds(settings.selectionAnimationMilliseconds);
+    }
+    if (settings.mainWindowAlwaysOnTop !== undefined) state.mainWindowAlwaysOnTop = Boolean(settings.mainWindowAlwaysOnTop);
+    if (settings.settingsWindowAlwaysOnTop !== undefined) state.settingsWindowAlwaysOnTop = Boolean(settings.settingsWindowAlwaysOnTop);
+    if (!window.spcBoyWK.isOptionsWindow && state.localBrowserEnabled && (!wasEnabled || previousRootPath !== state.rootPath || state.sidebarMode !== "diskPath")) {
+      window.spcBoyWK.refreshTree(state.rootPath, state.selectedFolderPath || state.rootPath)
+        .then((snapshot) => {
+          Object.assign(state, snapshot);
+          state.sidebarMode = "diskPath";
+          app.ui.renderAll();
+        })
+        .catch((error) => console.error("[SPCBoy] local settings sync failed", error));
+    } else if (!window.spcBoyWK.isOptionsWindow && wasEnabled && !state.localBrowserEnabled) {
+      state.sidebarMode = "consoles";
+      app.ui.setSidebarMode("consoles").catch((error) => console.error(error));
+    } else {
+      app.ui.renderAll();
+    }
+    if (previousFavoriteSortOrder !== state.favoriteSortOrder) {
+      app.ui.refreshFavorites().then(() => app.ui.renderAll()).catch(() => {});
+    }
+  });
+}
+
 if (window.spcBoyWK?.onRoutingPreferencesChanged) {
   window.spcBoyWK.onRoutingPreferencesChanged((preferences) => {
     app.ui.applyRoutingPreferences(preferences);
@@ -338,6 +386,11 @@ refs.optionsCloseButton.addEventListener("click", () => {
 
 refs.optionsThemeTab.addEventListener("click", () => {
   state.optionsSection = "theme";
+  app.ui.renderAll();
+});
+
+refs.optionsWindowsTab.addEventListener("click", () => {
+  state.optionsSection = "windows";
   app.ui.renderAll();
 });
 
@@ -372,6 +425,45 @@ refs.libraryDatabaseDefaultButton.addEventListener("click", () => {
     state.databaseLocationStatus = `Could not select default database • ${error.message}`;
     app.ui.renderAll();
   });
+});
+
+refs.localBrowserBrowseButton.addEventListener("click", () => {
+  window.spcBoyWK.chooseRootFolder()
+    .then((snapshot) => {
+      if (!snapshot) return;
+      state.localBrowserEnabled = true;
+      app.ui.applyLibrarySnapshot(snapshot);
+    })
+    .catch((error) => console.error("[SPCBoy] local folder selection failed", error));
+});
+
+refs.localBrowserEnabledCheckbox.addEventListener("change", (event) => {
+  const enabled = event.target.checked;
+  if (enabled && !state.rootPath) {
+    refs.localBrowserBrowseButton.click();
+    event.target.checked = false;
+    return;
+  }
+  state.localBrowserEnabled = enabled;
+  if (enabled) {
+    state.sidebarMode = "diskPath";
+    window.spcBoyWK.refreshTree(state.rootPath, state.selectedFolderPath || state.rootPath)
+      .then((snapshot) => app.ui.applyLibrarySnapshot(snapshot))
+      .catch((error) => console.error("[SPCBoy] local browser activation failed", error));
+  } else {
+    state.sidebarMode = "consoles";
+    app.ui.setSidebarMode("consoles").catch((error) => console.error(error));
+  }
+  app.persistSettings();
+  app.ui.renderAll();
+});
+
+refs.favoriteSortOrderSelect.addEventListener("change", (event) => {
+  state.favoriteSortOrder = event.target.value === "alphabetical" ? "alphabetical" : "historical";
+  app.persistSettings();
+  app.ui.refreshFavorites()
+    .then(() => app.ui.renderAll())
+    .catch((error) => console.error("[SPCBoy] favorites order failed", error));
 });
 
 refs.optionsRoutingTab.addEventListener("click", () => {
@@ -463,7 +555,7 @@ document.addEventListener("drop", (event) => {
 });
 
 refs.sidebarSearchInput.addEventListener("input", (event) => {
-  app.ui.updateSidebarSearch(event.target.value);
+  app.ui.updateSidebarSearch(event.target.value).catch((error) => console.error("[SPCBoy] sidebar search failed", error));
 });
 
 refs.sidebarViewToggleButton?.addEventListener("click", () => {
@@ -619,7 +711,7 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
     app.ui.activateFocusedItem(event.target).then((handled) => {
       if (handled) return;
-      if (sidebarViewState.resolve(state.sidebarMode, state.sidebarQuery).contentMode === "database") {
+      if (state.sidebarView.contentMode === "database") {
         app.ui.activateDatabaseSelection();
         return;
       }
@@ -636,5 +728,15 @@ window.addEventListener("keydown", (event) => {
 
 app.ui.bootstrap().catch((error) => {
   console.error(error);
+});
+
+window.addEventListener("focus", () => {
+  if (window.spcBoyWK?.isOptionsWindow) return;
+  app.ui.refreshFavorites()
+    .then(() => {
+      app.ui.renderSidebar();
+      app.ui.renderPlaylist();
+    })
+    .catch((error) => console.error("[SPCBoy] Favorites refresh failed", error));
 });
 })();

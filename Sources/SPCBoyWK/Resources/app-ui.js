@@ -1,7 +1,6 @@
 (() => {
 const uiApp = window.SPCBoyApp;
 const { state, refs, persistSettings, loadSettings, targetPlaybackSeconds, COLUMN_DEFS } = uiApp;
-const sidebarViewState = window.SPCBoySidebarViewState;
 const expandedFolders = new Set();
 let draggedColumnId = null;
 let metadataRefreshFrame = 0;
@@ -19,6 +18,11 @@ let databaseRowRenderGeneration = 0;
 let browserClickTimer = 0;
 let sidebarSearchTimer = 0;
 let columnResizePointerId = null;
+const PLAYLIST_VIRTUALIZATION_THRESHOLD = 200;
+const PLAYLIST_VIRTUAL_OVERSCAN = 12;
+let playlistVirtualRowHeight = 28;
+let playlistViewportFrame = 0;
+let playlistRowMeasurementFrame = 0;
 
 function syncCollapsedConsolePersistence() {
   state.collapsedConsoleNames = [...collapsedDatabaseConsoles];
@@ -26,7 +30,33 @@ function syncCollapsedConsolePersistence() {
 }
 
 function currentSidebarView() {
-  return sidebarViewState.resolve(state.sidebarMode, state.sidebarQuery);
+  return state.sidebarView;
+}
+
+async function syncSidebarView() {
+  state.sidebarView = Object.freeze(await window.spcBoyWK.resolveSidebarState(state.sidebarMode, state.sidebarQuery));
+  return state.sidebarView;
+}
+
+function applyFavoriteSnapshot(favorites) {
+  state.favorites = Array.isArray(favorites) ? favorites : [];
+  state.favoriteIds = state.favorites.map((track) => track.favoriteId).filter(Boolean);
+}
+
+function isFavoritePresentation(track) {
+  return Boolean(track?.favoriteId) && state.favoriteIds.includes(track.favoriteId);
+}
+
+async function refreshFavorites() {
+  const favorites = await window.spcBoyWK.favoritesList(state.favoriteSortOrder);
+  applyFavoriteSnapshot(favorites);
+  if (state.sidebarMode === "favorites") state.playlist = [...state.favorites];
+  return state.favorites;
+}
+
+async function toggleFavorites(tracks) {
+  applyFavoriteSnapshot(await window.spcBoyWK.favoritesToggle(tracks, state.favoriteSortOrder));
+  if (state.sidebarMode === "favorites") state.playlist = [...state.favorites];
 }
 let browserSelectionGeneration = 0;
 let playlistLoadGeneration = 0;
@@ -36,6 +66,43 @@ const playlistRowsByTrackId = new Map();
 let selectedPlaylistRow = null;
 let currentPlaylistRow = null;
 let selectionIndicatorFrame = 0;
+
+function playlistUsesVirtualRows() {
+  return state.playlist.length > PLAYLIST_VIRTUALIZATION_THRESHOLD;
+}
+
+function schedulePlaylistViewportRender() {
+  if (!playlistUsesVirtualRows() || playlistViewportFrame) return;
+  playlistViewportFrame = window.requestAnimationFrame(() => {
+    playlistViewportFrame = 0;
+    renderPlaylist({ sort: false });
+  });
+}
+
+function schedulePlaylistRowMeasurement() {
+  if (!playlistUsesVirtualRows() || playlistRowMeasurementFrame) return;
+  playlistRowMeasurementFrame = window.requestAnimationFrame(() => {
+    playlistRowMeasurementFrame = 0;
+    const row = refs.playlistBody.querySelector(".playlist-row");
+    const measuredHeight = Math.round(row?.getBoundingClientRect?.().height || 0);
+    if (!measuredHeight || measuredHeight === playlistVirtualRowHeight) return;
+    playlistVirtualRowHeight = measuredHeight;
+    renderPlaylist({ sort: false });
+  });
+}
+
+function makePlaylistVirtualSpacer(height) {
+  const row = document.createElement("tr");
+  row.className = "playlist-virtual-spacer";
+  row.setAttribute("aria-hidden", "true");
+  const cell = document.createElement("td");
+  cell.colSpan = Math.max(1, orderedColumns().length);
+  cell.style.height = `${Math.max(0, Math.round(height))}px`;
+  row.appendChild(cell);
+  return row;
+}
+
+refs.playlistBodyWrap?.addEventListener("scroll", schedulePlaylistViewportRender, { passive: true });
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>'"]/g, (character) => ({
@@ -278,13 +345,14 @@ async function previewBrowserLeaf(node) {
 }
 
 async function handleBrowserPrimaryClick(node) {
-  if (node.kind === "file") {
-    await previewBrowserLeaf(node);
-    return;
-  }
-  // A folder is always a dropdown on a primary click. Its contents may be
-  // sent to the playlist only by explicit activation (double-click/Enter).
-  await toggleBrowserNode(node);
+  await handleBrowserGesture(node, "primaryClick", state.selectedBrowserPath === node.path);
+}
+
+async function handleBrowserGesture(node, gesture, wasSelected = false) {
+  const intent = await window.SPCBoySidebarController.resolveIntent(node, gesture, wasSelected);
+  if (intent === "preview") await previewBrowserLeaf(node);
+  else if (intent === "toggleExpansion") await toggleBrowserNode(node);
+  else if (intent === "activate") await activateBrowserNode(node);
 }
 
 function selectBrowserNode(node, { focus = false, previewLeaf = true } = {}) {
@@ -335,7 +403,6 @@ function jumpFocusedListToEdge(toEnd, focused = document.activeElement) {
 
 function appendPlaylistTracks(additions, selectedBrowserPath = state.selectedBrowserPath) {
   if (!additions.length) return;
-  state.playlistLoading = false;
   const existingIds = new Set(state.playlist.map((track) => track.id));
   const uniqueAdditions = additions.filter((track) => !existingIds.has(track.id));
   if (!uniqueAdditions.length) return;
@@ -394,7 +461,7 @@ function renderTreeNode(node, container) {
     event.preventDefault();
     event.stopPropagation();
     window.clearTimeout(browserClickTimer);
-    void activateBrowserNode(node);
+    void handleBrowserGesture(node, "activate", true);
   });
   button.addEventListener("contextmenu", (event) => showSidebarContextMenu(node, event));
   button.addEventListener("keydown", (event) => {
@@ -407,8 +474,8 @@ function renderTreeNode(node, container) {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
     event.stopPropagation();
-    if (event.key === "Enter") void activateBrowserNode(node);
-    else if (node.kind === "folder") void toggleBrowserNode(node);
+    if (event.key === "Enter") void handleBrowserGesture(node, "activate", true);
+    else if (node.kind === "folder") void handleBrowserGesture(node, "disclosureClick", true);
   });
 
   wrapper.appendChild(button);
@@ -808,10 +875,11 @@ async function loadDatabaseFiles() {
 
 async function setSidebarMode(mode) {
   if (!["paths", "consoles", "diskPath", "favorites"].includes(mode)) return;
+  if (state.localBrowserEnabled && mode !== "diskPath") return;
   playlistLoadGeneration += 1;
-  state.playlistLoading = false;
   state.sidebarMode = mode;
   state.sidebarQuery = "";
+  await syncSidebarView();
   refs.sidebarSearchInput.value = "";
   state.databaseSearchGames = null;
   if (mode === "favorites") {
@@ -846,8 +914,9 @@ async function refreshDatabaseGamesForVisibleRoots() {
   }
 }
 
-function updateSidebarSearch(query) {
+async function updateSidebarSearch(query) {
   state.sidebarQuery = String(query || "");
+  await syncSidebarView();
   const databaseGeneration = ++state.databaseSearchGeneration;
   state.databaseSearchGames = state.sidebarQuery.trim() ? immediateDatabaseSearch(state.sidebarQuery) : null;
   window.clearTimeout(sidebarSearchTimer);
@@ -876,6 +945,7 @@ function updateSidebarSearch(query) {
 const SIDEBAR_VIEW_CYCLE = ["consoles", "paths", "favorites"];
 
 async function cycleSidebarMode() {
+  if (state.localBrowserEnabled) return;
   const current = currentSidebarView().storedMode;
   const currentIndex = SIDEBAR_VIEW_CYCLE.indexOf(current);
   const next = SIDEBAR_VIEW_CYCLE[(currentIndex + 1 + SIDEBAR_VIEW_CYCLE.length) % SIDEBAR_VIEW_CYCLE.length];
@@ -891,7 +961,7 @@ async function toggleSelectedFavorites() {
   if (!focusedInSidebar && state.selectedTrackIds.length) {
     const tracks = state.playlist.filter((entry) => state.selectedTrackIds.includes(entry.id));
     if (tracks.length) {
-      uiApp.toggleFavorites(tracks);
+      await toggleFavorites(tracks);
       renderSidebar();
       renderPlaylist();
       return;
@@ -904,7 +974,7 @@ async function toggleSelectedFavorites() {
       : [];
   if (!games.length) return;
   const rows = await window.spcBoyWK.databaseGameTracks(games);
-  uiApp.toggleFavorites(databaseRowsToPlaylistTracks(rows, games));
+  await toggleFavorites(databaseRowsToPlaylistTracks(rows, games));
   renderSidebar();
   renderPlaylist();
 }
@@ -920,6 +990,7 @@ function databaseRowsToPlaylistTracks(rows, games) {
   const fallbackGame = games[0] || {};
   return rows.map((row, index) => ({
     id: row.playlistId,
+    favoriteId: row.favoriteId || null,
     index: index + 1,
     path: row.path,
     rootPath: row.rootPath || fallbackGame.rootPath || state.rootPath,
@@ -940,25 +1011,15 @@ function databaseRowsToPlaylistTracks(rows, games) {
     system: row.system || fallbackGame.system || "—",
     lengthLabel: row.playLengthMs > 0 ? uiApp.formatTime(Math.round(row.playLengthMs / 1000)) : "—",
     basePlaybackSeconds: row.playLengthMs > 0 ? row.playLengthMs / 1000 : 0,
-    metadataLoaded: Number(row.metadataTrackId) > 0
+    metadataLoaded: row.metadataLoaded === true,
+    catalogRow: true
   }));
 }
 
 async function loadDatabaseGamesIntoPlaylist(games) {
   const loadGeneration = ++playlistLoadGeneration;
-  state.playlistLoading = true;
-  state.playlist = [];
-  renderPlaylist();
-  let rows;
-  try {
-    rows = await window.spcBoyWK.databaseGameTracks(games);
-  } catch (error) {
-    state.playlistLoading = false;
-    renderPlaylist();
-    throw error;
-  }
+  const rows = await window.spcBoyWK.databaseGameTracks(games);
   if (loadGeneration !== playlistLoadGeneration) return;
-  state.playlistLoading = false;
   state.databaseSidebarError = "";
   state.selectedDatabaseGameKey = games.length === 1 ? databaseGameKey(games[0]) : null;
   state.playlist = databaseRowsToPlaylistTracks(rows, games);
@@ -1043,7 +1104,7 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
 
 function renderSidebar() {
   const view = currentSidebarView();
-  const labels = { paths: "Paths View", consoles: "Database / Console View", diskPath: "Disk Path", favorites: "Favorites View" };
+  const labels = { paths: "Path View", consoles: "Console View", diskPath: "Local Files", favorites: "Favorites" };
   if (refs.sidebarViewToggleButton) {
     const title = labels[view.storedMode] || labels.consoles;
     refs.sidebarViewToggleButton.title = title;
@@ -1082,8 +1143,8 @@ function renderFavorites() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "database-game-row favorite-track-row";
-    button.dataset.favoriteKey = uiApp.favoriteKey(track);
-    button.innerHTML = `<span class="database-disclosure">★</span><span class="database-game-name">${escapeHtml(track.title || track.filename || "Favorite")}</span><span class="database-game-meta">${escapeHtml(track.game || "")}</span>`;
+    button.dataset.favoriteId = track.favoriteId || "";
+    button.innerHTML = `<span class="database-disclosure">★</span><span class="database-game-name">${escapeHtml(track.sidebarLabel || track.title || track.filename || "Favorite")}</span>`;
     button.addEventListener("click", () => {
       state.selectedTrackId = track.id;
       state.lastSelectedTrackId = track.id;
@@ -1096,8 +1157,8 @@ function renderFavorites() {
     button.addEventListener("dblclick", () => uiApp.playback.playTrack(track.id, 0).catch((error) => console.error(error)));
     button.addEventListener("contextmenu", (event) => {
       event.preventDefault();
-      showContextMenu(event, [["Remove from Favorites", () => {
-        uiApp.toggleFavorites([track]);
+      showContextMenu(event, [["Remove from Favorites", async () => {
+        await toggleFavorites([track]);
         state.playlist = [...state.favorites];
         renderSidebar();
         renderPlaylist();
@@ -1449,16 +1510,16 @@ function renderPlaylistCell(track, column, rowIndex) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "favorite-toggle";
-    const favorite = uiApp.isFavorite(track);
+    const favorite = isFavoritePresentation(track);
     button.title = favorite ? "Remove from Favorites" : "Add to Favorites";
     button.setAttribute("aria-label", button.title);
     button.setAttribute("aria-pressed", favorite ? "true" : "false");
     button.classList.toggle("is-favorite", favorite);
     button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="#icon-star"></use></svg>`;
-    button.addEventListener("click", (event) => {
+    button.addEventListener("click", async (event) => {
       event.preventDefault();
       event.stopPropagation();
-      uiApp.toggleFavorites([track]);
+      await toggleFavorites([track]);
       if (state.sidebarMode === "favorites") state.playlist = [...state.favorites];
       renderSidebar();
       renderPlaylist();
@@ -1488,25 +1549,17 @@ function selectPlaylistTrack(trackId, { focus = false, extend = false, range = f
   if (!track) return null;
 
   const previousIds = new Set(state.selectedTrackIds);
-  let nextIds;
-  if (range && state.playlistSelectionAnchorId) {
-    const anchorIndex = state.playlist.findIndex((entry) => entry.id === state.playlistSelectionAnchorId);
-    const targetIndex = state.playlist.findIndex((entry) => entry.id === trackId);
-    const start = Math.min(anchorIndex < 0 ? targetIndex : anchorIndex, targetIndex);
-    const end = Math.max(anchorIndex < 0 ? targetIndex : anchorIndex, targetIndex);
-    nextIds = state.playlist.slice(start, end + 1).map((entry) => entry.id);
-  } else if (extend) {
-    nextIds = [...state.selectedTrackIds];
-    if (nextIds.includes(trackId)) nextIds = nextIds.filter((id) => id !== trackId);
-    else nextIds.push(trackId);
-  } else {
-    nextIds = [trackId];
-  }
-  state.selectedTrackIds = nextIds;
-  state.selectedTrackId = nextIds.includes(track.id) ? track.id : (nextIds.at(-1) || null);
+  const selection = window.SPCBoyPlaylistController.reduceSelection({
+    playlist: state.playlist,
+    selectedIds: state.selectedTrackIds,
+    anchorId: state.playlistSelectionAnchorId
+  }, trackId, { extend, range });
+  if (!selection) return null;
+  state.selectedTrackIds = selection.selectedIds;
+  state.selectedTrackId = selection.primaryId;
   state.lastSelectedTrackId = track.id;
-  if (!range) state.playlistSelectionAnchorId = track.id;
-  if (previousIds.size !== nextIds.length || nextIds.some((id) => !previousIds.has(id))) persistSettings();
+  state.playlistSelectionAnchorId = selection.anchorId;
+  if (previousIds.size !== selection.selectedIds.length || selection.selectedIds.some((id) => !previousIds.has(id))) persistSettings();
 
   for (const [id, row] of playlistRowsByTrackId) updatePlaylistRowState(row, id);
   const nextRow = playlistRowsByTrackId.get(track.id) || null;
@@ -1541,7 +1594,7 @@ function refreshPlaylistRow(trackId) {
     if (column.id === "favorite") {
       const button = cell.querySelector("button");
       if (button) {
-        const favorite = uiApp.isFavorite(track);
+        const favorite = isFavoritePresentation(track);
         button.classList.toggle("is-favorite", favorite);
         button.title = favorite ? "Remove from Favorites" : "Add to Favorites";
         button.setAttribute("aria-label", button.title);
@@ -1573,13 +1626,16 @@ function syncPlaylistColumnWidths() {
   }
 }
 
-function appendPlaylistRowsInBatches(generation) {
-  let rowIndex = 0;
+function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = state.playlist.length, spacers = null) {
+  let rowIndex = startIndex;
   const appendBatch = () => {
     if (generation !== playlistRenderGeneration) return;
     const fragment = document.createDocumentFragment();
+    if (rowIndex === startIndex && spacers?.top > 0) {
+      fragment.appendChild(makePlaylistVirtualSpacer(spacers.top));
+    }
     const startedAt = performance.now();
-    while (rowIndex < state.playlist.length && performance.now() - startedAt < 8) {
+    while (rowIndex < endIndex && performance.now() - startedAt < 8) {
       const track = state.playlist[rowIndex];
       const row = document.createElement("tr");
       row.dataset.trackId = track.id;
@@ -1625,16 +1681,18 @@ function appendPlaylistRowsInBatches(generation) {
       rowIndex += 1;
     }
     refs.playlistBody.appendChild(fragment);
-    if (rowIndex < state.playlist.length) {
+    if (rowIndex < endIndex) {
       window.requestAnimationFrame(appendBatch);
     } else {
+      if (spacers?.bottom > 0) refs.playlistBody.appendChild(makePlaylistVirtualSpacer(spacers.bottom));
       scheduleSelectionIndicators();
+      schedulePlaylistRowMeasurement();
     }
   };
   window.requestAnimationFrame(appendBatch);
 }
 
-function renderPlaylist() {
+function renderPlaylist({ sort = true } = {}) {
   playlistRenderGeneration += 1;
   const generation = playlistRenderGeneration;
   if (!state.selectedTrackIds.length && state.selectedTrackId) {
@@ -1649,16 +1707,18 @@ function renderPlaylist() {
   playlistRowsByTrackId.clear();
   selectedPlaylistRow = null;
   currentPlaylistRow = null;
-  sortPlaylist();
-  const playlistSignature = playlistAutoSizeSignature();
-  const shouldAutoSize = columnResizePointerId === null
+  if (sort) sortPlaylist();
+  const virtualized = playlistUsesVirtualRows();
+  // Auto-sizing every cell defeats a catalog lookup. Large database playlists
+  // retain the current widths; explicit column auto-size remains available.
+  const playlistSignature = virtualized ? null : playlistAutoSizeSignature();
+  const shouldAutoSize = !virtualized && columnResizePointerId === null
     && state.columnAutoSize
     && playlistSignature !== autoSizedPlaylistSignature;
 
-  if (state.playlistLoading || state.playlist.length === 0) {
+  if (state.playlist.length === 0) {
     const row = document.createElement("tr");
-    const message = state.playlistLoading ? "Loading playlist…" : "";
-    row.innerHTML = `<td colspan="${Math.max(1, orderedColumns().length)}" class="empty-row">${message}</td>`;
+    row.innerHTML = `<td colspan="${Math.max(1, orderedColumns().length)}" class="empty-row"></td>`;
     refs.playlistBody.appendChild(row);
     scheduleSelectionIndicators();
     return;
@@ -1670,7 +1730,27 @@ function renderPlaylist() {
     renderPlaylistHeader();
     syncPlaylistColumnWidths();
   }
-  appendPlaylistRowsInBatches(generation);
+  if (!virtualized) {
+    appendPlaylistRowsInBatches(generation);
+    return;
+  }
+
+  const scrollTop = refs.playlistBodyWrap?.scrollTop || 0;
+  const viewportHeight = refs.playlistBodyWrap?.clientHeight || (playlistVirtualRowHeight * 24);
+  const firstVisibleRow = Math.max(0, Math.floor(scrollTop / playlistVirtualRowHeight) - PLAYLIST_VIRTUAL_OVERSCAN);
+  const lastVisibleRow = Math.min(
+    state.playlist.length,
+    Math.ceil((scrollTop + viewportHeight) / playlistVirtualRowHeight) + PLAYLIST_VIRTUAL_OVERSCAN
+  );
+  appendPlaylistRowsInBatches(
+    generation,
+    firstVisibleRow,
+    lastVisibleRow,
+    {
+      top: firstVisibleRow * playlistVirtualRowHeight,
+      bottom: (state.playlist.length - lastVisibleRow) * playlistVirtualRowHeight
+    }
+  );
 }
 
 function scheduleMetadataRefresh(trackId) {
@@ -1710,6 +1790,8 @@ function applyUISettings() {
   rootStyle.setProperty("--sidebar-width-percent", String(state.sidebarWidthPercent));
   rootStyle.setProperty("--accent", state.accentColor);
   rootStyle.setProperty("--item-spacing-rem", String(state.uiItemSpacingRem));
+  rootStyle.setProperty("--column-resize-duration", `${state.autoResizeAnimationMilliseconds}ms`);
+  rootStyle.setProperty("--selection-animation-duration", `${state.selectionAnimationMilliseconds}ms`);
 }
 
 function appearanceSettings() {
@@ -1789,12 +1871,15 @@ function renderAll() {
   const playbackSelected = state.optionsSection === "playback";
   const diagnosticsSelected = state.optionsSection === "diagnostics";
   const themeSelected = state.optionsSection === "theme";
+  const windowsSelected = state.optionsSection === "windows";
   refs.optionsDatabaseTab.classList.toggle("is-selected", databaseSelected);
   refs.optionsRoutingTab.classList.toggle("is-selected", routingSelected);
   refs.optionsPlaybackTab.classList.toggle("is-selected", playbackSelected);
   refs.optionsDiagnosticsTab.classList.toggle("is-selected", diagnosticsSelected);
   refs.optionsThemeTab.classList.toggle("is-selected", themeSelected);
+  refs.optionsWindowsTab.classList.toggle("is-selected", windowsSelected);
   refs.optionsThemeSection.classList.toggle("is-hidden", !themeSelected);
+  refs.optionsWindowsSection.classList.toggle("is-hidden", !windowsSelected);
   refs.optionsDatabaseSection.classList.toggle("is-hidden", !databaseSelected);
   refs.optionsRoutingSection.classList.toggle("is-hidden", !routingSelected);
   refs.optionsPlaybackSection.classList.toggle("is-hidden", !playbackSelected);
@@ -1811,9 +1896,18 @@ function renderAll() {
   refs.applicationMonospaceCheckbox.checked = state.applicationMonospace;
   refs.playlistHeaderBoldCheckbox.checked = state.playlistHeaderBold;
   refs.columnAutoSizeCheckbox.checked = state.columnAutoSize;
+  refs.autoResizeAnimationInput.value = String(state.autoResizeAnimationMilliseconds);
+  refs.selectionAnimationInput.value = String(state.selectionAnimationMilliseconds);
+  refs.mainWindowAlwaysOnTopCheckbox.checked = state.mainWindowAlwaysOnTop;
+  refs.settingsWindowAlwaysOnTopCheckbox.checked = state.settingsWindowAlwaysOnTop;
   refs.archiveCacheEnabledCheckbox.checked = state.archiveCacheEnabled;
   refs.archiveCacheLimitSelect.value = String(state.archiveCacheLimitBytes);
   refs.archiveCacheLimitSelect.disabled = !state.archiveCacheEnabled;
+  refs.localBrowserEnabledCheckbox.checked = state.localBrowserEnabled;
+  refs.localBrowserPath.value = state.rootPath || "";
+  refs.favoriteSortOrderSelect.value = state.favoriteSortOrder;
+  [refs.libraryDatabaseBrowseButton, refs.libraryDatabaseShowButton, refs.libraryDatabaseDefaultButton, refs.libraryDatabaseReloadButton]
+    .forEach((control) => { control.disabled = state.localBrowserEnabled; });
   refs.playbackSpeedEnabledCheckbox.checked = state.playbackSpeedEnabled;
   if (document.activeElement !== refs.playbackSpeedInput) refs.playbackSpeedInput.value = uiApp.formatPlaybackSpeed(state.playbackSpeed);
   refs.libvgmPlaybackSpeedEnabledCheckbox.checked = state.libvgmPlaybackSpeedEnabled;
@@ -1885,6 +1979,14 @@ function moveSelection(delta, { range = false, extend = false } = {}) {
   // can be routed through an old sidebar/focused row after arrow navigation.
   selectPlaylistTrack(state.playlist[nextIndex].id, { focus: true, range, extend });
   uiApp.playback.updateTimingSummary();
+  if (playlistUsesVirtualRows() && !playlistRowsByTrackId.has(state.selectedTrackId)) {
+    refs.playlistBodyWrap.scrollTop = Math.max(
+      0,
+      nextIndex * playlistVirtualRowHeight - (refs.playlistBodyWrap.clientHeight / 2)
+    );
+    renderPlaylist({ sort: false });
+    selectPlaylistTrack(state.selectedTrackId, { focus: true, range, extend });
+  }
   scrollSelectedTrackIntoView();
   uiApp.playback.preloadTrackAudio(uiApp.selectedTrack());
 }
@@ -1913,9 +2015,9 @@ function playSelectedTrack() {
 async function hydratePlaylistMetadata() {
   const metadataToken = ++state.metadataToken;
   const rawTrackIds = state.playlist
-    .filter((track) => !track.metadataLoaded && !track.archivePath)
+    .filter((track) => !track.catalogRow && !track.metadataLoaded && !track.archivePath)
     .map((track) => track.id);
-  const archiveTracks = state.playlist.filter((track) => !track.metadataLoaded && track.archivePath && track.archiveEntry);
+  const archiveTracks = state.playlist.filter((track) => !track.catalogRow && !track.metadataLoaded && track.archivePath && track.archiveEntry);
   let nextIndex = 0;
   const worker = async () => {
     while (metadataToken === state.metadataToken && nextIndex < rawTrackIds.length) {
@@ -2272,6 +2374,18 @@ function setColumnAutoSize(enabled) {
   renderPlaylist();
 }
 
+function setAnimationTiming(key, value) {
+  window.SPCBoyOptionsController.setAnimation(state, uiApp.normalizeAnimationMilliseconds, key, value);
+  persistSettings();
+  renderAll();
+}
+
+function setWindowAlwaysOnTop(key, enabled) {
+  window.SPCBoyOptionsController.setWindowLevel(state, key, enabled);
+  persistSettings();
+  renderAll();
+}
+
 function applyAppearanceSettings(settings) {
   if (settings.uiItemSpacingRem !== undefined) state.uiItemSpacingRem = uiApp.normalizeItemSpacing(settings.uiItemSpacingRem);
   if (settings.sidebarWidthPercent !== undefined) state.sidebarWidthPercent = uiApp.normalizeSidebarWidth(settings.sidebarWidthPercent);
@@ -2327,7 +2441,10 @@ async function bootstrap() {
   // Load persisted appearance before the first Options-window paint. The
   // window is native-sized and immediately visible; deferring this until
   // after catalog/cache requests produces a distracting default-style flash.
-  loadSettings();
+  window.SPCBoyOptionsController.applyManifest(await window.spcBoyWK.frontendOptionsManifest());
+  await loadSettings();
+  await syncSidebarView();
+  if (!window.spcBoyWK?.isOptionsWindow) await refreshFavorites();
   if (window.spcBoyWK?.isOptionsWindow) {
     document.body.classList.add("options-window");
     state.optionsOpen = true;
@@ -2366,6 +2483,9 @@ async function bootstrap() {
       selectedBrowserPath: state.selectedBrowserPath,
       playlist: []
     };
+  } else if (state.localBrowserEnabled && state.rootPath) {
+    state.sidebarMode = "diskPath";
+    snapshot = await window.spcBoyWK.refreshTree(state.rootPath, state.selectedFolderPath || state.rootPath);
   } else {
     snapshot = await window.spcBoyWK.bootstrap();
   }
@@ -2376,7 +2496,7 @@ async function bootstrap() {
   state.lastSelectedTrackId = state.selectedTrackId;
   state.totalSeconds = targetPlaybackSeconds();
   persistSettings();
-  if (!window.spcBoyWK?.isOptionsWindow && window.spcBoyWK?.databaseRoots) {
+  if (!state.localBrowserEnabled && !window.spcBoyWK?.isOptionsWindow && window.spcBoyWK?.databaseRoots) {
     state.libraryRoots = await window.spcBoyWK.databaseRoots();
     await uiApp.ui.handleLibraryRootsChanged(state.libraryRoots);
   }
@@ -2408,8 +2528,8 @@ async function openLibraryRoot() {
 
 function applyLibrarySnapshot(snapshot) {
   playlistLoadGeneration += 1;
-  state.playlistLoading = false;
   Object.assign(state, snapshot);
+  state.localBrowserEnabled = true;
   state.sidebarMode = "diskPath";
   state.sidebarQuery = "";
   state.selectedDatabaseGameKey = null;
@@ -2428,7 +2548,6 @@ function applyLibrarySnapshot(snapshot) {
 function applyFolderSelection(selection) {
   const preserveBrowserFocus = document.activeElement?.classList.contains("tree-node");
   playlistLoadGeneration += 1;
-  state.playlistLoading = false;
   state.selectedFolderPath = selection.selectedFolderPath;
   state.playlist = selection.playlist;
   state.selectedTrackId = resolveSelectedTrackId(selection.playlist);
@@ -2497,6 +2616,8 @@ uiApp.ui = {
   setApplicationMonospace,
   setPlaylistHeaderBold,
   setColumnAutoSize,
+  setAnimationTiming,
+  setWindowAlwaysOnTop,
   applyAppearanceSettings,
   applyRoutingPreferences,
   commitSidebarWidthInput,
@@ -2511,6 +2632,7 @@ uiApp.ui = {
   loadDatabaseGames,
   loadDatabaseGame,
   toggleSelectedFavorites,
+  refreshFavorites,
   activateDatabaseSelection,
   activateFocusedItem,
   renderSidebar,

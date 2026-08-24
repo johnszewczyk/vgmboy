@@ -12,5 +12,9 @@ PSF files.
 Selecting a catalog game fills the playlist directly from indexed catalog rows;
 it does not rescan the source folders or wait for a second metadata pass.
 
+Long Play is capability-gated by the VGMBoy format registry. Standard audio,
+including FLAC, keeps its decoder-reported natural duration even when Long Play
+is enabled; loop-capable formats retain the manual Long Play duration.
+
 The root window's sidebar divider is draggable. Its persisted width is also available from the
 appearance settings controls, and the divider supports keyboard adjustment when focused.

@@ -9,22 +9,31 @@ ordering.
 ## Ownership
 
 `CatalogReader` owns read-only catalog records. `CatalogBrowserCore` owns
-UI-neutral browser behavior. This project owns only the WebKit adapter and
-rendering.
+UI-neutral browser and search resolution. FrontendCore owns favorite identity
+and persistence. This project owns only the typed native adapter and WebKit rendering.
 
 ## Invariants
 
 - Search is a temporary catalog-console view and clearing it restores the stored mode. Favorites is a separate frontend-owned track-history view and is not a CatalogReader aggregation mode.
-- The sidebar view button is one toggle cycling `Database / Console View`, `Paths View`, and
-  `Favorites View`. `Disk Path` remains an explicitly opened local-filesystem state and is not
+- The sidebar view button is one toggle cycling `Console View`, `Path View`, and
+  `Favorites`. `Local Files` remains an explicitly enabled local-filesystem state and is not
   part of the library-view cycle.
 - Game identity includes the catalog root ID, game name, and system.
 - Game console labels come from CatalogReader's shared folder-versus-metadata
   aggregation; empty folder tags fall through to stored metadata before the
   UI receives a row.
 - Catalog writes, scans, decoder selection, and playback do not belong here.
-- Favorite identity/order is defined by FavoriteTrackCore. The current WebKit adapter renders a loading status while it reads the indexed catalog and uses database track queries directly for game previews; it does not walk source folders. Playlist rows support Command-click and Shift-click multi-selection. Cross-app favorite persistence still needs the planned shared sidecar store; the current local WebKit preference data is not the final shared storage contract.
+- Favorite identity/history and path-free `GAME-NN-SONG` labels are defined by FavoriteStoreCore and persisted in the shared VGMMan application-support sidecar. Historical or Alphabetical presentation is requested from Swift and never rewrites storage order. The WebKit adapter renders native snapshots and sends named toggle/import requests; it does not construct favorite identity or mutate SQLite.
+- Local Files uses `LocalFileBrowserCore`; enabling it in the Database options page disables catalog view commands. Command-O opens a native file/folder panel and publishes the Swift browser snapshot to the skin.
+- Sidebar mode/search resolution is performed by CatalogBrowserCore through the native bridge. The deleted Electron-era `sidebar-view-state.js` is not a second behavior implementation.
+- Sidebar row click/disclosure/activation intent is reduced by
+  `CatalogBrowserCore.SidebarRowInteraction` through the native bridge. The
+  WebKit controller dispatches the returned intent and does not duplicate the
+  selection rule table.
 - Database game selection updates the playlist directly; it must not invoke a full sidebar redraw or deferred metadata pass when catalog rows already contain metadata.
+- Large catalog playlists are rendered through a fixed-height visible window;
+  the database result remains fully selectable without creating one WebKit DOM
+  row per catalog track.
 - Native View-menu commands use the shared `FrontendCommandCore` sidebar command contract; the
   WebKit skin maps those commands to the same three view values.
 - Catalog-backed playlist rows must not stat source paths during hydration. CatalogReader supplies
@@ -35,3 +44,4 @@ rendering.
 
 - `/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogBrowserCore/CatalogBrowserCore.swift`
 - `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/index.html`
+- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/sidebar-controller.js`

@@ -1,6 +1,5 @@
 const DEFAULT_PLAY_FADE_SECONDS = 6;
 const SAMPLE_RATE = 44_100;
-const STORAGE_KEY = "spcboy-wk-settings";
 const DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES = 2 * 1024 * 1024 * 1024;
 const ARCHIVE_CACHE_LIMIT_CHOICES = Object.freeze([512, 1024, 2048, 4096].map((megabytes) => megabytes * 1024 * 1024));
 const COLUMN_DEFS = [
@@ -32,10 +31,14 @@ const playbackSpeed = window.SPCBoyPlaybackSpeed;
 
 const state = {
   rootPath: null,
+  localBrowserEnabled: false,
   tree: [],
   sidebarQuery: "",
   sidebarMode: "consoles",
+  sidebarView: Object.freeze({ storedMode: "consoles", query: "", view: "consoles", contentMode: "database", resultSource: "catalog-console-index", isTemporary: false }),
   favorites: [],
+  favoriteIds: [],
+  favoriteSortOrder: "historical",
   databaseGames: [],
   databaseFiles: [],
   databaseFileTree: [],
@@ -43,7 +46,6 @@ const state = {
   databaseSearchGeneration: 0,
   databaseSidebarError: "",
   databaseSidebarLoading: false,
-  playlistLoading: false,
   collapsedConsoleNames: [],
   selectedDatabaseGameKey: null,
   selectedDatabaseConsoleName: null,
@@ -95,6 +97,10 @@ const state = {
   columnAutoSize: true,
   sortColumn: "filename",
   sortDirection: "ascending",
+  autoResizeAnimationMilliseconds: 200,
+  selectionAnimationMilliseconds: 200,
+  mainWindowAlwaysOnTop: false,
+  settingsWindowAlwaysOnTop: false,
   optionsOpen: false,
   optionsSection: "database",
   libraryRoots: [],
@@ -155,7 +161,9 @@ const refs = {
   optionsPlaybackTab: document.getElementById("options-playback-tab"),
   optionsDiagnosticsTab: document.getElementById("options-diagnostics-tab"),
   optionsThemeTab: document.getElementById("options-theme-tab"),
+  optionsWindowsTab: document.getElementById("options-windows-tab"),
   optionsThemeSection: document.getElementById("options-theme-section"),
+  optionsWindowsSection: document.getElementById("options-windows-section"),
   optionsDatabaseSection: document.getElementById("options-database-section"),
   optionsRoutingSection: document.getElementById("options-routing-section"),
   optionsPlaybackSection: document.getElementById("options-playback-section"),
@@ -172,6 +180,10 @@ const refs = {
   libraryDatabaseShowButton: document.getElementById("library-database-show-button"),
   libraryDatabaseDefaultButton: document.getElementById("library-database-default-button"),
   libraryDatabaseReloadButton: document.getElementById("library-database-reload-button"),
+  localBrowserEnabledCheckbox: document.getElementById("local-browser-enabled-checkbox"),
+  localBrowserPath: document.getElementById("local-browser-path"),
+  localBrowserBrowseButton: document.getElementById("local-browser-browse-button"),
+  favoriteSortOrderSelect: document.getElementById("favorite-sort-order-select"),
   libraryCachePath: document.getElementById("library-cache-path"),
   libraryCacheBrowseButton: document.getElementById("library-cache-browse-button"),
   libraryCacheDefaultButton: document.getElementById("library-cache-default-button"),
@@ -185,6 +197,10 @@ const refs = {
   applicationMonospaceCheckbox: document.getElementById("application-monospace-checkbox"),
   playlistHeaderBoldCheckbox: document.getElementById("playlist-header-bold-checkbox"),
   columnAutoSizeCheckbox: document.getElementById("column-auto-size-checkbox"),
+  autoResizeAnimationInput: document.getElementById("auto-resize-animation-input"),
+  selectionAnimationInput: document.getElementById("selection-animation-input"),
+  mainWindowAlwaysOnTopCheckbox: document.getElementById("main-window-always-on-top-checkbox"),
+  settingsWindowAlwaysOnTopCheckbox: document.getElementById("settings-window-always-on-top-checkbox"),
   sidebarWidthInput: document.getElementById("sidebar-width-input"),
   accentColorInput: document.getElementById("accent-color-input"),
   uiItemSpacingInput: document.getElementById("ui-item-spacing-input"),
@@ -231,14 +247,9 @@ const refs = {
   repeatButton: document.getElementById("repeat-button")
 };
 
-function loadSettings() {
+async function loadSettings() {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return;
-    }
-
-    const parsed = JSON.parse(raw);
+    const parsed = await window.spcBoyWK.frontendSettingsLoad();
     state.manualPlayTimeSeconds = normalizePlayTime(parsed.manualPlayTimeSeconds);
     state.longPlayEnabled = Boolean(parsed.longPlayEnabled);
     state.repeatMode = ["off", "all", "one"].includes(parsed.repeatMode) ? parsed.repeatMode : "off";
@@ -255,12 +266,13 @@ function loadSettings() {
     state.monoEnabled = Boolean(parsed.monoEnabled);
     state.uiItemSpacingRem = normalizeItemSpacing(parsed.uiItemSpacingRem);
     state.rootPath = parsed.rootPath || null;
+    state.localBrowserEnabled = Boolean(parsed.localBrowserEnabled && state.rootPath);
     state.selectedFolderPath = parsed.selectedFolderPath || null;
     state.selectedBrowserPath = parsed.selectedBrowserPath || state.selectedFolderPath;
     state.sidebarMode = ["paths", "consoles", "diskPath", "favorites"].includes(parsed.sidebarMode)
       ? parsed.sidebarMode
       : "consoles";
-    state.favorites = Array.isArray(parsed.favorites) ? parsed.favorites.filter((track) => track && typeof track === "object") : [];
+    state.favoriteSortOrder = parsed.favoriteSortOrder === "alphabetical" ? "alphabetical" : "historical";
     state.selectedDatabaseGameKey = parsed.selectedDatabaseGameKey || null;
     state.collapsedConsoleNames = Array.isArray(parsed.collapsedConsoleNames)
       ? parsed.collapsedConsoleNames.filter((name) => typeof name === "string")
@@ -287,13 +299,17 @@ function loadSettings() {
     state.columnAutoSize = parsed.columnAutoSize !== false;
     state.sortColumn = normalizeSortColumn(parsed.sortColumn);
     state.sortDirection = normalizeSortDirection(parsed.sortDirection);
+    state.autoResizeAnimationMilliseconds = normalizeAnimationMilliseconds(parsed.autoResizeAnimationMilliseconds);
+    state.selectionAnimationMilliseconds = normalizeAnimationMilliseconds(parsed.selectionAnimationMilliseconds);
+    state.mainWindowAlwaysOnTop = Boolean(parsed.mainWindowAlwaysOnTop);
+    state.settingsWindowAlwaysOnTop = Boolean(parsed.settingsWindowAlwaysOnTop);
   } catch {
     return;
   }
 }
 
 function persistSettings() {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+  const settings = {
     manualPlayTimeSeconds: state.manualPlayTimeSeconds,
     longPlayEnabled: state.longPlayEnabled,
     repeatMode: state.repeatMode,
@@ -310,10 +326,11 @@ function persistSettings() {
     libvgmPlaybackSpeedEnabled: state.libvgmPlaybackSpeedEnabled,
     uiItemSpacingRem: state.uiItemSpacingRem,
     rootPath: state.rootPath,
+    localBrowserEnabled: state.localBrowserEnabled,
     selectedFolderPath: state.selectedFolderPath,
     selectedBrowserPath: state.selectedBrowserPath,
     sidebarMode: state.sidebarMode,
-    favorites: state.favorites,
+    favoriteSortOrder: state.favoriteSortOrder,
     selectedDatabaseGameKey: state.selectedDatabaseGameKey,
     collapsedConsoleNames: state.collapsedConsoleNames,
     lastSelectedTrackId: state.lastSelectedTrackId,
@@ -337,8 +354,14 @@ function persistSettings() {
     columnVisibility: state.columnVisibility,
     columnAutoSize: state.columnAutoSize,
     sortColumn: state.sortColumn,
-    sortDirection: state.sortDirection
-  }));
+    sortDirection: state.sortDirection,
+    autoResizeAnimationMilliseconds: state.autoResizeAnimationMilliseconds,
+    selectionAnimationMilliseconds: state.selectionAnimationMilliseconds,
+    mainWindowAlwaysOnTop: state.mainWindowAlwaysOnTop,
+    settingsWindowAlwaysOnTop: state.settingsWindowAlwaysOnTop
+  };
+  window.spcBoyWK.frontendSettingsSave(settings)
+    .catch((error) => console.error("[SPCBoy] native settings save failed", error));
 }
 
 function formatTime(totalSeconds) {
@@ -360,6 +383,11 @@ function normalizeFadeTime(value) {
   return Number.isFinite(numeric)
     ? Math.max(0, Math.min(30, Math.round(numeric)))
     : DEFAULT_PLAY_FADE_SECONDS;
+}
+
+function normalizeAnimationMilliseconds(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, Math.min(1000, Math.round(numeric))) : 200;
 }
 
 function normalizeEqualizerGain(value) {
@@ -490,41 +518,6 @@ function normalizeSortColumn(value) {
   return DEFAULT_COLUMN_ORDER.includes(value) && !["index", "favorite"].includes(value) ? value : "filename";
 }
 
-function favoriteKey(track) {
-  const sourcePath = String(track?.archivePath || track?.path || "").replace(/\\/g, "/");
-  const entry = String(track?.archiveEntry || "").trim();
-  const index = Math.max(0, Number(track?.trackIndex) || 0);
-  return `fav1|${sourcePath.length}|${sourcePath}|${entry.length}|${entry}|${index}`;
-}
-
-function isFavorite(track) {
-  const key = favoriteKey(track);
-  return state.favorites.some((entry) => favoriteKey(entry) === key);
-}
-
-function toggleFavorites(tracks) {
-  const unique = [];
-  const seen = new Set();
-  for (const track of tracks || []) {
-    const key = favoriteKey(track);
-    if (key && !seen.has(key)) {
-      seen.add(key);
-      unique.push(track);
-    }
-  }
-  if (!unique.length) return false;
-  const keys = new Set(unique.map(favoriteKey));
-  const allSelected = unique.every(isFavorite);
-  if (allSelected) {
-    state.favorites = state.favorites.filter((entry) => !keys.has(favoriteKey(entry)));
-  } else {
-    const existing = new Set(state.favorites.map(favoriteKey));
-    state.favorites = [...state.favorites, ...unique.filter((track) => !existing.has(favoriteKey(track)))];
-  }
-  persistSettings();
-  return !allSelected;
-}
-
 function normalizeSortDirection(value) {
   return value === "descending" ? "descending" : "ascending";
 }
@@ -560,11 +553,7 @@ function targetPlaybackSeconds() {
 window.SPCBoyApp = {
   DEFAULT_PLAY_FADE_SECONDS,
   SAMPLE_RATE,
-  STORAGE_KEY,
   COLUMN_DEFS,
-  favoriteKey,
-  isFavorite,
-  toggleFavorites,
   DEFAULT_COLUMN_ORDER,
   state,
   audioEngine,
@@ -574,6 +563,7 @@ window.SPCBoyApp = {
   formatTime,
   normalizePlayTime,
   normalizeFadeTime,
+  normalizeAnimationMilliseconds,
   normalizePlaybackSpeed: playbackSpeed.normalize,
   parsePlaybackSpeed: playbackSpeed.parse,
   formatPlaybackSpeed: playbackSpeed.format,

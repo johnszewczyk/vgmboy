@@ -37,10 +37,14 @@ final class WKPlaybackBridge: @unchecked Sendable {
             }
             let index = max(0, int(args.count > 1 ? args[1] : nil) ?? 0)
             let startMilliseconds = max(0, int(args.count > 2 ? args[2] : nil) ?? 0)
-            let playMilliseconds = max(1, int(args.count > 3 ? args[3] : nil) ?? 150_000)
+            let requestedPlayMilliseconds = int(args.count > 3 ? args[3] : nil)
             let fadeMilliseconds = max(0, int(args.count > 4 ? args[4] : nil) ?? 6_000)
             let tempo = number(args.count > 5 ? args[5] : nil) ?? 1
-            let mode: PlaybackMode = fadeMilliseconds > 0 ? .timed : .fileDefault
+            let mode = (args.count > 6 ? args[6] as? String : nil).flatMap(PlaybackMode.init)
+                ?? (fadeMilliseconds > 0 ? .timed : .fileDefault)
+            let playMilliseconds: Int? = mode == .fileDefault
+                ? nil
+                : max(1, requestedPlayMilliseconds ?? 150_000)
             let payload = PlaybackControlPayload(
                 path: path,
                 trackIndex: index,

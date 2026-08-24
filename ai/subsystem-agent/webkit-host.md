@@ -7,10 +7,27 @@ the `spcBoyWK` message bridge.
 
 ## Ownership
 
-Swift owns native capabilities and future catalog/playback bridges. The web
-resources own presentation and user interaction.
+Swift owns native capabilities, catalog/playback bridges, persistent settings,
+sidebar resolution, and favorite mutation. The web resources own DOM
+presentation, CSS animation, and user-interaction forwarding.
 
-The AppKit host owns Cmd-Q, Cmd-W, Cmd-M, and menu dispatch. Shared semantic
+Frontend settings cross the bridge as a JSON projection of the typed Swift
+`SPCBoyPreferencesSnapshot` and are retained by native `UserDefaults`. Browser
+`localStorage` and the retired favorites migration payload are not part of the
+runtime persistence path.
+
+The shared `FrontendPreferencesCore` contract owns the validated animation
+timing range and 200 ms defaults. DOM geometry and CSS remain WebKit-owned so
+SPCBoy keeps its rendering style; native Swift owns persistence and window
+levels.
+
+`FrontendOptionsManifest` provides the common Database, Interface, and Windows
+organization through the bridge. `options-controller.js` applies that manifest,
+`playlist-controller.js` reduces selection, and `sidebar-controller.js` forwards
+row gestures to the native shared reducer. `app-ui.js` remains the renderer and
+event wiring layer rather than the owner of those policies.
+
+The AppKit host owns Cmd-Q, Cmd-W, Cmd-M, Cmd-O, native file/folder selection, and menu dispatch. Shared semantic
 shortcut names and default keys come from `FrontendCommandCore`; WebKit receives
 the remaining frontend commands through the narrow `SPCBoyWK` dispatcher.
 
@@ -28,3 +45,6 @@ raw filesystem scanning or a second catalog implementation.
 
 - `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/main.swift`
 - `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Package.swift`
+- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/options-controller.js`
+- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/playlist-controller.js`
+- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/sidebar-controller.js`

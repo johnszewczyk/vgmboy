@@ -20,9 +20,12 @@ let package = Package(
                 .product(name: "CatalogBrowserCore", package: "CatalogReader"),
                 .product(name: "FrontendCommandCore", package: "CatalogReader"),
                 .product(name: "CatalogReader", package: "CatalogReader"),
+                .product(name: "CatalogPlaylistCore", package: "CatalogReader"),
                 .product(name: "ArchiveMaterializationCore", package: "FrontendCore"),
                 .product(name: "LocalFileBrowserCore", package: "FrontendCore"),
                 .product(name: "FavoriteTrackCore", package: "FrontendCore"),
+                .product(name: "FavoriteStoreCore", package: "FrontendCore"),
+                .product(name: "FrontendPreferencesCore", package: "FrontendCore"),
                 .product(name: "VGMBoyKit", package: "VGMBoy"),
                 .product(name: "VGMBoyEndpointCore", package: "VGMBoy")
             ],
