@@ -40,6 +40,10 @@ Playback timing requests are normalized by the shared `VGMBoyKit.PlaybackTimingR
 native bridge. JavaScript forwards Long Play and deliberate faded-skip intent; it does not choose
 the core's standard/timed duration policy. Ordinary finite audio therefore reaches VGMBoy with
 decoder-natural timing, while Long Play is the only normal path that supplies a manual length.
+For a row without catalog timing, the renderer currently uses its persisted manual duration for
+the provisional readout, while the native standard request leaves the play length unset and
+VGMBoyKit applies its fixed 150-second unknown-duration safety window. Native status is the
+playback authority; the two values must not be treated as equivalent.
 
 ## Failure Boundaries
 

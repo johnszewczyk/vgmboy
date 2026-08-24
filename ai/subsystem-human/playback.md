@@ -16,5 +16,8 @@ Long Play is capability-gated by the VGMBoy format registry. Standard audio,
 including FLAC, keeps its decoder-reported natural duration even when Long Play
 is enabled; loop-capable formats retain the manual Long Play duration.
 
+Tracks without decoder-provided timing, including SID music, use the VGMBoy
+safety window of 2:30 plus the configured fade unless Long Play is enabled.
+
 The root window's sidebar divider is draggable. Its persisted width is also available from the
 appearance settings controls, and the divider supports keyboard adjustment when focused.
