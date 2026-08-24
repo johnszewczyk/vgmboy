@@ -24,7 +24,9 @@ are deliberately exclusive to one family.
   source of truth for vgmstream playback and ScanSong admission roles. Manifest
   membership never replaces native open, enumeration, timing, and fixture proof.
 - `hasNaturalEnding == false` (lazyusf/USF and sidplayfp/SID) forces a capped decode window so a looping core can
-  never run indefinitely. `TimingPolicy.plan` carries this through `usesNativeEnding`.
+  never run indefinitely. `TimingPolicy.plan` carries this through `usesNativeEnding`. SID
+  metadata currently reports no natural duration, so its normal non-Long-Play window is the
+  VGMBoyKit safety cap rather than a file-derived length.
 - `appliesFadeInternally` distinguishes cores with native fade (libgme, libvgm) from PCM
   streamers (Highly Complete, vgmstream, lazyusf, playpsf, OpenMPT) that delegate the fade to
   `PlaybackSession`.

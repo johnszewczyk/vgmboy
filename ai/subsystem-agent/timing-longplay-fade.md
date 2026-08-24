@@ -34,6 +34,14 @@ combining a native-ending mode with an explicit fade value.
 - The 150-second value is only the core safety window for a timed request that lacks a natural
   duration. It is not a default duration for finite standard audio and must not be sent by a
   frontend for FLAC, WAV, or other decoder-natural formats.
+- When a file's decoder reports a positive `naturalPlayMs`, that value wins over the safety
+  window. Standard audio and FFmpeg audio obtain this from the file reader; libgme, libvgm,
+  Highly Complete, 2SF, vgmstream, Play!, QSF, and OpenMPT obtain it from their decoder
+  metadata. SID reports no natural timing, so standard SID playback uses the safety window; a
+  metadata-less lazyUSF track is handled the same way because its family has no natural ending.
+- The current 150-second safety value is fixed in VGMBoyKit. Frontend Long Play duration
+  preferences do not change it while Long Play is off. With the default six-second fade, an
+  unknown-duration track is capped at 156 seconds total; with fade disabled it is capped at 150.
 - Families with `hasNaturalEnding == false` never use a native ending — always a capped window.
 - The fade is applied once. Cores with native fade (`appliesFadeInternally`) do their own ramp and
   the session adds none; real-PCM cores get a linear fade-out over the final `fadeSeconds` before
