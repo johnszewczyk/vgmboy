@@ -47,7 +47,7 @@ same core as `vgmboy-electron-bridge`, and ScanSong receives VGMBoy-built inspec
   never an invented track.
 - Keep the kit's public API surface small and deliberate; the CLI and the SwiftUI app are two thin
   skins over one core.
-- MediaScanner remains a separate catalog-writer product. ScanSong consumes
+- ScanSong remains a separate catalog-writer product. ScanSong consumes
   VGMBoy-built inspection executables, but never links VGMBoyKit or invokes a
   player frontend.
 - ScanSong may consume VGMBoy-built inspection executables, but it does not link VGMBoyKit or

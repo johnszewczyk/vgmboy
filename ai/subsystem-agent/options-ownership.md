@@ -6,7 +6,7 @@ The stable division between frontend options and the shared VGMBoy control surfa
 
 ## Frontend-owned options
 
-- MediaScanner catalog path, read-only catalog reload, scan history, and root selection.
+- ScanSong catalog path, read-only catalog reload, scan history, and root selection.
 - Local-file browser roots, database/sidebar view, playlist columns, queue order, repeat, and
   queued-skip policy.
 - Window layout, appearance, fonts, toolbar/menu behavior, keyboard shortcuts, and persistence.

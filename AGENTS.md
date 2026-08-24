@@ -11,5 +11,5 @@ Read `ai/AGENTS.md`, then `ai/project-info.md`, then the narrow subsystem note r
   never an invented track.
 - Keep the kit's public API surface small and deliberate; the CLI and the SwiftUI app are two thin
   skins over the same core.
-- Leave parent apps (SPCBoy, CocoaSpice, MediaScanner) untouched until VGMBoy reaches a ready
+- Leave parent apps (SPCBoy, CocoaSpice, ScanSong) untouched until VGMBoy reaches a ready
   state; wire them in later.

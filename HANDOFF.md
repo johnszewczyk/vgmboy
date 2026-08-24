@@ -46,7 +46,7 @@ extracted to `/tmp/vgmboy-test/` (not committed); see each section for the file 
 - Equalizer (signal stage in the core output path).
 - Export WAV→AAC (from CocoaSpice `AudioExportAAC.swift` via AVAssetWriter).
 - `playback-core v1` control-point protocol, then wire parent apps (SPCBoy, CocoaSpice) in.
-- MediaScanner remains the sole schema-23 catalog writer. ScanSong consumes
+- ScanSong remains the sole schema-23 catalog writer. ScanSong consumes
   VGMBoy-built inspection outputs, while VGMBoy remains database-free.
 
 ## Repo

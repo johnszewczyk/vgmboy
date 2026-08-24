@@ -7,9 +7,9 @@ inspection builds for the CocoaSpice, SPCBoy WK, and ScanSong products.
 
 ## Ownership
 
-- CocoaSpice is the native SwiftUI playlist frontend. It reads the MediaScanner catalog and links
+- CocoaSpice is the native SwiftUI playlist frontend. It reads the ScanSong catalog and links
   `VGMBoyKit` in-process.
-- SPCBoy WK is the active native WebKit frontend. It reads the MediaScanner catalog and links the
+- SPCBoy WK is the active native WebKit frontend. It reads the ScanSong catalog and links the
   shared VGMBoy core through its native endpoint bridge. The original Electron SPCBoy is archived
   and is not an active consumer of VGMBoy changes.
 - ScanSong is the native catalog-management app and the sole schema-23 catalog writer. It bundles
@@ -34,4 +34,4 @@ inspection builds for the CocoaSpice, SPCBoy WK, and ScanSong products.
 - [build-integration.md](/Users/john/Downloads/Code/VGMMan/VGMBoy/ai/subsystem-agent/build-integration.md)
 - [CocoaSpice project info](/Users/john/Downloads/Code/VGMMan/CocoaSpice/ai/project-info.md)
 - [SPCBoy WK project info](/Users/john/Downloads/Code/VGMMan/SPCBoyWK/ai/project-info.md)
-- [ScanSong project info](/Users/john/Downloads/Code/VGMMan/MediaScanner/ai/project-info.md)
+- [ScanSong project info](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/project-info.md)

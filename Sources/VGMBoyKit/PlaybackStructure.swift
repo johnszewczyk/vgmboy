@@ -1,6 +1,6 @@
 import Foundation
 
-/// Decoder facts needed to form a local-file queue when no MediaScanner
+/// Decoder facts needed to form a local-file queue when no ScanSong
 /// catalogue is loaded. It intentionally exposes neither tags nor a database
 /// model: published catalog metadata remains a frontend concern.
 public struct PlaybackTrackStructure: Codable, Equatable, Sendable {

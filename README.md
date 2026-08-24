@@ -9,7 +9,7 @@ SwiftUI test app, and CocoaSpice are clients of the same `VGMBoyKit` transport.
 clients. It names the shared playback, audio, diagnostics, and export routes;
 the typed `PlaybackControlProtocol` remains the native Swift payload contract.
 
-VGMBoy is intentionally database-free. MediaScanner remains the sole schema-23
+VGMBoy is intentionally database-free. ScanSong remains the sole schema-23
 catalog writer. CocoaSpice links `VGMBoyKit` in-process; SPCBoy WK links the
 same core directly through its native endpoint adapter. The legacy Electron
 SPCBoy path remains separate until it is retired; ScanSong bundles the
@@ -19,7 +19,7 @@ inspection executables produced by VGMBoy.
 
 | Component | Responsibility |
 | --- | --- |
-| MediaScanner | Publishes the shared SQLite catalog and stored sidebar/playlist projections; bundles VGMBoy inspection plugins for intake. |
+| ScanSong | Publishes the shared SQLite catalog and stored sidebar/playlist projections; bundles VGMBoy inspection plugins for intake. |
 | CocoaSpice | Reads that catalog, owns playlist and queue policy, materializes selected archive members, and forwards playback controls to bundled VGMBoyKit. |
 | VGMBoyKit | Decodes a supplied playable path, owns timing/EQ/audio output, and reports status and natural end. |
 | SPCBoy WK | Reads the same catalog independently, materializes files app-side, and sends playback commands through the shared VGMBoy endpoint surface. |
@@ -96,7 +96,7 @@ name on case-insensitive filesystems.
 
 - `VGMBoyKit` owns decoding, playback timing, and the macOS audio device.
 - The CLI and SwiftUI app are test skins over that one core.
-- MediaScanner remains the only schema-23 catalog writer.
+- ScanSong remains the only schema-23 catalog writer.
 - CocoaSpice links VGMBoyKit directly; SPCBoy runs the same code through its
   private bundled bridge. Neither host has a second playback engine.
 

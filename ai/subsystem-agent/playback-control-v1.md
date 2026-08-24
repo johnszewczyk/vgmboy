@@ -49,7 +49,7 @@ same typed endpoint operations.
   AudioUnit ring so every decoder sees identical EQ behavior; the transport callback applies only
   the final de-click envelope.
 - Decoder header facts stay internal to session setup for subtrack validation and timing. VGMBoy
-  never exposes, writes, or looks up frontend playlist or MediaScanner catalog metadata.
+  never exposes, writes, or looks up frontend playlist or ScanSong catalog metadata.
 - `AACExporter` is a separate offline decoder session. It takes a frontend-provided naked playable
   path, subtrack, finite playback window, output folder, and display filename; it writes ADTS AAC
   (`.aac`) without touching the live transport/device or any catalog. VGMBoy sanitizes the stem and
