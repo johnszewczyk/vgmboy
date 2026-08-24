@@ -173,6 +173,7 @@ public struct PlaybackControlPayload: Codable, Sendable, Equatable {
     public var playbackMode: PlaybackMode?
     public var playMilliseconds: Int?
     public var fadeMilliseconds: Int?
+    public var unknownDurationMilliseconds: Int?
     public var equalizer: EqualizerConfiguration?
     public var outputVolume: Float?
     public var outputGain: Float?
@@ -189,6 +190,7 @@ public struct PlaybackControlPayload: Codable, Sendable, Equatable {
         playbackMode: PlaybackMode? = nil,
         playMilliseconds: Int? = nil,
         fadeMilliseconds: Int? = nil,
+        unknownDurationMilliseconds: Int? = nil,
         equalizer: EqualizerConfiguration? = nil,
         outputVolume: Float? = nil,
         outputGain: Float? = nil,
@@ -204,6 +206,7 @@ public struct PlaybackControlPayload: Codable, Sendable, Equatable {
         self.playbackMode = playbackMode
         self.playMilliseconds = playMilliseconds
         self.fadeMilliseconds = fadeMilliseconds
+        self.unknownDurationMilliseconds = unknownDurationMilliseconds
         self.equalizer = equalizer
         self.outputVolume = outputVolume
         self.outputGain = outputGain

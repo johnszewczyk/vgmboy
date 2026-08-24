@@ -535,6 +535,20 @@ struct PlaybackControllerTimingTests {
         #expect(request.fadeMilliseconds == 6_000)
     }
 
+    @Test("standard requests carry the configured unknown-duration window")
+    func standardRequestsCarryUnknownDurationWindow() throws {
+        let request = try PlaybackTimingRequest.standard(
+            path: "/tmp/song.sid",
+            longPlayEnabled: false,
+            manualPlayMilliseconds: 240_000,
+            fadeMilliseconds: 6_000,
+            unknownDurationMilliseconds: 300_000
+        )
+        #expect(request.playbackMode == .fileDefault)
+        #expect(request.playMilliseconds == nil)
+        #expect(request.unknownDurationMilliseconds == 300_000)
+    }
+
     @Test("standard Long Play supplies the explicit manual duration")
     func standardLongPlayUsesManualDuration() throws {
         let request = try PlaybackTimingRequest.standard(
@@ -589,6 +603,20 @@ struct PlaybackControllerTimingTests {
         )
         #expect(!plan.isLongPlay)
         #expect(!plan.usesNativeEnding)
+        #expect(plan.usesDecoderNaturalDuration)
+    }
+
+    @Test("file default uses the configured unknown-duration window")
+    func fileDefaultUsesConfiguredUnknownDuration() {
+        let plan = PlaybackController.plan(
+            mode: .fileDefault,
+            playMilliseconds: nil,
+            fadeMilliseconds: 6_000,
+            unknownDurationMilliseconds: 300_000,
+            family: FormatRegistry.sidplayfpFamily
+        )
+        #expect(plan.preFadeSeconds == 300)
+        #expect(plan.totalSeconds == 306)
         #expect(plan.usesDecoderNaturalDuration)
     }
 

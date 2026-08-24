@@ -17,6 +17,7 @@ public final class PlaybackController: @unchecked Sendable {
     private var mode: PlaybackMode = .fileDefault
     private var explicitPlayMilliseconds: Int?
     private var explicitFadeMilliseconds: Int?
+    private var explicitUnknownDurationMilliseconds: Int?
     private var equalizer = EqualizerConfiguration()
     private var loaded: LoadedTrack?
     private var subscribers: [UUID: EventHandler] = [:]
@@ -163,7 +164,7 @@ public final class PlaybackController: @unchecked Sendable {
         guard tempo.isFinite, tempo > 0 else {
             throw PlaybackControlError.invalidPayload("Tempo must be a positive finite value.")
         }
-        if payload.playbackMode != nil || payload.playMilliseconds != nil || payload.fadeMilliseconds != nil {
+        if payload.playbackMode != nil || payload.playMilliseconds != nil || payload.fadeMilliseconds != nil || payload.unknownDurationMilliseconds != nil {
             try configurePlaybackMode(payload, reloadCurrent: false)
         }
         guard trackIndex >= 0, let family = FormatRegistry.family(for: path) else {
@@ -180,10 +181,14 @@ public final class PlaybackController: @unchecked Sendable {
         }
         if let play = payload.playMilliseconds, play <= 0 { throw PlaybackControlError.invalidPayload("Play length must be positive.") }
         if let fade = payload.fadeMilliseconds, fade < 0 { throw PlaybackControlError.invalidPayload("Fade length cannot be negative.") }
+        if let unknown = payload.unknownDurationMilliseconds, unknown <= 0 {
+            throw PlaybackControlError.invalidPayload("Unknown-duration fallback must be positive.")
+        }
         lock.lock()
         mode = requestedMode
         explicitPlayMilliseconds = payload.playMilliseconds
         explicitFadeMilliseconds = payload.fadeMilliseconds
+        explicitUnknownDurationMilliseconds = payload.unknownDurationMilliseconds
         let current = loaded
         lock.unlock()
         guard reloadCurrent, let current else { return }
@@ -198,8 +203,15 @@ public final class PlaybackController: @unchecked Sendable {
         let mode = self.mode
         let play = explicitPlayMilliseconds
         let fade = explicitFadeMilliseconds ?? 6_000
+        let unknown = explicitUnknownDurationMilliseconds
         lock.unlock()
-        return Self.plan(mode: mode, playMilliseconds: play, fadeMilliseconds: fade, family: family)
+        return Self.plan(
+            mode: mode,
+            playMilliseconds: play,
+            fadeMilliseconds: fade,
+            unknownDurationMilliseconds: unknown,
+            family: family
+        )
     }
 
     /// Converts a public playback request into one consistent decode window.
@@ -209,9 +221,10 @@ public final class PlaybackController: @unchecked Sendable {
         mode: PlaybackMode,
         playMilliseconds: Int?,
         fadeMilliseconds: Int,
+        unknownDurationMilliseconds: Int? = nil,
         family: DecoderFamily
     ) -> PlaybackPlan {
-        let play = max(1, (playMilliseconds ?? 150_000) / 1_000)
+        let play = max(1, (playMilliseconds ?? unknownDurationMilliseconds ?? 150_000) / 1_000)
         let fade = max(0, fadeMilliseconds / 1_000)
         switch mode {
         case .fileDefault:

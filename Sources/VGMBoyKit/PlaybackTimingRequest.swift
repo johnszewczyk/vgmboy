@@ -8,11 +8,18 @@ public struct PlaybackTimingRequest: Equatable, Sendable {
     public let playbackMode: PlaybackMode
     public let playMilliseconds: Int?
     public let fadeMilliseconds: Int
+    public let unknownDurationMilliseconds: Int
 
-    public init(playbackMode: PlaybackMode, playMilliseconds: Int?, fadeMilliseconds: Int) {
+    public init(
+        playbackMode: PlaybackMode,
+        playMilliseconds: Int?,
+        fadeMilliseconds: Int,
+        unknownDurationMilliseconds: Int = PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000
+    ) {
         self.playbackMode = playbackMode
         self.playMilliseconds = playMilliseconds
         self.fadeMilliseconds = max(0, fadeMilliseconds)
+        self.unknownDurationMilliseconds = max(1_000, unknownDurationMilliseconds)
     }
 
     /// Builds the standard request for a newly selected file.
@@ -24,7 +31,8 @@ public struct PlaybackTimingRequest: Equatable, Sendable {
         path: String,
         longPlayEnabled: Bool,
         manualPlayMilliseconds: Int,
-        fadeMilliseconds: Int
+        fadeMilliseconds: Int,
+        unknownDurationMilliseconds: Int = PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000
     ) throws -> Self {
         guard !path.isEmpty, let family = FormatRegistry.family(for: path) else {
             throw PlaybackControlError.invalidPayload("Playback timing requires a supported file path.")
@@ -33,13 +41,15 @@ public struct PlaybackTimingRequest: Equatable, Sendable {
             return Self(
                 playbackMode: .longPlay,
                 playMilliseconds: max(1, manualPlayMilliseconds),
-                fadeMilliseconds: fadeMilliseconds
+                fadeMilliseconds: fadeMilliseconds,
+                unknownDurationMilliseconds: unknownDurationMilliseconds
             )
         }
         return Self(
             playbackMode: .fileDefault,
             playMilliseconds: nil,
-            fadeMilliseconds: fadeMilliseconds
+            fadeMilliseconds: fadeMilliseconds,
+            unknownDurationMilliseconds: unknownDurationMilliseconds
         )
     }
 
@@ -52,7 +62,8 @@ public struct PlaybackTimingRequest: Equatable, Sendable {
         return Self(
             playbackMode: .timed,
             playMilliseconds: playMilliseconds,
-            fadeMilliseconds: fadeMilliseconds
+            fadeMilliseconds: fadeMilliseconds,
+            unknownDurationMilliseconds: PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000
         )
     }
 }

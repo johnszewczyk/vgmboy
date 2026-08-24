@@ -45,8 +45,8 @@ Long play, fade, and seek work across all families. Tempo is available only wher
 supports it.
 
 Formats with decoder-provided timing use that natural duration. Formats without timing use the
-core's current 2:30 safety window plus fade unless the caller explicitly enables Long Play; this
-window is currently fixed in VGMBoyKit.
+shared unknown-duration default plus fade unless the caller explicitly enables Long Play. The
+default unknown-duration value is 2:30 and can be changed by the frontend.
 
 VGMBoyKit also exposes an in-process `PlaybackController` for native app hosts. It owns the
 decoder, transport, timing, and ten-band EQ; a host keeps its own playlist, repeat/shuffle policy,
