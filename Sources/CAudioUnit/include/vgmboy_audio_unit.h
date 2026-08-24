@@ -35,8 +35,11 @@ void vgmboy_audio_unit_set_volume(VGMBoyAudioUnit* output, float volume);
 void vgmboy_audio_unit_set_mono(VGMBoyAudioUnit* output, int enabled);
 void vgmboy_audio_unit_set_equalizer(VGMBoyAudioUnit* output, int enabled, const float* gains, size_t gain_count);
 void vgmboy_audio_unit_set_transport_gain(VGMBoyAudioUnit* output, float gain);
+void vgmboy_audio_unit_set_transport_active(VGMBoyAudioUnit* output, int active);
 void vgmboy_audio_unit_ramp_transport_gain(VGMBoyAudioUnit* output, float gain, uint32_t frame_count);
 size_t vgmboy_audio_unit_enqueue_pcm(VGMBoyAudioUnit* output, int16_t* interleaved_stereo, size_t frame_count);
+/* Runs the exact realtime PCM/ring/envelope path without opening a device. */
+size_t vgmboy_audio_unit_render_offline(VGMBoyAudioUnit* output, int16_t* interleaved_stereo, size_t frame_count);
 int vgmboy_audio_unit_snapshot(const VGMBoyAudioUnit* output, VGMBoyAudioUnitSnapshot* snapshot);
 
 #endif

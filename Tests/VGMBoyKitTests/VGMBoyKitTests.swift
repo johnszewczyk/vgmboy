@@ -2,6 +2,7 @@ import Testing
 import AudioToolbox
 import AVFoundation
 import Foundation
+import VGMBoyCAudioUnit
 @testable import VGMBoyKit
 
 @Suite("FormatRegistry")
@@ -91,6 +92,17 @@ struct FormatRegistryTests {
         }
     }
 
+    @Test("routes proven GameCube streams but not their sidecars as playable files")
+    func routesGameCubeVgmstream() {
+        let expected: Set<String> = ["adp", "agsc", "dsp", "h4m", "ldat", "logg", "rsf", "thp", "txtp"]
+        #expect(FormatRegistry.gameCubeVgmstreamExtensions == expected)
+        for ext in expected {
+            #expect(FormatRegistry.family(for: "/tmp/example.\(ext)")?.id == "vgmstream")
+        }
+        #expect(FormatRegistry.family(for: "/tmp/example.txth") == nil)
+        #expect(FormatRegistry.family(for: "/tmp/example.sbb") == nil)
+    }
+
     @Test("routes USF extensions to the lazyusf family")
     func routesLazyUSF() {
         for ext in FormatRegistry.lazyusfExtensions {
@@ -175,15 +187,67 @@ struct FormatRegistryTests {
     }
 }
 
-@Suite("QSF playback")
-struct QSFPlaybackTests {
-    @Test("renders non-silent PCM from a real QSF fixture when provided")
-    func rendersRealFixture() throws {
-        guard let path = ProcessInfo.processInfo.environment["VGMBoy_QSF_FIXTURE"],
-              FileManager.default.fileExists(atPath: path) else {
-            return
+@Suite("GameCube vgmstream playback")
+struct GameCubeVGMStreamPlaybackTests {
+    @Test(
+        "opens every admitted fixture format and renders non-silent PCM",
+        .enabled(
+            if: ProcessInfo.processInfo.environment["VGMBoy_GAMECUBE_FIXTURES"] != nil,
+            "Set VGMBoy_GAMECUBE_FIXTURES to run the archive-backed GameCube decoder checks."
+        )
+    )
+    func rendersRealFixtures() throws {
+        let rootPath = try #require(ProcessInfo.processInfo.environment["VGMBoy_GAMECUBE_FIXTURES"])
+        let root = URL(fileURLWithPath: rootPath, isDirectory: true)
+        let keys: [URLResourceKey] = [.isRegularFileKey]
+        let enumerator = try #require(FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: keys,
+            options: [.skipsPackageDescendants]
+        ))
+        let fixtures = enumerator.compactMap { $0 as? URL }.filter {
+            FormatRegistry.gameCubeVgmstreamExtensions.contains($0.pathExtension.lowercased())
         }
+        let foundExtensions = Set(fixtures.map { $0.pathExtension.lowercased() })
+        #expect(foundExtensions == FormatRegistry.gameCubeVgmstreamExtensions)
+
+        for fixture in fixtures.sorted(by: { $0.path < $1.path }) {
+            let decoder = try VgmstreamDecoder(path: fixture.path)
+            try decoder.startTrack(0)
+            let metadata = try decoder.metadata(for: 0)
+            #expect(decoder.trackCount > 0, Comment(rawValue: fixture.lastPathComponent))
+            #expect(metadata.naturalPlayMs > 0, Comment(rawValue: fixture.lastPathComponent))
+            var renderedAudio = false
+            for _ in 0..<48 {
+                let pcm = decoder.readFrames(4_096)
+                if pcm.left.contains(where: { abs($0) > 0.0001 })
+                    || pcm.right.contains(where: { abs($0) > 0.0001 }) {
+                    renderedAudio = true
+                    break
+                }
+            }
+            #expect(renderedAudio, Comment(rawValue: fixture.lastPathComponent))
+        }
+    }
+}
+
+@Suite("QSF playback", .serialized)
+struct QSFPlaybackTests {
+    @Test(
+        "renders non-silent PCM from a real QSF fixture",
+        .enabled(
+            if: ProcessInfo.processInfo.environment["VGMBoy_QSF_FIXTURE"] != nil,
+            "Set VGMBoy_QSF_FIXTURE to run the required archive-backed decoder check."
+        )
+    )
+    func rendersRealFixture() throws {
+        let path = try #require(ProcessInfo.processInfo.environment["VGMBoy_QSF_FIXTURE"])
+        #expect(FileManager.default.fileExists(atPath: path))
         let decoder = try QSFDecoder(path: path)
+        defer { decoder.close() }
+        #expect(throws: QSFDecoderError.concurrentUse) {
+            try QSFDecoder(path: path)
+        }
         try decoder.startTrack(0)
         let metadata = try decoder.metadata(for: 0)
         var pcm = (left: [Float](), right: [Float]())
@@ -198,6 +262,15 @@ struct QSFPlaybackTests {
         #expect(decoder.sampleRate == 44_100)
         #expect(metadata.system == "Capcom QSound")
         #expect(pcm.left.contains { abs($0) > 0.0001 } || pcm.right.contains { abs($0) > 0.0001 })
+    }
+
+    @Test("process-global QSF ownership fails fast and becomes reusable after release")
+    func bridgeLeaseIsExclusive() throws {
+        let first = try #require(QSFBridgeLease.acquire())
+        #expect(QSFBridgeLease.acquire() == nil)
+        first.release()
+        let replacement = try #require(QSFBridgeLease.acquire())
+        replacement.release()
     }
 }
 
@@ -313,6 +386,42 @@ struct RealtimeTransportTests {
         output.clearBuffer()
         #expect(output.bufferedFrames == 0)
     }
+
+    @Test("callback ramps queued PCM before inactive transport retains the ring")
+    func callbackEnvelopeAndInactiveRingSemantics() throws {
+        var config = VGMBoyAudioUnitConfig(
+            sample_rate: 44_100,
+            channel_count: 2,
+            callback_frames: 8,
+            ring_buffer_frames: 16
+        )
+        var handle: OpaquePointer?
+        #expect(vgmboy_audio_unit_create(&handle, &config) == 0)
+        let output = try #require(handle)
+        defer { vgmboy_audio_unit_destroy(output) }
+
+        var queued = [Int16](repeating: 24_000, count: 16)
+        #expect(vgmboy_audio_unit_enqueue_pcm(output, &queued, 8) == 8)
+        vgmboy_audio_unit_set_transport_active(output, 1)
+        vgmboy_audio_unit_set_transport_gain(output, 1)
+        vgmboy_audio_unit_ramp_transport_gain(output, 0, 8)
+
+        var rendered = [Int16](repeating: 0, count: 16)
+        #expect(vgmboy_audio_unit_render_offline(output, &rendered, 8) == 8)
+        #expect(abs(Int(rendered[0])) > abs(Int(rendered[14])))
+        #expect(rendered[14] == 0)
+
+        var pausedPCM = [Int16](repeating: 12_000, count: 4)
+        #expect(vgmboy_audio_unit_enqueue_pcm(output, &pausedPCM, 2) == 2)
+        vgmboy_audio_unit_set_transport_active(output, 0)
+        var silent = [Int16](repeating: 1, count: 4)
+        #expect(vgmboy_audio_unit_render_offline(output, &silent, 2) == 2)
+        #expect(silent.allSatisfy { $0 == 0 })
+
+        var snapshot = VGMBoyAudioUnitSnapshot()
+        #expect(vgmboy_audio_unit_snapshot(output, &snapshot) == 0)
+        #expect(snapshot.buffered_frames == 2)
+    }
 }
 
 @Suite("TimingPolicy")
@@ -426,6 +535,19 @@ struct PlaybackControllerTimingTests {
         #expect(!plan.usesNativeEnding)
     }
 
+    @Test("file default fade lets the decoder own natural duration")
+    func fileDefaultFadeUsesDecoderDurationWhenPlayIsOmitted() {
+        let plan = PlaybackController.plan(
+            mode: .fileDefault,
+            playMilliseconds: nil,
+            fadeMilliseconds: 6_000,
+            family: FormatRegistry.standardAudioFamily
+        )
+        #expect(!plan.isLongPlay)
+        #expect(!plan.usesNativeEnding)
+        #expect(plan.usesDecoderNaturalDuration)
+    }
+
     @Test("zero fade preserves native ending for natural formats")
     func zeroFadeRemainsNative() {
         let plan = PlaybackController.plan(
@@ -448,4 +570,31 @@ struct PlaybackControllerTimingTests {
         #expect(!plan.usesNativeEnding)
         #expect(plan.totalSeconds == 156)
     }
+}
+
+@Test(
+    "FLAC opens, reports its full duration, and renders PCM",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["VGMBoy_FLAC_FIXTURE"] != nil,
+        "Set VGMBoy_FLAC_FIXTURE to run the archive-backed FLAC decoder check."
+    )
+)
+func flacFixtureUsesSafeSequentialReader() throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBoy_FLAC_FIXTURE"])
+    let decoder = try DecoderFactory.make(path: path)
+    try decoder.startTrack(0)
+    let metadata = try decoder.metadata(for: 0)
+    #expect(metadata.playMs > 0)
+    let frames = decoder.readFrames(4_096)
+    #expect(frames.left.count > 0)
+    var renderedFrames = frames.left.count
+    while !decoder.trackEnded {
+        let chunk = decoder.readFrames(4_096)
+        if chunk.left.isEmpty { break }
+        renderedFrames += chunk.left.count
+    }
+    let expectedFrames = Int((Double(metadata.playMs) / 1_000.0 * 44_100.0).rounded())
+    #expect(abs(renderedFrames - expectedFrames) < 256)
+    decoder.seek(milliseconds: min(metadata.playMs / 2, 1_000))
+    #expect(decoder.absolutePlayedFrames > 0)
 }

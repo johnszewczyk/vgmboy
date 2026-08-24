@@ -4,46 +4,88 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SOURCE_BUILD_ROOT="$ROOT_DIR/.build"
 DEPENDENCY_ROOT="$ROOT_DIR/.build/dependencies"
+STAMP_ROOT="$ROOT_DIR/.build/dependency-stamps"
 
 [[ -f "$ROOT_DIR/Package.swift" ]] || {
     echo "Missing VGMBoy package: $ROOT_DIR" >&2
     exit 1
 }
 
-mkdir -p "$DEPENDENCY_ROOT"
+mkdir -p "$DEPENDENCY_ROOT" "$STAMP_ROOT"
+
+dependency_signature() {
+    local source_relative="$1"
+    shift
+    {
+        local input
+        for input in "$@"; do
+            shasum -a 256 "$ROOT_DIR/$input"
+        done
+        if [[ -d "$ROOT_DIR/$source_relative/.git" ]]; then
+            git -C "$ROOT_DIR/$source_relative" rev-parse HEAD
+            git -C "$ROOT_DIR/$source_relative" diff --binary HEAD
+        else
+            git -C "$ROOT_DIR" rev-parse "HEAD:$source_relative" 2>/dev/null || true
+            git -C "$ROOT_DIR" diff --binary HEAD -- "$source_relative"
+        fi
+        cmake --version 2>/dev/null | head -n 1 || true
+        "${CC:-cc}" --version 2>/dev/null | head -n 1 || true
+    } | shasum -a 256 | awk '{ print $1 }'
+}
+
+ensure_dependency() {
+    local name="$1"
+    local source_relative="$2"
+    local output_relative="$3"
+    local build_script="$4"
+    shift 4
+    local signature
+    signature="$(dependency_signature "$source_relative" "scripts/$build_script" "$@")"
+    local stamp="$STAMP_ROOT/$name.sha256"
+    if [[ -f "$ROOT_DIR/$output_relative" && -f "$stamp" && "$(<"$stamp")" == "$signature" ]]; then
+        echo "Reusing $name dependency product ($signature)"
+        return
+    fi
+    "$ROOT_DIR/scripts/$build_script"
+    [[ -f "$ROOT_DIR/$output_relative" ]] || {
+        echo "Missing $name dependency product: $ROOT_DIR/$output_relative" >&2
+        exit 1
+    }
+    printf '%s\n' "$signature" > "$stamp"
+}
 
 copy_dependency() {
     local name="$1"
     local source="$2"
     local destination="$DEPENDENCY_ROOT/$name"
+    local source_stamp="$STAMP_ROOT/$name.sha256"
+    local destination_stamp="$destination/.vgmboy-inputs.sha256"
     [[ -e "$source" ]] || { echo "Missing built dependency: $source" >&2; exit 1; }
+    if [[ -f "$source_stamp" && -f "$destination_stamp" ]] && cmp -s "$source_stamp" "$destination_stamp"; then
+        echo "Reusing packaged $name dependency"
+        return
+    fi
     rm -rf "$destination"
     mkdir -p "$destination"
     ditto "$source" "$destination"
+    install -m 644 "$source_stamp" "$destination_stamp"
 }
 
-if [[ ! -f "$SOURCE_BUILD_ROOT/libvgm/bin/libvgm-player.a" ]]; then
-    "$ROOT_DIR/scripts/build-libvgm.sh"
-fi
-if [[ ! -f "$SOURCE_BUILD_ROOT/mgba/libmgba.a" ]]; then
-    "$ROOT_DIR/scripts/build-mgba.sh"
-fi
-if [[ ! -f "$SOURCE_BUILD_ROOT/2sf/lib2sf.a" ]]; then
-    "$ROOT_DIR/scripts/build-2sf.sh"
-fi
-if [[ ! -f "$SOURCE_BUILD_ROOT/lazyusf/liblazyusf.a" || ! -f "$SOURCE_BUILD_ROOT/lazyusf/libpsflib.a" ]]; then
-    "$ROOT_DIR/scripts/build-lazyusf.sh"
-fi
-if [[ ! -f "$SOURCE_BUILD_ROOT/play-psf/libcocoaspice_play_psf.a" ]]; then
-    "$ROOT_DIR/scripts/build-play-psf.sh"
-fi
-"$ROOT_DIR/scripts/build-vgmstream.sh"
+ensure_dependency libvgm vendor/libvgm .build/libvgm/bin/libvgm-player.a build-libvgm.sh
+ensure_dependency mgba vendor/mgba .build/mgba/libmgba.a build-mgba.sh
+ensure_dependency 2sf vendor/2sf2wav .build/2sf/lib2sf.a build-2sf.sh
+ensure_dependency lazyusf vendor/lazyusf2 .build/lazyusf/liblazyusf.a build-lazyusf.sh
+[[ -f "$SOURCE_BUILD_ROOT/lazyusf/libpsflib.a" ]] || "$ROOT_DIR/scripts/build-lazyusf.sh"
+ensure_dependency play-psf vendor/play .build/play-psf/libcocoaspice_play_psf.a build-play-psf.sh patches/play-psfcore-only.patch
+ensure_dependency qsf vendor/aosdk .build/qsf/libvgmboy_qsf.a build-qsf.sh
+ensure_dependency vgmstream vendor/vgmstream .build/vgmstream/src/libvgmstream.a build-vgmstream.sh patches/vgmstream-cocoaspice.patch
 
 copy_dependency libvgm "$SOURCE_BUILD_ROOT/libvgm"
 copy_dependency mgba "$SOURCE_BUILD_ROOT/mgba"
 copy_dependency 2sf "$SOURCE_BUILD_ROOT/2sf"
 copy_dependency lazyusf "$SOURCE_BUILD_ROOT/lazyusf"
 copy_dependency play-psf "$SOURCE_BUILD_ROOT/play-psf"
+copy_dependency qsf "$SOURCE_BUILD_ROOT/qsf"
 copy_dependency vgmstream "$SOURCE_BUILD_ROOT/vgmstream"
 
 echo "VGMBoy dependencies ready: $DEPENDENCY_ROOT"

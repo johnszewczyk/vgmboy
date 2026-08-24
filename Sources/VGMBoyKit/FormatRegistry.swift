@@ -1,4 +1,5 @@
 import Foundation
+import VGMBoyFormatCore
 
 public struct DecoderFamily: Sendable, Codable {
     public var id: String
@@ -72,6 +73,12 @@ public enum FormatRegistry {
         supportsTempo: false
     )
 
+    public static let qsfFamily = DecoderFamily(
+        id: "qsf",
+        supportsLongPlay: true,
+        supportsTempo: false
+    )
+
     public static let sidplayfpFamily = DecoderFamily(
         id: "sidplayfp",
         supportsLongPlay: true,
@@ -107,13 +114,9 @@ public enum FormatRegistry {
         "2sf", "mini2sf"
     ]
 
-    public static let vgmstreamExtensions: Set<String> = [
-        "aa3", "adp", "adpcm", "adx", "ads", "aifc", "at3", "aus",
-        "bik", "bika", "bk2", "bnk", "dvi", "fsb", "genh", "hd",
-        "hbd", "iecs", "int", "mib", "msf", "mtaf", "ogg", "ps3",
-        "rws", "s14", "ss2", "stream", "strm", "svag", "swav", "txtp",
-        "vag", "xa", "xmd", "xvag"
-    ]
+    public static let gameCubeVgmstreamExtensions = VGMStreamFormatManifest.gameCubePrimaryExtensions
+
+    public static let vgmstreamExtensions = VGMStreamFormatManifest.playbackExtensions
 
     public static let lazyusfExtensions: Set<String> = [
         "usf", "miniusf"
@@ -122,6 +125,8 @@ public enum FormatRegistry {
     public static let playpsfExtensions: Set<String> = [
         "psf", "minipsf", "psf2", "minipsf2"
     ]
+
+    public static let qsfExtensions: Set<String> = ["qsf", "miniqsf"]
 
     public static let sidplayfpExtensions: Set<String> = ["sid"]
 
@@ -163,6 +168,9 @@ public enum FormatRegistry {
         }
         if playpsfExtensions.contains(ext) {
             return playpsfFamily
+        }
+        if qsfExtensions.contains(ext) {
+            return qsfFamily
         }
         return nil
     }

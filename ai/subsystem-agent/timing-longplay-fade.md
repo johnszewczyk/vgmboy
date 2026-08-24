@@ -8,9 +8,14 @@ Decode-window planning, long play, and fade for every decoder family.
 
 `TimingPolicy.plan` turns a requested mode and `TrackMetadata` into a `PlaybackPlan`
 (`preFadeSeconds`, `fadeSeconds`, `isLongPlay`, `usesNativeEnding`, `totalSeconds`).
-`PlaybackSession.load` applies the plan: for a native ending it configures the decoder to end at its
-tagged length and sets no frame cap; for a capped window it calls `configureFade` and caps the
-stream at `totalSeconds * sampleRate`.
+`PlaybackSession.load` applies the plan: for a native ending it uses decoder-native ending only
+when the decoder also owns its fade. If a decoder exposes authored timing but not fade DSP (such
+as Highly Complete/mGBA), the session uses the tagged play length plus fade as a shared cap and
+applies the common linear fade. Capped windows call `configureFade` and cap the stream at
+`totalSeconds * sampleRate`.
+The controller also forces any nonzero requested fade through this bounded path, including when
+the public mode is `file_default`; this prevents a client from accidentally bypassing fade by
+combining a native-ending mode with an explicit fade value.
 
 ## Invariants
 
@@ -18,6 +23,8 @@ stream at `totalSeconds * sampleRate`.
   lose the timeline.
 - Long play caps the stream at (manual + fade) in the shell for every family. Native ending relies
   on the decoder's own `trackEnded` (capped only as a backstop).
+- `file_default` uses a native ending only when the requested fade is zero. A nonzero fade is an
+  explicit bounded request and is applied exactly once by the decoder or shared session DSP.
 - Families with `hasNaturalEnding == false` never use a native ending — always a capped window.
 - The fade is applied once. Cores with native fade (`appliesFadeInternally`) do their own ramp and
   the session adds none; real-PCM cores get a linear fade-out over the final `fadeSeconds` before
@@ -32,6 +39,6 @@ refill and prime.
 
 ## Files
 
-- [TimingPolicy.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/TimingPolicy.swift)
-- [PlaybackSession.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/PlaybackSession.swift)
-- [TrackMetadata.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/TrackMetadata.swift)
+- [TimingPolicy.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/TimingPolicy.swift)
+- [PlaybackSession.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/PlaybackSession.swift)
+- [TrackMetadata.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/TrackMetadata.swift)

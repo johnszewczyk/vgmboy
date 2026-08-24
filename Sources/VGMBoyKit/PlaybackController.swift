@@ -196,27 +196,48 @@ public final class PlaybackController: @unchecked Sendable {
     private func makePlan(family: DecoderFamily) -> PlaybackPlan {
         lock.lock()
         let mode = self.mode
-        let play = explicitPlayMilliseconds ?? 150_000
+        let play = explicitPlayMilliseconds
         let fade = explicitFadeMilliseconds ?? 6_000
         lock.unlock()
+        return Self.plan(mode: mode, playMilliseconds: play, fadeMilliseconds: fade, family: family)
+    }
+
+    /// Converts a public playback request into one consistent decode window.
+    /// A requested fade must select the bounded path so every decoder either
+    /// applies its own fade or receives the session's shared output fade.
+    static func plan(
+        mode: PlaybackMode,
+        playMilliseconds: Int?,
+        fadeMilliseconds: Int,
+        family: DecoderFamily
+    ) -> PlaybackPlan {
+        let play = max(1, (playMilliseconds ?? 150_000) / 1_000)
+        let fade = max(0, fadeMilliseconds / 1_000)
         switch mode {
         case .fileDefault:
             return PlaybackPlan(
-                preFadeSeconds: max(1, play / 1_000),
-                fadeSeconds: max(0, fade / 1_000),
+                preFadeSeconds: play,
+                fadeSeconds: fade,
                 isLongPlay: false,
-                usesNativeEnding: family.hasNaturalEnding
+                usesNativeEnding: family.hasNaturalEnding && fade == 0,
+                usesDecoderNaturalDuration: playMilliseconds == nil
             )
         case .longPlay:
-            guard family.supportsLongPlay else { return makeFileDefaultPlan(play: play, fade: fade, family: family) }
-            return PlaybackPlan(preFadeSeconds: max(1, play / 1_000), fadeSeconds: max(0, fade / 1_000), isLongPlay: true, usesNativeEnding: false)
+            guard family.supportsLongPlay else { return fileDefaultPlan(play: play, fade: fade, family: family) }
+            return PlaybackPlan(preFadeSeconds: play, fadeSeconds: fade, isLongPlay: true, usesNativeEnding: false)
         case .timed:
-            return PlaybackPlan(preFadeSeconds: max(1, play / 1_000), fadeSeconds: max(0, fade / 1_000), isLongPlay: false, usesNativeEnding: false)
+            return PlaybackPlan(preFadeSeconds: play, fadeSeconds: fade, isLongPlay: false, usesNativeEnding: false)
         }
     }
 
-    private func makeFileDefaultPlan(play: Int, fade: Int, family: DecoderFamily) -> PlaybackPlan {
-        PlaybackPlan(preFadeSeconds: max(1, play / 1_000), fadeSeconds: max(0, fade / 1_000), isLongPlay: false, usesNativeEnding: family.hasNaturalEnding)
+    private static func fileDefaultPlan(play: Int, fade: Int, family: DecoderFamily) -> PlaybackPlan {
+        PlaybackPlan(
+            preFadeSeconds: play,
+            fadeSeconds: fade,
+            isLongPlay: false,
+            usesNativeEnding: family.hasNaturalEnding && fade == 0,
+            usesDecoderNaturalDuration: false
+        )
     }
 
     private func emit(_ event: PlaybackControlEvent) {

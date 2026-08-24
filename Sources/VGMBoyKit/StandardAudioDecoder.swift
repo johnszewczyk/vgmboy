@@ -7,8 +7,10 @@ final class StandardAudioDecoder: AudioDecoder, @unchecked Sendable {
     let sampleRate: Int
     let trackCount = 1
     let systemName = "Standard audio"
-    private let file: AVAudioFile
-    private let converter: AVAudioConverter
+    private var file: AVAudioFile
+    private var converter: AVAudioConverter
+    private let path: String
+    private let outputFormat: AVAudioFormat
     private let sourceSampleRate: Double
     private var sourceEnded = false
     private(set) var absolutePlayedFrames: Int64 = 0
@@ -17,7 +19,9 @@ final class StandardAudioDecoder: AudioDecoder, @unchecked Sendable {
     let appliesFadeInternally = false
 
     init(path: String, sampleRate: Int) throws {
-        file = try AVAudioFile(forReading: URL(fileURLWithPath: path))
+        let file = try AVAudioFile(forReading: URL(fileURLWithPath: path))
+        self.file = file
+        self.path = path
         sourceSampleRate = file.processingFormat.sampleRate
         self.sampleRate = sampleRate
         guard let outputFormat = AVAudioFormat(
@@ -28,12 +32,16 @@ final class StandardAudioDecoder: AudioDecoder, @unchecked Sendable {
         ), let converter = AVAudioConverter(from: file.processingFormat, to: outputFormat) else {
             throw DecoderFactoryError.unsupportedFamily("standard-audio conversion")
         }
+        self.outputFormat = outputFormat
         self.converter = converter
     }
 
     func startTrack(_ index: Int) throws {
         guard index == 0 else { throw PlaybackControlError.invalidPayload("Track index is not available for this file.") }
-        file.framePosition = 0
+        // AVAudioFile's framePosition setter is not supported by the macOS
+        // FLAC reader (it raises an Objective-C exception, not a Swift error).
+        // Reopening also resets AVAudioConverter's internal resampler state.
+        try reopenReader()
         sourceEnded = false
         absolutePlayedFrames = 0
     }
@@ -50,9 +58,39 @@ final class StandardAudioDecoder: AudioDecoder, @unchecked Sendable {
 
     func seek(milliseconds: Int) {
         let position = Int64((Double(max(0, milliseconds)) / 1_000 * sourceSampleRate).rounded(.down))
-        file.framePosition = min(max(0, position), file.length)
-        sourceEnded = file.framePosition >= file.length
-        absolutePlayedFrames = Int64((Double(file.framePosition) / sourceSampleRate * Double(sampleRate)).rounded(.down))
+        let target = min(max(0, position), file.length)
+        do {
+            try reopenReader()
+            try discardSourceFrames(target)
+            sourceEnded = target >= file.length
+            absolutePlayedFrames = Int64((Double(target) / sourceSampleRate * Double(sampleRate)).rounded(.down))
+        } catch {
+            sourceEnded = true
+        }
+    }
+
+    private func reopenReader() throws {
+        let reopened = try AVAudioFile(forReading: URL(fileURLWithPath: path))
+        guard let resetConverter = AVAudioConverter(from: reopened.processingFormat, to: outputFormat) else {
+            throw DecoderFactoryError.unsupportedFamily("standard-audio conversion")
+        }
+        file = reopened
+        converter = resetConverter
+    }
+
+    private func discardSourceFrames(_ frameCount: AVAudioFramePosition) throws {
+        var remaining = frameCount
+        while remaining > 0 {
+            guard let buffer = AVAudioPCMBuffer(
+                pcmFormat: file.processingFormat,
+                frameCapacity: AVAudioFrameCount(min(remaining, 16_384))
+            ) else {
+                throw DecoderFactoryError.unsupportedFamily("standard-audio seek buffer")
+            }
+            try file.read(into: buffer)
+            guard buffer.frameLength > 0 else { break }
+            remaining -= AVAudioFramePosition(buffer.frameLength)
+        }
     }
 
     func readFrames(_ frameCount: Int) -> (left: [Float], right: [Float]) {

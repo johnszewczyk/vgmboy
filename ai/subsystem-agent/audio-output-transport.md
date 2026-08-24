@@ -28,17 +28,21 @@ opens or manipulates an audio device.
   discontinuity at exactly the transition the envelope exists to protect.
 - The final callback multiplies post-EQ, post-volume PCM by the 10 ms envelope immediately before
   the default output device. `AudioOutput` gives that callback a 12 ms window before marking the
-  transport paused, while retaining a silent initialized unit for seamless next-track playback.
+  transport inactive, while retaining a silent initialized unit for seamless next-track playback.
+  The callback must remain active during that window so it ramps queued PCM rather than zeros.
 - EQ, app volume, and mono are producer-side DSP protected from concurrent control changes; they
   remain distinct from the callback-only transport envelope.
 - A frontend may request a bounded transport-gain ramp for an intentional musical transition such
   as SPCBoy's queued skip. The request changes only the core-owned final output gain; it does not
   create a second frontend audio graph or modify the user's volume/EQ setting.
 - Diagnostics contain output facts only and never choose a queue transition.
+- `vgmboy_audio_unit_render_offline` runs the exact ring, underrun, and envelope callback path
+  without opening a device. It exists for deterministic transport regression tests and must stay
+  behavior-identical to the AudioUnit callback.
 
 ## Files
 
-- [AudioOutput.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/AudioOutput.swift)
-- [vgmboy_audio_unit.c](/Users/john/Downloads/Code/VGMBoy/Sources/CAudioUnit/vgmboy_audio_unit.c)
-- [vgmboy_audio_unit.h](/Users/john/Downloads/Code/VGMBoy/Sources/CAudioUnit/include/vgmboy_audio_unit.h)
-- [PlaybackSession.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/PlaybackSession.swift)
+- [AudioOutput.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/AudioOutput.swift)
+- [vgmboy_audio_unit.c](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/CAudioUnit/vgmboy_audio_unit.c)
+- [vgmboy_audio_unit.h](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/CAudioUnit/include/vgmboy_audio_unit.h)
+- [PlaybackSession.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/PlaybackSession.swift)

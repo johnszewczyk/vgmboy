@@ -48,6 +48,7 @@ final class AudioOutput: @unchecked Sendable {
                 throw PlaybackControlError.invalidPayload("VGMBoy could not start the macOS audio output.")
             }
         }
+        vgmboy_audio_unit_set_transport_active(handle, 1)
         vgmboy_audio_unit_ramp_transport_gain(handle, 1, transportEnvelopeFrameCount)
         transportPlaying = true
     }
@@ -56,10 +57,16 @@ final class AudioOutput: @unchecked Sendable {
         controlLock.lock()
         defer { controlLock.unlock() }
         guard transportPlaying else { return }
+        // Keep consuming queued PCM while the device callback reaches silence.
+        // Deactivating first would make the callback ramp zero-filled output
+        // and reintroduce a hard discontinuity at the last audible sample.
         vgmboy_audio_unit_ramp_transport_gain(handle, 0, transportEnvelopeFrameCount)
         // Let the device callback emit final zero-gain frames, but deliberately
         // do not stop the endpoint: its restart is an independent click source.
         Thread.sleep(forTimeInterval: 0.012)
+        // Once the envelope is silent, retain the remaining paused PCM and stop
+        // counting silent callbacks as underruns until playback resumes.
+        vgmboy_audio_unit_set_transport_active(handle, 0)
         transportPlaying = false
     }
 

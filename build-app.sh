@@ -3,19 +3,20 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="$SCRIPT_DIR/.build"
+SWIFT_BUILD_DIR="$BUILD_DIR/swiftpm-release"
 MODULE_CACHE="$BUILD_DIR/module-cache"
 APP_DIR="$BUILD_DIR/app/VGMBoy.app"
-rm -rf "$BUILD_DIR"
+rm -rf "$SWIFT_BUILD_DIR" "$APP_DIR"
 mkdir -p "$MODULE_CACHE" "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 "$SCRIPT_DIR/scripts/build-dependencies.sh"
 export CLANG_MODULE_CACHE_PATH="$MODULE_CACHE"
 export SWIFTPM_MODULECACHE_OVERRIDE="$MODULE_CACHE"
 export XDG_CACHE_HOME="$BUILD_DIR/cache"
 
-swift build --package-path "$SCRIPT_DIR" --build-path "$BUILD_DIR" --disable-sandbox --configuration release --product VGMBoy
-BIN_DIR="$BUILD_DIR/arm64-apple-macosx/release"
+swift build --package-path "$SCRIPT_DIR" --build-path "$SWIFT_BUILD_DIR" --disable-sandbox --configuration release --product VGMBoy
+BIN_DIR="$SWIFT_BUILD_DIR/arm64-apple-macosx/release"
 if [[ ! -x "$BIN_DIR/VGMBoy" ]]; then
-    BIN_DIR="$(swift build --package-path "$SCRIPT_DIR" --build-path "$BUILD_DIR" --disable-sandbox --configuration release --show-bin-path)"
+    BIN_DIR="$(swift build --package-path "$SCRIPT_DIR" --build-path "$SWIFT_BUILD_DIR" --disable-sandbox --configuration release --show-bin-path)"
 fi
 [[ -x "$BIN_DIR/VGMBoy" ]] || { echo "Missing clean-built executable: $BIN_DIR/VGMBoy" >&2; exit 1; }
 

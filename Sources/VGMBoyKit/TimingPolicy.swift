@@ -5,12 +5,20 @@ struct PlaybackPlan: Sendable {
     var fadeSeconds: Int
     var isLongPlay: Bool
     var usesNativeEnding: Bool
+    var usesDecoderNaturalDuration: Bool
 
-    init(preFadeSeconds: Int, fadeSeconds: Int, isLongPlay: Bool, usesNativeEnding: Bool) {
+    init(
+        preFadeSeconds: Int,
+        fadeSeconds: Int,
+        isLongPlay: Bool,
+        usesNativeEnding: Bool,
+        usesDecoderNaturalDuration: Bool = false
+    ) {
         self.preFadeSeconds = preFadeSeconds
         self.fadeSeconds = fadeSeconds
         self.isLongPlay = isLongPlay
         self.usesNativeEnding = usesNativeEnding
+        self.usesDecoderNaturalDuration = usesDecoderNaturalDuration
     }
 
     var totalSeconds: Int { preFadeSeconds + fadeSeconds }
@@ -21,9 +29,9 @@ enum TimingPolicy {
     ///
     /// Long play caps the stream at (manual + fade) seconds in the shell;
     /// a natural plan lets the decoder end at its own tagged length and fade.
-    /// When no timing is known, a 150-second window with a native ending keeps
-    /// looping formats from running forever. Families without a natural ending
-    /// (USF) always get a capped window so they never run indefinitely.
+    /// When no timing is known, a 150-second window keeps looping formats from
+    /// running forever. A requested fade always makes that window explicit;
+    /// with zero fade, natural-ending families may still use their native end.
     static func plan(
         supportsLongPlay: Bool,
         metadata: TrackMetadata?,
@@ -54,7 +62,7 @@ enum TimingPolicy {
             preFadeSeconds: 150,
             fadeSeconds: clampedFade,
             isLongPlay: false,
-            usesNativeEnding: hasNaturalEnding
+            usesNativeEnding: hasNaturalEnding && clampedFade == 0
         )
     }
 }

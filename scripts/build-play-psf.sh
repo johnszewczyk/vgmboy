@@ -5,18 +5,21 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 build="$root/.build/play-psf"
 build_jobs="${COCOASPICE_BUILD_JOBS:-4}"
 patch="$root/patches/play-psfcore-only.patch"
+psfplayer_cmake="$root/vendor/play/tools/PsfPlayer/CMakeLists.txt"
 
-if [[ -e "$root/vendor/play/.git" ]]; then
-  if git -C "$root/vendor/play" apply --check "$patch" >/dev/null 2>&1; then
+if ! grep -q 'PSFCORE_ONLY' "$psfplayer_cmake"; then
+  if [[ -e "$root/vendor/play/.git" ]] && git -C "$root/vendor/play" apply --check "$patch" >/dev/null 2>&1; then
     git -C "$root/vendor/play" apply "$patch"
-  elif ! git -C "$root/vendor/play" apply --reverse --check "$patch" >/dev/null 2>&1; then
+  elif patch --dry-run -p1 -d "$root/vendor/play" < "$patch" >/dev/null 2>&1; then
+    patch -p1 -d "$root/vendor/play" < "$patch" >/dev/null
+  else
     echo "Play! source does not match the VGMBoy PSF-family patch" >&2
     exit 1
   fi
-elif patch --dry-run -p1 -d "$root/vendor/play" < "$patch" >/dev/null 2>&1; then
-  patch -p1 -d "$root/vendor/play" < "$patch" >/dev/null
-elif ! patch --dry-run -R -p1 -d "$root/vendor/play" < "$patch" >/dev/null 2>&1; then
-  echo "Play! source does not match the VGMBoy PSF-family patch" >&2
+fi
+
+if ! grep -q 'PSFCORE_ONLY' "$psfplayer_cmake"; then
+  echo "Play! PSF-core patch was not applied" >&2
   exit 1
 fi
 

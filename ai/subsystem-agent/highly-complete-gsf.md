@@ -28,6 +28,6 @@ contract and serializes every bridge call through its dedicated gate.
 
 ## Files
 
-- [HighlyCompleteDecoder.swift](/Users/john/Downloads/Code/VGMBoy/Sources/VGMBoyKit/HighlyCompleteDecoder.swift)
-- [highlycomplete_bridge.cpp](/Users/john/Downloads/Code/VGMBoy/Sources/CHighlyComplete/highlycomplete_bridge.cpp)
-- [Package.swift](/Users/john/Downloads/Code/VGMBoy/Package.swift)
+- [HighlyCompleteDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/HighlyCompleteDecoder.swift)
+- [highlycomplete_bridge.cpp](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/CHighlyComplete/highlycomplete_bridge.cpp)
+- [Package.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Package.swift)

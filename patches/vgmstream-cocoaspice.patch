@@ -20,3 +20,7 @@ index ec844b5..57330b7 100644
  		set(USE_FFMPEG_LIBOPUS OFF)
  		if(NOT EMSCRIPTEN)
  			find_package(PkgConfig REQUIRED)
+@@ -123,3 +123,0 @@
+-				--extra-libs=-static
+-				--extra-cflags=--static
+-				--pkg-config-flags=--static

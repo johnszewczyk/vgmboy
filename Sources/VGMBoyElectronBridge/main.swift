@@ -103,12 +103,15 @@ private final class BridgeSession {
         guard arguments.count >= 5,
               let trackIndex = Int(arguments[1]), trackIndex >= 0,
               let startMilliseconds = Int(arguments[2]), startMilliseconds >= 0,
-              let playMilliseconds = Int(arguments[3]), playMilliseconds > 0,
+              let playMilliseconds = Int(arguments[3]), playMilliseconds >= 0,
               let fadeMilliseconds = Int(arguments[4]), fadeMilliseconds >= 0 else {
             throw BridgeError.invalidArguments("player-load requires path, track, start, play, and fade milliseconds")
         }
-        let numerator = arguments.count > 5 ? Double(arguments[5]) ?? 1 : 1
-        let denominator = arguments.count > 6 ? Double(arguments[6]) ?? 1 : 1
+        let suppliedMode = arguments.count > 5 ? PlaybackMode(rawValue: arguments[5]) : nil
+        let playbackMode = suppliedMode ?? .fileDefault
+        let speedOffset = suppliedMode == nil ? 5 : 6
+        let numerator = arguments.count > speedOffset ? Double(arguments[speedOffset]) ?? 1 : 1
+        let denominator = arguments.count > speedOffset + 1 ? Double(arguments[speedOffset + 1]) ?? 1 : 1
         let tempo = numerator / denominator
         guard tempo.isFinite, tempo > 0 else {
             throw BridgeError.invalidArguments("player-load received an invalid tempo ratio")
@@ -120,8 +123,8 @@ private final class BridgeSession {
                 path: arguments[0],
                 trackIndex: trackIndex,
                 tempo: tempo,
-                playbackMode: .timed,
-                playMilliseconds: playMilliseconds,
+                playbackMode: playbackMode,
+                playMilliseconds: playMilliseconds > 0 ? playMilliseconds : nil,
                 fadeMilliseconds: fadeMilliseconds
             )
         )))

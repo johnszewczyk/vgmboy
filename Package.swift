@@ -20,11 +20,13 @@ let lazyUSFVendorDirectory = "\(sharedVendorRoot)/lazyusf2"
 let lazyUSFBuildDirectory = "\(dependencyRoot)/lazyusf"
 let playPSFBuildDirectory = "\(dependencyRoot)/play-psf"
 let playPSFVendorDirectory = "\(sharedVendorRoot)/play/tools/PsfPlayer/Source"
+let qsfBuildDirectory = "\(dependencyRoot)/qsf"
 
 let package = Package(
     name: "VGMBoy",
     platforms: [.macOS("26.0")],
     products: [
+        .library(name: "VGMBoyFormatCore", targets: ["VGMBoyFormatCore"]),
         .library(name: "VGMBoyKit", targets: ["VGMBoyKit"]),
         .library(name: "VGMBoyEndpointCore", targets: ["VGMBoyEndpointCore"]),
         .executable(name: "vgmboy-cli", targets: ["vgmboy"]),
@@ -33,6 +35,7 @@ let package = Package(
         .executable(name: "VGMBoy", targets: ["VGMBoyApp"])
     ],
     targets: [
+        .target(name: "VGMBoyFormatCore", path: "Sources/VGMBoyFormatCore"),
         .target(name: "VGMBoyEndpointCore", path: "Sources/VGMBoyEndpointCore"),
         .systemLibrary(
             name: "VGMBoyCGameMusicEmu",
@@ -184,6 +187,21 @@ let package = Package(
             ]
         ),
         .target(
+            name: "VGMBoyCQSF",
+            path: "Sources/CQSF",
+            publicHeadersPath: "include",
+            cSettings: [
+                .unsafeFlags([
+                    "-I\(sharedVendorRoot)/aosdk",
+                    "-I\(sharedVendorRoot)/aosdk/eng_qsf"
+                ])
+            ],
+            linkerSettings: [
+                .unsafeFlags(["\(qsfBuildDirectory)/libvgmboy_qsf.a"]),
+                .linkedLibrary("z")
+            ]
+        ),
+        .target(
             name: "VGMBoyCSIDPlayFP",
             path: "Sources/CSIDPlayFP",
             publicHeadersPath: "include",
@@ -215,7 +233,7 @@ let package = Package(
         ),
         .target(
             name: "VGMBoyKit",
-            dependencies: ["VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCFFmpeg", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCSIDPlayFP", "VGMBoyCOpenMPT", "VGMBoyCAudioUnit"],
+            dependencies: ["VGMBoyFormatCore", "VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCFFmpeg", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCQSF", "VGMBoyCSIDPlayFP", "VGMBoyCOpenMPT", "VGMBoyCAudioUnit"],
             linkerSettings: [
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("AudioToolbox")
@@ -243,7 +261,7 @@ let package = Package(
         ),
         .testTarget(
             name: "VGMBoyKitTests",
-            dependencies: ["VGMBoyKit", "VGMBoyEndpointCore"],
+            dependencies: ["VGMBoyKit", "VGMBoyEndpointCore", "VGMBoyCAudioUnit"],
             path: "Tests/VGMBoyKitTests"
         )
     ],

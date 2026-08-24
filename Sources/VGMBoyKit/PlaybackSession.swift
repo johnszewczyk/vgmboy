@@ -36,22 +36,56 @@ public struct PlaybackDiagnostics: Sendable, Codable, Equatable {
     }
 }
 
+/// Decoder and transport facts suitable for a frontend's diagnostics panel.
+/// This intentionally omits presentation fields such as title or “now
+/// playing”; catalog and queue ownership remain in the host application.
+public struct PlaybackStatistics: Sendable, Codable, Equatable {
+    public var decoderFamily: String?
+    public var trackIndex: Int?
+    public var decoderSampleRate: Int
+    public var outputSampleRate: Int
+    public var decodedFrames: Int64
+    public var audiblePositionFrames: Int64
+    public var tempo: Double
+
+    public init(
+        decoderFamily: String? = nil,
+        trackIndex: Int? = nil,
+        decoderSampleRate: Int = 0,
+        outputSampleRate: Int = 0,
+        decodedFrames: Int64 = 0,
+        audiblePositionFrames: Int64 = 0,
+        tempo: Double = 1
+    ) {
+        self.decoderFamily = decoderFamily
+        self.trackIndex = trackIndex
+        self.decoderSampleRate = decoderSampleRate
+        self.outputSampleRate = outputSampleRate
+        self.decodedFrames = decodedFrames
+        self.audiblePositionFrames = audiblePositionFrames
+        self.tempo = tempo
+    }
+}
+
 public struct PlaybackStatus: Sendable, Codable, Equatable {
     public var isPlaying: Bool
     public var elapsedSeconds: Double
     public var reachedEnd: Bool
     public var diagnostics: PlaybackDiagnostics
+    public var statistics: PlaybackStatistics
 
     public init(
         isPlaying: Bool,
         elapsedSeconds: Double,
         reachedEnd: Bool,
-        diagnostics: PlaybackDiagnostics = .init()
+        diagnostics: PlaybackDiagnostics = .init(),
+        statistics: PlaybackStatistics = .init()
     ) {
         self.isPlaying = isPlaying
         self.elapsedSeconds = elapsedSeconds
         self.reachedEnd = reachedEnd
         self.diagnostics = diagnostics
+        self.statistics = statistics
     }
 }
 
@@ -76,6 +110,8 @@ final class PlaybackSession: @unchecked Sendable {
     private var capFrames: Int64 = 0
     private var fadeFrames: Int64 = 0
     private var currentTrackIndex = 0
+    private var decoderFamily: String?
+    private var currentTempo = 1.0
     private var reachedEnd = false
     private var isLoaded = false
     private var generation = 0
@@ -104,7 +140,7 @@ final class PlaybackSession: @unchecked Sendable {
         try queue.sync {
             releaseCurrent()
             generation += 1
-            guard FormatRegistry.family(for: path) != nil else {
+            guard let family = FormatRegistry.family(for: path) else {
                 throw DecoderFactoryError.unsupportedFamily(
                     (path as NSString).pathExtension
                 )
@@ -116,22 +152,40 @@ final class PlaybackSession: @unchecked Sendable {
             let metadata = try decoder.metadata(for: trackIndex)
             if plan.usesNativeEnding {
                 if metadata.hasTiming {
-                    decoder.configureNativeEnding(
-                        playMs: metadata.naturalPlayMs,
-                        fadeMs: max(0, metadata.fadeMs)
-                    )
-                    capFrames = 0
+                    let fadeMilliseconds = max(0, metadata.fadeMs)
+                    if decoder.appliesFadeInternally {
+                        decoder.configureNativeEnding(
+                            playMs: metadata.naturalPlayMs,
+                            fadeMs: fadeMilliseconds
+                        )
+                        capFrames = 0
+                        fadeFrames = 0
+                    } else {
+                        // Some cores (notably Highly Complete/mGBA) expose
+                        // authored timing but do not own the fade DSP. Keep
+                        // the tagged play length, then apply the shared
+                        // output fade at the session boundary.
+                        decoder.configureFade(
+                            playMs: metadata.naturalPlayMs,
+                            fadeMs: fadeMilliseconds
+                        )
+                        capFrames = Int64(metadata.naturalPlayMs + fadeMilliseconds) * Int64(sampleRate) / 1_000
+                        fadeFrames = Int64(fadeMilliseconds) * Int64(sampleRate) / 1_000
+                    }
                 } else {
                     decoder.configureNativeEnding(playMs: 0, fadeMs: 0)
                     capFrames = Int64(plan.preFadeSeconds) * Int64(sampleRate)
+                    fadeFrames = 0
                 }
-                fadeFrames = 0
             } else {
+                let naturalPlayMilliseconds = plan.usesDecoderNaturalDuration && metadata.naturalPlayMs > 0
+                    ? metadata.naturalPlayMs
+                    : plan.preFadeSeconds * 1_000
                 decoder.configureFade(
-                    playMs: plan.preFadeSeconds * 1000,
+                    playMs: naturalPlayMilliseconds,
                     fadeMs: plan.fadeSeconds * 1000
                 )
-                capFrames = Int64(plan.totalSeconds) * Int64(sampleRate)
+                capFrames = Int64(naturalPlayMilliseconds + plan.fadeSeconds * 1_000) * Int64(sampleRate) / 1_000
                 fadeFrames = decoder.appliesFadeInternally
                     ? 0
                     : Int64(plan.fadeSeconds) * Int64(sampleRate)
@@ -139,6 +193,8 @@ final class PlaybackSession: @unchecked Sendable {
 
             self.decoder = decoder
             currentTrackIndex = trackIndex
+            decoderFamily = family.id
+            currentTempo = tempo
             reachedEnd = false
             isLoaded = true
             output.clearBuffer()
@@ -255,11 +311,22 @@ final class PlaybackSession: @unchecked Sendable {
         let elapsed = decoder.map {
             Double(max(0, $0.absolutePlayedFrames - Int64(diagnostics.bufferedFrames))) / Double(sampleRate)
         } ?? 0
+        let decodedFrames = decoder?.absolutePlayedFrames ?? 0
+        let statistics = PlaybackStatistics(
+            decoderFamily: decoderFamily,
+            trackIndex: isLoaded ? currentTrackIndex : nil,
+            decoderSampleRate: decoder?.sampleRate ?? 0,
+            outputSampleRate: diagnostics.sampleRate,
+            decodedFrames: decodedFrames,
+            audiblePositionFrames: max(0, decodedFrames - Int64(diagnostics.bufferedFrames)),
+            tempo: currentTempo
+        )
         return PlaybackStatus(
             isPlaying: output.isRunning,
             elapsedSeconds: elapsed,
             reachedEnd: reachedEnd,
-            diagnostics: diagnostics
+            diagnostics: diagnostics,
+            statistics: statistics
         )
     }
 
@@ -370,6 +437,8 @@ final class PlaybackSession: @unchecked Sendable {
         output.pause()
         decoder?.close()
         decoder = nil
+        decoderFamily = nil
+        currentTempo = 1
         capFrames = 0
         fadeFrames = 0
         reachedEnd = false
