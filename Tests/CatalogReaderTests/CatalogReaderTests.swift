@@ -56,6 +56,11 @@ private func fixtureCatalog() throws -> URL {
     #expect(try reader.tracks(rootID: 1, game: "Chew Man Fu", system: "PC Engine", preferFoldersOverMetadata: true).count == 1)
     #expect(try reader.tracks(rootID: 1, sourcePaths: ["/music/Game/Track 10.spc"]).map(\.title) == ["Track 10"])
     #expect(try reader.tracks(rootID: 1, folderPaths: ["/music/Game"]).map(\.title) == ["Track 9", "Track 10"])
+    #expect(try reader.tracks(sourceSelections: [
+        CatalogSourceSelection(rootID: 1, path: "/music/Game/Track 9.spc")
+    ]).map(\.title) == ["Track 9"])
+    #expect(try reader.tracks(rootPath: "/music", folderPath: "/music/Game").map(\.title) == ["Track 10", "Track 9"])
+    #expect(try reader.tracks(paths: ["/music/Game/Track 9.spc", "/music/Game/Track 10.spc"]).map(\.title) == ["Track 10", "Track 9"])
 }
 
 @Test func playlistGameProjectionPreservesOriginalSelectionSemantics() throws {

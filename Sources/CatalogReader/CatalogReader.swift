@@ -73,6 +73,19 @@ public struct CatalogFileBucket: Identifiable, Equatable, Sendable {
     public var id: String { "\(rootID)\u{1F}\(path)" }
 }
 
+/// One exact source selected from the Files sidebar. The root identity stays
+/// attached to the path so a shared reader never has to infer ownership from
+/// a filesystem walk.
+public struct CatalogSourceSelection: Hashable, Sendable {
+    public let rootID: Int64
+    public let path: String
+
+    public init(rootID: Int64, path: String) {
+        self.rootID = rootID
+        self.path = path
+    }
+}
+
 /// A published playlist leaf. It deliberately represents only catalog facts;
 /// decoder inspection results and playback state belong to VGMBoyKit.
 public struct CatalogTrack: Identifiable, Equatable, Sendable {
@@ -359,6 +372,62 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
         )
     }
 
+    /// Fetches exact Files-sidebar selections without opening source paths or
+    /// rebuilding a root. This is the shared query used by native and WebKit
+    /// frontends for database playlist hydration.
+    public func tracks(sourceSelections: [CatalogSourceSelection]) throws -> [CatalogTrack] {
+        let selections = Array(Set(sourceSelections.filter { !$0.path.isEmpty }))
+            .sorted { $0.rootID == $1.rootID ? $0.path < $1.path : $0.rootID < $1.rootID }
+        guard !selections.isEmpty else { return [] }
+        let clauses = Array(repeating: "(t.root_id=? AND t.path=?)", count: selections.count).joined(separator: " OR ")
+        var bindings: [QueryBinding] = []
+        for selection in selections {
+            bindings.append(.int(selection.rootID))
+            bindings.append(.text(selection.path))
+        }
+        return try filteredTracks(
+            whereClause: "\(clauses)",
+            bindings: bindings,
+            sortByCatalogIdentity: false,
+            rootVisibilityPredicate: "r.is_enabled=1",
+            deadSourcePredicate: "d.path=t.path"
+        )
+    }
+
+    /// Fetches one selected catalog folder and its descendants by root path.
+    /// This is a database projection only; it never enumerates the disk.
+    public func tracks(rootPath: String, folderPath: String) throws -> [CatalogTrack] {
+        let normalizedRootPath = URL(fileURLWithPath: rootPath, isDirectory: true).standardizedFileURL.path
+        let normalizedFolderPath = URL(fileURLWithPath: folderPath, isDirectory: true).standardizedFileURL.path
+        let folderPrefix = normalizedFolderPath.hasSuffix("/") ? normalizedFolderPath : normalizedFolderPath + "/"
+        return try filteredTracks(
+            whereClause: "r.path=? AND (t.folder_path=? OR t.folder_path LIKE ?)",
+            bindings: [.text(normalizedRootPath), .text(normalizedFolderPath), .text(folderPrefix + "%")],
+            orderBy: "t.filename ASC, t.track_index ASC",
+            sortByCatalogIdentity: false,
+            rootVisibilityPredicate: "r.is_enabled=1",
+            deadSourcePredicate: "d.path=t.path"
+        )
+    }
+
+    /// Fetches exact catalog paths across enabled roots. It is intentionally a
+    /// path-index lookup, not a full-catalog scan or source-path inspection.
+    public func tracks(paths: [String]) throws -> [CatalogTrack] {
+        let normalizedPaths = Array(Set(paths.map {
+            URL(fileURLWithPath: $0, isDirectory: false).standardizedFileURL.path
+        }.filter { !$0.isEmpty })).sorted()
+        guard !normalizedPaths.isEmpty else { return [] }
+        let placeholders = Array(repeating: "?", count: normalizedPaths.count).joined(separator: ", ")
+        return try filteredTracks(
+            whereClause: "t.path IN (\(placeholders))",
+            bindings: normalizedPaths.map(QueryBinding.text),
+            orderBy: "t.filename ASC, t.track_index ASC",
+            sortByCatalogIdentity: false,
+            rootVisibilityPredicate: "r.is_enabled=1",
+            deadSourcePredicate: "d.path=t.path"
+        )
+    }
+
     /// Fetches the exact folder projection selected by a player, including its
     /// descendants, through source indexes rather than a full-root traversal.
     public func tracks(rootID: Int64, folderPaths: [String]) throws -> [CatalogTrack] {
@@ -381,7 +450,14 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
         case text(String)
     }
 
-    private func filteredTracks(whereClause: String, bindings: [QueryBinding]) throws -> [CatalogTrack] {
+    private func filteredTracks(
+        whereClause: String,
+        bindings: [QueryBinding],
+        orderBy: String = "lower(t.folder_path), t.folder_path, lower(t.filename), t.filename, t.archive_entry, t.track_index",
+        sortByCatalogIdentity: Bool = true,
+        rootVisibilityPredicate: String = "r.is_attached=1 AND r.is_enabled=1",
+        deadSourcePredicate: String = "d.path=COALESCE(t.archive_path, t.path)"
+    ) throws -> [CatalogTrack] {
         let sql = """
         SELECT t.id, t.root_id, t.path, NULLIF(t.archive_path, ''), NULLIF(t.archive_entry, ''), t.track_index, t.track_count,
                COALESCE(m.title, ''), COALESCE(m.game, ''), COALESCE(m.author, ''),
@@ -392,10 +468,10 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
         FROM tracks t
         INNER JOIN library_roots r ON r.id=t.root_id
         LEFT JOIN track_metadata m ON m.track_id=t.id
-        WHERE r.is_attached=1 AND r.is_enabled=1
-          AND NOT EXISTS (SELECT 1 FROM dead_sources d WHERE d.root_id=t.root_id AND d.path=COALESCE(t.archive_path, t.path))
+        WHERE \(rootVisibilityPredicate)
+          AND NOT EXISTS (SELECT 1 FROM dead_sources d WHERE d.root_id=t.root_id AND \(deadSourcePredicate))
           AND \(whereClause)
-        ORDER BY lower(t.folder_path), t.folder_path, lower(t.filename), t.filename, t.archive_entry, t.track_index;
+        ORDER BY \(orderBy);
         """
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
@@ -418,7 +494,7 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
         guard sqlite3_errcode(database) == SQLITE_OK || sqlite3_errcode(database) == SQLITE_DONE else {
             throw CatalogReaderError.sqlite(String(cString: sqlite3_errmsg(database)))
         }
-        return records.sorted(by: Self.trackComesBefore)
+        return sortByCatalogIdentity ? records.sorted(by: Self.trackComesBefore) : records
     }
 
     private func scalarInt(_ sql: String) throws -> Int {
