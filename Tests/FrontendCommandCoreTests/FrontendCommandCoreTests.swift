@@ -8,3 +8,8 @@ import Testing
     #expect(FrontendShortcutCatalog.shortcut(for: .playPause).key == "F8")
     #expect(Set(FrontendShortcutCatalog.all.map(\.command)).count == FrontendCommand.allCases.count)
 }
+
+@Test func libraryViewWordingIsExactAndDiskPathStaysSeparate() {
+    #expect(FrontendSidebarView.allCases.map(\.title) == ["Console View", "Path View", "Favorites"])
+    #expect(FrontendShortcutCatalog.shortcut(for: .sidebarDiskPath).key == "3")
+}

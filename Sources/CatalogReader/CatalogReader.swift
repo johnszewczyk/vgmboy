@@ -3,7 +3,7 @@ import SQLite3
 
 private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
-/// Schema-only, query-only access to a catalog published by MediaScanner.
+/// Schema-only, query-only access to a catalog published by ScanSong.
 /// This package contains no scanner, writer, decoder, or application target.
 public struct CatalogSummary: Codable, Equatable, Sendable {
     public let path: String
@@ -31,7 +31,7 @@ public struct CatalogRoot: Identifiable, Equatable, Sendable {
     }
 }
 
-/// A compact, published Games-sidebar row. MediaScanner maintains this
+/// A compact, published Games-sidebar row. ScanSong maintains this
 /// projection; readers only consume it.
 public struct CatalogGameBucket: Identifiable, Equatable, Sendable {
     public let rootID: Int64

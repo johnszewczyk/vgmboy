@@ -7,24 +7,49 @@ public enum CatalogBrowserMode: String, CaseIterable, Codable, Sendable {
     case paths
     case consoles
     case diskPath
+    case favorites
 }
 
 public enum CatalogBrowserView: String, Codable, Sendable {
     case paths
     case consoles
     case diskPath
+    case favorites
     case search
 }
 
 public enum CatalogBrowserContentMode: String, Codable, Sendable {
     case database
     case tree
+    case favorites
 }
 
 public enum CatalogBrowserResultSource: String, Codable, Sendable {
     case catalogPathIndex = "catalog-path-index"
     case diskPathTree = "disk-path-tree"
     case catalogConsoleIndex = "catalog-console-index"
+    case favoriteTrackHistory = "favorite-track-history"
+}
+
+public enum SidebarRowKind: String, Codable, Sendable { case folder, leaf, group }
+public enum SidebarRowGesture: String, Codable, Sendable { case primaryClick, disclosureClick, repeatedPrimaryClick, activate }
+public enum SidebarRowIntent: String, Codable, Sendable { case select, preview, toggleExpansion, activate }
+
+/// UI-neutral row policy. Renderers retain focus, geometry, and animation.
+public enum SidebarRowInteraction {
+    public static func intent(kind: SidebarRowKind, gesture: SidebarRowGesture, wasSelected: Bool = false) -> SidebarRowIntent {
+        switch gesture {
+        case .activate:
+            return .activate
+        case .disclosureClick:
+            return kind == .leaf ? .select : .toggleExpansion
+        case .repeatedPrimaryClick:
+            return kind == .leaf ? .preview : .toggleExpansion
+        case .primaryClick:
+            if kind == .leaf { return .preview }
+            return wasSelected ? .toggleExpansion : .select
+        }
+    }
 }
 
 /// Search is a temporary view. Clearing the query restores the selected mode.
@@ -43,8 +68,10 @@ public struct CatalogBrowserState: Codable, Equatable, Sendable {
             case .paths: return .paths
             case .consoles: return .consoles
             case .diskPath: return .diskPath
+            case .favorites: return .favorites
             }
         }
+        if storedMode == .favorites { return .favorites }
         return .search
     }
 
@@ -52,6 +79,7 @@ public struct CatalogBrowserState: Codable, Equatable, Sendable {
         switch view {
         case .consoles, .search: return .database
         case .paths, .diskPath: return .tree
+        case .favorites: return .favorites
         }
     }
 
@@ -60,6 +88,7 @@ public struct CatalogBrowserState: Codable, Equatable, Sendable {
         case .paths: return .catalogPathIndex
         case .diskPath: return .diskPathTree
         case .consoles, .search: return .catalogConsoleIndex
+        case .favorites: return .favoriteTrackHistory
         }
     }
 

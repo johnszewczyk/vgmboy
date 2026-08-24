@@ -26,9 +26,9 @@ public enum FrontendSidebarView: String, CaseIterable, Codable, Equatable, Senda
 
     public var title: String {
         switch self {
-        case .consoles: "Database / Console View"
-        case .paths: "Paths View"
-        case .favorites: "Favorites View"
+        case .consoles: "Console View"
+        case .paths: "Path View"
+        case .favorites: "Favorites"
         }
     }
 }

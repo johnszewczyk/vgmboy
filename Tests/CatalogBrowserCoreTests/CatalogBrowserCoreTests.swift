@@ -2,6 +2,13 @@ import CatalogReader
 import CatalogBrowserCore
 import Testing
 
+@Test func sidebarRowIntentIsRendererIndependent() {
+    #expect(SidebarRowInteraction.intent(kind: .leaf, gesture: .primaryClick) == .preview)
+    #expect(SidebarRowInteraction.intent(kind: .folder, gesture: .primaryClick) == .select)
+    #expect(SidebarRowInteraction.intent(kind: .folder, gesture: .primaryClick, wasSelected: true) == .toggleExpansion)
+    #expect(SidebarRowInteraction.intent(kind: .group, gesture: .activate) == .activate)
+}
+
 @Test func searchTemporarilyUsesCatalogConsoleView() {
     var state = CatalogBrowserState(mode: .paths)
     #expect(state.view == .paths)
@@ -13,6 +20,19 @@ import Testing
     #expect(state.resultSource == .catalogConsoleIndex)
 
     state.setQuery("")
+    #expect(state.view == .paths)
+}
+
+@Test func favoritesKeepTheirOwnSearchAndContentBoundary() {
+    var state = CatalogBrowserState(mode: .favorites, query: "  mario  ")
+    #expect(state.storedMode == .favorites)
+    #expect(state.query == "mario")
+    #expect(state.view == .favorites)
+    #expect(state.contentMode == .favorites)
+    #expect(state.resultSource == .favoriteTrackHistory)
+
+    state.setMode(.paths)
+    #expect(state.query.isEmpty)
     #expect(state.view == .paths)
 }
 

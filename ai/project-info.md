@@ -24,7 +24,7 @@ Agent engineering notes:
 
 ## Local Rules
 
-- MediaScanner is the catalog writer and scanner owner.
+- ScanSong is the catalog writer and scanner owner.
 - VGMBoy is the playback and decoder owner.
 - Frontends render snapshots and issue activation requests; they do not write
   the catalog or duplicate its SQL.

@@ -1,4 +1,5 @@
 import CatalogReader
+import CatalogPlaylistCore
 import Foundation
 import SQLite3
 import Testing
@@ -55,4 +56,27 @@ private func fixtureCatalog() throws -> URL {
     #expect(try reader.tracks(rootID: 1, game: "Chew Man Fu", system: "PC Engine", preferFoldersOverMetadata: true).count == 1)
     #expect(try reader.tracks(rootID: 1, sourcePaths: ["/music/Game/Track 10.spc"]).map(\.title) == ["Track 10"])
     #expect(try reader.tracks(rootID: 1, folderPaths: ["/music/Game"]).map(\.title) == ["Track 9", "Track 10"])
+}
+
+@Test func playlistGameProjectionPreservesOriginalSelectionSemantics() throws {
+    let url = try fixtureCatalog()
+    defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+    let tracks = try CatalogPlaylistReader.tracksForGames(
+        databaseURL: url,
+        selections: [
+            CatalogPlaylistGameSelection(rootID: 1, game: "Game", system: "SNES"),
+            CatalogPlaylistGameSelection(rootID: 1, game: "Chew Man Fu", system: "PC Engine")
+        ],
+        preferFoldersOverMetadata: true
+    )
+
+    #expect(tracks.map(\.title) == ["Track 10", "Track 9"])
+    #expect(tracks.map(\.lengthMilliseconds) == [100000, 90000])
+
+    let metadataFallbackTracks = try CatalogPlaylistReader.tracksForGames(
+        databaseURL: url,
+        selections: [CatalogPlaylistGameSelection(rootID: 1, game: "Chew Man Fu", system: "PC Engine")],
+        preferFoldersOverMetadata: false
+    )
+    #expect(metadataFallbackTracks.map(\.title) == ["Chew Man Fu"])
 }
