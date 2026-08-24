@@ -522,6 +522,50 @@ struct TimingPolicyTests {
 
 @Suite("PlaybackController timing contract")
 struct PlaybackControllerTimingTests {
+    @Test("standard finite audio keeps decoder-natural duration")
+    func standardFiniteAudioUsesFileDefaultWithoutPlayLength() throws {
+        let request = try PlaybackTimingRequest.standard(
+            path: "/tmp/song.flac",
+            longPlayEnabled: false,
+            manualPlayMilliseconds: 150_000,
+            fadeMilliseconds: 6_000
+        )
+        #expect(request.playbackMode == .fileDefault)
+        #expect(request.playMilliseconds == nil)
+        #expect(request.fadeMilliseconds == 6_000)
+    }
+
+    @Test("standard Long Play supplies the explicit manual duration")
+    func standardLongPlayUsesManualDuration() throws {
+        let request = try PlaybackTimingRequest.standard(
+            path: "/tmp/song.spc",
+            longPlayEnabled: true,
+            manualPlayMilliseconds: 240_000,
+            fadeMilliseconds: 6_000
+        )
+        #expect(request.playbackMode == .longPlay)
+        #expect(request.playMilliseconds == 240_000)
+    }
+
+    @Test("unsupported Long Play falls back to natural file-default timing")
+    func unsupportedLongPlayDoesNotForceManualDuration() throws {
+        let request = try PlaybackTimingRequest.standard(
+            path: "/tmp/song.flac",
+            longPlayEnabled: true,
+            manualPlayMilliseconds: 240_000,
+            fadeMilliseconds: 6_000
+        )
+        #expect(request.playbackMode == .fileDefault)
+        #expect(request.playMilliseconds == nil)
+    }
+
+    @Test("explicit timed requests require an actual duration")
+    func timedRequestsCannotInventTheDefaultDuration() {
+        #expect(throws: PlaybackControlError.self) {
+            try PlaybackTimingRequest.timed(playMilliseconds: 0, fadeMilliseconds: 6_000)
+        }
+    }
+
     @Test("file default with a requested fade uses the bounded shared path")
     func fileDefaultFadeIsNotNative() {
         let plan = PlaybackController.plan(
