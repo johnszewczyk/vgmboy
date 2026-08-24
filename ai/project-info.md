@@ -8,6 +8,8 @@ for the CocoaSpice family of frontends.
 ## Major Components
 
 - `CatalogReader`: schema-23 SQLite reader and canonical catalog records.
+- `CatalogSessionCore`: shared read-only sidebar bucket access and latest-task
+  cancellation/stale-result ownership.
 - `CatalogBrowserCore`: UI-neutral browser state, grouping, search, identity,
   and deterministic presentation data.
 - `FrontendCommandCore`: shared semantic shortcut definitions for native and
