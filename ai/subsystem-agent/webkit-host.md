@@ -36,6 +36,11 @@ dependency chain in one temporary directory. That resolution belongs to the
 shared `ArchiveMaterializationCore`; the WK bridge must not extract a selected
 archive member directly.
 
+Playback timing requests are normalized by the shared `VGMBoyKit.PlaybackTimingRequest` at the
+native bridge. JavaScript forwards Long Play and deliberate faded-skip intent; it does not choose
+the core's standard/timed duration policy. Ordinary finite audio therefore reaches VGMBoy with
+decoder-natural timing, while Long Play is the only normal path that supplies a manual length.
+
 ## Failure Boundaries
 
 Missing packaged resources are fatal. The host must not silently fall back to

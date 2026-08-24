@@ -614,16 +614,13 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
       playbackPath,
       track.trackIndex || 0,
       Math.round(requestedStartSeconds * 1000),
-      Math.round((fadeNowSeconds > 0 || (state.longPlayEnabled && playbackBackends.forPath(track.sourceFilename || track.path || "")?.supportsLongPlay)
+      Math.round((fadeNowSeconds > 0
         ? playbackBaseSeconds
-        : 0) * 1000),
+        : (state.longPlayEnabled ? playbackBaseSeconds : Math.max(0, state.manualPlayTimeSeconds))) * 1000),
       Math.round((fadeNowSeconds > 0 ? fadeNowSeconds : currentFadeSeconds(track)) * 1000),
       playbackSpeedForTrack(track),
+      state.longPlayEnabled,
       fadeNowSeconds > 0
-        ? "timed"
-        : (state.longPlayEnabled && playbackBackends.forPath(track.sourceFilename || track.path || "")?.supportsLongPlay
-          ? "long_play"
-          : "file_default")
     );
     if (generation !== playbackGeneration) {
       return;

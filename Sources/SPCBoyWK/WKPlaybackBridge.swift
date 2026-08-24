@@ -40,18 +40,29 @@ final class WKPlaybackBridge: @unchecked Sendable {
             let requestedPlayMilliseconds = int(args.count > 3 ? args[3] : nil)
             let fadeMilliseconds = max(0, int(args.count > 4 ? args[4] : nil) ?? 6_000)
             let tempo = number(args.count > 5 ? args[5] : nil) ?? 1
-            let mode = (args.count > 6 ? args[6] as? String : nil).flatMap(PlaybackMode.init)
-                ?? (fadeMilliseconds > 0 ? .timed : .fileDefault)
-            let playMilliseconds: Int? = mode == .fileDefault
-                ? nil
-                : max(1, requestedPlayMilliseconds ?? 150_000)
+            let longPlayEnabled = args.count > 6 ? (args[6] as? Bool) ?? false : false
+            let timedOverride = args.count > 7 ? (args[7] as? Bool) ?? false : false
+            let timing: PlaybackTimingRequest
+            if timedOverride {
+                timing = try PlaybackTimingRequest.timed(
+                    playMilliseconds: requestedPlayMilliseconds ?? 0,
+                    fadeMilliseconds: fadeMilliseconds
+                )
+            } else {
+                timing = try PlaybackTimingRequest.standard(
+                    path: path,
+                    longPlayEnabled: longPlayEnabled,
+                    manualPlayMilliseconds: requestedPlayMilliseconds ?? 0,
+                    fadeMilliseconds: fadeMilliseconds
+                )
+            }
             let payload = PlaybackControlPayload(
                 path: path,
                 trackIndex: index,
                 tempo: tempo,
-                playbackMode: mode,
-                playMilliseconds: playMilliseconds,
-                fadeMilliseconds: fadeMilliseconds
+                playbackMode: timing.playbackMode,
+                playMilliseconds: timing.playMilliseconds,
+                fadeMilliseconds: timing.fadeMilliseconds
             )
             try perform(.load, payload: payload)
             if startMilliseconds > 0 { try perform(.seek, payload: .init(positionMilliseconds: startMilliseconds)) }
