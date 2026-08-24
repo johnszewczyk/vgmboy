@@ -12,6 +12,10 @@ PSF files.
 Selecting a catalog game fills the playlist directly from indexed catalog rows;
 it does not rescan the source folders or wait for a second metadata pass.
 
+Selecting catalog files or folders uses the same shared CatalogReader projections
+as CocoaSpice. JSON is only the bridge transport; it does not define a second
+playlist query implementation.
+
 Long Play is capability-gated by the VGMBoy format registry. Standard audio,
 including FLAC, keeps its decoder-reported natural duration even when Long Play
 is enabled; loop-capable formats retain the manual Long Play duration.

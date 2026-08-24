@@ -1895,6 +1895,7 @@ function renderAll() {
   refs.playlistMonospaceCheckbox.checked = state.playlistMonospace;
   refs.applicationMonospaceCheckbox.checked = state.applicationMonospace;
   refs.playlistHeaderBoldCheckbox.checked = state.playlistHeaderBold;
+  if (document.activeElement !== refs.spcUnknownDurationInput) refs.spcUnknownDurationInput.value = uiApp.formatTime(state.unknownDurationSeconds);
   refs.columnAutoSizeCheckbox.checked = state.columnAutoSize;
   refs.autoResizeAnimationInput.value = String(state.autoResizeAnimationMilliseconds);
   refs.selectionAnimationInput.value = String(state.selectionAnimationMilliseconds);
@@ -2231,6 +2232,16 @@ function commitSpcLengthInput(rawValue) {
   state.manualPlayTimeSeconds = uiApp.normalizePlayTime(parsedSeconds ?? state.manualPlayTimeSeconds);
   persistSettings();
   window.spcBoyWK?.setPlaybackSettings?.({ manualPlayTimeSeconds: state.manualPlayTimeSeconds });
+  uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
+    console.error(error);
+  });
+}
+
+function commitUnknownDurationInput(rawValue) {
+  const parsedSeconds = uiApp.parseDurationSeconds(rawValue);
+  state.unknownDurationSeconds = uiApp.normalizePlayTime(parsedSeconds ?? state.unknownDurationSeconds);
+  persistSettings();
+  window.spcBoyWK?.setPlaybackSettings?.({ unknownDurationSeconds: state.unknownDurationSeconds });
   uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
     console.error(error);
   });
@@ -2598,6 +2609,7 @@ uiApp.ui = {
   setMonoEnabled,
   adjustAppVolume,
   commitSpcLengthInput,
+  commitUnknownDurationInput,
   commitSpcFadeInput,
   commitPlaybackSpeedInput,
   setPlaybackSpeedEnabled,

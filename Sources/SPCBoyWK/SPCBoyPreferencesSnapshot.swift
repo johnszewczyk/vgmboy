@@ -13,6 +13,7 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
     enum SortDirection: String, Codable, Sendable { case ascending, descending }
 
     var manualPlayTimeSeconds: Int?
+    var unknownDurationSeconds: Int?
     var longPlayEnabled: Bool?
     var repeatMode: RepeatMode?
     var queuedSkipsEnabled: Bool?

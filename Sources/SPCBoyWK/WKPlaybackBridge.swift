@@ -42,6 +42,11 @@ final class WKPlaybackBridge: @unchecked Sendable {
             let tempo = number(args.count > 5 ? args[5] : nil) ?? 1
             let longPlayEnabled = args.count > 6 ? (args[6] as? Bool) ?? false : false
             let timedOverride = args.count > 7 ? (args[7] as? Bool) ?? false : false
+            let unknownDurationMilliseconds = max(
+                1_000,
+                int(args.count > 8 ? args[8] : nil)
+                    ?? PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000
+            )
             let timing: PlaybackTimingRequest
             if timedOverride {
                 timing = try PlaybackTimingRequest.timed(
@@ -53,7 +58,8 @@ final class WKPlaybackBridge: @unchecked Sendable {
                     path: path,
                     longPlayEnabled: longPlayEnabled,
                     manualPlayMilliseconds: requestedPlayMilliseconds ?? 0,
-                    fadeMilliseconds: fadeMilliseconds
+                    fadeMilliseconds: fadeMilliseconds,
+                    unknownDurationMilliseconds: unknownDurationMilliseconds
                 )
             }
             let payload = PlaybackControlPayload(
@@ -62,7 +68,8 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 tempo: tempo,
                 playbackMode: timing.playbackMode,
                 playMilliseconds: timing.playMilliseconds,
-                fadeMilliseconds: timing.fadeMilliseconds
+                fadeMilliseconds: timing.fadeMilliseconds,
+                unknownDurationMilliseconds: timing.unknownDurationMilliseconds
             )
             try perform(.load, payload: payload)
             if startMilliseconds > 0 { try perform(.seek, payload: .init(positionMilliseconds: startMilliseconds)) }

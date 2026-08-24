@@ -114,6 +114,18 @@ refs.spcLengthInput.addEventListener("blur", (event) => {
   app.ui.commitSpcLengthInput(event.target.value);
 });
 
+refs.spcUnknownDurationInput.addEventListener("change", (event) => {
+  app.ui.commitUnknownDurationInput(event.target.value);
+});
+
+refs.spcUnknownDurationInput.addEventListener("input", (event) => {
+  app.ui.commitUnknownDurationInput(event.target.value);
+});
+
+refs.spcUnknownDurationInput.addEventListener("blur", (event) => {
+  app.ui.commitUnknownDurationInput(event.target.value);
+});
+
 refs.spcFadeInput.addEventListener("change", (event) => {
   app.ui.commitSpcFadeInput(event.target.value);
 });
@@ -272,6 +284,12 @@ if (window.spcBoyWK?.onPlaybackSettingsChanged) {
     }
     if (settings.manualPlayTimeSeconds !== undefined) {
       state.manualPlayTimeSeconds = app.normalizePlayTime(settings.manualPlayTimeSeconds);
+      app.persistSettings();
+      app.playback.refreshPlaybackForTimingChange().catch((error) => console.error(error));
+      app.ui.renderAll();
+    }
+    if (settings.unknownDurationSeconds !== undefined) {
+      state.unknownDurationSeconds = app.normalizePlayTime(settings.unknownDurationSeconds);
       app.persistSettings();
       app.playback.refreshPlaybackForTimingChange().catch((error) => console.error(error));
       app.ui.renderAll();

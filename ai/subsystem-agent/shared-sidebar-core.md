@@ -39,6 +39,9 @@ and persistence. This project owns only the typed native adapter and WebKit rend
 - Catalog-backed playlist rows must not stat source paths during hydration. CatalogReader supplies
   the metadata required for the playlist; filesystem inspection belongs to explicit playback or
   metadata-inspection paths.
+- Files-sidebar source selections use the shared `CatalogSourceSelection` projection, and folder
+  selections use the shared root-path folder projection. The bridge does not issue one bespoke
+  source query per file or reconstruct catalog predicates in JavaScript.
 
 ## Files
 

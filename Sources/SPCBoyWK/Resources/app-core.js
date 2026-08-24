@@ -62,6 +62,7 @@ const state = {
   elapsedSeconds: 0,
   totalSeconds: DEFAULT_PLAY_FADE_SECONDS,
   manualPlayTimeSeconds: 150,
+  unknownDurationSeconds: 150,
   spcFadeSeconds: DEFAULT_PLAY_FADE_SECONDS,
   uiItemSpacingRem: 0.2,
   uiFontSizePt: 10,
@@ -208,6 +209,7 @@ const refs = {
   queuedSkipsCheckbox: document.getElementById("queued-skips-checkbox"),
   spcFadeCheckbox: document.getElementById("spc-fade-checkbox"),
   spcLengthInput: document.getElementById("spc-length-input"),
+  spcUnknownDurationInput: document.getElementById("spc-unknown-duration-input"),
   spcFadeInput: document.getElementById("spc-fade-input"),
   playbackSpeedInput: document.getElementById("libgme-playback-speed-input"),
   playbackSpeedEnabledCheckbox: document.getElementById("libgme-playback-speed-enabled-checkbox"),
@@ -251,6 +253,7 @@ async function loadSettings() {
   try {
     const parsed = await window.spcBoyWK.frontendSettingsLoad();
     state.manualPlayTimeSeconds = normalizePlayTime(parsed.manualPlayTimeSeconds);
+    state.unknownDurationSeconds = normalizePlayTime(parsed.unknownDurationSeconds);
     state.longPlayEnabled = Boolean(parsed.longPlayEnabled);
     state.repeatMode = ["off", "all", "one"].includes(parsed.repeatMode) ? parsed.repeatMode : "off";
     state.queuedSkipsEnabled = Boolean(parsed.queuedSkipsEnabled);
@@ -311,6 +314,7 @@ async function loadSettings() {
 function persistSettings() {
   const settings = {
     manualPlayTimeSeconds: state.manualPlayTimeSeconds,
+    unknownDurationSeconds: state.unknownDurationSeconds,
     longPlayEnabled: state.longPlayEnabled,
     repeatMode: state.repeatMode,
     queuedSkipsEnabled: state.queuedSkipsEnabled,

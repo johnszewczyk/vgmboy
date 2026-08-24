@@ -97,7 +97,7 @@ function currentBasePlaybackSeconds(track) {
     return track.basePlaybackSeconds;
   }
 
-  return state.manualPlayTimeSeconds;
+  return state.unknownDurationSeconds;
 }
 
 function playbackSpeedForTrack(track) {
@@ -157,6 +157,9 @@ function updateTimingSummary() {
   refs.progressSlider.max = String(Math.max(totalSeconds, 1));
   if (!shouldPreserveFieldValue(refs.spcLengthInput)) {
     refs.spcLengthInput.value = formatTime(state.manualPlayTimeSeconds);
+  }
+  if (!shouldPreserveFieldValue(refs.spcUnknownDurationInput)) {
+    refs.spcUnknownDurationInput.value = formatTime(state.unknownDurationSeconds);
   }
   if (!shouldPreserveFieldValue(refs.spcFadeInput)) {
     refs.spcFadeInput.value = formatTime(state.spcFadeSeconds);
@@ -616,11 +619,12 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
       Math.round(requestedStartSeconds * 1000),
       Math.round((fadeNowSeconds > 0
         ? playbackBaseSeconds
-        : (state.longPlayEnabled ? playbackBaseSeconds : Math.max(0, state.manualPlayTimeSeconds))) * 1000),
+      : (state.longPlayEnabled ? playbackBaseSeconds : Math.max(0, state.manualPlayTimeSeconds))) * 1000),
       Math.round((fadeNowSeconds > 0 ? fadeNowSeconds : currentFadeSeconds(track)) * 1000),
       playbackSpeedForTrack(track),
       state.longPlayEnabled,
-      fadeNowSeconds > 0
+      fadeNowSeconds > 0,
+      Math.round(state.unknownDurationSeconds * 1000)
     );
     if (generation !== playbackGeneration) {
       return;

@@ -448,16 +448,23 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     nonisolated private static func fileTracks(_ value: Any?, catalogURL: URL, folders: Bool) throws -> [[String: Any]] {
         guard let values = value as? [[String: Any]] else { return [] }
         let catalog = try openCatalog(catalogURL)
-        var tracks: [CatalogTrack] = []
-        for item in values {
-            guard let rootID = int64(item["rootId"]) else { continue }
-            if folders, let path = item["folderPath"] as? String {
-                tracks += try catalog.tracks(rootID: rootID, folderPaths: [path])
-            } else if !folders, let path = item["path"] as? String {
-                tracks += try catalog.tracks(rootID: rootID, sourcePaths: [path])
-            }
-        }
         let roots = Dictionary(uniqueKeysWithValues: try catalog.roots().map { ($0.id, $0.path) })
+        var tracks: [CatalogTrack] = []
+        if folders {
+            for item in values {
+                guard let rootID = int64(item["rootId"]),
+                      let folderPath = item["folderPath"] as? String,
+                      let rootPath = (item["rootPath"] as? String) ?? roots[rootID] else { continue }
+                tracks += try catalog.tracks(rootPath: rootPath, folderPath: folderPath)
+            }
+        } else {
+            let selections = values.compactMap { item -> CatalogSourceSelection? in
+                guard let rootID = int64(item["rootId"]),
+                      let path = item["path"] as? String else { return nil }
+                return CatalogSourceSelection(rootID: rootID, path: path)
+            }
+            tracks = try catalog.tracks(sourceSelections: selections)
+        }
         return tracks.map { trackResponse($0, rootPath: roots[$0.rootID] ?? "") }
     }
 
