@@ -141,11 +141,11 @@ public final class ArchiveMaterializer: @unchecked Sendable {
     }
 
     private func normalizedArchiveEntry(_ entry: String) throws -> String {
-        let components = entry.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
-        guard !components.isEmpty, !components.contains("..") else {
+        let normalized = ArchiveEntryPath.normalized(entry)
+        guard !normalized.isEmpty, ArchiveEntryPath.isSafe(normalized) else {
             throw ArchiveMaterializationError.invalidEntry
         }
-        return components.filter { $0 != "." }.joined(separator: "/")
+        return normalized
     }
 
     private func extractWithBSDTar(archiveURL: URL, entry: String, output: URL) throws {
