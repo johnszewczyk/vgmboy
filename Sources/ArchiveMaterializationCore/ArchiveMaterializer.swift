@@ -14,10 +14,19 @@ public final class ArchiveMaterializer: @unchecked Sendable {
 
     private let lock = NSLock()
     private let configuration: ArchiveMaterializerConfiguration
+    private let processRunner: ArchiveProcessRunner
     private var activeDirectory: URL?
 
     public init(configuration: ArchiveMaterializerConfiguration = .default) {
         self.configuration = configuration
+        self.processRunner = ArchiveProcessRunner(configuration: .init(
+            environment: ProcessInfo.processInfo.environment,
+            temporaryFilePrefix: "FrontendCore-materializer",
+            maxConcurrency: max(1, ProcessInfo.processInfo.activeProcessorCount - 1),
+            listingTimeout: 30,
+            extractionTimeout: 600,
+            capturedOutputMaximumBytes: 64 * 1024 * 1024
+        ))
     }
 
     @discardableResult
@@ -90,10 +99,20 @@ public final class ArchiveMaterializer: @unchecked Sendable {
 
     private func extractArchiveEntryOnce(archiveURL: URL, entry: String, output: URL) throws {
         try? FileManager.default.removeItem(at: output)
-        if archiveURL.path.lowercased().hasSuffix(".tar.zst") || archiveURL.path.lowercased().hasSuffix(".tar.zstd") {
+        guard let kind = ArchiveContainerKind(archiveURL: archiveURL) else {
+            throw ArchiveMaterializationError.toolUnavailable("supported archive format")
+        }
+        if kind == .tarZstandard {
             try extractTarZstd(archiveURL: archiveURL, entry: entry, output: output)
         } else {
-            try extractWithBSDTar(archiveURL: archiveURL, entry: entry, output: output)
+            try extractWithArchiveTool(
+                ArchiveToolRouting.selectedEntryToStdout(
+                    kind: kind,
+                    archiveURL: archiveURL,
+                    entryPath: entry
+                ),
+                outputURL: output
+            )
         }
     }
 
@@ -148,20 +167,26 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         return normalized
     }
 
-    private func extractWithBSDTar(archiveURL: URL, entry: String, output: URL) throws {
-        let process = Process()
-        process.executableURL = try configuration.bsdtarURL()
-        process.arguments = ["-xOf", archiveURL.path, entry]
-        FileManager.default.createFile(atPath: output.path, contents: nil)
-        let outputHandle = try FileHandle(forWritingTo: output)
-        defer { try? outputHandle.close() }
-        process.standardOutput = outputHandle
-        let errorPipe = Pipe()
-        process.standardError = errorPipe
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            throw ArchiveMaterializationError.extractFailed(Self.errorText(from: errorPipe))
+    private func extractWithArchiveTool(
+        _ invocation: ArchiveToolInvocation,
+        outputURL: URL
+    ) throws {
+        do {
+            switch invocation {
+            case let .process(executableName, arguments):
+                try processRunner.runWritingOutput(
+                    executable: try configuration.executableURL(named: executableName).path,
+                    arguments: arguments,
+                    outputURL: outputURL,
+                    operation: .extraction
+                )
+            case .zstandardTar:
+                throw ArchiveMaterializationError.invalidEntry
+            }
+        } catch let error as ArchiveMaterializationError {
+            throw error
+        } catch {
+            throw ArchiveMaterializationError.extractFailed(Self.errorText(from: error))
         }
     }
 
@@ -199,23 +224,41 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    private static func errorText(from error: Error) -> String {
+        let description = (error as? LocalizedError)?.errorDescription
+            ?? String(describing: error)
+        return description.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
 
 public struct ArchiveMaterializerConfiguration: Sendable {
     public var temporaryDirectoryName: String
     public var bsdtarCandidates: [String]
     public var zstdCandidates: [String]
+    public var sevenZipCandidates: [String]
+    public var unarCandidates: [String]
 
     public static let `default` = ArchiveMaterializerConfiguration(
         temporaryDirectoryName: "FrontendCore",
         bsdtarCandidates: ["/usr/bin/bsdtar", "/opt/homebrew/bin/bsdtar", "/usr/local/bin/bsdtar"],
-        zstdCandidates: ["/opt/homebrew/bin/zstd", "/usr/local/bin/zstd", "/usr/bin/zstd"]
+        zstdCandidates: ["/opt/homebrew/bin/zstd", "/usr/local/bin/zstd", "/usr/bin/zstd"],
+        sevenZipCandidates: ["/opt/homebrew/bin/7zz", "/usr/local/bin/7zz", "/usr/bin/7zz"],
+        unarCandidates: ["/opt/homebrew/bin/unar", "/usr/local/bin/unar", "/usr/bin/unar"]
     )
 
-    public init(temporaryDirectoryName: String, bsdtarCandidates: [String], zstdCandidates: [String]) {
+    public init(
+        temporaryDirectoryName: String,
+        bsdtarCandidates: [String],
+        zstdCandidates: [String],
+        sevenZipCandidates: [String] = ["/opt/homebrew/bin/7zz", "/usr/local/bin/7zz", "/usr/bin/7zz"],
+        unarCandidates: [String] = ["/opt/homebrew/bin/unar", "/usr/local/bin/unar", "/usr/bin/unar"]
+    ) {
         self.temporaryDirectoryName = temporaryDirectoryName
         self.bsdtarCandidates = bsdtarCandidates
         self.zstdCandidates = zstdCandidates
+        self.sevenZipCandidates = sevenZipCandidates
+        self.unarCandidates = unarCandidates
     }
 
     fileprivate func bsdtarURL() throws -> URL {
@@ -224,6 +267,16 @@ public struct ArchiveMaterializerConfiguration: Sendable {
 
     fileprivate func zstdURL() throws -> URL {
         try executableURL(from: zstdCandidates, name: "zstd")
+    }
+
+    fileprivate func executableURL(named name: String) throws -> URL {
+        switch name {
+        case "7zz": return try executableURL(from: sevenZipCandidates, name: name)
+        case "unar": return try executableURL(from: unarCandidates, name: name)
+        case "tar": return try bsdtarURL()
+        case "zstd": return try zstdURL()
+        default: throw ArchiveMaterializationError.toolUnavailable(name)
+        }
     }
 
     private func executableURL(from candidates: [String], name: String) throws -> URL {

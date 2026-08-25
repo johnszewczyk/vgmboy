@@ -30,6 +30,18 @@ public enum ArchiveEntryPath {
             .filter { !$0.isEmpty && $0 != "." && $0 != ".." }
     }
 
+    /// BSD tar treats selected member arguments as patterns. Quote the pattern
+    /// metacharacters so a scanned archive path is selected literally.
+    public static func tarMemberSelectionPatterns(_ entryPaths: [String]) -> [String] {
+        entryPaths.map { entryPath in
+            entryPath
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "*", with: "\\*")
+                .replacingOccurrences(of: "?", with: "\\?")
+                .replacingOccurrences(of: "[", with: "\\[")
+        }
+    }
+
     private static func containsTarOctalEscape(_ path: String) -> Bool {
         let bytes = Array(path.utf8)
         guard bytes.count >= 4 else { return false }

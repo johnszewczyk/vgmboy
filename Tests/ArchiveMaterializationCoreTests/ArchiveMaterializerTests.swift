@@ -60,3 +60,34 @@ import Testing
     #expect(try Data(contentsOf: dependency) == library)
     materializer.release()
 }
+
+@Test func materializesSevenZipEntryThroughSharedToolRouting() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("ArchiveMaterializer7z-\(UUID().uuidString)")
+    let source = root.appendingPathComponent("source", isDirectory: true)
+    let archive = root.appendingPathComponent("library.7z")
+    let selectedData = Data("shared-routing-entry".utf8)
+    try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+    try selectedData.write(to: source.appendingPathComponent("track.spc"))
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let sevenZip = "/opt/homebrew/bin/7zz"
+    #expect(FileManager.default.isExecutableFile(atPath: sevenZip))
+    let creator = Process()
+    creator.executableURL = URL(fileURLWithPath: sevenZip)
+    creator.arguments = ["a", archive.path, "track.spc"]
+    creator.currentDirectoryURL = source
+    try creator.run()
+    creator.waitUntilExit()
+    #expect(creator.terminationStatus == 0)
+
+    let materializer = ArchiveMaterializer(configuration: .init(
+        temporaryDirectoryName: "FrontendCoreTests",
+        bsdtarCandidates: [],
+        zstdCandidates: [],
+        sevenZipCandidates: [sevenZip],
+        unarCandidates: []
+    ))
+    let selected = try materializer.materialize(archivePath: archive.path, entry: "track.spc")
+    #expect(try Data(contentsOf: selected) == selectedData)
+    materializer.release()
+}
