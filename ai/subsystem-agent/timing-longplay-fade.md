@@ -15,10 +15,9 @@ Frontends must not manufacture a timed request with a missing duration.
 `TimingPolicy.plan` turns a requested mode and `TrackMetadata` into a `PlaybackPlan`
 (`preFadeSeconds`, `fadeSeconds`, `isLongPlay`, `usesNativeEnding`, `totalSeconds`).
 `PlaybackSession.load` applies the plan: for a native ending it uses decoder-native ending only
-when the decoder also owns its fade. If a decoder exposes authored timing but not fade DSP (such
-as Highly Complete/mGBA), the session uses the tagged play length plus fade as a shared cap and
-applies the common linear fade. Capped windows call `configureFade` and cap the stream at
-`totalSeconds * sampleRate`.
+when the decoder also owns its fade. Libvgm exposes natural timing but its bridge does not start
+an internal fade at an ordinary file end, so it uses the same session-boundary fade as Highly
+Complete/mGBA. Capped windows call `configureFade` and cap the stream at `totalSeconds * sampleRate`.
 The controller also forces any nonzero requested fade through this bounded path, including when
 the public mode is `file_default`; this prevents a client from accidentally bypassing fade by
 combining a native-ending mode with an explicit fade value.
@@ -44,9 +43,9 @@ combining a native-ending mode with an explicit fade value.
   fade, an unknown-duration track using the default is capped at 156 seconds total; with fade
   disabled it is capped at 150.
 - Families with `hasNaturalEnding == false` never use a native ending — always a capped window.
-- The fade is applied once. Cores with native fade (`appliesFadeInternally`) do their own ramp and
-  the session adds none; real-PCM cores get a linear fade-out over the final `fadeSeconds` before
-  the cap from `PlaybackSession.applyFadeIfNeeded`.
+- The fade is applied once. Cores that truly own native fade (`appliesFadeInternally`) do their
+  own ramp and the session adds none; libvgm and real-PCM cores get a linear fade-out over the
+  final `fadeSeconds` before the cap from `PlaybackSession.applyFadeIfNeeded`.
 - `fadeGain` is a pure function of frame position so it is unit-testable.
 
 ## Lifecycle

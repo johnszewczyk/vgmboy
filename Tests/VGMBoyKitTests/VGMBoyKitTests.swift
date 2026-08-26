@@ -795,3 +795,29 @@ func flacFixtureUsesSafeSequentialReader() throws {
     decoder.seek(milliseconds: min(metadata.playMs / 2, 1_000))
     #expect(decoder.absolutePlayedFrames > 0)
 }
+
+@Test(
+    "libvgm VGM natural endings use the shared session fade boundary",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["VGMBoy_VGM_FIXTURE"] != nil,
+        "Set VGMBoy_VGM_FIXTURE to run the archive-backed Namco VGM check."
+    )
+)
+func vgmFixtureUsesSharedFadeBoundary() throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBoy_VGM_FIXTURE"])
+    let decoder = try VGMDecoder(path: path)
+    try decoder.startTrack(0)
+    let metadata = try decoder.metadata(for: 0)
+    #expect(metadata.playMs > 0)
+    #expect(!decoder.appliesFadeInternally)
+    let fadePlan = TimingPolicy.plan(
+        supportsLongPlay: true,
+        metadata: metadata,
+        longPlayEnabled: false,
+        manualSeconds: 150,
+        fadeSeconds: 6,
+        hasNaturalEnding: true
+    )
+    #expect(!fadePlan.usesNativeEnding)
+    #expect(fadePlan.preFadeSeconds == Int((Double(metadata.playMs) / 1_000.0).rounded()))
+}

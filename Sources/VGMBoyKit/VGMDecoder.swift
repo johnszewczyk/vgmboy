@@ -21,7 +21,11 @@ enum VGMDecoderError: LocalizedError {
 /// Wraps the libvgm core (VGM/VGZ/GYM/S98/DRO) through the CLibVGM bridge.
 /// Single-track. The bridge handles VGZ gzip decompression internally.
 final class VGMDecoder: AudioDecoder, @unchecked Sendable {
-    var appliesFadeInternally: Bool { true }
+    // The bridge exposes libvgm's natural timing, but its PlayerA wrapper
+    // does not start an internal fade for an ordinary file end. Keep fade
+    // ownership at PlaybackSession so natural-end, Long Play, and skip paths
+    // use the same bounded output fade.
+    var appliesFadeInternally: Bool { false }
     let sampleRate: Int
     private let handle: libvgm_player_handle_t
     private var absoluteFrames: Int64 = 0
