@@ -19,6 +19,85 @@ public struct PlaybackQueueReplacementState: Equatable, Sendable, Codable {
     }
 }
 
+/// Value-only queue identity shared by native frontends.
+///
+/// This is deliberately unaware of track models, decoders, and presentation.
+/// It centralizes the transitions that must remain identical when a frontend
+/// replaces a playlist, navigates from the transport, or handles natural end.
+public struct PlaybackQueueState: Equatable, Sendable, Codable {
+    public let currentTrackID: String?
+    public let selectedTrackID: String?
+    public let pendingTrackID: String?
+
+    public init(
+        currentTrackID: String?,
+        selectedTrackID: String?,
+        pendingTrackID: String?
+    ) {
+        self.currentTrackID = currentTrackID
+        self.selectedTrackID = selectedTrackID
+        self.pendingTrackID = pendingTrackID
+    }
+
+    public func replacing(
+        playlistIDs: [String],
+        preservePlayback: Bool
+    ) -> PlaybackQueueState {
+        let replacementCurrentTrackID = preservePlayback ? currentTrackID : nil
+        let replacementPendingTrackID = preservePlayback ? pendingTrackID : nil
+        let replacementSelectedTrackID: String?
+
+        if let replacementCurrentTrackID,
+           playlistIDs.contains(replacementCurrentTrackID) {
+            replacementSelectedTrackID = replacementCurrentTrackID
+        } else {
+            replacementSelectedTrackID = playlistIDs.first
+        }
+
+        return PlaybackQueueState(
+            currentTrackID: replacementCurrentTrackID,
+            selectedTrackID: replacementSelectedTrackID,
+            pendingTrackID: replacementPendingTrackID
+        )
+    }
+
+    public func transportTargetID(playlistIDs: [String]) -> String? {
+        PlaybackQueueNavigation.transportPlaybackTarget(
+            currentTrackID: currentTrackID,
+            selectedTrackID: selectedTrackID,
+            playlistIDs: playlistIDs
+        )
+    }
+
+    public func navigationAnchorID(playlistIDs: [String]) -> String? {
+        pendingTrackID ?? currentTrackID ?? transportTargetID(playlistIDs: playlistIDs)
+    }
+
+    public func adjacentTargetID(
+        playlistIDs: [String],
+        direction: PlaybackQueueDirection,
+        wraps: Bool
+    ) -> String? {
+        PlaybackQueueNavigation.adjacentTrackID(
+            currentTrackID: navigationAnchorID(playlistIDs: playlistIDs),
+            playlistIDs: playlistIDs,
+            direction: direction,
+            wraps: wraps
+        )
+    }
+
+    public func completionTargetID(
+        playlistIDs: [String],
+        repeatMode: PlaybackRepeatMode
+    ) -> String? {
+        PlaybackQueueNavigation.completionTargetID(
+            currentTrackID: currentTrackID,
+            playlistIDs: playlistIDs,
+            repeatMode: repeatMode
+        )
+    }
+}
+
 /// Queue identity policy shared by native frontends.
 ///
 /// This type deliberately works on stable track IDs rather than frontend
@@ -127,19 +206,14 @@ public enum PlaybackQueueNavigation {
         playlistIDs: [String],
         preservePlayback: Bool
     ) -> PlaybackQueueReplacementState {
-        let replacementCurrentTrackID = preservePlayback ? currentTrackID : nil
-        let replacementSelectedTrackID: String?
-
-        if let replacementCurrentTrackID,
-           playlistIDs.contains(replacementCurrentTrackID) {
-            replacementSelectedTrackID = replacementCurrentTrackID
-        } else {
-            replacementSelectedTrackID = playlistIDs.first
-        }
-
+        let state = PlaybackQueueState(
+            currentTrackID: currentTrackID,
+            selectedTrackID: nil,
+            pendingTrackID: nil
+        ).replacing(playlistIDs: playlistIDs, preservePlayback: preservePlayback)
         return PlaybackQueueReplacementState(
-            currentTrackID: replacementCurrentTrackID,
-            selectedTrackID: replacementSelectedTrackID
+            currentTrackID: state.currentTrackID,
+            selectedTrackID: state.selectedTrackID
         )
     }
 }

@@ -81,3 +81,41 @@ func replacementClearsCurrentUnlessPlaybackIsExplicitlyPreserved() {
         preservePlayback: true
     ) == PlaybackQueueReplacementState(currentTrackID: "old", selectedTrackID: "new-one"))
 }
+
+@Test
+func queueStateSharesReplacementAnchorAndCompletionTransitions() {
+    let state = PlaybackQueueState(
+        currentTrackID: "old",
+        selectedTrackID: "new-two",
+        pendingTrackID: "new-one"
+    )
+    let ids = ["new-one", "new-two", "new-three"]
+
+    #expect(state.navigationAnchorID(playlistIDs: ids) == "new-one")
+    #expect(state.adjacentTargetID(
+        playlistIDs: ids,
+        direction: .next,
+        wraps: true
+    ) == "new-two")
+    #expect(state.completionTargetID(
+        playlistIDs: ids,
+        repeatMode: .off
+    ) == "new-one")
+
+    #expect(state.replacing(
+        playlistIDs: ids,
+        preservePlayback: false
+    ) == PlaybackQueueState(
+        currentTrackID: nil,
+        selectedTrackID: "new-one",
+        pendingTrackID: nil
+    ))
+    #expect(state.replacing(
+        playlistIDs: ids,
+        preservePlayback: true
+    ) == PlaybackQueueState(
+        currentTrackID: "old",
+        selectedTrackID: "new-one",
+        pendingTrackID: "new-one"
+    ))
+}

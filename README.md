@@ -40,10 +40,12 @@ VGMBoy session from concurrent native bridge commands. It does not own a
 playlist, queue policy, decoder, or renderer.
 
 `PlaybackQueueCore` owns the shared queue identity rules extracted from
-CocoaSpice: transport target resolution, adjacent-track navigation, natural
-completion continuation, and replacement-queue current/selected state. It
-operates on stable IDs so native CocoaSpice models and SPCBoyWK's WebKit
-renderer use the same transitions without sharing UI models.
+CocoaSpice. `PlaybackQueueState` is the value-only transition contract for
+current/selected/pending identity, playlist replacement, transport target and
+adjacent-track navigation, and natural completion continuation. It operates on
+stable IDs so native CocoaSpice models and SPCBoyWK's WebKit renderer use the
+same transitions without sharing UI models. `PlaybackQueueNavigation` remains
+the lower-level pure calculation layer used by that state contract.
 
 `PlaybackTransportCore` owns the shared native transport boundary: queued
 adjacent-track fade eligibility and bounded fade duration, serialized commands,
