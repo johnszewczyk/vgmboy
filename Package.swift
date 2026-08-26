@@ -40,7 +40,13 @@ let package = Package(
         .target(name: "FrontendPreferencesCore"),
         .target(name: "PlaybackRequestCore"),
         .target(name: "PlaybackQueueCore"),
-        .target(name: "PlaybackTransportCore"),
+        .target(
+            name: "PlaybackTransportCore",
+            dependencies: [
+                "PlaybackRequestCore",
+                .product(name: "VGMBoyKit", package: "VGMBoy")
+            ]
+        ),
         .testTarget(name: "ArchiveMaterializationCoreTests", dependencies: ["ArchiveMaterializationCore"]),
         .testTarget(name: "ArchiveCacheCoreTests", dependencies: ["ArchiveCacheCore"]),
         .testTarget(name: "LocalFileBrowserCoreTests", dependencies: ["LocalFileBrowserCore"]),

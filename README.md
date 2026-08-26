@@ -2,9 +2,11 @@
 
 Small, UI-neutral support shared by native frontend hosts.
 
-`FrontendPreferencesCore` supplies the cross-app 200 ms animation defaults and
-safe 0–1000 ms bounds. Each frontend retains its own renderer and persists its
-own typed preference snapshot.
+`FrontendPreferencesCore` supplies the cross-app animation defaults, enable
+flags, safe 0–1000 ms bounds, and the default-on column auto-size preference.
+`FrontendPreferencesStore` and `FrontendPreferencesCoordinator` provide the
+shared UserDefaults-backed interface state boundary; each frontend supplies
+only its key namespace and renderer while using the same preference meanings.
 
 `ArchiveMaterializationCore` turns a catalog-selected archive member into a
 dependency-complete temporary or cache-backed playable file. Its format
@@ -43,10 +45,19 @@ completion continuation, and replacement-queue current/selected state. It
 operates on stable IDs so native CocoaSpice models and SPCBoyWK's WebKit
 renderer use the same transitions without sharing UI models.
 
-`PlaybackTransportCore` owns pure transport decisions that are shared across
-frontends but do not touch audio: queued adjacent-track fade eligibility and
-the bounded fade duration. VGMBoy remains responsible for the actual output
-gain ramp and decoder timing.
+`PlaybackTransportCore` owns the shared native transport boundary: queued
+adjacent-track fade eligibility and bounded fade duration, serialized commands,
+request invalidation, timing reconfiguration, status snapshots, and the
+one-shot generation-checked natural-end event. VGMBoy remains responsible for
+the actual output gain ramp and decoder timing.
+
+`VGMBoyKit` owns the shared `PlaybackTimingPolicy`, configurable fade policy,
+tempo-aware playback plan, and offline `AACExporter`. Frontends may expose
+controls and destinations, but do not decode or render audio themselves.
+
+`ArchiveCacheCore` exposes the canonical cache choices of 2, 4, 8, and 16 GB
+with a 2 GB default. Frontend option panels must consume that policy rather
+than maintaining app-specific cache ranges.
 
 The current implementation supports normal archives through `bsdtar` and
 `.tar.zst`/`.tar.zstd` through `zstd` piped into `bsdtar`. The shared
