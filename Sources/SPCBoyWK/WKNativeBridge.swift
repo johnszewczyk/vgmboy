@@ -136,6 +136,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             databaseGroupState: (...args) => request("databaseGroupState", args),
             catalogSessionInvalidate: (...args) => request("catalogSessionInvalidate", args),
             playbackQueueTransition: (...args) => request("playbackQueueTransition", args),
+            playbackCompletionDecision: (...args) => request("playbackCompletionDecision", args),
             playbackFadeDuration: (...args) => request("playbackFadeDuration", args),
             databaseFileTracks: (...args) => request("databaseFileTracks", args),
             databaseFolderTracks: (...args) => request("databaseFolderTracks", args),
@@ -479,6 +480,32 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 ]
             default:
                 throw BridgeError.invalidArguments
+            }
+        case "playbackCompletionDecision":
+            guard let request = args.first as? [String: Any],
+                  let statePayload = request["state"] as? [String: Any],
+                  let intent = request["intent"] as? [String: Any] else {
+                throw BridgeError.invalidArguments
+            }
+            let state = PlaybackQueueState(
+                currentTrackID: statePayload["currentTrackId"] as? String,
+                selectedTrackID: statePayload["selectedTrackId"] as? String,
+                pendingTrackID: statePayload["pendingTrackId"] as? String
+            )
+            let repeatMode: PlaybackRepeatMode = switch intent["repeatMode"] as? String {
+            case "one": .song
+            case "all": .playlist
+            default: .off
+            }
+            let decision = state.completionDecision(
+                playlistIDs: stringArray(request["playlistIds"]),
+                repeatMode: repeatMode
+            )
+            switch decision.action {
+            case .stop:
+                return ["action": "stop"]
+            case .play(let trackID):
+                return ["action": "play", "trackId": trackID]
             }
         case "playbackFadeDuration":
             let duration = PlaybackFadePolicy.queuedSkipDuration(

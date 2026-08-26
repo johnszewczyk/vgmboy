@@ -167,6 +167,7 @@ function makeHarness() {
       queueTransitionRequests.push(request);
       return null;
     },
+    playbackCompletionDecision: async () => ({ action: "stop" }),
     playbackFadeDuration: async () => 6_000,
       setPlaybackPowerSaveBlocker: async () => {},
       releaseMaterializedTrack: async () => {}
@@ -283,7 +284,7 @@ test("SPCBoyWK drops a stale natural-end finalizer after replacement", async () 
   // The production finalizer must validate its captured generation after the
   // queue lookup; the harness replaces the bridge method for that await.
   const completionTarget = new Promise((resolve) => { releaseCompletionTarget = resolve; });
-  window.spcBoyWK.playbackQueueTransition = async () => completionTarget;
+  window.spcBoyWK.playbackCompletionDecision = async () => completionTarget;
   const finalizer = app.playback.finalizePlaybackEnded();
   state.currentTrackId = "track-b";
   state.currentTrackInfo = state.playlist[1];
@@ -311,7 +312,7 @@ test("SPCBoyWK advances after the completed session is retired", async () => {
   state.selectedTrackId = "track-a";
   state.isPlaying = true;
   state.nativePlayback = { ...state.nativePlayback, generation: 7, trackLoaded: true };
-  window.spcBoyWK.playbackQueueTransition = async () => "track-b";
+  window.spcBoyWK.playbackCompletionDecision = async () => ({ action: "play", trackId: "track-b" });
 
   await app.playback.finalizePlaybackEnded();
 

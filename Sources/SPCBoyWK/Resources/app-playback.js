@@ -595,9 +595,9 @@ async function finalizePlaybackEnded() {
     const finalizationGeneration = playbackGeneration;
     const completedTrackId = state.currentTrackId;
     const completedQueuedSkip = queuedSkipRequest;
-    let completionTargetId = null;
+    let completionDecision = { action: "stop" };
     if (!completedQueuedSkip) {
-      completionTargetId = await window.spcBoyWK.playbackQueueTransition({
+      completionDecision = await window.spcBoyWK.playbackCompletionDecision({
         state: {
           currentTrackId: completedTrackId,
           selectedTrackId: state.selectedTrackId,
@@ -607,6 +607,9 @@ async function finalizePlaybackEnded() {
         intent: { kind: "completion", repeatMode: state.repeatMode }
       });
     }
+    const completionTargetId = completionDecision?.action === "play"
+      ? completionDecision.trackId
+      : null;
     if (finalizationGeneration !== playbackGeneration
         || state.currentTrackId !== completedTrackId) {
       return;
