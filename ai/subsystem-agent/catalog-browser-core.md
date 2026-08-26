@@ -31,6 +31,16 @@ write SQLite, or activate playback.
   transitions. A group toggle clears game selection and never activates a
   child; frontends retain only their row rendering, focus, scroll, and
   persistence adapters.
+- `CatalogFileTreeIndex` owns the database-only Files graph: root/folder
+  identity, parent links, localized deterministic ordering, and flattening
+  against a caller-supplied disclosure set. `CatalogFileSearchIndex` owns the
+  filename/folder/full-path matching fields and cooperative cancellation.
+  These indexes never enumerate the filesystem, inspect archives, render rows,
+  or own selection and scroll state.
+- The native and WebKit frontends may map `CatalogFileTreeIndex.Row` and
+  `CatalogFileBucket` into AppKit row enums or bridge records. That mapping is
+  an adapter; a frontend must not rebuild the folder graph or create a second
+  file-search policy.
 
 ## Files
 

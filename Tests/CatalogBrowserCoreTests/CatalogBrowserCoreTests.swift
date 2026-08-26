@@ -62,6 +62,49 @@ import Testing
     #expect(index.matchingIndices(query: "") == [0, 1, 2])
 }
 
+@Test func fileTreeProjectionPreservesNativeFolderGraphAndRows() {
+    let root = "/music/Library"
+    let files = [
+        CatalogFileBucket(rootID: 1, rootPath: root, folderPath: "\(root)/NES", path: "\(root)/NES/zelda.nsf", isArchive: true, trackCount: 2),
+        CatalogFileBucket(rootID: 1, rootPath: root, folderPath: "\(root)/Neo Geo CD/KOF 96", path: "\(root)/Neo Geo CD/KOF 96/01.vgm", isArchive: false, trackCount: 1),
+        CatalogFileBucket(rootID: 1, rootPath: root, folderPath: "\(root)/Neo Geo CD/KOF 96", path: "\(root)/Neo Geo CD/KOF 96/00.vgm", isArchive: false, trackCount: 1)
+    ]
+    let index = CatalogFileTreeIndex(files: files)
+    let rootID = CatalogFileTreeIndex.folderID(rootID: 1, path: root)
+    let consoleID = CatalogFileTreeIndex.folderID(rootID: 1, path: "\(root)/Neo Geo CD")
+    let gameID = CatalogFileTreeIndex.folderID(rootID: 1, path: "\(root)/Neo Geo CD/KOF 96")
+
+    #expect(index.allFolderIDs == [rootID, consoleID, gameID, CatalogFileTreeIndex.folderID(rootID: 1, path: "\(root)/NES")])
+    #expect(index.rows(expandedFolderIDs: []).map { row in
+        if case .folder(let id, _, _, _) = row { return id }
+        return "file"
+    } == [rootID])
+
+    let rows = index.rows(expandedFolderIDs: [rootID, consoleID, gameID])
+    #expect(rows.count == 6)
+    if case .folder(_, let title, _, _) = rows[1] {
+        #expect(title == "Neo Geo CD")
+    } else {
+        Issue.record("Expected Neo Geo CD folder row")
+    }
+    if case .file(let file, _) = rows[3] {
+        #expect(file.path.hasSuffix("/00.vgm"))
+    } else {
+        Issue.record("Expected first KOF 96 file row")
+    }
+}
+
+@Test func fileSearchIndexSupportsCancellationAndSharedSearchFields() {
+    let files = [
+        CatalogFileBucket(rootID: 1, rootPath: "/music/Library", folderPath: "/music/Library/NES", path: "/music/Library/NES/ActRaiser.nsf", isArchive: true, trackCount: 1),
+        CatalogFileBucket(rootID: 1, rootPath: "/music/Library", folderPath: "/music/Library/SNES", path: "/music/Library/SNES/Chrono.spc", isArchive: false, trackCount: 1)
+    ]
+    let index = CatalogFileSearchIndex(files: files)
+    #expect(index.matchingFiles(query: "act nes") == [files[0]])
+    #expect(index.matchingFiles(query: "", isCancelled: { false }) == files)
+    #expect(index.matchingFiles(query: "act", isCancelled: { true }) == nil)
+}
+
 @Test func databaseGroupStateKeepsGroupClicksAwayFromGameActivation() {
     var state = CatalogBrowserGroupState(expandedGroupNames: ["SNES"])
     state = state.applying(.toggleGroup("SNES"))

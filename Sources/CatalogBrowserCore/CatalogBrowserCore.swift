@@ -181,6 +181,205 @@ public struct CatalogSearchIndex: Sendable {
     }
 }
 
+/// UI-neutral source-file search index. It precomputes the same filename,
+/// folder, and full-path search value used by the native Files sidebar and
+/// supports cooperative cancellation for large catalogs.
+public struct CatalogFileSearchIndex: Sendable {
+    private struct Entry: Sendable {
+        let file: CatalogFileBucket
+        let searchableText: String
+    }
+
+    private let entries: [Entry]
+
+    public init(files: [CatalogFileBucket]) {
+        entries = files.map { file in
+            Entry(
+                file: file,
+                searchableText: "\(Self.filename(in: file.path)) \(file.folderPath) \(file.path)".lowercased()
+            )
+        }
+    }
+
+    public func matchingFiles(
+        query: String,
+        isCancelled: @Sendable () -> Bool = { false }
+    ) -> [CatalogFileBucket]? {
+        let terms = query
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .split(whereSeparator: \.isWhitespace)
+            .map(String.init)
+        guard !terms.isEmpty else { return entries.map(\.file) }
+
+        var matches: [CatalogFileBucket] = []
+        matches.reserveCapacity(min(entries.count, 256))
+        for (index, entry) in entries.enumerated() {
+            if index.isMultiple(of: 256), isCancelled() { return nil }
+            if terms.allSatisfy(entry.searchableText.contains) {
+                matches.append(entry.file)
+            }
+        }
+        return isCancelled() ? nil : matches
+    }
+
+    private static func filename(in path: String) -> String {
+        URL(fileURLWithPath: path).lastPathComponent
+    }
+}
+
+/// A database-only Files-sidebar graph. It contains no rendering, selection,
+/// persistence, filesystem enumeration, archive inspection, or playback
+/// behavior. Frontends flatten the graph using their own disclosure state.
+public struct CatalogFileTreeIndex: Sendable {
+    public enum Row: Equatable, Sendable {
+        case folder(id: String, title: String, depth: Int, isExpanded: Bool)
+        case file(CatalogFileBucket, depth: Int)
+    }
+
+    private struct Folder: Sendable {
+        let path: String
+        let title: String
+        let childFolderIDs: [String]
+        let directFiles: [CatalogFileBucket]
+    }
+
+    private struct FolderBuilder {
+        let rootID: Int64
+        let path: String
+        let title: String
+        var childFolderIDs: Set<String> = []
+        var directFiles: [CatalogFileBucket] = []
+    }
+
+    private let rootFolderIDs: [String]
+    private let folders: [String: Folder]
+
+    public var allFolderIDs: Set<String> { Set(folders.keys) }
+
+    public init(files: [CatalogFileBucket]) {
+        self.init(files: files, isCancelled: { false })!
+    }
+
+    public init?(
+        files: [CatalogFileBucket],
+        isCancelled: @Sendable () -> Bool
+    ) {
+        var builders: [String: FolderBuilder] = [:]
+        var rootIDs: Set<String> = []
+
+        func title(for path: String) -> String {
+            let title = URL(fileURLWithPath: path, isDirectory: true).lastPathComponent
+            return title.isEmpty ? path : title
+        }
+
+        func ensureFolder(rootID: Int64, path: String) {
+            let id = Self.folderID(rootID: rootID, path: path)
+            guard builders[id] == nil else { return }
+            builders[id] = FolderBuilder(rootID: rootID, path: path, title: title(for: path))
+        }
+
+        for (index, file) in files.enumerated() {
+            if index.isMultiple(of: 256), isCancelled() { return nil }
+            let rootID = file.rootID
+            ensureFolder(rootID: rootID, path: file.rootPath)
+            rootIDs.insert(Self.folderID(rootID: rootID, path: file.rootPath))
+
+            var folderPath = file.folderPath
+            ensureFolder(rootID: rootID, path: folderPath)
+            while folderPath != file.rootPath,
+                  folderPath.hasPrefix(file.rootPath + "/") {
+                let parentPath = URL(fileURLWithPath: folderPath, isDirectory: true)
+                    .deletingLastPathComponent()
+                    .path
+                ensureFolder(rootID: rootID, path: parentPath)
+                let parentID = Self.folderID(rootID: rootID, path: parentPath)
+                let childID = Self.folderID(rootID: rootID, path: folderPath)
+                builders[parentID]?.childFolderIDs.insert(childID)
+                folderPath = parentPath
+            }
+
+            let folderID = Self.folderID(rootID: rootID, path: file.folderPath)
+            builders[folderID]?.directFiles.append(file)
+        }
+
+        var folders: [String: Folder] = [:]
+        folders.reserveCapacity(builders.count)
+        for (index, entry) in builders.enumerated() {
+            if index.isMultiple(of: 64), isCancelled() { return nil }
+            let (id, builder) = entry
+            let sortedFiles = builder.directFiles.sorted(by: Self.fileComesBefore)
+            folders[id] = Folder(
+                path: builder.path,
+                title: builder.title,
+                childFolderIDs: builder.childFolderIDs.sorted { lhs, rhs in
+                    let lhsTitle = builders[lhs]?.title ?? lhs
+                    let rhsTitle = builders[rhs]?.title ?? rhs
+                    return Self.localizedAscending(lhsTitle, rhsTitle, tieBreak: lhs, rhs)
+                },
+                directFiles: sortedFiles
+            )
+        }
+        guard !isCancelled() else { return nil }
+        self.folders = folders
+        self.rootFolderIDs = rootIDs.sorted { lhs, rhs in
+            let lhsPath = builders[lhs]?.path ?? lhs
+            let rhsPath = builders[rhs]?.path ?? rhs
+            return Self.localizedAscending(lhsPath, rhsPath, tieBreak: lhs, rhs)
+        }
+    }
+
+    public func rows(expandedFolderIDs: Set<String>) -> [Row] {
+        var rows: [Row] = []
+
+        func appendFolder(_ id: String, depth: Int) {
+            guard let folder = folders[id] else { return }
+            let isExpanded = expandedFolderIDs.contains(id)
+            rows.append(.folder(id: id, title: folder.title, depth: depth, isExpanded: isExpanded))
+            guard isExpanded else { return }
+
+            for childID in folder.childFolderIDs {
+                appendFolder(childID, depth: depth + 1)
+            }
+            for file in folder.directFiles {
+                rows.append(.file(file, depth: depth + 1))
+            }
+        }
+
+        for rootID in rootFolderIDs {
+            appendFolder(rootID, depth: 0)
+        }
+        return rows
+    }
+
+    public static func rootFolderIDs(for files: [CatalogFileBucket]) -> [String] {
+        Array(Set(files.map { folderID(rootID: $0.rootID, path: $0.rootPath) }))
+    }
+
+    public static func folderID(rootID: Int64, path: String) -> String {
+        "\(rootID)|\(path)"
+    }
+
+    private static func fileComesBefore(_ lhs: CatalogFileBucket, _ rhs: CatalogFileBucket) -> Bool {
+        localizedAscending(filename(in: lhs.path), filename(in: rhs.path), tieBreak: lhs.path, rhs.path)
+    }
+
+    private static func filename(in path: String) -> String {
+        URL(fileURLWithPath: path).lastPathComponent
+    }
+
+    private static func localizedAscending(
+        _ lhs: String,
+        _ rhs: String,
+        tieBreak lhsTieBreak: String,
+        _ rhsTieBreak: String
+    ) -> Bool {
+        let comparison = lhs.localizedCaseInsensitiveCompare(rhs)
+        if comparison != .orderedSame { return comparison == .orderedAscending }
+        return lhsTieBreak < rhsTieBreak
+    }
+}
+
 /// UI-neutral state for Console → Game presentation. Frontends retain their
 /// own rows, focus, scrolling, and persistence adapters, but the selection and
 /// disclosure transitions are shared so a group click cannot accidentally
