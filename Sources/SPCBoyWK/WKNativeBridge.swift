@@ -3,6 +3,7 @@ import ArchiveCacheCore
 import CatalogReader
 import CatalogPlaylistCore
 import CatalogBrowserCore
+import CatalogSessionCore
 import FavoriteStoreCore
 import FavoriteTrackCore
 import FrontendPreferencesCore
@@ -23,6 +24,7 @@ import WebKit
 final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     private let catalogURL: URL
     private let isOptionsWindow: Bool
+    private let catalogSessions = CatalogSessionCoordinator()
     private weak var playbackEventWebView: WKWebView?
 
     var onOpenOptionsWindow: (() -> Void)?
@@ -271,14 +273,41 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return
         }
 
-        Task.detached(priority: .userInitiated) { [catalogURL] in
-            do {
-                let result = try Self.handle(method: method, args: args, catalogURL: catalogURL)
-                await Self.reply(to: message.webView, id: id, success: true, valueJSON: Self.json(result))
-            } catch {
-                print("[SPCBoy WK] request \(method) failed: \(error.localizedDescription)")
-                await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": error.localizedDescription]))
+        let catalogScope = CatalogSessionScope.scope(for: method)
+        let catalogGeneration = catalogScope.map { catalogSessions.begin($0) }
+        let requestMethod = method
+        let requestArgumentsJSON = Self.json(args)
+        let requestCatalogURL = catalogURL
+        Task { [weak self, webView = message.webView] in
+            let response: (success: Bool, valueJSON: String) = await Task.detached(priority: .userInitiated) {
+                do {
+                    guard let data = requestArgumentsJSON.data(using: .utf8),
+                          let detachedArgs = try JSONSerialization.jsonObject(with: data) as? [Any] else {
+                        throw BridgeError.invalidArguments
+                    }
+                    let result = try Self.handle(method: requestMethod, args: detachedArgs, catalogURL: requestCatalogURL)
+                    return (true, Self.json(result))
+                } catch {
+                    print("[SPCBoy WK] request \(requestMethod) failed: \(error.localizedDescription)")
+                    return (false, Self.json(["message": error.localizedDescription]))
+                }
+            }.value
+
+            guard let self else { return }
+            var success = response.success
+            var valueJSON = response.valueJSON
+            if let catalogScope, let catalogGeneration {
+                let isStale = !self.catalogSessions.isCurrent(catalogGeneration, for: catalogScope)
+                if !isStale {
+                    self.catalogSessions.finish(catalogGeneration, for: catalogScope)
+                } else {
+                    // Every request still receives a reply, but stale catalog
+                    // work cannot publish data into the WebKit session.
+                    success = true
+                    valueJSON = Self.json(["stale": true])
+                }
             }
+            await Self.reply(to: webView, id: id, success: success, valueJSON: valueJSON)
         }
     }
 

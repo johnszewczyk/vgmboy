@@ -248,6 +248,7 @@ async function loadBrowserChildren(node) {
 }
 
 function catalogPlaylistSelection(rows, selectedPath) {
+  if (rows?.stale === true) return null;
   return {
     selectedFolderPath: selectedPath,
     selectedBrowserPath: state.selectedBrowserPath,
@@ -257,20 +258,15 @@ function catalogPlaylistSelection(rows, selectedPath) {
 
 async function loadBrowserSelection(node) {
   if (node.catalogFile) {
-    return catalogPlaylistSelection(
-      await window.spcBoyWK.databaseFileTracks([node.catalogFile]),
-      node.catalogFile.path
-    );
+    return catalogPlaylistSelection(await window.spcBoyWK.databaseFileTracks([node.catalogFile]), node.catalogFile.path);
   }
   if (node.catalogFolder) {
-    return catalogPlaylistSelection(
-      await window.spcBoyWK.databaseFolderTracks([node.catalogFolder]),
-      node.catalogFolder.folderPath
-    );
+    return catalogPlaylistSelection(await window.spcBoyWK.databaseFolderTracks([node.catalogFolder]), node.catalogFolder.folderPath);
   }
-  return node.kind === "folder"
+  const selection = node.kind === "folder"
     ? window.spcBoyWK.selectFolder(node.path)
     : window.spcBoyWK.selectFile(node.path);
+  return selection.then((value) => value?.stale === true ? null : value);
 }
 
 function hideSidebarContextMenu() {
@@ -324,6 +320,7 @@ async function activateBrowserNode(node, { playNow = true } = {}) {
       await loadBrowserChildren(node);
     }
     const selection = await loadBrowserSelection(node);
+    if (!selection) return;
     applyFolderSelection(selection);
     const target = selection.playlist?.[0];
     if (playNow && target) await uiApp.playback.playTrack(target.id, 0);
@@ -336,6 +333,7 @@ async function previewBrowserLeaf(node) {
   const generation = ++browserSelectionGeneration;
   try {
     const selection = await loadBrowserSelection(node);
+    if (!selection) return;
     if (generation !== browserSelectionGeneration || state.selectedBrowserPath !== node.path) return;
     applyFolderSelection(selection);
   } catch (error) {
@@ -418,6 +416,7 @@ function appendPlaylistTracks(additions, selectedBrowserPath = state.selectedBro
 
 async function queueBrowserNode(node) {
   const selection = await loadBrowserSelection(node);
+  if (!selection) return;
   appendPlaylistTracks(Array.isArray(selection.playlist) ? selection.playlist : [], node.path);
 }
 
@@ -660,6 +659,7 @@ function makeDatabaseGameButton(game) {
     showContextMenu(event, [
       ["Show in Finder", async () => {
         const rows = await window.spcBoyWK.databaseGameTracks([game]);
+        if (rows?.stale === true) return;
         const row = rows[0];
         if (row) await window.spcBoyWK.showInFinder(row.archivePath || row.path);
       }],
@@ -668,7 +668,11 @@ function makeDatabaseGameButton(game) {
         const targetID = loaded ? databaseLoadedSelectionID() : null;
         if (targetID) await uiApp.playback.playTrack(targetID, 0);
       }],
-      ["Queue", async () => appendPlaylistTracks(databaseRowsToPlaylistTracks(await window.spcBoyWK.databaseGameTracks([game]), [game]))]
+      ["Queue", async () => {
+        const rows = await window.spcBoyWK.databaseGameTracks([game]);
+        if (rows?.stale === true) return;
+        appendPlaylistTracks(databaseRowsToPlaylistTracks(rows, [game]));
+      }]
     ]);
   });
   return button;
@@ -844,11 +848,14 @@ async function loadDatabaseFiles() {
   state.databaseSidebarError = "";
   renderAll();
   try {
-    state.databaseFileTree = await window.spcBoyWK.databaseFileTree();
+    const fileTree = await window.spcBoyWK.databaseFileTree();
+    if (fileTree?.stale === true) return false;
+    state.databaseFileTree = fileTree;
     // The tree is the complete database projection. This array is retained
     // only as the loaded sentinel for the existing mode-switch lifecycle.
     state.databaseFiles = state.databaseFileTree;
     state.databaseSidebarError = "";
+    return true;
   } catch (error) {
     reportDatabaseSidebarError("read the catalog paths", error);
     throw error;
@@ -889,7 +896,9 @@ async function showFavoritesPlaylist() {
 async function refreshDatabaseGamesForVisibleRoots() {
   const previousSelection = state.selectedDatabaseGameKey;
   try {
-    state.databaseGames = await window.spcBoyWK.databaseGames();
+    const games = await window.spcBoyWK.databaseGames();
+    if (games?.stale === true) return false;
+    state.databaseGames = games;
   } catch (error) {
     reportDatabaseSidebarError("read the database sidebar", error);
     throw error;
@@ -903,6 +912,7 @@ async function refreshDatabaseGamesForVisibleRoots() {
     state.lastSelectedTrackId = null;
     persistSettings();
   }
+  return true;
 }
 
 async function updateSidebarSearch(query) {
@@ -919,6 +929,7 @@ async function updateSidebarSearch(query) {
       window.spcBoyWK.databaseSearchGames(requestedQuery)
         .then((games) => {
           if (databaseGeneration !== state.databaseSearchGeneration || state.sidebarQuery.trim() !== requestedQuery) return;
+          if (games?.stale === true) return;
           state.databaseSidebarError = "";
           state.databaseSearchGames = Array.isArray(games) ? games : [];
           renderSidebar();
@@ -964,6 +975,7 @@ async function toggleSelectedFavorites() {
       : [];
   if (!games.length) return;
   const rows = await window.spcBoyWK.databaseGameTracks(games);
+  if (rows?.stale === true) return;
   await toggleFavorites(databaseRowsToPlaylistTracks(rows, games));
   renderSidebar();
   renderPlaylist();
@@ -1014,6 +1026,7 @@ async function loadDatabaseGamesIntoPlaylist(games) {
     currentTrackInfo: state.currentTrackInfo
   };
   const rows = await window.spcBoyWK.databaseGameTracks(games);
+  if (rows?.stale === true) return false;
   if (loadGeneration !== playlistLoadGeneration) return false;
   state.databaseSidebarError = "";
   state.selectedDatabaseGameKey = games.length === 1 ? databaseGameKey(games[0]) : null;
@@ -2410,6 +2423,8 @@ async function bootstrap() {
     snapshot = await window.spcBoyWK.bootstrap();
   }
 
+  if (snapshot?.stale === true) return;
+
   Object.assign(state, snapshot);
   await uiApp.playback.stopPlaybackState();
   state.selectedTrackId = resolveSelectedTrackId(snapshot.playlist);
@@ -2441,6 +2456,7 @@ async function openLibraryRoot() {
 }
 
 function applyLibrarySnapshot(snapshot) {
+  if (snapshot?.stale === true) return;
   playlistLoadGeneration += 1;
   Object.assign(state, snapshot);
   state.localBrowserEnabled = true;
