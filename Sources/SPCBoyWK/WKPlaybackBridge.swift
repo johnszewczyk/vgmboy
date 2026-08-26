@@ -1,5 +1,5 @@
 import Foundation
-import ArchiveMaterializationCore
+import PlaybackRequestCore
 import VGMBoyKit
 
 /// Thin WK adapter over the shared in-process VGMBoy control surface.
@@ -9,42 +9,133 @@ final class WKPlaybackBridge: @unchecked Sendable {
     static let shared = WKPlaybackBridge()
 
     private let controller = PlaybackController()
+    private let commandQueue = PlaybackSerialExecutor(label: "SPCBoyWK.vgmboy-playback", qos: .userInitiated)
     private let lock = NSLock()
+    private var latestRequestID = 0
     private var trackLoaded = false
 
     private init() {}
 
     func handle(method: String, args: [Any]) throws -> Any {
+        let requestID: Int?
+        if method == "nativePlaybackStart" {
+            requestID = beginRequest()
+        } else {
+            requestID = nil
+            if ["nativePlaybackStop", "nativePlaybackClose", "nativePlaybackUnload"].contains(method) {
+                cancelRequest()
+            }
+        }
+        return try commandQueue.sync {
+            try handleSerialized(method: method, args: args, requestID: requestID)
+        }
+    }
+
+    private func handleSerialized(method: String, args: [Any], requestID: Int? = nil) throws -> Any {
         switch method {
         case "nativePlaybackInit", "nativePlaybackState":
             return statusResponse()
         case "nativePlaybackAudioConfig":
-            if let volume = number(args.first) {
-                try perform(.setOutputVolume, payload: .init(outputVolume: Float(max(0, min(1, volume)))))
+            let rawVolume = number(args.first).map(Float.init)
+            let rawGains = (args.count > 2 ? args[2] as? [Any] : nil)?.compactMap(number).map(Float.init)
+            let preferences = PlaybackPreferences(
+                equalizerEnabled: args.count > 1 ? (args[1] as? Bool) ?? false : false,
+                equalizerBandGains: rawGains ?? Array(repeating: 0, count: EqualizerConfiguration.bandCount),
+                outputVolume: rawVolume ?? PlaybackPreferences.defaultValue.outputVolume,
+                monoEnabled: args.count > 3 ? (args[3] as? Bool) ?? false : false
+            )
+            if rawVolume != nil {
+                try perform(.setOutputVolume, payload: .init(outputVolume: preferences.outputVolume))
             }
-            if args.count > 1, let enabled = args[1] as? Bool {
-                let gains = (args.count > 2 ? args[2] as? [Any] : nil)?.compactMap(number) ?? Array(repeating: 0, count: EqualizerConfiguration.bandCount)
-                let normalized = Array(gains.prefix(EqualizerConfiguration.bandCount)) + Array(repeating: 0, count: max(0, EqualizerConfiguration.bandCount - gains.count))
-                try perform(.setEqualizer, payload: .init(equalizer: .init(enabled: enabled, gainsDecibels: normalized.map(Float.init))))
+            if args.count > 1 {
+                try perform(.setEqualizer, payload: .init(equalizer: preferences.equalizer))
             }
-            if args.count > 3, let monoEnabled = args[3] as? Bool {
-                try perform(.setMonoEnabled, payload: .init(monoEnabled: monoEnabled))
+            if args.count > 3 {
+                try perform(.setMonoEnabled, payload: .init(monoEnabled: preferences.monoEnabled))
             }
             return statusResponse()
-        case "nativePlaybackLoad":
-            guard let path = args.first as? String, !path.isEmpty else {
-                throw PlaybackBridgeError.invalid("Playback load requires a file path.")
+        case "nativePlaybackTiming":
+            guard let request = args.first as? [String: Any],
+                  let path = request["path"] as? String,
+                  !path.isEmpty,
+                  let family = FormatRegistry.family(for: path) else {
+                throw PlaybackBridgeError.invalid("Playback timing requires a supported file path.")
             }
-            let index = max(0, int(args.count > 1 ? args[1] : nil) ?? 0)
-            let startMilliseconds = max(0, int(args.count > 2 ? args[2] : nil) ?? 0)
-            let requestedPlayMilliseconds = int(args.count > 3 ? args[3] : nil)
-            let fadeMilliseconds = max(0, int(args.count > 4 ? args[4] : nil) ?? 6_000)
-            let tempo = number(args.count > 5 ? args[5] : nil) ?? 1
-            let longPlayEnabled = args.count > 6 ? (args[6] as? Bool) ?? false : false
-            let timedOverride = args.count > 7 ? (args[7] as? Bool) ?? false : false
+            let metadata = PlaybackTimingMetadata(
+                playMilliseconds: max(0, int(request["playMilliseconds"]) ?? 0)
+            )
+            let preferences = PlaybackTimingPreferences(
+                longPlaySeconds: max(
+                    1,
+                    int(request["manualPlayMilliseconds"]).map { $0 / 1_000 }
+                        ?? PlaybackTimingPreferences.defaultLongPlaySeconds
+                ),
+                unknownDurationSeconds: max(
+                    1,
+                    int(request["unknownDurationMilliseconds"]).map { $0 / 1_000 }
+                        ?? PlaybackTimingPreferences.defaultUnknownDurationSeconds
+                ),
+                fadeSeconds: max(
+                    0,
+                    int(request["fadeMilliseconds"]).map { $0 / 1_000 }
+                        ?? PlaybackTimingPreferences.defaultFadeSeconds
+                )
+            )
+            let plan = PlaybackTimingPolicy.plan(
+                metadata: metadata,
+                family: family,
+                longPlayEnabled: request["longPlayEnabled"] as? Bool ?? false,
+                preferences: preferences
+            )
+            let tempo = tempoMultiplier(request["tempo"])
+            let scaledPreFadeSeconds = max(
+                1,
+                Int((Double(plan.preFadeSeconds) / tempo).rounded(.down))
+            )
+            return [
+                "pre_fade_seconds": scaledPreFadeSeconds,
+                "fade_seconds": plan.fadeSeconds,
+                "total_seconds": scaledPreFadeSeconds + plan.fadeSeconds,
+                "is_long_play": plan.isLongPlay,
+                "uses_native_ending": plan.usesNativeEnding
+            ]
+        case "nativePlaybackStart":
+            guard let request = args.first as? [String: Any],
+                  let sourcePath = request["path"] as? String,
+                  !sourcePath.isEmpty else {
+                throw PlaybackBridgeError.invalid("Playback start requires a file path.")
+            }
+            guard requestID.map(isCurrentRequest) ?? true else {
+                throw PlaybackBridgeError.superseded
+            }
+            let archivePath = request["archivePath"] as? String
+            let archiveEntry = request["archiveEntry"] as? String
+            let playbackPath: String
+            if let archivePath, !archivePath.isEmpty, let archiveEntry, !archiveEntry.isEmpty {
+                guard let requirement = FormatRegistry.archiveMaterializationRequirement(for: [archiveEntry]) else {
+                    throw PlaybackBridgeError.invalid("VGMBoy does not admit archive member \(archiveEntry).")
+                }
+                playbackPath = try SPCArchiveMaterialization.materialize(
+                    archivePath: archivePath,
+                    entry: archiveEntry,
+                    requirement: requirement
+                ).path
+            } else {
+                playbackPath = sourcePath
+            }
+            guard requestID.map(isCurrentRequest) ?? true else {
+                throw PlaybackBridgeError.superseded
+            }
+            let index = max(0, int(request["trackIndex"]) ?? 0)
+            let startMilliseconds = max(0, int(request["startMilliseconds"]) ?? 0)
+            let requestedPlayMilliseconds = int(request["playMilliseconds"])
+            let fadeMilliseconds = max(0, int(request["fadeMilliseconds"]) ?? 6_000)
+            let tempo = tempoMultiplier(request["tempo"])
+            let longPlayEnabled = request["longPlayEnabled"] as? Bool ?? false
+            let timedOverride = request["timedOverride"] as? Bool ?? false
             let unknownDurationMilliseconds = max(
                 1_000,
-                int(args.count > 8 ? args[8] : nil)
+                int(request["unknownDurationMilliseconds"])
                     ?? PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000
             )
             let timing: PlaybackTimingRequest
@@ -55,7 +146,7 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 )
             } else {
                 timing = try PlaybackTimingRequest.standard(
-                    path: path,
+                    path: playbackPath,
                     longPlayEnabled: longPlayEnabled,
                     manualPlayMilliseconds: requestedPlayMilliseconds ?? 0,
                     fadeMilliseconds: fadeMilliseconds,
@@ -63,7 +154,7 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 )
             }
             let payload = PlaybackControlPayload(
-                path: path,
+                path: playbackPath,
                 trackIndex: index,
                 tempo: tempo,
                 playbackMode: timing.playbackMode,
@@ -73,9 +164,10 @@ final class WKPlaybackBridge: @unchecked Sendable {
             )
             try perform(.load, payload: payload)
             if startMilliseconds > 0 { try perform(.seek, payload: .init(positionMilliseconds: startMilliseconds)) }
+            try perform(.play)
             lock.lock(); trackLoaded = true; lock.unlock()
             return statusResponse()
-        case "nativePlaybackPlay":
+        case "nativePlaybackResume":
             try perform(.play)
             return statusResponse()
         case "nativePlaybackPause":
@@ -96,13 +188,8 @@ final class WKPlaybackBridge: @unchecked Sendable {
             return statusResponse()
         case "setPlaybackPowerSaveBlocker":
             return NSNull()
-        case "materializeTrack":
-            guard let archivePath = args.first as? String, let entry = args.dropFirst().first as? String else {
-                throw PlaybackBridgeError.invalid("Archive playback requires a source archive and entry.")
-            }
-            return try ArchiveMaterializer.shared.materialize(archivePath: archivePath, entry: entry).path
         case "releaseMaterializedTrack":
-            ArchiveMaterializer.shared.release()
+            SPCArchiveMaterialization.release()
             return NSNull()
         default:
             throw PlaybackBridgeError.invalid("Unknown playback request \(method).")
@@ -129,6 +216,7 @@ final class WKPlaybackBridge: @unchecked Sendable {
             // advance over the remaining audible tail.
             "transport_state": status?.isPlaying == true ? "playing" : (status?.reachedEnd == true ? "ended" : "stopped"),
             "output_state": diagnostics?.isOutputRunning == true ? "running" : "idle",
+            "generation": diagnostics?.generation ?? 0,
             "track_loaded": loaded,
             "decode_error": false,
             "reached_end": status?.reachedEnd ?? false,
@@ -159,12 +247,53 @@ final class WKPlaybackBridge: @unchecked Sendable {
     private func int(_ value: Any?) -> Int? {
         number(value).map(Int.init)
     }
+
+    private func tempoMultiplier(_ value: Any?) -> Double {
+        if let scalar = number(value), scalar.isFinite, scalar > 0 {
+            return scalar
+        }
+        guard let ratio = value as? [String: Any],
+              let numerator = number(ratio["numerator"]),
+              let denominator = number(ratio["denominator"]),
+              numerator.isFinite,
+              denominator.isFinite,
+              numerator > 0,
+              denominator > 0 else {
+            return 1
+        }
+        return numerator / denominator
+    }
+
+    private func beginRequest() -> Int {
+        lock.lock()
+        latestRequestID += 1
+        let requestID = latestRequestID
+        lock.unlock()
+        return requestID
+    }
+
+    private func cancelRequest() {
+        lock.lock()
+        latestRequestID += 1
+        lock.unlock()
+    }
+
+    private func isCurrentRequest(_ requestID: Int) -> Bool {
+        lock.lock()
+        let isCurrent = requestID == latestRequestID
+        lock.unlock()
+        return isCurrent
+    }
 }
 
 private enum PlaybackBridgeError: LocalizedError {
     case invalid(String)
+    case superseded
 
     var errorDescription: String? {
-        switch self { case .invalid(let message): return message }
+        switch self {
+        case .invalid(let message): return message
+        case .superseded: return "Playback request was superseded."
+        }
     }
 }

@@ -16,6 +16,7 @@ let databaseConsoleGroups = [];
 let collapsedDatabaseConsoles = new Set();
 let databaseRowRenderGeneration = 0;
 let browserClickTimer = 0;
+let databaseGameClickTimer = 0;
 let sidebarSearchTimer = 0;
 let columnResizePointerId = null;
 const PLAYLIST_VIRTUALIZATION_THRESHOLD = 200;
@@ -395,7 +396,6 @@ function jumpFocusedListToEdge(toEnd, focused = document.activeElement) {
     const track = state.playlist[toEnd ? state.playlist.length - 1 : 0];
     selectPlaylistTrack(track.id, { focus: true });
     uiApp.playback.updateTimingSummary();
-    uiApp.playback.preloadTrackAudio(track);
     return true;
   }
   return false;
@@ -416,8 +416,6 @@ function appendPlaylistTracks(additions, selectedBrowserPath = state.selectedBro
   syncTreeSelection();
   renderPlaylist();
   uiApp.playback.updateTimingSummary();
-  uiApp.playback.preloadPlaylistAudio(state.playlist, state.selectedTrackId);
-  void hydratePlaylistMetadata();
 }
 
 async function queueBrowserNode(node) {
@@ -612,6 +610,38 @@ function databaseConsoleName(game) {
   return game.system || "Unknown Console";
 }
 
+let databaseGroupTransitionGeneration = 0;
+
+function databaseGroupStateSnapshot() {
+  const knownGroupNames = databaseConsoleGroups.map(({ consoleName }) => consoleName);
+  return {
+    expandedGroupNames: knownGroupNames.filter((name) => !collapsedDatabaseConsoles.has(name)),
+    selectedGroupName: state.selectedDatabaseConsoleName || null,
+    selectedGameID: state.selectedDatabaseGameKey || null,
+    knownGroupNames
+  };
+}
+
+async function applySharedDatabaseGroupAction(action, groupName = null, gameID = null, extra = {}) {
+  const generation = ++databaseGroupTransitionGeneration;
+  const next = await window.spcBoyWK.databaseGroupState(
+    { ...databaseGroupStateSnapshot(), ...extra },
+    action,
+    groupName,
+    gameID
+  );
+  if (generation !== databaseGroupTransitionGeneration || !next) return false;
+  const expanded = new Set(Array.isArray(next.expandedGroupNames) ? next.expandedGroupNames : []);
+  for (const knownName of databaseConsoleGroups.map(({ consoleName }) => consoleName)) {
+    if (expanded.has(knownName)) collapsedDatabaseConsoles.delete(knownName);
+    else collapsedDatabaseConsoles.add(knownName);
+  }
+  state.selectedDatabaseConsoleName = next.selectedGroupName || null;
+  state.selectedDatabaseGameKey = next.selectedGameID || null;
+  syncCollapsedConsolePersistence();
+  return true;
+}
+
 function visibleDatabaseGames() {
   return Array.isArray(state.databaseSearchGames) ? state.databaseSearchGames : state.databaseGames;
 }
@@ -625,6 +655,10 @@ function immediateDatabaseSearch(query) {
   });
 }
 
+function databaseLoadedSelectionID() {
+  return state.selectedTrackId || state.playlist[0]?.id || null;
+}
+
 function makeDatabaseGameButton(game) {
   const button = document.createElement("button");
   button.type = "button";
@@ -632,9 +666,13 @@ function makeDatabaseGameButton(game) {
   button.dataset.databaseGameKey = databaseGameKey(game);
   button.dataset.searchText = `${game.name} ${game.rootName || ""}`.toLowerCase();
   button.innerHTML = `<span class="database-disclosure">·</span><span class="database-game-name">${escapeHtml(game.displayName || game.name)}</span>${state.sidebarPathCounts ? `<span class="database-game-meta">${game.trackCount}</span>` : ""}`;
-  button.addEventListener("click", () => {
+  button.addEventListener("click", (event) => {
+    window.clearTimeout(databaseGameClickTimer);
+    if (event.detail > 1) return;
     state.selectedDatabaseGameKey = databaseGameKey(game);
     state.selectedDatabaseConsoleName = databaseConsoleName(game);
+    void applySharedDatabaseGroupAction("selectGame", state.selectedDatabaseConsoleName, state.selectedDatabaseGameKey)
+      .catch((error) => reportDatabaseSidebarError("select the database game", error));
     persistSettings();
     refs.treeRoot.querySelectorAll(".database-console-row.is-selected").forEach((row) => row.classList.remove("is-selected"));
     selectedDatabaseGameButton?.classList.remove("is-selected");
@@ -644,16 +682,41 @@ function makeDatabaseGameButton(game) {
     button.focus();
     // Database game rows are final sidebar leaves. Read the indexed tracks
     // immediately; this is a database preview, not a delayed filesystem scan.
-    loadDatabaseGame(game).catch((error) => reportDatabaseSidebarError("preview the selected game", error));
+    databaseGameClickTimer = window.setTimeout(() => {
+      databaseGameClickTimer = 0;
+      loadDatabaseGame(game).catch((error) => reportDatabaseSidebarError("preview the selected game", error));
+    }, 220);
+  });
+  button.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    event.stopPropagation();
+    window.clearTimeout(databaseGameClickTimer);
+    databaseGameClickTimer = 0;
+    state.selectedDatabaseGameKey = databaseGameKey(game);
+    state.selectedDatabaseConsoleName = databaseConsoleName(game);
+    void applySharedDatabaseGroupAction("selectGame", state.selectedDatabaseConsoleName, state.selectedDatabaseGameKey)
+      .catch((error) => reportDatabaseSidebarError("select the database game", error));
+    persistSettings();
+    loadDatabaseGame(game).then((loaded) => {
+      const targetID = loaded ? databaseLoadedSelectionID() : null;
+      if (targetID) return uiApp.playback.playTrack(targetID, 0);
+      return undefined;
+    }).catch((error) => reportDatabaseSidebarError("play the selected game", error));
   });
   button.addEventListener("dblclick", (event) => {
     event.preventDefault();
     event.stopPropagation();
+    window.clearTimeout(databaseGameClickTimer);
+    databaseGameClickTimer = 0;
     state.selectedDatabaseGameKey = databaseGameKey(game);
     state.selectedDatabaseConsoleName = databaseConsoleName(game);
+    void applySharedDatabaseGroupAction("selectGame", state.selectedDatabaseConsoleName, state.selectedDatabaseGameKey)
+      .catch((error) => reportDatabaseSidebarError("select the database game", error));
     persistSettings();
-    loadDatabaseGame(game).then(() => {
-      if (state.playlist[0]) return uiApp.playback.playTrack(state.playlist[0].id, 0);
+    loadDatabaseGame(game).then((loaded) => {
+      const targetID = loaded ? databaseLoadedSelectionID() : null;
+      if (targetID) return uiApp.playback.playTrack(targetID, 0);
       return undefined;
     }).catch((error) => reportDatabaseSidebarError("play the selected game", error));
   });
@@ -668,8 +731,9 @@ function makeDatabaseGameButton(game) {
         if (row) await window.spcBoyWK.showInFinder(row.archivePath || row.path);
       }],
       ["Play Now", async () => {
-        await loadDatabaseGame(game);
-        if (state.playlist[0]) await uiApp.playback.playTrack(state.playlist[0].id, 0);
+        const loaded = await loadDatabaseGame(game);
+        const targetID = loaded ? databaseLoadedSelectionID() : null;
+        if (targetID) await uiApp.playback.playTrack(targetID, 0);
       }],
       ["Queue", async () => appendPlaylistTracks(databaseRowsToPlaylistTracks(await window.spcBoyWK.databaseGameTracks([game]), [game]))]
     ]);
@@ -740,23 +804,13 @@ function renderDatabaseGames() {
       const games = document.createElement("div");
       games.className = "database-console-games";
       games.classList.toggle("is-hidden", !expanded);
-      heading.addEventListener("click", () => {
-        state.selectedDatabaseConsoleName = consoleName;
-        state.selectedDatabaseGameKey = null;
-        persistSettings();
-        // Derive disclosure state from the model, not from the currently
-        // filtered DOM. A search can temporarily force a group open and
-        // otherwise made a group such as NEC PC-98 appear impossible to
-        // close until Fold All was used.
-        const nextExpanded = collapsedDatabaseConsoles.has(consoleName);
-        if (nextExpanded) collapsedDatabaseConsoles.delete(consoleName);
-        else collapsedDatabaseConsoles.add(consoleName);
-        syncCollapsedConsolePersistence();
-        heading.innerHTML = `<span class="database-disclosure">${nextExpanded ? "▾" : "▸"}</span><span class="database-console-label">${escapeHtml(consoleName)}</span>`;
-        refs.treeRoot.querySelectorAll(".database-game-row.is-selected, .database-console-row.is-selected").forEach((row) => row.classList.remove("is-selected"));
-        heading.classList.add("is-selected");
-        scheduleSelectionIndicators();
-        games.classList.toggle("is-hidden", !nextExpanded);
+      heading.addEventListener("click", async () => {
+        try {
+          await applySharedDatabaseGroupAction("toggle", consoleName);
+          renderDatabaseGames();
+        } catch (error) {
+          reportDatabaseSidebarError("toggle the database console", error);
+        }
       });
       heading.addEventListener("keydown", (event) => {
         if (event.key !== " ") return;
@@ -766,9 +820,10 @@ function renderDatabaseGames() {
       heading.addEventListener("dblclick", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        state.selectedDatabaseConsoleName = consoleName;
-        state.selectedDatabaseGameKey = null;
-        activateDatabaseSelection().catch((error) => reportDatabaseSidebarError("play the selected console", error));
+        void (async () => {
+          await applySharedDatabaseGroupAction("select", consoleName);
+          await activateDatabaseSelection();
+        })().catch((error) => reportDatabaseSidebarError("play the selected console", error));
       });
       group.append(heading, games);
       refs.treeRoot.appendChild(group);
@@ -806,19 +861,15 @@ function renderDatabaseGames() {
   scheduleSelectionIndicators();
 }
 
-function setAllDatabaseConsolesCollapsed(collapsed) {
-  for (const { consoleName } of databaseConsoleGroups) {
-    if (collapsed) collapsedDatabaseConsoles.add(consoleName);
-    else collapsedDatabaseConsoles.delete(consoleName);
-  }
-  syncCollapsedConsolePersistence();
+async function setAllDatabaseConsolesCollapsed(collapsed) {
+  await applySharedDatabaseGroupAction("allCollapsed", null, null, { collapsed });
   renderDatabaseGames();
 }
 
 async function setAllSidebarNodesCollapsed(collapsed) {
   if (currentSidebarView().contentMode === "favorites") return;
   if (currentSidebarView().contentMode === "database") {
-    setAllDatabaseConsolesCollapsed(collapsed);
+    void setAllDatabaseConsolesCollapsed(collapsed).catch((error) => reportDatabaseSidebarError("change database console disclosure", error));
     return;
   }
 
@@ -953,7 +1004,7 @@ async function cycleSidebarMode() {
 }
 
 async function loadDatabaseGame(game) {
-  await loadDatabaseGamesIntoPlaylist([game]);
+  return loadDatabaseGamesIntoPlaylist([game]);
 }
 
 async function toggleSelectedFavorites() {
@@ -1018,12 +1069,26 @@ function databaseRowsToPlaylistTracks(rows, games) {
 
 async function loadDatabaseGamesIntoPlaylist(games) {
   const loadGeneration = ++playlistLoadGeneration;
+  await uiApp.playback.cancelQueuedSkip?.({ restoreOutput: true });
+  const replacementInput = {
+    currentTrackId: state.currentTrackId,
+    currentTrackInfo: state.currentTrackInfo
+  };
   const rows = await window.spcBoyWK.databaseGameTracks(games);
-  if (loadGeneration !== playlistLoadGeneration) return;
+  if (loadGeneration !== playlistLoadGeneration) return false;
   state.databaseSidebarError = "";
   state.selectedDatabaseGameKey = games.length === 1 ? databaseGameKey(games[0]) : null;
   state.playlist = databaseRowsToPlaylistTracks(rows, games);
-  state.selectedTrackId = state.playlist[0]?.id || null;
+  const replacementState = await window.spcBoyWK.playbackQueueReplacementState(
+    replacementInput.currentTrackId,
+    state.playlist.map((track) => track.id),
+    true
+  );
+  state.currentTrackId = replacementState?.currentTrackId || null;
+  state.currentTrackInfo = state.currentTrackId
+    ? state.playlist.find((track) => track.id === state.currentTrackId) || replacementInput.currentTrackInfo || null
+    : null;
+  state.selectedTrackId = replacementState?.selectedTrackId || null;
   state.selectedTrackIds = state.selectedTrackId ? [state.selectedTrackId] : [];
   state.lastSelectedTrackId = state.selectedTrackId;
   persistSettings();
@@ -1035,26 +1100,26 @@ async function loadDatabaseGamesIntoPlaylist(games) {
   uiApp.playback.updateTimingSummary();
   uiApp.playback.updatePlaybackReadout();
   uiApp.playback.updateNativeDiagnostics();
-  uiApp.playback.preloadPlaylistAudio(state.playlist, state.selectedTrackId);
-  if (state.playlist.some((track) => !track.metadataLoaded)) {
-    void hydratePlaylistMetadata();
-  }
+  return true;
 }
 
 async function activateDatabaseSelection() {
   const gamesForView = visibleDatabaseGames();
+  const selectedGame = gamesForView.find((entry) => databaseGameKey(entry) === state.selectedDatabaseGameKey);
+  if (selectedGame) {
+    const loaded = await loadDatabaseGame(selectedGame);
+    const targetID = loaded ? databaseLoadedSelectionID() : null;
+    if (targetID) await uiApp.playback.playTrack(targetID, 0);
+    return;
+  }
   if (state.selectedDatabaseConsoleName) {
     const games = gamesForView.filter((game) => databaseConsoleName(game) === state.selectedDatabaseConsoleName);
     if (games.length) {
-      await loadDatabaseGamesIntoPlaylist(games);
-      if (state.playlist[0]) await uiApp.playback.playTrack(state.playlist[0].id, 0);
+      const loaded = await loadDatabaseGamesIntoPlaylist(games);
+      const targetID = loaded ? databaseLoadedSelectionID() : null;
+      if (targetID) await uiApp.playback.playTrack(targetID, 0);
       return;
     }
-  }
-  const game = gamesForView.find((entry) => databaseGameKey(entry) === state.selectedDatabaseGameKey);
-  if (game) {
-    await loadDatabaseGame(game);
-    if (state.playlist[0]) await uiApp.playback.playTrack(state.playlist[0].id, 0);
   }
 }
 
@@ -1064,7 +1129,7 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
   if (playlistRow?.dataset.trackId) {
     // The visual selection is the activation target. Focus can legitimately
     // lag while arrow navigation advances the selected row.
-    const track = selectPlaylistTrack(state.selectedTrackId || playlistRow.dataset.trackId);
+    const track = selectPlaylistTrack(playlistRow.dataset.trackId);
     if (!track) return false;
     await uiApp.playback.playTrack(track.id, 0);
     return true;
@@ -1083,11 +1148,14 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
   if (databaseGameButton?.dataset.databaseGameKey) {
     const game = visibleDatabaseGames().find((entry) => databaseGameKey(entry) === databaseGameButton.dataset.databaseGameKey);
     if (game) {
+      window.clearTimeout(databaseGameClickTimer);
+      databaseGameClickTimer = 0;
       state.selectedDatabaseGameKey = databaseGameButton.dataset.databaseGameKey;
       state.selectedDatabaseConsoleName = databaseConsoleName(game);
       persistSettings();
-      await loadDatabaseGame(game);
-      if (state.playlist[0]) await uiApp.playback.playTrack(state.playlist[0].id, 0);
+      const loaded = await loadDatabaseGame(game);
+      const targetID = loaded ? databaseLoadedSelectionID() : null;
+      if (targetID) await uiApp.playback.playTrack(targetID, 0);
       return true;
     }
   }
@@ -1657,7 +1725,6 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
           range: event.shiftKey
         });
         uiApp.playback.updateTimingSummary();
-        uiApp.playback.preloadTrackAudio(selectedTrack);
       });
 
       row.addEventListener("dblclick", () => {
@@ -1670,7 +1737,7 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
         if (event.key !== "Enter") return;
         event.preventDefault();
         event.stopPropagation();
-        const selectedTrack = selectPlaylistTrack(state.selectedTrackId || track.id);
+        const selectedTrack = selectPlaylistTrack(track.id);
         if (!selectedTrack) return;
         uiApp.playback.playTrack(selectedTrack.id, 0).catch((error) => {
           console.error(error);
@@ -1989,7 +2056,6 @@ function moveSelection(delta, { range = false, extend = false } = {}) {
     selectPlaylistTrack(state.selectedTrackId, { focus: true, range, extend });
   }
   scrollSelectedTrackIntoView();
-  uiApp.playback.preloadTrackAudio(uiApp.selectedTrack());
 }
 
 function selectAllPlaylistTracks() {
@@ -2013,87 +2079,9 @@ function playSelectedTrack() {
   });
 }
 
-async function hydratePlaylistMetadata() {
-  const metadataToken = ++state.metadataToken;
-  const rawTrackIds = state.playlist
-    .filter((track) => !track.catalogRow && !track.metadataLoaded && !track.archivePath)
-    .map((track) => track.id);
-  const archiveTracks = state.playlist.filter((track) => !track.catalogRow && !track.metadataLoaded && track.archivePath && track.archiveEntry);
-  let nextIndex = 0;
-  const worker = async () => {
-    while (metadataToken === state.metadataToken && nextIndex < rawTrackIds.length) {
-      const trackId = rawTrackIds[nextIndex];
-      nextIndex += 1;
-      await hydrateTrackMetadata(trackId);
-    }
-  };
-  const hydrateRaw = Promise.all(Array.from({ length: Math.min(4, rawTrackIds.length) }, worker));
-  const hydrateArchives = window.spcBoyWK?.hydrateArchiveMetadata && archiveTracks.length
-    ? window.spcBoyWK.hydrateArchiveMetadata(archiveTracks.map((track) => ({
-      id: track.id,
-      path: track.path,
-      archivePath: track.archivePath,
-      archiveEntry: track.archiveEntry,
-      sourceFilename: track.sourceFilename,
-      trackIndex: track.trackIndex,
-      fileSize: track.fileSize,
-      modifiedAt: track.modifiedAt,
-      sourceSignature: track.sourceSignature,
-      scanVersion: track.scanVersion
-    }))).then((updates) => {
-      if (metadataToken !== state.metadataToken) return;
-      for (const update of updates || []) {
-        const target = state.playlist.find((track) => track.id === update.id);
-        if (!target) continue;
-        applyTrackInspection(target, update.inspection);
-      }
-    }).catch(() => {})
-    : Promise.resolve();
-  await Promise.all([hydrateRaw, hydrateArchives]);
-}
-
-function applyTrackInspection(target, inspection) {
-  target.title = inspection.metadata.song || target.title;
-  target.game = inspection.metadata.game || target.game;
-  target.artist = inspection.metadata.author || target.artist;
-  target.system = inspection.metadata.system || target.system;
-  target.lengthLabel = inspection.lengthLabel;
-  target.basePlaybackSeconds = inspection.basePlaybackSeconds;
-  target.metadataLoaded = true;
-  scheduleMetadataRefresh(target.id);
-  return target;
-}
-
-async function hydrateTrackMetadata(trackId, inspectionPath = null, sourceName = null) {
-  const track = state.playlist.find((entry) => entry.id === trackId);
-  if (!track || track.metadataLoaded) return track;
-
-  try {
-    const hydrateLoose = window.spcBoyWK.hydrateLooseMetadata
-      ? (payload) => window.spcBoyWK.hydrateLooseMetadata(payload)
-      : (payload) => window.spcBoyWK.inspectTrack(payload.inspectionPath, payload.sourceFilename);
-    const inspection = await hydrateLoose({
-      path: track.path,
-      trackIndex: track.trackIndex,
-      sourceFilename: sourceName || track.sourceFilename || track.filename,
-      inspectionPath: inspectionPath || track.path,
-      fileSize: track.fileSize,
-      modifiedAt: track.modifiedAt,
-      sourceSignature: track.sourceSignature,
-      scanVersion: track.scanVersion
-    });
-    const target = state.playlist.find((entry) => entry.id === trackId);
-    if (!target) return null;
-    return applyTrackInspection(target, inspection);
-  } catch {
-    return track;
-  }
-}
-
 function setPlayTime(nextSeconds) {
-  state.manualPlayTimeSeconds = uiApp.normalizePlayTime(nextSeconds);
+  state.manualPlayTimeSeconds = uiApp.normalizeLongPlayTime(nextSeconds);
   persistSettings();
-  window.spcBoyWK?.setPlaybackSettings?.({ manualPlayTimeSeconds: state.manualPlayTimeSeconds });
   uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
     console.error(error);
   });
@@ -2102,7 +2090,6 @@ function setPlayTime(nextSeconds) {
 function setSpcForceManualTime(nextEnabled) {
   state.longPlayEnabled = Boolean(nextEnabled);
   persistSettings();
-  window.spcBoyWK?.setPlaybackSettings?.({ longPlayEnabled: state.longPlayEnabled });
   uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
     console.error(error);
   });
@@ -2134,7 +2121,6 @@ function setSpcFadeEnabled(nextEnabled) {
 function setQueuedSkipsEnabled(nextEnabled) {
   state.queuedSkipsEnabled = Boolean(nextEnabled);
   persistSettings();
-  window.spcBoyWK?.setPlaybackSettings?.({ queuedSkipsEnabled: state.queuedSkipsEnabled });
   renderAll();
 }
 
@@ -2144,10 +2130,6 @@ async function applyArchiveCacheSettings() {
     limitBytes: state.archiveCacheLimitBytes
   };
   persistSettings();
-  window.spcBoyWK?.setPlaybackSettings?.({
-    archiveCacheEnabled: settings.enabled,
-    archiveCacheLimitBytes: settings.limitBytes
-  });
   const configured = await window.spcBoyWK?.configureArchiveCache?.(settings);
   if (configured?.summary) {
     state.archiveCacheSummary = { ...configured.summary, enabled: configured.enabled, limitBytes: configured.limitBytes };
@@ -2182,7 +2164,6 @@ function audioSettingsPayload() {
 
 function broadcastAudioSettings() {
   const settings = audioSettingsPayload();
-  window.spcBoyWK?.setPlaybackSettings?.(settings);
   window.spcBoyWK?.nativePlaybackAudioConfig?.(state.appVolume, state.equalizerEnabled, state.equalizerBandGains, state.monoEnabled).catch?.(() => {});
   uiApp.playback.setAudioSettings?.(settings);
 }
@@ -2229,9 +2210,8 @@ function adjustAppVolume(delta) {
 
 function commitSpcLengthInput(rawValue) {
   const parsedSeconds = uiApp.parseDurationSeconds(rawValue);
-  state.manualPlayTimeSeconds = uiApp.normalizePlayTime(parsedSeconds ?? state.manualPlayTimeSeconds);
+  state.manualPlayTimeSeconds = uiApp.normalizeLongPlayTime(parsedSeconds ?? state.manualPlayTimeSeconds);
   persistSettings();
-  window.spcBoyWK?.setPlaybackSettings?.({ manualPlayTimeSeconds: state.manualPlayTimeSeconds });
   uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
     console.error(error);
   });
@@ -2241,7 +2221,6 @@ function commitUnknownDurationInput(rawValue) {
   const parsedSeconds = uiApp.parseDurationSeconds(rawValue);
   state.unknownDurationSeconds = uiApp.normalizePlayTime(parsedSeconds ?? state.unknownDurationSeconds);
   persistSettings();
-  window.spcBoyWK?.setPlaybackSettings?.({ unknownDurationSeconds: state.unknownDurationSeconds });
   uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
     console.error(error);
   });
@@ -2251,7 +2230,6 @@ function commitSpcFadeInput(rawValue) {
   const parsedSeconds = uiApp.parseDurationSeconds(rawValue);
   state.spcFadeSeconds = uiApp.normalizeFadeTime(parsedSeconds ?? state.spcFadeSeconds);
   persistSettings();
-  window.spcBoyWK?.setPlaybackSettings?.({ spcFadeSeconds: state.spcFadeSeconds });
   uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
     console.error(error);
   });
@@ -2272,7 +2250,6 @@ function commitPlaybackSpeedInput(backendId, rawValue) {
   }
   state[speedKey] = parsedSpeed;
   persistSettings();
-  window.spcBoyWK?.setPlaybackSettings?.({ [speedKey]: state[speedKey] });
   if (state[enabledKey]) uiApp.playback.refreshPlaybackForSpeedChange(backendId).catch((error) => console.error(error));
   renderAll();
 }
@@ -2281,7 +2258,6 @@ function setPlaybackSpeedEnabled(backendId, enabled) {
   const enabledKey = backendId === "libvgm" ? "libvgmPlaybackSpeedEnabled" : "playbackSpeedEnabled";
   state[enabledKey] = Boolean(enabled);
   persistSettings();
-  window.spcBoyWK?.setPlaybackSettings?.({ [enabledKey]: state[enabledKey] });
   uiApp.playback.refreshPlaybackForSpeedChange(backendId).catch((error) => console.error(error));
   renderAll();
 }
@@ -2524,8 +2500,6 @@ async function bootstrap() {
   }
   syncTreeSelection();
   scrollSelectedTrackIntoView();
-  uiApp.playback.preloadPlaylistAudio(state.playlist, state.selectedTrackId);
-  void hydratePlaylistMetadata();
 }
 
 async function openLibraryRoot() {
@@ -2552,8 +2526,6 @@ function applyLibrarySnapshot(snapshot) {
   renderAll();
   syncTreeSelection();
   scrollSelectedTrackIntoView();
-  uiApp.playback.preloadPlaylistAudio(state.playlist, state.selectedTrackId);
-  void hydratePlaylistMetadata();
 }
 
 function applyFolderSelection(selection) {
@@ -2576,8 +2548,6 @@ function applyFolderSelection(selection) {
   uiApp.playback.updateTimingSummary();
   uiApp.playback.updatePlaybackReadout();
   scrollSelectedTrackIntoView();
-  uiApp.playback.preloadPlaylistAudio(state.playlist, state.selectedTrackId);
-  void hydratePlaylistMetadata();
 }
 
 uiApp.ui = {
@@ -2592,8 +2562,6 @@ uiApp.ui = {
   moveBrowserSelection,
   jumpFocusedListToEdge,
   playSelectedTrack,
-  hydratePlaylistMetadata,
-  hydrateTrackMetadata,
   setPlayTime,
   setSpcForceManualTime,
   cycleRepeatMode,

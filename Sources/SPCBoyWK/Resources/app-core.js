@@ -1,4 +1,5 @@
 const DEFAULT_PLAY_FADE_SECONDS = 6;
+const DEFAULT_LONG_PLAY_SECONDS = 180;
 const SAMPLE_RATE = 44_100;
 const DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES = 2 * 1024 * 1024 * 1024;
 const ARCHIVE_CACHE_LIMIT_CHOICES = Object.freeze([512, 1024, 2048, 4096].map((megabytes) => megabytes * 1024 * 1024));
@@ -61,7 +62,7 @@ const state = {
   isPlaying: false,
   elapsedSeconds: 0,
   totalSeconds: DEFAULT_PLAY_FADE_SECONDS,
-  manualPlayTimeSeconds: 150,
+  manualPlayTimeSeconds: DEFAULT_LONG_PLAY_SECONDS,
   unknownDurationSeconds: 150,
   spcFadeSeconds: DEFAULT_PLAY_FADE_SECONDS,
   uiItemSpacingRem: 0.2,
@@ -109,10 +110,10 @@ const state = {
   archiveCacheLocation: "",
   databaseLocation: null,
   databaseLocationStatus: "",
-  metadataToken: 0,
   nativePlayback: {
     transportState: "stopped",
     outputState: "idle",
+    generation: 0,
     trackLoaded: false,
     decodeError: false,
     reachedEnd: false,
@@ -252,7 +253,7 @@ const refs = {
 async function loadSettings() {
   try {
     const parsed = await window.spcBoyWK.frontendSettingsLoad();
-    state.manualPlayTimeSeconds = normalizePlayTime(parsed.manualPlayTimeSeconds);
+    state.manualPlayTimeSeconds = normalizeLongPlayTime(parsed.manualPlayTimeSeconds);
     state.unknownDurationSeconds = normalizePlayTime(parsed.unknownDurationSeconds);
     state.longPlayEnabled = Boolean(parsed.longPlayEnabled);
     state.repeatMode = ["off", "all", "one"].includes(parsed.repeatMode) ? parsed.repeatMode : "off";
@@ -380,6 +381,13 @@ function normalizePlayTime(value) {
   return Number.isFinite(numeric)
     ? Math.max(30, Math.min(900, Math.round(numeric)))
     : 150;
+}
+
+function normalizeLongPlayTime(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric)
+    ? Math.max(30, Math.min(900, Math.round(numeric)))
+    : DEFAULT_LONG_PLAY_SECONDS;
 }
 
 function normalizeFadeTime(value) {
@@ -556,6 +564,7 @@ function targetPlaybackSeconds() {
 
 window.SPCBoyApp = {
   DEFAULT_PLAY_FADE_SECONDS,
+  DEFAULT_LONG_PLAY_SECONDS,
   SAMPLE_RATE,
   COLUMN_DEFS,
   DEFAULT_COLUMN_ORDER,
@@ -566,6 +575,7 @@ window.SPCBoyApp = {
   persistSettings,
   formatTime,
   normalizePlayTime,
+  normalizeLongPlayTime,
   normalizeFadeTime,
   normalizeAnimationMilliseconds,
   normalizePlaybackSpeed: playbackSpeed.normalize,

@@ -18,11 +18,11 @@ let nativeStatePollTimer = 0;
 let nativePlaybackInitialized = false;
 let mediaSessionHandlersBound = false;
 let finalizePlaybackPromise = null;
-const playbackCoordinator = window.SPCBoyPlaybackCoordinator;
 const playbackBackends = window.SPCBoyPlaybackBackends;
 let queuedSkipRequest = null;
 let queuedSkipTimer = 0;
 let playbackWindow = null;
+const timingPlans = new Map();
 const TRANSPORT_DECLICK_MS = 10;
 
 function waitForAudioEnvelope(durationMs) {
@@ -58,6 +58,7 @@ function resetNativePlaybackSnapshot() {
   state.nativePlayback = {
     transportState: "stopped",
     outputState: "idle",
+    generation: 0,
     trackLoaded: false,
     decodeError: false,
     reachedEnd: false,
@@ -87,17 +88,13 @@ function effectiveTotalSeconds(track) {
 }
 
 function currentBasePlaybackSeconds(track) {
-  const sourceName = track?.archiveEntry || track?.sourceFilename || track?.path || "";
-  const backend = playbackBackends.forPath(sourceName);
-  if (state.longPlayEnabled && backend?.supportsLongPlay) {
-    return state.manualPlayTimeSeconds;
+  const plan = track ? timingPlans.get(track.id) : null;
+  if (plan && Number.isFinite(plan.pre_fade_seconds)) {
+    return plan.pre_fade_seconds;
   }
-
-  if (track?.basePlaybackSeconds > 0) {
-    return track.basePlaybackSeconds;
-  }
-
-  return state.unknownDurationSeconds;
+  return track?.basePlaybackSeconds > 0
+    ? track.basePlaybackSeconds
+    : state.unknownDurationSeconds;
 }
 
 function playbackSpeedForTrack(track) {
@@ -116,6 +113,43 @@ function currentOutputBasePlaybackSeconds(track) {
     Math.round(currentBasePlaybackSeconds(track) * 1000),
     playbackSpeedForTrack(track)
   ) / 1000;
+}
+
+async function resolveTimingPlan(track, { force = false } = {}) {
+  if (!track) {
+    return null;
+  }
+  if (!force && timingPlans.has(track.id)) {
+    return timingPlans.get(track.id);
+  }
+
+  const plan = await window.spcBoyWK.nativePlaybackTiming({
+    path: track.archiveEntry || track.sourceFilename || track.path || "",
+    playMilliseconds: Math.max(0, Math.round((Number(track.basePlaybackSeconds) || 0) * 1000)),
+    manualPlayMilliseconds: Math.max(1, Math.round(state.manualPlayTimeSeconds * 1000)),
+    fadeMilliseconds: Math.max(0, Math.round(currentFadeSeconds(track) * 1000)),
+    unknownDurationMilliseconds: Math.max(1, Math.round(state.unknownDurationSeconds * 1000)),
+    tempo: playbackSpeedForTrack(track),
+    longPlayEnabled: state.longPlayEnabled
+  });
+  if (!plan || !Number.isFinite(Number(plan.pre_fade_seconds))) {
+    throw new Error("VGMBoy returned no playback timing plan.");
+  }
+  const normalized = {
+    pre_fade_seconds: Math.max(1, Number(plan.pre_fade_seconds)),
+    fade_seconds: Math.max(0, Number(plan.fade_seconds) || 0),
+    total_seconds: Math.max(1, Number(plan.total_seconds) || 0),
+    is_long_play: Boolean(plan.is_long_play),
+    uses_native_ending: Boolean(plan.uses_native_ending)
+  };
+  timingPlans.set(track.id, normalized);
+  return normalized;
+}
+
+function clampPosition(positionSeconds, durationSeconds) {
+  const position = Number(positionSeconds) || 0;
+  const duration = Math.max(0, Number(durationSeconds) || 0);
+  return Math.max(0, Math.min(position, duration));
 }
 
 function shouldPreserveFieldValue(element) {
@@ -333,6 +367,7 @@ function handleNativePlaybackState(snapshot) {
     state.nativePlayback = {
       transportState: snapshot?.transport_state || "stopped",
       outputState: snapshot?.output_state || "idle",
+      generation: Number(snapshot?.generation) || 0,
       trackLoaded: Boolean(snapshot?.track_loaded),
       decodeError: Boolean(snapshot?.decode_error),
       reachedEnd: Boolean(snapshot?.reached_end),
@@ -354,7 +389,10 @@ function handleNativePlaybackState(snapshot) {
     return;
   }
 
-  applyNativePlaybackSnapshot(track, snapshot, playbackGeneration);
+  const applied = applyNativePlaybackSnapshot(track, snapshot, playbackGeneration);
+  if (!applied) {
+    return;
+  }
   if (snapshot.transport_state === "ended") {
     void finalizePlaybackEnded();
     return;
@@ -389,13 +427,20 @@ function applyNativePlaybackSnapshot(track, snapshot, generation) {
   }
 
   const activeTrack = track ?? activeTrackInfo();
+  const observedNativeGeneration = Number(snapshot?.generation) || 0;
+  const expectedNativeGeneration = Number(state.nativePlayback?.generation) || 0;
+  if (activeTrack && expectedNativeGeneration > 0 && observedNativeGeneration > 0
+      && observedNativeGeneration !== expectedNativeGeneration) {
+    return false;
+  }
   const totalSeconds = effectiveTotalSeconds(activeTrack);
-  const elapsedSeconds = playbackCoordinator.clampPosition((Number(snapshot?.position_ms) || 0) / 1000, totalSeconds);
+  const elapsedSeconds = clampPosition((Number(snapshot?.position_ms) || 0) / 1000, totalSeconds);
   const transportState = snapshot?.transport_state || "stopped";
 
   state.nativePlayback = {
     transportState,
     outputState: snapshot?.output_state || "idle",
+    generation: observedNativeGeneration,
     trackLoaded: Boolean(snapshot?.track_loaded),
     decodeError: Boolean(snapshot?.decode_error),
     reachedEnd: Boolean(snapshot?.reached_end),
@@ -425,11 +470,15 @@ function applyNativePlaybackSnapshot(track, snapshot, generation) {
 
   updatePlaybackReadout();
   updateNativeDiagnostics();
+  return true;
 }
 
 async function readNativePlaybackState(track, generation) {
   const snapshot = await window.spcBoyWK.nativePlaybackState();
-  applyNativePlaybackSnapshot(track, snapshot, generation);
+  const applied = applyNativePlaybackSnapshot(track, snapshot, generation);
+  if (!applied) {
+    return { ...snapshot, stale_generation: true };
+  }
   return snapshot;
 }
 
@@ -448,6 +497,10 @@ function scheduleNativePlaybackStatePoll(track, generation) {
     try {
       const snapshot = await readNativePlaybackState(track, generation);
       if (generation !== playbackGeneration) {
+        return;
+      }
+
+      if (snapshot?.stale_generation) {
         return;
       }
 
@@ -481,31 +534,39 @@ async function finalizePlaybackEnded() {
   }
 
   finalizePlaybackPromise = (async () => {
-    const activeIndex = state.playlist.findIndex((track) => track.id === state.currentTrackId);
-    const hasFollowingTrack = activeIndex >= 0 && activeIndex < state.playlist.length - 1;
+    const finalizationGeneration = playbackGeneration;
+    const completedTrackId = state.currentTrackId;
+    const completedQueuedSkip = queuedSkipRequest;
+    let completionTargetId = null;
+    if (!completedQueuedSkip) {
+      completionTargetId = await window.spcBoyWK.playbackQueueCompletionTarget(
+        completedTrackId,
+        state.playlist.map((track) => track.id),
+        state.repeatMode
+      );
+    }
+    if (finalizationGeneration !== playbackGeneration
+        || state.currentTrackId !== completedTrackId) {
+      return;
+    }
     clearNativeStatePoll();
     state.isPlaying = false;
     state.elapsedSeconds = state.totalSeconds;
     updatePlaybackReadout();
     updateNativeDiagnostics();
 
-    const completedQueuedSkip = queuedSkipRequest;
-    const nextDelta = completedQueuedSkip?.delta || (state.repeatMode === "one" ? 0 : 1);
-    const nextTrack = state.repeatMode === "one" && state.currentTrackId
-      ? state.playlist.find((track) => track.id === state.currentTrackId)
-      : (completedQueuedSkip || state.repeatMode === "all" || hasFollowingTrack)
-        ? state.playlist[(activeIndex + nextDelta + state.playlist.length) % state.playlist.length]
-        : null;
     queuedSkipRequest = null;
     clearQueuedSkipTimer();
-    await stopPlaybackState({ declick: false, keepNativeOutput: Boolean(nextTrack) });
+    await stopPlaybackState({ declick: false, keepNativeOutput: Boolean(completionTargetId || completedQueuedSkip) });
+
+    if (finalizationGeneration !== playbackGeneration) {
+      return;
+    }
 
     if (completedQueuedSkip) {
       advanceToAdjacent(completedQueuedSkip.delta);
-    } else if (state.repeatMode === "one" && state.currentTrackId) {
-      playTrack(state.currentTrackId, 0);
-    } else if (state.repeatMode === "all" || hasFollowingTrack) {
-      advanceToAdjacent(1);
+    } else if (completionTargetId) {
+      playTrack(completionTargetId, 0);
     }
   })();
 
@@ -538,15 +599,27 @@ async function stopPlaybackState({ declick = true, keepNativeOutput = false } = 
   playbackApp.ui.refreshPlaylistPlaybackState();
 }
 
+async function cancelQueuedSkip({ restoreOutput = false } = {}) {
+  const hadQueuedSkip = Boolean(queuedSkipRequest);
+  queuedSkipRequest = null;
+  clearQueuedSkipTimer();
+  if (restoreOutput && hadQueuedSkip && nativePlaybackInitialized && state.nativePlayback.trackLoaded) {
+    await window.spcBoyWK.nativePlaybackRampGain(1, TRANSPORT_DECLICK_MS);
+  }
+}
+
 async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
   let track = state.playlist.find((entry) => entry.id === trackId);
   if (!track) {
     return;
   }
 
-  const generation = playbackCoordinator.begin();
-  playbackGeneration = generation;
-  // Native-state broadcasts can arrive while the async materialize/load path is in flight.
+  const generation = ++playbackGeneration;
+  const timingPlan = await resolveTimingPlan(track, { force: true });
+  if (generation !== playbackGeneration) {
+    return;
+  }
+  // Native-state broadcasts can arrive while the native playback request is in flight.
   // Keep this request's offset immutable so a prior track cannot leak its elapsed position.
   let requestedStartSeconds = Math.max(0, Math.min(startSeconds, currentTotalSeconds(track)));
   const fadeNowSeconds = Math.max(0, Number(playbackOptions?.fadeNowSeconds) || 0);
@@ -561,6 +634,7 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
     ? { trackId: track.id, totalSeconds: playbackTotalSeconds, fadeSeconds: fadeNowSeconds }
     : null;
   clearPlaybackRuntimeState();
+  resetNativePlaybackSnapshot();
   await stopAllOutput({ keepNativeOutput: true });
 
   state.currentTrackId = track.id;
@@ -578,31 +652,8 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
   playbackApp.ui.refreshPlaylistPlaybackState();
 
   try {
-    // Hold the archive materialization while the bridge owns the source path.
     await setPlaybackPowerSaveBlocker(true);
-    const playbackPath = track.archivePath
-      ? await window.spcBoyWK.materializeTrack(track.archivePath, track.archiveEntry)
-      : track.path;
-    if (!track.metadataLoaded && playbackApp.ui?.hydrateTrackMetadata) {
-      track = await playbackApp.ui.hydrateTrackMetadata(track.id, playbackPath, track.sourceFilename || track.filename) || track;
-      state.currentTrackInfo = track;
-    }
-    // Recompute the playback timing window once metadata is available so a Long
-    // Play-off track uses its decoder-reported natural duration instead of the
-    // manual-duration fallback that the provisional values used above.
-    const recomputedTotalSeconds = fadeNowSeconds > 0
-      ? requestedStartSeconds + fadeNowSeconds
-      : currentTotalSeconds(track);
-    requestedStartSeconds = Math.max(0, Math.min(requestedStartSeconds, recomputedTotalSeconds));
-    const recomputedBaseSeconds = currentOutputBasePlaybackSeconds(track);
-    playbackBaseSeconds = fadeNowSeconds > 0
-      ? Math.max(0.001, requestedStartSeconds)
-      : recomputedBaseSeconds;
-    playbackTotalSeconds = recomputedTotalSeconds;
-    playbackWindow = fadeNowSeconds > 0
-      ? { trackId: track.id, totalSeconds: recomputedTotalSeconds, fadeSeconds: fadeNowSeconds }
-      : null;
-    state.totalSeconds = recomputedTotalSeconds;
+    state.totalSeconds = playbackTotalSeconds;
     state.elapsedSeconds = requestedStartSeconds;
     updatePlaybackReadout();
     if (state.elapsedSeconds >= state.totalSeconds) {
@@ -613,30 +664,27 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
       return;
     }
     await ensureNativePlaybackInitialized();
-    await window.spcBoyWK.nativePlaybackLoad(
-      playbackPath,
-      track.trackIndex || 0,
-      Math.round(requestedStartSeconds * 1000),
-      Math.round((fadeNowSeconds > 0
+    const snapshot = await window.spcBoyWK.nativePlaybackStart({
+      path: track.path,
+      archivePath: track.archivePath || null,
+      archiveEntry: track.archiveEntry || null,
+      trackIndex: track.trackIndex || 0,
+      startMilliseconds: Math.round(requestedStartSeconds * 1000),
+      playMilliseconds: Math.round((fadeNowSeconds > 0
         ? playbackBaseSeconds
-      : (state.longPlayEnabled ? playbackBaseSeconds : Math.max(0, state.manualPlayTimeSeconds))) * 1000),
-      Math.round((fadeNowSeconds > 0 ? fadeNowSeconds : currentFadeSeconds(track)) * 1000),
-      playbackSpeedForTrack(track),
-      state.longPlayEnabled,
-      fadeNowSeconds > 0,
-      Math.round(state.unknownDurationSeconds * 1000)
-    );
+        : (timingPlan.is_long_play ? playbackBaseSeconds : 0)) * 1000),
+      fadeMilliseconds: Math.round((fadeNowSeconds > 0 ? fadeNowSeconds : currentFadeSeconds(track)) * 1000),
+      tempo: playbackSpeedForTrack(track),
+      longPlayEnabled: timingPlan.is_long_play,
+      timedOverride: fadeNowSeconds > 0,
+      unknownDurationMilliseconds: Math.round(state.unknownDurationSeconds * 1000)
+    });
     if (generation !== playbackGeneration) {
       return;
     }
 
     await setPlaybackPowerSaveBlocker(true);
-    await window.spcBoyWK.nativePlaybackPlay();
-    if (generation !== playbackGeneration) {
-      return;
-    }
-
-    await readNativePlaybackState(track, generation);
+    applyNativePlaybackSnapshot(track, snapshot, generation);
     // Position and reached-end state are supplied on demand by the native
     // bridge. Keep the active generation polling so the transport readout
     // advances and the next playlist item can begin at track end.
@@ -664,25 +712,44 @@ function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playba
     queuedSkipRequest = null;
     clearQueuedSkipTimer();
   }
-  return playbackCoordinator.enqueue(() => playTrackNow(trackId, startSeconds, playbackOptions));
+  return playTrackNow(trackId, startSeconds, playbackOptions);
 }
 
-function advanceToAdjacent(delta) {
+async function advanceToAdjacent(delta) {
   if (state.playlist.length === 0) {
     return;
   }
 
-  const active = currentTrack() ?? selectedTrack() ?? state.playlist[0];
-  const currentIndex = state.playlist.findIndex((track) => track.id === active.id);
-  const nextIndex = (currentIndex + delta + state.playlist.length) % state.playlist.length;
-  playTrack(state.playlist[nextIndex].id, 0).catch((error) => {
+  try {
+    const playlistIDs = state.playlist.map((track) => track.id);
+    const anchorID = await window.spcBoyWK.playbackQueueTransportTarget(
+      state.currentTrackId,
+      state.selectedTrackId,
+      playlistIDs
+    );
+    if (!anchorID) return;
+    const nextID = await window.spcBoyWK.playbackQueueAdjacent(
+      anchorID,
+      playlistIDs,
+      delta < 0 ? "previous" : "next",
+      true
+    );
+    if (!nextID) return;
+    await playTrack(nextID, 0);
+  } catch (error) {
     console.error(error);
-  });
+  }
 }
 
 function playAdjacent(delta) {
-  if (!state.queuedSkipsEnabled || !state.isPlaying || !state.currentTrackId) {
-    advanceToAdjacent(delta);
+  return playAdjacentNow(delta).catch((error) => {
+    console.error("[SPCBoy] adjacent playback failed", error);
+  });
+}
+
+async function playAdjacentNow(delta) {
+  if (!state.currentTrackId) {
+    await advanceToAdjacent(delta);
     return;
   }
 
@@ -700,25 +767,44 @@ function playAdjacent(delta) {
 
   const track = currentTrack();
   const fadeSeconds = currentFadeSeconds(track);
-  const remainingSeconds = track ? Math.max(0, currentTotalSeconds(track) - state.elapsedSeconds) : 0;
-  if (!track || fadeSeconds <= 0 || state.elapsedSeconds >= currentOutputBasePlaybackSeconds(track) || remainingSeconds <= 0) {
-    advanceToAdjacent(delta);
+  const fadeDurationMs = await window.spcBoyWK.playbackFadeDuration(
+    state.queuedSkipsEnabled,
+    state.isPlaying,
+    Boolean(track),
+    state.elapsedSeconds,
+    currentOutputBasePlaybackSeconds(track),
+    fadeSeconds,
+    currentTotalSeconds(track)
+  );
+  if (!fadeDurationMs) {
+    await advanceToAdjacent(delta);
     return;
   }
 
-  const fadeDurationMs = Math.round(Math.min(fadeSeconds, remainingSeconds) * 1000);
-  queuedSkipRequest = { delta, generation: playbackGeneration };
+  queuedSkipRequest = {
+    delta,
+    generation: playbackGeneration,
+    nativeGeneration: Number(state.nativePlayback.generation) || 0
+  };
   fadeActiveOutput(fadeDurationMs).catch((error) => {
     console.error(error);
   });
   queuedSkipTimer = window.setTimeout(() => {
-    const request = queuedSkipRequest;
-    if (!request || request.generation !== playbackGeneration) return;
-    queuedSkipTimer = 0;
-    // Route timer completion through the same single-flight finalizer as a
-    // natural end, so an end event arriving on the same callback cannot
-    // advance the playlist twice.
-    void finalizePlaybackEnded();
+    void (async () => {
+      const request = queuedSkipRequest;
+      if (!request || request.generation !== playbackGeneration) return;
+      const snapshot = await window.spcBoyWK.nativePlaybackState();
+      if (request.nativeGeneration > 0
+          && Number(snapshot?.generation) !== request.nativeGeneration) {
+        await cancelQueuedSkip({ restoreOutput: true });
+        return;
+      }
+      queuedSkipTimer = 0;
+      // Route timer completion through the same single-flight finalizer as a
+      // natural end, so an end event arriving on the same callback cannot
+      // advance the playlist twice.
+      await finalizePlaybackEnded();
+    })().catch((error) => console.error("[SPCBoy] faded skip failed", error));
   }, fadeDurationMs);
 }
 
@@ -752,6 +838,27 @@ async function togglePlayback() {
     }
   }
 
+  if (nativePlaybackInitialized && state.nativePlayback.trackLoaded) {
+    const generation = ++playbackGeneration;
+    clearPlaybackRuntimeState();
+    try {
+      await setPlaybackPowerSaveBlocker(true);
+      const snapshot = await window.spcBoyWK.nativePlaybackResume();
+      if (generation !== playbackGeneration) {
+        return;
+      }
+      applyNativePlaybackSnapshot(track, snapshot, generation);
+      scheduleNativePlaybackStatePoll(track, generation);
+      updatePlaybackReadout();
+      return;
+    } catch (error) {
+      if (generation === playbackGeneration) {
+        await setPlaybackPowerSaveBlocker(false);
+      }
+      throw error;
+    }
+  }
+
   await playTrack(track.id, state.elapsedSeconds);
 }
 
@@ -765,6 +872,29 @@ async function restartAt(seconds) {
   updatePlaybackReadout();
 
   if (state.currentTrackId === track.id) {
+    if (nativePlaybackInitialized && state.nativePlayback.trackLoaded) {
+      const generation = playbackGeneration;
+      await cancelQueuedSkip({ restoreOutput: true });
+      clearPlaybackRuntimeState();
+      try {
+        const snapshot = await window.spcBoyWK.nativePlaybackSeek(
+          Math.round(state.elapsedSeconds * 1000)
+        );
+        if (generation !== playbackGeneration) {
+          return;
+        }
+        applyNativePlaybackSnapshot(track, snapshot, generation);
+        scheduleNativePlaybackStatePoll(track, generation);
+        updatePlaybackReadout();
+        return;
+      } catch (error) {
+        if (generation === playbackGeneration) {
+          updateNativeDiagnostics();
+        }
+        throw error;
+      }
+    }
+
     await playTrack(track.id, state.elapsedSeconds);
   }
 }
@@ -777,6 +907,8 @@ async function refreshPlaybackForTimingChange() {
     return;
   }
 
+  timingPlans.delete(track.id);
+  await resolveTimingPlan(track, { force: true });
   const resumeAt = Math.max(0, Math.min(state.elapsedSeconds, currentTotalSeconds(track)));
   if (!state.isPlaying) {
     state.elapsedSeconds = resumeAt;
@@ -796,14 +928,6 @@ async function refreshPlaybackForSpeedChange(backendId) {
   await refreshPlaybackForTimingChange();
 }
 
-function preloadTrackAudio() {
-  return Promise.resolve();
-}
-
-function preloadPlaylistAudio() {
-  return Promise.resolve();
-}
-
 playbackApp.playback = {
   updateTimingSummary,
   updatePlaybackReadout,
@@ -817,8 +941,7 @@ playbackApp.playback = {
   restartAt,
   refreshPlaybackForTimingChange,
   refreshPlaybackForSpeedChange,
-  setAudioSettings,
-  preloadTrackAudio,
-  preloadPlaylistAudio
+  cancelQueuedSkip,
+  setAudioSettings
 };
 })();

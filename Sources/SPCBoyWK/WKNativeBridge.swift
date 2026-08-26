@@ -1,4 +1,5 @@
 import AppKit
+import ArchiveCacheCore
 import CatalogReader
 import CatalogPlaylistCore
 import CatalogBrowserCore
@@ -7,6 +8,9 @@ import FavoriteTrackCore
 import FrontendPreferencesCore
 import Foundation
 import LocalFileBrowserCore
+import PlaybackQueueCore
+import PlaybackTransportCore
+import PlaylistIdentityCore
 import VGMBoyEndpointCore
 import VGMBoyKit
 import WebKit
@@ -39,34 +43,32 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     }
 
     private static var playbackBackendManifest: [[String: Any]] {
-        [
-            backend("libgme", extensions: FormatRegistry.libgmeExtensions, family: FormatRegistry.libgmeFamily, tempoExtensions: FormatRegistry.libgmeExtensions),
-            backend("libvgm", extensions: FormatRegistry.libvgmExtensions, family: FormatRegistry.libvgmFamily, tempoExtensions: FormatRegistry.libvgmExtensions),
-            backend("standard-audio", extensions: FormatRegistry.standardAudioExtensions, family: FormatRegistry.standardAudioFamily),
-            backend("ffmpeg-audio", extensions: FormatRegistry.ffmpegAudioExtensions, family: FormatRegistry.ffmpegAudioFamily),
-            backend("highly-complete", extensions: FormatRegistry.highlyCompleteExtensions, family: FormatRegistry.highlyCompleteFamily),
-            backend("twosf", extensions: FormatRegistry.twoSFExtensions, family: FormatRegistry.twoSFFamily),
-            backend("vgmstream", extensions: FormatRegistry.vgmstreamExtensions, family: FormatRegistry.vgmstreamFamily),
-            backend("lazyusf", extensions: FormatRegistry.lazyusfExtensions, family: FormatRegistry.lazyusfFamily),
-            backend("playpsf", extensions: FormatRegistry.playpsfExtensions, family: FormatRegistry.playpsfFamily),
-            backend("qsf", extensions: FormatRegistry.qsfExtensions, family: FormatRegistry.qsfFamily),
-            backend("sidplayfp", extensions: FormatRegistry.sidplayfpExtensions, family: FormatRegistry.sidplayfpFamily),
-            backend("openmpt", extensions: FormatRegistry.openMPTExtensions, family: FormatRegistry.openMPTFamily)
-        ]
+        FormatRegistry.playbackDescriptors.map { descriptor in
+            backend(
+                descriptor.id,
+                extensions: descriptor.extensions,
+                supportsLongPlay: descriptor.supportsLongPlay,
+                supportsTempo: descriptor.supportsTempo,
+                hasNaturalEnding: descriptor.hasNaturalEnding
+            )
+        }
     }
 
     private static func backend(
         _ id: String,
         extensions: Set<String>,
-        family: DecoderFamily,
-        tempoExtensions: Set<String> = []
+        supportsLongPlay: Bool,
+        supportsTempo: Bool,
+        hasNaturalEnding: Bool
     ) -> [String: Any] {
         [
             "id": id,
             "extensions": extensions.sorted(),
-            "supportsLongPlay": family.supportsLongPlay,
-            "playbackSpeedMode": tempoExtensions.isEmpty ? "none" : "native-tempo",
-            "playbackSpeedExtensions": tempoExtensions.sorted()
+            "supportsLongPlay": supportsLongPlay,
+            "supportsTempo": supportsTempo,
+            "hasNaturalEnding": hasNaturalEnding,
+            "playbackSpeedMode": supportsTempo ? "native-tempo" : "none",
+            "playbackSpeedExtensions": supportsTempo ? extensions.sorted() : []
         ]
     }
 
@@ -117,6 +119,12 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             databaseFiles: (...args) => request("databaseFiles", args),
             databaseSearchGames: (...args) => request("databaseSearchGames", args),
             databaseGameTracks: (...args) => request("databaseGameTracks", args),
+            databaseGroupState: (...args) => request("databaseGroupState", args),
+            playbackQueueTransportTarget: (...args) => request("playbackQueueTransportTarget", args),
+            playbackQueueAdjacent: (...args) => request("playbackQueueAdjacent", args),
+            playbackQueueCompletionTarget: (...args) => request("playbackQueueCompletionTarget", args),
+            playbackQueueReplacementState: (...args) => request("playbackQueueReplacementState", args),
+            playbackFadeDuration: (...args) => request("playbackFadeDuration", args),
             databaseFileTracks: (...args) => request("databaseFileTracks", args),
             databaseFolderTracks: (...args) => request("databaseFolderTracks", args),
             favoritesList: (...args) => request("favoritesList", args),
@@ -135,7 +143,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             clearArchiveCache: (...args) => request("clearArchiveCache", args),
             showArchiveCacheInFinder: () => request("showArchiveCacheInFinder"),
             setRoutingPreferences: (...args) => request("setRoutingPreferences", args),
-            setPlaybackSettings: (...args) => request("setPlaybackSettings", args),
             setAppearanceSettings: (...args) => request("setAppearanceSettings", args),
             openOptionsWindow: () => request("openOptionsWindow"),
             closeOptionsWindow: () => request("closeOptionsWindow"),
@@ -148,8 +155,9 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             showInFinder: (...args) => request("showInFinder", args),
             nativePlaybackInit: (...args) => request("nativePlaybackInit", args),
             nativePlaybackAudioConfig: (...args) => request("nativePlaybackAudioConfig", args),
-            nativePlaybackLoad: (...args) => request("nativePlaybackLoad", args),
-            nativePlaybackPlay: (...args) => request("nativePlaybackPlay", args),
+            nativePlaybackTiming: (...args) => request("nativePlaybackTiming", args),
+            nativePlaybackStart: (...args) => request("nativePlaybackStart", args),
+            nativePlaybackResume: (...args) => request("nativePlaybackResume", args),
             nativePlaybackPause: (...args) => request("nativePlaybackPause", args),
             nativePlaybackStop: (...args) => request("nativePlaybackStop", args),
             nativePlaybackClose: (...args) => request("nativePlaybackClose", args),
@@ -158,13 +166,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             nativePlaybackState: (...args) => request("nativePlaybackState", args),
             nativePlaybackRampGain: (...args) => request("nativePlaybackRampGain", args),
             setPlaybackPowerSaveBlocker: (...args) => request("setPlaybackPowerSaveBlocker", args),
-            materializeTrack: (...args) => request("materializeTrack", args),
             releaseMaterializedTrack: (...args) => request("releaseMaterializedTrack", args),
             onCatalogReloaded: (listener) => on("catalogReloaded", listener),
             onLibrarySnapshot: (listener) => on("librarySnapshot", listener),
             onLibraryCommand: (listener) => on("libraryCommand", listener),
             onNativePlaybackState: (listener) => on("nativePlaybackState", listener),
-            onPlaybackSettingsChanged: (listener) => on("playbackSettingsChanged", listener),
             onAppearanceSettingsChanged: (listener) => on("appearanceSettingsChanged", listener),
             onFrontendSettingsChanged: (listener) => on("frontendSettingsChanged", listener),
             onRoutingPreferencesChanged: (listener) => on("routingPreferencesChanged", listener),
@@ -286,14 +292,12 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path).standardizedFileURL])
             return true
         case "showArchiveCacheInFinder":
-            let url = FileManager.default.temporaryDirectory.appendingPathComponent("FrontendCore", isDirectory: true)
+            let url = URL(fileURLWithPath: SPCArchiveMaterialization.cacheLocation())
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
             NSWorkspace.shared.activateFileViewerSelecting([url.standardizedFileURL])
             return true
         case "archiveCacheLocation":
-            let url = FileManager.default.temporaryDirectory.appendingPathComponent("FrontendCore", isDirectory: true)
-            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-            return url.standardizedFileURL.path
+            return SPCArchiveMaterialization.cacheLocation()
         case "databaseLocation":
             return try location(catalogURL: catalogURL, reloaded: false)
         case "reloadDatabaseLibrary":
@@ -309,6 +313,66 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return try searchGames(query, catalogURL: catalogURL)
         case "databaseGameTracks":
             return try gameTracks(args.first, catalogURL: catalogURL)
+        case "databaseGroupState":
+            guard let state = args.first as? [String: Any],
+                  let action = args.dropFirst().first as? String else {
+                throw BridgeError.invalidArguments
+            }
+            return try databaseGroupState(
+                state: state,
+                action: action,
+                groupName: args.dropFirst(2).first as? String,
+                gameID: args.dropFirst(3).first as? String
+            )
+        case "playbackQueueTransportTarget":
+            return PlaybackQueueNavigation.transportPlaybackTarget(
+                currentTrackID: args.first as? String,
+                selectedTrackID: args.dropFirst().first as? String,
+                playlistIDs: stringArray(args.dropFirst(2).first)
+            ) ?? NSNull()
+        case "playbackQueueAdjacent":
+            guard let direction = PlaybackQueueDirection(rawValue: args.dropFirst(2).first as? String ?? ""),
+                  let targetID = PlaybackQueueNavigation.adjacentTrackID(
+                      currentTrackID: args.first as? String,
+                      playlistIDs: stringArray(args.dropFirst().dropFirst().first),
+                      direction: direction,
+                      wraps: args.dropFirst(3).first as? Bool ?? false
+                  ) else {
+                return NSNull()
+            }
+            return targetID
+        case "playbackQueueCompletionTarget":
+            let repeatMode: PlaybackRepeatMode = switch args.dropFirst(2).first as? String {
+            case "one": .song
+            case "all": .playlist
+            default: .off
+            }
+            return PlaybackQueueNavigation.completionTargetID(
+                currentTrackID: args.first as? String,
+                playlistIDs: stringArray(args.dropFirst().first),
+                repeatMode: repeatMode
+            ) ?? NSNull()
+        case "playbackQueueReplacementState":
+            let replacement = PlaybackQueueNavigation.replacementState(
+                currentTrackID: args.first as? String,
+                playlistIDs: stringArray(args.dropFirst().first),
+                preservePlayback: args.dropFirst(2).first as? Bool ?? false
+            )
+            return [
+                "currentTrackId": replacement.currentTrackID.map { $0 as Any } ?? NSNull(),
+                "selectedTrackId": replacement.selectedTrackID.map { $0 as Any } ?? NSNull()
+            ]
+        case "playbackFadeDuration":
+            let duration = PlaybackFadePolicy.queuedSkipDuration(
+                enabled: args.first as? Bool ?? false,
+                isPlaying: args.dropFirst().first as? Bool ?? false,
+                hasCurrentTrack: args.dropFirst(2).first as? Bool ?? false,
+                elapsedSeconds: double(args.dropFirst(3).first) ?? 0,
+                preFadeSeconds: double(args.dropFirst(4).first) ?? 0,
+                fadeSeconds: double(args.dropFirst(5).first) ?? 0,
+                totalSeconds: double(args.dropFirst(6).first) ?? 0
+            )
+            return duration.map { $0 * 1_000 } ?? NSNull()
         case "databaseFileTracks":
             return try fileTracks(args.first, catalogURL: catalogURL, folders: false)
         case "databaseFolderTracks":
@@ -343,17 +407,30 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return true
         case "endpointSurface":
             return try JSONSerialization.jsonObject(with: JSONEncoder().encode(VGMBoyEndpointSurface.v1))
-        case "configureArchiveCache", "archiveCacheSummary", "clearArchiveCache",
-             "setPlaybackSettings",
-             "setPlaybackPowerSaveBlocker":
+        case "configureArchiveCache":
+            guard let settings = args.first as? [String: Any] else { throw BridgeError.invalidArguments }
+            let enabled = settings["enabled"] as? Bool ?? true
+            let limitBytes = int64(settings["limitBytes"]) ?? ArchiveCachePolicy.defaultLimitBytes
+            let summary = SPCArchiveMaterialization.configure(enabled: enabled, limitBytes: limitBytes)
+            return [
+                "enabled": enabled,
+                "limitBytes": summary["limitBytes"] ?? limitBytes,
+                "summary": summary
+            ]
+        case "archiveCacheSummary":
+            return SPCArchiveMaterialization.cacheSummary()
+        case "clearArchiveCache":
+            try SPCArchiveMaterialization.clearCache()
+            return true
+        case "setPlaybackPowerSaveBlocker":
             return NSNull()
         case "setRoutingPreferences":
             return args.first ?? [:]
-        case "nativePlaybackInit", "nativePlaybackAudioConfig", "nativePlaybackLoad",
-             "nativePlaybackPlay", "nativePlaybackPause", "nativePlaybackStop",
+        case "nativePlaybackInit", "nativePlaybackAudioConfig", "nativePlaybackTiming", "nativePlaybackStart",
+             "nativePlaybackResume", "nativePlaybackPause", "nativePlaybackStop",
              "nativePlaybackClose", "nativePlaybackUnload", "nativePlaybackSeek",
              "nativePlaybackState", "nativePlaybackRampGain",
-             "materializeTrack", "releaseMaterializedTrack":
+             "releaseMaterializedTrack":
             return try WKPlaybackBridge.shared.handle(method: method, args: args)
         default:
             throw BridgeError.unsupported(method)
@@ -365,6 +442,56 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             throw BridgeError.catalogMissing(url.path)
         }
         return try ReadOnlyCatalog(databaseURL: url)
+    }
+
+    nonisolated private static func stringArray(_ value: Any?) -> [String] {
+        if let values = value as? [String] {
+            return values
+        }
+        if let values = value as? [Any] {
+            return values.compactMap { $0 as? String }
+        }
+        return []
+    }
+
+    nonisolated private static func databaseGroupState(
+        state: [String: Any],
+        action: String,
+        groupName: String?,
+        gameID: String?
+    ) throws -> [String: Any] {
+        let current = CatalogBrowserGroupState(
+            expandedGroupNames: Set(stringArray(state["expandedGroupNames"])),
+            selectedGroupName: state["selectedGroupName"] as? String,
+            selectedGameID: state["selectedGameID"] as? String
+        )
+        let next: CatalogBrowserGroupState
+        switch action {
+        case "toggle":
+            guard let groupName, !groupName.isEmpty else { throw BridgeError.invalidArguments }
+            next = current.applying(.toggleGroup(groupName))
+        case "select":
+            guard let groupName, !groupName.isEmpty else { throw BridgeError.invalidArguments }
+            next = current.applying(.selectGroup(groupName))
+        case "selectGame":
+            guard let groupName, !groupName.isEmpty, let gameID, !gameID.isEmpty else {
+                throw BridgeError.invalidArguments
+            }
+            next = current.applying(.selectGame(groupName: groupName, gameID: gameID))
+        case "allCollapsed":
+            let collapsed = state["collapsed"] as? Bool ?? true
+            next = current.applying(.setAllCollapsed(
+                collapsed,
+                knownGroupNames: Set(stringArray(state["knownGroupNames"]))
+            ))
+        default:
+            throw BridgeError.invalidArguments
+        }
+        return [
+            "expandedGroupNames": Array(next.expandedGroupNames).sorted(),
+            "selectedGroupName": next.selectedGroupName ?? NSNull(),
+            "selectedGameID": next.selectedGameID ?? NSNull()
+        ]
     }
 
     nonisolated private static func location(catalogURL: URL, reloaded: Bool) throws -> [String: Any] {
@@ -478,7 +605,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             trackCount: track.trackCount
         )
         return [
-            "playlistId": "catalog-\(track.id)",
+            "playlistId": PlaylistTrackIdentity.trackID(
+                sourcePath: track.archivePath ?? path,
+                archiveEntry: track.archiveEntry,
+                trackIndex: track.trackIndex
+            ),
             "favoriteId": favoriteIdentity.id,
             "metadataTrackId": track.id,
             "metadataLoaded": true,
@@ -516,7 +647,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             trackCount: track.trackCount
         )
         return [
-            "playlistId": "catalog-\(favoriteIdentity.id)",
+            "playlistId": PlaylistTrackIdentity.trackID(
+                sourcePath: archivePath ?? path,
+                archiveEntry: archiveEntry,
+                trackIndex: track.trackIndex
+            ),
             "favoriteId": favoriteIdentity.id,
             "metadataTrackId": 0,
             "metadataLoaded": true,
@@ -816,6 +951,13 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         if let value = value as? Int64 { return value }
         if let value = value as? Int { return Int64(value) }
         if let value = value as? NSNumber { return value.int64Value }
+        return nil
+    }
+
+    nonisolated private static func double(_ value: Any?) -> Double? {
+        if let value = value as? Double { return value }
+        if let value = value as? Int { return Double(value) }
+        if let value = value as? NSNumber { return value.doubleValue }
         return nil
     }
 

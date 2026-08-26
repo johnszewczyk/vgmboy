@@ -1,5 +1,6 @@
 import Foundation
 import FrontendPreferencesCore
+import VGMBoyKit
 
 /// The typed native persistence boundary for SPCBoy. JavaScript receives a JSON
 /// projection, but it no longer owns or migrates the durable preference schema.
@@ -66,6 +67,7 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
     init(jsonObject: [String: Any]) throws {
         let data = try JSONSerialization.data(withJSONObject: jsonObject)
         self = try JSONDecoder().decode(Self.self, from: data)
+        normalizeSharedPlaybackPreferences()
         autoResizeAnimationMilliseconds = FrontendAnimationTimings.clamp(
             autoResizeAnimationMilliseconds ?? FrontendAnimationTimings.defaultDurationMilliseconds
         )
@@ -75,6 +77,26 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
     }
 
     init() {
+        let shared = PlaybackPreferences.defaultValue
+        manualPlayTimeSeconds = shared.timing.longPlaySeconds
+        unknownDurationSeconds = shared.timing.unknownDurationSeconds
+        longPlayEnabled = false
+        fadeEnabled = shared.fadeEnabled
+        spcFadeSeconds = shared.timing.fadeSeconds
+        equalizerEnabled = shared.equalizer.enabled
+        equalizerBandGains = shared.equalizer.gainsDecibels.map(Double.init)
+        appVolume = Double(shared.outputVolume)
+        monoEnabled = shared.monoEnabled
+        playbackSpeed = .init(
+            numerator: shared.libgmeTempo.numerator,
+            denominator: shared.libgmeTempo.denominator
+        )
+        playbackSpeedEnabled = shared.libgmeTempoEnabled
+        libvgmPlaybackSpeed = .init(
+            numerator: shared.libvgmTempo.numerator,
+            denominator: shared.libvgmTempo.denominator
+        )
+        libvgmPlaybackSpeedEnabled = shared.libvgmTempoEnabled
         autoResizeAnimationMilliseconds = FrontendAnimationTimings.defaultDurationMilliseconds
         selectionAnimationMilliseconds = FrontendAnimationTimings.defaultDurationMilliseconds
         mainWindowAlwaysOnTop = false
@@ -87,5 +109,49 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
             throw SnapshotError.invalidJSON
         }
         return object
+    }
+
+    private mutating func normalizeSharedPlaybackPreferences() {
+        func tempo(_ rate: PlaybackRate?) -> PlaybackTempo {
+            PlaybackTempo(
+                numerator: rate?.numerator ?? PlaybackTempo.defaultValue.numerator,
+                denominator: rate?.denominator ?? PlaybackTempo.defaultValue.denominator
+            )
+        }
+
+        let shared = PlaybackPreferences(
+            timing: PlaybackTimingPreferences(
+                longPlaySeconds: manualPlayTimeSeconds ?? PlaybackTimingPreferences.defaultLongPlaySeconds,
+                unknownDurationSeconds: unknownDurationSeconds ?? PlaybackTimingPreferences.defaultUnknownDurationSeconds,
+                fadeSeconds: spcFadeSeconds ?? PlaybackTimingPreferences.defaultFadeSeconds
+            ),
+            fadeEnabled: fadeEnabled ?? true,
+            equalizerEnabled: equalizerEnabled ?? false,
+            equalizerBandGains: equalizerBandGains?.map(Float.init) ?? [],
+            outputVolume: Float(appVolume ?? 1),
+            monoEnabled: monoEnabled ?? false,
+            libgmeTempo: tempo(playbackSpeed),
+            libgmeTempoEnabled: playbackSpeedEnabled ?? false,
+            libvgmTempo: tempo(libvgmPlaybackSpeed),
+            libvgmTempoEnabled: libvgmPlaybackSpeedEnabled ?? false
+        )
+        manualPlayTimeSeconds = shared.timing.longPlaySeconds
+        unknownDurationSeconds = shared.timing.unknownDurationSeconds
+        fadeEnabled = shared.fadeEnabled
+        spcFadeSeconds = shared.timing.fadeSeconds
+        equalizerEnabled = shared.equalizer.enabled
+        equalizerBandGains = shared.equalizer.gainsDecibels.map(Double.init)
+        appVolume = Double(shared.outputVolume)
+        monoEnabled = shared.monoEnabled
+        playbackSpeed = PlaybackRate(
+            numerator: shared.libgmeTempo.numerator,
+            denominator: shared.libgmeTempo.denominator
+        )
+        playbackSpeedEnabled = shared.libgmeTempoEnabled
+        libvgmPlaybackSpeed = PlaybackRate(
+            numerator: shared.libvgmTempo.numerator,
+            denominator: shared.libvgmTempo.denominator
+        )
+        libvgmPlaybackSpeedEnabled = shared.libvgmTempoEnabled
     }
 }
