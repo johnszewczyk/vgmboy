@@ -228,6 +228,51 @@ public struct CatalogFileSearchIndex: Sendable {
     }
 }
 
+public struct CatalogFileTreeFolder: Equatable, Sendable {
+    public let rootID: Int64
+    public let rootPath: String
+    public let folderPath: String
+
+    public init(rootID: Int64, rootPath: String, folderPath: String) {
+        self.rootID = rootID
+        self.rootPath = rootPath
+        self.folderPath = folderPath
+    }
+}
+
+/// A complete database-only Files tree. This is a transportable projection of
+/// the shared graph, not a DOM or native view node. Frontends may map its
+/// `children` and source payloads into their local rendering shape.
+public struct CatalogFileTreeNode: Equatable, Sendable {
+    public enum Kind: String, Sendable {
+        case folder
+        case file
+    }
+
+    public let kind: Kind
+    public let id: String
+    public let title: String
+    public let folder: CatalogFileTreeFolder?
+    public let file: CatalogFileBucket?
+    public let children: [CatalogFileTreeNode]
+
+    public init(
+        kind: Kind,
+        id: String,
+        title: String,
+        folder: CatalogFileTreeFolder? = nil,
+        file: CatalogFileBucket? = nil,
+        children: [CatalogFileTreeNode] = []
+    ) {
+        self.kind = kind
+        self.id = id
+        self.title = title
+        self.folder = folder
+        self.file = file
+        self.children = children
+    }
+}
+
 /// A database-only Files-sidebar graph. It contains no rendering, selection,
 /// persistence, filesystem enumeration, archive inspection, or playback
 /// behavior. Frontends flatten the graph using their own disclosure state.
@@ -238,6 +283,7 @@ public struct CatalogFileTreeIndex: Sendable {
     }
 
     private struct Folder: Sendable {
+        let rootID: Int64
         let path: String
         let title: String
         let childFolderIDs: [String]
@@ -310,6 +356,7 @@ public struct CatalogFileTreeIndex: Sendable {
             let (id, builder) = entry
             let sortedFiles = builder.directFiles.sorted(by: Self.fileComesBefore)
             folders[id] = Folder(
+                rootID: builder.rootID,
                 path: builder.path,
                 title: builder.title,
                 childFolderIDs: builder.childFolderIDs.sorted { lhs, rhs in
@@ -352,6 +399,34 @@ public struct CatalogFileTreeIndex: Sendable {
         return rows
     }
 
+    public func nodes() -> [CatalogFileTreeNode] {
+        func makeFolderNode(_ id: String) -> CatalogFileTreeNode? {
+            guard let folder = folders[id] else { return nil }
+            let children = folder.childFolderIDs.compactMap(makeFolderNode)
+                + folder.directFiles.map { file in
+                    CatalogFileTreeNode(
+                        kind: .file,
+                        id: file.id,
+                        title: Self.filename(in: file.path),
+                        file: file
+                    )
+                }
+            return CatalogFileTreeNode(
+                kind: .folder,
+                id: id,
+                title: folder.title,
+                folder: CatalogFileTreeFolder(
+                    rootID: folder.rootID,
+                    rootPath: rootPath(for: folder.rootID, fallback: folder.path),
+                    folderPath: folder.path
+                ),
+                children: children
+            )
+        }
+
+        return rootFolderIDs.compactMap(makeFolderNode)
+    }
+
     public static func rootFolderIDs(for files: [CatalogFileBucket]) -> [String] {
         Array(Set(files.map { folderID(rootID: $0.rootID, path: $0.rootPath) }))
     }
@@ -366,6 +441,14 @@ public struct CatalogFileTreeIndex: Sendable {
 
     private static func filename(in path: String) -> String {
         URL(fileURLWithPath: path).lastPathComponent
+    }
+
+    private func rootPath(for rootID: Int64, fallback: String) -> String {
+        guard let rootFolderID = rootFolderIDs.first(where: { $0.split(separator: "|", maxSplits: 1).first.map(String.init) == String(rootID) }),
+              let rootFolder = folders[rootFolderID] else {
+            return fallback
+        }
+        return rootFolder.path
     }
 
     private static func localizedAscending(

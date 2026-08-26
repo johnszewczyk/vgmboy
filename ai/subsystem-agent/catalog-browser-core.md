@@ -41,6 +41,10 @@ write SQLite, or activate playback.
   `CatalogFileBucket` into AppKit row enums or bridge records. That mapping is
   an adapter; a frontend must not rebuild the folder graph or create a second
   file-search policy.
+- `CatalogFileTreeIndex.nodes()` exposes the complete nested tree for a
+  frontend bridge that needs hierarchical records. Its child ordering and
+  source payloads are still produced by the shared index; the bridge may only
+  rename fields or add renderer-local paths.
 
 ## Files
 

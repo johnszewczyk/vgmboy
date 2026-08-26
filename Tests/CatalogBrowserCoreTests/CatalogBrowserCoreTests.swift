@@ -92,6 +92,12 @@ import Testing
     } else {
         Issue.record("Expected first KOF 96 file row")
     }
+
+    let nodes = index.nodes()
+    #expect(nodes.count == 1)
+    #expect(nodes[0].folder?.folderPath == root)
+    #expect(nodes[0].children.map(\.title) == ["Neo Geo CD", "NES"])
+    #expect(nodes[0].children[0].children[0].children.last?.file?.path.hasSuffix("/01.vgm") == true)
 }
 
 @Test func fileSearchIndexSupportsCancellationAndSharedSearchFields() {
