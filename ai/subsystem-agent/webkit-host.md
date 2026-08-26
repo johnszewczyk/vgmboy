@@ -71,6 +71,12 @@ window when Long Play is off; the native standard request leaves the play length
 VGMBoyKit applies the same policy. Native status remains the playback authority for position and
 end state.
 
+The bridge preserves the distinction between a loaded paused session and a
+stopped session in its JSON status projection. It emits `paused` when VGMBoy
+is not playing, has not naturally ended, and the bridge still owns a loaded
+track, keeping WebKit diagnostics aligned with CocoaSpice's native status
+model.
+
 The native bridge projects `VGMBoyKit.FormatRegistry.playbackDescriptors` into the WebKit backend
 manifest; JavaScript only indexes and displays that projection. `SPCBoyPreferencesSnapshot`
 normalizes timing, fade, EQ, volume, mono, and native-tempo values through

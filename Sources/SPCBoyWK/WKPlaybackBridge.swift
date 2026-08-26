@@ -209,12 +209,22 @@ final class WKPlaybackBridge: @unchecked Sendable {
         let diagnostics = status?.diagnostics
         let statistics = status?.statistics
         lock.lock(); let loaded = trackLoaded; lock.unlock()
+        let transportState: String
+        if status?.isPlaying == true {
+            transportState = "playing"
+        } else if status?.reachedEnd == true {
+            transportState = "ended"
+        } else if loaded {
+            transportState = "paused"
+        } else {
+            transportState = "stopped"
+        }
         return [
             // reachedEnd means the decoder has no more source frames; output
             // may still be draining its buffered fade. Report ended only
             // after the audio device has stopped so the frontend does not
             // advance over the remaining audible tail.
-            "transport_state": status?.isPlaying == true ? "playing" : (status?.reachedEnd == true ? "ended" : "stopped"),
+            "transport_state": transportState,
             "output_state": diagnostics?.isOutputRunning == true ? "running" : "idle",
             "generation": diagnostics?.generation ?? 0,
             "track_loaded": loaded,
