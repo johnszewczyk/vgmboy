@@ -63,6 +63,25 @@ func completionTargetAppliesSharedRepeatPolicy() {
 }
 
 @Test
+func completionDecisionMakesTerminalStopExplicit() {
+    let terminal = PlaybackQueueNavigation.completionDecision(
+        currentTrackID: "two",
+        playlistIDs: ["one", "two"],
+        repeatMode: .off
+    )
+    #expect(terminal == PlaybackContinuationDecision(action: .stop))
+    #expect(terminal.targetID == nil)
+
+    let next = PlaybackQueueNavigation.completionDecision(
+        currentTrackID: "one",
+        playlistIDs: ["one", "two"],
+        repeatMode: .off
+    )
+    #expect(next == PlaybackContinuationDecision(action: .play(trackID: "two")))
+    #expect(next.targetID == "two")
+}
+
+@Test
 func replacementClearsCurrentUnlessPlaybackIsExplicitlyPreserved() {
     let ids = ["new-one", "new-two"]
 

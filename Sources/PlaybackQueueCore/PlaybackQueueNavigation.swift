@@ -9,6 +9,29 @@ public enum PlaybackRepeatMode: String, Sendable, Codable {
     case song
 }
 
+public enum PlaybackContinuationAction: Equatable, Sendable, Codable {
+    case stop
+    case play(trackID: String)
+}
+
+/// Explicit result of a native natural-end decision.
+///
+/// A nullable target made it too easy for each frontend to interpret “no
+/// target” differently. The shared contract makes the terminal case and the
+/// next-track case unambiguous without knowing track models or presentation.
+public struct PlaybackContinuationDecision: Equatable, Sendable, Codable {
+    public let action: PlaybackContinuationAction
+
+    public init(action: PlaybackContinuationAction) {
+        self.action = action
+    }
+
+    public var targetID: String? {
+        guard case let .play(trackID) = action else { return nil }
+        return trackID
+    }
+}
+
 public struct PlaybackQueueReplacementState: Equatable, Sendable, Codable {
     public let currentTrackID: String?
     public let selectedTrackID: String?
@@ -90,7 +113,18 @@ public struct PlaybackQueueState: Equatable, Sendable, Codable {
         playlistIDs: [String],
         repeatMode: PlaybackRepeatMode
     ) -> String? {
-        PlaybackQueueNavigation.completionTargetID(
+        PlaybackQueueNavigation.completionDecision(
+            currentTrackID: currentTrackID,
+            playlistIDs: playlistIDs,
+            repeatMode: repeatMode
+        ).targetID
+    }
+
+    public func completionDecision(
+        playlistIDs: [String],
+        repeatMode: PlaybackRepeatMode
+    ) -> PlaybackContinuationDecision {
+        PlaybackQueueNavigation.completionDecision(
             currentTrackID: currentTrackID,
             playlistIDs: playlistIDs,
             repeatMode: repeatMode
@@ -169,36 +203,58 @@ public enum PlaybackQueueNavigation {
         )
     }
 
-    /// Computes the single target allowed after a native natural-end event.
+    /// Computes the explicit action allowed after a native natural-end event.
     ///
     /// Random playback remains a frontend concern because it needs that
     /// frontend's candidate pool. Ordinary repeat behavior, however, is pure
     /// queue policy and must not diverge between native frontends.
-    public static func completionTargetID(
+    public static func completionDecision(
         currentTrackID: String?,
         playlistIDs: [String],
         repeatMode: PlaybackRepeatMode
-    ) -> String? {
-        guard !playlistIDs.isEmpty else { return nil }
+    ) -> PlaybackContinuationDecision {
+        guard !playlistIDs.isEmpty else {
+            return PlaybackContinuationDecision(action: .stop)
+        }
 
         switch repeatMode {
         case .song:
             guard let currentTrackID,
                   playlistIDs.contains(currentTrackID) else {
-                return nil
+                return PlaybackContinuationDecision(action: .stop)
             }
-            return currentTrackID
+            return PlaybackContinuationDecision(action: .play(trackID: currentTrackID))
         case .off:
-            return completionAdvanceTargetID(
+            guard let targetID = completionAdvanceTargetID(
                 currentTrackID: currentTrackID,
                 playlistIDs: playlistIDs
-            )
+            ) else {
+                return PlaybackContinuationDecision(action: .stop)
+            }
+            return PlaybackContinuationDecision(action: .play(trackID: targetID))
         case .playlist:
-            return completionAdvanceTargetID(
+            let targetID = completionAdvanceTargetID(
                 currentTrackID: currentTrackID,
                 playlistIDs: playlistIDs
             ) ?? playlistIDs.first
+            guard let targetID else {
+                return PlaybackContinuationDecision(action: .stop)
+            }
+            return PlaybackContinuationDecision(action: .play(trackID: targetID))
         }
+    }
+
+    public static func completionTargetID(
+        currentTrackID: String?,
+        playlistIDs: [String],
+        repeatMode: PlaybackRepeatMode
+    ) -> String? {
+        guard case let .play(trackID) = completionDecision(
+            currentTrackID: currentTrackID,
+            playlistIDs: playlistIDs,
+            repeatMode: repeatMode
+        ).action else { return nil }
+        return trackID
     }
 
     public static func replacementState(
