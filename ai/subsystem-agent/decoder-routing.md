@@ -8,15 +8,19 @@ Extension-based routing of files to the correct upstream decoder core, and the u
 ## Ownership
 
 `FormatRegistry` maps a path extension to a `DecoderFamily` (`id`, `supportsLongPlay`,
-`supportsTempo`, `hasNaturalEnding`). `DecoderFactory.make` builds the matching decoder through the
-internal `AudioDecoder` protocol. Decoder headers are read only inside a live playback session for
-subtrack validation and timing; the core does not expose inspection or catalog metadata. Extensions
-are deliberately exclusive to one family.
+`supportsTempo`, `hasNaturalEnding`). Its `playbackDescriptors` projection is the single
+frontend-facing capability table: it carries the stable backend ID, admitted extensions, and the
+same timing flags. `DecoderFactory.make` builds the matching decoder through the internal
+`AudioDecoder` protocol. Decoder headers are read only inside a live playback session for subtrack
+validation and timing; the core does not expose inspection or catalog metadata. Extensions are
+deliberately exclusive to one family.
 
 ## Invariants
 
 - A file must resolve to exactly one family. Unsupported input throws
   `DecoderFactoryError.unsupportedFamily` — never an invented track.
+- Frontends must project `FormatRegistry.playbackDescriptors` rather than rebuilding extension
+  unions, backend IDs, Long Play support, tempo support, or natural-ending flags.
 - GameCube admission is fixture-backed and limited to primary playable DSP,
   ADP, AGSC, H4M, LDAT, LOGG, RSF, THP, and TXTP files. TXTH and bank files
   remain adjacent dependencies rather than duplicate standalone playlist rows.
@@ -41,6 +45,11 @@ are deliberately exclusive to one family.
   fail-fast exclusive lease for the complete native-handle lifetime; concurrent live playback,
   AAC export, or structure inspection returns an explicit busy error instead of sharing emulator
   state. `close()` releases the native engine and lease before replacement.
+- QSF and miniQSF archive members require dependency-complete materialization:
+  `QSFDecoder` resolves adjacent `.qsflib` data from the staged directory, so
+  `FormatRegistry.archiveMaterializationRequirement` is the authority that
+  selects `.completeSet` for both extensions. Direct standalone files remain
+  unaffected; frontends must not implement a second QSF dependency rule.
 - Bridges are owned by VGMBoy (`Sources/C<Core>`). Shared upstream source and compatibility patches
   live in VGMBoy's `vendor/` and `patches/` inputs; dependency archives are built and staged here,
   never separately in CocoaSpice or SPCBoy. Symbol prefixes are per-core (`vgmboy_play_psf_*`, etc.).

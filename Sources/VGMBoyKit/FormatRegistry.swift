@@ -17,6 +17,30 @@ public struct DecoderFamily: Sendable, Codable {
     }
 }
 
+/// The frontend-facing projection of one VGMBoy playback family.
+///
+/// This is deliberately derived from the same family and extension sets that
+/// the playback controller uses. Frontends may format this descriptor for a
+/// native or JavaScript UI, but they must not recreate the admission or timing
+/// capability table themselves.
+public struct PlaybackFormatDescriptor: Sendable, Codable, Equatable, Hashable {
+    public let id: String
+    public let familyID: String
+    public let extensions: Set<String>
+    public let supportsLongPlay: Bool
+    public let supportsTempo: Bool
+    public let hasNaturalEnding: Bool
+
+    public init(id: String, family: DecoderFamily, extensions: Set<String>) {
+        self.id = id
+        self.familyID = family.id
+        self.extensions = extensions
+        self.supportsLongPlay = family.supportsLongPlay
+        self.supportsTempo = family.supportsTempo
+        self.hasNaturalEnding = family.hasNaturalEnding
+    }
+}
+
 public enum FormatRegistry {
     public static let libgmeFamily = DecoderFamily(
         id: "libgme",
@@ -134,8 +158,34 @@ public enum FormatRegistry {
         "669", "dmf", "far", "it", "mod", "mptm", "mtm", "okt", "ptm", "s3m", "stm", "ult", "xm"
     ]
 
+    /// Stable frontend order. Keep this list aligned with the backend order
+    /// exposed by the existing CocoaSpice and SPCBoyWK controls.
+    public static let playbackDescriptors: [PlaybackFormatDescriptor] = [
+        PlaybackFormatDescriptor(id: "libgme", family: libgmeFamily, extensions: libgmeExtensions),
+        PlaybackFormatDescriptor(id: "libvgm", family: libvgmFamily, extensions: libvgmExtensions),
+        PlaybackFormatDescriptor(id: "standard-audio", family: standardAudioFamily, extensions: standardAudioExtensions),
+        PlaybackFormatDescriptor(id: "ffmpeg-audio", family: ffmpegAudioFamily, extensions: ffmpegAudioExtensions),
+        PlaybackFormatDescriptor(id: "highly-complete", family: highlyCompleteFamily, extensions: highlyCompleteExtensions),
+        PlaybackFormatDescriptor(id: "twosf", family: twoSFFamily, extensions: twoSFExtensions),
+        PlaybackFormatDescriptor(id: "vgmstream", family: vgmstreamFamily, extensions: vgmstreamExtensions),
+        PlaybackFormatDescriptor(id: "lazyusf", family: lazyusfFamily, extensions: lazyusfExtensions),
+        PlaybackFormatDescriptor(id: "playpsf", family: playpsfFamily, extensions: playpsfExtensions),
+        PlaybackFormatDescriptor(id: "qsf", family: qsfFamily, extensions: qsfExtensions),
+        PlaybackFormatDescriptor(id: "sidplayfp", family: sidplayfpFamily, extensions: sidplayfpExtensions),
+        PlaybackFormatDescriptor(id: "openmpt", family: openMPTFamily, extensions: openMPTExtensions)
+    ]
+
+    public static let playbackExtensions: Set<String> = Set(
+        playbackDescriptors.flatMap(\.extensions)
+    )
+
+    public static func descriptor(for path: String) -> PlaybackFormatDescriptor? {
+        let extensionName = normalizedExtension(for: path)
+        return playbackDescriptors.first { $0.extensions.contains(extensionName) }
+    }
+
     public static func family(for path: String) -> DecoderFamily? {
-        let ext = (path as NSString).pathExtension.lowercased()
+        let ext = normalizedExtension(for: path)
         if libgmeExtensions.contains(ext) {
             return libgmeFamily
         }
@@ -173,5 +223,44 @@ public enum FormatRegistry {
             return qsfFamily
         }
         return nil
+    }
+
+    /// Returns the format-owned archive preparation requirement for a set of
+    /// catalog-selected members. The returned requirement describes only the
+    /// clean filesystem input VGMBoyKit needs; archive extraction, caching,
+    /// and temporary-file lifetime remain outside the decoder core.
+    public static func archiveMaterializationRequirement(
+        for entryPaths: [String]
+    ) -> VGMArchiveMaterializationRequirement? {
+        guard !entryPaths.isEmpty else { return nil }
+
+        var resolved: VGMArchiveMaterializationRequirement = .selectedEntry
+        for entryPath in entryPaths {
+            let extensionName = normalizedExtension(for: entryPath)
+            guard family(for: entryPath) != nil else { return nil }
+
+            if lazyusfExtensions.contains(extensionName) {
+                resolved = .completeSetWithLazyUSFAliases
+            } else if requiresCompleteSet(extensionName), resolved == .selectedEntry {
+                resolved = .completeSet
+            }
+        }
+        return resolved
+    }
+
+    private static func requiresCompleteSet(_ extensionName: String) -> Bool {
+        highlyCompleteExtensions.contains(extensionName)
+            || twoSFExtensions.contains(extensionName)
+            || playpsfExtensions.contains(extensionName)
+            // QSF/miniQSF files resolve their adjacent .qsflib through the
+            // filesystem, so archive playback must stage the complete set.
+            || qsfExtensions.contains(extensionName)
+            || VGMStreamFormatManifest.dependencyEnumeratedScannerExtensions.contains(extensionName)
+    }
+
+    private static func normalizedExtension(for path: String) -> String {
+        (path as NSString).pathExtension
+            .trimmingCharacters(in: CharacterSet(charactersIn: ". "))
+            .lowercased()
     }
 }

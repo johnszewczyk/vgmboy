@@ -7,6 +7,55 @@ import VGMBoyCAudioUnit
 
 @Suite("FormatRegistry")
 struct FormatRegistryTests {
+    @Test("publishes one complete frontend descriptor table")
+    func frontendDescriptorsMatchPlaybackRouting() {
+        let expectedIDs = [
+            "libgme", "libvgm", "standard-audio", "ffmpeg-audio",
+            "highly-complete", "twosf", "vgmstream", "lazyusf",
+            "playpsf", "qsf", "sidplayfp", "openmpt"
+        ]
+        #expect(FormatRegistry.playbackDescriptors.map(\.id) == expectedIDs)
+
+        let descriptorExtensions = Set(
+            FormatRegistry.playbackDescriptors.flatMap(\.extensions)
+        )
+        #expect(FormatRegistry.playbackExtensions == descriptorExtensions)
+
+        for descriptor in FormatRegistry.playbackDescriptors {
+            for extensionName in descriptor.extensions {
+                let path = "/tmp/example.\(extensionName)"
+                #expect(FormatRegistry.descriptor(for: path) == descriptor)
+                #expect(FormatRegistry.family(for: path)?.id == descriptor.familyID)
+            }
+        }
+    }
+
+    @Test("normalizes shared playback preferences without changing their meaning")
+    func sharedPlaybackPreferencesNormalizeValues() {
+        let preferences = PlaybackPreferences(
+            timing: .init(longPlaySeconds: 180, unknownDurationSeconds: 150, fadeSeconds: 6),
+            fadeEnabled: false,
+            equalizerEnabled: true,
+            equalizerBandGains: [-99, 3.5, 99],
+            outputVolume: 2,
+            monoEnabled: true,
+            libgmeTempo: PlaybackTempo(numerator: 2, denominator: 1),
+            libgmeTempoEnabled: true
+        )
+
+        #expect(preferences.fadeSeconds == 0)
+        #expect(preferences.equalizer.enabled)
+        #expect(preferences.equalizer.gainsDecibels[0] == -12)
+        #expect(preferences.equalizer.gainsDecibels[1] == 3.5)
+        #expect(preferences.equalizer.gainsDecibels[2] == 12)
+        #expect(preferences.equalizer.gainsDecibels.count == EqualizerConfiguration.bandCount)
+        #expect(preferences.outputVolume == 1)
+        #expect(preferences.monoEnabled)
+        #expect(preferences.libgmeTempo.multiplier == 2)
+        #expect(preferences.libgmeTempoEnabled)
+        #expect(!preferences.libvgmTempoEnabled)
+    }
+
     @Test("routes libgme extensions to the libgme family")
     func routesLibGME() {
         for ext in FormatRegistry.libgmeExtensions {
@@ -14,6 +63,29 @@ struct FormatRegistryTests {
             #expect(FormatRegistry.family(for: path)?.id == "libgme")
         }
         #expect(FormatRegistry.family(for: "/tmp/example.unknown") == nil)
+    }
+
+    @Test("publishes archive preparation as a format capability")
+    func archiveMaterializationRequirements() {
+        #expect(
+            FormatRegistry.archiveMaterializationRequirement(for: ["music.flac"])
+                == .selectedEntry
+        )
+        #expect(
+            FormatRegistry.archiveMaterializationRequirement(for: ["track.psf"])
+                == .completeSet
+        )
+        #expect(
+            FormatRegistry.archiveMaterializationRequirement(for: ["track.usf"])
+                == .completeSetWithLazyUSFAliases
+        )
+        #expect(
+            FormatRegistry.archiveMaterializationRequirement(for: ["track.miniqsf"])
+                == .completeSet
+        )
+        #expect(
+            FormatRegistry.archiveMaterializationRequirement(for: ["track.unknown"]) == nil
+        )
     }
 
     @Test("routes SID extensions to the libsidplayfp family")
@@ -344,11 +416,64 @@ struct PlaybackControlProtocolTests {
         if let audioFile { AudioFileClose(audioFile) }
     }
 
-    private func writeTestWAV(to url: URL) throws {
+    @Test("live transport preserves its native generation across pause seek resume and fade restore")
+    func liveTransportPreservesGenerationAcrossInterruptions() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let source = folder.appendingPathComponent("transport.wav")
+        try writeTestWAV(to: source, frameCount: 44_100)
+
+        let controller = PlaybackController()
+        defer { _ = controller.perform(.init(command: .stop)) }
+
+        let loaded = controller.perform(.init(command: .load, payload: .init(
+            path: source.path,
+            playbackMode: .timed,
+            playMilliseconds: 2_000,
+            fadeMilliseconds: 0
+        )))
+        #expect(loaded.kind != .error)
+
+        let started = controller.perform(.init(command: .play))
+        let generation = try #require(started.status?.diagnostics.generation)
+        #expect(started.status?.isPlaying == true)
+
+        let paused = controller.perform(.init(command: .pause))
+        #expect(paused.status?.isPlaying == false)
+        #expect(paused.status?.diagnostics.generation == generation)
+
+        let seeked = controller.perform(.init(
+            command: .seek,
+            payload: .init(positionMilliseconds: 250)
+        ))
+        #expect(seeked.kind != .error)
+        #expect(seeked.status?.diagnostics.generation == generation)
+
+        let resumed = controller.perform(.init(command: .play))
+        #expect(resumed.kind != .error)
+        #expect(resumed.status?.isPlaying == true)
+        #expect(resumed.status?.diagnostics.generation == generation)
+
+        let faded = controller.perform(.init(
+            command: .rampOutputGain,
+            payload: .init(outputGain: 0, rampMilliseconds: 10)
+        ))
+        #expect(faded.kind != .error)
+        let restored = controller.perform(.init(
+            command: .rampOutputGain,
+            payload: .init(outputGain: 1, rampMilliseconds: 10)
+        ))
+        #expect(restored.kind != .error)
+        #expect(restored.status?.diagnostics.generation == generation)
+    }
+
+    private func writeTestWAV(to url: URL, frameCount: AVAudioFrameCount = 4_410) throws {
         let pcm = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 2)!
         let file = try AVAudioFile(forWriting: url, settings: pcm.settings)
-        let buffer = AVAudioPCMBuffer(pcmFormat: pcm, frameCapacity: 4_410)!
-        buffer.frameLength = 4_410
+        let buffer = AVAudioPCMBuffer(pcmFormat: pcm, frameCapacity: frameCount)!
+        buffer.frameLength = frameCount
         try file.write(from: buffer)
     }
 

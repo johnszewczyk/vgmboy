@@ -40,6 +40,9 @@ same typed endpoint operations.
   rates, decoded frames, audible position frames, and tempo. It deliberately excludes title,
   filename, and other frontend “now playing” presentation fields. Device counters remain in
   `PlaybackStatus.diagnostics`.
+- `PlaybackStatus.diagnostics.generation` identifies the loaded native session. Clients that defer
+  a fade, status application, or completion handoff must discard the work when that generation
+  changes; pause, seek, and output-gain ramps preserve it.
 - `PlaybackTempo` is the shared fraction representation for frontend settings. UI parsing accepts
   decimal or fractional input and snaps it to musical 1/32 increments before the host sends the
   typed `set_tempo` multiplier; decoder-family capability remains owned by `FormatRegistry` and

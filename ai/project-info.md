@@ -12,6 +12,11 @@ same core as `vgmboy-electron-bridge`, and ScanSong receives VGMBoy-built inspec
 ## Major Components
 
 - `Sources/VGMBoyKit` — the audio core and decoder boundary.
+- `Sources/VGMBoyKit/FormatRegistry.swift` — decoder-owned format families plus the
+  complete `playbackDescriptors` projection consumed by CocoaSpice and SPCBoyWK.
+- `Sources/VGMBoyKit/PlaybackPreferences.swift` — shared timing, fade, EQ, volume,
+  mono, and native-tempo preference semantics. Frontends retain only persistence keys
+  and presentation state.
 - `Sources/VGMBoyEndpointCore` — the platform-neutral versioned endpoint and
   capability map that native and non-native frontends can mirror.
 - `Sources/VGMBoyElectronBridge` and `Sources/VGMBoyHighlyCompleteInspect` — narrow process
