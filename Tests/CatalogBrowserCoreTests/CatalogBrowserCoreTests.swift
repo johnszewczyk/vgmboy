@@ -23,19 +23,6 @@ import Testing
     #expect(state.view == .paths)
 }
 
-@Test func favoritesKeepTheirOwnSearchAndContentBoundary() {
-    var state = CatalogBrowserState(mode: .favorites, query: "  mario  ")
-    #expect(state.storedMode == .favorites)
-    #expect(state.query == "mario")
-    #expect(state.view == .favorites)
-    #expect(state.contentMode == .favorites)
-    #expect(state.resultSource == .favoriteTrackHistory)
-
-    state.setMode(.paths)
-    #expect(state.query.isEmpty)
-    #expect(state.view == .paths)
-}
-
 @Test func gameProjectionUsesStableIdentityAndSharedDisambiguation() {
     let buckets = [
         CatalogGameBucket(rootID: 2, rootPath: "/music/B", game: "Sonic 2", system: "Mega Drive", trackCount: 1),

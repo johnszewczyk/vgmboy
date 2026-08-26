@@ -3,7 +3,7 @@
 ## Scope
 
 `CatalogBrowserCore` owns behavior shared by native, WebKit, and future skins:
-browser modes including Favorites, temporary search semantics, game grouping, disambiguation,
+catalog browser modes, temporary search semantics, game grouping, disambiguation,
 stable row identity, deterministic ordering, and renderer-independent sidebar
 row gesture intent. It also owns the UI-neutral Console → Game disclosure and
 selection reducer and the incremental `CatalogSearchIndex` used by projected
@@ -19,7 +19,8 @@ write SQLite, or activate playback.
 ## Invariants
 
 - Search temporarily presents catalog-console results and clearing search restores the stored mode.
-- Favorites keeps its own searchable track-history content boundary rather than becoming a catalog aggregation.
+- Favorites is not a catalog-browser mode. Frontends project the shared favorite
+  snapshot into the playlist without changing this catalog state.
 - Duplicate game names are disambiguated consistently from system and root information.
 - Display labels never become selection identity.
 - Search terms match the same normalized name, system, root, and display-label fields in every skin; extending a query may reuse prior candidates, while backspace or replacement restarts from all rows.

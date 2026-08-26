@@ -7,28 +7,24 @@ public enum CatalogBrowserMode: String, CaseIterable, Codable, Sendable {
     case paths
     case consoles
     case diskPath
-    case favorites
 }
 
 public enum CatalogBrowserView: String, Codable, Sendable {
     case paths
     case consoles
     case diskPath
-    case favorites
     case search
 }
 
 public enum CatalogBrowserContentMode: String, Codable, Sendable {
     case database
     case tree
-    case favorites
 }
 
 public enum CatalogBrowserResultSource: String, Codable, Sendable {
     case catalogPathIndex = "catalog-path-index"
     case diskPathTree = "disk-path-tree"
     case catalogConsoleIndex = "catalog-console-index"
-    case favoriteTrackHistory = "favorite-track-history"
 }
 
 public enum SidebarRowKind: String, Codable, Sendable { case folder, leaf, group }
@@ -68,10 +64,8 @@ public struct CatalogBrowserState: Codable, Equatable, Sendable {
             case .paths: return .paths
             case .consoles: return .consoles
             case .diskPath: return .diskPath
-            case .favorites: return .favorites
             }
         }
-        if storedMode == .favorites { return .favorites }
         return .search
     }
 
@@ -79,7 +73,6 @@ public struct CatalogBrowserState: Codable, Equatable, Sendable {
         switch view {
         case .consoles, .search: return .database
         case .paths, .diskPath: return .tree
-        case .favorites: return .favorites
         }
     }
 
@@ -88,7 +81,6 @@ public struct CatalogBrowserState: Codable, Equatable, Sendable {
         case .paths: return .catalogPathIndex
         case .diskPath: return .diskPathTree
         case .consoles, .search: return .catalogConsoleIndex
-        case .favorites: return .favoriteTrackHistory
         }
     }
 

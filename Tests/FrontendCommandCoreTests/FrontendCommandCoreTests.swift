@@ -10,6 +10,8 @@ import Testing
 }
 
 @Test func libraryViewWordingIsExactAndDiskPathStaysSeparate() {
-    #expect(FrontendSidebarView.allCases.map(\.title) == ["Console View", "Path View", "Favorites"])
+    #expect(FrontendSidebarView.allCases.map(\.title) == ["Console View", "Path View"])
     #expect(FrontendShortcutCatalog.shortcut(for: .sidebarDiskPath).key == "3")
+    #expect(FrontendShortcutCatalog.shortcut(for: .favoritesPlaylist).key == "d")
+    #expect(FrontendShortcutCatalog.shortcut(for: .favoritesPlaylist).modifiers == [.command, .shift])
 }
