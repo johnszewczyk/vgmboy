@@ -135,9 +135,9 @@ Queue identity policy is shared with CocoaSpice through
 `FrontendCore.PlaybackQueueCore`. `PlaybackQueueState` is now the value-only
 transition contract for current/selected/pending identity, replacement,
 transport navigation, and natural completion. The WebKit renderer still asks
-the native bridge for the older replacement/target projections while the
-snapshot/intent bridge is completed; it must not add a second queue policy in
-JavaScript.
+the native bridge for projections of that shared state contract, so it does
+not carry a second queue policy in JavaScript. A fuller snapshot/intent bridge
+remains a later slice.
 
 Indexed database-game selection is a non-autoplay playlist preview. It replaces
 the renderer's queue while preserving the active native track and its timing;

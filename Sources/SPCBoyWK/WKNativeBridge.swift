@@ -345,15 +345,19 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 gameID: args.dropFirst(3).first as? String
             )
         case "playbackQueueTransportTarget":
-            return PlaybackQueueNavigation.transportPlaybackTarget(
+            let state = PlaybackQueueState(
                 currentTrackID: args.first as? String,
                 selectedTrackID: args.dropFirst().first as? String,
-                playlistIDs: stringArray(args.dropFirst(2).first)
-            ) ?? NSNull()
+                pendingTrackID: nil
+            )
+            return state.transportTargetID(playlistIDs: stringArray(args.dropFirst(2).first)) ?? NSNull()
         case "playbackQueueAdjacent":
             guard let direction = PlaybackQueueDirection(rawValue: args.dropFirst(2).first as? String ?? ""),
-                  let targetID = PlaybackQueueNavigation.adjacentTrackID(
+                  let targetID = PlaybackQueueState(
                       currentTrackID: args.first as? String,
+                      selectedTrackID: nil,
+                      pendingTrackID: nil
+                  ).adjacentTargetID(
                       playlistIDs: stringArray(args.dropFirst().dropFirst().first),
                       direction: direction,
                       wraps: args.dropFirst(3).first as? Bool ?? false
@@ -367,20 +371,28 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             case "all": .playlist
             default: .off
             }
-            return PlaybackQueueNavigation.completionTargetID(
+            let state = PlaybackQueueState(
                 currentTrackID: args.first as? String,
+                selectedTrackID: nil,
+                pendingTrackID: nil
+            )
+            return state.completionTargetID(
                 playlistIDs: stringArray(args.dropFirst().first),
                 repeatMode: repeatMode
             ) ?? NSNull()
         case "playbackQueueReplacementState":
-            let replacement = PlaybackQueueNavigation.replacementState(
+            let replacement = PlaybackQueueState(
                 currentTrackID: args.first as? String,
+                selectedTrackID: nil,
+                pendingTrackID: nil
+            ).replacing(
                 playlistIDs: stringArray(args.dropFirst().first),
                 preservePlayback: args.dropFirst(2).first as? Bool ?? false
             )
             return [
                 "currentTrackId": replacement.currentTrackID.map { $0 as Any } ?? NSNull(),
-                "selectedTrackId": replacement.selectedTrackID.map { $0 as Any } ?? NSNull()
+                "selectedTrackId": replacement.selectedTrackID.map { $0 as Any } ?? NSNull(),
+                "pendingTrackId": replacement.pendingTrackID.map { $0 as Any } ?? NSNull()
             ]
         case "playbackFadeDuration":
             let duration = PlaybackFadePolicy.queuedSkipDuration(
