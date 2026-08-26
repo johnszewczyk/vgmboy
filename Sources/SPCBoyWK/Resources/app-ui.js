@@ -315,6 +315,7 @@ function showSidebarContextMenu(node, event) {
 }
 
 async function activateBrowserNode(node, { playNow = true } = {}) {
+  const generation = ++browserSelectionGeneration;
   try {
     state.selectedBrowserPath = node.path;
     persistSettings();
@@ -323,7 +324,9 @@ async function activateBrowserNode(node, { playNow = true } = {}) {
       await loadBrowserChildren(node);
     }
     const selection = await loadBrowserSelection(node);
-    if (!selection) return;
+    if (!selection
+        || generation !== browserSelectionGeneration
+        || state.selectedBrowserPath !== node.path) return;
     applyFolderSelection(selection);
     const target = selection.playlist?.[0];
     if (playNow && target) await uiApp.playback.playTrack(target.id, 0);
@@ -356,6 +359,9 @@ async function handleBrowserGesture(node, gesture, wasSelected = false) {
 }
 
 function selectBrowserNode(node, { focus = false, previewLeaf = true } = {}) {
+  if (state.selectedBrowserPath !== node.path) {
+    browserSelectionGeneration += 1;
+  }
   state.selectedBrowserPath = node.path;
   persistSettings();
   syncTreeSelection();
