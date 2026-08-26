@@ -82,9 +82,9 @@ public enum CatalogPlaylistCoreError: LocalizedError {
 /// Read-only extraction of CocoaSpice's original Games playlist query.
 ///
 /// Keep this query aligned with the source implementation. In particular,
-/// the folder-first path is an exact `t.browser_system = ?` predicate so the
-/// published browser-bucket index remains usable. There is intentionally no
-/// fallback predicate here.
+/// the folder-first path uses the same projection as the sidebar: the folder
+/// system when present, otherwise the scanned metadata system. A selected
+/// sidebar row must therefore produce the same playlist rows as its bucket.
 public enum CatalogPlaylistReader {
     public static func tracksForGames(
         databaseURL: URL,
@@ -93,36 +93,111 @@ public enum CatalogPlaylistReader {
     ) throws -> [CatalogPlaylistTrack] {
         guard !selections.isEmpty else { return [] }
 
-        let systemPredicate = preferFoldersOverMetadata
-            ? "t.browser_system = ?"
-            : "COALESCE(NULLIF(m.system, ''), NULLIF(t.browser_system, ''), '') = ?"
-        let bucketPredicate = Array(
-            repeating: "(t.root_id = ? AND t.browser_game = ? AND \(systemPredicate))",
-            count: selections.count
-        ).joined(separator: " OR ")
+        enum BindValue {
+            case integer(Int64)
+            case text(String)
+        }
+
+        // Keep the folder-backed branch separate from the metadata-derived
+        // branch. The equivalent OR predicate is logically correct, but it
+        // prevents SQLite from using tracks_game_sidebar_index and turns a
+        // one-game activation into a root-wide scan. Arcade buckets commonly
+        // need the second branch because their stored folder system is blank.
+        var bindValues: [BindValue] = []
+        let branchProjection = """
+        t.path AS source_path,
+        t.archive_path AS archive_path,
+        t.archive_entry AS archive_entry,
+        t.track_index AS track_index,
+        t.track_count AS track_count,
+        COALESCE(m.title, '') AS title,
+        COALESCE(m.game, '') AS game,
+        COALESCE(m.author, '') AS author,
+        COALESCE(m.system, '') AS system,
+        COALESCE(m.comment, '') AS comment,
+        COALESCE(m.intro_length_ms, 0) AS intro_length_ms,
+        COALESCE(m.loop_length_ms, 0) AS loop_length_ms,
+        COALESCE(m.play_length_ms, 0) AS length_ms,
+        COALESCE(m.fade_length_ms, 0) AS fade_length_ms,
+        t.browser_game AS order_game,
+        lower(COALESCE(m.title, '')) AS order_title,
+        t.folder_path AS order_folder,
+        t.filename AS order_filename,
+        t.track_index AS order_index
+        """
+
+        func branch(systemPredicate: String, selection: CatalogPlaylistGameSelection, systemBind: String?) -> String {
+            bindValues.append(.integer(selection.rootID))
+            bindValues.append(.text(selection.game))
+            if let systemBind {
+                bindValues.append(.text(systemBind))
+            }
+            return """
+            SELECT \(branchProjection)
+            FROM tracks t
+            INNER JOIN library_roots r ON r.id = t.root_id
+            LEFT JOIN track_metadata m ON m.track_id = t.id
+            WHERE r.is_enabled = 1
+              AND NOT EXISTS (SELECT 1 FROM dead_sources d WHERE d.root_id = t.root_id AND d.path = t.path)
+              AND t.root_id = ?
+              AND t.browser_game = ?
+              AND \(systemPredicate)
+            """
+        }
+
+        var branches: [String] = []
+        for selection in selections {
+            if selection.system.isEmpty {
+                let predicate = preferFoldersOverMetadata
+                    ? "t.browser_system = '' AND NULLIF(m.system, '') IS NULL"
+                    : "NULLIF(m.system, '') IS NULL AND t.browser_system = ''"
+                branches.append(branch(systemPredicate: predicate, selection: selection, systemBind: nil))
+                continue
+            }
+
+            if preferFoldersOverMetadata {
+                branches.append(branch(
+                    systemPredicate: "t.browser_system = ?",
+                    selection: selection,
+                    systemBind: selection.system
+                ))
+                branches.append(branch(
+                    systemPredicate: "t.browser_system = '' AND NULLIF(m.system, '') = ?",
+                    selection: selection,
+                    systemBind: selection.system
+                ))
+            } else {
+                branches.append(branch(
+                    systemPredicate: "NULLIF(m.system, '') = ?",
+                    selection: selection,
+                    systemBind: selection.system
+                ))
+                branches.append(branch(
+                    systemPredicate: "NULLIF(m.system, '') IS NULL AND t.browser_system = ?",
+                    selection: selection,
+                    systemBind: selection.system
+                ))
+            }
+        }
+
         let sql = """
         SELECT
-            t.path,
-            t.archive_path,
-            t.archive_entry,
-            t.track_index,
-            t.track_count,
-            COALESCE(m.title, ''),
-            COALESCE(m.game, ''),
-            COALESCE(m.author, ''),
-            COALESCE(m.system, ''),
-            COALESCE(m.comment, ''),
-            COALESCE(m.intro_length_ms, 0),
-            COALESCE(m.loop_length_ms, 0),
-            COALESCE(m.play_length_ms, 0),
-            COALESCE(m.fade_length_ms, 0)
-        FROM tracks t
-        INNER JOIN library_roots r ON r.id = t.root_id
-        LEFT JOIN track_metadata m ON m.track_id = t.id
-        WHERE r.is_enabled = 1
-          AND NOT EXISTS (SELECT 1 FROM dead_sources d WHERE d.root_id = t.root_id AND d.path = t.path)
-          AND (\(bucketPredicate))
-        ORDER BY t.browser_game ASC, lower(COALESCE(m.title, '')) ASC, t.folder_path ASC, t.filename ASC, t.track_index ASC;
+            source_path,
+            archive_path,
+            archive_entry,
+            track_index,
+            track_count,
+            title,
+            game,
+            author,
+            system,
+            comment,
+            intro_length_ms,
+            loop_length_ms,
+            length_ms,
+            fade_length_ms
+        FROM (\(branches.joined(separator: " UNION ALL ")))
+        ORDER BY order_game ASC, order_title ASC, order_folder ASC, order_filename ASC, order_index ASC;
         """
 
         var database: OpaquePointer?
@@ -141,13 +216,19 @@ public enum CatalogPlaylistReader {
         }
         defer { sqlite3_finalize(statement) }
 
-        for (index, selection) in selections.enumerated() {
-            let baseIndex = Int32(index * 3)
-            guard sqlite3_bind_int64(statement, baseIndex + 1, selection.rootID) == SQLITE_OK,
-                  sqlite3_bind_text(statement, baseIndex + 2, selection.game, -1, sqliteTransient) == SQLITE_OK,
-                  sqlite3_bind_text(statement, baseIndex + 3, selection.system, -1, sqliteTransient) == SQLITE_OK else {
+        var bindIndex: Int32 = 1
+        for bindValue in bindValues {
+            let result: Int32
+            switch bindValue {
+            case .integer(let value):
+                result = sqlite3_bind_int64(statement, bindIndex, value)
+            case .text(let value):
+                result = sqlite3_bind_text(statement, bindIndex, value, -1, sqliteTransient)
+            }
+            guard result == SQLITE_OK else {
                 throw CatalogPlaylistCoreError.sqlite(String(cString: sqlite3_errmsg(database)))
             }
+            bindIndex += 1
         }
 
         var tracks: [CatalogPlaylistTrack] = []

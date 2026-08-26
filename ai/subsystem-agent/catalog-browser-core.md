@@ -5,7 +5,8 @@
 `CatalogBrowserCore` owns behavior shared by native, WebKit, and future skins:
 browser modes including Favorites, temporary search semantics, game grouping, disambiguation,
 stable row identity, deterministic ordering, and renderer-independent sidebar
-row gesture intent. `CatalogReader` supplies the
+row gesture intent. It also owns the UI-neutral Console → Game disclosure and
+selection reducer. `CatalogReader` supplies the
 same folder-versus-metadata aggregation policy to every skin before projection.
 
 ## Ownership
@@ -24,6 +25,10 @@ write SQLite, or activate playback.
   projection creates an `Unknown Console` group.
 - Folder, leaf, and group gestures reduce to select, preview, expansion, or
   activation intents without importing SwiftUI, AppKit, WebKit, or DOM state.
+- `CatalogBrowserGroupState` owns Console → Game group selection and disclosure
+  transitions. A group toggle clears game selection and never activates a
+  child; frontends retain only their row rendering, focus, scroll, and
+  persistence adapters.
 
 ## Files
 

@@ -48,3 +48,15 @@ import Testing
     #expect(games[0].displayName == "Sonic 2 (Mega Drive • A)")
     #expect(games[0].id != games[1].id)
 }
+
+@Test func databaseGroupStateKeepsGroupClicksAwayFromGameActivation() {
+    var state = CatalogBrowserGroupState(expandedGroupNames: ["SNES"])
+    state = state.applying(.toggleGroup("SNES"))
+    #expect(state.expandedGroupNames.isEmpty)
+    #expect(state.selectedGroupName == "SNES")
+    #expect(state.selectedGameID == nil)
+
+    state = state.applying(.selectGame(groupName: "SNES", gameID: "game-1"))
+    #expect(state.selectedGroupName == "SNES")
+    #expect(state.selectedGameID == "game-1")
+}

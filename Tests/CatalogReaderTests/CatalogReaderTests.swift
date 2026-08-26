@@ -63,7 +63,7 @@ private func fixtureCatalog() throws -> URL {
     #expect(try reader.tracks(paths: ["/music/Game/Track 9.spc", "/music/Game/Track 10.spc"]).map(\.title) == ["Track 10", "Track 9"])
 }
 
-@Test func playlistGameProjectionPreservesOriginalSelectionSemantics() throws {
+@Test func playlistGameProjectionUsesFolderFirstSystemProjection() throws {
     let url = try fixtureCatalog()
     defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
     let tracks = try CatalogPlaylistReader.tracksForGames(
@@ -75,8 +75,8 @@ private func fixtureCatalog() throws -> URL {
         preferFoldersOverMetadata: true
     )
 
-    #expect(tracks.map(\.title) == ["Track 10", "Track 9"])
-    #expect(tracks.map(\.lengthMilliseconds) == [100000, 90000])
+    #expect(tracks.map(\.title) == ["Chew Man Fu", "Track 10", "Track 9"])
+    #expect(tracks.map(\.lengthMilliseconds) == [120000, 100000, 90000])
 
     let metadataFallbackTracks = try CatalogPlaylistReader.tracksForGames(
         databaseURL: url,
@@ -84,4 +84,21 @@ private func fixtureCatalog() throws -> URL {
         preferFoldersOverMetadata: false
     )
     #expect(metadataFallbackTracks.map(\.title) == ["Chew Man Fu"])
+}
+
+@Test func playlistGameProjectionMatchesMetadataBackedSidebarSystems() throws {
+    let url = try fixtureCatalog()
+    defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+    let reader = try ReadOnlyCatalog(databaseURL: url)
+    let selections = try reader.gameBuckets().map {
+        CatalogPlaylistGameSelection(rootID: $0.rootID, game: $0.game, system: $0.system)
+    }
+
+    let tracks = try CatalogPlaylistReader.tracksForGames(
+        databaseURL: url,
+        selections: selections,
+        preferFoldersOverMetadata: true
+    )
+
+    #expect(tracks.map(\.title) == ["Chew Man Fu", "Track 10", "Track 9"])
 }

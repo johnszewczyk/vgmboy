@@ -142,6 +142,63 @@ public struct CatalogBrowserGameGroup: Identifiable, Codable, Equatable, Sendabl
     public var id: String { name }
 }
 
+/// UI-neutral state for Console → Game presentation. Frontends retain their
+/// own rows, focus, scrolling, and persistence adapters, but the selection and
+/// disclosure transitions are shared so a group click cannot accidentally
+/// activate a game in only one skin.
+public struct CatalogBrowserGroupState: Codable, Equatable, Sendable {
+    public private(set) var expandedGroupNames: Set<String>
+    public private(set) var selectedGroupName: String?
+    public private(set) var selectedGameID: String?
+
+    public init(
+        expandedGroupNames: Set<String> = [],
+        selectedGroupName: String? = nil,
+        selectedGameID: String? = nil
+    ) {
+        self.expandedGroupNames = expandedGroupNames
+        self.selectedGroupName = selectedGroupName
+        self.selectedGameID = selectedGameID
+    }
+
+    public func applying(_ action: Action) -> Self {
+        var next = self
+        switch action {
+        case .toggleGroup(let name):
+            next.selectedGroupName = name
+            next.selectedGameID = nil
+            if next.expandedGroupNames.contains(name) {
+                next.expandedGroupNames.remove(name)
+            } else {
+                next.expandedGroupNames.insert(name)
+            }
+        case .selectGroup(let name):
+            next.selectedGroupName = name
+            next.selectedGameID = nil
+        case .selectGame(let groupName, let gameID):
+            next.selectedGroupName = groupName
+            next.selectedGameID = gameID
+        case .setAllCollapsed(let collapsed, let knownGroupNames):
+            if collapsed {
+                next.expandedGroupNames.subtract(knownGroupNames)
+            } else {
+                next.expandedGroupNames.formUnion(knownGroupNames)
+            }
+        case .replaceExpandedGroups(let names):
+            next.expandedGroupNames = names
+        }
+        return next
+    }
+
+    public enum Action: Equatable, Sendable {
+        case toggleGroup(String)
+        case selectGroup(String)
+        case selectGame(groupName: String, gameID: String)
+        case setAllCollapsed(Bool, knownGroupNames: Set<String>)
+        case replaceExpandedGroups(Set<String>)
+    }
+}
+
 /// Deterministic grouping, disambiguation, sorting, and search shared by all
 /// frontends. It consumes published catalog buckets and never opens SQLite.
 public enum CatalogBrowserProjection {

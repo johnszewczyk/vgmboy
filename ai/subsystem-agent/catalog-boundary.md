@@ -24,13 +24,18 @@ row models, queue publication, and UI.
   inspect source paths, invoke a decoder, or rebuild a complete frontend.
 - `CatalogSourceSelection` keeps root identity attached to an exact Files row;
   consumers must not infer root ownership from filesystem state.
-- Game-sidebar aggregation has one explicit preference: use the recognized
-  folder-derived `browser_system` first or use stored track metadata first.
-  That display aggregation is separate from the exact playlist selection
-  predicate.
-- CatalogPlaylistCore preserves CocoaSpice's original folder-first activation
-  predicate (`t.browser_system = ?`) and its explicit metadata-first mode. It
-  does not add a fallback predicate or broaden the selection.
+- Game-sidebar aggregation and Games playlist hydration use the same explicit
+  system projection: use the recognized folder-derived `browser_system` first
+  or use stored track metadata first, according to the requested mode. A blank
+  folder system therefore remains selectable through the metadata system shown
+  by the sidebar.
+- CatalogPlaylistCore preserves the folder-first and metadata-first modes as
+  projection choices, not host-specific fallback behavior. The selected game,
+  root, and projected system must identify the same rows in both frontends.
+- Games playlist selection keeps folder-system and metadata-system branches
+  separate with `UNION ALL` so SQLite can use
+  `tracks_game_sidebar_index`. Replacing those branches with one broad `OR`
+  predicate is a performance regression even when it returns the same rows.
 - Games playlist activation accepts multiple stable sidebar identities in one
   read-only query and returns exactly the original fourteen projected columns.
 
