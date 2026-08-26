@@ -82,6 +82,11 @@ manifest; JavaScript only indexes and displays that projection. `SPCBoyPreferenc
 normalizes timing, fade, EQ, volume, mono, and native-tempo values through
 `VGMBoyKit.PlaybackPreferences` before persisting the frontend JSON shape.
 
+Database search is also native-owned: `CatalogBrowserCore.CatalogSearchIndex`
+provides the matching policy through `CatalogBrowserProjection.search`, and
+WebKit waits for that indexed read instead of maintaining a second immediate
+JavaScript filter with potentially different semantics.
+
 All typed VGMBoy commands sent through `WKPlaybackBridge` are serialized by
 the shared `FrontendCore.PlaybackRequestCore.PlaybackSerialExecutor`. The
 remaining JavaScript queue/status layer owns only WebKit interaction ordering

@@ -646,15 +646,6 @@ function visibleDatabaseGames() {
   return Array.isArray(state.databaseSearchGames) ? state.databaseSearchGames : state.databaseGames;
 }
 
-function immediateDatabaseSearch(query) {
-  const terms = String(query || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
-  if (!terms.length) return null;
-  return state.databaseGames.filter((game) => {
-    const text = `${game.name || ""} ${game.system || ""} ${game.rootName || ""} ${game.displayName || ""}`.toLowerCase();
-    return terms.every((term) => text.includes(term));
-  });
-}
-
 function databaseLoadedSelectionID() {
   return state.selectedTrackId || state.playlist[0]?.id || null;
 }
@@ -969,7 +960,7 @@ async function updateSidebarSearch(query) {
   state.sidebarQuery = String(query || "");
   await syncSidebarView();
   const databaseGeneration = ++state.databaseSearchGeneration;
-  state.databaseSearchGames = state.sidebarQuery.trim() ? immediateDatabaseSearch(state.sidebarQuery) : null;
+  state.databaseSearchGames = null;
   window.clearTimeout(sidebarSearchTimer);
   renderSidebar();
   if (state.sidebarMode === "favorites") return;
