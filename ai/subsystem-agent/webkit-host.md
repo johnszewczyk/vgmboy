@@ -98,6 +98,13 @@ records into its existing DOM node shape and owns only renderer-local browser
 paths, disclosure, focus, scroll, and context-menu behavior. The former
 `buildCatalogFileTree` graph constructor must not return.
 
+Catalog playlist replacement invalidation is native-owned through
+`CatalogSessionCore.CatalogSessionCoordinator`. WebKit sends the named
+`catalogSessionInvalidate("playlist")` intent before replacing or reading
+playlist rows; a detached request from an older playlist generation receives
+`{ "stale": true }` and cannot publish rows. The remaining
+`browserSelectionGeneration` protects DOM focus/selection ordering only.
+
 All typed VGMBoy commands sent through `WKPlaybackBridge` are serialized by
 the shared `FrontendCore.PlaybackTransportCore.PlaybackTransportCoordinator`,
 which also exposes one generation-checked natural-end event for queue

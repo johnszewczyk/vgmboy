@@ -58,7 +58,6 @@ async function toggleFavorites(tracks) {
   applyFavoriteSnapshot(await window.spcBoyWK.favoritesToggle(tracks, state.favoriteSortOrder));
 }
 let browserSelectionGeneration = 0;
-let playlistLoadGeneration = 0;
 let selectedBrowserButton = null;
 let selectedDatabaseGameButton = null;
 const playlistRowsByTrackId = new Map();
@@ -256,6 +255,10 @@ function catalogPlaylistSelection(rows, selectedPath) {
   };
 }
 
+async function invalidatePlaylistCatalogSession() {
+  await window.spcBoyWK.catalogSessionInvalidate("playlist");
+}
+
 async function loadBrowserSelection(node) {
   if (node.catalogFile) {
     return catalogPlaylistSelection(await window.spcBoyWK.databaseFileTracks([node.catalogFile]), node.catalogFile.path);
@@ -402,7 +405,6 @@ function appendPlaylistTracks(additions, selectedBrowserPath = state.selectedBro
   const existingIds = new Set(state.playlist.map((track) => track.id));
   const uniqueAdditions = additions.filter((track) => !existingIds.has(track.id));
   if (!uniqueAdditions.length) return;
-  playlistLoadGeneration += 1;
   state.selectedBrowserPath = selectedBrowserPath;
   state.playlist = [...state.playlist, ...uniqueAdditions];
   state.selectedTrackId = uniqueAdditions[0].id;
@@ -868,7 +870,7 @@ async function loadDatabaseFiles() {
 async function setSidebarMode(mode) {
   if (!["paths", "consoles", "diskPath"].includes(mode)) return;
   if (state.localBrowserEnabled && mode !== "diskPath") return;
-  playlistLoadGeneration += 1;
+  await invalidatePlaylistCatalogSession();
   state.sidebarMode = mode;
   state.sidebarQuery = "";
   await syncSidebarView();
@@ -883,7 +885,7 @@ async function setSidebarMode(mode) {
 
 async function showFavoritesPlaylist() {
   await refreshFavorites();
-  playlistLoadGeneration += 1;
+  await invalidatePlaylistCatalogSession();
   state.playlist = [...state.favorites];
   state.selectedTrackId = state.playlist[0]?.id || null;
   state.selectedTrackIds = state.selectedTrackId ? [state.selectedTrackId] : [];
@@ -1019,7 +1021,7 @@ function databaseRowsToPlaylistTracks(rows, games) {
 }
 
 async function loadDatabaseGamesIntoPlaylist(games) {
-  const loadGeneration = ++playlistLoadGeneration;
+  await invalidatePlaylistCatalogSession();
   await uiApp.playback.cancelQueuedSkip?.({ restoreOutput: true });
   const replacementInput = {
     currentTrackId: state.currentTrackId,
@@ -1027,7 +1029,6 @@ async function loadDatabaseGamesIntoPlaylist(games) {
   };
   const rows = await window.spcBoyWK.databaseGameTracks(games);
   if (rows?.stale === true) return false;
-  if (loadGeneration !== playlistLoadGeneration) return false;
   state.databaseSidebarError = "";
   state.selectedDatabaseGameKey = games.length === 1 ? databaseGameKey(games[0]) : null;
   state.playlist = databaseRowsToPlaylistTracks(rows, games);
@@ -2457,7 +2458,6 @@ async function openLibraryRoot() {
 
 function applyLibrarySnapshot(snapshot) {
   if (snapshot?.stale === true) return;
-  playlistLoadGeneration += 1;
   Object.assign(state, snapshot);
   state.localBrowserEnabled = true;
   state.sidebarMode = "diskPath";
@@ -2475,7 +2475,6 @@ function applyLibrarySnapshot(snapshot) {
 
 function applyFolderSelection(selection) {
   const preserveBrowserFocus = document.activeElement?.classList.contains("tree-node");
-  playlistLoadGeneration += 1;
   state.selectedFolderPath = selection.selectedFolderPath;
   state.playlist = selection.playlist;
   state.selectedTrackId = resolveSelectedTrackId(selection.playlist);

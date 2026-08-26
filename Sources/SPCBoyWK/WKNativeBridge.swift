@@ -134,6 +134,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             databaseSearchGames: (...args) => request("databaseSearchGames", args),
             databaseGameTracks: (...args) => request("databaseGameTracks", args),
             databaseGroupState: (...args) => request("databaseGroupState", args),
+            catalogSessionInvalidate: (...args) => request("catalogSessionInvalidate", args),
             playbackQueueTransition: (...args) => request("playbackQueueTransition", args),
             playbackFadeDuration: (...args) => request("playbackFadeDuration", args),
             databaseFileTracks: (...args) => request("databaseFileTracks", args),
@@ -244,6 +245,17 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return
         }
 
+        if method == "catalogSessionInvalidate" {
+            guard let rawScope = args.first as? String,
+                  let scope = CatalogSessionScope(rawValue: rawScope) else {
+                Task { await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": BridgeError.invalidArguments.localizedDescription])) }
+                return
+            }
+            let generation = catalogSessions.begin(scope)
+            Task { await Self.reply(to: message.webView, id: id, success: true, valueJSON: Self.json(generation)) }
+            return
+        }
+
         if method == "chooseRootFolder" || method == "choosePath" || method == "chooseAACExportDirectory" {
             let chooser: (() -> String?)?
             switch method {
@@ -252,6 +264,9 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             default: chooser = onChooseAACExportDirectory
             }
             let catalogURL = self.catalogURL
+            let catalogGeneration = (method == "chooseRootFolder" || method == "choosePath")
+                ? catalogSessions.begin(.playlist)
+                : nil
             Task { @MainActor in
                 guard let selectedPath = chooser?() else {
                     await Self.reply(to: message.webView, id: id, success: true, valueJSON: "null")
@@ -262,11 +277,29 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                     return
                 }
                 Task.detached(priority: .userInitiated) {
+                    let response: (success: Bool, valueJSON: String)
                     do {
                         let result = try Self.handle(method: "openPath", args: [selectedPath], catalogURL: catalogURL)
-                        await Self.reply(to: message.webView, id: id, success: true, valueJSON: Self.json(result))
+                        response = (true, Self.json(result))
                     } catch {
-                        await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": error.localizedDescription]))
+                        response = (false, Self.json(["message": error.localizedDescription]))
+                    }
+                    await MainActor.run {
+                        let stale = catalogGeneration.map {
+                            !self.catalogSessions.isCurrent($0, for: .playlist)
+                        } ?? false
+                        if let catalogGeneration, !stale {
+                            self.catalogSessions.finish(catalogGeneration, for: .playlist)
+                        }
+                        let valueJSON = stale ? Self.json(["stale": true]) : response.valueJSON
+                        Task {
+                            await Self.reply(
+                                to: message.webView,
+                                id: id,
+                                success: stale || response.success,
+                                valueJSON: valueJSON
+                            )
+                        }
                     }
                 }
             }
