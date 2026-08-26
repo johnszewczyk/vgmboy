@@ -28,6 +28,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     var onCloseOptionsWindow: (() -> Void)?
     var onChooseRootFolder: (() -> String?)?
     var onChoosePath: (() -> String?)?
+    var onChooseAACExportDirectory: (() -> String?)?
     var onAppearanceSettingsChanged: (([String: Any]) -> Void)?
     var onFrontendSettingsChanged: ((SPCBoyPreferencesSnapshot) -> Void)?
 
@@ -145,6 +146,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             showArchiveCacheInFinder: () => request("showArchiveCacheInFinder"),
             setRoutingPreferences: (...args) => request("setRoutingPreferences", args),
             setAppearanceSettings: (...args) => request("setAppearanceSettings", args),
+            chooseAACExportDirectory: () => request("chooseAACExportDirectory"),
+            defaultAACExportDirectory: () => request("defaultAACExportDirectory"),
             openOptionsWindow: () => request("openOptionsWindow"),
             closeOptionsWindow: () => request("closeOptionsWindow"),
             openPath: (...args) => request("openPath", args),
@@ -157,6 +160,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             nativePlaybackInit: (...args) => request("nativePlaybackInit", args),
             nativePlaybackAudioConfig: (...args) => request("nativePlaybackAudioConfig", args),
             nativePlaybackTiming: (...args) => request("nativePlaybackTiming", args),
+            nativePlaybackReconfigure: (...args) => request("nativePlaybackReconfigure", args),
             nativePlaybackStart: (...args) => request("nativePlaybackStart", args),
             nativePlaybackResume: (...args) => request("nativePlaybackResume", args),
             nativePlaybackPause: (...args) => request("nativePlaybackPause", args),
@@ -166,6 +170,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             nativePlaybackSeek: (...args) => request("nativePlaybackSeek", args),
             nativePlaybackState: (...args) => request("nativePlaybackState", args),
             nativePlaybackRampGain: (...args) => request("nativePlaybackRampGain", args),
+            nativeExportAAC: (...args) => request("nativeExportAAC", args),
             setPlaybackPowerSaveBlocker: (...args) => request("setPlaybackPowerSaveBlocker", args),
             releaseMaterializedTrack: (...args) => request("releaseMaterializedTrack", args),
             onCatalogReloaded: (listener) => on("catalogReloaded", listener),
@@ -229,12 +234,21 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return
         }
 
-        if method == "chooseRootFolder" || method == "choosePath" {
-            let chooser = method == "chooseRootFolder" ? onChooseRootFolder : onChoosePath
+        if method == "chooseRootFolder" || method == "choosePath" || method == "chooseAACExportDirectory" {
+            let chooser: (() -> String?)?
+            switch method {
+            case "chooseRootFolder": chooser = onChooseRootFolder
+            case "choosePath": chooser = onChoosePath
+            default: chooser = onChooseAACExportDirectory
+            }
             let catalogURL = self.catalogURL
             Task { @MainActor in
                 guard let selectedPath = chooser?() else {
                     await Self.reply(to: message.webView, id: id, success: true, valueJSON: "null")
+                    return
+                }
+                if method == "chooseAACExportDirectory" {
+                    await Self.reply(to: message.webView, id: id, success: true, valueJSON: Self.json(selectedPath))
                     return
                 }
                 Task.detached(priority: .userInitiated) {
@@ -297,6 +311,9 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
             NSWorkspace.shared.activateFileViewerSelecting([url.standardizedFileURL])
             return true
+        case "defaultAACExportDirectory":
+            return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first?.standardizedFileURL.path
+                ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Downloads", isDirectory: true).path
         case "archiveCacheLocation":
             return SPCArchiveMaterialization.cacheLocation()
         case "databaseLocation":
@@ -429,10 +446,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return NSNull()
         case "setRoutingPreferences":
             return args.first ?? [:]
-        case "nativePlaybackInit", "nativePlaybackAudioConfig", "nativePlaybackTiming", "nativePlaybackStart",
+        case "nativePlaybackInit", "nativePlaybackAudioConfig", "nativePlaybackTiming", "nativePlaybackReconfigure", "nativePlaybackStart",
              "nativePlaybackResume", "nativePlaybackPause", "nativePlaybackStop",
              "nativePlaybackClose", "nativePlaybackUnload", "nativePlaybackSeek",
              "nativePlaybackState", "nativePlaybackRampGain",
+             "nativeExportAAC",
              "releaseMaterializedTrack":
             return try WKPlaybackBridge.shared.handle(method: method, args: args)
         default:
@@ -992,9 +1010,13 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     nonisolated private static func frontendSettingsLoad() throws -> SPCBoyPreferencesSnapshot {
         let defaults = UserDefaults.standard
         if let data = defaults.data(forKey: frontendSettingsKey) {
-            return try JSONDecoder().decode(SPCBoyPreferencesSnapshot.self, from: data)
+            var snapshot = try JSONDecoder().decode(SPCBoyPreferencesSnapshot.self, from: data)
+            snapshot.apply(frontendInterface: FrontendPreferencesStore(defaults: defaults, keys: .spcBoyWK).load())
+            return snapshot
         }
-        let snapshot = SPCBoyPreferencesSnapshot()
+        var snapshot = SPCBoyPreferencesSnapshot()
+        let frontendPreferences = FrontendPreferencesStore(defaults: defaults, keys: .spcBoyWK).load()
+        snapshot.apply(frontendInterface: frontendPreferences)
         let data = try JSONEncoder().encode(snapshot)
         defaults.set(data, forKey: frontendSettingsKey)
         return snapshot
@@ -1003,6 +1025,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     @discardableResult
     nonisolated private static func frontendSettingsSave(_ settings: [String: Any]) throws -> SPCBoyPreferencesSnapshot {
         let snapshot = try SPCBoyPreferencesSnapshot(jsonObject: settings)
+        FrontendPreferencesStore(defaults: .standard, keys: .spcBoyWK).save(snapshot.frontendInterfacePreferences)
         UserDefaults.standard.set(try JSONEncoder().encode(snapshot), forKey: frontendSettingsKey)
         return snapshot
     }

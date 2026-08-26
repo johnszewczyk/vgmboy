@@ -14,9 +14,9 @@ and persistence. This project owns only the typed native adapter and WebKit rend
 
 ## Invariants
 
-- Search is a temporary catalog-console view and clearing it restores the stored mode. Favorites is a separate frontend-owned track-history view and is not a CatalogReader aggregation mode.
-- The sidebar view button is one toggle cycling `Console View`, `Path View`, and
-  `Favorites`. `Local Files` remains an explicitly enabled local-filesystem state and is not
+- Search is a temporary catalog-console view and clearing it restores the stored mode. Favorites is a playlist projection and is not a CatalogReader aggregation mode.
+- The sidebar view button is one toggle cycling `Console View` and `Path View`.
+  `Local Files` remains an explicitly enabled local-filesystem state and is not
   part of the library-view cycle.
 - Game identity includes the catalog root ID, game name, and system.
 - Game console labels come from CatalogReader's shared folder-versus-metadata
@@ -36,8 +36,10 @@ and persistence. This project owns only the typed native adapter and WebKit rend
 - Large catalog playlists are rendered through a fixed-height visible window;
   the database result remains fully selectable without creating one WebKit DOM
   row per catalog track.
-- Native View-menu commands use the shared `FrontendCommandCore` sidebar command contract; the
-  WebKit skin maps those commands to the same three view values.
+- Native View-menu commands use the shared `FrontendCommandCore` command
+  contract; the WebKit skin maps catalog commands to the same two view values.
+  `Favorites Playlist` uses Command-Shift-D and changes only the queue snapshot,
+  never the sidebar mode.
 - Catalog-backed playlist rows must not stat source paths during hydration. CatalogReader supplies
   the metadata required for the playlist; decoder inspection and duration authority belong to
   VGMBoy through the native playback bridge, not to JavaScript hydration workers.

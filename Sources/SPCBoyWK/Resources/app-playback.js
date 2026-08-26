@@ -156,6 +156,47 @@ function shouldPreserveFieldValue(element) {
   return document.activeElement === element;
 }
 
+async function chooseAACExportDirectory() {
+  const path = await window.spcBoyWK.chooseAACExportDirectory();
+  if (!path) return null;
+  state.aacExportDirectory = path;
+  state.aacExportStatus = `AAC exports will be written to ${path}`;
+  persistSettings();
+  updatePlaybackReadout();
+  playbackApp.ui.renderAll();
+  return path;
+}
+
+async function exportTrackAsAAC(track) {
+  if (!track || state.aacExportInProgress) return;
+  state.aacExportInProgress = true;
+  try {
+    let directory = state.aacExportDirectory;
+    if (!directory) directory = (await window.spcBoyWK.defaultAACExportDirectory?.()) || "";
+    if (!directory) return;
+    const plan = await resolveTimingPlan(track, { force: true });
+    state.aacExportStatus = `Exporting ${track.title || track.filename || "track"}…`;
+    playbackApp.ui.renderAll();
+    const result = await window.spcBoyWK.nativeExportAAC({
+      path: track.path,
+      archivePath: track.archivePath || null,
+      archiveEntry: track.archiveEntry || null,
+      trackIndex: track.trackIndex || 0,
+      outputDirectory: directory,
+      filenameStem: track.title || track.filename || "Untitled Track",
+      playMilliseconds: Math.max(1, Math.round(plan.pre_fade_seconds * 1000)),
+      fadeMilliseconds: Math.max(0, Math.round(plan.fade_seconds * 1000))
+    });
+    state.aacExportStatus = `Exported AAC: ${result?.path || "complete"}`;
+  } catch (error) {
+    state.aacExportStatus = error?.message || "AAC export failed.";
+    throw error;
+  } finally {
+    state.aacExportInProgress = false;
+    playbackApp.ui.renderAll();
+  }
+}
+
 function clearNativeStatePoll() {
   if (!nativeStatePollTimer) {
     return;
@@ -205,10 +246,7 @@ function updateTimingSummary() {
   refs.queuedSkipsCheckbox.checked = state.queuedSkipsEnabled;
   refs.spcFadeCheckbox.checked = state.fadeEnabled;
   if (!shouldPreserveFieldValue(refs.sidebarFontSizeInput)) {
-    refs.sidebarFontSizeInput.value = String(state.sidebarFontSizePt);
-  }
-  if (!shouldPreserveFieldValue(refs.playlistFontSizeInput)) {
-    refs.playlistFontSizeInput.value = String(state.playlistFontSizePt);
+    refs.sidebarFontSizeInput.value = String(state.uiFontSizePt);
   }
   if (!shouldPreserveFieldValue(refs.sidebarWidthInput)) {
     refs.sidebarWidthInput.value = String(state.sidebarWidthPercent);
@@ -421,7 +459,7 @@ async function ensureNativePlaybackInitialized() {
   nativePlaybackInitialized = true;
 }
 
-function applyNativePlaybackSnapshot(track, snapshot, generation) {
+function applyNativePlaybackSnapshot(track, snapshot, generation, { allowNativeGenerationChange = false } = {}) {
   if (generation !== playbackGeneration) {
     return;
   }
@@ -429,7 +467,7 @@ function applyNativePlaybackSnapshot(track, snapshot, generation) {
   const activeTrack = track ?? activeTrackInfo();
   const observedNativeGeneration = Number(snapshot?.generation) || 0;
   const expectedNativeGeneration = Number(state.nativePlayback?.generation) || 0;
-  if (activeTrack && expectedNativeGeneration > 0 && observedNativeGeneration > 0
+  if (!allowNativeGenerationChange && activeTrack && expectedNativeGeneration > 0 && observedNativeGeneration > 0
       && observedNativeGeneration !== expectedNativeGeneration) {
     return false;
   }
@@ -559,14 +597,17 @@ async function finalizePlaybackEnded() {
     clearQueuedSkipTimer();
     await stopPlaybackState({ declick: false, keepNativeOutput: Boolean(completionTargetId || completedQueuedSkip) });
 
-    if (finalizationGeneration !== playbackGeneration) {
+    // stopPlaybackState intentionally advances the generation once to retire
+    // the completed native session. A newer user request advances it again;
+    // only the expected single retirement may continue into queue advance.
+    if (playbackGeneration !== finalizationGeneration + 1 || state.currentTrackId) {
       return;
     }
 
     if (completedQueuedSkip) {
-      advanceToAdjacent(completedQueuedSkip.delta);
+      await advanceToAdjacent(completedQueuedSkip.delta);
     } else if (completionTargetId) {
-      playTrack(completionTargetId, 0);
+      await playTrack(completionTargetId, 0);
     }
   })();
 
@@ -900,7 +941,10 @@ async function restartAt(seconds) {
 }
 
 async function refreshPlaybackForTimingChange() {
-  const track = activeTrackInfo();
+  // Timing changes apply to the loaded session, including a paused session.
+  // Do not use activeTrackInfo() here: after a native stop it may return the
+  // last presentation track even though no current session exists.
+  const track = currentTrack();
   if (!track || state.currentTrackId !== track.id) {
     updateTimingSummary();
     updatePlaybackReadout();
@@ -908,17 +952,26 @@ async function refreshPlaybackForTimingChange() {
   }
 
   timingPlans.delete(track.id);
-  await resolveTimingPlan(track, { force: true });
-  const resumeAt = Math.max(0, Math.min(state.elapsedSeconds, currentTotalSeconds(track)));
-  if (!state.isPlaying) {
-    state.elapsedSeconds = resumeAt;
+  const plan = await resolveTimingPlan(track, { force: true });
+  if (!nativePlaybackInitialized || !state.nativePlayback.trackLoaded) {
     state.totalSeconds = currentTotalSeconds(track);
     updateTimingSummary();
     updatePlaybackReadout();
     return;
   }
 
-  await playTrack(track.id, resumeAt);
+  const snapshot = await window.spcBoyWK.nativePlaybackReconfigure({
+    longPlayEnabled: plan.is_long_play,
+    manualPlayMilliseconds: Math.max(1, Math.round(plan.pre_fade_seconds * 1000)),
+    fadeMilliseconds: Math.max(0, Math.round(plan.fade_seconds * 1000)),
+    unknownDurationMilliseconds: Math.max(1, Math.round(state.unknownDurationSeconds * 1000)),
+    tempo: playbackSpeedForTrack(track)
+  });
+  applyNativePlaybackSnapshot(track, snapshot, playbackGeneration, { allowNativeGenerationChange: true });
+  state.totalSeconds = effectiveTotalSeconds(track);
+  state.elapsedSeconds = Math.max(0, Math.min(state.elapsedSeconds, state.totalSeconds));
+  updateTimingSummary();
+  updatePlaybackReadout();
 }
 
 async function refreshPlaybackForSpeedChange(backendId) {
@@ -941,6 +994,8 @@ playbackApp.playback = {
   restartAt,
   refreshPlaybackForTimingChange,
   refreshPlaybackForSpeedChange,
+  chooseAACExportDirectory,
+  exportTrackAsAAC,
   cancelQueuedSkip,
   setAudioSettings
 };

@@ -1,5 +1,5 @@
 import Foundation
-import PlaybackRequestCore
+import PlaybackTransportCore
 import VGMBoyKit
 
 /// Thin WK adapter over the shared in-process VGMBoy control surface.
@@ -8,27 +8,21 @@ import VGMBoyKit
 final class WKPlaybackBridge: @unchecked Sendable {
     static let shared = WKPlaybackBridge()
 
-    private let controller = PlaybackController()
-    private let commandQueue = PlaybackSerialExecutor(label: "SPCBoyWK.vgmboy-playback", qos: .userInitiated)
-    private let lock = NSLock()
-    private var latestRequestID = 0
-    private var trackLoaded = false
+    private let transport = PlaybackTransportCoordinator(label: "SPCBoyWK.vgmboy-playback")
 
     private init() {}
 
     func handle(method: String, args: [Any]) throws -> Any {
         let requestID: Int?
         if method == "nativePlaybackStart" {
-            requestID = beginRequest()
+            requestID = transport.reservePlaybackRequest()
         } else {
             requestID = nil
             if ["nativePlaybackStop", "nativePlaybackClose", "nativePlaybackUnload"].contains(method) {
-                cancelRequest()
+                transport.invalidatePlaybackRequests()
             }
         }
-        return try commandQueue.sync {
-            try handleSerialized(method: method, args: args, requestID: requestID)
-        }
+        return try handleSerialized(method: method, args: args, requestID: requestID)
     }
 
     private func handleSerialized(method: String, args: [Any], requestID: Int? = nil) throws -> Any {
@@ -99,13 +93,31 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 "is_long_play": plan.isLongPlay,
                 "uses_native_ending": plan.usesNativeEnding
             ]
+        case "nativePlaybackReconfigure":
+            guard let request = args.first as? [String: Any] else {
+                throw PlaybackBridgeError.invalid("Playback reconfiguration requires timing settings.")
+            }
+            let mode: PlaybackMode = (request["longPlayEnabled"] as? Bool == true) ? .longPlay : .fileDefault
+            let payload = PlaybackControlPayload(
+                playbackMode: mode,
+                playMilliseconds: mode == .longPlay ? max(1, int(request["manualPlayMilliseconds"]) ?? 0) : nil,
+                fadeMilliseconds: max(0, int(request["fadeMilliseconds"]) ?? 0),
+                unknownDurationMilliseconds: max(
+                    1_000,
+                    int(request["unknownDurationMilliseconds"])
+                    ?? PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000
+                )
+            )
+            try perform(.setTempo, payload: .init(tempo: tempoMultiplier(request["tempo"])))
+            try perform(.setPlaybackMode, payload: payload)
+            return statusResponse()
         case "nativePlaybackStart":
             guard let request = args.first as? [String: Any],
                   let sourcePath = request["path"] as? String,
                   !sourcePath.isEmpty else {
                 throw PlaybackBridgeError.invalid("Playback start requires a file path.")
             }
-            guard requestID.map(isCurrentRequest) ?? true else {
+            guard requestID.map(transport.isCurrentPlaybackRequest) ?? true else {
                 throw PlaybackBridgeError.superseded
             }
             let archivePath = request["archivePath"] as? String
@@ -123,7 +135,7 @@ final class WKPlaybackBridge: @unchecked Sendable {
             } else {
                 playbackPath = sourcePath
             }
-            guard requestID.map(isCurrentRequest) ?? true else {
+            guard requestID.map(transport.isCurrentPlaybackRequest) ?? true else {
                 throw PlaybackBridgeError.superseded
             }
             let index = max(0, int(request["trackIndex"]) ?? 0)
@@ -165,7 +177,6 @@ final class WKPlaybackBridge: @unchecked Sendable {
             try perform(.load, payload: payload)
             if startMilliseconds > 0 { try perform(.seek, payload: .init(positionMilliseconds: startMilliseconds)) }
             try perform(.play)
-            lock.lock(); trackLoaded = true; lock.unlock()
             return statusResponse()
         case "nativePlaybackResume":
             try perform(.play)
@@ -175,7 +186,6 @@ final class WKPlaybackBridge: @unchecked Sendable {
             return statusResponse()
         case "nativePlaybackStop", "nativePlaybackClose", "nativePlaybackUnload":
             try perform(.stop)
-            lock.lock(); trackLoaded = false; lock.unlock()
             return statusResponse()
         case "nativePlaybackSeek":
             let milliseconds = max(0, int(args.first) ?? 0)
@@ -186,6 +196,8 @@ final class WKPlaybackBridge: @unchecked Sendable {
             let duration = max(1, int(args.count > 1 ? args[1] : nil) ?? 1)
             try perform(.rampOutputGain, payload: .init(outputGain: gain, rampMilliseconds: duration))
             return statusResponse()
+        case "nativeExportAAC":
+            return try exportAAC(args)
         case "setPlaybackPowerSaveBlocker":
             return NSNull()
         case "releaseMaterializedTrack":
@@ -197,18 +209,63 @@ final class WKPlaybackBridge: @unchecked Sendable {
     }
 
     private func perform(_ command: PlaybackControlCommand, payload: PlaybackControlPayload = .init()) throws {
-        let event = controller.perform(.init(command: command, payload: payload))
+        let event = transport.perform(.init(command: command, payload: payload))
         if event.kind == .error {
             throw PlaybackBridgeError.invalid(event.message ?? "VGMBoy playback request failed.")
         }
     }
 
+    private func exportAAC(_ args: [Any]) throws -> [String: Any] {
+        guard let request = args.first as? [String: Any],
+              let sourcePath = request["path"] as? String, !sourcePath.isEmpty,
+              let outputDirectory = request["outputDirectory"] as? String, !outputDirectory.isEmpty,
+              let filenameStem = request["filenameStem"] as? String,
+              let playMilliseconds = int(request["playMilliseconds"]), playMilliseconds > 0 else {
+            throw PlaybackBridgeError.invalid("AAC export requires a playable path, output folder, filename, and positive play length.")
+        }
+        let archivePath = request["archivePath"] as? String
+        let archiveEntry = request["archiveEntry"] as? String
+        let playbackPath: String
+        var materialized = false
+        if let archivePath, !archivePath.isEmpty, let archiveEntry, !archiveEntry.isEmpty {
+            guard let requirement = FormatRegistry.archiveMaterializationRequirement(for: [archiveEntry]) else {
+                throw PlaybackBridgeError.invalid("VGMBoy does not admit archive member \(archiveEntry).")
+            }
+            playbackPath = try SPCArchiveMaterialization.materializeForExport(
+                archivePath: archivePath,
+                entry: archiveEntry,
+                requirement: requirement
+            ).path
+            materialized = true
+        } else {
+            playbackPath = sourcePath
+        }
+        defer {
+            if materialized { SPCArchiveMaterialization.releaseExport() }
+        }
+        let event = transport.perform(.init(
+            command: .exportAAC,
+            payload: PlaybackControlPayload(
+                path: playbackPath,
+                trackIndex: max(0, int(request["trackIndex"]) ?? 0),
+                playMilliseconds: playMilliseconds,
+                fadeMilliseconds: max(0, int(request["fadeMilliseconds"]) ?? 0),
+                exportDirectory: outputDirectory,
+                exportFilenameStem: filenameStem
+            )
+        ))
+        guard event.kind != .error else {
+            throw PlaybackBridgeError.invalid(event.message ?? "VGMBoy AAC export failed.")
+        }
+        return ["path": event.message ?? ""]
+    }
+
     private func statusResponse() -> [String: Any] {
-        let event = controller.perform(.init(command: .status))
+        let event = transport.perform(.init(command: .status))
         let status = event.status
         let diagnostics = status?.diagnostics
         let statistics = status?.statistics
-        lock.lock(); let loaded = trackLoaded; lock.unlock()
+        let loaded = transport.statusSync().trackLoaded
         let transportState: String
         if status?.isPlaying == true {
             transportState = "playing"
@@ -274,26 +331,6 @@ final class WKPlaybackBridge: @unchecked Sendable {
         return numerator / denominator
     }
 
-    private func beginRequest() -> Int {
-        lock.lock()
-        latestRequestID += 1
-        let requestID = latestRequestID
-        lock.unlock()
-        return requestID
-    }
-
-    private func cancelRequest() {
-        lock.lock()
-        latestRequestID += 1
-        lock.unlock()
-    }
-
-    private func isCurrentRequest(_ requestID: Int) -> Bool {
-        lock.lock()
-        let isCurrent = requestID == latestRequestID
-        lock.unlock()
-        return isCurrent
-    }
 }
 
 private enum PlaybackBridgeError: LocalizedError {

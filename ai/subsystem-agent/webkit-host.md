@@ -21,7 +21,10 @@ typed snapshot. The retired partial `setPlaybackSettings` request and its
 change-event path are intentionally absent; they were no-op plumbing that made
 Long Play appear to have a native settings interface while playback actually
 read a different state. Long Play changes now persist through the snapshot and
-cross the shared VGMBoy boundary only as part of `nativePlaybackStart`.
+cross the shared VGMBoy boundary at both `nativePlaybackStart` and
+`nativePlaybackReconfigure`. The separate Options WebView relays timing fields
+to the main WebView, which asks VGMBoyKit to reconfigure the loaded session
+without losing position or paused state.
 
 The shared `FrontendPreferencesCore` contract owns the validated animation
 timing range and 200 ms defaults. DOM geometry and CSS remain WebKit-owned so
@@ -45,7 +48,8 @@ Transport regression coverage lives in
 `Tests/SPCBoyWKTransport.test.js`. It executes the production
 `Resources/app-playback.js` module and covers stale native-generation
 rejection, restoration of output when a queued adjacent fade is cancelled,
-and dropping a natural-end finalizer after a newer replacement request.
+dropping a natural-end finalizer after a newer replacement request, and
+advancing after the completed native session is retired.
 This is module-boundary coverage; a live WebKit interaction test remains a
 separate app-boundary check.
 
@@ -95,11 +99,14 @@ paths, disclosure, focus, scroll, and context-menu behavior. The former
 `buildCatalogFileTree` graph constructor must not return.
 
 All typed VGMBoy commands sent through `WKPlaybackBridge` are serialized by
-the shared `FrontendCore.PlaybackRequestCore.PlaybackSerialExecutor`. The
-remaining JavaScript queue/status layer owns only WebKit interaction ordering
-and stale UI generation checks; the native executor is the non-UI safety
-boundary that prevents concurrent detached bridge requests from racing one
-playback session.
+the shared `FrontendCore.PlaybackTransportCore.PlaybackTransportCoordinator`,
+which also exposes one generation-checked natural-end event for queue
+continuation.
+The bridge no longer owns a `PlaybackController`, serial executor, or native
+request-generation lock. The remaining JavaScript queue/status layer owns only
+WebKit interaction ordering and stale UI generation checks; the shared native
+coordinator is the non-UI safety boundary that prevents concurrent detached
+bridge requests from racing one playback session.
 
 The former JavaScript playback coordinator and split materialize/load/play
 workflow are removed. `nativePlaybackStart` now accepts one typed playback

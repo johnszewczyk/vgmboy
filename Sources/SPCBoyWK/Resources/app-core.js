@@ -2,7 +2,7 @@ const DEFAULT_PLAY_FADE_SECONDS = 6;
 const DEFAULT_LONG_PLAY_SECONDS = 180;
 const SAMPLE_RATE = 44_100;
 const DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES = 2 * 1024 * 1024 * 1024;
-const ARCHIVE_CACHE_LIMIT_CHOICES = Object.freeze([512, 1024, 2048, 4096].map((megabytes) => megabytes * 1024 * 1024));
+const ARCHIVE_CACHE_LIMIT_CHOICES = Object.freeze([2, 4, 8, 16].map((gigabytes) => gigabytes * 1024 * 1024 * 1024));
 const COLUMN_DEFS = [
   { id: "favorite", label: "★", className: "col-favorite", sortable: false },
   { id: "index", label: "#", className: "mono col-index", sortable: false },
@@ -93,6 +93,9 @@ const state = {
   equalizerBandGains: EQUALIZER_BAND_FREQUENCIES.map(() => 0),
   appVolume: 1,
   monoEnabled: false,
+  aacExportDirectory: "",
+  aacExportStatus: "",
+  aacExportInProgress: false,
   columnOrder: [...DEFAULT_COLUMN_ORDER],
   columnWidths: { ...DEFAULT_COLUMN_WIDTHS },
   columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY },
@@ -101,6 +104,8 @@ const state = {
   sortDirection: "ascending",
   autoResizeAnimationMilliseconds: 200,
   selectionAnimationMilliseconds: 200,
+  autoResizeAnimationEnabled: true,
+  selectionAnimationEnabled: true,
   mainWindowAlwaysOnTop: false,
   settingsWindowAlwaysOnTop: false,
   optionsOpen: false,
@@ -191,15 +196,16 @@ const refs = {
   libraryCacheDefaultButton: document.getElementById("library-cache-default-button"),
   sidebarFontSizeInput: document.getElementById("sidebar-font-size-input"),
   sidebarTextColorInput: document.getElementById("sidebar-text-color-input"),
-  sidebarMonospaceCheckbox: document.getElementById("sidebar-monospace-checkbox"),
   sidebarPathCountsCheckbox: document.getElementById("sidebar-path-counts-checkbox"),
-  playlistFontSizeInput: document.getElementById("playlist-font-size-input"),
-  playlistTextColorInput: document.getElementById("playlist-text-color-input"),
-  playlistMonospaceCheckbox: document.getElementById("playlist-monospace-checkbox"),
   applicationMonospaceCheckbox: document.getElementById("application-monospace-checkbox"),
+  aacExportDirectoryPath: document.getElementById("aac-export-directory-path"),
+  aacExportChooseButton: document.getElementById("aac-export-choose-button"),
+  aacExportStatus: document.getElementById("aac-export-status"),
   playlistHeaderBoldCheckbox: document.getElementById("playlist-header-bold-checkbox"),
   columnAutoSizeCheckbox: document.getElementById("column-auto-size-checkbox"),
+  autoResizeAnimationEnabledCheckbox: document.getElementById("auto-resize-animation-enabled-checkbox"),
   autoResizeAnimationInput: document.getElementById("auto-resize-animation-input"),
+  selectionAnimationEnabledCheckbox: document.getElementById("selection-animation-enabled-checkbox"),
   selectionAnimationInput: document.getElementById("selection-animation-input"),
   mainWindowAlwaysOnTopCheckbox: document.getElementById("main-window-always-on-top-checkbox"),
   settingsWindowAlwaysOnTopCheckbox: document.getElementById("settings-window-always-on-top-checkbox"),
@@ -268,12 +274,15 @@ async function loadSettings() {
     state.equalizerBandGains = EQUALIZER_BAND_FREQUENCIES.map((_, index) => normalizeEqualizerGain(parsed.equalizerBandGains?.[index]));
     state.appVolume = normalizeAppVolume(parsed.appVolume);
     state.monoEnabled = Boolean(parsed.monoEnabled);
+    state.aacExportDirectory = typeof parsed.aacExportDirectory === "string" && parsed.aacExportDirectory
+      ? parsed.aacExportDirectory
+      : (await window.spcBoyWK.defaultAACExportDirectory?.()) || "";
     state.uiItemSpacingRem = normalizeItemSpacing(parsed.uiItemSpacingRem);
     state.rootPath = parsed.rootPath || null;
     state.localBrowserEnabled = Boolean(parsed.localBrowserEnabled && state.rootPath);
     state.selectedFolderPath = parsed.selectedFolderPath || null;
     state.selectedBrowserPath = parsed.selectedBrowserPath || state.selectedFolderPath;
-    state.sidebarMode = ["paths", "consoles", "diskPath", "favorites"].includes(parsed.sidebarMode)
+    state.sidebarMode = ["paths", "consoles", "diskPath"].includes(parsed.sidebarMode)
       ? parsed.sidebarMode
       : "consoles";
     state.favoriteSortOrder = parsed.favoriteSortOrder === "alphabetical" ? "alphabetical" : "historical";
@@ -282,15 +291,18 @@ async function loadSettings() {
       ? parsed.collapsedConsoleNames.filter((name) => typeof name === "string")
       : [];
     state.lastSelectedTrackId = parsed.lastSelectedTrackId || null;
-    state.uiFontSizePt = normalizeFontSize(parsed.uiFontSizePt);
-    state.sidebarFontSizePt = normalizeFontSize(parsed.sidebarFontSizePt ?? parsed.uiFontSizePt);
-    state.sidebarTextColor = normalizeFontColor(parsed.sidebarTextColor);
-    state.sidebarMonospace = Boolean(parsed.sidebarMonospace);
+    const interfaceFontSize = normalizeFontSize(parsed.uiFontSizePt ?? parsed.sidebarFontSizePt ?? parsed.playlistFontSizePt);
+    const interfaceFontColor = normalizeFontColor(parsed.sidebarTextColor ?? parsed.playlistTextColor);
+    const interfaceMonospace = Boolean(parsed.applicationMonospace ?? parsed.sidebarMonospace ?? parsed.playlistMonospace);
+    state.uiFontSizePt = interfaceFontSize;
+    state.sidebarFontSizePt = interfaceFontSize;
+    state.sidebarTextColor = interfaceFontColor;
+    state.sidebarMonospace = interfaceMonospace;
     state.sidebarPathCounts = parsed.sidebarPathCounts !== false;
-    state.playlistFontSizePt = normalizeFontSize(parsed.playlistFontSizePt ?? parsed.uiFontSizePt);
-    state.playlistTextColor = normalizeFontColor(parsed.playlistTextColor);
-    state.playlistMonospace = Boolean(parsed.playlistMonospace);
-    state.applicationMonospace = Boolean(parsed.applicationMonospace);
+    state.playlistFontSizePt = interfaceFontSize;
+    state.playlistTextColor = interfaceFontColor;
+    state.playlistMonospace = interfaceMonospace;
+    state.applicationMonospace = interfaceMonospace;
     state.playlistHeaderBold = Boolean(parsed.playlistHeaderBold);
     state.sidebarWidthPercent = normalizeSidebarWidth(parsed.sidebarWidthPercent);
     state.accentColor = normalizeAccentColor(parsed.accentColor);
@@ -305,6 +317,8 @@ async function loadSettings() {
     state.sortDirection = normalizeSortDirection(parsed.sortDirection);
     state.autoResizeAnimationMilliseconds = normalizeAnimationMilliseconds(parsed.autoResizeAnimationMilliseconds);
     state.selectionAnimationMilliseconds = normalizeAnimationMilliseconds(parsed.selectionAnimationMilliseconds);
+    state.autoResizeAnimationEnabled = parsed.autoResizeAnimationEnabled !== false;
+    state.selectionAnimationEnabled = parsed.selectionAnimationEnabled !== false;
     state.mainWindowAlwaysOnTop = Boolean(parsed.mainWindowAlwaysOnTop);
     state.settingsWindowAlwaysOnTop = Boolean(parsed.settingsWindowAlwaysOnTop);
   } catch {
@@ -324,6 +338,7 @@ function persistSettings() {
     equalizerBandGains: state.equalizerBandGains,
     appVolume: state.appVolume,
     monoEnabled: state.monoEnabled,
+    aacExportDirectory: state.aacExportDirectory,
     spcFadeSeconds: state.spcFadeSeconds,
     playbackSpeed: state.playbackSpeed,
     playbackSpeedEnabled: state.playbackSpeedEnabled,
@@ -362,6 +377,8 @@ function persistSettings() {
     sortDirection: state.sortDirection,
     autoResizeAnimationMilliseconds: state.autoResizeAnimationMilliseconds,
     selectionAnimationMilliseconds: state.selectionAnimationMilliseconds,
+    autoResizeAnimationEnabled: state.autoResizeAnimationEnabled,
+    selectionAnimationEnabled: state.selectionAnimationEnabled,
     mainWindowAlwaysOnTop: state.mainWindowAlwaysOnTop,
     settingsWindowAlwaysOnTop: state.settingsWindowAlwaysOnTop
   };

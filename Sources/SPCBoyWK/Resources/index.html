@@ -124,13 +124,13 @@
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Application</div>
                 <label class="options-field"><span>Accent Color</span><span class="options-inline-trailing"><input id="accent-color-input" class="options-input options-color-text-input" type="text" value="lightskyblue" placeholder="lightskyblue, #87cefa, rgb(...), oklch(...)" aria-label="Accent color CSS value" /></span></label>
-                <label class="options-field options-inline-field"><span>Monospace Font</span><input id="application-monospace-checkbox" type="checkbox" /></label>
               </div>
               <div class="options-subpanel">
-                <div class="options-subpanel-title">Sidebar Fonts</div>
+                <div class="options-subpanel-title">Interface Style</div>
+                <div class="options-help-text">These controls apply consistently to the database sidebar and playlist.</div>
                 <label class="options-field"><span>Font Size</span><span class="options-inline-trailing"><input id="sidebar-font-size-input" class="options-input" type="text" inputmode="decimal" value="10" aria-label="Sidebar font size in points" /></span></label>
                 <label class="options-field"><span>Font Color</span><span class="options-inline-trailing"><input id="sidebar-text-color-input" class="options-input options-color-text-input" type="text" value="#a9a9a9" placeholder="#a9a9a9, rgb(...), red" aria-label="Sidebar font color CSS value" /></span></label>
-                <label class="options-field options-inline-field"><span>Monospace Font</span><input id="sidebar-monospace-checkbox" type="checkbox" /></label>
+                <label class="options-field options-inline-field"><span>Monospace Font</span><input id="application-monospace-checkbox" type="checkbox" /></label>
               </div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Sidebar Options</div>
@@ -138,21 +138,15 @@
                 <label class="options-field options-inline-field"><span>Path Counts</span><input id="sidebar-path-counts-checkbox" type="checkbox" checked /></label>
               </div>
               <div class="options-subpanel">
-                <div class="options-subpanel-title">Playlist Fonts</div>
-                <label class="options-field"><span>Font Size</span><span class="options-inline-trailing"><input id="playlist-font-size-input" class="options-input" type="text" inputmode="decimal" value="10" aria-label="Playlist font size in points" /></span></label>
-                <label class="options-field"><span>Font Color</span><span class="options-inline-trailing"><input id="playlist-text-color-input" class="options-input options-color-text-input" type="text" value="#a9a9a9" placeholder="#a9a9a9, rgb(...), red" aria-label="Playlist font color CSS value" /></span></label>
-                <label class="options-field options-inline-field"><span>Monospace Font</span><input id="playlist-monospace-checkbox" type="checkbox" /></label>
-                <label class="options-field options-inline-field"><span>Bold Header Font</span><input id="playlist-header-bold-checkbox" type="checkbox" /></label>
-              </div>
-              <div class="options-subpanel">
                 <div class="options-subpanel-title">Playlist Options</div>
+                <label class="options-field options-inline-field"><span>Bold Header Font</span><input id="playlist-header-bold-checkbox" type="checkbox" /></label>
                 <label class="options-field"><span>Item Spacing</span><span class="options-inline-trailing"><input id="ui-item-spacing-input" class="options-input" type="text" inputmode="decimal" value=".2" aria-label="Item spacing in rems" /></span></label>
-                <label class="options-field options-inline-field"><span>Column Auto-Size</span><input id="column-auto-size-checkbox" type="checkbox" checked /></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="column-auto-size-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Enable Column Auto-size</span><small>Automatically resize columns for content width on selection.</small></span></span></label>
               </div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Animations</div>
-                <label class="options-field"><span>Auto-Resize</span><span class="options-inline-trailing"><input id="auto-resize-animation-input" class="options-input" type="number" min="0" max="1000" step="10" value="200" aria-label="Auto-resize animation milliseconds" /><span>ms</span></span></label>
-                <label class="options-field"><span>Selection Bar</span><span class="options-inline-trailing"><input id="selection-animation-input" class="options-input" type="number" min="0" max="1000" step="10" value="200" aria-label="Selection bar animation milliseconds" /><span>ms</span></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="auto-resize-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Auto-Resize</span><small>Duration for automatic playlist column resizing.</small></span></span><span class="options-inline-trailing"><input id="auto-resize-animation-input" class="options-input" type="number" min="0" max="1000" step="10" value="200" aria-label="Auto-resize animation milliseconds" /><span>ms</span></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="selection-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Selection Bar</span><small>Duration for playlist and sidebar selection movement.</small></span></span><span class="options-inline-trailing"><input id="selection-animation-input" class="options-input" type="number" min="0" max="1000" step="10" value="200" aria-label="Selection bar animation milliseconds" /><span>ms</span></span></label>
               </div>
             </div>
 
@@ -160,8 +154,8 @@
               <div class="options-page-title">SPCBoy / Windows</div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Always on Top</div>
-                <label class="options-field options-inline-field"><span>Main Window</span><input id="main-window-always-on-top-checkbox" type="checkbox" /></label>
-                <label class="options-field options-inline-field"><span>Settings Window</span><input id="settings-window-always-on-top-checkbox" type="checkbox" /></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="main-window-always-on-top-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Main Window</span><small>Keep main window on top of other apps.</small></span></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="settings-window-always-on-top-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Options Window</span><small>Keep options window on top of main window.</small></span></span></label>
               </div>
             </div>
 
@@ -190,7 +184,7 @@
                 <div class="options-subpanel-title">Archive Cache</div>
                 <div class="database-stats-panel options-path-control"><input id="library-cache-path" class="options-input options-path-readout" type="text" readonly placeholder="Archive cache path" aria-label="Archive cache path" /><button id="library-cache-browse-button" class="tool-button glyph-button" type="button" aria-label="Show archive cache in Finder" title="Show archive cache in Finder"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="archive-cache-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Enable Cache</span><small>Usage: <strong id="database-cache-summary">—</strong></small><small>Decompressed files can be retained to reduce load time.</small></span></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><span class="options-checkbox-copy"><span>Cache Limit</span><small>Least-recently-used archive entries are removed automatically. Active playback is never removed.</small></span></span><span class="options-inline-trailing"><select id="archive-cache-limit-select" class="options-input" aria-label="Archive cache size limit"><option value="536870912">512 MB</option><option value="1073741824">1 GB</option><option value="2147483648" selected>2 GB</option><option value="4294967296">4 GB</option></select></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><span class="options-checkbox-copy"><span>Cache Limit</span><small>Least-recently-used archive entries are removed automatically. Active playback is never removed.</small></span></span><span class="options-inline-trailing"><select id="archive-cache-limit-select" class="options-input" aria-label="Archive cache size limit"><option value="2147483648" selected>2 GB</option><option value="4294967296">4 GB</option><option value="8589934592">8 GB</option><option value="17179869184">16 GB</option></select></span></label>
                 <p><strong>MediaScanner scratch files are separate:</strong> they are disposable and reclaimed after each source or after cancellation.</p>
                 <div class="options-library-toolbar options-panel-actions">
                   <button id="library-cache-default-button" class="tool-button" type="button">Use Default</button>
@@ -244,7 +238,13 @@
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="spc-force-length-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Long Play</span><small>Loop song with original format control.</small></span></span><span class="options-inline-trailing"><input id="spc-length-input" class="options-input options-duration-input" type="text" inputmode="numeric" value="3:00" aria-label="Long Play duration" /></span></label>
                 <label class="options-field options-inline-field"><span class="options-checkbox-copy"><span>Unknown-length default</span><small>Used when a decoder provides no natural duration and Long Play is off.</small></span><span class="options-inline-trailing"><input id="spc-unknown-duration-input" class="options-input options-duration-input" type="text" inputmode="numeric" value="2:30" aria-label="Unknown-length default duration" /></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="spc-fade-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Fade Out</span><small>Apply transitional volume fade to song end.</small></span></span><span class="options-inline-trailing"><input id="spc-fade-input" class="options-input options-duration-input" type="text" inputmode="numeric" value="0:06" aria-label="Fade length" /></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="queued-skips-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Queued Skips</span><small>First skip fades from the current position; another skip during that fade advances immediately.</small></span></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="queued-skips-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Faded Skip</span><small>First skip fades from the current position; another skip during that fade advances immediately.</small></span></span></label>
+              </div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">AAC Export</div>
+                <div class="options-help-text">VGMBoy performs the finite offline render. SPCBoy only supplies the selected track and destination.</div>
+                <div class="database-stats-panel options-path-control"><input id="aac-export-directory-path" class="options-input options-path-readout" type="text" readonly placeholder="Choose an export folder" aria-label="AAC export folder" /><button id="aac-export-choose-button" class="tool-button" type="button">Choose Folder</button></div>
+                <div id="aac-export-status" class="options-help-text" aria-live="polite"></div>
               </div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Play Speed</div>

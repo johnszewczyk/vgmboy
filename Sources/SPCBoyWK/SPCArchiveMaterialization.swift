@@ -25,6 +25,10 @@ enum SPCArchiveMaterialization {
         cacheRootURL: cacheRootURL,
         preferenceKeys: cacheKeys
     )
+    private static let exportMaterializer = ArchivePlaybackMaterializer(
+        cacheRootURL: cacheRootURL,
+        preferenceKeys: cacheKeys
+    )
 
     static func materialize(
         archivePath: String,
@@ -50,6 +54,30 @@ enum SPCArchiveMaterialization {
 
     static func release() {
         playbackMaterializer.release()
+    }
+
+    static func materializeForExport(
+        archivePath: String,
+        entry: String,
+        requirement: VGMArchiveMaterializationRequirement
+    ) throws -> URL {
+        let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
+        guard FileManager.default.fileExists(atPath: archiveURL.path) else {
+            throw ArchiveMaterializationError.missingSource(archiveURL.path)
+        }
+        let normalizedEntry = ArchiveEntryPath.normalized(entry)
+        guard !normalizedEntry.isEmpty, ArchiveEntryPath.isSafe(normalizedEntry) else {
+            throw ArchiveMaterializationError.invalidEntry
+        }
+        return try exportMaterializer.materialize(
+            archiveURL: archiveURL,
+            entryPath: normalizedEntry,
+            requirement: requirement
+        )
+    }
+
+    static func releaseExport() {
+        exportMaterializer.release()
     }
 
     static func configure(enabled: Bool, limitBytes: Int64) -> [String: Any] {

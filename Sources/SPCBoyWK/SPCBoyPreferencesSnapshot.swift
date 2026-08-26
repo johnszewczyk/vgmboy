@@ -2,6 +2,18 @@ import Foundation
 import FrontendPreferencesCore
 import VGMBoyKit
 
+extension FrontendPreferencesKeySet {
+    static let spcBoyWK = FrontendPreferencesKeySet(
+        autoResizeEnabledKey: "SPCBoyWK.autoResizeAnimationEnabled",
+        selectionEnabledKey: "SPCBoyWK.selectionAnimationEnabled",
+        autoResizeMillisecondsKey: "SPCBoyWK.autoResizeAnimationMilliseconds",
+        selectionMillisecondsKey: "SPCBoyWK.selectionAnimationMilliseconds",
+        columnAutoSizeKey: "SPCBoyWK.columnAutoSize",
+        mainWindowAlwaysOnTopKey: "SPCBoyWK.mainWindowAlwaysOnTop",
+        settingsWindowAlwaysOnTopKey: "SPCBoyWK.settingsWindowAlwaysOnTop"
+    )
+}
+
 /// The typed native persistence boundary for SPCBoy. JavaScript receives a JSON
 /// projection, but it no longer owns or migrates the durable preference schema.
 struct SPCBoyPreferencesSnapshot: Codable, Sendable {
@@ -50,6 +62,7 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
     var playlistHeaderBold: Bool?
     var sidebarWidthPercent: Double?
     var accentColor: String?
+    var aacExportDirectory: String?
     var routingPreferences: [String: String]?
     var archiveCacheEnabled: Bool?
     var archiveCacheLimitBytes: Int64?
@@ -61,6 +74,8 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
     var sortDirection: SortDirection?
     var autoResizeAnimationMilliseconds: Int?
     var selectionAnimationMilliseconds: Int?
+    var autoResizeAnimationEnabled: Bool?
+    var selectionAnimationEnabled: Bool?
     var mainWindowAlwaysOnTop: Bool?
     var settingsWindowAlwaysOnTop: Bool?
 
@@ -74,6 +89,8 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
         selectionAnimationMilliseconds = FrontendAnimationTimings.clamp(
             selectionAnimationMilliseconds ?? FrontendAnimationTimings.defaultDurationMilliseconds
         )
+        autoResizeAnimationEnabled = autoResizeAnimationEnabled ?? true
+        selectionAnimationEnabled = selectionAnimationEnabled ?? true
     }
 
     init() {
@@ -99,6 +116,8 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
         libvgmPlaybackSpeedEnabled = shared.libvgmTempoEnabled
         autoResizeAnimationMilliseconds = FrontendAnimationTimings.defaultDurationMilliseconds
         selectionAnimationMilliseconds = FrontendAnimationTimings.defaultDurationMilliseconds
+        autoResizeAnimationEnabled = true
+        selectionAnimationEnabled = true
         mainWindowAlwaysOnTop = false
         settingsWindowAlwaysOnTop = false
     }
@@ -109,6 +128,32 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
             throw SnapshotError.invalidJSON
         }
         return object
+    }
+
+    var frontendInterfacePreferences: FrontendInterfacePreferences {
+        FrontendInterfacePreferences(
+            animations: FrontendAnimationTimings(
+                autoResizeEnabled: autoResizeAnimationEnabled ?? true,
+                selectionEnabled: selectionAnimationEnabled ?? true,
+                autoResizeMilliseconds: autoResizeAnimationMilliseconds ?? FrontendAnimationTimings.defaultDurationMilliseconds,
+                selectionMilliseconds: selectionAnimationMilliseconds ?? FrontendAnimationTimings.defaultDurationMilliseconds
+            ),
+            windows: FrontendWindowPreferences(
+                mainAlwaysOnTop: mainWindowAlwaysOnTop ?? false,
+                settingsAlwaysOnTop: settingsWindowAlwaysOnTop ?? false
+            ),
+            columnAutoSize: columnAutoSize ?? true
+        )
+    }
+
+    mutating func apply(frontendInterface preferences: FrontendInterfacePreferences) {
+        autoResizeAnimationEnabled = preferences.animations.autoResizeEnabled
+        selectionAnimationEnabled = preferences.animations.selectionEnabled
+        autoResizeAnimationMilliseconds = preferences.animations.autoResizeMilliseconds
+        selectionAnimationMilliseconds = preferences.animations.selectionMilliseconds
+        columnAutoSize = preferences.columnAutoSize
+        mainWindowAlwaysOnTop = preferences.windows.mainAlwaysOnTop
+        settingsWindowAlwaysOnTop = preferences.windows.settingsAlwaysOnTop
     }
 
     private mutating func normalizeSharedPlaybackPreferences() {

@@ -203,38 +203,14 @@ refs.sidebarTextColorInput.addEventListener("blur", (event) => {
   app.ui.setSidebarTextColor(event.target.value);
 });
 
-refs.sidebarMonospaceCheckbox.addEventListener("change", (event) => {
-  app.ui.setSidebarMonospace(event.target.checked);
-});
-
 refs.sidebarPathCountsCheckbox.addEventListener("change", (event) => {
   app.ui.setSidebarPathCounts(event.target.checked);
 });
-
-refs.playlistFontSizeInput.addEventListener("change", (event) => {
-  app.ui.commitPlaylistFontSizeInput(event.target.value);
-});
-
-refs.playlistFontSizeInput.addEventListener("input", (event) => {
-  app.ui.commitPlaylistFontSizeInput(event.target.value);
-});
-
-refs.playlistFontSizeInput.addEventListener("blur", (event) => {
-  app.ui.commitPlaylistFontSizeInput(event.target.value);
-});
-
-refs.playlistTextColorInput.addEventListener("change", (event) => {
-  app.ui.setPlaylistTextColor(event.target.value);
-});
-refs.playlistTextColorInput.addEventListener("blur", (event) => {
-  app.ui.setPlaylistTextColor(event.target.value);
-});
-
-refs.playlistMonospaceCheckbox.addEventListener("change", (event) => {
-  app.ui.setPlaylistMonospace(event.target.checked);
-});
 refs.applicationMonospaceCheckbox.addEventListener("change", (event) => {
   app.ui.setApplicationMonospace(event.target.checked);
+});
+refs.aacExportChooseButton.addEventListener("click", () => {
+  app.playback.chooseAACExportDirectory().catch((error) => console.error("[SPCBoy] AAC export folder failed", error));
 });
 refs.playlistHeaderBoldCheckbox.addEventListener("change", (event) => {
   app.ui.setPlaylistHeaderBold(event.target.checked);
@@ -247,8 +223,14 @@ refs.columnAutoSizeCheckbox.addEventListener("change", (event) => {
 refs.autoResizeAnimationInput.addEventListener("change", (event) => {
   app.ui.setAnimationTiming("autoResizeAnimationMilliseconds", event.target.value);
 });
+refs.autoResizeAnimationEnabledCheckbox.addEventListener("change", (event) => {
+  app.ui.setAnimationEnabled("autoResizeAnimationEnabled", event.target.checked);
+});
 refs.selectionAnimationInput.addEventListener("change", (event) => {
   app.ui.setAnimationTiming("selectionAnimationMilliseconds", event.target.value);
+});
+refs.selectionAnimationEnabledCheckbox.addEventListener("change", (event) => {
+  app.ui.setAnimationEnabled("selectionAnimationEnabled", event.target.checked);
 });
 refs.mainWindowAlwaysOnTopCheckbox.addEventListener("change", (event) => {
   app.ui.setWindowAlwaysOnTop("mainWindowAlwaysOnTop", event.target.checked);
@@ -287,15 +269,34 @@ if (window.spcBoyWK?.onFrontendSettingsChanged) {
     const wasEnabled = state.localBrowserEnabled;
     const previousRootPath = state.rootPath;
     const previousFavoriteSortOrder = state.favoriteSortOrder;
+    const previousTiming = {
+      manualPlayTimeSeconds: state.manualPlayTimeSeconds,
+      unknownDurationSeconds: state.unknownDurationSeconds,
+      longPlayEnabled: state.longPlayEnabled,
+      fadeEnabled: state.fadeEnabled,
+      spcFadeSeconds: state.spcFadeSeconds
+    };
+    if (settings.manualPlayTimeSeconds !== undefined) state.manualPlayTimeSeconds = app.normalizeLongPlayTime(settings.manualPlayTimeSeconds);
+    if (settings.unknownDurationSeconds !== undefined) state.unknownDurationSeconds = app.normalizePlayTime(settings.unknownDurationSeconds);
+    if (settings.longPlayEnabled !== undefined) state.longPlayEnabled = Boolean(settings.longPlayEnabled);
+    if (settings.fadeEnabled !== undefined) state.fadeEnabled = Boolean(settings.fadeEnabled);
+    if (settings.spcFadeSeconds !== undefined) state.spcFadeSeconds = app.normalizeFadeTime(settings.spcFadeSeconds);
+    const timingChanged = previousTiming.manualPlayTimeSeconds !== state.manualPlayTimeSeconds
+      || previousTiming.unknownDurationSeconds !== state.unknownDurationSeconds
+      || previousTiming.longPlayEnabled !== state.longPlayEnabled
+      || previousTiming.fadeEnabled !== state.fadeEnabled
+      || previousTiming.spcFadeSeconds !== state.spcFadeSeconds;
     state.rootPath = settings.rootPath || state.rootPath;
     state.localBrowserEnabled = Boolean(settings.localBrowserEnabled && state.rootPath);
     state.favoriteSortOrder = settings.favoriteSortOrder === "alphabetical" ? "alphabetical" : "historical";
     if (settings.autoResizeAnimationMilliseconds !== undefined) {
       state.autoResizeAnimationMilliseconds = app.normalizeAnimationMilliseconds(settings.autoResizeAnimationMilliseconds);
     }
+    if (settings.autoResizeAnimationEnabled !== undefined) state.autoResizeAnimationEnabled = settings.autoResizeAnimationEnabled !== false;
     if (settings.selectionAnimationMilliseconds !== undefined) {
       state.selectionAnimationMilliseconds = app.normalizeAnimationMilliseconds(settings.selectionAnimationMilliseconds);
     }
+    if (settings.selectionAnimationEnabled !== undefined) state.selectionAnimationEnabled = settings.selectionAnimationEnabled !== false;
     if (settings.mainWindowAlwaysOnTop !== undefined) state.mainWindowAlwaysOnTop = Boolean(settings.mainWindowAlwaysOnTop);
     if (settings.settingsWindowAlwaysOnTop !== undefined) state.settingsWindowAlwaysOnTop = Boolean(settings.settingsWindowAlwaysOnTop);
     if (!window.spcBoyWK.isOptionsWindow && state.localBrowserEnabled && (!wasEnabled || previousRootPath !== state.rootPath || state.sidebarMode !== "diskPath")) {
@@ -311,6 +312,9 @@ if (window.spcBoyWK?.onFrontendSettingsChanged) {
       app.ui.setSidebarMode("consoles").catch((error) => console.error(error));
     } else {
       app.ui.renderAll();
+    }
+    if (!window.spcBoyWK.isOptionsWindow && timingChanged) {
+      app.playback.refreshPlaybackForTimingChange().catch((error) => console.error("[SPCBoy] playback timing sync failed", error));
     }
     if (previousFavoriteSortOrder !== state.favoriteSortOrder) {
       app.ui.refreshFavorites().then(() => app.ui.renderAll()).catch(() => {});

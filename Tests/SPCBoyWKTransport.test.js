@@ -8,6 +8,10 @@ const playbackSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/app-playback.js"),
   "utf8"
 );
+const uiSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/app-ui.js"),
+  "utf8"
+);
 
 function element() {
   return {
@@ -124,6 +128,7 @@ function makeHarness() {
   };
   const gainCalls = [];
   const startRequests = [];
+  const reconfigureRequests = [];
   let timerID = 0;
   const window = {
     setTimeout(callback, duration) {
@@ -149,6 +154,10 @@ function makeHarness() {
       nativePlaybackStart: async (request) => {
         startRequests.push(request);
         return snapshot(7);
+      },
+      nativePlaybackReconfigure: async (request) => {
+        reconfigureRequests.push(request);
+        return snapshot(8);
       },
     nativePlaybackState: async () => snapshot(state.nativePlayback.generation || 7),
     nativePlaybackUnload: async () => snapshot(state.nativePlayback.generation, "stopped"),
@@ -184,7 +193,7 @@ function makeHarness() {
     queueMicrotask
   };
   vm.runInNewContext(playbackSource, context, { filename: "app-playback.js" });
-  return { app, gainCalls, startRequests, window };
+  return { app, gainCalls, startRequests, reconfigureRequests, window };
 }
 
 test("SPCBoyWK ignores stale native generations", () => {
@@ -236,6 +245,19 @@ test("SPCBoyWK uses the native CocoaSpice timing plan for Long Play", async () =
   assert.equal(startRequests[0].playMilliseconds, 180000);
 });
 
+test("SPCBoyWK reapplies Long Play to the loaded session", async () => {
+  const { app, reconfigureRequests } = makeHarness();
+  await app.playback.playTrack("track-a");
+  app.state.longPlayEnabled = true;
+
+  await app.playback.refreshPlaybackForTimingChange();
+
+  assert.equal(reconfigureRequests.length, 1);
+  assert.equal(reconfigureRequests[0].longPlayEnabled, true);
+  assert.equal(reconfigureRequests[0].manualPlayMilliseconds, 180000);
+  assert.equal(app.state.totalSeconds, 186);
+});
+
 test("SPCBoyWK drops a stale natural-end finalizer after replacement", async () => {
   const { app, window } = makeHarness();
   const { state } = app;
@@ -268,4 +290,41 @@ test("SPCBoyWK drops a stale natural-end finalizer after replacement", async () 
 
   assert.equal(state.currentTrackId, "track-b");
   assert.equal(state.isPlaying, true);
+});
+
+test("SPCBoyWK advances after the completed session is retired", async () => {
+  const { app, startRequests, window } = makeHarness();
+  const { state } = app;
+  state.playlist.push({
+    id: "track-b",
+    title: "Next Track",
+    path: "/tmp/next.flac",
+    sourceFilename: "next.flac",
+    basePlaybackSeconds: 4
+  });
+  state.currentTrackId = "track-a";
+  state.currentTrackInfo = state.playlist[0];
+  state.selectedTrackId = "track-a";
+  state.isPlaying = true;
+  state.nativePlayback = { ...state.nativePlayback, generation: 7, trackLoaded: true };
+  window.spcBoyWK.playbackQueueCompletionTarget = async () => "track-b";
+
+  await app.playback.finalizePlaybackEnded();
+
+  assert.equal(state.currentTrackId, "track-b");
+  assert.equal(state.currentTrackInfo.id, "track-b");
+  assert.equal(state.isPlaying, true);
+  assert.equal(startRequests.length, 1);
+  assert.equal(startRequests[0].path, "/tmp/next.flac");
+});
+
+test("SPCBoyWK Enter activates the focused playlist row without a selection fallback", () => {
+  assert.match(
+    uiSource,
+    /const track = selectPlaylistTrack\(playlistRow\.dataset\.trackId, \{ focus: true \}\);/
+  );
+  assert.doesNotMatch(
+    uiSource,
+    /selectedTrack\(\)\s*\|\|\s*selectPlaylistTrack\(playlistRow\.dataset\.trackId\)/
+  );
 });

@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         nativeBridge.onOpenOptionsWindow = { [weak self] in self?.showOptionsWindow() }
         nativeBridge.onChooseRootFolder = { [weak self] in self?.choosePath(allowFiles: false) }
         nativeBridge.onChoosePath = { [weak self] in self?.choosePath(allowFiles: true) }
+        nativeBridge.onChooseAACExportDirectory = { [weak self] in self?.chooseDirectory(title: "Choose AAC Export Folder") }
         nativeBridge.onAppearanceSettingsChanged = { [weak self] settings in
             self?.broadcastAppearanceSettings(settings)
         }
@@ -39,7 +40,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         )
         window.title = "SPCBoy"
         window.contentView = webView
-        window.center()
+        if !window.setFrameAutosaveName("SPCBoyWK.Main") {
+            window.center()
+        }
         window.makeKeyAndOrderFront(nil)
         self.window = window
         applyWindowLevels()
@@ -81,7 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                           });
                         }
                         break;
-                      case "sidebarFavorites": app.ui?.setSidebarMode?.("favorites"); break;
+                      case "favoritesPlaylist": app.ui?.showFavoritesPlaylist?.(); break;
                       case "settings": window.spcBoyWK?.openOptionsWindow?.(); break;
                       default: break;
                     }
@@ -109,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         bridge.onCloseOptionsWindow = { [weak self] in self?.closeOptionsWindow() }
         bridge.onChooseRootFolder = { [weak self] in self?.choosePath(allowFiles: false) }
         bridge.onChoosePath = { [weak self] in self?.choosePath(allowFiles: true) }
+        bridge.onChooseAACExportDirectory = { [weak self] in self?.chooseDirectory(title: "Choose AAC Export Folder") }
         bridge.onAppearanceSettingsChanged = { [weak self] settings in
             self?.broadcastAppearanceSettings(settings)
         }
@@ -125,7 +129,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         )
         optionsWindow.title = "SPCBoy Settings"
         optionsWindow.contentView = optionsWebView
-        optionsWindow.center()
+        if !optionsWindow.setFrameAutosaveName("SPCBoyWK.Options") {
+            optionsWindow.center()
+        }
         optionsWindow.isReleasedWhenClosed = false
         optionsWindow.delegate = self
         self.optionsWebView = optionsWebView
@@ -190,6 +196,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return panel.url?.standardizedFileURL.path
     }
 
+    private func chooseDirectory(title: String) -> String? {
+        let panel = NSOpenPanel()
+        panel.title = title
+        panel.prompt = "Choose Folder"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK else { return nil }
+        return panel.url?.standardizedFileURL.path
+    }
+
     private func installApplicationMenu() {
         let mainMenu = NSMenu()
 
@@ -215,7 +232,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let viewMenu = NSMenu(title: "View")
         viewMenu.addItem(menuItem(FrontendSidebarView.consoles.title, command: .sidebarConsoles, action: #selector(sidebarConsoles(_:))))
         viewMenu.addItem(menuItem(FrontendSidebarView.paths.title, command: .sidebarPaths, action: #selector(sidebarPaths(_:))))
-        viewMenu.addItem(menuItem(FrontendSidebarView.favorites.title, command: .sidebarFavorites, action: #selector(sidebarFavorites(_:))))
+        viewMenu.addItem(menuItem("Favorites Playlist", command: .favoritesPlaylist, action: #selector(favoritesPlaylist(_:))))
         viewMenu.addItem(.separator())
         viewMenu.addItem(menuItem("Local Files", command: .sidebarDiskPath, action: #selector(sidebarDiskPath(_:))))
         viewMenuItem.submenu = viewMenu
@@ -285,7 +302,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc private func sidebarPaths(_ sender: Any?) { dispatch(.sidebarPaths) }
     @objc private func sidebarConsoles(_ sender: Any?) { dispatch(.sidebarConsoles) }
     @objc private func sidebarDiskPath(_ sender: Any?) { dispatch(.sidebarDiskPath) }
-    @objc private func sidebarFavorites(_ sender: Any?) { dispatch(.sidebarFavorites) }
+    @objc private func favoritesPlaylist(_ sender: Any?) { dispatch(.favoritesPlaylist) }
     @objc private func settings(_ sender: Any?) {
         showOptionsWindow()
     }
@@ -295,8 +312,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         guard menuItem.action == #selector(sidebarConsoles(_:))
-                || menuItem.action == #selector(sidebarPaths(_:))
-                || menuItem.action == #selector(sidebarFavorites(_:)) else { return true }
+                || menuItem.action == #selector(sidebarPaths(_:)) else { return true }
         return !localBrowserEnabled
     }
 

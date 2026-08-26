@@ -51,13 +51,11 @@ function isFavoritePresentation(track) {
 async function refreshFavorites() {
   const favorites = await window.spcBoyWK.favoritesList(state.favoriteSortOrder);
   applyFavoriteSnapshot(favorites);
-  if (state.sidebarMode === "favorites") state.playlist = [...state.favorites];
   return state.favorites;
 }
 
 async function toggleFavorites(tracks) {
   applyFavoriteSnapshot(await window.spcBoyWK.favoritesToggle(tracks, state.favoriteSortOrder));
-  if (state.sidebarMode === "favorites") state.playlist = [...state.favorites];
 }
 let browserSelectionGeneration = 0;
 let playlistLoadGeneration = 0;
@@ -802,7 +800,6 @@ async function setAllDatabaseConsolesCollapsed(collapsed) {
 }
 
 async function setAllSidebarNodesCollapsed(collapsed) {
-  if (currentSidebarView().contentMode === "favorites") return;
   if (currentSidebarView().contentMode === "database") {
     void setAllDatabaseConsolesCollapsed(collapsed).catch((error) => reportDatabaseSidebarError("change database console disclosure", error));
     return;
@@ -862,7 +859,7 @@ async function loadDatabaseFiles() {
 }
 
 async function setSidebarMode(mode) {
-  if (!["paths", "consoles", "diskPath", "favorites"].includes(mode)) return;
+  if (!["paths", "consoles", "diskPath"].includes(mode)) return;
   if (state.localBrowserEnabled && mode !== "diskPath") return;
   playlistLoadGeneration += 1;
   state.sidebarMode = mode;
@@ -870,17 +867,23 @@ async function setSidebarMode(mode) {
   await syncSidebarView();
   refs.sidebarSearchInput.value = "";
   state.databaseSearchGames = null;
-  if (mode === "favorites") {
-    state.playlist = [...state.favorites];
-    state.selectedTrackId = state.playlist[0]?.id || null;
-    state.selectedTrackIds = state.selectedTrackId ? [state.selectedTrackId] : [];
-    state.lastSelectedTrackId = state.selectedTrackId;
-  }
   if (mode === "paths" && !state.databaseFiles.length) await loadDatabaseFiles();
   if (mode === "consoles" && !state.databaseGames.length) await loadDatabaseGames();
   persistSettings();
   renderAll();
   syncTreeSelection();
+}
+
+async function showFavoritesPlaylist() {
+  await refreshFavorites();
+  playlistLoadGeneration += 1;
+  state.playlist = [...state.favorites];
+  state.selectedTrackId = state.playlist[0]?.id || null;
+  state.selectedTrackIds = state.selectedTrackId ? [state.selectedTrackId] : [];
+  state.lastSelectedTrackId = state.selectedTrackId;
+  persistSettings();
+  renderPlaylist();
+  renderSidebar();
 }
 
 async function refreshDatabaseGamesForVisibleRoots() {
@@ -909,7 +912,6 @@ async function updateSidebarSearch(query) {
   state.databaseSearchGames = null;
   window.clearTimeout(sidebarSearchTimer);
   renderSidebar();
-  if (state.sidebarMode === "favorites") return;
   const requestedQuery = state.sidebarQuery.trim();
   if (!requestedQuery) return;
   if (window.spcBoyWK?.databaseSearchGames) {
@@ -930,7 +932,7 @@ async function updateSidebarSearch(query) {
   }
 }
 
-const SIDEBAR_VIEW_CYCLE = ["consoles", "paths", "favorites"];
+const SIDEBAR_VIEW_CYCLE = ["consoles", "paths"];
 
 async function cycleSidebarMode() {
   if (state.localBrowserEnabled) return;
@@ -1064,9 +1066,9 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
   const focused = focusTarget?.closest?.(".playlist-row, .tree-node, .database-game-row, .database-console-row") || document.activeElement;
   const playlistRow = focused?.closest?.(".playlist-row");
   if (playlistRow?.dataset.trackId) {
-    // The visual selection is the activation target. Focus can legitimately
-    // lag while arrow navigation advances the selected row.
-    const track = selectPlaylistTrack(playlistRow.dataset.trackId);
+    // Enter on a playlist row activates that row. Never substitute the
+    // previously selected or playing track when DOM focus has moved.
+    const track = selectPlaylistTrack(playlistRow.dataset.trackId, { focus: true });
     if (!track) return false;
     await uiApp.playback.playTrack(track.id, 0);
     return true;
@@ -1109,13 +1111,13 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
 
 function renderSidebar() {
   const view = currentSidebarView();
-  const labels = { paths: "Path View", consoles: "Console View", diskPath: "Local Files", favorites: "Favorites" };
+  const labels = { paths: "Path View", consoles: "Console View", diskPath: "Local Files" };
   if (refs.sidebarViewToggleButton) {
     const title = labels[view.storedMode] || labels.consoles;
     refs.sidebarViewToggleButton.title = title;
     refs.sidebarViewToggleButton.setAttribute("aria-label", title);
   }
-  if (state.databaseSidebarLoading && view.contentMode !== "favorites") {
+  if (state.databaseSidebarLoading) {
     const indicator = resetSidebarContent();
     const loading = document.createElement("div");
     loading.className = "empty sidebar-empty sidebar-loading";
@@ -1125,53 +1127,7 @@ function renderSidebar() {
     return;
   }
   if (view.contentMode === "database") renderDatabaseGames();
-  else if (view.contentMode === "favorites") renderFavorites();
   else renderTree();
-}
-
-function renderFavorites() {
-  const indicator = resetSidebarContent();
-  const query = state.sidebarQuery.trim().toLowerCase();
-  const favorites = state.favorites.filter((track) => {
-    if (!query) return true;
-    return `${track.filename || ""} ${track.title || ""} ${track.game || ""} ${track.path || ""}`.toLowerCase().includes(query);
-  });
-  if (!favorites.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty sidebar-empty";
-    empty.textContent = state.favorites.length ? "No favorites match this search." : "Select a track or album and press Command-D.";
-    refs.treeRoot.appendChild(empty);
-    positionSelectionIndicator(refs.treeRoot, indicator, null);
-    return;
-  }
-  for (const track of favorites) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "database-game-row favorite-track-row";
-    button.dataset.favoriteId = track.favoriteId || "";
-    button.innerHTML = `<span class="database-disclosure">★</span><span class="database-game-name">${escapeHtml(track.sidebarLabel || track.title || track.filename || "Favorite")}</span>`;
-    button.addEventListener("click", () => {
-      state.selectedTrackId = track.id;
-      state.lastSelectedTrackId = track.id;
-      persistSettings();
-      state.playlist = [...state.favorites];
-      renderPlaylist();
-      button.focus();
-      scheduleSelectionIndicators();
-    });
-    button.addEventListener("dblclick", () => uiApp.playback.playTrack(track.id, 0).catch((error) => console.error(error)));
-    button.addEventListener("contextmenu", (event) => {
-      event.preventDefault();
-      showContextMenu(event, [["Remove from Favorites", async () => {
-        await toggleFavorites([track]);
-        state.playlist = [...state.favorites];
-        renderSidebar();
-        renderPlaylist();
-      }]]);
-    });
-    refs.treeRoot.appendChild(button);
-  }
-  syncTreeSelection();
 }
 
 function syncAnimatedRanges() {
@@ -1525,7 +1481,6 @@ function renderPlaylistCell(track, column, rowIndex) {
       event.preventDefault();
       event.stopPropagation();
       await toggleFavorites([track]);
-      if (state.sidebarMode === "favorites") state.playlist = [...state.favorites];
       renderSidebar();
       renderPlaylist();
     });
@@ -1670,6 +1625,12 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
         });
       });
 
+      row.addEventListener("contextmenu", (event) => {
+        showContextMenu(event, [["Export AAC", async () => {
+          await uiApp.playback.exportTrackAsAAC(track);
+        }]]);
+      });
+
       row.addEventListener("keydown", (event) => {
         if (event.key !== "Enter") return;
         event.preventDefault();
@@ -1794,8 +1755,8 @@ function applyUISettings() {
   rootStyle.setProperty("--sidebar-width-percent", String(state.sidebarWidthPercent));
   rootStyle.setProperty("--accent", state.accentColor);
   rootStyle.setProperty("--item-spacing-rem", String(state.uiItemSpacingRem));
-  rootStyle.setProperty("--column-resize-duration", `${state.autoResizeAnimationMilliseconds}ms`);
-  rootStyle.setProperty("--selection-animation-duration", `${state.selectionAnimationMilliseconds}ms`);
+  rootStyle.setProperty("--column-resize-duration", `${state.autoResizeAnimationEnabled ? state.autoResizeAnimationMilliseconds : 0}ms`);
+  rootStyle.setProperty("--selection-animation-duration", `${state.selectionAnimationEnabled ? state.selectionAnimationMilliseconds : 0}ms`);
 }
 
 function appearanceSettings() {
@@ -1889,20 +1850,22 @@ function renderAll() {
   refs.optionsPlaybackSection.classList.toggle("is-hidden", !playbackSelected);
   refs.optionsDiagnosticsSection.classList.toggle("is-hidden", !diagnosticsSelected);
   renderRoutingConflicts();
-  refs.sidebarFontSizeInput.value = String(state.sidebarFontSizePt);
-  refs.sidebarTextColorInput.value = state.sidebarTextColor;
-  refs.sidebarMonospaceCheckbox.checked = state.sidebarMonospace;
+  if (document.activeElement !== refs.sidebarFontSizeInput) refs.sidebarFontSizeInput.value = String(state.uiFontSizePt);
+  if (document.activeElement !== refs.sidebarTextColorInput) refs.sidebarTextColorInput.value = state.sidebarTextColor;
   refs.sidebarPathCountsCheckbox.checked = state.sidebarPathCounts;
-  refs.playlistFontSizeInput.value = String(state.playlistFontSizePt);
-  refs.playlistTextColorInput.value = state.playlistTextColor;
   if (document.activeElement !== refs.accentColorInput) refs.accentColorInput.value = state.accentColor;
-  refs.playlistMonospaceCheckbox.checked = state.playlistMonospace;
   refs.applicationMonospaceCheckbox.checked = state.applicationMonospace;
+  if (refs.aacExportDirectoryPath) refs.aacExportDirectoryPath.value = state.aacExportDirectory || "";
+  if (refs.aacExportStatus) refs.aacExportStatus.textContent = state.aacExportStatus || "";
   refs.playlistHeaderBoldCheckbox.checked = state.playlistHeaderBold;
   if (document.activeElement !== refs.spcUnknownDurationInput) refs.spcUnknownDurationInput.value = uiApp.formatTime(state.unknownDurationSeconds);
   refs.columnAutoSizeCheckbox.checked = state.columnAutoSize;
+  refs.autoResizeAnimationEnabledCheckbox.checked = state.autoResizeAnimationEnabled;
   refs.autoResizeAnimationInput.value = String(state.autoResizeAnimationMilliseconds);
+  refs.autoResizeAnimationInput.disabled = !state.autoResizeAnimationEnabled;
+  refs.selectionAnimationEnabledCheckbox.checked = state.selectionAnimationEnabled;
   refs.selectionAnimationInput.value = String(state.selectionAnimationMilliseconds);
+  refs.selectionAnimationInput.disabled = !state.selectionAnimationEnabled;
   refs.mainWindowAlwaysOnTopCheckbox.checked = state.mainWindowAlwaysOnTop;
   refs.settingsWindowAlwaysOnTopCheckbox.checked = state.settingsWindowAlwaysOnTop;
   refs.archiveCacheEnabledCheckbox.checked = state.archiveCacheEnabled;
@@ -2006,7 +1969,9 @@ function selectAllPlaylistTracks() {
 }
 
 function playSelectedTrack() {
-  const active = uiApp.selectedTrack() ?? uiApp.currentTrack();
+  // Never fall back to the current/last-playing track. Enter is a selection
+  // command; a missing selection is a no-op rather than an accidental replay.
+  const active = uiApp.selectedTrack();
   if (!active) {
     return;
   }
@@ -2019,6 +1984,7 @@ function playSelectedTrack() {
 function setPlayTime(nextSeconds) {
   state.manualPlayTimeSeconds = uiApp.normalizeLongPlayTime(nextSeconds);
   persistSettings();
+  renderAll();
   uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
     console.error(error);
   });
@@ -2027,6 +1993,7 @@ function setPlayTime(nextSeconds) {
 function setSpcForceManualTime(nextEnabled) {
   state.longPlayEnabled = Boolean(nextEnabled);
   persistSettings();
+  renderAll();
   uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
     console.error(error);
   });
@@ -2042,6 +2009,7 @@ function cycleRepeatMode() {
 function setSpcFadeTime(nextSeconds) {
   state.spcFadeSeconds = uiApp.normalizeFadeTime(nextSeconds);
   persistSettings();
+  renderAll();
   uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
     console.error(error);
   });
@@ -2050,6 +2018,7 @@ function setSpcFadeTime(nextSeconds) {
 function setSpcFadeEnabled(nextEnabled) {
   state.fadeEnabled = Boolean(nextEnabled);
   persistSettings();
+  renderAll();
   uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
     console.error(error);
   });
@@ -2207,8 +2176,12 @@ function setUiItemSpacing(nextSpacingRem) {
 }
 
 function setFontSize(nextSize) {
-  state.uiFontSizePt = uiApp.normalizeFontSize(nextSize);
+  const size = uiApp.normalizeFontSize(nextSize);
+  state.uiFontSizePt = size;
+  state.sidebarFontSizePt = size;
+  state.playlistFontSizePt = size;
   persistSettings();
+  broadcastAppearanceSettings();
   renderAll();
 }
 
@@ -2221,21 +2194,18 @@ function setSidebarWidth(nextWidth) {
 
 function commitFontSizeInput(rawValue) {
   const parsedValue = uiApp.parseNumericInput(rawValue);
-  state.uiFontSizePt = uiApp.normalizeFontSize(parsedValue ?? state.uiFontSizePt);
-  persistSettings();
-  renderAll();
+  setFontSize(parsedValue ?? state.uiFontSizePt);
 }
 
 function commitSidebarFontSizeInput(rawValue) {
   const parsedValue = uiApp.parseNumericInput(rawValue);
-  state.sidebarFontSizePt = uiApp.normalizeFontSize(parsedValue ?? state.sidebarFontSizePt);
-  persistSettings();
-  broadcastAppearanceSettings();
-  renderAll();
+  setFontSize(parsedValue ?? state.uiFontSizePt);
 }
 
 function setSidebarTextColor(color) {
-  state.sidebarTextColor = uiApp.normalizeFontColor(color);
+  const normalized = uiApp.normalizeFontColor(color);
+  state.sidebarTextColor = normalized;
+  state.playlistTextColor = normalized;
   persistSettings();
   broadcastAppearanceSettings();
   renderAll();
@@ -2279,7 +2249,10 @@ function setPlaylistMonospace(enabled) {
 }
 
 function setApplicationMonospace(enabled) {
-  state.applicationMonospace = Boolean(enabled);
+  const value = Boolean(enabled);
+  state.applicationMonospace = value;
+  state.sidebarMonospace = value;
+  state.playlistMonospace = value;
   persistSettings();
   broadcastAppearanceSettings();
   renderAll();
@@ -2304,6 +2277,12 @@ function setAnimationTiming(key, value) {
   renderAll();
 }
 
+function setAnimationEnabled(key, enabled) {
+  state[key] = Boolean(enabled);
+  persistSettings();
+  renderAll();
+}
+
 function setWindowAlwaysOnTop(key, enabled) {
   window.SPCBoyOptionsController.setWindowLevel(state, key, enabled);
   persistSettings();
@@ -2313,14 +2292,27 @@ function setWindowAlwaysOnTop(key, enabled) {
 function applyAppearanceSettings(settings) {
   if (settings.uiItemSpacingRem !== undefined) state.uiItemSpacingRem = uiApp.normalizeItemSpacing(settings.uiItemSpacingRem);
   if (settings.sidebarWidthPercent !== undefined) state.sidebarWidthPercent = uiApp.normalizeSidebarWidth(settings.sidebarWidthPercent);
-  if (settings.sidebarFontSizePt !== undefined) state.sidebarFontSizePt = uiApp.normalizeFontSize(settings.sidebarFontSizePt);
-  if (settings.sidebarTextColor !== undefined) state.sidebarTextColor = uiApp.normalizeFontColor(settings.sidebarTextColor);
-  if (settings.sidebarMonospace !== undefined) state.sidebarMonospace = Boolean(settings.sidebarMonospace);
+  const interfaceFontSize = settings.uiFontSizePt ?? settings.sidebarFontSizePt ?? settings.playlistFontSizePt;
+  if (interfaceFontSize !== undefined) {
+    const size = uiApp.normalizeFontSize(interfaceFontSize);
+    state.uiFontSizePt = size;
+    state.sidebarFontSizePt = size;
+    state.playlistFontSizePt = size;
+  }
+  const interfaceFontColor = settings.sidebarTextColor ?? settings.playlistTextColor;
+  if (interfaceFontColor !== undefined) {
+    const color = uiApp.normalizeFontColor(interfaceFontColor);
+    state.sidebarTextColor = color;
+    state.playlistTextColor = color;
+  }
+  const interfaceMonospace = settings.applicationMonospace ?? settings.sidebarMonospace ?? settings.playlistMonospace;
+  if (interfaceMonospace !== undefined) {
+    const enabled = Boolean(interfaceMonospace);
+    state.applicationMonospace = enabled;
+    state.sidebarMonospace = enabled;
+    state.playlistMonospace = enabled;
+  }
   if (settings.sidebarPathCounts !== undefined) state.sidebarPathCounts = Boolean(settings.sidebarPathCounts);
-  if (settings.playlistFontSizePt !== undefined) state.playlistFontSizePt = uiApp.normalizeFontSize(settings.playlistFontSizePt);
-  if (settings.playlistTextColor !== undefined) state.playlistTextColor = uiApp.normalizeFontColor(settings.playlistTextColor);
-  if (settings.playlistMonospace !== undefined) state.playlistMonospace = Boolean(settings.playlistMonospace);
-  if (settings.applicationMonospace !== undefined) state.applicationMonospace = Boolean(settings.applicationMonospace);
   if (settings.playlistHeaderBold !== undefined) state.playlistHeaderBold = Boolean(settings.playlistHeaderBold);
   if (settings.accentColor !== undefined) state.accentColor = uiApp.normalizeAccentColor(settings.accentColor);
   persistSettings();
@@ -2425,11 +2417,7 @@ async function bootstrap() {
     await uiApp.ui.handleLibraryRootsChanged(state.libraryRoots);
   }
   renderAll();
-  if (state.sidebarMode === "favorites") {
-    state.playlist = [...state.favorites];
-    state.selectedTrackId = resolveSelectedTrackId(state.playlist);
-    state.lastSelectedTrackId = state.selectedTrackId;
-  } else if (state.sidebarMode === "consoles") {
+  if (state.sidebarMode === "consoles") {
     const selectedGame = state.databaseGames.find((game) => databaseGameKey(game) === state.selectedDatabaseGameKey);
     if (selectedGame) {
       await loadDatabaseGame(selectedGame);
@@ -2534,6 +2522,7 @@ uiApp.ui = {
   setPlaylistHeaderBold,
   setColumnAutoSize,
   setAnimationTiming,
+  setAnimationEnabled,
   setWindowAlwaysOnTop,
   applyAppearanceSettings,
   applyRoutingPreferences,
@@ -2550,6 +2539,7 @@ uiApp.ui = {
   loadDatabaseGame,
   toggleSelectedFavorites,
   refreshFavorites,
+  showFavoritesPlaylist,
   activateDatabaseSelection,
   activateFocusedItem,
   renderSidebar,
