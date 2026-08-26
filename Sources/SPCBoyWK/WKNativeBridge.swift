@@ -117,6 +117,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             databaseRoots: (...args) => request("databaseRoots", args),
             databaseGames: (...args) => request("databaseGames", args),
             databaseFiles: (...args) => request("databaseFiles", args),
+            databaseFileTree: (...args) => request("databaseFileTree", args),
             databaseSearchGames: (...args) => request("databaseSearchGames", args),
             databaseGameTracks: (...args) => request("databaseGameTracks", args),
             databaseGroupState: (...args) => request("databaseGroupState", args),
@@ -308,6 +309,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return try games(catalogURL: catalogURL)
         case "databaseFiles":
             return try files(catalogURL: catalogURL)
+        case "databaseFileTree":
+            return try fileTree(catalogURL: catalogURL)
         case "databaseSearchGames":
             let query = (args.first as? String) ?? ""
             return try searchGames(query, catalogURL: catalogURL)
@@ -539,6 +542,63 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 "isArchive": $0.isArchive,
                 "trackCount": $0.trackCount
             ]
+        }
+    }
+
+    nonisolated private static func fileTree(catalogURL: URL) throws -> [[String: Any]] {
+        let index = CatalogFileTreeIndex(files: try openCatalog(catalogURL).fileBuckets())
+
+        func responseNode(_ node: CatalogFileTreeNode, isRoot: Bool = false) -> [String: Any] {
+            switch node.kind {
+            case .folder:
+                let folder = node.folder
+                let browserPath: String
+                if let folder {
+                    browserPath = isRoot
+                        ? "catalog-root:\(folder.rootID)\u{0000}\(folder.rootPath)"
+                        : "catalog-folder:\(folder.rootID):\(folder.folderPath)"
+                } else {
+                    browserPath = "catalog-folder:\(node.id)"
+                }
+                var response: [String: Any] = [
+                    "kind": "folder",
+                    "path": browserPath,
+                    "name": node.title,
+                    "alwaysExpanded": isRoot,
+                    "childrenLoaded": true,
+                    "children": node.children.map { responseNode($0) }
+                ]
+                if let folder {
+                    response["catalogFolder"] = [
+                        "rootId": folder.rootID,
+                        "rootPath": folder.rootPath,
+                        "folderPath": folder.folderPath
+                    ]
+                }
+                return response
+            case .file:
+                guard let file = node.file else { return [:] }
+                return [
+                    "kind": "file",
+                    "path": "catalog-file:\(file.rootID):\(file.path)",
+                    "name": URL(fileURLWithPath: file.path).lastPathComponent,
+                    "childrenLoaded": true,
+                    "children": [],
+                    "catalogFile": [
+                        "rootId": file.rootID,
+                        "rootPath": file.rootPath,
+                        "rootName": URL(fileURLWithPath: file.rootPath).lastPathComponent,
+                        "folderPath": file.folderPath,
+                        "path": file.path,
+                        "isArchive": file.isArchive,
+                        "trackCount": file.trackCount
+                    ]
+                ]
+            }
+        }
+
+        return index.nodes().map { node in
+            responseNode(node, isRoot: true)
         }
     }
 

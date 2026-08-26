@@ -87,6 +87,13 @@ provides the matching policy through `CatalogBrowserProjection.search`, and
 WebKit waits for that indexed read instead of maintaining a second immediate
 JavaScript filter with potentially different semantics.
 
+Database Files are native-owned in the same way:
+`CatalogBrowserCore.CatalogFileTreeIndex.nodes()` supplies the complete nested
+folder/file projection through `databaseFileTree`. JavaScript maps those
+records into its existing DOM node shape and owns only renderer-local browser
+paths, disclosure, focus, scroll, and context-menu behavior. The former
+`buildCatalogFileTree` graph constructor must not return.
+
 All typed VGMBoy commands sent through `WKPlaybackBridge` are serialized by
 the shared `FrontendCore.PlaybackRequestCore.PlaybackSerialExecutor`. The
 remaining JavaScript queue/status layer owns only WebKit interaction ordering

@@ -520,62 +520,6 @@ function filteredTree() {
 
 const sidebarNaturalCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 
-function buildCatalogFileTree(files) {
-  const roots = new Map();
-  const nodeFor = (parent, key, makeNode) => {
-    let child = parent.childrenByKey.get(key);
-    if (!child) {
-      child = makeNode();
-      parent.childrenByKey.set(key, child);
-      parent.children.push(child);
-    }
-    return child;
-  };
-
-  for (const file of files) {
-    const rootKey = `${file.rootId}\u0000${file.rootPath}`;
-    let root = roots.get(rootKey);
-    if (!root) {
-      root = {
-        kind: "folder", path: `catalog-root:${rootKey}`, name: file.rootName || file.rootPath,
-        alwaysExpanded: true, childrenLoaded: true, children: [], childrenByKey: new Map(),
-        catalogFolder: { rootId: file.rootId, folderPath: file.rootPath }
-      };
-      roots.set(rootKey, root);
-    }
-    const relativeFolder = String(file.folderPath || "").startsWith(file.rootPath)
-      ? String(file.folderPath).slice(file.rootPath.length).replace(/^\/+/, "")
-      : "";
-    let parent = root;
-    let absoluteFolder = file.rootPath;
-    for (const segment of relativeFolder.split("/").filter(Boolean)) {
-      absoluteFolder = `${absoluteFolder.replace(/\/$/, "")}/${segment}`;
-      const parentPath = absoluteFolder;
-      parent = nodeFor(parent, `folder:${parentPath}`, () => ({
-        kind: "folder", path: `catalog-folder:${file.rootId}:${parentPath}`, name: segment,
-        childrenLoaded: true, children: [], childrenByKey: new Map(),
-        catalogFolder: { rootId: file.rootId, folderPath: parentPath }
-      }));
-    }
-    const filename = String(file.path || "").split("/").pop() || file.path;
-    nodeFor(parent, `file:${file.path}`, () => ({
-      kind: "file", path: `catalog-file:${file.rootId}:${file.path}`, name: filename,
-      childrenLoaded: true, children: [], catalogFile: file
-    }));
-  }
-
-  const sortNode = (node) => {
-    node.children.sort((left, right) => (left.kind === right.kind ? 0 : left.kind === "folder" ? -1 : 1)
-      || sidebarNaturalCollator.compare(left.name, right.name));
-    node.children.forEach(sortNode);
-    delete node.childrenByKey;
-  };
-  const tree = [...roots.values()];
-  tree.sort((left, right) => sidebarNaturalCollator.compare(left.name, right.name));
-  tree.forEach(sortNode);
-  return tree;
-}
-
 function renderTree() {
   renderedDatabaseGames = null;
   databaseGameButtons = [];
@@ -903,8 +847,10 @@ async function loadDatabaseFiles() {
   state.databaseSidebarError = "";
   renderAll();
   try {
-    state.databaseFiles = await window.spcBoyWK.databaseFiles();
-    state.databaseFileTree = buildCatalogFileTree(state.databaseFiles);
+    state.databaseFileTree = await window.spcBoyWK.databaseFileTree();
+    // The tree is the complete database projection. This array is retained
+    // only as the loaded sentinel for the existing mode-switch lifecycle.
+    state.databaseFiles = state.databaseFileTree;
     state.databaseSidebarError = "";
   } catch (error) {
     reportDatabaseSidebarError("read the catalog paths", error);
