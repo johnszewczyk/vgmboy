@@ -18,6 +18,7 @@ public struct PlaybackTransportTrack: Equatable, Sendable {
 
 public struct PlaybackTransportStatus: Equatable, Sendable {
     public let currentTrackID: String?
+    public let generation: Int
     public let isPlaying: Bool
     public let elapsedSeconds: TimeInterval
     public let reachedEnd: Bool
@@ -25,12 +26,14 @@ public struct PlaybackTransportStatus: Equatable, Sendable {
 
     public init(
         currentTrackID: String?,
+        generation: Int = 0,
         isPlaying: Bool,
         elapsedSeconds: TimeInterval,
         reachedEnd: Bool,
         trackLoaded: Bool
     ) {
         self.currentTrackID = currentTrackID
+        self.generation = generation
         self.isPlaying = isPlaying
         self.elapsedSeconds = elapsedSeconds
         self.reachedEnd = reachedEnd
@@ -420,6 +423,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     private func status(_ status: VGMBoyKit.PlaybackStatus?) -> PlaybackTransportStatus {
         PlaybackTransportStatus(
             currentTrackID: currentTrack?.id,
+            generation: status?.diagnostics.generation ?? 0,
             isPlaying: status?.isPlaying ?? false,
             elapsedSeconds: status?.elapsedSeconds ?? 0,
             reachedEnd: status?.reachedEnd ?? false,
