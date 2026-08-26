@@ -47,3 +47,20 @@ func preservesProtectedAndActiveRootsDuringPrune() throws {
     #expect(FileManager.default.fileExists(atPath: active.path))
     #expect(!FileManager.default.fileExists(atPath: old.path))
 }
+
+@Test
+func reclaimsHiddenInterruptedDurableStaging() throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ArchiveCacheCoreTests-\(UUID().uuidString)", isDirectory: true)
+    let lifecycle = ArchiveCacheLifecycle(cacheRootURL: root)
+    let staging = lifecycle.durableRootURL.appendingPathComponent(".set-interrupted", isDirectory: true)
+    try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+    try Data(repeating: 1, count: 3).write(to: staging.appendingPathComponent("partial"))
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let recovery = lifecycle.reclaimAbandonedMaterialization()
+
+    #expect(recovery.rootCount == 1)
+    #expect(recovery.byteCount == 3)
+    #expect(!FileManager.default.fileExists(atPath: staging.path))
+}

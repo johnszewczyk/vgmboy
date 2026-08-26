@@ -1,10 +1,13 @@
 import Foundation
+import VGMBoyFormatCore
 
-/// A frontend-owned temporary materializer for a catalog-selected archive entry.
+/// A shared native materializer for a catalog-selected archive entry.
 ///
 /// CatalogReader remains responsible for archive identity and membership. The
-/// decoder core receives a normal playable file, while this type owns only the
-/// short-lived extracted file and removes the previous one before replacement.
+/// decoder core receives a normal playable file, while this type owns the
+/// dependency-complete temporary directory and removes the previous one
+/// before replacement. The format requirement comes from VGMBoyFormatCore;
+/// frontends do not interpret decoder dependencies.
 public final class ArchiveMaterializer: @unchecked Sendable {
     public static let shared = ArchiveMaterializer()
 
@@ -12,13 +15,16 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         "psf", "minipsf", "psflib", "psf2", "minipsf2", "psf2lib"
     ]
 
-    private let lock = NSLock()
     private let configuration: ArchiveMaterializerConfiguration
     private let processRunner: ArchiveProcessRunner
-    private var activeDirectory: URL?
+    private let session: ArchiveMaterializationSession
 
-    public init(configuration: ArchiveMaterializerConfiguration = .default) {
+    public init(
+        configuration: ArchiveMaterializerConfiguration = .default,
+        session: ArchiveMaterializationSession = ArchiveMaterializationSession()
+    ) {
         self.configuration = configuration
+        self.session = session
         self.processRunner = ArchiveProcessRunner(configuration: .init(
             environment: ProcessInfo.processInfo.environment,
             temporaryFilePrefix: "FrontendCore-materializer",
@@ -30,7 +36,11 @@ public final class ArchiveMaterializer: @unchecked Sendable {
     }
 
     @discardableResult
-    public func materialize(archivePath: String, entry: String) throws -> URL {
+    public func materialize(
+        archivePath: String,
+        entry: String,
+        requirement: VGMArchiveMaterializationRequirement
+    ) throws -> URL {
         let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
         guard FileManager.default.fileExists(atPath: archiveURL.path) else {
             throw ArchiveMaterializationError.missingSource(archiveURL.path)
@@ -52,12 +62,23 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         let output = directory.appendingPathComponent(normalizedEntry)
 
         do {
-            try extractArchiveEntry(archiveURL: archiveURL, entry: normalizedEntry, output: output)
-            try materializeDependencies(
-                archiveURL: archiveURL,
-                selectedEntry: normalizedEntry,
-                directory: directory
-            )
+            switch requirement {
+            case .selectedEntry:
+                try extractArchiveEntry(archiveURL: archiveURL, entry: normalizedEntry, output: output)
+                try materializeDependencies(
+                    archiveURL: archiveURL,
+                    selectedEntry: normalizedEntry,
+                    directory: directory
+                )
+            case .completeSet, .completeSetWithLazyUSFAliases:
+                try extractCompleteSet(archiveURL: archiveURL, destination: directory)
+                if requirement == .completeSetWithLazyUSFAliases {
+                    try ArchiveDependencyPreparation.prepareLazyUSFAliases(in: directory)
+                }
+                if URL(fileURLWithPath: normalizedEntry).pathExtension.lowercased() == "txtp" {
+                    try ArchiveDependencyPreparation.prepareTXTPDependencies(in: directory)
+                }
+            }
             let attributes = try FileManager.default.attributesOfItem(atPath: output.path)
             let byteCount = (attributes[.size] as? NSNumber)?.int64Value ?? 0
             guard byteCount > 0 else { throw ArchiveMaterializationError.emptyOutput }
@@ -66,19 +87,24 @@ public final class ArchiveMaterializer: @unchecked Sendable {
             throw error
         }
 
-        lock.lock()
-        activeDirectory = directory
-        lock.unlock()
+        session.replace(with: directory)
         return output
     }
 
     /// Removes the currently materialized entry, if any.
     public func release() {
-        lock.lock()
-        let directory = activeDirectory
-        activeDirectory = nil
-        lock.unlock()
-        if let directory { try? FileManager.default.removeItem(at: directory) }
+        session.clear()
+    }
+
+    /// Executes a shared archive-tool invocation without changing the
+    /// materializer's temporary playback session. Cache-backed frontends use
+    /// this as their extraction adapter so process topology and TZST handling
+    /// remain identical to the reference materializer.
+    public func execute(
+        _ invocation: ArchiveToolInvocation,
+        outputURL: URL? = nil
+    ) throws {
+        try runArchiveTool(invocation, outputURL: outputURL)
     }
 
     private func extractArchiveEntry(archiveURL: URL, entry: String, output: URL) throws {
@@ -114,6 +140,20 @@ public final class ArchiveMaterializer: @unchecked Sendable {
                 outputURL: output
             )
         }
+    }
+
+    private func extractCompleteSet(archiveURL: URL, destination: URL) throws {
+        guard let kind = ArchiveContainerKind(archiveURL: archiveURL) else {
+            throw ArchiveMaterializationError.toolUnavailable("supported archive format")
+        }
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        try runArchiveTool(
+            ArchiveToolRouting.completeSet(
+                kind: kind,
+                archiveURL: archiveURL,
+                destinationURL: destination
+            )
+        )
     }
 
     private func materializeDependencies(archiveURL: URL, selectedEntry: String, directory: URL) throws {
@@ -171,17 +211,46 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         _ invocation: ArchiveToolInvocation,
         outputURL: URL
     ) throws {
+        try runArchiveTool(invocation, outputURL: outputURL)
+    }
+
+    private func runArchiveTool(
+        _ invocation: ArchiveToolInvocation,
+        outputURL: URL? = nil
+    ) throws {
         do {
             switch invocation {
             case let .process(executableName, arguments):
-                try processRunner.runWritingOutput(
-                    executable: try configuration.executableURL(named: executableName).path,
-                    arguments: arguments,
+                let executable = try configuration.executableURL(named: executableName).path
+                if let outputURL {
+                    try processRunner.runWritingOutput(
+                        executable: executable,
+                        arguments: arguments,
+                        outputURL: outputURL,
+                        operation: .extraction
+                    )
+                } else {
+                    _ = try processRunner.run(
+                        executable: executable,
+                        arguments: arguments,
+                        operation: .extraction
+                    )
+                }
+            case let .zstandardTar(
+                zstdExecutableName,
+                zstdArguments,
+                tarExecutableName,
+                tarArguments,
+                allowEarlyConsumerExit
+            ):
+                try runZstandardTarPipeline(
+                    zstdExecutable: try configuration.executableURL(named: zstdExecutableName).path,
+                    zstdArguments: zstdArguments,
+                    tarExecutable: try configuration.executableURL(named: tarExecutableName).path,
+                    tarArguments: tarArguments,
                     outputURL: outputURL,
-                    operation: .extraction
+                    allowEarlyConsumerExit: allowEarlyConsumerExit
                 )
-            case .zstandardTar:
-                throw ArchiveMaterializationError.invalidEntry
             }
         } catch let error as ArchiveMaterializationError {
             throw error
@@ -191,33 +260,146 @@ public final class ArchiveMaterializer: @unchecked Sendable {
     }
 
     private func extractTarZstd(archiveURL: URL, entry: String, output: URL) throws {
+        try runZstandardTarPipeline(
+            zstdExecutable: try configuration.zstdURL().path,
+            zstdArguments: ["-d", "-q", "-c", archiveURL.path],
+            tarExecutable: try configuration.bsdtarURL().path,
+            tarArguments: ["-xOf", "-", entry],
+            outputURL: output,
+            allowEarlyConsumerExit: true
+        )
+    }
+
+    private func runZstandardTarPipeline(
+        zstdExecutable: String,
+        zstdArguments: [String],
+        tarExecutable: String,
+        tarArguments: [String],
+        outputURL: URL?,
+        allowEarlyConsumerExit: Bool
+    ) throws {
+        do {
+            try processRunner.acquirePermit()
+        } catch {
+            throw ArchiveMaterializationError.extractFailed(Self.errorText(from: error))
+        }
+        defer { processRunner.releasePermit() }
+
+        let environment = ProcessInfo.processInfo.environment
         let transport = Pipe()
-        let decompressor = Process()
-        decompressor.executableURL = try configuration.zstdURL()
-        decompressor.arguments = ["-d", "-q", "-c", archiveURL.path]
-        decompressor.standardOutput = transport
-        let decompressorError = Pipe()
-        decompressor.standardError = decompressorError
+        let zstd = Process()
+        zstd.executableURL = URL(fileURLWithPath: zstdExecutable)
+        zstd.arguments = zstdArguments
+        zstd.environment = environment
+        zstd.standardOutput = transport
 
         let tar = Process()
-        tar.executableURL = try configuration.bsdtarURL()
-        tar.arguments = ["-xOf", "-", entry]
+        tar.executableURL = URL(fileURLWithPath: tarExecutable)
+        tar.arguments = tarArguments
+        tar.environment = environment
         tar.standardInput = transport
-        FileManager.default.createFile(atPath: output.path, contents: nil)
-        let outputHandle = try FileHandle(forWritingTo: output)
-        defer { try? outputHandle.close() }
-        tar.standardOutput = outputHandle
+
+        var outputHandle: FileHandle?
+        if let outputURL {
+            FileManager.default.createFile(atPath: outputURL.path, contents: nil)
+            let handle = try FileHandle(forWritingTo: outputURL)
+            tar.standardOutput = handle
+            outputHandle = handle
+        } else {
+            tar.standardOutput = FileHandle.nullDevice
+        }
+        defer { try? outputHandle?.close() }
+
+        let zstdError = Pipe()
         let tarError = Pipe()
+        zstd.standardError = zstdError
         tar.standardError = tarError
 
-        try tar.run()
-        try decompressor.run()
-        decompressor.waitUntilExit()
-        tar.waitUntilExit()
-        guard decompressor.terminationStatus == 0, tar.terminationStatus == 0 else {
-            let detail = Self.errorText(from: decompressorError) + Self.errorText(from: tarError)
-            throw ArchiveMaterializationError.extractFailed(detail)
+        let zstdCompletion = DispatchSemaphore(value: 0)
+        let tarCompletion = DispatchSemaphore(value: 0)
+        zstd.terminationHandler = { _ in zstdCompletion.signal() }
+        tar.terminationHandler = { _ in tarCompletion.signal() }
+        defer {
+            zstd.terminationHandler = nil
+            tar.terminationHandler = nil
         }
+
+        let zstdCollector = ArchiveProcessOutputCollector()
+        let tarCollector = ArchiveProcessOutputCollector()
+        let readers = DispatchGroup()
+        for (handle, collector) in [
+            (zstdError.fileHandleForReading, zstdCollector),
+            (tarError.fileHandleForReading, tarCollector)
+        ] {
+            readers.enter()
+            DispatchQueue.global(qos: .utility).async {
+                collector.set(handle.readDataToEndOfFile())
+                try? handle.close()
+                readers.leave()
+            }
+        }
+
+        do {
+            try tar.run()
+            try zstd.run()
+            try transport.fileHandleForWriting.close()
+            try zstdError.fileHandleForWriting.close()
+            try tarError.fileHandleForWriting.close()
+            try processRunner.waitForProcess(
+                zstd,
+                completion: zstdCompletion,
+                executable: zstdExecutable,
+                timeout: 600
+            )
+            try processRunner.waitForProcess(
+                tar,
+                completion: tarCompletion,
+                executable: tarExecutable,
+                timeout: 600
+            )
+        } catch {
+            if zstd.isRunning { zstd.terminate() }
+            if tar.isRunning { tar.terminate() }
+            readers.wait()
+            throw ArchiveMaterializationError.extractFailed(Self.errorText(from: error))
+        }
+        readers.wait()
+
+        guard tar.terminationStatus == 0 else {
+            throw ArchiveMaterializationError.extractFailed(
+                Self.processErrorText(tarCollector.value, status: tar.terminationStatus)
+            )
+        }
+        let zstdStderr = String(decoding: zstdCollector.value, as: UTF8.self)
+        let zstdSucceeded = zstd.terminationStatus == 0
+            || (allowEarlyConsumerExit && Self.isExpectedZstandardPipeClosure(
+                exitStatus: zstd.terminationStatus,
+                terminationReason: zstd.terminationReason,
+                stderr: zstdStderr
+            ))
+        guard zstdSucceeded else {
+            throw ArchiveMaterializationError.extractFailed(
+                Self.processErrorText(zstdCollector.value, status: zstd.terminationStatus)
+            )
+        }
+    }
+
+    private static func isExpectedZstandardPipeClosure(
+        exitStatus: Int32,
+        terminationReason: Process.TerminationReason,
+        stderr: String
+    ) -> Bool {
+        (terminationReason == .uncaughtSignal && exitStatus == SIGPIPE)
+            || (terminationReason == .exit
+                && exitStatus == 70
+                && stderr.localizedCaseInsensitiveContains("write error")
+                && stderr.localizedCaseInsensitiveContains("broken pipe"))
+    }
+
+    private static func processErrorText(_ data: Data, status: Int32) -> String {
+        let text = String(decoding: data, as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? "exit code \(status)" : text
     }
 
     private static func errorText(from pipe: Pipe) -> String {
@@ -239,13 +421,28 @@ public struct ArchiveMaterializerConfiguration: Sendable {
     public var sevenZipCandidates: [String]
     public var unarCandidates: [String]
 
-    public static let `default` = ArchiveMaterializerConfiguration(
-        temporaryDirectoryName: "FrontendCore",
-        bsdtarCandidates: ["/usr/bin/bsdtar", "/opt/homebrew/bin/bsdtar", "/usr/local/bin/bsdtar"],
-        zstdCandidates: ["/opt/homebrew/bin/zstd", "/usr/local/bin/zstd", "/usr/bin/zstd"],
-        sevenZipCandidates: ["/opt/homebrew/bin/7zz", "/usr/local/bin/7zz", "/usr/bin/7zz"],
-        unarCandidates: ["/opt/homebrew/bin/unar", "/usr/local/bin/unar", "/usr/bin/unar"]
-    )
+    public static var `default`: ArchiveMaterializerConfiguration {
+        let environment = ProcessInfo.processInfo.environment
+        return ArchiveMaterializerConfiguration(
+            temporaryDirectoryName: "FrontendCore",
+            bsdtarCandidates: [
+                environment["COCOASPICE_TAR_BINARY"],
+                "/usr/bin/bsdtar", "/opt/homebrew/bin/bsdtar", "/usr/local/bin/bsdtar"
+            ].compactMap { $0 },
+            zstdCandidates: [
+                environment["COCOASPICE_ZSTD_BINARY"],
+                "/opt/homebrew/bin/zstd", "/usr/local/bin/zstd", "/usr/bin/zstd"
+            ].compactMap { $0 },
+            sevenZipCandidates: [
+                environment["COCOASPICE_7Z_BINARY"],
+                "/opt/homebrew/bin/7zz", "/usr/local/bin/7zz", "/usr/bin/7zz"
+            ].compactMap { $0 },
+            unarCandidates: [
+                environment["COCOASPICE_UNAR_BINARY"],
+                "/opt/homebrew/bin/unar", "/usr/local/bin/unar", "/usr/bin/unar"
+            ].compactMap { $0 }
+        )
+    }
 
     public init(
         temporaryDirectoryName: String,

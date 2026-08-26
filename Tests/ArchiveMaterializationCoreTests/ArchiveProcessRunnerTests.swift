@@ -77,3 +77,31 @@ private func runner() -> ArchiveProcessRunner {
         )
     }
 }
+
+@Test func cancellationWhileWaitingForPermitIsObserved() async throws {
+    let constrainedRunner = ArchiveProcessRunner(configuration: .init(
+        environment: ProcessInfo.processInfo.environment,
+        maxConcurrency: 1,
+        listingTimeout: 2,
+        extractionTimeout: 2,
+        capturedOutputMaximumBytes: 64
+    ))
+    try constrainedRunner.acquirePermit()
+    defer { constrainedRunner.releasePermit() }
+
+    let task = Task {
+        try constrainedRunner.run(
+            executable: "/usr/bin/printf",
+            arguments: ["should-not-run"],
+            operation: .listing
+        )
+    }
+    task.cancel()
+
+    do {
+        _ = try await task.value
+        #expect(Bool(false), "Cancelled archive work unexpectedly ran.")
+    } catch is CancellationError {
+        #expect(Bool(true))
+    }
+}

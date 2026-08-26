@@ -17,8 +17,9 @@ public enum ArchiveProcessRunnerError: Error, Equatable, Sendable {
 ///
 /// This type owns only bounded process execution: concurrency, cancellation,
 /// timeout observation, temporary stdout capture, and process failure. Archive
-/// formats, executable discovery, arguments, dependency rules, and cache
-/// policy remain owned by the frontend's archive adapter.
+/// formats, executable discovery, arguments, dependency policy, and cache
+/// policy remain owned by the archive/materialization layers above this
+/// runner.
 public final class ArchiveProcessRunner: @unchecked Sendable {
     public struct Configuration: Sendable {
         public var environment: [String: String]
