@@ -142,6 +142,45 @@ public struct CatalogBrowserGameGroup: Identifiable, Codable, Equatable, Sendabl
     public var id: String { name }
 }
 
+/// UI-neutral incremental search index. Frontends provide one searchable
+/// value per projected row and retain only the row-model adapter. Extending a
+/// query reuses the previous candidate indices; a non-extension restarts from
+/// the complete value set so results remain exact.
+public struct CatalogSearchIndex: Sendable {
+    private let normalizedValues: [String]
+    private var previousTerms: [String] = []
+    private var previousMatches: [Int]
+
+    public init(searchValues: [String]) {
+        normalizedValues = searchValues.map { $0.lowercased() }
+        previousMatches = Array(searchValues.indices)
+    }
+
+    public mutating func matchingIndices(query: String) -> [Int] {
+        let terms = query
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .split(whereSeparator: \.isWhitespace)
+            .map(String.init)
+
+        guard !terms.isEmpty else {
+            previousTerms = []
+            previousMatches = Array(normalizedValues.indices)
+            return previousMatches
+        }
+
+        let candidates = terms.starts(with: previousTerms)
+            ? previousMatches
+            : Array(normalizedValues.indices)
+        let matches = candidates.filter { index in
+            terms.allSatisfy { normalizedValues[index].contains($0) }
+        }
+        previousTerms = terms
+        previousMatches = matches
+        return matches
+    }
+}
+
 /// UI-neutral state for Console → Game presentation. Frontends retain their
 /// own rows, focus, scrolling, and persistence adapters, but the selection and
 /// disclosure transitions are shared so a group click cannot accidentally
@@ -237,15 +276,11 @@ public enum CatalogBrowserProjection {
     }
 
     public static func search(_ games: [CatalogBrowserGame], query: String) -> [CatalogBrowserGame] {
-        let terms = query
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-            .split(whereSeparator: \.isWhitespace)
-            .map(String.init)
-        guard !terms.isEmpty else { return games }
-        return games.filter { game in
-            let haystack = "\(game.name) \(game.system) \(game.rootDisplayName) \(game.displayName)".lowercased()
-            return terms.allSatisfy(haystack.contains)
+        var index = CatalogSearchIndex(searchValues: games.map {
+            "\($0.name) \($0.system) \($0.rootDisplayName) \($0.displayName)"
+        })
+        return index.matchingIndices(query: query).compactMap { position in
+            games.indices.contains(position) ? games[position] : nil
         }
     }
 

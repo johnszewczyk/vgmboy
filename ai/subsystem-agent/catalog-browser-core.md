@@ -6,7 +6,8 @@
 browser modes including Favorites, temporary search semantics, game grouping, disambiguation,
 stable row identity, deterministic ordering, and renderer-independent sidebar
 row gesture intent. It also owns the UI-neutral Console → Game disclosure and
-selection reducer. `CatalogReader` supplies the
+selection reducer and the incremental `CatalogSearchIndex` used by projected
+game searches. `CatalogReader` supplies the
 same folder-versus-metadata aggregation policy to every skin before projection.
 
 ## Ownership
@@ -21,6 +22,7 @@ write SQLite, or activate playback.
 - Favorites keeps its own searchable track-history content boundary rather than becoming a catalog aggregation.
 - Duplicate game names are disambiguated consistently from system and root information.
 - Display labels never become selection identity.
+- Search terms match the same normalized name, system, root, and display-label fields in every skin; extending a query may reuse prior candidates, while backspace or replacement restarts from all rows.
 - Empty folder console tags fall through to stored track metadata before the
   projection creates an `Unknown Console` group.
 - Folder, leaf, and group gestures reduce to select, preview, expansion, or

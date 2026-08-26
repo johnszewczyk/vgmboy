@@ -49,6 +49,19 @@ import Testing
     #expect(games[0].id != games[1].id)
 }
 
+@Test func searchIndexReusesOnlyExtendingQueriesAndRestartsAfterBackspace() {
+    var index = CatalogSearchIndex(searchValues: [
+        "Actraiser SNES JoshW",
+        "ActRaiser 2 SNES JoshW",
+        "Chrono Trigger SNES JoshW"
+    ])
+
+    #expect(index.matchingIndices(query: "act") == [0, 1])
+    #expect(index.matchingIndices(query: "act 2") == [1])
+    #expect(index.matchingIndices(query: "chrono") == [2])
+    #expect(index.matchingIndices(query: "") == [0, 1, 2])
+}
+
 @Test func databaseGroupStateKeepsGroupClicksAwayFromGameActivation() {
     var state = CatalogBrowserGroupState(expandedGroupNames: ["SNES"])
     state = state.applying(.toggleGroup("SNES"))
