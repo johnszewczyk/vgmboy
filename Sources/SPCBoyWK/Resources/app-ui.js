@@ -1018,11 +1018,15 @@ async function loadDatabaseGamesIntoPlaylist(games) {
   state.databaseSidebarError = "";
   state.selectedDatabaseGameKey = games.length === 1 ? databaseGameKey(games[0]) : null;
   state.playlist = databaseRowsToPlaylistTracks(rows, games);
-  const replacementState = await window.spcBoyWK.playbackQueueReplacementState(
-    replacementInput.currentTrackId,
-    state.playlist.map((track) => track.id),
-    true
-  );
+  const replacementState = await window.spcBoyWK.playbackQueueTransition({
+    state: {
+      currentTrackId: replacementInput.currentTrackId,
+      selectedTrackId: state.selectedTrackId,
+      pendingTrackId: null
+    },
+    playlistIds: state.playlist.map((track) => track.id),
+    intent: { kind: "replace", preservePlayback: true }
+  });
   state.currentTrackId = replacementState?.currentTrackId || null;
   state.currentTrackInfo = state.currentTrackId
     ? state.playlist.find((track) => track.id === state.currentTrackId) || replacementInput.currentTrackInfo || null

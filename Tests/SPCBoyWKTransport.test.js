@@ -129,6 +129,7 @@ function makeHarness() {
   const gainCalls = [];
   const startRequests = [];
   const reconfigureRequests = [];
+  const queueTransitionRequests = [];
   let timerID = 0;
   const window = {
     setTimeout(callback, duration) {
@@ -162,7 +163,10 @@ function makeHarness() {
     nativePlaybackState: async () => snapshot(state.nativePlayback.generation || 7),
     nativePlaybackUnload: async () => snapshot(state.nativePlayback.generation, "stopped"),
     nativePlaybackRampGain: async (gain) => { gainCalls.push(gain); return snapshot(7); },
-    playbackQueueCompletionTarget: async () => null,
+    playbackQueueTransition: async (request) => {
+      queueTransitionRequests.push(request);
+      return null;
+    },
     playbackFadeDuration: async () => 6_000,
       setPlaybackPowerSaveBlocker: async () => {},
       releaseMaterializedTrack: async () => {}
@@ -193,7 +197,7 @@ function makeHarness() {
     queueMicrotask
   };
   vm.runInNewContext(playbackSource, context, { filename: "app-playback.js" });
-  return { app, gainCalls, startRequests, reconfigureRequests, window };
+  return { app, gainCalls, startRequests, reconfigureRequests, queueTransitionRequests, window };
 }
 
 test("SPCBoyWK ignores stale native generations", () => {
@@ -279,7 +283,7 @@ test("SPCBoyWK drops a stale natural-end finalizer after replacement", async () 
   // The production finalizer must validate its captured generation after the
   // queue lookup; the harness replaces the bridge method for that await.
   const completionTarget = new Promise((resolve) => { releaseCompletionTarget = resolve; });
-  window.spcBoyWK.playbackQueueCompletionTarget = async () => completionTarget;
+  window.spcBoyWK.playbackQueueTransition = async () => completionTarget;
   const finalizer = app.playback.finalizePlaybackEnded();
   state.currentTrackId = "track-b";
   state.currentTrackInfo = state.playlist[1];
@@ -307,7 +311,7 @@ test("SPCBoyWK advances after the completed session is retired", async () => {
   state.selectedTrackId = "track-a";
   state.isPlaying = true;
   state.nativePlayback = { ...state.nativePlayback, generation: 7, trackLoaded: true };
-  window.spcBoyWK.playbackQueueCompletionTarget = async () => "track-b";
+  window.spcBoyWK.playbackQueueTransition = async () => "track-b";
 
   await app.playback.finalizePlaybackEnded();
 
@@ -316,6 +320,34 @@ test("SPCBoyWK advances after the completed session is retired", async () => {
   assert.equal(state.isPlaying, true);
   assert.equal(startRequests.length, 1);
   assert.equal(startRequests[0].path, "/tmp/next.flac");
+});
+
+test("SPCBoyWK sends typed queue state and adjacent intent to native", async () => {
+  const { app, queueTransitionRequests, window } = makeHarness();
+  app.state.playlist.push({
+    id: "track-b",
+    title: "Next Track",
+    path: "/tmp/next.flac",
+    sourceFilename: "next.flac",
+    basePlaybackSeconds: 4
+  });
+  app.state.selectedTrackId = "track-a";
+  window.spcBoyWK.playbackQueueTransition = async (request) => {
+    queueTransitionRequests.push(request);
+    return "track-b";
+  };
+
+  await app.playback.playAdjacent(1);
+
+  assert.deepEqual(JSON.parse(JSON.stringify(queueTransitionRequests[0])), {
+    state: {
+      currentTrackId: null,
+      selectedTrackId: "track-a",
+      pendingTrackId: null
+    },
+    playlistIds: ["track-a", "track-b"],
+    intent: { kind: "adjacent", direction: "next", wraps: true }
+  });
 });
 
 test("SPCBoyWK Enter activates the focused playlist row without a selection fallback", () => {

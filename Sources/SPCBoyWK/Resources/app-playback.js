@@ -577,11 +577,15 @@ async function finalizePlaybackEnded() {
     const completedQueuedSkip = queuedSkipRequest;
     let completionTargetId = null;
     if (!completedQueuedSkip) {
-      completionTargetId = await window.spcBoyWK.playbackQueueCompletionTarget(
-        completedTrackId,
-        state.playlist.map((track) => track.id),
-        state.repeatMode
-      );
+      completionTargetId = await window.spcBoyWK.playbackQueueTransition({
+        state: {
+          currentTrackId: completedTrackId,
+          selectedTrackId: state.selectedTrackId,
+          pendingTrackId: null
+        },
+        playlistIds: state.playlist.map((track) => track.id),
+        intent: { kind: "completion", repeatMode: state.repeatMode }
+      });
     }
     if (finalizationGeneration !== playbackGeneration
         || state.currentTrackId !== completedTrackId) {
@@ -763,18 +767,19 @@ async function advanceToAdjacent(delta) {
 
   try {
     const playlistIDs = state.playlist.map((track) => track.id);
-    const anchorID = await window.spcBoyWK.playbackQueueTransportTarget(
-      state.currentTrackId,
-      state.selectedTrackId,
-      playlistIDs
-    );
-    if (!anchorID) return;
-    const nextID = await window.spcBoyWK.playbackQueueAdjacent(
-      anchorID,
-      playlistIDs,
-      delta < 0 ? "previous" : "next",
-      true
-    );
+    const nextID = await window.spcBoyWK.playbackQueueTransition({
+      state: {
+        currentTrackId: state.currentTrackId,
+        selectedTrackId: state.selectedTrackId,
+        pendingTrackId: null
+      },
+      playlistIds: playlistIDs,
+      intent: {
+        kind: "adjacent",
+        direction: delta < 0 ? "previous" : "next",
+        wraps: true
+      }
+    });
     if (!nextID) return;
     await playTrack(nextID, 0);
   } catch (error) {

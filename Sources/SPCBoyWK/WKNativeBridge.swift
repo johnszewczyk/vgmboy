@@ -122,10 +122,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             databaseSearchGames: (...args) => request("databaseSearchGames", args),
             databaseGameTracks: (...args) => request("databaseGameTracks", args),
             databaseGroupState: (...args) => request("databaseGroupState", args),
-            playbackQueueTransportTarget: (...args) => request("playbackQueueTransportTarget", args),
-            playbackQueueAdjacent: (...args) => request("playbackQueueAdjacent", args),
-            playbackQueueCompletionTarget: (...args) => request("playbackQueueCompletionTarget", args),
-            playbackQueueReplacementState: (...args) => request("playbackQueueReplacementState", args),
+            playbackQueueTransition: (...args) => request("playbackQueueTransition", args),
             playbackFadeDuration: (...args) => request("playbackFadeDuration", args),
             databaseFileTracks: (...args) => request("databaseFileTracks", args),
             databaseFolderTracks: (...args) => request("databaseFolderTracks", args),
@@ -344,56 +341,54 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 groupName: args.dropFirst(2).first as? String,
                 gameID: args.dropFirst(3).first as? String
             )
-        case "playbackQueueTransportTarget":
-            let state = PlaybackQueueState(
-                currentTrackID: args.first as? String,
-                selectedTrackID: args.dropFirst().first as? String,
-                pendingTrackID: nil
-            )
-            return state.transportTargetID(playlistIDs: stringArray(args.dropFirst(2).first)) ?? NSNull()
-        case "playbackQueueAdjacent":
-            guard let direction = PlaybackQueueDirection(rawValue: args.dropFirst(2).first as? String ?? ""),
-                  let targetID = PlaybackQueueState(
-                      currentTrackID: args.first as? String,
-                      selectedTrackID: nil,
-                      pendingTrackID: nil
-                  ).adjacentTargetID(
-                      playlistIDs: stringArray(args.dropFirst().dropFirst().first),
-                      direction: direction,
-                      wraps: args.dropFirst(3).first as? Bool ?? false
-                  ) else {
-                return NSNull()
-            }
-            return targetID
-        case "playbackQueueCompletionTarget":
-            let repeatMode: PlaybackRepeatMode = switch args.dropFirst(2).first as? String {
-            case "one": .song
-            case "all": .playlist
-            default: .off
+        case "playbackQueueTransition":
+            guard let request = args.first as? [String: Any],
+                  let statePayload = request["state"] as? [String: Any],
+                  let intent = request["intent"] as? [String: Any] else {
+                throw BridgeError.invalidArguments
             }
             let state = PlaybackQueueState(
-                currentTrackID: args.first as? String,
-                selectedTrackID: nil,
-                pendingTrackID: nil
+                currentTrackID: statePayload["currentTrackId"] as? String,
+                selectedTrackID: statePayload["selectedTrackId"] as? String,
+                pendingTrackID: statePayload["pendingTrackId"] as? String
             )
-            return state.completionTargetID(
-                playlistIDs: stringArray(args.dropFirst().first),
-                repeatMode: repeatMode
-            ) ?? NSNull()
-        case "playbackQueueReplacementState":
-            let replacement = PlaybackQueueState(
-                currentTrackID: args.first as? String,
-                selectedTrackID: nil,
-                pendingTrackID: nil
-            ).replacing(
-                playlistIDs: stringArray(args.dropFirst().first),
-                preservePlayback: args.dropFirst(2).first as? Bool ?? false
-            )
-            return [
-                "currentTrackId": replacement.currentTrackID.map { $0 as Any } ?? NSNull(),
-                "selectedTrackId": replacement.selectedTrackID.map { $0 as Any } ?? NSNull(),
-                "pendingTrackId": replacement.pendingTrackID.map { $0 as Any } ?? NSNull()
-            ]
+            let playlistIDs = stringArray(request["playlistIds"])
+            switch intent["kind"] as? String {
+            case "transportTarget":
+                return state.transportTargetID(playlistIDs: playlistIDs) ?? NSNull()
+            case "adjacent":
+                guard let direction = PlaybackQueueDirection(rawValue: intent["direction"] as? String ?? ""),
+                      let targetID = state.adjacentTargetID(
+                          playlistIDs: playlistIDs,
+                          direction: direction,
+                          wraps: intent["wraps"] as? Bool ?? false
+                      ) else {
+                    return NSNull()
+                }
+                return targetID
+            case "completion":
+                let repeatMode: PlaybackRepeatMode = switch intent["repeatMode"] as? String {
+                case "one": .song
+                case "all": .playlist
+                default: .off
+                }
+                return state.completionTargetID(
+                    playlistIDs: playlistIDs,
+                    repeatMode: repeatMode
+                ) ?? NSNull()
+            case "replace":
+                let replacement = state.replacing(
+                    playlistIDs: playlistIDs,
+                    preservePlayback: intent["preservePlayback"] as? Bool ?? false
+                )
+                return [
+                    "currentTrackId": replacement.currentTrackID.map { $0 as Any } ?? NSNull(),
+                    "selectedTrackId": replacement.selectedTrackID.map { $0 as Any } ?? NSNull(),
+                    "pendingTrackId": replacement.pendingTrackID.map { $0 as Any } ?? NSNull()
+                ]
+            default:
+                throw BridgeError.invalidArguments
+            }
         case "playbackFadeDuration":
             let duration = PlaybackFadePolicy.queuedSkipDuration(
                 enabled: args.first as? Bool ?? false,
