@@ -132,9 +132,12 @@ changed is discarded; cancellation restores output gain before seek or queue
 replacement continues.
 
 Queue identity policy is shared with CocoaSpice through
-`FrontendCore.PlaybackQueueCore`. The WebKit renderer asks the native bridge
-for replacement state, transport targets, and adjacent IDs; it does not
-reimplement the CocoaSpice queue transition rules locally.
+`FrontendCore.PlaybackQueueCore`. `PlaybackQueueState` is now the value-only
+transition contract for current/selected/pending identity, replacement,
+transport navigation, and natural completion. The WebKit renderer still asks
+the native bridge for the older replacement/target projections while the
+snapshot/intent bridge is completed; it must not add a second queue policy in
+JavaScript.
 
 Indexed database-game selection is a non-autoplay playlist preview. It replaces
 the renderer's queue while preserving the active native track and its timing;
@@ -142,7 +145,7 @@ only an explicit Play Now/double-click sends a new playback start. A database
 lookup must never call the stop path merely because the playlist view changed.
 
 Playlist hydration is shared at the data/policy boundary: the bridge uses
-`CatalogPlaylistReader` and `PlaybackQueueNavigation`, matching CocoaSpice.
+`CatalogPlaylistReader` and `PlaybackQueueCore`, matching CocoaSpice.
 The JSON-to-track mapping remains WebKit-local because its fields are not the
 native metadata cache or column-width model.
 
