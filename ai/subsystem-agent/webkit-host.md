@@ -134,6 +134,18 @@ the renderer's queue while preserving the active native track and its timing;
 only an explicit Play Now/double-click sends a new playback start. A database
 lookup must never call the stop path merely because the playlist view changed.
 
+Playlist hydration is shared at the data/policy boundary: the bridge uses
+`CatalogPlaylistReader` and `PlaybackQueueNavigation`, matching CocoaSpice.
+The JSON-to-track mapping remains WebKit-local because its fields are not the
+native metadata cache or column-width model.
+
+Catalog snapshot loading is not yet identical: CocoaSpice has separate native
+Games/Files `LatestTaskOwner` sessions and complete-snapshot publication,
+while WebKit currently keeps one renderer loading flag and a search-only
+generation guard. The next extraction must establish request generation and
+stale-result rejection at the native bridge before attempting to share loading
+copy or DOM state.
+
 ## Failure Boundaries
 
 Missing packaged resources are fatal. The host must not silently fall back to
