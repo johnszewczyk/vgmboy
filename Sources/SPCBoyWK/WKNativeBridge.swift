@@ -23,6 +23,7 @@ import WebKit
 final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     private let catalogURL: URL
     private let isOptionsWindow: Bool
+    private weak var playbackEventWebView: WKWebView?
 
     var onOpenOptionsWindow: (() -> Void)?
     var onCloseOptionsWindow: (() -> Void)?
@@ -36,6 +37,15 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         self.catalogURL = catalogURL
         self.isOptionsWindow = isOptionsWindow
         super.init()
+    }
+
+    func attachPlaybackEvents(to webView: WKWebView) {
+        playbackEventWebView = webView
+        WKPlaybackBridge.shared.setNaturalEndHandler { [weak self] status in
+            Task { @MainActor [weak self] in
+                self?.publishNativePlaybackEnded(status)
+            }
+        }
     }
 
     static var defaultCatalogURL: URL {
@@ -174,6 +184,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             onLibrarySnapshot: (listener) => on("librarySnapshot", listener),
             onLibraryCommand: (listener) => on("libraryCommand", listener),
             onNativePlaybackState: (listener) => on("nativePlaybackState", listener),
+            onNativePlaybackEnded: (listener) => on("nativePlaybackEnded", listener),
             onAppearanceSettingsChanged: (listener) => on("appearanceSettingsChanged", listener),
             onFrontendSettingsChanged: (listener) => on("frontendSettingsChanged", listener),
             onRoutingPreferencesChanged: (listener) => on("routingPreferencesChanged", listener),
@@ -276,6 +287,24 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         let idJSON = json(id)
         await MainActor.run {
             webView.evaluateJavaScript("window.__spcBoyWKReply(\(idJSON), \(success ? "true" : "false"), \(valueJSON));", completionHandler: nil)
+        }
+    }
+
+    @MainActor
+    private func publishNativePlaybackEnded(_ status: PlaybackTransportStatus) {
+        let payload: [String: Any] = [
+            "transport_state": "ended",
+            "generation": status.generation,
+            "track_loaded": status.trackLoaded,
+            "reached_end": true,
+            "position_ms": Int((status.elapsedSeconds * 1_000).rounded())
+        ]
+        let valueJSON = Self.json(payload)
+        guard let webView = playbackEventWebView else { return }
+        Task { @MainActor in
+            _ = try? await webView.evaluateJavaScript(
+                "window.__spcBoyWKEvent('nativePlaybackEnded', \(valueJSON));"
+            )
         }
     }
 

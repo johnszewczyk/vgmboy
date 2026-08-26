@@ -115,6 +115,9 @@ request rejection, VGMBoy load/seek/play, and returns one native status
 snapshot. JavaScript retains only queue choice, user-intent forwarding, and
 DOM/status projection. Database rows are returned by the native catalog
 bridge; there are no JavaScript preload or metadata-hydration workers.
+Natural completion is delivered to the page through `nativePlaybackEnded`; the
+status poll remains diagnostic-only and does not infer end or advance the
+playlist.
 
 Once a track is loaded, pause/resume and seek use the existing VGMBoy session
 through `nativePlaybackPause`, `nativePlaybackResume`, and `nativePlaybackSeek`.

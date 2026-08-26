@@ -9,8 +9,17 @@ final class WKPlaybackBridge: @unchecked Sendable {
     static let shared = WKPlaybackBridge()
 
     private let transport = PlaybackTransportCoordinator(label: "SPCBoyWK.vgmboy-playback")
+    private var naturalEndHandler: (@Sendable (PlaybackTransportStatus) -> Void)?
 
-    private init() {}
+    private init() {
+        transport.setNaturalEndHandler { [weak self] status in
+            self?.naturalEndHandler?(status)
+        }
+    }
+
+    func setNaturalEndHandler(_ handler: (@Sendable (PlaybackTransportStatus) -> Void)?) {
+        naturalEndHandler = handler
+    }
 
     func handle(method: String, args: [Any]) throws -> Any {
         let requestID: Int?

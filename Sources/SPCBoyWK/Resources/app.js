@@ -573,6 +573,12 @@ if (window.spcBoyWK?.onNativePlaybackState) {
   });
 }
 
+if (window.spcBoyWK?.onNativePlaybackEnded) {
+  window.spcBoyWK.onNativePlaybackEnded((snapshot) => {
+    app.playback.handleNativePlaybackEnded(snapshot);
+  });
+}
+
 window.addEventListener("keydown", (event) => {
   const target = event.target;
   const isRangeInput = target instanceof HTMLInputElement && target.type === "range";

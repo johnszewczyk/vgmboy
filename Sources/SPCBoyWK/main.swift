@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         nativeBridge.onFrontendSettingsChanged = { [weak self] settings in self?.receiveFrontendSettings(settings) }
         let webView = makeWebView(bridge: nativeBridge, includeCommandDispatcher: true)
         self.webView = webView
+        nativeBridge.attachPlaybackEvents(to: webView)
         installApplicationMenu()
         guard let page = Bundle.module.url(forResource: "index", withExtension: "html") else {
             fatalError("SPCBoy WK resources are missing index.html")

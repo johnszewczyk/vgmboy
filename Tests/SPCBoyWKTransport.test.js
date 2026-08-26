@@ -350,6 +350,22 @@ test("SPCBoyWK sends typed queue state and adjacent intent to native", async () 
   });
 });
 
+test("SPCBoyWK finalizes from a matching native ended event", async () => {
+  const { app, window } = makeHarness();
+  const { state } = app;
+  state.currentTrackId = "track-a";
+  state.currentTrackInfo = state.playlist[0];
+  state.selectedTrackId = "track-a";
+  state.isPlaying = true;
+  state.nativePlayback = { ...state.nativePlayback, generation: 7, trackLoaded: true };
+  window.spcBoyWK.nativePlaybackState = async () => snapshot(7, "ended");
+
+  await app.playback.handleNativePlaybackEnded({ generation: 7 });
+
+  assert.equal(state.currentTrackId, null);
+  assert.equal(state.isPlaying, false);
+});
+
 test("SPCBoyWK Enter activates the focused playlist row without a selection fallback", () => {
   assert.match(
     uiSource,

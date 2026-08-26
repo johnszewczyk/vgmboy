@@ -431,9 +431,32 @@ function handleNativePlaybackState(snapshot) {
   if (!applied) {
     return;
   }
-  if (snapshot.transport_state === "ended") {
-    void finalizePlaybackEnded();
+}
+
+async function handleNativePlaybackEnded(event) {
+  const generation = playbackGeneration;
+  const expectedNativeGeneration = Number(state.nativePlayback?.generation) || 0;
+  const observedNativeGeneration = Number(event?.generation) || 0;
+  if (!activeTrackInfo() || !state.currentTrackId
+      || (expectedNativeGeneration > 0
+          && observedNativeGeneration > 0
+          && expectedNativeGeneration !== observedNativeGeneration)) {
     return;
+  }
+
+  try {
+    const snapshot = await window.spcBoyWK.nativePlaybackState();
+    if (generation !== playbackGeneration || snapshot?.transport_state !== "ended") {
+      return;
+    }
+    const applied = applyNativePlaybackSnapshot(activeTrackInfo(), snapshot, generation);
+    if (!applied) return;
+    clearNativeStatePoll();
+    await finalizePlaybackEnded();
+  } catch (error) {
+    if (generation === playbackGeneration) {
+      console.error("[SPCBoy] native completion handling failed", error);
+    }
   }
 }
 
@@ -547,10 +570,7 @@ function scheduleNativePlaybackStatePoll(track, generation) {
         return;
       }
 
-      if (snapshot?.transport_state === "ended") {
-        void finalizePlaybackEnded();
-        return;
-      }
+      if (snapshot?.transport_state === "ended") return;
 
       if (snapshot?.track_loaded) {
         scheduleNativePlaybackStatePoll(track, generation);
@@ -991,6 +1011,7 @@ playbackApp.playback = {
   updatePlaybackReadout,
   updateNativeDiagnostics,
   handleNativePlaybackState,
+  handleNativePlaybackEnded,
   stopPlaybackState,
   playTrack,
   finalizePlaybackEnded,
