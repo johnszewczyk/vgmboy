@@ -66,6 +66,43 @@ public final class PlaybackContinuationGate: @unchecked Sendable {
     }
 }
 
+/// Shared owner for the one-shot natural-end handoff boundary.
+///
+/// The gate and the queue decision are one lifecycle concern: a completion
+/// may be observed more than once, but only the first observation may claim
+/// the generation and ask the shared queue policy what happens next. The
+/// coordinator remains value/ID-only so AppKit and WebKit stay adapters.
+public final class PlaybackContinuationCoordinator: @unchecked Sendable {
+    private let gate = PlaybackContinuationGate()
+
+    public init() {}
+
+    public func reset() {
+        gate.reset()
+    }
+
+    public func claim(generation: Int) -> Bool {
+        gate.claim(generation: generation)
+    }
+
+    public func isClaimed(generation: Int) -> Bool {
+        gate.isClaimed(generation: generation)
+    }
+
+    public func decision(
+        generation: Int,
+        state: PlaybackQueueState,
+        playlistIDs: [String],
+        repeatMode: PlaybackRepeatMode
+    ) -> PlaybackContinuationDecision? {
+        guard claim(generation: generation) else { return nil }
+        return state.completionDecision(
+            playlistIDs: playlistIDs,
+            repeatMode: repeatMode
+        )
+    }
+}
+
 public struct PlaybackQueueReplacementState: Equatable, Sendable, Codable {
     public let currentTrackID: String?
     public let selectedTrackID: String?

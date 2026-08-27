@@ -95,6 +95,29 @@ func continuationGateClaimsEachGenerationOnlyOnce() {
 }
 
 @Test
+func continuationCoordinatorClaimsBeforeReturningSharedDecision() {
+    let coordinator = PlaybackContinuationCoordinator()
+    let state = PlaybackQueueState(
+        currentTrackID: "one",
+        selectedTrackID: "one",
+        pendingTrackID: nil
+    )
+
+    #expect(coordinator.decision(
+        generation: 12,
+        state: state,
+        playlistIDs: ["one", "two"],
+        repeatMode: .off
+    ) == PlaybackContinuationDecision(action: .play(trackID: "two")))
+    #expect(coordinator.decision(
+        generation: 12,
+        state: state,
+        playlistIDs: ["one", "two"],
+        repeatMode: .off
+    ) == nil)
+}
+
+@Test
 func replacementClearsCurrentUnlessPlaybackIsExplicitlyPreserved() {
     let ids = ["new-one", "new-two"]
 
