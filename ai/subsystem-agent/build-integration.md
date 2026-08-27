@@ -24,6 +24,12 @@ for ScanSong's external inspection executables.
   must run `git submodule update --init --recursive` before building. The small `2sf2wav`, mGBA,
   and PSFLib source snapshots remain ordinary tracked source because they are not independent
   submodules in the existing app-family checkouts.
+- The lazyUSF safety patch is tracked at
+  `patches/lazyusf2-render-safety.patch` and `scripts/build-lazyusf.sh`
+  applies it to the checked-out `vendor/lazyusf2` source before building. A
+  parent-repository gitlink alone does not contain that source change; the
+  dependency script also hashes a gitlink working tree so local source edits
+  cannot hide behind a stale dependency product.
 - Compiled archives and scanner-plugin outputs belong under VGMBoy's `.build`.
 - Native dependency products are keyed by source revision/diff, build script,
   compatibility patch, compiler, and CMake version. `build-app.sh` removes only

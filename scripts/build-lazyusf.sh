@@ -4,8 +4,13 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SOURCE_DIR="$ROOT_DIR/vendor/lazyusf2"
 BUILD_DIR="$ROOT_DIR/.build/lazyusf"
+PATCH_FILE="$ROOT_DIR/patches/lazyusf2-render-safety.patch"
 
 mkdir -p "$BUILD_DIR"
+
+if ! rg -q "usf_set_render_timeout_ms" "$SOURCE_DIR/usf/usf.h"; then
+  patch -l -p1 -d "$SOURCE_DIR" < "$PATCH_FILE" >/dev/null
+fi
 
 make -C "$SOURCE_DIR" liblazyusf.a \
   CC="${CC:-cc}" \

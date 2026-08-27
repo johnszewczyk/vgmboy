@@ -27,6 +27,14 @@ dependency_signature() {
         else
             git -C "$ROOT_DIR" rev-parse "HEAD:$source_relative" 2>/dev/null || true
             git -C "$ROOT_DIR" diff --binary HEAD -- "$source_relative"
+            # A checked-out gitlink has no diff visible from the parent
+            # repository. Hash its working tree too, so local compatibility
+            # changes cannot be hidden behind a stale dependency product.
+            if [[ -d "$ROOT_DIR/$source_relative" ]]; then
+                find "$ROOT_DIR/$source_relative" -type f -print0 \
+                    | sort -z \
+                    | xargs -0 shasum -a 256
+            fi
         fi
         cmake --version 2>/dev/null | head -n 1 || true
         "${CC:-cc}" --version 2>/dev/null | head -n 1 || true
@@ -51,6 +59,10 @@ ensure_dependency() {
         echo "Missing $name dependency product: $ROOT_DIR/$output_relative" >&2
         exit 1
     }
+    # A build script may apply a tracked compatibility patch to a gitlink
+    # source tree. Record the post-build source state, not the pre-patch one,
+    # so the next invocation can reuse the product deterministically.
+    signature="$(dependency_signature "$source_relative" "scripts/$build_script" "$@")"
     printf '%s\n' "$signature" > "$stamp"
 }
 
@@ -74,7 +86,7 @@ copy_dependency() {
 ensure_dependency libvgm vendor/libvgm .build/libvgm/bin/libvgm-player.a build-libvgm.sh
 ensure_dependency mgba vendor/mgba .build/mgba/libmgba.a build-mgba.sh
 ensure_dependency 2sf vendor/2sf2wav .build/2sf/lib2sf.a build-2sf.sh
-ensure_dependency lazyusf vendor/lazyusf2 .build/lazyusf/liblazyusf.a build-lazyusf.sh
+ensure_dependency lazyusf vendor/lazyusf2 .build/lazyusf/liblazyusf.a build-lazyusf.sh patches/lazyusf2-render-safety.patch
 [[ -f "$SOURCE_BUILD_ROOT/lazyusf/libpsflib.a" ]] || "$ROOT_DIR/scripts/build-lazyusf.sh"
 ensure_dependency play-psf vendor/play .build/play-psf/libcocoaspice_play_psf.a build-play-psf.sh patches/play-psfcore-only.patch
 ensure_dependency qsf vendor/aosdk .build/qsf/libvgmboy_qsf.a build-qsf.sh

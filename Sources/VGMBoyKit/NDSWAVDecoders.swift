@@ -130,5 +130,5 @@ final class NDSSWAVDecoder: AudioDecoder, @unchecked Sendable {
     func configureFade(playMs: Int, fadeMs: Int) { decoder.configureFade(playMs: playMs, fadeMs: fadeMs) }
     func configureNativeEnding(playMs: Int, fadeMs: Int) { decoder.configureNativeEnding(playMs: playMs, fadeMs: fadeMs) }
     func seek(milliseconds: Int) { decoder.seek(milliseconds: milliseconds) }
-    func readFrames(_ frameCount: Int) -> (left: [Float], right: [Float]) { decoder.readFrames(frameCount) }
+    func readFrames(_ frameCount: Int) throws -> (left: [Float], right: [Float]) { decoder.readFrames(frameCount) }
 }
