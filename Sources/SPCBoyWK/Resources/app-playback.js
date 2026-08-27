@@ -590,21 +590,21 @@ async function finalizePlaybackEnded() {
   const completedTrackId = state.currentTrackId;
   const completedQueuedSkip = queuedSkipRequest;
   const nativeGeneration = Number(state.nativePlayback?.generation) || finalizationGeneration;
-  const claimed = await window.spcBoyWK.playbackContinuationClaim(nativeGeneration);
-  if (!claimed) return;
-
-  let completionDecision = { action: "stop" };
-  if (!completedQueuedSkip) {
-    completionDecision = await window.spcBoyWK.playbackCompletionDecision({
-      state: {
-        currentTrackId: completedTrackId,
-        selectedTrackId: state.selectedTrackId,
-        pendingTrackId: null
-      },
-      playlistIds: state.playlist.map((track) => track.id),
-      intent: { kind: "completion", repeatMode: state.repeatMode }
-    });
-  }
+  // The native coordinator owns both the one-shot claim and the queue
+  // decision. Keeping them in one bridge call prevents duplicate end events
+  // from racing between JavaScript promises. A queued skip still uses the
+  // same claim; its adjacent target is calculated only after retirement.
+  const completionDecision = await window.spcBoyWK.playbackCompletionDecision({
+    generation: nativeGeneration,
+    state: {
+      currentTrackId: completedTrackId,
+      selectedTrackId: state.selectedTrackId,
+      pendingTrackId: null
+    },
+    playlistIds: state.playlist.map((track) => track.id),
+    intent: { kind: "completion", repeatMode: state.repeatMode }
+  });
+  if (!completionDecision) return;
   const completionTargetId = completionDecision?.action === "play"
     ? completionDecision.trackId
     : null;

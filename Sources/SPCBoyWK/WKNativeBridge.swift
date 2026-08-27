@@ -25,7 +25,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     private let catalogURL: URL
     private let isOptionsWindow: Bool
     private let catalogSessions = CatalogSessionCoordinator()
-    private let playbackContinuationGate = PlaybackContinuationGate()
+    private let playbackContinuationCoordinator = PlaybackContinuationCoordinator()
     private weak var playbackEventWebView: WKWebView?
 
     var onOpenOptionsWindow: (() -> Void)?
@@ -138,7 +138,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             catalogSessionInvalidate: (...args) => request("catalogSessionInvalidate", args),
             playbackQueueTransition: (...args) => request("playbackQueueTransition", args),
             playbackCompletionDecision: (...args) => request("playbackCompletionDecision", args),
-            playbackContinuationClaim: (...args) => request("playbackContinuationClaim", args),
             playbackFadeDuration: (...args) => request("playbackFadeDuration", args),
             databaseFileTracks: (...args) => request("databaseFileTracks", args),
             databaseFolderTracks: (...args) => request("databaseFolderTracks", args),
@@ -259,13 +258,13 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return
         }
 
-        if method == "playbackContinuationClaim" {
-            guard let rawGeneration = args.first as? NSNumber else {
-                Task { await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": BridgeError.invalidArguments.localizedDescription])) }
-                return
+        if method == "playbackCompletionDecision" {
+            do {
+                let result = try completionDecisionResponse(args)
+                Task { await Self.reply(to: message.webView, id: id, success: true, valueJSON: Self.json(result)) }
+            } catch {
+                Task { await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": error.localizedDescription])) }
             }
-            let claimed = playbackContinuationGate.claim(generation: rawGeneration.intValue)
-            Task { await Self.reply(to: message.webView, id: id, success: true, valueJSON: Self.json(claimed)) }
             return
         }
 
@@ -362,6 +361,39 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         let idJSON = json(id)
         await MainActor.run {
             webView.evaluateJavaScript("window.__spcBoyWKReply(\(idJSON), \(success ? "true" : "false"), \(valueJSON));", completionHandler: nil)
+        }
+    }
+
+    private func completionDecisionResponse(_ args: [Any]) throws -> Any {
+        guard let request = args.first as? [String: Any],
+              let statePayload = request["state"] as? [String: Any],
+              let intent = request["intent"] as? [String: Any],
+              let rawGeneration = request["generation"] as? NSNumber else {
+            throw BridgeError.invalidArguments
+        }
+        let state = PlaybackQueueState(
+            currentTrackID: statePayload["currentTrackId"] as? String,
+            selectedTrackID: statePayload["selectedTrackId"] as? String,
+            pendingTrackID: statePayload["pendingTrackId"] as? String
+        )
+        let repeatMode: PlaybackRepeatMode = switch intent["repeatMode"] as? String {
+        case "one": .song
+        case "all": .playlist
+        default: .off
+        }
+        guard let decision = playbackContinuationCoordinator.decision(
+            generation: rawGeneration.intValue,
+            state: state,
+            playlistIDs: Self.stringArray(request["playlistIds"]),
+            repeatMode: repeatMode
+        ) else {
+            return NSNull()
+        }
+        switch decision.action {
+        case .stop:
+            return ["action": "stop"]
+        case .play(let trackID):
+            return ["action": "play", "trackId": trackID]
         }
     }
 
@@ -492,32 +524,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 ]
             default:
                 throw BridgeError.invalidArguments
-            }
-        case "playbackCompletionDecision":
-            guard let request = args.first as? [String: Any],
-                  let statePayload = request["state"] as? [String: Any],
-                  let intent = request["intent"] as? [String: Any] else {
-                throw BridgeError.invalidArguments
-            }
-            let state = PlaybackQueueState(
-                currentTrackID: statePayload["currentTrackId"] as? String,
-                selectedTrackID: statePayload["selectedTrackId"] as? String,
-                pendingTrackID: statePayload["pendingTrackId"] as? String
-            )
-            let repeatMode: PlaybackRepeatMode = switch intent["repeatMode"] as? String {
-            case "one": .song
-            case "all": .playlist
-            default: .off
-            }
-            let decision = state.completionDecision(
-                playlistIDs: stringArray(request["playlistIds"]),
-                repeatMode: repeatMode
-            )
-            switch decision.action {
-            case .stop:
-                return ["action": "stop"]
-            case .play(let trackID):
-                return ["action": "play", "trackId": trackID]
             }
         case "playbackFadeDuration":
             let duration = PlaybackFadePolicy.queuedSkipDuration(

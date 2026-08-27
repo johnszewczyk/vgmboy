@@ -168,7 +168,6 @@ function makeHarness() {
       return null;
     },
     playbackCompletionDecision: async () => ({ action: "stop" }),
-    playbackContinuationClaim: async () => true,
     playbackFadeDuration: async () => 6_000,
       setPlaybackPowerSaveBlocker: async () => {},
       releaseMaterializedTrack: async () => {}

@@ -309,7 +309,7 @@ final class WKPlaybackBridge: @unchecked Sendable {
             "audible_position_frames": statistics?.audiblePositionFrames ?? 0,
             "tempo": statistics?.tempo ?? 1,
             "position_ms": Int((status?.elapsedSeconds ?? 0) * 1_000),
-            "error": NSNull()
+            "error": status?.errorMessage.map { $0 as Any } ?? NSNull()
         ]
     }
 
