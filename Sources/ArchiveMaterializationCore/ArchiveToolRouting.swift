@@ -7,6 +7,10 @@ public enum ArchiveContainerKind: String, CaseIterable, Equatable, Sendable {
     case rsn
     case tar
     case tarZstandard
+    /// A single playable payload compressed directly with Zstandard, such as
+    /// `track.vgm.zst`. This is intentionally distinct from TAR.ZST: it has
+    /// no member listing and cannot satisfy a complete-set requirement.
+    case singleFileZstandard
 
     public init?(archiveURL: URL) {
         let url = archiveURL.standardizedFileURL
@@ -27,6 +31,7 @@ public enum ArchiveContainerKind: String, CaseIterable, Equatable, Sendable {
         case "rsn": self = .rsn
         case "tar": self = .tar
         case "tzst": self = .tarZstandard
+        case "zst", "zstd": self = .singleFileZstandard
         default: return nil
         }
     }
@@ -77,6 +82,11 @@ public enum ArchiveToolRouting {
                 tarArguments: ["-xOf", "-", entryPath],
                 allowEarlyConsumerExit: true
             )
+        case .singleFileZstandard:
+            return .process(
+                executableName: "zstd",
+                arguments: ["-d", "-q", "-c", "--", archiveURL.path]
+            )
         }
     }
 
@@ -108,6 +118,13 @@ public enum ArchiveToolRouting {
                 tarExecutableName: "tar",
                 tarArguments: ["-xf", "-", "-C", destinationURL.path],
                 allowEarlyConsumerExit: false
+            )
+        case .singleFileZstandard:
+            // ArchivePlaybackMaterializer rejects this combination before
+            // execution: one payload cannot provide a decoder dependency set.
+            return .process(
+                executableName: "zstd",
+                arguments: ["-d", "-q", "-c", "--", archiveURL.path]
             )
         }
     }
@@ -143,6 +160,13 @@ public enum ArchiveToolRouting {
                 tarArguments: ["-xf", "-", "-C", destinationURL.path]
                     + ArchiveEntryPath.tarMemberSelectionPatterns(entryPaths),
                 allowEarlyConsumerExit: true
+            )
+        case .singleFileZstandard:
+            // A standalone Zstandard file has exactly one implicit member.
+            // Multi-entry extraction is rejected by the playback boundary.
+            return .process(
+                executableName: "zstd",
+                arguments: ["-d", "-q", "-c", "--", archiveURL.path]
             )
         }
     }

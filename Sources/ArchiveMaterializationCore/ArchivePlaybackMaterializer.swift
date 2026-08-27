@@ -69,6 +69,11 @@ public final class ArchivePlaybackMaterializer: @unchecked Sendable {
             }
 
         case .completeSet, .completeSetWithLazyUSFAliases:
+            if try archiveKind(for: archiveURL) == .singleFileZstandard {
+                throw ArchiveMaterializationError.extractFailed(
+                    "Standalone Zstandard input cannot provide the complete decoder set required by this format."
+                )
+            }
             let rootURL = try cacheMaterializer.materializeCompleteSet(
                 archiveURL: archiveURL,
                 policy: policy,

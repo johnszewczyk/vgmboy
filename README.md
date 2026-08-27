@@ -61,14 +61,23 @@ controls and destinations, but do not decode or render audio themselves.
 with a 2 GB default. Frontend option panels must consume that policy rather
 than maintaining app-specific cache ranges.
 
-The current implementation supports normal archives through `bsdtar` and
-`.tar.zst`/`.tar.zstd` through `zstd` piped into `bsdtar`. The shared
+The current implementation supports normal archives through `bsdtar`,
+`.tar.zst`/`.tar.zstd` through `zstd` piped into `bsdtar`, and standalone
+`name.ext.zst`/`name.ext.zstd` files by materializing their one implicit
+payload. The shared
 `ArchiveMaterializationSession` releases the active temporary member before
 the next one is materialized and when the frontend releases playback state;
 `ArchiveCacheMaterializer` activates the shared cache lease for durable
 materializations.
 
-This is the seed for extracting more CocoaSpice librarian-facing behavior
+Standalone Zstandard is intentionally a selected-entry operation; it cannot
+satisfy formats that require a complete decoder dependency set. This is the
+seed for extracting more CocoaSpice librarian-facing behavior
 without copying its database model or UI state into each skin. Archive listing,
 manifest reads, executable discovery, and format-specific TAR+Zstandard piping
 remain frontend adapters until their ownership is ported deliberately.
+
+The filename convention is deliberate: `track.vgm.zst` means one compressed
+`track.vgm` payload, while `set.tar.zst` and `set.tar.zstd` are recognized first
+as multi-member TAR+Zstandard containers. Plain `.zst` is not a general archive
+listing format and is not admitted without an inferable playable inner suffix.

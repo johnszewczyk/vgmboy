@@ -10,6 +10,8 @@ import Testing
     #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.tar.zst")) == .tarZstandard)
     #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.tar.zstd")) == .tarZstandard)
     #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.tzst")) == .tarZstandard)
+    #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "track.vgm.zst")) == .singleFileZstandard)
+    #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "track.flac.zstd")) == .singleFileZstandard)
     #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.rar")) == nil)
 }
 
@@ -32,6 +34,14 @@ import Testing
     ) == .process(
         executableName: "unar",
         arguments: ["-q", "-f", "-D", "-o", "/tmp/materialized", "/tmp/library.rsn"]
+    ))
+    #expect(ArchiveToolRouting.selectedEntryToStdout(
+        kind: .singleFileZstandard,
+        archiveURL: URL(fileURLWithPath: "/tmp/track.vgm.zst"),
+        entryPath: "track.vgm"
+    ) == .process(
+        executableName: "zstd",
+        arguments: ["-d", "-q", "-c", "--", "/tmp/track.vgm.zst"]
     ))
 }
 

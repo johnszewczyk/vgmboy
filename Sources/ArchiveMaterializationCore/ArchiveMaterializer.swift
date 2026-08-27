@@ -146,6 +146,11 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         guard let kind = ArchiveContainerKind(archiveURL: archiveURL) else {
             throw ArchiveMaterializationError.toolUnavailable("supported archive format")
         }
+        guard kind != .singleFileZstandard else {
+            throw ArchiveMaterializationError.extractFailed(
+                "Standalone Zstandard input cannot provide a complete decoder set."
+            )
+        }
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
         try runArchiveTool(
             ArchiveToolRouting.completeSet(
