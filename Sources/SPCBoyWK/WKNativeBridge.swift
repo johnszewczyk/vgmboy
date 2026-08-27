@@ -25,6 +25,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     private let catalogURL: URL
     private let isOptionsWindow: Bool
     private let catalogSessions = CatalogSessionCoordinator()
+    private let playbackContinuationGate = PlaybackContinuationGate()
     private weak var playbackEventWebView: WKWebView?
 
     var onOpenOptionsWindow: (() -> Void)?
@@ -137,6 +138,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             catalogSessionInvalidate: (...args) => request("catalogSessionInvalidate", args),
             playbackQueueTransition: (...args) => request("playbackQueueTransition", args),
             playbackCompletionDecision: (...args) => request("playbackCompletionDecision", args),
+            playbackContinuationClaim: (...args) => request("playbackContinuationClaim", args),
             playbackFadeDuration: (...args) => request("playbackFadeDuration", args),
             databaseFileTracks: (...args) => request("databaseFileTracks", args),
             databaseFolderTracks: (...args) => request("databaseFolderTracks", args),
@@ -254,6 +256,16 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             }
             let generation = catalogSessions.begin(scope)
             Task { await Self.reply(to: message.webView, id: id, success: true, valueJSON: Self.json(generation)) }
+            return
+        }
+
+        if method == "playbackContinuationClaim" {
+            guard let rawGeneration = args.first as? NSNumber else {
+                Task { await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": BridgeError.invalidArguments.localizedDescription])) }
+                return
+            }
+            let claimed = playbackContinuationGate.claim(generation: rawGeneration.intValue)
+            Task { await Self.reply(to: message.webView, id: id, success: true, valueJSON: Self.json(claimed)) }
             return
         }
 

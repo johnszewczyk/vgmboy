@@ -17,7 +17,6 @@ let playbackGeneration = 0;
 let nativeStatePollTimer = 0;
 let nativePlaybackInitialized = false;
 let mediaSessionHandlersBound = false;
-let finalizePlaybackPromise = null;
 const playbackBackends = window.SPCBoyPlaybackBackends;
 let queuedSkipRequest = null;
 let queuedSkipTimer = 0;
@@ -587,61 +586,53 @@ function scheduleNativePlaybackStatePoll(track, generation) {
 }
 
 async function finalizePlaybackEnded() {
-  if (finalizePlaybackPromise) {
-    return finalizePlaybackPromise;
+  const finalizationGeneration = playbackGeneration;
+  const completedTrackId = state.currentTrackId;
+  const completedQueuedSkip = queuedSkipRequest;
+  const nativeGeneration = Number(state.nativePlayback?.generation) || finalizationGeneration;
+  const claimed = await window.spcBoyWK.playbackContinuationClaim(nativeGeneration);
+  if (!claimed) return;
+
+  let completionDecision = { action: "stop" };
+  if (!completedQueuedSkip) {
+    completionDecision = await window.spcBoyWK.playbackCompletionDecision({
+      state: {
+        currentTrackId: completedTrackId,
+        selectedTrackId: state.selectedTrackId,
+        pendingTrackId: null
+      },
+      playlistIds: state.playlist.map((track) => track.id),
+      intent: { kind: "completion", repeatMode: state.repeatMode }
+    });
+  }
+  const completionTargetId = completionDecision?.action === "play"
+    ? completionDecision.trackId
+    : null;
+  if (finalizationGeneration !== playbackGeneration
+      || state.currentTrackId !== completedTrackId) {
+    return;
+  }
+  clearNativeStatePoll();
+  state.isPlaying = false;
+  state.elapsedSeconds = state.totalSeconds;
+  updatePlaybackReadout();
+  updateNativeDiagnostics();
+
+  queuedSkipRequest = null;
+  clearQueuedSkipTimer();
+  await stopPlaybackState({ declick: false, keepNativeOutput: Boolean(completionTargetId || completedQueuedSkip) });
+
+  // stopPlaybackState intentionally advances the generation once to retire
+  // the completed native session. A newer user request advances it again;
+  // only the expected single retirement may continue into queue advance.
+  if (playbackGeneration !== finalizationGeneration + 1 || state.currentTrackId) {
+    return;
   }
 
-  finalizePlaybackPromise = (async () => {
-    const finalizationGeneration = playbackGeneration;
-    const completedTrackId = state.currentTrackId;
-    const completedQueuedSkip = queuedSkipRequest;
-    let completionDecision = { action: "stop" };
-    if (!completedQueuedSkip) {
-      completionDecision = await window.spcBoyWK.playbackCompletionDecision({
-        state: {
-          currentTrackId: completedTrackId,
-          selectedTrackId: state.selectedTrackId,
-          pendingTrackId: null
-        },
-        playlistIds: state.playlist.map((track) => track.id),
-        intent: { kind: "completion", repeatMode: state.repeatMode }
-      });
-    }
-    const completionTargetId = completionDecision?.action === "play"
-      ? completionDecision.trackId
-      : null;
-    if (finalizationGeneration !== playbackGeneration
-        || state.currentTrackId !== completedTrackId) {
-      return;
-    }
-    clearNativeStatePoll();
-    state.isPlaying = false;
-    state.elapsedSeconds = state.totalSeconds;
-    updatePlaybackReadout();
-    updateNativeDiagnostics();
-
-    queuedSkipRequest = null;
-    clearQueuedSkipTimer();
-    await stopPlaybackState({ declick: false, keepNativeOutput: Boolean(completionTargetId || completedQueuedSkip) });
-
-    // stopPlaybackState intentionally advances the generation once to retire
-    // the completed native session. A newer user request advances it again;
-    // only the expected single retirement may continue into queue advance.
-    if (playbackGeneration !== finalizationGeneration + 1 || state.currentTrackId) {
-      return;
-    }
-
-    if (completedQueuedSkip) {
-      await advanceToAdjacent(completedQueuedSkip.delta);
-    } else if (completionTargetId) {
-      await playTrack(completionTargetId, 0);
-    }
-  })();
-
-  try {
-    await finalizePlaybackPromise;
-  } finally {
-    finalizePlaybackPromise = null;
+  if (completedQueuedSkip) {
+    await advanceToAdjacent(completedQueuedSkip.delta);
+  } else if (completionTargetId) {
+    await playTrack(completionTargetId, 0);
   }
 }
 
