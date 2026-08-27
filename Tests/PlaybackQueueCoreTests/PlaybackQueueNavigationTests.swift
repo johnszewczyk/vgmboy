@@ -82,6 +82,19 @@ func completionDecisionMakesTerminalStopExplicit() {
 }
 
 @Test
+func continuationGateClaimsEachGenerationOnlyOnce() {
+    let gate = PlaybackContinuationGate()
+
+    #expect(gate.claim(generation: 7))
+    #expect(!gate.claim(generation: 7))
+    #expect(gate.isClaimed(generation: 7))
+    #expect(gate.claim(generation: 8))
+
+    gate.reset()
+    #expect(gate.claim(generation: 7))
+}
+
+@Test
 func replacementClearsCurrentUnlessPlaybackIsExplicitlyPreserved() {
     let ids = ["new-one", "new-two"]
 

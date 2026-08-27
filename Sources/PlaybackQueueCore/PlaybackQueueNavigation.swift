@@ -1,3 +1,5 @@
+import Foundation
+
 public enum PlaybackQueueDirection: String, Sendable, Codable {
     case previous
     case next
@@ -29,6 +31,38 @@ public struct PlaybackContinuationDecision: Equatable, Sendable, Codable {
     public var targetID: String? {
         guard case let .play(trackID) = action else { return nil }
         return trackID
+    }
+}
+
+/// Thread-safe one-shot claim for a playback continuation.
+///
+/// Native playback may report the same terminal state through both an event
+/// and a status observation. Frontends must share one claim primitive so only
+/// one path can retire the completed session and advance the queue.
+public final class PlaybackContinuationGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var claimedGeneration: Int?
+
+    public init() {}
+
+    public func reset() {
+        lock.lock()
+        claimedGeneration = nil
+        lock.unlock()
+    }
+
+    public func claim(generation: Int) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard claimedGeneration != generation else { return false }
+        claimedGeneration = generation
+        return true
+    }
+
+    public func isClaimed(generation: Int) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return claimedGeneration == generation
     }
 }
 
