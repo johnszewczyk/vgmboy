@@ -25,6 +25,8 @@ typedef struct {
     char error[256];
 } lazyusf_player_t;
 
+static const uint32_t lazyusf_render_timeout_ms = 2000;
+
 static void *stdio_fopen(const char *path) { return fopen(path, "rb"); }
 static size_t stdio_fread(void *p, size_t size, size_t count, void *file) { return fread(p, size, count, (FILE *)file); }
 static int stdio_fseek(void *file, int64_t offset, int whence) { return fseek((FILE *)file, (long)offset, whence); }
@@ -119,6 +121,7 @@ lazyusf_player_handle_t lazyusf_player_create(const char *path, int32_t sample_r
     usf_set_compare(player->state, player->enable_compare);
     usf_set_fifo_full(player->state, player->enable_fifo_full);
     usf_set_hle_audio(player->state, 1);
+    usf_set_render_timeout_ms(player->state, lazyusf_render_timeout_ms);
     player->sample_rate = sample_rate;
     return player;
 }

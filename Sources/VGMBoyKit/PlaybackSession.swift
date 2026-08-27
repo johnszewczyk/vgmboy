@@ -71,6 +71,7 @@ public struct PlaybackStatus: Sendable, Codable, Equatable {
     public var isPlaying: Bool
     public var elapsedSeconds: Double
     public var reachedEnd: Bool
+    public var errorMessage: String?
     public var diagnostics: PlaybackDiagnostics
     public var statistics: PlaybackStatistics
 
@@ -78,12 +79,14 @@ public struct PlaybackStatus: Sendable, Codable, Equatable {
         isPlaying: Bool,
         elapsedSeconds: Double,
         reachedEnd: Bool,
+        errorMessage: String? = nil,
         diagnostics: PlaybackDiagnostics = .init(),
         statistics: PlaybackStatistics = .init()
     ) {
         self.isPlaying = isPlaying
         self.elapsedSeconds = elapsedSeconds
         self.reachedEnd = reachedEnd
+        self.errorMessage = errorMessage
         self.diagnostics = diagnostics
         self.statistics = statistics
     }
@@ -113,6 +116,7 @@ final class PlaybackSession: @unchecked Sendable {
     private var decoderFamily: String?
     private var currentTempo = 1.0
     private var reachedEnd = false
+    private var errorMessage: String?
     private var isLoaded = false
     private var generation = 0
     private var refillTimer: DispatchSourceTimer?
@@ -196,6 +200,7 @@ final class PlaybackSession: @unchecked Sendable {
             decoderFamily = family.id
             currentTempo = tempo
             reachedEnd = false
+            errorMessage = nil
             isLoaded = true
             output.clearBuffer()
             output.resetDiagnostics()
@@ -325,6 +330,7 @@ final class PlaybackSession: @unchecked Sendable {
             isPlaying: output.isRunning,
             elapsedSeconds: elapsed,
             reachedEnd: reachedEnd,
+            errorMessage: errorMessage,
             diagnostics: diagnostics,
             statistics: statistics
         )
@@ -362,7 +368,16 @@ final class PlaybackSession: @unchecked Sendable {
                 break
             }
             let chunkStart = decoder.absolutePlayedFrames
-            let frames = decoder.readFrames(chunkFrameCount)
+            let frames: (left: [Float], right: [Float])
+            do {
+                frames = try decoder.readFrames(chunkFrameCount)
+            } catch {
+                stopRefillTimer()
+                output.pause()
+                errorMessage = error.localizedDescription
+                publishStatus()
+                return
+            }
             let faded = applyFadeIfNeeded(decoder, chunkStart: chunkStart, left: frames.left, right: frames.right)
             if output.write(left: faded.left, right: faded.right) == 0 {
                 break
@@ -395,7 +410,7 @@ final class PlaybackSession: @unchecked Sendable {
                 break
             }
             let chunkStart = decoder.absolutePlayedFrames
-            let frames = decoder.readFrames(chunkFrameCount)
+            let frames = try decoder.readFrames(chunkFrameCount)
             let faded = applyFadeIfNeeded(decoder, chunkStart: chunkStart, left: frames.left, right: frames.right)
             if output.write(left: faded.left, right: faded.right) == 0 {
                 break
@@ -442,6 +457,7 @@ final class PlaybackSession: @unchecked Sendable {
         capFrames = 0
         fadeFrames = 0
         reachedEnd = false
+        errorMessage = nil
         isLoaded = false
         output.clearBuffer()
     }

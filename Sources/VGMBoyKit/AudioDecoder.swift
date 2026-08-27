@@ -24,7 +24,7 @@ protocol AudioDecoder: AnyObject {
     /// window means "unbounded"; the session then caps as a backstop.
     func configureNativeEnding(playMs: Int, fadeMs: Int)
     func seek(milliseconds: Int)
-    func readFrames(_ frameCount: Int) -> (left: [Float], right: [Float])
+    func readFrames(_ frameCount: Int) throws -> (left: [Float], right: [Float])
     /// Gives a decoder with non-ARC native lifetime requirements an explicit
     /// replacement boundary before the next decoder is constructed.
     func close()

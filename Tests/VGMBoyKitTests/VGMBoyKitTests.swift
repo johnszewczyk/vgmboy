@@ -291,7 +291,7 @@ struct GameCubeVGMStreamPlaybackTests {
             #expect(metadata.naturalPlayMs > 0, Comment(rawValue: fixture.lastPathComponent))
             var renderedAudio = false
             for _ in 0..<48 {
-                let pcm = decoder.readFrames(4_096)
+                let pcm = try decoder.readFrames(4_096)
                 if pcm.left.contains(where: { abs($0) > 0.0001 })
                     || pcm.right.contains(where: { abs($0) > 0.0001 }) {
                     renderedAudio = true
@@ -324,7 +324,7 @@ struct QSFPlaybackTests {
         let metadata = try decoder.metadata(for: 0)
         var pcm = (left: [Float](), right: [Float]())
         for _ in 0..<12 {
-            let chunk = decoder.readFrames(4_096)
+            let chunk = try decoder.readFrames(4_096)
             pcm.left.append(contentsOf: chunk.left)
             pcm.right.append(contentsOf: chunk.right)
             if pcm.left.contains(where: { abs($0) > 0.0001 }) || pcm.right.contains(where: { abs($0) > 0.0001 }) {
@@ -782,11 +782,11 @@ func flacFixtureUsesSafeSequentialReader() throws {
     try decoder.startTrack(0)
     let metadata = try decoder.metadata(for: 0)
     #expect(metadata.playMs > 0)
-    let frames = decoder.readFrames(4_096)
+    let frames = try decoder.readFrames(4_096)
     #expect(frames.left.count > 0)
     var renderedFrames = frames.left.count
     while !decoder.trackEnded {
-        let chunk = decoder.readFrames(4_096)
+        let chunk = try decoder.readFrames(4_096)
         if chunk.left.isEmpty { break }
         renderedFrames += chunk.left.count
     }

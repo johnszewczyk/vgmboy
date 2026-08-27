@@ -102,7 +102,7 @@ public enum AACExporter {
         var renderedFrames: Int64 = 0
         while renderedFrames < capFrames && !decoder.trackEnded {
             let wanted = min(chunkFrames, Int(capFrames - renderedFrames))
-            let frames = decoder.readFrames(wanted)
+            let frames = try decoder.readFrames(wanted)
             let count = min(wanted, min(frames.left.count, frames.right.count))
             guard count > 0 else { break }
             var interleaved = [Float](repeating: 0, count: count * 2)

@@ -102,12 +102,17 @@ final class LazyUSFDecoder: AudioDecoder, @unchecked Sendable {
         false
     }
 
-    func readFrames(_ frameCount: Int) -> (left: [Float], right: [Float]) {
+    func readFrames(_ frameCount: Int) throws -> (left: [Float], right: [Float]) {
         let interleaved = UnsafeMutablePointer<Int16>.allocate(capacity: frameCount * 2)
         defer { interleaved.deallocate() }
         var renderedFrames: Int32 = 0
         var error: UnsafeMutablePointer<CChar>?
-        _ = lazyusf_player_render_s16(handle, Int32(frameCount), interleaved, &renderedFrames, &error)
+        let result = lazyusf_player_render_s16(handle, Int32(frameCount), interleaved, &renderedFrames, &error)
+        if result != 0 {
+            let message = error.map { String(cString: $0) } ?? "Unknown lazyusf render failure."
+            if let error { lazyusf_error_message_free(error) }
+            throw LazyUSFDecoderError.createFailed(message)
+        }
         if let error { lazyusf_error_message_free(error) }
 
         var left = [Float](repeating: 0, count: frameCount)

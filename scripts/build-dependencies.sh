@@ -27,6 +27,14 @@ dependency_signature() {
         else
             git -C "$ROOT_DIR" rev-parse "HEAD:$source_relative" 2>/dev/null || true
             git -C "$ROOT_DIR" diff --binary HEAD -- "$source_relative"
+            # A checked-out gitlink has no diff visible from the parent
+            # repository. Hash its working tree too, so local compatibility
+            # changes cannot be hidden behind a stale dependency product.
+            if [[ -d "$ROOT_DIR/$source_relative" ]]; then
+                find "$ROOT_DIR/$source_relative" -type f -print0 \
+                    | sort -z \
+                    | xargs -0 shasum -a 256
+            fi
         fi
         cmake --version 2>/dev/null | head -n 1 || true
         "${CC:-cc}" --version 2>/dev/null | head -n 1 || true

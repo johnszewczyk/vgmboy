@@ -56,8 +56,14 @@ deliberately exclusive to one family.
 
 ## Failure Boundaries
 
-- Bridge `create` failures surface as localized decoder errors; decode-time bridge failures return
-  silence for that chunk rather than crashing the transport.
+- Bridge `create` and prime failures surface as localized decoder errors.
+- A later decode-time bridge failure stops the refill source, publishes the
+  shared `PlaybackStatus.errorMessage`, and does not emit a natural-end
+  completion event. Frontends may present the error, but must not interpret it
+  as EOF or silently advance the queue.
+- lazyUSF render calls use a bounded shared safety budget. The budget protects
+  the host from malformed/incompatible USF state; it is not a playback-length
+  fallback and does not replace Long Play or decoder timing.
 
 ## Files
 
