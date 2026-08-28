@@ -117,18 +117,6 @@ func continuationCoordinatorClaimsBeforeReturningSharedDecision() {
     ) == nil)
 }
 
-@MainActor
-@Test
-func sessionLifecycleSupersedesOlderFrontendRequests() {
-    let lifecycle = PlaybackSessionLifecycleCoordinator()
-    let firstRequest = lifecycle.begin()
-
-    let secondRequest = lifecycle.begin()
-    #expect(secondRequest != firstRequest)
-    #expect(!lifecycle.isCurrent(firstRequest))
-    #expect(lifecycle.isCurrent(secondRequest))
-}
-
 @Test
 func replacementClearsCurrentUnlessPlaybackIsExplicitlyPreserved() {
     let ids = ["new-one", "new-two"]

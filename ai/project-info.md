@@ -32,9 +32,8 @@ hosts. It must not become a second catalog writer or playback engine.
   executor shared by native playback hosts. It protects one VGMBoy session but
   does not own queue policy, catalog state, or presentation.
 - `PlaybackQueueCore`: pure queue identity and continuation policy plus the
-  `PlaybackSessionLifecycleCoordinator`, which composes the shared request
-  lifecycle with a generation-checked one-shot natural-end handoff. It stores
-  no track models, decoder state, or presentation data.
+  generation-checked one-shot natural-end handoff. It stores no track models,
+  decoder state, or presentation data.
 - `PlaybackTransportCore`: pure queued adjacent-track fade eligibility and
   duration policy. It does not perform the output ramp or access a decoder.
 - `VGMBoy`: decoder, timing, transport, and audio output.
