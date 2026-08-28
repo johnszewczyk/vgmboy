@@ -32,6 +32,10 @@ const playbackBridgeSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/WKPlaybackBridge.swift"),
   "utf8"
 );
+const statusPayloadSource = fs.readFileSync(
+  path.resolve(__dirname, "../../FrontendCore/Sources/PlaybackTransportCore/PlaybackTransportStatusPayload.swift"),
+  "utf8"
+);
 const appDelegateSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/main.swift"),
   "utf8"
@@ -438,9 +442,11 @@ test("SPCBoyWK advances the visible clock between authoritative native events", 
 });
 
 test("SPCBoyWK broadcasts complete native status to both windows", () => {
-  assert.match(nativeBridgeSource, /"buffered_frames": status\.bufferedFrames/);
-  assert.match(nativeBridgeSource, /"frames_requested": status\.framesRequested/);
-  assert.match(nativeBridgeSource, /"decoder_family": status\.decoderFamily/);
+  assert.match(statusPayloadSource, /"buffered_frames": bufferedFrames/);
+  assert.match(statusPayloadSource, /"frames_requested": framesRequested/);
+  assert.match(statusPayloadSource, /"decoder_family": decoderFamily/);
+  assert.match(nativeBridgeSource, /PlaybackTransportStatusPayload\(/);
+  assert.match(playbackBridgeSource, /PlaybackTransportStatusPayload\(/);
   assert.match(nativeBridgeSource, /if let onPlaybackEvent\s*\{\s*onPlaybackEvent\(name, payload\)/);
   assert.match(appDelegateSource, /broadcastPlaybackEvent\(name: name, payload: payload\)/);
   assert.match(appDelegateSource, /optionsWebView\?\.evaluateJavaScript\(script, completionHandler: nil\)/);

@@ -6,6 +6,12 @@ This project owns its native AppKit/WKWebView host and `spcBoyWK` bridge while
 sharing the read-only catalog reader, catalog-browser behavior, and VGMBoy
 playback core.
 
+Playback command replies and asynchronous native playback events use the same
+`FrontendCore.PlaybackTransportStatusPayload` projection. This keeps elapsed
+position and decoder diagnostics identical across the two WebKit status paths;
+the JavaScript layer only renders the returned status and interpolates between
+authoritative native updates.
+
 The current live native slice reads shared ScanSong catalog roots, games,
 files, search results, and playlist rows, and routes loose-file playback through
 VGMBoyKit. Explicitly opening a local folder uses the shared

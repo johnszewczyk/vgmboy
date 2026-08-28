@@ -374,42 +374,10 @@ final class WKPlaybackBridge: @unchecked Sendable {
     }
 
     private func statusResponse(_ status: PlaybackTransportStatus) -> [String: Any] {
-        let transportState: String
-        if status.isPlaying {
-            transportState = "playing"
-        } else if status.reachedEnd {
-            transportState = "ended"
-        } else if status.trackLoaded {
-            transportState = "paused"
-        } else {
-            transportState = "stopped"
-        }
-        return [
-            // reachedEnd means the decoder has no more source frames; output
-            // may still be draining its buffered fade. Report ended only
-            // after the audio device has stopped so the frontend does not
-            // advance over the remaining audible tail.
-            "transport_state": transportState,
-            "output_state": status.outputIsRunning ? "running" : "idle",
-            "generation": status.generation,
-            "track_loaded": status.trackLoaded,
-            "decode_error": status.errorMessage != nil,
-            "reached_end": status.reachedEnd,
-            "buffered_frames": status.bufferedFrames,
-            "ring_buffer_frames": status.ringBufferFrames,
-            "underrun_count": status.underrunCount,
-            "frames_requested": status.framesRequested,
-            "frames_supplied": status.framesSupplied,
-            "decoder_family": status.decoderFamily ?? NSNull(),
-            "track_index": status.trackIndex ?? NSNull(),
-            "decoder_sample_rate": status.decoderSampleRate,
-            "output_sample_rate": status.outputSampleRate,
-            "decoded_frames": status.decodedFrames,
-            "audible_position_frames": status.audiblePositionFrames,
-            "tempo": status.tempo,
-            "position_ms": Int((status.elapsedSeconds * 1_000).rounded()),
-            "error": status.errorMessage ?? NSNull()
-        ]
+        // reachedEnd means the decoder has no more source frames; output may
+        // still be draining its buffered fade. The shared projection keeps
+        // this reply identical to native status broadcasts.
+        return PlaybackTransportStatusPayload(status: status).jsonObject()
     }
 
     private func number(_ value: Any?) -> Double? {
