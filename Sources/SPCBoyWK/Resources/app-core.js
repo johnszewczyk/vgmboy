@@ -546,7 +546,7 @@ function normalizeColumnVisibility(value) {
   for (const column of COLUMN_DEFS) {
     if (typeof value[column.id] === "boolean") visibility[column.id] = value[column.id];
   }
-  if (!Object.values(visibility).some(Boolean)) visibility.filename = true;
+  if (!Object.values(visibility).some(Boolean)) visibility[DEFAULT_COLUMN_ORDER[0]] = true;
   return visibility;
 }
 

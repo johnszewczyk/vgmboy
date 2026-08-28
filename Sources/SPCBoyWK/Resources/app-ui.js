@@ -1254,11 +1254,11 @@ function showColumnMenu(event) {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = state.columnVisibility[column.id];
-    checkbox.disabled = column.id === "filename" && checkbox.checked;
     checkbox.addEventListener("change", () => {
       state.columnVisibility[column.id] = checkbox.checked;
       if (!Object.values(state.columnVisibility).some(Boolean)) {
-        state.columnVisibility.filename = true;
+        state.columnVisibility[column.id] = true;
+        checkbox.checked = true;
       }
       persistSettings();
       // Visibility changes must be immediate. Full content measurement belongs

@@ -8,6 +8,10 @@ const playbackSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/app-playback.js"),
   "utf8"
 );
+const appCoreSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/app-core.js"),
+  "utf8"
+);
 const uiSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/app-ui.js"),
   "utf8"
@@ -457,6 +461,12 @@ test("SPCBoyWK uses native in-place tempo and AAC cancellation events", () => {
   assert.match(uiSource, /\[\["Export AAC"/);
   assert.match(indexSource, /id="aac-export-directory-path"/);
   assert.match(indexSource, /id="aac-export-cancel-button"/);
+});
+
+test("SPCBoyWK allows every playlist column to be hidden except an empty table", () => {
+  assert.doesNotMatch(uiSource, /checkbox\.disabled\s*=\s*column\.id\s*===\s*"filename"/);
+  assert.match(uiSource, /state\.columnVisibility\[column\.id\]\s*=\s*true/);
+  assert.match(appCoreSource, /visibility\[DEFAULT_COLUMN_ORDER\[0\]\]\s*=\s*true/);
 });
 
 test("SPCBoyWK filters database search locally without a debounce", () => {
