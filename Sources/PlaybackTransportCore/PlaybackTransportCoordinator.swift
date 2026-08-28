@@ -349,40 +349,20 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         }
     }
 
-    /// Retires the completed session and starts the already-resolved target
-    /// on the same transport queue. Archive extraction and timing policy stay
-    /// outside this core; only the playable track and VGMBoy command payload
-    /// cross this boundary.
-    public func continueAfterCompletion(
-        state: PlaybackQueueState,
-        playlistIDs: [String],
-        repeatMode: PlaybackRepeatMode,
-        start: PlaybackContinuationStart?
-    ) async throws -> PlaybackContinuationDecision? {
+    /// Starts an already-resolved continuation after the caller has retired
+    /// completion and prepared any archive-backed playable path. Archive
+    /// extraction and cache leases stay in the adapter; the native load/play
+    /// operation remains serialized here.
+    public func startContinuation(_ start: PlaybackContinuationStart) async throws {
         try await run {
-            if let start, !self.isLatest(start.requestID) { throw CancellationError() }
-            guard let generation = self.controller.perform(.init(command: .status)).status?.diagnostics.generation else {
-                return nil
-            }
-            let request = PlaybackContinuationRequest(
-                generation: generation,
-                state: state,
-                playlistIDs: playlistIDs,
-                repeatMode: repeatMode
-            )
-            guard let decision = self.retireCompletedPlaybackLocked(request) else { return nil }
-            guard let start,
-                  case let .play(targetID) = decision.action,
-                  targetID == start.track.id else {
-                return decision
-            }
             guard self.isLatest(start.requestID) else { throw CancellationError() }
+            self.naturalEndGate.reset()
+            self.continuationCoordinator.reset()
             let event = self.controller.perform(.init(command: .load, payload: start.payload))
             try self.requireSuccess(event)
             try self.requireSuccess(self.controller.perform(.init(command: .play)))
             self.currentTrack = start.track
             self.currentPlaybackGeneration = event.status?.diagnostics.generation
-            return decision
         }
     }
 
