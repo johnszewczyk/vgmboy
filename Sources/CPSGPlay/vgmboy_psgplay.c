@@ -275,16 +275,17 @@ vgmboy_psgplay_handle_t vgmboy_psgplay_open(
         free(input);
         return NULL;
     }
-    free(input);
 
     struct vgmboy_psgplay *handle = calloc(1, sizeof(*handle));
     if (handle == NULL) {
+        free(input);
         free(owned);
         set_error(error_message, "Could not allocate the PSG play handle.");
         return NULL;
     }
     handle->data = owned != NULL ? owned : malloc(normalized_size);
     if (handle->data == NULL) {
+        free(input);
         free(owned);
         free(handle);
         set_error(error_message, "Could not retain the SNDH input.");
@@ -292,6 +293,7 @@ vgmboy_psgplay_handle_t vgmboy_psgplay_open(
     }
     if (owned == NULL)
         memcpy(handle->data, normalized, normalized_size);
+    free(input);
     handle->size = normalized_size;
     int32_t count = 0;
     int32_t default_track = 0;

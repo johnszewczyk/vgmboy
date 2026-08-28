@@ -286,12 +286,88 @@ func sndhFixtureUsesPSGPlay() throws {
     let decoder = try DecoderFactory.make(path: path)
     defer { decoder.close() }
     #expect(decoder.trackCount == metadata.tracks.count)
-    try decoder.startTrack(metadata.defaultTrack)
-    let track = try decoder.metadata(for: metadata.defaultTrack)
-    #expect(track.playMs == metadata.tracks[metadata.defaultTrack].durationMilliseconds)
-    let frames = try decoder.readFrames(4_096)
-    #expect(frames.left.count == 4_096)
-    #expect(frames.left.contains { abs($0) > 0.0001 } || frames.right.contains { abs($0) > 0.0001 })
+    for index in metadata.tracks.indices {
+        try decoder.startTrack(index)
+        let track = try decoder.metadata(for: index)
+        #expect(track.playMs == metadata.tracks[index].durationMilliseconds)
+        let frames = try decoder.readFrames(4_096)
+        #expect(frames.left.count == 4_096)
+        #expect(frames.left.contains { abs($0) > 0.0001 } || frames.right.contains { abs($0) > 0.0001 })
+    }
+}
+
+@Test(
+    "SNDH corpus sample enumerates and renders every declared subtune",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["VGMBoy_SNDH_SAMPLE_ROOT"] != nil,
+        "Set VGMBoy_SNDH_SAMPLE_ROOT to run the large SNDH corpus sample."
+    )
+)
+func sndhCorpusSampleUsesEverySubtune() throws {
+    let root = try #require(ProcessInfo.processInfo.environment["VGMBoy_SNDH_SAMPLE_ROOT"])
+    let rootURL = URL(fileURLWithPath: root, isDirectory: true)
+    let allFiles = FileManager.default
+        .enumerator(at: rootURL, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles])?
+        .compactMap { $0 as? URL }
+        .filter { $0.pathExtension.caseInsensitiveCompare("sndh") == .orderedSame }
+        .sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending } ?? []
+    #expect(!allFiles.isEmpty)
+
+    let requestedLimit = Int(ProcessInfo.processInfo.environment["VGMBoy_SNDH_SAMPLE_LIMIT"] ?? "256") ?? 256
+    let limit = max(1, requestedLimit)
+    var files: [URL]
+    if allFiles.count <= limit || limit == 1 {
+        files = allFiles
+        if limit == 1, allFiles.count > 1 {
+            files = [allFiles[allFiles.count / 2]]
+        }
+    } else {
+        files = (0..<limit).map { offset in
+            let position = Int((Double(offset) * Double(allFiles.count - 1) / Double(limit - 1)).rounded())
+            return allFiles[position]
+        }
+    }
+    let shadowDancer = rootURL.appendingPathComponent("4-Mat/Shadow_Dancer.sndh")
+    if allFiles.contains(shadowDancer), !files.contains(shadowDancer) {
+        files[files.count - 1] = shadowDancer
+    }
+
+    var failures: [String] = []
+    var renderedSubtunes = 0
+    for fileURL in files {
+        do {
+            let metadata = try SNDHMetadataReader.read(fileURL: fileURL)
+            guard !metadata.tracks.isEmpty else {
+                failures.append("\(fileURL.path): no subtunes")
+                continue
+            }
+            let decoder = try DecoderFactory.make(path: fileURL.path)
+            defer { decoder.close() }
+            guard decoder.trackCount == metadata.tracks.count else {
+                failures.append("\(fileURL.path): decoder count \(decoder.trackCount), metadata count \(metadata.tracks.count)")
+                continue
+            }
+            for index in metadata.tracks.indices {
+                try decoder.startTrack(index)
+                let track = try decoder.metadata(for: index)
+                guard track.playMs == metadata.tracks[index].durationMilliseconds else {
+                    failures.append("\(fileURL.path)#\(index + 1): timing mismatch")
+                    continue
+                }
+                let frames = try decoder.readFrames(4_096)
+                guard frames.left.contains(where: { abs($0) > 0.0001 })
+                    || frames.right.contains(where: { abs($0) > 0.0001 }) else {
+                    failures.append("\(fileURL.path)#\(index + 1): silent initial render")
+                    continue
+                }
+                renderedSubtunes += 1
+            }
+        } catch {
+            failures.append("\(fileURL.path): \(error.localizedDescription)")
+        }
+    }
+    print("SNDH sample: \(files.count) files, \(renderedSubtunes) subtunes rendered, \(failures.count) failures")
+    #expect(failures.isEmpty)
 }
 
 @Test(

@@ -40,7 +40,7 @@ the upstream decoders.
 | --- | --- | --- | --- | --- |
 | [Game Music Emu / libgme](https://github.com/libgme/game-music-emu) | 0.6.5 (Homebrew `game-music-emu` / `pkg-config`) | [github.com/libgme/game-music-emu](https://github.com/libgme/game-music-emu) | AY, GBS, HES, KSS, NSF, NSFE, SAP, SPC | `CGameMusicEmu` system-library target; native long-play and tempo support. |
 | [libvgm](https://github.com/ValleyBell/libvgm) | `867223e7c33d63de115d1ab955f784c44f19040a` | [github.com/ValleyBell/libvgm](https://github.com/ValleyBell/libvgm) | VGM, VGZ, GYM, S98, DRO | `CLibVGM` bridge; source and static-library build are owned by VGMBoy. |
-| [psgplay](https://github.com/frno7/psgplay) | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | [github.com/frno7/psgplay](https://github.com/frno7/psgplay) | SNDH | `CPSGPlay` bridge and `VGMBoySNDH` metadata product; enumerates SNDH subtunes and renders Atari ST PSG audio. A 16-file cross-variant sample passed metadata and non-silent PCM checks; the full corpus remains unqualified. |
+| [psgplay](https://github.com/frno7/psgplay) | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | [github.com/frno7/psgplay](https://github.com/frno7/psgplay) | SNDH | `CPSGPlay` bridge and `VGMBoySNDH` metadata product; enumerates SNDH subtunes and renders Atari ST PSG audio. A deterministic 1,024-file sample selected and rendered 2,030 subtunes; the full corpus remains unqualified. |
 | [Highly Complete](https://github.com/mgba-emu/mgba) (mGBA + PSFLib) | VGMBoy `vendor/mgba` snapshot; this checkout does not record an independent upstream revision | [github.com/mgba-emu/mgba](https://github.com/mgba-emu/mgba) | GSF, miniGSF | `CHighlyComplete` bridge; PSFLib resolves the complete miniGSF chain, then mGBA runs the assembled GBA ROM. The bridge resamples mGBA's live native rate into VGMBoy's fixed output rate. |
 | 2sf2wav | VGMBoy `vendor/2sf2wav` snapshot; this checkout does not record an independent upstream revision or home site | — | 2SF, mini2SF | `C2SF` bridge over the static DS core. It validates relative mini2SF libraries and explicitly tears down process-global DS state before any replacement decoder is created. |
 | [vgmstream](https://github.com/vgmstream/vgmstream) | `807b4948cfc1de0cd90e377e9c56f74664c54a1c` + shared compatibility patch | [github.com/vgmstream/vgmstream](https://github.com/vgmstream/vgmstream) / [vgmstream.org](https://vgmstream.org) | ADX, XA, AT3, FSB, VAG, AIFC, OGG, and the other extensions in `FormatRegistry.vgmstreamExtensions` | `CVGmstream` bridge plus the VGMBoy-built `vgmstream-cli` scanner plugin; built with FFmpeg and Vorbis support. |
@@ -86,9 +86,12 @@ DMA/STE-specialized capture, or a composition that intentionally produces no
 audible PSG output. VGMBoy routes all `.sndh` files through PSGPlay; successful
 admission means the file opens and its selected subtune can render, while
 audibility and musical identity remain fixture-level validation questions.
-The current sample covered Leitch game files, loaders/menus, DMA, 5-channel,
-digitized, demo, and several author families. It found no unsupported
-sub-variation, but it is not a whole-corpus certification.
+The multi-track contract is tested by selecting every declared subtune, not
+only the default. A deterministic 1,024-file sample from the 5,897-file
+Atari ST corpus rendered 2,030 subtunes with zero selection, timing, or silent
+initial-render failures; it included 4-Mat's eight-subtune `Shadow_Dancer.sndh`.
+This is still not a whole-corpus certification or a claim that every file is
+conventional music.
 
 ## Build and run
 
