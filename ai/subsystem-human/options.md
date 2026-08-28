@@ -8,6 +8,7 @@
 - Archive Cache uses the shared 2 GB default and 2, 4, 8, or 16 GB choices.
 - AAC Export exposes a destination folder and a playlist context-menu action. New installs default to Downloads, matching CocoaSpice. SPCBoy supplies the selected path, timing plan, and destination; VGMBoyKit performs the offline conversion, including archive-member materialization through the native bridge. Only one export runs at a time. Folder chooser controls use the shared folder glyph.
 - Settings persistence is a typed native Swift snapshot. Electron/WebKit localStorage and the retired favorites migration payload are no longer read or written.
+- Windows and Routing use the same page framing as Audio: their page titles sit outside the headed content cards, with each headed group retaining its own card.
 
 ## Window
 

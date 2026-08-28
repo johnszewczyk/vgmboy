@@ -154,7 +154,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             databaseGroupState: (...args) => request("databaseGroupState", args),
             catalogSessionInvalidate: (...args) => request("catalogSessionInvalidate", args),
             playbackQueueTransition: (...args) => request("playbackQueueTransition", args),
-            playbackCompletionDecision: (...args) => request("playbackCompletionDecision", args),
+            playbackCompletionRetire: (...args) => request("playbackCompletionRetire", args),
             playbackFadeDuration: (...args) => request("playbackFadeDuration", args),
             databaseFileTracks: (...args) => request("databaseFileTracks", args),
             databaseFolderTracks: (...args) => request("databaseFolderTracks", args),
@@ -277,9 +277,9 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return
         }
 
-        if method == "playbackCompletionDecision" {
+        if method == "playbackCompletionRetire" {
             do {
-                let result = try completionDecisionResponse(args)
+                let result = try completionRetirementResponse(args)
                 Task { await Self.reply(to: message.webView, id: id, success: true, valueJSON: Self.json(result)) }
             } catch {
                 Task { await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": error.localizedDescription])) }
@@ -383,7 +383,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         }
     }
 
-    private func completionDecisionResponse(_ args: [Any]) throws -> Any {
+    private func completionRetirementResponse(_ args: [Any]) throws -> Any {
         guard let request = args.first as? [String: Any],
               let statePayload = request["state"] as? [String: Any],
               let intent = request["intent"] as? [String: Any],
@@ -400,7 +400,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         case "all": .playlist
         default: .off
         }
-        guard let decision = WKPlaybackBridge.shared.completionDecision(
+        guard let decision = WKPlaybackBridge.shared.retireCompletedPlayback(
             generation: rawGeneration.intValue,
             state: state,
             playlistIDs: Self.stringArray(request["playlistIds"]),
@@ -408,6 +408,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         ) else {
             return NSNull()
         }
+        SPCArchiveMaterialization.release()
         switch decision.action {
         case .stop:
             return ["action": "stop"]

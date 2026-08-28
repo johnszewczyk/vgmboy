@@ -625,7 +625,7 @@ async function finalizePlaybackEnded() {
   // decision. Keeping them in one bridge call prevents duplicate end events
   // from racing between JavaScript promises. A queued skip still uses the
   // same claim; its adjacent target is calculated only after retirement.
-  const completionDecision = await window.spcBoyWK.playbackCompletionDecision({
+  const retirementDecision = await window.spcBoyWK.playbackCompletionRetire({
     generation: nativeGeneration,
     state: {
       currentTrackId: completedTrackId,
@@ -635,9 +635,9 @@ async function finalizePlaybackEnded() {
     playlistIds: playbackPlaylist().map((track) => track.id),
     intent: { kind: "completion", repeatMode: state.repeatMode }
   });
-  if (!completionDecision) return;
-  const completionTargetId = completionDecision?.action === "play"
-    ? completionDecision.trackId
+  if (!retirementDecision) return;
+  const completionTargetId = retirementDecision?.action === "play"
+    ? retirementDecision.trackId
     : null;
   if (finalizationGeneration !== playbackGeneration
       || state.currentTrackId !== completedTrackId) {
@@ -650,11 +650,12 @@ async function finalizePlaybackEnded() {
 
   queuedSkipRequest = null;
   clearQueuedSkipTimer();
-  await stopPlaybackState({ declick: false, keepNativeOutput: Boolean(completionTargetId || completedQueuedSkip) });
+  await stopPlaybackState({ declick: false, nativeAlreadyRetired: true });
 
-  // stopPlaybackState intentionally advances the generation once to retire
-  // the completed native session. A newer user request advances it again;
-  // only the expected single retirement may continue into queue advance.
+  // The native retirement operation already invalidated the completed
+  // session. stopPlaybackState advances the WebKit presentation generation
+  // once; a newer user request advances it again, so only the expected single
+  // retirement may continue into queue advance.
   if (playbackGeneration !== finalizationGeneration + 1 || state.currentTrackId) {
     return;
   }
@@ -666,9 +667,11 @@ async function finalizePlaybackEnded() {
   }
 }
 
-async function stopPlaybackState({ declick = true, keepNativeOutput = false } = {}) {
+async function stopPlaybackState({ declick = true, keepNativeOutput = false, nativeAlreadyRetired = false } = {}) {
   playbackGeneration += 1;
-  await stopAllOutput({ declick, keepNativeOutput });
+  if (!nativeAlreadyRetired) {
+    await stopAllOutput({ declick, keepNativeOutput });
+  }
 
   await setPlaybackPowerSaveBlocker(false);
   state.currentTrackId = null;

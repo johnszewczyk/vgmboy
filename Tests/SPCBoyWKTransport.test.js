@@ -203,7 +203,7 @@ function makeHarness() {
         queueTransitionRequests.push(request);
         return null;
       },
-      playbackCompletionDecision: async () => ({ action: "stop" }),
+      playbackCompletionRetire: async () => ({ action: "stop" }),
       playbackFadeDuration: async () => 6_000,
       setPlaybackPowerSaveBlocker: async () => {},
     }
@@ -332,7 +332,7 @@ test("SPCBoyWK drops a stale natural-end finalizer after replacement", async () 
   // The production finalizer must validate its captured generation after the
   // queue lookup; the harness replaces the bridge method for that await.
   const completionTarget = new Promise((resolve) => { releaseCompletionTarget = resolve; });
-  window.spcBoyWK.playbackCompletionDecision = async () => completionTarget;
+  window.spcBoyWK.playbackCompletionRetire = async () => completionTarget;
   const finalizer = app.playback.finalizePlaybackEnded();
   state.currentTrackId = "track-b";
   state.currentTrackInfo = state.playlist[1];
@@ -360,7 +360,7 @@ test("SPCBoyWK advances after the completed session is retired", async () => {
   state.selectedTrackId = "track-a";
   state.isPlaying = true;
   state.nativePlayback = { ...state.nativePlayback, generation: 7, trackLoaded: true };
-  window.spcBoyWK.playbackCompletionDecision = async () => ({ action: "play", trackId: "track-b" });
+  window.spcBoyWK.playbackCompletionRetire = async () => ({ action: "play", trackId: "track-b" });
 
   await app.playback.finalizePlaybackEnded();
 
@@ -446,10 +446,11 @@ test("SPCBoyWK broadcasts complete native status to both windows", () => {
   assert.match(appDelegateSource, /optionsWebView\?\.evaluateJavaScript\(script, completionHandler: nil\)/);
 });
 
-test("SPCBoyWK delegates completion claims to the shared transport", () => {
+test("SPCBoyWK delegates completion retirement to the shared transport", () => {
   assert.doesNotMatch(nativeBridgeSource, /private let playbackContinuationCoordinator/);
-  assert.match(nativeBridgeSource, /WKPlaybackBridge\.shared\.completionDecision\(/);
-  assert.match(playbackBridgeSource, /transport\.completionDecision\(/);
+  assert.match(nativeBridgeSource, /WKPlaybackBridge\.shared\.retireCompletedPlayback\(/);
+  assert.match(playbackBridgeSource, /transport\.retireCompletedPlayback\(/);
+  assert.match(nativeBridgeSource, /defer \{ SPCArchiveMaterialization\.release\(\) \}/);
   assert.doesNotMatch(nativeBridgeSource, /releaseMaterializedTrack/);
   assert.doesNotMatch(playbackSource, /releaseMaterializedTrack/);
   assert.match(playbackBridgeSource, /nativePlaybackStop[\s\S]*defer \{ SPCArchiveMaterialization\.release\(\) \}/);
