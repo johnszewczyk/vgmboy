@@ -1856,24 +1856,7 @@ function applyRoutingPreferences(preferences) {
   renderAll();
 }
 
-let optionsPagesOrganized = false;
-
-function organizeOptionsPages() {
-  if (optionsPagesOrganized || !refs.optionsAudioSection || !refs.optionsPlaybackSection) return;
-  const audioTitles = new Set(["AAC Export", "Equalizer", "Mono", "Volume"]);
-  const audioPanels = [...refs.optionsPlaybackSection.querySelectorAll(":scope > .options-subpanel")]
-    .filter((panel) => audioTitles.has(panel.querySelector(".options-subpanel-title")?.textContent?.trim()));
-  const sortPanels = (panels) => panels
-    .sort((left, right) => (left.querySelector(".options-subpanel-title")?.textContent || "")
-      .localeCompare(right.querySelector(".options-subpanel-title")?.textContent || ""));
-  sortPanels(audioPanels).forEach((panel) => refs.optionsAudioSection.appendChild(panel));
-  sortPanels([...refs.optionsPlaybackSection.querySelectorAll(":scope > .options-subpanel")])
-    .forEach((panel) => refs.optionsPlaybackSection.appendChild(panel));
-  optionsPagesOrganized = true;
-}
-
 function renderAll() {
-  organizeOptionsPages();
   applyUISettings();
   refs.optionsOverlay.classList.toggle("is-hidden", !state.optionsOpen);
   refs.optionsOverlay.setAttribute("aria-hidden", state.optionsOpen ? "false" : "true");

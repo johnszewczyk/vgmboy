@@ -1,12 +1,12 @@
 # Options
 
-- SPCBoy-owned pages mirror CocoaSpice organizationally: Database, Interface, and Windows, while retaining SPCBoy's WebKit styling.
+- SPCBoy-owned pages mirror CocoaSpice organizationally: Database, Interface, and Windows, while VGMBoy pages provide Audio, Diagnostics, Playback, and Routing in the same WebKit settings window.
 - Interface > Animations exposes checkbox-enabled Auto-Resize and Selection Bar timings; both default on at 200 ms and accept 0–1000 ms. Disabling one uses an effective 0 ms duration while retaining the configured value.
 - Playlist Options exposes Enable Column Auto-size, enabled by default, with the description “Automatically resize columns for content width on selection.”
 - Interface Style combines font size, font color, and monospace controls for the database sidebar and playlist; the single setting is applied to both surfaces.
 - Windows has independent Always on Top switches for Main Window and Options Window; both default off. Main keeps the main window on top of other apps; Options keeps the options window on top of the main window.
 - Archive Cache uses the shared 2 GB default and 2, 4, 8, or 16 GB choices.
-- AAC Export exposes a destination folder and a playlist context-menu action. New installs default to Downloads, matching CocoaSpice. SPCBoy supplies the selected path, timing plan, and destination; VGMBoyKit performs the offline conversion, including archive-member materialization through the native bridge. Only one export runs at a time.
+- AAC Export exposes a destination folder and a playlist context-menu action. New installs default to Downloads, matching CocoaSpice. SPCBoy supplies the selected path, timing plan, and destination; VGMBoyKit performs the offline conversion, including archive-member materialization through the native bridge. Only one export runs at a time. Folder chooser controls use the shared folder glyph.
 - Settings persistence is a typed native Swift snapshot. Electron/WebKit localStorage and the retired favorites migration payload are no longer read or written.
 
 ## Window
@@ -38,10 +38,10 @@ Reload Library, and Show in Finder. The catalog browse action is the folder butt
 path bar. Archive Cache uses the identical empty placeholder readout and uses Use Default, Clear Cache,
 and Show in Finder, with Show in Finder last.
 
-Playback controls are ordered Volume, Mono, Equalizer. Volume and each equalizer band use animated range bars with live values. The transport
+Audio controls are ordered AAC Export, Equalizer, Mono, and Volume. Volume and each equalizer band use animated range bars with live values. The transport
 seek bar remains a transport control, not a settings input.
 
-Play Time keeps Long Play, the configurable Unknown-length default, and the configurable End Fade duration together. The default End Fade is six
+Playback controls are ordered End Fade, Play Time, and Play Speed. Play Time keeps Long Play and the configurable Unknown-length default. The default End Fade is six
 seconds; Faded Skip is an option within that panel and does not have a separate page.
 
 Faded Skip is presented inline in the Play Time panel with End Fade behavior; it has no separate panel. SPCBoy WK's toolbar is rendered by WKWebView HTML. It uses the shared native playback command boundary, but it is not the same native SwiftUI macOS toolbar view used by CocoaSpice.

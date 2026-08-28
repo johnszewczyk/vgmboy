@@ -461,6 +461,22 @@ test("SPCBoyWK uses native in-place tempo and AAC cancellation events", () => {
   assert.match(uiSource, /\[\["Export AAC"/);
   assert.match(indexSource, /id="aac-export-directory-path"/);
   assert.match(indexSource, /id="aac-export-cancel-button"/);
+  assert.match(indexSource, /id="aac-export-choose-button" class="tool-button glyph-button"[\s\S]*icon-folder-tree/);
+});
+
+test("SPCBoyWK keeps Audio and Playback option panels structurally separated", () => {
+  const audioStart = indexSource.indexOf('id="options-audio-section"');
+  const playbackStart = indexSource.indexOf('id="options-playback-section"');
+  const diagnosticsStart = indexSource.indexOf('id="options-diagnostics-section"');
+  const audioSource = indexSource.slice(audioStart, playbackStart);
+  const playbackSource = indexSource.slice(playbackStart, diagnosticsStart);
+
+  assert.ok(audioStart >= 0 && playbackStart > audioStart && diagnosticsStart > playbackStart);
+  assert.match(audioSource, /AAC Export[\s\S]*Equalizer[\s\S]*Mono[\s\S]*Volume/);
+  assert.doesNotMatch(audioSource, /End Fade|Play Time|Play Speed/);
+  assert.match(playbackSource, /End Fade[\s\S]*Play Time[\s\S]*Play Speed/);
+  assert.doesNotMatch(playbackSource, /AAC Export|Equalizer|Mono|options-page-title[^]*Volume/);
+  assert.doesNotMatch(uiSource, /organizeOptionsPages/);
 });
 
 test("SPCBoyWK allows every playlist column to be hidden except an empty table", () => {

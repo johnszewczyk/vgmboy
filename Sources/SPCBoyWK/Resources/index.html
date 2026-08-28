@@ -206,19 +206,11 @@
 
             <div id="options-audio-section" class="options-page options-page-audio is-hidden">
               <div class="options-page-title">VGMBoy / Audio</div>
-            </div>
-
-            <div id="options-playback-section" class="options-page options-page-playback is-hidden">
-              <div class="options-page-title">VGMBoy / Playback</div>
               <div class="options-subpanel">
-                <div class="options-subpanel-title">Volume</div>
-                <div class="options-help-text">Volume applies to SPCBoy playback only. macOS volume keys continue to control system volume.</div>
-                <label class="equalizer-band equalizer-volume"><span>Volume</span><span class="range-slider"><input id="app-volume-input" class="animated-range" type="range" min="0" max="1" step="0.01" value="1" aria-label="App volume" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output id="app-volume-value">100%</output></label>
-              </div>
-              <div class="options-subpanel">
-                <div class="options-subpanel-title">Mono</div>
-                <label class="options-field options-inline-field"><span>Enable Mono</span><input id="mono-enabled-checkbox" type="checkbox" /></label>
-                <div class="options-help-text">Mix left and right channels, then play the same signal through both speakers.</div>
+                <div class="options-subpanel-title">AAC Export</div>
+                <div class="options-help-text">VGMBoy performs the finite offline render. SPCBoy only supplies the selected track and destination.</div>
+                <div class="database-stats-panel options-path-control"><input id="aac-export-directory-path" class="options-input options-path-readout" type="text" readonly placeholder="Choose an export folder" aria-label="AAC export folder" /><button id="aac-export-choose-button" class="tool-button glyph-button" type="button" aria-label="Choose AAC export folder" title="Choose AAC export folder"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
+                <div class="database-stats-panel"><div id="aac-export-status" class="options-help-text" aria-live="polite"></div><button id="aac-export-cancel-button" class="tool-button" type="button" disabled>Abort Export</button></div>
               </div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Equalizer</div>
@@ -239,6 +231,20 @@
                 <button id="equalizer-reset-button" class="tool-button" type="button">Reset</button>
               </div>
               <div class="options-subpanel">
+                <div class="options-subpanel-title">Mono</div>
+                <label class="options-field options-inline-field"><span>Enable Mono</span><input id="mono-enabled-checkbox" type="checkbox" /></label>
+                <div class="options-help-text">Mix left and right channels, then play the same signal through both speakers.</div>
+              </div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Volume</div>
+                <div class="options-help-text">Volume applies to SPCBoy playback only. macOS volume keys continue to control system volume.</div>
+                <label class="equalizer-band equalizer-volume"><span>Volume</span><span class="range-slider"><input id="app-volume-input" class="animated-range" type="range" min="0" max="1" step="0.01" value="1" aria-label="App volume" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output id="app-volume-value">100%</output></label>
+              </div>
+            </div>
+
+            <div id="options-playback-section" class="options-page options-page-playback is-hidden">
+              <div class="options-page-title">VGMBoy / Playback</div>
+              <div class="options-subpanel">
                 <div class="options-subpanel-title">End Fade</div>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="spc-fade-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Fade Out</span><small>Apply transitional volume fade to song end.</small></span></span><span class="options-inline-trailing"><input id="spc-fade-input" class="options-input options-duration-input" type="text" inputmode="numeric" value="0:06" aria-label="Fade length" /></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="queued-skips-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Faded Skip</span><small>First skip fades from the current position; another skip during that fade advances immediately.</small></span></span></label>
@@ -247,12 +253,6 @@
                 <div class="options-subpanel-title">Play Time</div>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="spc-force-length-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Long Play</span><small>Loop song with original format control.</small></span></span><span class="options-inline-trailing"><input id="spc-length-input" class="options-input options-duration-input" type="text" inputmode="numeric" value="3:00" aria-label="Long Play duration" /></span></label>
                 <label class="options-field options-inline-field"><span class="options-checkbox-copy"><span>Unknown-length default</span><small>Used when a decoder provides no natural duration and Long Play is off.</small></span><span class="options-inline-trailing"><input id="spc-unknown-duration-input" class="options-input options-duration-input" type="text" inputmode="numeric" value="2:30" aria-label="Unknown-length default duration" /></span></label>
-              </div>
-              <div class="options-subpanel">
-                <div class="options-subpanel-title">AAC Export</div>
-                <div class="options-help-text">VGMBoy performs the finite offline render. SPCBoy only supplies the selected track and destination.</div>
-                <div class="database-stats-panel options-path-control"><input id="aac-export-directory-path" class="options-input options-path-readout" type="text" readonly placeholder="Choose an export folder" aria-label="AAC export folder" /><button id="aac-export-choose-button" class="tool-button" type="button">Choose Folder</button></div>
-                <div class="database-stats-panel"><div id="aac-export-status" class="options-help-text" aria-live="polite"></div><button id="aac-export-cancel-button" class="tool-button" type="button" disabled>Abort Export</button></div>
               </div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Play Speed</div>
