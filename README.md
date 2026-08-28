@@ -51,7 +51,9 @@ the lower-level pure calculation layer used by that state contract.
 adjacent-track fade eligibility and bounded fade duration, serialized commands,
 request invalidation, timing reconfiguration, status snapshots, and the
 one-shot generation-checked natural-end event. VGMBoy remains responsible for
-the actual output gain ramp and decoder timing.
+the actual output gain ramp and decoder timing. `PlaybackTransportStatusPayload`
+is the single JSON projection for bridge replies and native event broadcasts,
+including elapsed position, decoder diagnostics, and drained natural-end state.
 
 `VGMBoyKit` owns the shared `PlaybackTimingPolicy`, configurable fade policy,
 tempo-aware playback plan, and offline `AACExporter`. Frontends may expose
