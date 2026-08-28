@@ -23,6 +23,23 @@ public struct PlaybackTransportStatus: Equatable, Sendable {
     public let elapsedSeconds: TimeInterval
     public let reachedEnd: Bool
     public let trackLoaded: Bool
+    /// Native output and decoder facts. These remain presentation-free so
+    /// every frontend can render an honest diagnostics view from the same
+    /// event that drives elapsed playback time.
+    public let outputIsRunning: Bool
+    public let errorMessage: String?
+    public let bufferedFrames: Int
+    public let ringBufferFrames: Int
+    public let underrunCount: Int64
+    public let framesRequested: Int64
+    public let framesSupplied: Int64
+    public let decoderFamily: String?
+    public let trackIndex: Int?
+    public let decoderSampleRate: Int
+    public let outputSampleRate: Int
+    public let decodedFrames: Int64
+    public let audiblePositionFrames: Int64
+    public let tempo: Double
 
     public init(
         currentTrackID: String?,
@@ -30,7 +47,21 @@ public struct PlaybackTransportStatus: Equatable, Sendable {
         isPlaying: Bool,
         elapsedSeconds: TimeInterval,
         reachedEnd: Bool,
-        trackLoaded: Bool
+        trackLoaded: Bool,
+        outputIsRunning: Bool = false,
+        errorMessage: String? = nil,
+        bufferedFrames: Int = 0,
+        ringBufferFrames: Int = 0,
+        underrunCount: Int64 = 0,
+        framesRequested: Int64 = 0,
+        framesSupplied: Int64 = 0,
+        decoderFamily: String? = nil,
+        trackIndex: Int? = nil,
+        decoderSampleRate: Int = 0,
+        outputSampleRate: Int = 0,
+        decodedFrames: Int64 = 0,
+        audiblePositionFrames: Int64 = 0,
+        tempo: Double = 1
     ) {
         self.currentTrackID = currentTrackID
         self.generation = generation
@@ -38,6 +69,20 @@ public struct PlaybackTransportStatus: Equatable, Sendable {
         self.elapsedSeconds = elapsedSeconds
         self.reachedEnd = reachedEnd
         self.trackLoaded = trackLoaded
+        self.outputIsRunning = outputIsRunning
+        self.errorMessage = errorMessage
+        self.bufferedFrames = bufferedFrames
+        self.ringBufferFrames = ringBufferFrames
+        self.underrunCount = underrunCount
+        self.framesRequested = framesRequested
+        self.framesSupplied = framesSupplied
+        self.decoderFamily = decoderFamily
+        self.trackIndex = trackIndex
+        self.decoderSampleRate = decoderSampleRate
+        self.outputSampleRate = outputSampleRate
+        self.decodedFrames = decodedFrames
+        self.audiblePositionFrames = audiblePositionFrames
+        self.tempo = tempo
     }
 }
 
@@ -314,27 +359,29 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         trackIndex: Int,
         plan: PlaybackTimingPlan,
         outputDirectory: URL,
-        filenameStem: String
+        filenameStem: String,
+        cancellation: AACExportCancellation? = nil,
+        progress: (@Sendable (AACExportProgress) -> Void)? = nil
     ) throws -> URL {
-        let event = controller.perform(.init(
-            command: .exportAAC,
-            payload: .init(
-                path: sourcePath,
-                trackIndex: trackIndex,
-                playMilliseconds: plan.preFadeSeconds * 1_000,
-                fadeMilliseconds: plan.fadeSeconds * 1_000,
-                exportDirectory: outputDirectory.path,
-                exportFilenameStem: filenameStem
-            )
-        ))
-        guard event.kind != .error, let path = event.message else {
-            throw NSError(
-                domain: "VGMBoyKit",
-                code: 1,
-                userInfo: [NSLocalizedDescriptionKey: event.message ?? "VGMBoy AAC export failed."]
-            )
+        try exportAAC(.init(
+            sourcePath: sourcePath,
+            trackIndex: trackIndex,
+            outputDirectory: outputDirectory,
+            filenameStem: filenameStem,
+            playMilliseconds: plan.preFadeSeconds * 1_000,
+            fadeMilliseconds: plan.fadeSeconds * 1_000
+        ), cancellation: cancellation, progress: progress)
+    }
+
+    public func exportAAC(
+        _ request: AACExportRequest,
+        cancellation: AACExportCancellation? = nil,
+        progress: (@Sendable (AACExportProgress) -> Void)? = nil
+    ) throws -> URL {
+        try queue.sync {
+            let result = try controller.exportAAC(request, cancellation: cancellation, progress: progress)
+            return result.outputURL
         }
-        return URL(fileURLWithPath: path)
     }
 
     /// Shared low-level command access for a host bridge. The command is still
@@ -421,13 +468,29 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     }
 
     private func status(_ status: VGMBoyKit.PlaybackStatus?) -> PlaybackTransportStatus {
-        PlaybackTransportStatus(
+        let diagnostics = status?.diagnostics
+        let statistics = status?.statistics
+        return PlaybackTransportStatus(
             currentTrackID: currentTrack?.id,
-            generation: status?.diagnostics.generation ?? 0,
+            generation: diagnostics?.generation ?? 0,
             isPlaying: status?.isPlaying ?? false,
             elapsedSeconds: status?.elapsedSeconds ?? 0,
             reachedEnd: status?.reachedEnd ?? false,
-            trackLoaded: currentTrack != nil
+            trackLoaded: currentTrack != nil,
+            outputIsRunning: diagnostics?.isOutputRunning ?? false,
+            errorMessage: status?.errorMessage,
+            bufferedFrames: diagnostics?.bufferedFrames ?? 0,
+            ringBufferFrames: diagnostics?.capacityFrames ?? 0,
+            underrunCount: diagnostics?.underrunCount ?? 0,
+            framesRequested: diagnostics?.framesRequested ?? 0,
+            framesSupplied: diagnostics?.framesSupplied ?? 0,
+            decoderFamily: statistics?.decoderFamily,
+            trackIndex: statistics?.trackIndex,
+            decoderSampleRate: statistics?.decoderSampleRate ?? 0,
+            outputSampleRate: statistics?.outputSampleRate ?? diagnostics?.sampleRate ?? 0,
+            decodedFrames: statistics?.decodedFrames ?? 0,
+            audiblePositionFrames: statistics?.audiblePositionFrames ?? 0,
+            tempo: statistics?.tempo ?? 1
         )
     }
 

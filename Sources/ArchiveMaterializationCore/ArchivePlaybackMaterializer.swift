@@ -77,7 +77,18 @@ public final class ArchivePlaybackMaterializer: @unchecked Sendable {
             let rootURL = try cacheMaterializer.materializeCompleteSet(
                 archiveURL: archiveURL,
                 policy: policy,
-                activePlaybackRoot: playbackLease.path.map(URL.init(fileURLWithPath:))
+                activePlaybackRoot: playbackLease.path.map(URL.init(fileURLWithPath:)),
+                isValid: { rootURL in
+                    let selectedURL = self.cacheMaterializer.archiveMemberURL(
+                        in: rootURL,
+                        entryPath: normalizedEntry
+                    )
+                    guard let attributes = try? FileManager.default.attributesOfItem(atPath: selectedURL.path),
+                          let byteCount = (attributes[.size] as? NSNumber)?.int64Value else {
+                        return false
+                    }
+                    return byteCount > 0
+                }
             ) { stagingURL in
                 try ArchiveMaterializer.shared.execute(
                     ArchiveToolRouting.completeSet(

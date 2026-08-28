@@ -66,6 +66,7 @@ public struct ArchiveCacheMaterializer: Sendable {
         archiveURL: URL,
         policy: ArchiveCachePolicy,
         activePlaybackRoot: URL?,
+        isValid: (URL) -> Bool = { _ in true },
         extract: (URL) throws -> Void
     ) throws -> URL {
         let archiveURL = archiveURL.standardizedFileURL
@@ -74,9 +75,17 @@ public struct ArchiveCacheMaterializer: Sendable {
         let completionURL = rootURL.appendingPathComponent(".complete", isDirectory: false)
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: completionURL.path) {
-            cacheStore.touch(archiveURL, policy: policy)
-            activateLease(for: archiveURL, policy: policy)
-            return rootURL
+            if isValid(rootURL) {
+                cacheStore.touch(archiveURL, policy: policy)
+                activateLease(for: archiveURL, policy: policy)
+                return rootURL
+            }
+            // A marker only proves that a prior extraction process finished,
+            // not that its selected decoder input survived. Never hand a
+            // missing dependency-set member to a frontend while an earlier
+            // track keeps playing; remove this invalid cache entry and stage
+            // the complete archive again.
+            try? fileManager.removeItem(at: rootURL)
         }
 
         try cacheStore.prepareWrite(policy: policy)
@@ -91,9 +100,13 @@ public struct ArchiveCacheMaterializer: Sendable {
             at: rootURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        if !fileManager.fileExists(atPath: rootURL.path) {
-            try fileManager.moveItem(at: stagingURL, to: rootURL)
+        // A previous interrupted extraction can leave `set` behind without a
+        // completion marker. It is not a warm hit and must not block the
+        // atomic replacement with the newly validated staging directory.
+        if fileManager.fileExists(atPath: rootURL.path) {
+            try fileManager.removeItem(at: rootURL)
         }
+        try fileManager.moveItem(at: stagingURL, to: rootURL)
         try cacheStore.enforceLimit(
             policy: policy,
             preserving: archiveRoot,

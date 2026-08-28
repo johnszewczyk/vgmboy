@@ -39,7 +39,7 @@ let package = Package(
         ),
         .target(name: "FrontendPreferencesCore"),
         .target(name: "PlaybackRequestCore"),
-        .target(name: "PlaybackQueueCore"),
+        .target(name: "PlaybackQueueCore", dependencies: ["PlaybackRequestCore"]),
         .target(
             name: "PlaybackTransportCore",
             dependencies: [

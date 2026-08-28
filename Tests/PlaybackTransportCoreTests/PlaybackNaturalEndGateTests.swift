@@ -26,3 +26,35 @@ func staleNaturalEndCannotPublishAfterReplacement() {
     #expect(!stale)
     #expect(current)
 }
+
+@Test
+func transportStatusCarriesPresentationNeutralDiagnostics() {
+    let status = PlaybackTransportStatus(
+        currentTrackID: "track-a",
+        generation: 12,
+        isPlaying: true,
+        elapsedSeconds: 42.5,
+        reachedEnd: false,
+        trackLoaded: true,
+        outputIsRunning: true,
+        errorMessage: nil,
+        bufferedFrames: 2_048,
+        ringBufferFrames: 8_192,
+        underrunCount: 3,
+        framesRequested: 5_000,
+        framesSupplied: 4_800,
+        decoderFamily: "libgme",
+        trackIndex: 2,
+        decoderSampleRate: 32_000,
+        outputSampleRate: 44_100,
+        decodedFrames: 88_200,
+        audiblePositionFrames: 86_152,
+        tempo: 1.25
+    )
+
+    #expect(status.outputIsRunning)
+    #expect(status.bufferedFrames == 2_048)
+    #expect(status.framesRequested == 5_000)
+    #expect(status.decoderFamily == "libgme")
+    #expect(status.audiblePositionFrames == 86_152)
+}
