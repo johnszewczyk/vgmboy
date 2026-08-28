@@ -203,7 +203,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             nativeExportAAC: (...args) => request("nativeExportAAC", args),
             nativeCancelAACExport: (...args) => request("nativeExportAACCancel", args),
             setPlaybackPowerSaveBlocker: (...args) => request("setPlaybackPowerSaveBlocker", args),
-            releaseMaterializedTrack: (...args) => request("releaseMaterializedTrack", args),
             onCatalogReloaded: (listener) => on("catalogReloaded", listener),
             onLibrarySnapshot: (listener) => on("librarySnapshot", listener),
             onLibraryCommand: (listener) => on("libraryCommand", listener),
@@ -665,8 +664,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
              "nativePlaybackResume", "nativePlaybackPause", "nativePlaybackStop",
              "nativePlaybackClose", "nativePlaybackUnload", "nativePlaybackSeek",
              "nativePlaybackState", "nativePlaybackRampGain",
-             "nativeExportAAC", "nativeExportAACCancel",
-             "releaseMaterializedTrack":
+             "nativeExportAAC", "nativeExportAACCancel":
             return try WKPlaybackBridge.shared.handle(method: method, args: args)
         default:
             throw BridgeError.unsupported(method)

@@ -136,9 +136,11 @@ bridge requests from racing one playback session.
 Natural-end completion claiming and repeat/advance decision also live on that
 shared transport coordinator. `WKNativeBridge` parses the JSON envelope, then
 delegates the typed decision through `WKPlaybackBridge`; it does not retain a
-second `PlaybackContinuationCoordinator`. WebKit still performs the renderer
-handoff (clear its presentation state, then request the chosen track) until the
-remaining stop/advance sequencing is extracted.
+second `PlaybackContinuationCoordinator`. Native stop/close/unload also
+releases the active archive materialization in that serialized boundary, so
+there is no second JavaScript release request. WebKit still performs the
+renderer handoff (clear its presentation state, then request the chosen track)
+until the remaining stop/advance sequencing is extracted.
 
 `WKPlaybackBridge` callback slots are lock-protected because handlers are
 installed by the AppKit host while status, natural-end, and AAC progress events

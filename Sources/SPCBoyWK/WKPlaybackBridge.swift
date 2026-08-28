@@ -246,6 +246,7 @@ final class WKPlaybackBridge: @unchecked Sendable {
             try perform(.pause)
             return statusResponse()
         case "nativePlaybackStop", "nativePlaybackClose", "nativePlaybackUnload":
+            defer { SPCArchiveMaterialization.release() }
             try perform(.stop)
             return statusResponse()
         case "nativePlaybackSeek":
@@ -262,9 +263,6 @@ final class WKPlaybackBridge: @unchecked Sendable {
         case "nativeExportAACCancel":
             return cancelAACExport(args)
         case "setPlaybackPowerSaveBlocker":
-            return NSNull()
-        case "releaseMaterializedTrack":
-            SPCArchiveMaterialization.release()
             return NSNull()
         default:
             throw PlaybackBridgeError.invalid("Unknown playback request \(method).")

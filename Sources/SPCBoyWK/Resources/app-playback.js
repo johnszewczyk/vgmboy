@@ -669,9 +669,6 @@ async function finalizePlaybackEnded() {
 async function stopPlaybackState({ declick = true, keepNativeOutput = false } = {}) {
   playbackGeneration += 1;
   await stopAllOutput({ declick, keepNativeOutput });
-  // The core owns every output path; release an archive materialization only
-  // after the bridge has stopped or unloaded it.
-  try { await window.spcBoyWK.releaseMaterializedTrack?.(); } catch {}
 
   await setPlaybackPowerSaveBlocker(false);
   state.currentTrackId = null;

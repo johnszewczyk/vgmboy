@@ -188,17 +188,16 @@ function makeHarness() {
         reconfigureRequests.push(request);
         return snapshot(8);
       },
-    nativePlaybackState: async () => snapshot(state.nativePlayback.generation || 7),
-    nativePlaybackUnload: async () => snapshot(state.nativePlayback.generation, "stopped"),
-    nativePlaybackRampGain: async (gain) => { gainCalls.push(gain); return snapshot(7); },
-    playbackQueueTransition: async (request) => {
-      queueTransitionRequests.push(request);
-      return null;
-    },
-    playbackCompletionDecision: async () => ({ action: "stop" }),
-    playbackFadeDuration: async () => 6_000,
+      nativePlaybackState: async () => snapshot(state.nativePlayback.generation || 7),
+      nativePlaybackUnload: async () => snapshot(state.nativePlayback.generation, "stopped"),
+      nativePlaybackRampGain: async (gain) => { gainCalls.push(gain); return snapshot(7); },
+      playbackQueueTransition: async (request) => {
+        queueTransitionRequests.push(request);
+        return null;
+      },
+      playbackCompletionDecision: async () => ({ action: "stop" }),
+      playbackFadeDuration: async () => 6_000,
       setPlaybackPowerSaveBlocker: async () => {},
-      releaseMaterializedTrack: async () => {}
     }
   };
   const app = {
@@ -443,6 +442,9 @@ test("SPCBoyWK delegates completion claims to the shared transport", () => {
   assert.doesNotMatch(nativeBridgeSource, /private let playbackContinuationCoordinator/);
   assert.match(nativeBridgeSource, /WKPlaybackBridge\.shared\.completionDecision\(/);
   assert.match(playbackBridgeSource, /transport\.completionDecision\(/);
+  assert.doesNotMatch(nativeBridgeSource, /releaseMaterializedTrack/);
+  assert.doesNotMatch(playbackSource, /releaseMaterializedTrack/);
+  assert.match(playbackBridgeSource, /nativePlaybackStop[\s\S]*defer \{ SPCArchiveMaterialization\.release\(\) \}/);
 });
 
 test("SPCBoyWK uses native in-place tempo and AAC cancellation events", () => {
