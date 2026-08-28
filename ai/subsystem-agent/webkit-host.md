@@ -125,7 +125,8 @@ the shared `FrontendCore.PlaybackTransportCore.PlaybackTransportCoordinator`,
 which also exposes one generation-checked natural-end event for queue
 continuation.
 Synchronous bridge replies and pushed playback events both derive from that
-same `PlaybackTransportStatus` snapshot; the WK layer must not re-query or
+same `PlaybackTransportStatus` snapshot and its shared
+`PlaybackTransportStatusPayload` projection; the WK layer must not re-query or
 independently reconstruct VGMBoy diagnostics.
 The bridge no longer owns a `PlaybackController`, serial executor, or native
 request-generation lock. The remaining JavaScript queue/status layer owns only
@@ -202,12 +203,12 @@ visibility are persisted in the WebKit settings projection; every displayed
 column, including File and the favorite marker, can be hidden, while the
 renderer keeps at least one column visible.
 
-Catalog snapshot loading is not yet identical: CocoaSpice has separate native
-Games/Files `LatestTaskOwner` sessions and complete-snapshot publication,
-while WebKit currently keeps one renderer loading flag and a search-only
-generation guard. The next extraction must establish request generation and
-stale-result rejection at the native bridge before attempting to share loading
-copy or DOM state.
+Catalog snapshot loading now uses independent native Games, Files, and playlist
+session scopes through `CatalogSessionCore.CatalogSessionCoordinator`. Detached
+work from an older generation receives an explicit `{ "stale": true }` envelope
+and cannot publish rows. WebKit still owns its loading copy, DOM snapshot
+application, and browser-selection ordering guard; those presentation concerns
+remain intentionally local.
 
 ## Failure Boundaries
 

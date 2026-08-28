@@ -1,9 +1,10 @@
 # Playback and transport
 
 SPCBoy WK obtains transport state, elapsed position, decoder statistics, and reached-end state
-from the in-process VGMBoy bridge. While a track is playing, the frontend polls that state so the
-elapsed/track/playlist readout stays current and the next playlist item can begin when playback
-ends. Playback timing remains owned by VGMBoy; SPCBoy owns queue order and presentation.
+from the in-process VGMBoy bridge. The native transport pushes bounded status updates while a
+track is playing, and the frontend renders those updates; it does not poll the decoder. Natural
+completion is delivered as a native end event. Playback timing remains owned by VGMBoy; SPCBoy
+owns queue order and presentation.
 
 Natural completion retires the finished native session and advances to the next
 queue target when one exists. The completion path waits for that replacement

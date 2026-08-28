@@ -17,6 +17,8 @@
   FrontendCore.
 - Shared explicit local-folder navigation through `LocalFileBrowserCore`.
 - Shared `PlaybackRequestCore` lifecycle and serial VGMBoy command execution.
+- Shared `PlaybackTransportCore` native transport lifecycle and
+  `PlaybackTransportStatusPayload` bridge projection.
 - Separate native Settings window with an independent options-mode WKWebView.
 
 The root library uses a shared two-row geometry: the sidebar toolbar and
