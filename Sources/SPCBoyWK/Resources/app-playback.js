@@ -636,13 +636,27 @@ async function finalizePlaybackEnded() {
     intent: { kind: "completion", repeatMode: state.repeatMode }
   });
   if (!retirementDecision) return;
-  const completionTargetId = retirementDecision?.action === "play"
-    ? retirementDecision.trackId
-    : null;
   if (finalizationGeneration !== playbackGeneration
       || state.currentTrackId !== completedTrackId) {
     return;
   }
+  await continueAfterPlaybackRetirement({
+    finalizationGeneration,
+    completedTrackId,
+    completedQueuedSkip,
+    retirementDecision
+  });
+}
+
+async function continueAfterPlaybackRetirement({
+  finalizationGeneration,
+  completedTrackId,
+  completedQueuedSkip,
+  retirementDecision
+}) {
+  const completionTargetId = retirementDecision?.action === "play"
+    ? retirementDecision.trackId
+    : null;
   state.isPlaying = false;
   state.elapsedSeconds = state.totalSeconds;
   updatePlaybackReadout();

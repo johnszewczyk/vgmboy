@@ -451,6 +451,7 @@ test("SPCBoyWK delegates completion retirement to the shared transport", () => {
   assert.match(nativeBridgeSource, /PlaybackContinuationRequest\(/);
   assert.match(nativeBridgeSource, /WKPlaybackBridge\.shared\.retireCompletedPlayback\(/);
   assert.match(playbackBridgeSource, /transport\.retireCompletedPlayback\(/);
+  assert.match(playbackSource, /continueAfterPlaybackRetirement\(/);
   assert.match(nativeBridgeSource, /SPCArchiveMaterialization\.release\(\)/);
   assert.doesNotMatch(nativeBridgeSource, /releaseMaterializedTrack/);
   assert.doesNotMatch(playbackSource, /releaseMaterializedTrack/);
