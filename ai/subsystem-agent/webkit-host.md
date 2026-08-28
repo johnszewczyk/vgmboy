@@ -192,7 +192,10 @@ lookup must never call the stop path merely because the playlist view changed.
 Playlist hydration is shared at the data/policy boundary: the bridge uses
 `CatalogPlaylistReader` and `PlaybackQueueCore`, matching CocoaSpice.
 The JSON-to-track mapping remains WebKit-local because its fields are not the
-native metadata cache or column-width model.
+native metadata cache or column-width model. Playlist column order, widths, and
+visibility are persisted in the WebKit settings projection; every displayed
+column, including File and the favorite marker, can be hidden, while the
+renderer keeps at least one column visible.
 
 Catalog snapshot loading is not yet identical: CocoaSpice has separate native
 Games/Files `LatestTaskOwner` sessions and complete-snapshot publication,
