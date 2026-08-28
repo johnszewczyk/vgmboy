@@ -54,17 +54,9 @@ final class WKPlaybackBridge: @unchecked Sendable {
     }
 
     func retireCompletedPlayback(
-        generation: Int,
-        state: PlaybackQueueState,
-        playlistIDs: [String],
-        repeatMode: PlaybackRepeatMode
+        _ request: PlaybackContinuationRequest
     ) -> PlaybackContinuationDecision? {
-        transport.retireCompletedPlayback(
-            generation: generation,
-            state: state,
-            playlistIDs: playlistIDs,
-            repeatMode: repeatMode
-        )
+        transport.retireCompletedPlayback(request)
     }
 
     func handle(method: String, args: [Any]) throws -> Any {

@@ -400,12 +400,13 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         case "all": .playlist
         default: .off
         }
-        guard let decision = WKPlaybackBridge.shared.retireCompletedPlayback(
+        let lifecycleRequest = PlaybackContinuationRequest(
             generation: rawGeneration.intValue,
             state: state,
             playlistIDs: Self.stringArray(request["playlistIds"]),
             repeatMode: repeatMode
-        ) else {
+        )
+        guard let decision = WKPlaybackBridge.shared.retireCompletedPlayback(lifecycleRequest) else {
             return NSNull()
         }
         SPCArchiveMaterialization.release()

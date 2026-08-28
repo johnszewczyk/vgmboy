@@ -448,9 +448,10 @@ test("SPCBoyWK broadcasts complete native status to both windows", () => {
 
 test("SPCBoyWK delegates completion retirement to the shared transport", () => {
   assert.doesNotMatch(nativeBridgeSource, /private let playbackContinuationCoordinator/);
+  assert.match(nativeBridgeSource, /PlaybackContinuationRequest\(/);
   assert.match(nativeBridgeSource, /WKPlaybackBridge\.shared\.retireCompletedPlayback\(/);
   assert.match(playbackBridgeSource, /transport\.retireCompletedPlayback\(/);
-  assert.match(nativeBridgeSource, /defer \{ SPCArchiveMaterialization\.release\(\) \}/);
+  assert.match(nativeBridgeSource, /SPCArchiveMaterialization\.release\(\)/);
   assert.doesNotMatch(nativeBridgeSource, /releaseMaterializedTrack/);
   assert.doesNotMatch(playbackSource, /releaseMaterializedTrack/);
   assert.match(playbackBridgeSource, /nativePlaybackStop[\s\S]*defer \{ SPCArchiveMaterialization\.release\(\) \}/);

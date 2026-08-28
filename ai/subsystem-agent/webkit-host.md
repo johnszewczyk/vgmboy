@@ -135,6 +135,9 @@ bridge requests from racing one playback session.
 
 Natural-end completion claiming, repeat/advance decision, and retirement of
 the completed native session also live on that shared transport coordinator.
+The bridge projects the JSON envelope into the shared
+`PlaybackContinuationRequest` value before invoking it, so CocoaSpice and
+SPCBoyWK submit the same lifecycle input.
 `WKNativeBridge` parses the JSON envelope, then delegates the typed retirement
 operation through `WKPlaybackBridge`; it does not retain a second
 `PlaybackContinuationCoordinator`. Completion retirement releases the active
