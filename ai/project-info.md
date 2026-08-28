@@ -19,8 +19,8 @@ hosts. It must not become a second catalog writer or playback engine.
   frontend-supplied extraction.
 - `ArchiveCacheCore`: archive playback cache roots, stable source identity,
   recovery, free-space checks, policy enforcement, cache touching, and bounded
-  LRU lifecycle. CocoaSpice still owns only its app error adapter and
-  maintenance scheduling during the orchestration transition.
+  LRU lifecycle. CocoaSpice retains only its app error adapter and maintenance
+  scheduling; cache lifecycle policy itself is shared.
 - `FavoriteTrackCore`: stable cross-app track identity and group-toggle semantics.
 - `FavoriteStoreCore`: versioned cross-process SQLite persistence at
   `Application Support/VGMMan/UserData.sqlite`, including ordered snapshots,
@@ -34,15 +34,19 @@ hosts. It must not become a second catalog writer or playback engine.
 - `PlaybackQueueCore`: pure queue identity and continuation policy plus the
   generation-checked one-shot natural-end handoff. It stores no track models,
   decoder state, or presentation data.
-- `PlaybackTransportCore`: pure queued adjacent-track fade eligibility and
-  duration policy. It does not perform the output ramp or access a decoder.
+- `PlaybackTransportCore`: serialized native transport commands, request
+  invalidation, timing/reconfiguration, status snapshots, completion retirement,
+  and queued adjacent-track fade policy. It does not perform decoder work;
+  VGMBoy owns decoding and the output-gain ramp. `PlaybackTransportStatusPayload`
+  is the common bridge projection for synchronous replies and pushed events.
 - `VGMBoy`: decoder, timing, transport, and audio output.
 - Frontends: queue, presentation, options state, and user-facing policy.
 
 ## Next extraction candidates
 
-Port librarian-facing CocoaSpice behavior here only after its persistence and
-ownership are explicit: archive cache policy, window-independent options
-commands, and shared file/entry presentation. Keep shared behavior in Swift and expose it to
-WebKit through typed host requests; do not copy `PlayerViewModel`, SwiftUI
-state, or Electron-era JavaScript application state into this package.
+Remaining extraction work is adoption and contract cleanup: move any still-
+duplicated queue continuation or catalog-snapshot handoff into the existing
+typed boundaries only after CocoaSpice behavior is characterized. Keep shared
+behavior in Swift and expose it to WebKit through typed host requests; do not
+copy `PlayerViewModel`, SwiftUI state, or Electron-era JavaScript application
+state into this package.
