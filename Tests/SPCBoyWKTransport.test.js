@@ -481,7 +481,7 @@ test("SPCBoyWK keeps Audio and Playback option panels structurally separated", (
   assert.match(playbackSource, /End Fade[\s\S]*Play Time[\s\S]*Play Speed/);
   assert.doesNotMatch(playbackSource, /AAC Export|Equalizer|Mono|options-page-title[^]*Volume/);
   assert.doesNotMatch(uiSource, /organizeOptionsPages/);
-  assert.match(stylesSource, /\.options-page-audio\s*\{[\s\S]*padding:\s*0;[\s\S]*background:\s*transparent;/);
+  assert.match(stylesSource, /\.options-page-audio,\s*\.options-windows-page,\s*\.options-routing-page\s*\{[\s\S]*padding:\s*0;[\s\S]*background:\s*transparent;/);
 });
 
 test("SPCBoyWK allows every playlist column to be hidden except an empty table", () => {

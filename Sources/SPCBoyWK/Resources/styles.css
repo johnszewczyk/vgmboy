@@ -1045,7 +1045,9 @@ body.is-file-drag-over::after {
   background: transparent;
 }
 
-.options-page-audio {
+.options-page-audio,
+.options-windows-page,
+.options-routing-page {
   margin-top: 0;
   gap: 1rem;
   padding: 0;
