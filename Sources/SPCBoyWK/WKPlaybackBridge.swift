@@ -6,19 +6,49 @@ import VGMBoyKit
 /// Queue/catalog policy remains in the web frontend; this object owns only
 /// decoder transport and audio configuration.
 final class WKPlaybackBridge: @unchecked Sendable {
+    struct AACExportEvent: Sendable {
+        let id: String
+        let state: String
+        let renderedFrames: Int64
+        let totalFrames: Int64
+        let message: String?
+    }
+
     static let shared = WKPlaybackBridge()
 
     private let transport = PlaybackTransportCoordinator(label: "SPCBoyWK.vgmboy-playback")
+    private let handlerLock = NSLock()
+    private var statusHandler: (@Sendable (PlaybackTransportStatus) -> Void)?
     private var naturalEndHandler: (@Sendable (PlaybackTransportStatus) -> Void)?
+    private var exportEventHandler: (@Sendable (AACExportEvent) -> Void)?
+    private let exportLock = NSLock()
+    private var activeExport: (id: String, cancellation: AACExportCancellation)?
 
     private init() {
+        transport.setStatusHandler { [weak self] status in
+            self?.publishStatus(status)
+        }
         transport.setNaturalEndHandler { [weak self] status in
-            self?.naturalEndHandler?(status)
+            self?.publishNaturalEnd(status)
         }
     }
 
+    func setStatusHandler(_ handler: (@Sendable (PlaybackTransportStatus) -> Void)?) {
+        handlerLock.lock()
+        defer { handlerLock.unlock() }
+        statusHandler = handler
+    }
+
     func setNaturalEndHandler(_ handler: (@Sendable (PlaybackTransportStatus) -> Void)?) {
+        handlerLock.lock()
+        defer { handlerLock.unlock() }
         naturalEndHandler = handler
+    }
+
+    func setExportEventHandler(_ handler: (@Sendable (AACExportEvent) -> Void)?) {
+        handlerLock.lock()
+        defer { handlerLock.unlock() }
+        exportEventHandler = handler
     }
 
     func handle(method: String, args: [Any]) throws -> Any {
@@ -120,6 +150,12 @@ final class WKPlaybackBridge: @unchecked Sendable {
             try perform(.setTempo, payload: .init(tempo: tempoMultiplier(request["tempo"])))
             try perform(.setPlaybackMode, payload: payload)
             return statusResponse()
+        case "nativePlaybackSetTempo":
+            guard let request = args.first as? [String: Any] else {
+                throw PlaybackBridgeError.invalid("Tempo update requires a tempo value.")
+            }
+            try perform(.setTempo, payload: .init(tempo: tempoMultiplier(request["tempo"])))
+            return statusResponse()
         case "nativePlaybackStart":
             guard let request = args.first as? [String: Any],
                   let sourcePath = request["path"] as? String,
@@ -207,6 +243,8 @@ final class WKPlaybackBridge: @unchecked Sendable {
             return statusResponse()
         case "nativeExportAAC":
             return try exportAAC(args)
+        case "nativeExportAACCancel":
+            return cancelAACExport(args)
         case "setPlaybackPowerSaveBlocker":
             return NSNull()
         case "releaseMaterializedTrack":
@@ -249,38 +287,93 @@ final class WKPlaybackBridge: @unchecked Sendable {
         } else {
             playbackPath = sourcePath
         }
+        let exportID = UUID().uuidString
+        let cancellation = AACExportCancellation()
+        exportLock.lock()
+        guard activeExport == nil else {
+            exportLock.unlock()
+            throw PlaybackBridgeError.invalid("AAC export already in progress.")
+        }
+        activeExport = (exportID, cancellation)
+        exportLock.unlock()
         defer {
             if materialized { SPCArchiveMaterialization.releaseExport() }
+            exportLock.lock()
+            if activeExport?.id == exportID { activeExport = nil }
+            exportLock.unlock()
         }
-        let event = transport.perform(.init(
-            command: .exportAAC,
-            payload: PlaybackControlPayload(
-                path: playbackPath,
+        publishExport(.init(id: exportID, state: "rendering", renderedFrames: 0, totalFrames: 0, message: filenameStem))
+        do {
+            let outputURL = try transport.exportAAC(.init(
+                sourcePath: playbackPath,
                 trackIndex: max(0, int(request["trackIndex"]) ?? 0),
+                outputDirectory: URL(fileURLWithPath: outputDirectory),
+                filenameStem: filenameStem,
                 playMilliseconds: playMilliseconds,
-                fadeMilliseconds: max(0, int(request["fadeMilliseconds"]) ?? 0),
-                exportDirectory: outputDirectory,
-                exportFilenameStem: filenameStem
+                fadeMilliseconds: max(0, int(request["fadeMilliseconds"]) ?? 0)
+            ),
+                cancellation: cancellation,
+                progress: { [weak self] progress in
+                    self?.publishExport(.init(
+                        id: exportID,
+                        state: "rendering",
+                        renderedFrames: progress.renderedFrames,
+                        totalFrames: progress.totalFrames,
+                        message: filenameStem
+                    ))
+                }
             )
-        ))
-        guard event.kind != .error else {
-            throw PlaybackBridgeError.invalid(event.message ?? "VGMBoy AAC export failed.")
+            publishExport(.init(id: exportID, state: "completed", renderedFrames: 0, totalFrames: 0, message: outputURL.path))
+            return ["path": outputURL.path, "id": exportID]
+        } catch {
+            let state = (error as? AACExportError) == .cancelled ? "cancelled" : "failed"
+            publishExport(.init(id: exportID, state: state, renderedFrames: 0, totalFrames: 0, message: error.localizedDescription))
+            throw error
         }
-        return ["path": event.message ?? ""]
+    }
+
+    private func cancelAACExport(_ args: [Any]) -> [String: Any] {
+        let requestedID = (args.first as? [String: Any])?["id"] as? String
+        exportLock.lock()
+        defer { exportLock.unlock() }
+        guard let activeExport,
+              requestedID == nil || requestedID == activeExport.id else { return ["cancelled": false] }
+        activeExport.cancellation.cancel()
+        return ["cancelled": true, "id": activeExport.id]
+    }
+
+    private func publishExport(_ event: AACExportEvent) {
+        handlerLock.lock()
+        let handler = exportEventHandler
+        handlerLock.unlock()
+        handler?(event)
+    }
+
+    private func publishStatus(_ status: PlaybackTransportStatus) {
+        handlerLock.lock()
+        let handler = statusHandler
+        handlerLock.unlock()
+        handler?(status)
+    }
+
+    private func publishNaturalEnd(_ status: PlaybackTransportStatus) {
+        handlerLock.lock()
+        let handler = naturalEndHandler
+        handlerLock.unlock()
+        handler?(status)
     }
 
     private func statusResponse() -> [String: Any] {
-        let event = transport.perform(.init(command: .status))
-        let status = event.status
-        let diagnostics = status?.diagnostics
-        let statistics = status?.statistics
-        let loaded = transport.statusSync().trackLoaded
+        return statusResponse(transport.statusSync())
+    }
+
+    private func statusResponse(_ status: PlaybackTransportStatus) -> [String: Any] {
         let transportState: String
-        if status?.isPlaying == true {
+        if status.isPlaying {
             transportState = "playing"
-        } else if status?.reachedEnd == true {
+        } else if status.reachedEnd {
             transportState = "ended"
-        } else if loaded {
+        } else if status.trackLoaded {
             transportState = "paused"
         } else {
             transportState = "stopped"
@@ -291,25 +384,25 @@ final class WKPlaybackBridge: @unchecked Sendable {
             // after the audio device has stopped so the frontend does not
             // advance over the remaining audible tail.
             "transport_state": transportState,
-            "output_state": diagnostics?.isOutputRunning == true ? "running" : "idle",
-            "generation": diagnostics?.generation ?? 0,
-            "track_loaded": loaded,
-            "decode_error": false,
-            "reached_end": status?.reachedEnd ?? false,
-            "buffered_frames": diagnostics?.bufferedFrames ?? 0,
-            "ring_buffer_frames": diagnostics?.capacityFrames ?? 0,
-            "underrun_count": diagnostics?.underrunCount ?? 0,
-            "frames_requested": diagnostics?.framesRequested ?? 0,
-            "frames_supplied": diagnostics?.framesSupplied ?? 0,
-            "decoder_family": statistics?.decoderFamily ?? NSNull(),
-            "track_index": statistics?.trackIndex ?? NSNull(),
-            "decoder_sample_rate": statistics?.decoderSampleRate ?? 0,
-            "output_sample_rate": statistics?.outputSampleRate ?? diagnostics?.sampleRate ?? 0,
-            "decoded_frames": statistics?.decodedFrames ?? 0,
-            "audible_position_frames": statistics?.audiblePositionFrames ?? 0,
-            "tempo": statistics?.tempo ?? 1,
-            "position_ms": Int((status?.elapsedSeconds ?? 0) * 1_000),
-            "error": status?.errorMessage.map { $0 as Any } ?? NSNull()
+            "output_state": status.outputIsRunning ? "running" : "idle",
+            "generation": status.generation,
+            "track_loaded": status.trackLoaded,
+            "decode_error": status.errorMessage != nil,
+            "reached_end": status.reachedEnd,
+            "buffered_frames": status.bufferedFrames,
+            "ring_buffer_frames": status.ringBufferFrames,
+            "underrun_count": status.underrunCount,
+            "frames_requested": status.framesRequested,
+            "frames_supplied": status.framesSupplied,
+            "decoder_family": status.decoderFamily ?? NSNull(),
+            "track_index": status.trackIndex ?? NSNull(),
+            "decoder_sample_rate": status.decoderSampleRate,
+            "output_sample_rate": status.outputSampleRate,
+            "decoded_frames": status.decodedFrames,
+            "audible_position_frames": status.audiblePositionFrames,
+            "tempo": status.tempo,
+            "position_ms": Int((status.elapsedSeconds * 1_000).rounded()),
+            "error": status.errorMessage ?? NSNull()
         ]
     }
 

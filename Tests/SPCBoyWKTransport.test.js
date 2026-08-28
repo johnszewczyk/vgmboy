@@ -12,6 +12,14 @@ const uiSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/app-ui.js"),
   "utf8"
 );
+const nativeBridgeSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/WKNativeBridge.swift"),
+  "utf8"
+);
+const appDelegateSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/main.swift"),
+  "utf8"
+);
 
 function element() {
   return {
@@ -359,12 +367,40 @@ test("SPCBoyWK finalizes from a matching native ended event", async () => {
   state.selectedTrackId = "track-a";
   state.isPlaying = true;
   state.nativePlayback = { ...state.nativePlayback, generation: 7, trackLoaded: true };
-  window.spcBoyWK.nativePlaybackState = async () => snapshot(7, "ended");
 
-  await app.playback.handleNativePlaybackEnded({ generation: 7 });
+  await app.playback.handleNativePlaybackEnded(snapshot(7, "ended"));
 
   assert.equal(state.currentTrackId, null);
   assert.equal(state.isPlaying, false);
+});
+
+test("SPCBoyWK renders native status events without a polling loop", () => {
+  assert.doesNotMatch(playbackSource, /scheduleNativePlaybackStatePoll/);
+  assert.doesNotMatch(playbackSource, /nativeStatePollTimer/);
+  assert.match(playbackSource, /function handleNativePlaybackState\(snapshot\)/);
+  assert.match(playbackSource, /function handleNativePlaybackEnded\(event\)/);
+});
+
+test("SPCBoyWK broadcasts complete native status to both windows", () => {
+  assert.match(nativeBridgeSource, /"buffered_frames": status\.bufferedFrames/);
+  assert.match(nativeBridgeSource, /"frames_requested": status\.framesRequested/);
+  assert.match(nativeBridgeSource, /"decoder_family": status\.decoderFamily/);
+  assert.match(nativeBridgeSource, /if let onPlaybackEvent\s*\{\s*onPlaybackEvent\(name, payload\)/);
+  assert.match(appDelegateSource, /broadcastPlaybackEvent\(name: name, payload: payload\)/);
+  assert.match(appDelegateSource, /optionsWebView\?\.evaluateJavaScript\(script, completionHandler: nil\)/);
+});
+
+test("SPCBoyWK uses native in-place tempo and AAC cancellation events", () => {
+  assert.match(playbackSource, /nativePlaybackSetTempo\(\{\s*tempo: playbackSpeedForTrack\(track\)/);
+  assert.doesNotMatch(playbackSource, /async function refreshPlaybackForSpeedChange[\s\S]*refreshPlaybackForTimingChange\(\)/);
+  assert.match(playbackSource, /function handleAACExportEvent\(event\)/);
+  assert.match(playbackSource, /nativeCancelAACExport/);
+  assert.match(nativeBridgeSource, /onNativeAACExport/);
+  assert.match(nativeBridgeSource, /nativeExportAACCancel/);
+});
+
+test("SPCBoyWK catalog roots are foldable in Path View", () => {
+  assert.doesNotMatch(nativeBridgeSource, /"alwaysExpanded": isRoot/);
 });
 
 test("SPCBoyWK Enter activates the focused playlist row without a selection fallback", () => {

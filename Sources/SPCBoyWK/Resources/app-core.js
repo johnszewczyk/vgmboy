@@ -56,6 +56,10 @@ const state = {
   selectedTrackId: null,
   selectedTrackIds: [],
   playlistSelectionAnchorId: null,
+  // The visible playlist is a browsing projection. Playback advances through
+  // this separate queue so selecting another sidebar item cannot silently
+  // replace the queue that is currently playing.
+  playingPlaylist: [],
   lastSelectedTrackId: null,
   currentTrackId: null,
   currentTrackInfo: null,
@@ -96,6 +100,7 @@ const state = {
   aacExportDirectory: "",
   aacExportStatus: "",
   aacExportInProgress: false,
+  aacExportID: null,
   columnOrder: [...DEFAULT_COLUMN_ORDER],
   columnWidths: { ...DEFAULT_COLUMN_WIDTHS },
   columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY },
@@ -167,6 +172,7 @@ const refs = {
   optionsRoutingTab: document.getElementById("options-routing-tab"),
   optionsPlaybackTab: document.getElementById("options-playback-tab"),
   optionsDiagnosticsTab: document.getElementById("options-diagnostics-tab"),
+  optionsAudioTab: document.getElementById("options-audio-tab"),
   optionsThemeTab: document.getElementById("options-theme-tab"),
   optionsWindowsTab: document.getElementById("options-windows-tab"),
   optionsThemeSection: document.getElementById("options-theme-section"),
@@ -175,6 +181,7 @@ const refs = {
   optionsRoutingSection: document.getElementById("options-routing-section"),
   optionsPlaybackSection: document.getElementById("options-playback-section"),
   optionsDiagnosticsSection: document.getElementById("options-diagnostics-section"),
+  optionsAudioSection: document.getElementById("options-audio-section"),
   routingConflictsList: document.getElementById("routing-conflicts-list"),
   libraryClearCacheButton: document.getElementById("library-clear-cache-button"),
   libraryShowCacheButton: document.getElementById("library-show-cache-button"),
@@ -190,7 +197,7 @@ const refs = {
   localBrowserEnabledCheckbox: document.getElementById("local-browser-enabled-checkbox"),
   localBrowserPath: document.getElementById("local-browser-path"),
   localBrowserBrowseButton: document.getElementById("local-browser-browse-button"),
-  favoriteSortOrderSelect: document.getElementById("favorite-sort-order-select"),
+  favoriteHistoricalSortCheckbox: document.getElementById("favorite-historical-sort-checkbox"),
   libraryCachePath: document.getElementById("library-cache-path"),
   libraryCacheBrowseButton: document.getElementById("library-cache-browse-button"),
   libraryCacheDefaultButton: document.getElementById("library-cache-default-button"),
@@ -201,6 +208,7 @@ const refs = {
   aacExportDirectoryPath: document.getElementById("aac-export-directory-path"),
   aacExportChooseButton: document.getElementById("aac-export-choose-button"),
   aacExportStatus: document.getElementById("aac-export-status"),
+  aacExportCancelButton: document.getElementById("aac-export-cancel-button"),
   playlistHeaderBoldCheckbox: document.getElementById("playlist-header-bold-checkbox"),
   columnAutoSizeCheckbox: document.getElementById("column-auto-size-checkbox"),
   autoResizeAnimationEnabledCheckbox: document.getElementById("auto-resize-animation-enabled-checkbox"),
@@ -552,7 +560,8 @@ function normalizeSortDirection(value) {
 }
 
 function currentTrack() {
-  return state.playlist.find((track) => track.id === state.currentTrackId) ?? null;
+  const queue = state.playingPlaylist?.length ? state.playingPlaylist : state.playlist;
+  return queue.find((track) => track.id === state.currentTrackId) ?? null;
 }
 
 function selectedTrack() {

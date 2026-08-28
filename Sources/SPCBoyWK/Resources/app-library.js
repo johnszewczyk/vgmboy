@@ -53,7 +53,7 @@ async function refreshDatabaseLocation() {
   state.databaseLocation = await window.spcBoyWK.databaseLocation();
   state.databaseLocationStatus = state.databaseLocation.requiresRestart
     ? "Restart SPCBoy to use the selected database."
-    : "The shared MediaScanner catalog is active and opened read-only.";
+    : "The shared ScanSong catalog is active and opened read-only.";
   renderAll();
 }
 
@@ -76,10 +76,10 @@ async function useDefaultDatabaseLocation() {
 async function handleCatalogReloaded(result) {
   state.databaseLocation = result || await window.spcBoyWK?.databaseLocation?.() || null;
   state.databaseLocationStatus = state.databaseLocation?.reloaded
-    ? "Library reloaded. SPCBoy is reading the latest MediaScanner catalog."
+    ? "Library reloaded. SPCBoy is reading the latest ScanSong catalog."
     : state.databaseLocation?.requiresRestart
       ? "Restart SPCBoy to use the selected database."
-      : "The shared MediaScanner catalog is active and opened read-only.";
+      : "The shared ScanSong catalog is active and opened read-only.";
   if (!window.spcBoyWK?.isOptionsWindow && window.spcBoyWK?.databaseRoots) {
     state.libraryRoots = await window.spcBoyWK.databaseRoots();
     await handleLibraryRootsChanged(state.libraryRoots);

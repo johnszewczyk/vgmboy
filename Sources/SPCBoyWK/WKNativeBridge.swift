@@ -35,6 +35,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     var onChooseAACExportDirectory: (() -> String?)?
     var onAppearanceSettingsChanged: (([String: Any]) -> Void)?
     var onFrontendSettingsChanged: ((SPCBoyPreferencesSnapshot) -> Void)?
+    var onPlaybackEvent: (@MainActor (String, [String: Any]) -> Void)?
 
     init(catalogURL: URL = WKNativeBridge.defaultCatalogURL, isOptionsWindow: Bool = false) {
         self.catalogURL = catalogURL
@@ -44,9 +45,25 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
     func attachPlaybackEvents(to webView: WKWebView) {
         playbackEventWebView = webView
+        WKPlaybackBridge.shared.setStatusHandler { [weak self] status in
+            Task { @MainActor [weak self] in
+                self?.publishNativePlaybackState(status)
+            }
+        }
         WKPlaybackBridge.shared.setNaturalEndHandler { [weak self] status in
             Task { @MainActor [weak self] in
                 self?.publishNativePlaybackEnded(status)
+            }
+        }
+        WKPlaybackBridge.shared.setExportEventHandler { [weak self] event in
+            Task { @MainActor [weak self] in
+                self?.publishPlaybackEvent(name: "nativeAACExport", payload: [
+                    "id": event.id,
+                    "state": event.state,
+                    "rendered_frames": event.renderedFrames,
+                    "total_frames": event.totalFrames,
+                    "message": event.message ?? NSNull()
+                ])
             }
         }
     }
@@ -180,9 +197,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             nativePlaybackClose: (...args) => request("nativePlaybackClose", args),
             nativePlaybackUnload: (...args) => request("nativePlaybackUnload", args),
             nativePlaybackSeek: (...args) => request("nativePlaybackSeek", args),
+            nativePlaybackSetTempo: (...args) => request("nativePlaybackSetTempo", args),
             nativePlaybackState: (...args) => request("nativePlaybackState", args),
             nativePlaybackRampGain: (...args) => request("nativePlaybackRampGain", args),
             nativeExportAAC: (...args) => request("nativeExportAAC", args),
+            nativeCancelAACExport: (...args) => request("nativeExportAACCancel", args),
             setPlaybackPowerSaveBlocker: (...args) => request("setPlaybackPowerSaveBlocker", args),
             releaseMaterializedTrack: (...args) => request("releaseMaterializedTrack", args),
             onCatalogReloaded: (listener) => on("catalogReloaded", listener),
@@ -190,6 +209,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             onLibraryCommand: (listener) => on("libraryCommand", listener),
             onNativePlaybackState: (listener) => on("nativePlaybackState", listener),
             onNativePlaybackEnded: (listener) => on("nativePlaybackEnded", listener),
+            onNativeAACExport: (listener) => on("nativeAACExport", listener),
             onAppearanceSettingsChanged: (listener) => on("appearanceSettingsChanged", listener),
             onFrontendSettingsChanged: (listener) => on("frontendSettingsChanged", listener),
             onRoutingPreferencesChanged: (listener) => on("routingPreferencesChanged", listener),
@@ -398,19 +418,71 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     }
 
     @MainActor
+    private func publishNativePlaybackState(_ status: PlaybackTransportStatus) {
+        publishPlaybackEvent(name: "nativePlaybackState", payload: playbackPayload(status))
+    }
+
+    @MainActor
     private func publishNativePlaybackEnded(_ status: PlaybackTransportStatus) {
-        let payload: [String: Any] = [
-            "transport_state": "ended",
+        publishPlaybackEvent(
+            name: "nativePlaybackEnded",
+            payload: playbackPayload(status, transportState: "ended", reachedEnd: true)
+        )
+    }
+
+    @MainActor
+    private func playbackPayload(
+        _ status: PlaybackTransportStatus,
+        transportState forcedTransportState: String? = nil,
+        reachedEnd forcedReachedEnd: Bool? = nil
+    ) -> [String: Any] {
+        let transportState: String
+        if let forcedTransportState {
+            transportState = forcedTransportState
+        } else if status.isPlaying {
+            transportState = "playing"
+        } else if status.reachedEnd {
+            transportState = "ended"
+        } else if status.trackLoaded {
+            transportState = "paused"
+        } else {
+            transportState = "stopped"
+        }
+        return [
+            "transport_state": transportState,
+            "output_state": status.outputIsRunning ? "running" : "idle",
             "generation": status.generation,
             "track_loaded": status.trackLoaded,
-            "reached_end": true,
-            "position_ms": Int((status.elapsedSeconds * 1_000).rounded())
+            "decode_error": status.errorMessage != nil,
+            "reached_end": forcedReachedEnd ?? status.reachedEnd,
+            "buffered_frames": status.bufferedFrames,
+            "ring_buffer_frames": status.ringBufferFrames,
+            "underrun_count": status.underrunCount,
+            "frames_requested": status.framesRequested,
+            "frames_supplied": status.framesSupplied,
+            "decoder_family": status.decoderFamily ?? NSNull(),
+            "track_index": status.trackIndex ?? NSNull(),
+            "decoder_sample_rate": status.decoderSampleRate,
+            "output_sample_rate": status.outputSampleRate,
+            "decoded_frames": status.decodedFrames,
+            "audible_position_frames": status.audiblePositionFrames,
+            "tempo": status.tempo,
+            "position_ms": Int((status.elapsedSeconds * 1_000).rounded()),
+            "error": status.errorMessage ?? NSNull()
         ]
+    }
+
+    @MainActor
+    private func publishPlaybackEvent(name: String, payload: [String: Any]) {
+        if let onPlaybackEvent {
+            onPlaybackEvent(name, payload)
+            return
+        }
         let valueJSON = Self.json(payload)
         guard let webView = playbackEventWebView else { return }
         Task { @MainActor in
             _ = try? await webView.evaluateJavaScript(
-                "window.__spcBoyWKEvent('nativePlaybackEnded', \(valueJSON));"
+                "window.__spcBoyWKEvent(\(Self.json(name)), \(valueJSON));"
             )
         }
     }
@@ -589,11 +661,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return NSNull()
         case "setRoutingPreferences":
             return args.first ?? [:]
-        case "nativePlaybackInit", "nativePlaybackAudioConfig", "nativePlaybackTiming", "nativePlaybackReconfigure", "nativePlaybackStart",
+        case "nativePlaybackInit", "nativePlaybackAudioConfig", "nativePlaybackTiming", "nativePlaybackReconfigure", "nativePlaybackSetTempo", "nativePlaybackStart",
              "nativePlaybackResume", "nativePlaybackPause", "nativePlaybackStop",
              "nativePlaybackClose", "nativePlaybackUnload", "nativePlaybackSeek",
              "nativePlaybackState", "nativePlaybackRampGain",
-             "nativeExportAAC",
+             "nativeExportAAC", "nativeExportAACCancel",
              "releaseMaterializedTrack":
             return try WKPlaybackBridge.shared.handle(method: method, args: args)
         default:
@@ -725,7 +797,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                     "kind": "folder",
                     "path": browserPath,
                     "name": node.title,
-                    "alwaysExpanded": isRoot,
                     "childrenLoaded": true,
                     "children": node.children.map { responseNode($0) }
                 ]

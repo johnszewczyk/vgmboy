@@ -24,6 +24,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             self?.broadcastAppearanceSettings(settings)
         }
         nativeBridge.onFrontendSettingsChanged = { [weak self] settings in self?.receiveFrontendSettings(settings) }
+        nativeBridge.onPlaybackEvent = { [weak self] name, payload in
+            self?.broadcastPlaybackEvent(name: name, payload: payload)
+        }
         let webView = makeWebView(bridge: nativeBridge, includeCommandDispatcher: true)
         self.webView = webView
         nativeBridge.attachPlaybackEvents(to: webView)
@@ -159,6 +162,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         guard let data = try? JSONEncoder().encode(settings),
               let json = String(data: data, encoding: .utf8) else { return }
         let script = "window.__spcBoyWKEvent('frontendSettingsChanged', \(json));"
+        webView?.evaluateJavaScript(script, completionHandler: nil)
+        optionsWebView?.evaluateJavaScript(script, completionHandler: nil)
+    }
+
+    private func broadcastPlaybackEvent(name: String, payload: [String: Any]) {
+        guard JSONSerialization.isValidJSONObject(payload),
+              let data = try? JSONSerialization.data(withJSONObject: payload),
+              let json = String(data: data, encoding: .utf8),
+              let nameData = try? JSONEncoder().encode(name),
+              let nameJSON = String(data: nameData, encoding: .utf8) else { return }
+        let script = "window.__spcBoyWKEvent(\(nameJSON), \(json));"
         webView?.evaluateJavaScript(script, completionHandler: nil)
         optionsWebView?.evaluateJavaScript(script, completionHandler: nil)
     }

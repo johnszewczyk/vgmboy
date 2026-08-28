@@ -212,6 +212,9 @@ refs.applicationMonospaceCheckbox.addEventListener("change", (event) => {
 refs.aacExportChooseButton.addEventListener("click", () => {
   app.playback.chooseAACExportDirectory().catch((error) => console.error("[SPCBoy] AAC export folder failed", error));
 });
+refs.aacExportCancelButton?.addEventListener("click", () => {
+  app.playback.cancelAACExport().catch((error) => console.error("[SPCBoy] AAC cancellation failed", error));
+});
 refs.playlistHeaderBoldCheckbox.addEventListener("change", (event) => {
   app.ui.setPlaylistHeaderBold(event.target.checked);
 });
@@ -412,8 +415,8 @@ refs.localBrowserEnabledCheckbox.addEventListener("change", (event) => {
   app.ui.renderAll();
 });
 
-refs.favoriteSortOrderSelect.addEventListener("change", (event) => {
-  state.favoriteSortOrder = event.target.value === "alphabetical" ? "alphabetical" : "historical";
+refs.favoriteHistoricalSortCheckbox.addEventListener("change", (event) => {
+  state.favoriteSortOrder = event.target.checked ? "historical" : "alphabetical";
   app.persistSettings();
   app.ui.refreshFavorites()
     .then(() => app.ui.renderAll())
@@ -432,6 +435,11 @@ refs.optionsPlaybackTab.addEventListener("click", () => {
 
 refs.optionsDiagnosticsTab.addEventListener("click", () => {
   state.optionsSection = "diagnostics";
+  app.ui.renderAll();
+});
+
+refs.optionsAudioTab.addEventListener("click", () => {
+  state.optionsSection = "audio";
   app.ui.renderAll();
 });
 
@@ -579,6 +587,12 @@ if (window.spcBoyWK?.onNativePlaybackEnded) {
   });
 }
 
+if (window.spcBoyWK?.onNativeAACExport) {
+  window.spcBoyWK.onNativeAACExport((event) => {
+    app.playback.handleAACExportEvent(event);
+  });
+}
+
 window.addEventListener("keydown", (event) => {
   const target = event.target;
   const isRangeInput = target instanceof HTMLInputElement && target.type === "range";
@@ -616,7 +630,13 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (event.metaKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === "d" && !state.optionsOpen) {
+  if (event.metaKey && event.shiftKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === "d" && !state.optionsOpen) {
+    event.preventDefault();
+    app.ui.showFavoritesPlaylist().catch((error) => console.error("[SPCBoy] favorites playlist failed", error));
+    return;
+  }
+
+  if (event.metaKey && !event.shiftKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === "d" && !state.optionsOpen) {
     event.preventDefault();
     app.ui.toggleSelectedFavorites().catch((error) => console.error("[SPCBoy] favorite toggle failed", error));
     return;

@@ -11,10 +11,7 @@ const {
   activeTrackInfo
 } = playbackApp;
 
-const NATIVE_STATE_POLL_MS = 1000;
-
 let playbackGeneration = 0;
-let nativeStatePollTimer = 0;
 let nativePlaybackInitialized = false;
 let mediaSessionHandlersBound = false;
 const playbackBackends = window.SPCBoyPlaybackBackends;
@@ -23,6 +20,10 @@ let queuedSkipTimer = 0;
 let playbackWindow = null;
 const timingPlans = new Map();
 const TRANSPORT_DECLICK_MS = 10;
+
+function playbackPlaylist() {
+  return state.playingPlaylist?.length ? state.playingPlaylist : state.playlist;
+}
 
 function waitForAudioEnvelope(durationMs) {
   return new Promise((resolve) => window.setTimeout(resolve, Math.max(0, Math.ceil(durationMs))));
@@ -192,21 +193,35 @@ async function exportTrackAsAAC(track) {
     throw error;
   } finally {
     state.aacExportInProgress = false;
+    state.aacExportID = null;
     playbackApp.ui.renderAll();
   }
 }
 
-function clearNativeStatePoll() {
-  if (!nativeStatePollTimer) {
-    return;
+function handleAACExportEvent(event) {
+  if (!event) return;
+  state.aacExportID = event.id || state.aacExportID;
+  const stateName = event.state || "rendering";
+  if (stateName === "rendering") {
+    const total = Number(event.total_frames) || 0;
+    const rendered = Number(event.rendered_frames) || 0;
+    const percent = total > 0 ? ` ${Math.min(100, Math.round((rendered / total) * 100))}%` : "";
+    state.aacExportStatus = `Exporting ${event.message || "track"}…${percent}`;
+  } else if (stateName === "completed") {
+    state.aacExportStatus = `Exported AAC: ${event.message || "complete"}`;
+  } else if (stateName === "cancelled") {
+    state.aacExportStatus = "AAC export cancelled; incomplete output removed.";
+  } else if (stateName === "failed") {
+    state.aacExportStatus = event.message || "AAC export failed.";
   }
-
-  window.clearTimeout(nativeStatePollTimer);
-  nativeStatePollTimer = 0;
+  playbackApp.ui.renderAll();
 }
 
-function clearPlaybackRuntimeState() {
-  clearNativeStatePoll();
+async function cancelAACExport() {
+  if (!state.aacExportInProgress) return;
+  state.aacExportStatus = "Cancelling AAC export…";
+  playbackApp.ui.renderAll();
+  await window.spcBoyWK.nativeCancelAACExport({ id: state.aacExportID });
 }
 
 async function stopAllOutput({ declick = true, keepNativeOutput = false } = {}) {
@@ -443,20 +458,9 @@ async function handleNativePlaybackEnded(event) {
     return;
   }
 
-  try {
-    const snapshot = await window.spcBoyWK.nativePlaybackState();
-    if (generation !== playbackGeneration || snapshot?.transport_state !== "ended") {
-      return;
-    }
-    const applied = applyNativePlaybackSnapshot(activeTrackInfo(), snapshot, generation);
-    if (!applied) return;
-    clearNativeStatePoll();
-    await finalizePlaybackEnded();
-  } catch (error) {
-    if (generation === playbackGeneration) {
-      console.error("[SPCBoy] native completion handling failed", error);
-    }
-  }
+  const applied = applyNativePlaybackSnapshot(activeTrackInfo(), event, generation);
+  if (!applied || event?.transport_state !== "ended") return;
+  await finalizePlaybackEnded();
 }
 
 async function setPlaybackPowerSaveBlocker(enabled) {
@@ -496,27 +500,28 @@ function applyNativePlaybackSnapshot(track, snapshot, generation, { allowNativeG
   const totalSeconds = effectiveTotalSeconds(activeTrack);
   const elapsedSeconds = clampPosition((Number(snapshot?.position_ms) || 0) / 1000, totalSeconds);
   const transportState = snapshot?.transport_state || "stopped";
+  const previous = state.nativePlayback || {};
 
   state.nativePlayback = {
     transportState,
-    outputState: snapshot?.output_state || "idle",
+    outputState: snapshot?.output_state ?? previous.outputState ?? "idle",
     generation: observedNativeGeneration,
     trackLoaded: Boolean(snapshot?.track_loaded),
-    decodeError: Boolean(snapshot?.decode_error),
+    decodeError: snapshot?.decode_error === undefined ? Boolean(previous.decodeError) : Boolean(snapshot.decode_error),
     reachedEnd: Boolean(snapshot?.reached_end),
-    bufferedFrames: Number(snapshot?.buffered_frames) || 0,
-    ringBufferFrames: Number(snapshot?.ring_buffer_frames) || 0,
-    underrunCount: Number(snapshot?.underrun_count) || 0,
-    framesRequested: Number(snapshot?.frames_requested) || 0,
-    framesSupplied: Number(snapshot?.frames_supplied) || 0,
-    decoderFamily: snapshot?.decoder_family || "",
-    decoderSampleRate: Number(snapshot?.decoder_sample_rate) || 0,
-    outputSampleRate: Number(snapshot?.output_sample_rate) || 0,
-    decodedFrames: Number(snapshot?.decoded_frames) || 0,
-    audiblePositionFrames: Number(snapshot?.audible_position_frames) || 0,
-    tempo: Number(snapshot?.tempo) || 1,
+    bufferedFrames: snapshot?.buffered_frames === undefined ? (previous.bufferedFrames || 0) : (Number(snapshot.buffered_frames) || 0),
+    ringBufferFrames: snapshot?.ring_buffer_frames === undefined ? (previous.ringBufferFrames || 0) : (Number(snapshot.ring_buffer_frames) || 0),
+    underrunCount: snapshot?.underrun_count === undefined ? (previous.underrunCount || 0) : (Number(snapshot.underrun_count) || 0),
+    framesRequested: snapshot?.frames_requested === undefined ? (previous.framesRequested || 0) : (Number(snapshot.frames_requested) || 0),
+    framesSupplied: snapshot?.frames_supplied === undefined ? (previous.framesSupplied || 0) : (Number(snapshot.frames_supplied) || 0),
+    decoderFamily: snapshot?.decoder_family ?? previous.decoderFamily ?? "",
+    decoderSampleRate: snapshot?.decoder_sample_rate === undefined ? (previous.decoderSampleRate || 0) : (Number(snapshot.decoder_sample_rate) || 0),
+    outputSampleRate: snapshot?.output_sample_rate === undefined ? (previous.outputSampleRate || 0) : (Number(snapshot.output_sample_rate) || 0),
+    decodedFrames: snapshot?.decoded_frames === undefined ? (previous.decodedFrames || 0) : (Number(snapshot.decoded_frames) || 0),
+    audiblePositionFrames: snapshot?.audible_position_frames === undefined ? (previous.audiblePositionFrames || 0) : (Number(snapshot.audible_position_frames) || 0),
+    tempo: snapshot?.tempo === undefined ? (previous.tempo || 1) : (Number(snapshot.tempo) || 1),
     positionMs: Number(snapshot?.position_ms) || 0,
-    errorMessage: snapshot?.error || ""
+    errorMessage: snapshot?.error ?? previous.errorMessage ?? ""
   };
 
   state.totalSeconds = totalSeconds;
@@ -531,58 +536,6 @@ function applyNativePlaybackSnapshot(track, snapshot, generation, { allowNativeG
   updatePlaybackReadout();
   updateNativeDiagnostics();
   return true;
-}
-
-async function readNativePlaybackState(track, generation) {
-  const snapshot = await window.spcBoyWK.nativePlaybackState();
-  const applied = applyNativePlaybackSnapshot(track, snapshot, generation);
-  if (!applied) {
-    return { ...snapshot, stale_generation: true };
-  }
-  return snapshot;
-}
-
-function scheduleNativePlaybackStatePoll(track, generation) {
-  clearNativeStatePoll();
-  if (generation !== playbackGeneration || !state.currentTrackId) {
-    return;
-  }
-
-  nativeStatePollTimer = window.setTimeout(async () => {
-    nativeStatePollTimer = 0;
-    if (generation !== playbackGeneration || !state.currentTrackId) {
-      return;
-    }
-
-    try {
-      const snapshot = await readNativePlaybackState(track, generation);
-      if (generation !== playbackGeneration) {
-        return;
-      }
-
-      if (snapshot?.stale_generation) {
-        return;
-      }
-
-      if (snapshot?.transport_state === "playing") {
-        scheduleNativePlaybackStatePoll(track, generation);
-        return;
-      }
-
-      if (snapshot?.transport_state === "ended") return;
-
-      if (snapshot?.track_loaded) {
-        scheduleNativePlaybackStatePoll(track, generation);
-      }
-    } catch (error) {
-      if (generation === playbackGeneration) {
-        state.isPlaying = false;
-        resetNativePlaybackSnapshot();
-        updatePlaybackReadout();
-        updateNativeDiagnostics();
-      }
-    }
-  }, NATIVE_STATE_POLL_MS);
 }
 
 async function finalizePlaybackEnded() {
@@ -601,7 +554,7 @@ async function finalizePlaybackEnded() {
       selectedTrackId: state.selectedTrackId,
       pendingTrackId: null
     },
-    playlistIds: state.playlist.map((track) => track.id),
+    playlistIds: playbackPlaylist().map((track) => track.id),
     intent: { kind: "completion", repeatMode: state.repeatMode }
   });
   if (!completionDecision) return;
@@ -612,7 +565,6 @@ async function finalizePlaybackEnded() {
       || state.currentTrackId !== completedTrackId) {
     return;
   }
-  clearNativeStatePoll();
   state.isPlaying = false;
   state.elapsedSeconds = state.totalSeconds;
   updatePlaybackReadout();
@@ -637,9 +589,7 @@ async function finalizePlaybackEnded() {
 }
 
 async function stopPlaybackState({ declick = true, keepNativeOutput = false } = {}) {
-  clearNativeStatePoll();
   playbackGeneration += 1;
-  clearPlaybackRuntimeState();
   await stopAllOutput({ declick, keepNativeOutput });
   // The core owns every output path; release an archive materialization only
   // after the bridge has stopped or unloaded it.
@@ -668,7 +618,7 @@ async function cancelQueuedSkip({ restoreOutput = false } = {}) {
 }
 
 async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
-  let track = state.playlist.find((entry) => entry.id === trackId);
+  let track = playbackPlaylist().find((entry) => entry.id === trackId);
   if (!track) {
     return;
   }
@@ -692,7 +642,6 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
   playbackWindow = fadeNowSeconds > 0
     ? { trackId: track.id, totalSeconds: playbackTotalSeconds, fadeSeconds: fadeNowSeconds }
     : null;
-  clearPlaybackRuntimeState();
   resetNativePlaybackSnapshot();
   await stopAllOutput({ keepNativeOutput: true });
 
@@ -744,10 +693,8 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
 
     await setPlaybackPowerSaveBlocker(true);
     applyNativePlaybackSnapshot(track, snapshot, generation);
-    // Position and reached-end state are supplied on demand by the native
-    // bridge. Keep the active generation polling so the transport readout
-    // advances and the next playlist item can begin at track end.
-    scheduleNativePlaybackStatePoll(track, generation);
+    // Native status events advance the readout and native completion events
+    // drive the generation-checked end handoff. JavaScript does not poll.
     playbackApp.ui.refreshPlaylistPlaybackState();
   } catch (error) {
     if (generation !== playbackGeneration) {
@@ -771,16 +718,20 @@ function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playba
     queuedSkipRequest = null;
     clearQueuedSkipTimer();
   }
+  if (playbackOptions?.replaceQueue || !state.playingPlaylist?.length) {
+    state.playingPlaylist = [...state.playlist];
+  }
   return playTrackNow(trackId, startSeconds, playbackOptions);
 }
 
 async function advanceToAdjacent(delta) {
-  if (state.playlist.length === 0) {
+  const queue = playbackPlaylist();
+  if (queue.length === 0) {
     return;
   }
 
   try {
-    const playlistIDs = state.playlist.map((track) => track.id);
+    const playlistIDs = queue.map((track) => track.id);
     const nextID = await window.spcBoyWK.playbackQueueTransition({
       state: {
         currentTrackId: state.currentTrackId,
@@ -885,7 +836,6 @@ async function togglePlayback() {
       clearQueuedSkipTimer();
     }
     playbackGeneration += 1;
-    clearPlaybackRuntimeState();
     try {
       await fadeActiveOutput(TRANSPORT_DECLICK_MS);
       const snapshot = await window.spcBoyWK.nativePlaybackPause();
@@ -900,7 +850,6 @@ async function togglePlayback() {
 
   if (nativePlaybackInitialized && state.nativePlayback.trackLoaded) {
     const generation = ++playbackGeneration;
-    clearPlaybackRuntimeState();
     try {
       await setPlaybackPowerSaveBlocker(true);
       const snapshot = await window.spcBoyWK.nativePlaybackResume();
@@ -908,7 +857,6 @@ async function togglePlayback() {
         return;
       }
       applyNativePlaybackSnapshot(track, snapshot, generation);
-      scheduleNativePlaybackStatePoll(track, generation);
       updatePlaybackReadout();
       return;
     } catch (error) {
@@ -935,7 +883,6 @@ async function restartAt(seconds) {
     if (nativePlaybackInitialized && state.nativePlayback.trackLoaded) {
       const generation = playbackGeneration;
       await cancelQueuedSkip({ restoreOutput: true });
-      clearPlaybackRuntimeState();
       try {
         const snapshot = await window.spcBoyWK.nativePlaybackSeek(
           Math.round(state.elapsedSeconds * 1000)
@@ -944,7 +891,6 @@ async function restartAt(seconds) {
           return;
         }
         applyNativePlaybackSnapshot(track, snapshot, generation);
-        scheduleNativePlaybackStatePoll(track, generation);
         updatePlaybackReadout();
         return;
       } catch (error) {
@@ -994,10 +940,14 @@ async function refreshPlaybackForTimingChange() {
 }
 
 async function refreshPlaybackForSpeedChange(backendId) {
-  const track = activeTrackInfo();
+  const track = currentTrack();
   const activeBackend = playbackBackends.forPath(track?.archiveEntry || track?.path)?.id;
-  if (activeBackend !== backendId) return;
-  await refreshPlaybackForTimingChange();
+  if (activeBackend !== backendId || !track || state.currentTrackId !== track.id) return;
+  const snapshot = await window.spcBoyWK.nativePlaybackSetTempo({
+    tempo: playbackSpeedForTrack(track)
+  });
+  applyNativePlaybackState(snapshot);
+  updatePlaybackReadout();
 }
 
 playbackApp.playback = {
@@ -1016,6 +966,8 @@ playbackApp.playback = {
   refreshPlaybackForSpeedChange,
   chooseAACExportDirectory,
   exportTrackAsAAC,
+  handleAACExportEvent,
+  cancelAACExport,
   cancelQueuedSkip,
   setAudioSettings
 };

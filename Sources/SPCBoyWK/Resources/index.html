@@ -112,8 +112,9 @@
             </div>
             <div class="options-nav-group" aria-labelledby="options-extension-heading">
               <div id="options-extension-heading" class="options-nav-group-title">VGMBoy</div>
-              <button id="options-playback-tab" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-play"></use></svg><span>Playback</span></button>
+              <button id="options-audio-tab" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg><span>Audio</span></button>
               <button id="options-diagnostics-tab" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-scan-search"></use></svg><span>Diagnostics</span></button>
+              <button id="options-playback-tab" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-play"></use></svg><span>Playback</span></button>
               <button id="options-routing-tab" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-route"></use></svg><span>Routing</span></button>
             </div>
           </nav>
@@ -145,8 +146,8 @@
               </div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Animations</div>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="auto-resize-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Auto-Resize</span><small>Duration for automatic playlist column resizing.</small></span></span><span class="options-inline-trailing"><input id="auto-resize-animation-input" class="options-input" type="number" min="0" max="1000" step="10" value="200" aria-label="Auto-resize animation milliseconds" /><span>ms</span></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="selection-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Selection Bar</span><small>Duration for playlist and sidebar selection movement.</small></span></span><span class="options-inline-trailing"><input id="selection-animation-input" class="options-input" type="number" min="0" max="1000" step="10" value="200" aria-label="Selection bar animation milliseconds" /><span>ms</span></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="auto-resize-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Auto-Resize</span><small>Duration for automatic playlist column resizing (ms).</small></span></span><span class="options-inline-trailing"><input id="auto-resize-animation-input" class="options-input" type="number" min="0" max="1000" step="10" value="200" aria-label="Auto-resize animation milliseconds" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="selection-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Selection Bar</span><small>Duration for playlist and sidebar selection movement (ms).</small></span></span><span class="options-inline-trailing"><input id="selection-animation-input" class="options-input" type="number" min="0" max="1000" step="10" value="200" aria-label="Selection bar animation milliseconds" /></span></label>
               </div>
             </div>
 
@@ -161,18 +162,21 @@
 
             <div id="options-database-section" class="options-page options-database-page">
               <div class="options-page-title">SPCBoy / Database</div>
-              <div class="options-subpanel options-local-files-panel">
-                <div class="options-subpanel-title">Local Files</div>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="local-browser-enabled-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Use Local Files</span><small>Browse one folder directly. The database library is disabled while this is on.</small></span></span></label>
-                <div class="database-stats-panel options-path-control"><input id="local-browser-path" class="options-input options-path-readout" type="text" readonly placeholder="No local folder selected" aria-label="Local files folder" /><button id="local-browser-browse-button" class="tool-button glyph-button" type="button" aria-label="Choose local files folder" title="Choose local files folder"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
-              </div>
-              <div class="options-subpanel options-favorites-panel">
-                <div class="options-subpanel-title">Favorites</div>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><span class="options-checkbox-copy"><span>Order</span><small>Historical preserves added order. Alphabetical changes display only.</small></span></span><span class="options-inline-trailing"><select id="favorite-sort-order-select" class="options-input" aria-label="Favorites order"><option value="historical">Historical</option><option value="alphabetical">Alphabetical</option></select></span></label>
+              <div class="options-subpanel options-cache-panel">
+                <div class="options-subpanel-title">Cache</div>
+                <div class="database-stats-panel options-path-control"><input id="library-cache-path" class="options-input options-path-readout" type="text" readonly placeholder="Archive cache path" aria-label="Archive cache path" /><button id="library-cache-browse-button" class="tool-button glyph-button" type="button" aria-label="Show archive cache in Finder" title="Show archive cache in Finder"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="archive-cache-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Enable Cache</span><small>Usage: <strong id="database-cache-summary">—</strong></small><small>Decompressed files can be retained to reduce load time.</small></span></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><span class="options-checkbox-copy"><span>Cache Limit</span><small>Least-recently-used archive entries are removed automatically. Active playback is never removed.</small></span></span><span class="options-inline-trailing"><select id="archive-cache-limit-select" class="options-input" aria-label="Archive cache size limit"><option value="2147483648" selected>2 GB</option><option value="4294967296">4 GB</option><option value="8589934592">8 GB</option><option value="17179869184">16 GB</option></select></span></label>
+                <p><strong>ScanSong scratch files are separate:</strong> they are disposable and reclaimed after each source or after cancellation.</p>
+                <div class="options-library-toolbar options-panel-actions">
+                  <button id="library-cache-default-button" class="tool-button" type="button">Use Default</button>
+                  <button id="library-clear-cache-button" class="tool-button" type="button">Clear Cache</button>
+                  <button id="library-show-cache-button" class="tool-button" type="button">Show in Finder</button>
+                </div>
               </div>
               <div class="options-subpanel options-database-panel">
                 <div class="options-subpanel-title">Database</div>
-                <div class="database-stats-panel options-path-control"><input id="library-database-path" class="options-input options-path-readout" type="text" readonly placeholder="MediaScanner catalog path" aria-label="Database path" /><button id="library-database-browse-button" class="tool-button glyph-button" type="button" aria-label="Browse for catalog" title="Browse for catalog"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
+                <div class="database-stats-panel options-path-control"><input id="library-database-path" class="options-input options-path-readout" type="text" readonly placeholder="ScanSong catalog path" aria-label="Database path" /><button id="library-database-browse-button" class="tool-button glyph-button" type="button" aria-label="Browse for catalog" title="Browse for catalog"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
                 <p id="library-database-location-status">SPCBoy reads the shared schema-23 catalog read-only.</p>
                 <div class="options-library-toolbar">
                   <button id="library-database-default-button" class="tool-button" type="button">Use Default</button>
@@ -180,17 +184,14 @@
                   <button id="library-database-show-button" class="tool-button" type="button">Show in Finder</button>
                 </div>
               </div>
-              <div class="options-subpanel options-cache-panel">
-                <div class="options-subpanel-title">Archive Cache</div>
-                <div class="database-stats-panel options-path-control"><input id="library-cache-path" class="options-input options-path-readout" type="text" readonly placeholder="Archive cache path" aria-label="Archive cache path" /><button id="library-cache-browse-button" class="tool-button glyph-button" type="button" aria-label="Show archive cache in Finder" title="Show archive cache in Finder"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="archive-cache-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Enable Cache</span><small>Usage: <strong id="database-cache-summary">—</strong></small><small>Decompressed files can be retained to reduce load time.</small></span></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><span class="options-checkbox-copy"><span>Cache Limit</span><small>Least-recently-used archive entries are removed automatically. Active playback is never removed.</small></span></span><span class="options-inline-trailing"><select id="archive-cache-limit-select" class="options-input" aria-label="Archive cache size limit"><option value="2147483648" selected>2 GB</option><option value="4294967296">4 GB</option><option value="8589934592">8 GB</option><option value="17179869184">16 GB</option></select></span></label>
-                <p><strong>MediaScanner scratch files are separate:</strong> they are disposable and reclaimed after each source or after cancellation.</p>
-                <div class="options-library-toolbar options-panel-actions">
-                  <button id="library-cache-default-button" class="tool-button" type="button">Use Default</button>
-                  <button id="library-clear-cache-button" class="tool-button" type="button">Clear Cache</button>
-                  <button id="library-show-cache-button" class="tool-button" type="button">Show in Finder</button>
-                </div>
+              <div class="options-subpanel options-favorites-panel">
+                <div class="options-subpanel-title">Favorites</div>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="favorite-historical-sort-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Sort by Date Added</span><small>Sort favorites playlist by date added.</small></span></span></label>
+              </div>
+              <div class="options-subpanel options-local-files-panel">
+                <div class="options-subpanel-title">Local Files</div>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="local-browser-enabled-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Use Local Files</span><small>Browse one folder directly. The database library is disabled while this is on.</small></span></span></label>
+                <div class="database-stats-panel options-path-control"><input id="local-browser-path" class="options-input options-path-readout" type="text" readonly placeholder="No local folder selected" aria-label="Local files folder" /><button id="local-browser-browse-button" class="tool-button glyph-button" type="button" aria-label="Choose local files folder" title="Choose local files folder"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
               </div>
             </div>
 
@@ -201,6 +202,10 @@
                 <div class="options-help-text">When installed plugins declare the same extension, scanning and playback use the same declared candidate set. This page exposes those conflicts before a per-format preference or global-priority policy is chosen.</div>
                 <div id="routing-conflicts-list" class="routing-conflicts-list" aria-live="polite"></div>
               </div>
+            </div>
+
+            <div id="options-audio-section" class="options-page options-page-audio is-hidden">
+              <div class="options-page-title">VGMBoy / Audio</div>
             </div>
 
             <div id="options-playback-section" class="options-page options-page-playback is-hidden">
@@ -234,17 +239,20 @@
                 <button id="equalizer-reset-button" class="tool-button" type="button">Reset</button>
               </div>
               <div class="options-subpanel">
+                <div class="options-subpanel-title">End Fade</div>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="spc-fade-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Fade Out</span><small>Apply transitional volume fade to song end.</small></span></span><span class="options-inline-trailing"><input id="spc-fade-input" class="options-input options-duration-input" type="text" inputmode="numeric" value="0:06" aria-label="Fade length" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="queued-skips-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Faded Skip</span><small>First skip fades from the current position; another skip during that fade advances immediately.</small></span></span></label>
+              </div>
+              <div class="options-subpanel">
                 <div class="options-subpanel-title">Play Time</div>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="spc-force-length-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Long Play</span><small>Loop song with original format control.</small></span></span><span class="options-inline-trailing"><input id="spc-length-input" class="options-input options-duration-input" type="text" inputmode="numeric" value="3:00" aria-label="Long Play duration" /></span></label>
                 <label class="options-field options-inline-field"><span class="options-checkbox-copy"><span>Unknown-length default</span><small>Used when a decoder provides no natural duration and Long Play is off.</small></span><span class="options-inline-trailing"><input id="spc-unknown-duration-input" class="options-input options-duration-input" type="text" inputmode="numeric" value="2:30" aria-label="Unknown-length default duration" /></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="spc-fade-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Fade Out</span><small>Apply transitional volume fade to song end.</small></span></span><span class="options-inline-trailing"><input id="spc-fade-input" class="options-input options-duration-input" type="text" inputmode="numeric" value="0:06" aria-label="Fade length" /></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="queued-skips-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Faded Skip</span><small>First skip fades from the current position; another skip during that fade advances immediately.</small></span></span></label>
               </div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">AAC Export</div>
                 <div class="options-help-text">VGMBoy performs the finite offline render. SPCBoy only supplies the selected track and destination.</div>
                 <div class="database-stats-panel options-path-control"><input id="aac-export-directory-path" class="options-input options-path-readout" type="text" readonly placeholder="Choose an export folder" aria-label="AAC export folder" /><button id="aac-export-choose-button" class="tool-button" type="button">Choose Folder</button></div>
-                <div id="aac-export-status" class="options-help-text" aria-live="polite"></div>
+                <div class="database-stats-panel"><div id="aac-export-status" class="options-help-text" aria-live="polite"></div><button id="aac-export-cancel-button" class="tool-button" type="button" disabled>Abort Export</button></div>
               </div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Play Speed</div>

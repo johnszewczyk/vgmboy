@@ -86,6 +86,11 @@ manifest; JavaScript only indexes and displays that projection. `SPCBoyPreferenc
 normalizes timing, fade, EQ, volume, mono, and native-tempo values through
 `VGMBoyKit.PlaybackPreferences` before persisting the frontend JSON shape.
 
+AAC export is a native offline task: `WKPlaybackBridge` forwards VGMBoy frame
+progress and terminal events to both the main and Options windows. The WebKit
+surface only renders those events and can request cancellation; VGMBoy removes
+the temporary partial file rather than exposing an incomplete `.aac` result.
+
 Database search is also native-owned: `CatalogBrowserCore.CatalogSearchIndex`
 provides the matching policy through `CatalogBrowserProjection.search`, and
 WebKit waits for that indexed read instead of maintaining a second immediate
@@ -109,11 +114,19 @@ All typed VGMBoy commands sent through `WKPlaybackBridge` are serialized by
 the shared `FrontendCore.PlaybackTransportCore.PlaybackTransportCoordinator`,
 which also exposes one generation-checked natural-end event for queue
 continuation.
+Synchronous bridge replies and pushed playback events both derive from that
+same `PlaybackTransportStatus` snapshot; the WK layer must not re-query or
+independently reconstruct VGMBoy diagnostics.
 The bridge no longer owns a `PlaybackController`, serial executor, or native
 request-generation lock. The remaining JavaScript queue/status layer owns only
 WebKit interaction ordering and stale UI generation checks; the shared native
 coordinator is the non-UI safety boundary that prevents concurrent detached
 bridge requests from racing one playback session.
+
+`WKPlaybackBridge` callback slots are lock-protected because handlers are
+installed by the AppKit host while status, natural-end, and AAC progress events
+arrive from transport or export queues. The bridge must copy a handler under
+the lock and invoke it after releasing the lock.
 
 The former JavaScript playback coordinator and split materialize/load/play
 workflow are removed. `nativePlaybackStart` now accepts one typed playback
@@ -123,8 +136,12 @@ snapshot. JavaScript retains only queue choice, user-intent forwarding, and
 DOM/status projection. Database rows are returned by the native catalog
 bridge; there are no JavaScript preload or metadata-hydration workers.
 Natural completion is delivered to the page through `nativePlaybackEnded`; the
-status poll remains diagnostic-only and does not infer end or advance the
-playlist.
+shared native transport also publishes complete `nativePlaybackState`
+snapshots at most four times per second while audio is playing. The AppKit host
+broadcasts each snapshot to both the main and separate Options WebViews, so the
+elapsed readout and Diagnostics page describe the same native session. The
+WebKit skin renders those events and does not run a status-poll loop or infer
+end from elapsed time.
 
 Once a track is loaded, pause/resume and seek use the existing VGMBoy session
 through `nativePlaybackPause`, `nativePlaybackResume`, and `nativePlaybackSeek`.

@@ -57,6 +57,10 @@ async function refreshFavorites() {
 async function toggleFavorites(tracks) {
   applyFavoriteSnapshot(await window.spcBoyWK.favoritesToggle(tracks, state.favoriteSortOrder));
 }
+
+function playVisibleTrack(trackId, startSeconds = 0) {
+  return uiApp.playback.playTrack(trackId, startSeconds, false, { replaceQueue: true });
+}
 let browserSelectionGeneration = 0;
 let selectedBrowserButton = null;
 let selectedDatabaseGameButton = null;
@@ -329,7 +333,7 @@ async function activateBrowserNode(node, { playNow = true } = {}) {
         || state.selectedBrowserPath !== node.path) return;
     applyFolderSelection(selection);
     const target = selection.playlist?.[0];
-    if (playNow && target) await uiApp.playback.playTrack(target.id, 0);
+    if (playNow && target) await playVisibleTrack(target.id, 0);
   } catch (error) {
     console.error(error);
   }
@@ -640,7 +644,7 @@ function makeDatabaseGameButton(game) {
     persistSettings();
     loadDatabaseGame(game).then((loaded) => {
       const targetID = loaded ? databaseLoadedSelectionID() : null;
-      if (targetID) return uiApp.playback.playTrack(targetID, 0);
+      if (targetID) return playVisibleTrack(targetID, 0);
       return undefined;
     }).catch((error) => reportDatabaseSidebarError("play the selected game", error));
   });
@@ -656,7 +660,7 @@ function makeDatabaseGameButton(game) {
     persistSettings();
     loadDatabaseGame(game).then((loaded) => {
       const targetID = loaded ? databaseLoadedSelectionID() : null;
-      if (targetID) return uiApp.playback.playTrack(targetID, 0);
+      if (targetID) return playVisibleTrack(targetID, 0);
       return undefined;
     }).catch((error) => reportDatabaseSidebarError("play the selected game", error));
   });
@@ -674,7 +678,7 @@ function makeDatabaseGameButton(game) {
       ["Play Now", async () => {
         const loaded = await loadDatabaseGame(game);
         const targetID = loaded ? databaseLoadedSelectionID() : null;
-        if (targetID) await uiApp.playback.playTrack(targetID, 0);
+        if (targetID) await playVisibleTrack(targetID, 0);
       }],
       ["Queue", async () => {
         const rows = await window.spcBoyWK.databaseGameTracks([game]);
@@ -802,7 +806,7 @@ function renderDatabaseGames() {
   databaseEmptyState.classList.toggle("is-hidden", !state.databaseSidebarError && gamesForView.length > 0);
   databaseEmptyState.textContent = state.databaseSidebarError || (state.databaseGames.length
     ? "No database games match this search."
-    : "Use MediaScanner to populate the selected database.");
+    : "Use ScanSong to populate the selected database.");
   scheduleSelectionIndicators();
 }
 
@@ -1028,30 +1032,15 @@ function databaseRowsToPlaylistTracks(rows, games) {
 
 async function loadDatabaseGamesIntoPlaylist(games) {
   await invalidatePlaylistCatalogSession();
-  await uiApp.playback.cancelQueuedSkip?.({ restoreOutput: true });
-  const replacementInput = {
-    currentTrackId: state.currentTrackId,
-    currentTrackInfo: state.currentTrackInfo
-  };
   const rows = await window.spcBoyWK.databaseGameTracks(games);
   if (rows?.stale === true) return false;
   state.databaseSidebarError = "";
   state.selectedDatabaseGameKey = games.length === 1 ? databaseGameKey(games[0]) : null;
   state.playlist = databaseRowsToPlaylistTracks(rows, games);
-  const replacementState = await window.spcBoyWK.playbackQueueTransition({
-    state: {
-      currentTrackId: replacementInput.currentTrackId,
-      selectedTrackId: state.selectedTrackId,
-      pendingTrackId: null
-    },
-    playlistIds: state.playlist.map((track) => track.id),
-    intent: { kind: "replace", preservePlayback: true }
-  });
-  state.currentTrackId = replacementState?.currentTrackId || null;
-  state.currentTrackInfo = state.currentTrackId
-    ? state.playlist.find((track) => track.id === state.currentTrackId) || replacementInput.currentTrackInfo || null
-    : null;
-  state.selectedTrackId = replacementState?.selectedTrackId || null;
+  // Sidebar selection is a preview operation. It must not replace the
+  // playback queue or clear the active track; explicit Play/Enter adopts this
+  // visible playlist through playTrack({ replaceQueue: true }).
+  state.selectedTrackId = resolveSelectedTrackId(state.playlist);
   state.selectedTrackIds = state.selectedTrackId ? [state.selectedTrackId] : [];
   state.lastSelectedTrackId = state.selectedTrackId;
   persistSettings();
@@ -1072,7 +1061,7 @@ async function activateDatabaseSelection() {
   if (selectedGame) {
     const loaded = await loadDatabaseGame(selectedGame);
     const targetID = loaded ? databaseLoadedSelectionID() : null;
-    if (targetID) await uiApp.playback.playTrack(targetID, 0);
+    if (targetID) await playVisibleTrack(targetID, 0);
     return;
   }
   if (state.selectedDatabaseConsoleName) {
@@ -1080,7 +1069,7 @@ async function activateDatabaseSelection() {
     if (games.length) {
       const loaded = await loadDatabaseGamesIntoPlaylist(games);
       const targetID = loaded ? databaseLoadedSelectionID() : null;
-      if (targetID) await uiApp.playback.playTrack(targetID, 0);
+      if (targetID) await playVisibleTrack(targetID, 0);
       return;
     }
   }
@@ -1094,7 +1083,7 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
     // previously selected or playing track when DOM focus has moved.
     const track = selectPlaylistTrack(playlistRow.dataset.trackId, { focus: true });
     if (!track) return false;
-    await uiApp.playback.playTrack(track.id, 0);
+    await playVisibleTrack(track.id, 0);
     return true;
   }
 
@@ -1118,7 +1107,7 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
       persistSettings();
       const loaded = await loadDatabaseGame(game);
       const targetID = loaded ? databaseLoadedSelectionID() : null;
-      if (targetID) await uiApp.playback.playTrack(targetID, 0);
+      if (targetID) await playVisibleTrack(targetID, 0);
       return true;
     }
   }
@@ -1136,10 +1125,12 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
 function renderSidebar() {
   const view = currentSidebarView();
   const labels = { paths: "Path View", consoles: "Console View", diskPath: "Local Files" };
+  const glyphs = { paths: "#icon-folder-tree", consoles: "#icon-database", diskPath: "#icon-folder-tree" };
   if (refs.sidebarViewToggleButton) {
     const title = labels[view.storedMode] || labels.consoles;
     refs.sidebarViewToggleButton.title = title;
     refs.sidebarViewToggleButton.setAttribute("aria-label", title);
+    refs.sidebarViewToggleButton.querySelector("use")?.setAttribute("href", glyphs[view.storedMode] || glyphs.consoles);
   }
   if (state.databaseSidebarLoading) {
     const indicator = resetSidebarContent();
@@ -1644,7 +1635,7 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
       });
 
       row.addEventListener("dblclick", () => {
-        uiApp.playback.playTrack(track.id, 0).catch((error) => {
+        playVisibleTrack(track.id, 0).catch((error) => {
           console.error(error);
         });
       });
@@ -1661,7 +1652,7 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
         event.stopPropagation();
         const selectedTrack = selectPlaylistTrack(track.id);
         if (!selectedTrack) return;
-        uiApp.playback.playTrack(selectedTrack.id, 0).catch((error) => {
+        playVisibleTrack(selectedTrack.id, 0).catch((error) => {
           console.error(error);
         });
       });
@@ -1851,7 +1842,24 @@ function applyRoutingPreferences(preferences) {
   renderAll();
 }
 
+let optionsPagesOrganized = false;
+
+function organizeOptionsPages() {
+  if (optionsPagesOrganized || !refs.optionsAudioSection || !refs.optionsPlaybackSection) return;
+  const audioTitles = new Set(["AAC Export", "Equalizer", "Mono", "Volume"]);
+  const audioPanels = [...refs.optionsPlaybackSection.querySelectorAll(":scope > .options-subpanel")]
+    .filter((panel) => audioTitles.has(panel.querySelector(".options-subpanel-title")?.textContent?.trim()));
+  const sortPanels = (panels) => panels
+    .sort((left, right) => (left.querySelector(".options-subpanel-title")?.textContent || "")
+      .localeCompare(right.querySelector(".options-subpanel-title")?.textContent || ""));
+  sortPanels(audioPanels).forEach((panel) => refs.optionsAudioSection.appendChild(panel));
+  sortPanels([...refs.optionsPlaybackSection.querySelectorAll(":scope > .options-subpanel")])
+    .forEach((panel) => refs.optionsPlaybackSection.appendChild(panel));
+  optionsPagesOrganized = true;
+}
+
 function renderAll() {
+  organizeOptionsPages();
   applyUISettings();
   refs.optionsOverlay.classList.toggle("is-hidden", !state.optionsOpen);
   refs.optionsOverlay.setAttribute("aria-hidden", state.optionsOpen ? "false" : "true");
@@ -1859,12 +1867,14 @@ function renderAll() {
   const routingSelected = state.optionsSection === "routing";
   const playbackSelected = state.optionsSection === "playback";
   const diagnosticsSelected = state.optionsSection === "diagnostics";
+  const audioSelected = state.optionsSection === "audio";
   const themeSelected = state.optionsSection === "theme";
   const windowsSelected = state.optionsSection === "windows";
   refs.optionsDatabaseTab.classList.toggle("is-selected", databaseSelected);
   refs.optionsRoutingTab.classList.toggle("is-selected", routingSelected);
   refs.optionsPlaybackTab.classList.toggle("is-selected", playbackSelected);
   refs.optionsDiagnosticsTab.classList.toggle("is-selected", diagnosticsSelected);
+  refs.optionsAudioTab.classList.toggle("is-selected", audioSelected);
   refs.optionsThemeTab.classList.toggle("is-selected", themeSelected);
   refs.optionsWindowsTab.classList.toggle("is-selected", windowsSelected);
   refs.optionsThemeSection.classList.toggle("is-hidden", !themeSelected);
@@ -1873,6 +1883,7 @@ function renderAll() {
   refs.optionsRoutingSection.classList.toggle("is-hidden", !routingSelected);
   refs.optionsPlaybackSection.classList.toggle("is-hidden", !playbackSelected);
   refs.optionsDiagnosticsSection.classList.toggle("is-hidden", !diagnosticsSelected);
+  refs.optionsAudioSection.classList.toggle("is-hidden", !audioSelected);
   renderRoutingConflicts();
   if (document.activeElement !== refs.sidebarFontSizeInput) refs.sidebarFontSizeInput.value = String(state.uiFontSizePt);
   if (document.activeElement !== refs.sidebarTextColorInput) refs.sidebarTextColorInput.value = state.sidebarTextColor;
@@ -1881,6 +1892,7 @@ function renderAll() {
   refs.applicationMonospaceCheckbox.checked = state.applicationMonospace;
   if (refs.aacExportDirectoryPath) refs.aacExportDirectoryPath.value = state.aacExportDirectory || "";
   if (refs.aacExportStatus) refs.aacExportStatus.textContent = state.aacExportStatus || "";
+  if (refs.aacExportCancelButton) refs.aacExportCancelButton.disabled = !state.aacExportInProgress;
   refs.playlistHeaderBoldCheckbox.checked = state.playlistHeaderBold;
   if (document.activeElement !== refs.spcUnknownDurationInput) refs.spcUnknownDurationInput.value = uiApp.formatTime(state.unknownDurationSeconds);
   refs.columnAutoSizeCheckbox.checked = state.columnAutoSize;
@@ -1897,7 +1909,7 @@ function renderAll() {
   refs.archiveCacheLimitSelect.disabled = !state.archiveCacheEnabled;
   refs.localBrowserEnabledCheckbox.checked = state.localBrowserEnabled;
   refs.localBrowserPath.value = state.rootPath || "";
-  refs.favoriteSortOrderSelect.value = state.favoriteSortOrder;
+  refs.favoriteHistoricalSortCheckbox.checked = state.favoriteSortOrder === "historical";
   [refs.libraryDatabaseBrowseButton, refs.libraryDatabaseShowButton, refs.libraryDatabaseDefaultButton, refs.libraryDatabaseReloadButton]
     .forEach((control) => { control.disabled = state.localBrowserEnabled; });
   refs.playbackSpeedEnabledCheckbox.checked = state.playbackSpeedEnabled;
@@ -1919,7 +1931,7 @@ function renderAll() {
   // paths into the compact field unless a future design explicitly asks for it.
   refs.libraryDatabasePath.value = "";
   if (refs.libraryCachePath) refs.libraryCachePath.value = "";
-  refs.libraryDatabaseLocationStatus.textContent = state.databaseLocationStatus || "SPCBoy reads this schema-23 catalog. MediaScanner owns scan paths, scanning, link checks, and cleanup.";
+  refs.libraryDatabaseLocationStatus.textContent = state.databaseLocationStatus || "SPCBoy reads this schema-23 catalog. ScanSong owns scan paths, scanning, link checks, and cleanup.";
   refs.libraryDatabaseReloadButton.disabled = Boolean(state.databaseLocation?.requiresRestart);
   refs.libraryClearCacheButton.disabled = false;
   refs.databaseCacheSummary.textContent = state.archiveCacheSummary ? formatArchiveCacheSummary(state.archiveCacheSummary) : "—";
@@ -2000,7 +2012,7 @@ function playSelectedTrack() {
     return;
   }
 
-  uiApp.playback.playTrack(active.id, 0).catch((error) => {
+  playVisibleTrack(active.id, 0).catch((error) => {
     console.error(error);
   });
 }
@@ -2402,7 +2414,7 @@ async function bootstrap() {
   state.databaseLocation = await window.spcBoyWK?.databaseLocation?.() || null;
   state.databaseLocationStatus = state.databaseLocation?.requiresRestart
     ? "Restart SPCBoy to use the selected database."
-    : "The shared MediaScanner catalog is active and opened read-only.";
+    : "The shared ScanSong catalog is active and opened read-only.";
   await window.spcBoyWK?.configureArchiveCache?.({
     enabled: state.archiveCacheEnabled,
     limitBytes: state.archiveCacheLimitBytes

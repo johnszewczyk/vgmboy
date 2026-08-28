@@ -26,7 +26,7 @@ Its page title is page-level content; Transport, Buffer, and Decoder are separat
 
 Appearance, database, playback, and cache choices are applied through the WebKit/native bridge and
 persisted by the native host. Changing the selected database does not make
-SPCBoy a catalog writer; MediaScanner remains responsible for scanning and publication.
+SPCBoy a catalog writer; ScanSong remains responsible for scanning and publication.
 
 ## Database panel layout
 

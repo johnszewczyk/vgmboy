@@ -6,7 +6,7 @@ This project owns its native AppKit/WKWebView host and `spcBoyWK` bridge while
 sharing the read-only catalog reader, catalog-browser behavior, and VGMBoy
 playback core.
 
-The current live native slice reads shared MediaScanner catalog roots, games,
+The current live native slice reads shared ScanSong catalog roots, games,
 files, search results, and playlist rows, and routes loose-file playback through
 VGMBoyKit. Explicitly opening a local folder uses the shared
 `LocalFileBrowserCore` for shallow navigation and ordinary supported files;
