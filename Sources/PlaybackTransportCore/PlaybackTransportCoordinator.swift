@@ -152,7 +152,7 @@ public struct PlaybackNaturalEndGate: Sendable {
 /// controller, timing reconfiguration, output controls, and native status.
 /// Queue selection, catalog rows, archive extraction, and presentation stay
 /// outside this boundary; the shared queue policy is consulted only for the
-/// generation-checked completion decision.
+/// generation-checked completion retirement operation.
 public final class PlaybackTransportCoordinator: @unchecked Sendable {
     public typealias StatusHandler = @Sendable (PlaybackTransportStatus) -> Void
     public typealias NaturalEndHandler = @Sendable (PlaybackTransportStatus) -> Void
@@ -274,51 +274,53 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
 
     public func stop() async {
         await run {
-            _ = self.controller.perform(.init(command: .stop))
-            self.currentTrack = nil
-            self.currentPlaybackGeneration = nil
-            self.naturalEndGate.reset()
-            self.continuationCoordinator.reset()
+            self.retirePlaybackLocked()
         }
     }
 
-    /// Claims and computes the one continuation decision for a completed
+    /// Claims, retires, and computes the one continuation decision for a completed
     /// native session. The generation check and one-shot claim live beside the
     /// VGMBoy controller so a frontend cannot accidentally make a decision for
-    /// a stale session or maintain a second continuation gate.
-    public func completionDecision(
+    /// a stale session or maintain a second continuation gate. The native
+    /// session is retired in the same queue-confined operation; frontends only
+    /// clear presentation state and honor the typed action that is returned.
+    public func retireCompletedPlayback(
         generation: Int,
         state: PlaybackQueueState,
         playlistIDs: [String],
         repeatMode: PlaybackRepeatMode
     ) -> PlaybackContinuationDecision? {
         queue.sync {
-            self.completionDecisionLocked(
+            guard let decision = self.completionDecisionLocked(
                 generation: generation,
                 state: state,
                 playlistIDs: playlistIDs,
                 repeatMode: repeatMode
-            )
+            ) else { return nil }
+            self.retirePlaybackLocked()
+            return decision
         }
     }
 
-    /// Computes the completion decision from the status sampled in the same
-    /// serialized operation. This is the native-frontend path; event-driven
-    /// hosts may use the generation-taking overload when they already have a
-    /// validated completion snapshot.
-    public func completionDecision(
+    /// Native-frontends may let the coordinator sample the active generation
+    /// and retire the session in the same serialized operation. This keeps a
+    /// status poll and completion retirement from becoming two competing
+    /// lifecycle decisions.
+    public func retireCompletedPlayback(
         state: PlaybackQueueState,
         playlistIDs: [String],
         repeatMode: PlaybackRepeatMode
     ) -> PlaybackContinuationDecision? {
         queue.sync {
-            guard let status = self.controller.perform(.init(command: .status)).status else { return nil }
-            return self.completionDecisionLocked(
-                generation: status.diagnostics.generation,
-                state: state,
-                playlistIDs: playlistIDs,
-                repeatMode: repeatMode
-            )
+            guard let generation = self.controller.perform(.init(command: .status)).status?.diagnostics.generation,
+                  let decision = self.completionDecisionLocked(
+                      generation: generation,
+                      state: state,
+                      playlistIDs: playlistIDs,
+                      repeatMode: repeatMode
+                  ) else { return nil }
+            self.retirePlaybackLocked()
+            return decision
         }
     }
 
@@ -336,6 +338,14 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             playlistIDs: playlistIDs,
             repeatMode: repeatMode
         )
+    }
+
+    private func retirePlaybackLocked() {
+        _ = controller.perform(.init(command: .stop))
+        currentTrack = nil
+        currentPlaybackGeneration = nil
+        naturalEndGate.reset()
+        continuationCoordinator.reset()
     }
 
     public func beginFadedSkip(duration: TimeInterval) async -> Int? {
