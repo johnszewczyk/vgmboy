@@ -30,6 +30,10 @@ deliberately exclusive to one family.
 - SNDH routes to `psgplay`. The shared `VGMBoySNDH` product reads SNDH tags and
   subtune timing without starting playback; `SNDHDecoder` uses the same
   vendored `psgplay` engine for subtune selection and stereo PCM rendering.
+  A 16-file sample across Leitch game music, loaders/menus, DMA, 5-channel,
+  digitized, and demo variants opened and produced non-silent PCM. This does
+  not certify the full Atari ST corpus or subjective musical content; SNDH
+  files may intentionally contain loaders, SFX, or hardware-specific code.
 - `hasNaturalEnding == false` (lazyusf/USF and sidplayfp/SID) forces a capped decode window so a looping core can
   never run indefinitely. `TimingPolicy.plan` carries this through `usesNativeEnding`. SID
   metadata currently reports no natural duration, so its normal non-Long-Play window is the
