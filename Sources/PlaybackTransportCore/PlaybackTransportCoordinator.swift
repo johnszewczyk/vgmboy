@@ -17,6 +17,25 @@ public struct PlaybackTransportTrack: Equatable, Sendable {
     }
 }
 
+/// Native continuation input after a frontend has resolved archive
+/// materialization and timing policy. The shared transport deliberately sees
+/// only the playable path and the finite VGMBoy load parameters.
+public struct PlaybackContinuationStart: Equatable, Sendable {
+    public let track: PlaybackTransportTrack
+    public let payload: PlaybackControlPayload
+    public let requestID: Int
+
+    public init(
+        track: PlaybackTransportTrack,
+        payload: PlaybackControlPayload,
+        requestID: Int
+    ) {
+        self.track = track
+        self.payload = payload
+        self.requestID = requestID
+    }
+}
+
 public struct PlaybackTransportStatus: Equatable, Sendable {
     public let currentTrackID: String?
     public let generation: Int
@@ -327,6 +346,43 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                 repeatMode: repeatMode
             )
             return self.retireCompletedPlaybackLocked(request)
+        }
+    }
+
+    /// Retires the completed session and starts the already-resolved target
+    /// on the same transport queue. Archive extraction and timing policy stay
+    /// outside this core; only the playable track and VGMBoy command payload
+    /// cross this boundary.
+    public func continueAfterCompletion(
+        state: PlaybackQueueState,
+        playlistIDs: [String],
+        repeatMode: PlaybackRepeatMode,
+        start: PlaybackContinuationStart?
+    ) async throws -> PlaybackContinuationDecision? {
+        try await run {
+            if let start, !self.isLatest(start.requestID) { throw CancellationError() }
+            guard let generation = self.controller.perform(.init(command: .status)).status?.diagnostics.generation else {
+                return nil
+            }
+            let request = PlaybackContinuationRequest(
+                generation: generation,
+                state: state,
+                playlistIDs: playlistIDs,
+                repeatMode: repeatMode
+            )
+            guard let decision = self.retireCompletedPlaybackLocked(request) else { return nil }
+            guard let start,
+                  case let .play(targetID) = decision.action,
+                  targetID == start.track.id else {
+                return decision
+            }
+            guard self.isLatest(start.requestID) else { throw CancellationError() }
+            let event = self.controller.perform(.init(command: .load, payload: start.payload))
+            try self.requireSuccess(event)
+            try self.requireSuccess(self.controller.perform(.init(command: .play)))
+            self.currentTrack = start.track
+            self.currentPlaybackGeneration = event.status?.diagnostics.generation
+            return decision
         }
     }
 
