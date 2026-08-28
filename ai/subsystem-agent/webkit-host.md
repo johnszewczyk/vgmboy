@@ -142,9 +142,10 @@ SPCBoyWK submit the same lifecycle input.
 operation through `WKPlaybackBridge`; it does not retain a second
 `PlaybackContinuationCoordinator`. Completion retirement releases the active
 archive materialization in that serialized boundary, so there is no second
-JavaScript release request. WebKit still performs the renderer handoff (clear
-its presentation state, then request the chosen track) until the remaining
-presentation/next-track sequencing is extracted.
+JavaScript release request. WebKit then performs the intentionally UI-local
+renderer handoff: clear its presentation state and forward the typed result's
+chosen track or adjacent intent. It does not choose repeat policy or retire
+the native session.
 
 `WKPlaybackBridge` callback slots are lock-protected because handlers are
 installed by the AppKit host while status, natural-end, and AAC progress events
