@@ -1045,6 +1045,13 @@ body.is-file-drag-over::after {
   background: transparent;
 }
 
+.options-page-audio {
+  margin-top: 0;
+  gap: 1rem;
+  padding: 0;
+  background: transparent;
+}
+
 .options-theme-page {
   gap: 1rem;
   padding: 0;

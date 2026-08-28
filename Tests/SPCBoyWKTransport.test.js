@@ -20,6 +20,10 @@ const indexSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/index.html"),
   "utf8"
 );
+const stylesSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/styles.css"),
+  "utf8"
+);
 const nativeBridgeSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/WKNativeBridge.swift"),
   "utf8"
@@ -477,6 +481,7 @@ test("SPCBoyWK keeps Audio and Playback option panels structurally separated", (
   assert.match(playbackSource, /End Fade[\s\S]*Play Time[\s\S]*Play Speed/);
   assert.doesNotMatch(playbackSource, /AAC Export|Equalizer|Mono|options-page-title[^]*Volume/);
   assert.doesNotMatch(uiSource, /organizeOptionsPages/);
+  assert.match(stylesSource, /\.options-page-audio\s*\{[\s\S]*padding:\s*0;[\s\S]*background:\s*transparent;/);
 });
 
 test("SPCBoyWK allows every playlist column to be hidden except an empty table", () => {
