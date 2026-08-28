@@ -81,6 +81,13 @@ is not playing, has not naturally ended, and the bridge still owns a loaded
 track, keeping WebKit diagnostics aligned with CocoaSpice's native status
 model.
 
+Native playback status remains authoritative for elapsed position, pause, seek,
+tempo, and end state. While transport is playing, WebKit projects a small
+monotonic clock between native status anchors so the visible readout moves
+smoothly between the shared coordinator's status broadcasts. The projection is
+cancelled on pause, stop, replacement, and natural end; it never polls the
+decoder or advances playback itself.
+
 The native bridge projects `VGMBoyKit.FormatRegistry.playbackDescriptors` into the WebKit backend
 manifest; JavaScript only indexes and displays that projection. `SPCBoyPreferencesSnapshot`
 normalizes timing, fade, EQ, volume, mono, and native-tempo values through
@@ -91,10 +98,13 @@ progress and terminal events to both the main and Options windows. The WebKit
 surface only renders those events and can request cancellation; VGMBoy removes
 the temporary partial file rather than exposing an incomplete `.aac` result.
 
-Database search is also native-owned: `CatalogBrowserCore.CatalogSearchIndex`
-provides the matching policy through `CatalogBrowserProjection.search`, and
-WebKit waits for that indexed read instead of maintaining a second immediate
-JavaScript filter with potentially different semantics.
+Database search uses the shared `CatalogBrowserCore.CatalogSearchIndex` matching
+policy over the already-published native game projection. WebKit maintains a
+transient renderer-local index with the same all-terms fields (`name`, system,
+root, and display name), so each keypress filters immediately without a bridge
+round-trip or debounce. Native remains responsible for publishing and
+refreshing the authoritative game projection; WebKit does not scan paths or
+decode metadata to answer search input.
 
 Database Files are native-owned in the same way:
 `CatalogBrowserCore.CatalogFileTreeIndex.nodes()` supplies the complete nested

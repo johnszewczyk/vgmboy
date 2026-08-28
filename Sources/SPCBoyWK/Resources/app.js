@@ -88,6 +88,7 @@ refs.equalizerToolbarButton.addEventListener("click", () => {
 refs.progressSlider.addEventListener("input", (event) => {
   const nextValue = Number(event.target.value);
   state.elapsedSeconds = nextValue;
+  app.playback.setPlaybackClockPosition?.(nextValue);
   app.playback.updatePlaybackReadout();
 });
 

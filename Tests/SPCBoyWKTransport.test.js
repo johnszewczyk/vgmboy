@@ -12,6 +12,10 @@ const uiSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/app-ui.js"),
   "utf8"
 );
+const indexSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/index.html"),
+  "utf8"
+);
 const nativeBridgeSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/WKNativeBridge.swift"),
   "utf8"
@@ -139,6 +143,9 @@ function makeHarness() {
   const reconfigureRequests = [];
   const queueTransitionRequests = [];
   let timerID = 0;
+  let clockNow = 1000;
+  let animationFrameID = 0;
+  const animationFrames = new Map();
   const window = {
     setTimeout(callback, duration) {
       const id = ++timerID;
@@ -146,6 +153,15 @@ function makeHarness() {
       return id;
     },
     clearTimeout() {},
+    performance: { now: () => clockNow },
+    requestAnimationFrame(callback) {
+      const id = ++animationFrameID;
+      animationFrames.set(id, callback);
+      return id;
+    },
+    cancelAnimationFrame(id) {
+      animationFrames.delete(id);
+    },
     SPCBoyApp: null,
     SPCBoyPlaybackBackends: { forPath() { return { supportsLongPlay: false }; } },
     spcBoyWK: {
@@ -206,7 +222,20 @@ function makeHarness() {
     queueMicrotask
   };
   vm.runInNewContext(playbackSource, context, { filename: "app-playback.js" });
-  return { app, gainCalls, startRequests, reconfigureRequests, queueTransitionRequests, window };
+  return {
+    app,
+    gainCalls,
+    startRequests,
+    reconfigureRequests,
+    queueTransitionRequests,
+    window,
+    flushAnimationFrame(elapsedMilliseconds = 500) {
+      clockNow += elapsedMilliseconds;
+      const pending = [...animationFrames.entries()];
+      animationFrames.clear();
+      pending.forEach(([, callback]) => callback(clockNow));
+    }
+  };
 }
 
 test("SPCBoyWK ignores stale native generations", () => {
@@ -381,6 +410,22 @@ test("SPCBoyWK renders native status events without a polling loop", () => {
   assert.match(playbackSource, /function handleNativePlaybackEnded\(event\)/);
 });
 
+test("SPCBoyWK advances the visible clock between authoritative native events", () => {
+  const { app, flushAnimationFrame } = makeHarness();
+  const { state } = app;
+  state.currentTrackId = "track-a";
+  state.currentTrackInfo = state.playlist[0];
+  state.totalSeconds = 10;
+  state.nativePlayback = { ...state.nativePlayback, generation: 7, trackLoaded: true };
+
+  app.playback.handleNativePlaybackState(snapshot(7, "playing"));
+  assert.equal(state.elapsedSeconds, 1);
+  flushAnimationFrame(500);
+
+  assert.ok(state.elapsedSeconds > 1);
+  assert.ok(state.elapsedSeconds <= 10);
+});
+
 test("SPCBoyWK broadcasts complete native status to both windows", () => {
   assert.match(nativeBridgeSource, /"buffered_frames": status\.bufferedFrames/);
   assert.match(nativeBridgeSource, /"frames_requested": status\.framesRequested/);
@@ -397,6 +442,18 @@ test("SPCBoyWK uses native in-place tempo and AAC cancellation events", () => {
   assert.match(playbackSource, /nativeCancelAACExport/);
   assert.match(nativeBridgeSource, /onNativeAACExport/);
   assert.match(nativeBridgeSource, /nativeExportAACCancel/);
+  assert.match(uiSource, /\[\["Export AAC"/);
+  assert.match(indexSource, /id="aac-export-directory-path"/);
+  assert.match(indexSource, /id="aac-export-cancel-button"/);
+});
+
+test("SPCBoyWK filters database search locally without a debounce", () => {
+  assert.match(uiSource, /function rebuildDatabaseGameSearchIndex\(games = state\.databaseGames\)/);
+  assert.match(uiSource, /terms\.every\(\(term\) => searchText\.includes\(term\)\)/);
+  assert.match(uiSource, /state\.sidebarView = Object\.freeze\(localSidebarView\(state\.sidebarMode, state\.sidebarQuery\)\)/);
+  assert.doesNotMatch(uiSource, /sidebarSearchTimer/);
+  assert.doesNotMatch(uiSource, /databaseSearchGames\(requestedQuery\)/);
+  assert.doesNotMatch(uiSource, /databaseSearchGeneration/);
 });
 
 test("SPCBoyWK catalog roots are foldable in Path View", () => {

@@ -44,7 +44,6 @@ const state = {
   databaseFiles: [],
   databaseFileTree: [],
   databaseSearchGames: null,
-  databaseSearchGeneration: 0,
   databaseSidebarError: "",
   databaseSidebarLoading: false,
   collapsedConsoleNames: [],

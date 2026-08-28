@@ -17,7 +17,7 @@ let collapsedDatabaseConsoles = new Set();
 let databaseRowRenderGeneration = 0;
 let browserClickTimer = 0;
 let databaseGameClickTimer = 0;
-let sidebarSearchTimer = 0;
+let databaseGameSearchRecords = [];
 let columnResizePointerId = null;
 const PLAYLIST_VIRTUALIZATION_THRESHOLD = 200;
 const PLAYLIST_VIRTUAL_OVERSCAN = 12;
@@ -32,6 +32,34 @@ function syncCollapsedConsolePersistence() {
 
 function currentSidebarView() {
   return state.sidebarView;
+}
+
+function localSidebarView(mode, query) {
+  const normalizedQuery = String(query || "").trim();
+  const view = normalizedQuery ? "search" : mode;
+  return {
+    storedMode: mode,
+    query: normalizedQuery,
+    view,
+    contentMode: view === "paths" || view === "diskPath" ? "tree" : "database",
+    resultSource: view === "paths" ? "catalog-path-index" : view === "diskPath" ? "disk-path-tree" : "catalog-console-index",
+    isTemporary: view === "search"
+  };
+}
+
+function rebuildDatabaseGameSearchIndex(games = state.databaseGames) {
+  databaseGameSearchRecords = (Array.isArray(games) ? games : []).map((game) => ({
+    game,
+    searchText: `${game.name || ""} ${game.system || ""} ${game.rootName || ""} ${game.displayName || ""}`.toLowerCase()
+  }));
+}
+
+function localDatabaseSearch(query) {
+  const terms = String(query || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return state.databaseGames;
+  return databaseGameSearchRecords
+    .filter(({ searchText }) => terms.every((term) => searchText.includes(term)))
+    .map(({ game }) => game);
 }
 
 async function syncSidebarView() {
@@ -911,6 +939,7 @@ async function refreshDatabaseGamesForVisibleRoots() {
     const games = await window.spcBoyWK.databaseGames();
     if (games?.stale === true) return false;
     state.databaseGames = games;
+    rebuildDatabaseGameSearchIndex(state.databaseGames);
   } catch (error) {
     reportDatabaseSidebarError("read the database sidebar", error);
     throw error;
@@ -929,30 +958,15 @@ async function refreshDatabaseGamesForVisibleRoots() {
 
 async function updateSidebarSearch(query) {
   state.sidebarQuery = String(query || "");
-  await syncSidebarView();
-  const databaseGeneration = ++state.databaseSearchGeneration;
-  state.databaseSearchGames = null;
-  window.clearTimeout(sidebarSearchTimer);
+  state.databaseSidebarError = "";
+  state.databaseSearchGames = state.sidebarQuery.trim()
+    ? localDatabaseSearch(state.sidebarQuery)
+    : null;
+  // Search is a view-policy projection, not a catalog read. Keeping this
+  // synchronous removes the bridge round-trip and debounce from every keypress
+  // while preserving CatalogBrowserCore's query semantics locally.
+  state.sidebarView = Object.freeze(localSidebarView(state.sidebarMode, state.sidebarQuery));
   renderSidebar();
-  const requestedQuery = state.sidebarQuery.trim();
-  if (!requestedQuery) return;
-  if (window.spcBoyWK?.databaseSearchGames) {
-    sidebarSearchTimer = window.setTimeout(() => {
-      window.spcBoyWK.databaseSearchGames(requestedQuery)
-        .then((games) => {
-          if (databaseGeneration !== state.databaseSearchGeneration || state.sidebarQuery.trim() !== requestedQuery) return;
-          if (games?.stale === true) return;
-          state.databaseSidebarError = "";
-          state.databaseSearchGames = Array.isArray(games) ? games : [];
-          renderSidebar();
-        })
-        .catch((error) => {
-          if (databaseGeneration !== state.databaseSearchGeneration) return;
-          reportDatabaseSidebarError("search the database", error);
-        });
-    }, 120);
-    return;
-  }
 }
 
 const SIDEBAR_VIEW_CYCLE = ["consoles", "paths"];
@@ -2445,6 +2459,7 @@ async function bootstrap() {
   if (snapshot?.stale === true) return;
 
   Object.assign(state, snapshot);
+  rebuildDatabaseGameSearchIndex(state.databaseGames);
   await uiApp.playback.stopPlaybackState();
   state.selectedTrackId = resolveSelectedTrackId(snapshot.playlist);
   state.lastSelectedTrackId = state.selectedTrackId;
@@ -2477,6 +2492,7 @@ async function openLibraryRoot() {
 function applyLibrarySnapshot(snapshot) {
   if (snapshot?.stale === true) return;
   Object.assign(state, snapshot);
+  rebuildDatabaseGameSearchIndex(state.databaseGames);
   state.localBrowserEnabled = true;
   state.sidebarMode = "diskPath";
   state.sidebarQuery = "";

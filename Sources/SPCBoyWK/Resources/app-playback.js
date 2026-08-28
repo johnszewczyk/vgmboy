@@ -18,6 +18,9 @@ const playbackBackends = window.SPCBoyPlaybackBackends;
 let queuedSkipRequest = null;
 let queuedSkipTimer = 0;
 let playbackWindow = null;
+let playbackClockHandle = 0;
+let playbackClockUsesAnimationFrame = false;
+let nativeClockAnchor = null;
 const timingPlans = new Map();
 const TRANSPORT_DECLICK_MS = 10;
 
@@ -48,6 +51,73 @@ function clearQueuedSkipTimer() {
   queuedSkipTimer = 0;
 }
 
+function monotonicNow() {
+  const performanceNow = window.performance?.now?.();
+  return Number.isFinite(performanceNow) ? performanceNow : Date.now();
+}
+
+function cancelPlaybackClock() {
+  if (!playbackClockHandle) return;
+  if (playbackClockUsesAnimationFrame && window.cancelAnimationFrame) {
+    window.cancelAnimationFrame(playbackClockHandle);
+  } else {
+    window.clearTimeout(playbackClockHandle);
+  }
+  playbackClockHandle = 0;
+}
+
+function renderPlaybackClock(timestamp) {
+  playbackClockHandle = 0;
+  const track = activeTrackInfo();
+  if (!state.isPlaying || !nativeClockAnchor || !track || track.id !== nativeClockAnchor.trackId) {
+    return;
+  }
+
+  const elapsedSinceAnchor = Math.max(0, (Number(timestamp) - nativeClockAnchor.timestamp) / 1000);
+  const tempo = Math.max(0.01, Number(state.nativePlayback?.tempo) || 1);
+  const projectedSeconds = clampPosition(
+    nativeClockAnchor.positionSeconds + elapsedSinceAnchor * tempo,
+    state.totalSeconds
+  );
+  if (projectedSeconds > state.elapsedSeconds) {
+    state.elapsedSeconds = projectedSeconds;
+    updateElapsedReadout();
+  }
+  if (state.isPlaying && projectedSeconds < state.totalSeconds) schedulePlaybackClock();
+}
+
+function schedulePlaybackClock() {
+  if (playbackClockHandle || !state.isPlaying || !nativeClockAnchor) return;
+  if (typeof window.requestAnimationFrame === "function") {
+    playbackClockUsesAnimationFrame = true;
+    playbackClockHandle = window.requestAnimationFrame(renderPlaybackClock);
+  } else {
+    playbackClockUsesAnimationFrame = false;
+    playbackClockHandle = window.setTimeout(() => renderPlaybackClock(monotonicNow()), 50);
+  }
+}
+
+function anchorPlaybackClock(track, snapshot, elapsedSeconds) {
+  if (!track || snapshot?.transport_state !== "playing") {
+    nativeClockAnchor = null;
+    cancelPlaybackClock();
+    return;
+  }
+  nativeClockAnchor = {
+    trackId: track.id,
+    positionSeconds: elapsedSeconds,
+    timestamp: monotonicNow()
+  };
+  cancelPlaybackClock();
+  schedulePlaybackClock();
+}
+
+function setPlaybackClockPosition(positionSeconds) {
+  if (!state.isPlaying || !nativeClockAnchor || !activeTrackInfo()) return;
+  nativeClockAnchor.positionSeconds = clampPosition(positionSeconds, state.totalSeconds);
+  nativeClockAnchor.timestamp = monotonicNow();
+}
+
 function setAudioSettings(settings = {}) {
   if (settings.appVolume !== undefined) playbackApp.state.appVolume = playbackApp.normalizeAppVolume(settings.appVolume);
   if (typeof settings.equalizerEnabled === "boolean") playbackApp.state.equalizerEnabled = settings.equalizerEnabled;
@@ -55,6 +125,8 @@ function setAudioSettings(settings = {}) {
 }
 
 function resetNativePlaybackSnapshot() {
+  nativeClockAnchor = null;
+  cancelPlaybackClock();
   state.nativePlayback = {
     transportState: "stopped",
     outputState: "idle",
@@ -325,15 +397,19 @@ function syncMediaSessionState() {
   });
 }
 
-function updatePlaybackReadout() {
+function updateElapsedReadout() {
   refs.elapsedLabel.textContent = formatTime(state.elapsedSeconds);
   refs.songLengthLabel.textContent = formatTime(state.totalSeconds);
-  const playlistTotalSeconds = state.playlist.reduce((sum, entry) => sum + currentOutputBasePlaybackSeconds(entry), 0);
-  refs.playlistTotalLabel.textContent = formatTime(playlistTotalSeconds);
   const currentValue = Math.min(state.elapsedSeconds, state.totalSeconds || 1);
   refs.progressSlider.value = String(currentValue);
   const percent = state.totalSeconds > 0 ? (currentValue / state.totalSeconds) * 100 : 0;
   refs.progressSliderShell.style.setProperty("--progress-percent", `${Math.max(0, Math.min(percent, 100))}%`);
+}
+
+function updatePlaybackReadout() {
+  updateElapsedReadout();
+  const playlistTotalSeconds = state.playlist.reduce((sum, entry) => sum + currentOutputBasePlaybackSeconds(entry), 0);
+  refs.playlistTotalLabel.textContent = formatTime(playlistTotalSeconds);
   refs.playButton.querySelector("use")?.setAttribute("href", state.isPlaying ? "#icon-pause" : "#icon-play");
   syncMediaSessionState();
 }
@@ -532,6 +608,8 @@ function applyNativePlaybackSnapshot(track, snapshot, generation, { allowNativeG
     state.isPlaying = false;
     state.elapsedSeconds = totalSeconds;
   }
+
+  anchorPlaybackClock(activeTrack, snapshot, state.elapsedSeconds);
 
   updatePlaybackReadout();
   updateNativeDiagnostics();
@@ -964,6 +1042,7 @@ playbackApp.playback = {
   restartAt,
   refreshPlaybackForTimingChange,
   refreshPlaybackForSpeedChange,
+  setPlaybackClockPosition,
   chooseAACExportDirectory,
   exportTrackAsAAC,
   handleAACExportEvent,
