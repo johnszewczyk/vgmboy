@@ -1,4 +1,5 @@
 import Foundation
+import PlaybackQueueCore
 import PlaybackRequestCore
 import VGMBoyKit
 
@@ -170,6 +171,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     private var naturalEndHandler: NaturalEndHandler?
     private var currentPlaybackGeneration: Int?
     private var naturalEndGate = PlaybackNaturalEndGate()
+    private let continuationCoordinator = PlaybackContinuationCoordinator()
     private let controlSurface: PlaybackControlSurface
 
     public init(label: String) {
@@ -275,6 +277,30 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             self.currentTrack = nil
             self.currentPlaybackGeneration = nil
             self.naturalEndGate.reset()
+            self.continuationCoordinator.reset()
+        }
+    }
+
+    /// Claims and computes the one continuation decision for a completed
+    /// native session. The generation check and one-shot claim live beside the
+    /// VGMBoy controller so a frontend cannot accidentally make a decision for
+    /// a stale session or maintain a second continuation gate.
+    public func completionDecision(
+        generation: Int,
+        state: PlaybackQueueState,
+        playlistIDs: [String],
+        repeatMode: PlaybackRepeatMode
+    ) -> PlaybackContinuationDecision? {
+        queue.sync {
+            guard self.currentTrack != nil,
+                  let status = self.controller.perform(.init(command: .status)).status,
+                  status.diagnostics.generation == generation else { return nil }
+            return self.continuationCoordinator.decision(
+                generation: generation,
+                state: state,
+                playlistIDs: playlistIDs,
+                repeatMode: repeatMode
+            )
         }
     }
 
@@ -404,6 +430,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                 currentTrack = nil
                 currentPlaybackGeneration = nil
                 naturalEndGate.reset()
+                continuationCoordinator.reset()
             default:
                 break
             }
@@ -429,6 +456,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             unknownDurationMilliseconds: plan.unknownDurationSeconds * 1_000
         )
         naturalEndGate.reset()
+        continuationCoordinator.reset()
         let event = controller.perform(.init(
             command: .load,
             payload: .init(

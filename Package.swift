@@ -44,6 +44,7 @@ let package = Package(
             name: "PlaybackTransportCore",
             dependencies: [
                 "PlaybackRequestCore",
+                "PlaybackQueueCore",
                 .product(name: "VGMBoyKit", package: "VGMBoy")
             ]
         ),
