@@ -36,6 +36,21 @@ final class GMEDecoder: AudioDecoder, @unchecked Sendable {
                 error.map { String(cString: $0) } ?? "Unknown error."
             )
         }
+
+        // HES archives commonly ship a sibling M3U that maps the file's raw
+        // address slots to the authored music and SFX tracks.  libgme does
+        // not discover that companion automatically; leaving it unloaded
+        // exposes 256 address slots and loses the set's real timing/titles.
+        if URL(fileURLWithPath: path).pathExtension.caseInsensitiveCompare("hes") == .orderedSame,
+           let playlistPath = Self.companionPlaylistPath(for: path) {
+            let playlistError = playlistPath.withCString { gme_load_m3u(created, $0) }
+            guard playlistError == nil else {
+                gme_delete(created)
+                throw GMEDecoderError.loadFailed(
+                    playlistError.map { String(cString: $0) } ?? "The companion HES playlist could not be loaded."
+                )
+            }
+        }
         self.emu = created
     }
 
@@ -135,5 +150,14 @@ final class GMEDecoder: AudioDecoder, @unchecked Sendable {
             right[index] = Float(interleaved[index * 2 + 1]) / 32768.0
         }
         return (left, right)
+    }
+
+    private static func companionPlaylistPath(for path: String) -> String? {
+        let baseURL = URL(fileURLWithPath: path).deletingPathExtension()
+        let candidates = [
+            baseURL.appendingPathExtension("m3u"),
+            baseURL.appendingPathExtension("M3U")
+        ]
+        return candidates.first { FileManager.default.fileExists(atPath: $0.path) }?.path
     }
 }

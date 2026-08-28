@@ -34,14 +34,57 @@ public struct AACExportResult: Sendable, Equatable {
     public let sampleRate: Int
 }
 
+/// A thread-safe cancellation token for an offline AAC render. Cancellation is
+/// observed between decode blocks; the exporter never publishes a partial file
+/// at the requested destination.
+public final class AACExportCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    public init() {}
+
+    public func cancel() {
+        lock.lock()
+        cancelled = true
+        lock.unlock()
+    }
+
+    public var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return cancelled
+    }
+}
+
+/// Presentation-neutral progress for one finite offline render. A host can
+/// use this to build a queue or conversion dialog without owning decoding.
+public struct AACExportProgress: Sendable, Equatable {
+    public let renderedFrames: Int64
+    public let totalFrames: Int64
+    public let sampleRate: Int
+
+    public init(renderedFrames: Int64, totalFrames: Int64, sampleRate: Int) {
+        self.renderedFrames = renderedFrames
+        self.totalFrames = totalFrames
+        self.sampleRate = sampleRate
+    }
+
+    public var fractionComplete: Double {
+        guard totalFrames > 0 else { return 0 }
+        return min(1, Double(renderedFrames) / Double(totalFrames))
+    }
+}
+
 public enum AACExportError: LocalizedError, Equatable {
     case invalidRequest(String)
     case audioToolbox(OSStatus)
+    case cancelled
 
     public var errorDescription: String? {
         switch self {
         case .invalidRequest(let message): return message
         case .audioToolbox(let status): return "AAC export failed (AudioToolbox status \(status))."
+        case .cancelled: return "AAC export cancelled."
         }
     }
 }
@@ -51,8 +94,16 @@ public enum AACExportError: LocalizedError, Equatable {
 public enum AACExporter {
     private static let sampleRate = 44_100
     private static let chunkFrames = 4_096
+    /// Progress is a presentation channel, not a per-decode-block callback.
+    /// Bound it so a slow realtime decoder cannot saturate the host's main
+    /// actor with thousands of UI updates during a long export.
+    private static let progressInterval: TimeInterval = 0.25
 
-    public static func export(_ request: AACExportRequest) throws -> AACExportResult {
+    public static func export(
+        _ request: AACExportRequest,
+        cancellation: AACExportCancellation? = nil,
+        progress: (@Sendable (AACExportProgress) -> Void)? = nil
+    ) throws -> AACExportResult {
         guard request.trackIndex >= 0 else {
             throw AACExportError.invalidRequest("AAC export requires a non-negative track index.")
         }
@@ -69,24 +120,34 @@ public enum AACExporter {
         }
 
         let outputURL = uniqueOutputURL(in: directory, filenameStem: request.filenameStem)
+        let partialURL = directory.appendingPathComponent(".\(UUID().uuidString).partial.aac")
+        var shouldRemovePartial = true
+        defer {
+            if shouldRemovePartial {
+                try? FileManager.default.removeItem(at: partialURL)
+            }
+        }
+        if cancellation?.isCancelled == true { throw AACExportError.cancelled }
         let decoder = try DecoderFactory.make(path: request.sourcePath, sampleRate: sampleRate)
         defer { decoder.close() }
         try decoder.startTrack(request.trackIndex)
         decoder.configureFade(playMs: request.playMilliseconds, fadeMs: request.fadeMilliseconds)
 
         let capFrames = Int64(request.playMilliseconds + request.fadeMilliseconds) * Int64(sampleRate) / 1_000
-        var writer: ExtAudioFileRef?
+        var writerRef: ExtAudioFileRef?
         var fileFormat = AudioStreamBasicDescription(
             mSampleRate: Double(sampleRate), mFormatID: kAudioFormatMPEG4AAC,
             mFormatFlags: 0, mBytesPerPacket: 0, mFramesPerPacket: 1_024,
             mBytesPerFrame: 0, mChannelsPerFrame: 2, mBitsPerChannel: 0, mReserved: 0
         )
         try check(ExtAudioFileCreateWithURL(
-            outputURL as CFURL, kAudioFileAAC_ADTSType, &fileFormat, nil,
-            AudioFileFlags.eraseFile.rawValue, &writer
+            partialURL as CFURL, kAudioFileAAC_ADTSType, &fileFormat, nil,
+            AudioFileFlags.eraseFile.rawValue, &writerRef
         ))
-        guard let writer else { throw AACExportError.invalidRequest("AAC export could not create its output file.") }
-        defer { ExtAudioFileDispose(writer) }
+        guard let writer = writerRef else { throw AACExportError.invalidRequest("AAC export could not create its output file.") }
+        defer {
+            if let writerRef { ExtAudioFileDispose(writerRef) }
+        }
 
         var clientFormat = AudioStreamBasicDescription(
             mSampleRate: Double(sampleRate), mFormatID: kAudioFormatLinearPCM,
@@ -100,7 +161,17 @@ public enum AACExporter {
         ))
 
         var renderedFrames: Int64 = 0
+        var lastProgressUptime: TimeInterval = 0
+        func reportProgress(force: Bool = false) {
+            guard let progress else { return }
+            let now = ProcessInfo.processInfo.systemUptime
+            guard force || now - lastProgressUptime >= progressInterval else { return }
+            lastProgressUptime = now
+            progress(AACExportProgress(renderedFrames: renderedFrames, totalFrames: capFrames, sampleRate: sampleRate))
+        }
+        reportProgress(force: true)
         while renderedFrames < capFrames && !decoder.trackEnded {
+            if cancellation?.isCancelled == true { throw AACExportError.cancelled }
             let wanted = min(chunkFrames, Int(capFrames - renderedFrames))
             let frames = try decoder.readFrames(wanted)
             let count = min(wanted, min(frames.left.count, frames.right.count))
@@ -118,7 +189,15 @@ public enum AACExporter {
                 try check(ExtAudioFileWrite(writer, UInt32(count), &bufferList))
             }
             renderedFrames += Int64(count)
+            reportProgress()
         }
+        if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+        reportProgress(force: true)
+        let closeStatus = ExtAudioFileDispose(writer)
+        writerRef = nil
+        try check(closeStatus)
+        try FileManager.default.moveItem(at: partialURL, to: outputURL)
+        shouldRemovePartial = false
         return AACExportResult(outputURL: outputURL, renderedFrames: renderedFrames, sampleRate: sampleRate)
     }
 

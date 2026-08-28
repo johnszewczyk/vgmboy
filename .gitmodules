@@ -10,3 +10,6 @@
 [submodule "vendor/vgmstream"]
 	path = vendor/vgmstream
 	url = https://github.com/vgmstream/vgmstream.git
+[submodule "vendor/psgplay"]
+	path = vendor/psgplay
+	url = https://github.com/frno7/psgplay.git

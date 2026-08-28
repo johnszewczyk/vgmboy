@@ -3,6 +3,7 @@ import AudioToolbox
 import AVFoundation
 import Foundation
 import VGMBoyCAudioUnit
+import VGMBoySNDH
 @testable import VGMBoyKit
 
 @Suite("FormatRegistry")
@@ -10,7 +11,7 @@ struct FormatRegistryTests {
     @Test("publishes one complete frontend descriptor table")
     func frontendDescriptorsMatchPlaybackRouting() {
         let expectedIDs = [
-            "libgme", "libvgm", "standard-audio", "ffmpeg-audio",
+            "libgme", "libvgm", "psgplay", "standard-audio", "ffmpeg-audio",
             "highly-complete", "twosf", "vgmstream", "lazyusf",
             "playpsf", "qsf", "sidplayfp", "openmpt"
         ]
@@ -141,6 +142,14 @@ struct FormatRegistryTests {
         }
     }
 
+    @Test("routes SNDH to PSGPlay")
+    func routesSNDH() {
+        #expect(FormatRegistry.family(for: "/tmp/zone_warrior.SNDH")?.id == "psgplay")
+        #expect(FormatRegistry.psgPlayFamily.supportsLongPlay)
+        #expect(!FormatRegistry.psgPlayFamily.supportsTempo)
+        #expect(FormatRegistry.psgPlayFamily.hasNaturalEnding)
+    }
+
     @Test("routes GSF extensions to the Highly Complete family")
     func routesHighlyComplete() {
         for ext in FormatRegistry.highlyCompleteExtensions {
@@ -257,6 +266,62 @@ struct FormatRegistryTests {
         #expect(!family.supportsTempo)
         #expect(family.hasNaturalEnding)
     }
+}
+
+@Test(
+    "SNDH metadata and playback use the vendored PSG engine",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["VGMBoy_SNDH_FIXTURE"] != nil,
+        "Set VGMBoy_SNDH_FIXTURE to run the Zone Warrior SNDH check."
+    )
+)
+func sndhFixtureUsesPSGPlay() throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBoy_SNDH_FIXTURE"])
+    let metadata = try SNDHMetadataReader.read(fileURL: URL(fileURLWithPath: path))
+    #expect(!metadata.title.isEmpty)
+    #expect(!metadata.composer.isEmpty)
+    #expect(!metadata.tracks.isEmpty)
+    #expect(metadata.tracks.allSatisfy { $0.durationMilliseconds > 0 })
+
+    let decoder = try DecoderFactory.make(path: path)
+    defer { decoder.close() }
+    #expect(decoder.trackCount == metadata.tracks.count)
+    try decoder.startTrack(metadata.defaultTrack)
+    let track = try decoder.metadata(for: metadata.defaultTrack)
+    #expect(track.playMs == metadata.tracks[metadata.defaultTrack].durationMilliseconds)
+    let frames = try decoder.readFrames(4_096)
+    #expect(frames.left.count == 4_096)
+    #expect(frames.left.contains { abs($0) > 0.0001 } || frames.right.contains { abs($0) > 0.0001 })
+}
+
+@Test(
+    "HES loads its sibling M3U and exposes authored music and SFX tracks",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["VGMBoy_HES_FIXTURE"] != nil,
+        "Set VGMBoy_HES_FIXTURE to run the archive-backed Bloody Wolf HES check."
+    )
+)
+func hesFixtureLoadsCompanionPlaylist() throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBoy_HES_FIXTURE"])
+    let decoder = try GMEDecoder(path: path)
+    defer { decoder.close() }
+
+    #expect(decoder.trackCount == 17)
+    try decoder.startTrack(0)
+    let title = try decoder.metadata(for: 0)
+    #expect(title.song == "Title")
+    #expect(title.playMs == 20_000)
+
+    try decoder.startTrack(12)
+    let soundEffect = try decoder.metadata(for: 12)
+    #expect(soundEffect.song == "Stage Clear")
+    #expect(soundEffect.playMs == 4_000)
+    let frames = decoder.readFrames(4_096)
+    #expect(frames.left.contains { abs($0) > 0.0001 } || frames.right.contains { abs($0) > 0.0001 })
+
+    let structure = try PlaybackStructureReader.read(path: path)
+    #expect(structure.trackCount == 17)
+    #expect(structure.tracks[12].naturalPlayMilliseconds == 4_000)
 }
 
 @Suite("GameCube vgmstream playback")
@@ -414,6 +479,30 @@ struct PlaybackControlProtocolTests {
         var audioFile: AudioFileID?
         #expect(AudioFileOpenURL(result.outputURL as CFURL, .readPermission, kAudioFileAAC_ADTSType, &audioFile) == noErr)
         if let audioFile { AudioFileClose(audioFile) }
+    }
+
+    @Test("AAC cancellation leaves no incomplete output")
+    func cancellationRemovesIncompleteAAC() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let source = folder.appendingPathComponent("source.wav")
+        try writeTestWAV(to: source)
+        let cancellation = AACExportCancellation()
+        cancellation.cancel()
+
+        #expect(throws: AACExportError.cancelled) {
+            try AACExporter.export(.init(
+                sourcePath: source.path,
+                outputDirectory: folder,
+                filenameStem: "Cancelled",
+                playMilliseconds: 100,
+                fadeMilliseconds: 0
+            ), cancellation: cancellation)
+        }
+        let contents = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+        #expect(contents == ["source.wav"])
     }
 
     @Test("live transport preserves its native generation across pause seek resume and fade restore")
@@ -797,6 +886,31 @@ func flacFixtureUsesSafeSequentialReader() throws {
 }
 
 @Test(
+    "Resident Evil 2 PSF starts with its sibling PSFLIB present",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["VGMBoy_RE2_PSF_FIXTURE"] != nil,
+        "Set VGMBoy_RE2_PSF_FIXTURE to run the Resident Evil 2 PSF playback check."
+    )
+)
+func residentEvil2PSFStartsAndProducesAudio() throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBoy_RE2_PSF_FIXTURE"])
+    let decoder = try PlayPSFDecoder(path: path)
+    defer { decoder.close() }
+    try decoder.startTrack(0)
+
+    var producedAudio = false
+    for _ in 0..<8 {
+        let frames = decoder.readFrames(2_048)
+        if frames.left.contains(where: { abs($0) > 0.0001 })
+            || frames.right.contains(where: { abs($0) > 0.0001 }) {
+            producedAudio = true
+            break
+        }
+    }
+    #expect(producedAudio)
+}
+
+@Test(
     "libvgm VGM natural endings use the shared session fade boundary",
     .enabled(
         if: ProcessInfo.processInfo.environment["VGMBoy_VGM_FIXTURE"] != nil,
@@ -820,4 +934,33 @@ func vgmFixtureUsesSharedFadeBoundary() throws {
     )
     #expect(!fadePlan.usesNativeEnding)
     #expect(fadePlan.preFadeSeconds == Int((Double(metadata.playMs) / 1_000.0).rounded()))
+}
+
+@Test(
+    "libvgm preserves tempo when timing configuration follows it",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["VGMBoy_VGM_FIXTURE"] != nil,
+        "Set VGMBoy_VGM_FIXTURE to run the libVGM tempo check."
+    )
+)
+func vgmFixturePreservesTempoAcrossConfiguration() throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBoy_VGM_FIXTURE"])
+
+    let baseline = try VGMDecoder(path: path)
+    try baseline.startTrack(0)
+    let baselineMetadata = try baseline.metadata(for: 0)
+    baseline.configureFade(playMs: baselineMetadata.playMs, fadeMs: 0)
+    let baselineFrames = baseline.readFrames(4_096)
+
+    let fast = try VGMDecoder(path: path)
+    try fast.startTrack(0)
+    let fastMetadata = try fast.metadata(for: 0)
+    fast.setTempo(2.0)
+    fast.configureFade(playMs: fastMetadata.playMs, fadeMs: 0)
+    let fastFrames = fast.readFrames(4_096)
+
+    let differences = zip(baselineFrames.left, fastFrames.left).reduce(into: 0) { count, pair in
+        if abs(pair.0 - pair.1) > 0.0001 { count += 1 }
+    }
+    #expect(differences > 0)
 }

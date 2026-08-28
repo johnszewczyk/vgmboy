@@ -27,6 +27,9 @@ deliberately exclusive to one family.
 - `VGMBoyFormatCore.VGMStreamFormatManifest` is the decoder-owned, database-free
   source of truth for vgmstream playback and ScanSong admission roles. Manifest
   membership never replaces native open, enumeration, timing, and fixture proof.
+- SNDH routes to `psgplay`. The shared `VGMBoySNDH` product reads SNDH tags and
+  subtune timing without starting playback; `SNDHDecoder` uses the same
+  vendored `psgplay` engine for subtune selection and stereo PCM rendering.
 - `hasNaturalEnding == false` (lazyusf/USF and sidplayfp/SID) forces a capped decode window so a looping core can
   never run indefinitely. `TimingPolicy.plan` carries this through `usesNativeEnding`. SID
   metadata currently reports no natural duration, so its normal non-Long-Play window is the

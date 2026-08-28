@@ -120,6 +120,7 @@ final class PlaybackSession: @unchecked Sendable {
     private var isLoaded = false
     private var generation = 0
     private var refillTimer: DispatchSourceTimer?
+    private var lastProgressStatusUptime: TimeInterval = 0
     private var statusHandler: (@Sendable (PlaybackStatus) -> Void)?
     private var completionHandler: (@Sendable () -> Void)?
 
@@ -389,7 +390,20 @@ final class PlaybackSession: @unchecked Sendable {
             } else {
                 publishStatus()
             }
+        } else {
+            publishProgressStatusIfDue()
         }
+    }
+
+    /// Progress is a presentation signal, not an audio callback contract.
+    /// Keep it comfortably below the 50 Hz refill cadence so native hosts can
+    /// render elapsed time and diagnostics without polling or flooding their
+    /// UI bridges.
+    private func publishProgressStatusIfDue() {
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastProgressStatusUptime >= 0.25 else { return }
+        lastProgressStatusUptime = now
+        publishStatus()
     }
 
     private func finishReachedEnd() {

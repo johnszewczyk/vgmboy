@@ -39,8 +39,12 @@ public final class PlaybackController: @unchecked Sendable {
 
     /// Render a finite AAC file without interrupting the controller's live
     /// session. Hosts should call this from their own background task.
-    public func exportAAC(_ request: AACExportRequest) throws -> AACExportResult {
-        try AACExporter.export(request)
+    public func exportAAC(
+        _ request: AACExportRequest,
+        cancellation: AACExportCancellation? = nil,
+        progress: (@Sendable (AACExportProgress) -> Void)? = nil
+    ) throws -> AACExportResult {
+        try AACExporter.export(request, cancellation: cancellation, progress: progress)
     }
 
     @discardableResult

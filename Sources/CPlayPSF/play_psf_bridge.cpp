@@ -139,6 +139,8 @@ struct Metadata {
 
 struct Player {
     CPsfVm vm;
+    std::mutex soundMutex;
+    std::condition_variable soundCondition;
     CaptureSoundHandler* sound = nullptr;
     CPsfBase::TagMap tags;
     std::map<std::string, std::string> exportedTags;
@@ -149,6 +151,18 @@ struct Player {
     int64_t fadeLengthFrames = 0;
     bool longPlay = false;
 
+    CaptureSoundHandler* WaitForSoundHandler() {
+        std::unique_lock lock(soundMutex);
+        soundCondition.wait_for(lock, kInitialAudioWait, [this] { return sound != nullptr; });
+        return sound;
+    }
+
+    void InstallSoundHandler(CaptureSoundHandler* handler) {
+        std::lock_guard lock(soundMutex);
+        sound = handler;
+        soundCondition.notify_all();
+    }
+
     explicit Player(const char* filePath)
         : path(filePath ? filePath : "") {
         if(path.empty()) throw std::runtime_error("PSF path is empty");
@@ -156,8 +170,9 @@ struct Player {
         systemName = metadata.systemName;
         const auto token = CPhysicalPsfStreamProvider::GetPathTokenFromFilePath(fs::path(path));
         vm.SetSpuHandler([this] {
-            sound = new CaptureSoundHandler();
-            return sound;
+            auto* handler = new CaptureSoundHandler();
+            InstallSoundHandler(handler);
+            return handler;
         });
         CPsfLoader::LoadPsf(vm, token, fs::path(), &tags);
         vm.SetReverbEnabled(true);
@@ -185,7 +200,13 @@ extern "C" int32_t vgmboy_play_psf_read(void* handle, int16_t* output, int32_t f
     // The shared stream session owns the post-length fade. Continue decoding
     // real PCM through that window; substituting silence here made the app
     // fade six seconds of silence instead of the actual PSF audio.
-    const auto frames = player->sound ? player->sound->Read(output, frameCount) : 0;
+    // Some PSF rips, including Resident Evil 2, install their SPU handler
+    // shortly after VM resume. Returning silence during that window makes the
+    // frontend believe playback began even though no source audio exists.
+    // Wait once for the handler, then let its own bounded PCM wait govern
+    // steady-state reads.
+    auto* sound = player->WaitForSoundHandler();
+    const auto frames = sound ? sound->Read(output, frameCount) : 0;
     player->playedFrames += frames;
     return frames;
 }
@@ -199,12 +220,17 @@ extern "C" int32_t vgmboy_play_psf_seek(void* handle, int64_t frame) {
     auto* player = static_cast<Player*>(handle);
     player->vm.Pause();
     player->vm.Reset();
+    {
+        std::lock_guard lock(player->soundMutex);
+        player->sound = nullptr;
+    }
     const auto token = CPhysicalPsfStreamProvider::GetPathTokenFromFilePath(fs::path(player->path));
     try {
         player->tags.clear();
         player->vm.SetSpuHandler([player] {
-            player->sound = new CaptureSoundHandler();
-            return player->sound;
+            auto* handler = new CaptureSoundHandler();
+            player->InstallSoundHandler(handler);
+            return handler;
         });
         CPsfLoader::LoadPsf(player->vm, token, fs::path(), &player->tags);
         player->vm.SetReverbEnabled(true);

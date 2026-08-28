@@ -533,7 +533,8 @@ int32_t libvgm_player_configure(
     config.loopCount = uses_native_ending ? 1 : 0;
     config.fadeSmpls = 0;
     config.endSilenceSmpls = 0;
-    config.pbSpeed = 1.0;
+    // Preserve the caller's playback speed. PlaybackSession applies tempo
+    // before this timing configuration during a load/reload operation.
     handle->player.SetConfiguration(config);
     handle->trackEnded = false;
 

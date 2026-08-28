@@ -91,6 +91,7 @@ ensure_dependency lazyusf vendor/lazyusf2 .build/lazyusf/liblazyusf.a build-lazy
 ensure_dependency play-psf vendor/play .build/play-psf/libcocoaspice_play_psf.a build-play-psf.sh patches/play-psfcore-only.patch
 ensure_dependency qsf vendor/aosdk .build/qsf/libvgmboy_qsf.a build-qsf.sh
 ensure_dependency vgmstream vendor/vgmstream .build/vgmstream/src/libvgmstream.a build-vgmstream.sh patches/vgmstream-cocoaspice.patch
+ensure_dependency psgplay vendor/psgplay .build/psgplay/libpsgplay.a build-psgplay.sh
 
 copy_dependency libvgm "$SOURCE_BUILD_ROOT/libvgm"
 copy_dependency mgba "$SOURCE_BUILD_ROOT/mgba"
@@ -99,5 +100,6 @@ copy_dependency lazyusf "$SOURCE_BUILD_ROOT/lazyusf"
 copy_dependency play-psf "$SOURCE_BUILD_ROOT/play-psf"
 copy_dependency qsf "$SOURCE_BUILD_ROOT/qsf"
 copy_dependency vgmstream "$SOURCE_BUILD_ROOT/vgmstream"
+copy_dependency psgplay "$SOURCE_BUILD_ROOT/psgplay"
 
 echo "VGMBoy dependencies ready: $DEPENDENCY_ROOT"

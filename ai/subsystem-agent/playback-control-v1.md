@@ -56,8 +56,12 @@ same typed endpoint operations.
 - `AACExporter` is a separate offline decoder session. It takes a frontend-provided naked playable
   path, subtrack, finite playback window, output folder, and display filename; it writes ADTS AAC
   (`.aac`) without touching the live transport/device or any catalog. VGMBoy sanitizes the stem and
-  chooses a non-overwriting collision suffix. A frontend owns its persisted destination preference
-  and archive materialization before making this call.
+  chooses a non-overwriting collision suffix. It reports frame progress, observes a host cancellation
+  token between decode blocks, renders to a hidden partial path, and moves that file to its final name
+  only after the encoder closes successfully. A frontend owns its persisted destination preference and
+  archive materialization before making this call.
+- AAC progress is rate-limited to four updates per second. It is a latest-state presentation channel,
+  so a realtime decoder cannot monopolize a frontend executor by emitting one UI task per decode block.
 - `PlaybackStructureReader` is the narrow exception for raw disk browsing: it returns only
   subtrack count, index, natural timing, and fade facts. It returns no decoder tags and never
   opens a catalog. The Electron bridge maps it as `player-structure`.

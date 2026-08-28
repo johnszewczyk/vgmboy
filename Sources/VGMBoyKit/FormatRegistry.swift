@@ -54,6 +54,12 @@ public enum FormatRegistry {
         supportsTempo: true
     )
 
+    public static let psgPlayFamily = DecoderFamily(
+        id: "psgplay",
+        supportsLongPlay: true,
+        supportsTempo: false
+    )
+
     public static let standardAudioFamily = DecoderFamily(
         id: "standardaudio",
         supportsLongPlay: false,
@@ -124,6 +130,8 @@ public enum FormatRegistry {
         "vgm", "vgz", "gym", "s98", "dro"
     ]
 
+    public static let psgPlayExtensions: Set<String> = ["sndh"]
+
     public static let standardAudioExtensions: Set<String> = [
         "aac", "aif", "aiff", "caf", "flac", "m4a", "mp3", "wav", "wave"
     ]
@@ -163,6 +171,7 @@ public enum FormatRegistry {
     public static let playbackDescriptors: [PlaybackFormatDescriptor] = [
         PlaybackFormatDescriptor(id: "libgme", family: libgmeFamily, extensions: libgmeExtensions),
         PlaybackFormatDescriptor(id: "libvgm", family: libvgmFamily, extensions: libvgmExtensions),
+        PlaybackFormatDescriptor(id: "psgplay", family: psgPlayFamily, extensions: psgPlayExtensions),
         PlaybackFormatDescriptor(id: "standard-audio", family: standardAudioFamily, extensions: standardAudioExtensions),
         PlaybackFormatDescriptor(id: "ffmpeg-audio", family: ffmpegAudioFamily, extensions: ffmpegAudioExtensions),
         PlaybackFormatDescriptor(id: "highly-complete", family: highlyCompleteFamily, extensions: highlyCompleteExtensions),
@@ -197,6 +206,9 @@ public enum FormatRegistry {
         }
         if libvgmExtensions.contains(ext) {
             return libvgmFamily
+        }
+        if psgPlayExtensions.contains(ext) {
+            return psgPlayFamily
         }
         if standardAudioExtensions.contains(ext) {
             return standardAudioFamily
