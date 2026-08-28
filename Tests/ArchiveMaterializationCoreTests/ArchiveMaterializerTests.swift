@@ -117,6 +117,50 @@ import VGMBoyFormatCore
     #expect(FileManager.default.fileExists(atPath: first.appendingPathComponent("track.spc").path))
 }
 
+@Test func cacheMaterializerNormalizesExtractedDirectoryPermissions() throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ArchiveCacheMaterializerPermissions-(UUID().uuidString)", isDirectory: true)
+    let archiveURL = root.appendingPathComponent("library.tar")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    try Data("archive".utf8).write(to: archiveURL)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let store = ArchiveCacheStore(cacheRootURL: root.appendingPathComponent("cache"))
+    let materializer = ArchiveCacheMaterializer(cacheStore: store)
+    let policy = ArchiveCachePolicy(mode: .disabled, maximumBytes: ArchiveCachePolicy.defaultLimitBytes)
+    let completeSet = try materializer.materializeCompleteSet(
+        archiveURL: archiveURL,
+        policy: policy,
+        activePlaybackRoot: nil
+    ) { destinationURL in
+        let nested = destinationURL.appendingPathComponent("UNKNOWN", isDirectory: true)
+        try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        try Data("track".utf8).write(to: nested.appendingPathComponent("track.psf"))
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: nested.path)
+    }
+
+    let attributes = try FileManager.default.attributesOfItem(atPath: completeSet.appendingPathComponent("UNKNOWN").path)
+    #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o755)
+    try FileManager.default.setAttributes(
+        [.posixPermissions: 0o644],
+        ofItemAtPath: completeSet.appendingPathComponent("UNKNOWN").path
+    )
+    let warmHit = try materializer.materializeCompleteSet(
+        archiveURL: archiveURL,
+        policy: policy,
+        activePlaybackRoot: nil,
+        isValid: { root in
+            FileManager.default.fileExists(atPath: root.appendingPathComponent("UNKNOWN/track.psf").path)
+        }
+    ) { _ in
+        Issue.record("A valid complete-set warm hit should not be re-extracted.")
+    }
+    let repairedAttributes = try FileManager.default.attributesOfItem(atPath: warmHit.appendingPathComponent("UNKNOWN").path)
+    #expect((repairedAttributes[.posixPermissions] as? NSNumber)?.intValue == 0o755)
+    try FileManager.default.removeItem(at: completeSet)
+    #expect(!FileManager.default.fileExists(atPath: completeSet.path))
+}
+
 @Test func playbackMaterializerReturnsPlayableMemberForSelectedAndCompleteRequirements() throws {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("ArchivePlaybackMaterializerTests-\(UUID().uuidString)", isDirectory: true)

@@ -1,5 +1,6 @@
 import ArchiveCacheCore
 import CryptoKit
+import Darwin
 import Foundation
 
 /// Shared cache-backed orchestration for archive materialization.
@@ -75,6 +76,10 @@ public struct ArchiveCacheMaterializer: Sendable {
         let completionURL = rootURL.appendingPathComponent(".complete", isDirectory: false)
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: completionURL.path) {
+            // Older cache entries may have inherited non-traversable directory
+            // modes from the source archive. Repair them before validating a
+            // warm hit so housekeeping can replace or remove the set.
+            try? normalizeExtractedDirectoryPermissions(at: rootURL)
             if isValid(rootURL) {
                 cacheStore.touch(archiveURL, policy: policy)
                 activateLease(for: archiveURL, policy: policy)
@@ -95,6 +100,7 @@ public struct ArchiveCacheMaterializer: Sendable {
         defer { try? fileManager.removeItem(at: stagingURL) }
         try fileManager.createDirectory(at: stagingURL, withIntermediateDirectories: true)
         try extract(stagingURL)
+        try normalizeExtractedDirectoryPermissions(at: stagingURL)
         try Data().write(to: stagingURL.appendingPathComponent(".complete"))
         try fileManager.createDirectory(
             at: rootURL.deletingLastPathComponent(),
@@ -104,6 +110,7 @@ public struct ArchiveCacheMaterializer: Sendable {
         // completion marker. It is not a warm hit and must not block the
         // atomic replacement with the newly validated staging directory.
         if fileManager.fileExists(atPath: rootURL.path) {
+            try? normalizeExtractedDirectoryPermissions(at: rootURL)
             try fileManager.removeItem(at: rootURL)
         }
         try fileManager.moveItem(at: stagingURL, to: rootURL)
@@ -145,6 +152,7 @@ public struct ArchiveCacheMaterializer: Sendable {
         defer { try? fileManager.removeItem(at: stagingURL) }
         try fileManager.createDirectory(at: stagingURL, withIntermediateDirectories: true)
         try extract(stagingURL, normalizedPaths)
+        try normalizeExtractedDirectoryPermissions(at: stagingURL)
         try Data().write(to: stagingURL.appendingPathComponent(".complete"))
         try fileManager.createDirectory(
             at: rootURL.deletingLastPathComponent(),
@@ -181,5 +189,30 @@ public struct ArchiveCacheMaterializer: Sendable {
         playbackLease?.replace(
             with: cacheStore.archiveCacheURL(for: archiveURL, policy: policy).standardizedFileURL.path
         )
+    }
+
+    /// Some source archives carry directory mode bits without the execute bit
+    /// (for example `0644`). Preserve file contents but make the extracted
+    /// cache traversable and removable by the owning process.
+    private func normalizeExtractedDirectoryPermissions(at rootURL: URL) throws {
+        let fileManager = FileManager.default
+        func normalize(_ directoryURL: URL) throws {
+            guard chmod(directoryURL.path, mode_t(0o755)) == 0 else {
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
+            let children = try fileManager.contentsOfDirectory(
+                at: directoryURL,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: []
+            )
+            for child in children {
+                guard (try child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
+                    continue
+                }
+                try normalize(child)
+            }
+        }
+        guard fileManager.fileExists(atPath: rootURL.path) else { return }
+        try normalize(rootURL)
     }
 }
