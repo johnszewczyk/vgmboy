@@ -150,8 +150,9 @@ public struct PlaybackNaturalEndGate: Sendable {
 /// Frontends provide a naked playable path and stable identity. This type owns
 /// command serialization, request invalidation, the in-process VGMBoy
 /// controller, timing reconfiguration, output controls, and native status.
-/// Queue navigation, catalog rows, archive extraction, and presentation stay
-/// outside this boundary.
+/// Queue selection, catalog rows, archive extraction, and presentation stay
+/// outside this boundary; the shared queue policy is consulted only for the
+/// generation-checked completion decision.
 public final class PlaybackTransportCoordinator: @unchecked Sendable {
     public typealias StatusHandler = @Sendable (PlaybackTransportStatus) -> Void
     public typealias NaturalEndHandler = @Sendable (PlaybackTransportStatus) -> Void
@@ -292,16 +293,49 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         repeatMode: PlaybackRepeatMode
     ) -> PlaybackContinuationDecision? {
         queue.sync {
-            guard self.currentTrack != nil,
-                  let status = self.controller.perform(.init(command: .status)).status,
-                  status.diagnostics.generation == generation else { return nil }
-            return self.continuationCoordinator.decision(
+            self.completionDecisionLocked(
                 generation: generation,
                 state: state,
                 playlistIDs: playlistIDs,
                 repeatMode: repeatMode
             )
         }
+    }
+
+    /// Computes the completion decision from the status sampled in the same
+    /// serialized operation. This is the native-frontend path; event-driven
+    /// hosts may use the generation-taking overload when they already have a
+    /// validated completion snapshot.
+    public func completionDecision(
+        state: PlaybackQueueState,
+        playlistIDs: [String],
+        repeatMode: PlaybackRepeatMode
+    ) -> PlaybackContinuationDecision? {
+        queue.sync {
+            guard let status = self.controller.perform(.init(command: .status)).status else { return nil }
+            return self.completionDecisionLocked(
+                generation: status.diagnostics.generation,
+                state: state,
+                playlistIDs: playlistIDs,
+                repeatMode: repeatMode
+            )
+        }
+    }
+
+    private func completionDecisionLocked(
+        generation: Int,
+        state: PlaybackQueueState,
+        playlistIDs: [String],
+        repeatMode: PlaybackRepeatMode
+    ) -> PlaybackContinuationDecision? {
+        guard currentTrack != nil,
+              controller.perform(.init(command: .status)).status?.diagnostics.generation == generation else { return nil }
+        return continuationCoordinator.decision(
+            generation: generation,
+            state: state,
+            playlistIDs: playlistIDs,
+            repeatMode: repeatMode
+        )
     }
 
     public func beginFadedSkip(duration: TimeInterval) async -> Int? {

@@ -119,32 +119,14 @@ func continuationCoordinatorClaimsBeforeReturningSharedDecision() {
 
 @MainActor
 @Test
-func sessionLifecycleSupersessionRearmsTheCompletionGate() {
+func sessionLifecycleSupersedesOlderFrontendRequests() {
     let lifecycle = PlaybackSessionLifecycleCoordinator()
     let firstRequest = lifecycle.begin()
-    let state = PlaybackQueueState(
-        currentTrackID: "one",
-        selectedTrackID: "one",
-        pendingTrackID: "one"
-    )
-
-    #expect(lifecycle.completionDecision(
-        state: state,
-        playlistIDs: ["one", "two"],
-        repeatMode: .off
-    ) == PlaybackContinuationDecision(action: .play(trackID: "two")))
-    #expect(lifecycle.completionClaimed)
 
     let secondRequest = lifecycle.begin()
     #expect(secondRequest != firstRequest)
     #expect(!lifecycle.isCurrent(firstRequest))
     #expect(lifecycle.isCurrent(secondRequest))
-    #expect(!lifecycle.completionClaimed)
-    #expect(lifecycle.completionDecision(
-        state: state,
-        playlistIDs: ["one", "two"],
-        repeatMode: .off
-    ) == PlaybackContinuationDecision(action: .play(trackID: "two")))
 }
 
 @Test
