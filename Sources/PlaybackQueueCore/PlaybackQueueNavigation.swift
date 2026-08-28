@@ -34,6 +34,28 @@ public struct PlaybackContinuationDecision: Equatable, Sendable, Codable {
     }
 }
 
+/// Complete, presentation-free input to the shared completion lifecycle.
+/// Frontends may encode/decode this value at a bridge boundary, but they must
+/// not reconstruct its fields into a second completion policy.
+public struct PlaybackContinuationRequest: Equatable, Sendable, Codable {
+    public let generation: Int
+    public let state: PlaybackQueueState
+    public let playlistIDs: [String]
+    public let repeatMode: PlaybackRepeatMode
+
+    public init(
+        generation: Int,
+        state: PlaybackQueueState,
+        playlistIDs: [String],
+        repeatMode: PlaybackRepeatMode
+    ) {
+        self.generation = generation
+        self.state = state
+        self.playlistIDs = playlistIDs
+        self.repeatMode = repeatMode
+    }
+}
+
 /// Thread-safe one-shot claim for a playback continuation.
 ///
 /// Native playback may report the same terminal state through both an event

@@ -290,16 +290,21 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         playlistIDs: [String],
         repeatMode: PlaybackRepeatMode
     ) -> PlaybackContinuationDecision? {
-        queue.sync {
-            guard let decision = self.completionDecisionLocked(
-                generation: generation,
-                state: state,
-                playlistIDs: playlistIDs,
-                repeatMode: repeatMode
-            ) else { return nil }
-            self.retirePlaybackLocked()
-            return decision
-        }
+        retireCompletedPlayback(.init(
+            generation: generation,
+            state: state,
+            playlistIDs: playlistIDs,
+            repeatMode: repeatMode
+        ))
+    }
+
+    /// Executes the complete typed completion lifecycle: validate the native
+    /// generation, claim the one-shot continuation, compute the shared queue
+    /// action, and retire the native session before returning that action.
+    public func retireCompletedPlayback(
+        _ request: PlaybackContinuationRequest
+    ) -> PlaybackContinuationDecision? {
+        queue.sync { self.retireCompletedPlaybackLocked(request) }
     }
 
     /// Native-frontends may let the coordinator sample the active generation
@@ -312,15 +317,16 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         repeatMode: PlaybackRepeatMode
     ) -> PlaybackContinuationDecision? {
         queue.sync {
-            guard let generation = self.controller.perform(.init(command: .status)).status?.diagnostics.generation,
-                  let decision = self.completionDecisionLocked(
-                      generation: generation,
-                      state: state,
-                      playlistIDs: playlistIDs,
-                      repeatMode: repeatMode
-                  ) else { return nil }
-            self.retirePlaybackLocked()
-            return decision
+            guard let generation = self.controller.perform(.init(command: .status)).status?.diagnostics.generation else {
+                return nil
+            }
+            let request = PlaybackContinuationRequest(
+                generation: generation,
+                state: state,
+                playlistIDs: playlistIDs,
+                repeatMode: repeatMode
+            )
+            return self.retireCompletedPlaybackLocked(request)
         }
     }
 
@@ -338,6 +344,19 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             playlistIDs: playlistIDs,
             repeatMode: repeatMode
         )
+    }
+
+    private func retireCompletedPlaybackLocked(
+        _ request: PlaybackContinuationRequest
+    ) -> PlaybackContinuationDecision? {
+        guard let decision = completionDecisionLocked(
+            generation: request.generation,
+            state: request.state,
+            playlistIDs: request.playlistIDs,
+            repeatMode: request.repeatMode
+        ) else { return nil }
+        retirePlaybackLocked()
+        return decision
     }
 
     private func retirePlaybackLocked() {

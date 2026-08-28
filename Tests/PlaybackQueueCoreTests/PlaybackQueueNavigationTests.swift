@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import PlaybackQueueCore
 
@@ -115,6 +116,25 @@ func continuationCoordinatorClaimsBeforeReturningSharedDecision() {
         playlistIDs: ["one", "two"],
         repeatMode: .off
     ) == nil)
+}
+
+@Test
+func continuationRequestCarriesOneSharedLifecycleEnvelope() throws {
+    let request = PlaybackContinuationRequest(
+        generation: 12,
+        state: PlaybackQueueState(
+            currentTrackID: "one",
+            selectedTrackID: "one",
+            pendingTrackID: nil
+        ),
+        playlistIDs: ["one", "two"],
+        repeatMode: .off
+    )
+
+    let encoded = try JSONEncoder().encode(request)
+    let decoded = try JSONDecoder().decode(PlaybackContinuationRequest.self, from: encoded)
+
+    #expect(decoded == request)
 }
 
 @Test
