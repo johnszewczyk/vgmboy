@@ -20,6 +20,10 @@ const nativeBridgeSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/WKNativeBridge.swift"),
   "utf8"
 );
+const playbackBridgeSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/WKPlaybackBridge.swift"),
+  "utf8"
+);
 const appDelegateSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/main.swift"),
   "utf8"
@@ -433,6 +437,12 @@ test("SPCBoyWK broadcasts complete native status to both windows", () => {
   assert.match(nativeBridgeSource, /if let onPlaybackEvent\s*\{\s*onPlaybackEvent\(name, payload\)/);
   assert.match(appDelegateSource, /broadcastPlaybackEvent\(name: name, payload: payload\)/);
   assert.match(appDelegateSource, /optionsWebView\?\.evaluateJavaScript\(script, completionHandler: nil\)/);
+});
+
+test("SPCBoyWK delegates completion claims to the shared transport", () => {
+  assert.doesNotMatch(nativeBridgeSource, /private let playbackContinuationCoordinator/);
+  assert.match(nativeBridgeSource, /WKPlaybackBridge\.shared\.completionDecision\(/);
+  assert.match(playbackBridgeSource, /transport\.completionDecision\(/);
 });
 
 test("SPCBoyWK uses native in-place tempo and AAC cancellation events", () => {

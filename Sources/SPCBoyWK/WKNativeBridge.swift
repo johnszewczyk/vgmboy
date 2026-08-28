@@ -19,13 +19,13 @@ import WebKit
 /// The only JavaScript-to-native boundary in SPCBoy WK.
 ///
 /// The web skin owns presentation and sends named requests. Swift owns the
-/// read-only catalog and returns plain JSON records. This keeps the bridge
-/// independent of the renderer's former host/runtime implementation.
+/// read-only catalog and returns plain JSON records. Transport completion
+/// decisions are delegated to WKPlaybackBridge rather than owned by this
+/// catalog bridge, keeping playback policy in the shared native boundary.
 final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     private let catalogURL: URL
     private let isOptionsWindow: Bool
     private let catalogSessions = CatalogSessionCoordinator()
-    private let playbackContinuationCoordinator = PlaybackContinuationCoordinator()
     private weak var playbackEventWebView: WKWebView?
 
     var onOpenOptionsWindow: (() -> Void)?
@@ -401,7 +401,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         case "all": .playlist
         default: .off
         }
-        guard let decision = playbackContinuationCoordinator.decision(
+        guard let decision = WKPlaybackBridge.shared.completionDecision(
             generation: rawGeneration.intValue,
             state: state,
             playlistIDs: Self.stringArray(request["playlistIds"]),

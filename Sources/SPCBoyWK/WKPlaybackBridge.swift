@@ -1,10 +1,12 @@
 import Foundation
+import PlaybackQueueCore
 import PlaybackTransportCore
 import VGMBoyKit
 
 /// Thin WK adapter over the shared in-process VGMBoy control surface.
-/// Queue/catalog policy remains in the web frontend; this object owns only
-/// decoder transport and audio configuration.
+/// Queue selection remains in the web frontend; completion claiming/decision,
+/// decoder transport, and audio configuration remain behind the shared native
+/// transport boundary.
 final class WKPlaybackBridge: @unchecked Sendable {
     struct AACExportEvent: Sendable {
         let id: String
@@ -49,6 +51,20 @@ final class WKPlaybackBridge: @unchecked Sendable {
         handlerLock.lock()
         defer { handlerLock.unlock() }
         exportEventHandler = handler
+    }
+
+    func completionDecision(
+        generation: Int,
+        state: PlaybackQueueState,
+        playlistIDs: [String],
+        repeatMode: PlaybackRepeatMode
+    ) -> PlaybackContinuationDecision? {
+        transport.completionDecision(
+            generation: generation,
+            state: state,
+            playlistIDs: playlistIDs,
+            repeatMode: repeatMode
+        )
     }
 
     func handle(method: String, args: [Any]) throws -> Any {
