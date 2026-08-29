@@ -229,8 +229,9 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
         let systemExpression = preferFoldersOverMetadata
             ? "COALESCE(NULLIF(t.browser_system, ''), NULLIF(m.system, ''), '')"
             : "COALESCE(NULLIF(m.system, ''), NULLIF(t.browser_system, ''), '')"
-        return try query(
-            """
+        let sql: String
+        if try gameSidebarBucketsAreCurrent() {
+            sql = """
             SELECT b.root_id, r.path, b.browser_game, \(systemExpression), COUNT(t.id)
             FROM game_sidebar_buckets b
             INNER JOIN library_roots r ON r.id=b.root_id
@@ -243,6 +244,20 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
             GROUP BY b.root_id, r.path, b.browser_game, \(systemExpression)
             ORDER BY lower(b.browser_game), b.browser_game, lower(\(systemExpression)), \(systemExpression), lower(r.path), r.path;
             """
+        } else {
+            sql = """
+            SELECT t.root_id, r.path, t.browser_game, \(systemExpression), COUNT(t.id)
+            FROM tracks t
+            INNER JOIN library_roots r ON r.id=t.root_id
+            LEFT JOIN track_metadata m ON m.track_id=t.id
+            WHERE r.is_attached=1 AND r.is_enabled=1
+              AND NOT EXISTS (SELECT 1 FROM dead_sources d WHERE d.root_id=t.root_id AND d.path=t.path)
+            GROUP BY t.root_id, r.path, t.browser_game, \(systemExpression)
+            ORDER BY lower(t.browser_game), t.browser_game, lower(\(systemExpression)), \(systemExpression), lower(r.path), r.path;
+            """
+        }
+        return try query(
+            sql
         ) { statement in
             CatalogGameBucket(
                 rootID: sqlite3_column_int64(statement, 0),
@@ -259,14 +274,28 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
     }
 
     public func fileBuckets() throws -> [CatalogFileBucket] {
-        try query(
-            """
+        let sql: String
+        if try fileSidebarBucketsAreCurrent() {
+            sql = """
             SELECT b.root_id, r.path, b.folder_path, b.path, b.is_archive, b.track_count
             FROM file_sidebar_buckets b
             INNER JOIN library_roots r ON r.id=b.root_id
             WHERE r.is_attached=1 AND r.is_enabled=1
             ORDER BY lower(b.path), b.path;
             """
+        } else {
+            sql = """
+            SELECT t.root_id, r.path, t.folder_path, t.path, MAX(t.archive_path IS NOT NULL), COUNT(*)
+            FROM tracks t
+            INNER JOIN library_roots r ON r.id=t.root_id
+            WHERE r.is_attached=1 AND r.is_enabled=1
+              AND NOT EXISTS (SELECT 1 FROM dead_sources d WHERE d.root_id=t.root_id AND d.path=t.path)
+            GROUP BY t.root_id, r.path, t.folder_path, t.path
+            ORDER BY lower(t.path), t.path;
+            """
+        }
+        return try query(
+            sql
         ) { statement in
             CatalogFileBucket(
                 rootID: sqlite3_column_int64(statement, 0),
@@ -281,6 +310,18 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
                 || (Self.naturalCompare($0.rootPath, $1.rootPath) == .orderedSame && Self.naturalCompare($0.folderPath, $1.folderPath) == .orderedAscending)
                 || (Self.naturalCompare($0.rootPath, $1.rootPath) == .orderedSame && Self.naturalCompare($0.folderPath, $1.folderPath) == .orderedSame && Self.naturalCompare($0.path, $1.path) == .orderedAscending)
         }
+    }
+
+    private func gameSidebarBucketsAreCurrent() throws -> Bool {
+        try scalarInt(
+            "SELECT NOT EXISTS (SELECT 1 FROM library_roots WHERE is_enabled=1 AND game_sidebar_buckets_dirty=1);"
+        ) != 0
+    }
+
+    private func fileSidebarBucketsAreCurrent() throws -> Bool {
+        try scalarInt(
+            "SELECT NOT EXISTS (SELECT 1 FROM library_roots WHERE is_enabled=1 AND file_sidebar_buckets_dirty=1);"
+        ) != 0
     }
 
     public func tracks(rootID: Int64? = nil) throws -> [CatalogTrack] {

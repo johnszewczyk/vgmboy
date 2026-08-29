@@ -38,6 +38,10 @@ row models, queue publication, and UI.
   predicate is a performance regression even when it returns the same rows.
 - Games playlist activation accepts multiple stable sidebar identities in one
   read-only query and returns exactly the original fourteen projected columns.
+- When ScanSong marks either sidebar projection dirty during a scan,
+  `CatalogReader` derives that projection from visible tracks until ScanSong
+  republishes the materialized buckets. This keeps CocoaSpice and SPCBoyWK
+  consistent without duplicating scanner-write logic in either frontend.
 
 ## Files
 
