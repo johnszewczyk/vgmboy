@@ -38,6 +38,12 @@ deliberately exclusive to one family.
   including 4-Mat's eight-subtune Shadow Dancer. This does not certify the
   full Atari ST corpus or subjective musical content; SNDH files may
   intentionally contain loaders, SFX, or hardware-specific code.
+- MDX routes to `mdxmini`. Each `.mdx` file is one logical playlist sequence;
+  `mdx_get_tracks()` reports FM/PCM channels and must not become playlist rows.
+  A declared adjacent `.pdx` bank is required, with case-insensitive lookup
+  confined to the module's directory. Missing banks fail both inspection and
+  playback instead of silently dropping PCM. The bridge reports mdxmini's
+  loop-policy duration in milliseconds and leaves tempo control disabled.
 - `hasNaturalEnding == false` (lazyusf/USF and sidplayfp/SID) forces a capped decode window so a looping core can
   never run indefinitely. `TimingPolicy.plan` carries this through `usesNativeEnding`. SID
   metadata currently reports no natural duration, so its normal non-Long-Play window is the

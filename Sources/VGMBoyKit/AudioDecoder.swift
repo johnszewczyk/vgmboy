@@ -55,6 +55,8 @@ enum DecoderFactory {
             return try VGMDecoder(path: path, sampleRate: sampleRate)
         case "psgplay":
             return try SNDHDecoder(path: path, sampleRate: sampleRate)
+        case "mdx":
+            return try MDXDecoder(path: path, sampleRate: sampleRate)
         case "standardaudio":
             return try StandardAudioDecoder(path: path, sampleRate: sampleRate)
         case "ffmpegaudio":

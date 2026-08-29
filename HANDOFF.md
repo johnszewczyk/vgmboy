@@ -2,8 +2,9 @@
 
 Status: **active shared core** — the playback/decoder and scanner-plugin build
 boundary for the CocoaSpice/SPCBoy/ScanSong family.
-This note hands off current state and next steps. Live verification happened against fixtures
-extracted to `/tmp/vgmboy-test/` (not committed); see each section for the file used.
+This note hands off current state and next steps. Verification below uses the
+repository's local fixture hooks and the JoshW RE2/QSF archives when available;
+archive payloads and generated databases are not committed.
 
 ## What works (verified)
 
@@ -22,7 +23,13 @@ extracted to `/tmp/vgmboy-test/` (not committed); see each section for the file 
 - USF family is `hasNaturalEnding == false`, so it always gets a capped window and can't run forever.
 - Play! PSF uses SPCBoy's computed long play (loop past tagged length only when the window exceeds
   it) plus driver-halt detection.
-- 17 tests pass: `swift test --package-path . --disable-sandbox`.
+- The current VGMBoy suite passes 64 tests across 9 suites. ScanSong's suite
+  passes 46 tests, including the RE2 PSF archive scan and the QSF archive scan
+  when their scanner inspection products are configured.
+- RE2 PSF direct decoding produces audio; ScanSong's 75-track PSF archive
+  fixture records the expected 43-second play and 10-second fade metadata.
+- The RE2 GameCube archive reaches the vgmstream inspector and passes its
+  underscore-TXTH alias check when the VGMBoy-built `vgmstream-cli` is supplied.
 
 ## Known constraints / gotchas
 
@@ -37,12 +44,21 @@ extracted to `/tmp/vgmboy-test/` (not committed); see each section for the file 
 - **miniusf and minipsf resolve `_lib` dependency chains** — companion `.usflib`/`.psflib` must be
   beside the file (matches CocoaSpice's complete-archive-set materialization).
 - Driver-halt PSF rips end at the halt (no audio) rather than looping silence — intended.
+- Scanner tests that invoke external inspectors require those staged products
+  through `SCANSONG_VGMSTREAM_CLI`, `SCANSONG_QSF_INSPECT`, or the packaged
+  bundle resources. Without them, ScanSong fails explicitly with “required
+  adapter unavailable”; it does not flatten a structured format into a false
+  single track.
+- The current FrontendCore Swift Testing helper can remain resident instead of
+  returning results on this host. Its package builds and test discovery works,
+  but a clean focused-run result is still outstanding.
 
 ## Next steps
 
 - Scanner-facing vgmstream and Highly Complete inspection products are now
-  built through VGMBoy. Remaining decoder breadth and fixture coverage should
-  be tracked as explicit format work, not as a repository-ownership migration.
+  built through VGMBoy. Keep the staged inspector paths part of release
+  packaging and continue decoder breadth and fixture coverage as explicit
+  format work.
 - Equalizer (signal stage in the core output path).
 - Export WAV→AAC (from CocoaSpice `AudioExportAAC.swift` via AVAssetWriter).
 - Continue playback-core contract cleanup and fixture coverage. CocoaSpice and

@@ -23,6 +23,7 @@ let playPSFVendorDirectory = "\(sharedVendorRoot)/play/tools/PsfPlayer/Source"
 let qsfBuildDirectory = "\(dependencyRoot)/qsf"
 let psgPlayVendorDirectory = "\(sharedVendorRoot)/psgplay"
 let psgPlayBuildDirectory = "\(dependencyRoot)/psgplay"
+let mdxMiniVendorDirectory = "\(sharedVendorRoot)/mdxmini/src"
 
 let package = Package(
     name: "VGMBoy",
@@ -35,6 +36,7 @@ let package = Package(
         .executable(name: "vgmboy-cli", targets: ["vgmboy"]),
         .executable(name: "vgmboy-electron-bridge", targets: ["VGMBoyElectronBridge"]),
         .executable(name: "vgmboy-highly-complete-inspect", targets: ["VGMBoyHighlyCompleteInspect"]),
+        .executable(name: "vgmboy-mdx-inspect", targets: ["VGMBoyMDXInspect"]),
         .executable(name: "VGMBoy", targets: ["VGMBoyApp"])
     ],
     targets: [
@@ -52,6 +54,24 @@ let package = Package(
             ],
             linkerSettings: [
                 .unsafeFlags(["\(psgPlayBuildDirectory)/libpsgplay.a"])
+            ]
+        ),
+        .target(
+            name: "VGMBoyCMDXCore",
+            path: "vendor/mdxmini/src",
+            publicHeadersPath: ".",
+            cSettings: [
+                .define("USE_ICONV"),
+                .define("USE_NLG")
+            ]
+        ),
+        .target(
+            name: "VGMBoyCMDX",
+            dependencies: ["VGMBoyCMDXCore"],
+            path: "Sources/CMDX",
+            publicHeadersPath: "include",
+            cSettings: [
+                .unsafeFlags(["-I\(mdxMiniVendorDirectory)"])
             ]
         ),
         .target(
@@ -255,7 +275,7 @@ let package = Package(
         ),
         .target(
             name: "VGMBoyKit",
-            dependencies: ["VGMBoyFormatCore", "VGMBoySNDH", "VGMBoyCPSGPlay", "VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCFFmpeg", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCQSF", "VGMBoyCSIDPlayFP", "VGMBoyCOpenMPT", "VGMBoyCAudioUnit"],
+            dependencies: ["VGMBoyFormatCore", "VGMBoySNDH", "VGMBoyCPSGPlay", "VGMBoyCMDX", "VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCFFmpeg", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCQSF", "VGMBoyCSIDPlayFP", "VGMBoyCOpenMPT", "VGMBoyCAudioUnit"],
             linkerSettings: [
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("AudioToolbox")
@@ -271,6 +291,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "VGMBoyHighlyCompleteInspect",
+            dependencies: ["VGMBoyKit"]
+        ),
+        .executableTarget(
+            name: "VGMBoyMDXInspect",
             dependencies: ["VGMBoyKit"]
         ),
         .executableTarget(

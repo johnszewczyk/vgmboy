@@ -60,6 +60,12 @@ public enum FormatRegistry {
         supportsTempo: false
     )
 
+    public static let mdxFamily = DecoderFamily(
+        id: "mdx",
+        supportsLongPlay: true,
+        supportsTempo: false
+    )
+
     public static let standardAudioFamily = DecoderFamily(
         id: "standardaudio",
         supportsLongPlay: false,
@@ -132,6 +138,8 @@ public enum FormatRegistry {
 
     public static let psgPlayExtensions: Set<String> = ["sndh"]
 
+    public static let mdxExtensions: Set<String> = ["mdx"]
+
     public static let standardAudioExtensions: Set<String> = [
         "aac", "aif", "aiff", "caf", "flac", "m4a", "mp3", "wav", "wave"
     ]
@@ -172,6 +180,7 @@ public enum FormatRegistry {
         PlaybackFormatDescriptor(id: "libgme", family: libgmeFamily, extensions: libgmeExtensions),
         PlaybackFormatDescriptor(id: "libvgm", family: libvgmFamily, extensions: libvgmExtensions),
         PlaybackFormatDescriptor(id: "psgplay", family: psgPlayFamily, extensions: psgPlayExtensions),
+        PlaybackFormatDescriptor(id: "mdx", family: mdxFamily, extensions: mdxExtensions),
         PlaybackFormatDescriptor(id: "standard-audio", family: standardAudioFamily, extensions: standardAudioExtensions),
         PlaybackFormatDescriptor(id: "ffmpeg-audio", family: ffmpegAudioFamily, extensions: ffmpegAudioExtensions),
         PlaybackFormatDescriptor(id: "highly-complete", family: highlyCompleteFamily, extensions: highlyCompleteExtensions),
@@ -209,6 +218,9 @@ public enum FormatRegistry {
         }
         if psgPlayExtensions.contains(ext) {
             return psgPlayFamily
+        }
+        if mdxExtensions.contains(ext) {
+            return mdxFamily
         }
         if standardAudioExtensions.contains(ext) {
             return standardAudioFamily

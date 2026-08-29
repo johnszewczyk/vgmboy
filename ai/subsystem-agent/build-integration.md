@@ -31,6 +31,13 @@ for ScanSong's external inspection executables.
   dependency script also hashes a gitlink working tree so local source edits
   cannot hide behind a stale dependency product.
 - Compiled archives and scanner-plugin outputs belong under VGMBoy's `.build`.
+- The MDX scanner handoff is the release `vgmboy-mdx-inspect` product copied to
+  `.build/scanner-plugins`; its vendored mdxmini source and compatibility patch
+  participate in the scanner input signature.
+- `Docs/plugin-versions.json` is the canonical milestone inventory for every
+  decoder/core input. `scripts/audit-plugin-versions.sh` is read-only and
+  reports upstream tags, installed Homebrew versions, missing source trees, and
+  unpinned snapshots; it never changes a checkout or build product.
 - Native dependency products are keyed by source revision/diff, build script,
   compatibility patch, compiler, and CMake version. `build-app.sh` removes only
   its clean Swift release directory and app staging directory; it preserves the
@@ -51,6 +58,8 @@ for ScanSong's external inspection executables.
 - [build-scanner-plugins.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/build-scanner-plugins.sh)
 - [build-dependencies.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/build-dependencies.sh)
 - [build-psgplay.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/build-psgplay.sh)
+- [plugin-versions.json](/Users/john/Downloads/Code/VGMMan/VGMBoy/Docs/plugin-versions.json)
+- [audit-plugin-versions.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/audit-plugin-versions.sh)
 
 ## Verification State (2026-08-23)
 

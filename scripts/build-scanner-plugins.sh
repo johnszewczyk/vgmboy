@@ -8,6 +8,7 @@ VGMSTREAM_SOURCE="$SHARED_VENDOR_DIR/vgmstream"
 VGMSTREAM_BUILD="$BUILD_DIR/vgmstream"
 VGMSTREAM_OUTPUT="$BUILD_DIR/vgmstream-cli"
 QSF_OUTPUT="$BUILD_DIR/vgmboy-qsf-inspect"
+MDX_OUTPUT="$BUILD_DIR/vgmboy-mdx-inspect"
 SCANNER_STAMP="$BUILD_DIR/scanner-inputs.sha256"
 
 "$ROOT_DIR/scripts/build-dependencies.sh"
@@ -17,6 +18,11 @@ scanner_signature="$({
         "$ROOT_DIR/scripts/build-scanner-plugins.sh" \
         "$ROOT_DIR/scripts/build-qsf-inspector.sh" \
         "$ROOT_DIR/Sources/VGMBoyQSFInspect/main.c" \
+        "$ROOT_DIR/Sources/VGMBoyMDXInspect/main.swift" \
+        "$ROOT_DIR/Sources/VGMBoyKit/MDXDecoder.swift" \
+        "$ROOT_DIR/Sources/CMDX/mdx_bridge.c" \
+        "$ROOT_DIR/vendor/mdxmini/src/"*.c \
+        "$ROOT_DIR/vendor/mdxmini/src/"*.h \
         "$ROOT_DIR/.build/dependency-stamps/qsf.sha256" \
         "$ROOT_DIR/.build/dependency-stamps/vgmstream.sha256"
     printf '%s\n' "$VGMSTREAM_SOURCE"
@@ -25,15 +31,22 @@ scanner_signature="$({
     pkg-config --modversion libavcodec vorbisfile ogg 2>/dev/null || true
 } | shasum -a 256 | awk '{ print $1 }')"
 
-if [[ -x "$VGMSTREAM_OUTPUT" && -x "$QSF_OUTPUT" && -f "$SCANNER_STAMP" \
+if [[ -x "$VGMSTREAM_OUTPUT" && -x "$QSF_OUTPUT" && -x "$MDX_OUTPUT" && -f "$SCANNER_STAMP" \
       && "$(<"$SCANNER_STAMP")" == "$scanner_signature" ]]; then
     echo "VGMBoy scanner plugins are current ($scanner_signature)"
     echo "vgmstream: $VGMSTREAM_OUTPUT"
     echo "qsf: $QSF_OUTPUT"
+    echo "mdx: $MDX_OUTPUT"
     exit 0
 fi
 
 "$ROOT_DIR/scripts/build-qsf-inspector.sh" >/dev/null
+
+swift build --disable-sandbox --package-path "$ROOT_DIR" --configuration release --product vgmboy-mdx-inspect >/dev/null
+MDX_BUILT="$ROOT_DIR/.build/arm64-apple-macosx/release/vgmboy-mdx-inspect"
+[[ -x "$MDX_BUILT" ]] || { echo "Missing built MDX inspector: $MDX_BUILT" >&2; exit 1; }
+cp -X "$MDX_BUILT" "$MDX_OUTPUT"
+chmod 755 "$MDX_OUTPUT"
 
 [[ -d "$VGMSTREAM_SOURCE" ]] || { echo "Missing shared vgmstream source: $VGMSTREAM_SOURCE" >&2; exit 1; }
 command -v cmake >/dev/null 2>&1 || { echo "Missing cmake" >&2; exit 1; }
@@ -81,4 +94,5 @@ printf '%s\n' "$scanner_signature" > "$SCANNER_STAMP"
 echo "Built VGMBoy scanner plugins"
 echo "vgmstream: $VGMSTREAM_OUTPUT"
 echo "qsf: $QSF_OUTPUT"
+echo "mdx: $MDX_OUTPUT"
 echo "highly-complete: build through VGMBoy Package.swift product"

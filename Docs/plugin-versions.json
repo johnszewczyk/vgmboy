@@ -1,0 +1,138 @@
+{
+  "schema": 1,
+  "lastReviewed": "2026-08-29",
+  "reviewIntervalDays": 90,
+  "policy": "Review upstream milestones quarterly and before a release. Do not adopt a decoder update without the format regression corpus and representative playback checks.",
+  "plugins": [
+    {
+      "id": "libgme",
+      "name": "Game Music Emu",
+      "kind": "homebrew",
+      "formula": "game-music-emu",
+      "current": "0.6.5",
+      "upstream": "https://github.com/libgme/game-music-emu",
+      "milestoneCheck": "release-or-tag",
+      "formats": ["AY", "GBS", "HES", "KSS", "NSF", "NSFE", "SAP", "SPC"]
+    },
+    {
+      "id": "libvgm",
+      "name": "libVGM",
+      "kind": "git",
+      "source": "vendor/libvgm",
+      "current": "867223e7c33d63de115d1ab955f784c44f19040a",
+      "upstream": "https://github.com/ValleyBell/libvgm.git",
+      "milestoneCheck": "release-or-tag",
+      "formats": ["VGM", "VGZ", "GYM", "S98", "DRO"]
+    },
+    {
+      "id": "psgplay",
+      "name": "PSGPlay",
+      "kind": "git",
+      "source": "vendor/psgplay",
+      "current": "f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06",
+      "upstream": "https://github.com/frno7/psgplay.git",
+      "milestoneCheck": "release-or-tag",
+      "formats": ["SNDH"]
+    },
+    {
+      "id": "mdxmini",
+      "name": "mdxmini",
+      "kind": "git",
+      "source": "vendor/mdxmini",
+      "current": "003531a471c1955f4ed4357d0e2a6cba809c34a0",
+      "upstream": "https://github.com/mistydemeo/mdxmini.git",
+      "milestoneCheck": "release-or-tag",
+      "formats": ["MDX", "PDX"]
+    },
+    {
+      "id": "vgmstream",
+      "name": "vgmstream",
+      "kind": "git",
+      "source": "vendor/vgmstream",
+      "current": "807b4948cfc1de0cd90e377e9c56f74664c54a1c",
+      "upstream": "https://github.com/vgmstream/vgmstream.git",
+      "milestoneCheck": "release-or-tag",
+      "formats": ["ADX", "XA", "AT3", "FSB", "VAG", "AIFC", "OGG"]
+    },
+    {
+      "id": "lazyusf2",
+      "name": "lazyusf2",
+      "kind": "git",
+      "source": "vendor/lazyusf2",
+      "current": "421f00bcaa1988b8e1825e91780129f24fbd1aa0",
+      "upstream": "https://gitlab.com/kode54/lazyusf2.git",
+      "milestoneCheck": "release-or-tag",
+      "formats": ["USF", "miniUSF"]
+    },
+    {
+      "id": "play-psf",
+      "name": "Play! PSF core",
+      "kind": "git",
+      "source": "vendor/play",
+      "current": "50aedca2639521bc498ace0b2be1ea012801a86a",
+      "upstream": "https://github.com/jpd002/Play-.git",
+      "milestoneCheck": "release-or-tag",
+      "formats": ["PSF", "PSF2"]
+    },
+    {
+      "id": "aosdk-qsf",
+      "name": "Audio Overload SDK QSF engine",
+      "kind": "snapshot",
+      "source": "vendor/aosdk",
+      "current": "source snapshot; upstream revision not recorded",
+      "upstream": "https://github.com/nmlgc/aosdk.git",
+      "milestoneCheck": "manual",
+      "formats": ["QSF", "miniQSF"]
+    },
+    {
+      "id": "mgba",
+      "name": "mGBA / Highly Complete",
+      "kind": "snapshot",
+      "source": "vendor/mgba",
+      "current": "0.11.0 snapshot; upstream revision not recorded",
+      "upstream": "https://github.com/mgba-emu/mgba.git",
+      "milestoneCheck": "release-or-tag",
+      "formats": ["GSF", "miniGSF"]
+    },
+    {
+      "id": "2sf2wav",
+      "name": "2sf2wav / DeSmuME DS core",
+      "kind": "snapshot",
+      "source": "vendor/2sf2wav",
+      "current": "DeSmuME 0.9.9 svn 4608 snapshot; upstream revision not recorded",
+      "upstream": "",
+      "milestoneCheck": "manual",
+      "formats": ["2SF", "mini2SF"]
+    },
+    {
+      "id": "psflib",
+      "name": "PSFLib",
+      "kind": "snapshot",
+      "source": "vendor/psflib",
+      "current": "source snapshot; upstream revision not recorded",
+      "upstream": "",
+      "milestoneCheck": "manual",
+      "formats": ["PSF dependencies"]
+    },
+    {
+      "id": "libsidplayfp",
+      "name": "libsidplayfp",
+      "kind": "homebrew",
+      "formula": "libsidplayfp",
+      "current": "3.1.0",
+      "upstream": "https://github.com/libsidplayfp/libsidplayfp",
+      "milestoneCheck": "release-or-tag",
+      "formats": ["SID"]
+    },
+    {
+      "id": "libopenmpt",
+      "name": "libopenmpt",
+      "kind": "homebrew",
+      "formula": "libopenmpt",
+      "current": "0.8.9",
+      "upstream": "https://github.com/OpenMPT/openmpt",
+      "milestoneCheck": "release-or-tag",
+      "formats": ["MOD", "XM", "IT", "S3M"]
+    }
+  ]
+}

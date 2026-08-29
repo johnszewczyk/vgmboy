@@ -13,6 +13,7 @@ It is a local snapshot identity, not a substitute for an upstream commit.
 | `mGBA` | `0.11.0`; upstream revision not recorded in the inherited snapshot | `b7b71f64dab500433f3662b818e3521cf67524dcdee1a9952c1f555629ff55c0` | [mgba-emu/mgba](https://github.com/mgba-emu/mgba); used by the Highly Complete bridge |
 | `2sf2wav` | DeSmuME `0.9.9 svn 4608`; independent upstream repository not recorded | `c3e329f9cf72881d25dabb03b9a89ebd4125ca9bd6d44c26f642589c622a9fb7` | GPL source snapshot used by the 2SF bridge |
 | `PSFLib` | Independent upstream revision not recorded in the inherited snapshot | `c3adb7ea371fbeeedc68b3747c314419b52d9cb46aa0d75f177f428bcdb7d021` | Compiled with lazyusf2 for PSF-family dependency resolution |
+| `mdxmini` | `003531a471c1955f4ed4357d0e2a6cba809c34a0` | vendored source snapshot | [mistydemeo/mdxmini](https://github.com/mistydemeo/mdxmini), GPL-2.0-or-later, with case-insensitive PDX lookup compatibility patch |
 
 The four submodule commits are also pinned in `.gitmodules` and the Git tree. The three ordinary
 source snapshots should receive an upstream commit or release tag if their source is refreshed.

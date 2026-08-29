@@ -36,19 +36,25 @@ project provides no release version for the exact source checked out here.
 Bridge code in `Sources/C<Core>/` belongs to VGMBoy; it does not fork any of
 the upstream decoders.
 
+The version/revision values below are mirrored in the machine-readable
+[`Docs/plugin-versions.json`](Docs/plugin-versions.json) manifest. Snapshot
+entries are intentionally labeled when their inherited source does not retain
+an upstream revision; they are review items, not silently assumed releases.
+
 | Plugin | Current version or revision | Upstream repository or home | Formats routed here | VGMBoy integration |
 | --- | --- | --- | --- | --- |
 | [Game Music Emu / libgme](https://github.com/libgme/game-music-emu) | 0.6.5 (Homebrew `game-music-emu` / `pkg-config`) | [github.com/libgme/game-music-emu](https://github.com/libgme/game-music-emu) | AY, GBS, HES, KSS, NSF, NSFE, SAP, SPC | `CGameMusicEmu` system-library target; native long-play and tempo support. |
 | [libvgm](https://github.com/ValleyBell/libvgm) | `867223e7c33d63de115d1ab955f784c44f19040a` | [github.com/ValleyBell/libvgm](https://github.com/ValleyBell/libvgm) | VGM, VGZ, GYM, S98, DRO | `CLibVGM` bridge; source and static-library build are owned by VGMBoy. |
 | [psgplay](https://github.com/frno7/psgplay) | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | [github.com/frno7/psgplay](https://github.com/frno7/psgplay) | SNDH | `CPSGPlay` bridge and `VGMBoySNDH` metadata product; enumerates SNDH subtunes and renders Atari ST PSG audio. A deterministic 1,024-file sample selected and rendered 2,030 subtunes; the full corpus remains unqualified. |
-| [Highly Complete](https://github.com/mgba-emu/mgba) (mGBA + PSFLib) | VGMBoy `vendor/mgba` snapshot; this checkout does not record an independent upstream revision | [github.com/mgba-emu/mgba](https://github.com/mgba-emu/mgba) | GSF, miniGSF | `CHighlyComplete` bridge; PSFLib resolves the complete miniGSF chain, then mGBA runs the assembled GBA ROM. The bridge resamples mGBA's live native rate into VGMBoy's fixed output rate. |
-| 2sf2wav | VGMBoy `vendor/2sf2wav` snapshot; this checkout does not record an independent upstream revision or home site | — | 2SF, mini2SF | `C2SF` bridge over the static DS core. It validates relative mini2SF libraries and explicitly tears down process-global DS state before any replacement decoder is created. |
+| [mdxmini](https://github.com/mistydemeo/mdxmini) | `003531a471c1955f4ed4357d0e2a6cba809c34a0` | [github.com/mistydemeo/mdxmini](https://github.com/mistydemeo/mdxmini) | MDX, with adjacent PDX sample banks | `CMDX` bridge; one logical MDX sequence per playlist item, case-insensitive PDX resolution, native duration, and a matching `vgmboy-mdx-inspect` scanner executable. GPL-2.0-or-later. |
+| [Highly Complete](https://github.com/mgba-emu/mgba) (mGBA + PSFLib) | mGBA 0.11.0 snapshot + PSFLib source snapshot; upstream revisions not recorded | [github.com/mgba-emu/mgba](https://github.com/mgba-emu/mgba) | GSF, miniGSF | `CHighlyComplete` bridge; PSFLib resolves the complete miniGSF chain, then mGBA runs the assembled GBA ROM. The bridge resamples mGBA's live native rate into VGMBoy's fixed output rate. |
+| 2sf2wav | DeSmuME 0.9.9 svn 4608 snapshot; upstream revision not recorded | — | 2SF, mini2SF | `C2SF` bridge over the static DS core. It validates relative mini2SF libraries and explicitly tears down process-global DS state before any replacement decoder is created. |
 | [vgmstream](https://github.com/vgmstream/vgmstream) | `807b4948cfc1de0cd90e377e9c56f74664c54a1c` + shared compatibility patch | [github.com/vgmstream/vgmstream](https://github.com/vgmstream/vgmstream) / [vgmstream.org](https://vgmstream.org) | ADX, XA, AT3, FSB, VAG, AIFC, OGG, and the other extensions in `FormatRegistry.vgmstreamExtensions` | `CVGmstream` bridge plus the VGMBoy-built `vgmstream-cli` scanner plugin; built with FFmpeg and Vorbis support. |
 | [lazyusf2](https://gitlab.com/kode54/lazyusf2) | `421f00bcaa1988b8e1825e91780129f24fbd1aa0` | [gitlab.com/kode54/lazyusf2](https://gitlab.com/kode54/lazyusf2) | USF, miniUSF | `CLazyUSF` bridge; companion `.usflib` files must be present beside a miniUSF. These streams have no natural ending, so VGMBoy always applies a finite playback window. |
 | [Play!](https://github.com/jpd002/Play-) PSF core | `50aedca2639521bc498ace0b2be1ea012801a86a` + VGMBoy PSF-core-only patch | [github.com/jpd002/Play-](https://github.com/jpd002/Play-) / [purei.org](https://purei.org) | PSF, miniPSF, PSF2, miniPSF2 | `CPlayPSF` bridge over the `PsfCore` static archive. The required patch is `patches/play-psfcore-only.patch`; companion `.psflib` files must be present beside a miniPSF. |
-| [Audio Overload SDK](https://github.com/nmlgc/aosdk) QSF engine | shallow source snapshot under `vendor/aosdk` | [github.com/nmlgc/aosdk](https://github.com/nmlgc/aosdk) | QSF, miniQSF | `CQSF` provides native PCM, seeking, timing tags, and `.qsflib` dependency resolution. Because the engine is process-global, one decoder holds an exclusive lifetime lease and concurrent QSF work fails explicitly. The same engine builds the `vgmboy-qsf-inspect` scanner plugin. |
-| [libsidplayfp](https://github.com/libsidplayfp/libsidplayfp) | Homebrew `libsidplayfp` build | [github.com/libsidplayfp/libsidplayfp](https://github.com/libsidplayfp/libsidplayfp) | SID | `CSIDPlayFP` bridge; SID output joins the same direct audio transport. |
-| [libopenmpt](https://lib.openmpt.org/libopenmpt/) | Homebrew `libopenmpt` build | [github.com/OpenMPT/openmpt](https://github.com/OpenMPT/openmpt) / [lib.openmpt.org](https://lib.openmpt.org/libopenmpt/) | MOD, XM, IT, S3M and registered tracker modules | `COpenMPT` bridge; modules use the same direct audio transport. |
+| [Audio Overload SDK](https://github.com/nmlgc/aosdk) QSF engine | source snapshot; upstream revision not recorded | [github.com/nmlgc/aosdk](https://github.com/nmlgc/aosdk) | QSF, miniQSF | `CQSF` provides native PCM, seeking, timing tags, and `.qsflib` dependency resolution. Because the engine is process-global, one decoder holds an exclusive lifetime lease and concurrent QSF work fails explicitly. The same engine builds the `vgmboy-qsf-inspect` scanner plugin. |
+| [libsidplayfp](https://github.com/libsidplayfp/libsidplayfp) | Homebrew `libsidplayfp` 3.1.0 build | [github.com/libsidplayfp/libsidplayfp](https://github.com/libsidplayfp/libsidplayfp) | SID | `CSIDPlayFP` bridge; SID output joins the same direct audio transport. |
+| [libopenmpt](https://lib.openmpt.org/libopenmpt/) | Homebrew `libopenmpt` 0.8.9 build | [github.com/OpenMPT/openmpt](https://github.com/OpenMPT/openmpt) / [lib.openmpt.org](https://lib.openmpt.org/libopenmpt/) | MOD, XM, IT, S3M and registered tracker modules | `COpenMPT` bridge; modules use the same direct audio transport. |
 
 `StandardAudioDecoder` uses AVFoundation for ordinary macOS-admitted formats. The separate
 `CFFmpeg` bridge handles MP2 and TAK without a frontend process fallback.
@@ -63,7 +69,7 @@ or install a broad package manager graph of its own.
 | --- | --- | --- |
 | VGMBoy shared source garden | `vendor/` in this checkout | Canonical upstream source inputs and compatibility patches for every VGMBoy bridge and scanner-facing plugin. |
 | [mGBA](https://github.com/mgba-emu/mgba) | VGMBoy `vendor/mgba` snapshot; no independent revision recorded by this checkout | Linked by the Highly Complete bridge and prepared for ScanSong through `scripts/build-scanner-plugins.sh`. |
-| [psgplay](https://github.com/frno7/psgplay) | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` plus recursive submodules | `vendor/psgplay` | Built as `libpsgplay.a` by `scripts/build-psgplay.sh` and staged for the SNDH bridge. |
+| [psgplay](https://github.com/frno7/psgplay) | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` plus recursive submodules | Built as `libpsgplay.a` by `scripts/build-psgplay.sh` and staged for the SNDH bridge. |
 | 2sf2wav | VGMBoy `vendor/2sf2wav` snapshot; no independent revision recorded by this checkout | Built as `lib2sf.a` through `scripts/build-2sf.sh` and linked by the 2SF bridge. |
 | Swift Package Manager | tools version 6.1; Swift language mode 6 | Builds `VGMBoyKit`, `vgmboy-cli`, and the `VGMBoy` test app. |
 | [CMake](https://cmake.org/) | 4.4.2 in the development environment | Builds libvgm, vgmstream, and the Play! PSF core through VGMBoy scripts. |
@@ -100,6 +106,7 @@ From this directory:
 ```bash
 git submodule update --init --recursive
 swift test --package-path . --disable-sandbox
+./scripts/audit-plugin-versions.sh
 ./launch.sh
 ```
 
@@ -108,6 +115,18 @@ static libraries through `scripts/build-dependencies.sh`, packages `VGMBoy.app`,
 inspection plugins, use `scripts/build-scanner-plugins.sh`. The
 CLI product is named `vgmboy-cli` specifically to avoid colliding with the app
 name on case-insensitive filesystems.
+
+### Decoder milestone audit
+
+`Docs/plugin-versions.json` is the canonical inventory of decoder revisions,
+system formulas, upstream locations, and format coverage. Run
+`scripts/audit-plugin-versions.sh` before a release and approximately every 90
+days. The default report is advisory and read-only; `--offline` skips remote
+milestone lookups, `--json` emits machine-readable output, and `--strict`
+returns a failure when an update or missing source needs review. A reported
+milestone is not adopted automatically: update the pin, rebuild the affected
+core and scanner plugin, then run the format-specific regression and playback
+checks before changing the manifest's `lastReviewed` date.
 
 ## Project boundaries
 

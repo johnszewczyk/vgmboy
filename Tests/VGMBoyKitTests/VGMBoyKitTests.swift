@@ -11,7 +11,7 @@ struct FormatRegistryTests {
     @Test("publishes one complete frontend descriptor table")
     func frontendDescriptorsMatchPlaybackRouting() {
         let expectedIDs = [
-            "libgme", "libvgm", "psgplay", "standard-audio", "ffmpeg-audio",
+            "libgme", "libvgm", "psgplay", "mdx", "standard-audio", "ffmpeg-audio",
             "highly-complete", "twosf", "vgmstream", "lazyusf",
             "playpsf", "qsf", "sidplayfp", "openmpt"
         ]
@@ -148,6 +148,13 @@ struct FormatRegistryTests {
         #expect(FormatRegistry.psgPlayFamily.supportsLongPlay)
         #expect(!FormatRegistry.psgPlayFamily.supportsTempo)
         #expect(FormatRegistry.psgPlayFamily.hasNaturalEnding)
+    }
+
+    @Test("routes MDX to the native MDX family")
+    func routesMDX() {
+        #expect(FormatRegistry.family(for: "/tmp/music.MDX")?.id == "mdx")
+        #expect(FormatRegistry.descriptor(for: "/tmp/music.mdx")?.extensions == ["mdx"])
+        #expect(FormatRegistry.family(for: "/tmp/samples.pdx") == nil)
     }
 
     @Test("routes GSF extensions to the Highly Complete family")
@@ -294,6 +301,26 @@ func sndhFixtureUsesPSGPlay() throws {
         #expect(frames.left.count == 4_096)
         #expect(frames.left.contains { abs($0) > 0.0001 } || frames.right.contains { abs($0) > 0.0001 })
     }
+}
+
+@Test(
+    "MDX fixture opens, reports native timing, and renders PCM",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["VGMBoy_MDX_FIXTURE"] != nil,
+        "Set VGMBoy_MDX_FIXTURE to run the archive-backed X68000 MDX check."
+    )
+)
+func mdxFixtureUsesNativeDecoder() throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBoy_MDX_FIXTURE"])
+    let decoder = try DecoderFactory.make(path: path)
+    defer { decoder.close() }
+    #expect(decoder.trackCount == 1)
+    let metadata = try decoder.metadata(for: 0)
+    #expect(metadata.system == "Sharp X68000")
+    #expect(metadata.playMs > 0)
+    let frames = try decoder.readFrames(4_096)
+    #expect(frames.left.count == 4_096)
+    #expect(frames.left.contains { abs($0) > 0.0001 } || frames.right.contains { abs($0) > 0.0001 })
 }
 
 @Test(
