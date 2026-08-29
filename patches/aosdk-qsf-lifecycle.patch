@@ -1,0 +1,38 @@
+diff --git a/eng_qsf/eng_qsf.c b/eng_qsf/eng_qsf.c
+--- a/eng_qsf/eng_qsf.c
++++ b/eng_qsf/eng_qsf.c
+@@ -155,6 +155,8 @@ int32 qsf_start(uint8 *buffer, uint32 length)
+ 	skey1 = skey2 = 0;
+ 	akey = 0;
+ 	xkey = 0;
++	uses_kabuki = 0;
++	samples_to_next_tick = samples_per_tick;
+ 	cur_bank = 0;
+ 
+ 	memset(RAM, 0, 0x1000);
+@@ -213,8 +215,12 @@ int32 qsf_frame(void)
+ 
+ int32 qsf_stop(void)
+ {
++	qsound_sh_stop();
++	z80_exit();
+ 	free(Z80ROM);
+ 	free(QSamples);
++	Z80ROM = NULL;
++	QSamples = NULL;
+ 
+ 	return AO_SUCCESS;
+ }
+@@ -278,6 +284,7 @@ uint8 qsf_memory_read(uint16 addr)
+ 	{
+ 		return RAM2[addr-0xf000];
+ 	}
++	return 0;
+ }
+ 
+ uint8 qsf_memory_readop(uint16 addr)
+@@ -344,4 +351,3 @@ void qsf_memory_writeport(uint16 addr, uint8 byte)
+ {
+ 	printf("Unk port %x @ %x\n", byte, addr);
+ }
+-

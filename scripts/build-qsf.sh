@@ -2,12 +2,13 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-AO="$ROOT_DIR/vendor/aosdk"
 BUILD="$ROOT_DIR/.build/qsf"
 CC_BIN="${CC:-clang}"
 
 mkdir -p "$BUILD"
 rm -f "$BUILD"/*.o "$BUILD/libvgmboy_qsf.a"
+AO="$BUILD/aosdk-source"
+"$ROOT_DIR/scripts/stage-aosdk-qsf.sh" "$AO"
 
 CFLAGS=(
     -O2

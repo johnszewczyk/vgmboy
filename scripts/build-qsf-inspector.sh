@@ -2,10 +2,11 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-AO="$ROOT_DIR/vendor/aosdk"
 OUT="$ROOT_DIR/.build/scanner-plugins/vgmboy-qsf-inspect"
 BUILD="$ROOT_DIR/.build/qsf-inspect"
 mkdir -p "$BUILD" "$(dirname "$OUT")"
+AO="$BUILD/aosdk-source"
+"$ROOT_DIR/scripts/stage-aosdk-qsf.sh" "$AO"
 
 cc=${CC:-clang}
 cflags=(-O2 -DNDEBUG -DLSB_FIRST=1 -DHAVE_STDINT_H -DPATH_MAX=2048

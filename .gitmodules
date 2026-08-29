@@ -10,6 +10,15 @@
 [submodule "vendor/vgmstream"]
 	path = vendor/vgmstream
 	url = https://github.com/vgmstream/vgmstream.git
+[submodule "vendor/aosdk"]
+	path = vendor/aosdk
+	url = https://github.com/nmlgc/aosdk.git
+[submodule "vendor/highly_quixotic"]
+	path = vendor/highly_quixotic
+	url = https://gitlab.com/kode54/highly_quixotic.git
+[submodule "vendor/psflib-qsf"]
+	path = vendor/psflib-qsf
+	url = https://gitlab.com/kode54/psflib.git
 [submodule "vendor/psgplay"]
 	path = vendor/psgplay
 	url = https://github.com/frno7/psgplay.git

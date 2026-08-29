@@ -89,7 +89,7 @@ ensure_dependency 2sf vendor/2sf2wav .build/2sf/lib2sf.a build-2sf.sh
 ensure_dependency lazyusf vendor/lazyusf2 .build/lazyusf/liblazyusf.a build-lazyusf.sh patches/lazyusf2-render-safety.patch
 [[ -f "$SOURCE_BUILD_ROOT/lazyusf/libpsflib.a" ]] || "$ROOT_DIR/scripts/build-lazyusf.sh"
 ensure_dependency play-psf vendor/play .build/play-psf/libcocoaspice_play_psf.a build-play-psf.sh patches/play-psfcore-only.patch
-ensure_dependency qsf vendor/aosdk .build/qsf/libvgmboy_qsf.a build-qsf.sh
+ensure_dependency qsf vendor/aosdk .build/qsf/libvgmboy_qsf.a build-qsf.sh patches/aosdk-qsf-lifecycle.patch
 ensure_dependency vgmstream vendor/vgmstream .build/vgmstream/src/libvgmstream.a build-vgmstream.sh patches/vgmstream-cocoaspice.patch
 ensure_dependency psgplay vendor/psgplay .build/psgplay/libpsgplay.a build-psgplay.sh
 

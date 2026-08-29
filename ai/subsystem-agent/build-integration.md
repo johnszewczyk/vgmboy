@@ -20,7 +20,7 @@ for ScanSong's external inspection executables.
 - Never fork an upstream decoder library per frontend.
 - The canonical upstream checkout is VGMBoy's `vendor/` garden. CocoaSpice and SPCBoy contain no
   decoder source or decoder build scripts.
-- `libvgm`, `lazyusf2`, `Play!`, `vgmstream`, and `psgplay` are Git submodules in that garden; a fresh checkout
+- `aosdk`, `libvgm`, `lazyusf2`, `Play!`, `vgmstream`, and `psgplay` are Git submodules in that garden; a fresh checkout
   must run `git submodule update --init --recursive` before building. The small `2sf2wav`, mGBA,
   and PSFLib source snapshots remain ordinary tracked source because they are not independent
   submodules in the existing app-family checkouts.
@@ -58,6 +58,8 @@ for ScanSong's external inspection executables.
 - [build-scanner-plugins.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/build-scanner-plugins.sh)
 - [build-dependencies.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/build-dependencies.sh)
 - [build-psgplay.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/build-psgplay.sh)
+- [stage-aosdk-qsf.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/stage-aosdk-qsf.sh) and
+  [aosdk-qsf-lifecycle.patch](/Users/john/Downloads/Code/VGMMan/VGMBoy/patches/aosdk-qsf-lifecycle.patch)
 - [plugin-versions.json](/Users/john/Downloads/Code/VGMMan/VGMBoy/Docs/plugin-versions.json)
 - [audit-plugin-versions.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/audit-plugin-versions.sh)
 
