@@ -15,6 +15,7 @@
 
 #include "version.h"
 #include "mdx.h"
+#include "lzx042.h"
 
 /* ------------------------------------------------------------------ */
 
@@ -29,11 +30,71 @@ __alloc_mdxwork(void)
   return mdx;
 }
 
+/* Replace an X68000 LZX-compressed MDX body while preserving its clear text
+ * title and PDX dependency header. A return value below zero means that a
+ * recognized LZX body was malformed; zero means the body was plain. */
+static int
+__normalize_mdx_lzx(unsigned char **buffer, int *length)
+{
+  unsigned char *source = *buffer;
+  int source_length = *length;
+  int title_end = -1;
+  int header_end = -1;
+  int i;
+
+  for (i = 0; i + 2 < source_length; i++) {
+    if (source[i] == 0x0d && source[i + 1] == 0x0a && source[i + 2] == 0x1a) {
+      title_end = i;
+      break;
+    }
+  }
+  if (title_end < 0) return 0;
+
+  for (i = title_end + 3; i < source_length; i++) {
+    if (source[i] == 0) {
+      header_end = i + 1;
+      break;
+    }
+  }
+  if (header_end < 0 || header_end >= source_length
+      || !x68k_lzx_looks_like(source + header_end, (size_t)(source_length - header_end))) {
+    return 0;
+  }
+
+  unsigned char *decoded = NULL;
+  size_t decoded_length = 0;
+  if (x68k_lzx_decode(
+          source + header_end,
+          (size_t)(source_length - header_end),
+          &decoded,
+          &decoded_length) != 0
+      || decoded_length > 0x7fffffffU - (size_t)header_end) {
+    free(decoded);
+    return -1;
+  }
+
+  size_t expanded_length = (size_t)header_end + decoded_length;
+  unsigned char *expanded = (unsigned char *)malloc(expanded_length + 16);
+  if (!expanded) {
+    free(decoded);
+    return -1;
+  }
+  memcpy(expanded, source, (size_t)header_end);
+  memcpy(expanded + header_end, decoded, decoded_length);
+  memset(expanded + expanded_length, 0, 16);
+  free(decoded);
+  free(source);
+  *buffer = expanded;
+  *length = (int)expanded_length;
+  return 1;
+}
+
 static int
 __load_file(MDX_DATA* mdx, char* fnam)
 {
   FILE* fp = NULL;
   unsigned char* buf = NULL;
+  long file_length = 0;
   int len = 0;
   int result = 0;
 
@@ -43,16 +104,20 @@ __load_file(MDX_DATA* mdx, char* fnam)
   }
 
   fseek(fp, 0, SEEK_END);
-  len = (int)ftell(fp);
+  file_length = ftell(fp);
+  if (file_length < 0 || file_length > 0x7fffffffL) {
+    fclose(fp);
+    return FLAG_FALSE;
+  }
+  len = (int)file_length;
   fseek(fp, 0, SEEK_SET);
 
   buf = (unsigned char *)malloc(sizeof(unsigned char)*(len+16));
-  memset(buf, 0, len);
-
   if (!buf) {
     fclose(fp);
     return FLAG_FALSE;
   }
+  memset(buf, 0, (size_t)len + 16);
 
 
   result = (int)fread( buf, 1, len, fp );
@@ -61,6 +126,11 @@ __load_file(MDX_DATA* mdx, char* fnam)
 
 
   if (result!=len) {
+    free(buf);
+    return FLAG_FALSE;
+  }
+
+  if (__normalize_mdx_lzx(&buf, &len) < 0) {
     free(buf);
     return FLAG_FALSE;
   }
@@ -100,15 +170,15 @@ MDX_DATA *mdx_open_mdx( char *name ) {
   if (mdx->length<3) {
     goto error_end;
   }
-  while(1) {
+  while (ptr + 2 < mdx->length) {
     if ( buf[ptr+0] == 0x0d &&
 	 buf[ptr+1] == 0x0a &&
 	 buf[ptr+2] == 0x1a ) break;
 
     mdx->data_title[i++]=buf[ptr++];  /* warning! this text is SJIS */
     if ( i>=MDX_MAX_TITLE_LENGTH ) i--;
-    if ( ptr > mdx->length ) return NULL;
   }
+  if (ptr + 2 >= mdx->length) goto error_end;
   mdx->data_title[i++]=0;
 
 
@@ -121,38 +191,51 @@ MDX_DATA *mdx_open_mdx( char *name ) {
   i=0;
   j=0;
   mdx->haspdx=FLAG_FALSE;
-  while(1) {
+  while (ptr < mdx->length) {
     if ( buf[ptr] == 0x00 ) break;
 
+    if (i >= MDX_MAX_PDX_FILENAME_LENGTH - 5) goto error_end;
     mdx->haspdx=FLAG_TRUE;
     mdx->pdx_name[i++] = buf[ptr++];
     if ( strcasecmp( ".pdx", (char *)(buf+ptr-1) )==0 ) j=1;
-    if ( i>= MDX_MAX_PDX_FILENAME_LENGTH ) i--;
-    if ( ptr > mdx->length ) goto error_end;
   }
+  if (ptr >= mdx->length) goto error_end;
   if ( mdx->haspdx==FLAG_TRUE && j==0 ) {
+    if (i > MDX_MAX_PDX_FILENAME_LENGTH - 5) goto error_end;
     mdx->pdx_name[i+0] = '.';
     mdx->pdx_name[i+1] = 'p';
     mdx->pdx_name[i+2] = 'd';
     mdx->pdx_name[i+3] = 'x';
   }
 
+  /* Older MDX writers used a leading backslash for a same-directory PDX
+   * basename. Normalize only that legacy spelling; the host materializer
+   * keeps its normal traversal checks for every other path spelling. */
+  if (mdx->pdx_name[0] == '\\') {
+    int start = 0;
+    while (mdx->pdx_name[start] == '\\') start++;
+    if (mdx->pdx_name[start] == '\0') goto error_end;
+    memmove(mdx->pdx_name, mdx->pdx_name + start,
+            strlen(mdx->pdx_name + start) + 1);
+  }
+
   /* get voice data offset */
 
   ptr++;
+  if (ptr + 3 >= mdx->length) goto error_end;
   mdx->base_pointer = ptr;
   mdx->voice_data_offset =
     (unsigned int)buf[ptr+0]*256 +
     (unsigned int)buf[ptr+1] + mdx->base_pointer;
 
-  if ( mdx->voice_data_offset > mdx->length ) goto error_end;
+  if ( mdx->voice_data_offset >= mdx->length ) goto error_end;
 
    /* get MML data offset */
 
   mdx->mml_data_offset[0] =
     (unsigned int)buf[ptr+2+0] * 256 +
     (unsigned int)buf[ptr+2+1] + mdx->base_pointer;
-  if ( mdx->mml_data_offset[0] > mdx->length ) goto error_end;
+  if ( mdx->mml_data_offset[0] >= mdx->length ) goto error_end;
 
   if ( buf[mdx->mml_data_offset[0]] == MDX_SET_PCM8_MODE ) {
     mdx->ispcm8mode = 1;
@@ -166,7 +249,7 @@ MDX_DATA *mdx_open_mdx( char *name ) {
     mdx->mml_data_offset[i] =
       (unsigned int)buf[ptr+i*2+2+0] * 256 +
       (unsigned int)buf[ptr+i*2+2+1] + mdx->base_pointer;
-    if ( mdx->mml_data_offset[i] > mdx->length ) goto error_end;
+    if ( mdx->mml_data_offset[i] >= mdx->length ) goto error_end;
   }
 
 
@@ -353,4 +436,3 @@ int mdx_output_titles( MDX_DATA *mdx ) {
 
   return 0;
 }
-

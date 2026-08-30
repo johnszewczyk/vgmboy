@@ -128,6 +128,12 @@ public enum FormatRegistry {
         supportsTempo: false
     )
 
+    public static let amigaFamily = DecoderFamily(
+        id: "amiga-uade",
+        supportsLongPlay: true,
+        supportsTempo: false
+    )
+
     public static let libgmeExtensions: Set<String> = [
         "ay", "gbs", "hes", "kss", "nsf", "nsfe", "sap", "spc"
     ]
@@ -174,6 +180,11 @@ public enum FormatRegistry {
         "669", "dmf", "far", "it", "mod", "mptm", "mtm", "okt", "ptm", "s3m", "stm", "ult", "xm"
     ]
 
+    /// Amiga music uses replayer prefixes (for example `p4x.earth`) rather
+    /// than a conventional suffix. Keep this separate from extensions so
+    /// names such as `stage.p4x` are not admitted accidentally.
+    public static let amigaPrefixes: Set<String> = AmigaFormatManifest.prefixes
+
     /// Stable frontend order. Keep this list aligned with the backend order
     /// exposed by the existing CocoaSpice and SPCBoyWK controls.
     public static let playbackDescriptors: [PlaybackFormatDescriptor] = [
@@ -190,7 +201,10 @@ public enum FormatRegistry {
         PlaybackFormatDescriptor(id: "playpsf", family: playpsfFamily, extensions: playpsfExtensions),
         PlaybackFormatDescriptor(id: "qsf", family: qsfFamily, extensions: qsfExtensions),
         PlaybackFormatDescriptor(id: "sidplayfp", family: sidplayfpFamily, extensions: sidplayfpExtensions),
-        PlaybackFormatDescriptor(id: "openmpt", family: openMPTFamily, extensions: openMPTExtensions)
+        PlaybackFormatDescriptor(id: "openmpt", family: openMPTFamily, extensions: openMPTExtensions),
+        // UADE admits Amiga replayer prefixes through descriptor(for:) rather
+        // than pretending those prefixes are ordinary filename extensions.
+        PlaybackFormatDescriptor(id: "amiga-uade", family: amigaFamily, extensions: [])
     ]
 
     public static let playbackExtensions: Set<String> = Set(
@@ -199,7 +213,12 @@ public enum FormatRegistry {
 
     public static func descriptor(for path: String) -> PlaybackFormatDescriptor? {
         let extensionName = normalizedExtension(for: path)
-        return playbackDescriptors.first { $0.extensions.contains(extensionName) }
+        if let descriptor = playbackDescriptors.first(where: { $0.id != "amiga-uade" && $0.extensions.contains(extensionName) }) {
+            return descriptor
+        }
+        return AmigaFormatManifest.prefix(for: path) == nil
+            ? nil
+            : playbackDescriptors.first { $0.id == "amiga-uade" }
     }
 
     public static func family(for path: String) -> DecoderFamily? {
@@ -246,6 +265,9 @@ public enum FormatRegistry {
         if qsfExtensions.contains(ext) {
             return qsfFamily
         }
+        if AmigaFormatManifest.prefix(for: path) != nil {
+            return amigaFamily
+        }
         return nil
     }
 
@@ -263,7 +285,9 @@ public enum FormatRegistry {
             let extensionName = normalizedExtension(for: entryPath)
             guard family(for: entryPath) != nil else { return nil }
 
-            if lazyusfExtensions.contains(extensionName) {
+            if AmigaFormatManifest.prefix(for: entryPath) != nil {
+                resolved = .completeSet
+            } else if lazyusfExtensions.contains(extensionName) {
                 resolved = .completeSetWithLazyUSFAliases
             } else if requiresCompleteSet(extensionName), resolved == .selectedEntry {
                 resolved = .completeSet

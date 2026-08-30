@@ -51,6 +51,8 @@ enum DecoderFactory {
             return try SIDDecoder(path: path, sampleRate: sampleRate)
         case "openmpt":
             return try OpenMPTDecoder(path: path, sampleRate: sampleRate)
+        case "amiga-uade":
+            return try AmigaDecoder(path: path, sampleRate: sampleRate)
         case "libvgm":
             return try VGMDecoder(path: path, sampleRate: sampleRate)
         case "psgplay":

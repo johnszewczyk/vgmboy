@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "lastReviewed": "2026-08-29",
+  "lastReviewed": "2026-08-30",
   "reviewIntervalDays": 90,
   "policy": "Review upstream milestones quarterly and before a release. Do not adopt a decoder update without the format regression corpus and representative playback checks.",
   "plugins": [
@@ -20,6 +20,7 @@
       "kind": "git",
       "source": "vendor/libvgm",
       "current": "867223e7c33d63de115d1ab955f784c44f19040a",
+      "sourceIdentity": "git commit",
       "upstream": "https://github.com/ValleyBell/libvgm.git",
       "milestoneCheck": "release-or-tag",
       "formats": ["VGM", "VGZ", "GYM", "S98", "DRO"]
@@ -30,6 +31,7 @@
       "kind": "git",
       "source": "vendor/psgplay",
       "current": "f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06",
+      "sourceIdentity": "git commit",
       "upstream": "https://github.com/frno7/psgplay.git",
       "milestoneCheck": "release-or-tag",
       "formats": ["SNDH"]
@@ -40,9 +42,21 @@
       "kind": "git",
       "source": "vendor/mdxmini",
       "current": "003531a471c1955f4ed4357d0e2a6cba809c34a0",
+      "sourceIdentity": "git commit plus vendored compatibility source",
       "upstream": "https://github.com/mistydemeo/mdxmini.git",
       "milestoneCheck": "release-or-tag",
       "formats": ["MDX", "PDX"]
+    },
+    {
+      "id": "uade",
+      "name": "UADE",
+      "kind": "homebrew",
+      "formula": "uade",
+      "current": "3.05",
+      "upstream": "https://github.com/dv1/uade",
+      "milestoneCheck": "release-or-tag",
+      "license": "GPL-2.0-only",
+      "formats": ["Amiga EaglePlayer modules", "TFMX", "MED", "custom Amiga players"]
     },
     {
       "id": "vgmstream",
@@ -77,11 +91,13 @@
     {
       "id": "aosdk-qsf",
       "name": "Audio Overload SDK QSF engine",
-      "kind": "snapshot",
+      "kind": "git",
       "source": "vendor/aosdk",
-      "current": "source snapshot; upstream revision not recorded",
+      "current": "e359a6e5154b2ba8499fb1f24a1f5f8a18538a61",
+      "sourceIdentity": "git commit",
       "upstream": "https://github.com/nmlgc/aosdk.git",
       "milestoneCheck": "manual",
+      "patches": ["patches/aosdk-qsf-lifecycle.patch"],
       "formats": ["QSF", "miniQSF"]
     },
     {
@@ -89,7 +105,9 @@
       "name": "mGBA / Highly Complete",
       "kind": "snapshot",
       "source": "vendor/mgba",
-      "current": "0.11.0 snapshot; upstream revision not recorded",
+      "current": "0.11.0",
+      "sourceIdentity": "tree SHA-256",
+      "snapshotDigest": "b7b71f64dab500433f3662b818e3521cf67524dcdee1a9952c1f555629ff55c0",
       "upstream": "https://github.com/mgba-emu/mgba.git",
       "milestoneCheck": "release-or-tag",
       "formats": ["GSF", "miniGSF"]
@@ -99,7 +117,9 @@
       "name": "2sf2wav / DeSmuME DS core",
       "kind": "snapshot",
       "source": "vendor/2sf2wav",
-      "current": "DeSmuME 0.9.9 svn 4608 snapshot; upstream revision not recorded",
+      "current": "DeSmuME 0.9.9 svn 4608",
+      "sourceIdentity": "tree SHA-256",
+      "snapshotDigest": "c3e329f9cf72881d25dabb03b9a89ebd4125ca9bd6d44c26f642589c622a9fb7",
       "upstream": "",
       "milestoneCheck": "manual",
       "formats": ["2SF", "mini2SF"]
@@ -109,7 +129,9 @@
       "name": "PSFLib",
       "kind": "snapshot",
       "source": "vendor/psflib",
-      "current": "source snapshot; upstream revision not recorded",
+      "current": "source snapshot",
+      "sourceIdentity": "tree SHA-256",
+      "snapshotDigest": "c3adb7ea371fbeeedc68b3747c314419b52d9cb46aa0d75f177f428bcdb7d021",
       "upstream": "",
       "milestoneCheck": "manual",
       "formats": ["PSF dependencies"]

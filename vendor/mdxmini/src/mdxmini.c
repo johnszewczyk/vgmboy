@@ -30,6 +30,7 @@
 
 #include "mdxmini.h"
 #include "class.h"
+#include "lzx042.h"
 
 #ifdef USE_NLG
 
@@ -428,6 +429,21 @@ _load_pdx_data(char* name, long* out_length)
   len = (int)fread(buf, 1, len, fp );
   if (len<0) {
     goto error_end;
+  }
+
+  /* PDX sidecars may themselves be whole-file X68000 LZX 0.32/0.42
+   * streams. Decode them before the native PDX table parser sees the bytes. */
+  if (x68k_lzx_looks_like(buf, (size_t)len)) {
+    unsigned char *decoded = NULL;
+    size_t decoded_length = 0;
+    if (x68k_lzx_decode(buf, (size_t)len, &decoded, &decoded_length) != 0
+        || decoded_length > 0x7fffffffU) {
+      free(decoded);
+      goto error_end;
+    }
+    free(buf);
+    buf = decoded;
+    len = (int)decoded_length;
   }
   fclose(fp);
   

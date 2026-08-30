@@ -24,6 +24,8 @@ let qsfBuildDirectory = "\(dependencyRoot)/qsf"
 let psgPlayVendorDirectory = "\(sharedVendorRoot)/psgplay"
 let psgPlayBuildDirectory = "\(dependencyRoot)/psgplay"
 let mdxMiniVendorDirectory = "\(sharedVendorRoot)/mdxmini/src"
+let uadeIncludeDirectory = "/opt/homebrew/opt/uade/include"
+let uadeLibraryDirectory = "/opt/homebrew/opt/uade/lib"
 
 let package = Package(
     name: "VGMBoy",
@@ -37,6 +39,7 @@ let package = Package(
         .executable(name: "vgmboy-electron-bridge", targets: ["VGMBoyElectronBridge"]),
         .executable(name: "vgmboy-highly-complete-inspect", targets: ["VGMBoyHighlyCompleteInspect"]),
         .executable(name: "vgmboy-mdx-inspect", targets: ["VGMBoyMDXInspect"]),
+        .executable(name: "vgmboy-amiga-inspect", targets: ["VGMBoyAmigaInspect"]),
         .executable(name: "VGMBoy", targets: ["VGMBoyApp"])
     ],
     targets: [
@@ -268,6 +271,18 @@ let package = Package(
             ]
         ),
         .target(
+            name: "VGMBoyCUADE",
+            path: "Sources/CUADE",
+            publicHeadersPath: "include",
+            cSettings: [
+                .unsafeFlags(["-I\(uadeIncludeDirectory)"])
+            ],
+            linkerSettings: [
+                .unsafeFlags(["-L\(uadeLibraryDirectory)"]),
+                .linkedLibrary("uade")
+            ]
+        ),
+        .target(
             name: "VGMBoyCAudioUnit",
             path: "Sources/CAudioUnit",
             publicHeadersPath: "include",
@@ -275,7 +290,7 @@ let package = Package(
         ),
         .target(
             name: "VGMBoyKit",
-            dependencies: ["VGMBoyFormatCore", "VGMBoySNDH", "VGMBoyCPSGPlay", "VGMBoyCMDX", "VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCFFmpeg", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCQSF", "VGMBoyCSIDPlayFP", "VGMBoyCOpenMPT", "VGMBoyCAudioUnit"],
+            dependencies: ["VGMBoyFormatCore", "VGMBoySNDH", "VGMBoyCPSGPlay", "VGMBoyCMDX", "VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCFFmpeg", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCQSF", "VGMBoyCSIDPlayFP", "VGMBoyCOpenMPT", "VGMBoyCUADE", "VGMBoyCAudioUnit"],
             linkerSettings: [
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("AudioToolbox")
@@ -295,6 +310,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "VGMBoyMDXInspect",
+            dependencies: ["VGMBoyKit"]
+        ),
+        .executableTarget(
+            name: "VGMBoyAmigaInspect",
             dependencies: ["VGMBoyKit"]
         ),
         .executableTarget(

@@ -34,6 +34,12 @@ for ScanSong's external inspection executables.
 - The MDX scanner handoff is the release `vgmboy-mdx-inspect` product copied to
   `.build/scanner-plugins`; its vendored mdxmini source and compatibility patch
   participate in the scanner input signature.
+- The MDX handoff includes the vendored X68000 LZX 0.32/0.42 decoder. It is
+  applied inside mdxmini for both playback and inspection, so ScanSong does not
+  maintain a second decompressor or rewrite the preserved source library.
+- The Amiga scanner handoff is the release `vgmboy-amiga-inspect` product copied
+  to `.build/scanner-plugins`; it links the Homebrew UADE runtime and uses the
+  same `AmigaFormatManifest` admission source as VGMBoyKit.
 - `Docs/plugin-versions.json` is the canonical milestone inventory for every
   decoder/core input. `scripts/audit-plugin-versions.sh` is read-only and
   reports upstream tags, installed Homebrew versions, missing source trees, and
@@ -45,7 +51,8 @@ for ScanSong's external inspection executables.
 - The vgmstream and QSF scanner executables have a second combined input stamp;
   a warm scanner-plugin build must reuse both products instead of recompiling
   the AOSDK/QSF and vgmstream source trees during every ScanSong package.
-- ScanSong receives the built vgmstream CLI and Highly Complete inspector from VGMBoy; it must not
+- ScanSong receives the built vgmstream CLI, Highly Complete inspector, MDX
+  inspector, and Amiga inspector from VGMBoy; it must not
   copy a CocoaSpice app resource or invoke a CocoaSpice launcher/build entry point.
 - Executable product names must not collide on a case-insensitive filesystem. The CLI is
   `vgmboy-cli`; the GUI app is `VGMBoy`. A `vgmboy` (CLI) vs `VGMBoy` (app) collision silently
@@ -62,14 +69,16 @@ for ScanSong's external inspection executables.
   [aosdk-qsf-lifecycle.patch](/Users/john/Downloads/Code/VGMMan/VGMBoy/patches/aosdk-qsf-lifecycle.patch)
 - [plugin-versions.json](/Users/john/Downloads/Code/VGMMan/VGMBoy/Docs/plugin-versions.json)
 - [audit-plugin-versions.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/audit-plugin-versions.sh)
+- [check-plugin-docs.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/check-plugin-docs.sh)
 
-## Verification State (2026-08-23)
+## Verification State (2026-08-30)
 
 - Clean VGMBoy and ScanSong app bundles built and passed strict deep signature
   verification. A warm dependency pass reused all seven native products and
   staged copies in 0.6 seconds; the scanner-plugin pair also reused its stamp.
 - Archive-backed GameCube playback opened every admitted fixture and rendered
   non-silent PCM. ScanSong's matching inspector/timing fixture passed.
-- The isolated AAC export test currently fails at AudioToolbox format setup
-  with `fmt?` (`1718449215`). This is a retained playback/export issue, not
-  evidence against the GameCube decoder or scanner admission boundary.
+- The AAC export and live-transport interruption tests pass, including three
+  consecutive complete VGMBoy test runs. An earlier `fmt?` AAC result and
+  generation assertion were produced while SwiftPM test invocations overlapped;
+  rerunning the suite serially reproduced neither failure.

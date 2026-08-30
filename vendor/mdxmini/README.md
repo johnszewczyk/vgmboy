@@ -117,3 +117,6 @@ Credits
 * [Daisuke Nagano](http://web.archive.org/web/20101015100349/http://homepage3.nifty.com/StudioBreeze/) - author of the Unix [mdxplay](http://web.archive.org/web/20130217181839/http://homepage3.nifty.com/StudioBreeze/software/mdxplay-e.html)
 * [BouKiCHi](http://clogging.blog57.fc2.com) - author of the mdxmini library, and of the Android mdxplayer
 * [Misty De Meo](http://www.mistys-internet.website) - bugfixes and improvements to mdxmini, current maintainer
+* Mamiya - author of the GPL-2.0 `lzx042.nas` stream decoder mirrored by
+  [FIX94/in_mdx](https://github.com/FIX94/in_mdx); VGMBoy's `lzx042.c` is a
+  bounded C port used for X68000 LZX 0.32/0.42 MDX bodies and PDX banks

@@ -100,7 +100,7 @@ static void store_pdx_data( PDX_DATA *pdx, unsigned char *buf, int buflen ) {
       /* 16bit pcm */
       pdx->tone[num].orig_data = (int *)malloc(sizeof(int)*size/2);
       if (!pdx->tone[num].orig_data) {
-	  printf("%s Error : %d\n" ,__FILE__,__LINE__);
+	  fprintf(stderr, "%s Error : %d\n" ,__FILE__,__LINE__);
 	goto error_end;
       }
       pdx->tone[num].orig_size = size/2;
@@ -109,7 +109,7 @@ static void store_pdx_data( PDX_DATA *pdx, unsigned char *buf, int buflen ) {
 	  d = (int)(buf[address+j*2+0]<<8)+(int)buf[address+j*2+1];
 	  if ( d>=0x8000 ) d-=0x10000;
 	} else {
-	  printf("%s Error : %d\n" ,__FILE__,__LINE__);
+	  fprintf(stderr, "%s Error : %d\n" ,__FILE__,__LINE__);
 	  goto error_end;
 	}
 	pdx->tone[num].orig_data[j] = d*32;
@@ -119,7 +119,7 @@ static void store_pdx_data( PDX_DATA *pdx, unsigned char *buf, int buflen ) {
 	/* raw 16bit pcm */
 	pdx->tone[num].data = (int *)malloc(sizeof(int)*size/2);
 	if (!pdx->tone[num].data) {
-	  printf("%s Error : %d\n" ,__FILE__,__LINE__);
+	  fprintf(stderr, "%s Error : %d\n" ,__FILE__,__LINE__);
 	  goto error_end;
 	}
 	pdx->tone[num].size = size/2;
@@ -128,7 +128,7 @@ static void store_pdx_data( PDX_DATA *pdx, unsigned char *buf, int buflen ) {
 	    d = (int)(buf[address+j*2+0]<<8)+(int)buf[address+j*2+1];
 	    if ( d>=0x8000 ) d-=0x10000;
 	  } else {
-	  printf("%s Error : %d\n" ,__FILE__,__LINE__);
+	  fprintf(stderr, "%s Error : %d\n" ,__FILE__,__LINE__);
 	    goto error_end;
 	  }
 	  pdx->tone[num].data[j] = d*32;
@@ -137,7 +137,7 @@ static void store_pdx_data( PDX_DATA *pdx, unsigned char *buf, int buflen ) {
 	/* adpcm */
 	pdx->tone[num].data = (int *)malloc(sizeof(int)*size*2);
 	if (!pdx->tone[num].data) {
-	  printf("%s Error : %d\n" ,__FILE__,__LINE__);
+	  fprintf(stderr, "%s Error : %d\n" ,__FILE__,__LINE__);
 	  goto error_end;
 	}
 	pdx->tone[num].size = size*2;

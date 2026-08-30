@@ -13,7 +13,7 @@ struct FormatRegistryTests {
         let expectedIDs = [
             "libgme", "libvgm", "psgplay", "mdx", "standard-audio", "ffmpeg-audio",
             "highly-complete", "twosf", "vgmstream", "lazyusf",
-            "playpsf", "qsf", "sidplayfp", "openmpt"
+            "playpsf", "qsf", "sidplayfp", "openmpt", "amiga-uade"
         ]
         #expect(FormatRegistry.playbackDescriptors.map(\.id) == expectedIDs)
 
@@ -155,6 +155,15 @@ struct FormatRegistryTests {
         #expect(FormatRegistry.family(for: "/tmp/music.MDX")?.id == "mdx")
         #expect(FormatRegistry.descriptor(for: "/tmp/music.mdx")?.extensions == ["mdx"])
         #expect(FormatRegistry.family(for: "/tmp/samples.pdx") == nil)
+    }
+
+    @Test("routes Amiga replayer prefixes to UADE without stealing ordinary extensions")
+    func routesAmigaPrefixes() {
+        #expect(FormatRegistry.family(for: "/tmp/mod.xpose-end")?.id == "amiga-uade")
+        #expect(FormatRegistry.family(for: "/tmp/p4x.earth")?.id == "amiga-uade")
+        #expect(FormatRegistry.family(for: "/tmp/music.mod")?.id == "openmpt")
+        #expect(FormatRegistry.family(for: "/tmp/stage.p4x") == nil)
+        #expect(FormatRegistry.archiveMaterializationRequirement(for: ["p4x.earth"]) == .completeSet)
     }
 
     @Test("routes GSF extensions to the Highly Complete family")
@@ -321,6 +330,76 @@ func mdxFixtureUsesNativeDecoder() throws {
     let frames = try decoder.readFrames(4_096)
     #expect(frames.left.count == 4_096)
     #expect(frames.left.contains { abs($0) > 0.0001 } || frames.right.contains { abs($0) > 0.0001 })
+}
+
+@Test(
+    "MDX LZX fixture uses the native decoder and reports timing",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["VGMBoy_MDX_LZX_FIXTURE"] != nil,
+        "Set VGMBoy_MDX_LZX_FIXTURE to run the real X68000 LZX check."
+    )
+)
+func mdxLZXFixtureUsesNativeDecoder() throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBoy_MDX_LZX_FIXTURE"])
+    let decoder = try DecoderFactory.make(path: path)
+    defer { decoder.close() }
+    #expect(decoder.trackCount == 1)
+    let metadata = try decoder.metadata(for: 0)
+    #expect(metadata.system == "Sharp X68000")
+    #expect(metadata.playMs > 0)
+}
+
+@Test(
+    "Amiga fixture opens through UADE and renders PCM",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["VGMBoy_AMIGA_FIXTURE"] != nil,
+        "Set VGMBoy_AMIGA_FIXTURE to run the UADE Amiga check."
+    )
+)
+func amigaFixtureUsesUADE() throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBoy_AMIGA_FIXTURE"])
+    let decoder = try DecoderFactory.make(path: path)
+    defer { decoder.close() }
+    #expect(decoder.systemName == "Commodore Amiga")
+    #expect(decoder.trackCount > 0)
+    try decoder.startTrack(0)
+    let metadata = try decoder.metadata(for: 0)
+    #expect(metadata.system == "Commodore Amiga")
+    var renderedAudio = false
+    for _ in 0..<48 {
+        let frames = try decoder.readFrames(4_096)
+        #expect(frames.left.count == 4_096)
+        if frames.left.contains(where: { abs($0) > 0.0001 })
+            || frames.right.contains(where: { abs($0) > 0.0001 }) {
+            renderedAudio = true
+            break
+        }
+    }
+    #expect(renderedAudio)
+}
+
+@Test(
+    "SPC fixture reports native timing and advances the decoder clock",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["VGMBoy_SPC_FIXTURE"] != nil,
+        "Set VGMBoy_SPC_FIXTURE to run the archive-backed SPC decoder check."
+    )
+)
+func spcFixtureUsesNativeTimingAndClock() throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBoy_SPC_FIXTURE"])
+    let decoder = try GMEDecoder(path: path)
+    defer { decoder.close() }
+
+    #expect(decoder.trackCount > 0)
+    try decoder.startTrack(0)
+    let metadata = try decoder.metadata(for: 0)
+    #expect(metadata.lengthMs > 0 || metadata.playMs > 0)
+    #expect(metadata.naturalPlayMs > 0)
+
+    let before = decoder.absolutePlayedFrames
+    let frames = decoder.readFrames(4_096)
+    #expect(frames.left.count == 4_096)
+    #expect(decoder.absolutePlayedFrames == before + 4_096)
 }
 
 @Test(

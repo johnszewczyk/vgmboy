@@ -263,6 +263,7 @@ struct ContentView: View {
         FormatRegistry.sidplayfpFamily,
         FormatRegistry.libvgmFamily,
         FormatRegistry.openMPTFamily,
+        FormatRegistry.amigaFamily,
         FormatRegistry.highlyCompleteFamily,
         FormatRegistry.twoSFFamily,
         FormatRegistry.vgmstreamFamily,

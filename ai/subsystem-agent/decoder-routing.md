@@ -43,7 +43,12 @@ deliberately exclusive to one family.
   A declared adjacent `.pdx` bank is required, with case-insensitive lookup
   confined to the module's directory. Missing banks fail both inspection and
   playback instead of silently dropping PCM. The bridge reports mdxmini's
-  loop-policy duration in milliseconds and leaves tempo control disabled.
+  loop-policy duration in milliseconds and leaves tempo control disabled. The
+  mdxmini file boundary decodes the X68000 LZX 0.32/0.42 form used by some
+  libraries, preserving the MDX header while replacing only its compressed
+  body and decoding whole-file LZX PDX banks before table parsing. A legacy
+  leading backslash in a PDX basename is normalized narrowly; absolute and
+  traversal paths remain invalid.
 - `hasNaturalEnding == false` (lazyusf/USF and sidplayfp/SID) forces a capped decode window so a looping core can
   never run indefinitely. `TimingPolicy.plan` carries this through `usesNativeEnding`. SID
   metadata currently reports no natural duration, so its normal non-Long-Play window is the

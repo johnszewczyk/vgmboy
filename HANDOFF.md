@@ -1,4 +1,4 @@
-# VGMBoy — WIP Handoff
+# VGMBoy — Current Handoff
 
 Status: **active shared core** — the playback/decoder and scanner-plugin build
 boundary for the CocoaSpice/SPCBoy/ScanSong family.
@@ -8,24 +8,25 @@ archive payloads and generated databases are not committed.
 
 ## What works (verified)
 
-- Core owns the macOS audio device (AVAudioEngine + AVAudioSourceNode) and transport
-  (`PlaybackSession`), with decoder-authoritative position, seek, long play, tempo, and fade.
+- Core owns the macOS audio device through the direct AudioUnit transport and
+  `PlaybackSession`, with decoder-authoritative position, seek, long play,
+  tempo, fade, equalizer, volume, and mono controls.
 - Command line `vgmboy-cli play` and a minimal SwiftUI GUI (`VGMBoy`) are two thin skins.
-- Five decoder families, all end-to-end verified:
-  - `libgme` — NSF (Deathbots, 22 tracks)
-  - `libvgm` — VGZ (Pit Fighter)
-  - `vgmstream` — XA (Bloody Roar loop study)
-  - `lazyusf` — N64 miniusf (Blast Corps; needs its companion `.usflib` beside it)
-  - `playpsf` — PS1 PSF (Resident Evil 3 MAIN00)
+- The active decoder families are routed through one registry: libgme, libvgm,
+  PSGPlay, mdxmini, UADE, vgmstream, LazyUSF, Play!, QSF, Highly Complete,
+  2SF, libsidplayfp, libopenmpt, Core Audio, and FFmpeg-only audio.
+- Representative end-to-end checks cover NSF, VGZ, XA, miniUSF, PSF, SNDH,
+  MDX/PDX, Amiga replayers, QSF, and the scanner-facing inspector products.
 - Session fade DSP now real for real-PCM cores (vgmstream/lazyusf/playpsf) via
   `AudioDecoder.appliesFadeInternally` + `PlaybackSession.applyFadeIfNeeded`. This fixed a latent
   bug where "fade" was just extra playtime for non-internal-fade cores.
 - USF family is `hasNaturalEnding == false`, so it always gets a capped window and can't run forever.
 - Play! PSF uses SPCBoy's computed long play (loop past tagged length only when the window exceeds
   it) plus driver-halt detection.
-- The current VGMBoy suite passes 64 tests across 9 suites. ScanSong's suite
-  passes 46 tests, including the RE2 PSF archive scan and the QSF archive scan
-  when their scanner inspection products are configured.
+- The current VGMBoy suite passes 68 tests across 9 suites. ScanSong's suite
+  passes its current contract and archive tests, including MDX/PDX and Amiga
+  routing checks; real external-inspector tests run when their products and
+  fixtures are configured.
 - RE2 PSF direct decoding produces audio; ScanSong's 75-track PSF archive
   fixture records the expected 43-second play and 10-second fade metadata.
 - The RE2 GameCube archive reaches the vgmstream inspector and passes its
@@ -59,12 +60,12 @@ archive payloads and generated databases are not committed.
   built through VGMBoy. Keep the staged inspector paths part of release
   packaging and continue decoder breadth and fixture coverage as explicit
   format work.
-- Equalizer (signal stage in the core output path).
-- Export WAV→AAC (from CocoaSpice `AudioExportAAC.swift` via AVAssetWriter).
-- Continue playback-core contract cleanup and fixture coverage. CocoaSpice and
-  SPCBoy are already wired to the extracted native transport/request boundaries;
-  remaining app work belongs in explicit parity or format slices, not initial
-  parent-app wiring.
+- Keep `Docs/plugin-versions.json`, `Docs/plugin-catalog.md`, and
+  `vendor/PROVENANCE.md` aligned when a decoder source or system dependency
+  changes. Run the read-only milestone audit before release work.
+- Continue playback-core contract cleanup and fixture coverage. AAC export and
+  live-transport interruption tests are currently green; remaining app work
+  belongs in explicit parity or format slices.
 - ScanSong remains the sole schema-23 catalog writer. ScanSong consumes
   VGMBoy-built inspection outputs, while VGMBoy remains database-free.
 

@@ -6,8 +6,10 @@ VGMBoy is the shared macOS game-music playback core and decoder/plugin owner for
 CocoaSpice, SPCBoy, and ScanSong app family. It owns format routing, decoder integration,
 timing, Long Play, tempo, fade, equalizer processing, and the audio device.
 
-The repository is database-free. CocoaSpice links `VGMBoyKit` in-process, SPCBoy bundles the
-same core as `vgmboy-electron-bridge`, and ScanSong receives VGMBoy-built inspection executables.
+The repository is database-free. CocoaSpice and the active native SPCBoyWK frontend link
+`VGMBoyKit` in-process through their host-specific adapters. The archived Electron SPCBoy path
+uses the separate `vgmboy-electron-bridge` compatibility target; it is not the source of native
+SPCBoyWK behavior. ScanSong receives VGMBoy-built inspection executables.
 
 ## Major Components
 
@@ -19,8 +21,10 @@ same core as `vgmboy-electron-bridge`, and ScanSong receives VGMBoy-built inspec
   and presentation state.
 - `Sources/VGMBoyEndpointCore` — the platform-neutral versioned endpoint and
   capability map that native and non-native frontends can mirror.
-- `Sources/VGMBoyElectronBridge` and `Sources/VGMBoyHighlyCompleteInspect` — narrow process
-  boundaries used by SPCBoy and ScanSong.
+- `Sources/VGMBoyElectronBridge` — the retained narrow process boundary for the archived
+  Electron SPCBoy path; native SPCBoyWK does not use it.
+- `Sources/VGMBoyHighlyCompleteInspect`, `Sources/VGMBoyMDXInspect`, and
+  `Sources/VGMBoyAmigaInspect` — narrow inspection boundaries used by ScanSong.
 - `Sources/vgmboy` and `Sources/VGMBoyApp` — command-line and native test clients.
 - `vendor/`, `patches/`, and `scripts/` — shared upstream source, compatibility patches, and
   dependency/scanner-plugin build inputs.
@@ -45,9 +49,11 @@ same core as `vgmboy-electron-bridge`, and ScanSong receives VGMBoy-built inspec
 ## Local Rules
 
 - VGMBoy owns the macOS audio device, decoded transport, timing, and equalizer; front-ends own queue policy and their user interfaces.
-- Piece out the best bridge cores from SPCBoy and CocoaSpice; never fork the shared upstream
-  decoder libraries per app. Bridge glue and compiled dependency staging belong to VGMBoy. A frontend removes its old bridge objects before
-  linking VGMBoyKit; duplicate bridge implementations are a deliberate linker error.
+- CocoaSpice is the behavioral reference for shared playback work; promote a behavior into
+  VGMBoy only after characterization, then link active SPCBoyWK to that shared boundary. Never
+  fork the upstream decoder libraries per app. Bridge glue and compiled dependency staging belong
+  to VGMBoy. A native frontend removes its old bridge objects before linking VGMBoyKit; duplicate
+  bridge implementations are a deliberate linker error.
 - Use boring, simple vanilla features. Fail hard and loud: unsupported input is an explicit error,
   never an invented track.
 - Keep the kit's public API surface small and deliberate; the CLI and the SwiftUI app are two thin
@@ -62,3 +68,6 @@ same core as `vgmboy-electron-bridge`, and ScanSong receives VGMBoy-built inspec
 
 - `ai/subsystem-human/` is the human-facing behavior reference.
 - `README.md` contains the current supported-decoder and build overview.
+- `Docs/plugin-catalog.md` contains the human-readable decoder, scanner,
+  dependency, provenance, and format-boundary matrix; exact pins remain in
+  `Docs/plugin-versions.json`.
