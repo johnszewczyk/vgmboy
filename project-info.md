@@ -2,8 +2,9 @@
 
 ## Product
 
-`VGMMan` is the coordination workspace for the game-music application family.
-It is not an umbrella Git repository or a second owner of product behavior.
+`VGMMan` is the single-root repository for the game-music application family.
+The child directories remain explicit component boundaries, but their source,
+tests, and coordination documents share one Git history.
 
 ## Major Components
 
@@ -36,14 +37,15 @@ It is not an umbrella Git repository or a second owner of product behavior.
 
 ## Local Rules
 
-- Preserve the six independent Git histories and worktrees.
+- Preserve the six component ownership and build boundaries inside the single
+  Git history.
 - Shared behavior belongs in the narrow owning package, not copied between
   frontends.
 - Catalog writes belong only to ScanSong; player frontends are read-only.
 - Decoder, timing, and audio ownership belong to VGMBoy.
 - Frontend-specific AppKit, SwiftUI, WebKit, focus, and selection presentation
   stay in the owning frontend.
-- Verify cross-repository work against exact child revisions and dirty states.
+- Verify cross-component work against the monorepo commit and component paths.
 - Compilation alone does not prove packaged, visible, or audible behavior.
 
 ## Human Docs

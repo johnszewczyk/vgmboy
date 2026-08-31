@@ -1,8 +1,8 @@
 # VGMMan
 
-VGMMan is the local workspace for the game-music application family. It is an
-organizational parent, not an umbrella Git repository: every child directory
-below keeps its own repository, history, build script, and release boundary.
+VGMMan is the single Git repository for the game-music application family.
+Every child directory keeps its own package boundary, build script, and release
+boundary while sharing the family root's history.
 
 ## Projects
 

@@ -10,7 +10,7 @@ PROJECTS=(CatalogReader VGMBoy FrontendCore ScanSong CocoaSpice SPCBoyWK)
 usage() {
   echo "Usage: $0 [--inventory-only] [--output-dir PATH]"
   echo
-  echo "Records exact source/tool state for all six VGMMan repositories."
+  echo "Records exact source/tool state for all six VGMMan components."
   echo "The default mode also runs the family package and renderer checks."
 }
 
@@ -75,34 +75,42 @@ record_repository() {
   local untracked_file="$STATE_DIR/$project.untracked-sha256"
   local submodule_file="$STATE_DIR/$project.submodules"
   local branch head upstream ahead behind dirty_count patch_hash untracked_hash submodule_hash
+  local git_root="$repository"
+  local file_root="$repository"
+  local -a scope_args=(.)
 
   if ! git -C "$repository" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    echo "Not a Git worktree: $repository" >&2
-    exit 1
+    git_root="$FAMILY_ROOT"
+    file_root="$FAMILY_ROOT"
+    scope_args=("$project")
+    if ! git -C "$git_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      echo "Not a Git worktree: $repository or $FAMILY_ROOT" >&2
+      exit 1
+    fi
   fi
 
-  git -C "$repository" status --porcelain=v1 -uall > "$status_file"
-  git -C "$repository" diff --binary HEAD > "$patch_file"
-  git -C "$repository" submodule status --recursive > "$submodule_file" 2>/dev/null || true
+  git -C "$git_root" status --porcelain=v1 -uall -- "${scope_args[@]}" > "$status_file"
+  git -C "$git_root" diff --binary HEAD -- "${scope_args[@]}" > "$patch_file"
+  git -C "$git_root" submodule status --recursive > "$submodule_file" 2>/dev/null || true
 
   : > "$untracked_file"
   while IFS= read -r untracked_path; do
     [[ -n "$untracked_path" ]] || continue
-    if [[ -f "$repository/$untracked_path" ]]; then
-      printf '%s  %s\n' "$(shasum -a 256 "$repository/$untracked_path" | awk '{print $1}')" "$untracked_path" >> "$untracked_file"
+    if [[ -f "$file_root/$untracked_path" ]]; then
+      printf '%s  %s\n' "$(shasum -a 256 "$file_root/$untracked_path" | awk '{print $1}')" "$untracked_path" >> "$untracked_file"
     else
       printf '%s  %s\n' "NONREGULAR" "$untracked_path" >> "$untracked_file"
     fi
-  done < <(git -C "$repository" ls-files --others --exclude-standard | LC_ALL=C sort)
+  done < <(git -C "$git_root" ls-files --others --exclude-standard -- "${scope_args[@]}" | LC_ALL=C sort)
 
-  branch="$(git -C "$repository" branch --show-current)"
+  branch="$(git -C "$git_root" branch --show-current)"
   [[ -n "$branch" ]] || branch="DETACHED"
-  head="$(git -C "$repository" rev-parse HEAD)"
-  upstream="$(git -C "$repository" rev-parse --abbrev-ref '@{upstream}' 2>/dev/null || true)"
+  head="$(git -C "$git_root" rev-parse HEAD)"
+  upstream="$(git -C "$git_root" rev-parse --abbrev-ref '@{upstream}' 2>/dev/null || true)"
   ahead=0
   behind=0
   if [[ -n "$upstream" ]]; then
-    read -r ahead behind < <(git -C "$repository" rev-list --left-right --count "HEAD...$upstream")
+    read -r ahead behind < <(git -C "$git_root" rev-list --left-right --count "HEAD...$upstream")
   fi
   dirty_count="$(wc -l < "$status_file" | tr -d ' ')"
   patch_hash="$(hash_file "$patch_file")"
@@ -199,9 +207,9 @@ fi
     echo "- Failures: $failure_count"
   fi
   echo
-  echo "The source-state directory contains the porcelain status, binary Git patch,"
+  echo "The source-state directory contains component status, binary Git patch,"
   echo "untracked-file hashes, and submodule state used to derive each manifest hash."
-  echo "It records dirty state without copying untracked source payloads."
+  echo "It records working-tree state without copying untracked source payloads."
 } > "$SUMMARY"
 
 echo "Verification evidence: $RESULT_ROOT"
