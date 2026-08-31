@@ -1,0 +1,20 @@
+{
+	"id": "idolm",
+	"name": "The iDOLM@STER/偶像大师",
+	"driver": "sys246",
+	"dongle":
+	{
+		"name": "NM00022 IDMS1, Ver.D a026061343464a [Station].bin"
+	},
+	"hdd":
+	{
+		"name": "NM00022 IDM1-HA (HDD).chd"
+	},
+	"inputMode": "touch",
+	"screenPosXform": [ 65535, 0, -65535, 0 ],
+	"eeFrequencyScale": [4, 3],
+	"boot": "ac0:IDLLOAD",
+	"patches":
+	[
+	]
+}

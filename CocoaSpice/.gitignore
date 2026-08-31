@@ -1,0 +1,25 @@
+.DS_Store
+
+# SwiftPM and local build output
+.build/
+
+# Generated distribution artifacts
+dist/
+*.tar.gz
+
+# Generated lazyusf2 objects and archives
+vendor/lazyusf2/**/*.o
+vendor/lazyusf2/*.a
+vendor/lazyusf2/bench
+vendor/lazyusf2/dumpresampled
+
+# Generated 2sf2wav objects and archives
+vendor/2sf2wav/**/*.o
+vendor/2sf2wav/*.a
+
+# Local editor and OS metadata
+.idea/
+.vscode/
+
+# Local playback fixtures are intentionally not source artifacts.
+Silent Hill 2 (EMU).zophar.zip

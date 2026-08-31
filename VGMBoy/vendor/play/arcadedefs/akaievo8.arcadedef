@@ -1,0 +1,40 @@
+{
+	"id": "akaievo8",
+	"parent": "akaievo",
+	"name": "Animal Kaiser Evolution 8",
+	"driver": "sys147",
+	"boot": "atfile0:main.elf",
+	"patches":
+	[
+		{
+			"address": "0x001021E8",
+			"value": "0x0",
+			"description": "Prevent storing dispenser jammed & no cards"
+		},
+		{
+			"address": "0x00102208",
+			"value": "0x0",
+			"description": "Prevent storing dispenser jammed & no cards"
+		},
+		{
+			"address": "0x0015FA18",
+			"value": "0x0",
+			"description": "Fake IC card key parity & checksum success"
+		},
+		{
+			"address": "0x0015FC20",
+			"value": "0x0",
+			"description": "Fake IC card key parity & checksum success"
+		},
+		{
+			"address": "0x001D8A0C",
+			"value": "0x24027FFF",
+			"description": "Set audio level to 7"
+		},
+		{
+			"address": "0x001051b4",
+			"value": "0x240F0578",
+			"description": "Evo 8"
+		}
+	]
+}

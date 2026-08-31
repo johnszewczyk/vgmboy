@@ -1,0 +1,175 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{193DF815-8F87-4285-A634-89A786A720B3}</ProjectGuid>
+    <RootNamespace>MediaCenter</RootNamespace>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="GeneralSettings.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="GeneralSettings.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>11.0.51106.1</_ProjectFileVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
+    <IntDir>$(Configuration)\</IntDir>
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
+    <IntDir>$(Configuration)\</IntDir>
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <PrecompiledHeader />
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <PrecompiledHeader />
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\Source\Log.cpp" />
+    <ClCompile Include="..\Source\Ac3SoundStreamDecoder.cpp" />
+    <ClCompile Include="..\Source\AppConfig.cpp" />
+    <ClCompile Include="..\Source\LogSettings.cpp" />
+    <ClCompile Include="..\Source\ProgramStreamDecoder.cpp" />
+    <ClCompile Include="..\Source\RawMpeg2Container.cpp" />
+    <ClCompile Include="..\Source\VideoDecoder.cpp" />
+    <ClCompile Include="..\Source\VideoStream_Decoder.cpp" />
+    <ClCompile Include="..\Source\VideoStream_ReadBlock.cpp" />
+    <ClCompile Include="..\Source\VideoStream_ReadDcDifferential.cpp" />
+    <ClCompile Include="..\Source\VideoStream_ReadDct.cpp" />
+    <ClCompile Include="..\Source\VideoStream_ReadGroupOfPicturesHeader.cpp" />
+    <ClCompile Include="..\Source\VideoStream_ReadMacroblock.cpp" />
+    <ClCompile Include="..\Source\VideoStream_ReadMacroblockModes.cpp" />
+    <ClCompile Include="..\Source\VideoStream_ReadMotionVector.cpp" />
+    <ClCompile Include="..\Source\VideoStream_ReadMotionVectors.cpp" />
+    <ClCompile Include="..\Source\VideoStream_ReadPictureCodingExtension.cpp" />
+    <ClCompile Include="..\Source\VideoStream_ReadPictureHeader.cpp" />
+    <ClCompile Include="..\Source\VideoStream_ReadSequenceExtension.cpp" />
+    <ClCompile Include="..\Source\VideoStream_ReadSequenceHeader.cpp" />
+    <ClCompile Include="..\Source\VideoStream_ReadSlice.cpp" />
+    <ClCompile Include="..\Source\WavOutputStream.cpp" />
+    <ClCompile Include="..\Source\win32ui\FrameBufferWindow.cpp" />
+    <ClCompile Include="..\Source\win32ui\Main.cpp" />
+    <ClCompile Include="..\Source\win32ui\MainWindow.cpp" />
+    <ClCompile Include="..\Source\XaSoundStreamDecoder.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\Framework\build_win32\Framework.vcxproj">
+      <Project>{553ce050-a97e-4e6e-ae84-057a1f0fa45d}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\..\Framework\build_win32\FrameworkOpenGl.vcxproj">
+      <Project>{482892bb-6d81-4ca4-bfd5-01a756c21292}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\Source\Log.h" />
+    <ClInclude Include="..\Source\Ac3SoundStreamDecoder.h" />
+    <ClInclude Include="..\Source\AppConfig.h" />
+    <ClInclude Include="..\Source\LogSettings.h" />
+    <ClInclude Include="..\Source\MpegVideoState.h" />
+    <ClInclude Include="..\Source\ProgramStreamDecoder.h" />
+    <ClInclude Include="..\Source\RawMpeg2Container.h" />
+    <ClInclude Include="..\Source\VideoContainer.h" />
+    <ClInclude Include="..\Source\VideoDecoder.h" />
+    <ClInclude Include="..\Source\VideoStream_Decoder.h" />
+    <ClInclude Include="..\Source\VideoStream_Program.h" />
+    <ClInclude Include="..\Source\VideoStream_ReadBlock.h" />
+    <ClInclude Include="..\Source\VideoStream_ReadDcDifferential.h" />
+    <ClInclude Include="..\Source\VideoStream_ReadDct.h" />
+    <ClInclude Include="..\Source\VideoStream_ReadGroupOfPicturesHeader.h" />
+    <ClInclude Include="..\Source\VideoStream_ReadMacroblock.h" />
+    <ClInclude Include="..\Source\VideoStream_ReadMacroblockModes.h" />
+    <ClInclude Include="..\Source\VideoStream_ReadMotionVector.h" />
+    <ClInclude Include="..\Source\VideoStream_ReadMotionVectors.h" />
+    <ClInclude Include="..\Source\VideoStream_ReadPictureCodingExtension.h" />
+    <ClInclude Include="..\Source\VideoStream_ReadPictureHeader.h" />
+    <ClInclude Include="..\Source\VideoStream_ReadSequenceExtension.h" />
+    <ClInclude Include="..\Source\VideoStream_ReadSequenceHeader.h" />
+    <ClInclude Include="..\Source\VideoStream_ReadSlice.h" />
+    <ClInclude Include="..\Source\VideoStream_ReadStructure.h" />
+    <ClInclude Include="..\Source\WavOutputStream.h" />
+    <ClInclude Include="..\Source\win32ui\FrameBufferWindow.h" />
+    <ClInclude Include="..\Source\win32ui\MainWindow.h" />
+    <ClInclude Include="..\Source\XaSoundStreamDecoder.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\Source\win32ui\Res.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="nuget.config" />
+    <None Include="packages.config" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\..\..\..\NuGetPackages\boost.1.60.0.0\build\native\boost.targets" Condition="Exists('..\..\..\..\NuGetPackages\boost.1.60.0.0\build\native\boost.targets')" />
+    <Import Project="..\..\..\..\NuGetPackages\boost_filesystem-vc140.1.60.0.0\build\native\boost_filesystem-vc140.targets" Condition="Exists('..\..\..\..\NuGetPackages\boost_filesystem-vc140.1.60.0.0\build\native\boost_filesystem-vc140.targets')" />
+    <Import Project="..\..\..\..\NuGetPackages\boost_system-vc140.1.60.0.0\build\native\boost_system-vc140.targets" Condition="Exists('..\..\..\..\NuGetPackages\boost_system-vc140.1.60.0.0\build\native\boost_system-vc140.targets')" />
+    <Import Project="..\..\..\..\NuGetPackages\glew.v140.1.12.0\build\native\glew.v140.targets" Condition="Exists('..\..\..\..\NuGetPackages\glew.v140.1.12.0\build\native\glew.v140.targets')" />
+  </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\..\..\..\NuGetPackages\boost.1.60.0.0\build\native\boost.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\..\..\NuGetPackages\boost.1.60.0.0\build\native\boost.targets'))" />
+    <Error Condition="!Exists('..\..\..\..\NuGetPackages\boost_filesystem-vc140.1.60.0.0\build\native\boost_filesystem-vc140.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\..\..\NuGetPackages\boost_filesystem-vc140.1.60.0.0\build\native\boost_filesystem-vc140.targets'))" />
+    <Error Condition="!Exists('..\..\..\..\NuGetPackages\boost_system-vc140.1.60.0.0\build\native\boost_system-vc140.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\..\..\NuGetPackages\boost_system-vc140.1.60.0.0\build\native\boost_system-vc140.targets'))" />
+    <Error Condition="!Exists('..\..\..\..\NuGetPackages\glew.v140.1.12.0\build\native\glew.v140.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\..\..\NuGetPackages\glew.v140.1.12.0\build\native\glew.v140.targets'))" />
+  </Target>
+</Project>

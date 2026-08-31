@@ -1,0 +1,351 @@
+#include "play_psf_bridge.h"
+
+#include "PsfBase.h"
+#include "PsfLoader.h"
+#include "PsfPathToken.h"
+#include "PsfPlayerAppConfig.h"
+#include "PsfTags.h"
+#include "PsfVm.h"
+#include "sound/SoundHandler.h"
+#include "StdStream.h"
+#include "StdStreamUtils.h"
+
+#include <algorithm>
+#include <chrono>
+#include <condition_variable>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+namespace {
+
+constexpr int kSampleRate = 44100;
+constexpr size_t kBufferedFrameCapacity = kSampleRate;
+constexpr size_t kPsfWriteBlockSamples = 44 * 2 * 10;
+constexpr auto kInitialAudioWait = std::chrono::seconds(5);
+constexpr auto kSteadyStateAudioWait = std::chrono::milliseconds(250);
+
+class CaptureSoundHandler final : public CSoundHandler {
+public:
+    CaptureSoundHandler()
+        : m_samples(kBufferedFrameCapacity * 2) {
+    }
+
+    void Reset() override {
+        std::lock_guard lock(m_mutex);
+        m_readIndex = 0;
+        m_writeIndex = 0;
+        m_sampleCount = 0;
+        m_hasProducedAudio = false;
+        m_errorMessage.clear();
+        m_condition.notify_all();
+    }
+
+    void Write(int16_t* samples, unsigned int sampleCount, unsigned int sampleRate) override {
+        if(sampleRate != kSampleRate) return;
+        std::lock_guard lock(m_mutex);
+        // HasFreeBuffers is queried by the emulator before every fixed-size
+        // write. Never block the VM thread here: Pause and teardown are mailbox
+        // operations that must be allowed to reach that same thread.
+        if((m_samples.size() - m_sampleCount) < sampleCount) return;
+        for(size_t index = 0; index < sampleCount; index++) {
+            m_samples[m_writeIndex] = samples[index];
+            m_writeIndex = (m_writeIndex + 1) % m_samples.size();
+        }
+        m_sampleCount += sampleCount;
+        m_hasProducedAudio = true;
+        m_condition.notify_all();
+    }
+
+    bool HasFreeBuffers() override {
+        std::lock_guard lock(m_mutex);
+        return (m_samples.size() - m_sampleCount) >= kPsfWriteBlockSamples;
+    }
+    void RecycleBuffers() override {}
+
+    void Fail(const std::string& message) {
+        std::lock_guard lock(m_mutex);
+        m_errorMessage = message;
+        m_condition.notify_all();
+    }
+
+    int32_t Read(int16_t* output, int32_t frameCount) {
+        std::unique_lock lock(m_mutex);
+        if(!m_errorMessage.empty()) return -1;
+        const auto wait = m_hasProducedAudio ? kSteadyStateAudioWait : kInitialAudioWait;
+        m_condition.wait_for(lock, wait, [&] {
+            return m_sampleCount >= static_cast<size_t>(frameCount) * 2 || !m_errorMessage.empty();
+        });
+        if(!m_errorMessage.empty()) return -1;
+        const auto availableFrames = static_cast<int32_t>(m_sampleCount / 2);
+        const auto frames = std::min(frameCount, availableFrames);
+        const auto samplesToRead = static_cast<size_t>(frames) * 2;
+        for(size_t index = 0; index < samplesToRead; index++) {
+            output[index] = m_samples[m_readIndex];
+            m_readIndex = (m_readIndex + 1) % m_samples.size();
+        }
+        m_sampleCount -= samplesToRead;
+        m_condition.notify_all();
+        return frames;
+    }
+
+    int64_t BufferedFrames() const {
+        std::lock_guard lock(m_mutex);
+        return static_cast<int64_t>(m_sampleCount / 2);
+    }
+
+private:
+    mutable std::mutex m_mutex;
+    std::condition_variable m_condition;
+    std::vector<int16_t> m_samples;
+    size_t m_readIndex = 0;
+    size_t m_writeIndex = 0;
+    size_t m_sampleCount = 0;
+    bool m_hasProducedAudio = false;
+    std::string m_errorMessage;
+};
+
+struct Metadata {
+    CPsfBase::TagMap tags;
+    std::map<std::string, std::string> exportedTags;
+    int64_t playLengthFrames = 0;
+    int64_t fadeLengthFrames = 0;
+    std::string systemName;
+
+    explicit Metadata(const char* filePath) {
+        if(!filePath || !filePath[0]) throw std::runtime_error("PSF path is empty");
+        auto stream = Framework::CreateInputStdStream(fs::path(filePath).native());
+        CPsfBase psfFile(stream);
+        switch(psfFile.GetVersion()) {
+        case CPsfBase::VERSION_PLAYSTATION:
+            systemName = "PlayStation";
+            break;
+        case CPsfBase::VERSION_PLAYSTATION2:
+            systemName = "PlayStation 2";
+            break;
+        default:
+            throw std::runtime_error("File is not a supported PlayStation PSF");
+        }
+        tags.insert(psfFile.GetTagsBegin(), psfFile.GetTagsEnd());
+        exportedTags.insert(tags.begin(), tags.end());
+        playLengthFrames = ParseTimeFrames(tags, "length");
+        fadeLengthFrames = ParseTimeFrames(tags, "fade");
+    }
+
+    static int64_t ParseTimeFrames(const CPsfBase::TagMap& values, const char* name) {
+        const auto it = values.find(name);
+        if(it == values.end()) return 0;
+        try {
+            const auto wideLength = CPsfPathToken::WidenString(it->second);
+            return static_cast<int64_t>(CPsfTags::ConvertTimeString(wideLength.c_str()) * kSampleRate);
+        } catch(...) {
+            return 0;
+        }
+    }
+};
+
+struct Player {
+    CPsfVm vm;
+    std::mutex soundMutex;
+    std::condition_variable soundCondition;
+    CaptureSoundHandler* sound = nullptr;
+    CPsfBase::TagMap tags;
+    std::map<std::string, std::string> exportedTags;
+    std::string path;
+    std::string systemName;
+    int64_t playedFrames = 0;
+    int64_t playLengthFrames = 0;
+    int64_t fadeLengthFrames = 0;
+    bool longPlay = false;
+
+    void HandleVmError(const std::string& message) {
+        CaptureSoundHandler* handler;
+        {
+            std::lock_guard lock(soundMutex);
+            handler = sound;
+        }
+        if(handler) handler->Fail(message);
+        soundCondition.notify_all();
+    }
+
+    CaptureSoundHandler* WaitForSoundHandler() {
+        std::unique_lock lock(soundMutex);
+        soundCondition.wait_for(lock, kInitialAudioWait, [this] {
+            return sound != nullptr || vm.HasError();
+        });
+        return sound;
+    }
+
+    void InstallSoundHandler(CaptureSoundHandler* handler) {
+        {
+            std::lock_guard lock(soundMutex);
+            sound = handler;
+        }
+        const auto error = vm.GetErrorMessage();
+        if(!error.empty()) handler->Fail(error);
+        soundCondition.notify_all();
+    }
+
+    explicit Player(const char* filePath)
+        : path(filePath ? filePath : "") {
+        if(path.empty()) throw std::runtime_error("PSF path is empty");
+        vm.SetErrorHandler([this](const std::string& message) { HandleVmError(message); });
+        Metadata metadata(path.c_str());
+        systemName = metadata.systemName;
+        const auto token = CPhysicalPsfStreamProvider::GetPathTokenFromFilePath(fs::path(path));
+        vm.SetSpuHandler([this] {
+            auto* handler = new CaptureSoundHandler();
+            InstallSoundHandler(handler);
+            return handler;
+        });
+        CPsfLoader::LoadPsf(vm, token, fs::path(), &tags);
+        vm.SetReverbEnabled(true);
+        for(const auto& [key, value] : tags) exportedTags.emplace(key, value);
+        playLengthFrames = Metadata::ParseTimeFrames(tags, "length");
+        fadeLengthFrames = Metadata::ParseTimeFrames(tags, "fade");
+        vm.Resume();
+    }
+
+    ~Player() { vm.Pause(); }
+
+};
+
+} // namespace
+
+extern "C" void* vgmboy_play_psf_open(const char* path) {
+    try { return new Player(path); } catch(...) { return nullptr; }
+}
+
+extern "C" void vgmboy_play_psf_close(void* handle) { delete static_cast<Player*>(handle); }
+
+extern "C" int32_t vgmboy_play_psf_read(void* handle, int16_t* output, int32_t frameCount) {
+    if(!handle || !output || frameCount <= 0) return -1;
+    auto* player = static_cast<Player*>(handle);
+    if(player->vm.HasError()) return -1;
+    // The shared stream session owns the post-length fade. Continue decoding
+    // real PCM through that window; substituting silence here made the app
+    // fade six seconds of silence instead of the actual PSF audio.
+    // Some PSF rips, including Resident Evil 2, install their SPU handler
+    // shortly after VM resume. Returning silence during that window makes the
+    // frontend believe playback began even though no source audio exists.
+    // Wait once for the handler, then let its own bounded PCM wait govern
+    // steady-state reads.
+    auto* sound = player->WaitForSoundHandler();
+    if(!sound) return player->vm.HasError() ? -1 : 0;
+    const auto frames = sound->Read(output, frameCount);
+    player->playedFrames += frames;
+    return frames;
+}
+
+extern "C" const char* vgmboy_play_psf_error(void* handle) {
+    if(!handle) return nullptr;
+    static thread_local std::string message;
+    message = static_cast<Player*>(handle)->vm.GetErrorMessage();
+    return message.empty() ? nullptr : message.c_str();
+}
+
+extern "C" void vgmboy_play_psf_set_long_play(void* handle, int32_t enabled) {
+    if(handle) static_cast<Player*>(handle)->longPlay = enabled != 0;
+}
+
+extern "C" int32_t vgmboy_play_psf_seek(void* handle, int64_t frame) {
+    if(!handle || frame < 0) return -1;
+    auto* player = static_cast<Player*>(handle);
+    player->vm.Pause();
+    player->vm.Reset();
+    {
+        std::lock_guard lock(player->soundMutex);
+        player->sound = nullptr;
+    }
+    const auto token = CPhysicalPsfStreamProvider::GetPathTokenFromFilePath(fs::path(player->path));
+    try {
+        player->tags.clear();
+        player->vm.SetSpuHandler([player] {
+            auto* handler = new CaptureSoundHandler();
+            player->InstallSoundHandler(handler);
+            return handler;
+        });
+        CPsfLoader::LoadPsf(player->vm, token, fs::path(), &player->tags);
+        player->vm.SetReverbEnabled(true);
+        player->vm.Resume();
+        player->playedFrames = 0;
+        std::vector<int16_t> scratch(2048 * 2);
+        while(player->playedFrames < frame) {
+            const auto requested = static_cast<int32_t>(std::min<int64_t>(2048, frame - player->playedFrames));
+            const auto read = vgmboy_play_psf_read(player, scratch.data(), requested);
+            if(read <= 0) break;
+        }
+        return 0;
+    } catch(...) { return -1; }
+}
+
+extern "C" void vgmboy_play_psf_set_suspended(void* handle, int32_t suspended) {
+    if(!handle) return;
+    auto* player = static_cast<Player*>(handle);
+    if(suspended) {
+        player->vm.Pause();
+    } else {
+        player->vm.Resume();
+    }
+}
+
+extern "C" int32_t vgmboy_play_psf_finished(void* handle) {
+    if(!handle) return 1;
+    auto* player = static_cast<Player*>(handle);
+    return !player->longPlay
+        && player->playLengthFrames > 0
+        && player->playedFrames >= player->playLengthFrames;
+}
+
+extern "C" int64_t vgmboy_play_psf_played_frames(void* handle) {
+    return handle ? static_cast<Player*>(handle)->playedFrames : 0;
+}
+
+extern "C" int64_t vgmboy_play_psf_play_length_frames(void* handle) {
+    return handle ? static_cast<Player*>(handle)->playLengthFrames : 0;
+}
+
+extern "C" int64_t vgmboy_play_psf_fade_length_frames(void* handle) {
+    return handle ? static_cast<Player*>(handle)->fadeLengthFrames : 0;
+}
+
+extern "C" const char* vgmboy_play_psf_tag(void* handle, const char* name) {
+    if(!handle || !name) return nullptr;
+    auto& tags = static_cast<Player*>(handle)->exportedTags;
+    const auto it = tags.find(name);
+    return it == tags.end() ? nullptr : it->second.c_str();
+}
+
+extern "C" const char* vgmboy_play_psf_system_name(void* handle) {
+    return handle ? static_cast<Player*>(handle)->systemName.c_str() : nullptr;
+}
+
+extern "C" void* vgmboy_play_psf_metadata_open(const char* path) {
+    try { return new Metadata(path); } catch(...) { return nullptr; }
+}
+
+extern "C" void vgmboy_play_psf_metadata_close(void* handle) {
+    delete static_cast<Metadata*>(handle);
+}
+
+extern "C" int64_t vgmboy_play_psf_metadata_play_length_frames(void* handle) {
+    return handle ? static_cast<Metadata*>(handle)->playLengthFrames : 0;
+}
+
+extern "C" int64_t vgmboy_play_psf_metadata_fade_length_frames(void* handle) {
+    return handle ? static_cast<Metadata*>(handle)->fadeLengthFrames : 0;
+}
+
+extern "C" const char* vgmboy_play_psf_metadata_tag(void* handle, const char* name) {
+    if(!handle || !name) return nullptr;
+    auto& tags = static_cast<Metadata*>(handle)->exportedTags;
+    const auto it = tags.find(name);
+    return it == tags.end() ? nullptr : it->second.c_str();
+}
+
+extern "C" const char* vgmboy_play_psf_metadata_system_name(void* handle) {
+    return handle ? static_cast<Metadata*>(handle)->systemName.c_str() : nullptr;
+}

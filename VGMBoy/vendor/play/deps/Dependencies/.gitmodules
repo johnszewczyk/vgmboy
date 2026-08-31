@@ -1,0 +1,15 @@
+[submodule "SDWebImage"]
+	path = SDWebImage
+	url = https://github.com/rs/SDWebImage.git
+[submodule "ghc_filesystem"]
+	path = ghc_filesystem
+	url = https://github.com/gulrak/filesystem.git
+[submodule "zstd"]
+	path = zstd
+	url = https://github.com/facebook/zstd.git
+[submodule "xxHash"]
+	path = xxHash
+	url = https://github.com/Cyan4973/xxHash.git
+[submodule "zlib"]
+	path = zlib
+	url = https://github.com/madler/zlib.git

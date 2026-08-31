@@ -1,0 +1,424 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\src\Base64.cpp" />
+    <ClCompile Include="..\src\bitmap\Bitmap.cpp" />
+    <ClCompile Include="..\src\bitmap\BMP.cpp" />
+    <ClCompile Include="..\src\bitmap\JPEG.cpp" />
+    <ClCompile Include="..\src\bitmap\PNG.cpp" />
+    <ClCompile Include="..\src\bitmap\TGA.cpp" />
+    <ClCompile Include="..\src\BitStream.cpp" />
+    <ClCompile Include="..\src\Config.cpp" />
+    <ClCompile Include="..\src\Endian.cpp" />
+    <ClCompile Include="..\src\GZipStream.cpp" />
+    <ClCompile Include="..\src\idct\IEEE1180.cpp" />
+    <ClCompile Include="..\src\idct\TrivialC.cpp" />
+    <ClCompile Include="..\src\IosIStream.cpp" />
+    <ClCompile Include="..\src\IosOStream.cpp" />
+    <ClCompile Include="..\src\layout\FlatLayout.cpp" />
+    <ClCompile Include="..\src\layout\GridLayout.cpp" />
+    <ClCompile Include="..\src\layout\HorizontalLayout.cpp" />
+    <ClCompile Include="..\src\layout\LayoutBase.cpp" />
+    <ClCompile Include="..\src\layout\LayoutBaseItem.cpp" />
+    <ClCompile Include="..\src\layout\LayoutObject.cpp" />
+    <ClCompile Include="..\src\layout\LayoutStretch.cpp" />
+    <ClCompile Include="..\src\layout\VerticalLayout.cpp" />
+    <ClCompile Include="..\src\LzAri.cpp" />
+    <ClCompile Include="..\src\math\MathStringUtils.cpp" />
+    <ClCompile Include="..\src\MemStream.cpp" />
+    <ClCompile Include="..\src\mpeg2\CodedBlockPatternTable.cpp" />
+    <ClCompile Include="..\src\mpeg2\DcSizeChrominanceTable.cpp" />
+    <ClCompile Include="..\src\mpeg2\DcSizeLuminanceTable.cpp" />
+    <ClCompile Include="..\src\mpeg2\DctCoefficientTable.cpp" />
+    <ClCompile Include="..\src\mpeg2\DctCoefficientTable0.cpp" />
+    <ClCompile Include="..\src\mpeg2\DctCoefficientTable1.cpp" />
+    <ClCompile Include="..\src\mpeg2\InverseScanTable.cpp" />
+    <ClCompile Include="..\src\mpeg2\MacroblockAddressIncrementTable.cpp" />
+    <ClCompile Include="..\src\mpeg2\MacroblockTypeBTable.cpp" />
+    <ClCompile Include="..\src\mpeg2\MacroblockTypeITable.cpp" />
+    <ClCompile Include="..\src\mpeg2\MacroblockTypePTable.cpp" />
+    <ClCompile Include="..\src\mpeg2\MotionCodeTable.cpp" />
+    <ClCompile Include="..\src\mpeg2\QuantiserScaleTable.cpp" />
+    <ClCompile Include="..\src\mpeg2\VLCTable.cpp" />
+    <ClCompile Include="..\src\PathUtils.cpp" />
+    <ClCompile Include="..\src\PtrStream.cpp" />
+    <ClCompile Include="..\src\StdStream.cpp" />
+    <ClCompile Include="..\src\StdStreamUtils.cpp" />
+    <ClCompile Include="..\src\Stream.cpp" />
+    <ClCompile Include="..\src\StreamBitStream.cpp" />
+    <ClCompile Include="..\src\string_cast.cpp" />
+    <ClCompile Include="..\src\string_cast_sjis.cpp" />
+    <ClCompile Include="..\src\string_cast_win1252.cpp" />
+    <ClCompile Include="..\src\ThreadPool.cpp" />
+    <ClCompile Include="..\src\Utf8.cpp" />
+    <ClCompile Include="..\src\win32\AcceleratorTableGenerator.cpp" />
+    <ClCompile Include="..\src\win32\ActiveXHost.cpp" />
+    <ClCompile Include="..\src\win32\Button.cpp" />
+    <ClCompile Include="..\src\win32\ClientDeviceContext.cpp" />
+    <ClCompile Include="..\src\win32\ColumnTreeView.cpp" />
+    <ClCompile Include="..\src\win32\ComboBox.cpp" />
+    <ClCompile Include="..\src\win32\ComStreamAdapter.cpp" />
+    <ClCompile Include="..\src\win32\CustomDrawn.cpp" />
+    <ClCompile Include="..\src\win32\DefaultFonts.cpp" />
+    <ClCompile Include="..\src\win32\DefaultWndClass.cpp" />
+    <ClCompile Include="..\src\win32\DeviceContext.cpp" />
+    <ClCompile Include="..\src\win32\Dialog.cpp" />
+    <ClCompile Include="..\src\win32\DpiUtils.cpp" />
+    <ClCompile Include="..\src\win32\Edit.cpp" />
+    <ClCompile Include="..\src\win32\FileDialog.cpp" />
+    <ClCompile Include="..\src\win32\FindFile.cpp" />
+    <ClCompile Include="..\src\win32\Font.cpp" />
+    <ClCompile Include="..\src\win32\Header.cpp" />
+    <ClCompile Include="..\src\win32\HorizontalSplitter.cpp" />
+    <ClCompile Include="..\src\win32\InputBox.cpp" />
+    <ClCompile Include="..\src\win32\LayoutWindow.cpp" />
+    <ClCompile Include="..\src\win32\ListBox.cpp" />
+    <ClCompile Include="..\src\win32\ListView.cpp" />
+    <ClCompile Include="..\src\win32\MDIChild.cpp" />
+    <ClCompile Include="..\src\win32\MDIClient.cpp" />
+    <ClCompile Include="..\src\win32\MDIFrame.cpp" />
+    <ClCompile Include="..\src\win32\MemoryDeviceContext.cpp" />
+    <ClCompile Include="..\src\win32\MenuItem.cpp" />
+    <ClCompile Include="..\src\win32\ModalWindow.cpp" />
+    <ClCompile Include="..\src\win32\Progress.cpp" />
+    <ClCompile Include="..\src\win32\PropertyGrid.cpp" />
+    <ClCompile Include="..\src\win32\PropertyGridEdit.cpp" />
+    <ClCompile Include="..\src\win32\PropertyGridListBox.cpp" />
+    <ClCompile Include="..\src\win32\Rect.cpp" />
+    <ClCompile Include="..\src\win32\RichTextEdit.cpp" />
+    <ClCompile Include="..\src\win32\ScrollBar.cpp" />
+    <ClCompile Include="..\src\win32\Splitter.cpp" />
+    <ClCompile Include="..\src\win32\Static.cpp" />
+    <ClCompile Include="..\src\win32\StatusBar.cpp" />
+    <ClCompile Include="..\src\win32\Tab.cpp" />
+    <ClCompile Include="..\src\win32\TaskBarList.cpp" />
+    <ClCompile Include="..\src\win32\ToolBar.cpp" />
+    <ClCompile Include="..\src\win32\ToolTip.cpp" />
+    <ClCompile Include="..\src\win32\TrayIcon.cpp" />
+    <ClCompile Include="..\src\win32\TrayIconServer.cpp" />
+    <ClCompile Include="..\src\win32\TreeView.cpp" />
+    <ClCompile Include="..\src\win32\VerticalSplitter.cpp" />
+    <ClCompile Include="..\src\win32\WebBrowser.cpp" />
+    <ClCompile Include="..\src\win32\Window.cpp" />
+    <ClCompile Include="..\src\xml\FilteringNodeIterator.cpp" />
+    <ClCompile Include="..\src\xml\Node.cpp" />
+    <ClCompile Include="..\src\xml\Parser.cpp" />
+    <ClCompile Include="..\src\xml\Utils.cpp" />
+    <ClCompile Include="..\src\xml\Writer.cpp" />
+    <ClCompile Include="..\src\zip\ZipArchiveReader.cpp" />
+    <ClCompile Include="..\src\zip\ZipArchiveWriter.cpp" />
+    <ClCompile Include="..\src\zip\ZipDeflateStream.cpp" />
+    <ClCompile Include="..\src\zip\ZipFile.cpp" />
+    <ClCompile Include="..\src\zip\ZipInflateStream.cpp" />
+    <ClCompile Include="..\src\zip\ZipStoreStream.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\include\AlignedAlloc.h" />
+    <ClInclude Include="..\include\alloca_def.h" />
+    <ClInclude Include="..\include\Base64.h" />
+    <ClInclude Include="..\include\BasicUnion.h" />
+    <ClInclude Include="..\include\BitManip.h" />
+    <ClInclude Include="..\include\bitmap\Bitmap.h" />
+    <ClInclude Include="..\include\bitmap\BMP.h" />
+    <ClInclude Include="..\include\bitmap\JPEG.h" />
+    <ClInclude Include="..\include\bitmap\PNG.h" />
+    <ClInclude Include="..\include\bitmap\TGA.h" />
+    <ClInclude Include="..\include\BitStream.h" />
+    <ClInclude Include="..\include\Config.h" />
+    <ClInclude Include="..\include\Convertible.h" />
+    <ClInclude Include="..\include\countof.h" />
+    <ClInclude Include="..\include\Endian.h" />
+    <ClInclude Include="..\include\GZipStream.h" />
+    <ClInclude Include="..\include\idct\IEEE1180.h" />
+    <ClInclude Include="..\include\idct\Interface.h" />
+    <ClInclude Include="..\include\idct\TrivialC.h" />
+    <ClInclude Include="..\include\IosIStream.h" />
+    <ClInclude Include="..\include\IosOStream.h" />
+    <ClInclude Include="..\include\layout\FlatLayout.h" />
+    <ClInclude Include="..\include\layout\GridLayout.h" />
+    <ClInclude Include="..\include\layout\HorizontalLayout.h" />
+    <ClInclude Include="..\include\layout\LayoutBase.h" />
+    <ClInclude Include="..\include\layout\LayoutBaseItem.h" />
+    <ClInclude Include="..\include\layout\LayoutEngine.h" />
+    <ClInclude Include="..\include\layout\LayoutObject.h" />
+    <ClInclude Include="..\include\layout\LayoutStretch.h" />
+    <ClInclude Include="..\include\layout\VerticalLayout.h" />
+    <ClInclude Include="..\include\lexical_cast_ex.h" />
+    <ClInclude Include="..\include\LockFreeQueue.h" />
+    <ClInclude Include="..\include\LzAri.h" />
+    <ClInclude Include="..\include\make_unique.h" />
+    <ClInclude Include="..\include\math\MathDef.h" />
+    <ClInclude Include="..\include\math\MathOps.h" />
+    <ClInclude Include="..\include\math\MathStringUtils.h" />
+    <ClInclude Include="..\include\math\Matrix4.h" />
+    <ClInclude Include="..\include\math\Plane.h" />
+    <ClInclude Include="..\include\math\Quaternion.h" />
+    <ClInclude Include="..\include\math\Ray.h" />
+    <ClInclude Include="..\include\math\Sphere.h" />
+    <ClInclude Include="..\include\math\Vector2.h" />
+    <ClInclude Include="..\include\math\Vector3.h" />
+    <ClInclude Include="..\include\math\Vector4.h" />
+    <ClInclude Include="..\include\MemStream.h" />
+    <ClInclude Include="..\include\mpeg2\CodedBlockPatternTable.h" />
+    <ClInclude Include="..\include\mpeg2\DcSizeChrominanceTable.h" />
+    <ClInclude Include="..\include\mpeg2\DcSizeLuminanceTable.h" />
+    <ClInclude Include="..\include\mpeg2\DctCoefficientTable.h" />
+    <ClInclude Include="..\include\mpeg2\DctCoefficientTable0.h" />
+    <ClInclude Include="..\include\mpeg2\DctCoefficientTable1.h" />
+    <ClInclude Include="..\include\mpeg2\InverseScanTable.h" />
+    <ClInclude Include="..\include\mpeg2\MacroblockAddressIncrementTable.h" />
+    <ClInclude Include="..\include\mpeg2\MacroblockTypeBTable.h" />
+    <ClInclude Include="..\include\mpeg2\MacroblockTypeITable.h" />
+    <ClInclude Include="..\include\mpeg2\MacroblockTypePTable.h" />
+    <ClInclude Include="..\include\mpeg2\MotionCodeTable.h" />
+    <ClInclude Include="..\include\mpeg2\QuantiserScaleTable.h" />
+    <ClInclude Include="..\include\mpeg2\VLCTable.h" />
+    <ClInclude Include="..\include\ObjCMemberFunctionPointer.h" />
+    <ClInclude Include="..\include\offsetof_def.h" />
+    <ClInclude Include="..\include\PathUtils.h" />
+    <ClInclude Include="..\include\placeholder_def.h" />
+    <ClInclude Include="..\include\PtrMacro.h" />
+    <ClInclude Include="..\include\PtrStream.h" />
+    <ClInclude Include="..\include\Singleton.h" />
+    <ClInclude Include="..\include\StdStream.h" />
+    <ClInclude Include="..\include\StdStreamUtils.h" />
+    <ClInclude Include="..\include\Stream.h" />
+    <ClInclude Include="..\include\StreamBitStream.h" />
+    <ClInclude Include="..\include\stricmp.h" />
+    <ClInclude Include="..\include\string_cast.h" />
+    <ClInclude Include="..\include\string_cast_sjis.h" />
+    <ClInclude Include="..\include\string_cast_win1252.h" />
+    <ClInclude Include="..\include\string_format.h" />
+    <ClInclude Include="..\include\tcharx.h" />
+    <ClInclude Include="..\include\ThreadPool.h" />
+    <ClInclude Include="..\include\Types.h" />
+    <ClInclude Include="..\include\Utf8.h" />
+    <ClInclude Include="..\include\win32\AcceleratorTableGenerator.h" />
+    <ClInclude Include="..\include\win32\ActiveXHost.h" />
+    <ClInclude Include="..\include\win32\Button.h" />
+    <ClInclude Include="..\include\win32\ClientDeviceContext.h" />
+    <ClInclude Include="..\include\win32\ColumnTreeView.h" />
+    <ClInclude Include="..\include\win32\ComboBox.h" />
+    <ClInclude Include="..\include\win32\ComPtr.h" />
+    <ClInclude Include="..\include\win32\ComStreamAdapter.h" />
+    <ClInclude Include="..\include\win32\CustomDrawn.h" />
+    <ClInclude Include="..\include\win32\DblBufferedCtrl.h" />
+    <ClInclude Include="..\include\win32\DefaultFonts.h" />
+    <ClInclude Include="..\include\win32\DefaultWndClass.h" />
+    <ClInclude Include="..\include\win32\DeviceContext.h" />
+    <ClInclude Include="..\include\win32\Dialog.h" />
+    <ClInclude Include="..\include\win32\DpiUtils.h" />
+    <ClInclude Include="..\include\win32\Edit.h" />
+    <ClInclude Include="..\include\win32\FileDialog.h" />
+    <ClInclude Include="..\include\win32\FindFile.h" />
+    <ClInclude Include="..\include\win32\Font.h" />
+    <ClInclude Include="..\include\win32\GdiObj.h" />
+    <ClInclude Include="..\include\win32\GuidUtils.h" />
+    <ClInclude Include="..\include\win32\Header.h" />
+    <ClInclude Include="..\include\win32\HorizontalSplitter.h" />
+    <ClInclude Include="..\include\win32\InputBox.h" />
+    <ClInclude Include="..\include\win32\Layouts.h" />
+    <ClInclude Include="..\include\win32\LayoutWindow.h" />
+    <ClInclude Include="..\include\win32\ListBox.h" />
+    <ClInclude Include="..\include\win32\ListView.h" />
+    <ClInclude Include="..\include\win32\MDIChild.h" />
+    <ClInclude Include="..\include\win32\MDIClient.h" />
+    <ClInclude Include="..\include\win32\MDIFrame.h" />
+    <ClInclude Include="..\include\win32\MemoryDeviceContext.h" />
+    <ClInclude Include="..\include\win32\MenuItem.h" />
+    <ClInclude Include="..\include\win32\ModalWindow.h" />
+    <ClInclude Include="..\include\win32\Progress.h" />
+    <ClInclude Include="..\include\win32\PropertyGrid.h" />
+    <ClInclude Include="..\include\win32\PropertyGridEdit.h" />
+    <ClInclude Include="..\include\win32\PropertyGridListBox.h" />
+    <ClInclude Include="..\include\win32\Rect.h" />
+    <ClInclude Include="..\include\win32\RichTextEdit.h" />
+    <ClInclude Include="..\include\win32\ScrollBar.h" />
+    <ClInclude Include="..\include\win32\Splitter.h" />
+    <ClInclude Include="..\include\win32\Static.h" />
+    <ClInclude Include="..\include\win32\StatusBar.h" />
+    <ClInclude Include="..\include\win32\Tab.h" />
+    <ClInclude Include="..\include\win32\TaskBarList.h" />
+    <ClInclude Include="..\include\win32\ToolBar.h" />
+    <ClInclude Include="..\include\win32\ToolTip.h" />
+    <ClInclude Include="..\include\win32\TrayIcon.h" />
+    <ClInclude Include="..\include\win32\TrayIconServer.h" />
+    <ClInclude Include="..\include\win32\TreeView.h" />
+    <ClInclude Include="..\include\win32\VerticalSplitter.h" />
+    <ClInclude Include="..\include\win32\WebBrowser.h" />
+    <ClInclude Include="..\include\win32\Win32Defs.h" />
+    <ClInclude Include="..\include\win32\Window.h" />
+    <ClInclude Include="..\include\xml\FilteringNodeIterator.h" />
+    <ClInclude Include="..\include\xml\Node.h" />
+    <ClInclude Include="..\include\xml\Parser.h" />
+    <ClInclude Include="..\include\xml\Utils.h" />
+    <ClInclude Include="..\include\xml\Writer.h" />
+    <ClInclude Include="..\include\zip\ZipArchiveReader.h" />
+    <ClInclude Include="..\include\zip\ZipArchiveWriter.h" />
+    <ClInclude Include="..\include\zip\ZipDeflateStream.h" />
+    <ClInclude Include="..\include\zip\ZipDefs.h" />
+    <ClInclude Include="..\include\zip\ZipFile.h" />
+    <ClInclude Include="..\include\zip\ZipInflateStream.h" />
+    <ClInclude Include="..\include\zip\ZipStoreStream.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{553CE050-A97E-4E6E-AE84-057A1F0FA45D}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>Framework</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="GeneralSettings.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="GeneralSettings.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="GeneralSettings.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="GeneralSettings.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(SolutionDir)$(PlatformName)\$(Configuration)\</OutDir>
+    <IntDir>$(PlatformName)\$(ProjectName)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(SolutionDir)$(PlatformName)\$(Configuration)\</OutDir>
+    <IntDir>$(PlatformName)\$(ProjectName)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(SolutionDir)$(PlatformName)\$(Configuration)\</OutDir>
+    <IntDir>$(PlatformName)\$(ProjectName)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(SolutionDir)$(PlatformName)\$(Configuration)\</OutDir>
+    <IntDir>$(PlatformName)\$(ProjectName)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\..\NuGetPackages\boost.1.60.0.0\build\native\boost.targets" Condition="Exists('..\..\NuGetPackages\boost.1.60.0.0\build\native\boost.targets')" />
+  </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\..\NuGetPackages\boost.1.60.0.0\build\native\boost.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\NuGetPackages\boost.1.60.0.0\build\native\boost.targets'))" />
+  </Target>
+</Project>

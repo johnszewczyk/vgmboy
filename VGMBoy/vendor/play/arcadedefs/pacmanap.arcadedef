@@ -1,0 +1,25 @@
+{
+	"id": "pacmanap",
+	"name": "Pac-Man's Arcade Party",
+	"driver": "sys147",
+	"nand":
+	{
+		"name": "kp007a_k9k8g08u0b_pmaam12-na-c.ic26",
+		"mounts":
+		{
+			"atfile0": 24576,
+			"atfile1": 131072
+		}
+	},
+	"buttons":
+	{
+		"84": "0:l1",
+		"86": "0:dpad_up",
+		"87": "0:dpad_down",
+		"88": "0:cross"
+	},
+	"boot": "atfile0:PMAAC.elf",
+	"patches":
+	[
+	]
+}

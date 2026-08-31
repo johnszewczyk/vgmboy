@@ -1,0 +1,230 @@
+#pragma once
+
+#include <memory>
+#include "GSH_VulkanContext.h"
+#include "GSH_VulkanFrameCommandBuffer.h"
+#include "GSH_VulkanPipelineCache.h"
+#include "vulkan/ShaderModule.h"
+#include "vulkan/Buffer.h"
+#include "vulkan/Image.h"
+#include "Convertible.h"
+#include "../GsSpriteRegion.h"
+
+namespace GSH_Vulkan
+{
+	class CDraw : public IFrameCommandBufferWriter
+	{
+	public:
+		enum
+		{
+			MAX_FRAMES = CFrameCommandBuffer::MAX_FRAMES,
+		};
+
+		typedef uint64 PipelineCapsInt;
+
+		enum PIPELINE_PRIMITIVE_TYPE
+		{
+			PIPELINE_PRIMITIVE_TRIANGLE = 0,
+			PIPELINE_PRIMITIVE_LINE = 1,
+			PIPELINE_PRIMITIVE_POINT = 2,
+		};
+
+		struct PIPELINE_CAPS : public convertible<PipelineCapsInt>
+		{
+			uint32 primitiveType : 2;
+
+			uint32 hasTexture : 1;
+			uint32 textureUseMemoryCopy : 1;
+			uint32 textureHasAlpha : 1;
+			uint32 textureBlackIsTransparent : 1;
+			uint32 textureFunction : 2;
+			uint32 textureUseLinearFiltering : 1;
+			uint32 textureUseDynamicMipLOD : 1;
+			uint32 texClampU : 2;
+			uint32 texClampV : 2;
+
+			uint32 hasFog : 1;
+
+			uint32 maskColor : 1;
+			uint32 writeDepth : 1;
+
+			uint32 scanMask : 2;
+
+			uint32 hasAlphaBlending : 1;
+			uint32 alphaA : 2;
+			uint32 alphaB : 2;
+			uint32 alphaC : 2;
+			uint32 alphaD : 2;
+			uint32 colClamp : 1;
+			uint32 fba : 1;
+
+			uint32 depthTestFunction : 2;
+			uint32 alphaTestFunction : 3;
+			uint32 alphaTestFailAction : 2;
+
+			uint32 hasDstAlphaTest : 1;
+			uint32 dstAlphaTestRef : 1;
+
+			uint32 textureFormat : 6;
+			uint32 clutFormat : 6;
+			uint32 framebufferFormat : 6;
+			uint32 depthbufferFormat : 6;
+		};
+		static_assert(sizeof(PIPELINE_CAPS) <= sizeof(PipelineCapsInt), "PIPELINE_CAPS too big for PipelineCapsInt");
+
+		struct PRIM_VERTEX
+		{
+			float x, y;
+			uint32 z;
+			uint32 color;
+			float s, t, q;
+			float f;
+		};
+
+		using MipBufs = std::array<std::pair<uint32, uint32>, 6>;
+
+		CDraw(const ContextPtr&, const FrameCommandBufferPtr&);
+		virtual ~CDraw();
+
+		virtual void SetPipelineCaps(const PIPELINE_CAPS&);
+		virtual void SetFramebufferParams(uint32, uint32, uint32);
+		virtual void SetDepthbufferParams(uint32, uint32);
+		void SetTextureParams(uint32, uint32, uint32, uint32, uint32, uint32);
+		void SetMipParams(const MipBufs&, uint32, float, uint32);
+		void SetClutBufferOffset(uint32);
+		void SetTextureAlphaParams(uint32, uint32);
+		void SetTextureClampParams(uint32, uint32, uint32, uint32);
+		void SetFogParams(float, float, float);
+		void SetAlphaBlendingParams(uint32);
+		void SetAlphaTestParams(uint32);
+		virtual void SetScissor(uint32, uint32, uint32, uint32);
+		void SetMemoryCopyParams(uint32, uint32);
+
+		void AddVertices(const PRIM_VERTEX*, const PRIM_VERTEX*);
+		virtual void FlushVertices() = 0;
+		virtual void FlushRenderPass() = 0;
+
+		void PreFlushFrameCommandBuffer() override;
+		void PostFlushFrameCommandBuffer() override;
+
+	protected:
+		enum
+		{
+			DRAW_AREA_SIZE = 2048
+		};
+
+		static constexpr uint32 MAX_MIPPARAMS_COUNT = 2048;
+
+		typedef uint32 DescriptorSetCapsInt;
+
+		struct DESCRIPTORSET_CAPS : public convertible<DescriptorSetCapsInt>
+		{
+			uint32 hasTexture : 1;
+			uint32 textureFormat : 6;
+			uint32 textureUseDynamicMipLOD : 1;
+			uint32 framebufferFormat : 6;
+			uint32 depthbufferFormat : 6;
+			uint32 frameNumber : 2;
+		};
+		static_assert(sizeof(DESCRIPTORSET_CAPS) == sizeof(DescriptorSetCapsInt));
+		typedef std::unordered_map<DescriptorSetCapsInt, VkDescriptorSet> DescriptorSetCache;
+
+		typedef CPipelineCache<PipelineCapsInt> PipelineCache;
+
+		struct DRAW_PIPELINE_PUSHCONSTANTS
+		{
+			//fbDepthParams
+			uint32 fbBufAddr = 0;
+			uint32 fbBufWidth = 0;
+			uint32 depthBufAddr = 0;
+			uint32 depthBufWidth = 0;
+
+			//texParams0
+			uint32 texBufAddr = 0;
+			uint32 texBufWidth = 0;
+			uint32 texWidth = 0;
+			uint32 texHeight = 0;
+
+			//texParams1
+			uint32 texMipLevel = 0;
+			uint32 texCsa = 0;
+			uint32 texA0 = 0;
+			uint32 texA1 = 0;
+
+			//texParams2
+			uint32 clampMin[2];
+			uint32 clampMax[2];
+
+			//alphaFbParams
+			uint32 fbWriteMask = 0;
+			uint32 alphaFix = 0;
+			uint32 alphaRef = 0;
+			uint32 alphaFbParamsReserved = 0;
+
+			//fogColor
+			float fogColor[4];
+		};
+		static_assert(sizeof(DRAW_PIPELINE_PUSHCONSTANTS) <= 128, "Push constants size can't exceed 128 bytes.");
+
+		struct DRAW_PIPELINE_MIPPARAMS_UNIFORMS
+		{
+			//mipParams0-mipParams2
+			MipBufs mipBufs;
+
+			//mipParams3
+			uint32 maxMip;
+			uint32 lodL;
+			uint32 unused1[2];
+
+			//mipParams4
+			float lodK;
+			uint32 unused2[3];
+
+			//padding
+			uint32 unused3[44];
+		};
+		//Needs to accomodate minUniformBufferOffsetAlignment, which seems to be at most 0x100 in the wild
+		static_assert((sizeof(DRAW_PIPELINE_MIPPARAMS_UNIFORMS) & 0xFF) == 0);
+
+		struct FRAMECONTEXT
+		{
+			Framework::Vulkan::CBuffer vertexBuffer;
+			PRIM_VERTEX* vertexBufferPtr = nullptr;
+
+			Framework::Vulkan::CBuffer mipParamsBuffer;
+			DRAW_PIPELINE_MIPPARAMS_UNIFORMS* mipParamsBufferPtr = nullptr;
+		};
+
+		static std::vector<VkVertexInputAttributeDescription> GetVertexAttributes();
+		Framework::Vulkan::CShaderModule CreateVertexShader(const PIPELINE_CAPS&);
+
+		static constexpr float DEPTH_MAX = 4294967296.0f;
+
+		ContextPtr m_context;
+		FrameCommandBufferPtr m_frameCommandBuffer;
+		PipelineCache m_pipelineCache;
+		DescriptorSetCache m_descriptorSetCache;
+
+		FRAMECONTEXT m_frames[MAX_FRAMES];
+
+		uint32 m_passVertexStart = 0;
+		uint32 m_passVertexEnd = 0;
+		bool m_renderPassBegun = false;
+
+		uint32 m_mipParamsIndex = 0;
+
+		PIPELINE_CAPS m_pipelineCaps;
+		DRAW_PIPELINE_PUSHCONSTANTS m_pushConstants;
+		uint32 m_scissorX = 0;
+		uint32 m_scissorY = 0;
+		uint32 m_scissorWidth = 0;
+		uint32 m_scissorHeight = 0;
+		uint32 m_clutBufferOffset = 0;
+		uint32 m_memoryCopyAddress = 0;
+		uint32 m_memoryCopySize = 0;
+
+		CGsSpriteRegion m_memoryCopyRegion;
+	};
+
+	typedef std::shared_ptr<CDraw> DrawPtr;
+}

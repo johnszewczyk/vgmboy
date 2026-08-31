@@ -1,0 +1,29 @@
+@@ -1,5 +1,7 @@
+ if(USE_FFMPEG)
+-	if(NOT FFMPEG_PATH AND NOT BUILD_STATIC)
++	# A static vgmstream archive can still link against an installed FFmpeg.
++	# Only use the bundled FFmpeg path when system discovery is unavailable.
++	if(NOT FFMPEG_PATH)
+ 		# FFmpeg detection
+ 		if(WIN32)
+ 			find_package(FFmpeg COMPONENTS AVFORMAT AVUTIL AVCODEC SWRESAMPLE)
+@@ -49,7 +51,7 @@
+ 			set(FFMPEG_SOURCE "(system)")
+ 		endif()
+ 	endif()
+-	if(USE_FFMPEG AND NOT WIN32 AND (NOT FFmpeg_FOUND OR FFMPEG_PATH OR BUILD_STATIC))
++	if(USE_FFMPEG AND NOT WIN32 AND (NOT FFmpeg_FOUND OR FFMPEG_PATH))
+ 		set(USE_FFMPEG_LIBOPUS OFF)
+ 		if(NOT EMSCRIPTEN)
+ 			find_package(PkgConfig REQUIRED)
+@@ -119,10 +119,7 @@
+ 				--enable-parser=${FFMPEG_CONF_PARSER}
+ 				--enable-demuxer=${FFMPEG_CONF_DEMUXER}
+ 				--enable-decoder=${FFMPEG_CONF_DECODER}
+ 				--enable-swresample
+-				--extra-libs=-static
+-				--extra-cflags=--static
+-				--pkg-config-flags=--static
+ 			)
+ 
+ 

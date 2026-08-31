@@ -1,0 +1,232 @@
+#pragma once
+
+#include "Types.h"
+#include "zip/ZipArchiveWriter.h"
+#include "zip/ZipArchiveReader.h"
+#include "Dmac_Channel.h"
+
+class CMIPS;
+
+class CDMAC
+{
+public:
+	friend class Dmac::CChannel;
+
+	enum CHANNEL_ID
+	{
+		CHANNEL_ID_VIF0,
+		CHANNEL_ID_VIF1,
+		CHANNEL_ID_GIF,
+		CHANNEL_ID_FROM_IPU,
+		CHANNEL_ID_TO_IPU,
+		CHANNEL_ID_SIF0,
+		CHANNEL_ID_SIF1,
+		CHANNEL_ID_SIF2,
+		CHANNEL_ID_FROM_SPR,
+		CHANNEL_ID_TO_SPR
+	};
+
+	enum REGISTER
+	{
+		D0_CHCR = 0x10008000,
+		D0_MADR = 0x10008010,
+		D0_QWC = 0x10008020,
+		D0_TADR = 0x10008030,
+		D0_ASR0 = 0x10008040,
+		D0_ASR1 = 0x10008050,
+
+		D1_CHCR = 0x10009000,
+		D1_MADR = 0x10009010,
+		D1_QWC = 0x10009020,
+		D1_TADR = 0x10009030,
+		D1_ASR0 = 0x10009040,
+		D1_ASR1 = 0x10009050,
+
+		D2_CHCR = 0x1000A000,
+		D2_MADR = 0x1000A010,
+		D2_QWC = 0x1000A020,
+		D2_TADR = 0x1000A030,
+		D2_ASR0 = 0x1000A040,
+		D2_ASR1 = 0x1000A050,
+
+		D3_CHCR = 0x1000B000,
+		D3_MADR = 0x1000B010,
+		D3_QWC = 0x1000B020,
+
+		D4_CHCR = 0x1000B400,
+		D4_MADR = 0x1000B410,
+		D4_QWC = 0x1000B420,
+		D4_TADR = 0x1000B430,
+
+		D5_CHCR = 0x1000C000,
+		D5_MADR = 0x1000C010,
+		D5_QWC = 0x1000C020,
+
+		D6_CHCR = 0x1000C400,
+		D6_MADR = 0x1000C410,
+		D6_QWC = 0x1000C420,
+		D6_TADR = 0x1000C430,
+
+		D8_CHCR = 0x1000D000,
+		D8_MADR = 0x1000D010,
+		D8_QWC = 0x1000D020,
+		D8_SADR = 0x1000D080,
+
+		D9_CHCR = 0x1000D400,
+		D9_MADR = 0x1000D410,
+		D9_QWC = 0x1000D420,
+		D9_TADR = 0x1000D430,
+		D9_SADR = 0x1000D480,
+
+		D_CTRL = 0x1000E000,
+		D_STAT = 0x1000E010,
+		D_PCR = 0x1000E020,
+		D_SQWC = 0x1000E030,
+		D_RBSR = 0x1000E040,
+		D_RBOR = 0x1000E050,
+		D_STADR = 0x1000E060,
+
+		D_ENABLER = 0x1000F520,
+		D_ENABLEW = 0x1000F590,
+	};
+
+	enum CHCR_BIT
+	{
+		CHCR_STR = 0x100,
+	};
+
+	enum ENABLE_BIT
+	{
+		ENABLE_CPND = 0x10000,
+	};
+
+	enum WRITE_MASKS
+	{
+		MADR_WRITE_MASK = ~(0x0000000FU),
+		QWC_WRITE_MASK = ~(0xFFFF0000U),
+		SPR_MADR_WRITE_MASK = ~(0x8000000FU),
+	};
+
+	CDMAC(uint8*, uint8*, uint8*, uint8*, CMIPS&);
+	virtual ~CDMAC() = default;
+
+	void Reset();
+
+	void SetChannelTransferFunction(unsigned int, const Dmac::DmaReceiveHandler&);
+
+	uint32 GetRegister(uint32);
+	void SetRegister(uint32, uint32);
+
+	void LoadState(Framework::CZipArchiveReader&);
+	void SaveState(Framework::CZipArchiveWriter&);
+
+	void DisassembleGet(uint32);
+	void DisassembleSet(uint32, uint32);
+
+	bool IsInterruptPending() const;
+	void ResumeDMA0();
+	void ResumeDMA1();
+	void ResumeDMA2();
+	uint32 ResumeDMA3(const void*, uint32);
+	void ResumeDMA4();
+	void ResumeDMA8();
+	void ResumeDMA9();
+	bool IsDMA4Started() const;
+	static bool IsEndSrcTagId(uint32);
+	static bool IsEndDstTagId(uint32);
+
+private:
+	enum D_CTRL_STS
+	{
+		D_CTRL_STS_NONE = 0,
+		D_CTRL_STS_SIF0 = 1,
+		D_CTRL_STS_FROM_SPR = 2,
+		D_CTRL_STS_FROM_IPU = 3,
+	};
+
+	enum D_CTRL_STD
+	{
+		D_CTRL_STD_NONE = 0,
+		D_CTRL_STD_VIF1 = 1,
+		D_CTRL_STD_GIF = 2,
+		D_CTRL_STD_SIF1 = 3,
+	};
+
+	enum D_STAT_BITS
+	{
+		D_STAT_MEIS = (1 << 14),
+	};
+
+	struct D_CTRL_REG : public convertible<uint32>
+	{
+		unsigned int dmae : 1;
+		unsigned int rele : 1;
+		unsigned int mfd : 2;
+		unsigned int sts : 2;
+		unsigned int std : 2;
+		unsigned int rcyc : 3;
+		unsigned int reserved : 21;
+	};
+	static_assert(sizeof(D_CTRL_REG) == sizeof(uint32), "Size of D_CTRL_REG struct must be 4 bytes.");
+
+	struct D_SQWC_REG : public convertible<uint32>
+	{
+		unsigned int sqwc : 8;
+		unsigned int reserved0 : 8;
+		unsigned int tqwc : 8;
+		unsigned int reserved1 : 8;
+	};
+	static_assert(sizeof(D_SQWC_REG) == sizeof(uint32), "Size of D_SQWC_REG struct must be 4 bytes.");
+
+	uint64 FetchDMATag(uint32);
+
+	uint32 ReceiveDMA8(uint32, uint32, uint32, bool);
+	uint32 ReceiveDMA9(uint32, uint32, uint32, bool);
+
+	void UpdateCpCond();
+
+	uint8* m_ram = nullptr;
+	uint8* m_spr = nullptr;
+	uint8* m_vuMem0 = nullptr;
+	uint8* m_vuMem1 = nullptr;
+
+	CMIPS& m_ee;
+
+	D_CTRL_REG m_D_CTRL;
+	uint32 m_D_STAT;
+	uint32 m_D_ENABLE;
+	uint32 m_D_PCR;
+	D_SQWC_REG m_D_SQWC;
+	uint32 m_D_RBSR;
+	uint32 m_D_RBOR;
+	uint32 m_D_STADR;
+
+	Dmac::CChannel m_D0;
+	Dmac::CChannel m_D1;
+
+	Dmac::CChannel m_D2;
+
+	uint32 m_D3_CHCR;
+	uint32 m_D3_MADR;
+	uint32 m_D3_QWC;
+
+	Dmac::CChannel m_D4;
+
+	uint32 m_D5_CHCR;
+	uint32 m_D5_MADR;
+	uint32 m_D5_QWC;
+
+	uint32 m_D6_CHCR;
+	uint32 m_D6_MADR;
+	uint32 m_D6_QWC;
+	uint32 m_D6_TADR;
+
+	Dmac::CChannel m_D8;
+	uint32 m_D8_SADR;
+
+	Dmac::CChannel m_D9;
+	uint32 m_D9_SADR;
+
+	Dmac::DmaReceiveHandler m_receiveDma5;
+	Dmac::DmaReceiveHandler m_receiveDma6;
+};

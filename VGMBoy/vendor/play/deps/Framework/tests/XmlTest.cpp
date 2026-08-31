@@ -1,0 +1,41 @@
+#include "XmlTest.h"
+#include <cstring>
+#include <cstdint>
+#include <string_view>
+#include "PtrStream.h"
+#include "xml/Parser.h"
+#include "xml/Utils.h"
+#include "TestDefs.h"
+
+using namespace std::literals;
+
+static const std::string_view g_escapeCharXml = "<root>Bacon &amp; Eggs</root>"sv;
+static const std::string_view g_commentXml = "<root><!-- This is a comment --></root>"sv;
+
+void XmlTest_Execute()
+{
+	{
+		Framework::CPtrStream input(g_escapeCharXml.data(), g_escapeCharXml.size());
+		auto node = Framework::Xml::CParser::ParseDocument(input);
+		auto rootNode = node->Select("root");
+		TEST_VERIFY(!strcmp(rootNode->GetInnerText(), "Bacon & Eggs"));
+	}
+	{
+		Framework::CPtrStream input(g_commentXml.data(), g_commentXml.size());
+		auto node = Framework::Xml::CParser::ParseDocument(input);
+		auto rootNode = node->Select("root");
+		TEST_VERIFY(!rootNode->GetInnerText());
+	}
+	{
+		static const int32 intValue = INT32_MAX;
+		auto node = std::make_unique<Framework::Xml::CNode>("AttribTest", true);
+		node->InsertAttribute(Framework::Xml::CreateAttributeIntValue("TestInt", intValue));
+		TEST_VERIFY(Framework::Xml::GetAttributeIntValue(node.get(), "TestInt") == intValue);
+	}
+	{
+		static const int64 int64Value = INT64_MAX;
+		auto node = std::make_unique<Framework::Xml::CNode>("AttribTest", true);
+		node->InsertAttribute(Framework::Xml::CreateAttributeInt64Value("TestInt64", int64Value));
+		TEST_VERIFY(Framework::Xml::GetAttributeInt64Value(node.get(), "TestInt64") == int64Value);
+	}
+}

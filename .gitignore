@@ -1,0 +1,17 @@
+# Monorepo-local build and package output.
+**/.build/
+**/DerivedData/
+**/dist/
+**/node_modules/
+
+# Repositories and submodule metadata are imported as source snapshots here.
+**/.git/
+
+# Local source archives and fixture payloads do not belong in the software repo.
+*.zip
+*.tar.gz
+*.tar.zst
+
+# macOS metadata.
+.DS_Store
+

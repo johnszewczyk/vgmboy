@@ -1,0 +1,1253 @@
+import AppKit
+import CatalogBrowserCore
+import FavoriteStoreCore
+import FrontendCommandCore
+import SwiftUI
+
+let databaseFileSidebarDragType = NSPasteboard.PasteboardType("com.cocoaspice.database-file-sidebar-items")
+
+struct MainView: View {
+    @Bindable var model: PlayerViewModel
+
+    var body: some View {
+        liveMainView
+        .frame(minWidth: 320, minHeight: 240)
+        .background(MainWindowLevelConfigurator(alwaysOnTop: model.mainWindowAlwaysOnTop))
+        .toolbar {
+            ToolbarItem(placement: .navigation) { sidebarToolbarButton(.games) }
+            ToolbarItem(placement: .navigation) { sidebarToolbarButton(.files) }
+            if model.localBrowserEnabled {
+                ToolbarItem(placement: .navigation) { sidebarToolbarButton(.localFiles) }
+            }
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    model.toggleSidebarDisclosureAll()
+                } label: {
+                    Image(systemName: model.sidebarDisclosureControlIconName)
+                }
+                .help(model.sidebarDisclosureControlTitle)
+                .accessibilityLabel(model.sidebarDisclosureControlTitle)
+                .disabled(!model.sidebarDisclosureControlEnabled)
+            }
+            // Keep playback transport out of the navigation slot. The
+            // navigation slot is reserved for the sidebar disclosure and its
+            // adjacent view/fold controls; sharing it makes AppKit merge the
+            // two toolbars visually.
+            ToolbarItemGroup(placement: .secondaryAction) {
+                Button(action: model.playPrevious) { Image(systemName: "backward.fill") }
+                    .disabled(model.playlist.isEmpty)
+                Button(action: model.togglePlayback) { Image(systemName: model.isPlaying ? "pause.fill" : "play.fill") }
+                    .disabled(model.currentTrack == nil || model.isLoading)
+                Button(action: model.playNext) { Image(systemName: "forward.fill") }
+                    .disabled(model.playlist.isEmpty)
+            }
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    model.longPlayEnabled.toggle()
+                    model.toggleLongPlayEnabled()
+                } label: { Image(systemName: "infinity").foregroundStyle(model.longPlayEnabled ? .primary : .secondary) }
+                .help(model.longPlayEnabled ? "Long Play: On" : "Long Play: Off")
+                Button(action: model.cycleRepeatMode) {
+                    Image(systemName: model.repeatMode.iconName).foregroundStyle(model.repeatMode == .off ? .secondary : .primary)
+                }
+                .help(model.repeatMode.title)
+                Button(action: model.cycleRandomPlaybackScope) { Image(systemName: model.randomPlaybackScope.iconName) }
+                    .disabled(model.playlist.isEmpty && model.databaseGameItems.isEmpty)
+                    .help(model.randomPlaybackScope.title)
+                Button(action: model.toggleEqualizerEnabled) {
+                    Image(systemName: "slider.horizontal.3").foregroundStyle(model.equalizerEnabled ? .primary : .secondary)
+                }
+                .help(model.equalizerEnabled ? "Equalizer: On" : "Equalizer: Off")
+            }
+        }
+    }
+
+    private func sidebarToolbarButton(_ mode: SidebarBrowserMode) -> some View {
+        Button {
+            model.setSidebarBrowserMode(mode)
+        } label: {
+            Image(systemName: mode.iconName)
+        }
+        .help(mode.title)
+        .accessibilityLabel(mode.title)
+    }
+
+    private var liveMainView: some View {
+        NavigationSplitView {
+            VStack(spacing: 0) {
+                NativeSearchField(
+                    text: $model.sidebarSearchText,
+                    placeholder: model.localBrowserEnabled ? "Search Local Files" : "Search Library",
+                    debounceInterval: 0.1,
+                    initialDebounceInterval: 0.25
+                )
+                .padding(.horizontal, 8)
+                .padding(.top, 0)
+                .padding(.bottom, 2)
+
+                if !model.localBrowserEnabled, let error = model.databaseSidebarLoadError {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text(error)
+                            .font(.caption)
+                            .lineLimit(3)
+                        Spacer(minLength: 4)
+                        Button("Retry") {
+                            model.retryDatabaseSidebarLoad()
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(.orange.opacity(0.12))
+                }
+
+                Group {
+                    if model.sidebarBrowserMode == .localFiles {
+                        LocalBrowserSidebarListView(model: model)
+                    } else if model.effectiveSidebarBrowserMode == .games
+                        ? model.isLoadingDatabaseSidebar
+                        : model.isLoadingDatabaseFileSidebar {
+                        VStack(spacing: 10) {
+                            ProgressView()
+                                .progressViewStyle(.linear)
+                                .frame(width: 180)
+                            Text(model.effectiveSidebarBrowserMode == .games ? "Loading Games Library" : "Loading Files Library")
+                                .font(.headline)
+                            Text(model.databaseSidebarLoadingStatus)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if model.effectiveSidebarBrowserMode == .games && model.databaseGameItems.isEmpty {
+                        ContentUnavailableView(
+                            "No Database Games",
+                            systemImage: "books.vertical",
+                            description: Text("Open a published ScanSong catalog with game entries.")
+                        )
+                    } else if model.effectiveSidebarBrowserMode == .files && model.databaseFileItems.isEmpty {
+                        ContentUnavailableView(
+                            "No Database Files",
+                            systemImage: "folder",
+                            description: Text("Open a published ScanSong catalog with file entries.")
+                        )
+                    } else if model.effectiveSidebarBrowserMode == .games && model.visibleDatabaseGameItems.isEmpty {
+                        ContentUnavailableView(
+                            "No Matches",
+                            systemImage: "magnifyingglass",
+                            description: Text("No database games match the current sidebar search.")
+                        )
+                    } else if model.effectiveSidebarBrowserMode == .files && model.visibleDatabaseFileItems.isEmpty {
+                        ContentUnavailableView(
+                            "No Matches",
+                            systemImage: "magnifyingglass",
+                            description: Text("No scanned files match the current sidebar search.")
+                        )
+                    } else {
+                        // These are native AppKit table views. Keep both alive
+                        // after they are first shown so switching Games/Files
+                        // never reconstructs the expanded Files hierarchy.
+                        ZStack {
+                            DatabaseGameListView(
+                                model: model,
+                                sidebarFontSize: model.databaseSidebarFontSize,
+                                sidebarTextColor: model.databaseSidebarTextColor,
+                                sidebarMonospace: model.databaseSidebarMonospaceFont
+                            )
+                            .opacity(model.effectiveSidebarBrowserMode == .games ? 1 : 0)
+                            .allowsHitTesting(model.effectiveSidebarBrowserMode == .games)
+
+                            DatabaseFileListView(
+                                model: model,
+                                sidebarFontSize: model.databaseSidebarFontSize,
+                                sidebarTextColor: model.databaseSidebarTextColor,
+                                sidebarMonospace: model.databaseSidebarMonospaceFont,
+                                sidebarDisclosureGap: model.databaseSidebarDisclosureGapPoints,
+                                sidebarChildIndent: model.databaseSidebarChildIndentPoints,
+                                hideFileExtensions: model.databaseSidebarHidesFileExtensions
+                            )
+                            .opacity(model.effectiveSidebarBrowserMode == .files ? 1 : 0)
+                            .allowsHitTesting(model.effectiveSidebarBrowserMode == .files)
+                        }
+                    }
+                }
+            }
+            .navigationSplitViewColumnWidth(ideal: 220, max: 500)
+        } detail: {
+            VStack(spacing: 0) {
+                ZStack {
+                    PlaylistTableView(model: model)
+
+                    if model.playlist.isEmpty {
+                        ContentUnavailableView("Empty Queue", systemImage: "music.note.list", description: Text("Double-click a game or a folder search result in the sidebar to queue tracks."))
+                            .allowsHitTesting(false)
+                    }
+                }
+
+                Divider()
+                statusBar
+            }
+            .frame(minWidth: 320, minHeight: 240)
+        }
+    }
+
+    private var statusBar: some View {
+        HStack(spacing: 12) {
+            Text(model.isExportingAAC ? model.statusText : model.statusPathReadout)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            if model.isExportingAAC {
+                ProgressView(value: model.aacExportProgress)
+                    .frame(width: 96)
+                Button("Abort") { model.cancelAACExport() }
+                    .help("Cancel AAC export and remove its incomplete output")
+            }
+
+            Spacer(minLength: 12)
+
+            Text("\(model.elapsedReadout) / \(model.currentTrackDurationReadout) / \(model.playlistTotalDurationReadout)")
+                .font(.system(size: 11))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .help("Elapsed time / song total / playlist total. A + means one or more track durations are still unknown.")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.bar)
+    }
+}
+
+private struct MainWindowLevelConfigurator: NSViewRepresentable {
+    let alwaysOnTop: Bool
+    func makeNSView(context: Context) -> NSView { NSView() }
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            nsView.window?.cocoaSpiceRole = .main
+            nsView.window?.level = alwaysOnTop ? .floating : .normal
+        }
+    }
+}
+
+private struct LocalBrowserSidebarListView: View {
+    @Bindable var model: PlayerViewModel
+
+    private var rows: [LocalBrowserSidebarRow] {
+        let query = model.sidebarSearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return query.isEmpty ? model.localBrowserRows : model.localBrowserRows.filter { $0.node.name.lowercased().contains(query) }
+    }
+
+    var body: some View {
+        if rows.isEmpty {
+            ContentUnavailableView(
+                model.localBrowserPath.isEmpty ? "No Local Folder" : "No Local Files",
+                systemImage: "externaldrive",
+                description: Text("Choose a readable folder on the Database page in Options.")
+            )
+        } else {
+            List(rows) { row in
+                HStack(spacing: model.databaseSidebarDisclosureGapPoints) {
+                    if row.node.kind == .folder {
+                        Button { model.toggleLocalBrowserFolder(row.node.path) } label: {
+                            Image(systemName: row.isExpanded ? "chevron.down" : "chevron.right")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Color.clear.frame(width: 9, height: 9)
+                    }
+                    Text(row.node.name)
+                        .font(.system(size: model.databaseSidebarFontSize, design: model.databaseSidebarMonospaceFont ? .monospaced : .default))
+                        .foregroundStyle(Color(nsColor: DatabaseSidebarTableChrome.textColor(model.databaseSidebarTextColor)))
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .padding(.leading, CGFloat(row.depth) * model.databaseSidebarChildIndentPoints)
+                .contentShape(Rectangle())
+                .onTapGesture { model.selectLocalBrowserRow(row) }
+                .onTapGesture(count: 2) { model.activateLocalBrowserPath(row.node.path) }
+                .contextMenu {
+                    Button("Set as Playlist") { model.activateLocalBrowserPath(row.node.path) }
+                    Button("Add to Playlist") { model.activateLocalBrowserPath(row.node.path, enqueue: true) }
+                    Button("Show in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: row.node.path)])
+                    }
+                }
+            }
+            .listStyle(.plain)
+        }
+    }
+}
+
+@MainActor
+private enum DatabaseSidebarTableChrome {
+    static func makeTableView(
+        rowHeight: CGFloat,
+        columnIdentifier: String,
+        coordinator: NSObject & NSTableViewDataSource & NSTableViewDelegate,
+        doubleAction: Selector,
+        activationHandler: @escaping () -> Void,
+        rowMenuProvider: @escaping (Int) -> NSMenu?,
+        selectionColor: NSColor,
+        supportsDragging: Bool = false
+    ) -> (scrollView: NSScrollView, tableView: DatabaseSidebarNativeTableView) {
+        let tableView = DatabaseSidebarNativeTableView(frame: .zero)
+        tableView.headerView = nil
+        tableView.rowHeight = rowHeight
+        tableView.intercellSpacing = NSSize(width: 0, height: 0)
+        tableView.focusRingType = .none
+        // Match the playlist's chrome. The automatic/source-list style keeps
+        // drawing its own selection behind the shared capsule overlay.
+        tableView.style = .fullWidth
+        tableView.selectionHighlightStyle = .none
+        tableView.usesAutomaticRowHeights = false
+        tableView.allowsEmptySelection = true
+        tableView.allowsMultipleSelection = true
+        tableView.backgroundColor = .clear
+        tableView.delegate = coordinator
+        tableView.dataSource = coordinator
+        tableView.doubleAction = doubleAction
+        tableView.target = coordinator
+        tableView.activationHandler = activationHandler
+        tableView.rowMenuProvider = rowMenuProvider
+        if supportsDragging {
+            tableView.setDraggingSourceOperationMask(.copy, forLocal: true)
+            tableView.setDraggingSourceOperationMask(.copy, forLocal: false)
+        }
+
+        let column = NSTableColumn(identifier: .init(columnIdentifier))
+        column.resizingMask = .autoresizingMask
+        tableView.addTableColumn(column)
+
+        let selectionHighlightView = AnimatedCapsuleSelectionHighlightView(frame: tableView.bounds)
+        selectionHighlightView.selectionColor = selectionColor
+        selectionHighlightView.autoresizingMask = [.width, .height]
+        tableView.addSubview(selectionHighlightView, positioned: .below, relativeTo: nil)
+        tableView.selectionHighlightView = selectionHighlightView
+
+        let scrollView = NSScrollView(frame: .zero)
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
+        scrollView.documentView = tableView
+        return (scrollView, tableView)
+    }
+
+    static func textCell(
+        in tableView: NSTableView,
+        identifier: NSUserInterfaceItemIdentifier
+    ) -> NSTableCellView {
+        tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTableCellView ?? {
+            let cell = NSTableCellView()
+            cell.identifier = identifier
+            let textField = NSTextField(labelWithString: "")
+            textField.translatesAutoresizingMaskIntoConstraints = false
+            textField.lineBreakMode = .byTruncatingTail
+            textField.usesSingleLineMode = true
+            cell.textField = textField
+            cell.addSubview(textField)
+            NSLayoutConstraint.activate([
+                textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
+                textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
+                textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
+            ])
+            return cell
+        }()
+    }
+
+    static func textColor(_ color: PlayerViewModel.DatabaseSidebarTextColor) -> NSColor {
+        switch color {
+        case .secondary: .secondaryLabelColor
+        case .primary: .labelColor
+        case .tertiary: .tertiaryLabelColor
+        }
+    }
+
+    static func reloadVisibleRows(in tableView: NSTableView) {
+        let visibleRange = tableView.rows(in: tableView.visibleRect)
+        guard visibleRange.length > 0 else { return }
+        let firstRow = max(0, visibleRange.location)
+        let lastRow = min(tableView.numberOfRows, NSMaxRange(visibleRange))
+        guard firstRow < lastRow else { return }
+        tableView.reloadData(
+            forRowIndexes: IndexSet(integersIn: firstRow..<lastRow),
+            columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns)
+        )
+    }
+
+    static func updateSelectionHighlight(in tableView: NSTableView, animated: Bool) {
+        let selectedRows = tableView.selectedRowIndexes.filter {
+            $0 >= 0 && $0 < tableView.numberOfRows
+        }
+        let rowRects = selectedRows.map(tableView.rect(ofRow:))
+        let highlight = (tableView as? DatabaseSidebarNativeTableView)?.selectionHighlightView
+        let stored = UserDefaults.standard.object(forKey: AppDefaultsKey.selectionAnimationMilliseconds) as? NSNumber
+        let enabled = UserDefaults.standard.object(forKey: AppDefaultsKey.selectionAnimationEnabled) as? Bool ?? true
+        highlight?.animationDuration = enabled ? Double(stored?.intValue ?? 200) / 1_000 : 0
+        highlight?.update(
+            selectionRects: rowRects,
+            primaryRect: selectedRows.count == 1 ? rowRects.first : nil,
+            animated: animated
+        )
+    }
+}
+
+private struct DatabaseGameListView: NSViewRepresentable {
+    @Bindable var model: PlayerViewModel
+    let sidebarFontSize: CGFloat
+    let sidebarTextColor: PlayerViewModel.DatabaseSidebarTextColor
+    let sidebarMonospace: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            model: model,
+            sidebarFontSize: sidebarFontSize,
+            sidebarTextColor: sidebarTextColor,
+            sidebarMonospace: sidebarMonospace
+        )
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let chrome = DatabaseSidebarTableChrome.makeTableView(
+            rowHeight: model.databaseSidebarFontSize + 5,
+            columnIdentifier: "Game",
+            coordinator: context.coordinator,
+            doubleAction: #selector(Coordinator.handleDoubleAction(_:)),
+            activationHandler: { [weak coordinator = context.coordinator] in
+            coordinator?.handleReturnActivation()
+            },
+            rowMenuProvider: { [weak coordinator = context.coordinator] row in
+                coordinator?.makeRowMenu(clickedRow: row)
+            },
+            selectionColor: NSColor.controlAccentColor
+        )
+        context.coordinator.attach(tableView: chrome.tableView)
+        return chrome.scrollView
+    }
+
+    func updateNSView(_ nsView: NSScrollView, context: Context) {
+        context.coordinator.model = model
+        context.coordinator.setSelectionColor(NSColor.controlAccentColor)
+        context.coordinator.sidebarFontSize = sidebarFontSize
+        context.coordinator.sidebarTextColor = sidebarTextColor
+        context.coordinator.sidebarMonospace = sidebarMonospace
+        context.coordinator.reload()
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+        private enum SidebarRow {
+            case system(String, isExpanded: Bool)
+            case game(DatabaseGameItem)
+
+            var game: DatabaseGameItem? {
+                guard case .game(let item) = self else { return nil }
+                return item
+            }
+        }
+
+        @Bindable var model: PlayerViewModel
+        var sidebarFontSize: CGFloat
+        var sidebarTextColor: PlayerViewModel.DatabaseSidebarTextColor
+        var sidebarMonospace: Bool
+        private weak var tableView: DatabaseSidebarNativeTableView?
+        private var reloadScheduled = false
+        private var isSynchronizingTableSelection = false
+        private var cachedSidebarRows: [SidebarRow] = []
+        private var lastSidebarContentRevision = -1
+        private var lastSidebarSystemMode: Bool?
+        private var lastExpandedSystems: Set<String>?
+        private var lastSelectionIDs: Set<String> = []
+        private var lastFontSize: CGFloat?
+        private var lastTextColor: PlayerViewModel.DatabaseSidebarTextColor?
+        private var lastMonospace: Bool?
+
+        func setSelectionColor(_ color: NSColor) {
+            tableView?.selectionHighlightView?.selectionColor = color
+        }
+
+        init(
+            model: PlayerViewModel,
+            sidebarFontSize: CGFloat,
+            sidebarTextColor: PlayerViewModel.DatabaseSidebarTextColor,
+            sidebarMonospace: Bool
+        ) {
+            self._model = Bindable(model)
+            self.sidebarFontSize = sidebarFontSize
+            self.sidebarTextColor = sidebarTextColor
+            self.sidebarMonospace = sidebarMonospace
+        }
+
+        func attach(tableView: DatabaseSidebarNativeTableView) {
+            self.tableView = tableView
+        }
+
+        func reload() {
+            guard let tableView else { return }
+            let sidebarContentRevision = model.databaseSidebar.contentRevision
+            let expandedSystems = model.expandedDatabaseSystems
+            let sidebarDataChanged = sidebarContentRevision != lastSidebarContentRevision
+                || model.sidebarSystemMode != lastSidebarSystemMode
+                || expandedSystems != lastExpandedSystems
+            let needsContentReload = sidebarDataChanged
+                || sidebarFontSize != lastFontSize
+                || sidebarTextColor != lastTextColor
+                || sidebarMonospace != lastMonospace
+            let selectionChanged = model.selectedDatabaseGameIDs != lastSelectionIDs
+            guard needsContentReload || selectionChanged else { return }
+
+            lastSelectionIDs = model.selectedDatabaseGameIDs
+            lastFontSize = sidebarFontSize
+            lastTextColor = sidebarTextColor
+            lastMonospace = sidebarMonospace
+
+            if sidebarDataChanged {
+                cachedSidebarRows = makeSidebarRows()
+                lastSidebarContentRevision = sidebarContentRevision
+                lastSidebarSystemMode = model.sidebarSystemMode
+                lastExpandedSystems = expandedSystems
+            }
+
+            guard needsContentReload else {
+                syncSelection(in: tableView, refreshHighlight: false, scrollToSelection: selectionChanged)
+                return
+            }
+
+            guard !reloadScheduled else { return }
+            reloadScheduled = true
+
+            DispatchQueue.main.async { [weak self, weak tableView] in
+                guard let self, let tableView else { return }
+                self.reloadScheduled = false
+                tableView.reloadData()
+                self.syncSelection(in: tableView, refreshHighlight: true, scrollToSelection: selectionChanged)
+            }
+        }
+
+        private func syncSelection(
+            in tableView: NSTableView,
+            refreshHighlight: Bool,
+            scrollToSelection: Bool = true
+        ) {
+            isSynchronizingTableSelection = true
+            defer { isSynchronizingTableSelection = false }
+            let rows = IndexSet(cachedSidebarRows.enumerated().compactMap { index, row in
+                row.game.flatMap { model.selectedDatabaseGameIDs.contains($0.id) ? index : nil }
+            })
+            var selectionChanged = false
+
+            if !rows.isEmpty {
+                if tableView.selectedRowIndexes != rows {
+                    tableView.selectRowIndexes(rows, byExtendingSelection: false)
+                    selectionChanged = true
+                }
+                if scrollToSelection, let row = rows.last {
+                    tableView.scrollRowToVisible(row)
+                }
+            } else if tableView.selectedRow != -1 {
+                tableView.deselectAll(nil)
+                selectionChanged = true
+            }
+            if refreshHighlight || selectionChanged {
+                DatabaseSidebarTableChrome.updateSelectionHighlight(in: tableView, animated: false)
+            }
+        }
+
+        func numberOfRows(in tableView: NSTableView) -> Int {
+            cachedSidebarRows.count
+        }
+
+        func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+            sidebarFontSize + 5
+        }
+
+        func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
+            guard row >= 0, row < cachedSidebarRows.count else { return false }
+            if case .system(let systemName, _) = cachedSidebarRows[row] {
+                model.toggleDatabaseSystemExpansion(systemName)
+                reload()
+                return false
+            }
+            return true
+        }
+
+        func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+            guard row >= 0, row < cachedSidebarRows.count else { return nil }
+            let rowItem = cachedSidebarRows[row]
+            let identifier = NSUserInterfaceItemIdentifier("DatabaseGameCell")
+            let cell = DatabaseSidebarTableChrome.textCell(in: tableView, identifier: identifier)
+
+            switch rowItem {
+            case .system(let systemName, let isExpanded):
+                cell.textField?.stringValue = "\(isExpanded ? "▾" : "▸")  \(systemName)"
+                cell.textField?.font = sidebarMonospace
+                    ? .monospacedSystemFont(ofSize: sidebarFontSize, weight: .semibold)
+                    : .boldSystemFont(ofSize: sidebarFontSize)
+            case .game(let item):
+                cell.textField?.stringValue = model.sidebarSystemMode ? "    \(item.name)" : item.displayName
+                cell.textField?.font = sidebarMonospace
+                    ? .monospacedSystemFont(ofSize: sidebarFontSize, weight: .regular)
+                    : .systemFont(ofSize: sidebarFontSize)
+            }
+            cell.textField?.textColor = DatabaseSidebarTableChrome.textColor(sidebarTextColor)
+            return cell
+        }
+
+        func tableViewSelectionDidChange(_ notification: Notification) {
+            guard !isSynchronizingTableSelection else { return }
+            guard let tableView else { return }
+            let rows = tableView.selectedRowIndexes.filter { $0 >= 0 && $0 < cachedSidebarRows.count }
+            let items = rows.compactMap { cachedSidebarRows[$0].game }
+            let ids = items.map(\.id)
+            let primaryID = items.last?.id
+            model.selectDatabaseGames(ids: ids, primaryID: primaryID)
+            reloadVisibleRows()
+            DatabaseSidebarTableChrome.updateSelectionHighlight(in: tableView, animated: true)
+        }
+
+        @objc func handleDoubleAction(_ sender: Any?) {
+            guard let tableView else { return }
+            let row = tableView.clickedRow >= 0 ? tableView.clickedRow : tableView.selectedRow
+            guard row >= 0, row < cachedSidebarRows.count else { return }
+            if case .system(let systemName, _) = cachedSidebarRows[row] {
+                model.toggleDatabaseSystemExpansion(systemName)
+                reload()
+                return
+            }
+            guard let item = cachedSidebarRows[row].game else { return }
+            switch model.sidebarDoubleClickAction {
+            case .playNow:
+                model.activateDatabaseGame(item, replace: true)
+            case .enqueue:
+                model.activateDatabaseGame(item, replace: false)
+            }
+        }
+
+        func handleReturnActivation() {
+            model.activateSelectedDatabaseGamesWithReturn()
+        }
+
+        func makeRowMenu(clickedRow: Int) -> NSMenu? {
+            guard clickedRow >= 0, clickedRow < cachedSidebarRows.count,
+                  let item = cachedSidebarRows[clickedRow].game else { return nil }
+            let menu = NSMenu(title: "Actions")
+
+            let playNow = NSMenuItem(title: "Set as Playlist", action: #selector(handlePlayNow(_:)), keyEquivalent: "")
+            playNow.representedObject = item.id
+            playNow.target = self
+            menu.addItem(playNow)
+
+            let enqueue = NSMenuItem(title: "Add to Playlist", action: #selector(handleEnqueue(_:)), keyEquivalent: "")
+            enqueue.representedObject = item.id
+            enqueue.target = self
+            menu.addItem(enqueue)
+
+            let favorite = NSMenuItem(title: "Toggle Favorites", action: #selector(handleFavorite(_:)), keyEquivalent: "")
+            favorite.representedObject = item.id
+            favorite.target = self
+            menu.addItem(favorite)
+
+            let showInFinder = NSMenuItem(title: "Show in Finder", action: #selector(handleShowInFinder(_:)), keyEquivalent: "")
+            showInFinder.representedObject = URL(fileURLWithPath: item.rootPath).standardizedFileURL
+            showInFinder.target = self
+            showInFinder.isEnabled = !item.rootPath.isEmpty
+            menu.addItem(showInFinder)
+
+            return menu
+        }
+
+        @objc private func handlePlayNow(_ sender: NSMenuItem) {
+            guard let id = sender.representedObject as? String,
+                  let item = model.databaseGameItems.first(where: { $0.id == id }) else { return }
+            model.activateDatabaseGame(item, replace: true)
+        }
+
+        @objc private func handleEnqueue(_ sender: NSMenuItem) {
+            guard let id = sender.representedObject as? String,
+                  let item = model.databaseGameItems.first(where: { $0.id == id }) else { return }
+            model.activateDatabaseGame(item, replace: false)
+        }
+
+        @objc private func handleFavorite(_ sender: NSMenuItem) {
+            guard let id = sender.representedObject as? String,
+                  let item = model.databaseGameItems.first(where: { $0.id == id }) else { return }
+            model.toggleFavorites(for: item)
+        }
+
+        @objc private func handleShowInFinder(_ sender: NSMenuItem) {
+            guard let url = sender.representedObject as? URL else { return }
+            model.showOnDisk(url)
+        }
+
+        private func reloadVisibleRows() {
+            guard let tableView else { return }
+            DatabaseSidebarTableChrome.reloadVisibleRows(in: tableView)
+        }
+
+        private func makeSidebarRows() -> [SidebarRow] {
+            let items = model.visibleDatabaseGameItems
+            guard model.sidebarSystemMode else { return items.map(SidebarRow.game) }
+
+            let grouped = Dictionary(grouping: items, by: model.sidebarSystemName(for:))
+            return grouped.keys.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+                .flatMap { systemName in
+                    let isExpanded = model.expandedDatabaseSystems.contains(systemName)
+                    let children = isExpanded ? (grouped[systemName] ?? []).map(SidebarRow.game) : []
+                    return [.system(systemName, isExpanded: isExpanded)] + children
+                }
+        }
+    }
+}
+
+private struct DatabaseFileListView: NSViewRepresentable {
+    @Bindable var model: PlayerViewModel
+    let sidebarFontSize: CGFloat
+    let sidebarTextColor: PlayerViewModel.DatabaseSidebarTextColor
+    let sidebarMonospace: Bool
+    let sidebarDisclosureGap: CGFloat
+    let sidebarChildIndent: CGFloat
+    let hideFileExtensions: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            model: model,
+            sidebarFontSize: sidebarFontSize,
+            sidebarTextColor: sidebarTextColor,
+            sidebarMonospace: sidebarMonospace,
+            sidebarDisclosureGap: sidebarDisclosureGap,
+            sidebarChildIndent: sidebarChildIndent,
+            hideFileExtensions: hideFileExtensions
+        )
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let chrome = DatabaseSidebarTableChrome.makeTableView(
+            rowHeight: model.databaseSidebarFontSize + 5,
+            columnIdentifier: "File",
+            coordinator: context.coordinator,
+            doubleAction: #selector(Coordinator.handleDoubleAction(_:)),
+            activationHandler: { [weak coordinator = context.coordinator] in
+                coordinator?.handleReturnActivation()
+            },
+            rowMenuProvider: { [weak coordinator = context.coordinator] row in
+                coordinator?.makeRowMenu(clickedRow: row)
+            },
+            selectionColor: NSColor.controlAccentColor,
+            supportsDragging: true
+        )
+        context.coordinator.attach(tableView: chrome.tableView)
+        chrome.tableView.spaceHandler = { [weak coordinator = context.coordinator] in
+            coordinator?.toggleSelectedFolderDisclosure()
+        }
+        return chrome.scrollView
+    }
+
+    func updateNSView(_ nsView: NSScrollView, context: Context) {
+        context.coordinator.model = model
+        context.coordinator.setSelectionColor(NSColor.controlAccentColor)
+        context.coordinator.sidebarFontSize = sidebarFontSize
+        context.coordinator.sidebarTextColor = sidebarTextColor
+        context.coordinator.sidebarMonospace = sidebarMonospace
+        context.coordinator.sidebarDisclosureGap = sidebarDisclosureGap
+        context.coordinator.sidebarChildIndent = sidebarChildIndent
+        context.coordinator.hideFileExtensions = hideFileExtensions
+        context.coordinator.reload()
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+        @Bindable var model: PlayerViewModel
+        var sidebarFontSize: CGFloat
+        var sidebarTextColor: PlayerViewModel.DatabaseSidebarTextColor
+        var sidebarMonospace: Bool
+        var sidebarDisclosureGap: CGFloat
+        var sidebarChildIndent: CGFloat
+        var hideFileExtensions: Bool
+        private weak var tableView: DatabaseSidebarNativeTableView?
+        private var reloadScheduled = false
+        private var isSynchronizingTableSelection = false
+        private var cachedRows: [DatabaseFileSidebarTree.Row] = []
+        private var lastContentRevision = -1
+        private var lastExpandedFolderIDs: Set<String> = []
+        private var lastSelectionIDs: Set<String> = []
+        private var lastSelectedFolders: Set<DatabaseFileSidebarFolder> = []
+        private var lastFontSize: CGFloat?
+        private var lastTextColor: PlayerViewModel.DatabaseSidebarTextColor?
+        private var lastMonospace: Bool?
+        private var lastDisclosureGap: CGFloat?
+        private var lastChildIndent: CGFloat?
+        private var lastHideFileExtensions: Bool?
+
+        func setSelectionColor(_ color: NSColor) {
+            tableView?.selectionHighlightView?.selectionColor = color
+        }
+
+        private final class ContextMenuAction: NSObject {
+            let payload: DatabaseFileSidebarDragPayload
+
+            init(payload: DatabaseFileSidebarDragPayload) {
+                self.payload = payload
+            }
+        }
+
+        init(
+            model: PlayerViewModel,
+            sidebarFontSize: CGFloat,
+            sidebarTextColor: PlayerViewModel.DatabaseSidebarTextColor,
+            sidebarMonospace: Bool,
+            sidebarDisclosureGap: CGFloat,
+            sidebarChildIndent: CGFloat,
+            hideFileExtensions: Bool
+        ) {
+            self._model = Bindable(model)
+            self.sidebarFontSize = sidebarFontSize
+            self.sidebarTextColor = sidebarTextColor
+            self.sidebarMonospace = sidebarMonospace
+            self.sidebarDisclosureGap = sidebarDisclosureGap
+            self.sidebarChildIndent = sidebarChildIndent
+            self.hideFileExtensions = hideFileExtensions
+        }
+
+        func attach(tableView: DatabaseSidebarNativeTableView) {
+            self.tableView = tableView
+            tableView.rowClickHandler = { [weak self] row, point, modifierFlags, wasSelected in
+                self?.handleFolderClick(
+                    row: row,
+                    locationX: point.x,
+                    modifierFlags: modifierFlags,
+                    wasSelected: wasSelected
+                ) ?? false
+            }
+        }
+
+        func reload() {
+            guard let tableView else { return }
+            let contentRevision = model.databaseFileSidebar.contentRevision
+            let expandedFolderIDs = model.databaseFileSidebar.expandedFolderIDs
+            let treeChanged = contentRevision != lastContentRevision || expandedFolderIDs != lastExpandedFolderIDs
+            let needsContentReload = treeChanged
+                || sidebarFontSize != lastFontSize
+                || sidebarTextColor != lastTextColor
+                || sidebarMonospace != lastMonospace
+                || sidebarDisclosureGap != lastDisclosureGap
+                || sidebarChildIndent != lastChildIndent
+                || hideFileExtensions != lastHideFileExtensions
+            let selectionChanged = model.selectedDatabaseFileIDs != lastSelectionIDs
+                || model.selectedDatabaseFileFolders != lastSelectedFolders
+            guard needsContentReload || selectionChanged else { return }
+
+            lastSelectionIDs = model.selectedDatabaseFileIDs
+            lastSelectedFolders = model.selectedDatabaseFileFolders
+            lastFontSize = sidebarFontSize
+            lastTextColor = sidebarTextColor
+            lastMonospace = sidebarMonospace
+            lastDisclosureGap = sidebarDisclosureGap
+            lastChildIndent = sidebarChildIndent
+            lastHideFileExtensions = hideFileExtensions
+            if treeChanged {
+                cachedRows = model.databaseFileSidebar.rows()
+                lastContentRevision = contentRevision
+                lastExpandedFolderIDs = expandedFolderIDs
+            }
+
+            guard needsContentReload else {
+                syncSelection(in: tableView, refreshHighlight: false, scrollToSelection: selectionChanged)
+                return
+            }
+            guard !reloadScheduled else { return }
+            reloadScheduled = true
+            DispatchQueue.main.async { [weak self, weak tableView] in
+                guard let self, let tableView else { return }
+                self.reloadScheduled = false
+                self.isSynchronizingTableSelection = true
+                defer { self.isSynchronizingTableSelection = false }
+                tableView.reloadData()
+                self.syncSelection(in: tableView, refreshHighlight: true, scrollToSelection: selectionChanged)
+            }
+        }
+
+        private func syncSelection(
+            in tableView: NSTableView,
+            refreshHighlight: Bool,
+            scrollToSelection: Bool = true
+        ) {
+            let rows = IndexSet(cachedRows.enumerated().compactMap { index, row in
+                switch row {
+                case .file(let item, _):
+                    model.selectedDatabaseFileIDs.contains(item.id) ? index : nil
+                case .folder(let id, _, _, _):
+                    model.selectedDatabaseFileFolders.contains(where: { $0.id == id }) ? index : nil
+                }
+            })
+            var selectionChanged = false
+            if !rows.isEmpty {
+                if tableView.selectedRowIndexes != rows {
+                    tableView.selectRowIndexes(rows, byExtendingSelection: false)
+                    selectionChanged = true
+                }
+                if scrollToSelection, let row = rows.last {
+                    tableView.scrollRowToVisible(row)
+                }
+            } else if tableView.selectedRow != -1 {
+                tableView.deselectAll(nil)
+                selectionChanged = true
+            }
+            if refreshHighlight || selectionChanged {
+                DatabaseSidebarTableChrome.updateSelectionHighlight(in: tableView, animated: false)
+            }
+        }
+
+        func numberOfRows(in tableView: NSTableView) -> Int {
+            cachedRows.count
+        }
+
+        func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+            sidebarFontSize + 5
+        }
+
+        func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
+            row >= 0 && row < cachedRows.count
+        }
+
+        func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+            guard row >= 0, row < cachedRows.count else { return nil }
+            let identifier = NSUserInterfaceItemIdentifier("DatabaseFileCell")
+            let cell = (tableView.makeView(withIdentifier: identifier, owner: self) as? DatabaseFileSidebarCellView)
+                ?? DatabaseFileSidebarCellView(identifier: identifier)
+
+            switch cachedRows[row] {
+            case .folder(_, let title, let depth, let isExpanded):
+                let font: NSFont = sidebarMonospace
+                    ? NSFont.monospacedSystemFont(ofSize: sidebarFontSize, weight: .semibold)
+                    : NSFont.boldSystemFont(ofSize: sidebarFontSize)
+                cell.configureFolder(
+                    title: title,
+                    depth: depth,
+                    isExpanded: isExpanded,
+                    font: font,
+                    color: DatabaseSidebarTableChrome.textColor(sidebarTextColor),
+                    fontSize: sidebarFontSize,
+                    disclosureGap: sidebarDisclosureGap,
+                    childIndent: sidebarChildIndent
+                )
+            case .file(let item, let depth):
+                let font: NSFont = sidebarMonospace
+                    ? NSFont.monospacedSystemFont(ofSize: sidebarFontSize, weight: .regular)
+                    : NSFont.systemFont(ofSize: sidebarFontSize)
+                cell.configureFile(
+                    title: displayedFilename(for: item),
+                    depth: depth,
+                    font: font,
+                    color: DatabaseSidebarTableChrome.textColor(sidebarTextColor),
+                    fontSize: sidebarFontSize,
+                    disclosureGap: sidebarDisclosureGap,
+                    childIndent: sidebarChildIndent
+                )
+            }
+            return cell
+        }
+
+        func tableViewSelectionDidChange(_ notification: Notification) {
+            guard let tableView else { return }
+            // Reloading a collapsed tree can generate a synthetic selection
+            // notification for the retained folder row. Only an actual user
+            // selection should auto-expand a folder; otherwise a second click
+            // can never leave the selected folder folded.
+            guard !isSynchronizingTableSelection else { return }
+            let rows = tableView.selectedRowIndexes.filter { $0 >= 0 && $0 < cachedRows.count }
+            let items = rows.compactMap { cachedRows[$0].file }
+            let folders = rows.compactMap { row -> DatabaseFileSidebarFolder? in
+                guard case .folder(_, _, _, _) = cachedRows[row],
+                      let folder = folder(for: cachedRows[row]) else { return nil }
+                return folder
+            }
+            model.selectDatabaseFileSidebarItems(
+                fileIDs: items.map(\.id),
+                primaryFileID: items.last?.id,
+                folders: folders
+            )
+            // Files mode uses the initial user selection as its normal
+            // disclosure gesture. A subsequent plain click is intercepted by
+            // `handleFolderClick` and toggles the selected folder.
+            if items.isEmpty, folders.count == 1, let folder = folders.first {
+                model.expandDatabaseFileFolder(folder.id)
+            }
+            if folders.isEmpty, items.count == 1, let item = items.first,
+               DatabaseFileSidebarInteraction.shouldPopulatePlaylistOnSelection(item) {
+                model.activateDatabaseFile(item, replace: true)
+            }
+            reloadVisibleRows()
+            DatabaseSidebarTableChrome.updateSelectionHighlight(in: tableView, animated: true)
+        }
+
+        @objc func handleDoubleAction(_ sender: Any?) {
+            guard let tableView else { return }
+            let row = tableView.clickedRow >= 0 ? tableView.clickedRow : tableView.selectedRow
+            guard row >= 0, row < cachedRows.count else { return }
+            if let folder = folder(for: cachedRows[row]) {
+                model.activateDatabaseFileFolder(folder)
+                return
+            }
+            model.activateSelectedDatabaseFilesWithReturn()
+        }
+
+        func handleReturnActivation() {
+            model.activateSelectedDatabaseFilesWithReturn()
+        }
+
+        func makeRowMenu(clickedRow: Int) -> NSMenu? {
+            guard clickedRow >= 0, clickedRow < cachedRows.count else { return nil }
+            let action = ContextMenuAction(
+                payload: dragPayload(for: IndexSet(integer: clickedRow))
+            )
+            let menu = NSMenu(title: "Actions")
+            let showOnDisk = NSMenuItem(title: "Show in Finder", action: #selector(handleShowOnDisk(_:)), keyEquivalent: "")
+            showOnDisk.representedObject = fileURL(for: cachedRows[clickedRow])
+            showOnDisk.target = self
+            menu.addItem(showOnDisk)
+            menu.addItem(.separator())
+            let playNow = NSMenuItem(title: "Set as Playlist", action: #selector(handlePlayNow(_:)), keyEquivalent: "")
+            playNow.representedObject = action
+            playNow.target = self
+            menu.addItem(playNow)
+            let enqueue = NSMenuItem(title: "Add to Playlist", action: #selector(handleEnqueue(_:)), keyEquivalent: "")
+            enqueue.representedObject = action
+            enqueue.target = self
+            menu.addItem(enqueue)
+            return menu
+        }
+
+        @objc private func handlePlayNow(_ sender: NSMenuItem) {
+            guard let action = sender.representedObject as? ContextMenuAction else { return }
+            model.queueDatabaseFileSidebarSelection(action.payload, replace: true)
+        }
+
+        @objc private func handleEnqueue(_ sender: NSMenuItem) {
+            guard let action = sender.representedObject as? ContextMenuAction else { return }
+            model.queueDatabaseFileSidebarSelection(action.payload, replace: false)
+        }
+
+        @objc private func handleShowOnDisk(_ sender: NSMenuItem) {
+            guard let url = sender.representedObject as? URL else { return }
+            model.showOnDisk(url)
+        }
+
+        nonisolated func tableView(_ tableView: NSTableView, writeRowsWith rowIndexes: IndexSet, to pasteboard: NSPasteboard) -> Bool {
+            let data: Data? = MainActor.assumeIsolated { () -> Data? in
+                let payload = dragPayload(for: rowIndexes)
+                guard !payload.fileIDs.isEmpty || !payload.folders.isEmpty,
+                      let data = try? JSONEncoder().encode(payload) else {
+                    return nil
+                }
+                return data
+            }
+            guard let data else { return false }
+            pasteboard.clearContents()
+            pasteboard.setData(data, forType: databaseFileSidebarDragType)
+            return true
+        }
+
+        private func handleFolderClick(
+            row: Int,
+            locationX: CGFloat,
+            modifierFlags: NSEvent.ModifierFlags,
+            wasSelected: Bool
+        ) -> Bool {
+            guard row >= 0,
+                  row < cachedRows.count,
+                  DatabaseFileSidebarInteraction.allowsFolderDisclosure(modifierFlags: modifierFlags),
+                  case .folder(let id, _, let depth, _) = cachedRows[row] else {
+                return false
+            }
+            let clickedDisclosure = DatabaseFileSidebarInteraction.isDisclosureHit(
+                locationX: locationX,
+                depth: depth,
+                fontSize: sidebarFontSize,
+                gap: sidebarDisclosureGap,
+                childIndent: sidebarChildIndent
+            )
+            let gesture: SidebarRowGesture = clickedDisclosure ? .disclosureClick : .primaryClick
+            guard SidebarRowInteraction.intent(kind: .folder, gesture: gesture, wasSelected: wasSelected) == .toggleExpansion else {
+                return false
+            }
+            model.toggleDatabaseFileFolder(id)
+            reload()
+            return true
+        }
+
+        func toggleSelectedFolderDisclosure() {
+            guard let tableView,
+                  tableView.selectedRow >= 0,
+                  tableView.selectedRow < cachedRows.count,
+                  case .folder(let id, _, _, _) = cachedRows[tableView.selectedRow] else {
+                return
+            }
+            model.toggleDatabaseFileFolder(id)
+            reload()
+        }
+
+        private func folder(for row: DatabaseFileSidebarTree.Row) -> DatabaseFileSidebarFolder? {
+            guard case .folder(let id, _, _, _) = row else { return nil }
+            return model.databaseFileSidebar.folder(forID: id)
+        }
+
+        private func displayedFilename(for item: DatabaseFileItem) -> String {
+            guard hideFileExtensions else { return item.filename }
+            return FilenamePresentation.withoutDisplayedExtension(item.filename)
+        }
+
+        private func fileURL(for row: DatabaseFileSidebarTree.Row) -> URL? {
+            switch row {
+            case .file(let item, _):
+                URL(fileURLWithPath: item.path)
+            case .folder:
+                folder(for: row).map { URL(fileURLWithPath: $0.path, isDirectory: true) }
+            }
+        }
+
+        private func dragPayload(for rows: IndexSet) -> DatabaseFileSidebarDragPayload {
+            let validRows = rows.filter { $0 >= 0 && $0 < cachedRows.count }
+            return DatabaseFileSidebarDragPayload(
+                fileIDs: validRows.compactMap { cachedRows[$0].file?.id },
+                folders: validRows.compactMap { folder(for: cachedRows[$0]) }
+            )
+        }
+
+        private func reloadVisibleRows() {
+            guard let tableView else { return }
+            DatabaseSidebarTableChrome.reloadVisibleRows(in: tableView)
+        }
+    }
+}
+
+@MainActor
+private final class DatabaseFileSidebarCellView: NSTableCellView {
+    private let disclosureField = NSTextField(labelWithString: "")
+    private let titleField = NSTextField(labelWithString: "")
+    private var disclosureLeadingConstraint: NSLayoutConstraint!
+    private var disclosureWidthConstraint: NSLayoutConstraint!
+    private var titleLeadingConstraint: NSLayoutConstraint!
+
+    init(identifier: NSUserInterfaceItemIdentifier) {
+        super.init(frame: .zero)
+        self.identifier = identifier
+
+        disclosureField.translatesAutoresizingMaskIntoConstraints = false
+        titleField.translatesAutoresizingMaskIntoConstraints = false
+        disclosureField.alignment = .center
+        titleField.lineBreakMode = .byTruncatingTail
+        addSubview(disclosureField)
+        addSubview(titleField)
+
+        disclosureLeadingConstraint = disclosureField.leadingAnchor.constraint(equalTo: leadingAnchor)
+        disclosureWidthConstraint = disclosureField.widthAnchor.constraint(equalToConstant: 10)
+        titleLeadingConstraint = titleField.leadingAnchor.constraint(equalTo: leadingAnchor)
+        NSLayoutConstraint.activate([
+            disclosureLeadingConstraint,
+            titleLeadingConstraint,
+            disclosureWidthConstraint,
+            disclosureField.centerYAnchor.constraint(equalTo: centerYAnchor),
+            titleField.centerYAnchor.constraint(equalTo: centerYAnchor),
+            titleField.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -4)
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func configureFolder(
+        title: String,
+        depth: Int,
+        isExpanded: Bool,
+        font: NSFont,
+        color: NSColor,
+        fontSize: CGFloat,
+        disclosureGap: CGFloat,
+        childIndent: CGFloat
+    ) {
+        disclosureField.isHidden = false
+        disclosureField.stringValue = isExpanded ? "▾" : "▸"
+        disclosureField.font = font
+        disclosureField.textColor = color
+        disclosureWidthConstraint.constant = DatabaseFileSidebarInteraction.disclosureGlyphWidth(fontSize: fontSize)
+        titleField.stringValue = title
+        titleField.font = font
+        titleField.textColor = color
+        disclosureLeadingConstraint.constant = DatabaseFileSidebarInteraction.disclosureOrigin(
+            depth: depth,
+            fontSize: fontSize,
+            gap: disclosureGap,
+            childIndent: childIndent
+        )
+        titleLeadingConstraint.constant = DatabaseFileSidebarInteraction.titleLeading(
+            depth: depth,
+            fontSize: fontSize,
+            gap: disclosureGap,
+            childIndent: childIndent
+        )
+    }
+
+    func configureFile(
+        title: String,
+        depth: Int,
+        font: NSFont,
+        color: NSColor,
+        fontSize: CGFloat,
+        disclosureGap: CGFloat,
+        childIndent: CGFloat
+    ) {
+        disclosureField.isHidden = true
+        disclosureWidthConstraint.constant = 0
+        titleField.stringValue = title
+        titleField.font = font
+        titleField.textColor = color
+        titleLeadingConstraint.constant = DatabaseFileSidebarInteraction.disclosureOrigin(
+            depth: depth,
+            fontSize: fontSize,
+            gap: disclosureGap,
+            childIndent: childIndent
+        )
+    }
+}
+
+@MainActor
+private final class DatabaseSidebarNativeTableView: NSTableView {
+    weak var selectionHighlightView: AnimatedCapsuleSelectionHighlightView?
+    var activationHandler: (() -> Void)?
+    var spaceHandler: (() -> Void)?
+    var rowMenuProvider: ((Int) -> NSMenu?)?
+    var rowClickHandler: ((Int, CGPoint, NSEvent.ModifierFlags, Bool) -> Bool)?
+
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        let clickedRow = row(at: point)
+        if event.clickCount == 1,
+           clickedRow >= 0,
+           rowClickHandler?(clickedRow, point, event.modifierFlags, selectedRowIndexes.contains(clickedRow)) == true {
+            return
+        }
+        super.mouseDown(with: event)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        switch event.keyCode {
+        case 36, 76:
+            activationHandler?()
+        case 49:
+            spaceHandler?()
+        default:
+            super.keyDown(with: event)
+        }
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let point = convert(event.locationInWindow, from: nil)
+        let clickedRow = row(at: point)
+        guard clickedRow >= 0 else { return super.menu(for: event) }
+        return rowMenuProvider?(clickedRow) ?? super.menu(for: event)
+    }
+}

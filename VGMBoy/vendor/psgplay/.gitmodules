@@ -1,0 +1,12 @@
+[submodule "toslibc"]
+	path = lib/toslibc
+	url = ../toslibc
+[submodule "lib/cf2149"]
+	path = lib/cf2149
+	url = ../cf2149
+[submodule "lib/cf68901"]
+	path = lib/cf68901
+	url = ../cf68901
+[submodule "lib/cf300588"]
+	path = lib/cf300588
+	url = ../cf300588

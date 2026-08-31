@@ -1,0 +1,113 @@
+name: Compile TOS/libc
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    container: ghcr.io/frno7/gentoo-m68k:main
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Archive tag
+        run: |
+          echo "ARCHIVE_TAG=${GITHUB_REF_NAME}-${GITHUB_SHA:0:8}" >> $GITHUB_ENV
+
+      - name: Compile and install TOS/libc with Linux
+        env:
+          TARGET_COMPILE: m68k-elf-
+        run: |
+          JOBS="$(getconf _NPROCESSORS_ONLN)"
+          # Avoid fatal: unsafe repository (directory is owned by someone else)
+          # Confer https://github.com/actions/checkout/issues/760
+          git config --global --add safe.directory "$PWD"
+          make -j"$JOBS" V=1 S=1
+          make -j"$JOBS" V=1 S=1 install
+          ls -lR ~/.local/usr/m68k-atari-tos-gnu
+          export PATH=~/.local/usr/m68k-atari-tos-gnu/bin:"$PATH"
+          (cd ~/.local/usr/m68k-atari-tos-gnu/share/toslibc/example && make clean && make)
+          mkdir local32 && cp -ra ~/.local/usr/m68k-atari-tos-gnu/share/toslibc/example local32
+          cp -ra example example32
+          cp -ra test test32
+          :
+          rm -rf ~/.local/usr/m68k-atari-tos-gnu
+          make clean
+          git clean -fdx -e example32 -e local32 -e test32
+          :
+          make -j"$JOBS" V=1 INT16=1 prefix="$HOME/.local/usr/m68k-atari-tos16-gnu"
+          make -j"$JOBS" V=1 INT16=1 prefix="$HOME/.local/usr/m68k-atari-tos16-gnu" install
+          ls -lR ~/.local/usr/m68k-atari-tos16-gnu
+          export PATH=~/.local/usr/m68k-atari-tos16-gnu/bin:"$PATH"
+          (cd ~/.local/usr/m68k-atari-tos16-gnu/share/toslibc/example && make clean && make)
+          mkdir local16 && cp -ra ~/.local/usr/m68k-atari-tos16-gnu/share/toslibc/example local16
+          cp -ra example example16
+          cp -ra test test16
+
+      - name: Publish examples and test suite
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: "example-test-${{ env.ARCHIVE_TAG }}"
+          if-no-files-found: error
+          compression-level: 9
+          path: |
+            example16/*.PRG
+            example16/*.TOS
+            example16/*.SNDH
+            example32/*.PRG
+            example32/*.TOS
+            example32/*.SNDH
+            local16/example/*.PRG
+            local16/example/*.TOS
+            local16/example/*.SNDH
+            local32/example/*.PRG
+            local32/example/*.TOS
+            local32/example/*.SNDH
+            test16/SUITE.TOS
+            test16/test.txt
+            test32/SUITE.TOS
+            test32/test.txt
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Update brew with gcc and m68k-elf-gcc
+        run: |
+          brew update
+          brew install gcc m68k-elf-gcc
+
+      - name: Compile and install TOS/libc with Mac OS
+        env:
+          TARGET_COMPILE: m68k-elf-
+        run: |
+          brew_prefix="${HOMEBREW_PREFIX:-$(brew --prefix)}"
+          brew_gcc="$(find -L "$brew_prefix/bin" -name 'gcc-[0-9]*' 2>/dev/null | sort -Vr | head -n1)"
+          echo "$brew_gcc $($brew_gcc --version | sed -n 1p)"
+          JOBS="$(getconf _NPROCESSORS_ONLN)"
+          # Avoid fatal: unsafe repository (directory is owned by someone else)
+          # Confer https://github.com/actions/checkout/issues/760
+          git config --global --add safe.directory "*"
+          make -j"$JOBS" V=1 CC="$brew_gcc"
+          make -j"$JOBS" V=1 CC="$brew_gcc" install
+          ls -lR ~/.local/usr/m68k-atari-tos-gnu
+          export PATH=~/.local/usr/m68k-atari-tos-gnu/bin:"$PATH"
+          (cd ~/.local/usr/m68k-atari-tos-gnu/share/toslibc/example && make clean && make)
+          :
+          rm -rf ~/.local/usr/m68k-atari-tos-gnu
+          make clean
+          git clean -fdx
+          :
+          make -j"$JOBS" V=1 CC="$brew_gcc" INT16=1 prefix="$HOME/.local/usr/m68k-atari-tos16-gnu"
+          make -j"$JOBS" V=1 CC="$brew_gcc" INT16=1 prefix="$HOME/.local/usr/m68k-atari-tos16-gnu" install
+          ls -lR ~/.local/usr/m68k-atari-tos16-gnu
+          export PATH=~/.local/usr/m68k-atari-tos16-gnu/bin:"$PATH"
+          (cd ~/.local/usr/m68k-atari-tos16-gnu/share/toslibc/example && make clean && make)

@@ -1,0 +1,18 @@
+{
+	"id": "tekken5d",
+	"name": "Tekken 5: Dark Resurrection",
+	"driver": "sys246",
+	"dongle":
+	{
+		"name": "ted1vera.ic002"
+	},
+	"cdvd":
+	{
+		"name": "ted1dvd0b.chd"
+	},
+	"eeFrequencyScale": [4, 3],
+	"boot": "ac0:T55LOAD",
+	"patches":
+	[
+	]
+}

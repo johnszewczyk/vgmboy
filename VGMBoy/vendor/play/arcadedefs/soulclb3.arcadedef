@@ -1,0 +1,17 @@
+{
+	"id": "soulclb3",
+	"name": "Soul Calibur 3",
+	"driver": "sys246",
+	"dongle":
+	{
+		"name": "sc31001-na-a.ic002"
+	},
+	"cdvd":
+	{
+		"name": "sc31001-na-dvd0-b.chd"
+	},
+	"boot": "ac0:SC3LOAD",
+	"patches":
+	[
+	]
+}

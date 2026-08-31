@@ -1,0 +1,197 @@
+diff --git a/Source/MA_MIPSIV.h b/Source/MA_MIPSIV.h
+index 2f09f7d..5b1f2d0 100644
+--- a/Source/MA_MIPSIV.h
++++ b/Source/MA_MIPSIV.h
+@@ -7,4 +7,4 @@ class CMA_MIPSIV : public CMIPSArchitecture
+ {
+ public:
+-	CMA_MIPSIV(MIPS_REGSIZE);
++	CMA_MIPSIV(MIPS_REGSIZE, bool ps2DynamicLinkHack = false);
+ 	virtual ~CMA_MIPSIV() = default;
+@@ -69,6 +69,7 @@ protected:
+ 	uint8 m_nRD = 0;
+ 	uint8 m_nSA = 0;
+ 	uint16 m_nImmediate = 0;
++	bool m_ps2DynamicLinkHack = false;
+ 
+ protected:
+ 	struct MemoryAccessTraits
+diff --git a/Source/MA_MIPSIV.cpp b/Source/MA_MIPSIV.cpp
+index f51ca9a..2be7ba5 100644
+--- a/Source/MA_MIPSIV.cpp
++++ b/Source/MA_MIPSIV.cpp
+@@ -211,8 +211,9 @@ extern "C" void SDR_Proxy(uint32 address, uint64 rt, CMIPS* context)
+ 	memory |= rt;
+ 	MemoryUtils_SetDoubleProxy(context, memory, alignedAddress);
+ }
+ 
+-CMA_MIPSIV::CMA_MIPSIV(MIPS_REGSIZE nRegSize)
+-    : CMIPSArchitecture(nRegSize)
++CMA_MIPSIV::CMA_MIPSIV(MIPS_REGSIZE nRegSize, bool ps2DynamicLinkHack)
++    : CMIPSArchitecture(nRegSize)
++	, m_ps2DynamicLinkHack(ps2DynamicLinkHack)
+ {
+ 	SetupInstructionTables();
+@@ -365,7 +366,7 @@ void CMA_MIPSIV::ADDI()
+ //09
+ void CMA_MIPSIV::ADDIU()
+ {
+-	if(m_nRT == 0 && m_nRS == 0)
++	if(m_ps2DynamicLinkHack && m_nRT == 0 && m_nRS == 0)
+ 	{
+ 		//Hack: PS2 IOP uses ADDIU R0, R0, $x for dynamic linking
+ 		m_codeGen->PushRel(offsetof(CMIPS, m_State.nPC));
+diff --git a/Source/iop/Iop_SubSystem.cpp b/Source/iop/Iop_SubSystem.cpp
+index 8e61f87..fbd7e9c 100644
+--- a/Source/iop/Iop_SubSystem.cpp
++++ b/Source/iop/Iop_SubSystem.cpp
+@@ -25,5 +25,5 @@ using namespace PS2;
+ CSubSystem::CSubSystem(bool ps2Mode)
+     : m_cpu(MEMORYMAP_ENDIAN_LSBF, true)
+-    , m_cpuArch(MIPS_REGSIZE_32)
++    , m_cpuArch(MIPS_REGSIZE_32, ps2Mode)
+    , m_copScu(MIPS_REGSIZE_32)
+
+diff --git a/tools/PsfPlayer/Source/PsfVm.h b/tools/PsfPlayer/Source/PsfVm.h
+index 8a7a3e7..1dfacb8 100644
+--- a/tools/PsfPlayer/Source/PsfVm.h
++++ b/tools/PsfPlayer/Source/PsfVm.h
+@@ -8,4 +8,7 @@
+ #include "Debuggable.h"
+ #include "MailBox.h"
+ #include <thread>
++#include <functional>
++#include <mutex>
++#include <string>
+ #include "filesystem_def.h"
+@@ -14,4 +14,5 @@ class CPsfVm : public CVirtualMachine
+ {
+ public:
+ 	typedef std::function<CSoundHandler*()> SpuHandlerFactory;
++	typedef std::function<void(const std::string&)> ErrorHandler;
+ 	typedef Framework::CSignal<void()> NewFrameEvent;
+@@ -22,3 +26,7 @@ public:
+ 	void Reset();
+ 	void Step();
+ 	void SetSpuHandler(const SpuHandlerFactory&);
++	void SetErrorHandler(const ErrorHandler&);
++	bool HasError() const;
++	std::string GetErrorMessage() const;
++	void ClearError();
+@@ -57,3 +65,4 @@ private:
+ 	void SetVolumeAdjustImpl(float);
+ 	void PauseImpl();
+ 	void SetSpuHandlerImpl(const SpuHandlerFactory&);
++	void ReportThreadError(const std::string&);
+@@ -65,3 +74,6 @@ private:
+ 	bool m_isThreadOver;
+ 	Framework::CSignal<void()>::Connection m_OnNewFrameConnection;
++	mutable std::mutex m_errorMutex;
++	std::string m_errorMessage;
++	ErrorHandler m_errorHandler;
+ };
+diff --git a/tools/PsfPlayer/Source/PsfVm.cpp b/tools/PsfPlayer/Source/PsfVm.cpp
+index 9d991c8..c2ec0c0 100644
+--- a/tools/PsfPlayer/Source/PsfVm.cpp
++++ b/tools/PsfPlayer/Source/PsfVm.cpp
+@@ -38,4 +38,5 @@ CPsfVm::~CPsfVm()
+ 
+ void CPsfVm::Reset()
+ {
++	ClearError();
+ 	m_subSystem.reset();
+@@ -173,5 +174,42 @@ void CPsfVm::SetSpuHandler(const SpuHandlerFactory& factory)
+ 	m_mailBox.SendCall(bind(&CPsfVm::SetSpuHandlerImpl, this, factory), true);
+ }
+ 
++void CPsfVm::SetErrorHandler(const ErrorHandler& handler)
++{
++	std::lock_guard lock(m_errorMutex);
++	m_errorHandler = handler;
++}
++
++bool CPsfVm::HasError() const
++{
++	std::lock_guard lock(m_errorMutex);
++	return !m_errorMessage.empty();
++}
++
++std::string CPsfVm::GetErrorMessage() const
++{
++	std::lock_guard lock(m_errorMutex);
++	return m_errorMessage;
++}
++
++void CPsfVm::ClearError()
++{
++	std::lock_guard lock(m_errorMutex);
++	m_errorMessage.clear();
++}
++
++void CPsfVm::ReportThreadError(const std::string& message)
++{
++	ErrorHandler handler;
++	{
++		std::lock_guard lock(m_errorMutex);
++		if(!m_errorMessage.empty()) return;
++		m_errorMessage = message;
++		handler = m_errorHandler;
++	}
++	m_status = PAUSED;
++	if(handler) handler(message);
++}
++
+ void CPsfVm::SetSpuHandlerImpl(const SpuHandlerFactory& factory)
+ {
+@@ -226,16 +261,27 @@ void CPsfVm::ThreadProc()
+ 		}
+ 		else
+ 		{
+-			m_subSystem->Update(m_singleStep, m_soundHandler);
++			try
++			{
++				m_subSystem->Update(m_singleStep, m_soundHandler);
+ #ifdef DEBUGGER_INCLUDED
+-			if(m_subSystem->MustBreak() || m_singleStep)
+-			{
+-				m_status = PAUSED;
+-				m_singleStep = false;
+-				OnMachineStateChange();
+-				OnRunningStateChange();
+-			}
++				if(m_subSystem->MustBreak() || m_singleStep)
++				{
++					m_status = PAUSED;
++					m_singleStep = false;
++					OnMachineStateChange();
++					OnRunningStateChange();
++				}
+ #endif
++			}
++			catch(const std::exception& exception)
++			{
++				ReportThreadError(exception.what());
++			}
++			catch(...)
++			{
++				ReportThreadError("PlayStation emulation failed with an unknown error.");
++			}
+ 		}
+ 	}
+
+diff --git a/Source/psx/PsxBios.cpp b/Source/psx/PsxBios.cpp
+index 3ac5a1f..5b9b8b8 100644
+--- a/Source/psx/PsxBios.cpp
++++ b/Source/psx/PsxBios.cpp
+@@ -436,7 +436,6 @@ void CPsxBios::HandleException()
+ 	assert(m_cpu.m_State.nHasException);
+ 	uint32 searchAddress = m_cpu.m_pAddrTranslator(&m_cpu, m_cpu.m_State.nCOP0[CCOP_SCU::EPC]);
+-	uint32 callInstruction = m_cpu.m_pMemoryMap->GetWord(searchAddress);
+-	if(callInstruction != 0x0000000C)
+-	{
+-		throw std::runtime_error("Not a SYSCALL.");
+-	}
++	// In PSX mode, MIPS_EXCEPTION_SYSCALL is raised by the compiled SYSCALL
++	// instruction. Do not re-read the RAM stub here: a game may overwrite a
++	// cached BIOS stub after its block has been compiled, which is valid
++	// self-modifying behavior for this emulation path.

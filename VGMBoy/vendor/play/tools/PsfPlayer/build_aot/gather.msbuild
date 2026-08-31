@@ -1,0 +1,17 @@
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<PropertyGroup>
+		<PsfAotPath>$(MSBuildThisFileDirectory)\..\..\..\build_cmake\build_psfaot\tools\PsfPlayer\Source\ui_aot\RelWithDebInfo\PsfAot.exe</PsfAotPath>
+		<InputDir>D:\Media\Aot</InputDir>
+		<OutputDir>.\blocks</OutputDir>
+	</PropertyGroup>
+	<ItemGroup>
+		<PsfFiles Include="$(InputDir)\*.zip" />
+	</ItemGroup>
+	<Target Name="Build" Inputs="@(PsfFiles)" Outputs="$(OutputDir)\%(FileName).blockcache_iop)">
+		<MakeDir Directories="$(OutputDir)" />
+		<Exec 
+			Command="&quot;$(PsfAotPath)&quot; gather &quot;%(PsfFiles.Identity)&quot; &quot;$(OutputDir)\%(PsfFiles.FileName).blockcache_iop&quot;"
+			ContinueOnError="ErrorAndContinue" 
+		/>
+	</Target>
+</Project>

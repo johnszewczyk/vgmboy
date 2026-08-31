@@ -1,0 +1,159 @@
+diff --git a/usf/usf.h b/usf/usf.h
+--- a/usf/usf.h
++++ b/usf/usf.h
+@@ -35,6 +35,13 @@ void usf_set_hle_audio(void * state, int enable);
+    and potentially emulation bugs. */
+ void usf_set_hle_audio(void * state, int enable);
+
++/* Bounds one render call so a malformed or incompatible rip cannot leave the
++   host blocked inside the emulated R4300 forever. A zero timeout disables the
++   guard for legacy callers. */
++void usf_set_render_timeout_ms(void * state, uint32_t timeout_ms);
++
++/* Internal execution-loop hook used by the interpreter watchdog. */
++int usf_render_watchdog_expired(void * state);
+ 
+ /* This processes and uploads the ROM and/or Project 64 save state data
+    present in the reserved section of each USF file. They should be
+diff --git a/usf/usf_internal.h b/usf/usf_internal.h
+--- a/usf/usf_internal.h
++++ b/usf/usf_internal.h
+@@ -339,4 +339,7 @@ struct usf_state
+     unsigned int count_per_op/* = COUNT_PER_OP_DEFAULT*/;
+     int llbit, rompause;
+     int stop;
++    uint32_t render_timeout_ms;
++    uint64_t render_deadline_ns;
++    int render_timed_out;
+     long long int reg[32], hi, lo;
+@@ -480,6 +483,8 @@ struct usf_state
+ #endif
+ };
+ 
++int usf_render_watchdog_expired_state(usf_state_t *state);
++
+ void usf_set_audio_format(void *, unsigned int frequency, unsigned int bits);
+ void usf_push_audio_samples(void *, const void * buffer, size_t size);
+ 
+diff --git a/usf/usf.c b/usf/usf.c
+--- a/usf/usf.c
++++ b/usf/usf.c
+@@ -1,5 +1,6 @@
+ #include <stdint.h>
+ #include <string.h>
+ #include <stdio.h>
++#include <time.h>
+ 
+ #include "usf.h"
+@@ -77,7 +78,33 @@ void usf_set_hle_audio(void * state, int enable)
+ {
+     USF_STATE->enable_hle_audio = enable;
+ }
+ 
++void usf_set_render_timeout_ms(void * state, uint32_t timeout_ms)
++{
++    USF_STATE->render_timeout_ms = timeout_ms;
++}
++
++static uint64_t monotonic_time_ns(void)
++{
++    struct timespec time_value;
++    if (clock_gettime(CLOCK_MONOTONIC, &time_value) != 0)
++        return 0;
++    return (uint64_t)time_value.tv_sec * 1000000000ULL + (uint64_t)time_value.tv_nsec;
++}
++
++int usf_render_watchdog_expired_state(usf_state_t *state)
++{
++    if (!state->render_deadline_ns || monotonic_time_ns() < state->render_deadline_ns)
++        return 0;
++    state->render_timed_out = 1;
++    return 1;
++}
++
++int usf_render_watchdog_expired(void *state)
++{
++    return usf_render_watchdog_expired_state(USF_STATE);
++}
++
+ void usf_set_trimming_mode(void * state, int enable)
+ {
+     USF_STATE->enable_trimming_mode = enable;
+@@ -315,5 +341,9 @@ const char * usf_render(void * state, int16_t * buffer, size_t count, int32_t * s
+ {
+     USF_STATE->last_error = 0;
+     USF_STATE->error_message[0] = '\0';
++    USF_STATE->render_timed_out = 0;
++    USF_STATE->render_deadline_ns = USF_STATE->render_timeout_ms
++        ? monotonic_time_ns() + (uint64_t)USF_STATE->render_timeout_ms * 1000000ULL
++        : 0;
+ 
+     if ( !USF_STATE->MemoryState )
+@@ -360,6 +405,18 @@ const char * usf_render(void * state, int16_t * buffer, size_t count, int32_t * s
+ 
+     main_run(USF_STATE);
+ 
++    USF_STATE->render_deadline_ns = 0;
++    if (USF_STATE->render_timed_out) {
++        snprintf(
++            USF_STATE->error_message,
++            sizeof(USF_STATE->error_message),
++            "USF emulation exceeded the %u ms render safety limit.",
++            USF_STATE->render_timeout_ms
++        );
++        USF_STATE->last_error = USF_STATE->error_message;
++        return USF_STATE->last_error;
++    }
++
+     if ( sample_rate )
+         *sample_rate = USF_STATE->SampleRate;
+ 
+diff --git a/main/main.c b/main/main.c
+--- a/main/main.c
++++ b/main/main.c
+@@ -136,7 +136,11 @@ m64p_error main_start(usf_state_t * state)
+ #ifdef DEBUG_INFO
+     state->r4300emu = 0;
+ #else
+-    state->r4300emu = state->enable_trimming_mode ? 0 : 2;
++    // Use the bounded pure interpreter only for callers that requested the
++    // render watchdog. Legacy callers retain the normal cached interpreter.
++    state->r4300emu = state->render_timeout_ms
++        ? 0
++        : (state->enable_trimming_mode ? 0 : 2);
+ #endif
+ 
+     /* set some other core parameters based on the config file values */
+diff --git a/main/savestates.c b/main/savestates.c
+--- a/main/savestates.c
++++ b/main/savestates.c
+@@ -639,5 +639,7 @@ int savestates_load(usf_state_t * state, unsigned char * ptr, unsigned int size,
+ 
+ int savestates_load(usf_state_t * state, unsigned char * ptr, unsigned int size, unsigned int is_m64p)
+ {
++    if (state->render_timeout_ms)
++        state->r4300emu = CORE_PURE_INTERPRETER;
+     if (is_m64p)
+         return savestates_load_m64p(state, ptr, size);
+     else
+diff --git a/r4300/pure_interp.c b/r4300/pure_interp.c
+--- a/r4300/pure_interp.c
++++ b/r4300/pure_interp.c
+@@ -740,8 +740,17 @@ void pure_interpreter(usf_state_t * state)
+    state->stop = 0;
+    state->PC = &state->interp_PC;
+ 
++   unsigned int watchdog_counter = 0;
+    while (!state->stop)
+    {
+      InterpretOpcode(state);
++     if ((++watchdog_counter & 0xFFF) == 0)
++     {
++       if (usf_render_watchdog_expired_state(state))
++       {
++         state->stop = 1;
++         break;
++       }
++     }
+    }
+ }

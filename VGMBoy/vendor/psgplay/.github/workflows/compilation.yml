@@ -1,0 +1,156 @@
+name: Compile PSG play
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-atari-st:
+    runs-on: ubuntu-latest
+    container: ghcr.io/frno7/gentoo-m68k:main
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Archive tag
+        run: |
+          echo "ARCHIVE_TAG=${GITHUB_REF_NAME}-${GITHUB_SHA:0:8}" | sed 's#/#-#g' >> $GITHUB_ENV
+
+      - name: Fix repository ownership problem
+        run: |
+          # Avoid fatal: unsafe repository (directory is owned by someone else)
+          # Confer https://github.com/actions/checkout/issues/760
+          git config --global --add safe.directory "*"
+
+      - name: Compile PSGPLAY.TOS archive for the Atari ST
+        run: |
+          script/compile arch verify atari-st
+
+      - name: Publish PSGPLAY.TOS archive for the Atari ST
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: "psgplay-atari-st-${{ env.ARCHIVE_TAG }}"
+          if-no-files-found: error
+          compression-level: 9
+          path: PSGPLAY.TOS
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Archive tag
+        run: |
+          echo "ARCHIVE_TAG=${GITHUB_REF_NAME}-${GITHUB_SHA:0:8}" | sed 's#/#-#g' >> $GITHUB_ENV
+
+      - name: Update brew with gcc and portaudio
+        run: |
+          brew update
+          brew install portaudio gcc
+
+      - name: Compile PSG play archive for Mac
+        run: |
+          # Avoid fatal: unsafe repository (directory is owned by someone else)
+          # Confer https://github.com/actions/checkout/issues/760
+          git config --global --add safe.directory "*"
+          script/compile arch mac mac-homebrew-gcc-portaudio
+          make V=1 install-psgplay install-include install-lib-static install-pkg-config install-man
+          ls -lR ~/.local/usr
+
+      - name: Publish PSG play archive for Mac
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: "psgplay-mac-${{ env.ARCHIVE_TAG }}"
+          if-no-files-found: error
+          compression-level: 9
+          path: psgplay
+
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Archive tag
+        run: |
+          echo "ARCHIVE_TAG=${GITHUB_REF_NAME}-${GITHUB_SHA:0:8}" | sed 's#/#-#g' >> $GITHUB_ENV
+
+      - uses: mymindstorm/setup-emsdk@v14
+
+      - name: Compile web assembly archive
+        run: |
+          script/compile arch web
+
+      - name: Publish web assembly archive
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: "psgplay-web-${{ env.ARCHIVE_TAG }}"
+          if-no-files-found: error
+          compression-level: 9
+          path: |
+            lib/psgplay/libpsgplay.js
+            lib/psgplay/libpsgplay.wasm
+
+  build-linux:
+    strategy:
+      fail-fast: false  # 'false' means don't stop if some archs fail.
+      matrix:
+        arch: [x86_64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Archive tag
+        run: |
+          echo "ARCHIVE_TAG=${{ matrix.arch }}-${GITHUB_REF_NAME}-${GITHUB_SHA:0:8}" | sed 's#/#-#g' >> $GITHUB_ENV
+
+      - uses: uraimo/run-on-arch-action@v2.2.0
+        name: Compile PSG play archive for Linux/${{ matrix.arch }}
+        if: ${{ matrix.arch != 'x86_64' }}
+        with:
+          arch: ${{ matrix.arch }}
+          # Not required, but speeds up builds
+          githubToken: ${{ github.token }}
+          install: |
+            apt-get update -q -y
+            apt-get install -q -y git make gcc libc-dev libasound2-dev
+            apt-get install -q -y libasound2 || \
+            apt-get install -q -y libasound2t64
+          run: |
+            # Avoid fatal: unsafe repository (directory is owned by someone else)
+            # Confer https://github.com/actions/checkout/issues/760
+            git config --global --add safe.directory "*"
+            rm -f build-log.txt
+            script/compile arch ${{ matrix.arch }}
+            make V=1 install-psgplay install-include install-lib-static install-pkg-config install-man
+            ls -lR ~/.local/usr
+
+      - name: Compile PSG play archive for Linux/x86_64
+        if: ${{ matrix.arch == 'x86_64' }}
+        run: |
+          sudo apt-get update -q -y
+          sudo apt-get install -q -y git make gcc clang libc-dev libasound2-dev
+          sudo apt-get install -q -y libasound2 || \
+          sudo apt-get install -q -y libasound2t64
+          script/compile arch ${{ matrix.arch }}
+          make V=1 install-psgplay install-include install-lib-static install-pkg-config install-man
+          ls -lR ~/.local/usr
+
+      - name: Publish PSG play archive for Linux
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: "psgplay-linux-${{ env.ARCHIVE_TAG }}"
+          if-no-files-found: error
+          compression-level: 9
+          path: psgplay

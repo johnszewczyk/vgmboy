@@ -1,0 +1,33 @@
+cmake_minimum_required(VERSION 3.18)
+
+set(CMAKE_MODULE_PATH
+	${CMAKE_CURRENT_SOURCE_DIR}/../../deps/Dependencies/cmake-modules
+	${CMAKE_MODULE_PATH}
+)
+include(Header)
+
+project(PsfPlayer)
+
+option(PSFCORE_ONLY "Build the PSF decoder core without a platform UI" OFF)
+
+if(PSFCORE_ONLY)
+	add_subdirectory(Source)
+	return()
+endif()
+
+if(TARGET_PLATFORM_UNIX)
+	set(USE_QT ON CACHE BOOL "Use Qt UI")
+endif()
+
+#UI
+if(BUILD_AOT_CACHE)
+	add_subdirectory(Source/ui_aot)
+else()
+	if(TARGET_PLATFORM_IOS)
+		add_subdirectory(Source/ui_ios/)
+	elseif(TARGET_PLATFORM_JS)
+		add_subdirectory(Source/ui_js/)
+	else()
+		add_subdirectory(Source/ui_qt/)
+	endif()
+endif()

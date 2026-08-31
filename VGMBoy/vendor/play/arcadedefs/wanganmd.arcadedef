@@ -1,0 +1,18 @@
+{
+	"id": "wanganmd",
+	"name": "Wangan Midnight",
+	"driver": "sys246",
+	"dongle":
+	{
+		"name": "wmn1vera.ic002"
+	},
+	"cdvd":
+	{
+		"name": "wmn1-a.chd"
+	},
+	"inputMode": "drive",
+	"boot": "ac0:WGNLOAD",
+	"patches":
+	[
+	]
+}

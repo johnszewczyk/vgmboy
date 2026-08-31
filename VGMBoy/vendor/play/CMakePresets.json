@@ -1,0 +1,247 @@
+{
+    "version": 4,
+    "configurePresets": [
+        {
+            "name": "VS",
+            "displayName": "Visual Studio 17 2022",
+            "generator": "Visual Studio 17 2022",
+            "binaryDir": "${sourceDir}/build_cmake/build/${presetName}",
+            "hidden": true
+        },
+        {
+            "name": "NINJA",
+            "displayName": "Ninja",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/build_cmake/build/${presetName}",
+            "hidden": true
+        },
+        {
+            "name": "XCODE",
+            "displayName": "Xcode",
+            "generator": "Xcode",
+            "binaryDir": "${sourceDir}/build_cmake/build/${presetName}",
+            "hidden": true
+        },
+        {
+            "name": "DEBUGGER",
+            "cacheVariables": {
+                "DEBUGGER_INCLUDED": {
+                    "type": "BOOL",
+                    "value": "ON"
+                }
+            },
+            "hidden": true
+        },
+        {
+            "name": "WINDOWS",
+            "cacheVariables": {
+                "USE_QT": {
+                    "type": "BOOL",
+                    "value": "ON"
+                },
+                "BUILD_PSFPLAYER": {
+                    "type": "BOOL",
+                    "value": "ON"
+                }
+            },
+            "hidden": true
+        },
+        {
+            "name": "WINDOWS-X86_32",
+            "inherits": "WINDOWS",
+            "architecture": {
+                "value": "Win32",
+                "strategy": "set"
+            },
+            "hidden": true
+        },
+        {
+            "name": "WINDOWS-X86_64",
+            "inherits": "WINDOWS",
+            "architecture": {
+                "value": "x64",
+                "strategy": "set"
+            },
+            "hidden": true
+        },
+        {
+            "name": "MACOS",
+            "cacheVariables": {
+                "USE_QT": {
+                    "type": "BOOL",
+                    "value": "ON"
+                },
+                "BUILD_PSFPLAYER": {
+                    "type": "BOOL",
+                    "value": "ON"
+                }
+            },
+            "hidden": true
+        },
+        {
+            "name": "IOS",
+            "toolchainFile": "${sourceDir}/deps/Dependencies/cmake-ios/ios.cmake",
+            "cacheVariables": {
+                "TARGET_IOS": {
+                    "type": "BOOL",
+                    "value": "ON"
+                },
+                "BUILD_PSFPLAYER": {
+                    "type": "BOOL",
+                    "value": "ON"
+                }
+            },
+            "hidden": true
+        },
+        {
+            "name": "LINUX",
+            "cacheVariables": {
+                "BUILD_PSFPLAYER": {
+                    "type": "BOOL",
+                    "value": "ON"
+                },
+                "BUILD_TESTS": {
+                    "type": "BOOL",
+                    "value": "ON"
+                },
+                "USE_QT": {
+                    "type": "BOOL",
+                    "value": "ON"
+                }
+            },
+            "hidden": true
+        },
+        {
+            "name": "WASM",
+            "cacheVariables": {
+                "BUILD_PSFPLAYER": {
+                    "type": "BOOL",
+                    "value": "ON"
+                },
+                "BUILD_TESTS": {
+                    "type": "BOOL",
+                    "value": "OFF"
+                },
+                "USE_QT": {
+                    "type": "BOOL",
+                    "value": "OFF"
+                }
+            },
+            "hidden": true
+        },
+        {
+            "name": "windows-x86_32-vs",
+            "inherits": [
+                "WINDOWS-X86_32",
+                "VS"
+            ]
+        },
+        {
+            "name": "windows-x86_64-vs",
+            "inherits": [
+                "WINDOWS-X86_64",
+                "VS"
+            ]
+        },
+        {
+            "name": "windows-debugger-x86_64-vs",
+            "inherits": [
+                "WINDOWS-X86_64",
+                "VS",
+                "DEBUGGER"
+            ]
+        },
+        {
+            "name": "macos-xcode",
+            "inherits": [
+                "MACOS",
+                "XCODE"
+            ]
+        },
+        {
+            "name": "macos-debugger-xcode",
+            "inherits": [
+                "MACOS",
+                "XCODE",
+                "DEBUGGER"
+            ]
+        },
+        {
+            "name": "ios-xcode",
+            "inherits": [
+                "IOS",
+                "XCODE"
+            ]
+        },
+        {
+            "name": "linux-ninja",
+            "inherits": [
+                "LINUX",
+                "NINJA"
+            ]
+        },
+        {
+            "name": "wasm-ninja",
+            "inherits": [
+                "WASM",
+                "NINJA"
+            ]
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "windows-x86_64-vs",
+            "configurePreset": "windows-x86_64-vs",
+            "configuration": "RelWithDebInfo",
+            "targets": [
+                "Play",
+                "CodeGenTestSuite"
+            ]
+        },
+        {
+            "name": "windows-debugger-x86_64-vs",
+            "configurePreset": "windows-debugger-x86_64-vs",
+            "targets": [
+                "Play"
+            ]
+        },
+        {
+            "name": "wasm-ninja-debug",
+            "configurePreset": "wasm-ninja",
+            "configuration": "Debug",
+            "targets": [
+                "Play",
+                "PsfPlayer",
+                "CodeGenTestSuite"
+            ]
+        },
+        {
+            "name": "wasm-ninja-release",
+            "configurePreset": "wasm-ninja",
+            "configuration": "Release",
+            "targets": [
+                "Play",
+                "PsfPlayer",
+                "CodeGenTestSuite"
+            ]
+        },
+        {
+            "name": "linux-ninja-debug",
+            "configurePreset": "linux-ninja",
+            "configuration": "Debug",
+            "targets": [
+                "Play",
+                "CodeGenTestSuite"
+            ]
+        },
+        {
+            "name": "linux-ninja-release",
+            "configurePreset": "linux-ninja",
+            "configuration": "Release",
+            "targets": [
+                "Play",
+                "CodeGenTestSuite"
+            ]
+        }
+    ]
+}

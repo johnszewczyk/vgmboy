@@ -1,0 +1,130 @@
+import org.ajoberstar.grgit.Grgit
+
+apply plugin: 'com.android.application'
+
+buildscript {
+	repositories {
+		google()
+		mavenCentral()
+	}
+
+	dependencies {
+		classpath 'com.android.tools.build:gradle:8.13.2'
+		classpath 'org.ajoberstar.grgit:grgit-gradle:4.1.1'
+	}
+}
+
+project.ext {
+	signingEnabled = project.hasProperty("PLAY_RELEASE_STORE_FILE")
+	git = Grgit.open(currentDir: project.rootDir)
+	gitVersionCode = git.tag.list().size()
+	gitVersionName = "${git.describe()}"
+}
+
+project.afterEvaluate {
+	preBuild.dependsOn 'copyPatchesFile'
+}
+
+android {
+	repositories {
+		google()
+		mavenCentral()
+	}
+
+	namespace 'com.virtualapplications.play'
+	compileSdk 35
+
+	buildFeatures {
+		buildConfig true
+	}
+
+	defaultConfig {
+		versionCode (100 + gitVersionCode)
+		versionName gitVersionName
+		minSdkVersion 21
+		targetSdkVersion 35
+		externalNativeBuild {
+			cmake {
+				arguments "-DANDROID_ARM_NEON=TRUE", "-DANDROID_TOOLCHAIN=clang",
+						"-DANDROID_CPP_FEATURES=exceptions rtti", "-DANDROID_STL=c++_static"
+				cppFlags "-frtti"
+				targets "Play"
+			}
+			ndkVersion "29.0.14206865"
+			ndk {
+				abiFilters 'armeabi-v7a', 'x86', 'x86_64', 'arm64-v8a'
+			}
+		}
+	}
+
+	dependencies {
+		api 'androidx.appcompat:appcompat:1.6.1'
+		api 'androidx.preference:preference:1.2.1'
+		implementation 'androidx.documentfile:documentfile:1.0.1'
+		api 'org.apache.commons:commons-lang3:3.4'
+		api 'commons-io:commons-io:2.13.0'
+	}
+
+	signingConfigs {
+		if(project.ext.signingEnabled) {
+			release {
+				storeFile file(PLAY_RELEASE_STORE_FILE)
+				storePassword PLAY_RELEASE_STORE_PASSWORD
+				keyAlias PLAY_RELEASE_KEY_ALIAS
+				keyPassword PLAY_RELEASE_KEY_PASSWORD
+			}
+		} else {
+			release {
+
+			}
+		}
+	}
+
+	buildTypes {
+		debug {
+			debuggable true
+			jniDebuggable true
+			buildConfigField "java.util.Date", "buildTime", "new java.util.Date(" + System.currentTimeMillis() + "L)"
+		}
+		release {
+			proguardFile getDefaultProguardFile('proguard-android.txt')
+			if(project.ext.signingEnabled) {
+				signingConfig signingConfigs.release
+			}
+			buildConfigField "java.util.Date", "buildTime", "new java.util.Date(" + System.currentTimeMillis() + "L)"
+			externalNativeBuild {
+				cmake {
+					cppFlags += "-flto=full"
+				}
+			}
+		}
+	}
+	packagingOptions {
+		resources {
+			excludes += ['META-INF/LICENSE.txt', 'META-INF/NOTICE.txt']
+		}
+	}
+
+	task copyPatchesFile(type: Copy) {
+		from '../GameConfig.xml'
+		into 'src/main/assets'
+	}
+
+	sourceSets.main {
+		java.srcDirs = [ '../Source/ui_android/java' ]
+        jniLibs.srcDir 'src/main/libs'
+	}
+
+	externalNativeBuild {
+		cmake {
+			path '../CMakeLists.txt'
+			version "3.31.1"
+		}
+	}
+
+	compileOptions {
+		encoding "UTF-8"
+		sourceCompatibility JavaVersion.VERSION_1_8
+		targetCompatibility JavaVersion.VERSION_1_8
+	}
+}

@@ -1,0 +1,18 @@
+{
+	"id": "zoidsinf",
+	"name": "Zoids Infinity",
+	"driver": "sys246",
+	"dongle":
+	{
+		"name": "b3900076a.ic002"
+	},
+	"hdd":
+	{
+		"name": "zoidsinf.chd"
+	},
+	"boot": "ac0:ZOILOAD",
+	"idleLoopBlocks":
+	[
+		"0x001A0500"
+	]
+}

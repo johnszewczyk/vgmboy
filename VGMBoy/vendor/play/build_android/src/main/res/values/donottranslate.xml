@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    
+    <string name="app_name">Play!</string>
+    
+    <!-- Applciation Preferences -->
+    
+    <string-array name="pref_theme_selection_values">
+		<item>0</item>
+		<item>1</item>
+		<item>2</item>
+		<item>3</item>
+		<item>4</item>
+		<item>5</item>
+		<item>6</item>
+    </string-array>
+    
+    <!-- ROM File Type Arrays -->
+	
+	<string-array name="disks">
+		<item>iso</item>
+		<item>bin</item>
+		<item>cso</item>
+		<item>isz</item>
+		<item>elf</item>
+	</string-array>
+	
+	<string-array name="homebrew">
+		<item>elf</item>
+	</string-array>
+
+	<string-array name="pref_emu_video_gs_handler_values">
+		<item>0</item>
+		<item>1</item>
+	</string-array>
+
+	<string-array name="pref_emu_video_res_factor_values">
+		<item>1</item>
+		<item>2</item>
+		<item>4</item>
+		<item>8</item>
+    </string-array>
+
+	<string-array name="pref_emu_video_presentation_mode_values">
+		<item>0</item>
+		<item>1</item>
+		<item>2</item>
+	</string-array>
+
+	<string-array name="pref_emu_audio_spublockcount_values">
+		<item>400</item>
+		<item>200</item>
+		<item>100</item>
+		<item>50</item>
+		<item>10</item>
+	</string-array>
+
+</resources>

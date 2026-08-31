@@ -1,0 +1,33 @@
+{
+	"id": "rrvac",
+	"name": "Ridge Racer V: Arcade Battle",
+	"driver": "sys246",
+	"dongle":
+	{
+		"name": "rrv3vera.ic002"
+	},
+	"cdvd":
+	{
+		"name": "rrv1-a.chd"
+	},
+	"inputMode": "drive",
+	"boot": "ac0:START",
+	"patches":
+	[
+		{
+			"address": "0x00236D84",
+			"value": "0x0",
+			"description": "Disable iLink init"
+		},
+		{
+			"address": "0x00229BD8",
+			"value": "0x0",
+			"description": "skip brake & gaz check"
+		},
+		{
+			"address": "0x0026CE38",
+			"value": "0x0",
+			"description": "Fix hang preventing attract mode from starting"
+		}
+	]
+}

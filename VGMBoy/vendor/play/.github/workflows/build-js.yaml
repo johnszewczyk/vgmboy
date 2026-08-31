@@ -1,0 +1,116 @@
+name: Build JavaScript
+
+on: [push, pull_request]
+jobs:
+  build_js:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup Emscripten
+      uses: emscripten-core/setup-emsdk@v16
+      with:
+        version: 4.0.1
+    - name: Install Dependencies
+      run: |
+        sudo apt update
+        sudo apt install ninja-build
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        submodules: recursive
+        fetch-depth: 0
+    - name: Generate CMake Project
+      run: emcmake cmake --preset wasm-ninja
+    - name: Build Native Code
+      run: cmake --build --preset wasm-ninja-release
+    # Setup Node.js since Emscripten can override the node's version.
+    - name: Set up Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: 20.17
+    - name: Run CodeGenTestSuite
+      run: |
+        cd $GITHUB_WORKSPACE/deps/CodeGen/js
+        npm install
+        tsc
+        cd $GITHUB_WORKSPACE/build_cmake/build/wasm-ninja/Source/ui_js/Source/CodeGen/Release
+        node $GITHUB_WORKSPACE/deps/CodeGen/js/out/index.js
+    - name: Build Play Browser
+      run: |
+        PLAYJS_BUILD_DIR=$GITHUB_WORKSPACE/build_cmake/build/wasm-ninja/Source/ui_js/Release/
+        cd js/play_browser
+        cp $PLAYJS_BUILD_DIR/Play.js ./src/
+        cp $PLAYJS_BUILD_DIR/Play.wasm ./public/
+        cp $PLAYJS_BUILD_DIR/Play.js ./public/
+        export REACT_APP_VERSION=$(git describe)
+        npm install
+        npm run build
+    - name: Build PsfPlayer Browser
+      run: |
+        PSFPLAYERJS_BUILD_DIR=$GITHUB_WORKSPACE/build_cmake/build/wasm-ninja/tools/PsfPlayer/Source/ui_js/Release/
+        cd js/psfplayer_browser
+        cp $PSFPLAYERJS_BUILD_DIR/PsfPlayer.js ./src/
+        cp $PSFPLAYERJS_BUILD_DIR/PsfPlayer.wasm ./public/
+        cp $PSFPLAYERJS_BUILD_DIR/PsfPlayer.js ./public/
+        export REACT_APP_VERSION=$(git describe)
+        npm install
+        npm run build
+    - name: Update Play/Test Environment
+      if: ${{ env.AWS_ACCESS_KEY_ID != null }}
+      uses: jakejarvis/s3-sync-action@v0.5.1
+      with:
+        args: --acl public-read --delete
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: us-east-2
+        AWS_S3_BUCKET: playjs-test
+        SOURCE_DIR: 'js/play_browser/build'
+    - name: Update Play/Prod Environment
+      if: ${{ (env.AWS_ACCESS_KEY_ID != null) && (github.ref == 'refs/heads/master') }}
+      uses: jakejarvis/s3-sync-action@v0.5.1
+      with:
+        args: --acl public-read --delete
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: us-east-2
+        AWS_S3_BUCKET: playjs
+        SOURCE_DIR: 'js/play_browser/build'
+    - name: Update PsfPlayer/Test Environment
+      if: ${{ env.AWS_ACCESS_KEY_ID != null }}
+      uses: jakejarvis/s3-sync-action@v0.5.1
+      with:
+        args: --acl public-read --delete
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: us-east-2
+        AWS_S3_BUCKET: psfplayer-test
+        SOURCE_DIR: 'js/psfplayer_browser/build'
+    - name: Invalidate Play/Test Environment CloudFront Distribution
+      if: ${{ env.AWS_ACCESS_KEY_ID != null }}
+      uses: chetan/invalidate-cloudfront-action@v2.4
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: us-east-2
+        DISTRIBUTION: E1A9RDVO70PTKO
+        PATHS: '/*'
+    - name: Invalidate Play/Prod Environment CloudFront Distribution
+      if: ${{ (env.AWS_ACCESS_KEY_ID != null) && (github.ref == 'refs/heads/master') }}
+      uses: chetan/invalidate-cloudfront-action@v2.4
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: us-east-2
+        DISTRIBUTION: E2IQ40RGGBWGV3
+        PATHS: '/*'
+    - name: Invalidate PsfPlayer/Test Environment CloudFront Distribution
+      if: ${{ env.AWS_ACCESS_KEY_ID != null }}
+      uses: chetan/invalidate-cloudfront-action@v2.4
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: us-east-2
+        DISTRIBUTION: ELJDS9GVQ9YYY
+        PATHS: '/*'

@@ -1,0 +1,19 @@
+{
+	"id": "taiko7",
+	"name": "Taiko no Tatsujin 7",
+	"driver": "sys246",
+	"dongle":
+	{
+		"name": "tk71.ic002"
+	},
+	"cdvd":
+	{
+		"name": "tk71dvd0.chd"
+	},
+	"inputMode": "drum",
+	"eeFrequencyScale": [4, 3],
+	"boot": "ac0:TA7LOAD",
+	"patches":
+	[
+	]
+}

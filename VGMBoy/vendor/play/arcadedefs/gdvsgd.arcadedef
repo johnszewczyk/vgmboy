@@ -1,0 +1,18 @@
+{
+	"id": "gdvsgd",
+	"name": "Mobile Suit Gundam - Gundam vs. Gundam",
+	"driver": "sys246",
+	"dongle":
+	{
+		"name": "gvs1vera.ic002"
+	},
+	"cdvd":
+	{
+		"name": "gvs1dvd0b.chd"
+	},
+	"eeFrequencyScale": [4, 3],
+	"boot": "ac0:GDNLOAD",
+	"patches":
+	[
+	]
+}

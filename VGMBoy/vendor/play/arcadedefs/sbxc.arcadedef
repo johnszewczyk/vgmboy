@@ -1,0 +1,17 @@
+{
+	"id": "sbxc",
+	"name": "Sengoku Basara X Cross",
+	"driver": "sys246",
+	"dongle":
+	{
+		"name": "bax1vera.ic002"
+	},
+	"cdvd":
+	{
+		"name": "bax1_dvd0.chd"
+	},
+	"boot": "ac0:BASLOAD",
+	"patches":
+	[
+	]
+}

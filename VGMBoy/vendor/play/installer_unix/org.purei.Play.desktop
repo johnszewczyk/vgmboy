@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Play!
+TryExec=Play
+Exec=Play
+Icon=org.purei.Play
+Version=1.0
+Terminal=false
+Type=Application
+Categories=Game;Emulator;
+

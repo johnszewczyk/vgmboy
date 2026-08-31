@@ -1,0 +1,163 @@
+<GameConfigs>
+	<GameConfig Executable="SCUS_973.16;1" Title="Sly 2: Band of Thieves">
+		<Vu1BlockNoClamping BlockKey="36605D29AD96FFFE30895C24E0016A2B;40" />
+		<Vu1BlockNoClamping BlockKey="D28BFBE4C726F016DCA80BECE7C4114B;40" />
+		<Vu1BlockNoClamping BlockKey="4E7ED78F963A2076ECF775BFAA3D8AFB;40" />
+		<Vu1BlockNoClamping BlockKey="2BBED1DEDFAAA676D34A4B8975CFD17D;40" />
+		<Vu1BlockNoClamping BlockKey="C2A5656FA61988893D4F67239AB837FC;64" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_200.18;1" Title="Onimusha: Warlords">
+		<BlockFpRoundingMode Address="0x001025D8" Mode="NEAREST" Description="Fixes inability to go inside the hole." />
+	</GameConfig>
+	<GameConfig Executable="SLUS_200.24;1" Title="Blood Omen 2">
+		<Patch Address="0x00463018" Value="0x03E00008" Description="Nullify custom exception handler." />
+		<Patch Address="0x0046301C" Value="0x24020001" Description="Nullify custom exception handler." />
+	</GameConfig>
+	<GameConfig Executable="SLUS_201.60;1" Title="WinBack: Covert Operations">
+		<IdleLoopBlock Address="0x00234E58" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_206.98;1" Title="SD Gundam Force - Showdown!">
+		<IdleLoopBlock Address="0x001F8BB0" />
+	</GameConfig>
+	<GameConfig Executable="SLPM_663.59;1" Title="Mutsu-boshi Kirari - Hoshifuru Miyako">
+		<IdleLoopBlock Address="0x001009E4" />
+	</GameConfig>
+	<GameConfig Executable="SLPS_204.20;1" Title="Ultraman Nexus">
+		<IdleLoopBlock Address="0x00292DE0" />
+	</GameConfig>
+	<GameConfig Executable="SLPM_654.81;1" Title="After... - Wasure Enu Kizuna">
+		<IdleLoopBlock Address="0x00106F18" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_203.05;1" Title="Simpsons Road Rage">
+		<IdleLoopBlock Address="0x0027C708" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_206.16;1" Title="Virtua Fighter 4 - Evolution">
+		<IdleLoopBlock Address="0x001EDA2C" />
+	</GameConfig>
+	<GameConfig Executable="SLPM_651.69;1" Title="CombatQueen">
+		<IdleLoopBlock Address="0x00104BF8" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_203.07;1" Title="Burnout">
+		<IdleLoopBlock Address="0x0021B980" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_203.12;1" Title="Final Fantasy X">
+		<BlockFpRoundingMode Address="0x00120F9C" Mode="MINUSINFINITY" Description="Fixes general wonkiness." />
+		<BlockFpRoundingMode Address="0x001ABDDC" Mode="MINUSINFINITY" Description="Fixes general wonkiness in battle." />
+	</GameConfig>
+	<GameConfig Executable="SLUS_203.18;1" Title="King's Field: The Ancient City">
+		<Patch Address="0x001BE42C" Value="0x46150036" Description="Fixes rooms not being loaded properly. (credits: wgarvin)" />
+		<BlockFpRoundingMode Address="0x001C0CE0" Mode="MINUSINFINITY" Description="Fixes rooms not being loaded properly." />
+		<BlockFpRoundingMode Address="0x001C0CE4" Mode="MINUSINFINITY" Description="Fixes rooms not being loaded properly." />
+	</GameConfig>
+	<GameConfig Executable="SLUS_203.47;1" Title="Shadow Hearts">
+		<BlockFpRoundingMode Address="0x0021C614" Mode="NEAREST" Description="Fixes soft-lock in gambling wheel game." />
+	</GameConfig>
+	<GameConfig Executable="SLUS_203.63;1" Title="Sled Storm">
+		<IdleLoopBlock Address="0x00261940" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_204.71;1" Title="Rygar - The Legendary Adventure">
+		<BlockFpRoundingMode Address="0x00147D88" Mode="NEAREST" Description="Fixes hang when entering first door." />
+	</GameConfig>
+	<GameConfig Executable="SLUS_204.87;1" Title="Mega Man X7">
+		<BlockFpRoundingMode Address="0x001027A8" Mode="PLUSINFINITY" Description="Fixes camera wonkiness." />
+	</GameConfig>
+	<GameConfig Executable="SLUS_206.56;1" Title="X-Men Legends">
+		<BlockFpRoundingMode Address="0x003D74D0" Mode="NEAREST" Description="Fixes hang in Blob boss area." />
+	</GameConfig>
+	<GameConfig Executable="SLUS_207.09;1" Title="Batman: Rise of Sin Tzu">
+		<IdleLoopBlock Address="0x0045B538" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_207.82;1" Title="Blood Will Tell: Tezuka Osamu's Dororo">
+		<BlockFpRoundingMode Address="0x001B4060" Mode="NEAREST" Description="Fixes soft lock in Chapter 4 boss battle." />
+		<IdleLoopBlock Address="0x001B4690" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_208.98;1" Title="Star Wars: Battlefront">
+		<IdleLoopBlock Address="0x00342138" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_210.05;1" Title="Kingdom Hearts II">
+		<BlockFpUseAccurateAddSub Address="0x001D8154" Description="Fixes issue with Tron level boss" />
+		<BlockFpUseAccurateAddSub Address="0x001D8164" Description="Fixes issue with Tron level boss" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_210.15;1" Title="DreamWorks Madagascar">
+		<IdleLoopBlock Address="0x00294410" CheckBlockKey="8F7278F0F50BB7EBF2039E27C816E4B3;20" Description="Version 3.01" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_210.48;1" Title="Evil Dead: Regeneration">
+		<IdleLoopBlock Address="0x00377898" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_211.32;1" Title="Stella Deus: The Gate of Eternity">
+		<IdleLoopBlock Address="0x001CAF28" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_212.39;1" Title="Beatmania">
+		<IdleLoopBlock Address="0x00161888" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_212.91;1" Title="Suikoden 5">
+		<IdleLoopBlock Address="0x002317F4" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_213.06;1" Title="Ghost Rider">
+		<IdleLoopBlock Address="0x002F43E8" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_213.86;1" Title="Tales of the Abyss">
+		<BlockFpRoundingMode Address="0x002921B4" Mode="NEAREST" Description="Fixes collision issues." />
+		<IdleLoopBlock Address="0x001A4508" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_216.09;1" Title="Dance Dance Revolution: Disney Channel Edition">
+		<IdleLoopBlock Address="0x001B48D8" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_216.15;1" Title="Wild Arms 5">
+		<IdleLoopBlock Address="0x001324D8" />
+	</GameConfig>
+	<GameConfig Executable="SLUS_216.91;1" Title="Swashbucklers: Blue vs. Grey">
+		<IdleLoopBlock Address="0x0022FC70" />
+	</GameConfig>
+	<GameConfig Executable="SLES_501.76;1" Title="Oni">
+		<Patch Address="0x001cef7c" Value="0x00000000 // bc0f $001cef7c" Description="Fix hang by skip branch if copro 0 condition false." />
+	</GameConfig>
+	<GameConfig Executable="SLES_524.48;1" Title="Knights of the Temple: Infernal Crusade">
+		<BlockFpRoundingMode Address="0x0036581C" Mode="NEAREST" Description="Fixes collision issues." />
+		<BlockFpRoundingMode Address="0x00365948" Mode="NEAREST" Description="Fixes collision issues." />
+		<BlockFpRoundingMode Address="0x00365A1C" Mode="NEAREST" Description="Fixes collision issues." />
+		<BlockFpRoundingMode Address="0x00365AA4" Mode="NEAREST" Description="Fixes collision issues." />
+		<BlockFpRoundingMode Address="0x00365B14" Mode="NEAREST" Description="Fixes collision issues." />
+		<BlockFpRoundingMode Address="0x00365B9C" Mode="NEAREST" Description="Fixes collision issues." />
+		<IdleLoopBlock Address="0x002BFB78" />
+	</GameConfig>
+	<GameConfig Executable="SLES_526.36;1" Title="Colin McRae Rally 2005">
+		<IdleLoopBlock Address="0x002E5CE0" />
+	</GameConfig>
+	<GameConfig Executable="SLES_542.03;1" Title="PES 6: Pro Evolution Soccer">
+		<IdleLoopBlock Address="0x0013E610" />
+		<IdleLoopBlock Address="0x0013E660" />
+	</GameConfig>	
+	<GameConfig Executable="SLPM_551.91;1" Title="L2 - Love x Loop">
+		<Patch Address="0x001B4828" Value="0x10000008" Description="Avoid bug in code that fiddles with SP and causes the stack to be clobbered by SifCallRpc. Requires proper data cache handling to avoid issue." />
+	</GameConfig>
+	<GameConfig Executable="SLPM_657.75;1" Title="DDR Festival: Dance Dance Revolution">
+		<BlockFpRoundingMode Address="0x00122F08" Mode="NEAREST" Description="Fixes issue with inability to select some options in UI." />
+	</GameConfig>
+	<GameConfig Executable="SLPM_659.46;1" Title="Beatmania II DX 9th Style">
+		<IdleLoopBlock Address="0x001661F8" />
+	</GameConfig>
+	<GameConfig Executable="SLPM_661.11;1" Title="Fushigi no Umi no Nadia: Dennou Battle: Miss Nautilus Contest">
+		<IdleLoopBlock Address="0x001B0C40" />
+	</GameConfig>
+	<GameConfig Executable="SLPM_661.12;1" Title="Fushigi no Umi no Nadia: Inherit the Blue Water">
+		<IdleLoopBlock Address="0x001D26A0" />
+	</GameConfig>
+	<GameConfig Executable="SLPM_666.75;1" Title="Kingdom Hearts II Final Mix">
+		<BlockFpUseAccurateAddSub Address="0x001DA9FC" Description="Fixes issue with Tron level boss" />
+		<BlockFpUseAccurateAddSub Address="0x001DAA0C" Description="Fixes issue with Tron level boss" />
+	</GameConfig>
+	<GameConfig Executable="SCES_500.03;1" Title="Dead or Alive 2">
+		<Patch Address="0x002b4c44" Value="0x24060000" Description="Make the file reading RPC call synchronous. Requires proper data cache handling to avoid issue." />
+	</GameConfig>
+	<GameConfig Executable="SLPS_250.02;1" Title="Dead or Alive 2">
+		<Patch Address="0x00290408" Value="0x24060000" Description="Make the file reading RPC call synchronous. Requires proper data cache handling to avoid issue." />
+	</GameConfig>
+	<GameConfig Executable="SLPS_258.42;1" Title="Tales of Destiny: Director's Cut">
+		<BlockFpRoundingMode Address="0x001C7B7C" Mode="PLUSINFINITY" Description="Fixes softlock issues in various parts of the game." />
+	</GameConfig>
+	<GameConfig Executable="SWBFRNT2.ELF;1" Title="Star Wars: Battlefront II">
+		<!-- SLUS-21240 Version 2.01 -->
+		<IdleLoopBlock Address="0x00427F40" CheckBlockKey="6D8515A293E38030EE880D6C915CEAA2;12"/>
+	</GameConfig>
+</GameConfigs>
