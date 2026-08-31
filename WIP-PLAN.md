@@ -22,15 +22,13 @@ relinked. CocoaSpice is not allowed to regress while SPCBoyWK catches up.
 
 ### Management baseline — 2026-08-28
 
-The VGMMan family is managed as six independent repositories: VGMBoy,
-CocoaSpice, SPCBoyWK, ScanSong, CatalogReader, and FrontendCore. The prior
-management baseline was committed and its configured remote state was recorded
-there. The current working trees intentionally contain follow-up WIP in VGMBoy,
-ScanSong, CocoaSpice, SPCBoyWK, FrontendCore, and LaunchPad; those dirty trees
-must not be described as released snapshots. CatalogReader has no current code
-WIP. The generated CatalogReader `.DS_Store` and the pre-existing dirty
-`VGMBoy/vendor/aosdk` submodule remain deliberately outside any cleanup or
-extraction change.
+The VGMMan family is now organized as one Git repository with six explicit
+component boundaries: VGMBoy, CocoaSpice, SPCBoyWK, ScanSong, CatalogReader,
+and FrontendCore. The migration snapshot records the source state in the root
+history while preserving each component's package, build, and release
+boundary. The original standalone child checkouts remain separate local
+copies until they are explicitly retired; they are not part of this root
+repository's working tree.
 
 The CocoaSpice playback adapter now protects its frontend `TrackItem` snapshot
 from concurrent transport callbacks and reports callback identity from the

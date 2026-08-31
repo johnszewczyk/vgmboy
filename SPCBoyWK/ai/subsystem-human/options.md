@@ -57,6 +57,6 @@ store and remain separate from the read-only schema-23 scan catalog.
 
 ## Files
 
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/index.html`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/styles.css`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/main.swift`
+- `../../Sources/SPCBoyWK/Resources/index.html`
+- `../../Sources/SPCBoyWK/Resources/styles.css`
+- `../../Sources/SPCBoyWK/main.swift`

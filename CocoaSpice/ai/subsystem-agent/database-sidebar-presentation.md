@@ -72,10 +72,10 @@
 
 ## Files
 
-- [DatabaseSidebarPresentation.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/DatabaseSidebarPresentation.swift)
-- [DatabaseSidebarState.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/DatabaseSidebarState.swift)
-- [DatabaseFileSidebarInteraction.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/DatabaseFileSidebarInteraction.swift)
-- [LibraryDatabase.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/LibraryDatabase.swift)
-- [MainView.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/MainView.swift)
-- [PlayerViewModel.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlayerViewModel.swift)
-- [LibraryModels.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/LibraryModels.swift)
+- [DatabaseSidebarPresentation.swift](../../Sources/CocoaSpice/App/DatabaseSidebarPresentation.swift)
+- [DatabaseSidebarState.swift](../../Sources/CocoaSpice/App/DatabaseSidebarState.swift)
+- [DatabaseFileSidebarInteraction.swift](../../Sources/CocoaSpice/App/DatabaseFileSidebarInteraction.swift)
+- [LibraryDatabase.swift](../../Sources/CocoaSpice/App/LibraryDatabase.swift)
+- [MainView.swift](../../Sources/CocoaSpice/App/MainView.swift)
+- [PlayerViewModel.swift](../../Sources/CocoaSpice/App/PlayerViewModel.swift)
+- [LibraryModels.swift](../../Sources/CocoaSpice/App/LibraryModels.swift)

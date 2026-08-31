@@ -232,6 +232,10 @@ and cannot publish rows. WebKit still owns its loading copy, DOM snapshot
 application, and browser-selection ordering guard; those presentation concerns
 remain intentionally local.
 
+Catalog playlist rows also carry the optional ScanSong `dumper` value through
+the native bridge. The renderer exposes it as a configurable Dumper column and
+uses an em dash when a row has no authored value.
+
 ## Failure Boundaries
 
 Missing packaged resources are fatal. The host must not silently fall back to
@@ -239,13 +243,13 @@ raw filesystem scanning or a second catalog implementation.
 
 ## Files
 
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/main.swift`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/WKNativeBridge.swift`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/WKPlaybackBridge.swift`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Package.swift`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/app-playback.js`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/app-ui.js`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/options-controller.js`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/playlist-controller.js`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/sidebar-controller.js`
-- `/Users/john/Downloads/Code/VGMMan/FrontendCore/Sources/PlaybackQueueCore/PlaybackQueueNavigation.swift`
+- [main.swift](../../Sources/SPCBoyWK/main.swift)
+- [WKNativeBridge.swift](../../Sources/SPCBoyWK/WKNativeBridge.swift)
+- [WKPlaybackBridge.swift](../../Sources/SPCBoyWK/WKPlaybackBridge.swift)
+- [Package.swift](../../Package.swift)
+- [app-playback.js](../../Sources/SPCBoyWK/Resources/app-playback.js)
+- [app-ui.js](../../Sources/SPCBoyWK/Resources/app-ui.js)
+- [options-controller.js](../../Sources/SPCBoyWK/Resources/options-controller.js)
+- [playlist-controller.js](../../Sources/SPCBoyWK/Resources/playlist-controller.js)
+- [sidebar-controller.js](../../Sources/SPCBoyWK/Resources/sidebar-controller.js)
+- [PlaybackQueueNavigation.swift](../../../FrontendCore/Sources/PlaybackQueueCore/PlaybackQueueNavigation.swift)

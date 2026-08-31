@@ -30,6 +30,8 @@ Agent engineering notes:
 - VGMBoy is the playback and decoder owner.
 - Frontends render snapshots and issue activation requests; they do not write
   the catalog or duplicate its SQL.
+- Dumper is read as catalog metadata when present; pre-Dumper schema-23
+  catalogs remain readable and return an empty value.
 
 ## Human Docs
 

@@ -2,7 +2,7 @@
 
 ## Product
 
-`ScanSong` is the independent Swift package and native scanner app. `ScanSongKit` owns
+`ScanSong` is the scanner component in the VGMMan monorepo. Its Swift package and native scanner app are kept as an explicit build boundary. `ScanSongKit` owns
 discovery, inspection, archive handling, schema-23 catalog creation, resumable staging, and
 publication. The product is the sole catalog writer consumed by CocoaSpice and SPCBoy.
 
@@ -19,17 +19,19 @@ duration and common tags; it does not link VGMBoyKit or transcode the source.
 
 ## Task Routing
 
-- Scanner ownership and protocol: [scanner-contract.md](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-agent/scanner-contract.md)
-- Per-plugin intake behavior: [format-accommodations.md](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-agent/format-accommodations.md)
-- Build and plugin packaging: [build-integration.md](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-agent/build-integration.md)
-- Command-line behavior: [cli.md](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-human/cli.md)
-- Native catalog management: [catalog-management.md](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-human/catalog-management.md)
+- Scanner ownership and protocol: [scanner-contract.md](subsystem-agent/scanner-contract.md)
+- Per-plugin intake behavior: [format-accommodations.md](subsystem-agent/format-accommodations.md)
+- Build and plugin packaging: [build-integration.md](subsystem-agent/build-integration.md)
+- Command-line behavior: [cli.md](subsystem-human/cli.md)
+- Native catalog management: [catalog-management.md](subsystem-human/catalog-management.md)
 
 ## Local Rules
 
 - ScanSong is the sole schema-23 catalog writer.
 - Player apps read the catalog; they do not receive scanner write access.
 - ScanSong receives inspection executables from VGMBoy and never invokes a player frontend.
+- SPC ID666 and xID6 metadata include the authored Dumper field; it is stored in
+  `track_metadata` for catalog-backed playlist readers.
 - Human notes describe implemented UI behavior; agent notes describe scanner ownership and failure boundaries.
 
 ## File-type policy and unsupported formats

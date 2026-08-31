@@ -29,6 +29,6 @@ playlist model.
 
 ## Files
 
-- [VGMBoyEndpointCore.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyEndpointCore/VGMBoyEndpointCore.swift)
-- [PlaybackControlProtocol.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/PlaybackControlProtocol.swift)
-- [PlaybackSession.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/PlaybackSession.swift)
+- [VGMBoyEndpointCore.swift](../../Sources/VGMBoyEndpointCore/VGMBoyEndpointCore.swift)
+- [PlaybackControlProtocol.swift](../../Sources/VGMBoyKit/PlaybackControlProtocol.swift)
+- [PlaybackSession.swift](../../Sources/VGMBoyKit/PlaybackSession.swift)

@@ -2,7 +2,7 @@
 
 ## Product
 
-`SPCBoy (WK)` is an independent native macOS WebKit frontend for SPCBoy.
+`SPCBoy (WK)` is the native WebKit frontend component in the VGMMan monorepo.
 
 ## Major Components
 
@@ -50,6 +50,8 @@ Agent engineering notes:
 
 - Launch through `./launch.sh`; it performs a clean release rebuild first.
 - Keep catalog access read-only and behind a narrow native bridge.
+- The configurable playlist includes a Dumper column populated from the
+  read-only ScanSong catalog projection; missing values display an em dash.
 - The WK bridge is the only native capability boundary. Keep it typed by
   named requests and keep catalog access read-only.
 - Keep playback ownership in VGMBoy; this project owns presentation and host integration.

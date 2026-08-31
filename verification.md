@@ -3,13 +3,13 @@
 ## Scope
 
 `scripts/verify-family.sh` records and verifies the exact source combination of
-the six independent VGMMan repositories.
+the six VGMMan component directories in this single Git repository.
 
 ## Inventory
 
 Every run records:
 
-- branch, HEAD, upstream, ahead/behind counts, and dirty-file count;
+- root branch, HEAD, upstream, ahead/behind counts, and dirty-file count;
 - a SHA-256 hash of the binary tracked patch;
 - paths and SHA-256 hashes for untracked regular files without copying them;
 - recursive submodule state and its SHA-256 hash;
@@ -43,4 +43,3 @@ is repaired and repeatedly verified.
 The verifier does not commit, stash, reset, copy source trees, or change Git
 configuration. SwiftPM may update each repository's existing `.build` scratch
 directory during verification.
-

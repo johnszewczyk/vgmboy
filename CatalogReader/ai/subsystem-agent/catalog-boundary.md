@@ -37,7 +37,9 @@ row models, queue publication, and UI.
   `tracks_game_sidebar_index`. Replacing those branches with one broad `OR`
   predicate is a performance regression even when it returns the same rows.
 - Games playlist activation accepts multiple stable sidebar identities in one
-  read-only query and returns exactly the original fourteen projected columns.
+  read-only query and returns the catalog metadata projection, including
+  Dumper when the optional schema-23 column exists. Older schema-23 catalogs
+  without that column read an empty value.
 - When ScanSong marks either sidebar projection dirty during a scan,
   `CatalogReader` derives that projection from visible tracks until ScanSong
   republishes the materialized buckets. This keeps CocoaSpice and SPCBoyWK
@@ -45,7 +47,7 @@ row models, queue publication, and UI.
 
 ## Files
 
-- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogReader/CatalogReader.swift`
-- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Tests/CatalogReaderTests/CatalogReaderTests.swift`
-- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogPlaylistCore/CatalogPlaylistCore.swift`
-- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogReaderElectronBridge/main.swift`
+- [CatalogReader.swift](../../Sources/CatalogReader/CatalogReader.swift)
+- [CatalogReaderTests.swift](../../Tests/CatalogReaderTests/CatalogReaderTests.swift)
+- [CatalogPlaylistCore.swift](../../Sources/CatalogPlaylistCore/CatalogPlaylistCore.swift)
+- [main.swift](../../Sources/CatalogReaderElectronBridge/main.swift)

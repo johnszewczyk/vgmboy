@@ -177,16 +177,16 @@ error.
 The complete per-plugin contract—including route policy, native metadata
 source, dependency and archive handling, multi-track expansion, playback
 boundaries, and retained failure behavior—is maintained in
-[`ai/subsystem-agent/format-accommodations.md`](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-agent/format-accommodations.md).
+[`ai/subsystem-agent/format-accommodations.md`](ai/subsystem-agent/format-accommodations.md).
 
 Decoder provenance and milestone versions are maintained centrally by VGMBoy
-in [`Docs/plugin-versions.json`](/Users/john/Downloads/Code/VGMMan/VGMBoy/Docs/plugin-versions.json).
+in [`Docs/plugin-versions.json`](../VGMBoy/Docs/plugin-versions.json).
 ScanSong consumes the staged scanner products and does not maintain a second
 decoder-version list. Run VGMBoy's read-only audit before a release or after
 the documented review interval; adopting a newer decoder still requires
 rebuilding the scanner product and running its format-specific fixtures.
 The human-readable plugin matrix and dependency notes are in
-[`VGMBoy/Docs/plugin-catalog.md`](/Users/john/Downloads/Code/VGMMan/VGMBoy/Docs/plugin-catalog.md).
+[`VGMBoy/Docs/plugin-catalog.md`](../VGMBoy/Docs/plugin-catalog.md).
 
 Standalone Zstandard inputs use the explicit `name.ext.zst` or
 `name.ext.zstd` convention: `ext` is the required inner playable format name,

@@ -13,6 +13,11 @@ The existing VGMBoy remote history is being preserved separately. This
 snapshot is published first on a migration branch; no existing remote branch is
 replaced by this operation.
 
+The current feature path keeps the six component directories in this single
+Git history. Dumper metadata is owned by ScanSong, exposed read-only by
+CatalogReader, and rendered by CocoaSpice and SPCBoyWK; no frontend writes or
+rescans the catalog.
+
 ## Bootstrap and verification
 
 From the repository root, build the native VGMBoy dependency products first:

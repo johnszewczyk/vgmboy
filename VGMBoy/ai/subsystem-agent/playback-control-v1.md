@@ -75,7 +75,7 @@ same typed endpoint operations.
 
 ## Files
 
-- [PlaybackControlProtocol.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/PlaybackControlProtocol.swift)
-- [PlaybackSession.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/PlaybackSession.swift)
-- [PlaybackController.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/PlaybackController.swift)
-- [VGMBoyEndpointCore.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyEndpointCore/VGMBoyEndpointCore.swift)
+- [PlaybackControlProtocol.swift](../../Sources/VGMBoyKit/PlaybackControlProtocol.swift)
+- [PlaybackSession.swift](../../Sources/VGMBoyKit/PlaybackSession.swift)
+- [PlaybackController.swift](../../Sources/VGMBoyKit/PlaybackController.swift)
+- [VGMBoyEndpointCore.swift](../../Sources/VGMBoyEndpointCore/VGMBoyEndpointCore.swift)

@@ -60,9 +60,9 @@ knowledge.
 
 ## Files
 
-- [CocoaSpiceFrontendControlSurface.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/CocoaSpiceFrontendControlSurface.swift)
-- [PlayerViewModel.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlayerViewModel.swift)
-- [FrontendPreferencesCoordinator.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/FrontendPreferencesCoordinator.swift)
-- [FavoritesCoordinator.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/FavoritesCoordinator.swift)
-- [LocalBrowserCoordinator.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/LocalBrowserCoordinator.swift)
-- [PlaylistQueueCoordinator.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlaylistQueueCoordinator.swift)
+- [CocoaSpiceFrontendControlSurface.swift](../../Sources/CocoaSpice/App/CocoaSpiceFrontendControlSurface.swift)
+- [PlayerViewModel.swift](../../Sources/CocoaSpice/App/PlayerViewModel.swift)
+- [FrontendPreferencesCoordinator.swift](../../Sources/CocoaSpice/App/FrontendPreferencesCoordinator.swift)
+- [FavoritesCoordinator.swift](../../Sources/CocoaSpice/App/FavoritesCoordinator.swift)
+- [LocalBrowserCoordinator.swift](../../Sources/CocoaSpice/App/LocalBrowserCoordinator.swift)
+- [PlaylistQueueCoordinator.swift](../../Sources/CocoaSpice/App/PlaylistQueueCoordinator.swift)

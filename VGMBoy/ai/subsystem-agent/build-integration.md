@@ -63,16 +63,16 @@ for ScanSong's external inspection executables.
 
 ## Files
 
-- [Package.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Package.swift)
-- [build-app.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/build-app.sh)
-- [build-scanner-plugins.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/build-scanner-plugins.sh)
-- [build-dependencies.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/build-dependencies.sh)
-- [build-psgplay.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/build-psgplay.sh)
-- [stage-aosdk-qsf.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/stage-aosdk-qsf.sh) and
-  [aosdk-qsf-lifecycle.patch](/Users/john/Downloads/Code/VGMMan/VGMBoy/patches/aosdk-qsf-lifecycle.patch)
-- [plugin-versions.json](/Users/john/Downloads/Code/VGMMan/VGMBoy/Docs/plugin-versions.json)
-- [audit-plugin-versions.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/audit-plugin-versions.sh)
-- [check-plugin-docs.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/check-plugin-docs.sh)
+- [Package.swift](../../Package.swift)
+- [build-app.sh](../../build-app.sh)
+- [build-scanner-plugins.sh](../../scripts/build-scanner-plugins.sh)
+- [build-dependencies.sh](../../scripts/build-dependencies.sh)
+- [build-psgplay.sh](../../scripts/build-psgplay.sh)
+- [stage-aosdk-qsf.sh](../../scripts/stage-aosdk-qsf.sh) and
+  [aosdk-qsf-lifecycle.patch](../../patches/aosdk-qsf-lifecycle.patch)
+- [plugin-versions.json](../../Docs/plugin-versions.json)
+- [audit-plugin-versions.sh](../../scripts/audit-plugin-versions.sh)
+- [check-plugin-docs.sh](../../scripts/check-plugin-docs.sh)
 
 ## Verification State (2026-08-30)
 

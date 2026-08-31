@@ -49,5 +49,5 @@ write SQLite, or activate playback.
 
 ## Files
 
-- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogBrowserCore/CatalogBrowserCore.swift`
-- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Tests/CatalogBrowserCoreTests/CatalogBrowserCoreTests.swift`
+- `../../Sources/CatalogBrowserCore/CatalogBrowserCore.swift`
+- `../../Tests/CatalogBrowserCoreTests/CatalogBrowserCoreTests.swift`

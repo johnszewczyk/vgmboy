@@ -30,8 +30,8 @@
 
 ## Files
 
-- [LibraryDatabase+ReadQueries.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/LibraryDatabase+ReadQueries.swift)
-- [CatalogRootLoader.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/CatalogRootLoader.swift)
-- [PlaylistQueueLoader.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlaylistQueueLoader.swift)
-- [CatalogPlaylistCore.swift](/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogPlaylistCore/CatalogPlaylistCore.swift)
-- [CatalogSessionCore.swift](/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogSessionCore/CatalogSessionCore.swift)
+- [LibraryDatabase+ReadQueries.swift](../../Sources/CocoaSpice/App/LibraryDatabase+ReadQueries.swift)
+- [CatalogRootLoader.swift](../../Sources/CocoaSpice/App/CatalogRootLoader.swift)
+- [PlaylistQueueLoader.swift](../../Sources/CocoaSpice/App/PlaylistQueueLoader.swift)
+- [CatalogPlaylistCore.swift](../../../CatalogReader/Sources/CatalogPlaylistCore/CatalogPlaylistCore.swift)
+- [CatalogSessionCore.swift](../../../CatalogReader/Sources/CatalogSessionCore/CatalogSessionCore.swift)

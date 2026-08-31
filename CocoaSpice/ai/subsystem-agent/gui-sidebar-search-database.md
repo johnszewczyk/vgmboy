@@ -25,9 +25,9 @@
 
 ## Files
 
-- [DatabaseSidebarPresentation.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/DatabaseSidebarPresentation.swift)
-- [MainView.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/MainView.swift)
-- [NativeSearchField.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/NativeSearchField.swift)
-- [PlayerViewModel.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlayerViewModel.swift)
-- [Cross-app search-view fixture](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Tests/CocoaSpiceTests/cross-app-sidebar-search-view-v1.json)
-- [LibraryDatabase.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/LibraryDatabase.swift)
+- [DatabaseSidebarPresentation.swift](../../Sources/CocoaSpice/App/DatabaseSidebarPresentation.swift)
+- [MainView.swift](../../Sources/CocoaSpice/App/MainView.swift)
+- [NativeSearchField.swift](../../Sources/CocoaSpice/App/NativeSearchField.swift)
+- [PlayerViewModel.swift](../../Sources/CocoaSpice/App/PlayerViewModel.swift)
+- [Cross-app search-view fixture](../../Tests/CocoaSpiceTests/cross-app-sidebar-search-view-v1.json)
+- [LibraryDatabase.swift](../../Sources/CocoaSpice/App/LibraryDatabase.swift)

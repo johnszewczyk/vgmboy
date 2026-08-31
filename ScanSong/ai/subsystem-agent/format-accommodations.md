@@ -5,7 +5,7 @@
 This document describes the scanner's current behavior for every registered
 intake route. It is intentionally more specific than a list of decoder names:
 an extension is admitted only according to the route in
-[`BuiltInScannerPlugins.swift`](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/BuiltInScannerPlugins.swift), and a row is published only according to that route's structure and metadata handler.
+[`BuiltInScannerPlugins.swift`](../../Sources/ScanSongKit/BuiltInScannerPlugins.swift), and a row is published only according to that route's structure and metadata handler.
 
 Scanner admission, metadata availability, and playback compatibility are
 separate facts. A format may have a useful scanner row while its playback
@@ -42,7 +42,7 @@ fake one-track record merely to make a collection look complete.
 
 The route table is deliberately not a claim that every registered source is
 playable in every frontend. VGMBoy's playback registry and the scanner's
-registry are separate contracts; the [VGMBoy format registry](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/FormatRegistry.swift) is the playback source of truth.
+registry are separate contracts; the [VGMBoy format registry](../../../VGMBoy/Sources/VGMBoyKit/FormatRegistry.swift) is the playback source of truth.
 
 ## Game Music Emu family
 
@@ -54,6 +54,10 @@ process. It accepts both text and binary ID666 timing layouts, aggregates
 segmented xID6 values, bounds all lengths, and ignores unknown xID6 item types
 after validating their boundaries. This makes length and fade available without
 starting libgme and avoids paying emulator startup cost for every SPC.
+
+The legacy ID666 Dumper field and xID6 item `0x04` are retained as the catalog
+`dumper` value. Other scanner routes leave that field empty until their native
+metadata source publishes an equivalent authored value.
 
 The scanner stores `play_length_ms`, `fade_length_ms`, intro, and loop values
 as supplied by the native metadata. A missing or invalid native length remains
@@ -197,7 +201,7 @@ it. A libVGM/open failure is retained as a failure record.
 ### Raw direct streams
 
 The direct vgmstream set is owned by VGMBoy's
-[`VGMStreamFormatManifest.swift`](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyFormatCore/VGMStreamFormatManifest.swift):
+[`VGMStreamFormatManifest.swift`](../../../VGMBoy/Sources/VGMBoyFormatCore/VGMStreamFormatManifest.swift):
 
 ```text
 .aa3 .adx .ads .ahx .aifc .at3 .aus .bik .bika .bnk .dvi .fsb .genh .int

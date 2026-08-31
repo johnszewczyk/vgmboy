@@ -50,6 +50,6 @@
 
 ## Files
 
-- [MainView.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/MainView.swift)
-- [LibraryDatabase.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/LibraryDatabase.swift)
-- [LibraryModels.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/LibraryModels.swift)
+- [MainView.swift](../../Sources/CocoaSpice/App/MainView.swift)
+- [LibraryDatabase.swift](../../Sources/CocoaSpice/App/LibraryDatabase.swift)
+- [LibraryModels.swift](../../Sources/CocoaSpice/App/LibraryModels.swift)

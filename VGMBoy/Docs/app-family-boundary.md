@@ -29,9 +29,9 @@ inspection builds for the CocoaSpice, SPCBoy WK, and ScanSong products.
 
 ## Files
 
-- [Package.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Package.swift)
-- [build-app.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/build-app.sh)
-- [build-integration.md](/Users/john/Downloads/Code/VGMMan/VGMBoy/ai/subsystem-agent/build-integration.md)
-- [CocoaSpice project info](/Users/john/Downloads/Code/VGMMan/CocoaSpice/ai/project-info.md)
-- [SPCBoy WK project info](/Users/john/Downloads/Code/VGMMan/SPCBoyWK/ai/project-info.md)
-- [ScanSong project info](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/project-info.md)
+- [Package.swift](../Package.swift)
+- [build-app.sh](../build-app.sh)
+- [build-integration.md](../ai/subsystem-agent/build-integration.md)
+- [CocoaSpice project info](../../CocoaSpice/ai/project-info.md)
+- [SPCBoy WK project info](../../SPCBoyWK/ai/project-info.md)
+- [ScanSong project info](../../ScanSong/ai/project-info.md)

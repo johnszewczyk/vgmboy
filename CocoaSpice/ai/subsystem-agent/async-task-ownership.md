@@ -30,6 +30,6 @@
 
 ## Files
 
-- [CatalogSessionCore.swift](/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogSessionCore/CatalogSessionCore.swift)
-- [PlaybackRequestState.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlaybackRequestState.swift)
-- [PlayerViewModel.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlayerViewModel.swift)
+- [CatalogSessionCore.swift](../../../CatalogReader/Sources/CatalogSessionCore/CatalogSessionCore.swift)
+- [PlaybackRequestState.swift](../../Sources/CocoaSpice/App/PlaybackRequestState.swift)
+- [PlayerViewModel.swift](../../Sources/CocoaSpice/App/PlayerViewModel.swift)

@@ -49,6 +49,6 @@ and persistence. This project owns only the typed native adapter and WebKit rend
 
 ## Files
 
-- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogBrowserCore/CatalogBrowserCore.swift`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/index.html`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/sidebar-controller.js`
+- `../../../CatalogReader/Sources/CatalogBrowserCore/CatalogBrowserCore.swift`
+- `../../Sources/SPCBoyWK/Resources/index.html`
+- `../../Sources/SPCBoyWK/Resources/sidebar-controller.js`

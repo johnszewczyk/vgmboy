@@ -26,5 +26,5 @@
 
 ## Files
 
-- [PlaylistTableView.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlaylistTableView.swift)
-- [PlayerViewModel.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlayerViewModel.swift)
+- [PlaylistTableView.swift](../../Sources/CocoaSpice/App/PlaylistTableView.swift)
+- [PlayerViewModel.swift](../../Sources/CocoaSpice/App/PlayerViewModel.swift)

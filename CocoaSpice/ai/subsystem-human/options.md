@@ -65,4 +65,4 @@
 
 ## Files
 
-- [OptionsView.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/OptionsView.swift)
+- [OptionsView.swift](../../Sources/CocoaSpice/App/OptionsView.swift)

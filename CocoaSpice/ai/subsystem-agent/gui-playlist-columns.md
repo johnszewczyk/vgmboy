@@ -8,7 +8,8 @@
 
 ## Current State
 
-- Current columns are favorite, index, file, title, game, author, system, path, and length. Favorite is fixed immediately before index, uses a star header, and is user-hideable but not reorderable. The obsolete Play/Stop transport column is not part of the table.
+- Current columns are favorite, index, file, title, game, author, dumper, system, path, and length. Favorite is fixed immediately before index, uses a star header, and is user-hideable but not reorderable. The obsolete Play/Stop transport column is not part of the table.
+- Dumper is catalog metadata, primarily populated by ScanSong's SPC ID666/xID6 reader; rows without that metadata display an em dash.
 - Metadata-backed columns fall back to filename or parent-folder text when metadata is absent.
 - The Path column uses `TrackItem.fullPathText`: a full filesystem path for ordinary files and `archive-path#member-path` for archive members.
 - Column visibility, order, and width are persisted in `UserDefaults`.
@@ -29,6 +30,6 @@
 
 ## Files
 
-- [PlaylistTableView.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlaylistTableView.swift)
-- [PlaylistTableAutoSizer.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlaylistTableAutoSizer.swift)
-- [PlayerViewModel.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlayerViewModel.swift)
+- [PlaylistTableView.swift](../../Sources/CocoaSpice/App/PlaylistTableView.swift)
+- [PlaylistTableAutoSizer.swift](../../Sources/CocoaSpice/App/PlaylistTableAutoSizer.swift)
+- [PlayerViewModel.swift](../../Sources/CocoaSpice/App/PlayerViewModel.swift)

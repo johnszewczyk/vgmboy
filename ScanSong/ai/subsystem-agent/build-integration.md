@@ -8,8 +8,8 @@ executables.
 ## Ownership
 
 - VGMBoy owns decoder source, compatibility patches, dependency archives, and scanner-plugin builds.
-- VGMBoy's [plugin milestone manifest](/Users/john/Downloads/Code/VGMMan/VGMBoy/Docs/plugin-versions.json)
-  and [read-only audit script](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/audit-plugin-versions.sh)
+- VGMBoy's [plugin milestone manifest](../../../VGMBoy/Docs/plugin-versions.json)
+  and [read-only audit script](../../../VGMBoy/scripts/audit-plugin-versions.sh)
   are the source of truth for upstream revision review; ScanSong does not keep a second version list.
 - ScanSong depends on VGMBoy's lightweight `VGMBoyFormatCore` and `VGMBoySNDH` products
   for typed format admission; it does not link VGMBoyKit or native decoders.
@@ -50,7 +50,7 @@ executables.
 
 ## Files
 
-- [build-app.sh](/Users/john/Downloads/Code/VGMMan/ScanSong/build-app.sh)
-- [launch.sh](/Users/john/Downloads/Code/VGMMan/ScanSong/launch.sh)
-- [ScannerInspectors.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/ScannerInspectors.swift)
-- [VGMBoy build integration](/Users/john/Downloads/Code/VGMMan/VGMBoy/ai/subsystem-agent/build-integration.md)
+- [build-app.sh](../../build-app.sh)
+- [launch.sh](../../launch.sh)
+- [ScannerInspectors.swift](../../Sources/ScanSongKit/ScannerInspectors.swift)
+- [VGMBoy build integration](../../../VGMBoy/ai/subsystem-agent/build-integration.md)

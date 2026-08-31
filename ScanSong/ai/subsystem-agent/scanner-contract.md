@@ -71,6 +71,9 @@
 - The folder projection recognizes the collection's console directory, such as
   `set/Nintendo DS/game.tar.zst`. Players may choose that value or embedded
   metadata when grouping; ScanSong never rewrites rows for the preference.
+- SPC metadata preserves the ID666/xID6 `Dumper` field in `track_metadata`;
+  non-SPC routes publish the empty value until their native metadata contracts
+  expose an equivalent field.
 - Structure policy is independent from optional metadata policy. Required child
   or dependency enumeration cannot be deferred.
 - A scanner plugin has a `ScannerPluginDescriptor` for routing and a
@@ -227,15 +230,15 @@
 
 ## Files
 
-- [CatalogScanner.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/CatalogScanner.swift)
-- [CanonicalCatalogWriter.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/CanonicalCatalogWriter.swift)
-- [CanonicalCatalogSchema.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/CanonicalCatalogSchema.swift)
-- [CatalogLinkAuditor.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/CatalogLinkAuditor.swift)
-- [ScannerInspectors.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/ScannerInspectors.swift)
-- [InspectorProcessRunner.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/InspectorProcessRunner.swift)
-- [TXTPDependencyResolver.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/TXTPDependencyResolver.swift)
-- [ArchiveMemberEnumerator.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/ArchiveMemberEnumerator.swift)
-- [StandaloneArchiveExtractor.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/StandaloneArchiveExtractor.swift)
-- [format-accommodations.md](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-agent/format-accommodations.md)
-- [ScanSongCommand.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/scansong/ScanSongCommand.swift)
-- [ScanSongApp.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongApp/ScanSongApp.swift)
+- [CatalogScanner.swift](../../Sources/ScanSongKit/CatalogScanner.swift)
+- [CanonicalCatalogWriter.swift](../../Sources/ScanSongKit/CanonicalCatalogWriter.swift)
+- [CanonicalCatalogSchema.swift](../../Sources/ScanSongKit/CanonicalCatalogSchema.swift)
+- [CatalogLinkAuditor.swift](../../Sources/ScanSongKit/CatalogLinkAuditor.swift)
+- [ScannerInspectors.swift](../../Sources/ScanSongKit/ScannerInspectors.swift)
+- [InspectorProcessRunner.swift](../../Sources/ScanSongKit/InspectorProcessRunner.swift)
+- [TXTPDependencyResolver.swift](../../Sources/ScanSongKit/TXTPDependencyResolver.swift)
+- [ArchiveMemberEnumerator.swift](../../Sources/ScanSongKit/ArchiveMemberEnumerator.swift)
+- [StandaloneArchiveExtractor.swift](../../Sources/ScanSongKit/StandaloneArchiveExtractor.swift)
+- [format-accommodations.md](format-accommodations.md)
+- [ScanSongCommand.swift](../../Sources/scansong/ScanSongCommand.swift)
+- [ScanSongApp.swift](../../Sources/ScanSongApp/ScanSongApp.swift)
