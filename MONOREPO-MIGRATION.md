@@ -12,3 +12,17 @@ current software checkout.
 The existing VGMBoy remote history is being preserved separately. This
 snapshot is published first on a migration branch; no existing remote branch is
 replaced by this operation.
+
+## Bootstrap and verification
+
+From the repository root, build the native VGMBoy dependency products first:
+
+    ./VGMBoy/scripts/build-dependencies.sh
+
+Then run the family checks. The verifier writes its evidence to a temporary
+directory unless `--output-dir` is supplied:
+
+    ./scripts/verify-family.sh
+
+The generated `.build` trees and local archives are intentionally ignored and
+are not part of the source snapshot.

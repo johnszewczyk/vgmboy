@@ -27,10 +27,10 @@ development workspace rather than belonging to the playback product family.
 
 Working coordination documents:
 
-- [`WIP-PLAN.md`](/Users/john/Downloads/Code/VGMMan/WIP-PLAN.md) — shared-core extraction plan.
-- [`PARITY-WIP-REPORT.md`](/Users/john/Downloads/Code/VGMMan/PARITY-WIP-REPORT.md) — CS/SPCBoyWK behavioral parity ledger and next validation slices.
+- [`WIP-PLAN.md`](WIP-PLAN.md) — shared-core extraction plan.
+- [`PARITY-WIP-REPORT.md`](PARITY-WIP-REPORT.md) — CS/SPCBoyWK behavioral parity ledger and next validation slices.
 
 Decoder and scanner documentation:
 
-- [`VGMBoy plugin catalog`](/Users/john/Downloads/Code/VGMMan/VGMBoy/Docs/plugin-catalog.md) — decoder pins, provenance, scanner products, dependencies, and format boundaries.
-- [`ScanSong format accommodations`](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-agent/format-accommodations.md) — scanner-side routing, archive, sidecar, and multitrack behavior.
+- [`VGMBoy plugin catalog`](VGMBoy/Docs/plugin-catalog.md) — decoder pins, provenance, scanner products, dependencies, and format boundaries.
+- [`ScanSong format accommodations`](ScanSong/ai/subsystem-agent/format-accommodations.md) — scanner-side routing, archive, sidecar, and multitrack behavior.
