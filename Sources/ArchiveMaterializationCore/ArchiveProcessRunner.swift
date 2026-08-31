@@ -104,7 +104,7 @@ public final class ArchiveProcessRunner: @unchecked Sendable {
         let errorCollector = ArchiveProcessOutputCollector()
         let readers = DispatchGroup()
         readers.enter()
-        DispatchQueue.global(qos: .utility).async {
+        Thread.detachNewThread {
             let data = errorReadHandle.readDataToEndOfFile()
             try? errorReadHandle.close()
             errorCollector.set(data)
@@ -172,7 +172,7 @@ public final class ArchiveProcessRunner: @unchecked Sendable {
         let errorCollector = ArchiveProcessOutputCollector()
         let readers = DispatchGroup()
         readers.enter()
-        DispatchQueue.global(qos: .utility).async {
+        Thread.detachNewThread {
             let data = errorReadHandle.readDataToEndOfFile()
             try? errorReadHandle.close()
             errorCollector.set(data)

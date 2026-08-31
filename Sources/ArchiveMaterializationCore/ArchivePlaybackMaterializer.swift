@@ -19,9 +19,13 @@ public final class ArchivePlaybackMaterializer: @unchecked Sendable {
     public init(
         cacheRootURL: URL,
         preferenceKeys: ArchiveCachePreferenceKeys,
-        playbackLease: ArchivePlaybackLease = ArchivePlaybackLease()
+        playbackLease: ArchivePlaybackLease = ArchivePlaybackLease(),
+        capacityProvider: ArchiveCacheStore.CapacityProvider? = nil
     ) {
-        let cacheStore = ArchiveCacheStore(cacheRootURL: cacheRootURL)
+        let cacheStore = ArchiveCacheStore(
+            cacheRootURL: cacheRootURL,
+            capacityProvider: capacityProvider
+        )
         self.cacheStore = cacheStore
         self.playbackLease = playbackLease
         self.cacheMaterializer = ArchiveCacheMaterializer(

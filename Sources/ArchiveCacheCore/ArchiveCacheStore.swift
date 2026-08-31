@@ -5,15 +5,24 @@ import Foundation
 /// material. Frontends provide their policy; they do not reimplement cache
 /// identity, root selection, free-space checks, or eviction rules.
 public struct ArchiveCacheStore: Sendable {
+    public typealias CapacityProvider = @Sendable (URL) -> Int64?
+
     public enum Error: Swift.Error, Equatable, Sendable {
         case insufficientStorage(requiredBytes: Int64)
         case cacheLimitExceeded(limitBytes: Int64)
     }
 
     public let lifecycle: ArchiveCacheLifecycle
+    private let capacityProvider: CapacityProvider
 
-    public init(cacheRootURL: URL) {
+    public init(
+        cacheRootURL: URL,
+        capacityProvider: CapacityProvider? = nil
+    ) {
         self.lifecycle = ArchiveCacheLifecycle(cacheRootURL: cacheRootURL)
+        self.capacityProvider = capacityProvider ?? { url in
+            Self.systemAvailableCapacityNear(url)
+        }
     }
 
     public var cacheRootURL: URL { lifecycle.cacheRootURL }
@@ -46,6 +55,10 @@ public struct ArchiveCacheStore: Sendable {
     }
 
     public func availableCapacityNear(_ url: URL) -> Int64? {
+        capacityProvider(url)
+    }
+
+    private static func systemAvailableCapacityNear(_ url: URL) -> Int64? {
         let fileManager = FileManager.default
         var probe = url
         while !fileManager.fileExists(atPath: probe.path), probe.path != "/" {
@@ -62,8 +75,7 @@ public struct ArchiveCacheStore: Sendable {
     public func prepareWrite(policy: ArchiveCachePolicy) throws {
         let root = materializationRootURL(policy: policy)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        let values = try root.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-        let available = Int64(values.volumeAvailableCapacityForImportantUsage ?? 0)
+        let available = availableCapacityNear(root) ?? 0
         guard available >= ArchiveCachePolicy.requiredFreeBytes else {
             throw Error.insufficientStorage(requiredBytes: ArchiveCachePolicy.requiredFreeBytes)
         }

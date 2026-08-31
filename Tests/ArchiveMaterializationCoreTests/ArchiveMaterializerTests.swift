@@ -49,7 +49,7 @@ import VGMBoyFormatCore
     try Data("archive".utf8).write(to: archiveURL)
     defer { try? FileManager.default.removeItem(at: root) }
 
-    let store = ArchiveCacheStore(cacheRootURL: root.appendingPathComponent("cache"))
+    let store = testCacheStore(at: root.appendingPathComponent("cache"))
     let lease = ArchivePlaybackLease()
     let materializer = ArchiveCacheMaterializer(cacheStore: store, playbackLease: lease)
     let policy = ArchiveCachePolicy(mode: .disabled, maximumBytes: ArchiveCachePolicy.defaultLimitBytes)
@@ -90,7 +90,7 @@ import VGMBoyFormatCore
     try Data("archive".utf8).write(to: archiveURL)
     defer { try? FileManager.default.removeItem(at: root) }
 
-    let store = ArchiveCacheStore(cacheRootURL: root.appendingPathComponent("cache"))
+    let store = testCacheStore(at: root.appendingPathComponent("cache"))
     let materializer = ArchiveCacheMaterializer(cacheStore: store)
     let policy = ArchiveCachePolicy(mode: .disabled, maximumBytes: ArchiveCachePolicy.defaultLimitBytes)
     var extractionCount = 0
@@ -125,7 +125,7 @@ import VGMBoyFormatCore
     try Data("archive".utf8).write(to: archiveURL)
     defer { try? FileManager.default.removeItem(at: root) }
 
-    let store = ArchiveCacheStore(cacheRootURL: root.appendingPathComponent("cache"))
+    let store = testCacheStore(at: root.appendingPathComponent("cache"))
     let materializer = ArchiveCacheMaterializer(cacheStore: store)
     let policy = ArchiveCachePolicy(mode: .disabled, maximumBytes: ArchiveCachePolicy.defaultLimitBytes)
     let completeSet = try materializer.materializeCompleteSet(
@@ -189,7 +189,8 @@ import VGMBoyFormatCore
     ).save(keys: keys)
     let materializer = ArchivePlaybackMaterializer(
         cacheRootURL: cache,
-        preferenceKeys: keys
+        preferenceKeys: keys,
+        capacityProvider: { _ in Int64.max }
     )
 
     let selected = try materializer.materialize(
@@ -218,7 +219,7 @@ import VGMBoyFormatCore
     try Data("archive".utf8).write(to: archiveURL)
     defer { try? FileManager.default.removeItem(at: root) }
 
-    let store = ArchiveCacheStore(cacheRootURL: root.appendingPathComponent("cache"))
+    let store = testCacheStore(at: root.appendingPathComponent("cache"))
     let materializer = ArchiveCacheMaterializer(cacheStore: store)
     let policy = ArchiveCachePolicy(mode: .disabled, maximumBytes: ArchiveCachePolicy.defaultLimitBytes)
 
@@ -239,6 +240,10 @@ import VGMBoyFormatCore
         includingPropertiesForKeys: nil
     )) ?? []
     #expect(remaining.filter { $0.lastPathComponent.hasPrefix(".set-") }.isEmpty)
+}
+
+private func testCacheStore(at root: URL) -> ArchiveCacheStore {
+    ArchiveCacheStore(cacheRootURL: root, capacityProvider: { _ in Int64.max })
 }
 
 @Test func rejectsEmptyEntry() {
