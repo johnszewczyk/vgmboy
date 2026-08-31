@@ -48,6 +48,14 @@ Formats with decoder-provided timing use that natural duration. Formats without 
 shared unknown-duration default plus fade unless the caller explicitly enables Long Play. The
 default unknown-duration value is 2:30 and can be changed by the frontend.
 
+RenderWare Stream (`.rws`) files are a special case: the vendored vgmstream parser currently
+marks RWS streams as non-looping, including the Silent Hill Origins PS2 family
+([rws_80d.c](../../vendor/vgmstream/src/meta/rws_80d.c)). Long Play can extend playback only when
+the decoder has loop points to follow; it cannot turn these finite segmented streams into a
+sample-seamless infinite loop. Repeat Song is a frontend-level restart at the stream boundary,
+so any audible gap or reset there is expected until a format-specific loop definition is
+established.
+
 VGMBoyKit also exposes an in-process `PlaybackController` for native app hosts. It owns the
 decoder, transport, timing, and ten-band EQ; a host keeps its own playlist, repeat/shuffle policy,
 catalog, and macOS media-key integration.
