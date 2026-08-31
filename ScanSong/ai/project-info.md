@@ -64,9 +64,11 @@ inventory and result log. Archive members with genuinely unknown extensions are
 retained as grouped `unrecognized` diagnostics; known decoder sidecars and
 archive documentation remain quiet. Archive extraction is serialized to one
 payload at a time, TAR.ZST uses a streaming `zstd -dc` to `tar` pipeline rather
-than a second full temporary TAR, and stale scratch roots older than one day
-are removed when extraction starts. Disposable scratch prefixes are removed
-from failure messages before catalog persistence as well as log rendering.
+than a second full temporary TAR, and a producer `SIGPIPE` is accepted only
+when `tar` has already completed successfully. Stale scratch roots older than
+one day are removed when extraction starts. Disposable scratch prefixes are
+removed from failure messages before catalog persistence as well as log
+rendering.
 
 ## Current failure boundary
 

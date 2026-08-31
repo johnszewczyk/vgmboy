@@ -97,8 +97,10 @@
   scan-log entries. An archive may publish valid sibling tracks while preserving
   the failed member for retry and diagnosis.
 - TAR.ZST listing and extraction stream `zstd -dc` into `tar`; ScanSong does not
-  create a second full temporary TAR and does not close the producer pipe before
-  the consumer finishes.
+  create a second full temporary TAR. A producer `SIGPIPE`/broken-pipe result
+  is accepted only when `tar` exited successfully after consuming the archive;
+  a nonzero `tar` result or any other producer failure remains an extraction
+  failure.
 - Standard output contains JSONL events only, with explicit contract name,
   version, and monotonically increasing sequence. Progress diagnostics are
   rate-limited to phase changes, phase completion, or one event per second so
@@ -131,8 +133,9 @@
   per-archive expanded-byte limit therefore cannot multiply across the source
   pipeline. TAR.ZST archives use a cancellation-safe `zstd -dc` to `tar`
   pipeline for listing and extraction, without first creating a second full
-  `expanded.tar`; stale scanner scratch roots older than one day are reaped
-  when a new extraction begins. Extracted underscore aliases such as
+  `expanded.tar`; an expected producer pipe closure is tolerated only after a
+  successful `tar` completion. Stale scanner scratch roots older than one day
+  are reaped when a new extraction begins. Extracted underscore aliases such as
   `_.ldat.txth` are normalized to the decoder's canonical `.ldat.txth` name
   inside disposable scratch storage.
 - Archive member inspection runs under the shared bounded permit pool

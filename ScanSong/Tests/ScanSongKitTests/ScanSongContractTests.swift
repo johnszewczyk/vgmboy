@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import SQLite3
 import Testing
@@ -39,6 +40,9 @@ import zlib
     #expect(StandaloneArchiveExtractor.isStandaloneSupportFile(URL(fileURLWithPath: "bank.PDX.zst")))
     for sidecar in ["bank.2sflib.zst", "bank.ssflib.zst", "bank.usflib.zst"] {
         #expect(StandaloneArchiveExtractor.isStandaloneSupportFile(URL(fileURLWithPath: sidecar)))
+    }
+    for documentation in ["album.htm.zst", "album.html.zstd"] {
+        #expect(StandaloneArchiveExtractor.isStandaloneSupportFile(URL(fileURLWithPath: documentation)))
     }
     #expect(!StandaloneArchiveExtractor.isStandaloneSupportFile(URL(fileURLWithPath: "track.MDX.zst")))
     #expect(StandaloneArchiveExtractor.standaloneEntryPath(
@@ -362,6 +366,8 @@ func gameCubeFixturesInspectThroughVGMStream() async throws {
     try Data([0]).write(to: root.appendingPathComponent("music.sbb"))
     try Data([0]).write(to: root.appendingPathComponent("star.pdx"))
     try Data([0]).write(to: root.appendingPathComponent("ReadMe.TXT"))
+    try Data([0]).write(to: root.appendingPathComponent("album.htm"))
+    try Data([0]).write(to: root.appendingPathComponent("album.html"))
     try Data([0]).write(to: root.appendingPathComponent("extensionless"))
 
     let listing = try ArchiveMemberEnumerator().enumerate(
@@ -374,6 +380,29 @@ func gameCubeFixturesInspectThroughVGMStream() async throws {
     #expect(listing.members.isEmpty)
     #expect(listing.skipped.map(\.entryPath) == ["notes.xyz"])
     #expect(listing.skipped.first?.reason == .unsupportedFormat)
+}
+
+@Test func tarZstandardAcceptsSuccessfulConsumerPipeClosure() {
+    #expect(StandaloneArchiveExtractor.isExpectedZstandardPipeClosure(
+        exitStatus: SIGPIPE,
+        terminationReason: .uncaughtSignal,
+        stderr: ""
+    ))
+    #expect(StandaloneArchiveExtractor.isExpectedZstandardPipeClosure(
+        exitStatus: 70,
+        terminationReason: .exit,
+        stderr: "zstd: error 70: write error: broken pipe"
+    ))
+    #expect(!StandaloneArchiveExtractor.isExpectedZstandardPipeClosure(
+        exitStatus: SIGPIPE,
+        terminationReason: .exit,
+        stderr: ""
+    ))
+    #expect(!StandaloneArchiveExtractor.isExpectedZstandardPipeClosure(
+        exitStatus: SIGTERM,
+        terminationReason: .uncaughtSignal,
+        stderr: ""
+    ))
 }
 
 @Test func sidHeaderReaderPublishesCommodore64Metadata() async throws {

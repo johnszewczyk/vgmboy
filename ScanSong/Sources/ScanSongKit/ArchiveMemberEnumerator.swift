@@ -8,7 +8,7 @@ struct ArchiveMemberEnumerator {
     // archives do not produce one diagnostic per decoder sidecar.
     private static let supportFileExtensions: Set<String> = [
         "2sflib", "bd", "gsflib", "pdx", "psflib", "qsflib", "ssflib",
-        "pcm", "sbb", "smp", "txth", "txt", "usflib"
+        "htm", "html", "pcm", "sbb", "smp", "txth", "txt", "usflib"
     ]
 
     init(fileManager: FileManager = .default) {

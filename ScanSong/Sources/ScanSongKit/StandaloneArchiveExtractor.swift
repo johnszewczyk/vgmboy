@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 public struct ExtractedScanArchive: Sendable {
@@ -49,7 +50,7 @@ public struct StandaloneArchiveExtractor: Sendable {
     // dependency policy and also applies to standalone .zst wrappers.
     private static let supportFileExtensions: Set<String> = [
         "2sflib", "bd", "gsflib", "pdx", "psflib", "qsflib", "ssflib",
-        "pcm", "sbb", "smp", "txth", "txt", "usflib"
+        "htm", "html", "pcm", "sbb", "smp", "txth", "txt", "usflib"
     ]
 
     private var fileManager: FileManager { .default }
@@ -421,6 +422,20 @@ public struct StandaloneArchiveExtractor: Sendable {
         return (name.hasSuffix(".zst") || name.hasSuffix(".zstd")) && !isTarZstandard(url)
     }
 
+    /// BSD tar may stop reading immediately after the TAR end markers. If
+    /// zstd is still writing at that point, it receives SIGPIPE even though
+    /// tar successfully consumed and extracted the complete archive.
+    static func isExpectedZstandardPipeClosure(
+        exitStatus: Int32,
+        terminationReason: Process.TerminationReason,
+        stderr: String
+    ) -> Bool {
+        (terminationReason == .uncaughtSignal && exitStatus == SIGPIPE)
+            || (terminationReason == .exit
+                && exitStatus == 70
+                && stderr.localizedCaseInsensitiveContains("write error")
+                && stderr.localizedCaseInsensitiveContains("broken pipe"))
+    }
 }
 
 enum MDXDependencyReader {
@@ -553,6 +568,12 @@ private final class MDXDependencyIndex: @unchecked Sendable {
     }
 }
 
+private struct ScannerPipelineResult: Sendable {
+    let zstandardStatus: Int32
+    let zstandardTerminationReason: Process.TerminationReason
+    let tarStatus: Int32
+}
+
 private final class ScannerPipelineStatus: @unchecked Sendable {
     enum ProcessKind {
         case zstandard
@@ -568,13 +589,14 @@ private final class ScannerPipelineStatus: @unchecked Sendable {
     private let lock = NSLock()
     private var zstandardStatus: Int32?
     private var tarStatus: Int32?
-    private var continuation: CheckedContinuation<(Int32, Int32), Error>?
+    private var zstandardTerminationReason: Process.TerminationReason?
+    private var continuation: CheckedContinuation<ScannerPipelineResult, Error>?
     private var failure: Error?
     private var zstandardState: State = .notStarted
     private var tarState: State = .notStarted
     private var didResume = false
 
-    func install(_ continuation: CheckedContinuation<(Int32, Int32), Error>) {
+    func install(_ continuation: CheckedContinuation<ScannerPipelineResult, Error>) {
         lock.withLock { self.continuation = continuation }
     }
 
@@ -597,9 +619,10 @@ private final class ScannerPipelineStatus: @unchecked Sendable {
         }
     }
 
-    func recordZstandard(_ status: Int32) {
+    func recordZstandard(_ status: Int32, reason: Process.TerminationReason) {
         lock.withLock {
             zstandardStatus = status
+            zstandardTerminationReason = reason
             zstandardState = .finished
             finishIfReadyLocked()
         }
@@ -629,8 +652,12 @@ private final class ScannerPipelineStatus: @unchecked Sendable {
         didResume = true
         if let failure {
             continuation.resume(throwing: failure)
-        } else if let zstandardStatus, let tarStatus {
-            continuation.resume(returning: (zstandardStatus, tarStatus))
+        } else if let zstandardStatus, let zstandardTerminationReason, let tarStatus {
+            continuation.resume(returning: ScannerPipelineResult(
+                zstandardStatus: zstandardStatus,
+                zstandardTerminationReason: zstandardTerminationReason,
+                tarStatus: tarStatus
+            ))
         } else {
             continuation.resume(throwing: CancellationError())
         }
@@ -793,7 +820,10 @@ private enum ScannerCommand {
                 let completion = ScannerPipelineStatus()
                 completion.install(continuation)
                 zstandardProcess.terminationHandler = { process in
-                    completion.recordZstandard(process.terminationStatus)
+                    completion.recordZstandard(
+                        process.terminationStatus,
+                        reason: process.terminationReason
+                    )
                 }
                 tarProcess.terminationHandler = { process in
                     completion.recordTar(process.terminationStatus)
@@ -829,18 +859,26 @@ private enum ScannerCommand {
         outputClosed = true
 
         let standardOutput = (try? Data(contentsOf: logURL)) ?? Data()
-        let errorOutput = zstandardError.fileHandleForReading.readDataToEndOfFile()
-            + tarError.fileHandleForReading.readDataToEndOfFile()
+        let zstandardErrorData = zstandardError.fileHandleForReading.readDataToEndOfFile()
+        let tarErrorData = tarError.fileHandleForReading.readDataToEndOfFile()
+        let errorOutput = zstandardErrorData + tarErrorData
         let combinedOutput = standardOutput + errorOutput
         try combinedOutput.write(to: logURL, options: .atomic)
         if Task.isCancelled { throw CancellationError() }
-        guard status.0 == 0, status.1 == 0 else {
-            let failedTool = status.0 == 0 ? tar.lastPathComponent : zstandard.lastPathComponent
+        let zstdStderr = String(decoding: zstandardErrorData, as: UTF8.self)
+        let zstandardSucceeded = status.zstandardStatus == 0
+            || StandaloneArchiveExtractor.isExpectedZstandardPipeClosure(
+                exitStatus: status.zstandardStatus,
+                terminationReason: status.zstandardTerminationReason,
+                stderr: zstdStderr
+            )
+        guard zstandardSucceeded, status.tarStatus == 0 else {
+            let failedTool = zstandardSucceeded ? tar.lastPathComponent : zstandard.lastPathComponent
             let detail = String(decoding: errorOutput.suffix(8_192), as: UTF8.self)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             throw StandaloneArchiveError.commandFailed(
                 tool: failedTool,
-                status: status.0 == 0 ? status.1 : status.0,
+                status: zstandardSucceeded ? status.tarStatus : status.zstandardStatus,
                 detail: detail.isEmpty ? "No diagnostic output." : detail
             )
         }
