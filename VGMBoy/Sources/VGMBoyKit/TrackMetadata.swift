@@ -5,6 +5,7 @@ struct TrackMetadata: Sendable, Codable, Equatable {
     var song: String
     var game: String
     var author: String
+    var dumper: String
     var system: String
     var lengthMs: Int
     var introMs: Int
@@ -22,12 +23,14 @@ struct TrackMetadata: Sendable, Codable, Equatable {
         introMs: Int,
         loopMs: Int,
         playMs: Int,
-        fadeMs: Int
+        fadeMs: Int,
+        dumper: String = ""
     ) {
         self.index = index
         self.song = song
         self.game = game
         self.author = author
+        self.dumper = dumper
         self.system = system
         self.lengthMs = lengthMs
         self.introMs = introMs

@@ -341,6 +341,7 @@ struct PlaylistColumnWidthHints: Equatable, Sendable {
     let titleText: String
     let gameText: String
     let authorText: String
+    let dumperText: String
     let systemText: String
     let lengthText: String
 }

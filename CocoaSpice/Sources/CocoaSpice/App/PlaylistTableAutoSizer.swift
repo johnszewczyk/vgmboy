@@ -85,6 +85,8 @@ struct PlaylistTableAutoSizer: NSViewRepresentable {
                 widestWidth(in: model.playlist) { model.gameText(for: $0) }
             case "Author":
                 widestWidth(in: model.playlist) { model.authorText(for: $0) }
+            case "Dumper":
+                widestWidth(in: model.playlist) { model.dumperText(for: $0) }
             case "System":
                 widestWidth(in: model.playlist) { model.systemText(for: $0) }
             case "Path":

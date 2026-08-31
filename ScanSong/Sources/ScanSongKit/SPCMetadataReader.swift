@@ -47,7 +47,8 @@ enum SPCMetadataReader {
             introLengthMs: introLengthMs,
             loopLengthMs: loopLengthMs,
             playLengthMs: playLengthMs,
-            fadeLengthMs: extended.fadeLengthMs ?? legacy.fadeLengthMs
+            fadeLengthMs: extended.fadeLengthMs ?? legacy.fadeLengthMs,
+            dumper: extended.dumper ?? legacy.dumper
         )
     }
 
@@ -74,6 +75,7 @@ enum SPCMetadataReader {
             game: text(data[0x4E..<0x6E]),
             song: text(data[0x2E..<0x4E]),
             author: text(data[authorRange]),
+            dumper: text(data[0x6E..<0x7E]),
             comment: text(data[0x7E..<0x9E]),
             playLengthMs: playLengthMs,
             fadeLengthMs: fadeLengthMs
@@ -193,6 +195,7 @@ enum SPCMetadataReader {
         case (0x01, 1): metadata.song = nonEmptyText(payload)
         case (0x02, 1): metadata.game = nonEmptyText(payload)
         case (0x03, 1): metadata.author = nonEmptyText(payload)
+        case (0x04, 1): metadata.dumper = nonEmptyText(payload)
         case (0x07, 1): metadata.comment = nonEmptyText(payload)
         case (0x30, 4): metadata.introLengthMs = ticksToMilliseconds(payload)
         case (0x31, 4): metadata.loopLengthMs = ticksToMilliseconds(payload)
@@ -292,6 +295,7 @@ struct SPCLegacyMetadata {
     var game = ""
     var song = ""
     var author = ""
+    var dumper = ""
     var comment = ""
     var playLengthMs = 0
     var fadeLengthMs = 0
@@ -302,6 +306,7 @@ struct SPCExtendedMetadata {
     var game: String?
     var song: String?
     var author: String?
+    var dumper: String?
     var comment: String?
     var introLengthMs: Int?
     var loopLengthMs: Int?

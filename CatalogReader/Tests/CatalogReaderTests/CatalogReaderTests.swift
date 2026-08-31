@@ -81,6 +81,23 @@ private func fixtureCatalog() throws -> URL {
     #expect(try reader.tracks(paths: ["/music/Game/Track 9.spc", "/music/Game/Track 10.spc"]).map(\.title) == ["Track 10", "Track 9"])
 }
 
+@Test func readersProjectDumperWhenTheOptionalColumnExists() throws {
+    let url = try fixtureCatalog()
+    defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+    var database: OpaquePointer?
+    guard sqlite3_open(url.path, &database) == SQLITE_OK else { throw NSError(domain: "CatalogReaderTests", code: 4) }
+    try execute(database, "ALTER TABLE track_metadata ADD COLUMN dumper TEXT NOT NULL DEFAULT ''; UPDATE track_metadata SET dumper='SPC Dumper' WHERE track_id=1;")
+    sqlite3_close(database)
+
+    let reader = try ReadOnlyCatalog(databaseURL: url)
+    #expect(try reader.tracks(rootID: 1, sourcePaths: ["/music/Game/Track 9.spc"]).map(\.dumper) == ["SPC Dumper"])
+    let playlist = try CatalogPlaylistReader.tracksForGames(
+        databaseURL: url,
+        selections: [CatalogPlaylistGameSelection(rootID: 1, game: "Game", system: "SNES")]
+    )
+    #expect(playlist.first(where: { $0.title == "Track 9" })?.dumper == "SPC Dumper")
+}
+
 @Test func playlistGameProjectionUsesFolderFirstSystemProjection() throws {
     let url = try fixtureCatalog()
     defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }

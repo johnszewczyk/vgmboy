@@ -567,6 +567,12 @@ test("SPCBoyWK allows every playlist column to be hidden except an empty table",
   assert.match(appCoreSource, /visibility\[DEFAULT_COLUMN_ORDER\[0\]\]\s*=\s*true/);
 });
 
+test("SPCBoyWK exposes the catalog Dumper column", () => {
+  assert.match(appCoreSource, /id: "dumper", label: "Dumper"/);
+  assert.match(uiSource, /dumper: row\.dumper \|\| "—"/);
+  assert.match(uiSource, /column\.id === "dumper"/);
+});
+
 test("SPCBoyWK filters database search locally without a debounce", () => {
   assert.match(uiSource, /function rebuildDatabaseGameSearchIndex\(games = state\.databaseGames\)/);
   assert.match(uiSource, /terms\.every\(\(term\) => searchText\.includes\(term\)\)/);

@@ -38,7 +38,7 @@ extension LibraryDatabase {
     ) throws -> (tracks: [TrackItem], metadata: [String: TrackMetadata], widthHints: PlaylistColumnWidthHints) {
         let normalizedItems = Array(NSOrderedSet(array: gameItems)) as? [DatabaseGameItem] ?? []
         guard !normalizedItems.isEmpty else {
-            return ([], [:], PlaylistColumnWidthHints(indexText: "1", fileText: "", titleText: "", gameText: "", authorText: "", systemText: "", lengthText: "—"))
+            return ([], [:], PlaylistColumnWidthHints(indexText: "1", fileText: "", titleText: "", gameText: "", authorText: "", dumperText: "", systemText: "", lengthText: "—"))
         }
 
         let selections = normalizedItems.map {
@@ -56,6 +56,7 @@ extension LibraryDatabase {
         var widestTitleText = ""
         var widestGameText = ""
         var widestAuthorText = ""
+        var widestDumperText = ""
         var widestSystemText = ""
         var widestLengthText = "—"
         for catalogTrack in catalogTracks {
@@ -63,6 +64,7 @@ extension LibraryDatabase {
             let title = catalogTrack.title
             let game = catalogTrack.game
             let author = catalogTrack.author
+            let dumper = catalogTrack.dumper
             let system = catalogTrack.system
             let comment = catalogTrack.comment
             let introLengthMs = catalogTrack.introLengthMilliseconds
@@ -79,13 +81,15 @@ extension LibraryDatabase {
                 introLengthMs: introLengthMs,
                 loopLengthMs: loopLengthMs,
                 playLengthMs: playLengthMs,
-                fadeLengthMs: fadeLengthMs
+                fadeLengthMs: fadeLengthMs,
+                dumper: dumper
             )
 
             widestFileText = widerText(widestFileText, track.filename)
             widestTitleText = widerText(widestTitleText, title.isEmpty ? track.displayName : title)
             widestGameText = widerText(widestGameText, game.isEmpty ? track.url.deletingLastPathComponent().lastPathComponent : game)
             widestAuthorText = widerText(widestAuthorText, author.isEmpty ? "—" : author)
+            widestDumperText = widerText(widestDumperText, dumper.isEmpty ? "—" : dumper)
             widestSystemText = widerText(widestSystemText, system.isEmpty ? "SNES" : system)
             let lengthText = formatLengthText(playLengthMs: playLengthMs)
             widestLengthText = widerText(widestLengthText, lengthText)
@@ -97,6 +101,7 @@ extension LibraryDatabase {
             titleText: widestTitleText,
             gameText: widestGameText,
             authorText: widestAuthorText,
+            dumperText: widestDumperText,
             systemText: widestSystemText,
             lengthText: widestLengthText
         )
@@ -107,7 +112,7 @@ extension LibraryDatabase {
     static func tracksAndMetadataForFiles(databaseURL: URL, fileItems: [DatabaseFileItem]) throws -> (tracks: [TrackItem], metadata: [String: TrackMetadata], widthHints: PlaylistColumnWidthHints) {
         let normalizedItems = Array(NSOrderedSet(array: fileItems)) as? [DatabaseFileItem] ?? []
         guard !normalizedItems.isEmpty else {
-            return ([], [:], PlaylistColumnWidthHints(indexText: "1", fileText: "", titleText: "", gameText: "", authorText: "", systemText: "", lengthText: "—"))
+            return ([], [:], PlaylistColumnWidthHints(indexText: "1", fileText: "", titleText: "", gameText: "", authorText: "", dumperText: "", systemText: "", lengthText: "—"))
         }
 
         let catalog = try ReadOnlyCatalog(databaseURL: databaseURL)
@@ -127,7 +132,7 @@ extension LibraryDatabase {
             URL(fileURLWithPath: $0, isDirectory: false).standardizedFileURL.path
         })) as? [String] ?? []
         guard !normalizedPaths.isEmpty else {
-            return ([], [:], PlaylistColumnWidthHints(indexText: "1", fileText: "", titleText: "", gameText: "", authorText: "", systemText: "", lengthText: "—"))
+            return ([], [:], PlaylistColumnWidthHints(indexText: "1", fileText: "", titleText: "", gameText: "", authorText: "", dumperText: "", systemText: "", lengthText: "—"))
         }
 
         let catalog = try ReadOnlyCatalog(databaseURL: databaseURL)
@@ -409,6 +414,7 @@ extension LibraryDatabase {
         var widestTitleText = ""
         var widestGameText = ""
         var widestAuthorText = ""
+        var widestDumperText = ""
         var widestSystemText = ""
         var widestLengthText = "—"
 
@@ -424,13 +430,15 @@ extension LibraryDatabase {
                 introLengthMs: catalogTrack.introLengthMilliseconds,
                 loopLengthMs: catalogTrack.loopLengthMilliseconds,
                 playLengthMs: catalogTrack.lengthMilliseconds,
-                fadeLengthMs: catalogTrack.fadeLengthMilliseconds
+                fadeLengthMs: catalogTrack.fadeLengthMilliseconds,
+                dumper: catalogTrack.dumper
             )
 
             widestFileText = widerText(widestFileText, track.filename)
             widestTitleText = widerText(widestTitleText, catalogTrack.title.isEmpty ? track.displayName : catalogTrack.title)
             widestGameText = widerText(widestGameText, catalogTrack.game.isEmpty ? track.url.deletingLastPathComponent().lastPathComponent : catalogTrack.game)
             widestAuthorText = widerText(widestAuthorText, catalogTrack.author.isEmpty ? "—" : catalogTrack.author)
+            widestDumperText = widerText(widestDumperText, catalogTrack.dumper.isEmpty ? "—" : catalogTrack.dumper)
             widestSystemText = widerText(widestSystemText, catalogTrack.system.isEmpty ? "SNES" : catalogTrack.system)
             widestLengthText = widerText(widestLengthText, formatLengthText(playLengthMs: catalogTrack.lengthMilliseconds))
         }
@@ -444,6 +452,7 @@ extension LibraryDatabase {
                 titleText: widestTitleText,
                 gameText: widestGameText,
                 authorText: widestAuthorText,
+                dumperText: widestDumperText,
                 systemText: widestSystemText,
                 lengthText: widestLengthText
             )
@@ -471,6 +480,7 @@ extension LibraryDatabase {
         var widestTitleText = ""
         var widestGameText = ""
         var widestAuthorText = ""
+        var widestDumperText = ""
         var widestSystemText = ""
         var widestLengthText = "—"
 
@@ -480,12 +490,13 @@ extension LibraryDatabase {
             let title = sqliteString(statement, index: 5)
             let game = sqliteString(statement, index: 6)
             let author = sqliteString(statement, index: 7)
-            let system = sqliteString(statement, index: 8)
-            let comment = sqliteString(statement, index: 9)
-            let introLengthMs = Int(sqlite3_column_int(statement, 10))
-            let loopLengthMs = Int(sqlite3_column_int(statement, 11))
-            let playLengthMs = Int(sqlite3_column_int(statement, 12))
-            let fadeLengthMs = Int(sqlite3_column_int(statement, 13))
+            let dumper = sqliteString(statement, index: 8)
+            let system = sqliteString(statement, index: 9)
+            let comment = sqliteString(statement, index: 10)
+            let introLengthMs = Int(sqlite3_column_int(statement, 11))
+            let loopLengthMs = Int(sqlite3_column_int(statement, 12))
+            let playLengthMs = Int(sqlite3_column_int(statement, 13))
+            let fadeLengthMs = Int(sqlite3_column_int(statement, 14))
 
             tracks.append(track)
             metadata[track.id] = TrackMetadata(
@@ -497,13 +508,15 @@ extension LibraryDatabase {
                 introLengthMs: introLengthMs,
                 loopLengthMs: loopLengthMs,
                 playLengthMs: playLengthMs,
-                fadeLengthMs: fadeLengthMs
+                fadeLengthMs: fadeLengthMs,
+                dumper: dumper
             )
 
             widestFileText = widerText(widestFileText, track.filename)
             widestTitleText = widerText(widestTitleText, title.isEmpty ? track.displayName : title)
             widestGameText = widerText(widestGameText, game.isEmpty ? track.url.deletingLastPathComponent().lastPathComponent : game)
             widestAuthorText = widerText(widestAuthorText, author.isEmpty ? "—" : author)
+            widestDumperText = widerText(widestDumperText, dumper.isEmpty ? "—" : dumper)
             widestSystemText = widerText(widestSystemText, system.isEmpty ? "SNES" : system)
             let lengthText = formatLengthText(playLengthMs: playLengthMs)
             widestLengthText = widerText(widestLengthText, lengthText)
@@ -517,6 +530,7 @@ extension LibraryDatabase {
             titleText: widestTitleText,
             gameText: widestGameText,
             authorText: widestAuthorText,
+            dumperText: widestDumperText,
             systemText: widestSystemText,
             lengthText: widestLengthText
         )

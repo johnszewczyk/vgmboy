@@ -22,7 +22,7 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
     enum RepeatMode: String, Codable, Sendable { case off, all, one }
     enum SidebarMode: String, Codable, Sendable { case paths, consoles, diskPath, favorites }
     enum FavoriteOrder: String, Codable, Sendable { case historical, alphabetical }
-    enum PlaylistSortColumn: String, Codable, Sendable { case filename, title, game, artist, system, path, lengthLabel }
+    enum PlaylistSortColumn: String, Codable, Sendable { case filename, title, game, artist, dumper, system, path, lengthLabel }
     enum SortDirection: String, Codable, Sendable { case ascending, descending }
 
     var manualPlayTimeSeconds: Int?

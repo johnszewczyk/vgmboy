@@ -506,6 +506,7 @@ func gameCubeFixturesInspectThroughVGMStream() async throws {
     var data = makeSPCFile(id666Flag: 0x1A)
     writeBytes(&data, at: 0x2E, value: "Binary Song")
     writeBytes(&data, at: 0x4E, value: "Binary Game")
+    writeBytes(&data, at: 0x6E, value: "Binary Dumper")
     writeBytes(&data, at: 0xB0, value: "Binary Artist")
 
     // Binary ID666: seconds at 0xA9 as LE16 and fade milliseconds at 0xAC as LE24.
@@ -523,6 +524,7 @@ func gameCubeFixturesInspectThroughVGMStream() async throws {
 
     #expect(metadata.song == "Binary Song")
     #expect(metadata.game == "Binary Game")
+    #expect(metadata.dumper == "Binary Dumper")
     #expect(metadata.author == "Binary Artist")
     #expect(metadata.playLengthMs == 30_000)
     #expect(metadata.fadeLengthMs == 5_000)
@@ -531,6 +533,7 @@ func gameCubeFixturesInspectThroughVGMStream() async throws {
 @Test func spcReaderParsesTextID666LengthAndFade() throws {
     var data = makeSPCFile(id666Flag: 0x1A)
     writeBytes(&data, at: 0x2E, value: "Text Song")
+    writeBytes(&data, at: 0x6E, value: "Text Dumper")
     writeBytes(&data, at: 0x9E, value: "01/02/2003")
     writeBytes(&data, at: 0xA9, value: "045")
     writeBytes(&data, at: 0xAC, value: "00600")
@@ -541,6 +544,7 @@ func gameCubeFixturesInspectThroughVGMStream() async throws {
     let metadata = try #require(try SPCMetadataReader.read(fileURL: fileURL))
 
     #expect(metadata.song == "Text Song")
+    #expect(metadata.dumper == "Text Dumper")
     #expect(metadata.author == "Text Artist")
     #expect(metadata.playLengthMs == 45_000)
     #expect(metadata.fadeLengthMs == 600)
@@ -552,6 +556,7 @@ func gameCubeFixturesInspectThroughVGMStream() async throws {
         makeXID6Item(id: 0x02, type: 1, payload: Array("xID6 Game".utf8)),
         makeXID6Item(id: 0x01, type: 1, payload: Array("xID6 Song".utf8)),
         makeXID6Item(id: 0x03, type: 1, payload: Array("xID6 Artist".utf8)),
+        makeXID6Item(id: 0x04, type: 1, payload: Array("xID6 Dumper".utf8)),
         makeXID6Item(id: 0x55, type: 2, payload: [0xAA, 0xBB]),
         makeXID6Item(id: 0x30, type: 4, payload: littleEndianBytes(128_000)), // 2 seconds
         makeXID6Item(id: 0x31, type: 4, payload: littleEndianBytes(192_000)), // 3 seconds
@@ -567,6 +572,7 @@ func gameCubeFixturesInspectThroughVGMStream() async throws {
     #expect(metadata.song == "xID6 Song")
     #expect(metadata.game == "xID6 Game")
     #expect(metadata.author == "xID6 Artist")
+    #expect(metadata.dumper == "xID6 Dumper")
     #expect(metadata.introLengthMs == 2_000)
     #expect(metadata.loopLengthMs == 3_000)
     #expect(metadata.playLengthMs == 12_000) // intro + loop * 2 + end
@@ -603,6 +609,7 @@ func spcFixturesPublishNativeLengths() async throws {
 
     var data = makeSPCFile(id666Flag: 0x1A)
     writeBytes(&data, at: 0x2E, value: "Stored SPC")
+    writeBytes(&data, at: 0x6E, value: "Stored Dumper")
     data[0xA9] = 62
     data[0xAA] = 0
     data[0xAB] = 0
@@ -617,10 +624,10 @@ func spcFixturesPublishNativeLengths() async throws {
     #expect(sqlite3_open_v2(databaseURL.path, &database, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
     let row = try querySingleRow(
         database: try #require(database),
-        sql: "SELECT play_length_ms, fade_length_ms FROM track_metadata LIMIT 1;"
+        sql: "SELECT play_length_ms, fade_length_ms, dumper FROM track_metadata LIMIT 1;"
     )
     sqlite3_close(database)
-    #expect(row == ["62000", "0"])
+    #expect(row == ["62000", "0", "Stored Dumper"])
 }
 
 @Test func multiRootScanPublishesOneStableSourceTotal() async throws {

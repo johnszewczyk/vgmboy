@@ -893,6 +893,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "title": track.title,
             "game": track.game,
             "artist": track.author,
+            "dumper": track.dumper,
             "system": track.system,
             "playLengthMs": track.lengthMilliseconds
         ]
@@ -932,6 +933,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "title": track.title,
             "game": track.game,
             "artist": track.author,
+            "dumper": track.dumper,
             "system": track.system,
             "playLengthMs": track.lengthMilliseconds
         ]
@@ -1063,6 +1065,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 "title": basename,
                 "game": game,
                 "artist": "",
+                "dumper": "",
                 "system": system,
                 "playLengthMs": item.naturalPlayMilliseconds
             ]
@@ -1153,6 +1156,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 "title": snapshot.title,
                 "game": snapshot.game,
                 "artist": snapshot.author,
+                "dumper": "—",
                 "system": snapshot.system,
                 "trackIndex": identity.trackIndex,
                 "trackCount": identity.trackCount,

@@ -5,6 +5,7 @@ public struct ScannerMetadata: Codable, Equatable, Sendable {
     public let song: String
     public let system: String
     public let author: String
+    public let dumper: String
     public let comment: String
     public let introLengthMs: Int
     public let loopLengthMs: Int
@@ -20,12 +21,14 @@ public struct ScannerMetadata: Codable, Equatable, Sendable {
         introLengthMs: Int,
         loopLengthMs: Int,
         playLengthMs: Int,
-        fadeLengthMs: Int
+        fadeLengthMs: Int,
+        dumper: String = ""
     ) {
         self.game = game
         self.song = song
         self.system = system
         self.author = author
+        self.dumper = dumper
         self.comment = comment
         self.introLengthMs = introLengthMs
         self.loopLengthMs = loopLengthMs

@@ -433,10 +433,10 @@ public final class CanonicalCatalogWriter: @unchecked Sendable {
             try execute(
                 """
                 INSERT INTO track_metadata
-                    (track_id, title, game, author, system, comment, intro_length_ms,
+                    (track_id, title, game, author, dumper, system, comment, intro_length_ms,
                      loop_length_ms, play_length_ms, fade_length_ms, metadata_scanned_at)
                 SELECT staged.id, metadata.title, metadata.game, metadata.author,
-                       metadata.system, metadata.comment, metadata.intro_length_ms,
+                       COALESCE(metadata.dumper, ''), metadata.system, metadata.comment, metadata.intro_length_ms,
                        metadata.loop_length_ms, metadata.play_length_ms,
                        metadata.fade_length_ms, metadata.metadata_scanned_at
                 FROM tracks staged
@@ -638,6 +638,7 @@ public final class CanonicalCatalogWriter: @unchecked Sendable {
     private func prepareSchema() throws {
         let version = try scalarInt("PRAGMA user_version;")
         if version == CanonicalCatalog.schemaVersion {
+            try ensureDumperColumn()
             _ = try CanonicalCatalog.inspect(databaseURL: databaseURL)
             return
         }
@@ -718,18 +719,26 @@ public final class CanonicalCatalogWriter: @unchecked Sendable {
         try execute(
             """
             INSERT INTO track_metadata
-                (track_id, title, game, author, system, comment, intro_length_ms,
+                (track_id, title, game, author, dumper, system, comment, intro_length_ms,
                  loop_length_ms, play_length_ms, fade_length_ms, metadata_scanned_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             [
                 .integer(sqlite3_last_insert_rowid(database)), .text(metadata.song), .text(metadata.game),
-                .text(metadata.author), .text(metadata.system), .text(metadata.comment),
+                .text(metadata.author), .text(metadata.dumper), .text(metadata.system), .text(metadata.comment),
                 .integer(Int64(metadata.introLengthMs)), .integer(Int64(metadata.loopLengthMs)),
                 .integer(Int64(metadata.playLengthMs)), .integer(Int64(metadata.fadeLengthMs)),
                 .real(Date().timeIntervalSince1970)
             ]
         )
+    }
+
+    private func ensureDumperColumn() throws {
+        let columns = try query("PRAGMA table_info(track_metadata);") { statement in
+            Self.string(statement, 1)
+        }
+        guard !columns.contains("dumper") else { return }
+        try execute("ALTER TABLE track_metadata ADD COLUMN dumper TEXT NOT NULL DEFAULT '';" )
     }
 
     private func upsertInventory(

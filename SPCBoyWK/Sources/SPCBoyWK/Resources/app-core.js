@@ -10,6 +10,7 @@ const COLUMN_DEFS = [
   { id: "title", label: "Title" },
   { id: "game", label: "Game" },
   { id: "artist", label: "Artist" },
+  { id: "dumper", label: "Dumper" },
   { id: "system", label: "System" },
   { id: "path", label: "Path" },
   { id: "lengthLabel", label: "Length", className: "mono col-length" }
@@ -22,6 +23,7 @@ const DEFAULT_COLUMN_WIDTHS = Object.freeze({
   title: 18,
   game: 18,
   artist: 16,
+  dumper: 16,
   system: 10,
   path: 28,
   lengthLabel: 8

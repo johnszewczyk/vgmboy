@@ -124,6 +124,7 @@ final class PlayerViewModel {
         case title
         case game
         case author
+        case dumper
         case system
         case path
         case length
@@ -137,6 +138,7 @@ final class PlayerViewModel {
             case .title: "Title"
             case .game: "Game"
             case .author: "Author"
+            case .dumper: "Dumper"
             case .system: "System"
             case .path: "Path"
             case .length: "Length"
@@ -3438,7 +3440,7 @@ final class PlayerViewModel {
         switch column {
         case .index, .file, .path:
             return false
-        case .title, .game, .author, .system, .length:
+        case .title, .game, .author, .dumper, .system, .length:
             return true
         }
     }
@@ -3453,6 +3455,10 @@ final class PlayerViewModel {
 
     func authorText(for track: TrackItem) -> String {
         PlaylistPresentation.authorText(for: metadataCache[track.id])
+    }
+
+    func dumperText(for track: TrackItem) -> String {
+        PlaylistPresentation.dumperText(for: metadataCache[track.id])
     }
 
     func systemText(for track: TrackItem) -> String {

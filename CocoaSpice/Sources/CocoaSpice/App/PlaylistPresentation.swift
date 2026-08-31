@@ -13,6 +13,10 @@ enum PlaylistPresentation {
         metadata?.author.nonEmpty ?? "—"
     }
 
+    static func dumperText(for metadata: TrackMetadata?) -> String {
+        metadata?.dumper.nonEmpty ?? "—"
+    }
+
     static func systemText(for metadata: TrackMetadata?) -> String {
         metadata?.system.nonEmpty ?? "—"
     }
@@ -40,6 +44,7 @@ enum PlaylistPresentation {
                 titleText(for: track, metadata: trackMetadata),
                 gameText(for: track, metadata: trackMetadata),
                 authorText(for: trackMetadata),
+                dumperText(for: trackMetadata),
                 systemText(for: trackMetadata)
             ]
             .joined(separator: " ")
@@ -57,6 +62,7 @@ enum PlaylistPresentation {
         var widestTitleText = ""
         var widestGameText = ""
         var widestAuthorText = ""
+        var widestDumperText = ""
         var widestSystemText = ""
         var widestLengthText = "—"
 
@@ -66,6 +72,7 @@ enum PlaylistPresentation {
             widestTitleText = longerText(widestTitleText, titleText(for: track, metadata: trackMetadata))
             widestGameText = longerText(widestGameText, gameText(for: track, metadata: trackMetadata))
             widestAuthorText = longerText(widestAuthorText, authorText(for: trackMetadata))
+            widestDumperText = longerText(widestDumperText, dumperText(for: trackMetadata))
             widestSystemText = longerText(widestSystemText, systemText(for: trackMetadata))
             widestLengthText = longerText(widestLengthText, lengthText(for: trackMetadata))
         }
@@ -76,6 +83,7 @@ enum PlaylistPresentation {
             titleText: widestTitleText,
             gameText: widestGameText,
             authorText: widestAuthorText,
+            dumperText: widestDumperText,
             systemText: widestSystemText,
             lengthText: widestLengthText
         )
@@ -102,6 +110,8 @@ enum PlaylistPresentation {
             return compare(gameText(for: lhs, metadata: lhsMetadata), gameText(for: rhs, metadata: rhsMetadata))
         case .author:
             return compare(authorText(for: lhsMetadata), authorText(for: rhsMetadata))
+        case .dumper:
+            return compare(dumperText(for: lhsMetadata), dumperText(for: rhsMetadata))
         case .system:
             return compare(systemText(for: lhsMetadata), systemText(for: rhsMetadata))
         case .path:

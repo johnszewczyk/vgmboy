@@ -94,6 +94,7 @@ struct PlaylistTableView: NSViewRepresentable {
             case title
             case game
             case author
+            case dumper
             case system
             case path
             case length
@@ -107,6 +108,7 @@ struct PlaylistTableView: NSViewRepresentable {
                 case .title: "Title"
                 case .game: "Game"
                 case .author: "Author"
+                case .dumper: "Dumper"
                 case .system: "System"
                 case .path: "Path"
                 case .length: "Length"
@@ -122,6 +124,7 @@ struct PlaylistTableView: NSViewRepresentable {
                 case .title: 220
                 case .game: 220
                 case .author: 150
+                case .dumper: 150
                 case .system: 80
                 case .path: 320
                 case .length: 70
@@ -135,6 +138,7 @@ struct PlaylistTableView: NSViewRepresentable {
                 case .index: 32
                 case .file, .title, .game: 120
                 case .author: 90
+                case .dumper: 90
                 case .system: 60
                 case .path: 160
                 case .length: 60
@@ -176,6 +180,8 @@ struct PlaylistTableView: NSViewRepresentable {
                     .game
                 case .author:
                     .author
+                case .dumper:
+                    .dumper
                 case .system:
                     .system
                 case .path:
@@ -441,6 +447,8 @@ struct PlaylistTableView: NSViewRepresentable {
                     return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.gameText(for: track), isCurrentTrack: model.currentTrack?.id == track.id)
                 case .author:
                     return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.authorText(for: track), isCurrentTrack: model.currentTrack?.id == track.id)
+                case .dumper:
+                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.dumperText(for: track), isCurrentTrack: model.currentTrack?.id == track.id)
                 case .system:
                     return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.systemText(for: track), isCurrentTrack: model.currentTrack?.id == track.id)
                 case .path:
@@ -673,7 +681,7 @@ struct PlaylistTableView: NSViewRepresentable {
             let metadataColumns = IndexSet(tableView.tableColumns.enumerated().compactMap { index, tableColumn in
                 guard let column = Column(rawValue: tableColumn.identifier.rawValue) else { return nil }
                 return switch column {
-                case .title, .game, .author, .system, .length:
+                case .title, .game, .author, .dumper, .system, .length:
                     index
                 case .favorite, .index, .file, .path, .fileSize:
                     nil
@@ -1098,6 +1106,8 @@ struct PlaylistTableView: NSViewRepresentable {
                 hints.gameText
             case .author:
                 hints.authorText
+            case .dumper:
+                hints.dumperText
             case .system:
                 hints.systemText
             case .path:
@@ -1123,6 +1133,8 @@ struct PlaylistTableView: NSViewRepresentable {
                 model.gameText(for: track)
             case .author:
                 model.authorText(for: track)
+            case .dumper:
+                model.dumperText(for: track)
             case .system:
                 model.systemText(for: track)
             case .path:

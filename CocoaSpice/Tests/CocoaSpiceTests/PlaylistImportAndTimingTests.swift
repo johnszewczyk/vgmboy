@@ -459,6 +459,7 @@ func realAmigaLHAArchiveListsPrefixLedModule() async throws {
     #expect(PlaylistPresentation.titleText(for: track, metadata: nil) == "Game Theme")
     #expect(PlaylistPresentation.gameText(for: track, metadata: nil) == "Example")
     #expect(PlaylistPresentation.authorText(for: nil) == "—")
+    #expect(PlaylistPresentation.dumperText(for: nil) == "—")
     #expect(PlaylistPresentation.systemText(for: nil) == "—")
 }
 

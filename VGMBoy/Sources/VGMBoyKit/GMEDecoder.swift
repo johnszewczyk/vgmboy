@@ -99,7 +99,8 @@ final class GMEDecoder: AudioDecoder, @unchecked Sendable {
             introMs: Int(info.intro_length),
             loopMs: Int(info.loop_length),
             playMs: Int(info.play_length),
-            fadeMs: Int(info.fade_length)
+            fadeMs: Int(info.fade_length),
+            dumper: String(cString: info.dumper)
         )
     }
 

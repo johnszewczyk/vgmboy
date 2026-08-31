@@ -1036,6 +1036,7 @@ function databaseRowsToPlaylistTracks(rows, games) {
     title: row.title || row.filename.replace(/\.[^.]+$/i, ""),
     game: row.game || fallbackGame.name || "—",
     artist: row.artist || "—",
+    dumper: row.dumper || "—",
     system: row.system || fallbackGame.system || "—",
     lengthLabel: row.playLengthMs > 0 ? uiApp.formatTime(Math.round(row.playLengthMs / 1000)) : "—",
     basePlaybackSeconds: row.playLengthMs > 0 ? row.playLengthMs / 1000 : 0,
@@ -1222,6 +1223,7 @@ function playlistDisplayPath(track) {
 function playlistColumnValue(track, column, rowIndex = null) {
   if (column.id === "index") return rowIndex === null ? "" : rowIndex + 1;
   if (column.id === "favorite") return "";
+  if (column.id === "dumper") return track.dumper || "—";
   return column.id === "path" ? playlistDisplayPath(track) : (track[column.id] ?? "");
 }
 
@@ -1599,7 +1601,7 @@ function refreshPlaylistRow(trackId) {
 }
 
 function playlistSortDependsOnMetadata() {
-  return ["title", "game", "artist", "system", "lengthLabel"].includes(state.sortColumn);
+  return ["title", "game", "artist", "dumper", "system", "lengthLabel"].includes(state.sortColumn);
 }
 
 function syncPlaylistColumnWidths() {
