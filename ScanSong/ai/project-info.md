@@ -106,10 +106,11 @@ collapsed into one ignored-format bucket:
 The last-result scan log uses uniform `status | detail | path` columns. Paths
 are relative to the selected scanner root, including the `archive#member`
 identifier for an archive error. Redundant member names are removed from the
-detail column. Successful archive members are never listed; skipped archive
-members are grouped by archive and extension. Unknown archive members use
-`unrecognized` rows without becoming catalog candidates, while known support
-files and extensionless archive material remain quiet.
+detail column. Successful archive members are never listed; explicitly ignored
+files are omitted from the log, while unknown archive members are grouped as
+`unrecognized` rows without becoming catalog candidates. Known support files
+and extensionless archive material remain quiet. The native log retains every
+emitted row; it does not impose a line or byte truncation cap.
 Scan, Check Links, and Remove Links share one operation telemetry model in the
 native UI: item progress, failure/missing counts, elapsed `HH:MM`/`HH:MM:SS`,
 and completion time are reported uniformly.

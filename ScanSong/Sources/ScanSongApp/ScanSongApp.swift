@@ -681,7 +681,7 @@ final class ScannerAppModel: ObservableObject {
             let startedAt = results.compactMap(\.root.lastScanStartedAt).min() ?? completedAt
             let totalDiscovered = results.reduce(0) { $0 + $1.discoveredSourceCount }
             let totalFailures = results.reduce(0) { $0 + $1.failures.count }
-            let totalSkipped = results.reduce(0) { $0 + $1.skipped.count }
+            let totalSkipped = results.reduce(0) { $0 + ScanLogFormatter.reportableSkipped($1.skipped).count }
             let totalTracks = results.reduce(0) { $0 + $1.trackCount }
             let telemetry = ScannerOperationTelemetry(
                 operation: .scan,

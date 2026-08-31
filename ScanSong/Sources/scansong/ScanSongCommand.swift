@@ -217,8 +217,9 @@ private struct ScanSongCommand {
                         )
                     }
                 }
-                if !result.skipped.isEmpty {
-                    let counts = Dictionary(grouping: result.skipped, by: \.extensionName)
+                let reportableSkipped = ScanLogFormatter.reportableSkipped(result.skipped)
+                if !reportableSkipped.isEmpty {
+                    let counts = Dictionary(grouping: reportableSkipped, by: \.extensionName)
                         .mapValues(\.count)
                         .sorted { $0.key < $1.key }
                         .map { ".\($0.key): \($0.value)" }
@@ -231,7 +232,7 @@ private struct ScanSongCommand {
                             diagnostic: ScannerDiagnostic(
                                 code: "scan.skipped.summary",
                                 severity: .warning,
-                                message: "Explicitly ignored files were recorded in the scan log (\(counts))."
+                                message: "Unsupported files were retained as scan diagnostics (\(counts))."
                             )
                         )
                     }

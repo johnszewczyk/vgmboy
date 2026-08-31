@@ -37,8 +37,10 @@
 
 - The last-result log has fixed `status | detail | path` columns. Actual
   archive failures retain the root-relative `archive#member` path; successful members are
-  never listed, and skipped archive members are grouped by archive and
-  extension. Scan Status is the only in-window summary.
+  never listed, and unsupported archive members are grouped by archive and
+  extension. Explicitly ignored files do not appear in the log or its skipped
+  count. Scan Status is the only in-window summary, and the saved log is not
+  truncated by line or byte count.
 - Scanner-owned extraction scratch prefixes are removed from diagnostic details;
   the archive/member path remains the stable identifier.
 - During Scan, Check Links, or Remove Links, Scan Status shows only sampled
@@ -83,7 +85,8 @@
   supported formats remain active so malformed files still appear in the scan
   result and last-result log.
 - The ignore selection is persisted in ScanSong preferences. Explicitly ignored
-  files are recorded in the post-operation scan log. Archive members without a
+  files remain internal scan accounting only and are omitted from the
+  post-operation scan log. Archive members without a
   scanner route are grouped as `unrecognized` diagnostics unless they are known
   decoder support files, archive documentation, or extensionless material; none
   become playable candidates.

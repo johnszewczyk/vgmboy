@@ -1376,7 +1376,7 @@ func joshWResidentEvil2GameCubeArchiveResolvesTXTHAliases() async throws {
     ]
     let lines = ScanLogFormatter.lines(
         status: "complete",
-        summary: "4 discovered, 2 tracks, 1 reused, 2 skipped",
+        summary: "4 discovered, 2 tracks, 1 reused, 1 skipped",
         rootPath: "/library",
         failures: [archiveFailure],
         skipped: skippedArchiveMembers + [
@@ -1389,11 +1389,35 @@ func joshWResidentEvil2GameCubeArchiveResolvesTXTHAliases() async throws {
     )
 
     #expect(lines[0] == "status | detail | path")
-    #expect(lines[1] == "complete | 4 discovered, 2 tracks, 1 reused, 2 skipped | .")
+    #expect(lines[1] == "complete | 4 discovered, 2 tracks, 1 reused, 1 skipped | .")
     #expect(lines.contains("archive-error | metadata: decoder failed | NeuroDancer.zip#music/bad.spc"))
-    #expect(lines.contains("ignored | explicit ignore (.sgc, 2 archive members) | NeuroDancer.zip"))
     #expect(lines.contains("unrecognized | unsupported format (.xyz) | notes.xyz"))
-    #expect(!lines.contains(where: { $0.contains("music/one.sgc") || $0.contains("music/two.sgc") }))
+    #expect(!lines.contains(where: { $0.contains("explicit ignore") || $0.contains("music/one.sgc") || $0.contains("music/two.sgc") }))
+    #expect(ScanLogFormatter.reportableSkipped(skippedArchiveMembers).isEmpty)
+
+    let ignoredLooseFiles = [
+        ScanSkippedFile(
+            identity: ScanItemIdentity(rootID: 1, path: "/library/playlist.m3u", archiveEntry: nil),
+            extensionName: "m3u",
+            reason: .explicitlyIgnored
+        ),
+        ScanSkippedFile(
+            identity: ScanItemIdentity(rootID: 1, path: "/library/cover.png", archiveEntry: nil),
+            extensionName: "png",
+            reason: .explicitlyIgnored
+        )
+    ]
+    let ignoredLines = ScanLogFormatter.lines(
+        status: "complete",
+        summary: "1 discovered, 1 track, 0 skipped",
+        rootPath: "/library",
+        failures: [],
+        skipped: ignoredLooseFiles
+    )
+    #expect(ignoredLines == [
+        "status | detail | path",
+        "complete | 1 discovered, 1 track, 0 skipped | ."
+    ])
 
     let scratchFailure = ScanFailure(
         identity: ScanItemIdentity(rootID: 1, path: "/library/Silent Hill HD Collection.tar.zst", archiveEntry: "sh3_bgm_02.hd"),

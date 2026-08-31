@@ -49,8 +49,9 @@ Removing a scan path only detaches it and retains its records.
 
 Each path shows its last scan time, source count, active track count, and issue
 count. Its last-result log uses uniform `status | detail | path` rows. It records
-the root summary, actual failure records, and compact ignored/unrecognized diagnostics;
-successful archive members are never expanded into a file list, while an
+the root summary, actual failure records, and compact unsupported-format diagnostics;
+files explicitly ignored by the File Types policy are omitted; successful archive
+members are never expanded into a file list, while an
 archive-member failure keeps its `archive#member` path. Scanner-owned scratch
 prefixes are removed from diagnostic details so the archive member path remains
 the useful identifier. Path status is grey before a completed scan, green when
