@@ -64,6 +64,10 @@ const favoriteActionsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/favorite-actions.js"),
   "utf8"
 );
+const playlistMutationActionsSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-mutation-actions.js"),
+  "utf8"
+);
 const playlistColumnsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-columns.js"),
   "utf8"
@@ -397,6 +401,12 @@ function loadFavoriteActions() {
   const window = {};
   vm.runInNewContext(favoriteActionsSource, { window }, { filename: "favorite-actions.js" });
   return window.SPCBoyFavoriteActions;
+}
+
+function loadPlaylistMutationActions() {
+  const window = {};
+  vm.runInNewContext(playlistMutationActionsSource, { window }, { filename: "playlist-mutation-actions.js" });
+  return window.SPCBoyPlaylistMutationActions;
 }
 
 function loadAppearanceView() {
@@ -1374,6 +1384,40 @@ test("SPCBoyWK keeps favorite snapshots and selection toggles in a favorite acti
     "sidebar",
     "playlist"
   ]);
+});
+
+test("SPCBoyWK keeps shared playlist append mutation in a playlist mutation module", () => {
+  assert.match(indexSource, /favorite-actions\.js[\s\S]*playlist-mutation-actions\.js[\s\S]*app-ui\.js/);
+  assert.match(playlistMutationActionsSource, /function appendPlaylistTracks\(/);
+  assert.match(uiSource, /return playlistMutationActions\.appendPlaylistTracks\(additions, selectedBrowserPath\)/);
+  assert.doesNotMatch(uiSource, /const existingIds = new Set\(state\.playlist\.map/);
+
+  const calls = [];
+  const state = {
+    selectedBrowserPath: "old-path",
+    playlist: [{ id: "existing" }],
+    selectedTrackId: "existing",
+    lastSelectedTrackId: "existing"
+  };
+  const actions = loadPlaylistMutationActions().create({
+    state,
+    persistSettings: () => calls.push("persist"),
+    renderTree: () => calls.push("tree"),
+    syncTreeSelection: () => calls.push("selection"),
+    renderPlaylist: () => calls.push("playlist"),
+    updateTimingSummary: () => calls.push("timing")
+  });
+
+  actions.appendPlaylistTracks([{ id: "existing" }, { id: "new-a" }, { id: "new-b" }], "new-path");
+  actions.appendPlaylistTracks([{ id: "new-a" }], "ignored-path");
+
+  assert.deepEqual(JSON.parse(JSON.stringify(state)), {
+    selectedBrowserPath: "new-path",
+    playlist: [{ id: "existing" }, { id: "new-a" }, { id: "new-b" }],
+    selectedTrackId: "new-a",
+    lastSelectedTrackId: "new-a"
+  });
+  assert.deepEqual(calls, ["persist", "tree", "selection", "playlist", "timing"]);
 });
 
 test("SPCBoyWK database view utilities preserve search and temporary-view semantics", () => {

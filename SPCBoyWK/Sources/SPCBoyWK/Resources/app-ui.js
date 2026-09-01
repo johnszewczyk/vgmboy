@@ -120,6 +120,14 @@ const favoriteActions = window.SPCBoyFavoriteActions.create({
   databaseGameTracks: (games) => window.spcBoyWK.databaseGameTracks(games),
   databaseRowsToPlaylistTracks: catalogTrackMapper.databaseRowsToPlaylistTracks
 });
+const playlistMutationActions = window.SPCBoyPlaylistMutationActions.create({
+  state,
+  persistSettings,
+  renderTree: () => renderTree(),
+  syncTreeSelection: () => syncTreeSelection(),
+  renderPlaylist: () => renderPlaylist(),
+  updateTimingSummary: () => uiApp.playback.updateTimingSummary()
+});
 const appearanceView = window.SPCBoyAppearanceView.create({
   state,
   refs,
@@ -429,19 +437,7 @@ function jumpFocusedListToEdge(toEnd, focused = document.activeElement) {
 }
 
 function appendPlaylistTracks(additions, selectedBrowserPath = state.selectedBrowserPath) {
-  if (!additions.length) return;
-  const existingIds = new Set(state.playlist.map((track) => track.id));
-  const uniqueAdditions = additions.filter((track) => !existingIds.has(track.id));
-  if (!uniqueAdditions.length) return;
-  state.selectedBrowserPath = selectedBrowserPath;
-  state.playlist = [...state.playlist, ...uniqueAdditions];
-  state.selectedTrackId = uniqueAdditions[0].id;
-  state.lastSelectedTrackId = state.selectedTrackId;
-  persistSettings();
-  renderTree();
-  syncTreeSelection();
-  renderPlaylist();
-  uiApp.playback.updateTimingSummary();
+  return playlistMutationActions.appendPlaylistTracks(additions, selectedBrowserPath);
 }
 
 async function queueBrowserNode(node) {
