@@ -20,6 +20,10 @@ const playlistTableSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-table-utils.js"),
   "utf8"
 );
+const databaseViewSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/database-view-utils.js"),
+  "utf8"
+);
 const indexSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/index.html"),
   "utf8"
@@ -263,6 +267,12 @@ function loadPlaylistTable() {
   const window = {};
   vm.runInNewContext(playlistTableSource, { window }, { filename: "playlist-table-utils.js" });
   return window.SPCBoyPlaylistTable;
+}
+
+function loadDatabaseView() {
+  const window = {};
+  vm.runInNewContext(databaseViewSource, { window }, { filename: "database-view-utils.js" });
+  return window.SPCBoyDatabaseView;
 }
 
 test("SPCBoyWK ignores stale native generations", () => {
@@ -601,11 +611,26 @@ test("SPCBoyWK playlist table utilities preserve Dumper, archive path, and lengt
 
 test("SPCBoyWK filters database search locally without a debounce", () => {
   assert.match(uiSource, /function rebuildDatabaseGameSearchIndex\(games = state\.databaseGames\)/);
-  assert.match(uiSource, /terms\.every\(\(term\) => searchText\.includes\(term\)\)/);
-  assert.match(uiSource, /state\.sidebarView = Object\.freeze\(localSidebarView\(state\.sidebarMode, state\.sidebarQuery\)\)/);
+  assert.match(databaseViewSource, /terms\.every\(\(term\) => searchText\.includes\(term\)\)/);
+  assert.match(uiSource, /state\.sidebarView = Object\.freeze\(sidebarView\(state\.sidebarMode, state\.sidebarQuery\)\)/);
   assert.doesNotMatch(uiSource, /sidebarSearchTimer/);
   assert.doesNotMatch(uiSource, /databaseSearchGames\(requestedQuery\)/);
   assert.doesNotMatch(uiSource, /databaseSearchGeneration/);
+});
+
+test("SPCBoyWK database view utilities preserve search and temporary-view semantics", () => {
+  const view = loadDatabaseView();
+  const games = [
+    { name: "Silent Hill", system: "PSP", rootName: "JoshW" },
+    { name: "Kirby", system: "SNES", rootName: "Local" }
+  ];
+
+  const records = view.searchRecords(games);
+  assert.equal(view.filterSearchRecords(records, "silent psp", games)[0].name, "Silent Hill");
+  assert.strictEqual(view.filterSearchRecords(records, "", games), games);
+  assert.equal(view.sidebarView("paths", "").contentMode, "tree");
+  assert.equal(view.sidebarView("consoles", "silent").view, "search");
+  assert.equal(view.sidebarView("consoles", "silent").isTemporary, true);
 });
 
 test("SPCBoyWK catalog roots are foldable in Path View", () => {

@@ -1,6 +1,7 @@
 (() => {
 const uiApp = window.SPCBoyApp;
 const { state, refs, persistSettings, loadSettings, targetPlaybackSeconds, COLUMN_DEFS } = uiApp;
+const { sidebarView, searchRecords, filterSearchRecords } = window.SPCBoyDatabaseView;
 const { valueForColumn, sortValue } = window.SPCBoyPlaylistTable;
 const expandedFolders = new Set();
 let draggedColumnId = null;
@@ -35,32 +36,12 @@ function currentSidebarView() {
   return state.sidebarView;
 }
 
-function localSidebarView(mode, query) {
-  const normalizedQuery = String(query || "").trim();
-  const view = normalizedQuery ? "search" : mode;
-  return {
-    storedMode: mode,
-    query: normalizedQuery,
-    view,
-    contentMode: view === "paths" || view === "diskPath" ? "tree" : "database",
-    resultSource: view === "paths" ? "catalog-path-index" : view === "diskPath" ? "disk-path-tree" : "catalog-console-index",
-    isTemporary: view === "search"
-  };
-}
-
 function rebuildDatabaseGameSearchIndex(games = state.databaseGames) {
-  databaseGameSearchRecords = (Array.isArray(games) ? games : []).map((game) => ({
-    game,
-    searchText: `${game.name || ""} ${game.system || ""} ${game.rootName || ""} ${game.displayName || ""}`.toLowerCase()
-  }));
+  databaseGameSearchRecords = searchRecords(games);
 }
 
 function localDatabaseSearch(query) {
-  const terms = String(query || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
-  if (!terms.length) return state.databaseGames;
-  return databaseGameSearchRecords
-    .filter(({ searchText }) => terms.every((term) => searchText.includes(term)))
-    .map(({ game }) => game);
+  return filterSearchRecords(databaseGameSearchRecords, query, state.databaseGames);
 }
 
 async function syncSidebarView() {
@@ -966,7 +947,7 @@ async function updateSidebarSearch(query) {
   // Search is a view-policy projection, not a catalog read. Keeping this
   // synchronous removes the bridge round-trip and debounce from every keypress
   // while preserving CatalogBrowserCore's query semantics locally.
-  state.sidebarView = Object.freeze(localSidebarView(state.sidebarMode, state.sidebarQuery));
+  state.sidebarView = Object.freeze(sidebarView(state.sidebarMode, state.sidebarQuery));
   renderSidebar();
 }
 
