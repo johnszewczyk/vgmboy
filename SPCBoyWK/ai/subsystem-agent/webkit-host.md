@@ -41,8 +41,9 @@ option controls use the same accent surface.
 `FrontendOptionsManifest` provides the common Database, Interface, and Windows
 organization through the bridge. `options-controller.js` applies that manifest,
 `playlist-controller.js` reduces selection, and `sidebar-controller.js` forwards
-browser-tree row gestures to the native shared reducer. `app-ui.js` remains the
-renderer and event wiring layer rather than the owner of those policies.
+browser-tree row gestures to the native shared reducer. `playlist-table-utils.js`
+owns the pure playlist path, cell-value, and sort projections; `app-ui.js` remains
+the DOM renderer and event wiring layer rather than the owner of those policies.
 Database Console → Game group disclosure and selection also pass through the
 shared `CatalogBrowserGroupState` reducer. WebKit retains only DOM rows, focus,
 scrolling, and persistence projection.
@@ -249,6 +250,7 @@ raw filesystem scanning or a second catalog implementation.
 - [Package.swift](../../Package.swift)
 - [app-playback.js](../../Sources/SPCBoyWK/Resources/app-playback.js)
 - [app-ui.js](../../Sources/SPCBoyWK/Resources/app-ui.js)
+- [playlist-table-utils.js](../../Sources/SPCBoyWK/Resources/playlist-table-utils.js)
 - [options-controller.js](../../Sources/SPCBoyWK/Resources/options-controller.js)
 - [playlist-controller.js](../../Sources/SPCBoyWK/Resources/playlist-controller.js)
 - [sidebar-controller.js](../../Sources/SPCBoyWK/Resources/sidebar-controller.js)

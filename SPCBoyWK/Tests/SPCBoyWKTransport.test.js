@@ -16,6 +16,10 @@ const uiSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/app-ui.js"),
   "utf8"
 );
+const playlistTableSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-table-utils.js"),
+  "utf8"
+);
 const indexSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/index.html"),
   "utf8"
@@ -253,6 +257,12 @@ function makeHarness() {
       pending.forEach(([, callback]) => callback(clockNow));
     }
   };
+}
+
+function loadPlaylistTable() {
+  const window = {};
+  vm.runInNewContext(playlistTableSource, { window }, { filename: "playlist-table-utils.js" });
+  return window.SPCBoyPlaylistTable;
 }
 
 test("SPCBoyWK ignores stale native generations", () => {
@@ -569,8 +579,24 @@ test("SPCBoyWK allows every playlist column to be hidden except an empty table",
 
 test("SPCBoyWK exposes the catalog Dumper column", () => {
   assert.match(appCoreSource, /id: "dumper", label: "Dumper"/);
-  assert.match(uiSource, /dumper: row\.dumper \|\| "—"/);
-  assert.match(uiSource, /column\.id === "dumper"/);
+  assert.match(playlistTableSource, /track\.dumper \|\| "—"/);
+  assert.match(playlistTableSource, /column\.id === "dumper"/);
+});
+
+test("SPCBoyWK playlist table utilities preserve Dumper, archive path, and length sort values", () => {
+  const table = loadPlaylistTable();
+  const track = {
+    path: "/Volumes/Music/Library/Game.zip#song.spc",
+    rootPath: "/Volumes/Music/Library",
+    dumper: "Stored Dumper",
+    basePlaybackSeconds: 42
+  };
+
+  assert.equal(table.valueForColumn(track, { id: "dumper" }), "Stored Dumper");
+  assert.equal(table.valueForColumn({ ...track, dumper: "" }, { id: "dumper" }), "—");
+  assert.equal(table.valueForColumn(track, { id: "path" }), "Library/Game.zip#song.spc");
+  assert.equal(table.valueForColumn(track, { id: "index" }, 2), 3);
+  assert.equal(table.sortValue(track, { id: "lengthLabel" }), 42);
 });
 
 test("SPCBoyWK filters database search locally without a debounce", () => {

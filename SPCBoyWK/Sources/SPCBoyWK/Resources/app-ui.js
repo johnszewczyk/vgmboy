@@ -1,6 +1,7 @@
 (() => {
 const uiApp = window.SPCBoyApp;
 const { state, refs, persistSettings, loadSettings, targetPlaybackSeconds, COLUMN_DEFS } = uiApp;
+const { valueForColumn, sortValue } = window.SPCBoyPlaylistTable;
 const expandedFolders = new Set();
 let draggedColumnId = null;
 let metadataRefreshFrame = 0;
@@ -1194,45 +1195,12 @@ function orderedColumns() {
   return allColumns().filter((column) => state.columnVisibility[column.id]);
 }
 
-function playlistSortValue(track, column) {
-  if (column.id === "lengthLabel") {
-    return Number(track.basePlaybackSeconds) || 0;
-  }
-  return String(playlistColumnValue(track, column)).toLocaleLowerCase();
-}
-
-function playlistDisplayPath(track) {
-  const sourcePath = String(track.path || "");
-  const rootPath = String(track.rootPath || state.rootPath || "");
-  if (!sourcePath || !rootPath) return sourcePath;
-  const hashIndex = sourcePath.indexOf("#");
-  const physicalPath = hashIndex === -1 ? sourcePath : sourcePath.slice(0, hashIndex);
-  const archiveSuffix = hashIndex === -1 ? "" : sourcePath.slice(hashIndex);
-  const normalizedRoot = rootPath.replace(/[\\/]+$/, "");
-  const normalizedPhysical = physicalPath.replace(/\\/g, "/");
-  const normalizedRootForMatch = normalizedRoot.replace(/\\/g, "/");
-  const rootPrefix = `${normalizedRootForMatch}/`;
-  const rootLabel = normalizedRootForMatch.split("/").at(-1);
-  const sourceForMatch = normalizedPhysical.toLocaleLowerCase();
-  const rootForMatch = normalizedRootForMatch.toLocaleLowerCase();
-  if (sourceForMatch === rootForMatch) return `${rootLabel}${archiveSuffix}`;
-  if (sourceForMatch.startsWith(rootPrefix.toLocaleLowerCase())) return `${rootLabel}/${normalizedPhysical.slice(rootPrefix.length)}${archiveSuffix}`;
-  return sourcePath;
-}
-
-function playlistColumnValue(track, column, rowIndex = null) {
-  if (column.id === "index") return rowIndex === null ? "" : rowIndex + 1;
-  if (column.id === "favorite") return "";
-  if (column.id === "dumper") return track.dumper || "—";
-  return column.id === "path" ? playlistDisplayPath(track) : (track[column.id] ?? "");
-}
-
 function sortPlaylist() {
   const column = COLUMN_DEFS.find((candidate) => candidate.id === state.sortColumn) || COLUMN_DEFS.find((candidate) => candidate.id === "filename");
   const direction = state.sortDirection === "descending" ? -1 : 1;
   state.playlist.sort((left, right) => {
-    const leftValue = playlistSortValue(left, column);
-    const rightValue = playlistSortValue(right, column);
+    const leftValue = sortValue(left, column, state.rootPath);
+    const rightValue = sortValue(right, column, state.rootPath);
     if (leftValue < rightValue) return -1 * direction;
     if (leftValue > rightValue) return 1 * direction;
     return String(left.id).localeCompare(String(right.id));
@@ -1346,7 +1314,7 @@ function columnContentWidth(columnId) {
   const sample = state.playlist.length > 1200
     ? [...state.playlist.slice(0, 600), ...state.playlist.slice(-600)]
     : state.playlist;
-  const values = [column.label, ...sample.map((track, rowIndex) => String(playlistColumnValue(track, column, rowIndex)))];
+  const values = [column.label, ...sample.map((track, rowIndex) => String(valueForColumn(track, column, rowIndex, state.rootPath)))];
   return Math.max(...values.map((value) => textMeasureContext.measureText(value).width), 0) + 24;
 }
 
@@ -1517,7 +1485,7 @@ function renderPlaylistCell(track, column, rowIndex) {
     });
     td.appendChild(button);
   } else {
-    td.textContent = String(playlistColumnValue(track, column, rowIndex));
+    td.textContent = String(valueForColumn(track, column, rowIndex, state.rootPath));
   }
   return td;
 }
@@ -1592,7 +1560,7 @@ function refreshPlaylistRow(trackId) {
         button.setAttribute("aria-pressed", favorite ? "true" : "false");
       }
     } else {
-      cell.textContent = String(playlistColumnValue(track, column, rowIndex));
+      cell.textContent = String(valueForColumn(track, column, rowIndex, state.rootPath));
     }
     cell.style.width = `${state.columnWidths[column.id]}%`;
   }
