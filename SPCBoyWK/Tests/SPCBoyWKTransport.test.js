@@ -76,6 +76,10 @@ const sidebarCollapseActionsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/sidebar-collapse-actions.js"),
   "utf8"
 );
+const librarySelectionActionsSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/library-selection-actions.js"),
+  "utf8"
+);
 const playlistColumnsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-columns.js"),
   "utf8"
@@ -427,6 +431,12 @@ function loadSidebarCollapseActions() {
   const window = {};
   vm.runInNewContext(sidebarCollapseActionsSource, { window }, { filename: "sidebar-collapse-actions.js" });
   return window.SPCBoySidebarCollapseActions;
+}
+
+function loadLibrarySelectionActions() {
+  const window = {};
+  vm.runInNewContext(librarySelectionActionsSource, { window }, { filename: "library-selection-actions.js" });
+  return window.SPCBoyLibrarySelectionActions;
 }
 
 function loadAppearanceView() {
@@ -1526,6 +1536,70 @@ test("SPCBoyWK keeps shared sidebar disclosure transitions in a collapse action 
   assert.equal(expandedFolders.size, 0);
   assert.equal(state.selectedBrowserPath, "catalog-root");
   assert.deepEqual(calls.slice(-3), ["persist", "tree", "selection"]);
+});
+
+test("SPCBoyWK keeps library and folder selection state transitions in a library module", () => {
+  assert.match(indexSource, /sidebar-collapse-actions\.js[\s\S]*library-selection-actions\.js[\s\S]*app-ui\.js/);
+  assert.match(librarySelectionActionsSource, /function applyLibrarySnapshot\(/);
+  assert.match(librarySelectionActionsSource, /function applyFolderSelection\(/);
+  assert.match(uiSource, /return librarySelectionActions\.applyFolderSelection\(selection\)/);
+  assert.doesNotMatch(uiSource, /state\.localBrowserEnabled = true/);
+
+  const calls = [];
+  const state = {
+    currentTrackId: null,
+    selectedBrowserPath: "folder/a",
+    selectedFolderPath: null,
+    playlist: [],
+    selectedTrackId: null,
+    lastSelectedTrackId: null,
+    totalSeconds: 0,
+    databaseGames: [],
+    localBrowserEnabled: false,
+    sidebarMode: "consoles",
+    sidebarQuery: "old",
+    selectedDatabaseGameKey: "game"
+  };
+  const refs = {
+    sidebarSearchInput: { value: "old" },
+    treeRoot: { querySelector: () => null }
+  };
+  const actions = loadLibrarySelectionActions().create({
+    state,
+    refs,
+    rebuildDatabaseGameSearchIndex: (games) => calls.push(["index", games]),
+    resolveSelectedTrackId: (playlist) => playlist[0]?.id || null,
+    targetPlaybackSeconds: () => 42,
+    persistSettings: () => calls.push("persist"),
+    renderAll: () => calls.push("all"),
+    syncTreeSelection: () => calls.push("selection"),
+    scrollSelectedTrackIntoView: () => calls.push("scroll"),
+    renderTree: () => calls.push("tree"),
+    renderPlaylist: () => calls.push("playlist"),
+    updateTimingSummary: () => calls.push("timing"),
+    updatePlaybackReadout: () => calls.push("readout"),
+    isBrowserFocused: () => true,
+    focusSelectedBrowserNode: (path) => calls.push(["focus", path])
+  });
+
+  actions.applyFolderSelection({ selectedFolderPath: "folder", playlist: [{ id: "track-a" }] });
+  assert.equal(state.selectedFolderPath, "folder");
+  assert.equal(state.selectedTrackId, "track-a");
+  assert.equal(state.totalSeconds, 42);
+  assert.deepEqual(calls, ["persist", "tree", "selection", ["focus", "folder/a"], "playlist", "timing", "readout", "scroll"]);
+
+  calls.length = 0;
+  actions.applyLibrarySnapshot({
+    rootPath: "/new-library",
+    databaseGames: [{ name: "Game" }],
+    playlist: [{ id: "track-b" }]
+  });
+  assert.equal(state.localBrowserEnabled, true);
+  assert.equal(state.sidebarMode, "diskPath");
+  assert.equal(state.sidebarQuery, "");
+  assert.equal(state.selectedDatabaseGameKey, null);
+  assert.equal(refs.sidebarSearchInput.value, "");
+  assert.deepEqual(calls, [["index", [{ name: "Game" }]], "persist", "all", "selection", "scroll"]);
 });
 
 test("SPCBoyWK database view utilities preserve search and temporary-view semantics", () => {

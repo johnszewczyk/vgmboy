@@ -151,6 +151,23 @@ const sidebarCollapseActions = window.SPCBoySidebarCollapseActions.create({
   syncTreeSelection: () => syncTreeSelection(),
   reportDatabaseSidebarError: (action, error) => reportDatabaseSidebarError(action, error)
 });
+const librarySelectionActions = window.SPCBoyLibrarySelectionActions.create({
+  state,
+  refs,
+  rebuildDatabaseGameSearchIndex: (games) => rebuildDatabaseGameSearchIndex(games),
+  resolveSelectedTrackId: (playlist) => resolveSelectedTrackId(playlist),
+  targetPlaybackSeconds: () => targetPlaybackSeconds(),
+  persistSettings,
+  renderAll: () => renderAll(),
+  syncTreeSelection: () => syncTreeSelection(),
+  scrollSelectedTrackIntoView: () => scrollSelectedTrackIntoView(),
+  renderTree: () => renderTree(),
+  renderPlaylist: () => renderPlaylist(),
+  updateTimingSummary: () => uiApp.playback.updateTimingSummary(),
+  updatePlaybackReadout: () => uiApp.playback.updatePlaybackReadout(),
+  isBrowserFocused: () => document.activeElement?.classList.contains("tree-node"),
+  focusSelectedBrowserNode: (path) => refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(path)}"]`)?.focus()
+});
 const appearanceView = window.SPCBoyAppearanceView.create({
   state,
   refs,
@@ -1133,42 +1150,11 @@ async function openLibraryRoot() {
 }
 
 function applyLibrarySnapshot(snapshot) {
-  if (snapshot?.stale === true) return;
-  Object.assign(state, snapshot);
-  rebuildDatabaseGameSearchIndex(state.databaseGames);
-  state.localBrowserEnabled = true;
-  state.sidebarMode = "diskPath";
-  state.sidebarQuery = "";
-  state.selectedDatabaseGameKey = null;
-  refs.sidebarSearchInput.value = "";
-  state.selectedTrackId = resolveSelectedTrackId(snapshot.playlist);
-  state.lastSelectedTrackId = state.selectedTrackId;
-  state.totalSeconds = targetPlaybackSeconds();
-  persistSettings();
-  renderAll();
-  syncTreeSelection();
-  scrollSelectedTrackIntoView();
+  return librarySelectionActions.applyLibrarySnapshot(snapshot);
 }
 
 function applyFolderSelection(selection) {
-  const preserveBrowserFocus = document.activeElement?.classList.contains("tree-node");
-  state.selectedFolderPath = selection.selectedFolderPath;
-  state.playlist = selection.playlist;
-  state.selectedTrackId = resolveSelectedTrackId(selection.playlist);
-  state.lastSelectedTrackId = state.selectedTrackId;
-  if (!state.currentTrackId) {
-    state.totalSeconds = targetPlaybackSeconds();
-  }
-  persistSettings();
-  renderTree();
-  syncTreeSelection();
-  if (preserveBrowserFocus && state.selectedBrowserPath) {
-    refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(state.selectedBrowserPath)}"]`)?.focus();
-  }
-  renderPlaylist();
-  uiApp.playback.updateTimingSummary();
-  uiApp.playback.updatePlaybackReadout();
-  scrollSelectedTrackIntoView();
+  return librarySelectionActions.applyFolderSelection(selection);
 }
 
 uiApp.ui = {
