@@ -36,6 +36,10 @@ const appearanceViewSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/appearance-view.js"),
   "utf8"
 );
+const sidebarTreeSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/sidebar-tree-view.js"),
+  "utf8"
+);
 const indexSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/index.html"),
   "utf8"
@@ -291,6 +295,12 @@ function loadAppearanceView() {
   const window = { SPCBoyPlaybackBackends: { conflicts: [] } };
   vm.runInNewContext(appearanceViewSource, { window }, { filename: "appearance-view.js" });
   return window.SPCBoyAppearanceView;
+}
+
+function loadSidebarTree() {
+  const window = {};
+  vm.runInNewContext(sidebarTreeSource, { window }, { filename: "sidebar-tree-view.js" });
+  return window.SPCBoySidebarTree;
 }
 
 test("SPCBoyWK ignores stale native generations", () => {
@@ -658,6 +668,44 @@ test("SPCBoyWK keeps appearance and routing presentation in its view module", ()
     view.formatArchiveCacheSummary({ byteCount: 3 * 1024 * 1024, fileCount: 4, partialCount: 1 }),
     "3.0 MB • 4 files • 2 GB limit • 1 partial"
   );
+});
+
+test("SPCBoyWK keeps filesystem tree filtering and rendering in the sidebar tree module", () => {
+  assert.match(indexSource, /playlist-rows\.js[\s\S]*appearance-view\.js[\s\S]*sidebar-tree-view\.js[\s\S]*app-ui\.js/);
+  assert.match(sidebarTreeSource, /function filteredTree\(\)/);
+  assert.match(sidebarTreeSource, /function renderTreeNode\(/);
+  assert.match(sidebarTreeSource, /function renderTree\(\)/);
+  assert.match(uiSource, /return sidebarTree\.renderTree\(\)/);
+  assert.doesNotMatch(uiSource, /function renderTreeNode\(/);
+
+  const leaf = { path: "/root/leaf.spc", name: "Leaf SPC", kind: "file", children: [] };
+  const tree = [{ path: "/root", name: "Root", kind: "folder", children: [leaf] }];
+  const state = {
+    rootPath: "/root",
+    selectedBrowserPath: "/root/leaf.spc",
+    sidebarQuery: "leaf",
+    tree,
+    databaseFileTree: []
+  };
+  const view = loadSidebarTree().create({
+    state,
+    refs: {},
+    expandedFolders: new Set(),
+    currentSidebarView: () => ({ view: "diskPath" }),
+    escapeHtml: (value) => String(value),
+    resetSidebarContent() {},
+    scheduleSelectionIndicators() {},
+    selectBrowserNode() {},
+    handleBrowserPrimaryClick() {},
+    handleBrowserGesture() {},
+    showSidebarContextMenu() {},
+    moveBrowserSelection() {},
+    setSelectedBrowserButton() {}
+  });
+
+  assert.equal(view.findBrowserNode(tree, leaf.path), leaf);
+  assert.equal(view.filteredTree()[0].path, "/root");
+  assert.equal(view.filteredTree()[0].children[0].path, leaf.path);
 });
 
 test("SPCBoyWK exposes the catalog Dumper column", () => {
