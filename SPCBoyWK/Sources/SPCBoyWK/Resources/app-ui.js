@@ -1417,7 +1417,8 @@ async function bootstrap() {
     throw new Error(message);
   }
 
-  collapsedDatabaseConsoles = new Set(state.collapsedConsoleNames);
+  collapsedDatabaseConsoles.clear();
+  state.collapsedConsoleNames.forEach((name) => collapsedDatabaseConsoles.add(name));
   state.databaseLocation = await window.spcBoyWK?.databaseLocation?.() || null;
   state.databaseLocationStatus = state.databaseLocation?.requiresRestart
     ? "Restart SPCBoy to use the selected database."

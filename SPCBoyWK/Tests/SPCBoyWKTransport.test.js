@@ -744,6 +744,7 @@ test("SPCBoyWK keeps database console grouping and rendering in the database sid
   assert.match(databaseSidebarSource, /function makeDatabaseGameButton\(/);
   assert.match(databaseSidebarSource, /function renderDatabaseGames\(/);
   assert.match(uiSource, /return databaseSidebarView\.renderDatabaseGames\(\)/);
+  assert.match(uiSource, /collapsedDatabaseConsoles\.clear\(\)[\s\S]*collapsedDatabaseConsoles\.add\(name\)/);
   assert.doesNotMatch(uiSource, /function makeDatabaseGameButton\(/);
 
   const view = loadDatabaseSidebar().create({
