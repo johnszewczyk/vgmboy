@@ -57,6 +57,15 @@ const playbackSettingsActions = window.SPCBoyPlaybackSettingsActions.create({
   normalizePlayTime: uiApp.normalizePlayTime,
   parseDurationSeconds: uiApp.parseDurationSeconds
 });
+const audioSettingsActions = window.SPCBoyAudioSettingsActions.create({
+  state,
+  persistSettings,
+  nativePlaybackAudioConfig: (...args) => window.spcBoyWK?.nativePlaybackAudioConfig?.(...args),
+  setAudioSettings: (settings) => uiApp.playback.setAudioSettings?.(settings),
+  normalizeEqualizerGain: uiApp.normalizeEqualizerGain,
+  normalizeAppVolume: uiApp.normalizeAppVolume,
+  renderAll: () => renderAll()
+});
 const appearanceView = window.SPCBoyAppearanceView.create({
   state,
   refs,
@@ -955,59 +964,28 @@ function setArchiveCacheLimit(value) {
   renderAll();
 }
 
-function audioSettingsPayload() {
-  return {
-    equalizerEnabled: state.equalizerEnabled,
-    equalizerBandGains: [...state.equalizerBandGains],
-    appVolume: state.appVolume,
-    monoEnabled: state.monoEnabled
-  };
-}
-
-function broadcastAudioSettings() {
-  const settings = audioSettingsPayload();
-  window.spcBoyWK?.nativePlaybackAudioConfig?.(state.appVolume, state.equalizerEnabled, state.equalizerBandGains, state.monoEnabled).catch?.(() => {});
-  uiApp.playback.setAudioSettings?.(settings);
-}
-
 function setEqualizerEnabled(enabled) {
-  state.equalizerEnabled = Boolean(enabled);
-  persistSettings();
-  broadcastAudioSettings();
-  renderAll();
+  return audioSettingsActions.setEqualizerEnabled(enabled);
 }
 
 function setEqualizerBandGain(index, gain) {
-  if (!state.equalizerBandGains[index]) state.equalizerBandGains[index] = 0;
-  state.equalizerBandGains[index] = uiApp.normalizeEqualizerGain(gain);
-  persistSettings();
-  broadcastAudioSettings();
-  renderAll();
+  return audioSettingsActions.setEqualizerBandGain(index, gain);
 }
 
 function resetEqualizer() {
-  state.equalizerBandGains = state.equalizerBandGains.map(() => 0);
-  persistSettings();
-  broadcastAudioSettings();
-  renderAll();
+  return audioSettingsActions.resetEqualizer();
 }
 
 function setAppVolume(volume) {
-  state.appVolume = uiApp.normalizeAppVolume(volume);
-  persistSettings();
-  broadcastAudioSettings();
-  renderAll();
+  return audioSettingsActions.setAppVolume(volume);
 }
 
 function setMonoEnabled(enabled) {
-  state.monoEnabled = Boolean(enabled);
-  persistSettings();
-  broadcastAudioSettings();
-  renderAll();
+  return audioSettingsActions.setMonoEnabled(enabled);
 }
 
 function adjustAppVolume(delta) {
-  setAppVolume(state.appVolume + Number(delta || 0));
+  return audioSettingsActions.adjustAppVolume(delta);
 }
 
 function commitSpcLengthInput(rawValue) {

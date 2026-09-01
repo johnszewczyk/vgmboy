@@ -40,6 +40,10 @@ const playbackSettingsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playback-settings-actions.js"),
   "utf8"
 );
+const audioSettingsSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/audio-settings-actions.js"),
+  "utf8"
+);
 const playlistColumnsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-columns.js"),
   "utf8"
@@ -337,6 +341,12 @@ function loadPlaybackSettings() {
   const window = {};
   vm.runInNewContext(playbackSettingsSource, { window }, { filename: "playback-settings-actions.js" });
   return window.SPCBoyPlaybackSettingsActions;
+}
+
+function loadAudioSettings() {
+  const window = {};
+  vm.runInNewContext(audioSettingsSource, { window }, { filename: "audio-settings-actions.js" });
+  return window.SPCBoyAudioSettingsActions;
 }
 
 function loadAppearanceView() {
@@ -1016,6 +1026,56 @@ test("SPCBoyWK keeps playback timing preferences in a playback settings module",
   assert.equal(state.repeatMode, "all");
   assert.equal(state.unknownDurationSeconds, 240);
   assert.deepEqual(calls, ["persist", "render", "refresh", "persist", "render", "persist", "refresh"]);
+});
+
+test("SPCBoyWK keeps audio settings and native audio updates in an audio module", () => {
+  assert.match(indexSource, /playback-settings-actions\.js[\s\S]*audio-settings-actions\.js[\s\S]*app-ui\.js/);
+  assert.match(audioSettingsSource, /function audioSettingsPayload\(/);
+  assert.match(audioSettingsSource, /function setEqualizerBandGain\(/);
+  assert.match(audioSettingsSource, /function adjustAppVolume\(/);
+  assert.match(uiSource, /return audioSettingsActions\.setEqualizerEnabled\(enabled\)/);
+  assert.match(uiSource, /return audioSettingsActions\.adjustAppVolume\(delta\)/);
+  assert.doesNotMatch(uiSource, /function audioSettingsPayload\(/);
+
+  const calls = [];
+  const state = {
+    equalizerEnabled: false,
+    equalizerBandGains: [0, 1.5],
+    appVolume: 0.5,
+    monoEnabled: false
+  };
+  const actions = loadAudioSettings().create({
+    state,
+    persistSettings: () => calls.push("persist"),
+    nativePlaybackAudioConfig: (...args) => calls.push(["native", ...args]),
+    setAudioSettings: (settings) => calls.push(["playback", settings]),
+    normalizeEqualizerGain: (value) => Number(value),
+    normalizeAppVolume: (value) => Math.max(0, Math.min(1, Number(value))),
+    renderAll: () => calls.push("render")
+  });
+
+  actions.setEqualizerBandGain(0, 3);
+  actions.adjustAppVolume(0.25);
+  const payload = actions.audioSettingsPayload();
+
+  assert.equal(state.equalizerBandGains[0], 3);
+  assert.equal(state.appVolume, 0.75);
+  assert.deepEqual(JSON.parse(JSON.stringify(payload)), {
+    equalizerEnabled: false,
+    equalizerBandGains: [3, 1.5],
+    appVolume: 0.75,
+    monoEnabled: false
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+    "persist",
+    ["native", 0.5, false, [3, 1.5], false],
+    ["playback", { equalizerEnabled: false, equalizerBandGains: [3, 1.5], appVolume: 0.5, monoEnabled: false }],
+    "render",
+    "persist",
+    ["native", 0.75, false, [3, 1.5], false],
+    ["playback", { equalizerEnabled: false, equalizerBandGains: [3, 1.5], appVolume: 0.75, monoEnabled: false }],
+    "render"
+  ]);
 });
 
 test("SPCBoyWK database view utilities preserve search and temporary-view semantics", () => {
