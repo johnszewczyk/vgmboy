@@ -32,6 +32,10 @@ const playlistRowsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-rows.js"),
   "utf8"
 );
+const appearanceViewSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/appearance-view.js"),
+  "utf8"
+);
 const indexSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/index.html"),
   "utf8"
@@ -281,6 +285,12 @@ function loadDatabaseView() {
   const window = {};
   vm.runInNewContext(databaseViewSource, { window }, { filename: "database-view-utils.js" });
   return window.SPCBoyDatabaseView;
+}
+
+function loadAppearanceView() {
+  const window = { SPCBoyPlaybackBackends: { conflicts: [] } };
+  vm.runInNewContext(appearanceViewSource, { window }, { filename: "appearance-view.js" });
+  return window.SPCBoyAppearanceView;
 }
 
 test("SPCBoyWK ignores stale native generations", () => {
@@ -610,6 +620,44 @@ test("SPCBoyWK keeps playlist row and virtualization state in the row module", (
   assert.match(playlistRowsSource, /function schedulePlaylistViewportRender\(/);
   assert.match(uiSource, /return playlistRows\.renderPlaylist\(\{ sort \}\)/);
   assert.doesNotMatch(uiSource, /function appendPlaylistRowsInBatches\(/);
+});
+
+test("SPCBoyWK keeps appearance and routing presentation in its view module", () => {
+  assert.match(indexSource, /playlist-rows\.js[\s\S]*appearance-view\.js[\s\S]*app-ui\.js/);
+  assert.match(appearanceViewSource, /function applyUISettings\(/);
+  assert.match(appearanceViewSource, /function appearanceSettings\(/);
+  assert.match(appearanceViewSource, /function renderRoutingConflicts\(/);
+  assert.match(uiSource, /return appearanceView\.applyUISettings\(\)/);
+  assert.match(uiSource, /return appearanceView\.renderRoutingConflicts\(\)/);
+  assert.doesNotMatch(uiSource, /rootStyle\.setProperty\("--ui-font-size-pt"/);
+
+  const view = loadAppearanceView().create({
+    state: {
+      uiItemSpacingRem: 0.4,
+      sidebarWidthPercent: 28,
+      sidebarFontSizePt: 11,
+      sidebarTextColor: "#111111",
+      sidebarMonospace: true,
+      sidebarPathCounts: false,
+      playlistFontSizePt: 12,
+      playlistTextColor: "#222222",
+      playlistMonospace: false,
+      applicationMonospace: true,
+      playlistHeaderBold: true,
+      accentColor: "#333333",
+      archiveCacheLimitBytes: 2 * 1024 * 1024 * 1024
+    },
+    refs: {},
+    escapeHtml: (value) => String(value),
+    onSetRoutingPreference() {}
+  });
+
+  assert.equal(view.appearanceSettings().accentColor, "#333333");
+  assert.equal(view.appearanceSettings().sidebarPathCounts, false);
+  assert.equal(
+    view.formatArchiveCacheSummary({ byteCount: 3 * 1024 * 1024, fileCount: 4, partialCount: 1 }),
+    "3.0 MB • 4 files • 2 GB limit • 1 partial"
+  );
 });
 
 test("SPCBoyWK exposes the catalog Dumper column", () => {
