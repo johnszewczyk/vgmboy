@@ -44,6 +44,10 @@ const databaseSidebarSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/database-sidebar-view.js"),
   "utf8"
 );
+const browserActionsSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/browser-actions.js"),
+  "utf8"
+);
 const indexSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/index.html"),
   "utf8"
@@ -311,6 +315,12 @@ function loadDatabaseSidebar() {
   const window = {};
   vm.runInNewContext(databaseSidebarSource, { window }, { filename: "database-sidebar-view.js" });
   return window.SPCBoyDatabaseSidebar;
+}
+
+function loadBrowserActions() {
+  const window = {};
+  vm.runInNewContext(browserActionsSource, { window }, { filename: "browser-actions.js" });
+  return window.SPCBoyBrowserActions;
 }
 
 test("SPCBoyWK ignores stale native generations", () => {
@@ -756,6 +766,38 @@ test("SPCBoyWK keeps database console grouping and rendering in the database sid
 
   assert.equal([...groups.keys()].join(","), "SNES,PSP");
   assert.equal(groups.get("SNES").length, 2);
+});
+
+test("SPCBoyWK keeps local browser actions and stale-selection guards in their action module", () => {
+  assert.match(indexSource, /database-sidebar-view\.js[\s\S]*browser-actions\.js[\s\S]*app-ui\.js/);
+  assert.match(browserActionsSource, /async function activateBrowserNode\(/);
+  assert.match(browserActionsSource, /async function previewBrowserLeaf\(/);
+  assert.match(browserActionsSource, /function selectBrowserNode\(/);
+  assert.match(browserActionsSource, /async function toggleBrowserNode\(/);
+  assert.match(browserActionsSource, /generation !== browserSelectionGeneration/);
+  assert.match(uiSource, /return browserActions\.activateBrowserNode\(node, \{ playNow \}\)/);
+  assert.doesNotMatch(uiSource, /browserSelectionGeneration/);
+
+  const state = { selectedBrowserPath: "/root/file.spc" };
+  const view = loadBrowserActions().create({
+    state,
+    refs: {},
+    expandedFolders: new Set(),
+    persistSettings() {},
+    databaseRowsToPlaylistTracks: (rows) => rows,
+    applyFolderSelection() {},
+    playVisibleTrack() {},
+    renderTree() {},
+    syncTreeSelection() {},
+    filteredTree() { return []; },
+    findBrowserNode() {},
+    appendPlaylistTracks() {}
+  });
+  const selection = view.catalogPlaylistSelection([{ id: "track-a" }], "/root");
+
+  assert.equal(selection.selectedFolderPath, "/root");
+  assert.equal(selection.selectedBrowserPath, "/root/file.spc");
+  assert.equal(selection.playlist[0].id, "track-a");
 });
 
 test("SPCBoyWK exposes the catalog Dumper column", () => {
