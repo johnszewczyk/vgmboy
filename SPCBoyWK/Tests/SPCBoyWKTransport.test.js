@@ -52,6 +52,10 @@ const appearanceActionsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/appearance-actions.js"),
   "utf8"
 );
+const archiveCacheActionsSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/archive-cache-actions.js"),
+  "utf8"
+);
 const playlistColumnsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-columns.js"),
   "utf8"
@@ -367,6 +371,12 @@ function loadAppearanceActions() {
   const window = {};
   vm.runInNewContext(appearanceActionsSource, { window }, { filename: "appearance-actions.js" });
   return window.SPCBoyAppearanceActions;
+}
+
+function loadArchiveCacheActions() {
+  const window = {};
+  vm.runInNewContext(archiveCacheActionsSource, { window }, { filename: "archive-cache-actions.js" });
+  return window.SPCBoyArchiveCacheActions;
 }
 
 function loadAppearanceView() {
@@ -1215,6 +1225,48 @@ test("SPCBoyWK keeps appearance preference mutations in an appearance action mod
     "persist", "render",
     "persist", "render"
   ]);
+});
+
+test("SPCBoyWK keeps archive cache configuration actions in an archive cache module", async () => {
+  assert.match(indexSource, /appearance-actions\.js[\s\S]*archive-cache-actions\.js[\s\S]*app-ui\.js/);
+  assert.match(archiveCacheActionsSource, /async function applyArchiveCacheSettings\(/);
+  assert.match(archiveCacheActionsSource, /function setArchiveCacheEnabled\(/);
+  assert.match(uiSource, /return archiveCacheActions\.setArchiveCacheLimit\(value\)/);
+  assert.doesNotMatch(uiSource, /const configured = await window\.spcBoyWK\?\.configureArchiveCache/);
+
+  const calls = [];
+  const state = {
+    archiveCacheEnabled: false,
+    archiveCacheLimitBytes: 100,
+    archiveCacheSummary: null
+  };
+  const actions = loadArchiveCacheActions().create({
+    state,
+    persistSettings: () => calls.push("persist"),
+    configureArchiveCache: async (settings) => {
+      calls.push(["configure", settings]);
+      return { enabled: settings.enabled, limitBytes: settings.limitBytes, summary: { files: 2 } };
+    },
+    normalizeArchiveCacheLimit: (value) => Number(value) * 10,
+    renderAll: () => calls.push("render")
+  });
+
+  actions.setArchiveCacheEnabled(true);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(state.archiveCacheEnabled, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(state.archiveCacheSummary)), { files: 2, enabled: true, limitBytes: 100 });
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+    "persist",
+    ["configure", { enabled: true, limitBytes: 100 }],
+    "render",
+    "render"
+  ]);
+
+  calls.length = 0;
+  actions.setArchiveCacheLimit("25");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(state.archiveCacheLimitBytes, 250);
 });
 
 test("SPCBoyWK database view utilities preserve search and temporary-view semantics", () => {

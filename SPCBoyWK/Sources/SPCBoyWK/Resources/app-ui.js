@@ -93,6 +93,13 @@ const appearanceActions = window.SPCBoyAppearanceActions.create({
   setAnimation: (key, value, normalize) => window.SPCBoyOptionsController.setAnimation(state, normalize, key, value),
   setWindowLevel: (key, enabled) => window.SPCBoyOptionsController.setWindowLevel(state, key, enabled)
 });
+const archiveCacheActions = window.SPCBoyArchiveCacheActions.create({
+  state,
+  persistSettings,
+  configureArchiveCache: (settings) => window.spcBoyWK?.configureArchiveCache?.(settings),
+  normalizeArchiveCacheLimit: uiApp.normalizeArchiveCacheLimit,
+  renderAll: () => renderAll()
+});
 const appearanceView = window.SPCBoyAppearanceView.create({
   state,
   refs,
@@ -963,32 +970,15 @@ function setQueuedSkipsEnabled(nextEnabled) {
 }
 
 async function applyArchiveCacheSettings() {
-  const settings = {
-    enabled: state.archiveCacheEnabled,
-    limitBytes: state.archiveCacheLimitBytes
-  };
-  persistSettings();
-  const configured = await window.spcBoyWK?.configureArchiveCache?.(settings);
-  if (configured?.summary) {
-    state.archiveCacheSummary = { ...configured.summary, enabled: configured.enabled, limitBytes: configured.limitBytes };
-  }
-  renderAll();
+  return archiveCacheActions.applyArchiveCacheSettings();
 }
 
 function setArchiveCacheEnabled(enabled) {
-  state.archiveCacheEnabled = Boolean(enabled);
-  applyArchiveCacheSettings().catch((error) => {
-    console.error("[SPCBoy] archive cache setting update failed", error);
-  });
-  renderAll();
+  return archiveCacheActions.setArchiveCacheEnabled(enabled);
 }
 
 function setArchiveCacheLimit(value) {
-  state.archiveCacheLimitBytes = uiApp.normalizeArchiveCacheLimit(value);
-  applyArchiveCacheSettings().catch((error) => {
-    console.error("[SPCBoy] archive cache limit update failed", error);
-  });
-  renderAll();
+  return archiveCacheActions.setArchiveCacheLimit(value);
 }
 
 function setEqualizerEnabled(enabled) {
