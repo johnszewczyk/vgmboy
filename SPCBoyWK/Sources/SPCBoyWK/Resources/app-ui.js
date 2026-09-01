@@ -6,7 +6,6 @@ const { valueForColumn, sortValue } = window.SPCBoyPlaylistTable;
 const expandedFolders = new Set();
 let metadataRefreshFrame = 0;
 const metadataRefreshTrackIds = new Set();
-let playlistRenderGeneration = 0;
 let renderedDatabaseGames = null;
 let databaseGameButtons = [];
 let databaseEmptyState = null;
@@ -16,11 +15,6 @@ let databaseRowRenderGeneration = 0;
 let browserClickTimer = 0;
 let databaseGameClickTimer = 0;
 let databaseGameSearchRecords = [];
-const PLAYLIST_VIRTUALIZATION_THRESHOLD = 200;
-const PLAYLIST_VIRTUAL_OVERSCAN = 12;
-let playlistVirtualRowHeight = 28;
-let playlistViewportFrame = 0;
-let playlistRowMeasurementFrame = 0;
 const playlistColumns = window.SPCBoyPlaylistColumns.create({
   state,
   refs,
@@ -29,7 +23,23 @@ const playlistColumns = window.SPCBoyPlaylistColumns.create({
   normalizeColumnOrder: uiApp.normalizeColumnOrder,
   valueForColumn,
   sortValue,
-  getPlaylistRows: () => playlistRowsByTrackId,
+  getPlaylistRows: () => playlistRows.rows(),
+  onRenderPlaylist: (options) => renderPlaylist(options)
+});
+const playlistRows = window.SPCBoyPlaylistRows.create({
+  state,
+  refs,
+  columns: playlistColumns,
+  valueForColumn,
+  persistSettings,
+  isFavoritePresentation,
+  toggleFavorites,
+  renderSidebar,
+  showContextMenu,
+  playVisibleTrack,
+  exportTrackAsAAC: (track) => uiApp.playback.exportTrackAsAAC(track),
+  updateTimingSummary: () => uiApp.playback.updateTimingSummary(),
+  scheduleSelectionIndicators,
   onRenderPlaylist: (options) => renderPlaylist(options)
 });
 
@@ -80,47 +90,7 @@ function playVisibleTrack(trackId, startSeconds = 0) {
 let browserSelectionGeneration = 0;
 let selectedBrowserButton = null;
 let selectedDatabaseGameButton = null;
-const playlistRowsByTrackId = new Map();
-let selectedPlaylistRow = null;
-let currentPlaylistRow = null;
 let selectionIndicatorFrame = 0;
-
-function playlistUsesVirtualRows() {
-  return state.playlist.length > PLAYLIST_VIRTUALIZATION_THRESHOLD;
-}
-
-function schedulePlaylistViewportRender() {
-  if (!playlistUsesVirtualRows() || playlistViewportFrame) return;
-  playlistViewportFrame = window.requestAnimationFrame(() => {
-    playlistViewportFrame = 0;
-    renderPlaylist({ sort: false });
-  });
-}
-
-function schedulePlaylistRowMeasurement() {
-  if (!playlistUsesVirtualRows() || playlistRowMeasurementFrame) return;
-  playlistRowMeasurementFrame = window.requestAnimationFrame(() => {
-    playlistRowMeasurementFrame = 0;
-    const row = refs.playlistBody.querySelector(".playlist-row");
-    const measuredHeight = Math.round(row?.getBoundingClientRect?.().height || 0);
-    if (!measuredHeight || measuredHeight === playlistVirtualRowHeight) return;
-    playlistVirtualRowHeight = measuredHeight;
-    renderPlaylist({ sort: false });
-  });
-}
-
-function makePlaylistVirtualSpacer(height) {
-  const row = document.createElement("tr");
-  row.className = "playlist-virtual-spacer";
-  row.setAttribute("aria-hidden", "true");
-  const cell = document.createElement("td");
-  cell.colSpan = Math.max(1, orderedColumns().length);
-  cell.style.height = `${Math.max(0, Math.round(height))}px`;
-  row.appendChild(cell);
-  return row;
-}
-
-refs.playlistBodyWrap?.addEventListener("scroll", schedulePlaylistViewportRender, { passive: true });
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>'"]/g, (character) => ({
@@ -171,7 +141,7 @@ function syncSelectionIndicators() {
   selectionIndicatorFrame = 0;
   const sidebarTarget = refs.treeRoot.querySelector(".tree-node.is-selected, .database-game-row.is-selected, .database-console-row.is-selected");
   positionSelectionIndicator(refs.treeRoot, ensureSidebarSelectionIndicator(), sidebarTarget);
-  positionSelectionIndicator(refs.playlistBodyWrap, refs.playlistSelectionIndicator, selectedPlaylistRow);
+  positionSelectionIndicator(refs.playlistBodyWrap, refs.playlistSelectionIndicator, playlistRows.selectedRow());
 }
 
 function scheduleSelectionIndicators() {
@@ -1205,250 +1175,27 @@ function syncPlaylistColumnWidths() {
 }
 
 function renderPlaylistCell(track, column, rowIndex) {
-  const td = document.createElement("td");
-  td.className = column.className || "";
-  td.dataset.columnId = column.id;
-  td.style.width = `${state.columnWidths[column.id]}%`;
-  if (column.id === "favorite") {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "favorite-toggle";
-    const favorite = isFavoritePresentation(track);
-    button.title = favorite ? "Remove from Favorites" : "Add to Favorites";
-    button.setAttribute("aria-label", button.title);
-    button.setAttribute("aria-pressed", favorite ? "true" : "false");
-    button.classList.toggle("is-favorite", favorite);
-    button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="#icon-star"></use></svg>`;
-    button.addEventListener("click", async (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      await toggleFavorites([track]);
-      renderSidebar();
-      renderPlaylist();
-    });
-    td.appendChild(button);
-  } else {
-    td.textContent = String(valueForColumn(track, column, rowIndex, state.rootPath));
-  }
-  return td;
+  return playlistRows.renderPlaylistCell(track, column, rowIndex);
 }
 
-function updatePlaylistRowState(row, trackId) {
-  if (!row) return;
-  row.classList.toggle("is-selected", state.selectedTrackIds.includes(trackId));
-  row.classList.toggle("is-current", state.currentTrackId === trackId);
-}
-
-function selectPlaylistTrack(trackId, { focus = false, extend = false, range = false } = {}) {
-  const track = state.playlist.find((entry) => entry.id === trackId);
-  if (!track) return null;
-
-  const previousIds = new Set(state.selectedTrackIds);
-  const selection = window.SPCBoyPlaylistController.reduceSelection({
-    playlist: state.playlist,
-    selectedIds: state.selectedTrackIds,
-    anchorId: state.playlistSelectionAnchorId
-  }, trackId, { extend, range });
-  if (!selection) return null;
-  state.selectedTrackIds = selection.selectedIds;
-  state.selectedTrackId = selection.primaryId;
-  state.lastSelectedTrackId = track.id;
-  state.playlistSelectionAnchorId = selection.anchorId;
-  if (previousIds.size !== selection.selectedIds.length || selection.selectedIds.some((id) => !previousIds.has(id))) persistSettings();
-
-  for (const [id, row] of playlistRowsByTrackId) updatePlaylistRowState(row, id);
-  const nextRow = playlistRowsByTrackId.get(track.id) || null;
-  selectedPlaylistRow = nextRow;
-  scheduleSelectionIndicators();
-  if (focus) nextRow?.focus({ preventScroll: true });
-  return track;
+function selectPlaylistTrack(trackId, options = {}) {
+  return playlistRows.selectPlaylistTrack(trackId, options);
 }
 
 function refreshPlaylistPlaybackState() {
-  for (const [id, row] of playlistRowsByTrackId) updatePlaylistRowState(row, id);
-  const nextSelectedRow = state.selectedTrackId ? playlistRowsByTrackId.get(state.selectedTrackId) || null : null;
-  selectedPlaylistRow = nextSelectedRow;
-
-  currentPlaylistRow?.classList.remove("is-current");
-  const nextCurrentRow = state.currentTrackId ? playlistRowsByTrackId.get(state.currentTrackId) || null : null;
-  nextCurrentRow?.classList.add("is-current");
-  currentPlaylistRow = nextCurrentRow;
-  scheduleSelectionIndicators();
+  return playlistRows.refreshPlaylistPlaybackState();
 }
 
 function refreshPlaylistRow(trackId) {
-  const track = state.playlist.find((entry) => entry.id === trackId);
-  const rowIndex = state.playlist.findIndex((entry) => entry.id === trackId);
-  const row = playlistRowsByTrackId.get(trackId);
-  if (!track || !row) return false;
-
-  row.setAttribute("aria-label", `${track.title || track.filename || "Track"}`);
-  for (const column of orderedColumns()) {
-    const cell = row.querySelector(`[data-column-id="${CSS.escape(column.id)}"]`);
-    if (!cell) return false;
-    if (column.id === "favorite") {
-      const button = cell.querySelector("button");
-      if (button) {
-        const favorite = isFavoritePresentation(track);
-        button.classList.toggle("is-favorite", favorite);
-        button.title = favorite ? "Remove from Favorites" : "Add to Favorites";
-        button.setAttribute("aria-label", button.title);
-        button.setAttribute("aria-pressed", favorite ? "true" : "false");
-      }
-    } else {
-      cell.textContent = String(valueForColumn(track, column, rowIndex, state.rootPath));
-    }
-    cell.style.width = `${state.columnWidths[column.id]}%`;
-  }
-  updatePlaylistRowState(row, trackId);
-  return true;
+  return playlistRows.refreshPlaylistRow(trackId);
 }
 
 function playlistSortDependsOnMetadata() {
-  return ["title", "game", "artist", "dumper", "system", "lengthLabel"].includes(state.sortColumn);
-}
-
-function syncPlaylistColumnWidths() {
-  for (const column of orderedColumns()) {
-    const header = refs.playlistHeaderRow.querySelector(`[data-column-id="${CSS.escape(column.id)}"]`);
-    if (header) header.style.width = `${state.columnWidths[column.id]}%`;
-  }
-  for (const row of playlistRowsByTrackId.values()) {
-    for (const column of orderedColumns()) {
-      const cell = row.querySelector(`[data-column-id="${CSS.escape(column.id)}"]`);
-      if (cell) cell.style.width = `${state.columnWidths[column.id]}%`;
-    }
-  }
-}
-
-function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = state.playlist.length, spacers = null) {
-  let rowIndex = startIndex;
-  const appendBatch = () => {
-    if (generation !== playlistRenderGeneration) return;
-    const fragment = document.createDocumentFragment();
-    if (rowIndex === startIndex && spacers?.top > 0) {
-      fragment.appendChild(makePlaylistVirtualSpacer(spacers.top));
-    }
-    const startedAt = performance.now();
-    while (rowIndex < endIndex && performance.now() - startedAt < 8) {
-      const track = state.playlist[rowIndex];
-      const row = document.createElement("tr");
-      row.dataset.trackId = track.id;
-      row.tabIndex = 0;
-      row.setAttribute("aria-label", `${track.title || track.filename || "Track"}`);
-      row.className = `playlist-row${state.selectedTrackIds.includes(track.id) ? " is-selected" : ""}${state.currentTrackId === track.id ? " is-current" : ""}`;
-      playlistRowsByTrackId.set(track.id, row);
-      if (state.selectedTrackId === track.id) selectedPlaylistRow = row;
-      if (state.currentTrackId === track.id) currentPlaylistRow = row;
-
-      for (const column of orderedColumns()) {
-        row.appendChild(renderPlaylistCell(track, column, rowIndex));
-      }
-
-      row.addEventListener("click", (event) => {
-        const selectedTrack = selectPlaylistTrack(track.id, {
-          focus: true,
-          extend: event.metaKey || event.ctrlKey,
-          range: event.shiftKey
-        });
-        uiApp.playback.updateTimingSummary();
-      });
-
-      row.addEventListener("dblclick", () => {
-        playVisibleTrack(track.id, 0).catch((error) => {
-          console.error(error);
-        });
-      });
-
-      row.addEventListener("contextmenu", (event) => {
-        showContextMenu(event, [["Export AAC", async () => {
-          await uiApp.playback.exportTrackAsAAC(track);
-        }]]);
-      });
-
-      row.addEventListener("keydown", (event) => {
-        if (event.key !== "Enter") return;
-        event.preventDefault();
-        event.stopPropagation();
-        const selectedTrack = selectPlaylistTrack(track.id);
-        if (!selectedTrack) return;
-        playVisibleTrack(selectedTrack.id, 0).catch((error) => {
-          console.error(error);
-        });
-      });
-
-      fragment.appendChild(row);
-      rowIndex += 1;
-    }
-    refs.playlistBody.appendChild(fragment);
-    if (rowIndex < endIndex) {
-      window.requestAnimationFrame(appendBatch);
-    } else {
-      if (spacers?.bottom > 0) refs.playlistBody.appendChild(makePlaylistVirtualSpacer(spacers.bottom));
-      scheduleSelectionIndicators();
-      schedulePlaylistRowMeasurement();
-    }
-  };
-  window.requestAnimationFrame(appendBatch);
+  return playlistRows.playlistSortDependsOnMetadata();
 }
 
 function renderPlaylist({ sort = true } = {}) {
-  playlistRenderGeneration += 1;
-  const generation = playlistRenderGeneration;
-  if (!state.selectedTrackIds.length && state.selectedTrackId) {
-    state.selectedTrackIds = [state.selectedTrackId];
-  }
-  const playlistIDs = new Set(state.playlist.map((track) => track.id));
-  state.selectedTrackIds = state.selectedTrackIds.filter((id) => playlistIDs.has(id));
-  if (state.selectedTrackId && state.selectedTrackIds.length && !state.selectedTrackIds.includes(state.selectedTrackId)) {
-    state.selectedTrackId = state.selectedTrackIds.at(-1) || null;
-  }
-  refs.playlistBody.innerHTML = "";
-  playlistRowsByTrackId.clear();
-  selectedPlaylistRow = null;
-  currentPlaylistRow = null;
-  if (sort) sortPlaylist();
-  const virtualized = playlistUsesVirtualRows();
-  // Auto-sizing every cell defeats a catalog lookup. Large database playlists
-  // retain the current widths; explicit column auto-size remains available.
-  const playlistSignature = virtualized ? null : playlistAutoSizeSignature();
-  const shouldAutoSize = playlistColumns.shouldAutoSize(virtualized, playlistSignature);
-
-  if (state.playlist.length === 0) {
-    const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="${Math.max(1, orderedColumns().length)}" class="empty-row"></td>`;
-    refs.playlistBody.appendChild(row);
-    scheduleSelectionIndicators();
-    return;
-  }
-
-  if (shouldAutoSize) {
-    playlistColumns.markAutoSized(playlistSignature);
-    autoSizeColumns();
-    renderPlaylistHeader();
-    syncPlaylistColumnWidths();
-  }
-  if (!virtualized) {
-    appendPlaylistRowsInBatches(generation);
-    return;
-  }
-
-  const scrollTop = refs.playlistBodyWrap?.scrollTop || 0;
-  const viewportHeight = refs.playlistBodyWrap?.clientHeight || (playlistVirtualRowHeight * 24);
-  const firstVisibleRow = Math.max(0, Math.floor(scrollTop / playlistVirtualRowHeight) - PLAYLIST_VIRTUAL_OVERSCAN);
-  const lastVisibleRow = Math.min(
-    state.playlist.length,
-    Math.ceil((scrollTop + viewportHeight) / playlistVirtualRowHeight) + PLAYLIST_VIRTUAL_OVERSCAN
-  );
-  appendPlaylistRowsInBatches(
-    generation,
-    firstVisibleRow,
-    lastVisibleRow,
-    {
-      top: firstVisibleRow * playlistVirtualRowHeight,
-      bottom: (state.playlist.length - lastVisibleRow) * playlistVirtualRowHeight
-    }
-  );
+  return playlistRows.renderPlaylist({ sort });
 }
 
 function scheduleMetadataRefresh(trackId) {
@@ -1687,10 +1434,10 @@ function moveSelection(delta, { range = false, extend = false } = {}) {
   // can be routed through an old sidebar/focused row after arrow navigation.
   selectPlaylistTrack(state.playlist[nextIndex].id, { focus: true, range, extend });
   uiApp.playback.updateTimingSummary();
-  if (playlistUsesVirtualRows() && !playlistRowsByTrackId.has(state.selectedTrackId)) {
+  if (playlistRows.playlistUsesVirtualRows() && !playlistRows.hasRow(state.selectedTrackId)) {
     refs.playlistBodyWrap.scrollTop = Math.max(
       0,
-      nextIndex * playlistVirtualRowHeight - (refs.playlistBodyWrap.clientHeight / 2)
+      nextIndex * playlistRows.playlistVirtualRowHeight() - (refs.playlistBodyWrap.clientHeight / 2)
     );
     renderPlaylist({ sort: false });
     selectPlaylistTrack(state.selectedTrackId, { focus: true, range, extend });

@@ -28,6 +28,10 @@ const playlistColumnsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-columns.js"),
   "utf8"
 );
+const playlistRowsSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-rows.js"),
+  "utf8"
+);
 const indexSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/index.html"),
   "utf8"
@@ -563,7 +567,7 @@ test("SPCBoyWK uses native in-place tempo and AAC cancellation events", () => {
   assert.match(playbackSource, /nativeCancelAACExport/);
   assert.match(nativeBridgeSource, /onNativeAACExport/);
   assert.match(nativeBridgeSource, /nativeExportAACCancel/);
-  assert.match(uiSource, /\[\["Export AAC"/);
+  assert.match(playlistRowsSource, /\[\["Export AAC"/);
   assert.match(indexSource, /id="aac-export-directory-path"/);
   assert.match(indexSource, /id="aac-export-cancel-button"/);
   assert.match(indexSource, /id="aac-export-choose-button" class="tool-button glyph-button"[\s\S]*icon-folder-tree/);
@@ -592,11 +596,20 @@ test("SPCBoyWK allows every playlist column to be hidden except an empty table",
 });
 
 test("SPCBoyWK keeps playlist column state and DOM ownership in the column module", () => {
-  assert.match(indexSource, /app-playback\.js[\s\S]*database-view-utils\.js[\s\S]*playlist-table-utils\.js[\s\S]*playlist-columns\.js[\s\S]*app-ui\.js/);
+  assert.match(indexSource, /app-playback\.js[\s\S]*database-view-utils\.js[\s\S]*playlist-table-utils\.js[\s\S]*playlist-columns\.js[\s\S]*playlist-rows\.js[\s\S]*app-ui\.js/);
   assert.match(playlistColumnsSource, /function create\(\{/);
   assert.match(playlistColumnsSource, /function renderHeader\(\)/);
   assert.match(playlistColumnsSource, /function beginColumnResize\(/);
   assert.doesNotMatch(uiSource, /function beginColumnResize\(/);
+});
+
+test("SPCBoyWK keeps playlist row and virtualization state in the row module", () => {
+  assert.match(playlistRowsSource, /function selectPlaylistTrack\(/);
+  assert.match(playlistRowsSource, /function renderPlaylist\(/);
+  assert.match(playlistRowsSource, /PLAYLIST_VIRTUALIZATION_THRESHOLD = 200/);
+  assert.match(playlistRowsSource, /function schedulePlaylistViewportRender\(/);
+  assert.match(uiSource, /return playlistRows\.renderPlaylist\(\{ sort \}\)/);
+  assert.doesNotMatch(uiSource, /function appendPlaylistRowsInBatches\(/);
 });
 
 test("SPCBoyWK exposes the catalog Dumper column", () => {
