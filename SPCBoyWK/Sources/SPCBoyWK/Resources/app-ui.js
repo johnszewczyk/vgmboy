@@ -6,13 +6,7 @@ const { valueForColumn, sortValue } = window.SPCBoyPlaylistTable;
 const expandedFolders = new Set();
 let metadataRefreshFrame = 0;
 const metadataRefreshTrackIds = new Set();
-let renderedDatabaseGames = null;
-let databaseGameButtons = [];
-let databaseEmptyState = null;
-let databaseConsoleGroups = [];
 let collapsedDatabaseConsoles = new Set();
-let databaseRowRenderGeneration = 0;
-let databaseGameClickTimer = 0;
 let databaseGameSearchRecords = [];
 const playlistColumns = window.SPCBoyPlaylistColumns.create({
   state,
@@ -62,6 +56,28 @@ const sidebarTree = window.SPCBoySidebarTree.create({
   moveBrowserSelection,
   setSelectedBrowserButton: (button) => { selectedBrowserButton = button; }
 });
+const databaseSidebarView = window.SPCBoyDatabaseSidebar.create({
+  state,
+  refs,
+  sidebarNaturalCollator: new Intl.Collator(undefined, { numeric: true, sensitivity: "base" }),
+  collapsedDatabaseConsoles,
+  databaseGameKey,
+  databaseConsoleName,
+  escapeHtml,
+  persistSettings,
+  resetSidebarContent,
+  positionSelectionIndicator,
+  scheduleSelectionIndicators,
+  applySharedDatabaseGroupAction,
+  reportDatabaseSidebarError,
+  showContextMenu,
+  loadDatabaseGame,
+  databaseLoadedSelectionID,
+  playVisibleTrack,
+  activateDatabaseSelection,
+  appendPlaylistTracks,
+  databaseRowsToPlaylistTracks
+});
 
 function syncCollapsedConsolePersistence() {
   state.collapsedConsoleNames = [...collapsedDatabaseConsoles];
@@ -109,7 +125,6 @@ function playVisibleTrack(trackId, startSeconds = 0) {
 }
 let browserSelectionGeneration = 0;
 let selectedBrowserButton = null;
-let selectedDatabaseGameButton = null;
 let selectionIndicatorFrame = 0;
 
 function escapeHtml(value) {
@@ -132,7 +147,7 @@ function resetSidebarContent() {
   // Keep the single selection surface alive across sidebar renders. Recreating
   // it on every click resets its transform, producing both flicker and stale
   // looking bars instead of one continuous 100 ms movement.
-  databaseRowRenderGeneration += 1;
+  databaseSidebarView.invalidate();
   const indicator = ensureSidebarSelectionIndicator();
   refs.treeRoot.replaceChildren(indicator);
   return indicator;
@@ -416,13 +431,7 @@ function filteredTree() {
   return sidebarTree.filteredTree();
 }
 
-const sidebarNaturalCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
-
 function renderTree() {
-  renderedDatabaseGames = null;
-  databaseGameButtons = [];
-  databaseEmptyState = null;
-  databaseConsoleGroups = [];
   selectedBrowserButton = null;
   return sidebarTree.renderTree();
 }
@@ -438,7 +447,7 @@ function databaseConsoleName(game) {
 let databaseGroupTransitionGeneration = 0;
 
 function databaseGroupStateSnapshot() {
-  const knownGroupNames = databaseConsoleGroups.map(({ consoleName }) => consoleName);
+  const knownGroupNames = databaseSidebarView.consoleNames();
   return {
     expandedGroupNames: knownGroupNames.filter((name) => !collapsedDatabaseConsoles.has(name)),
     selectedGroupName: state.selectedDatabaseConsoleName || null,
@@ -457,7 +466,7 @@ async function applySharedDatabaseGroupAction(action, groupName = null, gameID =
   );
   if (generation !== databaseGroupTransitionGeneration || !next) return false;
   const expanded = new Set(Array.isArray(next.expandedGroupNames) ? next.expandedGroupNames : []);
-  for (const knownName of databaseConsoleGroups.map(({ consoleName }) => consoleName)) {
+  for (const knownName of databaseSidebarView.consoleNames()) {
     if (expanded.has(knownName)) collapsedDatabaseConsoles.delete(knownName);
     else collapsedDatabaseConsoles.add(knownName);
   }
@@ -475,211 +484,8 @@ function databaseLoadedSelectionID() {
   return state.selectedTrackId || state.playlist[0]?.id || null;
 }
 
-function makeDatabaseGameButton(game) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "database-game-row";
-  button.dataset.databaseGameKey = databaseGameKey(game);
-  button.dataset.searchText = `${game.name} ${game.rootName || ""}`.toLowerCase();
-  button.innerHTML = `<span class="database-disclosure">·</span><span class="database-game-name">${escapeHtml(game.displayName || game.name)}</span>${state.sidebarPathCounts ? `<span class="database-game-meta">${game.trackCount}</span>` : ""}`;
-  button.addEventListener("click", (event) => {
-    window.clearTimeout(databaseGameClickTimer);
-    if (event.detail > 1) return;
-    state.selectedDatabaseGameKey = databaseGameKey(game);
-    state.selectedDatabaseConsoleName = databaseConsoleName(game);
-    void applySharedDatabaseGroupAction("selectGame", state.selectedDatabaseConsoleName, state.selectedDatabaseGameKey)
-      .catch((error) => reportDatabaseSidebarError("select the database game", error));
-    persistSettings();
-    refs.treeRoot.querySelectorAll(".database-console-row.is-selected").forEach((row) => row.classList.remove("is-selected"));
-    selectedDatabaseGameButton?.classList.remove("is-selected");
-    selectedDatabaseGameButton = button;
-    selectedDatabaseGameButton.classList.add("is-selected");
-    scheduleSelectionIndicators();
-    button.focus();
-    // Database game rows are final sidebar leaves. Read the indexed tracks
-    // immediately; this is a database preview, not a delayed filesystem scan.
-    databaseGameClickTimer = window.setTimeout(() => {
-      databaseGameClickTimer = 0;
-      loadDatabaseGame(game).catch((error) => reportDatabaseSidebarError("preview the selected game", error));
-    }, 220);
-  });
-  button.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter") return;
-    event.preventDefault();
-    event.stopPropagation();
-    window.clearTimeout(databaseGameClickTimer);
-    databaseGameClickTimer = 0;
-    state.selectedDatabaseGameKey = databaseGameKey(game);
-    state.selectedDatabaseConsoleName = databaseConsoleName(game);
-    void applySharedDatabaseGroupAction("selectGame", state.selectedDatabaseConsoleName, state.selectedDatabaseGameKey)
-      .catch((error) => reportDatabaseSidebarError("select the database game", error));
-    persistSettings();
-    loadDatabaseGame(game).then((loaded) => {
-      const targetID = loaded ? databaseLoadedSelectionID() : null;
-      if (targetID) return playVisibleTrack(targetID, 0);
-      return undefined;
-    }).catch((error) => reportDatabaseSidebarError("play the selected game", error));
-  });
-  button.addEventListener("dblclick", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    window.clearTimeout(databaseGameClickTimer);
-    databaseGameClickTimer = 0;
-    state.selectedDatabaseGameKey = databaseGameKey(game);
-    state.selectedDatabaseConsoleName = databaseConsoleName(game);
-    void applySharedDatabaseGroupAction("selectGame", state.selectedDatabaseConsoleName, state.selectedDatabaseGameKey)
-      .catch((error) => reportDatabaseSidebarError("select the database game", error));
-    persistSettings();
-    loadDatabaseGame(game).then((loaded) => {
-      const targetID = loaded ? databaseLoadedSelectionID() : null;
-      if (targetID) return playVisibleTrack(targetID, 0);
-      return undefined;
-    }).catch((error) => reportDatabaseSidebarError("play the selected game", error));
-  });
-  button.addEventListener("contextmenu", (event) => {
-    state.selectedDatabaseGameKey = databaseGameKey(game);
-    state.selectedDatabaseConsoleName = databaseConsoleName(game);
-    persistSettings();
-    showContextMenu(event, [
-      ["Show in Finder", async () => {
-        const rows = await window.spcBoyWK.databaseGameTracks([game]);
-        if (rows?.stale === true) return;
-        const row = rows[0];
-        if (row) await window.spcBoyWK.showInFinder(row.archivePath || row.path);
-      }],
-      ["Play Now", async () => {
-        const loaded = await loadDatabaseGame(game);
-        const targetID = loaded ? databaseLoadedSelectionID() : null;
-        if (targetID) await playVisibleTrack(targetID, 0);
-      }],
-      ["Queue", async () => {
-        const rows = await window.spcBoyWK.databaseGameTracks([game]);
-        if (rows?.stale === true) return;
-        appendPlaylistTracks(databaseRowsToPlaylistTracks(rows, [game]));
-      }]
-    ]);
-  });
-  return button;
-}
-
-function appendDatabaseGameRowsInBatches(groupedGames) {
-  const generation = databaseRowRenderGeneration;
-  const pendingRows = databaseConsoleGroups.flatMap(({ games, consoleName }) =>
-    (groupedGames.get(consoleName) || []).map((game) => ({ games, game }))
-  );
-  let offset = 0;
-
-  const appendBatch = () => {
-    if (generation !== databaseRowRenderGeneration) return;
-    const startedAt = performance.now();
-    while (offset < pendingRows.length && performance.now() - startedAt < 8) {
-      const { games, game } = pendingRows[offset++];
-      const button = makeDatabaseGameButton(game);
-      games.appendChild(button);
-      databaseGameButtons.push(button);
-    }
-    if (offset < pendingRows.length) {
-      window.requestAnimationFrame(appendBatch);
-    } else {
-      scheduleSelectionIndicators();
-    }
-  };
-
-  window.requestAnimationFrame(appendBatch);
-}
-
 function renderDatabaseGames() {
-  if (state.databaseSidebarLoading) {
-    renderedDatabaseGames = null;
-    const indicator = resetSidebarContent();
-    const loading = document.createElement("div");
-    loading.className = "empty sidebar-empty sidebar-loading";
-    loading.textContent = "Loading catalog…";
-    refs.treeRoot.appendChild(loading);
-    positionSelectionIndicator(refs.treeRoot, indicator, null);
-    return;
-  }
-  const gamesForView = visibleDatabaseGames();
-  if (renderedDatabaseGames !== gamesForView) {
-    resetSidebarContent();
-    selectedDatabaseGameButton = null;
-    databaseConsoleGroups = [];
-    const groupedGames = new Map();
-    for (const game of gamesForView) {
-      const consoleName = databaseConsoleName(game);
-      const games = groupedGames.get(consoleName) || [];
-      games.push(game);
-      groupedGames.set(consoleName, games);
-    }
-    databaseGameButtons = [];
-    [...groupedGames.keys()].sort((left, right) => sidebarNaturalCollator.compare(left, right)).forEach((consoleName) => {
-      const group = document.createElement("div");
-      group.className = "database-console-group";
-      const heading = document.createElement("button");
-      heading.type = "button";
-      heading.className = `database-console-row${state.selectedDatabaseConsoleName === consoleName && !state.selectedDatabaseGameKey ? " is-selected" : ""}`;
-      heading.dataset.databaseConsoleName = consoleName;
-      heading.tabIndex = 0;
-      const expanded = !collapsedDatabaseConsoles.has(consoleName);
-      heading.innerHTML = `<span class="database-disclosure">${expanded ? "▾" : "▸"}</span><span class="database-console-label">${escapeHtml(consoleName)}</span>`;
-      const games = document.createElement("div");
-      games.className = "database-console-games";
-      games.classList.toggle("is-hidden", !expanded);
-      heading.addEventListener("click", async () => {
-        try {
-          await applySharedDatabaseGroupAction("toggle", consoleName);
-          renderDatabaseGames();
-        } catch (error) {
-          reportDatabaseSidebarError("toggle the database console", error);
-        }
-      });
-      heading.addEventListener("keydown", (event) => {
-        if (event.key !== " ") return;
-        event.preventDefault();
-        heading.click();
-      });
-      heading.addEventListener("dblclick", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        void (async () => {
-          await applySharedDatabaseGroupAction("select", consoleName);
-          await activateDatabaseSelection();
-        })().catch((error) => reportDatabaseSidebarError("play the selected console", error));
-      });
-      group.append(heading, games);
-      refs.treeRoot.appendChild(group);
-      databaseConsoleGroups.push({ group, games, consoleName });
-    });
-
-    databaseEmptyState = document.createElement("div");
-    databaseEmptyState.className = "empty sidebar-empty";
-    refs.treeRoot.appendChild(databaseEmptyState);
-    renderedDatabaseGames = gamesForView;
-    appendDatabaseGameRowsInBatches(groupedGames);
-  }
-
-  const query = state.sidebarQuery.trim();
-  for (const button of databaseGameButtons) {
-    button.classList.remove("is-hidden");
-    button.classList.toggle("is-selected", state.selectedDatabaseGameKey === button.dataset.databaseGameKey);
-    if (state.selectedDatabaseGameKey === button.dataset.databaseGameKey) selectedDatabaseGameButton = button;
-  }
-
-  for (const { group, games, consoleName } of databaseConsoleGroups) {
-    if (query) {
-      games.classList.remove("is-hidden");
-    } else {
-      games.classList.toggle("is-hidden", collapsedDatabaseConsoles.has(consoleName));
-    }
-    const disclosure = group.querySelector(".database-console-row .database-disclosure");
-    if (disclosure) disclosure.textContent = games.classList.contains("is-hidden") ? "▸" : "▾";
-  }
-
-  databaseEmptyState.classList.toggle("is-hidden", !state.databaseSidebarError && gamesForView.length > 0);
-  databaseEmptyState.textContent = state.databaseSidebarError || (state.databaseGames.length
-    ? "No database games match this search."
-    : "Use ScanSong to populate the selected database.");
-  scheduleSelectionIndicators();
+  return databaseSidebarView.renderDatabaseGames();
 }
 
 async function setAllDatabaseConsolesCollapsed(collapsed) {
@@ -959,8 +765,7 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
   if (databaseGameButton?.dataset.databaseGameKey) {
     const game = visibleDatabaseGames().find((entry) => databaseGameKey(entry) === databaseGameButton.dataset.databaseGameKey);
     if (game) {
-      window.clearTimeout(databaseGameClickTimer);
-      databaseGameClickTimer = 0;
+      databaseSidebarView.cancelPendingGameClick();
       state.selectedDatabaseGameKey = databaseGameButton.dataset.databaseGameKey;
       state.selectedDatabaseConsoleName = databaseConsoleName(game);
       persistSettings();
@@ -1551,7 +1356,7 @@ function setSidebarPathCounts(enabled) {
   state.sidebarPathCounts = Boolean(enabled);
   persistSettings();
   broadcastAppearanceSettings();
-  renderedDatabaseGames = null;
+  databaseSidebarView.invalidate();
   renderSidebar();
 }
 

@@ -40,6 +40,10 @@ const sidebarTreeSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/sidebar-tree-view.js"),
   "utf8"
 );
+const databaseSidebarSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/database-sidebar-view.js"),
+  "utf8"
+);
 const indexSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/index.html"),
   "utf8"
@@ -301,6 +305,12 @@ function loadSidebarTree() {
   const window = {};
   vm.runInNewContext(sidebarTreeSource, { window }, { filename: "sidebar-tree-view.js" });
   return window.SPCBoySidebarTree;
+}
+
+function loadDatabaseSidebar() {
+  const window = {};
+  vm.runInNewContext(databaseSidebarSource, { window }, { filename: "database-sidebar-view.js" });
+  return window.SPCBoyDatabaseSidebar;
 }
 
 test("SPCBoyWK ignores stale native generations", () => {
@@ -706,6 +716,46 @@ test("SPCBoyWK keeps filesystem tree filtering and rendering in the sidebar tree
   assert.equal(view.findBrowserNode(tree, leaf.path), leaf);
   assert.equal(view.filteredTree()[0].path, "/root");
   assert.equal(view.filteredTree()[0].children[0].path, leaf.path);
+});
+
+test("SPCBoyWK keeps database console grouping and rendering in the database sidebar module", () => {
+  assert.match(indexSource, /sidebar-tree-view\.js[\s\S]*database-sidebar-view\.js[\s\S]*app-ui\.js/);
+  assert.match(databaseSidebarSource, /function groupedGamesByConsole\(/);
+  assert.match(databaseSidebarSource, /function makeDatabaseGameButton\(/);
+  assert.match(databaseSidebarSource, /function renderDatabaseGames\(/);
+  assert.match(uiSource, /return databaseSidebarView\.renderDatabaseGames\(\)/);
+  assert.doesNotMatch(uiSource, /function makeDatabaseGameButton\(/);
+
+  const view = loadDatabaseSidebar().create({
+    state: {},
+    refs: {},
+    sidebarNaturalCollator: { compare: (left, right) => left.localeCompare(right) },
+    collapsedDatabaseConsoles: new Set(),
+    databaseGameKey: (game) => game.name,
+    databaseConsoleName: (game) => game.system || "Unknown Console",
+    escapeHtml: (value) => String(value),
+    persistSettings() {},
+    resetSidebarContent() {},
+    positionSelectionIndicator() {},
+    scheduleSelectionIndicators() {},
+    applySharedDatabaseGroupAction() {},
+    reportDatabaseSidebarError() {},
+    showContextMenu() {},
+    loadDatabaseGame() {},
+    databaseLoadedSelectionID() {},
+    playVisibleTrack() {},
+    activateDatabaseSelection() {},
+    appendPlaylistTracks() {},
+    databaseRowsToPlaylistTracks() {}
+  });
+  const groups = view.groupedGamesByConsole([
+    { name: "First", system: "SNES" },
+    { name: "Second", system: "PSP" },
+    { name: "Third", system: "SNES" }
+  ]);
+
+  assert.equal([...groups.keys()].join(","), "SNES,PSP");
+  assert.equal(groups.get("SNES").length, 2);
 });
 
 test("SPCBoyWK exposes the catalog Dumper column", () => {
