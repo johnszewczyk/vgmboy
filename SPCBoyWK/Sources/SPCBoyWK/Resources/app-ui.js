@@ -1061,6 +1061,23 @@ function setOptionsOpen(nextOpen) {
   renderAll();
 }
 
+function recoverFromUnavailableLocalBrowser(error) {
+  console.warn("[SPCBoy] persisted local browser path unavailable; returning to the catalog", error);
+  state.localBrowserEnabled = false;
+  state.rootPath = null;
+  state.tree = [];
+  state.selectedFolderPath = null;
+  state.selectedBrowserPath = null;
+  state.sidebarMode = "consoles";
+  state.sidebarQuery = "";
+  state.sidebarView = Object.freeze(sidebarView("consoles", ""));
+  state.databaseFiles = [];
+  state.databaseFileTree = [];
+  state.databaseSearchGames = null;
+  state.databaseSidebarError = "";
+  refs.sidebarSearchInput.value = "";
+}
+
 
 async function bootstrap() {
   // Load persisted appearance before the first Options-window paint. The
@@ -1111,7 +1128,12 @@ async function bootstrap() {
     };
   } else if (state.localBrowserEnabled && state.rootPath) {
     state.sidebarMode = "diskPath";
-    snapshot = await window.spcBoyWK.refreshTree(state.rootPath, state.selectedFolderPath || state.rootPath);
+    try {
+      snapshot = await window.spcBoyWK.refreshTree(state.rootPath, state.selectedFolderPath || state.rootPath);
+    } catch (error) {
+      recoverFromUnavailableLocalBrowser(error);
+      snapshot = await window.spcBoyWK.bootstrap();
+    }
   } else {
     snapshot = await window.spcBoyWK.bootstrap();
   }

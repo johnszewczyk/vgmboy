@@ -1602,6 +1602,14 @@ test("SPCBoyWK keeps library and folder selection state transitions in a library
   assert.deepEqual(calls, [["index", [{ name: "Game" }]], "persist", "all", "selection", "scroll"]);
 });
 
+test("SPCBoyWK recovers from an unavailable persisted local browser path", () => {
+  assert.match(uiSource, /function recoverFromUnavailableLocalBrowser\(error\)/);
+  assert.match(uiSource, /recoverFromUnavailableLocalBrowser\(error\);\s*snapshot = await window\.spcBoyWK\.bootstrap\(\);/);
+  assert.match(uiSource, /state\.localBrowserEnabled = false;/);
+  assert.match(uiSource, /state\.rootPath = null;/);
+  assert.match(uiSource, /state\.sidebarMode = "consoles";/);
+});
+
 test("SPCBoyWK database view utilities preserve search and temporary-view semantics", () => {
   const view = loadDatabaseView();
   const games = [
