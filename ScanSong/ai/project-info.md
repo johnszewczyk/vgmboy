@@ -114,6 +114,13 @@ emitted row; it does not impose a line or byte truncation cap.
 Scan, Check Links, and Remove Links share one operation telemetry model in the
 native UI: item progress, failure/missing counts, elapsed `HH:MM`/`HH:MM:SS`,
 and completion time are reported uniformly.
+
+Built-in inspection ownership is split by decoder family. GME, PSF-style tags,
+VGM/VGZ metadata, SNDH, SID, standard audio, and OpenMPT single-track
+inspection each have their own handler file; the central registry only maps
+plugin IDs to handlers. External adapters for vgmstream, QSF, MDX, UADE,
+Highly Complete, and FFmpeg remain independently owned. Do not reintroduce a
+format switch into a single catch-all inspector when adding a new route.
 The CLI progress stream is rate-limited to phase changes, phase completion, or
 at most one progress event per second so diagnostics cannot become the scan's
 throughput limiter.

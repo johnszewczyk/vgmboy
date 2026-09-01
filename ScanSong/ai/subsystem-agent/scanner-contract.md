@@ -80,6 +80,11 @@
   `ScanFormatHandler` for structure and metadata. Handlers return a complete
   `ScanInspection` and are the only layer permitted to invoke their parser;
   they never write the catalog directly.
+- Built-in handlers are organized by decoder family rather than one central
+  inspector switch: GME, PSF-style tags, VGM/VGZ metadata, SNDH, SID, standard
+  audio, and OpenMPT each own a focused handler file. The registry is wiring
+  only; format-specific metadata readers stay beside their handler, while
+  shared readers used by external adapters remain reusable utilities.
 - Unknown inputs and unavailable required adapters are typed diagnostics, never
   invented playable rows or calls into a host scanner.
 - The persisted ScanSong file-type policy ignores only documented decoder-absent
