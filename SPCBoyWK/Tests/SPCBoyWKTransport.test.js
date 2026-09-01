@@ -24,6 +24,10 @@ const databaseViewSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/database-view-utils.js"),
   "utf8"
 );
+const catalogTrackMapperSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/catalog-track-mapper.js"),
+  "utf8"
+);
 const playlistColumnsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-columns.js"),
   "utf8"
@@ -297,6 +301,12 @@ function loadDatabaseView() {
   const window = {};
   vm.runInNewContext(databaseViewSource, { window }, { filename: "database-view-utils.js" });
   return window.SPCBoyDatabaseView;
+}
+
+function loadCatalogTrackMapper() {
+  const window = {};
+  vm.runInNewContext(catalogTrackMapperSource, { window }, { filename: "catalog-track-mapper.js" });
+  return window.SPCBoyCatalogTrackMapper;
 }
 
 function loadAppearanceView() {
@@ -820,6 +830,33 @@ test("SPCBoyWK playlist table utilities preserve Dumper, archive path, and lengt
   assert.equal(table.valueForColumn(track, { id: "path" }), "Library/Game.zip#song.spc");
   assert.equal(table.valueForColumn(track, { id: "index" }, 2), 3);
   assert.equal(table.sortValue(track, { id: "lengthLabel" }), 42);
+});
+
+test("SPCBoyWK catalog track mapping preserves indexed metadata and multi-track labels", () => {
+  assert.match(indexSource, /database-view-utils\.js[\s\S]*catalog-track-mapper\.js[\s\S]*playlist-table-utils\.js/);
+  assert.match(catalogTrackMapperSource, /function databaseRowsToPlaylistTracks\(/);
+  assert.match(uiSource, /return catalogTrackMapper\.databaseRowsToPlaylistTracks\(rows, games\)/);
+  assert.doesNotMatch(uiSource, /const fallbackGame = games\[0\] \|\| \{\}/);
+
+  const mapper = loadCatalogTrackMapper().create({
+    state: { rootPath: "/library" },
+    formatTime: (seconds) => `${seconds}s`
+  });
+  const track = mapper.databaseRowsToPlaylistTracks([{
+    playlistId: "track-a",
+    path: "/library/game.spc",
+    filename: "game.spc",
+    trackIndex: 1,
+    trackCount: 2,
+    dumper: "Stored Dumper",
+    playLengthMs: 42000
+  }], [{ name: "Game", system: "SNES", rootPath: "/library" }])[0];
+
+  assert.equal(track.filename, "game.spc [2]");
+  assert.equal(track.displayName, "game [2]");
+  assert.equal(track.dumper, "Stored Dumper");
+  assert.equal(track.lengthLabel, "42s");
+  assert.equal(track.catalogRow, true);
 });
 
 test("SPCBoyWK filters database search locally without a debounce", () => {
