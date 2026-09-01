@@ -47,6 +47,16 @@ const playlistSelectionActions = window.SPCBoyPlaylistSelectionActions.create({
   getSelectedTrack: () => uiApp.selectedTrack(),
   playVisibleTrack
 });
+const playbackSettingsActions = window.SPCBoyPlaybackSettingsActions.create({
+  state,
+  persistSettings,
+  renderAll: () => renderAll(),
+  refreshPlaybackForTimingChange: () => uiApp.playback.refreshPlaybackForTimingChange(),
+  normalizeLongPlayTime: uiApp.normalizeLongPlayTime,
+  normalizeFadeTime: uiApp.normalizeFadeTime,
+  normalizePlayTime: uiApp.normalizePlayTime,
+  parseDurationSeconds: uiApp.parseDurationSeconds
+});
 const appearanceView = window.SPCBoyAppearanceView.create({
   state,
   refs,
@@ -893,52 +903,27 @@ function playSelectedTrack() {
 }
 
 function setPlayTime(nextSeconds) {
-  state.manualPlayTimeSeconds = uiApp.normalizeLongPlayTime(nextSeconds);
-  persistSettings();
-  renderAll();
-  uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
-    console.error(error);
-  });
+  return playbackSettingsActions.setPlayTime(nextSeconds);
 }
 
 function setSpcForceManualTime(nextEnabled) {
-  state.longPlayEnabled = Boolean(nextEnabled);
-  persistSettings();
-  renderAll();
-  uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
-    console.error(error);
-  });
+  return playbackSettingsActions.setSpcForceManualTime(nextEnabled);
 }
 
 function cycleRepeatMode() {
-  const modes = ["off", "all", "one"];
-  state.repeatMode = modes[(modes.indexOf(state.repeatMode) + 1) % modes.length];
-  persistSettings();
-  renderAll();
+  return playbackSettingsActions.cycleRepeatMode();
 }
 
 function setSpcFadeTime(nextSeconds) {
-  state.spcFadeSeconds = uiApp.normalizeFadeTime(nextSeconds);
-  persistSettings();
-  renderAll();
-  uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
-    console.error(error);
-  });
+  return playbackSettingsActions.setSpcFadeTime(nextSeconds);
 }
 
 function setSpcFadeEnabled(nextEnabled) {
-  state.fadeEnabled = Boolean(nextEnabled);
-  persistSettings();
-  renderAll();
-  uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
-    console.error(error);
-  });
+  return playbackSettingsActions.setSpcFadeEnabled(nextEnabled);
 }
 
 function setQueuedSkipsEnabled(nextEnabled) {
-  state.queuedSkipsEnabled = Boolean(nextEnabled);
-  persistSettings();
-  renderAll();
+  return playbackSettingsActions.setQueuedSkipsEnabled(nextEnabled);
 }
 
 async function applyArchiveCacheSettings() {
@@ -1026,30 +1011,15 @@ function adjustAppVolume(delta) {
 }
 
 function commitSpcLengthInput(rawValue) {
-  const parsedSeconds = uiApp.parseDurationSeconds(rawValue);
-  state.manualPlayTimeSeconds = uiApp.normalizeLongPlayTime(parsedSeconds ?? state.manualPlayTimeSeconds);
-  persistSettings();
-  uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
-    console.error(error);
-  });
+  return playbackSettingsActions.commitSpcLengthInput(rawValue);
 }
 
 function commitUnknownDurationInput(rawValue) {
-  const parsedSeconds = uiApp.parseDurationSeconds(rawValue);
-  state.unknownDurationSeconds = uiApp.normalizePlayTime(parsedSeconds ?? state.unknownDurationSeconds);
-  persistSettings();
-  uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
-    console.error(error);
-  });
+  return playbackSettingsActions.commitUnknownDurationInput(rawValue);
 }
 
 function commitSpcFadeInput(rawValue) {
-  const parsedSeconds = uiApp.parseDurationSeconds(rawValue);
-  state.spcFadeSeconds = uiApp.normalizeFadeTime(parsedSeconds ?? state.spcFadeSeconds);
-  persistSettings();
-  uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
-    console.error(error);
-  });
+  return playbackSettingsActions.commitSpcFadeInput(rawValue);
 }
 
 function commitPlaybackSpeedInput(backendId, rawValue) {

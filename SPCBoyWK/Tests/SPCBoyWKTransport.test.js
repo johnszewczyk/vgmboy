@@ -36,6 +36,10 @@ const playlistSelectionSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-selection-actions.js"),
   "utf8"
 );
+const playbackSettingsSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playback-settings-actions.js"),
+  "utf8"
+);
 const playlistColumnsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-columns.js"),
   "utf8"
@@ -327,6 +331,12 @@ function loadPlaylistSelection() {
   const window = {};
   vm.runInNewContext(playlistSelectionSource, { window }, { filename: "playlist-selection-actions.js" });
   return window.SPCBoyPlaylistSelectionActions;
+}
+
+function loadPlaybackSettings() {
+  const window = {};
+  vm.runInNewContext(playbackSettingsSource, { window }, { filename: "playback-settings-actions.js" });
+  return window.SPCBoyPlaybackSettingsActions;
 }
 
 function loadAppearanceView() {
@@ -965,6 +975,47 @@ test("SPCBoyWK keeps playlist selection and keyboard actions in a selection modu
   });
 
   assert.equal(actions.selectedTrackIndex(), 1);
+});
+
+test("SPCBoyWK keeps playback timing preferences in a playback settings module", async () => {
+  assert.match(indexSource, /playlist-selection-actions\.js[\s\S]*playback-settings-actions\.js[\s\S]*app-ui\.js/);
+  assert.match(playbackSettingsSource, /function setPlayTime\(/);
+  assert.match(playbackSettingsSource, /function cycleRepeatMode\(/);
+  assert.match(playbackSettingsSource, /function commitSpcLengthInput\(/);
+  assert.match(uiSource, /return playbackSettingsActions\.setPlayTime\(nextSeconds\)/);
+  assert.match(uiSource, /return playbackSettingsActions\.commitUnknownDurationInput\(rawValue\)/);
+  assert.doesNotMatch(uiSource, /state\.manualPlayTimeSeconds = uiApp\.normalizeLongPlayTime\(nextSeconds\)/);
+
+  const calls = [];
+  const state = {
+    manualPlayTimeSeconds: 120,
+    longPlayEnabled: false,
+    repeatMode: "off",
+    spcFadeSeconds: 5,
+    fadeEnabled: false,
+    queuedSkipsEnabled: false,
+    unknownDurationSeconds: 90
+  };
+  const actions = loadPlaybackSettings().create({
+    state,
+    persistSettings: () => calls.push("persist"),
+    renderAll: () => calls.push("render"),
+    refreshPlaybackForTimingChange: async () => calls.push("refresh"),
+    normalizeLongPlayTime: (value) => Number(value) || 0,
+    normalizeFadeTime: (value) => Number(value) || 0,
+    normalizePlayTime: (value) => Number(value) || 0,
+    parseDurationSeconds: (value) => Number(value)
+  });
+
+  actions.setPlayTime(180);
+  actions.cycleRepeatMode();
+  actions.commitUnknownDurationInput("240");
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(state.manualPlayTimeSeconds, 180);
+  assert.equal(state.repeatMode, "all");
+  assert.equal(state.unknownDurationSeconds, 240);
+  assert.deepEqual(calls, ["persist", "render", "refresh", "persist", "render", "persist", "refresh"]);
 });
 
 test("SPCBoyWK database view utilities preserve search and temporary-view semantics", () => {
