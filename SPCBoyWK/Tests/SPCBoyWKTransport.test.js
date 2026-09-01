@@ -32,6 +32,10 @@ const catalogActionsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/catalog-actions.js"),
   "utf8"
 );
+const playlistSelectionSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-selection-actions.js"),
+  "utf8"
+);
 const playlistColumnsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-columns.js"),
   "utf8"
@@ -317,6 +321,12 @@ function loadCatalogActions() {
   const window = {};
   vm.runInNewContext(catalogActionsSource, { window }, { filename: "catalog-actions.js" });
   return window.SPCBoyCatalogActions;
+}
+
+function loadPlaylistSelection() {
+  const window = {};
+  vm.runInNewContext(playlistSelectionSource, { window }, { filename: "playlist-selection-actions.js" });
+  return window.SPCBoyPlaylistSelectionActions;
 }
 
 function loadAppearanceView() {
@@ -922,6 +932,39 @@ test("SPCBoyWK catalog actions keep local search indexing separate from the host
   actions.rebuildDatabaseGameSearchIndex();
 
   assert.equal(actions.localDatabaseSearch("silent")[0].name, "Silent Hill");
+});
+
+test("SPCBoyWK keeps playlist selection and keyboard actions in a selection module", () => {
+  assert.match(indexSource, /catalog-actions\.js[\s\S]*playlist-selection-actions\.js[\s\S]*app-ui\.js/);
+  assert.match(playlistSelectionSource, /function moveSelection\(/);
+  assert.match(playlistSelectionSource, /function selectAllPlaylistTracks\(/);
+  assert.match(playlistSelectionSource, /function playSelectedTrack\(/);
+  assert.match(uiSource, /return playlistSelectionActions\.moveSelection\(delta, \{ range, extend \}\)/);
+  assert.match(uiSource, /return playlistSelectionActions\.playSelectedTrack\(\)/);
+  assert.doesNotMatch(uiSource, /const currentIndex = selectedTrackIndex\(\)/);
+
+  const state = {
+    playlist: [{ id: "track-a" }, { id: "track-b" }],
+    selectedTrackId: "track-b"
+  };
+  const actions = loadPlaylistSelection().create({
+    state,
+    refs: { playlistBody: { querySelector: () => null } },
+    persistSettings() {},
+    selectPlaylistTrack() {},
+    refreshPlaylistPlaybackState() {},
+    renderPlaylist() {},
+    playlistRows: {
+      playlistUsesVirtualRows: () => false,
+      hasRow: () => true,
+      playlistVirtualRowHeight: () => 32
+    },
+    updateTimingSummary() {},
+    getSelectedTrack: () => state.playlist[1],
+    playVisibleTrack: async () => {}
+  });
+
+  assert.equal(actions.selectedTrackIndex(), 1);
 });
 
 test("SPCBoyWK database view utilities preserve search and temporary-view semantics", () => {
