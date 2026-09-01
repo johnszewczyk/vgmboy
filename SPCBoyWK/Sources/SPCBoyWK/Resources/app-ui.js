@@ -75,6 +75,24 @@ const playbackSpeedActions = window.SPCBoyPlaybackSpeedActions.create({
   refreshPlaybackForSpeedChange: (backendId) => uiApp.playback.refreshPlaybackForSpeedChange(backendId),
   renderAll: () => renderAll()
 });
+const appearanceActions = window.SPCBoyAppearanceActions.create({
+  state,
+  persistSettings,
+  broadcastAppearanceSettings: () => broadcastAppearanceSettings(),
+  renderAll: () => renderAll(),
+  renderPlaylist: () => renderPlaylist(),
+  renderSidebar: () => renderSidebar(),
+  invalidateDatabaseSidebar: () => databaseSidebarView.invalidate(),
+  normalizeItemSpacing: uiApp.normalizeItemSpacing,
+  normalizeFontSize: uiApp.normalizeFontSize,
+  normalizeSidebarWidth: uiApp.normalizeSidebarWidth,
+  normalizeFontColor: uiApp.normalizeFontColor,
+  normalizeAccentColor: uiApp.normalizeAccentColor,
+  normalizeAnimationMilliseconds: uiApp.normalizeAnimationMilliseconds,
+  parseNumericInput: uiApp.parseNumericInput,
+  setAnimation: (key, value, normalize) => window.SPCBoyOptionsController.setAnimation(state, normalize, key, value),
+  setWindowLevel: (key, enabled) => window.SPCBoyOptionsController.setWindowLevel(state, key, enabled)
+});
 const appearanceView = window.SPCBoyAppearanceView.create({
   state,
   refs,
@@ -1018,169 +1036,83 @@ function setPlaybackSpeedEnabled(backendId, enabled) {
 }
 
 function setUiItemSpacing(nextSpacingRem) {
-  state.uiItemSpacingRem = uiApp.normalizeItemSpacing(nextSpacingRem);
-  persistSettings();
-  broadcastAppearanceSettings();
-  renderAll();
+  return appearanceActions.setUiItemSpacing(nextSpacingRem);
 }
 
 function setFontSize(nextSize) {
-  const size = uiApp.normalizeFontSize(nextSize);
-  state.uiFontSizePt = size;
-  state.sidebarFontSizePt = size;
-  state.playlistFontSizePt = size;
-  persistSettings();
-  broadcastAppearanceSettings();
-  renderAll();
+  return appearanceActions.setFontSize(nextSize);
 }
 
 function setSidebarWidth(nextWidth) {
-  state.sidebarWidthPercent = uiApp.normalizeSidebarWidth(nextWidth);
-  persistSettings();
-  broadcastAppearanceSettings();
-  renderAll();
+  return appearanceActions.setSidebarWidth(nextWidth);
 }
 
 function commitFontSizeInput(rawValue) {
-  const parsedValue = uiApp.parseNumericInput(rawValue);
-  setFontSize(parsedValue ?? state.uiFontSizePt);
+  return appearanceActions.commitFontSizeInput(rawValue);
 }
 
 function commitSidebarFontSizeInput(rawValue) {
-  const parsedValue = uiApp.parseNumericInput(rawValue);
-  setFontSize(parsedValue ?? state.uiFontSizePt);
+  return appearanceActions.commitSidebarFontSizeInput(rawValue);
 }
 
 function setSidebarTextColor(color) {
-  const normalized = uiApp.normalizeFontColor(color);
-  state.sidebarTextColor = normalized;
-  state.playlistTextColor = normalized;
-  persistSettings();
-  broadcastAppearanceSettings();
-  renderAll();
+  return appearanceActions.setSidebarTextColor(color);
 }
 
 function setSidebarMonospace(enabled) {
-  state.sidebarMonospace = Boolean(enabled);
-  persistSettings();
-  broadcastAppearanceSettings();
-  renderAll();
+  return appearanceActions.setSidebarMonospace(enabled);
 }
 
 function setSidebarPathCounts(enabled) {
-  state.sidebarPathCounts = Boolean(enabled);
-  persistSettings();
-  broadcastAppearanceSettings();
-  databaseSidebarView.invalidate();
-  renderSidebar();
+  return appearanceActions.setSidebarPathCounts(enabled);
 }
 
 function commitPlaylistFontSizeInput(rawValue) {
-  const parsedValue = uiApp.parseNumericInput(rawValue);
-  state.playlistFontSizePt = uiApp.normalizeFontSize(parsedValue ?? state.playlistFontSizePt);
-  persistSettings();
-  broadcastAppearanceSettings();
-  renderAll();
+  return appearanceActions.commitPlaylistFontSizeInput(rawValue);
 }
 
 function setPlaylistTextColor(color) {
-  state.playlistTextColor = uiApp.normalizeFontColor(color);
-  persistSettings();
-  broadcastAppearanceSettings();
-  renderAll();
+  return appearanceActions.setPlaylistTextColor(color);
 }
 
 function setPlaylistMonospace(enabled) {
-  state.playlistMonospace = Boolean(enabled);
-  persistSettings();
-  broadcastAppearanceSettings();
-  renderAll();
+  return appearanceActions.setPlaylistMonospace(enabled);
 }
 
 function setApplicationMonospace(enabled) {
-  const value = Boolean(enabled);
-  state.applicationMonospace = value;
-  state.sidebarMonospace = value;
-  state.playlistMonospace = value;
-  persistSettings();
-  broadcastAppearanceSettings();
-  renderAll();
+  return appearanceActions.setApplicationMonospace(enabled);
 }
 
 function setPlaylistHeaderBold(enabled) {
-  state.playlistHeaderBold = Boolean(enabled);
-  persistSettings();
-  broadcastAppearanceSettings();
-  renderAll();
+  return appearanceActions.setPlaylistHeaderBold(enabled);
 }
 
 function setColumnAutoSize(enabled) {
-  state.columnAutoSize = Boolean(enabled);
-  persistSettings();
-  renderPlaylist();
+  return appearanceActions.setColumnAutoSize(enabled);
 }
 
 function setAnimationTiming(key, value) {
-  window.SPCBoyOptionsController.setAnimation(state, uiApp.normalizeAnimationMilliseconds, key, value);
-  persistSettings();
-  renderAll();
+  return appearanceActions.setAnimationTiming(key, value);
 }
 
 function setAnimationEnabled(key, enabled) {
-  state[key] = Boolean(enabled);
-  persistSettings();
-  renderAll();
+  return appearanceActions.setAnimationEnabled(key, enabled);
 }
 
 function setWindowAlwaysOnTop(key, enabled) {
-  window.SPCBoyOptionsController.setWindowLevel(state, key, enabled);
-  persistSettings();
-  renderAll();
+  return appearanceActions.setWindowAlwaysOnTop(key, enabled);
 }
 
 function applyAppearanceSettings(settings) {
-  if (settings.uiItemSpacingRem !== undefined) state.uiItemSpacingRem = uiApp.normalizeItemSpacing(settings.uiItemSpacingRem);
-  if (settings.sidebarWidthPercent !== undefined) state.sidebarWidthPercent = uiApp.normalizeSidebarWidth(settings.sidebarWidthPercent);
-  const interfaceFontSize = settings.uiFontSizePt ?? settings.sidebarFontSizePt ?? settings.playlistFontSizePt;
-  if (interfaceFontSize !== undefined) {
-    const size = uiApp.normalizeFontSize(interfaceFontSize);
-    state.uiFontSizePt = size;
-    state.sidebarFontSizePt = size;
-    state.playlistFontSizePt = size;
-  }
-  const interfaceFontColor = settings.sidebarTextColor ?? settings.playlistTextColor;
-  if (interfaceFontColor !== undefined) {
-    const color = uiApp.normalizeFontColor(interfaceFontColor);
-    state.sidebarTextColor = color;
-    state.playlistTextColor = color;
-  }
-  const interfaceMonospace = settings.applicationMonospace ?? settings.sidebarMonospace ?? settings.playlistMonospace;
-  if (interfaceMonospace !== undefined) {
-    const enabled = Boolean(interfaceMonospace);
-    state.applicationMonospace = enabled;
-    state.sidebarMonospace = enabled;
-    state.playlistMonospace = enabled;
-  }
-  if (settings.sidebarPathCounts !== undefined) state.sidebarPathCounts = Boolean(settings.sidebarPathCounts);
-  if (settings.playlistHeaderBold !== undefined) state.playlistHeaderBold = Boolean(settings.playlistHeaderBold);
-  if (settings.accentColor !== undefined) state.accentColor = uiApp.normalizeAccentColor(settings.accentColor);
-  persistSettings();
-  renderAll();
+  return appearanceActions.applyAppearanceSettings(settings);
 }
 
 function setAccentColor(color) {
-  state.accentColor = uiApp.normalizeAccentColor(color);
-  persistSettings();
-  broadcastAppearanceSettings();
-  renderAll();
+  return appearanceActions.setAccentColor(color);
 }
 
 function commitSidebarWidthInput(rawValue) {
-  const parsedValue = uiApp.parseNumericInput(rawValue);
-  state.sidebarWidthPercent = uiApp.normalizeSidebarWidth(parsedValue ?? state.sidebarWidthPercent);
-  persistSettings();
-  broadcastAppearanceSettings();
-  renderAll();
+  return appearanceActions.commitSidebarWidthInput(rawValue);
 }
 
 function setOptionsOpen(nextOpen) {

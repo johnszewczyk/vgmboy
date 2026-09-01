@@ -48,6 +48,10 @@ const playbackSpeedActionsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playback-speed-actions.js"),
   "utf8"
 );
+const appearanceActionsSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/appearance-actions.js"),
+  "utf8"
+);
 const playlistColumnsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-columns.js"),
   "utf8"
@@ -357,6 +361,12 @@ function loadPlaybackSpeedActions() {
   const window = {};
   vm.runInNewContext(playbackSpeedActionsSource, { window }, { filename: "playback-speed-actions.js" });
   return window.SPCBoyPlaybackSpeedActions;
+}
+
+function loadAppearanceActions() {
+  const window = {};
+  vm.runInNewContext(appearanceActionsSource, { window }, { filename: "appearance-actions.js" });
+  return window.SPCBoyAppearanceActions;
 }
 
 function loadAppearanceView() {
@@ -1125,6 +1135,86 @@ test("SPCBoyWK keeps playback speed input and enablement actions in a speed modu
   assert.equal(refs.playbackSpeedInput.value, "2/1");
   assert.equal(state.libvgmPlaybackSpeedEnabled, true);
   assert.deepEqual(calls, ["persist", ["refresh", "vgm"], "render", "persist", ["refresh", "libvgm"], "render"]);
+});
+
+test("SPCBoyWK keeps appearance preference mutations in an appearance action module", () => {
+  assert.match(indexSource, /playback-speed-actions\.js[\s\S]*appearance-actions\.js[\s\S]*app-ui\.js/);
+  assert.match(appearanceActionsSource, /function setFontSize\(/);
+  assert.match(appearanceActionsSource, /function setAnimationTiming\(/);
+  assert.match(appearanceActionsSource, /function applyAppearanceSettings\(/);
+  assert.match(uiSource, /return appearanceActions\.setFontSize\(nextSize\)/);
+  assert.match(uiSource, /return appearanceActions\.applyAppearanceSettings\(settings\)/);
+  assert.doesNotMatch(uiSource, /const interfaceFontSize = settings\.uiFontSizePt/);
+
+  const calls = [];
+  const state = {
+    uiItemSpacingRem: 0.4,
+    sidebarWidthPercent: 25,
+    uiFontSizePt: 12,
+    sidebarFontSizePt: 12,
+    playlistFontSizePt: 12,
+    sidebarTextColor: "#111111",
+    playlistTextColor: "#111111",
+    applicationMonospace: false,
+    sidebarMonospace: false,
+    playlistMonospace: false,
+    sidebarPathCounts: false,
+    playlistHeaderBold: false,
+    accentColor: "#000000",
+    selectionAnimationMilliseconds: 100,
+    mainWindowAlwaysOnTop: false
+  };
+  const actions = loadAppearanceActions().create({
+    state,
+    persistSettings: () => calls.push("persist"),
+    broadcastAppearanceSettings: () => calls.push("broadcast"),
+    renderAll: () => calls.push("render"),
+    renderPlaylist: () => calls.push("playlist"),
+    renderSidebar: () => calls.push("sidebar"),
+    invalidateDatabaseSidebar: () => calls.push("invalidate"),
+    normalizeItemSpacing: Number,
+    normalizeFontSize: Number,
+    normalizeSidebarWidth: Number,
+    normalizeFontColor: (value) => String(value).toLowerCase(),
+    normalizeAccentColor: (value) => String(value).toLowerCase(),
+    normalizeAnimationMilliseconds: (value) => Number(value),
+    parseNumericInput: (value) => Number(value),
+    setAnimation: (key, value, normalize) => { state[key] = normalize(value); },
+    setWindowLevel: (key, enabled) => { state[key] = Boolean(enabled); }
+  });
+
+  actions.setFontSize(14);
+  actions.setAnimationTiming("selectionAnimationMilliseconds", 240);
+  actions.setWindowAlwaysOnTop("mainWindowAlwaysOnTop", true);
+  actions.applyAppearanceSettings({
+    uiItemSpacingRem: 0.6,
+    sidebarWidthPercent: 30,
+    uiFontSizePt: 15,
+    sidebarTextColor: "#ABCDEF",
+    applicationMonospace: true,
+    sidebarPathCounts: true,
+    playlistHeaderBold: true,
+    accentColor: "#FEDCBA"
+  });
+
+  assert.equal(state.uiFontSizePt, 15);
+  assert.equal(state.sidebarFontSizePt, 15);
+  assert.equal(state.playlistFontSizePt, 15);
+  assert.equal(state.sidebarWidthPercent, 30);
+  assert.equal(state.sidebarTextColor, "#abcdef");
+  assert.equal(state.playlistTextColor, "#abcdef");
+  assert.equal(state.applicationMonospace, true);
+  assert.equal(state.sidebarMonospace, true);
+  assert.equal(state.playlistMonospace, true);
+  assert.equal(state.selectionAnimationMilliseconds, 240);
+  assert.equal(state.mainWindowAlwaysOnTop, true);
+  assert.equal(state.accentColor, "#fedcba");
+  assert.deepEqual(calls, [
+    "persist", "broadcast", "render",
+    "persist", "render",
+    "persist", "render",
+    "persist", "render"
+  ]);
 });
 
 test("SPCBoyWK database view utilities preserve search and temporary-view semantics", () => {
