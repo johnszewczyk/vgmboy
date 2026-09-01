@@ -24,6 +24,10 @@ const databaseViewSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/database-view-utils.js"),
   "utf8"
 );
+const playlistColumnsSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-columns.js"),
+  "utf8"
+);
 const indexSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/index.html"),
   "utf8"
@@ -582,9 +586,17 @@ test("SPCBoyWK keeps Audio and Playback option panels structurally separated", (
 });
 
 test("SPCBoyWK allows every playlist column to be hidden except an empty table", () => {
-  assert.doesNotMatch(uiSource, /checkbox\.disabled\s*=\s*column\.id\s*===\s*"filename"/);
-  assert.match(uiSource, /state\.columnVisibility\[column\.id\]\s*=\s*true/);
+  assert.doesNotMatch(playlistColumnsSource, /checkbox\.disabled\s*=\s*column\.id\s*===\s*"filename"/);
+  assert.match(playlistColumnsSource, /state\.columnVisibility\[column\.id\]\s*=\s*true/);
   assert.match(appCoreSource, /visibility\[DEFAULT_COLUMN_ORDER\[0\]\]\s*=\s*true/);
+});
+
+test("SPCBoyWK keeps playlist column state and DOM ownership in the column module", () => {
+  assert.match(indexSource, /app-playback\.js[\s\S]*database-view-utils\.js[\s\S]*playlist-table-utils\.js[\s\S]*playlist-columns\.js[\s\S]*app-ui\.js/);
+  assert.match(playlistColumnsSource, /function create\(\{/);
+  assert.match(playlistColumnsSource, /function renderHeader\(\)/);
+  assert.match(playlistColumnsSource, /function beginColumnResize\(/);
+  assert.doesNotMatch(uiSource, /function beginColumnResize\(/);
 });
 
 test("SPCBoyWK exposes the catalog Dumper column", () => {

@@ -42,10 +42,11 @@ option controls use the same accent surface.
 organization through the bridge. `options-controller.js` applies that manifest,
 `playlist-controller.js` reduces selection, and `sidebar-controller.js` forwards
 browser-tree row gestures to the native shared reducer. `database-view-utils.js`
-owns pure sidebar-view and catalog-search projections, while
-`playlist-table-utils.js` owns pure playlist path, cell-value, and sort
-projections. `app-ui.js` remains the DOM renderer and event wiring layer rather
-than the owner of those policies.
+owns pure sidebar-view and catalog-search projections. `playlist-table-utils.js`
+owns pure playlist path, cell-value, and sort projections, while
+`playlist-columns.js` owns column state, header rendering, resizing, and
+auto-sizing. `app-ui.js` remains the playlist-row, selection, and broader DOM
+event wiring layer rather than the owner of those column policies.
 Database Console → Game group disclosure and selection also pass through the
 shared `CatalogBrowserGroupState` reducer. WebKit retains only DOM rows, focus,
 scrolling, and persistence projection.
@@ -254,6 +255,7 @@ raw filesystem scanning or a second catalog implementation.
 - [app-ui.js](../../Sources/SPCBoyWK/Resources/app-ui.js)
 - [database-view-utils.js](../../Sources/SPCBoyWK/Resources/database-view-utils.js)
 - [playlist-table-utils.js](../../Sources/SPCBoyWK/Resources/playlist-table-utils.js)
+- [playlist-columns.js](../../Sources/SPCBoyWK/Resources/playlist-columns.js)
 - [options-controller.js](../../Sources/SPCBoyWK/Resources/options-controller.js)
 - [playlist-controller.js](../../Sources/SPCBoyWK/Resources/playlist-controller.js)
 - [sidebar-controller.js](../../Sources/SPCBoyWK/Resources/sidebar-controller.js)
