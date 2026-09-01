@@ -68,6 +68,10 @@ const playlistMutationActionsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-mutation-actions.js"),
   "utf8"
 );
+const navigationActionsSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/navigation-actions.js"),
+  "utf8"
+);
 const playlistColumnsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-columns.js"),
   "utf8"
@@ -407,6 +411,12 @@ function loadPlaylistMutationActions() {
   const window = {};
   vm.runInNewContext(playlistMutationActionsSource, { window }, { filename: "playlist-mutation-actions.js" });
   return window.SPCBoyPlaylistMutationActions;
+}
+
+function loadNavigationActions() {
+  const window = {};
+  vm.runInNewContext(navigationActionsSource, { window, document: { activeElement: null } }, { filename: "navigation-actions.js" });
+  return window.SPCBoyNavigationActions;
 }
 
 function loadAppearanceView() {
@@ -1418,6 +1428,43 @@ test("SPCBoyWK keeps shared playlist append mutation in a playlist mutation modu
     lastSelectedTrackId: "new-a"
   });
   assert.deepEqual(calls, ["persist", "tree", "selection", "playlist", "timing"]);
+});
+
+test("SPCBoyWK keeps edge navigation in a navigation action module", () => {
+  assert.match(indexSource, /playlist-mutation-actions\.js[\s\S]*navigation-actions\.js[\s\S]*app-ui\.js/);
+  assert.match(navigationActionsSource, /function scrollSelectedBrowserItemIntoView\(/);
+  assert.match(navigationActionsSource, /function jumpFocusedListToEdge\(/);
+  assert.match(uiSource, /return navigationActions\.jumpFocusedListToEdge\(toEnd, focused\)/);
+  assert.doesNotMatch(uiSource, /const games = \[\.\.\.refs\.treeRoot\.querySelectorAll\("\.database-console-games/);
+
+  const calls = [];
+  const treeRoot = {
+    contains: (value) => value === "tree-focus",
+    querySelectorAll: () => []
+  };
+  const playlistBody = { contains: (value) => value === "playlist-focus" };
+  const state = { selectedBrowserPath: "folder/a", playlist: [{ id: "track-a" }, { id: "track-b" }] };
+  const actions = loadNavigationActions().create({
+    state,
+    refs: {
+      treeRoot,
+      playlistBody: { ...playlistBody, querySelector: () => null }
+    },
+    currentSidebarView: () => ({ contentMode: "tree" }),
+    visibleBrowserNodes: () => [{ path: "first" }, { path: "last" }],
+    selectBrowserNode: (node, options) => calls.push(["browser", node.path, options]),
+    selectPlaylistTrack: (trackId, options) => calls.push(["playlist", trackId, options]),
+    updateTimingSummary: () => calls.push("timing")
+  });
+
+  assert.equal(actions.jumpFocusedListToEdge(true, "tree-focus"), true);
+  assert.equal(actions.jumpFocusedListToEdge(false, "playlist-focus"), true);
+  assert.equal(actions.jumpFocusedListToEdge(false, "other-focus"), false);
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+    ["browser", "last", { focus: true }],
+    ["playlist", "track-a", { focus: true }],
+    "timing"
+  ]);
 });
 
 test("SPCBoyWK database view utilities preserve search and temporary-view semantics", () => {

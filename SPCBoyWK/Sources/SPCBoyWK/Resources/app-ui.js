@@ -128,6 +128,15 @@ const playlistMutationActions = window.SPCBoyPlaylistMutationActions.create({
   renderPlaylist: () => renderPlaylist(),
   updateTimingSummary: () => uiApp.playback.updateTimingSummary()
 });
+const navigationActions = window.SPCBoyNavigationActions.create({
+  state,
+  refs,
+  currentSidebarView: () => currentSidebarView(),
+  visibleBrowserNodes: () => visibleBrowserNodes(),
+  selectBrowserNode: (node, options) => selectBrowserNode(node, options),
+  selectPlaylistTrack: (trackId, options) => selectPlaylistTrack(trackId, options),
+  updateTimingSummary: () => uiApp.playback.updateTimingSummary()
+});
 const appearanceView = window.SPCBoyAppearanceView.create({
   state,
   refs,
@@ -332,9 +341,7 @@ function showStartupFailure(message) {
 }
 
 function scrollSelectedBrowserItemIntoView() {
-  if (!state.selectedBrowserPath) return;
-  const button = refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(state.selectedBrowserPath)}"]`);
-  button?.scrollIntoView({ block: "nearest" });
+  return navigationActions.scrollSelectedBrowserItemIntoView();
 }
 
 async function loadBrowserChildren(node) {
@@ -416,24 +423,7 @@ function moveBrowserSelection(delta) {
 }
 
 function jumpFocusedListToEdge(toEnd, focused = document.activeElement) {
-  if (refs.treeRoot.contains(focused)) {
-    if (currentSidebarView().contentMode === "tree") {
-      const nodes = visibleBrowserNodes();
-      if (nodes.length) selectBrowserNode(nodes[toEnd ? nodes.length - 1 : 0], { focus: true });
-      return true;
-    }
-    const games = [...refs.treeRoot.querySelectorAll(".database-console-games:not(.is-hidden) .database-game-row")];
-    const target = games[toEnd ? games.length - 1 : 0];
-    target?.focus();
-    return Boolean(target);
-  }
-  if (refs.playlistBody.contains(focused) && state.playlist.length) {
-    const track = state.playlist[toEnd ? state.playlist.length - 1 : 0];
-    selectPlaylistTrack(track.id, { focus: true });
-    uiApp.playback.updateTimingSummary();
-    return true;
-  }
-  return false;
+  return navigationActions.jumpFocusedListToEdge(toEnd, focused);
 }
 
 function appendPlaylistTracks(additions, selectedBrowserPath = state.selectedBrowserPath) {
