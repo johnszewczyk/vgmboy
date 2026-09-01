@@ -137,6 +137,20 @@ const navigationActions = window.SPCBoyNavigationActions.create({
   selectPlaylistTrack: (trackId, options) => selectPlaylistTrack(trackId, options),
   updateTimingSummary: () => uiApp.playback.updateTimingSummary()
 });
+const sidebarCollapseActions = window.SPCBoySidebarCollapseActions.create({
+  state,
+  collapsedDatabaseConsoles,
+  expandedFolders,
+  databaseConsoleNames: () => databaseSidebarView.consoleNames(),
+  databaseGroupState: (...args) => window.spcBoyWK.databaseGroupState(...args),
+  persistSettings,
+  currentSidebarView: () => currentSidebarView(),
+  loadBrowserChildren: (node) => loadBrowserChildren(node),
+  renderDatabaseGames: () => renderDatabaseGames(),
+  renderTree: () => renderTree(),
+  syncTreeSelection: () => syncTreeSelection(),
+  reportDatabaseSidebarError: (action, error) => reportDatabaseSidebarError(action, error)
+});
 const appearanceView = window.SPCBoyAppearanceView.create({
   state,
   refs,
@@ -218,11 +232,6 @@ const catalogActions = window.SPCBoyCatalogActions.create({
   reportDatabaseSidebarError,
   playback: uiApp.playback
 });
-
-function syncCollapsedConsolePersistence() {
-  state.collapsedConsoleNames = [...collapsedDatabaseConsoles];
-  persistSettings();
-}
 
 function currentSidebarView() {
   return state.sidebarView;
@@ -466,36 +475,8 @@ function databaseConsoleName(game) {
   return game.system || "Unknown Console";
 }
 
-let databaseGroupTransitionGeneration = 0;
-
-function databaseGroupStateSnapshot() {
-  const knownGroupNames = databaseSidebarView.consoleNames();
-  return {
-    expandedGroupNames: knownGroupNames.filter((name) => !collapsedDatabaseConsoles.has(name)),
-    selectedGroupName: state.selectedDatabaseConsoleName || null,
-    selectedGameID: state.selectedDatabaseGameKey || null,
-    knownGroupNames
-  };
-}
-
 async function applySharedDatabaseGroupAction(action, groupName = null, gameID = null, extra = {}) {
-  const generation = ++databaseGroupTransitionGeneration;
-  const next = await window.spcBoyWK.databaseGroupState(
-    { ...databaseGroupStateSnapshot(), ...extra },
-    action,
-    groupName,
-    gameID
-  );
-  if (generation !== databaseGroupTransitionGeneration || !next) return false;
-  const expanded = new Set(Array.isArray(next.expandedGroupNames) ? next.expandedGroupNames : []);
-  for (const knownName of databaseSidebarView.consoleNames()) {
-    if (expanded.has(knownName)) collapsedDatabaseConsoles.delete(knownName);
-    else collapsedDatabaseConsoles.add(knownName);
-  }
-  state.selectedDatabaseConsoleName = next.selectedGroupName || null;
-  state.selectedDatabaseGameKey = next.selectedGameID || null;
-  syncCollapsedConsolePersistence();
-  return true;
+  return sidebarCollapseActions.applySharedDatabaseGroupAction(action, groupName, gameID, extra);
 }
 
 function visibleDatabaseGames() {
@@ -511,36 +492,11 @@ function renderDatabaseGames() {
 }
 
 async function setAllDatabaseConsolesCollapsed(collapsed) {
-  await applySharedDatabaseGroupAction("allCollapsed", null, null, { collapsed });
-  renderDatabaseGames();
+  return sidebarCollapseActions.setAllDatabaseConsolesCollapsed(collapsed);
 }
 
 async function setAllSidebarNodesCollapsed(collapsed) {
-  if (currentSidebarView().contentMode === "database") {
-    void setAllDatabaseConsolesCollapsed(collapsed).catch((error) => reportDatabaseSidebarError("change database console disclosure", error));
-    return;
-  }
-
-  if (collapsed) {
-    expandedFolders.clear();
-    state.selectedBrowserPath = currentSidebarView().view === "paths"
-      ? state.databaseFileTree[0]?.path || null
-      : state.rootPath;
-    persistSettings();
-    renderTree();
-    syncTreeSelection();
-    return;
-  }
-
-  async function expandFolder(node) {
-    if (node.kind !== "folder") return;
-    expandedFolders.add(node.path);
-    if (currentSidebarView().view !== "paths") await loadBrowserChildren(node);
-    await Promise.all(node.children.filter((child) => child.kind === "folder").map(expandFolder));
-  }
-  await Promise.all(state.tree.map(expandFolder));
-  renderTree();
-  syncTreeSelection();
+  return sidebarCollapseActions.setAllSidebarNodesCollapsed(collapsed);
 }
 
 async function loadDatabaseGames() {

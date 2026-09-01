@@ -72,6 +72,10 @@ const navigationActionsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/navigation-actions.js"),
   "utf8"
 );
+const sidebarCollapseActionsSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/sidebar-collapse-actions.js"),
+  "utf8"
+);
 const playlistColumnsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-columns.js"),
   "utf8"
@@ -417,6 +421,12 @@ function loadNavigationActions() {
   const window = {};
   vm.runInNewContext(navigationActionsSource, { window, document: { activeElement: null } }, { filename: "navigation-actions.js" });
   return window.SPCBoyNavigationActions;
+}
+
+function loadSidebarCollapseActions() {
+  const window = {};
+  vm.runInNewContext(sidebarCollapseActionsSource, { window }, { filename: "sidebar-collapse-actions.js" });
+  return window.SPCBoySidebarCollapseActions;
 }
 
 function loadAppearanceView() {
@@ -1465,6 +1475,57 @@ test("SPCBoyWK keeps edge navigation in a navigation action module", () => {
     ["playlist", "track-a", { focus: true }],
     "timing"
   ]);
+});
+
+test("SPCBoyWK keeps shared sidebar disclosure transitions in a collapse action module", async () => {
+  assert.match(indexSource, /navigation-actions\.js[\s\S]*sidebar-collapse-actions\.js[\s\S]*app-ui\.js/);
+  assert.match(sidebarCollapseActionsSource, /async function applySharedDatabaseGroupAction\(/);
+  assert.match(sidebarCollapseActionsSource, /async function setAllSidebarNodesCollapsed\(/);
+  assert.match(uiSource, /return sidebarCollapseActions\.setAllSidebarNodesCollapsed\(collapsed\)/);
+  assert.doesNotMatch(uiSource, /let databaseGroupTransitionGeneration/);
+
+  const calls = [];
+  const collapsedDatabaseConsoles = new Set(["SNES"]);
+  const expandedFolders = new Set(["old-folder"]);
+  const state = {
+    selectedDatabaseConsoleName: "SNES",
+    selectedDatabaseGameKey: "game",
+    collapsedConsoleNames: [],
+    sidebarView: { contentMode: "tree", view: "paths" },
+    databaseFileTree: [{ path: "catalog-root" }],
+    rootPath: "/library",
+    selectedBrowserPath: "old-path",
+    tree: []
+  };
+  const actions = loadSidebarCollapseActions().create({
+    state,
+    collapsedDatabaseConsoles,
+    expandedFolders,
+    databaseConsoleNames: () => ["SNES", "PSP"],
+    databaseGroupState: async (snapshot, action, groupName, gameID) => {
+      calls.push([snapshot, action, groupName, gameID]);
+      return { expandedGroupNames: ["PSP"], selectedGroupName: "PSP", selectedGameID: "new-game" };
+    },
+    persistSettings: () => calls.push("persist"),
+    currentSidebarView: () => state.sidebarView,
+    loadBrowserChildren: async () => {},
+    renderDatabaseGames: () => calls.push("database"),
+    renderTree: () => calls.push("tree"),
+    syncTreeSelection: () => calls.push("selection"),
+    reportDatabaseSidebarError: () => calls.push("error")
+  });
+
+  await actions.setAllDatabaseConsolesCollapsed(true);
+  assert.equal(collapsedDatabaseConsoles.has("SNES"), true);
+  assert.equal(collapsedDatabaseConsoles.has("PSP"), false);
+  assert.equal(state.selectedDatabaseConsoleName, "PSP");
+  assert.equal(state.selectedDatabaseGameKey, "new-game");
+  assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), "database");
+
+  await actions.setAllSidebarNodesCollapsed(true);
+  assert.equal(expandedFolders.size, 0);
+  assert.equal(state.selectedBrowserPath, "catalog-root");
+  assert.deepEqual(calls.slice(-3), ["persist", "tree", "selection"]);
 });
 
 test("SPCBoyWK database view utilities preserve search and temporary-view semantics", () => {
