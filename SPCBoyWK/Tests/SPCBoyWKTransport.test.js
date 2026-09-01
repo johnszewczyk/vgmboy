@@ -60,6 +60,10 @@ const routingActionsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/routing-actions.js"),
   "utf8"
 );
+const favoriteActionsSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/favorite-actions.js"),
+  "utf8"
+);
 const playlistColumnsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-columns.js"),
   "utf8"
@@ -387,6 +391,12 @@ function loadRoutingActions() {
   const window = {};
   vm.runInNewContext(routingActionsSource, { window }, { filename: "routing-actions.js" });
   return window.SPCBoyRoutingActions;
+}
+
+function loadFavoriteActions() {
+  const window = {};
+  vm.runInNewContext(favoriteActionsSource, { window }, { filename: "favorite-actions.js" });
+  return window.SPCBoyFavoriteActions;
 }
 
 function loadAppearanceView() {
@@ -1312,6 +1322,58 @@ test("SPCBoyWK keeps backend routing preference actions in a routing module", as
 
   actions.applyRoutingPreferences(null);
   assert.deepEqual(JSON.parse(JSON.stringify(state.routingPreferences)), {});
+});
+
+test("SPCBoyWK keeps favorite snapshots and selection toggles in a favorite action module", async () => {
+  assert.match(indexSource, /routing-actions\.js[\s\S]*favorite-actions\.js[\s\S]*app-ui\.js/);
+  assert.match(favoriteActionsSource, /function applyFavoriteSnapshot\(/);
+  assert.match(favoriteActionsSource, /async function toggleSelectedFavorites\(/);
+  assert.match(uiSource, /return favoriteActions\.refreshFavorites\(\)/);
+  assert.match(uiSource, /return favoriteActions\.toggleSelectedFavorites\(\)/);
+  assert.doesNotMatch(uiSource, /window\.spcBoyWK\.favoritesList\(state\.favoriteSortOrder\)/);
+
+  const calls = [];
+  const state = {
+    favoriteSortOrder: "historical",
+    favorites: [],
+    favoriteIds: [],
+    playlist: [{ id: "track-a", favoriteId: "fav-a" }],
+    selectedTrackIds: ["track-a"],
+    selectedDatabaseGameKey: null,
+    selectedDatabaseConsoleName: null
+  };
+  const actions = loadFavoriteActions().create({
+    state,
+    listFavorites: async (sortOrder) => {
+      calls.push(["list", sortOrder]);
+      return [{ favoriteId: "fav-a", name: "Track A" }];
+    },
+    toggleFavoriteTracks: async (tracks, sortOrder) => {
+      calls.push(["toggle", tracks, sortOrder]);
+      return tracks.map((track) => ({ ...track, favoriteId: track.favoriteId || "fav-a" }));
+    },
+    renderSidebar: () => calls.push("sidebar"),
+    renderPlaylist: () => calls.push("playlist"),
+    isSidebarFocused: () => false,
+    visibleDatabaseGames: () => [],
+    databaseGameKey: () => "",
+    databaseConsoleName: () => "",
+    databaseGameTracks: async () => [],
+    databaseRowsToPlaylistTracks: (rows) => rows
+  });
+
+  await actions.refreshFavorites();
+  await actions.toggleSelectedFavorites();
+
+  assert.equal(actions.isFavoritePresentation({ favoriteId: "fav-a" }), true);
+  assert.equal(actions.isFavoritePresentation({ favoriteId: "fav-missing" }), false);
+  assert.deepEqual(JSON.parse(JSON.stringify(state.favorites)), [{ id: "track-a", favoriteId: "fav-a" }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+    ["list", "historical"],
+    ["toggle", [{ id: "track-a", favoriteId: "fav-a" }], "historical"],
+    "sidebar",
+    "playlist"
+  ]);
 });
 
 test("SPCBoyWK database view utilities preserve search and temporary-view semantics", () => {

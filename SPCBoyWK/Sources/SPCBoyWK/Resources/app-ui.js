@@ -107,6 +107,19 @@ const routingActions = window.SPCBoyRoutingActions.create({
   setRoutingPreferences: (preferences) => window.spcBoyWK?.setRoutingPreferences?.(preferences),
   renderAll: () => renderAll()
 });
+const favoriteActions = window.SPCBoyFavoriteActions.create({
+  state,
+  listFavorites: (sortOrder) => window.spcBoyWK.favoritesList(sortOrder),
+  toggleFavoriteTracks: (tracks, sortOrder) => window.spcBoyWK.favoritesToggle(tracks, sortOrder),
+  renderSidebar: () => renderSidebar(),
+  renderPlaylist: () => renderPlaylist(),
+  isSidebarFocused: () => refs.treeRoot.contains(document.activeElement),
+  visibleDatabaseGames: () => visibleDatabaseGames(),
+  databaseGameKey: (game) => databaseGameKey(game),
+  databaseConsoleName: (game) => databaseConsoleName(game),
+  databaseGameTracks: (games) => window.spcBoyWK.databaseGameTracks(games),
+  databaseRowsToPlaylistTracks: catalogTrackMapper.databaseRowsToPlaylistTracks
+});
 const appearanceView = window.SPCBoyAppearanceView.create({
   state,
   refs,
@@ -210,23 +223,16 @@ async function syncSidebarView() {
   return catalogActions.syncSidebarView();
 }
 
-function applyFavoriteSnapshot(favorites) {
-  state.favorites = Array.isArray(favorites) ? favorites : [];
-  state.favoriteIds = state.favorites.map((track) => track.favoriteId).filter(Boolean);
-}
-
 function isFavoritePresentation(track) {
-  return Boolean(track?.favoriteId) && state.favoriteIds.includes(track.favoriteId);
+  return favoriteActions.isFavoritePresentation(track);
 }
 
 async function refreshFavorites() {
-  const favorites = await window.spcBoyWK.favoritesList(state.favoriteSortOrder);
-  applyFavoriteSnapshot(favorites);
-  return state.favorites;
+  return favoriteActions.refreshFavorites();
 }
 
 async function toggleFavorites(tracks) {
-  applyFavoriteSnapshot(await window.spcBoyWK.favoritesToggle(tracks, state.favoriteSortOrder));
+  return favoriteActions.toggleFavorites(tracks);
 }
 
 function playVisibleTrack(trackId, startSeconds = 0) {
@@ -584,27 +590,7 @@ async function loadDatabaseGame(game) {
 }
 
 async function toggleSelectedFavorites() {
-  const focusedInSidebar = refs.treeRoot.contains(document.activeElement);
-  if (!focusedInSidebar && state.selectedTrackIds.length) {
-    const tracks = state.playlist.filter((entry) => state.selectedTrackIds.includes(entry.id));
-    if (tracks.length) {
-      await toggleFavorites(tracks);
-      renderSidebar();
-      renderPlaylist();
-      return;
-    }
-  }
-  const games = state.selectedDatabaseGameKey
-    ? visibleDatabaseGames().filter((game) => databaseGameKey(game) === state.selectedDatabaseGameKey)
-    : state.selectedDatabaseConsoleName
-      ? visibleDatabaseGames().filter((game) => databaseConsoleName(game) === state.selectedDatabaseConsoleName)
-      : [];
-  if (!games.length) return;
-  const rows = await window.spcBoyWK.databaseGameTracks(games);
-  if (rows?.stale === true) return;
-  await toggleFavorites(databaseRowsToPlaylistTracks(rows, games));
-  renderSidebar();
-  renderPlaylist();
+  return favoriteActions.toggleSelectedFavorites();
 }
 
 function reportDatabaseSidebarError(action, error) {
