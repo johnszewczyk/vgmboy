@@ -44,6 +44,10 @@ const audioSettingsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/audio-settings-actions.js"),
   "utf8"
 );
+const playbackSpeedActionsSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playback-speed-actions.js"),
+  "utf8"
+);
 const playlistColumnsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-columns.js"),
   "utf8"
@@ -347,6 +351,12 @@ function loadAudioSettings() {
   const window = {};
   vm.runInNewContext(audioSettingsSource, { window }, { filename: "audio-settings-actions.js" });
   return window.SPCBoyAudioSettingsActions;
+}
+
+function loadPlaybackSpeedActions() {
+  const window = {};
+  vm.runInNewContext(playbackSpeedActionsSource, { window }, { filename: "playback-speed-actions.js" });
+  return window.SPCBoyPlaybackSpeedActions;
 }
 
 function loadAppearanceView() {
@@ -1076,6 +1086,45 @@ test("SPCBoyWK keeps audio settings and native audio updates in an audio module"
     ["playback", { equalizerEnabled: false, equalizerBandGains: [3, 1.5], appVolume: 0.75, monoEnabled: false }],
     "render"
   ]);
+});
+
+test("SPCBoyWK keeps playback speed input and enablement actions in a speed module", async () => {
+  assert.match(indexSource, /audio-settings-actions\.js[\s\S]*playback-speed-actions\.js[\s\S]*app-ui\.js/);
+  assert.match(playbackSpeedActionsSource, /function commitPlaybackSpeedInput\(/);
+  assert.match(playbackSpeedActionsSource, /function setPlaybackSpeedEnabled\(/);
+  assert.match(uiSource, /return playbackSpeedActions\.commitPlaybackSpeedInput\(backendId, rawValue\)/);
+  assert.doesNotMatch(uiSource, /const parsedSpeed = uiApp\.parsePlaybackSpeed\(rawValue\)/);
+
+  const calls = [];
+  const state = {
+    playbackSpeed: { numerator: 1, denominator: 1 },
+    playbackSpeedEnabled: true,
+    libvgmPlaybackSpeed: { numerator: 1, denominator: 1 },
+    libvgmPlaybackSpeedEnabled: false
+  };
+  const refs = {
+    playbackSpeedInput: { value: "" },
+    libvgmPlaybackSpeedInput: { value: "" }
+  };
+  const actions = loadPlaybackSpeedActions().create({
+    state,
+    refs,
+    persistSettings: () => calls.push("persist"),
+    parsePlaybackSpeed: (value) => value === "bad" ? null : ({ numerator: 2, denominator: 1 }),
+    formatPlaybackSpeed: (value) => `${value.numerator}/${value.denominator}`,
+    refreshPlaybackForSpeedChange: async (backendId) => calls.push(["refresh", backendId]),
+    renderAll: () => calls.push("render")
+  });
+
+  actions.commitPlaybackSpeedInput("vgm", "2");
+  actions.commitPlaybackSpeedInput("vgm", "bad");
+  actions.setPlaybackSpeedEnabled("libvgm", true);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(state.playbackSpeed, { numerator: 2, denominator: 1 });
+  assert.equal(refs.playbackSpeedInput.value, "2/1");
+  assert.equal(state.libvgmPlaybackSpeedEnabled, true);
+  assert.deepEqual(calls, ["persist", ["refresh", "vgm"], "render", "persist", ["refresh", "libvgm"], "render"]);
 });
 
 test("SPCBoyWK database view utilities preserve search and temporary-view semantics", () => {

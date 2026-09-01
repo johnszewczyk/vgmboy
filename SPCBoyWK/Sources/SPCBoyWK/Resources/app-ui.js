@@ -66,6 +66,15 @@ const audioSettingsActions = window.SPCBoyAudioSettingsActions.create({
   normalizeAppVolume: uiApp.normalizeAppVolume,
   renderAll: () => renderAll()
 });
+const playbackSpeedActions = window.SPCBoyPlaybackSpeedActions.create({
+  state,
+  refs,
+  persistSettings,
+  parsePlaybackSpeed: uiApp.parsePlaybackSpeed,
+  formatPlaybackSpeed: uiApp.formatPlaybackSpeed,
+  refreshPlaybackForSpeedChange: (backendId) => uiApp.playback.refreshPlaybackForSpeedChange(backendId),
+  renderAll: () => renderAll()
+});
 const appearanceView = window.SPCBoyAppearanceView.create({
   state,
   refs,
@@ -1001,30 +1010,11 @@ function commitSpcFadeInput(rawValue) {
 }
 
 function commitPlaybackSpeedInput(backendId, rawValue) {
-  const speedKey = backendId === "libvgm" ? "libvgmPlaybackSpeed" : "playbackSpeed";
-  const enabledKey = backendId === "libvgm" ? "libvgmPlaybackSpeedEnabled" : "playbackSpeedEnabled";
-  const input = backendId === "libvgm" ? refs.libvgmPlaybackSpeedInput : refs.playbackSpeedInput;
-  const parsedSpeed = uiApp.parsePlaybackSpeed(rawValue);
-  if (!parsedSpeed) {
-    input.value = uiApp.formatPlaybackSpeed(state[speedKey]);
-    return;
-  }
-  if (parsedSpeed.numerator === state[speedKey].numerator && parsedSpeed.denominator === state[speedKey].denominator) {
-    input.value = uiApp.formatPlaybackSpeed(parsedSpeed);
-    return;
-  }
-  state[speedKey] = parsedSpeed;
-  persistSettings();
-  if (state[enabledKey]) uiApp.playback.refreshPlaybackForSpeedChange(backendId).catch((error) => console.error(error));
-  renderAll();
+  return playbackSpeedActions.commitPlaybackSpeedInput(backendId, rawValue);
 }
 
 function setPlaybackSpeedEnabled(backendId, enabled) {
-  const enabledKey = backendId === "libvgm" ? "libvgmPlaybackSpeedEnabled" : "playbackSpeedEnabled";
-  state[enabledKey] = Boolean(enabled);
-  persistSettings();
-  uiApp.playback.refreshPlaybackForSpeedChange(backendId).catch((error) => console.error(error));
-  renderAll();
+  return playbackSpeedActions.setPlaybackSpeedEnabled(backendId, enabled);
 }
 
 function setUiItemSpacing(nextSpacingRem) {
