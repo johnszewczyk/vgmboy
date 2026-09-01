@@ -56,6 +56,10 @@ const archiveCacheActionsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/archive-cache-actions.js"),
   "utf8"
 );
+const routingActionsSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/routing-actions.js"),
+  "utf8"
+);
 const playlistColumnsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-columns.js"),
   "utf8"
@@ -377,6 +381,12 @@ function loadArchiveCacheActions() {
   const window = {};
   vm.runInNewContext(archiveCacheActionsSource, { window }, { filename: "archive-cache-actions.js" });
   return window.SPCBoyArchiveCacheActions;
+}
+
+function loadRoutingActions() {
+  const window = {};
+  vm.runInNewContext(routingActionsSource, { window }, { filename: "routing-actions.js" });
+  return window.SPCBoyRoutingActions;
 }
 
 function loadAppearanceView() {
@@ -1267,6 +1277,41 @@ test("SPCBoyWK keeps archive cache configuration actions in an archive cache mod
   actions.setArchiveCacheLimit("25");
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(state.archiveCacheLimitBytes, 250);
+});
+
+test("SPCBoyWK keeps backend routing preference actions in a routing module", async () => {
+  assert.match(indexSource, /archive-cache-actions\.js[\s\S]*routing-actions\.js[\s\S]*app-ui\.js/);
+  assert.match(routingActionsSource, /function setRoutingPreference\(/);
+  assert.match(routingActionsSource, /function applyRoutingPreferences\(/);
+  assert.match(uiSource, /return routingActions\.setRoutingPreference\(extension, backendId\)/);
+  assert.doesNotMatch(uiSource, /const nextPreferences = \{ \.\.\.state\.routingPreferences \}/);
+
+  const calls = [];
+  const state = { routingPreferences: {} };
+  const actions = loadRoutingActions().create({
+    state,
+    persistSettings: () => calls.push("persist"),
+    candidatesForPath: () => [{ id: "default" }, { id: "alternate" }],
+    setRoutingPreferences: async (preferences) => {
+      calls.push(["native", preferences]);
+      return { ...preferences, normalized: true };
+    },
+    renderAll: () => calls.push("render")
+  });
+
+  actions.setRoutingPreference(".vgz", "alternate");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(JSON.parse(JSON.stringify(state.routingPreferences)), { ".vgz": "alternate", normalized: true });
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+    "persist",
+    ["native", { ".vgz": "alternate" }],
+    "render",
+    "persist",
+    "render"
+  ]);
+
+  actions.applyRoutingPreferences(null);
+  assert.deepEqual(JSON.parse(JSON.stringify(state.routingPreferences)), {});
 });
 
 test("SPCBoyWK database view utilities preserve search and temporary-view semantics", () => {

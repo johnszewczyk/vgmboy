@@ -100,6 +100,13 @@ const archiveCacheActions = window.SPCBoyArchiveCacheActions.create({
   normalizeArchiveCacheLimit: uiApp.normalizeArchiveCacheLimit,
   renderAll: () => renderAll()
 });
+const routingActions = window.SPCBoyRoutingActions.create({
+  state,
+  persistSettings,
+  candidatesForPath: (filePath) => window.SPCBoyPlaybackBackends?.candidatesForPath?.(filePath) || [],
+  setRoutingPreferences: (preferences) => window.spcBoyWK?.setRoutingPreferences?.(preferences),
+  renderAll: () => renderAll()
+});
 const appearanceView = window.SPCBoyAppearanceView.create({
   state,
   refs,
@@ -808,25 +815,11 @@ function renderRoutingConflicts() {
 }
 
 function setRoutingPreference(extension, backendId) {
-  const candidates = window.SPCBoyPlaybackBackends?.candidatesForPath?.(`route${extension}`) || [];
-  if (!candidates.some((backend) => backend.id === backendId)) return;
-  const nextPreferences = { ...state.routingPreferences };
-  if (backendId === candidates[0]?.id) delete nextPreferences[extension];
-  else nextPreferences[extension] = backendId;
-  state.routingPreferences = nextPreferences;
-  persistSettings();
-  window.spcBoyWK?.setRoutingPreferences?.(nextPreferences).then((normalizedPreferences) => {
-    state.routingPreferences = { ...normalizedPreferences };
-    persistSettings();
-    renderAll();
-  }).catch((error) => console.error("[SPCBoy] routing preference update failed", error));
-  renderAll();
+  return routingActions.setRoutingPreference(extension, backendId);
 }
 
 function applyRoutingPreferences(preferences) {
-  state.routingPreferences = preferences && typeof preferences === "object" ? { ...preferences } : {};
-  persistSettings();
-  renderAll();
+  return routingActions.applyRoutingPreferences(preferences);
 }
 
 function renderAll() {
