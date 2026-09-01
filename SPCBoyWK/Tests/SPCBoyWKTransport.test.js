@@ -28,6 +28,10 @@ const catalogTrackMapperSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/catalog-track-mapper.js"),
   "utf8"
 );
+const catalogActionsSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/catalog-actions.js"),
+  "utf8"
+);
 const playlistColumnsSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-columns.js"),
   "utf8"
@@ -307,6 +311,12 @@ function loadCatalogTrackMapper() {
   const window = {};
   vm.runInNewContext(catalogTrackMapperSource, { window }, { filename: "catalog-track-mapper.js" });
   return window.SPCBoyCatalogTrackMapper;
+}
+
+function loadCatalogActions() {
+  const window = {};
+  vm.runInNewContext(catalogActionsSource, { window }, { filename: "catalog-actions.js" });
+  return window.SPCBoyCatalogActions;
 }
 
 function loadAppearanceView() {
@@ -862,11 +872,56 @@ test("SPCBoyWK catalog track mapping preserves indexed metadata and multi-track 
 
 test("SPCBoyWK filters database search locally without a debounce", () => {
   assert.match(uiSource, /function rebuildDatabaseGameSearchIndex\(games = state\.databaseGames\)/);
+  assert.match(catalogActionsSource, /state\.sidebarView = Object\.freeze\(sidebarView\(state\.sidebarMode, state\.sidebarQuery\)\)/);
+  assert.match(uiSource, /return catalogActions\.updateSidebarSearch\(query\)/);
   assert.match(databaseViewSource, /terms\.every\(\(term\) => searchText\.includes\(term\)\)/);
-  assert.match(uiSource, /state\.sidebarView = Object\.freeze\(sidebarView\(state\.sidebarMode, state\.sidebarQuery\)\)/);
   assert.doesNotMatch(uiSource, /sidebarSearchTimer/);
   assert.doesNotMatch(uiSource, /databaseSearchGames\(requestedQuery\)/);
   assert.doesNotMatch(uiSource, /databaseSearchGeneration/);
+});
+
+test("SPCBoyWK catalog actions keep local search indexing separate from the host UI", () => {
+  assert.match(indexSource, /catalog-track-mapper\.js[\s\S]*catalog-actions\.js[\s\S]*app-ui\.js/);
+  assert.match(catalogActionsSource, /async function loadDatabaseGames\(/);
+  assert.match(catalogActionsSource, /async function loadDatabaseFiles\(/);
+  assert.match(catalogActionsSource, /async function setSidebarMode\(/);
+  assert.match(catalogActionsSource, /async function loadDatabaseGamesIntoPlaylist\(/);
+  assert.match(catalogActionsSource, /async function activateDatabaseSelection\(/);
+  assert.doesNotMatch(uiSource, /function loadDatabaseGamesIntoPlaylist\(/);
+
+  const state = {
+    databaseGames: [
+      { name: "Silent Hill", system: "PSP" },
+      { name: "Kirby", system: "SNES" }
+    ]
+  };
+  const actions = loadCatalogActions().create({
+    state,
+    refs: {},
+    sidebarView: () => ({}),
+    searchRecords: (games) => games.map((game) => ({ game, searchText: `${game.name} ${game.system}`.toLowerCase() })),
+    filterSearchRecords: (records, query) => records.filter((record) => record.searchText.includes(query.toLowerCase())).map((record) => record.game),
+    resolveSidebarState: async () => ({}),
+    persistSettings() {},
+    invalidatePlaylistCatalogSession: async () => {},
+    renderAll() {},
+    renderSidebar() {},
+    renderPlaylist() {},
+    syncTreeSelection() {},
+    refreshFavorites: async () => {},
+    resolveSelectedTrackId() {},
+    targetPlaybackSeconds() {},
+    databaseGameKey: (game) => game.name,
+    databaseConsoleName: (game) => game.system,
+    databaseRowsToPlaylistTracks: (rows) => rows,
+    databaseLoadedSelectionID() {},
+    playVisibleTrack() {},
+    reportDatabaseSidebarError() {},
+    playback: {}
+  });
+  actions.rebuildDatabaseGameSearchIndex();
+
+  assert.equal(actions.localDatabaseSearch("silent")[0].name, "Silent Hill");
 });
 
 test("SPCBoyWK database view utilities preserve search and temporary-view semantics", () => {
