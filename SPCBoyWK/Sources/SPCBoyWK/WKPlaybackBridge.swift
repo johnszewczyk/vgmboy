@@ -105,28 +105,32 @@ final class WKPlaybackBridge: @unchecked Sendable {
             let metadata = PlaybackTimingMetadata(
                 playMilliseconds: max(0, int(request["playMilliseconds"]) ?? 0)
             )
-            let preferences = PlaybackTimingPreferences(
-                longPlaySeconds: max(
+            let longPlayEnabled = request["longPlayEnabled"] as? Bool ?? false
+            let supportsLongPlay = family.supportsLongPlay
+            let timingRequest = PlaybackTimingRequest(
+                playbackMode: longPlayEnabled && supportsLongPlay ? .longPlay : .fileDefault,
+                playMilliseconds: longPlayEnabled
+                    ? max(
+                        0,
+                        int(request["manualPlayMilliseconds"])
+                            ?? PlaybackTimingPreferences.defaultLongPlaySeconds * 1_000
+                    )
+                    : nil,
+                fadeMilliseconds: max(
                     0,
-                    int(request["manualPlayMilliseconds"]).map { $0 / 1_000 }
-                        ?? PlaybackTimingPreferences.defaultLongPlaySeconds
+                    int(request["fadeMilliseconds"])
+                        ?? PlaybackTimingPreferences.defaultFadeSeconds * 1_000
                 ),
-                unknownDurationSeconds: max(
-                    1,
-                    int(request["unknownDurationMilliseconds"]).map { $0 / 1_000 }
-                        ?? PlaybackTimingPreferences.defaultUnknownDurationSeconds
-                ),
-                fadeSeconds: max(
-                    0,
-                    int(request["fadeMilliseconds"]).map { $0 / 1_000 }
-                        ?? PlaybackTimingPreferences.defaultFadeSeconds
+                unknownDurationMilliseconds: max(
+                    1_000,
+                    int(request["unknownDurationMilliseconds"])
+                        ?? PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000
                 )
             )
             let plan = PlaybackTimingPolicy.plan(
                 metadata: metadata,
                 family: family,
-                longPlayEnabled: request["longPlayEnabled"] as? Bool ?? false,
-                preferences: preferences
+                request: timingRequest
             )
             let tempo = tempoMultiplier(request["tempo"])
             let scaledPreFadeSeconds = plan.preFadeSeconds <= 0

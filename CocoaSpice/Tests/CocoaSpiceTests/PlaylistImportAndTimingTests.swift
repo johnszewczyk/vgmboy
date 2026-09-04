@@ -3,6 +3,11 @@ import Testing
 import VGMBoyKit
 @testable import CocoaSpice
 
+@Test func playlistRowHeightAndGapStaySeparate() {
+    #expect(PlaylistTableMetrics.rowHeight(for: 12) == 18)
+    #expect(PlaylistTableMetrics.rowHeight(for: 18) == 24)
+}
+
 @Test func archivePreparationUsesVGMBoyFormatCapabilities() throws {
     #expect(PlaybackFormatRegistry.archiveMaterialization(for: ["track.flac"]) == .selectedEntry)
     #expect(PlaybackFormatRegistry.archiveMaterialization(for: ["track.psf"]) == .completeSet)
@@ -385,7 +390,8 @@ func realAmigaLHAArchiveListsPrefixLedModule() async throws {
             #expect(plan.fadeSeconds == 6)
             #expect(plan.totalSeconds == 246)
         } else {
-            #expect(plan.usesNativeEnding, "Finite audio must retain its native ending for \(extensionName)")
+            #expect(!plan.usesNativeEnding, "Unknown timing must remain bounded for \(extensionName)")
+            #expect(plan.usesDecoderNaturalDuration, "Finite audio should defer to decoder timing for \(extensionName)")
         }
     }
 
@@ -397,7 +403,8 @@ func realAmigaLHAArchiveListsPrefixLedModule() async throws {
         fadeSeconds: 6
     )
     #expect(!unsupported.isLongPlay)
-    #expect(unsupported.usesNativeEnding)
+    #expect(!unsupported.usesNativeEnding)
+    #expect(unsupported.usesDecoderNaturalDuration)
 }
 
 @Test func playbackPreferencesRestoreOnlyUnifiedKeys() {
@@ -431,6 +438,7 @@ func realAmigaLHAArchiveListsPrefixLedModule() async throws {
     defaults.set(true, forKey: AppDefaultsKey.databaseSidebarHidesFileExtensions)
     defaults.set(15, forKey: AppDefaultsKey.playlistFontSize)
     defaults.set("tertiary", forKey: AppDefaultsKey.playlistTextColor)
+    defaults.set(7, forKey: AppDefaultsKey.playlistRowGapPoints)
     defaults.set(true, forKey: AppDefaultsKey.equalizerEnabled)
     defaults.set([-12.0, -3.5, 4.0, 12.0], forKey: AppDefaultsKey.equalizerBandGains)
 
@@ -442,6 +450,7 @@ func realAmigaLHAArchiveListsPrefixLedModule() async throws {
     #expect(unifiedPreferences.databaseSidebarHidesFileExtensions)
     #expect(unifiedPreferences.playlistFontSize == 15)
     #expect(unifiedPreferences.playlistTextColor == "tertiary")
+    #expect(unifiedPreferences.playlistRowGapPoints == 7)
     #expect(unifiedPreferences.sidebarSystemMode)
     #expect(unifiedPreferences.equalizerEnabled)
     #expect(unifiedPreferences.equalizerBandGains == [-12.0, -3.5, 4.0, 12.0])
@@ -461,6 +470,13 @@ func realAmigaLHAArchiveListsPrefixLedModule() async throws {
     #expect(PlaylistPresentation.authorText(for: nil) == "—")
     #expect(PlaylistPresentation.dumperText(for: nil) == "—")
     #expect(PlaylistPresentation.systemText(for: nil) == "—")
+}
+
+@Test func emptyPlaylistColumnPlaceholdersAreNotMeaningful() {
+    #expect(!PlaylistPresentation.isMeaningfulColumnText(""))
+    #expect(!PlaylistPresentation.isMeaningfulColumnText("  \n"))
+    #expect(!PlaylistPresentation.isMeaningfulColumnText("—"))
+    #expect(PlaylistPresentation.isMeaningfulColumnText("SPC700"))
 }
 
 private func runProcess(

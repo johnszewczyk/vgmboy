@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         let nativeBridge = WKNativeBridge()
         nativeBridge.onOpenOptionsWindow = { [weak self] in self?.showOptionsWindow() }
+        nativeBridge.onToggleOptionsWindow = { [weak self] in self?.toggleOptionsWindow() }
         nativeBridge.onChooseRootFolder = { [weak self] in self?.choosePath(allowFiles: false) }
         nativeBridge.onChoosePath = { [weak self] in self?.choosePath(allowFiles: true) }
         nativeBridge.onChooseAACExportDirectory = { [weak self] in self?.chooseDirectory(title: "Choose AAC Export Folder") }
@@ -89,7 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                         }
                         break;
                       case "favoritesPlaylist": app.ui?.showFavoritesPlaylist?.(); break;
-                      case "settings": window.spcBoyWK?.openOptionsWindow?.(); break;
+                      case "settings": window.spcBoyWK?.toggleOptionsWindow?.(); break;
                       default: break;
                     }
                   }
@@ -147,6 +148,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     private func closeOptionsWindow() {
         optionsWindow?.close()
+    }
+
+    private func toggleOptionsWindow() {
+        if let optionsWindow, optionsWindow.isVisible {
+            optionsWindow.orderOut(nil)
+            return
+        }
+        showOptionsWindow()
     }
 
     private func broadcastAppearanceSettings(_ settings: [String: Any]) {
@@ -319,7 +328,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc private func sidebarDiskPath(_ sender: Any?) { dispatch(.sidebarDiskPath) }
     @objc private func favoritesPlaylist(_ sender: Any?) { dispatch(.favoritesPlaylist) }
     @objc private func settings(_ sender: Any?) {
-        showOptionsWindow()
+        toggleOptionsWindow()
     }
     @objc private func previous(_ sender: Any?) { dispatch(.previous) }
     @objc private func playPause(_ sender: Any?) { dispatch(.playPause) }

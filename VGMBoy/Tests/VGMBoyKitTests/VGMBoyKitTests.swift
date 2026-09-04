@@ -237,6 +237,14 @@ struct FormatRegistryTests {
         #expect(family.supportsTempo)
     }
 
+    @Test("routes frontend extension values to tempo-capable families")
+    func routesFrontendExtensions() {
+        #expect(FormatRegistry.familyForExtension("spc")?.id == "libgme")
+        #expect(FormatRegistry.familyForExtension(".SPC")?.id == "libgme")
+        #expect(FormatRegistry.familyForExtension("vgz")?.id == "libvgm")
+        #expect(FormatRegistry.familyForExtension("") == nil)
+    }
+
     @Test("Highly Complete supports long play but not tempo")
     func highlyCompleteCapabilities() {
         let family = FormatRegistry.highlyCompleteFamily
@@ -313,6 +321,39 @@ func sndhFixtureUsesPSGPlay() throws {
 }
 
 @Test(
+    "SNDH playback reports an advancing audible clock",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["VGMBoy_SNDH_FIXTURE"] != nil,
+        "Set VGMBoy_SNDH_FIXTURE to run the SNDH transport clock check."
+    )
+)
+func sndhPlaybackSessionAdvancesClock() throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBoy_SNDH_FIXTURE"])
+    let session = PlaybackSession()
+    defer { session.stop() }
+
+    try session.load(
+        path: path,
+        trackIndex: 0,
+        plan: PlaybackPlan(
+            preFadeSeconds: 20,
+            fadeSeconds: 0,
+            isLongPlay: false,
+            usesNativeEnding: false
+        ),
+        tempo: 1
+    )
+    let loaded = session.status()
+    try session.play()
+    Thread.sleep(forTimeInterval: 0.5)
+    let playing = session.status()
+
+    #expect(playing.isPlaying)
+    #expect(playing.statistics.decoderFamily == "psgplay")
+    #expect(playing.elapsedSeconds > loaded.elapsedSeconds + 0.1)
+}
+
+@Test(
     "MDX fixture opens, reports native timing, and renders PCM",
     .enabled(
         if: ProcessInfo.processInfo.environment["VGMBoy_MDX_FIXTURE"] != nil,
@@ -324,12 +365,21 @@ func mdxFixtureUsesNativeDecoder() throws {
     let decoder = try DecoderFactory.make(path: path)
     defer { decoder.close() }
     #expect(decoder.trackCount == 1)
+    try decoder.startTrack(0)
     let metadata = try decoder.metadata(for: 0)
     #expect(metadata.system == "Sharp X68000")
     #expect(metadata.playMs > 0)
-    let frames = try decoder.readFrames(4_096)
-    #expect(frames.left.count == 4_096)
-    #expect(frames.left.contains { abs($0) > 0.0001 } || frames.right.contains { abs($0) > 0.0001 })
+    var renderedAudio = false
+    for _ in 0..<32 {
+        let frames = try decoder.readFrames(4_096)
+        #expect(frames.left.count == 4_096)
+        if frames.left.contains(where: { abs($0) > 0.0001 })
+            || frames.right.contains(where: { abs($0) > 0.0001 }) {
+            renderedAudio = true
+            break
+        }
+    }
+    #expect(renderedAudio)
 }
 
 @Test(
@@ -820,8 +870,8 @@ struct RealtimeTransportTests {
     }
 }
 
-@Suite("TimingPolicy")
-struct TimingPolicyTests {
+@Suite("PlaybackTimingPolicy")
+struct PlaybackTimingPolicyTests {
     private let metadata = TrackMetadata(
         index: 0,
         song: "Title",
@@ -835,14 +885,40 @@ struct TimingPolicyTests {
         fadeMs: 8_000
     )
 
+    private let family = DecoderFamily(
+        id: "test",
+        supportsLongPlay: true,
+        supportsTempo: false
+    )
+
+    private var timingMetadata: PlaybackTimingMetadata {
+        PlaybackTimingMetadata(
+            playMilliseconds: metadata.playMs,
+            introMilliseconds: metadata.introMs,
+            loopMilliseconds: metadata.loopMs
+        )
+    }
+
+    private func request(
+        mode: PlaybackMode,
+        playSeconds: Int? = nil,
+        fadeSeconds: Int,
+        unknownDurationSeconds: Int = PlaybackTimingPreferences.defaultUnknownDurationSeconds
+    ) -> PlaybackTimingRequest {
+        PlaybackTimingRequest(
+            playbackMode: mode,
+            playMilliseconds: playSeconds.map { $0 * 1_000 },
+            fadeMilliseconds: fadeSeconds * 1_000,
+            unknownDurationMilliseconds: unknownDurationSeconds * 1_000
+        )
+    }
+
     @Test("long play caps at manual plus fade")
     func longPlayWindow() {
-        let plan = TimingPolicy.plan(
-            supportsLongPlay: true,
-            metadata: metadata,
-            longPlayEnabled: true,
-            manualSeconds: 105,
-            fadeSeconds: 6
+        let plan = PlaybackTimingPolicy.plan(
+            metadata: timingMetadata,
+            family: family,
+            request: request(mode: .longPlay, playSeconds: 105, fadeSeconds: 6)
         )
         #expect(plan.isLongPlay)
         #expect(plan.preFadeSeconds == 105)
@@ -853,12 +929,10 @@ struct TimingPolicyTests {
 
     @Test("zero Long Play is an explicit unbounded window")
     func unboundedLongPlayWindow() {
-        let plan = TimingPolicy.plan(
-            supportsLongPlay: true,
-            metadata: metadata,
-            longPlayEnabled: true,
-            manualSeconds: 0,
-            fadeSeconds: 6
+        let plan = PlaybackTimingPolicy.plan(
+            metadata: timingMetadata,
+            family: family,
+            request: request(mode: .longPlay, playSeconds: 0, fadeSeconds: 6)
         )
         #expect(plan.isLongPlay)
         #expect(plan.preFadeSeconds == 0)
@@ -867,12 +941,10 @@ struct TimingPolicyTests {
 
     @Test("natural play uses tagged play length")
     func naturalWindow() {
-        let plan = TimingPolicy.plan(
-            supportsLongPlay: true,
-            metadata: metadata,
-            longPlayEnabled: false,
-            manualSeconds: 60,
-            fadeSeconds: 6
+        let plan = PlaybackTimingPolicy.plan(
+            metadata: timingMetadata,
+            family: family,
+            request: request(mode: .fileDefault, fadeSeconds: 6)
         )
         #expect(!plan.isLongPlay)
         #expect(plan.preFadeSeconds == 150)
@@ -881,24 +953,20 @@ struct TimingPolicyTests {
 
     @Test("zero fade defers to the native ending")
     func nativeEndingWithZeroFade() {
-        let plan = TimingPolicy.plan(
-            supportsLongPlay: true,
-            metadata: metadata,
-            longPlayEnabled: false,
-            manualSeconds: 60,
-            fadeSeconds: 0
+        let plan = PlaybackTimingPolicy.plan(
+            metadata: timingMetadata,
+            family: family,
+            request: request(mode: .fileDefault, fadeSeconds: 0)
         )
         #expect(plan.usesNativeEnding)
     }
 
     @Test("missing timing falls back to a 150s bounded window when fading")
     func fallbackWithoutTiming() {
-        let plan = TimingPolicy.plan(
-            supportsLongPlay: true,
+        let plan = PlaybackTimingPolicy.plan(
             metadata: nil,
-            longPlayEnabled: false,
-            manualSeconds: 60,
-            fadeSeconds: 6
+            family: family,
+            request: request(mode: .fileDefault, fadeSeconds: 6)
         )
         #expect(plan.preFadeSeconds == 150)
         #expect(!plan.usesNativeEnding)
@@ -906,24 +974,24 @@ struct TimingPolicyTests {
 
     @Test("no-natural-ending family always gets a capped window")
     func noNaturalEndingAlwaysCapped() {
-        let withMetadata = TimingPolicy.plan(
+        let noNaturalEndingFamily = DecoderFamily(
+            id: "test-no-natural",
             supportsLongPlay: true,
-            metadata: metadata,
-            longPlayEnabled: false,
-            manualSeconds: 60,
-            fadeSeconds: 0,
+            supportsTempo: false,
             hasNaturalEnding: false
+        )
+        let withMetadata = PlaybackTimingPolicy.plan(
+            metadata: timingMetadata,
+            family: noNaturalEndingFamily,
+            request: request(mode: .fileDefault, fadeSeconds: 0)
         )
         #expect(!withMetadata.usesNativeEnding)
         #expect(withMetadata.preFadeSeconds == 150)
 
-        let withoutMetadata = TimingPolicy.plan(
-            supportsLongPlay: true,
+        let withoutMetadata = PlaybackTimingPolicy.plan(
             metadata: nil,
-            longPlayEnabled: false,
-            manualSeconds: 60,
-            fadeSeconds: 0,
-            hasNaturalEnding: false
+            family: noNaturalEndingFamily,
+            request: request(mode: .fileDefault, fadeSeconds: 0)
         )
         #expect(!withoutMetadata.usesNativeEnding)
         #expect(withoutMetadata.preFadeSeconds == 150)
@@ -1194,13 +1262,18 @@ func vgmFixtureUsesSharedFadeBoundary() throws {
     let metadata = try decoder.metadata(for: 0)
     #expect(metadata.playMs > 0)
     #expect(!decoder.appliesFadeInternally)
-    let fadePlan = TimingPolicy.plan(
-        supportsLongPlay: true,
-        metadata: metadata,
-        longPlayEnabled: false,
-        manualSeconds: 150,
-        fadeSeconds: 6,
-        hasNaturalEnding: true
+    let fadePlan = PlaybackTimingPolicy.plan(
+        metadata: PlaybackTimingMetadata(
+            playMilliseconds: metadata.playMs,
+            introMilliseconds: metadata.introMs,
+            loopMilliseconds: metadata.loopMs
+        ),
+        family: FormatRegistry.libvgmFamily,
+        request: PlaybackTimingRequest(
+            playbackMode: .fileDefault,
+            playMilliseconds: nil,
+            fadeMilliseconds: 6_000
+        )
     )
     #expect(!fadePlan.usesNativeEnding)
     #expect(fadePlan.preFadeSeconds == Int((Double(metadata.playMs) / 1_000.0).rounded()))

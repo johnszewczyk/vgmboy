@@ -2,7 +2,7 @@
 const uiApp = window.SPCBoyApp;
 const { state, refs, persistSettings, loadSettings, targetPlaybackSeconds, COLUMN_DEFS } = uiApp;
 const { sidebarView, searchRecords, filterSearchRecords } = window.SPCBoyDatabaseView;
-const { valueForColumn, sortValue } = window.SPCBoyPlaylistTable;
+const { valueForColumn, sortValue, compareSortValues } = window.SPCBoyPlaylistTable;
 const catalogTrackMapper = window.SPCBoyCatalogTrackMapper.create({ state, formatTime: uiApp.formatTime });
 const expandedFolders = new Set();
 let metadataRefreshFrame = 0;
@@ -16,8 +16,10 @@ const playlistColumns = window.SPCBoyPlaylistColumns.create({
   normalizeColumnOrder: uiApp.normalizeColumnOrder,
   valueForColumn,
   sortValue,
+  compareSortValues,
   getPlaylistRows: () => playlistRows.rows(),
-  onRenderPlaylist: (options) => renderPlaylist(options)
+  onRenderPlaylist: (options) => renderPlaylist(options),
+  onColumnVisibilityChange: () => syncPlaylistColumnWidths()
 });
 const playlistRows = window.SPCBoyPlaylistRows.create({
   state,
@@ -33,6 +35,12 @@ const playlistRows = window.SPCBoyPlaylistRows.create({
   exportTrackAsAAC: (track) => uiApp.playback.exportTrackAsAAC(track),
   updateTimingSummary: () => uiApp.playback.updateTimingSummary(),
   scheduleSelectionIndicators,
+  clearPlaylistSelectionIndicator: () => positionSelectionIndicator(
+    refs.playlistBodyWrap,
+    refs.playlistSelectionIndicator,
+    null,
+    false
+  ),
   onRenderPlaylist: (options) => renderPlaylist(options)
 });
 const playlistSelectionActions = window.SPCBoyPlaylistSelectionActions.create({
@@ -283,6 +291,8 @@ function playVisibleTrack(trackId, startSeconds = 0) {
 }
 let selectedBrowserButton = null;
 let selectionIndicatorFrame = 0;
+let selectionLayoutObserver = null;
+let selectionIndicatorAnimationPending = false;
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>'"]/g, (character) => ({
@@ -303,42 +313,151 @@ function ensureSidebarSelectionIndicator() {
 function resetSidebarContent() {
   // Keep the single selection surface alive across sidebar renders. Recreating
   // it on every click resets its transform, producing both flicker and stale
-  // looking bars instead of one continuous 100 ms movement.
+  // looking bars instead of one continuous movement.
   databaseSidebarView.invalidate();
   const indicator = ensureSidebarSelectionIndicator();
   refs.treeRoot.replaceChildren(indicator);
   return indicator;
 }
 
-function positionSelectionIndicator(container, indicator, target) {
+function restoreSelectionIndicatorTransition(indicator, previousTransition) {
+  // Force an immediate update for initial/rebuilt geometry, then restore the
+  // stylesheet transition so the next user selection can animate normally.
+  void indicator.offsetWidth;
+  if (previousTransition) indicator.style.transition = previousTransition;
+  else indicator.style.removeProperty("transition");
+}
+
+function clearSelectionIndicatorAnimation(indicator) {
+  const transitionHandler = indicator?.__spcBoySelectionTransitionHandler;
+  if (transitionHandler) {
+    indicator.removeEventListener?.("transitionend", transitionHandler);
+    indicator.removeEventListener?.("transitioncancel", transitionHandler);
+    indicator.__spcBoySelectionTransitionHandler = null;
+  }
+  if (indicator) indicator.dataset.selectionAnimating = "false";
+}
+
+function selectionIndicatorTransitionDurationMilliseconds(indicator) {
+  const computed = window.getComputedStyle?.(indicator);
+  const durations = String(computed?.transitionDuration || "")
+    .split(",")
+    .map((value) => value.trim())
+    .map((value) => value.endsWith("ms")
+      ? Number.parseFloat(value)
+      : Number.parseFloat(value) * 1000)
+    .filter((value) => Number.isFinite(value));
+  return durations.length ? Math.max(...durations) : null;
+}
+
+function watchSelectionIndicatorAnimation(indicator) {
+  clearSelectionIndicatorAnimation(indicator);
+  const duration = selectionIndicatorTransitionDurationMilliseconds(indicator);
+  if (duration === 0) return;
+
+  const transitionHandler = (event) => {
+    if (event.target !== indicator) return;
+    if (!["transform", "width", "height", "opacity"].includes(event.propertyName)) return;
+    clearSelectionIndicatorAnimation(indicator);
+    scheduleSelectionIndicators({ animated: false });
+  };
+  indicator.__spcBoySelectionTransitionHandler = transitionHandler;
+  indicator.addEventListener?.("transitionend", transitionHandler);
+  indicator.addEventListener?.("transitioncancel", transitionHandler);
+  indicator.dataset.selectionAnimating = "true";
+}
+
+function positionSelectionIndicator(container, indicator, target, animated = true) {
   if (!container || !indicator || !target) {
-    if (indicator) indicator.style.opacity = "0";
+    if (indicator) {
+      clearSelectionIndicatorAnimation(indicator);
+      const previousTransition = indicator.style.transition;
+      indicator.style.transition = "none";
+      indicator.style.opacity = "0";
+      indicator.dataset.positioned = "false";
+      restoreSelectionIndicatorTransition(indicator, previousTransition);
+    }
+    container?.setAttribute?.("data-selection-indicator-visible", "false");
     return;
   }
+  // ResizeObserver and render completion can arrive immediately after a
+  // selection event. They are layout maintenance, not permission to snap a
+  // user-visible transition back to its destination.
+  if (!animated && indicator.dataset.selectionAnimating === "true") return;
   const containerBounds = container.getBoundingClientRect();
   const targetBounds = target.getBoundingClientRect();
   if (!targetBounds.width || !targetBounds.height) {
+    clearSelectionIndicatorAnimation(indicator);
+    const previousTransition = indicator.style.transition;
+    indicator.style.transition = "none";
     indicator.style.opacity = "0";
+    indicator.dataset.positioned = "false";
+    restoreSelectionIndicatorTransition(indicator, previousTransition);
+    container.setAttribute("data-selection-indicator-visible", "false");
     return;
   }
-  const left = targetBounds.left - containerBounds.left + container.scrollLeft;
+  // Match CocoaSpice's capsule: inset the bounds, then move the whole pill.
+  const horizontalInset = Math.min(4, targetBounds.width / 2);
+  const left = targetBounds.left - containerBounds.left + container.scrollLeft + horizontalInset;
   const top = targetBounds.top - containerBounds.top + container.scrollTop;
-  indicator.style.width = `${targetBounds.width}px`;
-  indicator.style.height = `${targetBounds.height}px`;
-  indicator.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
+  const nextWidth = String(Math.max(0, targetBounds.width - (horizontalInset * 2))) + "px";
+  const nextHeight = String(targetBounds.height) + "px";
+  const nextTransform = "translate3d(" + left + "px, " + top + "px, 0)";
+  const changed = indicator.style.width !== nextWidth
+    || indicator.style.height !== nextHeight
+    || indicator.style.transform !== nextTransform
+    || indicator.style.opacity !== "1";
+  // Playback/status refreshes legitimately reschedule this sync while the
+  // selected row is unchanged. Do not turn that harmless refresh into a
+  // transition cancellation.
+  if (animated && indicator.dataset.selectionAnimating === "true" && !changed) return;
+  const shouldAnimate = animated && indicator.dataset.positioned === "true" && changed;
+  const previousTransition = indicator.style.transition;
+  if (!shouldAnimate) {
+    clearSelectionIndicatorAnimation(indicator);
+    indicator.style.transition = "none";
+  }
+  indicator.style.width = nextWidth;
+  indicator.style.height = nextHeight;
+  indicator.style.transform = nextTransform;
   indicator.style.opacity = "1";
+  indicator.dataset.positioned = "true";
+  container.setAttribute("data-selection-indicator-visible", "true");
+  if (shouldAnimate) watchSelectionIndicatorAnimation(indicator);
+  else restoreSelectionIndicatorTransition(indicator, previousTransition);
 }
 
-function syncSelectionIndicators() {
+function syncSelectionIndicators({ animated = true } = {}) {
   selectionIndicatorFrame = 0;
+  if (animated) selectionIndicatorAnimationPending = false;
   const sidebarTarget = refs.treeRoot.querySelector(".tree-node.is-selected, .database-game-row.is-selected, .database-console-row.is-selected");
-  positionSelectionIndicator(refs.treeRoot, ensureSidebarSelectionIndicator(), sidebarTarget);
-  positionSelectionIndicator(refs.playlistBodyWrap, refs.playlistSelectionIndicator, playlistRows.selectedRow());
+  positionSelectionIndicator(refs.treeRoot, ensureSidebarSelectionIndicator(), sidebarTarget, animated);
+  positionSelectionIndicator(refs.playlistBodyWrap, refs.playlistSelectionIndicator, playlistRows.selectedRow(), animated);
 }
 
-function scheduleSelectionIndicators() {
+function ensureSelectionLayoutObserver() {
+  if (selectionLayoutObserver || typeof window.ResizeObserver !== "function") return;
+  selectionLayoutObserver = new window.ResizeObserver(() => {
+    // Layout changes are not new selections. Track the target immediately so
+    // a moving table/sidebar cannot make the capsule chase the old geometry.
+    scheduleSelectionIndicators({ animated: false });
+  });
+  if (refs.treeRoot) selectionLayoutObserver.observe(refs.treeRoot);
+  if (refs.playlistBodyTable) selectionLayoutObserver.observe(refs.playlistBodyTable);
+}
+
+function scheduleSelectionIndicators({ animated = true } = {}) {
+  ensureSelectionLayoutObserver();
+  if (!animated) {
+    // Never cancel a pending user-selection frame. A layout callback can
+    // legally follow the click in the same run-loop turn.
+    if (selectionIndicatorAnimationPending) return;
+    syncSelectionIndicators({ animated: false });
+    return;
+  }
+  selectionIndicatorAnimationPending = true;
   if (selectionIndicatorFrame) return;
-  selectionIndicatorFrame = window.requestAnimationFrame(syncSelectionIndicators);
+  selectionIndicatorFrame = window.requestAnimationFrame(() => syncSelectionIndicators({ animated: true }));
 }
 
 function resolveSelectedTrackId(playlist, preferredTrackId = state.lastSelectedTrackId) {
@@ -732,8 +851,6 @@ function scheduleMetadataRefresh(trackId) {
     } else if (!playlistColumns.isResizing() && state.columnAutoSize && trackIds.length) {
       playlistColumns.markAutoSized();
       autoSizeColumns();
-      renderPlaylistHeader();
-      syncPlaylistColumnWidths();
     }
     uiApp.playback.updateTimingSummary();
   });

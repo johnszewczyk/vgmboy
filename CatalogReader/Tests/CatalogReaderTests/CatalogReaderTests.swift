@@ -98,6 +98,106 @@ private func fixtureCatalog() throws -> URL {
     #expect(playlist.first(where: { $0.title == "Track 9" })?.dumper == "SPC Dumper")
 }
 
+@Test func playlistReaderUsesTheCleanBrowserGameWhenEmbeddedGameIsMissing() throws {
+    let url = try fixtureCatalog()
+    defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+    var database: OpaquePointer?
+    guard sqlite3_open(url.path, &database) == SQLITE_OK else { throw NSError(domain: "CatalogReaderTests", code: 5) }
+    try execute(database, "UPDATE tracks SET browser_game='song.sndh' WHERE id=1; UPDATE track_metadata SET game='?' WHERE track_id=1;")
+    sqlite3_close(database)
+
+    let playlist = try CatalogPlaylistReader.tracksForGames(
+        databaseURL: url,
+        selections: [CatalogPlaylistGameSelection(rootID: 1, game: "song.sndh", system: "SNES")]
+    )
+    #expect(playlist.first?.game == "song")
+    let directTrack = try ReadOnlyCatalog(databaseURL: url).tracks(
+        rootID: 1,
+        sourcePaths: ["/music/Game/Track 9.spc"]
+    )
+    #expect(directTrack.first?.game == "song")
+}
+
+@Test func catalogRowsExposeTheArchiveMemberLeafFilename() {
+    let track = CatalogTrack(
+        id: 1,
+        rootID: 1,
+        sourcePath: "/music/Mega Man X.tar.zst",
+        archivePath: "/music/Mega Man X.tar.zst",
+        archiveEntry: "nested/04 Opening Stage.spc",
+        trackIndex: 0,
+        trackCount: 1,
+        title: "Opening Stage",
+        game: "Megaman X",
+        author: "Composer",
+        system: "Super Nintendo",
+        comment: "",
+        browserGame: "Megaman X",
+        browserSystem: "Super Nintendo",
+        introLengthMilliseconds: 0,
+        loopLengthMilliseconds: 0,
+        lengthMilliseconds: 1000,
+        fadeLengthMilliseconds: 0
+    )
+    let playlistTrack = CatalogPlaylistTrack(
+        sourcePath: track.sourcePath,
+        archivePath: track.archivePath,
+        archiveEntry: track.archiveEntry,
+        trackIndex: track.trackIndex,
+        trackCount: track.trackCount,
+        title: track.title,
+        game: track.game,
+        author: track.author,
+        system: track.system,
+        comment: track.comment,
+        introLengthMilliseconds: track.introLengthMilliseconds,
+        loopLengthMilliseconds: track.loopLengthMilliseconds,
+        lengthMilliseconds: track.lengthMilliseconds,
+        fadeLengthMilliseconds: track.fadeLengthMilliseconds
+    )
+
+    #expect(track.leafFilename == "04 Opening Stage.spc")
+    #expect(playlistTrack.leafFilename == "04 Opening Stage.spc")
+}
+
+@Test func playlistPresentationUsesMemberIdentityAndSharedFallbacks() {
+    let track = CatalogTrack(
+        id: 1,
+        rootID: 1,
+        sourcePath: "/music/Mega Man X.tar.zst",
+        archivePath: "/music/Mega Man X.tar.zst",
+        archiveEntry: "nested/04 Opening Stage.spc",
+        trackIndex: 1,
+        trackCount: 3,
+        title: "",
+        game: "Megaman X",
+        author: "Composer",
+        system: "Super Nintendo",
+        comment: "",
+        browserGame: "Megaman X",
+        browserSystem: "Super Nintendo",
+        introLengthMilliseconds: 0,
+        loopLengthMilliseconds: 0,
+        lengthMilliseconds: 1_500,
+        fadeLengthMilliseconds: 0
+    )
+
+    let display = CatalogPlaylistPresentation.display(for: track)
+    #expect(display.sourceFilename == "04 Opening Stage.spc")
+    #expect(display.filename == "04 Opening Stage.spc [2]")
+    #expect(display.displayName == "04 Opening Stage [2]")
+    #expect(display.title == "04 Opening Stage [2]")
+    #expect(display.lengthLabel == "0:02")
+}
+
+@Test func playlistPresentationStripsKnownArchiveWrappersButKeepsUnknownNames() {
+    #expect(CatalogPlaylistPresentation.withoutDisplayedExtension("Game.tar.zst") == "Game")
+    #expect(CatalogPlaylistPresentation.withoutDisplayedExtension("song.sndh.zst") == "song")
+    #expect(CatalogPlaylistPresentation.withoutDisplayedExtension("song.spc") == "song")
+    #expect(CatalogPlaylistPresentation.withoutDisplayedExtension("README") == "README")
+}
+
 @Test func playlistGameProjectionUsesFolderFirstSystemProjection() throws {
     let url = try fixtureCatalog()
     defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }

@@ -114,7 +114,11 @@ function create({
       window.clearTimeout(browserClickTimer);
       void handleBrowserGesture(node, "activate", true);
     });
-    button.addEventListener("contextmenu", (event) => showSidebarContextMenu(node, event));
+    button.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      showSidebarContextMenu(node, event);
+    });
     button.addEventListener("keydown", (event) => {
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
@@ -154,13 +158,13 @@ function create({
           ? "No subfolders match this view."
           : "Choose Open Path to browse a local folder.";
       refs.treeRoot.appendChild(empty);
-      scheduleSelectionIndicators();
+      scheduleSelectionIndicators({ animated: false });
       return;
     }
 
     ensureExpandedToSelection(visibleTree);
     visibleTree.forEach((node) => renderTreeNode(node, refs.treeRoot));
-    scheduleSelectionIndicators();
+    scheduleSelectionIndicators({ animated: false });
   }
 
   return Object.freeze({

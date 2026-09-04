@@ -3,10 +3,16 @@
 Small, UI-neutral support shared by native frontend hosts.
 
 `FrontendPreferencesCore` supplies the cross-app animation defaults, enable
-flags, safe 0–1000 ms bounds, and the default-on column auto-size preference.
+flags, nonnegative user-controlled animation durations, and the default-on
+column auto-size preference.
 `FrontendPreferencesStore` and `FrontendPreferencesCoordinator` provide the
 shared UserDefaults-backed interface state boundary; each frontend supplies
 only its key namespace and renderer while using the same preference meanings.
+`FrontendAnimationContract` is the first shared settings contract: animation
+durations are elapsed-time values, zero is immediate, there is no arbitrary
+upper cap, and animated layout work is sampled at the display cadence (60 Hz
+by default) with the shared ease-in-out curve. The native and WebKit hosts may
+render through different APIs, but they must preserve those observable rules.
 
 `ArchiveMaterializationCore` turns a catalog-selected archive member into a
 dependency-complete temporary or cache-backed playable file. Its format

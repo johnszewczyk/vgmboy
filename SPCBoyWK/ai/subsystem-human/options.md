@@ -1,7 +1,8 @@
 # Options
 
 - SPCBoy-owned pages mirror CocoaSpice organizationally: Database, Interface, and Windows, while VGMBoy pages provide Audio, Diagnostics, Playback, and Routing in the same WebKit settings window.
-- Interface > Animations exposes checkbox-enabled Auto-Resize and Selection Bar timings; both default on at 200 ms and accept 0–1000 ms. Disabling one uses an effective 0 ms duration while retaining the configured value.
+- Interface > Animations exposes checkbox-enabled Auto-Resize and Selection Bar timings; both default on at 200 ms and accept any nonnegative duration. Zero is immediate. Disabling one uses an effective 0 ms duration while retaining the configured value.
+- Cmd-Comma toggles the separate Settings window: it opens it when dismissed and dismisses it when visible. The native menu and the toolbar Options button share the same window boundary; the toolbar button remains an explicit open action.
 - Playlist Options exposes Column Auto-size, enabled by default, with the description “Automatically resize columns for content width on selection.”
 - Interface Style combines font size, font color, and monospace controls for the database sidebar and playlist; the single setting is applied to both surfaces.
 - Windows has independent Always on Top switches for Main Window and Options Window; both default off. Main keeps the main window on top of other apps; Options keeps the options window on top of the main window.

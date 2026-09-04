@@ -1,6 +1,11 @@
 import Foundation
+import CatalogPlaylistCore
 
 enum PlaylistPresentation {
+    static func isMeaningfulColumnText(_ text: String) -> Bool {
+        CatalogPlaylistPresentation.isMeaningful(text)
+    }
+
     static func titleText(for track: TrackItem, metadata: TrackMetadata?) -> String {
         metadata?.song.nonEmpty ?? track.displayName
     }
@@ -23,9 +28,7 @@ enum PlaylistPresentation {
 
     static func lengthText(for metadata: TrackMetadata?) -> String {
         guard let metadata else { return "—" }
-        let seconds = max(0, metadata.playLengthMs > 0 ? metadata.playLengthMs / 1000 : 0)
-        guard seconds > 0 else { return "—" }
-        return formatTime(seconds)
+        return CatalogPlaylistPresentation.lengthLabel(milliseconds: metadata.playLengthMs)
     }
 
     static func filterTracks(

@@ -274,6 +274,18 @@ public enum FormatRegistry {
         return nil
     }
 
+    /// Resolve a decoder family from a filename extension supplied by a
+    /// frontend. Frontends commonly have the extension without a filename
+    /// (for example, `spc`); routing it through `family(for:)` directly would
+    /// ask NSString for the extension of a bare word and return no family.
+    public static func familyForExtension(_ extensionName: String) -> DecoderFamily? {
+        let normalized = extensionName
+            .trimmingCharacters(in: CharacterSet(charactersIn: ". "))
+            .lowercased()
+        guard !normalized.isEmpty else { return nil }
+        return family(for: "source.\(normalized)")
+    }
+
     /// Returns the format-owned archive preparation requirement for a set of
     /// catalog-selected members. The returned requirement describes only the
     /// clean filesystem input VGMBoyKit needs; archive extraction, caching,

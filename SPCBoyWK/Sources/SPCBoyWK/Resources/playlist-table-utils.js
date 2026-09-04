@@ -32,5 +32,14 @@
     return String(valueForColumn(track, column, null, rootPath)).toLocaleLowerCase();
   }
 
-  window.SPCBoyPlaylistTable = Object.freeze({ displayPath, valueForColumn, sortValue });
+  const naturalCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+  function compareSortValues(left, right) {
+    if (typeof left === "number" && typeof right === "number") {
+      return left - right;
+    }
+    return naturalCollator.compare(String(left), String(right));
+  }
+
+  window.SPCBoyPlaylistTable = Object.freeze({ displayPath, valueForColumn, sortValue, compareSortValues });
 })();

@@ -61,6 +61,7 @@ extension LibraryDatabase {
         var widestLengthText = "—"
         for catalogTrack in catalogTracks {
             let track = track(from: catalogTrack)
+            let display = CatalogPlaylistPresentation.display(for: catalogTrack)
             let title = catalogTrack.title
             let game = catalogTrack.game
             let author = catalogTrack.author
@@ -85,14 +86,13 @@ extension LibraryDatabase {
                 dumper: dumper
             )
 
-            widestFileText = widerText(widestFileText, track.filename)
-            widestTitleText = widerText(widestTitleText, title.isEmpty ? track.displayName : title)
+            widestFileText = widerText(widestFileText, display.filename)
+            widestTitleText = widerText(widestTitleText, display.title)
             widestGameText = widerText(widestGameText, game.isEmpty ? track.url.deletingLastPathComponent().lastPathComponent : game)
             widestAuthorText = widerText(widestAuthorText, author.isEmpty ? "—" : author)
             widestDumperText = widerText(widestDumperText, dumper.isEmpty ? "—" : dumper)
             widestSystemText = widerText(widestSystemText, system.isEmpty ? "SNES" : system)
-            let lengthText = formatLengthText(playLengthMs: playLengthMs)
-            widestLengthText = widerText(widestLengthText, lengthText)
+            widestLengthText = widerText(widestLengthText, display.lengthLabel)
         }
 
         let widthHints = PlaylistColumnWidthHints(
@@ -420,6 +420,7 @@ extension LibraryDatabase {
 
         for catalogTrack in catalogTracks {
             let track = track(from: catalogTrack)
+            let display = CatalogPlaylistPresentation.display(for: catalogTrack)
             tracks.append(track)
             metadata[track.id] = TrackMetadata(
                 game: catalogTrack.game,
@@ -434,13 +435,13 @@ extension LibraryDatabase {
                 dumper: catalogTrack.dumper
             )
 
-            widestFileText = widerText(widestFileText, track.filename)
-            widestTitleText = widerText(widestTitleText, catalogTrack.title.isEmpty ? track.displayName : catalogTrack.title)
+            widestFileText = widerText(widestFileText, display.filename)
+            widestTitleText = widerText(widestTitleText, display.title)
             widestGameText = widerText(widestGameText, catalogTrack.game.isEmpty ? track.url.deletingLastPathComponent().lastPathComponent : catalogTrack.game)
             widestAuthorText = widerText(widestAuthorText, catalogTrack.author.isEmpty ? "—" : catalogTrack.author)
             widestDumperText = widerText(widestDumperText, catalogTrack.dumper.isEmpty ? "—" : catalogTrack.dumper)
             widestSystemText = widerText(widestSystemText, catalogTrack.system.isEmpty ? "SNES" : catalogTrack.system)
-            widestLengthText = widerText(widestLengthText, formatLengthText(playLengthMs: catalogTrack.lengthMilliseconds))
+            widestLengthText = widerText(widestLengthText, display.lengthLabel)
         }
 
         return (
@@ -627,9 +628,5 @@ private func widerText(_ lhs: String, _ rhs: String) -> String {
 }
 
 private func formatLengthText(playLengthMs: Int) -> String {
-    let seconds = max(0, playLengthMs > 0 ? playLengthMs / 1000 : 0)
-    guard seconds > 0 else { return "—" }
-    let minutes = seconds / 60
-    let remainder = seconds % 60
-    return String(format: "%d:%02d", minutes, remainder)
+    CatalogPlaylistPresentation.lengthLabel(milliseconds: playLengthMs)
 }

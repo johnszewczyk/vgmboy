@@ -122,8 +122,12 @@ public struct CatalogBrowserGame: Identifiable, Codable, Equatable, Sendable {
         self.name = cleanName.isEmpty ? "Unknown Game" : cleanName
         self.system = cleanSystem
         self.trackCount = bucket.trackCount
-        self.displayName = (displayName ?? (cleanName.isEmpty ? "Unknown Game" : cleanName))
+        self.displayName = (displayName ?? Self.fallbackDisplayName(cleanName.isEmpty ? "Unknown Game" : cleanName))
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func fallbackDisplayName(_ value: String) -> String {
+        CatalogDisplayName.game(value)
     }
 }
 
@@ -535,7 +539,7 @@ public enum CatalogBrowserProjection {
                 game: game.name,
                 system: game.system,
                 trackCount: game.trackCount
-            ), displayName: "\(game.name) (\(system)\(source))")
+            ), displayName: "\(game.displayName) (\(system)\(source))")
         }.sorted(by: gameComesBefore)
     }
 

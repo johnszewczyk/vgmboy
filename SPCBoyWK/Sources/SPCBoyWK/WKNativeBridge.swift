@@ -29,6 +29,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     private weak var playbackEventWebView: WKWebView?
 
     var onOpenOptionsWindow: (() -> Void)?
+    var onToggleOptionsWindow: (() -> Void)?
     var onCloseOptionsWindow: (() -> Void)?
     var onChooseRootFolder: (() -> String?)?
     var onChoosePath: (() -> String?)?
@@ -105,8 +106,13 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
     func userScript() -> WKUserScript {
         let optionsWindowFlag = isOptionsWindow ? "true" : "false"
+        let animationContract = Self.json([
+            "frameRate": FrontendAnimationContract.frameRate,
+            "easing": FrontendAnimationContract.easingName
+        ])
         return WKUserScript(source: """
         (() => {
+          window.SPCBoyFrontendAnimationContract = \(animationContract);
           const pending = new Map();
           const listeners = new Map();
           let nextRequestID = 1;
@@ -178,6 +184,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             chooseAACExportDirectory: () => request("chooseAACExportDirectory"),
             defaultAACExportDirectory: () => request("defaultAACExportDirectory"),
             openOptionsWindow: () => request("openOptionsWindow"),
+            toggleOptionsWindow: () => request("toggleOptionsWindow"),
             closeOptionsWindow: () => request("closeOptionsWindow"),
             openPath: (...args) => request("openPath", args),
             chooseRootFolder: (...args) => request("chooseRootFolder", args),
@@ -229,8 +236,12 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
         print("[SPCBoy WK] request \(method)")
 
-        if method == "openOptionsWindow" || method == "closeOptionsWindow" {
-            let handler = method == "openOptionsWindow" ? onOpenOptionsWindow : onCloseOptionsWindow
+        if method == "openOptionsWindow" || method == "toggleOptionsWindow" || method == "closeOptionsWindow" {
+            let handler: (() -> Void)? = switch method {
+            case "openOptionsWindow": onOpenOptionsWindow
+            case "toggleOptionsWindow": onToggleOptionsWindow
+            default: onCloseOptionsWindow
+            }
             Task { @MainActor in handler?() }
             Task {
                 await Self.reply(to: message.webView, id: id, success: true, valueJSON: "null")
@@ -860,7 +871,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
     nonisolated private static func trackResponse(_ track: CatalogTrack, rootPath: String) -> [String: Any] {
         let path = track.sourcePath
-        let fileURL = URL(fileURLWithPath: path)
+        let display = CatalogPlaylistPresentation.display(for: track)
         let favoriteIdentity = FavoriteTrackIdentity(
             sourcePath: track.archivePath ?? path,
             archiveEntry: track.archiveEntry,
@@ -878,7 +889,10 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "metadataLoaded": true,
             "rootPath": rootPath,
             "path": path,
-            "filename": fileURL.lastPathComponent,
+            "sourceFilename": display.sourceFilename,
+            "filename": display.sourceFilename,
+            "displayFilename": display.filename,
+            "displayName": display.displayName,
             "archivePath": track.archivePath ?? NSNull(),
             "archiveEntry": track.archiveEntry ?? NSNull(),
             "trackIndex": track.trackIndex,
@@ -890,18 +904,20 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "modifiedAt": 0,
             "sourceSignature": NSNull(),
             "scanVersion": 0,
-            "title": track.title,
+            "title": display.title,
             "game": track.game,
             "artist": track.author,
             "dumper": track.dumper,
             "system": track.system,
-            "playLengthMs": track.lengthMilliseconds
+            "playLengthMs": display.lengthMilliseconds,
+            "lengthLabel": display.lengthLabel,
+            "basePlaybackSeconds": Double(display.lengthMilliseconds) / 1_000
         ]
     }
 
     nonisolated private static func playlistTrackResponse(_ track: CatalogPlaylistTrack, rootPath: String) -> [String: Any] {
         let path = track.sourcePath
-        let fileURL = URL(fileURLWithPath: path)
+        let display = CatalogPlaylistPresentation.display(for: track)
         let archivePath = track.archivePath?.isEmpty == false ? track.archivePath : nil
         let archiveEntry = track.archiveEntry?.isEmpty == false ? track.archiveEntry : nil
         let favoriteIdentity = FavoriteTrackIdentity(
@@ -921,7 +937,10 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "metadataLoaded": true,
             "rootPath": rootPath,
             "path": path,
-            "filename": fileURL.lastPathComponent,
+            "sourceFilename": display.sourceFilename,
+            "filename": display.sourceFilename,
+            "displayFilename": display.filename,
+            "displayName": display.displayName,
             "archivePath": archivePath ?? NSNull(),
             "archiveEntry": archiveEntry ?? NSNull(),
             "trackIndex": track.trackIndex,
@@ -930,12 +949,14 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "modifiedAt": 0,
             "sourceSignature": NSNull(),
             "scanVersion": 0,
-            "title": track.title,
+            "title": display.title,
             "game": track.game,
             "artist": track.author,
             "dumper": track.dumper,
             "system": track.system,
-            "playLengthMs": track.lengthMilliseconds
+            "playLengthMs": display.lengthMilliseconds,
+            "lengthLabel": display.lengthLabel,
+            "basePlaybackSeconds": Double(display.lengthMilliseconds) / 1_000
         ]
     }
 

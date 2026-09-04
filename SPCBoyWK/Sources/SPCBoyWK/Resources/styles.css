@@ -242,14 +242,19 @@ body.is-file-drag-over::after {
 .sidebar-context-menu button:hover,
 .sidebar-context-menu button:focus-visible { background: var(--accent); color: rgb(20 20 20); outline: 0; }
 
-.database-game-row { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%; padding: var(--list-item-padding-y) 0.5rem; border: 0; border-radius: 999px; background: transparent; color: var(--text); text-align: left; cursor: pointer; transition: color var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1); }
-.database-game-row:hover { background: var(--bg-hover); }
+.database-game-row { position: relative; z-index: 1; isolation: isolate; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%; padding: var(--list-item-padding-y) 0.5rem; border: 0; border-radius: 999px; background: transparent; color: var(--text); text-align: left; cursor: pointer; user-select: none; -webkit-user-select: none; transition: color var(--selection-animation-duration) ease; }
+.database-game-row::before,
+.database-console-row::before,
+.tree-node::before { position: absolute; inset: 0 4px; z-index: -1; border-radius: 999px; background: transparent; content: ""; pointer-events: none; }
+.database-game-row:hover::before { background: var(--bg-hover); }
+.database-game-row.is-selected:hover::before { background: transparent; }
 .database-game-row.is-selected { box-shadow: none; }
 .database-game-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .database-game-meta { flex: 0 0 auto; color: var(--muted); font-variant-numeric: tabular-nums; }
 .database-console-group { position: relative; z-index: 1; }
-.database-console-row { display: flex; align-items: center; gap: 0; width: 100%; padding: var(--list-item-padding-y) 0.5rem; border: 0; border-radius: 999px; background: transparent; color: var(--text); font: inherit; font-weight: 400; text-align: left; cursor: pointer; transition: color var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1); }
-.database-console-row:hover { background: var(--bg-hover); }
+.database-console-row { position: relative; z-index: 1; isolation: isolate; display: flex; align-items: center; gap: 0; width: 100%; padding: var(--list-item-padding-y) 0.5rem; border: 0; border-radius: 999px; background: transparent; color: var(--text); font: inherit; font-weight: 400; text-align: left; cursor: pointer; user-select: none; -webkit-user-select: none; transition: color var(--selection-animation-duration) ease; }
+.database-console-row:hover::before { background: var(--bg-hover); }
+.database-console-row.is-selected:hover::before { background: transparent; }
 .database-console-row.is-selected { box-shadow: none; }
 .database-console-games { display: flex; flex-direction: column; min-width: 0; overflow: hidden; padding-left: 1rem; }
 .database-disclosure { flex: 0 0 1rem; width: 1rem; color: var(--muted); text-align: center; }
@@ -299,6 +304,9 @@ body.is-file-drag-over::after {
 }
 
 .tree-node {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
   display: flex;
   align-items: center;
   width: 100%;
@@ -314,7 +322,8 @@ body.is-file-drag-over::after {
   min-width: 0;
   justify-content: flex-start;
   user-select: none;
-  transition: color var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1);
+  -webkit-user-select: none;
+  transition: color var(--selection-animation-duration) ease;
 }
 
 .tree-node.is-selected {
@@ -324,8 +333,10 @@ body.is-file-drag-over::after {
 }
 
 .tree-node:hover {
-  background: var(--bg-hover);
+  background: transparent;
 }
+.tree-node:hover::before { background: var(--bg-hover); }
+.tree-node.is-selected:hover::before { background: transparent; }
 
 .tree-node.tree-file { color: var(--sidebar-text-color); }
 .tree-node.tree-file.is-selected { color: var(--accent-ink); }
@@ -586,13 +597,23 @@ body.is-file-drag-over::after {
 .playlist-table th,
 .playlist-table td {
   padding: var(--list-item-padding-y) 0.5rem;
-  transition: width var(--column-resize-duration) var(--column-resize-easing), color var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1);
+  transition:
+    width var(--column-resize-duration) var(--column-resize-easing),
+    padding var(--column-resize-duration) var(--column-resize-easing),
+    opacity var(--column-resize-duration) var(--column-resize-easing),
+    color var(--selection-animation-duration) ease;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: left;
   font-weight: 400;
   vertical-align: middle;
+}
+
+.playlist-scroll-wrap.is-column-resizing .playlist-table,
+.playlist-scroll-wrap.is-column-resizing .playlist-table th,
+.playlist-scroll-wrap.is-column-resizing .playlist-table td {
+  transition: color var(--selection-animation-duration) ease;
 }
 
 .playlist-table th {
@@ -611,6 +632,22 @@ body.is-file-drag-over::after {
 
 .playlist-table th + th {
   padding-left: var(--toolbar-gap);
+}
+
+.playlist-table th.is-column-hidden,
+.playlist-table td.is-column-hidden {
+  min-width: 0;
+  max-width: 0;
+  padding-left: 0;
+  padding-right: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.playlist-table th.is-column-hidden > *,
+.playlist-table td.is-column-hidden > * {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .playlist-table th { font-weight: var(--playlist-header-font-weight); }
@@ -717,6 +754,15 @@ body.is-file-drag-over::after {
   color: var(--accent-ink);
 }
 
+/* The selected row is intentionally kept in the DOM while a playlist is
+   being replaced, but its capsule is hidden until the new row geometry is
+   known. Keep that interim row readable instead of painting dark ink on the
+   dark table background. */
+.playlist-body-wrap:not([data-selection-indicator-visible="true"]) .playlist-row.is-selected > td,
+.playlist-body-wrap:not([data-selection-indicator-visible="true"]) .playlist-row.is-selected > td * {
+  color: var(--text);
+}
+
 .playlist-virtual-spacer,
 .playlist-virtual-spacer td {
   padding: 0 !important;
@@ -755,7 +801,12 @@ body.is-file-drag-over::after {
   pointer-events: none;
   opacity: 0;
   transform: translate3d(0, 0, 0);
-  transition: transform var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1), width var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1), height var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1), opacity var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1);
+  will-change: transform, width, height, opacity;
+  transition:
+    transform var(--selection-animation-duration) ease,
+    width var(--selection-animation-duration) ease,
+    height var(--selection-animation-duration) ease,
+    opacity var(--selection-animation-duration) ease;
 }
 
 .col-index {

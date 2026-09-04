@@ -15,7 +15,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "CatalogReader", linkerSettings: [.linkedLibrary("sqlite3")]),
-        .target(name: "CatalogPlaylistCore", linkerSettings: [.linkedLibrary("sqlite3")]),
+        .target(name: "CatalogPlaylistCore", dependencies: ["CatalogReader"], linkerSettings: [.linkedLibrary("sqlite3")]),
         .target(name: "CatalogBrowserCore", dependencies: ["CatalogReader"]),
         .target(name: "CatalogSessionCore", dependencies: ["CatalogReader"]),
         .target(name: "FrontendCommandCore"),

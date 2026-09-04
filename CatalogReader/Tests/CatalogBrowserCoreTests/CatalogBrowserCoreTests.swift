@@ -36,6 +36,17 @@ import Testing
     #expect(games[0].id != games[1].id)
 }
 
+@Test func gameProjectionHidesKnownFormatSuffixesFromFallbackDisplayNames() {
+    let games = CatalogBrowserProjection.games(from: [
+        CatalogGameBucket(rootID: 1, rootPath: "/music", game: "song.sndh", system: "", trackCount: 1),
+        CatalogGameBucket(rootID: 1, rootPath: "/music", game: "track.MDX", system: "", trackCount: 1),
+        CatalogGameBucket(rootID: 1, rootPath: "/music", game: "Game.tar.zst", system: "", trackCount: 1)
+    ])
+
+    #expect(games.map(\.displayName) == ["Game", "song", "track"])
+    #expect(games.map(\.name) == ["Game.tar.zst", "song.sndh", "track.MDX"])
+}
+
 @Test func searchIndexReusesOnlyExtendingQueriesAndRestartsAfterBackspace() {
     var index = CatalogSearchIndex(searchValues: [
         "Actraiser SNES JoshW",

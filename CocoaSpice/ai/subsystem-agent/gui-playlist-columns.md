@@ -11,12 +11,15 @@
 - Current columns are favorite, index, file, title, game, author, dumper, system, path, and length. Favorite is fixed immediately before index, uses a star header, and is user-hideable but not reorderable. The obsolete Play/Stop transport column is not part of the table.
 - Dumper is catalog metadata, primarily populated by ScanSong's SPC ID666/xID6 reader; rows without that metadata display an em dash.
 - Metadata-backed columns fall back to filename or parent-folder text when metadata is absent.
+- Catalog-backed filename, title fallback, and duration-label text comes from
+  `CatalogPlaylistCore.CatalogPlaylistPresentation`; direct/imported playlist
+  rows continue to use the local `PlaylistPresentation` fallback path.
 - The Path column uses `TrackItem.fullPathText`: a full filesystem path for ordinary files and `archive-path#member-path` for archive members.
 - Column visibility, order, and width are persisted in `UserDefaults`.
-- Playlist font size, text color, and monospaced styling are persisted with playback preferences. The native table reloads cells, adjusts row height, and remeasures columns when its font size or family changes.
+- Playlist font size, text color, monospaced styling, and Row Gap are persisted with playback preferences. The native table uses one shared compact row-height calculation for its table property and delegate callback, while Row Gap is applied separately as AppKit inter-cell spacing; font changes still reload cells and remeasure columns.
 - Sort column and sort direction are persisted separately from column layout state.
 - User-reorderable columns exclude the fixed-position favorite column; every column, including favorite, can be hidden, and at least one column remains visible.
-- Visible columns automatically size after queue population and again when final metadata width hints change. The resize is coalesced, defaults to ten ease-in-out updates over 200 ms, follows the Interface animation preference, and does not reload rows or change selection.
+- Visible columns automatically size after queue population and again when final metadata width hints change. The resize is coalesced, follows the Interface animation preference with elapsed-time interpolation at the shared 60 Hz cadence and ease-in-out timing, and does not reload rows or change selection.
 - Double-clicking a header divider autosizes that column to current content.
 - The header context menu exposes both per-column and all-visible-column autosizing.
 

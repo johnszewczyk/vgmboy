@@ -448,6 +448,26 @@ struct OptionsView: View {
                     }
                 }
                 .toggleStyle(.checkbox)
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Row Gap")
+                        Text("Vertical space between playlist rows, measured in points.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 16)
+                    TextField(
+                        "0",
+                        value: Binding(
+                            get: { Double(model.playlistRowGapPoints) },
+                            set: { model.setPlaylistRowGapPoints(CGFloat($0)) }
+                        ),
+                        format: .number.precision(.fractionLength(0))
+                    )
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 56)
+                }
             }
 
             sectionCard(title: "Sidebar Options") {

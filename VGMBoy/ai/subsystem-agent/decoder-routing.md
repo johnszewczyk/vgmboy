@@ -50,9 +50,9 @@ deliberately exclusive to one family.
   leading backslash in a PDX basename is normalized narrowly; absolute and
   traversal paths remain invalid.
 - `hasNaturalEnding == false` (lazyusf/USF and sidplayfp/SID) forces a capped decode window so a looping core can
-  never run indefinitely. `TimingPolicy.plan` carries this through `usesNativeEnding`. SID
-  metadata currently reports no natural duration, so its normal non-Long-Play window is the
-  shared unknown-duration setting rather than a file-derived length.
+  never run indefinitely. `PlaybackTimingPolicy.plan` carries this through the bounded plan. SID metadata
+  currently reports no natural duration, so its normal non-Long-Play window is the shared unknown-duration
+  setting rather than a file-derived length.
 - `appliesFadeInternally` distinguishes cores with native fade (libgme, libvgm) from PCM
   streamers (Highly Complete, vgmstream, lazyusf, playpsf, OpenMPT) that delegate the fade to
   `PlaybackSession`.

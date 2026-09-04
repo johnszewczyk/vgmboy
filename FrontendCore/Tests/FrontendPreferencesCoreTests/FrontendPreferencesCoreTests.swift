@@ -50,11 +50,20 @@ import Testing
 
 @Test func optionsManifestKeepsTheSharedAppOrganization() {
     #expect(FrontendOptionsManifest.v1.appSections == [.database, .interface, .windows])
-    #expect(FrontendOptionsManifest.v1.animationRange == 0...1_000)
+    #expect(FrontendOptionsManifest.v1.animationRange == 0...Int.max)
 }
 
-@Test func animationTimingsClampUnsafeValues() {
+@Test func animationTimingsKeepAnyNonnegativeUserDuration() {
     let timings = FrontendAnimationTimings(autoResizeMilliseconds: -1, selectionMilliseconds: 2_000)
     #expect(timings.autoResizeMilliseconds == 0)
-    #expect(timings.selectionMilliseconds == 1_000)
+    #expect(timings.selectionMilliseconds == 2_000)
+}
+
+@Test func animationContractUsesElapsedTimeAndKeepsZeroImmediate() {
+    #expect(FrontendAnimationContract.frameRate == 60)
+    #expect(FrontendAnimationContract.frameNanoseconds == 16_666_666)
+    #expect(FrontendAnimationContract.easedProgress(elapsedMilliseconds: 0, durationMilliseconds: 1_000) == 0)
+    #expect(FrontendAnimationContract.easedProgress(elapsedMilliseconds: 500, durationMilliseconds: 1_000) == 0.5)
+    #expect(FrontendAnimationContract.easedProgress(elapsedMilliseconds: 1_000, durationMilliseconds: 1_000) == 1)
+    #expect(FrontendAnimationContract.easedProgress(elapsedMilliseconds: 1_000, durationMilliseconds: 0) == 1)
 }

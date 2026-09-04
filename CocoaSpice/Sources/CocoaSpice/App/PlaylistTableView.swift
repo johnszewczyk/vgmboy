@@ -3,6 +3,15 @@ import FrontendPreferencesCore
 import OSLog
 import SwiftUI
 
+enum PlaylistTableMetrics {
+    /// Keep row text geometry separate from inter-row spacing. The table's
+    /// rowHeight and delegate callback must use the same value or AppKit can
+    /// lay out adjacent recycled rows against different metrics.
+    static func rowHeight(for fontSize: CGFloat) -> CGFloat {
+        max(18, fontSize + 6)
+    }
+}
+
 struct PlaylistTableView: NSViewRepresentable {
     @Bindable var model: PlayerViewModel
 
@@ -19,11 +28,15 @@ struct PlaylistTableView: NSViewRepresentable {
         tableView.allowsColumnResizing = true
         tableView.allowsMultipleSelection = true
         tableView.allowsEmptySelection = true
-        tableView.rowHeight = 17
-        tableView.intercellSpacing = NSSize(width: 0, height: 0)
+        tableView.rowHeight = PlaylistTableMetrics.rowHeight(for: model.playlistFontSize)
+        tableView.intercellSpacing = NSSize(width: 0, height: model.playlistRowGapPoints)
         tableView.focusRingType = .none
         tableView.style = .fullWidth
         tableView.selectionHighlightStyle = .none
+        // The custom capsule lives below the table's row views. Keep the
+        // native table background transparent so it is visible in the
+        // playlist just as it is in the sidebar tables.
+        tableView.backgroundColor = .clear
         tableView.usesAutomaticRowHeights = false
         tableView.delegate = context.coordinator
         tableView.dataSource = context.coordinator
@@ -75,7 +88,7 @@ struct PlaylistTableView: NSViewRepresentable {
             subsystem: "com.local.cocoaspice",
             category: "playlist-load"
         )
-        private let columnResizeAnimationSteps = 10
+        private let columnResizeFrameNanoseconds = FrontendAnimationContract.frameNanoseconds
         private let autoSizeSampleLimit = 200
         private let autoSizeDebounceNanoseconds: UInt64 = 120_000_000
 
@@ -85,9 +98,10 @@ struct PlaylistTableView: NSViewRepresentable {
             let widthHints: PlaylistColumnWidthHints?
             let fontSize: CGFloat
             let monospace: Bool
+            let metadataLoadToken: Int
         }
 
-        private enum Column: String, CaseIterable {
+        private enum Column: String, CaseIterable, Hashable {
             case favorite
             case index
             case file
@@ -215,6 +229,10 @@ struct PlaylistTableView: NSViewRepresentable {
         private var autoSizeTask: Task<Void, Never>?
         private var suppressWidthPersistence = false
         private var columnResizeTask: Task<Void, Never>?
+        private var automaticallyHiddenColumns: Set<Column> = []
+        private var visibilityAnimationTarget: [String: Bool]?
+        private var pendingVisibilityAnimation: [(NSTableColumn, Bool, CGFloat, CGFloat)] = []
+        private var pendingAutoSizeAfterVisibility = false
 
         init(model: PlayerViewModel) {
             self._model = Bindable(model)
@@ -268,12 +286,16 @@ struct PlaylistTableView: NSViewRepresentable {
             let fontChanged = model.playlistFontSize != lastFontSize
                 || model.playlistTextColor != lastTextColor
                 || model.playlistMonospaceFont != lastMonospaceFont
-            let rowHeight = max(18, model.playlistFontSize + 6)
+            let gapChanged = tableView.intercellSpacing.height != model.playlistRowGapPoints
+            let rowHeight = PlaylistTableMetrics.rowHeight(for: model.playlistFontSize)
             if tableView.rowHeight != rowHeight {
                 tableView.rowHeight = rowHeight
             }
+            if gapChanged {
+                tableView.intercellSpacing = NSSize(width: 0, height: model.playlistRowGapPoints)
+            }
 
-            if rowsChanged || favoritesChanged || sortChanged || fontChanged {
+            if rowsChanged || favoritesChanged || sortChanged || fontChanged || gapChanged {
                 let reloadStartedAt = ContinuousClock.now
                 tableView.reloadData()
                 let reloadElapsed = reloadStartedAt.duration(to: .now)
@@ -309,7 +331,8 @@ struct PlaylistTableView: NSViewRepresentable {
                     trackCount: model.visiblePlaylist.count,
                     widthHints: model.playlistColumnWidthHints,
                     fontSize: model.playlistFontSize,
-                    monospace: model.playlistMonospaceFont
+                    monospace: model.playlistMonospaceFont,
+                    metadataLoadToken: model.playlistMetadataLoadToken
                 )
             )
 
@@ -334,7 +357,7 @@ struct PlaylistTableView: NSViewRepresentable {
 
         nonisolated func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
             MainActor.assumeIsolated {
-                max(18, model.playlistFontSize + 6)
+                PlaylistTableMetrics.rowHeight(for: model.playlistFontSize)
             }
         }
 
@@ -494,6 +517,11 @@ struct PlaylistTableView: NSViewRepresentable {
 
         nonisolated func tableView(_ tableView: NSTableView, userDidChangeVisibilityOf tableColumns: [NSTableColumn]) {
             MainActor.assumeIsolated {
+                for tableColumn in tableColumns {
+                    if let column = Column(rawValue: tableColumn.identifier.rawValue) {
+                        automaticallyHiddenColumns.remove(column)
+                    }
+                }
                 persistVisibility()
             }
         }
@@ -584,6 +612,8 @@ struct PlaylistTableView: NSViewRepresentable {
                 NSLayoutConstraint.activate([
                     textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
                     textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
+                    textField.topAnchor.constraint(greaterThanOrEqualTo: cell.topAnchor),
+                    textField.bottomAnchor.constraint(lessThanOrEqualTo: cell.bottomAnchor),
                     textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
                 ])
 
@@ -645,17 +675,90 @@ struct PlaylistTableView: NSViewRepresentable {
 
         private func applyVisibility(to tableView: NSTableView) {
             let visibility = storedVisibility()
-            for column in tableView.tableColumns {
-                guard let playlistColumn = Column(rawValue: column.identifier.rawValue) else { continue }
-                let isHidden = playlistColumn.visibilityConfigurable && visibility[playlistColumn.rawValue] == false
-                if column.isHidden != isHidden {
-                    column.isHidden = isHidden
+            var desired = tableView.tableColumns.compactMap { tableColumn -> (NSTableColumn, Bool)? in
+                guard let playlistColumn = Column(rawValue: tableColumn.identifier.rawValue) else { return nil }
+                let isHidden = playlistColumn.visibilityConfigurable
+                    && (visibility[playlistColumn.rawValue] == false || automaticallyHiddenColumns.contains(playlistColumn))
+                return (tableColumn, isHidden)
+            }
+
+            if desired.allSatisfy({ $0.1 }), let firstColumn = tableView.tableColumns.first {
+                desired = desired.map { ($0.0, $0.0 === firstColumn ? false : true) }
+            }
+
+            let target = Dictionary(uniqueKeysWithValues: desired.map {
+                ($0.0.identifier.rawValue, $0.1)
+            })
+            let changed = desired.contains { tableColumn, isHidden in
+                (visibilityAnimationTarget?[tableColumn.identifier.rawValue] ?? tableColumn.isHidden) != isHidden
+            }
+            if changed {
+                animateVisibility(to: desired, target: target, in: tableView)
+            }
+        }
+
+        private func animateVisibility(
+            to desired: [(NSTableColumn, Bool)],
+            target: [String: Bool],
+            in tableView: NSTableView
+        ) {
+            pendingAutoSizeAfterVisibility = false
+            columnResizeTask?.cancel()
+            finishVisibilityAnimation()
+            visibilityAnimationTarget = target
+
+            let original = desired.map { tableColumn, isHidden in
+                (tableColumn, isHidden, tableColumn.width, tableColumn.minWidth)
+            }
+            pendingVisibilityAnimation = original
+
+            let currentTotal = tableView.tableColumns
+                .filter { !$0.isHidden }
+                .reduce(CGFloat.zero) { $0 + max(0, $1.width) }
+            let animationTotal = max(currentTotal, tableView.bounds.width, 1)
+            // Fixed affordances (currently the favorite star) must retain
+            // their compact width while flexible metadata columns absorb the
+            // available table width. Treating every visible column as a
+            // proportional content column lets the star consume the whole
+            // table after an animated visibility change.
+            let fixedWidths = desired.map { tableColumn, isHidden -> CGFloat in
+                guard !isHidden,
+                      let column = Column(rawValue: tableColumn.identifier.rawValue),
+                      !column.canAutoSize else { return 0 }
+                return max(tableColumn.minWidth, storedWidth(for: column) ?? column.defaultWidth)
+            }
+            let fixedTotal = fixedWidths.reduce(0, +)
+            let flexibleWeights = desired.map { tableColumn, isHidden -> CGFloat in
+                guard !isHidden,
+                      let column = Column(rawValue: tableColumn.identifier.rawValue),
+                      column.canAutoSize else { return 0 }
+                guard !tableColumn.isHidden else {
+                    return storedWidth(for: column) ?? column.defaultWidth
+                }
+                return max(1, tableColumn.width)
+            }
+            let flexibleTotal = max(flexibleWeights.reduce(0, +), 1)
+            let flexibleAvailable = max(0, animationTotal - fixedTotal)
+
+            for (tableColumn, isHidden) in desired {
+                tableColumn.minWidth = 0
+                if !isHidden {
+                    if tableColumn.isHidden { tableColumn.width = 0 }
+                    tableColumn.isHidden = false
                 }
             }
-            if tableView.tableColumns.allSatisfy(\.isHidden),
-               let firstColumn = tableView.tableColumns.first {
-                firstColumn.isHidden = false
+
+            let targets = desired.enumerated().map { index, item in
+                guard !item.1,
+                      let column = Column(rawValue: item.0.identifier.rawValue) else {
+                    return (item.0, CGFloat.zero)
+                }
+                if !column.canAutoSize {
+                    return (item.0, fixedWidths[index])
+                }
+                return (item.0, flexibleAvailable * flexibleWeights[index] / flexibleTotal)
             }
+            applyColumnWidths(targets, preservingVisibilityAnimation: true)
         }
 
         private func reloadVisibleRows(in tableView: NSTableView) {
@@ -727,6 +830,10 @@ struct PlaylistTableView: NSViewRepresentable {
         }
 
         private func storedWidth(for column: Column) -> CGFloat? {
+            // Non-configurable affordances (currently the favorite star) do
+            // not have a user-owned width. Ignore stale persisted values so a
+            // previous layout bug cannot make them absorb the table again.
+            guard column.userConfigurable else { return nil }
             let widths = model.pendingPlaylistColumnWidths ?? [:]
             guard let width = widths[column.rawValue] else {
                 return nil
@@ -747,8 +854,12 @@ struct PlaylistTableView: NSViewRepresentable {
 
         private func persistVisibility() {
             guard let tableView else { return }
+            let stored = storedVisibility()
             let visibility: [String: Bool] = Dictionary(uniqueKeysWithValues: tableView.tableColumns.compactMap { column in
                 guard let playlistColumn = Column(rawValue: column.identifier.rawValue), playlistColumn.visibilityConfigurable else { return nil }
+                if automaticallyHiddenColumns.contains(playlistColumn) {
+                    return (playlistColumn.rawValue, stored[playlistColumn.rawValue] ?? true)
+                }
                 return (playlistColumn.rawValue, !column.isHidden)
             })
             model.rememberPlaylistColumnVisibility(visibility)
@@ -801,6 +912,8 @@ struct PlaylistTableView: NSViewRepresentable {
                 autoSizeTask?.cancel()
                 autoSizeTask = nil
                 pendingAutoSizeSignature = nil
+                lastAutoSizeSignature = nil
+                restoreAutomaticallyHiddenColumns()
                 return
             }
             guard signature.trackCount > 0 else {
@@ -808,6 +921,7 @@ struct PlaylistTableView: NSViewRepresentable {
                 autoSizeTask = nil
                 pendingAutoSizeSignature = nil
                 lastAutoSizeSignature = nil
+                restoreAutomaticallyHiddenColumns()
                 return
             }
             guard signature != lastAutoSizeSignature,
@@ -830,6 +944,16 @@ struct PlaylistTableView: NSViewRepresentable {
 
         private func autoSizeVisibleColumns() {
             guard let tableView else { return }
+            if automaticallyHideEmptyColumns(in: tableView) {
+                pendingAutoSizeAfterVisibility = true
+                // A disabled animation has already finalized the visibility
+                // change synchronously, so continue directly into measurement.
+                if model.effectiveAutoResizeAnimationMilliseconds == 0 {
+                    pendingAutoSizeAfterVisibility = false
+                    autoSizeVisibleColumns()
+                }
+                return
+            }
             let targets = tableView.tableColumns.enumerated().compactMap { columnIndex, tableColumn -> (NSTableColumn, CGFloat)? in
                 guard !tableColumn.isHidden,
                       Column(rawValue: tableColumn.identifier.rawValue)?.canAutoSize == true else {
@@ -840,6 +964,58 @@ struct PlaylistTableView: NSViewRepresentable {
             applyColumnWidths(targets)
         }
 
+        private func restoreAutomaticallyHiddenColumns() {
+            guard let tableView else {
+                automaticallyHiddenColumns.removeAll()
+                return
+            }
+
+            pendingAutoSizeAfterVisibility = false
+            columnResizeTask?.cancel()
+            finishVisibilityAnimation()
+            let visibility = storedVisibility()
+            for tableColumn in tableView.tableColumns {
+                guard let column = Column(rawValue: tableColumn.identifier.rawValue),
+                      automaticallyHiddenColumns.contains(column) else {
+                    continue
+                }
+                tableColumn.isHidden = visibility[column.rawValue] == false
+            }
+            automaticallyHiddenColumns.removeAll()
+        }
+
+        @discardableResult
+        private func automaticallyHideEmptyColumns(in tableView: NSTableView) -> Bool {
+            guard !model.visiblePlaylist.isEmpty else { return false }
+            let visibility = storedVisibility()
+            var changed = false
+
+            for tableColumn in tableView.tableColumns {
+                guard let column = Column(rawValue: tableColumn.identifier.rawValue), column.canAutoSize else {
+                    continue
+                }
+
+                if visibility[column.rawValue] == false {
+                    changed = automaticallyHiddenColumns.remove(column) != nil || changed
+                    continue
+                }
+
+                if hasMeaningfulValue(for: column) {
+                    changed = automaticallyHiddenColumns.remove(column) != nil || changed
+                } else {
+                    if automaticallyHiddenColumns.insert(column).inserted { changed = true }
+                }
+            }
+            if changed { applyVisibility(to: tableView) }
+            return changed
+        }
+
+        private func hasMeaningfulValue(for column: Column) -> Bool {
+            model.visiblePlaylist.contains { track in
+                PlaylistPresentation.isMeaningfulColumnText(value(for: column, track: track))
+            }
+        }
+
         private func fittedWidth(for columnIndex: Int, in tableView: NSTableView) -> CGFloat {
             let tableColumn = tableView.tableColumns[columnIndex]
             let measuredWidth = self.tableView(tableView, sizeToFitWidthOfColumn: columnIndex)
@@ -848,42 +1024,76 @@ struct PlaylistTableView: NSViewRepresentable {
         }
 
         private func applyColumnWidths(_ targets: [(NSTableColumn, CGFloat)]) {
+            applyColumnWidths(targets, preservingVisibilityAnimation: false)
+        }
+
+        private func applyColumnWidths(
+            _ targets: [(NSTableColumn, CGFloat)],
+            preservingVisibilityAnimation: Bool
+        ) {
             guard !targets.isEmpty else { return }
 
             columnResizeTask?.cancel()
+            if !preservingVisibilityAnimation { finishVisibilityAnimation() }
             let startWidths = targets.map { $0.0.width }
-            let steps = columnResizeAnimationSteps
             let duration = model.effectiveAutoResizeAnimationMilliseconds
             suppressWidthPersistence = true
 
             if duration == 0 {
                 for (tableColumn, finalWidth) in targets { tableColumn.width = finalWidth }
+                if preservingVisibilityAnimation { finishVisibilityAnimation() }
                 suppressWidthPersistence = false
                 persistWidths()
                 return
             }
-            let intervalNanoseconds = UInt64(duration) * 1_000_000 / UInt64(steps)
+            let startedAt = DispatchTime.now().uptimeNanoseconds
+            let durationMilliseconds = Double(duration)
 
             columnResizeTask = Task { @MainActor [weak self] in
                 guard let self else { return }
-                for step in 1...steps {
-                    try? await Task.sleep(nanoseconds: intervalNanoseconds)
+                while true {
+                    try? await Task.sleep(nanoseconds: self.columnResizeFrameNanoseconds)
                     guard !Task.isCancelled else { return }
-                    let linearProgress = CGFloat(step) / CGFloat(steps)
-                    let progress = linearProgress < 0.5
-                        ? 2 * linearProgress * linearProgress
-                        : 1 - (pow(-2 * linearProgress + 2, 2) / 2)
+                    let elapsedMilliseconds = Double(DispatchTime.now().uptimeNanoseconds - startedAt) / 1_000_000
+                    let progress = FrontendAnimationContract.easedProgress(
+                        elapsedMilliseconds: elapsedMilliseconds,
+                        durationMilliseconds: duration
+                    )
                     for (index, target) in targets.enumerated() {
                         let (tableColumn, finalWidth) = target
-                        tableColumn.width = startWidths[index] + ((finalWidth - startWidths[index]) * progress)
+                        tableColumn.width = startWidths[index] + ((finalWidth - startWidths[index]) * CGFloat(progress))
                     }
+                    if elapsedMilliseconds >= durationMilliseconds { break }
                 }
 
                 guard !Task.isCancelled else { return }
+                if preservingVisibilityAnimation { self.finishVisibilityAnimation() }
                 self.suppressWidthPersistence = false
                 self.persistWidths()
                 self.columnResizeTask = nil
             }
+        }
+
+        private func finishVisibilityAnimation() {
+            guard !pendingVisibilityAnimation.isEmpty else {
+                visibilityAnimationTarget = nil
+                return
+            }
+
+            let pending = pendingVisibilityAnimation
+            pendingVisibilityAnimation.removeAll()
+            visibilityAnimationTarget = nil
+            let shouldAutoSize = pendingAutoSizeAfterVisibility
+            pendingAutoSizeAfterVisibility = false
+
+            for (tableColumn, isHidden, originalWidth, originalMinWidth) in pending {
+                tableColumn.minWidth = 0
+                tableColumn.isHidden = isHidden
+                if isHidden { tableColumn.width = originalWidth }
+                tableColumn.minWidth = originalMinWidth
+            }
+
+            if shouldAutoSize { autoSizeVisibleColumns() }
         }
 
         private func droppedFileURLs(from info: NSDraggingInfo) -> [URL] {
@@ -1048,6 +1258,7 @@ struct PlaylistTableView: NSViewRepresentable {
         private func toggleColumnVisibility(_ sender: NSMenuItem) {
             guard let rawValue = sender.representedObject as? String,
                   let tableView,
+                  let column = Column(rawValue: rawValue),
                   let tableColumn = tableView.tableColumns.first(where: { $0.identifier.rawValue == rawValue }) else {
                 return
             }
@@ -1055,6 +1266,7 @@ struct PlaylistTableView: NSViewRepresentable {
             guard tableColumn.isHidden || tableView.tableColumns.contains(where: { !$0.isHidden && $0 !== tableColumn }) else {
                 return
             }
+            automaticallyHiddenColumns.remove(column)
             tableColumn.isHidden.toggle()
             persistVisibility()
         }

@@ -1009,17 +1009,26 @@ public enum CatalogIdentity {
 
     private static func normalizeSystem(_ value: String) -> String? {
         let key = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if let alias = aliases[key] { return alias }
-        let longestMatch = aliases.keys
-            .filter(key.contains)
-            .max { $0.count < $1.count }
-        return longestMatch.flatMap { aliases[$0] }
+        // System names come from directory components, not arbitrary title
+        // text. Substring matching makes short aliases such as `gc` leak out
+        // of game names (for example, `WreckingCrew`) and corrupt the
+        // browser-system projection for unrelated formats.
+        return aliases[key]
     }
 
     private static func stripArchiveExtension(_ name: String) -> String {
         let lower = name.lowercased()
         for suffix in [".tar.zstd", ".tar.zst", ".tzst", ".zip", ".7z", ".rar", ".rsn", ".zstd", ".zst"] where lower.hasSuffix(suffix) {
-            return String(name.dropLast(suffix.count))
+            let stem = String(name.dropLast(suffix.count))
+            // A plain .zst/.zstd source is a compressed single music file,
+            // not a tar container. The first removal leaves (for example)
+            // `track.sndh`; remove that known playable suffix as well so the
+            // browser game is a title rather than a filename.
+            if suffix == ".zst" || suffix == ".zstd",
+               let formatSuffix = [".sndh", ".mdx"].first(where: { stem.lowercased().hasSuffix($0) }) {
+                return String(stem.dropLast(formatSuffix.count))
+            }
+            return stem
         }
         return URL(fileURLWithPath: name).deletingPathExtension().lastPathComponent
     }

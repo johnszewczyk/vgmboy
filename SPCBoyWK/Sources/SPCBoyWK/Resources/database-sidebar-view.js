@@ -120,6 +120,8 @@ function create({
       }).catch((error) => reportDatabaseSidebarError("play the selected game", error));
     });
     button.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       state.selectedDatabaseGameKey = databaseGameKey(game);
       state.selectedDatabaseConsoleName = databaseConsoleName(game);
       persistSettings();
@@ -164,7 +166,7 @@ function create({
       if (offset < pendingRows.length) {
         window.requestAnimationFrame(appendBatch);
       } else {
-        scheduleSelectionIndicators();
+        scheduleSelectionIndicators({ animated: false });
       }
     };
 
@@ -223,6 +225,10 @@ function create({
             await activateDatabaseSelection();
           })().catch((error) => reportDatabaseSidebarError("play the selected console", error));
         });
+        heading.addEventListener("contextmenu", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        });
         group.append(heading, games);
         refs.treeRoot.appendChild(group);
         databaseConsoleGroups.push({ group, games, consoleName });
@@ -256,7 +262,7 @@ function create({
     databaseEmptyState.textContent = state.databaseSidebarError || (state.databaseGames.length
       ? "No database games match this search."
       : "Use ScanSong to populate the selected database.");
-    scheduleSelectionIndicators();
+    scheduleSelectionIndicators({ animated: false });
   }
 
   return Object.freeze({

@@ -219,6 +219,9 @@ final class PlayerViewModel {
         get { interfaceMonospaceFont }
         set { interfaceMonospaceFont = newValue }
     }
+    /// Vertical space between playlist rows, in points. The row itself keeps
+    /// the compact text height; this value is the separate inter-row gap.
+    var playlistRowGapPoints: CGFloat = 0
     var sidebarBrowserMode: SidebarBrowserMode = .games
     var effectiveSidebarBrowserMode: SidebarBrowserMode {
         Self.effectiveSidebarBrowserMode(storedMode: sidebarBrowserMode, searchText: sidebarSearchQuery)
@@ -1553,6 +1556,7 @@ final class PlayerViewModel {
             playlistFontSize: playlistFontSize,
             playlistTextColor: playlistTextColor.rawValue,
             playlistMonospaceFont: playlistMonospaceFont,
+            playlistRowGapPoints: playlistRowGapPoints,
             sidebarSystemMode: sidebarSystemMode,
             preferEmbeddedConsoleTags: preferEmbeddedConsoleTags,
             sidebarBrowserModeRawValue: sidebarBrowserMode.rawValue,
@@ -1685,6 +1689,11 @@ final class PlayerViewModel {
 
     func setPlaylistMonospaceFont(_ enabled: Bool) {
         setDatabaseSidebarMonospaceFont(enabled)
+    }
+
+    func setPlaylistRowGapPoints(_ gap: CGFloat) {
+        playlistRowGapPoints = gap.isFinite ? max(0, gap.rounded()) : 0
+        savePreferencesNow()
     }
 
     func setSidebarSystemMode(_ enabled: Bool) {
@@ -2365,7 +2374,7 @@ final class PlayerViewModel {
 
     private func applyPlaybackTempoIfNeeded(for backendID: String) {
         guard let currentTrack,
-              FormatRegistry.family(for: currentTrack.playablePathExtension)?.id == backendID,
+              FormatRegistry.familyForExtension(currentTrack.playablePathExtension)?.id == backendID,
               !isLoading else { return }
         let tempo = playbackTempo(for: currentTrack)
         isLoading = true
@@ -2573,7 +2582,7 @@ final class PlayerViewModel {
 
     private func playbackTempo(forPathExtension pathExtension: String?) -> PlaybackTempo {
         guard let pathExtension,
-              let family = FormatRegistry.family(for: "source.\(pathExtension)"),
+              let family = FormatRegistry.familyForExtension(pathExtension),
               family.supportsTempo else {
             return .defaultValue
         }
@@ -2716,6 +2725,7 @@ final class PlayerViewModel {
             fadeSeconds: plan.fadeSeconds,
             usesNativeEnding: plan.usesNativeEnding,
             isLongPlay: plan.isLongPlay,
+            usesDecoderNaturalDuration: plan.usesDecoderNaturalDuration,
             unknownDurationSeconds: plan.unknownDurationSeconds
         )
     }
@@ -3134,6 +3144,10 @@ final class PlayerViewModel {
         }
         if let storedSidebarChildIndentPoints = preferences.databaseSidebarChildIndentPoints {
             databaseSidebarChildIndentPoints = min(max(CGFloat(storedSidebarChildIndentPoints).rounded(), 0), 32)
+        }
+        if let storedPlaylistRowGapPoints = preferences.playlistRowGapPoints,
+           storedPlaylistRowGapPoints.isFinite {
+            playlistRowGapPoints = max(0, CGFloat(storedPlaylistRowGapPoints).rounded())
         }
         databaseSidebarHidesFileExtensions = preferences.databaseSidebarHidesFileExtensions
         sidebarSystemMode = preferences.sidebarSystemMode

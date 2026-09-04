@@ -255,6 +255,35 @@ import zlib
     #expect(CatalogIdentity.browserSystem(sourcePath: source, rootPath: "/Audio/JoshW") == "Nintendo DS")
 }
 
+@Test func catalogBrowserSystemStillRecognizesAnExactGameCubeFolder() {
+    let source = "/Audio/JoshW/Nintendo GameCube/Resident Evil/track.h4m"
+    #expect(CatalogIdentity.browserSystem(
+        sourcePath: source,
+        rootPath: "/Audio/JoshW"
+    ) == "Nintendo GameCube")
+}
+
+@Test func catalogBrowserSystemDoesNotMatchAliasesInsideGameFolderNames() {
+    let source = "/Audio/X68000 MDX Master Library/MXDRV/Game/Nintendo/WreckingCrew/CREW01.MDX"
+    #expect(CatalogIdentity.browserSystem(
+        sourcePath: source,
+        rootPath: "/Audio/X68000 MDX Master Library"
+    ) == "")
+}
+
+@Test func catalogBrowserGameStripsTheFormatFromCompressedSingleFileSources() {
+    #expect(CatalogIdentity.browserGame(
+        metadataGame: "",
+        sourcePath: "/Audio/ATARIST/song.sndh.zst",
+        archiveEntry: "song.sndh"
+    ) == "song")
+    #expect(CatalogIdentity.browserGame(
+        metadataGame: "",
+        sourcePath: "/Audio/X68000/song.MDX.zst",
+        archiveEntry: "song.MDX"
+    ) == "song")
+}
+
 @Test func incrementalRescanReusesAnUnchangedCompletedSource() async throws {
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("ScanSong-reuse-\(UUID().uuidString)", isDirectory: true)

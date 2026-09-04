@@ -1,5 +1,6 @@
 import Foundation
 import SQLite3
+import CatalogReader
 
 private let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
@@ -37,6 +38,13 @@ public struct CatalogPlaylistTrack: Equatable, Sendable {
     public let lengthMilliseconds: Int
     public let fadeLengthMilliseconds: Int
 
+    /// The file represented by this row. Archive-backed rows use the member
+    /// leaf; `sourcePath` remains the catalog's physical source/container path.
+    public var leafFilename: String {
+        let path = archiveEntry?.isEmpty == false ? archiveEntry! : sourcePath
+        return URL(fileURLWithPath: path).lastPathComponent
+    }
+
     public init(
         sourcePath: String,
         archivePath: String?,
@@ -69,6 +77,95 @@ public struct CatalogPlaylistTrack: Equatable, Sendable {
         self.loopLengthMilliseconds = loopLengthMilliseconds
         self.lengthMilliseconds = lengthMilliseconds
         self.fadeLengthMilliseconds = fadeLengthMilliseconds
+    }
+}
+
+/// The text projection shared by native catalog consumers. This is deliberately
+/// a value-only catalog result, not a table row or UI model. Frontends may add
+/// their own columns and layout, but the source/member filename, title
+/// fallback, track suffix, and duration label must not drift between them.
+public struct CatalogPlaylistDisplayValues: Equatable, Sendable {
+    public let sourceFilename: String
+    public let filename: String
+    public let displayName: String
+    public let title: String
+    public let lengthMilliseconds: Int
+    public let lengthLabel: String
+
+    public init(
+        sourceFilename: String,
+        filename: String,
+        displayName: String,
+        title: String,
+        lengthMilliseconds: Int,
+        lengthLabel: String
+    ) {
+        self.sourceFilename = sourceFilename
+        self.filename = filename
+        self.displayName = displayName
+        self.title = title
+        self.lengthMilliseconds = lengthMilliseconds
+        self.lengthLabel = lengthLabel
+    }
+}
+
+/// Shared, UI-neutral text rules for catalog-backed playlist rows.
+public enum CatalogPlaylistPresentation {
+    public static func display(for track: CatalogPlaylistTrack) -> CatalogPlaylistDisplayValues {
+        make(
+            sourceFilename: track.leafFilename,
+            trackIndex: track.trackIndex,
+            trackCount: track.trackCount,
+            title: track.title,
+            lengthMilliseconds: track.lengthMilliseconds
+        )
+    }
+
+    public static func display(for track: CatalogTrack) -> CatalogPlaylistDisplayValues {
+        make(
+            sourceFilename: track.leafFilename,
+            trackIndex: track.trackIndex,
+            trackCount: track.trackCount,
+            title: track.title,
+            lengthMilliseconds: track.lengthMilliseconds
+        )
+    }
+
+    /// Removes the playable format extension and known archive/compression
+    /// wrappers from a leaf filename while leaving the source filename intact.
+    public static func withoutDisplayedExtension(_ filename: String) -> String {
+        CatalogDisplayName.file(filename)
+    }
+
+    public static func lengthLabel(milliseconds: Int) -> String {
+        guard milliseconds > 0 else { return "—" }
+        let totalSeconds = Int((Double(milliseconds) / 1_000).rounded())
+        return String(format: "%d:%02d", totalSeconds / 60, totalSeconds % 60)
+    }
+
+    public static func isMeaningful(_ value: String) -> Bool {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !normalized.isEmpty && normalized != "—"
+    }
+
+    private static func make(
+        sourceFilename: String,
+        trackIndex: Int,
+        trackCount: Int,
+        title: String,
+        lengthMilliseconds: Int
+    ) -> CatalogPlaylistDisplayValues {
+        let suffix = max(1, trackCount) > 1 ? " [\(max(0, trackIndex) + 1)]" : ""
+        let displayName = "\(withoutDisplayedExtension(sourceFilename))\(suffix)"
+        let filename = "\(sourceFilename)\(suffix)"
+        return CatalogPlaylistDisplayValues(
+            sourceFilename: sourceFilename,
+            filename: filename,
+            displayName: displayName,
+            title: title.isEmpty ? displayName : title,
+            lengthMilliseconds: max(0, lengthMilliseconds),
+            lengthLabel: lengthLabel(milliseconds: lengthMilliseconds)
+        )
     }
 }
 
@@ -125,7 +222,7 @@ public enum CatalogPlaylistReader {
         t.track_index AS track_index,
         t.track_count AS track_count,
         COALESCE(m.title, '') AS title,
-        COALESCE(m.game, '') AS game,
+        COALESCE(NULLIF(NULLIF(m.game, ''), '?'), NULLIF(t.browser_game, ''), '') AS game,
         COALESCE(m.author, '') AS author,
         \(dumperExpression) AS dumper,
         COALESCE(m.system, '') AS system,
@@ -247,7 +344,7 @@ public enum CatalogPlaylistReader {
                 trackIndex: Int(sqlite3_column_int(statement, 3)),
                 trackCount: Int(sqlite3_column_int(statement, 4)),
                 title: text(statement, index: 5),
-                game: text(statement, index: 6),
+                game: displayGame(text(statement, index: 6)),
                 author: text(statement, index: 7),
                 system: text(statement, index: 9),
                 comment: text(statement, index: 10),
@@ -267,6 +364,10 @@ public enum CatalogPlaylistReader {
     private static func text(_ statement: OpaquePointer?, index: Int32) -> String {
         guard let value = sqlite3_column_text(statement, index) else { return "" }
         return String(cString: value)
+    }
+
+    private static func displayGame(_ value: String) -> String {
+        CatalogDisplayName.game(value)
     }
 
     private static func nullableText(_ statement: OpaquePointer?, index: Int32) -> String? {

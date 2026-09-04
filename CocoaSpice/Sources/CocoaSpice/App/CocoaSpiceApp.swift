@@ -131,6 +131,9 @@ private final class CocoaSpiceAppDelegate: NSObject, NSApplicationDelegate {
 private struct CocoaSpiceCommands: Commands {
     @Bindable var model: PlayerViewModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
+
+    private static let settingsShortcut = FrontendShortcutCatalog.shortcut(for: .settings)
 
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
@@ -226,15 +229,15 @@ private struct CocoaSpiceCommands: Commands {
 
         CommandGroup(replacing: .appSettings) {
             Button("Options...") {
-                if let optionsWindow = NSApp.windows.first(where: {
-                    $0.isVisible && $0.cocoaSpiceRole == .settings
+                if NSApp.windows.contains(where: {
+                    $0.isVisible && ($0.cocoaSpiceRole == .settings || $0.identifier?.rawValue == "options")
                 }) {
-                    optionsWindow.close()
+                    dismissWindow(id: "options")
                 } else {
                     openWindow(id: "options")
                 }
             }
-            .keyboardShortcut(",", modifiers: .command)
+            .keyboardShortcut(KeyEquivalent(Self.settingsShortcut.key.first!), modifiers: .command)
         }
     }
 }

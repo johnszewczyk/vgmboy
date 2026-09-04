@@ -139,7 +139,7 @@ private func trackResponse(_ track: CatalogTrack, rootPaths: [Int64: String]) ->
     TrackResponse(
         rootPath: rootPaths[track.rootID] ?? "",
         path: track.sourcePath,
-        filename: URL(fileURLWithPath: track.sourcePath).lastPathComponent,
+        filename: track.leafFilename,
         archivePath: track.archivePath,
         archiveEntry: track.archiveEntry,
         trackIndex: track.trackIndex,
@@ -194,10 +194,11 @@ private func serve(databasePath: String) throws {
                 let values = buckets.map { bucket in
                     let rootName = rootDisplayName(bucket.rootPath)
                     let key = "\(bucket.game)\u{0}\(bucket.system)"
+                    let displayGame = CatalogDisplayName.game(bucket.game)
                     return GameResponse(
                         rootID: bucket.rootID, rootPath: bucket.rootPath, name: bucket.game, system: bucket.system,
                         trackCount: bucket.trackCount, rootName: rootName,
-                        displayName: duplicateKeys.contains(key) ? "\(bucket.game) (\(bucket.system.isEmpty ? "Unknown Console" : bucket.system) • \(rootName))" : bucket.game
+                        displayName: duplicateKeys.contains(key) ? "\(displayGame) (\(bucket.system.isEmpty ? "Unknown Console" : bucket.system) • \(rootName))" : displayGame
                     )
                 }
                 writeOK(requestID, json: try encodePayload(values))

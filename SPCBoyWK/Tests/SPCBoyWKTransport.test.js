@@ -8,6 +8,10 @@ const playbackSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/app-playback.js"),
   "utf8"
 );
+const playbackBackendsSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playback-backends.js"),
+  "utf8"
+);
 const appCoreSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/app-core.js"),
   "utf8"
@@ -165,8 +169,8 @@ function snapshot(generation, transportState = "playing") {
   };
 }
 
-function makeHarness() {
-  const track = {
+function makeHarness(options = {}) {
+  const track = options.track || {
     id: "track-a",
     title: "Fixture",
     path: "/tmp/fixture.flac",
@@ -247,6 +251,7 @@ function makeHarness() {
   const gainCalls = [];
   const startRequests = [];
   const reconfigureRequests = [];
+  const speedRequests = [];
   const queueTransitionRequests = [];
   let timerID = 0;
   let clockNow = 1000;
@@ -269,7 +274,9 @@ function makeHarness() {
       animationFrames.delete(id);
     },
     SPCBoyApp: null,
-    SPCBoyPlaybackBackends: { forPath() { return { supportsLongPlay: false }; } },
+    SPCBoyPlaybackBackends: {
+      forPath() { return options.playbackBackend || { supportsLongPlay: false }; }
+    },
     spcBoyWK: {
       nativePlaybackInit: async () => snapshot(0, "stopped"),
       nativePlaybackAudioConfig: async () => snapshot(0, "stopped"),
@@ -289,6 +296,10 @@ function makeHarness() {
       nativePlaybackReconfigure: async (request) => {
         reconfigureRequests.push(request);
         return snapshot(8);
+      },
+      nativePlaybackSetTempo: async (request) => {
+        speedRequests.push(request);
+        return snapshot(9);
       },
       nativePlaybackState: async () => snapshot(state.nativePlayback.generation || 7),
       nativePlaybackUnload: async () => snapshot(state.nativePlayback.generation, "stopped"),
@@ -332,6 +343,7 @@ function makeHarness() {
     gainCalls,
     startRequests,
     reconfigureRequests,
+    speedRequests,
     queueTransitionRequests,
     window,
     flushAnimationFrame(elapsedMilliseconds = 500) {
@@ -347,6 +359,117 @@ function loadPlaylistTable() {
   const window = {};
   vm.runInNewContext(playlistTableSource, { window }, { filename: "playlist-table-utils.js" });
   return window.SPCBoyPlaylistTable;
+}
+
+function loadPlaylistColumnsForTest({ animate = false } = {}) {
+  const table = loadPlaylistTable();
+  const columnDefs = [
+    { id: "favorite", label: "★" },
+    { id: "index", label: "#" },
+    { id: "filename", label: "File" },
+    { id: "title", label: "Title" },
+    { id: "game", label: "Game" },
+    { id: "artist", label: "Artist" },
+    { id: "dumper", label: "Dumper" },
+    { id: "system", label: "System" },
+    { id: "path", label: "Path" },
+    { id: "lengthLabel", label: "Length" }
+  ];
+  const state = {
+    columnOrder: columnDefs.map((column) => column.id),
+    columnVisibility: Object.fromEntries(columnDefs.map((column) => [column.id, true])),
+    columnWidths: Object.fromEntries(columnDefs.map((column) => [column.id, 10])),
+    columnAutoSize: true,
+    playlist: [{
+      id: "track-a",
+      filename: "fixture.spc",
+      title: "Fixture",
+      game: "Game",
+      artist: "Composer",
+      dumper: "—",
+      system: "SPC700",
+      path: "/music/fixture.spc",
+      lengthLabel: "—"
+    }],
+    rootPath: "/music"
+  };
+  const style = { fontWeight: "400", fontSize: "13px", fontFamily: "system-ui" };
+  const makeElement = () => ({
+    style: {},
+    classList: { toggle() {} },
+    querySelector() { return null; },
+    closest() { return { getBoundingClientRect: () => ({ width: 800 }) }; }
+  });
+  const refs = {
+    playlistHeaderRow: makeElement(),
+    playlistHeaderTable: { style: {}, clientWidth: 800 },
+    playlistBodyTable: { style: {} },
+    playlistBody: makeElement(),
+    playlistScrollWrap: { clientWidth: 800, classList: { toggle() {} } }
+  };
+  const document = {
+    createElement(type) {
+      if (type === "canvas") {
+        return { getContext: () => ({ measureText: (value) => ({ width: String(value).length * 8 }) }) };
+      }
+      return makeElement();
+    },
+    addEventListener() {},
+    removeEventListener() {},
+    body: { appendChild() {} }
+  };
+  let clockNow = 1_000;
+  let animationFrameID = 0;
+  const animationFrames = new Map();
+  let persistenceCount = 0;
+  const window = animate ? {
+    performance: { now: () => clockNow },
+    SPCBoyFrontendAnimationContract: { frameRate: 60, easing: "easeInOut" },
+    requestAnimationFrame(callback) {
+      const id = ++animationFrameID;
+      animationFrames.set(id, callback);
+      return id;
+    },
+    cancelAnimationFrame(id) {
+      animationFrames.delete(id);
+    }
+  } : {};
+  const context = {
+    window,
+    document,
+    CSS: { escape: (value) => value },
+    getComputedStyle: () => style
+  };
+  vm.runInNewContext(playlistColumnsSource, context, { filename: "playlist-columns.js" });
+  let visibilityChanges = 0;
+  let playlistRenders = 0;
+  const columns = window.SPCBoyPlaylistColumns.create({
+    state,
+    refs,
+    COLUMN_DEFS: columnDefs,
+    persistSettings() { persistenceCount += 1; },
+    normalizeColumnOrder: (value) => value,
+    valueForColumn: table.valueForColumn,
+    sortValue: table.sortValue,
+    compareSortValues: table.compareSortValues,
+    getPlaylistRows: () => new Map(),
+    onRenderPlaylist() { playlistRenders += 1; },
+    onColumnVisibilityChange() { visibilityChanges += 1; }
+  });
+  return {
+    columns,
+    state,
+    visibilityChanges: () => visibilityChanges,
+    playlistRenders: () => playlistRenders,
+    persistenceCount: () => persistenceCount,
+    flushAnimationFrame(elapsedMilliseconds) {
+      clockNow += elapsedMilliseconds;
+      const pending = [...animationFrames.entries()];
+      animationFrames.clear();
+      pending.forEach(([, callback]) => callback(clockNow));
+    },
+    pendingAnimationFrames: () => animationFrames.size
+  };
 }
 
 function loadDatabaseView() {
@@ -389,6 +512,12 @@ function loadPlaybackSpeedActions() {
   const window = {};
   vm.runInNewContext(playbackSpeedActionsSource, { window }, { filename: "playback-speed-actions.js" });
   return window.SPCBoyPlaybackSpeedActions;
+}
+
+function loadPlaybackBackends(backends) {
+  const window = { spcBoyWK: { playbackBackends: backends } };
+  vm.runInNewContext(playbackBackendsSource, { window }, { filename: "playback-backends.js" });
+  return window.SPCBoyPlaybackBackends;
 }
 
 function loadAppearanceActions() {
@@ -710,10 +839,113 @@ test("SPCBoyWK ignores delayed native status events", () => {
 
 test("SPCBoyWK uses one accent selection capsule for sidebar and playlist", () => {
   assert.match(stylesSource, /\.list-selection-indicator[\s\S]*?background: var\(--accent\)/);
+  assert.match(stylesSource, /\.list-selection-indicator[\s\S]*?border-radius: 999px[\s\S]*?will-change: transform, width, height, opacity[\s\S]*?transition:[\s\S]*?transform var\(--selection-animation-duration\) ease/);
+  assert.doesNotMatch(stylesSource, /\.list-selection-indicator[\s\S]*?cubic-bezier/);
+  assert.match(uiSource, /const horizontalInset = Math\.min\(4, targetBounds\.width \/ 2\)/);
+  assert.match(uiSource, /data-selection-indicator-visible/);
+  assert.match(uiSource, /function syncSelectionIndicators\(\{ animated = true \} = \{\}\)/);
+  assert.match(uiSource, /function ensureSelectionLayoutObserver\(\)/);
+  assert.match(uiSource, /new window\.ResizeObserver/);
+  assert.match(uiSource, /let selectionIndicatorAnimationPending = false/);
+  assert.match(uiSource, /if \(selectionIndicatorAnimationPending\) return/);
+  assert.match(uiSource, /indicator\.dataset\.selectionAnimating === "true"/);
+  assert.match(uiSource, /if \(animated && indicator\.dataset\.selectionAnimating === "true" && !changed\) return/);
+  assert.match(uiSource, /function watchSelectionIndicatorAnimation\(indicator\)/);
+  assert.match(uiSource, /clearSelectionIndicatorAnimation\(indicator\);[\s\S]*?scheduleSelectionIndicators\(\{ animated: false \}\)/);
+  assert.match(uiSource, /scheduleSelectionIndicators\(\{ animated: false \}\)/);
   assert.match(stylesSource, /button:is\(\.tree-node, \.database-game-row, \.database-console-row\)\.is-selected[\s\S]*?background: transparent/);
-  assert.match(stylesSource, /\.tree-node[\s\S]*?transition: color var\(--selection-animation-duration\)/);
-  assert.match(stylesSource, /\.playlist-table td[\s\S]*?transition: width[\s\S]*?color var\(--selection-animation-duration\)/);
+  assert.match(stylesSource, /\.tree-node\s*\{[^}]*transition: color var\(--selection-animation-duration\) ease/);
+  assert.match(stylesSource, /\.database-game-row\s*\{[^}]*transition: color var\(--selection-animation-duration\) ease/);
+  assert.match(stylesSource, /\.database-console-row\s*\{[^}]*transition: color var\(--selection-animation-duration\) ease/);
+  assert.match(stylesSource, /\.playlist-body-wrap:not\(\[data-selection-indicator-visible="true"\]\) \.playlist-row\.is-selected/);
+  assert.match(stylesSource, /\.database-game-row[^}]*user-select: none/);
+  assert.match(stylesSource, /\.tree-node[^}]*-webkit-user-select: none/);
+  assert.match(databaseSidebarSource, /event\.preventDefault\(\);\s*event\.stopPropagation\(\);/);
+  assert.match(sidebarTreeSource, /event\.preventDefault\(\);\s*event\.stopPropagation\(\);/);
+  assert.match(stylesSource, /\.playlist-table th,[\s\S]*?\.playlist-table td\s*\{[^}]*width var\(--column-resize-duration\)/);
+  assert.match(stylesSource, /\.playlist-table th,[\s\S]*?\.playlist-table td\s*\{[\s\S]*?color var\(--selection-animation-duration\) ease/);
+  assert.match(playlistRowsSource, /if \(!spacers && !playlistUsesVirtualRows\(\)\) appendBatch\(\);/);
+  assert.match(playlistRowsSource, /clearPlaylistSelectionIndicator\(\);[\s\S]*?refs\.playlistBody\.innerHTML = ""/);
+  assert.match(playlistRowsSource, /scheduleSelectionIndicators\(\{ animated: false \}\)/);
+  assert.match(databaseSidebarSource, /scheduleSelectionIndicators\(\{ animated: false \}\)/);
+  assert.match(sidebarTreeSource, /scheduleSelectionIndicators\(\{ animated: false \}\)/);
   assert.doesNotMatch(stylesSource, /button:not\([^\n]*\):is\([^\n]*\.is-selected/);
+});
+
+test("SPCBoyWK lets playlist tables animate in both width directions", () => {
+  assert.match(playlistColumnsSource, /playlistTable\.style\.width = width;[\s\S]*?playlistTable\.style\.minWidth = "100%"/);
+  assert.doesNotMatch(playlistColumnsSource, /playlistTable\.style\.minWidth = width/);
+  assert.match(playlistColumnsSource, /const applyResizeWidths = \(nextWidth\) =>/);
+  assert.match(playlistColumnsSource, /applyResizeWidths\(nextWidth\);/);
+  assert.doesNotMatch(playlistColumnsSource, /persistSettings\(\);\s*renderHeader\(\);\s*syncWidths\(\);/);
+  assert.doesNotMatch(playlistRowsSource, /columns\.autoSizeColumns\(\);\s*columns\.renderHeader\(\)/);
+  assert.match(playlistColumnsSource, /function animateColumnLayout\(targetTableWidth, targetWidths\)/);
+  assert.match(playlistColumnsSource, /window\.performance\?\.now/);
+  assert.match(playlistColumnsSource, /window\.requestAnimationFrame/);
+  assert.match(playlistColumnsSource, /const linearProgress = Math\.min\(1, elapsedMilliseconds \/ durationMilliseconds\)/);
+  assert.match(stylesSource, /\.playlist-scroll-wrap\.is-column-resizing[\s\S]*?transition: color var\(--selection-animation-duration\) ease/);
+});
+
+test("SPCBoyWK auto-fit follows elapsed time instead of a fixed step count", () => {
+  const harness = loadPlaylistColumnsForTest({ animate: true });
+  harness.state.autoResizeAnimationMilliseconds = 1_000;
+  const initialWidths = JSON.stringify(harness.state.columnWidths);
+
+  harness.columns.autoSizeColumns();
+  assert.equal(harness.pendingAnimationFrames(), 1);
+  assert.equal(harness.persistenceCount(), 0);
+
+  harness.flushAnimationFrame(250);
+  const quarterWidths = JSON.stringify(harness.state.columnWidths);
+  assert.notEqual(quarterWidths, initialWidths);
+  assert.equal(harness.persistenceCount(), 0);
+  assert.equal(harness.pendingAnimationFrames(), 1);
+
+  harness.flushAnimationFrame(750);
+  assert.notEqual(JSON.stringify(harness.state.columnWidths), quarterWidths);
+  assert.equal(harness.persistenceCount(), 1);
+  assert.equal(harness.pendingAnimationFrames(), 0);
+});
+
+test("SPCBoyWK toggles the native settings window from the shared settings command", () => {
+  assert.match(appDelegateSource, /private func toggleOptionsWindow\(\)/);
+  assert.match(appDelegateSource, /@objc private func settings\(_ sender: Any\?\) \{\s*toggleOptionsWindow\(\)/);
+  assert.match(appDelegateSource, /case "settings": window\.spcBoyWK\?\.toggleOptionsWindow\?\.\(\); break;/);
+  assert.match(nativeBridgeSource, /toggleOptionsWindow: \(\) => request\("toggleOptionsWindow"\)/);
+  assert.match(nativeBridgeSource, /window\.SPCBoyFrontendAnimationContract =/);
+});
+
+test("SPCBoyWK auto-hides placeholder-only metadata columns without persisting false", () => {
+  const { columns, state, visibilityChanges, playlistRenders } = loadPlaylistColumnsForTest();
+
+  columns.autoSizeColumns();
+
+  assert.equal(state.columnVisibility.dumper, true);
+  assert.equal(columns.orderedColumns().some((column) => column.id === "dumper"), false);
+  assert.equal(visibilityChanges(), 1);
+  assert.equal(playlistRenders(), 1);
+
+  state.playlist[0].dumper = "SPC700 Dumper";
+  columns.autoSizeColumns();
+
+  assert.equal(state.columnVisibility.dumper, true);
+  assert.equal(columns.orderedColumns().some((column) => column.id === "dumper"), true);
+  assert.equal(visibilityChanges(), 2);
+  assert.equal(playlistRenders(), 2);
+
+  columns.restoreAutomaticVisibility();
+  assert.equal(columns.orderedColumns().some((column) => column.id === "dumper"), true);
+});
+
+test("SPCBoyWK keeps automatic column visibility in the resize module", () => {
+  assert.match(playlistColumnsSource, /const automaticallyHiddenColumnIds = new Set\(\)/);
+  assert.match(playlistColumnsSource, /function isMeaningfulColumnValue\(value\)/);
+  assert.match(playlistColumnsSource, /function refreshAutomaticVisibility\(\{ force = false \} = \{\}\)/);
+  assert.match(playlistColumnsSource, /if \(visibilityChanged\)[\s\S]*?onRenderPlaylist\(\{ sort: false \}\)/);
+  assert.match(playlistColumnsSource, /restoreAutomaticVisibility/);
+  assert.match(playlistRowsSource, /columns\.refreshAutomaticVisibility\(\)/);
+  assert.match(playlistRowsSource, /columns\.restoreAutomaticVisibility\(\)/);
+  assert.match(uiSource, /onColumnVisibilityChange: \(\) => syncPlaylistColumnWidths\(\)/);
 });
 
 test("SPCBoyWK broadcasts complete native status to both windows", () => {
@@ -751,6 +983,57 @@ test("SPCBoyWK uses native in-place tempo and AAC cancellation events", () => {
   assert.match(indexSource, /id="aac-export-directory-path"/);
   assert.match(indexSource, /id="aac-export-cancel-button"/);
   assert.match(indexSource, /id="aac-export-choose-button" class="tool-button glyph-button"[\s\S]*icon-folder-tree/);
+});
+
+test("SPCBoyWK normalizes native backend extensions before path lookup", () => {
+  const backends = loadPlaybackBackends([
+    {
+      id: "libgme",
+      extensions: ["spc"],
+      playbackSpeedMode: "native-tempo",
+      playbackSpeedExtensions: [".SPC"]
+    },
+    {
+      id: "libvgm",
+      extensions: ["vgz"],
+      playbackSpeedMode: "native-tempo",
+      playbackSpeedExtensions: ["vgz"]
+    }
+  ]);
+
+  assert.equal(backends.forPath("/music/theme.spc").id, "libgme");
+  assert.equal(backends.forPath("/music/theme.SPC").id, "libgme");
+  assert.equal(backends.forPath("/music/theme.vgz").id, "libvgm");
+  assert.deepEqual(backends.forPath("/music/theme.spc").playbackSpeedExtensions, ["spc"]);
+});
+
+test("SPCBoyWK applies the selected native tempo to an active libgme track", async () => {
+  const { app, speedRequests } = makeHarness({
+    track: {
+      id: "track-a",
+      title: "Fixture",
+      path: "/tmp/fixture.spc",
+      sourceFilename: "fixture.spc",
+      basePlaybackSeconds: 4
+    },
+    playbackBackend: {
+      id: "libgme",
+      playbackSpeedMode: "native-tempo",
+      playbackSpeedExtensions: ["spc"],
+      supportsLongPlay: true
+    }
+  });
+  app.state.playbackSpeed = { numerator: 2, denominator: 1 };
+  app.state.playbackSpeedEnabled = true;
+  app.state.currentTrackId = "track-a";
+  app.state.currentTrackInfo = app.currentTrack();
+  app.state.isPlaying = true;
+
+  await app.playback.refreshPlaybackForSpeedChange("libgme");
+
+  assert.deepEqual(JSON.parse(JSON.stringify(speedRequests)), [
+    { tempo: { numerator: 2, denominator: 1 } }
+  ]);
 });
 
 test("SPCBoyWK keeps Audio and Playback option panels structurally separated", () => {
@@ -963,6 +1246,25 @@ test("SPCBoyWK playlist table utilities preserve Dumper, archive path, and lengt
   assert.equal(table.sortValue(track, { id: "lengthLabel" }), 42);
 });
 
+test("SPCBoyWK sorts numbered playlist files naturally", () => {
+  const { columns, state } = loadPlaylistColumnsForTest();
+  state.playlist = [
+    { id: "eleven", filename: "Track 11.sndh" },
+    { id: "one", filename: "Track 1.sndh" },
+    { id: "two", filename: "Track 2.sndh" }
+  ];
+  state.sortColumn = "filename";
+  state.sortDirection = "ascending";
+
+  columns.sortPlaylist();
+
+  assert.deepEqual(state.playlist.map((track) => track.filename), [
+    "Track 1.sndh",
+    "Track 2.sndh",
+    "Track 11.sndh"
+  ]);
+});
+
 test("SPCBoyWK catalog track mapping preserves indexed metadata and multi-track labels", () => {
   assert.match(indexSource, /database-view-utils\.js[\s\S]*catalog-track-mapper\.js[\s\S]*playlist-table-utils\.js/);
   assert.match(catalogTrackMapperSource, /function databaseRowsToPlaylistTracks\(/);
@@ -981,13 +1283,63 @@ test("SPCBoyWK catalog track mapping preserves indexed metadata and multi-track 
     trackCount: 2,
     dumper: "Stored Dumper",
     playLengthMs: 42000
-  }], [{ name: "Game", system: "SNES", rootPath: "/library" }])[0];
+  }], [{ name: "Game.sndh", displayName: "Game", system: "SNES", rootPath: "/library" }])[0];
 
   assert.equal(track.filename, "game.spc [2]");
   assert.equal(track.displayName, "game [2]");
   assert.equal(track.dumper, "Stored Dumper");
+  assert.equal(track.game, "Game");
   assert.equal(track.lengthLabel, "42s");
   assert.equal(track.catalogRow, true);
+});
+
+test("SPCBoyWK catalog track mapping displays an archive member instead of its container", () => {
+  const mapper = loadCatalogTrackMapper().create({
+    state: { rootPath: "/library" },
+    formatTime: (seconds) => `${seconds}s`
+  });
+  const track = mapper.databaseRowsToPlaylistTracks([{
+    playlistId: "archive-track",
+    path: "/library/Mega Man X.tar.zst",
+    filename: "Mega Man X.tar.zst",
+    archiveEntry: "nested/04 Opening Stage.spc",
+    trackIndex: 0,
+    trackCount: 1,
+    title: "Opening Stage"
+  }], [{ name: "Megaman X", system: "Super Nintendo", rootPath: "/library" }])[0];
+
+  assert.equal(track.sourceFilename, "04 Opening Stage.spc");
+  assert.equal(track.filename, "04 Opening Stage.spc");
+  assert.equal(track.displayName, "04 Opening Stage");
+  assert.equal(track.path, "/library/Mega Man X.tar.zst");
+});
+
+test("SPCBoyWK catalog track mapping consumes the native display projection", () => {
+  const mapper = loadCatalogTrackMapper().create({
+    state: { rootPath: "/library" },
+    formatTime: (seconds) => String(seconds) + "s"
+  });
+  const track = mapper.databaseRowsToPlaylistTracks([{
+    playlistId: "canonical-track",
+    path: "/library/Mega Man X.tar.zst",
+    filename: "Mega Man X.tar.zst",
+    sourceFilename: "04 Opening Stage.spc",
+    displayFilename: "04 Opening Stage.spc [2]",
+    displayName: "04 Opening Stage [2]",
+    title: "Canonical Opening Stage",
+    trackIndex: 1,
+    trackCount: 2,
+    playLengthMs: 8250,
+    lengthLabel: "0:08",
+    basePlaybackSeconds: 8.25
+  }], [{ name: "Megaman X", system: "Super Nintendo", rootPath: "/library" }])[0];
+
+  assert.equal(track.sourceFilename, "04 Opening Stage.spc");
+  assert.equal(track.filename, "04 Opening Stage.spc [2]");
+  assert.equal(track.displayName, "04 Opening Stage [2]");
+  assert.equal(track.title, "Canonical Opening Stage");
+  assert.equal(track.lengthLabel, "0:08");
+  assert.equal(track.basePlaybackSeconds, 8.25);
 });
 
 test("SPCBoyWK filters database search locally without a debounce", () => {

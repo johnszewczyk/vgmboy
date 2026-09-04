@@ -1,4 +1,5 @@
 import Foundation
+import CatalogPlaylistCore
 import PlaylistIdentityCore
 
 enum TrackSource: Hashable, Sendable {
@@ -118,17 +119,8 @@ enum TrackSource: Hashable, Sendable {
 }
 
 enum FilenamePresentation {
-    private static let compoundArchiveSuffixes = [
-        ".tar.zst", ".tar.zstd", ".tar.gz", ".tar.bz2", ".tar.xz", ".tar.lz", ".tar.lz4"
-    ]
-
     static func withoutDisplayedExtension(_ filename: String) -> String {
-        let lowercased = filename.lowercased()
-        if let suffix = compoundArchiveSuffixes.first(where: { lowercased.hasSuffix($0) }) {
-            return String(filename.dropLast(suffix.count))
-        }
-        let stem = URL(fileURLWithPath: filename).deletingPathExtension().lastPathComponent
-        return stem.isEmpty ? filename : stem
+        CatalogPlaylistPresentation.withoutDisplayedExtension(filename)
     }
 }
 

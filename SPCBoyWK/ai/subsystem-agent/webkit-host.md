@@ -26,9 +26,13 @@ cross the shared VGMBoy boundary at both `nativePlaybackStart` and
 to the main WebView, which asks VGMBoyKit to reconfigure the loaded session
 without losing position or paused state.
 
-The shared `FrontendPreferencesCore` contract owns the validated animation
-timing range and 200 ms defaults. DOM geometry and CSS remain WebKit-owned so
-SPCBoy keeps its rendering style; native Swift owns persistence and window
+The shared `FrontendPreferencesCore` contract owns the nonnegative animation
+timing values and 200 ms defaults. Zero is the explicit immediate-transition
+value; user-entered durations are not capped at an arbitrary maximum. Playlist
+auto-fit uses elapsed-time interpolation on display-synchronized
+`requestAnimationFrame` updates with the shared 60 Hz/ease-in-out contract;
+it does not use a fixed step count. DOM geometry and CSS remain WebKit-owned
+so SPCBoy keeps its rendering style; native Swift owns persistence and window
 levels.
 
 The accent color is a persisted CSS color in the typed settings projection.
@@ -37,13 +41,23 @@ playlist use the same moving accent capsule. Selected-row backgrounds remain
 transparent so a second instantaneous paint cannot flash over the capsule;
 selected text transitions to the shared dark accent ink. Active toolbar and
 option controls use the same accent surface.
+The capsule's transform, size, and opacity use one vanilla `ease` CSS
+transition driven by the persisted duration; selection geometry is applied at
+subpixel precision so long durations remain smooth. Layout-only recalculation
+updates the indicator immediately, while a user selection remains animated. A
+pending selection frame cannot be cancelled by a same-turn layout callback,
+and an in-flight selection transition is protected from `ResizeObserver` and
+render-maintenance snaps until its transition completes.
 
 `FrontendOptionsManifest` provides the common Database, Interface, and Windows
 organization through the bridge. `options-controller.js` applies that manifest,
 `playlist-controller.js` reduces selection, and `sidebar-controller.js` forwards
 browser-tree row gestures to the native shared reducer. `database-view-utils.js`
-owns pure sidebar-view and catalog-search projections. `playlist-table-utils.js`
-owns pure playlist path, cell-value, and sort projections, while
+owns pure sidebar-view and catalog-search projections. The native catalog bridge
+publishes the shared `CatalogPlaylistCore` filename, title, and duration
+projection for database-backed rows; the renderer retains backward-compatible
+fallbacks for older/local payloads. `playlist-table-utils.js` owns pure
+playlist path, cell-value, and sort projections, while
 `playlist-columns.js` owns column state, header rendering, resizing, and
 auto-sizing. `playlist-rows.js` owns playlist row rendering, selection state,
 virtualized rendering, and row refresh. `app-ui.js` remains the broader DOM
@@ -53,7 +67,7 @@ Database Console → Game group disclosure and selection also pass through the
 shared `CatalogBrowserGroupState` reducer. WebKit retains only DOM rows, focus,
 scrolling, and persistence projection.
 
-The AppKit host owns Cmd-Q, Cmd-W, Cmd-M, Cmd-O, native file/folder selection, and menu dispatch. Shared semantic
+The AppKit host owns Cmd-Q, Cmd-W, Cmd-M, Cmd-O, Cmd-Comma options toggling, native file/folder selection, and menu dispatch. Shared semantic
 shortcut names and default keys come from `FrontendCommandCore`; WebKit receives
 the remaining frontend commands through the narrow `SPCBoyWK` dispatcher.
 
@@ -225,6 +239,9 @@ lookup must never call the stop path merely because the playlist view changed.
 
 Playlist hydration is shared at the data/policy boundary: the bridge uses
 `CatalogPlaylistReader` and `PlaybackQueueCore`, matching CocoaSpice.
+Archive-backed bridge rows keep the archive member leaf in `filename` for the
+WebKit `File` column; `path` remains the physical archive source used for
+`Path` and playback identity.
 The JSON-to-track mapping remains WebKit-local because its fields are not the
 native metadata cache or column-width model. Playlist column order, widths, and
 visibility are persisted in the WebKit settings projection; every displayed

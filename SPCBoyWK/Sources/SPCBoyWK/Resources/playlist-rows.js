@@ -16,6 +16,7 @@
     exportTrackAsAAC,
     updateTimingSummary,
     scheduleSelectionIndicators,
+    clearPlaylistSelectionIndicator = () => {},
     onRenderPlaylist
   }) {
     const rowsByTrackId = new Map();
@@ -55,7 +56,7 @@
       row.className = "playlist-virtual-spacer";
       row.setAttribute("aria-hidden", "true");
       const cell = document.createElement("td");
-      cell.colSpan = Math.max(1, columns.orderedColumns().length);
+      cell.colSpan = Math.max(1, columns.allColumns().length);
       cell.style.height = `${Math.max(0, Math.round(height))}px`;
       row.appendChild(cell);
       return row;
@@ -67,7 +68,8 @@
       const td = document.createElement("td");
       td.className = column.className || "";
       td.dataset.columnId = column.id;
-      td.style.width = `${state.columnWidths[column.id]}%`;
+      td.classList.toggle("is-column-hidden", !columns.isColumnVisible(column.id));
+      td.style.width = `${columns.columnWidthPercent(column.id)}%`;
       if (column.id === "favorite") {
         const button = document.createElement("button");
         button.type = "button";
@@ -142,7 +144,7 @@
       if (!track || !row) return false;
 
       row.setAttribute("aria-label", `${track.title || track.filename || "Track"}`);
-      for (const column of columns.orderedColumns()) {
+      for (const column of columns.allColumns()) {
         const cell = row.querySelector(`[data-column-id="${CSS.escape(column.id)}"]`);
         if (!cell) return false;
         if (column.id === "favorite") {
@@ -157,7 +159,8 @@
         } else {
           cell.textContent = String(valueForColumn(track, column, rowIndex, state.rootPath));
         }
-        cell.style.width = `${state.columnWidths[column.id]}%`;
+        cell.classList.toggle("is-column-hidden", !columns.isColumnVisible(column.id));
+        cell.style.width = `${columns.columnWidthPercent(column.id)}%`;
       }
       updatePlaylistRowState(row, trackId);
       return true;
@@ -187,7 +190,7 @@
           if (state.selectedTrackId === track.id) selectedPlaylistRow = row;
           if (state.currentTrackId === track.id) currentPlaylistRow = row;
 
-          for (const column of columns.orderedColumns()) {
+          for (const column of columns.allColumns()) {
             row.appendChild(renderPlaylistCell(track, column, rowIndex));
           }
 
@@ -231,16 +234,21 @@
           window.requestAnimationFrame(appendBatch);
         } else {
           if (spacers?.bottom > 0) refs.playlistBody.appendChild(makePlaylistVirtualSpacer(spacers.bottom));
-          scheduleSelectionIndicators();
+          scheduleSelectionIndicators({ animated: false });
           schedulePlaylistRowMeasurement();
         }
       };
-      window.requestAnimationFrame(appendBatch);
+      if (!spacers && !playlistUsesVirtualRows()) appendBatch();
+      else window.requestAnimationFrame(appendBatch);
     }
 
     function renderPlaylist({ sort = true } = {}) {
       playlistRenderGeneration += 1;
       const generation = playlistRenderGeneration;
+      // A playlist replacement invalidates the old row geometry immediately.
+      // Hide the capsule before rebuilding so an empty/new playlist cannot
+      // inherit a stale transform from the previous selection.
+      clearPlaylistSelectionIndicator();
       if (!state.selectedTrackIds.length && state.selectedTrackId) {
         state.selectedTrackIds = [state.selectedTrackId];
       }
@@ -253,7 +261,16 @@
       rowsByTrackId.clear();
       selectedPlaylistRow = null;
       currentPlaylistRow = null;
+      if (!state.playlist.length) {
+        state.selectedTrackId = null;
+        state.selectedTrackIds = [];
+      }
       if (sort) columns.sortPlaylist();
+      if (!state.columnAutoSize || !state.playlist.length) {
+        columns.restoreAutomaticVisibility();
+      } else {
+        columns.refreshAutomaticVisibility();
+      }
       const virtualized = playlistUsesVirtualRows();
       // Auto-sizing every cell defeats a catalog lookup. Large database playlists
       // retain the current widths; explicit column auto-size remains available.
@@ -262,17 +279,15 @@
 
       if (state.playlist.length === 0) {
         const row = document.createElement("tr");
-        row.innerHTML = `<td colspan="${Math.max(1, columns.orderedColumns().length)}" class="empty-row"></td>`;
+        row.innerHTML = `<td colspan="${Math.max(1, columns.allColumns().length)}" class="empty-row"></td>`;
         refs.playlistBody.appendChild(row);
-        scheduleSelectionIndicators();
+        scheduleSelectionIndicators({ animated: false });
         return;
       }
 
       if (shouldAutoSize) {
         columns.markAutoSized(playlistSignature);
         columns.autoSizeColumns();
-        columns.renderHeader();
-        columns.syncWidths();
       }
       if (!virtualized) {
         appendPlaylistRowsInBatches(generation);

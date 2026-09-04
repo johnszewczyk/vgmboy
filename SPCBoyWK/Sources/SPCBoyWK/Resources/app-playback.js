@@ -175,7 +175,7 @@ function currentBasePlaybackSeconds(track) {
 function playbackSpeedForTrack(track) {
   const sourceName = track?.archiveEntry || track?.sourceFilename || track?.path || "";
   const backend = playbackBackends.forPath(sourceName);
-  const extension = sourceName.slice(sourceName.lastIndexOf(".")).toLowerCase();
+  const extension = sourceName.slice(sourceName.lastIndexOf(".") + 1).toLowerCase();
   if (backend?.playbackSpeedMode === "native-tempo" && backend.playbackSpeedExtensions?.includes(extension)) {
     if (backend.id === "libgme" && state.playbackSpeedEnabled) return state.playbackSpeed;
     if (backend.id === "libvgm" && state.libvgmPlaybackSpeedEnabled) return state.libvgmPlaybackSpeed;
@@ -1090,7 +1090,7 @@ async function refreshPlaybackForSpeedChange(backendId) {
   const snapshot = await window.spcBoyWK.nativePlaybackSetTempo({
     tempo: playbackSpeedForTrack(track)
   });
-  applyNativePlaybackState(snapshot);
+  applyNativePlaybackSnapshot(track, snapshot, playbackGeneration);
   updatePlaybackReadout();
 }
 

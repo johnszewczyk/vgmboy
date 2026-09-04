@@ -15,6 +15,12 @@ sidebar projections and derives Games/Files buckets from visible tracks until
 ScanSong republishes them. Both frontends therefore share the same in-scan
 fallback instead of maintaining separate database-query workarounds.
 
+Latest bounded slice (2026-09-03): `CatalogPlaylistCore` now owns the
+UI-neutral text projection for catalog-backed playlist rows: archive-member
+filename identity, multi-track suffixes, title fallbacks, and duration labels.
+CocoaSpice uses it for catalog width hints; SPCBoyWK receives the same values
+from its native bridge and keeps renderer fallbacks for older payloads.
+
 Live packaged verification snapshot (2026-08-29): a fresh production build of
 SPCBoyWK launched from `.build/SPCBoy (WK).app` and opened the shared ScanSong
 catalog. Filtering to Cyberbots exposed all 53 archive-backed tracks with
@@ -63,6 +69,9 @@ semantics.
   while ScanSong's materialized sidebar projections are dirty.
 - [x] CocoaSpice's unreachable duplicate Games/Files SQL reader was removed;
   its active browser path now has one catalog-reader owner.
+- [x] Catalog-backed playlist filename/title/duration text is projected once
+  by CatalogPlaylistCore and consumed by both frontends; local/imported
+  playlists retain their frontend-specific presentation fallbacks.
 - [ ] The complete visible playback transition handoff is not yet one shared
   frontend boundary; WebKit still retains presentation sequencing.
 - [ ] Remaining CocoaSpice and SPCBoyWK adapters need contract cleanup where
@@ -113,6 +122,8 @@ semantics.
   format-capability contracts while retaining frontend-specific presentation.
 - [x] Continue adoption cleanup only where it removes a real duplicate policy;
   CocoaSpice's duplicate sidebar query policy is removed.
+- [x] Extract catalog-backed filename, title-fallback, and duration-label
+  projection without moving AppKit/SwiftUI or WebKit DOM rendering into core.
 - [ ] Keep auditing remaining adapters without moving SwiftUI views or WebKit
   DOM rendering into the shared core.
 

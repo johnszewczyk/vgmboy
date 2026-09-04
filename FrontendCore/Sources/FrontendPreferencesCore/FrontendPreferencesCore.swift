@@ -4,7 +4,10 @@ import Observation
 /// Shared interaction timings for the native and WebKit frontends.
 public struct FrontendAnimationTimings: Codable, Equatable, Sendable {
     public static let defaultDurationMilliseconds = 200
-    public static let allowedMilliseconds = 0...1_000
+    /// Durations are user-controlled timing values. Zero remains the explicit
+    /// way to make a transition immediate, but there is no arbitrary upper
+    /// limit that turns a long requested animation into a different one.
+    public static let allowedMilliseconds = 0...Int.max
 
     public var autoResizeEnabled: Bool
     public var selectionEnabled: Bool
@@ -41,7 +44,7 @@ public struct FrontendAnimationTimings: Codable, Equatable, Sendable {
     }
 
     public static func clamp(_ value: Int) -> Int {
-        min(max(value, allowedMilliseconds.lowerBound), allowedMilliseconds.upperBound)
+        max(value, allowedMilliseconds.lowerBound)
     }
 }
 

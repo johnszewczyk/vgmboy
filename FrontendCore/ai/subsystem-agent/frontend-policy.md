@@ -12,6 +12,9 @@ contracts shared by CocoaSpice and SPCBoyWK.
   identities, group semantics, ordered shared persistence, and playlist identity.
 - `FrontendPreferencesCore` owns typed option organization and validated shared
   values; each frontend retains its key namespace and rendering.
+- `FrontendAnimationContract` defines the cross-frontend animation contract:
+  durations are elapsed-time values, zero is immediate, there is no arbitrary
+  upper cap, and the default frame cadence/easing are 60 Hz/ease-in-out.
 - `PlaybackRequestCore` owns newest-request-wins lifecycle and serial native
   command execution.
 - `PlaybackQueueCore` owns pure queue identity, adjacent navigation, repeat
@@ -29,6 +32,8 @@ contracts shared by CocoaSpice and SPCBoyWK.
 - FrontendCore does not decode audio, ramp output gain, store UI models, or own
   renderer focus and selection.
 - App-specific UserDefaults keys and presentation state remain in the frontend.
+- Shared shortcut semantics come from `CatalogReader.FrontendCommandCore`;
+  the `.settings` command is Cmd-Comma and toggles the options window.
 
 ## Files
 
@@ -37,8 +42,8 @@ contracts shared by CocoaSpice and SPCBoyWK.
 - `Sources/FavoriteStoreCore/`
 - `Sources/PlaylistIdentityCore/`
 - `Sources/FrontendPreferencesCore/`
+- `Sources/FrontendPreferencesCore/FrontendAnimationContract.swift`
 - `Sources/PlaybackRequestCore/`
 - `Sources/PlaybackQueueCore/`
 - `Sources/PlaybackTransportCore/`
 - corresponding directories under `Tests/`
-

@@ -231,32 +231,23 @@ public final class PlaybackController: @unchecked Sendable {
         unknownDurationMilliseconds: Int? = nil,
         family: DecoderFamily
     ) -> PlaybackPlan {
-        let play = max(0, (playMilliseconds ?? unknownDurationMilliseconds ?? 150_000) / 1_000)
-        let fade = max(0, fadeMilliseconds / 1_000)
-        switch mode {
-        case .fileDefault:
-            return PlaybackPlan(
-                preFadeSeconds: play,
-                fadeSeconds: fade,
-                isLongPlay: false,
-                usesNativeEnding: family.hasNaturalEnding && fade == 0,
-                usesDecoderNaturalDuration: playMilliseconds == nil
-            )
-        case .longPlay:
-            guard family.supportsLongPlay else { return fileDefaultPlan(play: play, fade: fade, family: family) }
-            return PlaybackPlan(preFadeSeconds: play, fadeSeconds: fade, isLongPlay: true, usesNativeEnding: false)
-        case .timed:
-            return PlaybackPlan(preFadeSeconds: play, fadeSeconds: fade, isLongPlay: false, usesNativeEnding: false)
-        }
-    }
-
-    private static func fileDefaultPlan(play: Int, fade: Int, family: DecoderFamily) -> PlaybackPlan {
-        PlaybackPlan(
-            preFadeSeconds: play,
-            fadeSeconds: fade,
-            isLongPlay: false,
-            usesNativeEnding: family.hasNaturalEnding && fade == 0,
-            usesDecoderNaturalDuration: false
+        let unknown = max(
+            1_000,
+            unknownDurationMilliseconds ?? PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000
+        )
+        let requestedPlay = mode == .fileDefault
+            ? playMilliseconds
+            : playMilliseconds ?? unknown
+        let request = PlaybackTimingRequest(
+            playbackMode: mode,
+            playMilliseconds: requestedPlay,
+            fadeMilliseconds: max(0, fadeMilliseconds),
+            unknownDurationMilliseconds: unknown
+        )
+        return PlaybackTimingPolicy.plan(
+            metadata: nil,
+            family: family,
+            request: request
         )
     }
 
