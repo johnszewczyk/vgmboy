@@ -26,6 +26,15 @@ import zlib
     #expect(registry.route(forPath: "/tmp/p4x.earth")?.pluginID == "amiga-uade")
     #expect(registry.route(forPath: "/tmp/music.mod")?.pluginID == "openmpt")
     #expect(registry.route(forPath: "/tmp/stage.p4x") == nil)
+    for ayFamilyPath in [
+        "/tmp/STAR.pt2",
+        "/tmp/SKT.pt3",
+        "/tmp/ML.4 95.ayl",
+        "/tmp/ICE.asc",
+        "/tmp/SONIC.stc"
+    ] {
+        #expect(registry.route(forPath: ayFamilyPath) == nil)
+    }
     #expect(registry.route(pathExtension: "ogg")?.metadataPolicy == .direct)
     #expect(registry.route(pathExtension: "ogg")?.pluginID == "standard-audio")
     #expect(registry.route(pathExtension: "ogg")?.pluginID != "vgmstream")

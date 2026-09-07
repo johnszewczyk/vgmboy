@@ -105,6 +105,10 @@ error.
   resolve player/sample companions before it publishes real subsong rows.
 - Native libgme enumeration and timing for NSF, NSFE, GBS, AY, HES, KSS, SAP,
   and related registered formats, supplemented by direct NSF/GBS header metadata.
+  The current AY route is the `.ay` container; ZX Spectrum tracker and playlist
+  families in aggregate AY collections are not admitted until a decoder-backed
+  scanner route is qualified. Their suffixes are also excluded from the shared
+  Amiga prefix fallback so they cannot become false UADE candidates.
 - Direct bounded SPC ID666/xID6 harvesting, PSF-style footer tags (including
   QSF/GSF length and fade tags), VGM/VGZ GD3/timing, and Commodore 64 SID
   PSID/RSID header reads.

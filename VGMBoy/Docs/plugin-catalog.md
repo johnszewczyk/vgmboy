@@ -7,13 +7,13 @@ this page records what each input does at the VGMBoy and ScanSong boundaries.
 It describes the current implementation, not a claim that every file in a
 format family is playable.
 
-Last reviewed: **2026-08-30**
+Last reviewed: **2026-09-07**
 
 ## Decoder matrix
 
 | ID | Source/version | Playback bridge | ScanSong boundary | Formats and special data |
 | --- | --- | --- | --- | --- |
-| `libgme` | Game Music Emu 0.6.5 through Homebrew | `CGameMusicEmu` | Native libgme metadata route | AY, GBS, HES, KSS, NSF, NSFE, SAP, SPC |
+| `libgme` | Game Music Emu 0.6.5 through Homebrew | `CGameMusicEmu` | Native libgme metadata route | AY (`.ay`), GBS, HES, KSS, NSF, NSFE, SAP, SPC |
 | `libvgm` | `867223e7c33d63de115d1ab955f784c44f19040a` | `CLibVGM` | Native libVGM route | VGM, VGZ, GYM, S98, DRO |
 | `psgplay` | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | `CPSGPlay` / `VGMBoySNDH` | Shared SNDH inspector | Atari ST SNDH; declared subtunes become playlist rows |
 | `mdxmini` | `003531a471c1955f4ed4357d0e2a6cba809c34a0` plus vendored LZX code | `CMDX` | `vgmboy-mdx-inspect` | X68000 MDX and PDX; sibling banks, legacy `\name`, inner LZX 0.32/0.42 |
@@ -42,6 +42,12 @@ libgme owns enumeration and timing for the console music families it supports.
 ScanSong supplements it with direct fixed-header metadata where that is safe:
 NSF/GBS text fields and SPC ID666/xID6 fields. SPC metadata does not start an
 emulator. The decoder remains authoritative for SPC playback and timing checks.
+
+The `.ay` container is the current AY-family route. ZX Spectrum tracker and
+playlist families found in aggregate AY collections (`.asc`, `.ayl`, `.pt1`,
+`.pt2`, `.pt3`, `.stc`, `.stp`, `.vtx`, and related suffixes) are not libgme
+inputs and are not registered as ScanSong sources. They remain unsupported
+until a decoder and scanner contract are fixture-qualified.
 
 ### libVGM (`libvgm`)
 
@@ -78,7 +84,9 @@ traversal paths remain unsafe.
 UADE is used for Amiga replayer files that are identified by EaglePlayer or
 other content-name conventions. Prefix-led names such as `mod.*` and `p4x.*`
 are admitted through the shared `AmigaFormatManifest`, while an ordinary
-`music.mod` remains an OpenMPT module. ScanSong materializes the complete
+`music.mod` remains an OpenMPT module. Known AY-family tracker and playlist
+suffixes are excluded from this prefix fallback because names such as
+`STAR.pt2` can otherwise collide with an Amiga prefix. ScanSong materializes the complete
 archive set so player and sample companions are available, then publishes
 UADE's actual subsongs. The Homebrew runtime/data installation is required for
 both playback and inspection.

@@ -82,6 +82,14 @@ inspects the file but suppresses unverified HES timing rather than presenting
 the raw 256-slot address space as a real album. The `.m3u` itself is support
 data and is not a catalog track.
 
+The current AY-family route is limited to the registered `.ay` container. The
+aggregate Bulba AY collections also contain tracker and playlist suffixes such
+as `.asc`, `.ayl`, `.pt1`, `.pt2`, `.pt3`, `.stc`, `.stp`, and `.vtx`; those
+formats do not have a current ScanSong/VGMBoy decoder route. They remain
+unsupported-format diagnostics rather than synthetic tracks. The shared Amiga
+prefix fallback explicitly excludes the known AY-family suffix set so names
+such as `STAR.pt2` or `ML.4 95.ayl` cannot be mistaken for UADE modules.
+
 ## SNDH / PSGPlay
 
 `.sndh` is a multi-track executable Atari ST music format and receives the
