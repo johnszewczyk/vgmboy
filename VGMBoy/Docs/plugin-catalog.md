@@ -17,6 +17,7 @@ Last reviewed: **2026-09-07**
 | `libvgm` | `867223e7c33d63de115d1ab955f784c44f19040a` | `CLibVGM` | Native libVGM route | VGM, VGZ, GYM, S98, DRO |
 | `psgplay` | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | `CPSGPlay` / `VGMBoySNDH` | Shared SNDH inspector | Atari ST SNDH; declared subtunes become playlist rows |
 | `mdxmini` | `003531a471c1955f4ed4357d0e2a6cba809c34a0` plus vendored LZX code | `CMDX` | `vgmboy-mdx-inspect` | X68000 MDX and PDX; sibling banks, legacy `\name`, inner LZX 0.32/0.42 |
+| `zxtune-aym` | `c93e81d081685ea2c7cd21fe0077e93d84b4d88d` plus `zxtune-modern-libcxx.patch` | `CZXTune` | `vgmboy-zxtune-inspect` | AY-family tracker formats: AS0, ASC, FTC, GTR, PSC, PSG, PSM, PT1/PT2/PT3, SQT, ST1/ST3/STC/STP, VTX, YM |
 | `uade` | Homebrew UADE 3.05 | `CUADE` | `vgmboy-amiga-inspect` | Amiga EaglePlayer modules, TFMX, MED, and prefix-led replayers |
 | `vgmstream` | `807b4948cfc1de0cd90e377e9c56f74664c54a1c` plus compatibility patch | `CVGmstream` | Bundled `vgmstream-cli` | Console streamed audio, TXTP, HD/HBD/IECS-related routes |
 | `lazyusf2` | `421f00bcaa1988b8e1825e91780129f24fbd1aa0` | `CLazyUSF` | Native dependency-aware route | USF and miniUSF; `.usflib` companions |
@@ -43,11 +44,29 @@ ScanSong supplements it with direct fixed-header metadata where that is safe:
 NSF/GBS text fields and SPC ID666/xID6 fields. SPC metadata does not start an
 emulator. The decoder remains authoritative for SPC playback and timing checks.
 
-The `.ay` container is the current AY-family route. ZX Spectrum tracker and
-playlist families found in aggregate AY collections (`.asc`, `.ayl`, `.pt1`,
-`.pt2`, `.pt3`, `.stc`, `.stp`, `.vtx`, and related suffixes) are not libgme
-inputs and are not registered as ScanSong sources. They remain unsupported
-until a decoder and scanner contract are fixture-qualified.
+The `.ay` container remains the libgme route. ZX Spectrum tracker and playlist
+families found in aggregate AY collections are routed separately through the
+focused ZXTune AY-family bridge below. The shared Amiga prefix fallback
+excludes these suffixes so a tracker file cannot be mistaken for an Amiga
+module.
+
+### ZXTune AY-family
+
+The `zxtune-aym` route registers a deliberately narrow set of ZXTune player
+plugins directly: `.as0`, `.asc`, `.ftc`, `.gtr`, `.psc`, `.psg`, `.psm`,
+`.pt1`, `.pt2`, `.pt3`, `.sqt`, `.st1`, `.st3`, `.stc`, `.stp`, `.vtx`, and
+`.ym`. This avoids linking ZXTune's unrelated archive/player graph into the
+shared playback core. The native bridge produces stereo PCM and the standalone
+`vgmboy-zxtune-inspect` process supplies the same route's title, author,
+program, system, and duration fields to ScanSong.
+
+Real members from the Bulba AY archive have been opened and rendered for PT2,
+STC, ASC, PT3, VTX, and YM fixtures. The aggregate remains a sample-based
+qualification target. `.ayl` is intentionally not admitted because the
+upstream source has no AYL playlist decoder; `.ts` is also held out of this
+focused bridge because its upstream support depends on the wider plugin
+enumeration graph. These are explicit unsupported boundaries, not fallback
+routes to libgme or UADE.
 
 ### libVGM (`libvgm`)
 
@@ -78,6 +97,24 @@ only in scratch memory, preserves the original files, validates the decoded
 length, and rejects malformed streams. A legacy leading backslash in a PDX
 basename is normalized narrowly to a same-directory name; absolute and
 traversal paths remain unsafe.
+
+### ZXTune AY-family
+
+The `zxtune-aym` route registers a deliberately narrow set of ZXTune player
+plugins directly: `.as0`, `.asc`, `.ftc`, `.gtr`, `.psc`, `.psg`, `.psm`,
+`.pt1`, `.pt2`, `.pt3`, `.sqt`, `.st1`, `.st3`, `.stc`, `.stp`, `.vtx`, and
+`.ym`. This avoids linking ZXTune's unrelated archive/player graph into the
+shared playback core. The native bridge produces stereo PCM and the standalone
+`vgmboy-zxtune-inspect` process supplies the same route's title, author,
+program, system, and duration fields to ScanSong.
+
+Real members from the Bulba AY archive have been opened and rendered for PT2,
+STC, ASC, PT3, VTX, and YM fixtures. The aggregate remains a sample-based
+qualification target. `.ayl` is intentionally not admitted because the
+upstream source has no AYL playlist decoder; `.ts` is also held out of this
+focused bridge because its upstream support depends on the wider plugin
+enumeration graph. These are explicit unsupported boundaries, not fallback
+routes to libgme or UADE.
 
 ### UADE
 
@@ -118,6 +155,17 @@ SID uses libsidplayfp through the shared transport. Tracker modules use
 libopenmpt and are admitted as structurally known single rows unless the native
 module exposes a different supported structure. Neither route converts source
 modules to an intermediate audio file for cataloging.
+
+## Shared Long Play and timing contract
+
+Long Play is a shared playback-session policy. For a loop-capable family it
+enables the decoder's loop configuration and keeps rendering at the decoder's
+native clock; it does not rewrite source bytes, alter authored metadata, or
+force a universal duration. A decoder with no natural ending is bounded by the
+shared timing policy so a looping core cannot run forever accidentally. Tempo,
+native fade, and natural-ending capability are declared once in
+`FormatRegistry` and projected to both native frontends. The UI's ordinary
+end-time/default-duration setting remains separate from the stream clock.
 
 ## Build and runtime dependencies
 

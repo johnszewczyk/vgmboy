@@ -50,6 +50,7 @@ repository-level summary readable.
 | [libvgm](https://github.com/ValleyBell/libvgm) | `867223e7c33d63de115d1ab955f784c44f19040a` | [github.com/ValleyBell/libvgm](https://github.com/ValleyBell/libvgm) | VGM, VGZ, GYM, S98, DRO | `CLibVGM` bridge; source and static-library build are owned by VGMBoy. |
 | [psgplay](https://github.com/frno7/psgplay) | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | [github.com/frno7/psgplay](https://github.com/frno7/psgplay) | SNDH | `CPSGPlay` bridge and `VGMBoySNDH` metadata product; enumerates SNDH subtunes and renders Atari ST PSG audio. A deterministic 1,024-file sample selected and rendered 2,030 subtunes; the full corpus remains unqualified. |
 | [mdxmini](https://github.com/mistydemeo/mdxmini) | `003531a471c1955f4ed4357d0e2a6cba809c34a0` | [github.com/mistydemeo/mdxmini](https://github.com/mistydemeo/mdxmini) | MDX, with adjacent PDX sample banks | `CMDX` bridge; one logical MDX sequence per playlist item, case-insensitive PDX resolution, native duration, X68000 LZX 0.32/0.42 normalization for MDX bodies and PDX banks, and a matching `vgmboy-mdx-inspect` scanner executable. GPL-2.0-or-later. |
+| [ZXTune](https://github.com/vitamin-caig/zxtune) | `c93e81d081685ea2c7cd21fe0077e93d84b4d88d` plus `patches/zxtune-modern-libcxx.patch` | [github.com/vitamin-caig/zxtune](https://github.com/vitamin-caig/zxtune) | ASC, FTC, GTR, PSC, PSG, PSM, PT1/PT2/PT3, SQT, ST1/ST3/STC/STP, VTX, YM, AS0 | Focused AY-family bridge (`CZXTune`) and native `vgmboy-zxtune-inspect` scanner handoff. The direct plugin set is registered explicitly so unrelated ZXTune archive/player dependencies are not pulled into VGMBoy. `.ayl` and `.ts` remain outside the admitted set pending dedicated fixture-qualified routes. LGPL-3.0. |
 | [UADE](https://github.com/dv1/uade) | Homebrew `uade` 3.05 | [github.com/dv1/uade](https://github.com/dv1/uade) | Amiga EaglePlayer modules, including prefix-led `mod.*`, `p4x.*`, TFMX, MED, and custom players | `CUADE` bridge; content-aware prefix routing, complete Amiga archive-set materialization, UADE subsong enumeration, native PCM, and the matching `vgmboy-amiga-inspect` scanner executable. GPL-2.0-only; the installed runtime/data directory is required at run time. |
 | [Highly Complete](https://github.com/mgba-emu/mgba) (mGBA + PSFLib) | mGBA 0.11.0 source snapshot + PSFLib source snapshot; tree digests in `vendor/PROVENANCE.md` | [github.com/mgba-emu/mgba](https://github.com/mgba-emu/mgba) | GSF, miniGSF | `CHighlyComplete` bridge; PSFLib resolves the complete miniGSF chain, then mGBA runs the assembled GBA ROM. The bridge resamples mGBA's live native rate into VGMBoy's fixed output rate. |
 | 2sf2wav | DeSmuME 0.9.9 svn 4608 source snapshot; tree digest in `vendor/PROVENANCE.md` | — | 2SF, mini2SF | `C2SF` bridge over the static DS core. It validates relative mini2SF libraries and explicitly tears down process-global DS state before any replacement decoder is created. |
@@ -119,6 +120,37 @@ playback or scanner scratch layer. A legacy leading `\name` PDX reference is
 treated as a same-directory basename; absolute paths and traversal syntax are
 not admitted. `mdx_get_tracks()` continues to describe driver channels, not
 playlist rows, so each MDX remains one logical track.
+
+### ZXTune AY-family validation boundary
+
+ZXTune is integrated as a narrow native bridge for the tracker formats found
+in the aggregate Bulba AY collection. The direct route registers the upstream
+player plugins for AS0, ASC, FTC, GTR, PSC, PSG, PSM, PT1, PT2, PT3, SQT, ST1,
+ST3, STC, STP, VTX, and YM, then renders signed stereo PCM through the common
+`AudioDecoder` contract. The scanner invokes the standalone
+`vgmboy-zxtune-inspect` binary so cataloging does not link ScanSong to
+VGMBoyKit or to the full ZXTune application graph.
+
+The first qualified fixtures include PT2, STC, ASC, PT3, VTX, and YM members
+from the real Bulba archive. Each opened, returned metadata, and rendered
+non-silent PCM. The broader aggregate remains a sampling target: admission
+means that the route is available, not that every file in a large collection
+has been certified. `.ayl` is intentionally not admitted because the upstream
+source does not provide the required playlist decoder; `.ts` is held back from
+this focused bridge because its upstream support is coupled to the wider plugin
+enumeration graph. Those decisions are recorded rather than silently routing
+unknown files through Amiga or Game Music Emu.
+
+### Long Play and timing contract
+
+Long Play is configured by the shared playback session and exposed through the
+same `DecoderFamily` flags to CocoaSpice and SPCBoyWK. A loop-capable decoder
+receives its loop policy and continues rendering at its native clock; Long Play
+does not rewrite source bytes, alter authored metadata, or force a universal
+duration. A decoder with no natural ending is bounded by the shared timing
+policy. Tempo is advertised only by families whose bridge implements it, and
+the ordinary end-time/default-duration setting remains separate from the
+decoder's stream clock.
 
 ## Build and run
 

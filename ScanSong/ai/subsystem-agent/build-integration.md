@@ -13,7 +13,7 @@ executables.
   are the source of truth for upstream revision review; ScanSong does not keep a second version list.
 - ScanSong depends on VGMBoy's lightweight `VGMBoyFormatCore` and `VGMBoySNDH` products
   for typed format admission; it does not link VGMBoyKit or native decoders.
-- `ScanSong/build-app.sh` asks VGMBoy to build the vgmstream CLI, Highly Complete inspector, MDX inspector, UADE-backed Amiga inspector, and FFmpeg inspector,
+- `ScanSong/build-app.sh` asks VGMBoy to build the vgmstream CLI, Highly Complete inspector, MDX inspector, UADE-backed Amiga inspector, FFmpeg inspector, and ZXTune inspector,
   then copies those products into the ScanSong bundle.
 - `ScanSong/launch.sh` packages a fresh app, asks the older ScanSong process to
   close through `SIGTERM`, and refuses to open it while that process remains.
@@ -24,7 +24,8 @@ executables.
 - The app bundle contains the VGMBoy-built `vgmstream-cli` and
   `vgmboy-highly-complete-inspect`, `vgmboy-mdx-inspect`,
   `vgmboy-amiga-inspect`, and `vgmboy-ffmpeg-inspect` products at the paths
-  expected by the scanner adapters.
+  expected by the scanner adapters, plus `vgmboy-zxtune-inspect` for the
+  focused AY-family route.
 - `build-app.sh` removes `.build` before a release build so stale scanner binaries cannot survive
   a fresh packaging run.
 - A missing inspection executable is a typed adapter failure; the scanner does not invent a row or
@@ -47,6 +48,10 @@ executables.
   ScanSong owns only prefix admission, archive materialization, and catalog projection.
 - APE metadata is read through the VGMBoy-built `vgmboy-ffmpeg-inspect` process;
   ScanSong owns only route registration, bounded process execution, and catalog projection.
+- ZXTune metadata is read through the VGMBoy-built `vgmboy-zxtune-inspect`
+  process; ScanSong owns only direct suffix admission, bounded process
+  execution, and catalog projection. It does not link `VGMBoyKit` for this
+  route.
 
 ## Files
 

@@ -14,7 +14,7 @@ public enum AmigaFormatManifest {
     /// path-prefix fallback must not admit them to UADE.
     public static let knownNonAmigaExtensions: Set<String> = [
         "as0", "asc", "ayl", "ftc", "fxm", "gtr", "org", "psc", "psm",
-        "pt1", "pt2", "pt3", "rus", "sqt", "stc", "stc_", "stp", "vtx", "ym", "zx"
+        "pt1", "pt2", "pt3", "psg", "rus", "sqt", "st1", "st3", "stc", "stc_", "stp", "vtx", "ym", "zx"
     ]
 
     public static let prefixes: Set<String> = Set("""

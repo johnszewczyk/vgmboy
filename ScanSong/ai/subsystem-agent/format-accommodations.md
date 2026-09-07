@@ -26,6 +26,7 @@ fake one-track record merely to make a collection look complete.
 | `libvgm` | `.gym`, `.s98`, `.vgm`, `.vgz` | One stream row | Direct VGM/VGZ GD3 and timing; GYM/S98 text may be empty | VGZ is bounded gzip decompression, not a generic archive. |
 | `psgplay` | `.sndh` | One row per declared subtune | Shared `VGMBoySNDH` header/timing reader | Never starts PSGPlay during metadata inspection. |
 | `mdx` | `.mdx` | One logical sequence row | VGMBoy-built `vgmboy-mdx-inspect` | A declared PDX bank is prepared but never published as a track. |
+| `zxtune-aym` | `.as0`, `.asc`, `.ftc`, `.gtr`, `.psc`, `.psg`, `.psm`, `.pt1`, `.pt2`, `.pt3`, `.sqt`, `.st1`, `.st3`, `.stc`, `.stp`, `.vtx`, `.ym` | One known single row | VGMBoy-built `vgmboy-zxtune-inspect` | Direct AY-family player route; `.ayl` and `.ts` remain unsupported boundaries. |
 | `amiga-uade` | UADE replayer prefixes (`mod.*`, `p4x.*`, `med.*`, TFMX, and custom players) | One row per UADE subsong | VGMBoy-built `vgmboy-amiga-inspect` | `.lha` and loose sets are materialized as complete sets; companions remain dependency data. |
 | `highly-complete` | `.gsf`, `.minigsf` | One validated row | VGMBoy-built inspector plus PSF-style tags | Complete miniGSF dependency set is required. |
 | `highly-theoretical` | `.ssf`, `.minissf` | One structurally-known row | PSF-style footer tags | Scanner tags the PSF container; a native playback route is not implied. |
@@ -82,13 +83,22 @@ inspects the file but suppresses unverified HES timing rather than presenting
 the raw 256-slot address space as a real album. The `.m3u` itself is support
 data and is not a catalog track.
 
-The current AY-family route is limited to the registered `.ay` container. The
-aggregate Bulba AY collections also contain tracker and playlist suffixes such
-as `.asc`, `.ayl`, `.pt1`, `.pt2`, `.pt3`, `.stc`, `.stp`, and `.vtx`; those
-formats do not have a current ScanSong/VGMBoy decoder route. They remain
-unsupported-format diagnostics rather than synthetic tracks. The shared Amiga
-prefix fallback explicitly excludes the known AY-family suffix set so names
-such as `STAR.pt2` or `ML.4 95.ayl` cannot be mistaken for UADE modules.
+The `.ay` container remains the Game Music Emu route. The aggregate Bulba AY
+collections also contain tracker and playlist suffixes; the fixture-qualified
+subset is admitted through `zxtune-aym` and the native
+`vgmboy-zxtune-inspect` process. `.ayl` remains unsupported because the
+upstream source does not provide the required playlist decoder, and `.ts` is
+held outside the focused direct-plugin graph. The shared Amiga prefix fallback
+explicitly excludes the known AY-family suffix set so names such as `STAR.pt2`
+or `ML.4 95.ayl` cannot be mistaken for UADE modules.
+
+### ZXTune AY-family
+
+The ZXTune scanner route publishes one known-single row per admitted source.
+The native inspector returns title, author, program, system, and duration
+fields from the same player plugin family used by playback. ScanSong launches
+the bounded native process after archive/member materialization; it does not
+link the complete playback core or invent metadata when a member fails.
 
 ## SNDH / PSGPlay
 

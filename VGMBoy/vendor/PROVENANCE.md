@@ -15,8 +15,10 @@ It is a local snapshot identity, not a substitute for an upstream commit.
 | `2sf2wav` | DeSmuME `0.9.9 svn 4608`; independent upstream repository not recorded | `c3e329f9cf72881d25dabb03b9a89ebd4125ca9bd6d44c26f642589c622a9fb7` | GPL source snapshot used by the 2SF bridge |
 | `PSFLib` | Independent upstream revision not recorded in the inherited snapshot | `c3adb7ea371fbeeedc68b3747c314419b52d9cb46aa0d75f177f428bcdb7d021` | Compiled with lazyusf2 for PSF-family dependency resolution |
 | `mdxmini` | `003531a471c1955f4ed4357d0e2a6cba809c34a0` | vendored source snapshot | [mistydemeo/mdxmini](https://github.com/mistydemeo/mdxmini), GPL-2.0-or-later, with case-insensitive PDX lookup compatibility patch |
+| `zxtune` | `c93e81d081685ea2c7cd21fe0077e93d84b4d88d` | unified source snapshot | [vitamin-caig/zxtune](https://github.com/vitamin-caig/zxtune), LGPL-3.0, with the tracked Apple libc++ `use_count()` compatibility patch; focused AY-family build only |
 
 The submodule commits are pinned in `.gitmodules` and the Git tree. Compatibility changes for
 upstream gitlinks are applied to disposable build copies from `patches/`; the vendor checkouts
 remain upstream-readable. The three ordinary source snapshots should receive an upstream commit
-or release tag if their source is refreshed.
+or release tag if their source is refreshed. ZXTune is kept as a regular source snapshot in this
+unified repository so the parent Git history owns the exact decoder source and patch together.

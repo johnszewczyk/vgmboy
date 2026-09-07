@@ -24,6 +24,10 @@ let qsfBuildDirectory = "\(dependencyRoot)/qsf"
 let psgPlayVendorDirectory = "\(sharedVendorRoot)/psgplay"
 let psgPlayBuildDirectory = "\(dependencyRoot)/psgplay"
 let mdxMiniVendorDirectory = "\(sharedVendorRoot)/mdxmini/src"
+let zxtuneVendorDirectory = "\(sharedVendorRoot)/zxtune"
+let zxtuneBuildDirectory = "\(dependencyRoot)/zxtune"
+let zxtuneLibraryDirectory = "\(zxtuneBuildDirectory)/lib/darwin/release"
+let zxtuneScanResultObject = "\(zxtuneBuildDirectory)/scan_result.cpp.o"
 let uadeIncludeDirectory = "/opt/homebrew/opt/uade/include"
 let uadeLibraryDirectory = "/opt/homebrew/opt/uade/lib"
 
@@ -41,6 +45,7 @@ let package = Package(
         .executable(name: "vgmboy-mdx-inspect", targets: ["VGMBoyMDXInspect"]),
         .executable(name: "vgmboy-amiga-inspect", targets: ["VGMBoyAmigaInspect"]),
         .executable(name: "vgmboy-ffmpeg-inspect", targets: ["VGMBoyFFmpegInspect"]),
+        .executable(name: "vgmboy-zxtune-inspect", targets: ["VGMBoyZXTuneInspect"]),
         .executable(name: "VGMBoy", targets: ["VGMBoyApp"])
     ],
     targets: [
@@ -290,8 +295,52 @@ let package = Package(
             linkerSettings: [.linkedFramework("AudioToolbox")]
         ),
         .target(
+            name: "VGMBoyCZXTune",
+            path: "Sources/CZXTune",
+            sources: ["vgmboy_zxtune.cpp"],
+            publicHeadersPath: "include",
+            cxxSettings: [
+                .unsafeFlags([
+                    "-std=c++20",
+                    "-I\(zxtuneVendorDirectory)",
+                    "-I\(zxtuneVendorDirectory)/include",
+                    "-I\(zxtuneVendorDirectory)/src",
+                    "-I\(zxtuneVendorDirectory)/3rdparty/fmt/include"
+                ])
+            ],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-L\(zxtuneLibraryDirectory)",
+                    zxtuneScanResultObject,
+                    "-lcore_plugins_players",
+                    "-lmodule_players",
+                    "-lmodule_properties",
+                    "-lmodule_conversion",
+                    "-lformats_chiptune",
+                    "-lformats_multitrack",
+                    "-ldevices_aym",
+                    "-ldevices_aym_dumper",
+                    "-lsound",
+                    "-lbinary_format",
+                    "-lbinary",
+                    "-lbinary_compression",
+                    "-lanalysis",
+                    "-lparameters",
+                    "-lstrings",
+                    "-ltools",
+                    "-ldebug",
+                    "-lplatform",
+                    "-lasync",
+                    "-ll10n_stub",
+                    "-llhasa",
+                    "-lz80ex",
+                    "-lz"
+                ])
+            ]
+        ),
+        .target(
             name: "VGMBoyKit",
-            dependencies: ["VGMBoyFormatCore", "VGMBoySNDH", "VGMBoyCPSGPlay", "VGMBoyCMDX", "VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCFFmpeg", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCQSF", "VGMBoyCSIDPlayFP", "VGMBoyCOpenMPT", "VGMBoyCUADE", "VGMBoyCAudioUnit"],
+            dependencies: ["VGMBoyFormatCore", "VGMBoySNDH", "VGMBoyCPSGPlay", "VGMBoyCMDX", "VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCFFmpeg", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCQSF", "VGMBoyCSIDPlayFP", "VGMBoyCOpenMPT", "VGMBoyCUADE", "VGMBoyCAudioUnit", "VGMBoyCZXTune"],
             linkerSettings: [
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("AudioToolbox")
@@ -319,6 +368,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "VGMBoyFFmpegInspect",
+            dependencies: ["VGMBoyKit"]
+        ),
+        .executableTarget(
+            name: "VGMBoyZXTuneInspect",
             dependencies: ["VGMBoyKit"]
         ),
         .executableTarget(

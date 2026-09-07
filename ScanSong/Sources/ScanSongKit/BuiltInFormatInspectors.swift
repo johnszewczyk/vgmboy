@@ -21,6 +21,8 @@ public enum BuiltInFormatInspectors {
             return StandardAudioFormatInspector(descriptor: descriptor)
         case "openmpt":
             return SingleTrackFormatInspector(descriptor: descriptor)
+        case "zxtune-aym":
+            return ZXTuneCLIInspector(descriptor: descriptor)
         case "sid":
             return SIDFormatInspector(descriptor: descriptor)
         case "vgmstream", "vgmstream-txtp", "vgmstream-hd-bank":

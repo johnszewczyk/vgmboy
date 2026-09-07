@@ -31,7 +31,13 @@ dependency_signature() {
             # repository. Hash its working tree too, so local compatibility
             # changes cannot be hidden behind a stale dependency product.
             if [[ -d "$ROOT_DIR/$source_relative" ]]; then
-                find "$ROOT_DIR/$source_relative" -type f -print0 \
+                find "$ROOT_DIR/$source_relative" \
+                    \( -path "$ROOT_DIR/$source_relative/bin" \
+                    -o -path "$ROOT_DIR/$source_relative/lib" \
+                    -o -path "$ROOT_DIR/$source_relative/obj" \
+                    -o -path "$ROOT_DIR/$source_relative/pkg" \
+                    -o -path "$ROOT_DIR/$source_relative/Builds" \) -prune -o \
+                    -type f -print0 \
                     | sort -z \
                     | xargs -0 shasum -a 256
             fi
@@ -92,6 +98,7 @@ ensure_dependency play-psf vendor/play .build/play-psf/libcocoaspice_play_psf.a 
 ensure_dependency qsf vendor/aosdk .build/qsf/libvgmboy_qsf.a build-qsf.sh patches/aosdk-qsf-lifecycle.patch
 ensure_dependency vgmstream vendor/vgmstream .build/vgmstream/src/libvgmstream.a build-vgmstream.sh patches/vgmstream-cocoaspice.patch
 ensure_dependency psgplay vendor/psgplay .build/psgplay/libpsgplay.a build-psgplay.sh
+ensure_dependency zxtune vendor/zxtune .build/zxtune/source-revision build-zxtune.sh patches/zxtune-modern-libcxx.patch
 
 copy_dependency libvgm "$SOURCE_BUILD_ROOT/libvgm"
 copy_dependency mgba "$SOURCE_BUILD_ROOT/mgba"
@@ -101,5 +108,6 @@ copy_dependency play-psf "$SOURCE_BUILD_ROOT/play-psf"
 copy_dependency qsf "$SOURCE_BUILD_ROOT/qsf"
 copy_dependency vgmstream "$SOURCE_BUILD_ROOT/vgmstream"
 copy_dependency psgplay "$SOURCE_BUILD_ROOT/psgplay"
+copy_dependency zxtune "$SOURCE_BUILD_ROOT/zxtune"
 
 echo "VGMBoy dependencies ready: $DEPENDENCY_ROOT"

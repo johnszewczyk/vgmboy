@@ -16,6 +16,7 @@ public enum BuiltInScannerPlugins {
         .init(pluginID: "gme", displayName: "Game Music Emu", supportedExtensions: ["spc"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 10),
         .init(pluginID: "gme-multitrack", displayName: "Game Music Emu", supportedExtensions: ["ay", "gbs", "hes", "kss", "nsf", "nsfe", "sap"], structurePolicy: .enumerate, metadataPolicy: .decoder, priority: 10),
         .init(pluginID: "openmpt", displayName: "libopenmpt", supportedExtensions: ["669", "dmf", "far", "it", "mod", "mptm", "mtm", "okt", "ptm", "s3m", "stm", "ult", "xm"], structurePolicy: .knownSingle, metadataPolicy: .optionalDeferred, priority: 10),
+        .init(pluginID: "zxtune-aym", displayName: "ZXTune", supportedExtensions: ["as0", "asc", "ftc", "gtr", "psc", "psg", "psm", "pt1", "pt2", "pt3", "sqt", "st1", "st3", "stc", "stp", "vtx", "ym"], structurePolicy: .knownSingle, metadataPolicy: .decoder, priority: 10),
         .init(pluginID: "standard-audio", displayName: "Core Audio", supportedExtensions: ["aif", "aiff", "flac", "m4a", "mp3", "ogg", "wav"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 10),
         .init(pluginID: "ffmpeg-audio", displayName: "FFmpeg", supportedExtensions: ["ape"], structurePolicy: .knownSingle, metadataPolicy: .decoder, priority: 10),
         .init(pluginID: "libvgm", displayName: "libVGM", supportedExtensions: ["gym", "s98", "vgm", "vgz"], structurePolicy: .enumerate, metadataPolicy: .decoder, priority: 10),

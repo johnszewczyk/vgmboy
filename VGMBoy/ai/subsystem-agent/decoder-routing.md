@@ -49,6 +49,13 @@ deliberately exclusive to one family.
   body and decoding whole-file LZX PDX banks before table parsing. A legacy
   leading backslash in a PDX basename is normalized narrowly; absolute and
   traversal paths remain invalid.
+- ZXTune AY-family tracker files route to `zxtune-aym`. The admitted suffix set
+  is explicit (`as0`, `asc`, `ftc`, `gtr`, `psc`, `psg`, `psm`, `pt1`, `pt2`,
+  `pt3`, `sqt`, `st1`, `st3`, `stc`, `stp`, `vtx`, `ym`) and is shared with
+  ScanSong's native `vgmboy-zxtune-inspect` handoff. `.ayl` and `.ts` are not
+  fallback candidates: the former lacks the required upstream playlist
+  decoder, and the latter is outside the focused direct-plugin graph until it
+  has fixture-qualified support.
 - `hasNaturalEnding == false` (lazyusf/USF and sidplayfp/SID) forces a capped decode window so a looping core can
   never run indefinitely. `PlaybackTimingPolicy.plan` carries this through the bounded plan. SID metadata
   currently reports no natural duration, so its normal non-Long-Play window is the shared unknown-duration

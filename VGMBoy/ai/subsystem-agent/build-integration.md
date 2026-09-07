@@ -22,8 +22,9 @@ for ScanSong's external inspection executables.
   decoder source or decoder build scripts.
 - `aosdk`, `libvgm`, `lazyusf2`, `Play!`, `vgmstream`, and `psgplay` are Git submodules in that garden; a fresh checkout
   must run `git submodule update --init --recursive` before building. The small `2sf2wav`, mGBA,
-  and PSFLib source snapshots remain ordinary tracked source because they are not independent
-  submodules in the existing app-family checkouts.
+  PSFLib, and ZXTune source snapshots remain ordinary tracked source because they are not
+  independent submodules in the unified app-family checkout. ZXTune's upstream commit and
+  compatibility patch are recorded in `vendor/PROVENANCE.md` and the plugin manifest.
 - The lazyUSF safety patch is tracked at
   `patches/lazyusf2-render-safety.patch` and `scripts/build-lazyusf.sh`
   applies it to the checked-out `vendor/lazyusf2` source before building. A
@@ -43,6 +44,10 @@ for ScanSong's external inspection executables.
 - The FFmpeg scanner handoff is the release `vgmboy-ffmpeg-inspect` product
   copied to `.build/scanner-plugins`; it uses the same `CFFmpeg` APE/MP2/TAK
   decoder and duration/tag projection as VGMBoy playback.
+- The ZXTune scanner handoff is the native `vgmboy-zxtune-inspect` product
+  copied to `.build/scanner-plugins`; it is built from the focused AY-family
+  bridge and does not require ScanSong to link `VGMBoyKit` or the full ZXTune
+  desktop application graph.
 - `Docs/plugin-versions.json` is the canonical milestone inventory for every
   decoder/core input. `scripts/audit-plugin-versions.sh` is read-only and
   reports upstream tags, installed Homebrew versions, missing source trees, and
@@ -55,7 +60,8 @@ for ScanSong's external inspection executables.
   a warm scanner-plugin build must reuse both products instead of recompiling
   the AOSDK/QSF and vgmstream source trees during every ScanSong package.
 - ScanSong receives the built vgmstream CLI, Highly Complete inspector, MDX
-  inspector, and Amiga inspector from VGMBoy; it must not
+  inspector, Amiga inspector, FFmpeg inspector, and ZXTune inspector from
+  VGMBoy; it must not
   copy a CocoaSpice app resource or invoke a CocoaSpice launcher/build entry point.
 - Executable product names must not collide on a case-insensitive filesystem. The CLI is
   `vgmboy-cli`; the GUI app is `VGMBoy`. A `vgmboy` (CLI) vs `VGMBoy` (app) collision silently
@@ -67,6 +73,7 @@ for ScanSong's external inspection executables.
 - [build-app.sh](../../build-app.sh)
 - [build-scanner-plugins.sh](../../scripts/build-scanner-plugins.sh)
 - [build-dependencies.sh](../../scripts/build-dependencies.sh)
+- [build-zxtune.sh](../../scripts/build-zxtune.sh)
 - [build-psgplay.sh](../../scripts/build-psgplay.sh)
 - [stage-aosdk-qsf.sh](../../scripts/stage-aosdk-qsf.sh) and
   [aosdk-qsf-lifecycle.patch](../../patches/aosdk-qsf-lifecycle.patch)

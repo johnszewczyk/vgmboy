@@ -1,0 +1,180 @@
+/**
+ *
+ * @file
+ *
+ * @brief  Module properties builder implementation
+ *
+ * @author vitamin.caig@gmail.com
+ *
+ **/
+
+#include "module/players/properties_helper.h"
+
+#include "formats/chiptune.h"
+#include "module/attributes.h"
+#include "sound/sound_parameters.h"
+#include "strings/join.h"
+#include "strings/trim.h"
+
+#include "string_view.h"
+
+namespace Module
+{
+  void PropertiesHelper::SetNonEmptyProperty(StringView name, StringView value)
+  {
+    if (!value.empty())
+    {
+      Delegate.SetValue(name, value);
+    }
+  }
+
+  void PropertiesHelper::SetBinaryProperty(StringView name, Binary::View value)
+  {
+    Delegate.SetValue(name, value);
+  }
+
+  void PropertiesHelper::SetType(StringView type)
+  {
+    Delegate.SetValue(ATTR_TYPE, type);
+  }
+
+  void PropertiesHelper::SetContainer(StringView container)
+  {
+    SetNonEmptyProperty(ATTR_CONTAINER, container);
+  }
+
+  void PropertiesHelper::SetSource(const Formats::Chiptune::Container& source)
+  {
+    Delegate.SetValue(ATTR_SIZE, source.Size());
+    Delegate.SetValue(ATTR_CRC, source.Checksum());
+    Delegate.SetValue(ATTR_FIXEDCRC, source.FixedChecksum());
+  }
+
+  void PropertiesHelper::SetAuthor(StringView author)
+  {
+    SetNonEmptyProperty(ATTR_AUTHOR, author);
+  }
+
+  void PropertiesHelper::SetTitle(StringView title)
+  {
+    SetNonEmptyProperty(ATTR_TITLE, title);
+  }
+
+  void PropertiesHelper::SetComment(StringView comment)
+  {
+    SetNonEmptyProperty(ATTR_COMMENT, comment);
+  }
+
+  void PropertiesHelper::SetProgram(StringView program)
+  {
+    SetNonEmptyProperty(ATTR_PROGRAM, program);
+  }
+
+  void PropertiesHelper::SetComputer(StringView computer)
+  {
+    SetNonEmptyProperty(ATTR_COMPUTER, computer);
+  }
+
+  void PropertiesHelper::SetStrings(const Strings::Array& strings)
+  {
+    // TODO: Join(begin, end, delimiter)
+    const auto joined = Strings::Join(strings, "\n"sv);
+    const auto trimmed = Strings::Trim(joined, '\n');
+    SetNonEmptyProperty(ATTR_STRINGS, trimmed);
+  }
+
+  void PropertiesHelper::SetVersion(uint_t major, uint_t minor)
+  {
+    assert(minor < 10);
+    const uint_t version = 10 * major + minor;
+    Delegate.SetValue(ATTR_VERSION, version);
+  }
+
+  void PropertiesHelper::SetVersion(StringView version)
+  {
+    SetNonEmptyProperty(ATTR_VERSION, version);
+  }
+
+  void PropertiesHelper::SetDate(StringView date)
+  {
+    SetNonEmptyProperty(ATTR_DATE, date);
+  }
+
+  void PropertiesHelper::SetPlatform(StringView platform)
+  {
+    Delegate.SetValue(ATTR_PLATFORM, platform);
+  }
+
+  void PropertiesHelper::SetChannels(const Strings::Array& names, uint_t count)
+  {
+    if (count == 1)
+    {
+      const auto joined = Strings::Join(names, "\n"sv);
+      SetNonEmptyProperty(ATTR_CHANNELS_NAMES, joined);
+    }
+    else
+    {
+      constexpr uint_t OFFSET = 1;
+      String result;
+      for (uint_t idx = 0; idx != count; ++idx)
+      {
+        for (const auto& ch : names)
+        {
+          if (!result.empty())
+          {
+            result += '\n';
+          }
+          result += ch;
+          result += '/';
+          result += std::to_string(idx + OFFSET);
+        }
+      }
+      SetNonEmptyProperty(ATTR_CHANNELS_NAMES, result);
+    }
+  }
+
+  void PropertiesHelper::SetChannels(StringView prefix, uint_t count)
+  {
+    constexpr uint_t OFFSET = 1;
+    String result;
+    for (uint_t idx = 0; idx != count; ++idx)
+    {
+      if (!result.empty())
+      {
+        result += '\n';
+      }
+      result += prefix;
+      if (count > 1)
+      {
+        result += ' ';
+        result += std::to_string(idx + OFFSET);
+      }
+    }
+    SetNonEmptyProperty(ATTR_CHANNELS_NAMES, result);
+  }
+
+  void PropertiesHelper::SetFadein(Time::Milliseconds fadein)
+  {
+    using namespace Parameters::ZXTune::Sound;
+    Delegate.SetValue(FADEIN, FADEIN_PRECISION * fadein.Get() / fadein.PER_SECOND);
+  }
+
+  void PropertiesHelper::SetFadeout(Time::Milliseconds fadeout)
+  {
+    using namespace Parameters::ZXTune::Sound;
+    Delegate.SetValue(FADEOUT, FADEOUT_PRECISION * fadeout.Get() / fadeout.PER_SECOND);
+  }
+
+  void PropertiesHelper::SetGain(float gain)
+  {
+    using namespace Parameters::ZXTune::Sound;
+    if (gain > 1.f / GAIN_PRECISION)
+    {
+      Delegate.SetValue(GAIN, GAIN_PRECISION * gain);
+    }
+    else
+    {
+      Delegate.SetValue(GAIN, 1);
+    }
+  }
+}  // namespace Module

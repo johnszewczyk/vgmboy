@@ -11,7 +11,14 @@ QSF_OUTPUT="$BUILD_DIR/vgmboy-qsf-inspect"
 MDX_OUTPUT="$BUILD_DIR/vgmboy-mdx-inspect"
 AMIGA_OUTPUT="$BUILD_DIR/vgmboy-amiga-inspect"
 FFMPEG_OUTPUT="$BUILD_DIR/vgmboy-ffmpeg-inspect"
+ZXTUNE_OUTPUT="$BUILD_DIR/vgmboy-zxtune-inspect"
 SCANNER_STAMP="$BUILD_DIR/scanner-inputs.sha256"
+MODULE_CACHE_DIR="${CLANG_MODULE_CACHE_PATH:-$ROOT_DIR/.build/module-cache}"
+SWIFT_CACHE_DIR="${XDG_CACHE_HOME:-$ROOT_DIR/.build/swift-cache}"
+mkdir -p "$MODULE_CACHE_DIR" "$SWIFT_CACHE_DIR"
+export CLANG_MODULE_CACHE_PATH="$MODULE_CACHE_DIR"
+export SWIFTPM_MODULECACHE_OVERRIDE="$MODULE_CACHE_DIR"
+export XDG_CACHE_HOME="$SWIFT_CACHE_DIR"
 
 "$ROOT_DIR/scripts/build-dependencies.sh"
 
@@ -23,6 +30,13 @@ scanner_signature="$({
         "$ROOT_DIR/Sources/VGMBoyMDXInspect/main.swift" \
         "$ROOT_DIR/Sources/VGMBoyAmigaInspect/main.swift" \
         "$ROOT_DIR/Sources/VGMBoyFFmpegInspect/main.swift" \
+        "$ROOT_DIR/Sources/VGMBoyZXTuneInspect/main.swift" \
+        "$ROOT_DIR/Sources/VGMBoyKit/ZXTuneDecoder.swift" \
+        "$ROOT_DIR/Sources/VGMBoyKit/ZXTuneInspector.swift" \
+        "$ROOT_DIR/Sources/CZXTune/vgmboy_zxtune.cpp" \
+        "$ROOT_DIR/Sources/CZXTune/zxtune_inspect.cpp" \
+        "$ROOT_DIR/Sources/CZXTune/include/vgmboy_zxtune.h" \
+        "$ROOT_DIR/scripts/build-zxtune.sh" \
         "$ROOT_DIR/Sources/VGMBoyKit/AmigaDecoder.swift" \
         "$ROOT_DIR/Sources/VGMBoyKit/FFmpegAudioDecoder.swift" \
         "$ROOT_DIR/Sources/VGMBoyKit/FFmpegInspector.swift" \
@@ -44,7 +58,7 @@ scanner_signature="$({
     pkg-config --modversion libavcodec vorbisfile ogg 2>/dev/null || true
 } | shasum -a 256 | awk '{ print $1 }')"
 
-if [[ -x "$VGMSTREAM_OUTPUT" && -x "$QSF_OUTPUT" && -x "$MDX_OUTPUT" && -x "$AMIGA_OUTPUT" && -x "$FFMPEG_OUTPUT" && -f "$SCANNER_STAMP" \
+if [[ -x "$VGMSTREAM_OUTPUT" && -x "$QSF_OUTPUT" && -x "$MDX_OUTPUT" && -x "$AMIGA_OUTPUT" && -x "$FFMPEG_OUTPUT" && -x "$ZXTUNE_OUTPUT" && -f "$SCANNER_STAMP" \
       && "$(<"$SCANNER_STAMP")" == "$scanner_signature" ]]; then
     echo "VGMBoy scanner plugins are current ($scanner_signature)"
     echo "vgmstream: $VGMSTREAM_OUTPUT"
@@ -52,6 +66,7 @@ if [[ -x "$VGMSTREAM_OUTPUT" && -x "$QSF_OUTPUT" && -x "$MDX_OUTPUT" && -x "$AMI
     echo "mdx: $MDX_OUTPUT"
     echo "amiga: $AMIGA_OUTPUT"
     echo "ffmpeg: $FFMPEG_OUTPUT"
+    echo "zxtune: $ZXTUNE_OUTPUT"
     exit 0
 fi
 
@@ -74,6 +89,11 @@ FFMPEG_BUILT="$ROOT_DIR/.build/arm64-apple-macosx/release/vgmboy-ffmpeg-inspect"
 [[ -x "$FFMPEG_BUILT" ]] || { echo "Missing built FFmpeg inspector: $FFMPEG_BUILT" >&2; exit 1; }
 cp -X "$FFMPEG_BUILT" "$FFMPEG_OUTPUT"
 chmod 755 "$FFMPEG_OUTPUT"
+
+ZXTUNE_BUILT="$ROOT_DIR/.build/zxtune/vgmboy-zxtune-inspect"
+[[ -x "$ZXTUNE_BUILT" ]] || { echo "Missing built ZXTune inspector: $ZXTUNE_BUILT" >&2; exit 1; }
+cp -X "$ZXTUNE_BUILT" "$ZXTUNE_OUTPUT"
+chmod 755 "$ZXTUNE_OUTPUT"
 
 [[ -d "$VGMSTREAM_SOURCE" ]] || { echo "Missing shared vgmstream source: $VGMSTREAM_SOURCE" >&2; exit 1; }
 command -v cmake >/dev/null 2>&1 || { echo "Missing cmake" >&2; exit 1; }
@@ -124,4 +144,5 @@ echo "qsf: $QSF_OUTPUT"
 echo "mdx: $MDX_OUTPUT"
 echo "amiga: $AMIGA_OUTPUT"
 echo "ffmpeg: $FFMPEG_OUTPUT"
+echo "zxtune: $ZXTUNE_OUTPUT"
 echo "highly-complete: build through VGMBoy Package.swift product"

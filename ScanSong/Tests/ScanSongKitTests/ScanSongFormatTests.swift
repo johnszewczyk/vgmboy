@@ -29,12 +29,14 @@ import zlib
     for ayFamilyPath in [
         "/tmp/STAR.pt2",
         "/tmp/SKT.pt3",
-        "/tmp/ML.4 95.ayl",
         "/tmp/ICE.asc",
         "/tmp/SONIC.stc"
     ] {
-        #expect(registry.route(forPath: ayFamilyPath) == nil)
+        #expect(registry.route(forPath: ayFamilyPath)?.pluginID == "zxtune-aym")
+        #expect(registry.route(forPath: ayFamilyPath)?.structurePolicy == .knownSingle)
+        #expect(registry.route(forPath: ayFamilyPath)?.metadataPolicy == .decoder)
     }
+    #expect(registry.route(forPath: "/tmp/ML.4 95.ayl") == nil)
     #expect(registry.route(pathExtension: "ogg")?.metadataPolicy == .direct)
     #expect(registry.route(pathExtension: "ogg")?.pluginID == "standard-audio")
     #expect(registry.route(pathExtension: "ogg")?.pluginID != "vgmstream")
