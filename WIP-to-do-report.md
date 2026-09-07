@@ -1,6 +1,6 @@
 # WIP crash report: CocoaSpice heap corruption during MediaRemote work
 
-**Status:** Investigation deferred; documentation only. No code change has been made from this report.
+**Status:** Investigation active. First narrow MediaRemote hardening slice is implemented; root cause remains unconfirmed.
 
 **Reported:** 2026-09-05 10:39:15 -0400  
 **Process:** CocoaSpice 0.1.0 (1), arm64 native  
@@ -66,6 +66,20 @@ The MediaRemote path is nevertheless a high-priority boundary to audit. CocoaSpi
 
 The crash report refers to an Apple playback-queue request rather than directly naming `nowPlayingInfo`, so this is a lead, not a confirmed root cause.
 
+The source audit found one concrete amplification risk: `PlayerViewModel.startPlaybackTimer()` runs every 250 ms and calls `updateRemoteTransportState()`. Because the elapsed position changes on each tick, the existing equality check did not coalesce normal progress. This allowed up to four asynchronous `MPNowPlayingInfoCenter` metadata publications per second for the lifetime of a playback session.
+
+The first hardening slice now:
+
+- coalesces ordinary elapsed-position updates to one publication per second;
+- still publishes immediately for track, title, duration, play/pause, and large seek changes;
+- sanitizes elapsed and duration values to finite, non-negative numbers before the MediaPlayer boundary;
+- uses explicit `NSNumber` values for the numeric MediaRemote fields; and
+- adds pure unit coverage for the publication policy and sanitization.
+
+This reduces pressure on the suspected system boundary but is not yet a demonstrated fix for the heap corruption.
+
+Verification for this slice: `swift test` in `CocoaSpice/` built the executable and test bundle successfully; 60 tests passed. Optional archive-backed tests were skipped because their fixture environment variables were not set.
+
 Other live possibilities include:
 
 - an earlier out-of-bounds write or use-after-free in a decoder/audio bridge;
@@ -98,7 +112,8 @@ Do not currently classify `PlaylistPresentation.compare` as the root cause. The 
 - [ ] Ensure every value sent to MediaRemote is an immutable, primitive snapshot created before the framework call; never expose live playlist arrays, mutable metadata containers, decoder objects, or Swift storage with a shorter lifetime.
 - [ ] Audit whether any MediaRemote call can be initiated concurrently with an update to the source playlist or current-track metadata.
 - [ ] Confirm all `RemoteTransportController` calls remain main-actor serialized and that no callback retains application-owned mutable state across the framework boundary.
-- [ ] Add a bounded, deterministic test for repeated Now Playing publication while tracks are completed, sorted, replaced, and removed.
+- [x] Add pure coverage for repeated Now Playing publication coalescing, immediate state/seek changes, and numeric sanitization.
+- [ ] Add an integration test for repeated Now Playing publication while tracks are completed, sorted, replaced, and removed.
 - [ ] Add logging around publication generation, playlist count, current-track identity, title/album lengths, duration, and elapsed time. Avoid logging full paths or unbounded metadata.
 
 ### P1: verify the playlist-sort path independently

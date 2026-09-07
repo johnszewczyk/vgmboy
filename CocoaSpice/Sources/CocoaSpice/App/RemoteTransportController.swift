@@ -2,11 +2,42 @@ import Foundation
 import MediaPlayer
 
 struct RemoteTransportNowPlaying: Equatable, Sendable {
+    static let minimumElapsedUpdateInterval: TimeInterval = 1
+
     let title: String
     let albumTitle: String
     let elapsedSeconds: TimeInterval
     let durationSeconds: TimeInterval
     let isPlaying: Bool
+
+    /// MediaRemote is an Objective-C framework boundary. Keep the payload a
+    /// finite, non-negative value snapshot before handing it to Foundation;
+    /// decoder or transport corruption must not become NaN/Inf metadata.
+    var sanitizedForMediaRemote: Self {
+        Self(
+            title: title,
+            albumTitle: albumTitle,
+            elapsedSeconds: Self.sanitizeTime(elapsedSeconds),
+            durationSeconds: Self.sanitizeTime(durationSeconds),
+            isPlaying: isPlaying
+        )
+    }
+
+    static func shouldPublish(previous: Self?, next: Self) -> Bool {
+        guard let previous else { return true }
+        guard previous.title == next.title,
+              previous.albumTitle == next.albumTitle,
+              previous.durationSeconds == next.durationSeconds,
+              previous.isPlaying == next.isPlaying else {
+            return true
+        }
+        return abs(next.elapsedSeconds - previous.elapsedSeconds) >= minimumElapsedUpdateInterval
+    }
+
+    private static func sanitizeTime(_ value: TimeInterval) -> TimeInterval {
+        guard value.isFinite else { return 0 }
+        return max(0, value)
+    }
 }
 
 @MainActor
@@ -59,17 +90,21 @@ final class RemoteTransportController {
     }
 
     func updateNowPlaying(_ nowPlaying: RemoteTransportNowPlaying) {
-        guard nowPlaying != lastPublishedNowPlaying else { return }
-        lastPublishedNowPlaying = nowPlaying
+        let snapshot = nowPlaying.sanitizedForMediaRemote
+        guard RemoteTransportNowPlaying.shouldPublish(
+            previous: lastPublishedNowPlaying,
+            next: snapshot
+        ) else { return }
+        lastPublishedNowPlaying = snapshot
 
         var info: [String: Any] = [:]
-        info[MPMediaItemPropertyTitle] = nowPlaying.title
-        info[MPMediaItemPropertyAlbumTitle] = nowPlaying.albumTitle
-        info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = nowPlaying.elapsedSeconds
-        info[MPMediaItemPropertyPlaybackDuration] = nowPlaying.durationSeconds
-        info[MPNowPlayingInfoPropertyPlaybackRate] = nowPlaying.isPlaying ? 1.0 : 0.0
+        info[MPMediaItemPropertyTitle] = snapshot.title
+        info[MPMediaItemPropertyAlbumTitle] = snapshot.albumTitle
+        info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = NSNumber(value: snapshot.elapsedSeconds)
+        info[MPMediaItemPropertyPlaybackDuration] = NSNumber(value: snapshot.durationSeconds)
+        info[MPNowPlayingInfoPropertyPlaybackRate] = NSNumber(value: snapshot.isPlaying ? 1.0 : 0.0)
 
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-        MPNowPlayingInfoCenter.default().playbackState = nowPlaying.isPlaying ? .playing : .paused
+        MPNowPlayingInfoCenter.default().playbackState = snapshot.isPlaying ? .playing : .paused
     }
 }
