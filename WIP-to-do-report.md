@@ -133,7 +133,7 @@ Do not currently classify `PlaylistPresentation.compare` as the root cause. The 
 - The crash is not yet proven to be caused by playlist sorting.
 - The crash is not yet proven to be caused by MediaRemote; MediaRemote may be where earlier heap damage was detected.
 - No evidence in this report identifies UADE, MDX, a particular decoder, or a particular media file as the source.
-- No fix should be attempted from this report alone while the incident is being deferred.
+- The current publication change is a mitigation only; no root-cause fix should be declared until the crash boundary is reproduced or otherwise confirmed.
 
 ## Source and ownership references
 
