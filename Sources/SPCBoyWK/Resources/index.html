@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SPCBoy</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <svg class="icon-sprite" aria-hidden="true" focusable="false">
+      <symbol id="icon-folder-tree" viewBox="0 0 24 24"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z" /><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z" /><path d="M3 5a2 2 0 0 0 2 2h3" /><path d="M3 3v13a2 2 0 0 0 2 2h3" /></symbol>
+      <symbol id="icon-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></symbol>
+      <symbol id="icon-sidebar-views" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /><path d="M12 8h6" /><path d="M12 12h6" /><path d="M12 16h6" /><path d="M5.5 8h1" /><path d="M5.5 12h1" /><path d="M5.5 16h1" /></symbol>
+      <symbol id="icon-play" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" /></symbol>
+      <symbol id="icon-route" viewBox="0 0 24 24"><circle cx="6" cy="19" r="3" /><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" /><circle cx="18" cy="5" r="3" /></symbol>
+      <symbol id="icon-palette" viewBox="0 0 24 24"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z" /><circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /><circle cx="17.5" cy="10.5" r=".5" fill="currentColor" /><circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /><circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /></symbol>
+      <symbol id="icon-folder-plus" viewBox="0 0 24 24"><path d="M12 10v6" /><path d="M9 13h6" /><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></symbol>
+      <symbol id="icon-check-check" viewBox="0 0 24 24"><path d="M18 6 7 17l-5-5" /><path d="m22 10-7.5 7.5L13 16" /></symbol>
+      <symbol id="icon-scan-search" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><circle cx="12" cy="12" r="3" /><path d="m16 16-1.9-1.9" /></symbol>
+      <symbol id="icon-file-search" viewBox="0 0 24 24"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /><path d="M14 2v5a1 1 0 0 0 1 1h5" /><circle cx="11.5" cy="14.5" r="2.5" /><path d="M13.3 16.3 15 18" /></symbol>
+      <symbol id="icon-scroll-text" viewBox="0 0 24 24"><path d="M15 12h-5" /><path d="M15 8h-5" /><path d="M19 17V5a2 2 0 0 0-2-2H4" /><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" /></symbol>
+      <symbol id="icon-trash-2" viewBox="0 0 24 24"><path d="M10 11v6" /><path d="M14 11v6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></symbol>
+      <symbol id="icon-sliders-horizontal" viewBox="0 0 24 24"><path d="M10 5H3" /><path d="M12 19H3" /><path d="M14 3v4" /><path d="M16 17v4" /><path d="M21 12h-9" /><path d="M21 19h-5" /><path d="M21 5h-7" /><path d="M8 10v4" /><path d="M8 12H3" /></symbol>
+      <symbol id="icon-skip-back" viewBox="0 0 24 24"><path d="M17.971 4.285A2 2 0 0 1 21 6v12a2 2 0 0 1-3.029 1.715l-9.997-5.998a2 2 0 0 1-.003-3.432z" /><path d="M3 20V4" /></symbol>
+      <symbol id="icon-pause" viewBox="0 0 24 24"><rect x="14" y="3" width="5" height="18" rx="1" /><rect x="5" y="3" width="5" height="18" rx="1" /></symbol>
+      <symbol id="icon-skip-forward" viewBox="0 0 24 24"><path d="M21 4v16" /><path d="M6.029 4.285A2 2 0 0 0 3 6v12a2 2 0 0 0 3.029 1.715l9.997-5.998a2 2 0 0 0 .003-3.432z" /></symbol>
+      <symbol id="icon-infinity" viewBox="0 0 24 24"><path d="M6 16c5 0 7-8 12-8a4 4 0 0 1 0 8c-5 0-7-8-12-8a4 4 0 1 0 0 8" /></symbol>
+      <symbol id="icon-repeat-2" viewBox="0 0 24 24"><path d="m2 9 3-3 3 3" /><path d="M13 18H7a2 2 0 0 1-2-2V6" /><path d="m22 15-3 3-3-3" /><path d="M11 6h6a2 2 0 0 1 2 2v10" /></symbol>
+      <symbol id="icon-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z" /></symbol>
+    </svg>
+    <div class="app-shell">
+      <main class="workspace">
+        <aside class="sidebar">
+          <div class="sidebar-search-wrap toolbar">
+              <input id="sidebar-search-input" class="sidebar-search-input" type="search" placeholder="Search" />
+            <div class="sidebar-search-actions">
+              <div class="sidebar-view-actions" role="group" aria-label="Library view">
+                <button id="sidebar-view-toggle-button" class="sidebar-mode-button" type="button" title="Library view" aria-label="Library view"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sidebar-views"></use></svg></button>
+              </div>
+              <div class="sidebar-fold-actions" role="group" aria-label="Fold current view">
+                <button id="database-expand-all-button" class="sidebar-mode-button database-tree-control" type="button" title="Expand all" aria-label="Expand all">+</button>
+                <button id="database-collapse-all-button" class="sidebar-mode-button database-tree-control" type="button" title="Collapse all" aria-label="Collapse all">−</button>
+              </div>
+            </div>
+          </div>
+          <div id="tree-root" class="tree-root"></div>
+          <div id="sidebar-context-menu" class="sidebar-context-menu is-hidden" role="menu"></div>
+        </aside>
+        <div id="sidebar-resize-handle" class="sidebar-resize-handle" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" aria-valuemin="12" aria-valuemax="50" aria-valuenow="20" tabindex="0"></div>
+
+        <section class="content">
+          <div class="playlist-wrap">
+            <div class="playlist-scroll-wrap">
+              <div class="playlist-header-wrap">
+                <table class="playlist-table playlist-header-table">
+                  <thead><tr></tr></thead>
+                </table>
+              </div>
+              <div class="playlist-body-wrap">
+                <div id="playlist-selection-indicator" class="list-selection-indicator" aria-hidden="true"></div>
+                <table class="playlist-table playlist-body-table">
+                  <tbody id="playlist-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="content-bottombar">
+            <div class="bottom-primary toolbar toolbar-fill">
+              <div id="progress-slider-shell" class="ui-control toolbar-control progress-slider-shell">
+                <div class="progress-slider-rail">
+                  <div class="progress-slider-fill"></div>
+                  <div class="progress-slider-thumb"></div>
+                </div>
+                <input id="progress-slider" type="range" min="0" max="1" step="0.1" value="0" />
+              </div>
+              <div class="ui-control toolbar-control timing-readout">
+                <span id="elapsed-label" class="time-label">0:00</span>
+                <span class="time-separator">/</span>
+                <span id="song-length-label" class="time-label">0:00</span>
+                <span class="time-separator">/</span>
+                <span id="playlist-total-label" class="time-label">0:00</span>
+              </div>
+              <div class="transport toolbar-fixed">
+                <button id="previous-button" class="tool-button glyph-button ui-control" title="Previous" aria-label="Previous"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-back"></use></svg></button>
+                <button id="play-button" class="tool-button glyph-button ui-control is-primary" title="Play / Pause" aria-label="Play / Pause"><svg class="ui-icon" aria-hidden="true"><use href="#icon-play"></use></svg></button>
+                <button id="next-button" class="tool-button glyph-button ui-control" title="Next" aria-label="Next"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-forward"></use></svg></button>
+                <button id="equalizer-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Enable Equalizer" aria-label="Enable Equalizer" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg></button>
+                <button id="long-play-button" class="tool-button glyph-button ui-control" type="button" title="Toggle Long Play" aria-label="Toggle Long Play"><svg class="ui-icon" aria-hidden="true"><use href="#icon-infinity"></use></svg></button>
+                <button id="repeat-button" class="tool-button glyph-button ui-control" type="button" title="Repeat off" aria-label="Repeat off"><svg class="ui-icon" aria-hidden="true"><use href="#icon-repeat-2"></use></svg></button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="options-overlay" class="options-overlay is-hidden" aria-hidden="true">
+      <div class="options-panel" role="dialog" aria-modal="true" aria-label="Options">
+        <div class="options-header">
+          <span>Options</span>
+          <button id="options-close-button" class="tool-button glyph-button" title="Close" aria-label="Close">×</button>
+        </div>
+
+        <div class="options-body">
+          <nav class="options-nav" aria-label="Options sections">
+            <div class="options-nav-group" aria-labelledby="options-native-heading">
+              <div id="options-native-heading" class="options-nav-group-title">SPCBoy</div>
+              <button id="options-database-tab" data-app-option-section="database" class="options-nav-item is-selected" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-database"></use></svg><span>Database</span></button>
+              <button id="options-theme-tab" data-app-option-section="interface" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"></use></svg><span>Interface</span></button>
+              <button id="options-windows-tab" data-app-option-section="windows" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sidebar-views"></use></svg><span>Windows</span></button>
+            </div>
+            <div class="options-nav-group" aria-labelledby="options-extension-heading">
+              <div id="options-extension-heading" class="options-nav-group-title">VGMBoy</div>
+              <button id="options-audio-tab" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg><span>Audio</span></button>
+              <button id="options-diagnostics-tab" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-scan-search"></use></svg><span>Diagnostics</span></button>
+              <button id="options-playback-tab" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-play"></use></svg><span>Playback</span></button>
+              <button id="options-routing-tab" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-route"></use></svg><span>Routing</span></button>
+            </div>
+          </nav>
+
+          <div class="options-content">
+            <div id="options-theme-section" class="options-page options-theme-page is-hidden">
+              <div class="options-page-title">SPCBoy / Interface</div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Application</div>
+                <label class="options-field"><span>Accent Color</span><span class="options-inline-trailing"><input id="accent-color-input" class="options-input options-color-text-input" type="text" value="lightskyblue" placeholder="lightskyblue, #87cefa, rgb(...), oklch(...)" aria-label="Accent color CSS value" /></span></label>
+              </div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Interface Style</div>
+                <div class="options-help-text">These controls apply consistently to the database sidebar and playlist.</div>
+                <label class="options-field"><span>Font Size</span><span class="options-inline-trailing"><input id="sidebar-font-size-input" class="options-input" type="text" inputmode="decimal" value="10" aria-label="Sidebar font size in points" /></span></label>
+                <label class="options-field"><span>Font Color</span><span class="options-inline-trailing"><input id="sidebar-text-color-input" class="options-input options-color-text-input" type="text" value="#a9a9a9" placeholder="#a9a9a9, rgb(...), red" aria-label="Sidebar font color CSS value" /></span></label>
+                <label class="options-field options-inline-field"><span>Monospace Font</span><input id="application-monospace-checkbox" type="checkbox" /></label>
+              </div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Sidebar Options</div>
+                <label class="options-field"><span>Sidebar Width</span><span class="options-inline-trailing"><input id="sidebar-width-input" class="options-input" type="text" inputmode="numeric" value="20" aria-label="Sidebar width percent" /></span></label>
+                <label class="options-field options-inline-field"><span>Path Counts</span><input id="sidebar-path-counts-checkbox" type="checkbox" checked /></label>
+              </div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Playlist Options</div>
+                <label class="options-field options-inline-field"><span>Bold Header Font</span><input id="playlist-header-bold-checkbox" type="checkbox" /></label>
+                <label class="options-field"><span>Item Spacing</span><span class="options-inline-trailing"><input id="ui-item-spacing-input" class="options-input" type="text" inputmode="decimal" value=".2" aria-label="Item spacing in rems" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="column-auto-size-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Column Auto-size</span><small>Automatically resize columns for content width on selection.</small></span></span></label>
+              </div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Animations</div>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="auto-resize-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Auto-Resize</span><small>Duration for automatic playlist column resizing (ms).</small></span></span><span class="options-inline-trailing"><input id="auto-resize-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Auto-resize animation milliseconds" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="selection-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Selection Bar</span><small>Duration for playlist and sidebar selection movement (ms).</small></span></span><span class="options-inline-trailing"><input id="selection-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Selection bar animation milliseconds" /></span></label>
+              </div>
+            </div>
+
+            <div id="options-windows-section" class="options-page options-windows-page is-hidden">
+              <div class="options-page-title">SPCBoy / Windows</div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Always on Top</div>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="main-window-always-on-top-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Main Window</span><small>Keep main window on top of other apps.</small></span></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="settings-window-always-on-top-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Options Window</span><small>Keep options window on top of main window.</small></span></span></label>
+              </div>
+            </div>
+
+            <div id="options-database-section" class="options-page options-database-page">
+              <div class="options-page-title">SPCBoy / Database</div>
+              <div class="options-subpanel options-cache-panel">
+                <div class="options-subpanel-title">Cache</div>
+                <div class="database-stats-panel options-path-control"><input id="library-cache-path" class="options-input options-path-readout" type="text" readonly placeholder="Archive cache path" aria-label="Archive cache path" /><button id="library-cache-browse-button" class="tool-button glyph-button" type="button" aria-label="Show archive cache in Finder" title="Show archive cache in Finder"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="archive-cache-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Cache</span><small>Usage: <strong id="database-cache-summary">—</strong></small><small>Decompressed files can be retained to reduce load time.</small></span></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><span class="options-checkbox-copy"><span>Cache Limit</span><small>Least-recently-used archive entries are removed automatically. Active playback is never removed.</small></span></span><span class="options-inline-trailing"><select id="archive-cache-limit-select" class="options-input" aria-label="Archive cache size limit"><option value="2147483648" selected>2 GB</option><option value="4294967296">4 GB</option><option value="8589934592">8 GB</option><option value="17179869184">16 GB</option></select></span></label>
+                <p><strong>ScanSong scratch files are separate:</strong> they are disposable and reclaimed after each source or after cancellation.</p>
+                <div class="options-library-toolbar options-panel-actions">
+                  <button id="library-cache-default-button" class="tool-button" type="button">Use Default</button>
+                  <button id="library-clear-cache-button" class="tool-button" type="button">Clear Cache</button>
+                  <button id="library-show-cache-button" class="tool-button" type="button">Show in Finder</button>
+                </div>
+              </div>
+              <div class="options-subpanel options-database-panel">
+                <div class="options-subpanel-title">Database</div>
+                <div class="database-stats-panel options-path-control"><input id="library-database-path" class="options-input options-path-readout" type="text" readonly placeholder="ScanSong catalog path" aria-label="Database path" /><button id="library-database-browse-button" class="tool-button glyph-button" type="button" aria-label="Browse for catalog" title="Browse for catalog"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
+                <p id="library-database-location-status">SPCBoy reads the shared schema-23 catalog read-only.</p>
+                <div class="options-library-toolbar">
+                  <button id="library-database-default-button" class="tool-button" type="button">Use Default</button>
+                  <button id="library-database-reload-button" class="tool-button" type="button">Reload Library</button>
+                  <button id="library-database-show-button" class="tool-button" type="button">Show in Finder</button>
+                </div>
+              </div>
+              <div class="options-subpanel options-favorites-panel">
+                <div class="options-subpanel-title">Favorites</div>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="favorite-historical-sort-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Sort by Date Added</span><small>Sort favorites playlist by date added.</small></span></span></label>
+              </div>
+              <div class="options-subpanel options-local-files-panel">
+                <div class="options-subpanel-title">Local Files</div>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="local-browser-enabled-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Use Local Files</span><small>Browse one folder directly. The database library is disabled while this is on.</small></span></span></label>
+                <div class="database-stats-panel options-path-control"><input id="local-browser-path" class="options-input options-path-readout" type="text" readonly placeholder="No local folder selected" aria-label="Local files folder" /><button id="local-browser-browse-button" class="tool-button glyph-button" type="button" aria-label="Choose local files folder" title="Choose local files folder"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
+              </div>
+            </div>
+
+            <div id="options-routing-section" class="options-page options-routing-page is-hidden">
+              <div class="options-page-title">VGMBoy / Routing</div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Decoder Conflicts</div>
+                <div class="options-help-text">When installed plugins declare the same extension, scanning and playback use the same declared candidate set. This page exposes those conflicts before a per-format preference or global-priority policy is chosen.</div>
+                <div id="routing-conflicts-list" class="routing-conflicts-list" aria-live="polite"></div>
+              </div>
+            </div>
+
+            <div id="options-audio-section" class="options-page options-page-audio is-hidden">
+              <div class="options-page-title">VGMBoy / Audio</div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">AAC Export</div>
+                <div class="options-help-text">VGMBoy performs the finite offline render. SPCBoy only supplies the selected track and destination.</div>
+                <div class="database-stats-panel options-path-control"><input id="aac-export-directory-path" class="options-input options-path-readout" type="text" readonly placeholder="Choose an export folder" aria-label="AAC export folder" /><button id="aac-export-choose-button" class="tool-button glyph-button" type="button" aria-label="Choose AAC export folder" title="Choose AAC export folder"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
+                <div class="database-stats-panel"><div id="aac-export-status" class="options-help-text" aria-live="polite"></div><button id="aac-export-cancel-button" class="tool-button" type="button" disabled>Abort Export</button></div>
+              </div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Equalizer</div>
+                <div class="options-help-text">Equalizer gains apply to SPCBoy playback only.</div>
+                <label class="options-field options-inline-field"><span>Equalizer</span><input id="equalizer-enabled-checkbox" type="checkbox" /></label>
+                <div class="equalizer-bands">
+                  <label class="equalizer-band"><span>31 Hz</span><span class="range-slider"><input data-equalizer-band="0" class="animated-range" type="range" min="-12" max="12" step="0.5" value="0" aria-label="31 Hz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="0">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>62 Hz</span><span class="range-slider"><input data-equalizer-band="1" class="animated-range" type="range" min="-12" max="12" step="0.5" value="0" aria-label="62 Hz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="1">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>125 Hz</span><span class="range-slider"><input data-equalizer-band="2" class="animated-range" type="range" min="-12" max="12" step="0.5" value="0" aria-label="125 Hz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="2">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>250 Hz</span><span class="range-slider"><input data-equalizer-band="3" class="animated-range" type="range" min="-12" max="12" step="0.5" value="0" aria-label="250 Hz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="3">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>500 Hz</span><span class="range-slider"><input data-equalizer-band="4" class="animated-range" type="range" min="-12" max="12" step="0.5" value="0" aria-label="500 Hz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="4">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>1 kHz</span><span class="range-slider"><input data-equalizer-band="5" class="animated-range" type="range" min="-12" max="12" step="0.5" value="0" aria-label="1 kHz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="5">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>2 kHz</span><span class="range-slider"><input data-equalizer-band="6" class="animated-range" type="range" min="-12" max="12" step="0.5" value="0" aria-label="2 kHz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="6">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>4 kHz</span><span class="range-slider"><input data-equalizer-band="7" class="animated-range" type="range" min="-12" max="12" step="0.5" value="0" aria-label="4 kHz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="7">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>8 kHz</span><span class="range-slider"><input data-equalizer-band="8" class="animated-range" type="range" min="-12" max="12" step="0.5" value="0" aria-label="8 kHz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="8">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>16 kHz</span><span class="range-slider"><input data-equalizer-band="9" class="animated-range" type="range" min="-12" max="12" step="0.5" value="0" aria-label="16 kHz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="9">0.0 dB</output></label>
+                </div>
+                <button id="equalizer-reset-button" class="tool-button" type="button">Reset</button>
+              </div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Mono</div>
+                <label class="options-field options-inline-field"><span>Mono</span><input id="mono-enabled-checkbox" type="checkbox" /></label>
+                <div class="options-help-text">Mix left and right channels, then play the same signal through both speakers.</div>
+              </div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Volume</div>
+                <div class="options-help-text">Volume applies to SPCBoy playback only. macOS volume keys continue to control system volume.</div>
+                <label class="equalizer-band equalizer-volume"><span>Volume</span><span class="range-slider"><input id="app-volume-input" class="animated-range" type="range" min="0" max="1" step="0.01" value="1" aria-label="App volume" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output id="app-volume-value">100%</output></label>
+              </div>
+            </div>
+
+            <div id="options-playback-section" class="options-page options-page-playback is-hidden">
+              <div class="options-page-title">VGMBoy / Playback</div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">End Fade</div>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="spc-fade-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Fade Out</span><small>Apply transitional volume fade to song end.</small></span></span><span class="options-inline-trailing"><input id="spc-fade-input" class="options-input options-duration-input" type="text" inputmode="numeric" value="0:06" aria-label="Fade length" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="queued-skips-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Faded Skip</span><small>First skip fades from the current position; another skip during that fade advances immediately.</small></span></span></label>
+              </div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Play Time</div>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="spc-force-length-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Long Play</span><small>Loop song with original format control.</small></span></span><span class="options-inline-trailing"><input id="spc-length-input" class="options-input options-duration-input" type="text" inputmode="numeric" value="3:00" aria-label="Long Play duration" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-checkbox-copy"><span>Unknown-length default</span><small>Used when a decoder provides no natural duration and Long Play is off.</small></span><span class="options-inline-trailing"><input id="spc-unknown-duration-input" class="options-input options-duration-input" type="text" inputmode="numeric" value="2:30" aria-label="Unknown-length default duration" /></span></label>
+              </div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Play Speed</div>
+                <div class="options-help-text">Fractions and decimals are accepted and snap to 1/32 increments.</div>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="libgme-playback-speed-enabled-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>libgme</span><small>SPC, NSF/NSFE, GBS, HES, KSS, AY, and SAP.</small></span></span><span class="options-inline-trailing"><input id="libgme-playback-speed-input" class="options-input options-duration-input" type="text" inputmode="decimal" value="1" aria-label="libgme playback speed" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="libvgm-playback-speed-enabled-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>libvgm</span><small>GYM, S98, VGM, and VGZ.</small></span></span><span class="options-inline-trailing"><input id="libvgm-playback-speed-input" class="options-input options-duration-input" type="text" inputmode="decimal" value="1" aria-label="libvgm playback speed" /></span></label>
+              </div>
+            </div>
+
+            <div id="options-diagnostics-section" class="options-page options-diagnostics-page is-hidden">
+              <div class="options-page-title">VGMBoy / Diagnostics</div>
+              <div class="options-subpanel diagnostics-category">
+                <div class="options-subpanel-title">Transport</div>
+                <div id="native-diagnostics" class="diagnostics-list" aria-live="polite">
+                  <div class="diagnostics-row"><span>Transport</span><strong id="native-transport-label" class="play-stat-value">Idle</strong></div>
+                  <div class="diagnostics-row"><span>Track</span><strong id="native-track-label" class="play-stat-value">Not loaded</strong></div>
+                  <div class="diagnostics-row"><span>Output</span><strong id="native-output-label" class="play-stat-value">Idle</strong></div>
+                  <div class="diagnostics-row"><span>Position</span><strong id="native-position-label" class="play-stat-value">0:00</strong></div>
+                </div>
+              </div>
+              <div class="options-subpanel diagnostics-category">
+                <div class="options-subpanel-title">Buffer</div>
+                <div class="diagnostics-list" aria-live="polite">
+                  <div class="diagnostics-row"><span>Buffer</span><strong id="native-buffer-label" class="play-stat-value">0 / — frames</strong></div>
+                  <div class="diagnostics-row"><span>Fill</span><strong id="native-buffer-fill-label" class="play-stat-value">—</strong></div>
+                  <div class="diagnostics-row"><span>Underruns</span><strong id="native-underrun-label" class="play-stat-value">0</strong></div>
+                  <div class="diagnostics-row"><span>Requested / Supplied</span><strong id="native-frames-label" class="play-stat-value">0 / 0</strong></div>
+                </div>
+              </div>
+              <div class="options-subpanel diagnostics-category">
+                <div class="options-subpanel-title">Decoder</div>
+                <div class="diagnostics-list" aria-live="polite">
+                  <div class="diagnostics-row"><span>Decoder</span><strong id="native-decoder-label" class="play-stat-value">—</strong></div>
+                  <div class="diagnostics-row"><span>Rates</span><strong id="native-rates-label" class="play-stat-value">— / — Hz</strong></div>
+                  <div class="diagnostics-row"><span>Decoded / Audible</span><strong id="native-decoded-label" class="play-stat-value">0 / 0</strong></div>
+                  <div class="diagnostics-row"><span>Tempo</span><strong id="native-tempo-label" class="play-stat-value">1×</strong></div>
+                  <div class="diagnostics-row"><span>Decode</span><strong id="native-decode-label" class="play-stat-value">Ready</strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="./playback-speed.js"></script>
+    <script src="./app-core.js"></script>
+    <script src="./sidebar-controller.js"></script>
+    <script src="./playlist-controller.js"></script>
+    <script src="./options-controller.js"></script>
+    <script src="./playback-backends.js"></script>
+    <script src="./app-playback.js"></script>
+    <script src="./app-ui.js"></script>
+    <script src="./app-library.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
