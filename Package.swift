@@ -284,6 +284,20 @@ let package = Package(
             ]
         ),
         .target(
+            name: "VGMBoyMDXInspectionCore",
+            dependencies: ["VGMBoyCMDX"],
+            path: "Sources/VGMBoyScannerInspectionCore",
+            exclude: ["AmigaInspection.swift"],
+            sources: ["MDXInspection.swift"]
+        ),
+        .target(
+            name: "VGMBoyAmigaInspectionCore",
+            dependencies: ["VGMBoyCUADE"],
+            path: "Sources/VGMBoyScannerInspectionCore",
+            exclude: ["MDXInspection.swift"],
+            sources: ["AmigaInspection.swift"]
+        ),
+        .target(
             name: "VGMBoyCAudioUnit",
             path: "Sources/CAudioUnit",
             publicHeadersPath: "include",
@@ -307,11 +321,11 @@ let package = Package(
         ),
         .executableTarget(
             name: "VGMBoyMDXInspect",
-            dependencies: ["VGMBoyKit"]
+            dependencies: ["VGMBoyMDXInspectionCore"]
         ),
         .executableTarget(
             name: "VGMBoyAmigaInspect",
-            dependencies: ["VGMBoyKit"]
+            dependencies: ["VGMBoyAmigaInspectionCore"]
         ),
         .executableTarget(
             name: "VGMBoyApp",
@@ -323,7 +337,7 @@ let package = Package(
         ),
         .testTarget(
             name: "VGMBoyKitTests",
-            dependencies: ["VGMBoyKit", "VGMBoySNDH", "VGMBoyEndpointCore", "VGMBoyCAudioUnit"],
+            dependencies: ["VGMBoyKit", "VGMBoySNDH", "VGMBoyEndpointCore", "VGMBoyCAudioUnit", "VGMBoyMDXInspectionCore", "VGMBoyAmigaInspectionCore"],
             path: "Tests/VGMBoyKitTests"
         ),
         .testTarget(

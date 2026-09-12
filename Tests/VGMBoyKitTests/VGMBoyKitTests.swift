@@ -3,6 +3,8 @@ import AudioToolbox
 import AVFoundation
 import Foundation
 import VGMBoyCAudioUnit
+import VGMBoyAmigaInspectionCore
+import VGMBoyMDXInspectionCore
 import VGMBoySNDH
 @testable import VGMBoyKit
 
@@ -321,12 +323,18 @@ func sndhFixtureUsesPSGPlay() throws {
 )
 func mdxFixtureUsesNativeDecoder() throws {
     let path = try #require(ProcessInfo.processInfo.environment["VGMBoy_MDX_FIXTURE"])
+    let inspection = try VGMBoyMDXInspectionCore.VGMBoyMDXInspection(path: path)
     let decoder = try DecoderFactory.make(path: path)
     defer { decoder.close() }
     #expect(decoder.trackCount == 1)
     let metadata = try decoder.metadata(for: 0)
     #expect(metadata.system == "Sharp X68000")
     #expect(metadata.playMs > 0)
+    #expect(inspection.trackCount == decoder.trackCount)
+    #expect(inspection.title == metadata.song)
+    #expect(inspection.system == metadata.system)
+    #expect(inspection.playLengthMs == metadata.playMs)
+    #expect(inspection.introLengthMs == metadata.introMs)
     let frames = try decoder.readFrames(4_096)
     #expect(frames.left.count == 4_096)
     #expect(frames.left.contains { abs($0) > 0.0001 } || frames.right.contains { abs($0) > 0.0001 })
@@ -358,6 +366,7 @@ func mdxLZXFixtureUsesNativeDecoder() throws {
 )
 func amigaFixtureUsesUADE() throws {
     let path = try #require(ProcessInfo.processInfo.environment["VGMBoy_AMIGA_FIXTURE"])
+    let inspection = try VGMBoyAmigaInspectionCore.VGMBoyAmigaInspection(path: path)
     let decoder = try DecoderFactory.make(path: path)
     defer { decoder.close() }
     #expect(decoder.systemName == "Commodore Amiga")
@@ -365,6 +374,9 @@ func amigaFixtureUsesUADE() throws {
     try decoder.startTrack(0)
     let metadata = try decoder.metadata(for: 0)
     #expect(metadata.system == "Commodore Amiga")
+    #expect(inspection.trackCount == decoder.trackCount)
+    #expect(inspection.tracks.first?.title == metadata.song)
+    #expect(inspection.tracks.first?.lengthMs == metadata.playMs)
     var renderedAudio = false
     for _ in 0..<48 {
         let frames = try decoder.readFrames(4_096)

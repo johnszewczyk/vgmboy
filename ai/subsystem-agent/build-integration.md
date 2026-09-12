@@ -40,6 +40,11 @@ for ScanSong's external inspection executables.
 - The Amiga scanner handoff is the release `vgmboy-amiga-inspect` product copied
   to `.build/scanner-plugins`; it links the Homebrew UADE runtime and uses the
   same `AmigaFormatManifest` admission source as VGMBoyKit.
+- Scanner inspection APIs are split by format. The MDX inspector depends on
+  `VGMBoyMDXInspectionCore` plus `VGMBoyCMDX`; the Amiga inspector depends on
+  `VGMBoyAmigaInspectionCore` plus `VGMBoyCUADE`. Neither depends on the
+  all-decoder `VGMBoyKit` umbrella. Their native MDX/UADE inspection behavior
+  and output fields remain unchanged.
 - APE is no longer a scanner-helper product. ScanSong reads its native header
   timing and tags directly; `CFFmpeg` remains a VGMBoy playback dependency for
   APE, MP2, and TAK.
@@ -59,11 +64,12 @@ for ScanSong's external inspection executables.
   no Highly Complete or QSF inspector executable is part of the scanner handoff.
   The scanner-plugin builder removes retired QSF and FFmpeg inspector binaries
   from its shared output folder without touching their playback libraries.
-  The current scanner-plugin script still invokes the broad playback dependency
-  builder, so mGBA and the QSF core are prepared as build-time collateral even
-  though the scanner does not link or run them. A scanner-only dependency build
-  is not yet separated. ScanSong must not copy a CocoaSpice app resource or
-  invoke a CocoaSpice launcher/build entry point.
+  Scanner-plugin preparation builds the two narrow inspector products and the
+  vgmstream CLI directly; it no longer invokes `build-dependencies.sh`, so
+  playback-only mGBA, QSF, libgme, 2SF, LazyUSF, and Play! are not scanner-build
+  prerequisites. The full `build-dependencies.sh` path remains VGMBoy playback
+  ownership. ScanSong must not copy a CocoaSpice app resource or invoke a
+  CocoaSpice launcher/build entry point.
 - Executable product names must not collide on a case-insensitive filesystem. The CLI is
   `vgmboy-cli`; the GUI app is `VGMBoy`. A `vgmboy` (CLI) vs `VGMBoy` (app) collision silently
   overwrote one binary and must not recur.

@@ -23,7 +23,7 @@ Last reviewed: **2026-09-12**
 | `lazyusf2` | `421f00bcaa1988b8e1825e91780129f24fbd1aa0` | `CLazyUSF` | Native dependency-aware route | USF and miniUSF; `.usflib` companions |
 | `play-psf` | `50aedca2639521bc498ace0b2be1ea012801a86a` plus PSF-core patch | `CPlayPSF` | Native PSF route | PSF, miniPSF, PSF2, miniPSF2; `.psflib` companions |
 | `aosdk-qsf` | `e359a6e5154b2ba8499fb1f24a1f5f8a18538a61` plus lifecycle patch | `CQSF` | Playback only; ScanSong uses its own direct reader | QSF and miniQSF; `.qsflib` companions |
-| `mgba` | mGBA 0.11.0 source snapshot; tree SHA-256 `b7b71f64dab500433f3662b818e3521cf67524dcdee1a9952c1f555629ff55c0` | `CHighlyComplete` | GSF playback only; ScanSong reads GSF containers directly | GSF and miniGSF playback; PSFLib assembles dependency chains. The shared dependency build still prepares mGBA as collateral; the scanner does not link or run it. |
+| `mgba` | mGBA 0.11.0 source snapshot; tree SHA-256 `b7b71f64dab500433f3662b818e3521cf67524dcdee1a9952c1f555629ff55c0` | `CHighlyComplete` | GSF playback only; ScanSong reads GSF containers directly | GSF and miniGSF playback; PSFLib assembles dependency chains. The scanner neither links nor prepares mGBA. |
 | `2sf2wav` | DeSmuME 0.9.9 svn 4608 source snapshot; tree SHA-256 `c3e329f9cf72881d25dabb03b9a89ebd4125ca9bd6d44c26f642589c622a9fb7` | `C2SF` | Native 2SF route | 2SF and mini2SF; relative library dependencies |
 | `psflib` | VGMBoy-managed source snapshot; tree SHA-256 `c3adb7ea371fbeeedc68b3747c314419b52d9cb46aa0d75f177f428bcdb7d021` | Used by PSF-family bridges | Dependency support, not a standalone route | PSF and GSF library resolution |
 | `libsidplayfp` | Homebrew libsidplayfp 3.1.0 | `CSIDPlayFP` | Native SID route | SID |

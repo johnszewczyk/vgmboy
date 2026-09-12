@@ -1,5 +1,5 @@
 import Foundation
-import VGMBoyKit
+import VGMBoyMDXInspectionCore
 
 guard CommandLine.arguments.count == 2 else {
     FileHandle.standardError.write(Data("usage: vgmboy-mdx-inspect <file>\n".utf8))
