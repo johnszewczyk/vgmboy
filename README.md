@@ -28,10 +28,10 @@ free-space checks, policy enforcement, and cache-touch semantics. Archive
 format listing, extraction tools, and frontend cache preferences remain outside
 this package.
 
-`ArchiveListingParser` owns bounded, pure 7-Zip, TAR, and RSN listing parsing,
-including reversible BSD-tar octal pathname rendering. `ArchiveManifestReader`
-owns temporary, non-cache manifest extraction; process execution remains a
-frontend adapter.
+`ArchiveListingParser` owns bounded, pure 7-Zip (including 7zz-listed LHA), TAR,
+and RSN listing parsing, including reversible BSD-tar octal pathname rendering.
+`ArchiveManifestReader` owns temporary, non-cache manifest extraction; process
+execution remains a frontend adapter.
 
 `PlaybackRequestCore` owns UI-neutral playback request lifecycle and serial
 command execution. `PlaybackRequestLifecycle` supplies newest-request-wins
@@ -63,8 +63,9 @@ controls and destinations, but do not decode or render audio themselves.
 with a 2 GB default. Frontend option panels must consume that policy rather
 than maintaining app-specific cache ranges.
 
-The current implementation supports normal archives through `bsdtar`,
-`.tar.zst`/`.tar.zstd` through `zstd` piped into `bsdtar`, and standalone
+The current implementation routes ZIP, 7z, and LHA through the injected `7zz`
+adapter, RSN through the injected `unar` adapter, TAR through the native tar
+route, `.tar.zst`/`.tar.zstd` through `zstd` piped into tar, and standalone
 `name.ext.zst`/`name.ext.zstd` files by materializing their one implicit
 payload. The shared
 `ArchiveMaterializationSession` releases the active temporary member before

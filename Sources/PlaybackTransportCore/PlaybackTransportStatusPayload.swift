@@ -9,6 +9,7 @@ public struct PlaybackTransportStatusPayload: Equatable, Sendable, Codable {
     public let transportState: String
     public let outputState: String
     public let generation: Int
+    public let statusSequence: UInt64
     public let trackLoaded: Bool
     public let decodeError: Bool
     public let reachedEnd: Bool
@@ -45,6 +46,7 @@ public struct PlaybackTransportStatusPayload: Equatable, Sendable, Codable {
         }
         outputState = status.outputIsRunning ? "running" : "idle"
         generation = status.generation
+        statusSequence = status.statusSequence
         trackLoaded = status.trackLoaded
         decodeError = status.errorMessage != nil
         reachedEnd = forcedReachedEnd ?? status.reachedEnd
@@ -70,6 +72,7 @@ public struct PlaybackTransportStatusPayload: Equatable, Sendable, Codable {
             "transport_state": transportState,
             "output_state": outputState,
             "generation": generation,
+            "status_sequence": statusSequence,
             "track_loaded": trackLoaded,
             "decode_error": decodeError,
             "reached_end": reachedEnd,

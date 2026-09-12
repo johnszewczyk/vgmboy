@@ -4,6 +4,7 @@ import Foundation
 public enum ArchiveContainerKind: String, CaseIterable, Equatable, Sendable {
     case zip
     case sevenZip
+    case lha
     case rsn
     case tar
     case tarZstandard
@@ -28,6 +29,7 @@ public enum ArchiveContainerKind: String, CaseIterable, Equatable, Sendable {
         switch extensionName {
         case "zip": self = .zip
         case "7z": self = .sevenZip
+        case "lha": self = .lha
         case "rsn": self = .rsn
         case "tar": self = .tar
         case "tzst": self = .tarZstandard
@@ -64,7 +66,7 @@ public enum ArchiveToolRouting {
                 executableName: "unar",
                 arguments: ["-q", "-f", "-o", "-", archiveURL.path, entryPath]
             )
-        case .zip, .sevenZip:
+        case .zip, .sevenZip, .lha:
             return .process(
                 executableName: "7zz",
                 arguments: ["x", "-mmt=1", "-so", archiveURL.path, entryPath]
@@ -72,14 +74,14 @@ public enum ArchiveToolRouting {
         case .tar:
             return .process(
                 executableName: "tar",
-                arguments: ["-xOf", archiveURL.path, entryPath]
+                arguments: ["-xOf", archiveURL.path, tarMemberSelectionPattern(entryPath)]
             )
         case .tarZstandard:
             return .zstandardTar(
                 zstdExecutableName: "zstd",
                 zstdArguments: ["-d", "-q", "-c", archiveURL.path],
                 tarExecutableName: "tar",
-                tarArguments: ["-xOf", "-", entryPath],
+                tarArguments: ["-xOf", "-", tarMemberSelectionPattern(entryPath)],
                 allowEarlyConsumerExit: true
             )
         case .singleFileZstandard:
@@ -88,6 +90,10 @@ public enum ArchiveToolRouting {
                 arguments: ["-d", "-q", "-c", "--", archiveURL.path]
             )
         }
+    }
+
+    private static func tarMemberSelectionPattern(_ entryPath: String) -> String {
+        ArchiveEntryPath.tarMemberSelectionPatterns([entryPath]).first ?? entryPath
     }
 
     public static func completeSet(
@@ -101,7 +107,7 @@ public enum ArchiveToolRouting {
                 executableName: "unar",
                 arguments: ["-q", "-f", "-D", "-o", destinationURL.path, archiveURL.path]
             )
-        case .zip, .sevenZip:
+        case .zip, .sevenZip, .lha:
             return .process(
                 executableName: "7zz",
                 arguments: ["x", "-mmt=1", "-y", "-o\(destinationURL.path)", archiveURL.path]
@@ -141,7 +147,7 @@ public enum ArchiveToolRouting {
                 executableName: "unar",
                 arguments: ["-q", "-f", "-D", "-o", destinationURL.path, archiveURL.path] + entryPaths
             )
-        case .zip, .sevenZip:
+        case .zip, .sevenZip, .lha:
             return .process(
                 executableName: "7zz",
                 arguments: ["x", "-mmt=1", "-y", "-o\(destinationURL.path)", archiveURL.path] + entryPaths

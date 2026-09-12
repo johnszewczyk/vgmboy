@@ -5,6 +5,7 @@ import Testing
 @Test func detectsCocoaSpiceArchiveContainerKinds() {
     #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.zip")) == .zip)
     #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.7z")) == .sevenZip)
+    #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.lha")) == .lha)
     #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.rsn")) == .rsn)
     #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.tar")) == .tar)
     #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.tar.zst")) == .tarZstandard)
@@ -27,6 +28,14 @@ import Testing
         executableName: "7zz",
         arguments: ["x", "-mmt=1", "-so", "/tmp/library.zip", "music/track.spc"]
     ))
+    #expect(ArchiveToolRouting.selectedEntryToStdout(
+        kind: .lha,
+        archiveURL: archiveURL,
+        entryPath: "Xpose/mod.xpose-end"
+    ) == .process(
+        executableName: "7zz",
+        arguments: ["x", "-mmt=1", "-so", "/tmp/library.zip", "Xpose/mod.xpose-end"]
+    ))
     #expect(ArchiveToolRouting.completeSet(
         kind: .rsn,
         archiveURL: URL(fileURLWithPath: "/tmp/library.rsn"),
@@ -42,6 +51,25 @@ import Testing
     ) == .process(
         executableName: "zstd",
         arguments: ["-d", "-q", "-c", "--", "/tmp/track.vgm.zst"]
+    ))
+    #expect(ArchiveToolRouting.selectedEntryToStdout(
+        kind: .tar,
+        archiveURL: URL(fileURLWithPath: "/tmp/library.tar"),
+        entryPath: "Toki [JuJu Densetsu].nsf"
+    ) == .process(
+        executableName: "tar",
+        arguments: ["-xOf", "/tmp/library.tar", "Toki \\[JuJu Densetsu].nsf"]
+    ))
+    #expect(ArchiveToolRouting.selectedEntryToStdout(
+        kind: .tarZstandard,
+        archiveURL: URL(fileURLWithPath: "/tmp/library.tar.zst"),
+        entryPath: "Toki [JuJu Densetsu].nsf"
+    ) == .zstandardTar(
+        zstdExecutableName: "zstd",
+        zstdArguments: ["-d", "-q", "-c", "/tmp/library.tar.zst"],
+        tarExecutableName: "tar",
+        tarArguments: ["-xOf", "-", "Toki \\[JuJu Densetsu].nsf"],
+        allowEarlyConsumerExit: true
     ))
 }
 

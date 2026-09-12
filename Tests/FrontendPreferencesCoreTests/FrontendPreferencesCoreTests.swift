@@ -58,3 +58,72 @@ import Testing
     #expect(timings.autoResizeMilliseconds == 0)
     #expect(timings.selectionMilliseconds == 1_000)
 }
+
+@Test func playlistColumnSizingUsesSharedEightPointPadding() throws {
+    let sizing = FrontendPlaylistColumnSizing()
+    #expect(sizing.horizontalPaddingPerSide == 8)
+    #expect(sizing.horizontalPadding == 16)
+
+    let decoded = try JSONDecoder().decode(
+        FrontendPlaylistColumnSizing.self,
+        from: #"{"horizontalPaddingPerSide":99}"#.data(using: .utf8)!
+    )
+    #expect(decoded.horizontalPaddingPerSide == 16)
+}
+
+@Test func playlistColumnSchemaRepairsStaleOrderAndKeepsFixedColumnsInPlace() {
+    let schema = FrontendPlaylistColumnSchema(columns: [
+        .init(id: "favorite", isReorderable: false, isSortable: false),
+        .init(id: "index", isSortable: false),
+        .init(id: "file"),
+        .init(id: "title")
+    ])
+
+    let layout = schema.normalizedLayout(
+        order: ["title", "unknown", "file", "title", "favorite"],
+        visibility: nil
+    )
+
+    #expect(layout.order == ["favorite", "title", "file", "index"])
+    #expect(layout.visibility == ["favorite": true, "index": true, "file": true, "title": true])
+}
+
+@Test func playlistColumnSchemaRetainsOneVisibleColumn() {
+    let schema = FrontendPlaylistColumnSchema(columns: [
+        .init(id: "favorite", isReorderable: false, isSortable: false),
+        .init(id: "file"),
+        .init(id: "title", isVisibleByDefault: false)
+    ])
+
+    let layout = schema.normalizedLayout(
+        order: nil,
+        visibility: ["favorite": false, "file": false, "title": false, "unknown": true]
+    )
+
+    #expect(layout.order == ["favorite", "file", "title"])
+    #expect(layout.visibility == ["favorite": true, "file": false, "title": false])
+}
+
+@Test func playlistColumnSchemaRequiresAnExplicitValidSort() {
+    let schema = FrontendPlaylistColumnSchema(columns: [
+        .init(id: "favorite", isReorderable: false, isSortable: false),
+        .init(id: "file"),
+        .init(id: "title")
+    ])
+
+    #expect(schema.normalizedSort(isEnabled: nil, columnID: "title", direction: .descending) == .init(
+        isEnabled: false,
+        columnID: nil,
+        direction: .descending
+    ))
+    #expect(schema.normalizedSort(isEnabled: true, columnID: "favorite", direction: nil) == .init(
+        isEnabled: false,
+        columnID: nil,
+        direction: .ascending
+    ))
+    #expect(schema.normalizedSort(isEnabled: true, columnID: "title", direction: .descending) == .init(
+        isEnabled: true,
+        columnID: "title",
+        direction: .descending
+    ))
+}

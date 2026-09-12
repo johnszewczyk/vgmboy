@@ -24,21 +24,131 @@ public struct PlaybackContinuationStart: Equatable, Sendable {
     public let track: PlaybackTransportTrack
     public let payload: PlaybackControlPayload
     public let requestID: Int
+    public let startMilliseconds: Int
 
     public init(
         track: PlaybackTransportTrack,
         payload: PlaybackControlPayload,
-        requestID: Int
+        requestID: Int,
+        startMilliseconds: Int = 0
     ) {
         self.track = track
         self.payload = payload
         self.requestID = requestID
+        self.startMilliseconds = max(0, startMilliseconds)
+    }
+}
+
+/// Typed frontend request for starting playback before an adapter resolves an
+/// archive member to a naked playable path. It carries stable identity and
+/// timing/tempo intent, but deliberately leaves extraction and UI state to the
+/// frontend-specific archive and presentation adapters.
+public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
+    public let trackID: String
+    public let sourcePath: String
+    public let archivePath: String?
+    public let archiveEntry: String?
+    public let trackIndex: Int
+    public let startMilliseconds: Int
+    public let playMilliseconds: Int
+    public let fadeMilliseconds: Int
+    public let tempo: PlaybackTempo
+    public let longPlayEnabled: Bool
+    public let timedOverride: Bool
+    public let unknownDurationMilliseconds: Int
+
+    public init(
+        trackID: String,
+        sourcePath: String,
+        archivePath: String? = nil,
+        archiveEntry: String? = nil,
+        trackIndex: Int = 0,
+        startMilliseconds: Int = 0,
+        playMilliseconds: Int = 0,
+        fadeMilliseconds: Int = 0,
+        tempo: PlaybackTempo = .defaultValue,
+        longPlayEnabled: Bool = false,
+        timedOverride: Bool = false,
+        unknownDurationMilliseconds: Int = PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000
+    ) {
+        self.trackID = trackID
+        self.sourcePath = sourcePath
+        self.archivePath = archivePath
+        self.archiveEntry = archiveEntry
+        self.trackIndex = max(0, trackIndex)
+        self.startMilliseconds = max(0, startMilliseconds)
+        self.playMilliseconds = max(0, playMilliseconds)
+        self.fadeMilliseconds = max(0, fadeMilliseconds)
+        self.tempo = PlaybackTempo(numerator: tempo.numerator, denominator: tempo.denominator)
+        self.longPlayEnabled = longPlayEnabled
+        self.timedOverride = timedOverride
+        self.unknownDurationMilliseconds = max(1_000, unknownDurationMilliseconds)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case trackID = "trackId"
+        case sourcePath = "path"
+        case archivePath
+        case archiveEntry
+        case trackIndex
+        case startMilliseconds
+        case playMilliseconds
+        case fadeMilliseconds
+        case tempo
+        case longPlayEnabled
+        case timedOverride
+        case unknownDurationMilliseconds
+    }
+
+    /// Resolves the common transport input only after the adapter has supplied
+    /// its direct or archive-materialized playable path.
+    public func continuationStart(
+        resolvedPath: String,
+        requestID: Int
+    ) throws -> PlaybackContinuationStart {
+        guard !trackID.isEmpty, !sourcePath.isEmpty, !resolvedPath.isEmpty else {
+            throw PlaybackControlError.invalidPayload("Playback start requires a track ID and file path.")
+        }
+        let timing: PlaybackTimingRequest
+        if timedOverride {
+            timing = try .timed(
+                playMilliseconds: playMilliseconds,
+                fadeMilliseconds: fadeMilliseconds
+            )
+        } else {
+            timing = try .standard(
+                path: resolvedPath,
+                longPlayEnabled: longPlayEnabled,
+                manualPlayMilliseconds: playMilliseconds,
+                fadeMilliseconds: fadeMilliseconds,
+                unknownDurationMilliseconds: unknownDurationMilliseconds
+            )
+        }
+        let normalizedTempo = PlaybackTempo(numerator: tempo.numerator, denominator: tempo.denominator)
+        return PlaybackContinuationStart(
+            track: .init(id: trackID, path: resolvedPath, trackIndex: trackIndex),
+            payload: .init(
+                path: resolvedPath,
+                trackIndex: trackIndex,
+                tempo: normalizedTempo.multiplier,
+                playbackMode: timing.playbackMode,
+                playMilliseconds: timing.playMilliseconds,
+                fadeMilliseconds: timing.fadeMilliseconds,
+                unknownDurationMilliseconds: timing.unknownDurationMilliseconds
+            ),
+            requestID: requestID,
+            startMilliseconds: startMilliseconds
+        )
     }
 }
 
 public struct PlaybackTransportStatus: Equatable, Sendable {
     public let currentTrackID: String?
     public let generation: Int
+    /// Monotonic order for status replies and broadcasts from this transport.
+    /// Frontends use it to discard a delayed native event that would otherwise
+    /// roll a visible clock back to an older paused/stopped state.
+    public let statusSequence: UInt64
     public let isPlaying: Bool
     public let elapsedSeconds: TimeInterval
     public let reachedEnd: Bool
@@ -64,6 +174,7 @@ public struct PlaybackTransportStatus: Equatable, Sendable {
     public init(
         currentTrackID: String?,
         generation: Int = 0,
+        statusSequence: UInt64 = 0,
         isPlaying: Bool,
         elapsedSeconds: TimeInterval,
         reachedEnd: Bool,
@@ -85,6 +196,7 @@ public struct PlaybackTransportStatus: Equatable, Sendable {
     ) {
         self.currentTrackID = currentTrackID
         self.generation = generation
+        self.statusSequence = statusSequence
         self.isPlaying = isPlaying
         self.elapsedSeconds = elapsedSeconds
         self.reachedEnd = reachedEnd
@@ -190,6 +302,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     private var statusHandler: StatusHandler?
     private var naturalEndHandler: NaturalEndHandler?
     private var currentPlaybackGeneration: Int?
+    private var nextStatusSequence: UInt64 = 0
     private var naturalEndGate = PlaybackNaturalEndGate()
     private let continuationCoordinator = PlaybackContinuationCoordinator()
     private let controlSurface: PlaybackControlSurface
@@ -355,15 +468,34 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     /// operation remains serialized here.
     public func startContinuation(_ start: PlaybackContinuationStart) async throws {
         try await run {
-            guard self.isLatest(start.requestID) else { throw CancellationError() }
-            self.naturalEndGate.reset()
-            self.continuationCoordinator.reset()
-            let event = self.controller.perform(.init(command: .load, payload: start.payload))
-            try self.requireSuccess(event)
-            try self.requireSuccess(self.controller.perform(.init(command: .play)))
-            self.currentTrack = start.track
-            self.currentPlaybackGeneration = event.status?.diagnostics.generation
+            try self.startContinuationLocked(start)
         }
+    }
+
+    /// Synchronous host-bridge entry for a fully typed start request. It uses
+    /// the same serialized start sequence as async frontends and preserves the
+    /// frontend's stable track ID for status and completion publication.
+    public func start(_ start: PlaybackContinuationStart) throws {
+        try queue.sync {
+            try self.startContinuationLocked(start)
+        }
+    }
+
+    private func startContinuationLocked(_ start: PlaybackContinuationStart) throws {
+        guard isLatest(start.requestID) else { throw CancellationError() }
+        naturalEndGate.reset()
+        continuationCoordinator.reset()
+        let event = controller.perform(.init(command: .load, payload: start.payload))
+        try requireSuccess(event)
+        if start.startMilliseconds > 0 {
+            try requireSuccess(controller.perform(.init(
+                command: .seek,
+                payload: .init(positionMilliseconds: start.startMilliseconds)
+            )))
+        }
+        try requireSuccess(controller.perform(.init(command: .play)))
+        currentTrack = start.track
+        currentPlaybackGeneration = event.status?.diagnostics.generation
     }
 
     private func completionDecisionLocked(
@@ -477,6 +609,30 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     public func setEqualizer(enabled: Bool, bandGains: [Float]) {
         let preferences = PlaybackPreferences(equalizerEnabled: enabled, equalizerBandGains: bandGains)
         performOutputControl(.setEqualizer, payload: .init(equalizer: preferences.equalizer))
+    }
+
+    /// Applies the complete audio-output snapshot in one serialized transport
+    /// operation. Hosts provide a typed value rather than independently
+    /// parsing, normalizing, and sequencing volume/EQ/mono bridge fields.
+    public func configureAudio(
+        _ request: PlaybackTransportAudioConfigurationRequest
+    ) throws -> PlaybackTransportStatus {
+        try queue.sync {
+            let preferences = request.preferences
+            try requireSuccess(controller.perform(.init(
+                command: .setOutputVolume,
+                payload: .init(outputVolume: preferences.outputVolume)
+            )))
+            try requireSuccess(controller.perform(.init(
+                command: .setEqualizer,
+                payload: .init(equalizer: preferences.equalizer)
+            )))
+            try requireSuccess(controller.perform(.init(
+                command: .setMonoEnabled,
+                payload: .init(monoEnabled: preferences.monoEnabled)
+            )))
+            return status(controller.perform(.init(command: .status)).status)
+        }
     }
 
     public func exportAAC(
@@ -595,11 +751,13 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     }
 
     private func status(_ status: VGMBoyKit.PlaybackStatus?) -> PlaybackTransportStatus {
+        nextStatusSequence &+= 1
         let diagnostics = status?.diagnostics
         let statistics = status?.statistics
         return PlaybackTransportStatus(
             currentTrackID: currentTrack?.id,
             generation: diagnostics?.generation ?? 0,
+            statusSequence: nextStatusSequence,
             isPlaying: status?.isPlaying ?? false,
             elapsedSeconds: status?.elapsedSeconds ?? 0,
             reachedEnd: status?.reachedEnd ?? false,

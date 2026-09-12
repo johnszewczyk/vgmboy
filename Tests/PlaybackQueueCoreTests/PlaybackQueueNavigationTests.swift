@@ -135,6 +135,51 @@ func continuationRequestCarriesOneSharedLifecycleEnvelope() throws {
     let decoded = try JSONDecoder().decode(PlaybackContinuationRequest.self, from: encoded)
 
     #expect(decoded == request)
+    let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    #expect(object["playlistIds"] as? [String] == ["one", "two"])
+    #expect(object["playlistIDs"] == nil)
+    let state = try #require(object["state"] as? [String: Any])
+    #expect(state["currentTrackId"] as? String == "one")
+    #expect(state["currentTrackID"] == nil)
+}
+
+@Test
+func continuationResponseKeepsTheBridgeActionAndTrackIDExplicit() throws {
+    let response = PlaybackContinuationResponse(
+        decision: .init(action: .play(trackID: "two"))
+    )
+
+    let encoded = try JSONEncoder().encode(response)
+    let decoded = try JSONDecoder().decode(PlaybackContinuationResponse.self, from: encoded)
+    let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+
+    #expect(decoded == response)
+    #expect(object["action"] as? String == "play")
+    #expect(object["trackId"] as? String == "two")
+    #expect(object["trackID"] == nil)
+}
+
+@Test
+func adjacentRequestUsesTheSharedWireNamesAndNavigationPolicy() throws {
+    let request = PlaybackQueueAdjacentRequest(
+        state: .init(currentTrackID: nil, selectedTrackID: "one", pendingTrackID: nil),
+        playlistIDs: ["one", "two"],
+        direction: .next,
+        wraps: true
+    )
+
+    let encoded = try JSONEncoder().encode(request)
+    let decoded = try JSONDecoder().decode(PlaybackQueueAdjacentRequest.self, from: encoded)
+    let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+
+    #expect(decoded == request)
+    #expect(object["playlistIds"] as? [String] == ["one", "two"])
+    #expect(object["playlistIDs"] == nil)
+    #expect(request.response == PlaybackQueueAdjacentResponse(trackID: "two"))
+    #expect(try JSONDecoder().decode(
+        PlaybackQueueAdjacentResponse.self,
+        from: JSONEncoder().encode(request.response)
+    ).trackID == "two")
 }
 
 @Test

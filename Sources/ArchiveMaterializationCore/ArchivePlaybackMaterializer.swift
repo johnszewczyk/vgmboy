@@ -71,7 +71,6 @@ public final class ArchivePlaybackMaterializer: @unchecked Sendable {
                     outputURL: temporaryURL
                 )
             }
-
         case .completeSet, .completeSetWithLazyUSFAliases:
             if try archiveKind(for: archiveURL) == .singleFileZstandard {
                 throw ArchiveMaterializationError.extractFailed(
