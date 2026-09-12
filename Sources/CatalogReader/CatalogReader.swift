@@ -334,7 +334,7 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
         var statement: OpaquePointer?
         let sql = """
         SELECT t.id, t.root_id, t.path, NULLIF(t.archive_path, ''), NULLIF(t.archive_entry, ''), t.track_index, t.track_count,
-               COALESCE(m.title, ''), COALESCE(m.game, ''), COALESCE(m.author, ''),
+               COALESCE(m.title, ''), COALESCE(NULLIF(m.game, ''), NULLIF(t.browser_game, ''), ''), COALESCE(m.author, ''),
                COALESCE(m.system, ''), COALESCE(m.comment, ''),
                COALESCE(t.browser_game, ''), COALESCE(t.browser_system, ''),
                COALESCE(m.intro_length_ms, 0), COALESCE(m.loop_length_ms, 0),
@@ -368,7 +368,7 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
             : "COALESCE(NULLIF(m.system, ''), NULLIF(t.browser_system, ''), '')"
         let sql = """
         SELECT t.id, t.root_id, t.path, NULLIF(t.archive_path, ''), NULLIF(t.archive_entry, ''), t.track_index, t.track_count,
-               COALESCE(m.title, ''), COALESCE(m.game, ''), COALESCE(m.author, ''),
+               COALESCE(m.title, ''), COALESCE(NULLIF(m.game, ''), NULLIF(t.browser_game, ''), ''), COALESCE(m.author, ''),
                COALESCE(m.system, ''), COALESCE(m.comment, ''),
                COALESCE(t.browser_game, ''), COALESCE(t.browser_system, ''),
                COALESCE(m.intro_length_ms, 0), COALESCE(m.loop_length_ms, 0),
@@ -501,7 +501,7 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
     ) throws -> [CatalogTrack] {
         let sql = """
         SELECT t.id, t.root_id, t.path, NULLIF(t.archive_path, ''), NULLIF(t.archive_entry, ''), t.track_index, t.track_count,
-               COALESCE(m.title, ''), COALESCE(m.game, ''), COALESCE(m.author, ''),
+               COALESCE(m.title, ''), COALESCE(NULLIF(m.game, ''), NULLIF(t.browser_game, ''), ''), COALESCE(m.author, ''),
                COALESCE(m.system, ''), COALESCE(m.comment, ''),
                COALESCE(t.browser_game, ''), COALESCE(t.browser_system, ''),
                COALESCE(m.intro_length_ms, 0), COALESCE(m.loop_length_ms, 0),

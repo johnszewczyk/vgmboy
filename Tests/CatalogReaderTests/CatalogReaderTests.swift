@@ -33,7 +33,7 @@ private func fixtureCatalog() throws -> URL {
         INSERT INTO tracks VALUES (2, 1, '/music/Game', '/music/Game/Track 10.spc', 'Track 10.spc', 'Game', 'SNES', 0, 1, NULL, NULL);
         INSERT INTO tracks VALUES (3, 1, '/music/TG16', '/music/TG16/Chew-Man-Fu.tar.zst', 'Chew-Man-Fu.tar.zst', 'Chew Man Fu', '', 0, 1, '/music/TG16/Chew-Man-Fu.tar.zst', NULL);
         INSERT INTO track_metadata VALUES (1, 'Track 9', 'Game', 'Composer', 'SNES', '', 0, 0, 90000, 0);
-        INSERT INTO track_metadata VALUES (2, 'Track 10', 'Game', 'Composer', 'SNES', '', 0, 0, 100000, 0);
+        INSERT INTO track_metadata VALUES (2, 'Track 10', '', 'Composer', 'SNES', '', 0, 0, 100000, 0);
         INSERT INTO track_metadata VALUES (3, 'Chew Man Fu', 'Chew Man Fu', 'Composer', 'PC Engine', '', 0, 0, 120000, 0);
         INSERT INTO game_sidebar_buckets VALUES (1, 'Game', 'SNES', 2);
         INSERT INTO game_sidebar_buckets VALUES (1, 'Chew Man Fu', '', 1);
@@ -94,6 +94,7 @@ private func fixtureCatalog() throws -> URL {
     )
 
     #expect(tracks.map(\.title) == ["Chew Man Fu", "Track 10", "Track 9"])
+    #expect(tracks.first(where: { $0.title == "Track 10" })?.game == "Game")
     #expect(tracks.map(\.lengthMilliseconds) == [120000, 100000, 90000])
 
     let metadataFallbackTracks = try CatalogPlaylistReader.tracksForGames(

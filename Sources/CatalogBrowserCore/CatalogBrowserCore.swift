@@ -114,6 +114,25 @@ public struct CatalogBrowserGame: Identifiable, Codable, Equatable, Sendable {
         URL(fileURLWithPath: rootPath, isDirectory: true).lastPathComponent
     }
 
+    /// The shared Console-view group label. Renderers use this value for
+    /// selection and disclosure actions instead of inventing an empty-system
+    /// fallback of their own.
+    public var consoleGroupName: String {
+        system.isEmpty ? "Unknown Console" : system
+    }
+
+    /// The normalized, complete database-search value published to every
+    /// frontend. Renderers may filter this projection locally, but must not
+    /// rebuild a different combination of catalog fields.
+    public var searchText: String {
+        CatalogBrowserSearchText.game(
+            name: name,
+            system: system,
+            rootDisplayName: rootDisplayName,
+            displayName: displayName
+        )
+    }
+
     public init(bucket: CatalogGameBucket, displayName: String? = nil) {
         let cleanName = bucket.game.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanSystem = bucket.system.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -134,6 +153,25 @@ public struct CatalogBrowserGameGroup: Identifiable, Codable, Equatable, Sendabl
     public var id: String { name }
 }
 
+/// Canonical text projection for the shared catalog Games search. It keeps the
+/// searchable fields and case normalization out of renderer models while still
+/// allowing a WebKit skin to filter its already-published list without a
+/// database round trip per keystroke.
+public enum CatalogBrowserSearchText {
+    public static func game(
+        name: String,
+        system: String,
+        rootDisplayName: String,
+        displayName: String
+    ) -> String {
+        normalized("\(name) \(system) \(rootDisplayName) \(displayName)")
+    }
+
+    public static func normalized(_ value: String) -> String {
+        value.lowercased()
+    }
+}
+
 /// UI-neutral incremental search index. Frontends provide one searchable
 /// value per projected row and retain only the row-model adapter. Extending a
 /// query reuses the previous candidate indices; a non-extension restarts from
@@ -144,14 +182,13 @@ public struct CatalogSearchIndex: Sendable {
     private var previousMatches: [Int]
 
     public init(searchValues: [String]) {
-        normalizedValues = searchValues.map { $0.lowercased() }
+        normalizedValues = searchValues.map(CatalogBrowserSearchText.normalized)
         previousMatches = Array(searchValues.indices)
     }
 
     public mutating func matchingIndices(query: String) -> [Int] {
-        let terms = query
+        let terms = CatalogBrowserSearchText.normalized(query)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
             .split(whereSeparator: \.isWhitespace)
             .map(String.init)
 
@@ -449,7 +486,10 @@ public struct CatalogFileTreeIndex: Sendable {
         tieBreak lhsTieBreak: String,
         _ rhsTieBreak: String
     ) -> Bool {
-        let comparison = lhs.localizedCaseInsensitiveCompare(rhs)
+        // Match the local-files browser and the catalog reader: users expect
+        // numbered folders/files to read 2 before 10. This ordering is shared
+        // data projection, not a renderer preference.
+        let comparison = lhs.localizedStandardCompare(rhs)
         if comparison != .orderedSame { return comparison == .orderedAscending }
         return lhsTieBreak < rhsTieBreak
     }
@@ -503,12 +543,101 @@ public struct CatalogBrowserGroupState: Codable, Equatable, Sendable {
         return next
     }
 
-    public enum Action: Equatable, Sendable {
+    public enum Action: Equatable, Sendable, Codable {
         case toggleGroup(String)
         case selectGroup(String)
         case selectGame(groupName: String, gameID: String)
         case setAllCollapsed(Bool, knownGroupNames: Set<String>)
         case replaceExpandedGroups(Set<String>)
+
+        private enum CodingKeys: String, CodingKey {
+            case kind
+            case groupName
+            case gameID = "gameId"
+            case collapsed
+            case knownGroupNames
+            case expandedGroupNames
+        }
+
+        private enum Kind: String, Codable {
+            case toggle
+            case select
+            case selectGame
+            case allCollapsed
+            case replaceExpandedGroups
+        }
+
+        public init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            let kind = try values.decode(Kind.self, forKey: .kind)
+            switch kind {
+            case .toggle:
+                let groupName = try values.decode(String.self, forKey: .groupName)
+                guard !groupName.isEmpty else { throw DecodingError.dataCorruptedError(forKey: .groupName, in: values, debugDescription: "A group name is required.") }
+                self = .toggleGroup(groupName)
+            case .select:
+                let groupName = try values.decode(String.self, forKey: .groupName)
+                guard !groupName.isEmpty else { throw DecodingError.dataCorruptedError(forKey: .groupName, in: values, debugDescription: "A group name is required.") }
+                self = .selectGroup(groupName)
+            case .selectGame:
+                let groupName = try values.decode(String.self, forKey: .groupName)
+                let gameID = try values.decode(String.self, forKey: .gameID)
+                guard !groupName.isEmpty, !gameID.isEmpty else {
+                    throw DecodingError.dataCorruptedError(forKey: .gameID, in: values, debugDescription: "A group name and game ID are required.")
+                }
+                self = .selectGame(groupName: groupName, gameID: gameID)
+            case .allCollapsed:
+                self = .setAllCollapsed(
+                    try values.decodeIfPresent(Bool.self, forKey: .collapsed) ?? false,
+                    knownGroupNames: Set(try values.decodeIfPresent([String].self, forKey: .knownGroupNames) ?? [])
+                )
+            case .replaceExpandedGroups:
+                self = .replaceExpandedGroups(
+                    Set(try values.decodeIfPresent([String].self, forKey: .expandedGroupNames) ?? [])
+                )
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var values = encoder.container(keyedBy: CodingKeys.self)
+            switch self {
+            case let .toggleGroup(groupName):
+                try values.encode(Kind.toggle, forKey: .kind)
+                try values.encode(groupName, forKey: .groupName)
+            case let .selectGroup(groupName):
+                try values.encode(Kind.select, forKey: .kind)
+                try values.encode(groupName, forKey: .groupName)
+            case let .selectGame(groupName, gameID):
+                try values.encode(Kind.selectGame, forKey: .kind)
+                try values.encode(groupName, forKey: .groupName)
+                try values.encode(gameID, forKey: .gameID)
+            case let .setAllCollapsed(collapsed, knownGroupNames):
+                try values.encode(Kind.allCollapsed, forKey: .kind)
+                try values.encode(collapsed, forKey: .collapsed)
+                try values.encode(knownGroupNames.sorted(), forKey: .knownGroupNames)
+            case let .replaceExpandedGroups(names):
+                try values.encode(Kind.replaceExpandedGroups, forKey: .kind)
+                try values.encode(names.sorted(), forKey: .expandedGroupNames)
+            }
+        }
+    }
+}
+
+/// Complete UI-neutral Console → Game transition at a renderer bridge.
+/// Frontends supply only the current shared state and an explicit user action;
+/// `CatalogBrowserCore` owns validation and the resulting disclosure/selection
+/// change without any bridge-local field reconstruction.
+public struct CatalogBrowserGroupStateRequest: Codable, Equatable, Sendable {
+    public let state: CatalogBrowserGroupState
+    public let action: CatalogBrowserGroupState.Action
+
+    public init(state: CatalogBrowserGroupState, action: CatalogBrowserGroupState.Action) {
+        self.state = state
+        self.action = action
+    }
+
+    public var response: CatalogBrowserGroupState {
+        state.applying(action)
     }
 }
 
@@ -540,7 +669,7 @@ public enum CatalogBrowserProjection {
     }
 
     public static func groups(from games: [CatalogBrowserGame]) -> [CatalogBrowserGameGroup] {
-        let grouped = Dictionary(grouping: games, by: { $0.system.isEmpty ? "Unknown Console" : $0.system })
+        let grouped = Dictionary(grouping: games, by: \.consoleGroupName)
         return grouped.keys.sorted(by: naturalAscending).map { name in
             CatalogBrowserGameGroup(
                 name: name,
@@ -550,9 +679,7 @@ public enum CatalogBrowserProjection {
     }
 
     public static func search(_ games: [CatalogBrowserGame], query: String) -> [CatalogBrowserGame] {
-        var index = CatalogSearchIndex(searchValues: games.map {
-            "\($0.name) \($0.system) \($0.rootDisplayName) \($0.displayName)"
-        })
+        var index = CatalogSearchIndex(searchValues: games.map(\.searchText))
         return index.matchingIndices(query: query).compactMap { position in
             games.indices.contains(position) ? games[position] : nil
         }

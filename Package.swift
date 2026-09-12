@@ -8,6 +8,7 @@ let package = Package(
     products: [
         .library(name: "CatalogReader", targets: ["CatalogReader"]),
         .library(name: "CatalogPlaylistCore", targets: ["CatalogPlaylistCore"]),
+        .library(name: "CatalogPlaylistPresentationCore", targets: ["CatalogPlaylistPresentationCore"]),
         .library(name: "CatalogBrowserCore", targets: ["CatalogBrowserCore"]),
         .library(name: "CatalogSessionCore", targets: ["CatalogSessionCore"]),
         .library(name: "FrontendCommandCore", targets: ["FrontendCommandCore"]),
@@ -16,11 +17,19 @@ let package = Package(
     targets: [
         .target(name: "CatalogReader", linkerSettings: [.linkedLibrary("sqlite3")]),
         .target(name: "CatalogPlaylistCore", linkerSettings: [.linkedLibrary("sqlite3")]),
+        .target(
+            name: "CatalogPlaylistPresentationCore",
+            dependencies: ["CatalogReader", "CatalogPlaylistCore"]
+        ),
         .target(name: "CatalogBrowserCore", dependencies: ["CatalogReader"]),
         .target(name: "CatalogSessionCore", dependencies: ["CatalogReader"]),
         .target(name: "FrontendCommandCore"),
         .executableTarget(name: "CatalogReaderElectronBridge", dependencies: ["CatalogReader"]),
         .testTarget(name: "CatalogReaderTests", dependencies: ["CatalogReader", "CatalogPlaylistCore"], linkerSettings: [.linkedLibrary("sqlite3")]),
+        .testTarget(
+            name: "CatalogPlaylistPresentationCoreTests",
+            dependencies: ["CatalogPlaylistPresentationCore"]
+        ),
         .testTarget(name: "CatalogBrowserCoreTests", dependencies: ["CatalogBrowserCore"]),
         .testTarget(name: "CatalogSessionCoreTests", dependencies: ["CatalogSessionCore"]),
         .testTarget(name: "FrontendCommandCoreTests", dependencies: ["FrontendCommandCore"])

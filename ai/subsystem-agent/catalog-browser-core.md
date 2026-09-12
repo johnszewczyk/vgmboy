@@ -26,14 +26,22 @@ write SQLite, or activate playback.
 - Search terms match the same normalized name, system, root, and display-label fields in every skin; extending a query may reuse prior candidates, while backspace or replacement restarts from all rows.
 - Empty folder console tags fall through to stored track metadata before the
   projection creates an `Unknown Console` group.
+- `CatalogBrowserGame.consoleGroupName` and
+  `CatalogBrowserProjection.groups(from:)` own the Console-view fallback,
+  natural group order, and game membership. A renderer may map group IDs into
+  native or DOM rows, but must not regroup or sort console labels locally.
 - Folder, leaf, and group gestures reduce to select, preview, expansion, or
   activation intents without importing SwiftUI, AppKit, WebKit, or DOM state.
 - `CatalogBrowserGroupState` owns Console → Game group selection and disclosure
   transitions. A group toggle clears game selection and never activates a
   child; frontends retain only their row rendering, focus, scroll, and
   persistence adapters.
+- `CatalogBrowserGroupStateRequest` is the direct Codable bridge contract for
+  that reducer. It carries a `CatalogBrowserGroupState` plus one validated
+  action and returns the next state; WebKit adapters must decode/encode it
+  rather than reconstruct disclosure fields from dictionaries.
 - `CatalogFileTreeIndex` owns the database-only Files graph: root/folder
-  identity, parent links, localized deterministic ordering, and flattening
+  identity, parent links, localized natural deterministic ordering, and flattening
   against a caller-supplied disclosure set. `CatalogFileSearchIndex` owns the
   filename/folder/full-path matching fields and cooperative cancellation.
   These indexes never enumerate the filesystem, inspect archives, render rows,
