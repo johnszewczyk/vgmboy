@@ -41,6 +41,7 @@ const state = {
   favoriteIds: [],
   favoriteSortOrder: "historical",
   databaseGames: [],
+  databaseGameGroups: [],
   databaseFiles: [],
   databaseFileTree: [],
   databaseSearchGames: null,
@@ -52,6 +53,8 @@ const state = {
   selectedFolderPath: null,
   selectedBrowserPath: null,
   playlist: [],
+  catalogPlaylistColumnContentHints: null,
+  catalogPlaylistSortSessionId: null,
   selectedTrackId: null,
   selectedTrackIds: [],
   playlistSelectionAnchorId: null,
@@ -59,7 +62,6 @@ const state = {
   // this separate queue so selecting another sidebar item cannot silently
   // replace the queue that is currently playing.
   playingPlaylist: [],
-  lastSelectedTrackId: null,
   currentTrackId: null,
   currentTrackInfo: null,
   isPlaying: false,
@@ -103,8 +105,12 @@ const state = {
   columnOrder: [...DEFAULT_COLUMN_ORDER],
   columnWidths: { ...DEFAULT_COLUMN_WIDTHS },
   columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY },
+  playlistColumnSizing: { horizontalPaddingPerSide: 8 },
   columnAutoSize: true,
-  sortColumn: "filename",
+  // Catalog order is authoritative until a user explicitly asks to sort a
+  // column. Do not let a display/width feature reorder shared rows.
+  playlistSortEnabled: false,
+  sortColumn: null,
   sortDirection: "ascending",
   autoResizeAnimationMilliseconds: 200,
   selectionAnimationMilliseconds: 200,
@@ -123,6 +129,7 @@ const state = {
     transportState: "stopped",
     outputState: "idle",
     generation: 0,
+    statusSequence: 0,
     trackLoaded: false,
     decodeError: false,
     reachedEnd: false,
@@ -297,7 +304,6 @@ async function loadSettings() {
     state.collapsedConsoleNames = Array.isArray(parsed.collapsedConsoleNames)
       ? parsed.collapsedConsoleNames.filter((name) => typeof name === "string")
       : [];
-    state.lastSelectedTrackId = parsed.lastSelectedTrackId || null;
     const interfaceFontSize = normalizeFontSize(parsed.uiFontSizePt ?? parsed.sidebarFontSizePt ?? parsed.playlistFontSizePt);
     const interfaceFontColor = normalizeFontColor(parsed.sidebarTextColor ?? parsed.playlistTextColor);
     const interfaceMonospace = Boolean(parsed.applicationMonospace ?? parsed.sidebarMonospace ?? parsed.playlistMonospace);
@@ -316,12 +322,22 @@ async function loadSettings() {
     state.routingPreferences = parsed.routingPreferences && typeof parsed.routingPreferences === "object" ? { ...parsed.routingPreferences } : {};
     state.archiveCacheEnabled = parsed.archiveCacheEnabled !== false;
     state.archiveCacheLimitBytes = normalizeArchiveCacheLimit(parsed.archiveCacheLimitBytes);
-    state.columnOrder = normalizeColumnOrder(parsed.columnOrder);
+    // The native snapshot already applies the shared column schema. WebKit
+    // receives a projection to render rather than a second layout policy.
+    state.columnOrder = Array.isArray(parsed.columnOrder) ? [...parsed.columnOrder] : [...DEFAULT_COLUMN_ORDER];
     state.columnWidths = normalizeColumnWidths(parsed.columnWidths);
-    state.columnVisibility = normalizeColumnVisibility(parsed.columnVisibility);
+    state.columnVisibility = parsed.columnVisibility && typeof parsed.columnVisibility === "object"
+      ? { ...parsed.columnVisibility }
+      : { ...DEFAULT_COLUMN_VISIBILITY };
+    state.playlistColumnSizing = normalizePlaylistColumnSizing(parsed.playlistColumnSizing);
     state.columnAutoSize = parsed.columnAutoSize !== false;
-    state.sortColumn = normalizeSortColumn(parsed.sortColumn);
-    state.sortDirection = normalizeSortDirection(parsed.sortDirection);
+    const savedSortColumn = typeof parsed.sortColumn === "string" ? parsed.sortColumn : null;
+    // The old renderer always persisted a sort column, even when the user had
+    // not chosen one. Absence of the opt-in flag marks that legacy state as
+    // inactive so fresh catalog order reaches the list unchanged.
+    state.playlistSortEnabled = parsed.playlistSortEnabled === true && savedSortColumn !== null;
+    state.sortColumn = state.playlistSortEnabled ? savedSortColumn : null;
+    state.sortDirection = parsed.sortDirection === "descending" ? "descending" : "ascending";
     state.autoResizeAnimationMilliseconds = normalizeAnimationMilliseconds(parsed.autoResizeAnimationMilliseconds);
     state.selectionAnimationMilliseconds = normalizeAnimationMilliseconds(parsed.selectionAnimationMilliseconds);
     state.autoResizeAnimationEnabled = parsed.autoResizeAnimationEnabled !== false;
@@ -360,7 +376,6 @@ function persistSettings() {
     favoriteSortOrder: state.favoriteSortOrder,
     selectedDatabaseGameKey: state.selectedDatabaseGameKey,
     collapsedConsoleNames: state.collapsedConsoleNames,
-    lastSelectedTrackId: state.lastSelectedTrackId,
     uiFontSizePt: state.uiFontSizePt,
     sidebarFontSizePt: state.sidebarFontSizePt,
     sidebarTextColor: state.sidebarTextColor,
@@ -379,7 +394,9 @@ function persistSettings() {
     columnOrder: state.columnOrder,
     columnWidths: state.columnWidths,
     columnVisibility: state.columnVisibility,
+    playlistColumnSizing: state.playlistColumnSizing,
     columnAutoSize: state.columnAutoSize,
+    playlistSortEnabled: state.playlistSortEnabled,
     sortColumn: state.sortColumn,
     sortDirection: state.sortDirection,
     autoResizeAnimationMilliseconds: state.autoResizeAnimationMilliseconds,
@@ -410,7 +427,9 @@ function normalizePlayTime(value) {
 function normalizeLongPlayTime(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric)
-    ? Math.max(30, Math.min(900, Math.round(numeric)))
+    // Long Play is an explicit user policy. Zero means no finite cap; do not
+    // silently rewrite the user's value to an arbitrary window.
+    ? Math.max(0, Math.round(numeric))
     : DEFAULT_LONG_PLAY_SECONDS;
 }
 
@@ -516,46 +535,23 @@ function parseNumericInput(value) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
-function normalizeColumnOrder(value) {
-  if (!Array.isArray(value)) {
-    return [...DEFAULT_COLUMN_ORDER];
-  }
-
-  const validIds = new Set(DEFAULT_COLUMN_ORDER);
-  const deduped = value.filter((columnId, index) => (
-    validIds.has(columnId) &&
-    value.indexOf(columnId) === index
-  ));
-  const missing = DEFAULT_COLUMN_ORDER.filter((columnId) => !deduped.includes(columnId));
-  return ["favorite", ...deduped.filter((columnId) => columnId !== "favorite"), ...missing.filter((columnId) => columnId !== "favorite")];
-}
-
 function normalizeColumnWidths(value) {
   const widths = { ...DEFAULT_COLUMN_WIDTHS };
   if (!value || typeof value !== "object") return widths;
   for (const column of COLUMN_DEFS) {
     const numeric = Number(value[column.id]);
-    if (Number.isFinite(numeric)) widths[column.id] = Math.max(4, Math.min(80, numeric));
+    if (Number.isFinite(numeric)) widths[column.id] = Math.max(0, Math.min(80, numeric));
   }
   return widths;
 }
 
-function normalizeColumnVisibility(value) {
-  const visibility = { ...DEFAULT_COLUMN_VISIBILITY };
-  if (!value || typeof value !== "object") return visibility;
-  for (const column of COLUMN_DEFS) {
-    if (typeof value[column.id] === "boolean") visibility[column.id] = value[column.id];
-  }
-  if (!Object.values(visibility).some(Boolean)) visibility[DEFAULT_COLUMN_ORDER[0]] = true;
-  return visibility;
-}
-
-function normalizeSortColumn(value) {
-  return DEFAULT_COLUMN_ORDER.includes(value) && !["index", "favorite"].includes(value) ? value : "filename";
-}
-
-function normalizeSortDirection(value) {
-  return value === "descending" ? "descending" : "ascending";
+function normalizePlaylistColumnSizing(value) {
+  const numeric = Number(value?.horizontalPaddingPerSide);
+  return {
+    horizontalPaddingPerSide: Number.isFinite(numeric)
+      ? Math.max(0, Math.min(16, numeric))
+      : 8
+  };
 }
 
 function currentTrack() {
@@ -618,11 +614,7 @@ window.SPCBoyApp = {
   normalizeAppVolume,
   normalizeArchiveCacheLimit,
   normalizeSidebarWidth,
-  normalizeColumnOrder,
   normalizeColumnWidths,
-  normalizeColumnVisibility,
-  normalizeSortColumn,
-  normalizeSortDirection,
   currentTrack,
   selectedTrack,
   activeTrackInfo,

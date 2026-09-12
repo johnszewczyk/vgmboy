@@ -27,9 +27,19 @@ to the main WebView, which asks VGMBoyKit to reconfigure the loaded session
 without losing position or paused state.
 
 The shared `FrontendPreferencesCore` contract owns the validated animation
-timing range and 200 ms defaults. DOM geometry and CSS remain WebKit-owned so
-SPCBoy keeps its rendering style; native Swift owns persistence and window
-levels.
+timing range, 200 ms defaults, and the eight-point-per-side playlist header
+minimum padding. DOM font measurement, geometry, and CSS remain WebKit-owned
+so SPCBoy keeps its rendering style; native Swift owns persistence and window
+levels. The sizing value crosses the typed settings snapshot rather than
+becoming a second per-column policy in JavaScript.
+
+The accent color is a persisted CSS color in the typed settings projection.
+`app-ui.js` applies it as the root `--accent` value, and both the sidebar and
+playlist use the same moving accent capsule. Selected-row backgrounds remain
+transparent so a second instantaneous paint cannot flash over the capsule.
+Selection never changes sidebar or playlist text color: users choose accent
+and text colors with the contrast they want. Active toolbar and option controls
+use the same accent surface.
 
 `FrontendOptionsManifest` provides the common Database, Interface, and Windows
 organization through the bridge. `options-controller.js` applies that manifest,
@@ -37,8 +47,22 @@ organization through the bridge. `options-controller.js` applies that manifest,
 browser-tree row gestures to the native shared reducer. `app-ui.js` remains the
 renderer and event wiring layer rather than the owner of those policies.
 Database Console → Game group disclosure and selection also pass through the
-shared `CatalogBrowserGroupState` reducer. WebKit retains only DOM rows, focus,
-scrolling, and persistence projection.
+shared `CatalogBrowserGroupState` reducer through its direct
+`CatalogBrowserGroupStateRequest` codec. The Swift bridge publishes the
+shared natural group order, canonical game IDs, and each game's
+`consoleGroupName`; WebKit maps those IDs into DOM rows and does not regroup or
+sort console labels or rebuild native disclosure state. WebKit retains only DOM
+rows, focus, scrolling, and persistence projection.
+
+`CatalogPlaylistPresentationCore` supplies ordered catalog playlist rows with
+their visible fallback text and non-pixel column-content hints. `WKNativeBridge`
+serializes that projection, retains a bounded native sort session, and applies
+its `CatalogPlaylistSorting` comparator only after an explicit user sort
+gesture; `app-ui.js` sends that session ID and current row IDs, then applies the
+returned identity order. WebKit keeps font measurement, column sizing,
+animation, and DOM reordering only. It must
+not rebuild archive-member filenames, metadata fallback text, duration labels,
+an implicit default catalog sort, or a second catalog sort comparator.
 
 The AppKit host owns Cmd-Q, Cmd-W, Cmd-M, Cmd-O, native file/folder selection, and menu dispatch. Shared semantic
 shortcut names and default keys come from `FrontendCommandCore`; WebKit receives
@@ -53,16 +77,63 @@ advancing after the completed native session is retired.
 This is module-boundary coverage; a live WebKit interaction test remains a
 separate app-boundary check.
 
+The renderer suite reads CocoaSpice's canonical
+`Tests/CocoaSpiceTests/cross-app-playlist-activation-v1.json` directly. It loads
+the production selection controller, UI, and playback modules to exercise
+focused-row activation through the native-start request, preserving the
+native-supplied playable ID, archive member, and subtrack across metadata changes.
+Native ID construction is checked by CocoaSpice's fixture consumer; the WK
+test does not generate or validate native catalog projections.
+
+Start, stop, initialization, and failed-start cleanup retain their captured
+renderer generation across bridge awaits. Recheck it before sending the next
+native command or publishing state: after fade/unload, power-save changes,
+initialization/audio configuration, and failed-start close. An obsolete stop
+must not clear the replacement's presentation; an obsolete close reply must
+not reset its initialization flag. Current-start failures still close and
+surface the original error. Shared native serialization cannot identify an
+obsolete renderer intent sent as a new command.
+
+Deferred-response tests exercise replacement and explicit stop during start
+preparation, replacement during stop/fade/error cleanup, late native-start
+success and failure, and an obsolete completion response containing a next-track
+action. These tests control reply ordering rather than relying on elapsed sleeps.
+
+Pause, resume, seek, and adjacent intents capture their renderer generation too.
+A seek captures its requested offset before awaiting fade cancellation and starts
+a new renderer generation, so a late earlier seek cannot rewind the same track.
+Adjacent queue/fade replies are ignored after supersession. A queued-fade status
+reply must still match both the original queued request object and its generation
+before completion retirement or cancellation. The second-skip path awaits its
+fade, stop, and native-selected queue handoff instead of detaching the operation.
+Shared native code continues to select the target and compute fade policy.
+
+`SPCBOY_TEST_PLAYBACK_SOURCE` lets the renderer tests run against an explicit
+app-playback.js file, including the packaged resource. It changes only test input;
+production resources and runtime routing do not read that environment variable.
+
 Archive-backed playback must receive a clean path from
 `FrontendCore.ArchivePlaybackMaterializer`. The required selected-entry or
 complete-set preparation is a VGMBoy format capability; extraction, cache
 identity, atomic staging, dependency preparation, output validation, lease
 protection, and the connected TZST tool pipeline are shared with CocoaSpice.
+ZIP, 7z, LHA, RSN, and TAR+Zstandard use the shared archive boundary. Amiga
+members identified by UADE filename prefixes use complete-set preparation so
+their player/sample companions remain available; an LHA member is not treated
+as a standalone suffix-only file. MDX keeps a matching PDX bank as dependency
+data and never exposes the PDX as a playlist row.
 `SPCArchiveMaterialization` is only the WK preference/cache adapter, and
 `WKPlaybackBridge` may request materialization only through that shared core;
 it must not implement archive extraction or access decoder implementations
 directly. The bridge's cache settings, summary, location, and clear commands
 must remain native and functional rather than no-op placeholders.
+
+`nativePlaybackStart` directly decodes `PlaybackTransportStartRequest`. The
+request carries the renderer's stable track ID, source/archive reference,
+timing, tempo, and seek offset; after any adapter-owned materialization,
+`PlaybackTransportCore` performs the shared load/seek/play sequence. Do not
+reconstruct `PlaybackControlPayload` from bridge dictionaries or use the cache
+path as the transport's track identity.
 
 Playback timing is resolved by the native bridge through the shared `VGMBoyKit.PlaybackTimingPolicy`
 and `PlaybackTimingRequest` boundary used by CocoaSpice. JavaScript asks for and caches that plan
@@ -70,10 +141,28 @@ for the active track, then uses the same plan for its readout and native start r
 forwards Long Play and deliberate faded-skip intent; it does not choose the core's standard/timed
 duration policy. Ordinary finite audio therefore reaches VGMBoy with decoder-natural timing, while
 Long Play is the only normal path that supplies a manual length.
-For a row without catalog timing, the shared plan uses the persisted unknown-duration safety
-window when Long Play is off; the native standard request leaves the play length unset and
-VGMBoyKit applies the same policy. Native status remains the playback authority for position and
-end state.
+
+`nativePlaybackTiming`, `nativePlaybackReconfigure`, and `nativePlaybackSetTempo` directly decode
+the shared `PlaybackTimingPreviewRequest`, `PlaybackTransportReconfigurationRequest`, and
+`PlaybackTransportTempoRequest` codecs. The contracts retain the established WebKit JSON keys but
+own preview scaling, control-payload construction, and tempo normalization; the WK bridge must not
+parse individual timing fields, calculate a multiplier, or build a `PlaybackControlPayload` itself.
+
+`nativePlaybackAudioConfig` receives one object decoded as
+`PlaybackTransportAudioConfigurationRequest` rather than positional arguments. The shared transport
+normalizes and serializes the volume, EQ, and mono commands together. Both initial setup and option
+changes send the complete snapshot, so a persisted mono choice is applied before the first track.
+Timing and tempo settings carry both the renderer playback generation and a
+settings-request revision across bridge awaits. A late timing plan, reconfigure
+reply, or `set_tempo` status may not update a replacement track or supersede a
+newer setting. This is a WebKit presentation-ordering guard only; the shared
+transport remains the sole owner of the native timing and tempo mutation.
+For a row without catalog timing, the shared plan uses the persisted unknown-duration fallback
+when Long Play is off; the native standard request leaves the play length unset and VGMBoyKit
+applies the same policy. An explicit Long Play value is passed through without the former
+30-second/900-second renderer clamp; zero is the unbounded value and is represented as a zero
+total in the timing contract. Native status remains the playback authority for position and end
+state.
 
 The bridge preserves the distinction between a loaded paused session and a
 stopped session in its JSON status projection. It emits `paused` when VGMBoy
@@ -88,6 +177,12 @@ smoothly between the shared coordinator's status broadcasts. The projection is
 cancelled on pause, stop, replacement, and natural end; it never polls the
 decoder or advances playback itself.
 
+Every shared status reply and broadcast also carries a monotonic
+`status_sequence`. The renderer retains the newest sequence and discards a
+delayed older event before it can clear an active clock or regress transport
+state. Generation still protects track identity; the sequence protects event
+ordering within one track.
+
 The native bridge projects `VGMBoyKit.FormatRegistry.playbackDescriptors` into the WebKit backend
 manifest; JavaScript only indexes and displays that projection. `SPCBoyPreferencesSnapshot`
 normalizes timing, fade, EQ, volume, mono, and native-tempo values through
@@ -97,10 +192,15 @@ AAC export is a native offline task: `WKPlaybackBridge` forwards VGMBoy frame
 progress and terminal events to both the main and Options windows. The WebKit
 surface only renders those events and can request cancellation; VGMBoy removes
 the temporary partial file rather than exposing an incomplete `.aac` result.
+`nativeExportAAC` and `nativeExportAACCancel` decode the shared typed export
+and cancellation contracts. The WK adapter may materialize/release an archive
+member and report progress, but it must not parse export fields or construct
+the `AACExportRequest` consumed by the shared transport.
 
 Database search uses the shared `CatalogBrowserCore.CatalogSearchIndex` matching
-policy over the already-published native game projection. WebKit maintains a
-transient renderer-local index with the same all-terms fields (`name`, system,
+policy over the already-published native game projection. The projection carries
+the complete normalized search text; WebKit maintains only a transient index
+over that field rather than rebuilding the all-terms fields (`name`, system,
 root, and display name), so each keypress filters immediately without a bridge
 round-trip or debounce. Native remains responsible for publishing and
 refreshing the authoritative game projection; WebKit does not scan paths or
@@ -112,6 +212,12 @@ folder/file projection through `databaseFileTree`. JavaScript maps those
 records into its existing DOM node shape and owns only renderer-local browser
 paths, disclosure, focus, scroll, and context-menu behavior. The former
 `buildCatalogFileTree` graph constructor must not return.
+
+The shared catalog order is the initial playlist order. WebKit does not sort a
+catalog projection merely because it measures columns or renders a header; a
+header click explicitly enables the shared presentation sort. Legacy
+stored sort columns predate that opt-in flag and therefore do not reorder a
+newly loaded catalog projection.
 
 Catalog playlist replacement invalidation is native-owned through
 `CatalogSessionCore.CatalogSessionCoordinator`. WebKit sends the named
@@ -129,18 +235,19 @@ same `PlaybackTransportStatus` snapshot and its shared
 `PlaybackTransportStatusPayload` projection; the WK layer must not re-query or
 independently reconstruct VGMBoy diagnostics.
 The bridge no longer owns a `PlaybackController`, serial executor, or native
-request-generation lock. The remaining JavaScript queue/status layer owns only
-WebKit interaction ordering and stale UI generation checks; the shared native
-coordinator is the non-UI safety boundary that prevents concurrent detached
-bridge requests from racing one playback session.
+request-generation lock. The remaining JavaScript layer owns WebKit interaction
+ordering, the renderer playback-generation guard, bounded clock interpolation,
+queued-fade timers, and the final presentation handoff; it does not own decoder,
+queue-target, repeat, completion-claim, or session-retirement policy. The shared
+native coordinator is the non-UI safety boundary that prevents concurrent
+detached bridge requests from racing one playback session.
 
 Natural-end completion claiming, repeat/advance decision, and retirement of
 the completed native session also live on that shared transport coordinator.
-The bridge projects the JSON envelope into the shared
-`PlaybackContinuationRequest` value before invoking it, so CocoaSpice and
-SPCBoyWK submit the same lifecycle input.
-`WKNativeBridge` parses the JSON envelope, then delegates the typed retirement
-operation through `WKPlaybackBridge`; it does not retain a second
+`WKNativeBridge` directly decodes the JSON envelope as
+`PlaybackContinuationRequest`, delegates it through `WKPlaybackBridge`, and
+encodes the resulting `PlaybackContinuationResponse`; it does not reconstruct
+field dictionaries or retain a second
 `PlaybackContinuationCoordinator`. Completion retirement releases the active
 archive materialization in that serialized boundary, so there is no second
 JavaScript release request. WebKit then performs the intentionally UI-local
@@ -172,11 +279,15 @@ Once a track is loaded, pause/resume and seek use the existing VGMBoy session
 through `nativePlaybackPause`, `nativePlaybackResume`, and `nativePlaybackSeek`.
 Those transitions must not call `nativePlaybackStart`; reloading would create
 avoidable decoder/archive work and could reset the authoritative timing window.
+Seek and output-ramp commands decode the named shared
+`PlaybackTransportSeekRequest` and `PlaybackTransportRampGainRequest` codecs;
+the WebKit client must not restore positional scalar bridge calls.
 
 The WebKit adjacent-track path asks the native bridge for the shared
-`PlaybackTransportCore.PlaybackFadePolicy` result. It must not duplicate fade
-eligibility or remaining-window calculations in JavaScript; only the timer,
-queue intent, and DOM status presentation remain local.
+`PlaybackQueuedSkipFadeRequest` result. The same typed FrontendCore request is
+used by CocoaSpice, and replaces the former seven positional WebKit arguments.
+JavaScript must not duplicate fade eligibility or remaining-window calculations;
+only the timer, queue intent, and DOM status presentation remain local.
 
 Every delayed fade stores both the WebKit playback generation and VGMBoy's
 native diagnostics generation. A callback that observes either generation has
@@ -187,21 +298,33 @@ Queue identity policy is shared with CocoaSpice through
 `FrontendCore.PlaybackQueueCore`. `PlaybackQueueState` is now the value-only
 transition contract for current/selected/pending identity, replacement,
 transport navigation, and natural completion. The WebKit renderer still asks
-the single native `playbackQueueTransition` snapshot/intent bridge for those
-transitions, so it does not carry a second queue policy in JavaScript.
+the narrow native `playbackQueueAdjacent` bridge for an explicit skip. It
+serializes `PlaybackQueueAdjacentRequest` and receives
+`PlaybackQueueAdjacentResponse`, so it does not carry a second queue policy or
+reconstruct a queue state in JavaScript.
 
 Indexed database-game selection is a non-autoplay playlist preview. It replaces
 the renderer's queue while preserving the active native track and its timing;
 only an explicit Play Now/double-click sends a new playback start. A database
 lookup must never call the stop path merely because the playlist view changed.
+Sidebar-derived preview replacements clear visible playlist selection, so no
+old row or coincident track ID leaves a residual selection capsule. The
+no-selection state hides the capsule immediately rather than fading it at the
+previous row.
 
 Playlist hydration is shared at the data/policy boundary: the bridge uses
 `CatalogPlaylistReader` and `PlaybackQueueCore`, matching CocoaSpice.
 The JSON-to-track mapping remains WebKit-local because its fields are not the
-native metadata cache or column-width model. Playlist column order, widths, and
-visibility are persisted in the WebKit settings projection; every displayed
-column, including File and the favorite marker, can be hidden, while the
-renderer keeps at least one column visible.
+native metadata cache or column-width model. `FrontendPlaylistColumnSchema`
+normalizes the persisted column order, visibility, and explicit sort request
+before the WebKit settings projection is returned; every displayed column,
+including File and the favorite marker, can be hidden. The renderer owns only
+its percentage widths, labels, drag behavior, and DOM presentation.
+
+Explicit playlist sorting never compares values in JavaScript. Catalog rows use
+a retained native presentation session; local, mixed, and Favorites rows use a
+typed `CatalogPlaylistSortRequest` and receive the shared comparator's ordered
+IDs. WebKit applies that identity order before rendering.
 
 Catalog snapshot loading now uses independent native Games, Files, and playlist
 session scopes through `CatalogSessionCore.CatalogSessionCoordinator`. Detached

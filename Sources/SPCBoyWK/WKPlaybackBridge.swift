@@ -77,106 +77,43 @@ final class WKPlaybackBridge: @unchecked Sendable {
         case "nativePlaybackInit", "nativePlaybackState":
             return statusResponse()
         case "nativePlaybackAudioConfig":
-            let rawVolume = number(args.first).map(Float.init)
-            let rawGains = (args.count > 2 ? args[2] as? [Any] : nil)?.compactMap(number).map(Float.init)
-            let preferences = PlaybackPreferences(
-                equalizerEnabled: args.count > 1 ? (args[1] as? Bool) ?? false : false,
-                equalizerBandGains: rawGains ?? Array(repeating: 0, count: EqualizerConfiguration.bandCount),
-                outputVolume: rawVolume ?? PlaybackPreferences.defaultValue.outputVolume,
-                monoEnabled: args.count > 3 ? (args[3] as? Bool) ?? false : false
+            let request: PlaybackTransportAudioConfigurationRequest = try bridgeRequest(
+                args,
+                errorMessage: "Audio configuration requires complete output settings."
             )
-            if rawVolume != nil {
-                try perform(.setOutputVolume, payload: .init(outputVolume: preferences.outputVolume))
-            }
-            if args.count > 1 {
-                try perform(.setEqualizer, payload: .init(equalizer: preferences.equalizer))
-            }
-            if args.count > 3 {
-                try perform(.setMonoEnabled, payload: .init(monoEnabled: preferences.monoEnabled))
-            }
-            return statusResponse()
+            return statusResponse(try transport.configureAudio(request))
         case "nativePlaybackTiming":
-            guard let request = args.first as? [String: Any],
-                  let path = request["path"] as? String,
-                  !path.isEmpty,
-                  let family = FormatRegistry.family(for: path) else {
-                throw PlaybackBridgeError.invalid("Playback timing requires a supported file path.")
-            }
-            let metadata = PlaybackTimingMetadata(
-                playMilliseconds: max(0, int(request["playMilliseconds"]) ?? 0)
+            let request: PlaybackTimingPreviewRequest = try bridgeRequest(
+                args,
+                errorMessage: "Playback timing requires complete timing settings."
             )
-            let preferences = PlaybackTimingPreferences(
-                longPlaySeconds: max(
-                    1,
-                    int(request["manualPlayMilliseconds"]).map { $0 / 1_000 }
-                        ?? PlaybackTimingPreferences.defaultLongPlaySeconds
-                ),
-                unknownDurationSeconds: max(
-                    1,
-                    int(request["unknownDurationMilliseconds"]).map { $0 / 1_000 }
-                        ?? PlaybackTimingPreferences.defaultUnknownDurationSeconds
-                ),
-                fadeSeconds: max(
-                    0,
-                    int(request["fadeMilliseconds"]).map { $0 / 1_000 }
-                        ?? PlaybackTimingPreferences.defaultFadeSeconds
-                )
-            )
-            let plan = PlaybackTimingPolicy.plan(
-                metadata: metadata,
-                family: family,
-                longPlayEnabled: request["longPlayEnabled"] as? Bool ?? false,
-                preferences: preferences
-            )
-            let tempo = tempoMultiplier(request["tempo"])
-            let scaledPreFadeSeconds = max(
-                1,
-                Int((Double(plan.preFadeSeconds) / tempo).rounded(.down))
-            )
-            return [
-                "pre_fade_seconds": scaledPreFadeSeconds,
-                "fade_seconds": plan.fadeSeconds,
-                "total_seconds": scaledPreFadeSeconds + plan.fadeSeconds,
-                "is_long_play": plan.isLongPlay,
-                "uses_native_ending": plan.usesNativeEnding
-            ]
+            return try bridgeResponse(request.preview())
         case "nativePlaybackReconfigure":
-            guard let request = args.first as? [String: Any] else {
-                throw PlaybackBridgeError.invalid("Playback reconfiguration requires timing settings.")
-            }
-            let mode: PlaybackMode = (request["longPlayEnabled"] as? Bool == true) ? .longPlay : .fileDefault
-            let payload = PlaybackControlPayload(
-                playbackMode: mode,
-                playMilliseconds: mode == .longPlay ? max(1, int(request["manualPlayMilliseconds"]) ?? 0) : nil,
-                fadeMilliseconds: max(0, int(request["fadeMilliseconds"]) ?? 0),
-                unknownDurationMilliseconds: max(
-                    1_000,
-                    int(request["unknownDurationMilliseconds"])
-                    ?? PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000
-                )
+            let request: PlaybackTransportReconfigurationRequest = try bridgeRequest(
+                args,
+                errorMessage: "Playback reconfiguration requires complete timing settings."
             )
-            try perform(.setTempo, payload: .init(tempo: tempoMultiplier(request["tempo"])))
-            try perform(.setPlaybackMode, payload: payload)
+            try perform(.setTempo, payload: .init(tempo: request.tempo.multiplier))
+            try perform(.setPlaybackMode, payload: request.playbackModePayload)
             return statusResponse()
         case "nativePlaybackSetTempo":
-            guard let request = args.first as? [String: Any] else {
-                throw PlaybackBridgeError.invalid("Tempo update requires a tempo value.")
-            }
-            try perform(.setTempo, payload: .init(tempo: tempoMultiplier(request["tempo"])))
+            let request: PlaybackTransportTempoRequest = try bridgeRequest(
+                args,
+                errorMessage: "Tempo update requires a tempo value."
+            )
+            try perform(.setTempo, payload: .init(tempo: request.tempo.multiplier))
             return statusResponse()
         case "nativePlaybackStart":
-            guard let request = args.first as? [String: Any],
-                  let sourcePath = request["path"] as? String,
-                  !sourcePath.isEmpty else {
-                throw PlaybackBridgeError.invalid("Playback start requires a file path.")
-            }
             guard requestID.map(transport.isCurrentPlaybackRequest) ?? true else {
                 throw PlaybackBridgeError.superseded
             }
-            let archivePath = request["archivePath"] as? String
-            let archiveEntry = request["archiveEntry"] as? String
+            let request: PlaybackTransportStartRequest = try bridgeRequest(
+                args,
+                errorMessage: "Playback start requires a complete track request."
+            )
             let playbackPath: String
-            if let archivePath, !archivePath.isEmpty, let archiveEntry, !archiveEntry.isEmpty {
+            if let archivePath = request.archivePath, !archivePath.isEmpty,
+               let archiveEntry = request.archiveEntry, !archiveEntry.isEmpty {
                 guard let requirement = FormatRegistry.archiveMaterializationRequirement(for: [archiveEntry]) else {
                     throw PlaybackBridgeError.invalid("VGMBoy does not admit archive member \(archiveEntry).")
                 }
@@ -186,50 +123,15 @@ final class WKPlaybackBridge: @unchecked Sendable {
                     requirement: requirement
                 ).path
             } else {
-                playbackPath = sourcePath
+                playbackPath = request.sourcePath
             }
             guard requestID.map(transport.isCurrentPlaybackRequest) ?? true else {
                 throw PlaybackBridgeError.superseded
             }
-            let index = max(0, int(request["trackIndex"]) ?? 0)
-            let startMilliseconds = max(0, int(request["startMilliseconds"]) ?? 0)
-            let requestedPlayMilliseconds = int(request["playMilliseconds"])
-            let fadeMilliseconds = max(0, int(request["fadeMilliseconds"]) ?? 6_000)
-            let tempo = tempoMultiplier(request["tempo"])
-            let longPlayEnabled = request["longPlayEnabled"] as? Bool ?? false
-            let timedOverride = request["timedOverride"] as? Bool ?? false
-            let unknownDurationMilliseconds = max(
-                1_000,
-                int(request["unknownDurationMilliseconds"])
-                    ?? PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000
-            )
-            let timing: PlaybackTimingRequest
-            if timedOverride {
-                timing = try PlaybackTimingRequest.timed(
-                    playMilliseconds: requestedPlayMilliseconds ?? 0,
-                    fadeMilliseconds: fadeMilliseconds
-                )
-            } else {
-                timing = try PlaybackTimingRequest.standard(
-                    path: playbackPath,
-                    longPlayEnabled: longPlayEnabled,
-                    manualPlayMilliseconds: requestedPlayMilliseconds ?? 0,
-                    fadeMilliseconds: fadeMilliseconds,
-                    unknownDurationMilliseconds: unknownDurationMilliseconds
-                )
-            }
-            let payload = PlaybackControlPayload(
-                path: playbackPath,
-                trackIndex: index,
-                tempo: tempo,
-                playbackMode: timing.playbackMode,
-                playMilliseconds: timing.playMilliseconds,
-                fadeMilliseconds: timing.fadeMilliseconds,
-                unknownDurationMilliseconds: timing.unknownDurationMilliseconds
-            )
-            try perform(.load, payload: payload)
-            if startMilliseconds > 0 { try perform(.seek, payload: .init(positionMilliseconds: startMilliseconds)) }
-            try perform(.play)
+            try transport.start(try request.continuationStart(
+                resolvedPath: playbackPath,
+                requestID: requestID ?? transport.reservePlaybackRequest()
+            ))
             return statusResponse()
         case "nativePlaybackResume":
             try perform(.play)
@@ -242,18 +144,31 @@ final class WKPlaybackBridge: @unchecked Sendable {
             try perform(.stop)
             return statusResponse()
         case "nativePlaybackSeek":
-            let milliseconds = max(0, int(args.first) ?? 0)
-            try perform(.seek, payload: .init(positionMilliseconds: milliseconds))
+            let request: PlaybackTransportSeekRequest = try bridgeRequest(
+                args,
+                errorMessage: "Playback seek requires a position."
+            )
+            try perform(.seek, payload: request.payload)
             return statusResponse()
         case "nativePlaybackRampGain":
-            let gain = Float(number(args.first) ?? 0)
-            let duration = max(1, int(args.count > 1 ? args[1] : nil) ?? 1)
-            try perform(.rampOutputGain, payload: .init(outputGain: gain, rampMilliseconds: duration))
+            let request: PlaybackTransportRampGainRequest = try bridgeRequest(
+                args,
+                errorMessage: "Playback output ramp requires gain and duration."
+            )
+            try perform(.rampOutputGain, payload: request.payload)
             return statusResponse()
         case "nativeExportAAC":
-            return try exportAAC(args)
+            let request: PlaybackTransportAACExportRequest = try bridgeRequest(
+                args,
+                errorMessage: "AAC export requires a complete render request."
+            )
+            return try bridgeResponse(try exportAAC(request))
         case "nativeExportAACCancel":
-            return cancelAACExport(args)
+            let request: PlaybackTransportAACExportCancellationRequest = try bridgeRequest(
+                args,
+                errorMessage: "AAC export cancellation requires an export identifier."
+            )
+            return try bridgeResponse(cancelAACExport(request))
         case "setPlaybackPowerSaveBlocker":
             return NSNull()
         default:
@@ -268,19 +183,13 @@ final class WKPlaybackBridge: @unchecked Sendable {
         }
     }
 
-    private func exportAAC(_ args: [Any]) throws -> [String: Any] {
-        guard let request = args.first as? [String: Any],
-              let sourcePath = request["path"] as? String, !sourcePath.isEmpty,
-              let outputDirectory = request["outputDirectory"] as? String, !outputDirectory.isEmpty,
-              let filenameStem = request["filenameStem"] as? String,
-              let playMilliseconds = int(request["playMilliseconds"]), playMilliseconds > 0 else {
-            throw PlaybackBridgeError.invalid("AAC export requires a playable path, output folder, filename, and positive play length.")
-        }
-        let archivePath = request["archivePath"] as? String
-        let archiveEntry = request["archiveEntry"] as? String
+    private func exportAAC(
+        _ request: PlaybackTransportAACExportRequest
+    ) throws -> PlaybackTransportAACExportResponse {
         let playbackPath: String
         var materialized = false
-        if let archivePath, !archivePath.isEmpty, let archiveEntry, !archiveEntry.isEmpty {
+        if let archivePath = request.archivePath, !archivePath.isEmpty,
+           let archiveEntry = request.archiveEntry, !archiveEntry.isEmpty {
             guard let requirement = FormatRegistry.archiveMaterializationRequirement(for: [archiveEntry]) else {
                 throw PlaybackBridgeError.invalid("VGMBoy does not admit archive member \(archiveEntry).")
             }
@@ -291,7 +200,7 @@ final class WKPlaybackBridge: @unchecked Sendable {
             ).path
             materialized = true
         } else {
-            playbackPath = sourcePath
+            playbackPath = request.sourcePath
         }
         let exportID = UUID().uuidString
         let cancellation = AACExportCancellation()
@@ -308,16 +217,10 @@ final class WKPlaybackBridge: @unchecked Sendable {
             if activeExport?.id == exportID { activeExport = nil }
             exportLock.unlock()
         }
-        publishExport(.init(id: exportID, state: "rendering", renderedFrames: 0, totalFrames: 0, message: filenameStem))
+        publishExport(.init(id: exportID, state: "rendering", renderedFrames: 0, totalFrames: 0, message: request.filenameStem))
         do {
-            let outputURL = try transport.exportAAC(.init(
-                sourcePath: playbackPath,
-                trackIndex: max(0, int(request["trackIndex"]) ?? 0),
-                outputDirectory: URL(fileURLWithPath: outputDirectory),
-                filenameStem: filenameStem,
-                playMilliseconds: playMilliseconds,
-                fadeMilliseconds: max(0, int(request["fadeMilliseconds"]) ?? 0)
-            ),
+            let outputURL = try transport.exportAAC(
+                try request.exportRequest(resolvedPath: playbackPath),
                 cancellation: cancellation,
                 progress: { [weak self] progress in
                     self?.publishExport(.init(
@@ -325,12 +228,12 @@ final class WKPlaybackBridge: @unchecked Sendable {
                         state: "rendering",
                         renderedFrames: progress.renderedFrames,
                         totalFrames: progress.totalFrames,
-                        message: filenameStem
+                        message: request.filenameStem
                     ))
                 }
             )
             publishExport(.init(id: exportID, state: "completed", renderedFrames: 0, totalFrames: 0, message: outputURL.path))
-            return ["path": outputURL.path, "id": exportID]
+            return .init(path: outputURL.path, id: exportID)
         } catch {
             let state = (error as? AACExportError) == .cancelled ? "cancelled" : "failed"
             publishExport(.init(id: exportID, state: state, renderedFrames: 0, totalFrames: 0, message: error.localizedDescription))
@@ -338,14 +241,15 @@ final class WKPlaybackBridge: @unchecked Sendable {
         }
     }
 
-    private func cancelAACExport(_ args: [Any]) -> [String: Any] {
-        let requestedID = (args.first as? [String: Any])?["id"] as? String
+    private func cancelAACExport(
+        _ request: PlaybackTransportAACExportCancellationRequest
+    ) -> PlaybackTransportAACExportCancellationResponse {
         exportLock.lock()
         defer { exportLock.unlock() }
         guard let activeExport,
-              requestedID == nil || requestedID == activeExport.id else { return ["cancelled": false] }
+              request.id == nil || request.id == activeExport.id else { return .init(cancelled: false) }
         activeExport.cancellation.cancel()
-        return ["cancelled": true, "id": activeExport.id]
+        return .init(cancelled: true, id: activeExport.id)
     }
 
     private func publishExport(_ event: AACExportEvent) {
@@ -380,31 +284,31 @@ final class WKPlaybackBridge: @unchecked Sendable {
         return PlaybackTransportStatusPayload(status: status).jsonObject()
     }
 
-    private func number(_ value: Any?) -> Double? {
-        if let value = value as? Double { return value }
-        if let value = value as? Int { return Double(value) }
-        if let value = value as? NSNumber { return value.doubleValue }
-        return nil
+    private func bridgeRequest<Request: Decodable>(
+        _ args: [Any],
+        errorMessage: String
+    ) throws -> Request {
+        guard let payload = args.first as? [String: Any],
+              JSONSerialization.isValidJSONObject(payload) else {
+            throw PlaybackBridgeError.invalid(errorMessage)
+        }
+        do {
+            return try JSONDecoder().decode(
+                Request.self,
+                from: JSONSerialization.data(withJSONObject: payload)
+            )
+        } catch {
+            throw PlaybackBridgeError.invalid(errorMessage)
+        }
     }
 
-    private func int(_ value: Any?) -> Int? {
-        number(value).map(Int.init)
-    }
-
-    private func tempoMultiplier(_ value: Any?) -> Double {
-        if let scalar = number(value), scalar.isFinite, scalar > 0 {
-            return scalar
+    private func bridgeResponse<Response: Encodable>(_ response: Response) throws -> [String: Any] {
+        guard let object = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(response)
+        ) as? [String: Any] else {
+            throw PlaybackBridgeError.invalid("Playback bridge failed to encode its response.")
         }
-        guard let ratio = value as? [String: Any],
-              let numerator = number(ratio["numerator"]),
-              let denominator = number(ratio["denominator"]),
-              numerator.isFinite,
-              denominator.isFinite,
-              numerator > 0,
-              denominator > 0 else {
-            return 1
-        }
-        return numerator / denominator
+        return object
     }
 
 }

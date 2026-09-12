@@ -10,6 +10,7 @@
   --muted: gray;
   --dim: dimgray;
   --accent: lightskyblue;
+  --accent-ink: rgb(20 20 20);
   --line: rgb(40 40 40);
   --ui-font-size-pt: 10;
   --sidebar-width-percent: 20;
@@ -207,7 +208,7 @@ body.is-file-drag-over::after {
 
 .sidebar-search-actions, .sidebar-view-actions, .sidebar-fold-actions { display: flex; flex: 0 0 auto; gap: 0.25rem; }
 .sidebar-mode-button { display: inline-flex; align-items: center; justify-content: center; width: var(--top-toolbar-control-height); height: var(--top-toolbar-control-height); padding: 0; border: 1px solid rgb(30 30 30); border-radius: 5px; background: var(--bg-chrome); color: var(--muted); cursor: pointer; line-height: 1; }
-.sidebar-mode-button:hover, .sidebar-mode-button.is-selected { background: var(--bg-subpanel); color: var(--sidebar-text-color); }
+.sidebar-mode-button:hover { background: var(--bg-subpanel); }
 .icon-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 .ui-icon { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .sidebar-mode-button .ui-icon { width: 1rem; height: 1rem; vertical-align: middle; }
@@ -243,13 +244,13 @@ body.is-file-drag-over::after {
 
 .database-game-row { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%; padding: var(--list-item-padding-y) 0.5rem; border: 0; border-radius: 999px; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
 .database-game-row:hover { background: var(--bg-hover); }
-.database-game-row.is-selected { color: var(--sidebar-text-color); box-shadow: none; }
+.database-game-row.is-selected { box-shadow: none; }
 .database-game-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .database-game-meta { flex: 0 0 auto; color: var(--muted); font-variant-numeric: tabular-nums; }
 .database-console-group { position: relative; z-index: 1; }
 .database-console-row { display: flex; align-items: center; gap: 0; width: 100%; padding: var(--list-item-padding-y) 0.5rem; border: 0; border-radius: 999px; background: transparent; color: var(--text); font: inherit; font-weight: 400; text-align: left; cursor: pointer; }
 .database-console-row:hover { background: var(--bg-hover); }
-.database-console-row.is-selected { color: var(--sidebar-text-color); box-shadow: none; }
+.database-console-row.is-selected { box-shadow: none; }
 .database-console-games { display: flex; flex-direction: column; min-width: 0; overflow: hidden; padding-left: 1rem; }
 .database-disclosure { flex: 0 0 1rem; width: 1rem; color: var(--muted); text-align: center; }
 .database-console-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -316,7 +317,7 @@ body.is-file-drag-over::after {
 }
 
 .tree-node.is-selected {
-  color: var(--sidebar-text-color);
+  background: transparent;
   box-shadow: none;
 }
 
@@ -325,7 +326,6 @@ body.is-file-drag-over::after {
 }
 
 .tree-node.tree-file { color: var(--sidebar-text-color); }
-.tree-node.tree-file.is-selected { color: var(--sidebar-text-color); }
 
 .tree-disclosure {
   flex: 0 0 1rem;
@@ -697,16 +697,16 @@ body.is-file-drag-over::after {
   background: transparent;
 }
 
-.playlist-row.is-selected {
-  background: transparent;
-}
-
 .playlist-row.is-current {
   background: var(--bg-panel);
 }
 
 .playlist-row.is-current td {
   color: var(--accent);
+}
+
+.playlist-row.is-selected {
+  background: transparent;
 }
 
 .playlist-virtual-spacer,
@@ -743,12 +743,16 @@ body.is-file-drag-over::after {
   width: 0;
   height: 0;
   border-radius: 999px;
-  background: var(--bg-subpanel);
+  background: var(--accent);
   pointer-events: none;
   opacity: 0;
   transform: translate3d(0, 0, 0);
   transition: transform var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1), width var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1), height var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1), opacity var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1);
 }
+
+/* A sidebar preview has no playlist selection. Do not leave the old capsule
+   fading at its prior row while the new list is rendered. */
+.list-selection-indicator.is-hidden { transition: none; }
 
 .col-index {
   width: 48px;
@@ -893,14 +897,14 @@ body.is-file-drag-over::after {
 
 .content-bottombar .tool-button.is-selected,
 .content-bottombar .tool-button[aria-pressed="true"] {
-  background: var(--bg-subpanel);
-  color: var(--sidebar-text-color);
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 
 #long-play-button.is-selected .ui-icon,
 #repeat-button.is-selected .ui-icon,
 #repeat-button.is-selected::after {
-  color: var(--accent);
+  color: inherit;
 }
 
 .options-overlay {
@@ -1006,10 +1010,10 @@ body.is-file-drag-over::after {
   cursor: pointer;
 }
 
-.options-nav-item:hover,
+.options-nav-item:hover { background: var(--bg-hover); }
 .options-nav-item.is-selected {
-  background: rgb(30 30 30);
-  color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
   font-weight: 700;
 }
 
@@ -1211,6 +1215,11 @@ body.is-file-drag-over::after {
   padding: 0;
   background: transparent;
   color: var(--muted);
+  font-family: var(--mono-font-family);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-align: left;
 }
 
@@ -1227,6 +1236,31 @@ body.is-file-drag-over::after {
 
 .options-panel-actions .tool-button {
   width: 0;
+}
+
+/* Active and latched controls use the accent as their state surface. Keeping
+   the rule centralized prevents individual controls from reverting to an
+   accent-colored label on a dark background. */
+button:not(.tree-node):not(.database-game-row):not(.database-console-row):is(:active, [aria-pressed="true"]) {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+button:not(.tree-node):not(.database-game-row):not(.database-console-row):is(:active, [aria-pressed="true"]) .ui-icon {
+  color: inherit;
+}
+
+/* List selection is painted by the moving capsule above. Do not put a second
+   background on the row itself: that flashes during a selection change and
+   hides the animation. */
+button:is(.tree-node, .database-game-row, .database-console-row).is-selected {
+  background: transparent;
+  box-shadow: none;
+}
+
+.favorite-toggle.is-favorite {
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 
 .options-library-toolbar .tool-button,
@@ -1350,7 +1384,7 @@ body.options-window .options-header { display: none; }
 }
 
 .options-input {
-  width: 7rem;
+  width: 8rem;
   padding: 0.25rem 0.5rem;
   border: 0;
   border-radius: 0.375rem;
@@ -1361,7 +1395,7 @@ body.options-window .options-header { display: none; }
 }
 
 .options-number-input {
-  width: 5rem;
+  width: 8rem;
   min-width: 0;
   font-variant-numeric: tabular-nums;
 }

@@ -30,8 +30,9 @@ and persistence. This project owns only the typed native adapter and WebKit rend
   `CatalogBrowserCore.SidebarRowInteraction` through the native bridge. The
   WebKit controller dispatches that returned intent and does not duplicate the
   browser-tree selection rule table. Database Console → Game group disclosure
-  and selection state are reduced by `CatalogBrowserGroupState` through the
-  native bridge; WebKit retains only DOM rows, focus, and persistence.
+and selection state are reduced by `CatalogBrowserGroupStateRequest` through
+the native bridge; WebKit sends the typed shared state/action envelope and
+retains only DOM rows, focus, and persistence.
 - Database game selection updates the playlist directly; it must not invoke a full sidebar redraw or deferred metadata pass when catalog rows already contain metadata.
 - Large catalog playlists are rendered through a fixed-height visible window;
   the database result remains fully selectable without creating one WebKit DOM

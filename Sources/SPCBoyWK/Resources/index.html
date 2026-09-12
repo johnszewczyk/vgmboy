@@ -142,12 +142,12 @@
                 <div class="options-subpanel-title">Playlist Options</div>
                 <label class="options-field options-inline-field"><span>Bold Header Font</span><input id="playlist-header-bold-checkbox" type="checkbox" /></label>
                 <label class="options-field"><span>Item Spacing</span><span class="options-inline-trailing"><input id="ui-item-spacing-input" class="options-input" type="text" inputmode="decimal" value=".2" aria-label="Item spacing in rems" /></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="column-auto-size-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Enable Column Auto-size</span><small>Automatically resize columns for content width on selection.</small></span></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="column-auto-size-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Column Auto-size</span><small>Automatically resize columns for content width on selection.</small></span></span></label>
               </div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Animations</div>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="auto-resize-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Auto-Resize</span><small>Duration for automatic playlist column resizing (ms).</small></span></span><span class="options-inline-trailing"><input id="auto-resize-animation-input" class="options-input" type="number" min="0" max="1000" step="10" value="200" aria-label="Auto-resize animation milliseconds" /></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="selection-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Selection Bar</span><small>Duration for playlist and sidebar selection movement (ms).</small></span></span><span class="options-inline-trailing"><input id="selection-animation-input" class="options-input" type="number" min="0" max="1000" step="10" value="200" aria-label="Selection bar animation milliseconds" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="auto-resize-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Auto-Resize</span><small>Duration for automatic playlist column resizing (ms).</small></span></span><span class="options-inline-trailing"><input id="auto-resize-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Auto-resize animation milliseconds" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="selection-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Selection Bar</span><small>Duration for playlist and sidebar selection movement (ms).</small></span></span><span class="options-inline-trailing"><input id="selection-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Selection bar animation milliseconds" /></span></label>
               </div>
             </div>
 
@@ -165,7 +165,7 @@
               <div class="options-subpanel options-cache-panel">
                 <div class="options-subpanel-title">Cache</div>
                 <div class="database-stats-panel options-path-control"><input id="library-cache-path" class="options-input options-path-readout" type="text" readonly placeholder="Archive cache path" aria-label="Archive cache path" /><button id="library-cache-browse-button" class="tool-button glyph-button" type="button" aria-label="Show archive cache in Finder" title="Show archive cache in Finder"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="archive-cache-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Enable Cache</span><small>Usage: <strong id="database-cache-summary">—</strong></small><small>Decompressed files can be retained to reduce load time.</small></span></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="archive-cache-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Cache</span><small>Usage: <strong id="database-cache-summary">—</strong></small><small>Decompressed files can be retained to reduce load time.</small></span></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><span class="options-checkbox-copy"><span>Cache Limit</span><small>Least-recently-used archive entries are removed automatically. Active playback is never removed.</small></span></span><span class="options-inline-trailing"><select id="archive-cache-limit-select" class="options-input" aria-label="Archive cache size limit"><option value="2147483648" selected>2 GB</option><option value="4294967296">4 GB</option><option value="8589934592">8 GB</option><option value="17179869184">16 GB</option></select></span></label>
                 <p><strong>ScanSong scratch files are separate:</strong> they are disposable and reclaimed after each source or after cancellation.</p>
                 <div class="options-library-toolbar options-panel-actions">
@@ -215,7 +215,7 @@
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Equalizer</div>
                 <div class="options-help-text">Equalizer gains apply to SPCBoy playback only.</div>
-                <label class="options-field options-inline-field"><span>Enable Equalizer</span><input id="equalizer-enabled-checkbox" type="checkbox" /></label>
+                <label class="options-field options-inline-field"><span>Equalizer</span><input id="equalizer-enabled-checkbox" type="checkbox" /></label>
                 <div class="equalizer-bands">
                   <label class="equalizer-band"><span>31 Hz</span><span class="range-slider"><input data-equalizer-band="0" class="animated-range" type="range" min="-12" max="12" step="0.5" value="0" aria-label="31 Hz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="0">0.0 dB</output></label>
                   <label class="equalizer-band"><span>62 Hz</span><span class="range-slider"><input data-equalizer-band="1" class="animated-range" type="range" min="-12" max="12" step="0.5" value="0" aria-label="62 Hz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="1">0.0 dB</output></label>
@@ -232,7 +232,7 @@
               </div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Mono</div>
-                <label class="options-field options-inline-field"><span>Enable Mono</span><input id="mono-enabled-checkbox" type="checkbox" /></label>
+                <label class="options-field options-inline-field"><span>Mono</span><input id="mono-enabled-checkbox" type="checkbox" /></label>
                 <div class="options-help-text">Mix left and right channels, then play the same signal through both speakers.</div>
               </div>
               <div class="options-subpanel">
