@@ -40,7 +40,7 @@ public struct PlaybackTimingRequest: Equatable, Sendable {
         if longPlayEnabled, family.supportsLongPlay {
             return Self(
                 playbackMode: .longPlay,
-                playMilliseconds: max(1, manualPlayMilliseconds),
+                playMilliseconds: max(0, manualPlayMilliseconds),
                 fadeMilliseconds: fadeMilliseconds,
                 unknownDurationMilliseconds: unknownDurationMilliseconds
             )

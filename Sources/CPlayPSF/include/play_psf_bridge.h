@@ -9,6 +9,7 @@ extern "C" {
 void* vgmboy_play_psf_open(const char* path);
 void vgmboy_play_psf_close(void* handle);
 int32_t vgmboy_play_psf_read(void* handle, int16_t* interleavedStereo, int32_t frameCount);
+const char* vgmboy_play_psf_error(void* handle);
 int32_t vgmboy_play_psf_seek(void* handle, int64_t frame);
 void vgmboy_play_psf_set_long_play(void* handle, int32_t enabled);
 void vgmboy_play_psf_set_suspended(void* handle, int32_t suspended);

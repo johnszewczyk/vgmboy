@@ -40,6 +40,9 @@ for ScanSong's external inspection executables.
 - The Amiga scanner handoff is the release `vgmboy-amiga-inspect` product copied
   to `.build/scanner-plugins`; it links the Homebrew UADE runtime and uses the
   same `AmigaFormatManifest` admission source as VGMBoyKit.
+- APE is no longer a scanner-helper product. ScanSong reads its native header
+  timing and tags directly; `CFFmpeg` remains a VGMBoy playback dependency for
+  APE, MP2, and TAK.
 - `Docs/plugin-versions.json` is the canonical milestone inventory for every
   decoder/core input. `scripts/audit-plugin-versions.sh` is read-only and
   reports upstream tags, installed Homebrew versions, missing source trees, and
@@ -48,12 +51,19 @@ for ScanSong's external inspection executables.
   compatibility patch, compiler, and CMake version. `build-app.sh` removes only
   its clean Swift release directory and app staging directory; it preserves the
   validated dependency products and stamps.
-- The vgmstream and QSF scanner executables have a second combined input stamp;
-  a warm scanner-plugin build must reuse both products instead of recompiling
-  the AOSDK/QSF and vgmstream source trees during every ScanSong package.
-- ScanSong receives the built vgmstream CLI, Highly Complete inspector, MDX
-  inspector, and Amiga inspector from VGMBoy; it must not
-  copy a CocoaSpice app resource or invoke a CocoaSpice launcher/build entry point.
+- The vgmstream scanner executable has a combined input stamp; a warm
+  scanner-plugin build must reuse its product instead of recompiling the
+  vgmstream source tree during every ScanSong package.
+- ScanSong receives the built vgmstream CLI, MDX inspector, and Amiga inspector
+  from VGMBoy. ScanSong owns direct APE, GSF/miniGSF, and QSF/miniQSF readers;
+  no Highly Complete or QSF inspector executable is part of the scanner handoff.
+  The scanner-plugin builder removes retired QSF and FFmpeg inspector binaries
+  from its shared output folder without touching their playback libraries.
+  The current scanner-plugin script still invokes the broad playback dependency
+  builder, so mGBA and the QSF core are prepared as build-time collateral even
+  though the scanner does not link or run them. A scanner-only dependency build
+  is not yet separated. ScanSong must not copy a CocoaSpice app resource or
+  invoke a CocoaSpice launcher/build entry point.
 - Executable product names must not collide on a case-insensitive filesystem. The CLI is
   `vgmboy-cli`; the GUI app is `VGMBoy`. A `vgmboy` (CLI) vs `VGMBoy` (app) collision silently
   overwrote one binary and must not recur.
@@ -70,15 +80,3 @@ for ScanSong's external inspection executables.
 - [plugin-versions.json](/Users/john/Downloads/Code/VGMMan/VGMBoy/Docs/plugin-versions.json)
 - [audit-plugin-versions.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/audit-plugin-versions.sh)
 - [check-plugin-docs.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/check-plugin-docs.sh)
-
-## Verification State (2026-08-30)
-
-- Clean VGMBoy and ScanSong app bundles built and passed strict deep signature
-  verification. A warm dependency pass reused all seven native products and
-  staged copies in 0.6 seconds; the scanner-plugin pair also reused its stamp.
-- Archive-backed GameCube playback opened every admitted fixture and rendered
-  non-silent PCM. ScanSong's matching inspector/timing fixture passed.
-- The AAC export and live-transport interruption tests pass, including three
-  consecutive complete VGMBoy test runs. An earlier `fmt?` AAC result and
-  generation assertion were produced while SwiftPM test invocations overlapped;
-  rerunning the suite serially reproduced neither failure.

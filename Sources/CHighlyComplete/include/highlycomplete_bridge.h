@@ -57,13 +57,6 @@ int32_t highlycomplete_player_render_s16(
 int32_t highlycomplete_player_track_ended(highlycomplete_player_handle_t handle);
 int32_t highlycomplete_player_played_frames(highlycomplete_player_handle_t handle);
 
-int32_t highlycomplete_inspect_file(
-    const char* path,
-    highlycomplete_metadata_t* metadata,
-    int32_t* track_count,
-    char** error_message
-);
-
 void highlycomplete_metadata_clear(highlycomplete_metadata_t* metadata);
 void highlycomplete_error_message_free(char* error_message);
 

@@ -21,7 +21,7 @@ struct PlaybackPlan: Sendable {
         self.usesDecoderNaturalDuration = usesDecoderNaturalDuration
     }
 
-    var totalSeconds: Int { preFadeSeconds + fadeSeconds }
+    var totalSeconds: Int { preFadeSeconds > 0 ? preFadeSeconds + fadeSeconds : 0 }
 }
 
 enum TimingPolicy {
@@ -43,7 +43,7 @@ enum TimingPolicy {
         let clampedFade = max(0, fadeSeconds)
         if longPlayEnabled, supportsLongPlay {
             return PlaybackPlan(
-                preFadeSeconds: max(1, manualSeconds),
+                preFadeSeconds: max(0, manualSeconds),
                 fadeSeconds: clampedFade,
                 isLongPlay: true,
                 usesNativeEnding: false

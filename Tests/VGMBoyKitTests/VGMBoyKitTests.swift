@@ -851,6 +851,20 @@ struct TimingPolicyTests {
         #expect(!plan.usesNativeEnding)
     }
 
+    @Test("zero Long Play is an explicit unbounded window")
+    func unboundedLongPlayWindow() {
+        let plan = TimingPolicy.plan(
+            supportsLongPlay: true,
+            metadata: metadata,
+            longPlayEnabled: true,
+            manualSeconds: 0,
+            fadeSeconds: 6
+        )
+        #expect(plan.isLongPlay)
+        #expect(plan.preFadeSeconds == 0)
+        #expect(plan.totalSeconds == 0)
+    }
+
     @Test("natural play uses tagged play length")
     func naturalWindow() {
         let plan = TimingPolicy.plan(
@@ -955,6 +969,18 @@ struct PlaybackControllerTimingTests {
         )
         #expect(request.playbackMode == .longPlay)
         #expect(request.playMilliseconds == 240_000)
+    }
+
+    @Test("standard Long Play accepts zero as unbounded")
+    func standardLongPlayAcceptsUnboundedDuration() throws {
+        let request = try PlaybackTimingRequest.standard(
+            path: "/tmp/song.spc",
+            longPlayEnabled: true,
+            manualPlayMilliseconds: 0,
+            fadeMilliseconds: 6_000
+        )
+        #expect(request.playbackMode == .longPlay)
+        #expect(request.playMilliseconds == 0)
     }
 
     @Test("unsupported Long Play falls back to natural file-default timing")
@@ -1068,6 +1094,36 @@ func flacFixtureUsesSafeSequentialReader() throws {
 }
 
 @Test(
+    "APE opens through FFmpeg, reports native duration, tags, and renders PCM",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["VGMBoy_APE_FIXTURE"] != nil,
+        "Set VGMBoy_APE_FIXTURE to run the Monkey's Audio decoder check."
+    )
+)
+func apeFixtureUsesFFmpegDecoder() throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBoy_APE_FIXTURE"])
+    let decoder = try DecoderFactory.make(path: path)
+    defer { decoder.close() }
+    #expect(decoder.trackCount == 1)
+    try decoder.startTrack(0)
+    let metadata = try decoder.metadata(for: 0)
+    #expect(metadata.playMs > 30_000)
+    #expect(metadata.song.lowercased().contains("credit"))
+    #expect(metadata.game.contains("NeuroDancer") || metadata.game.isEmpty)
+
+    var renderedAudio = false
+    for _ in 0..<8 {
+        let frames = try decoder.readFrames(4_096)
+        if frames.left.contains(where: { abs($0) > 0.0001 })
+            || frames.right.contains(where: { abs($0) > 0.0001 }) {
+            renderedAudio = true
+            break
+        }
+    }
+    #expect(renderedAudio)
+}
+
+@Test(
     "Resident Evil 2 PSF starts with its sibling PSFLIB present",
     .enabled(
         if: ProcessInfo.processInfo.environment["VGMBoy_RE2_PSF_FIXTURE"] != nil,
@@ -1082,7 +1138,7 @@ func residentEvil2PSFStartsAndProducesAudio() throws {
 
     var producedAudio = false
     for _ in 0..<8 {
-        let frames = decoder.readFrames(2_048)
+        let frames = try decoder.readFrames(2_048)
         if frames.left.contains(where: { abs($0) > 0.0001 })
             || frames.right.contains(where: { abs($0) > 0.0001 }) {
             producedAudio = true
@@ -1090,6 +1146,38 @@ func residentEvil2PSFStartsAndProducesAudio() throws {
         }
     }
     #expect(producedAudio)
+}
+
+@Test(
+    "Resident Evil 3 PSF tracks start without aborting the PSX core",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["VGMBoy_RE3_PSF_FIXTURE"] != nil,
+        "Set VGMBoy_RE3_PSF_FIXTURE to a Resident Evil 3 MAIN00.psf file."
+    )
+)
+func residentEvil3PSFTracksStartWithoutCoreAbort() throws {
+    let firstPath = try #require(ProcessInfo.processInfo.environment["VGMBoy_RE3_PSF_FIXTURE"])
+    let firstURL = URL(fileURLWithPath: firstPath)
+    let secondPath = firstURL.deletingLastPathComponent()
+        .appendingPathComponent("MAIN01.psf")
+        .path
+
+    for path in [firstPath, secondPath] {
+        let decoder = try PlayPSFDecoder(path: path)
+        defer { decoder.close() }
+        try decoder.startTrack(0)
+
+        var producedAudio = false
+        for _ in 0..<8 {
+            let frames = try decoder.readFrames(2_048)
+            if frames.left.contains(where: { abs($0) > 0.0001 })
+                || frames.right.contains(where: { abs($0) > 0.0001 }) {
+                producedAudio = true
+                break
+            }
+        }
+        #expect(producedAudio, "Expected PCM from \(path)")
+    }
 }
 
 @Test(

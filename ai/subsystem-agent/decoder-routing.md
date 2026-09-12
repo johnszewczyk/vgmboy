@@ -59,6 +59,9 @@ deliberately exclusive to one family.
 - Standard audio, including FLAC, is finite and never supports Long Play. Its AVAudioFile reader
   is reopened for track starts and seeks so the macOS compressed-file reader and converter state
   are reset without using the unsupported FLAC `framePosition` setter.
+- APE, MP2, and TAK use the finite `FFmpegAudioDecoder` playback route. ScanSong reads APE
+  container timing and common tags directly, with no FFmpeg scanner process or playback-core link;
+  the source is never converted into a different catalog format.
 - Highly Complete bridge calls are serialized through one gate. Its native GBA rate may change
   while mGBA runs, so the bridge resamples to VGMBoy's requested output rate and reports output-frame position.
 - 2SF bridge calls are serialized because the DS core is process-global. `PlaybackSession` calls
@@ -91,6 +94,7 @@ deliberately exclusive to one family.
 
 - [FormatRegistry.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/FormatRegistry.swift)
 - [AudioDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/AudioDecoder.swift)
+- [FFmpegAudioDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/FFmpegAudioDecoder.swift)
 - [GMEDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/GMEDecoder.swift)
 - [SIDDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/SIDDecoder.swift)
 - [OpenMPTDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/OpenMPTDecoder.swift)

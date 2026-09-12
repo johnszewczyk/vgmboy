@@ -155,6 +155,16 @@
       "upstream": "https://github.com/OpenMPT/openmpt",
       "milestoneCheck": "release-or-tag",
       "formats": ["MOD", "XM", "IT", "S3M"]
+    },
+    {
+      "id": "ffmpeg-audio",
+      "name": "FFmpeg",
+      "kind": "homebrew",
+      "formula": "ffmpeg",
+      "current": "8.1.2_1",
+      "upstream": "https://ffmpeg.org/",
+      "milestoneCheck": "release-or-tag",
+      "formats": ["APE", "MP2", "TAK"]
     }
   ]
 }

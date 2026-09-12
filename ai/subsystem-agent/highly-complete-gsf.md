@@ -4,6 +4,15 @@
 
 `gsf` and `minigsf` decoding through PSFLib and headless mGBA.
 
+## ScanSong boundary
+
+This note covers playback only. ScanSong reads GSF/miniGSF containers,
+compressed payloads, executable segments, tags, and library chains with its own
+direct metadata reader; it does not use `CHighlyComplete` or link/run mGBA.
+VGMBoy still retains this bridge for actual GSF playback. The shared
+scanner-plugin preparation currently builds mGBA as collateral through the
+broad VGMBoy dependency builder, so build-time isolation is not complete.
+
 ## Ownership
 
 `CHighlyComplete` owns PSF dependency resolution, in-memory GBA ROM assembly, mGBA lifecycle,

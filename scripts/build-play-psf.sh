@@ -5,13 +5,14 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 build="$root/.build/play-psf"
 build_jobs="${COCOASPICE_BUILD_JOBS:-4}"
 patch="$root/patches/play-psfcore-only.patch"
+psx_compat_patch="$root/patches/play-psx-compatibility.patch"
 psfplayer_cmake="$root/vendor/play/tools/PsfPlayer/CMakeLists.txt"
 
 if ! grep -q 'PSFCORE_ONLY' "$psfplayer_cmake"; then
   if [[ -e "$root/vendor/play/.git" ]] && git -C "$root/vendor/play" apply --check "$patch" >/dev/null 2>&1; then
     git -C "$root/vendor/play" apply "$patch"
-  elif patch --dry-run -p1 -d "$root/vendor/play" < "$patch" >/dev/null 2>&1; then
-    patch -p1 -d "$root/vendor/play" < "$patch" >/dev/null
+  elif patch --dry-run -l -p1 -d "$root/vendor/play" < "$patch" >/dev/null 2>&1; then
+    patch -l -p1 -d "$root/vendor/play" < "$patch" >/dev/null
   else
     echo "Play! source does not match the VGMBoy PSF-family patch" >&2
     exit 1
@@ -20,6 +21,22 @@ fi
 
 if ! grep -q 'PSFCORE_ONLY' "$psfplayer_cmake"; then
   echo "Play! PSF-core patch was not applied" >&2
+  exit 1
+fi
+
+if ! grep -q 'm_ps2DynamicLinkHack' "$root/vendor/play/Source/MA_MIPSIV.h"; then
+  if [[ -e "$root/vendor/play/.git" ]] && git -C "$root/vendor/play" apply --check "$psx_compat_patch" >/dev/null 2>&1; then
+    git -C "$root/vendor/play" apply "$psx_compat_patch"
+  elif patch --dry-run -l -p1 -d "$root/vendor/play" < "$psx_compat_patch" >/dev/null 2>&1; then
+    patch -l -p1 -d "$root/vendor/play" < "$psx_compat_patch" >/dev/null
+  else
+    echo "Play! source does not match the VGMBoy PSX compatibility patch" >&2
+    exit 1
+  fi
+fi
+
+if ! grep -q 'm_ps2DynamicLinkHack' "$root/vendor/play/Source/MA_MIPSIV.h"; then
+  echo "Play! PSX compatibility patch was not applied" >&2
   exit 1
 fi
 

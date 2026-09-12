@@ -7,18 +7,25 @@ BUILD_DIR="$ROOT_DIR/.build/scanner-plugins"
 VGMSTREAM_SOURCE="$SHARED_VENDOR_DIR/vgmstream"
 VGMSTREAM_BUILD="$BUILD_DIR/vgmstream"
 VGMSTREAM_OUTPUT="$BUILD_DIR/vgmstream-cli"
-QSF_OUTPUT="$BUILD_DIR/vgmboy-qsf-inspect"
 MDX_OUTPUT="$BUILD_DIR/vgmboy-mdx-inspect"
 AMIGA_OUTPUT="$BUILD_DIR/vgmboy-amiga-inspect"
 SCANNER_STAMP="$BUILD_DIR/scanner-inputs.sha256"
+
+# Remove retired ScanSong helpers that can survive in this shared output
+# directory across scanner-route changes. The playback libraries remain in
+# VGMBoy's dependency build and are not touched here.
+for obsolete_output in "$BUILD_DIR/vgmboy-qsf-inspect" "$BUILD_DIR/vgmboy-ffmpeg-inspect"; do
+    if [[ -f "$obsolete_output" ]]; then
+        rm -f "$obsolete_output"
+        echo "Removed retired ScanSong helper: $(basename "$obsolete_output")"
+    fi
+done
 
 "$ROOT_DIR/scripts/build-dependencies.sh"
 
 scanner_signature="$({
     shasum -a 256 \
         "$ROOT_DIR/scripts/build-scanner-plugins.sh" \
-        "$ROOT_DIR/scripts/build-qsf-inspector.sh" \
-        "$ROOT_DIR/Sources/VGMBoyQSFInspect/main.c" \
         "$ROOT_DIR/Sources/VGMBoyMDXInspect/main.swift" \
         "$ROOT_DIR/Sources/VGMBoyAmigaInspect/main.swift" \
         "$ROOT_DIR/Sources/VGMBoyKit/AmigaDecoder.swift" \
@@ -30,7 +37,6 @@ scanner_signature="$({
         "$ROOT_DIR/Sources/CMDX/mdx_bridge.c" \
         "$ROOT_DIR/vendor/mdxmini/src/"*.c \
         "$ROOT_DIR/vendor/mdxmini/src/"*.h \
-        "$ROOT_DIR/.build/dependency-stamps/qsf.sha256" \
         "$ROOT_DIR/.build/dependency-stamps/vgmstream.sha256"
     printf '%s\n' "$VGMSTREAM_SOURCE"
     cmake --version | head -n 1
@@ -38,17 +44,14 @@ scanner_signature="$({
     pkg-config --modversion libavcodec vorbisfile ogg 2>/dev/null || true
 } | shasum -a 256 | awk '{ print $1 }')"
 
-if [[ -x "$VGMSTREAM_OUTPUT" && -x "$QSF_OUTPUT" && -x "$MDX_OUTPUT" && -x "$AMIGA_OUTPUT" && -f "$SCANNER_STAMP" \
+if [[ -x "$VGMSTREAM_OUTPUT" && -x "$MDX_OUTPUT" && -x "$AMIGA_OUTPUT" && -f "$SCANNER_STAMP" \
       && "$(<"$SCANNER_STAMP")" == "$scanner_signature" ]]; then
     echo "VGMBoy scanner plugins are current ($scanner_signature)"
     echo "vgmstream: $VGMSTREAM_OUTPUT"
-    echo "qsf: $QSF_OUTPUT"
     echo "mdx: $MDX_OUTPUT"
     echo "amiga: $AMIGA_OUTPUT"
     exit 0
 fi
-
-"$ROOT_DIR/scripts/build-qsf-inspector.sh" >/dev/null
 
 swift build --disable-sandbox --package-path "$ROOT_DIR" --configuration release --product vgmboy-amiga-inspect >/dev/null
 AMIGA_BUILT="$ROOT_DIR/.build/arm64-apple-macosx/release/vgmboy-amiga-inspect"
@@ -107,7 +110,5 @@ printf '%s\n' "$scanner_signature" > "$SCANNER_STAMP"
 
 echo "Built VGMBoy scanner plugins"
 echo "vgmstream: $VGMSTREAM_OUTPUT"
-echo "qsf: $QSF_OUTPUT"
 echo "mdx: $MDX_OUTPUT"
 echo "amiga: $AMIGA_OUTPUT"
-echo "highly-complete: build through VGMBoy Package.swift product"

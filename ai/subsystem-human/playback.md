@@ -32,7 +32,7 @@ title, and track window. Supported options:
 - Tracker modules (libopenmpt): `.669`, `.dmf`, `.far`, `.it`, `.mod`, `.mptm`, `.mtm`, `.okt`,
   `.ptm`, `.s3m`, `.stm`, `.ult`, and `.xm`
 - Standard audio: AVFoundation handles `.aac`, `.aif`, `.aiff`, `.caf`, `.flac`, `.m4a`, `.mp3`,
-  `.wav`, and `.wave`; bundled FFmpeg handles `.mp2` and `.tak`
+  `.wav`, and `.wave`; bundled FFmpeg handles `.ape`, `.mp2`, and `.tak`
 - Streamed game audio (vgmstream): `.adp`, `.adpcm`, `.adx`, `.at3`, `.bik`, `.bk2`, `.fsb`, `.vag`,
   `.xvag`, `.xmd`, `.aifc`, `.ogg`, and the other registered stream/bank extensions
 - Nintendo 64 (lazyusf): `.usf`, `.miniusf` — needs its companion `.usflib` files beside it

@@ -1,20 +1,25 @@
 import Foundation
 import VGMBoyCFFmpeg
 
-/// Streaming FFmpeg decoder for formats Core Audio does not admit (currently
-/// MPEG Layer II and TAK). The core owns it so frontends never substitute a
-/// process or PCM graph for individual formats.
+/// Streaming FFmpeg decoder for formats Core Audio does not admit (Monkey's
+/// Audio, MPEG Layer II, and TAK). The core owns it so frontends never
+/// substitute a process or PCM graph for individual formats.
 final class FFmpegAudioDecoder: AudioDecoder, @unchecked Sendable {
     let sampleRate: Int
     let trackCount = 1
     let systemName = "Standard audio"
     private let handle: OpaquePointer
     private let durationMs: Int
+    private let fallbackSong: String
     private(set) var absolutePlayedFrames: Int64 = 0
     private var ended = false
 
     var trackEnded: Bool { ended }
     let appliesFadeInternally = false
+
+    var metadataComment: String {
+        metadataString(vgmboy_ffmpeg_decoder_comment(handle)) ?? ""
+    }
 
     init(path: String, sampleRate: Int) throws {
         var error: UnsafeMutablePointer<CChar>?
@@ -26,6 +31,7 @@ final class FFmpegAudioDecoder: AudioDecoder, @unchecked Sendable {
         self.handle = handle
         self.sampleRate = sampleRate
         self.durationMs = max(0, Int(vgmboy_ffmpeg_decoder_duration_ms(handle)))
+        self.fallbackSong = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
     }
 
     deinit { vgmboy_ffmpeg_decoder_destroy(handle) }
@@ -37,7 +43,18 @@ final class FFmpegAudioDecoder: AudioDecoder, @unchecked Sendable {
 
     func metadata(for index: Int) throws -> TrackMetadata {
         guard index == 0 else { throw PlaybackControlError.invalidPayload("Track index is not available for this file.") }
-        return TrackMetadata(index: 0, song: "", game: "", author: "", system: systemName, lengthMs: durationMs, introMs: 0, loopMs: 0, playMs: durationMs, fadeMs: 0)
+        return TrackMetadata(
+            index: 0,
+            song: metadataString(vgmboy_ffmpeg_decoder_title(handle)) ?? fallbackSong,
+            game: metadataString(vgmboy_ffmpeg_decoder_album(handle)) ?? "",
+            author: metadataString(vgmboy_ffmpeg_decoder_artist(handle)) ?? "",
+            system: systemName,
+            lengthMs: durationMs,
+            introMs: 0,
+            loopMs: 0,
+            playMs: durationMs,
+            fadeMs: 0
+        )
     }
 
     func setTempo(_ tempo: Double) {}
@@ -69,5 +86,11 @@ final class FFmpegAudioDecoder: AudioDecoder, @unchecked Sendable {
         absolutePlayedFrames += Int64(frames)
         if frames < frameCount { ended = true }
         return (Array(left.prefix(frames)), Array(right.prefix(frames)))
+    }
+
+    private func metadataString(_ value: UnsafePointer<CChar>?) -> String? {
+        guard let value else { return nil }
+        let string = String(cString: value).trimmingCharacters(in: .whitespacesAndNewlines)
+        return string.isEmpty ? nil : string
     }
 }

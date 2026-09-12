@@ -34,7 +34,7 @@ combining a native-ending mode with an explicit fade value.
   duration. It is not a default duration for finite standard audio and must not be sent by a
   frontend for FLAC, WAV, or other decoder-natural formats.
 - When a file's decoder reports a positive `naturalPlayMs`, that value wins over the safety
-  window. Standard audio and FFmpeg audio obtain this from the file reader; libgme, libvgm,
+  window. Standard audio and FFmpeg audio (including APE) obtain this from the file reader; libgme, libvgm,
   Highly Complete, 2SF, vgmstream, Play!, QSF, and OpenMPT obtain it from their decoder
   metadata. SID reports no natural timing, so standard SID playback uses the safety window; a
   metadata-less lazyUSF track is handled the same way because its family has no natural ending.

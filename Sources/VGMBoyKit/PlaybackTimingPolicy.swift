@@ -15,7 +15,7 @@ public struct PlaybackTimingPreferences: Codable, Equatable, Sendable {
         unknownDurationSeconds: Int = Self.defaultUnknownDurationSeconds,
         fadeSeconds: Int = Self.defaultFadeSeconds
     ) {
-        self.longPlaySeconds = max(1, longPlaySeconds)
+        self.longPlaySeconds = max(0, longPlaySeconds)
         self.unknownDurationSeconds = max(1, unknownDurationSeconds)
         self.fadeSeconds = max(0, fadeSeconds)
     }
@@ -57,7 +57,7 @@ public struct PlaybackTimingPlan: Equatable, Sendable {
     public let isLongPlay: Bool
     public let unknownDurationSeconds: Int
 
-    public var totalSeconds: Int { preFadeSeconds + fadeSeconds }
+    public var totalSeconds: Int { preFadeSeconds > 0 ? preFadeSeconds + fadeSeconds : 0 }
 
     public init(
         preFadeSeconds: Int,
@@ -66,7 +66,7 @@ public struct PlaybackTimingPlan: Equatable, Sendable {
         isLongPlay: Bool,
         unknownDurationSeconds: Int = PlaybackTimingPreferences.defaultUnknownDurationSeconds
     ) {
-        self.preFadeSeconds = max(1, preFadeSeconds)
+        self.preFadeSeconds = max(0, preFadeSeconds)
         self.fadeSeconds = max(0, fadeSeconds)
         self.usesNativeEnding = usesNativeEnding
         self.isLongPlay = isLongPlay

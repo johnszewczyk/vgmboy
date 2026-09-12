@@ -183,7 +183,10 @@ public final class PlaybackController: @unchecked Sendable {
         guard let requestedMode = payload.playbackMode else {
             throw PlaybackControlError.invalidPayload("set_playback_mode requires a playback mode.")
         }
-        if let play = payload.playMilliseconds, play <= 0 { throw PlaybackControlError.invalidPayload("Play length must be positive.") }
+        if let play = payload.playMilliseconds,
+           play < 0 || (requestedMode == .timed && play <= 0) {
+            throw PlaybackControlError.invalidPayload("Play length must be non-negative for Long Play and positive for timed playback.")
+        }
         if let fade = payload.fadeMilliseconds, fade < 0 { throw PlaybackControlError.invalidPayload("Fade length cannot be negative.") }
         if let unknown = payload.unknownDurationMilliseconds, unknown <= 0 {
             throw PlaybackControlError.invalidPayload("Unknown-duration fallback must be positive.")
@@ -228,7 +231,7 @@ public final class PlaybackController: @unchecked Sendable {
         unknownDurationMilliseconds: Int? = nil,
         family: DecoderFamily
     ) -> PlaybackPlan {
-        let play = max(1, (playMilliseconds ?? unknownDurationMilliseconds ?? 150_000) / 1_000)
+        let play = max(0, (playMilliseconds ?? unknownDurationMilliseconds ?? 150_000) / 1_000)
         let fade = max(0, fadeMilliseconds / 1_000)
         switch mode {
         case .fileDefault:

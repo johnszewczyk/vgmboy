@@ -56,12 +56,15 @@ repository-level summary readable.
 | [vgmstream](https://github.com/vgmstream/vgmstream) | `807b4948cfc1de0cd90e377e9c56f74664c54a1c` + shared compatibility patch | [github.com/vgmstream/vgmstream](https://github.com/vgmstream/vgmstream) / [vgmstream.org](https://vgmstream.org) | ADX, XA, AT3, FSB, VAG, AIFC, OGG, and the other extensions in `FormatRegistry.vgmstreamExtensions` | `CVGmstream` bridge plus the VGMBoy-built `vgmstream-cli` scanner plugin; built with FFmpeg and Vorbis support. |
 | [lazyusf2](https://gitlab.com/kode54/lazyusf2) | `421f00bcaa1988b8e1825e91780129f24fbd1aa0` | [gitlab.com/kode54/lazyusf2](https://gitlab.com/kode54/lazyusf2) | USF, miniUSF | `CLazyUSF` bridge; companion `.usflib` files must be present beside a miniUSF. These streams have no natural ending, so VGMBoy always applies a finite playback window. |
 | [Play!](https://github.com/jpd002/Play-) PSF core | `50aedca2639521bc498ace0b2be1ea012801a86a` + VGMBoy PSF-core-only patch | [github.com/jpd002/Play-](https://github.com/jpd002/Play-) / [purei.org](https://purei.org) | PSF, miniPSF, PSF2, miniPSF2 | `CPlayPSF` bridge over the `PsfCore` static archive. The required patch is `patches/play-psfcore-only.patch`; companion `.psflib` files must be present beside a miniPSF. |
-| [Audio Overload SDK](https://github.com/nmlgc/aosdk) QSF engine | `e359a6e5154b2ba8499fb1f24a1f5f8a18538a61` plus VGMBoy compatibility patch | [github.com/nmlgc/aosdk](https://github.com/nmlgc/aosdk) | QSF, miniQSF | `CQSF` provides native PCM, seeking, timing tags, and `.qsflib` dependency resolution. Because the engine is process-global, one decoder holds an exclusive lifetime lease and concurrent QSF work fails explicitly. The same engine builds the `vgmboy-qsf-inspect` scanner plugin. Builds apply `patches/aosdk-qsf-lifecycle.patch` only to a disposable source copy. |
+| [Audio Overload SDK](https://github.com/nmlgc/aosdk) QSF engine | `e359a6e5154b2ba8499fb1f24a1f5f8a18538a61` plus VGMBoy compatibility patch | [github.com/nmlgc/aosdk](https://github.com/nmlgc/aosdk) | QSF, miniQSF | `CQSF` provides playback PCM, seeking, timing tags, and `.qsflib` dependency resolution. Because the engine is process-global, one decoder holds an exclusive lifetime lease and concurrent playback work fails explicitly. ScanSong reads QSF metadata and container structure directly without the QSound core. Builds apply `patches/aosdk-qsf-lifecycle.patch` only to a disposable source copy. |
 | [libsidplayfp](https://github.com/libsidplayfp/libsidplayfp) | Homebrew `libsidplayfp` 3.1.0 build | [github.com/libsidplayfp/libsidplayfp](https://github.com/libsidplayfp/libsidplayfp) | SID | `CSIDPlayFP` bridge; SID output joins the same direct audio transport. |
 | [libopenmpt](https://lib.openmpt.org/libopenmpt/) | Homebrew `libopenmpt` 0.8.9 build | [github.com/OpenMPT/openmpt](https://github.com/OpenMPT/openmpt) / [lib.openmpt.org](https://lib.openmpt.org/libopenmpt/) | MOD, XM, IT, S3M and registered tracker modules | `COpenMPT` bridge; modules use the same direct audio transport. |
+| [FFmpeg](https://ffmpeg.org/) | Homebrew FFmpeg 8.1.2_1 | [ffmpeg.org](https://ffmpeg.org/) | APE (Monkey's Audio), MP2, TAK | `CFFmpeg` playback bridge; ScanSong reads APE metadata directly. |
 
 `StandardAudioDecoder` uses AVFoundation for ordinary macOS-admitted formats. The separate
-`CFFmpeg` bridge handles MP2 and TAK without a frontend process fallback.
+`CFFmpeg` bridge handles APE, MP2, and TAK without a frontend process fallback. APE remains the
+original lossless Monkey's Audio file; VGMBoy decodes it directly and does not convert it for
+cataloging or playback.
 
 ## Direct build and platform dependencies
 
@@ -72,13 +75,13 @@ or install a broad package manager graph of its own.
 | Dependency | Version or source state | Role |
 | --- | --- | --- |
 | VGMBoy shared source garden | `vendor/` in this checkout | Canonical upstream source inputs and compatibility patches for every VGMBoy bridge and scanner-facing plugin. |
-| [mGBA](https://github.com/mgba-emu/mgba) | VGMBoy `vendor/mgba` 0.11.0 source snapshot; tree digest in `vendor/PROVENANCE.md` | Linked by the Highly Complete bridge and prepared for ScanSong through `scripts/build-scanner-plugins.sh`. |
+| [mGBA](https://github.com/mgba-emu/mgba) | VGMBoy `vendor/mgba` 0.11.0 source snapshot; tree digest in `vendor/PROVENANCE.md` | Linked by the Highly Complete playback bridge. The current shared dependency build prepares it as collateral, but ScanSong's direct GSF reader does not link or run it. |
 | [psgplay](https://github.com/frno7/psgplay) | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` plus recursive submodules | Built as `libpsgplay.a` by `scripts/build-psgplay.sh` and staged for the SNDH bridge. |
 | [UADE](https://github.com/dv1/uade) | Homebrew `uade` 3.05; shared library and runtime data | Supplies `libuade`/`uadecore` plus EaglePlayer configuration and emulation data used by `CUADE` and `vgmboy-amiga-inspect`. |
 | 2sf2wav | VGMBoy `vendor/2sf2wav` DeSmuME 0.9.9 svn 4608 source snapshot; tree digest in `vendor/PROVENANCE.md` | Built as `lib2sf.a` through `scripts/build-2sf.sh` and linked by the 2SF bridge. |
 | Swift Package Manager | tools version 6.1; Swift language mode 6 | Builds `VGMBoyKit`, `vgmboy-cli`, and the `VGMBoy` test app. |
 | [CMake](https://cmake.org/) | 4.4.2 in the development environment | Builds libvgm, vgmstream, and the Play! PSF core through VGMBoy scripts. |
-| [FFmpeg](https://ffmpeg.org/) | 8.1.2_1 (`libavcodec` ABI 62.28.102, `libavformat` 62.12.102, `libavutil` 60.26.102, `libswresample` 6.3.102) | Enabled in the vgmstream static build and linked directly by `CFFmpeg` for MP2/TAK playback. |
+| [FFmpeg](https://ffmpeg.org/) | 8.1.2_1 (`libavcodec` ABI 62.28.102, `libavformat` 62.12.102, `libavutil` 60.26.102, `libswresample` 6.3.102) | Enabled in the vgmstream static build and linked directly by `CFFmpeg` for APE/MP2/TAK playback. ScanSong reads APE metadata independently. |
 | [libvorbis](https://xiph.org/vorbis/) | 1.3.7 | Enabled in the vgmstream static build. |
 | [libogg](https://xiph.org/ogg/) | 1.3.6 | Enabled in the vgmstream static build. |
 | PSFLib source snapshot | VGMBoy-managed `vendor/psflib`; tree digest in `vendor/PROVENANCE.md` | Compiled with lazyusf2 and Highly Complete to resolve PSF-family dependency chains. |

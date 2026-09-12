@@ -32,18 +32,19 @@ let package = Package(
     platforms: [.macOS("26.0")],
     products: [
         .library(name: "VGMBoyFormatCore", targets: ["VGMBoyFormatCore"]),
+        .library(name: "VGMBoyFormatDataCore", targets: ["VGMBoyFormatDataCore"]),
         .library(name: "VGMBoySNDH", targets: ["VGMBoySNDH"]),
         .library(name: "VGMBoyKit", targets: ["VGMBoyKit"]),
         .library(name: "VGMBoyEndpointCore", targets: ["VGMBoyEndpointCore"]),
         .executable(name: "vgmboy-cli", targets: ["vgmboy"]),
         .executable(name: "vgmboy-electron-bridge", targets: ["VGMBoyElectronBridge"]),
-        .executable(name: "vgmboy-highly-complete-inspect", targets: ["VGMBoyHighlyCompleteInspect"]),
         .executable(name: "vgmboy-mdx-inspect", targets: ["VGMBoyMDXInspect"]),
         .executable(name: "vgmboy-amiga-inspect", targets: ["VGMBoyAmigaInspect"]),
         .executable(name: "VGMBoy", targets: ["VGMBoyApp"])
     ],
     targets: [
         .target(name: "VGMBoyFormatCore", path: "Sources/VGMBoyFormatCore"),
+        .target(name: "VGMBoyFormatDataCore", path: "Sources/VGMBoyFormatDataCore"),
         .target(name: "VGMBoyEndpointCore", path: "Sources/VGMBoyEndpointCore"),
         .target(
             name: "VGMBoyCPSGPlay",
@@ -305,10 +306,6 @@ let package = Package(
             dependencies: ["VGMBoyKit"]
         ),
         .executableTarget(
-            name: "VGMBoyHighlyCompleteInspect",
-            dependencies: ["VGMBoyKit"]
-        ),
-        .executableTarget(
             name: "VGMBoyMDXInspect",
             dependencies: ["VGMBoyKit"]
         ),
@@ -328,6 +325,11 @@ let package = Package(
             name: "VGMBoyKitTests",
             dependencies: ["VGMBoyKit", "VGMBoySNDH", "VGMBoyEndpointCore", "VGMBoyCAudioUnit"],
             path: "Tests/VGMBoyKitTests"
+        ),
+        .testTarget(
+            name: "VGMBoyFormatDataCoreTests",
+            dependencies: ["VGMBoyFormatDataCore"],
+            path: "Tests/VGMBoyFormatDataCoreTests"
         )
     ],
     swiftLanguageModes: [.v6]

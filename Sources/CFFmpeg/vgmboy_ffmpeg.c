@@ -3,6 +3,7 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/channel_layout.h>
+#include <libavutil/dict.h>
 #include <libavutil/error.h>
 #include <libavutil/mem.h>
 #include <libavutil/opt.h>
@@ -11,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 struct vgmboy_ffmpeg_decoder {
     AVFormatContext *format;
@@ -26,7 +28,20 @@ struct vgmboy_ffmpeg_decoder {
     int input_eof;
     int flush_sent;
     int output_eof;
+    char *title;
+    char *album;
+    char *artist;
+    char *comment;
 };
+
+static char *copy_tag(AVDictionary *metadata, const char *wanted) {
+    if (!metadata) return NULL;
+    AVDictionaryEntry *entry = NULL;
+    while ((entry = av_dict_get(metadata, "", entry, AV_DICT_IGNORE_SUFFIX))) {
+        if (strcasecmp(entry->key, wanted) == 0) return av_strdup(entry->value);
+    }
+    return NULL;
+}
 
 static void set_error(char **target, const char *prefix, int code) {
     if (!target) return;
@@ -166,6 +181,12 @@ vgmboy_ffmpeg_decoder *vgmboy_ffmpeg_decoder_create(const char *path, int output
     if (result < 0) { set_error(error_message, "FFmpeg output format failed", result); goto failed; }
     result = swr_init(decoder->resampler);
     if (result < 0) { set_error(error_message, "FFmpeg resampler initialization failed", result); goto failed; }
+    decoder->title = copy_tag(decoder->format->metadata, "title");
+    decoder->album = copy_tag(decoder->format->metadata, "album");
+    if (!decoder->album) decoder->album = copy_tag(decoder->format->metadata, "album_name");
+    decoder->artist = copy_tag(decoder->format->metadata, "artist");
+    if (!decoder->artist) decoder->artist = copy_tag(decoder->format->metadata, "album_artist");
+    decoder->comment = copy_tag(decoder->format->metadata, "comment");
     decoder->packet = av_packet_alloc();
     decoder->frame = av_frame_alloc();
     if (!decoder->packet || !decoder->frame) { if (error_message) *error_message = av_strdup("FFmpeg frame allocation failed."); goto failed; }
@@ -183,6 +204,10 @@ void vgmboy_ffmpeg_decoder_destroy(vgmboy_ffmpeg_decoder *decoder) {
     swr_free(&decoder->resampler);
     avcodec_free_context(&decoder->codec);
     avformat_close_input(&decoder->format);
+    av_freep(&decoder->title);
+    av_freep(&decoder->album);
+    av_freep(&decoder->artist);
+    av_freep(&decoder->comment);
     av_free(decoder);
 }
 
@@ -234,8 +259,29 @@ int vgmboy_ffmpeg_decoder_read(vgmboy_ffmpeg_decoder *decoder, float *left, floa
 }
 
 int64_t vgmboy_ffmpeg_decoder_duration_ms(const vgmboy_ffmpeg_decoder *decoder) {
-    if (!decoder || decoder->format->duration == AV_NOPTS_VALUE) return 0;
-    return av_rescale(decoder->format->duration, 1000, AV_TIME_BASE);
+    if (!decoder) return 0;
+    if (decoder->format->duration != AV_NOPTS_VALUE) {
+        return av_rescale(decoder->format->duration, 1000, AV_TIME_BASE);
+    }
+    const AVStream *stream = decoder->format->streams[decoder->stream_index];
+    if (stream->duration == AV_NOPTS_VALUE) return 0;
+    return av_rescale_q(stream->duration, stream->time_base, (AVRational){1, 1000});
+}
+
+const char *vgmboy_ffmpeg_decoder_title(const vgmboy_ffmpeg_decoder *decoder) {
+    return decoder ? decoder->title : NULL;
+}
+
+const char *vgmboy_ffmpeg_decoder_album(const vgmboy_ffmpeg_decoder *decoder) {
+    return decoder ? decoder->album : NULL;
+}
+
+const char *vgmboy_ffmpeg_decoder_artist(const vgmboy_ffmpeg_decoder *decoder) {
+    return decoder ? decoder->artist : NULL;
+}
+
+const char *vgmboy_ffmpeg_decoder_comment(const vgmboy_ffmpeg_decoder *decoder) {
+    return decoder ? decoder->comment : NULL;
 }
 
 void vgmboy_ffmpeg_error_message_free(char *message) { av_free(message); }

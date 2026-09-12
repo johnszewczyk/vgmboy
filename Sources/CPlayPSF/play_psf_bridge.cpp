@@ -40,6 +40,7 @@ public:
         m_writeIndex = 0;
         m_sampleCount = 0;
         m_hasProducedAudio = false;
+        m_errorMessage.clear();
         m_condition.notify_all();
     }
 
@@ -65,12 +66,20 @@ public:
     }
     void RecycleBuffers() override {}
 
+    void Fail(const std::string& message) {
+        std::lock_guard lock(m_mutex);
+        m_errorMessage = message;
+        m_condition.notify_all();
+    }
+
     int32_t Read(int16_t* output, int32_t frameCount) {
         std::unique_lock lock(m_mutex);
+        if(!m_errorMessage.empty()) return -1;
         const auto wait = m_hasProducedAudio ? kSteadyStateAudioWait : kInitialAudioWait;
         m_condition.wait_for(lock, wait, [&] {
-            return m_sampleCount >= static_cast<size_t>(frameCount) * 2;
+            return m_sampleCount >= static_cast<size_t>(frameCount) * 2 || !m_errorMessage.empty();
         });
+        if(!m_errorMessage.empty()) return -1;
         const auto availableFrames = static_cast<int32_t>(m_sampleCount / 2);
         const auto frames = std::min(frameCount, availableFrames);
         const auto samplesToRead = static_cast<size_t>(frames) * 2;
@@ -96,6 +105,7 @@ private:
     size_t m_writeIndex = 0;
     size_t m_sampleCount = 0;
     bool m_hasProducedAudio = false;
+    std::string m_errorMessage;
 };
 
 struct Metadata {
@@ -151,21 +161,38 @@ struct Player {
     int64_t fadeLengthFrames = 0;
     bool longPlay = false;
 
+    void HandleVmError(const std::string& message) {
+        CaptureSoundHandler* handler;
+        {
+            std::lock_guard lock(soundMutex);
+            handler = sound;
+        }
+        if(handler) handler->Fail(message);
+        soundCondition.notify_all();
+    }
+
     CaptureSoundHandler* WaitForSoundHandler() {
         std::unique_lock lock(soundMutex);
-        soundCondition.wait_for(lock, kInitialAudioWait, [this] { return sound != nullptr; });
+        soundCondition.wait_for(lock, kInitialAudioWait, [this] {
+            return sound != nullptr || vm.HasError();
+        });
         return sound;
     }
 
     void InstallSoundHandler(CaptureSoundHandler* handler) {
-        std::lock_guard lock(soundMutex);
-        sound = handler;
+        {
+            std::lock_guard lock(soundMutex);
+            sound = handler;
+        }
+        const auto error = vm.GetErrorMessage();
+        if(!error.empty()) handler->Fail(error);
         soundCondition.notify_all();
     }
 
     explicit Player(const char* filePath)
         : path(filePath ? filePath : "") {
         if(path.empty()) throw std::runtime_error("PSF path is empty");
+        vm.SetErrorHandler([this](const std::string& message) { HandleVmError(message); });
         Metadata metadata(path.c_str());
         systemName = metadata.systemName;
         const auto token = CPhysicalPsfStreamProvider::GetPathTokenFromFilePath(fs::path(path));
@@ -197,6 +224,7 @@ extern "C" void vgmboy_play_psf_close(void* handle) { delete static_cast<Player*
 extern "C" int32_t vgmboy_play_psf_read(void* handle, int16_t* output, int32_t frameCount) {
     if(!handle || !output || frameCount <= 0) return -1;
     auto* player = static_cast<Player*>(handle);
+    if(player->vm.HasError()) return -1;
     // The shared stream session owns the post-length fade. Continue decoding
     // real PCM through that window; substituting silence here made the app
     // fade six seconds of silence instead of the actual PSF audio.
@@ -206,9 +234,17 @@ extern "C" int32_t vgmboy_play_psf_read(void* handle, int16_t* output, int32_t f
     // Wait once for the handler, then let its own bounded PCM wait govern
     // steady-state reads.
     auto* sound = player->WaitForSoundHandler();
-    const auto frames = sound ? sound->Read(output, frameCount) : 0;
+    if(!sound) return player->vm.HasError() ? -1 : 0;
+    const auto frames = sound->Read(output, frameCount);
     player->playedFrames += frames;
     return frames;
+}
+
+extern "C" const char* vgmboy_play_psf_error(void* handle) {
+    if(!handle) return nullptr;
+    static thread_local std::string message;
+    message = static_cast<Player*>(handle)->vm.GetErrorMessage();
+    return message.empty() ? nullptr : message.c_str();
 }
 
 extern "C" void vgmboy_play_psf_set_long_play(void* handle, int32_t enabled) {

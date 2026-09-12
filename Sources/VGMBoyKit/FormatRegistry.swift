@@ -150,7 +150,10 @@ public enum FormatRegistry {
         "aac", "aif", "aiff", "caf", "flac", "m4a", "mp3", "wav", "wave"
     ]
 
-    public static let ffmpegAudioExtensions: Set<String> = ["mp2", "tak"]
+    /// Audio formats admitted by the shared FFmpeg bridge rather than
+    /// AVFoundation. Core Audio does not provide a native APE reader, while
+    /// FFmpeg has a real Monkey's Audio demuxer and decoder.
+    public static let ffmpegAudioExtensions: Set<String> = ["ape", "mp2", "tak"]
 
     public static let highlyCompleteExtensions: Set<String> = [
         "gsf", "minigsf"

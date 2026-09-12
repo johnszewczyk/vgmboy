@@ -183,17 +183,29 @@ final class PlaybackSession: @unchecked Sendable {
                     fadeFrames = 0
                 }
             } else {
-                let naturalPlayMilliseconds = plan.usesDecoderNaturalDuration && metadata.naturalPlayMs > 0
-                    ? metadata.naturalPlayMs
-                    : plan.preFadeSeconds * 1_000
+                let naturalPlayMilliseconds: Int
+                if plan.isLongPlay && plan.preFadeSeconds == 0 {
+                    // Zero Long Play is the explicit unbounded mode. A fade
+                    // value must not turn that choice into a hidden cap.
+                    naturalPlayMilliseconds = 0
+                } else {
+                    naturalPlayMilliseconds = plan.usesDecoderNaturalDuration && metadata.naturalPlayMs > 0
+                        ? metadata.naturalPlayMs
+                        : plan.preFadeSeconds * 1_000
+                }
                 decoder.configureFade(
                     playMs: naturalPlayMilliseconds,
                     fadeMs: plan.fadeSeconds * 1000
                 )
-                capFrames = Int64(naturalPlayMilliseconds + plan.fadeSeconds * 1_000) * Int64(sampleRate) / 1_000
-                fadeFrames = decoder.appliesFadeInternally
-                    ? 0
-                    : Int64(plan.fadeSeconds) * Int64(sampleRate)
+                if naturalPlayMilliseconds > 0 {
+                    capFrames = Int64(naturalPlayMilliseconds + plan.fadeSeconds * 1_000) * Int64(sampleRate) / 1_000
+                    fadeFrames = decoder.appliesFadeInternally
+                        ? 0
+                        : Int64(plan.fadeSeconds) * Int64(sampleRate)
+                } else {
+                    capFrames = 0
+                    fadeFrames = 0
+                }
             }
 
             self.decoder = decoder

@@ -3,11 +3,14 @@ import Foundation
 
 enum PlayPSFDecoderError: LocalizedError {
     case createFailed(String)
+    case decodeFailed(String)
 
     var errorDescription: String? {
         switch self {
         case .createFailed(let message):
             "Play! could not open the PSF file. \(message)"
+        case .decodeFailed(let message):
+            "Play! could not decode the PSF file. \(message)"
         }
     }
 }
@@ -115,13 +118,18 @@ final class PlayPSFDecoder: AudioDecoder, @unchecked Sendable {
         return vgmboy_play_psf_finished(handle) != 0 || driverHalted
     }
 
-    func readFrames(_ frameCount: Int) -> (left: [Float], right: [Float]) {
+    func readFrames(_ frameCount: Int) throws -> (left: [Float], right: [Float]) {
         guard let handle else {
             return ([Float](repeating: 0, count: frameCount), [Float](repeating: 0, count: frameCount))
         }
         let interleaved = UnsafeMutablePointer<Int16>.allocate(capacity: frameCount * 2)
         defer { interleaved.deallocate() }
-        let rendered = max(0, Int(vgmboy_play_psf_read(handle, interleaved, Int32(frameCount))))
+        let rendered = Int(vgmboy_play_psf_read(handle, interleaved, Int32(frameCount)))
+        if rendered < 0 {
+            let message = vgmboy_play_psf_error(handle).map { String(cString: $0) }
+                ?? "The emulation core stopped unexpectedly."
+            throw PlayPSFDecoderError.decodeFailed(message)
+        }
         if rendered > 0 {
             producedAudioOnce = true
         } else if producedAudioOnce {
