@@ -108,19 +108,6 @@ import Testing
     #expect(result.metadata.fadeLengthMs == 4_250)
 }
 
-@Test func vgmFormatReaderHarvestsTimingWithoutDecoder() throws {
-    var data = Data(repeating: 0, count: 0x40)
-    data.replaceSubrange(0..<4, with: Data("Vgm ".utf8))
-    writeLittleEndian(&data, at: 0x18, value: 44_100)
-    writeLittleEndian(&data, at: 0x20, value: 22_050)
-
-    let metadata = try #require(try VGMFormatDataReader.read(data: data, displayName: "Song.vgm"))
-    #expect(metadata.song == "Song")
-    #expect(metadata.playLengthMs == 1_000)
-    #expect(metadata.loopLengthMs == 500)
-    #expect(metadata.introLengthMs == 500)
-}
-
 @Test func sidFormatReaderHarvestsHeaderFacts() throws {
     var data = Data(repeating: 0, count: 0x7A)
     data.replaceSubrange(0..<4, with: Data("PSID".utf8))

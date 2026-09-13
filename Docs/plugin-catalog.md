@@ -14,7 +14,7 @@ Last reviewed: **2026-09-12**
 | ID | Source/version | Playback bridge | ScanSong boundary | Formats and special data |
 | --- | --- | --- | --- | --- |
 | `libgme` | Game Music Emu 0.6.5 through Homebrew | `CGameMusicEmu` | ScanSong tests only as a parity oracle; no production scanner link | Playback supports AY, GBS, HES, KSS, NSF, NSFE, SAP, SPC |
-| `VGMBoyFormatDataCore` | Foundation-only shared readers | None | Direct byte metadata route | SPC ID666/xID6 and tagless defaults, AY, NSF/GBS/NSFE, SAP, HES/M3U, direct PSF family, VGM/VGZ, SID |
+| `VGMBoyFormatDataCore` | Foundation-only shared readers | None | Direct byte metadata route | SPC ID666/xID6 and tagless defaults, AY, NSF/GBS/NSFE, SAP, HES/M3U, direct PSF family, SID |
 | `libvgm` | `867223e7c33d63de115d1ab955f784c44f19040a` | `CLibVGM` | Native libVGM route | GYM, S98, DRO |
 | `psgplay` | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | `CPSGPlay` / `VGMBoySNDH` | Shared SNDH inspector | Atari ST SNDH; declared subtunes become playlist rows |
 | `mdxmini` | `003531a471c1955f4ed4357d0e2a6cba809c34a0` plus vendored LZX code | `CMDX` | `vgmboy-mdx-inspect` | X68000 MDX and PDX; sibling banks, legacy `\name`, inner LZX 0.32/0.42 |
@@ -56,9 +56,11 @@ NSF payload remains playback data owned by the libgme-backed VGMBoy player.
 
 ### libVGM (`libvgm`)
 
-libVGM remains the decoder route for GYM and S98. VGM/VGZ are a separate
-direct `VGMBoyFormatDataCore` route for header, GD3, and timing facts. Tempo
-support is exposed only for families where the bridge has verified it.
+libVGM remains the playback decoder route for VGM/VGZ, GYM, S98, and DRO.
+ScanSong's VGM/VGZ header, GD3, and timing reader now lives in the separate
+MetaManCore package; VGMBoyFormatDataCore no longer owns a duplicate VGM
+metadata parser. Tempo support is exposed only for families where the bridge
+has verified it.
 
 ### PSGPlay (`psgplay`)
 
