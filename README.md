@@ -76,3 +76,7 @@ the same library result directly. Formats move into MetaMan as complete
 readers, with their methodology and evidence added to the table above. The
 current registry contains S98 only; other ScanSong readers have not yet been
 migrated.
+
+This initial repository is committed locally but has no Git remote yet.
+ScanSong currently consumes it as a sibling path dependency; independent
+checkouts need a published MetaMan repository at that sibling path.
