@@ -75,6 +75,21 @@ func s98StaleLoopPointerIsIgnored() throws {
     #expect(document.diagnostics.contains { $0.contains("loop offset does not identify") })
 }
 
+@Test("S98 zero-duration loop pointers are omitted with a diagnostic")
+func s98ZeroDurationLoopIsOmitted() throws {
+    let document = try MetaManCore.read(data: makeS98(
+        numerator: 10,
+        denominator: 1_000,
+        commands: [0xFF, 0xFD],
+        loopCommandIndex: 1
+    ))
+
+    #expect(document.timing?.playLengthMs == 10)
+    #expect(document.timing?.introLengthMs == 0)
+    #expect(document.timing?.loopLengthMs == 0)
+    #expect(document.diagnostics.contains { $0.contains("zero duration") })
+}
+
 @Test("S98 malformed waits fail, while an incomplete final write remains diagnosable")
 func s98MalformedInputsFailSafely() throws {
     #expect(throws: MetadataReadError.self) {

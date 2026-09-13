@@ -69,6 +69,11 @@ enum S98MetadataReader {
             let loopStartTicks = timingScan.loopStartTicks
             let hasLoop = loopOffset != 0
                 && loopStartTicks.map { $0 < totalTicks } == true
+            if header.loopOffset != 0,
+               let loopStartTicks,
+               loopStartTicks >= totalTicks {
+                diagnostics.append("S98 loop offset identifies the end command and has zero duration; loop timing was omitted.")
+            }
             let introTicks = hasLoop ? (loopStartTicks ?? 0) : 0
             let loopTicks = hasLoop ? totalTicks - introTicks : 0
 
