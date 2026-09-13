@@ -5,17 +5,18 @@ other media files. Its reusable product is `MetaManCore`; the `metaman` command
 is a thin JSON interface for scripting and support work. Applications should
 import the library rather than shelling out to the CLI.
 
-The first complete format implementation is S98. It reads header/device
-information, the full v3 tag block (including arbitrary and repeated keys),
-legacy pre-v3 titles, and timing from the register-command stream. It does not
-instantiate a playback core. A UTF-8 v3 `DATE` is retained as a full string and
-preferred for normalized `date`; `YEAR` remains independently available.
-Unknown fields and original tag bytes are retained for diagnostics and future
-editor work.
+MetaMan currently has complete S98 and VGM/VGZ readers. The S98 reader handles
+header/device information, the full v3 tag block (including arbitrary and
+repeated keys), legacy pre-v3 titles, and timing from the register-command
+stream. The VGM reader handles the common header, timing fields, gzip-compressed
+VGZ input, and the complete standard GD3 field sequence. Neither reader
+instantiates a playback core. Unknown fields, both GD3 language variants, and
+original tag bytes remain available to clients.
 
 | Format | Read path | Metadata / timing | Write support |
 | --- | --- | --- | --- |
 | S98 v0-v3 | Direct header, tag-block, device-table, and command-stream parser | Ordered raw tags, normalized common fields, technical header facts, and stream timing | Not implemented |
+| VGM / VGZ | Direct 64-byte header and GD3 parser; bounded gzip inflate for compressed input | All 11 ordered GD3 fields (plus future extras), original-language values, release date, converter, notes, header facts, and 44.1 kHz sample timing | Not implemented |
 
 This is a library first, not a CLI-only tool. The `metaman` executable is an
 optional JSON frontend; CocoaSpice, ScanSong, and future clients can consume
@@ -47,6 +48,29 @@ tag set includes `title`, `artist`, `game`, `year`, `genre`, `comment`,
 `copyright`, `s98by`, and `system`; MetaMan retains additional keys instead of
 dropping them. See the [S98 v3 specification](https://github.com/rururutan/s98spec3/blob/master/s98spec3-en.md).
 
+GD3 stores 11 ordered UTF-16LE values: English and original-language title,
+game, system, and artist; release date; converter; and notes. MetaMan retains
+both language values, prefers English for normalized common fields when
+present, and falls back to the original-language value. `fields.date`,
+`fields.encodedBy`, and `fields.comment` expose release date, converter, and
+notes independently. Header timing is taken from total and loop sample counts
+at 44.1 kHz; no audio is rendered. VGZ data is inflated in-process with a
+256 MiB output limit. The raw GD3 tag, including its on-file header, remains in
+`rawTagBlock`. See the [VGM specification](https://vgmrips.net/wiki/VGM_Specification)
+and [GD3 specification](https://vgmrips.net/wiki/GD3_Specification).
+
+ScanSong uses MetaMan for both VGM and S98. Its VGM adapter keeps the
+English-first common fields and GD3-notes comment projection; the shared
+document also exposes release date and converter. Against the current live
+root-1 catalog (42,147 VGM/VGZ rows), 42,099 rows matched exactly and 48 had
+only a system-label difference: MetaMan preserved the literal English GD3
+value `Sega Genesis`, while the saved catalog contains alternate labels. No
+other metadata, timing, or track-structure differences were found. Treat that
+saved catalog as a comparison baseline, not as a current libvgm oracle. This
+is a metadata-ownership extraction: the previous ScanSong VGM route was already
+decoder-independent, so this change does not remove a playback-decoder
+dependency.
+
 ## Use
 
 ```swift
@@ -61,6 +85,7 @@ for tag in document.tags {
 
 ```sh
 swift run --package-path MetaMan metaman read song.s98
+swift run --package-path MetaMan metaman read song.vgz
 ```
 
 JSON includes normalized fields, the ordered decoded tags, the original tag
@@ -72,11 +97,10 @@ is implied. Future writers must be format-specific and preserve unknown data.
 
 MetaMan has no dependency on ScanSong, VGMBoy, or a playback decoder. ScanSong
 adapts `MetadataDocument` into its catalog schema; other clients can consume
-the same library result directly. Formats move into MetaMan as complete
-readers, with their methodology and evidence added to the table above. The
-current registry contains S98 only; other ScanSong readers have not yet been
-migrated.
+the same library result directly. The current registry contains S98 and
+VGM/VGZ. Other ScanSong readers have not yet been migrated.
 
-This initial repository is committed locally but has no Git remote yet.
-ScanSong currently consumes it as a sibling path dependency; independent
-checkouts need a published MetaMan repository at that sibling path.
+This repository currently has no Git remote. ScanSong consumes it as a sibling
+path dependency; independent checkouts and other clients need a published
+MetaMan repository (or a package-registry release) before they can resolve this
+shared dependency outside the local project family.

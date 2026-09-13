@@ -10,7 +10,12 @@ let package = Package(
         .executable(name: "metaman", targets: ["metaman"])
     ],
     targets: [
-        .target(name: "MetaManCore"),
+        .target(
+            name: "MetaManZlib",
+            publicHeadersPath: "include",
+            linkerSettings: [.linkedLibrary("z")]
+        ),
+        .target(name: "MetaManCore", dependencies: ["MetaManZlib"]),
         .executableTarget(name: "metaman", dependencies: ["MetaManCore"]),
         .testTarget(name: "MetaManCoreTests", dependencies: ["MetaManCore"])
     ],

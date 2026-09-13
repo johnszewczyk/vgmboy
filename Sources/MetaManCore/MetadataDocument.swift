@@ -76,8 +76,9 @@ public struct MetadataTiming: Codable, Equatable, Sendable {
 }
 
 /// Read-only result of inspecting one media file. `rawTagBlock` retains the
-/// original on-file tag bytes (excluding the optional NUL terminator), while
-/// `tags` provides a decoded, ordered view for applications and editors.
+/// format-specific original tag bytes; its exact extent is defined by each
+/// reader. `tags` provides a decoded, ordered view for applications and
+/// editors.
 public struct MetadataDocument: Codable, Equatable, Sendable {
     public let format: String
     public let fields: MetadataFields
