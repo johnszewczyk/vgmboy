@@ -106,9 +106,9 @@ func s98MalformedInputsFailSafely() throws {
     }
 }
 
-@Test("S98, VGM, PSF, SPC, SID, APE, ADX, and AUS are registered as direct read-only parsers")
+@Test("S98, VGM, PSF, SPC, SID, APE, ADX, AUS, and ATRAC3 are registered as direct readers")
 func supportedFormatsAreRegisteredAsDirectFormatDataParsers() {
-    #expect(MetaManCore.supportedFormats.map(\.identifier) == ["s98", "vgm", "psf-family", "spc", "sid", "ape", "adx", "aus"])
+    #expect(MetaManCore.supportedFormats.map(\.identifier) == ["s98", "vgm", "psf-family", "spc", "sid", "ape", "adx", "aus", "at3"])
     #expect(MetaManCore.supportedFormats[0].fileExtensions == ["s98"])
     #expect(MetaManCore.supportedFormats[0].methodology.contains("no playback decoder"))
     #expect(MetaManCore.supportedFormats[2].fileExtensions.contains("mini2sf"))
@@ -122,6 +122,8 @@ func supportedFormatsAreRegisteredAsDirectFormatDataParsers() {
     #expect(MetaManCore.supportedFormats[6].methodology.contains("Direct CRI/Monster ADX"))
     #expect(MetaManCore.supportedFormats[7].fileExtensions == ["aus"])
     #expect(MetaManCore.supportedFormats[7].methodology.contains("Direct Atomic Planet"))
+    #expect(MetaManCore.supportedFormats[8].fileExtensions == ["at3"])
+    #expect(MetaManCore.supportedFormats[8].methodology.contains("RIFF/WAVE ATRAC3"))
 }
 
 private func makeS98(

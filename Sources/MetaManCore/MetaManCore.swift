@@ -43,6 +43,11 @@ public enum MetaManCore {
             identifier: "aus",
             fileExtensions: ["aus"],
             methodology: "Direct Atomic Planet header and loop-timing parser; preserves the complete header and native facts without decoding audio or classifying non-AUS aliases."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "at3",
+            fileExtensions: ["at3"],
+            methodology: "Direct RIFF/WAVE ATRAC3 and ATRAC3+ chunk, INFO-tag, and loop-timing parser; preserves non-audio chunks without decoding audio or claiming unrelated .at3 aliases."
         )
     ]
 
@@ -53,6 +58,17 @@ public enum MetaManCore {
             formatHint: fileURL.pathExtension,
             displayName: fileURL.lastPathComponent
         )
+    }
+
+    /// Content probe used by clients routing ambiguous file extensions. This
+    /// does not decode audio or produce metadata; false means the specified
+    /// direct reader does not claim this payload, not that no decoder supports it.
+    public static func canReadDirectly(fileURL: URL, formatHint: String) -> Bool {
+        let normalized = formatHint.trimmingCharacters(in: CharacterSet(charactersIn: ". ")).lowercased()
+        return switch normalized {
+        case "at3": RIFFATRAC3MetadataReader.supports(fileURL: fileURL)
+        default: false
+        }
     }
 
     public static func read(
@@ -108,12 +124,23 @@ public enum MetaManCore {
             return try AtomicPlanetAUSMetadataReader.read(data: data, displayName: displayName)
         }
 
+        if normalizedFormat == "at3" {
+            guard RIFFATRAC3MetadataReader.matches(data) else {
+                throw MetadataReadError.unsupportedFormat("RIFF ATRAC3 signature")
+            }
+            return try RIFFATRAC3MetadataReader.read(data: data, displayName: displayName)
+        }
+
         if normalizedFormat == nil && ADXMetadataReader.matches(data) {
             return try ADXMetadataReader.read(data: data, displayName: displayName)
         }
 
         if normalizedFormat == nil && AtomicPlanetAUSMetadataReader.matches(data) {
             return try AtomicPlanetAUSMetadataReader.read(data: data, displayName: displayName)
+        }
+
+        if normalizedFormat == nil && RIFFATRAC3MetadataReader.matches(data) {
+            return try RIFFATRAC3MetadataReader.read(data: data, displayName: displayName)
         }
 
         throw MetadataReadError.unsupportedFormat(normalizedFormat ?? "unknown content")
