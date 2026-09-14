@@ -33,6 +33,11 @@ public enum MetaManCore {
             identifier: "ape",
             fileExtensions: ["ape"],
             methodology: "Direct APE descriptor, seek-table, APEv2, and leading ID3 parser; derives duration from encoded sample counts without an audio decoder."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "adx",
+            fileExtensions: ["adx"],
+            methodology: "Direct CRI/Monster ADX header and loop-timing parser; non-ADX aliases sharing .adx are not classified as ADX."
         )
     ]
 
@@ -82,6 +87,17 @@ public enum MetaManCore {
 
         if normalizedFormat == "ape" || (normalizedFormat == nil && APEMetadataReader.matches(data)) {
             return try APEMetadataReader.read(data: data, displayName: displayName)
+        }
+
+        if normalizedFormat == "adx" {
+            guard ADXMetadataReader.matches(data) else {
+                throw MetadataReadError.unsupportedFormat("ADX signature")
+            }
+            return try ADXMetadataReader.read(data: data, displayName: displayName)
+        }
+
+        if normalizedFormat == nil && ADXMetadataReader.matches(data) {
+            return try ADXMetadataReader.read(data: data, displayName: displayName)
         }
 
         throw MetadataReadError.unsupportedFormat(normalizedFormat ?? "unknown content")

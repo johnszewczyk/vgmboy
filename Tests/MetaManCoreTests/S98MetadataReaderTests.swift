@@ -106,9 +106,9 @@ func s98MalformedInputsFailSafely() throws {
     }
 }
 
-@Test("S98, VGM, PSF, SPC, SID, and APE are registered as direct read-only parsers")
+@Test("S98, VGM, PSF, SPC, SID, APE, and ADX are registered as direct read-only parsers")
 func supportedFormatsAreRegisteredAsDirectFormatDataParsers() {
-    #expect(MetaManCore.supportedFormats.map(\.identifier) == ["s98", "vgm", "psf-family", "spc", "sid", "ape"])
+    #expect(MetaManCore.supportedFormats.map(\.identifier) == ["s98", "vgm", "psf-family", "spc", "sid", "ape", "adx"])
     #expect(MetaManCore.supportedFormats[0].fileExtensions == ["s98"])
     #expect(MetaManCore.supportedFormats[0].methodology.contains("no playback decoder"))
     #expect(MetaManCore.supportedFormats[2].fileExtensions.contains("mini2sf"))
@@ -118,6 +118,8 @@ func supportedFormatsAreRegisteredAsDirectFormatDataParsers() {
     #expect(MetaManCore.supportedFormats[4].methodology.contains("does not instantiate the SID playback core"))
     #expect(MetaManCore.supportedFormats[5].fileExtensions == ["ape"])
     #expect(MetaManCore.supportedFormats[5].methodology.contains("without an audio decoder"))
+    #expect(MetaManCore.supportedFormats[6].fileExtensions == ["adx"])
+    #expect(MetaManCore.supportedFormats[6].methodology.contains("Direct CRI/Monster ADX"))
 }
 
 private func makeS98(
