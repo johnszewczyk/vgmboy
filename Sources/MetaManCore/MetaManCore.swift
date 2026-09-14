@@ -28,6 +28,11 @@ public enum MetaManCore {
             identifier: "sid",
             fileExtensions: ["sid"],
             methodology: "Direct PSID/RSID header parser; preserves the raw header and does not instantiate the SID playback core."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "ape",
+            fileExtensions: ["ape"],
+            methodology: "Direct APE descriptor, seek-table, APEv2, and leading ID3 parser; derives duration from encoded sample counts without an audio decoder."
         )
     ]
 
@@ -73,6 +78,10 @@ public enum MetaManCore {
 
         if normalizedFormat == "sid" || (normalizedFormat == nil && SIDMetadataReader.matches(data)) {
             return try SIDMetadataReader.read(data: data, displayName: displayName ?? "SID")
+        }
+
+        if normalizedFormat == "ape" || (normalizedFormat == nil && APEMetadataReader.matches(data)) {
+            return try APEMetadataReader.read(data: data, displayName: displayName)
         }
 
         throw MetadataReadError.unsupportedFormat(normalizedFormat ?? "unknown content")
