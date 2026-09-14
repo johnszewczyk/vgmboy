@@ -106,12 +106,16 @@ func s98MalformedInputsFailSafely() throws {
     }
 }
 
-@Test("S98, VGM, and PSF families are registered as direct read-only parsers")
-func s98VGMAndPSFFamiliesAreRegisteredAsDirectFormatDataParsing() {
-    #expect(MetaManCore.supportedFormats.map(\.identifier) == ["s98", "vgm", "psf-family"])
+@Test("S98, VGM, PSF, SPC, and SID are registered as direct read-only parsers")
+func supportedFormatsAreRegisteredAsDirectFormatDataParsers() {
+    #expect(MetaManCore.supportedFormats.map(\.identifier) == ["s98", "vgm", "psf-family", "spc", "sid"])
     #expect(MetaManCore.supportedFormats[0].fileExtensions == ["s98"])
     #expect(MetaManCore.supportedFormats[0].methodology.contains("no playback decoder"))
     #expect(MetaManCore.supportedFormats[2].fileExtensions.contains("mini2sf"))
+    #expect(MetaManCore.supportedFormats[3].fileExtensions == ["spc"])
+    #expect(MetaManCore.supportedFormats[3].methodology.contains("does not start the playback emulator"))
+    #expect(MetaManCore.supportedFormats[4].fileExtensions == ["sid"])
+    #expect(MetaManCore.supportedFormats[4].methodology.contains("does not instantiate the SID playback core"))
 }
 
 private func makeS98(

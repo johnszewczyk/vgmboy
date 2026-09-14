@@ -18,6 +18,16 @@ public enum MetaManCore {
             identifier: "psf-family",
             fileExtensions: PSFMetadataReader.supportedExtensions.sorted(),
             methodology: "Direct PSF-style [TAG] footer parser for PSF, PSF2, SSF, USF, and 2SF; no playback decoder."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "spc",
+            fileExtensions: ["spc"],
+            methodology: "Direct SPC ID666/xID6 header and chunk parser; preserves both original tag blocks and does not start the playback emulator."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "sid",
+            fileExtensions: ["sid"],
+            methodology: "Direct PSID/RSID header parser; preserves the raw header and does not instantiate the SID playback core."
         )
     ]
 
@@ -55,6 +65,14 @@ public enum MetaManCore {
         let isPSFHint = normalizedFormat.map(PSFMetadataReader.supportedExtensions.contains) ?? false
         if isPSFHint || (normalizedFormat == nil && PSFMetadataReader.matches(data)) {
             return try PSFMetadataReader.read(data: data, formatHint: normalizedFormat, displayName: displayName)
+        }
+
+        if normalizedFormat == "spc" || (normalizedFormat == nil && SPCMetadataReader.matches(data)) {
+            return try SPCMetadataReader.read(data: data, displayName: displayName ?? "SPC")
+        }
+
+        if normalizedFormat == "sid" || (normalizedFormat == nil && SIDMetadataReader.matches(data)) {
+            return try SIDMetadataReader.read(data: data, displayName: displayName ?? "SID")
         }
 
         throw MetadataReadError.unsupportedFormat(normalizedFormat ?? "unknown content")

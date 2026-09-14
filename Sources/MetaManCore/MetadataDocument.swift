@@ -59,8 +59,8 @@ public struct MetadataFields: Codable, Equatable, Sendable {
     }
 }
 
-/// Timings are measured directly from a file's command stream, not rendered
-/// through a playback decoder.
+/// Timings are read from file data or format metadata, not rendered through a
+/// playback decoder.
 public struct MetadataTiming: Codable, Equatable, Sendable {
     public let introLengthMs: Int
     public let loopLengthMs: Int
@@ -84,6 +84,10 @@ public struct MetadataDocument: Codable, Equatable, Sendable {
     public let fields: MetadataFields
     public let tags: [MetadataTag]
     public let rawTagBlock: Data?
+    /// Original format-specific metadata blocks, keyed by block name when a
+    /// format stores more than one independent block. Optional for backward-
+    /// compatible decoding of documents written before this property existed.
+    public let rawMetadataBlocks: [String: Data]?
     public let sourceEncoding: String?
     public let timing: MetadataTiming?
     public let technicalFacts: [String: String]
@@ -94,6 +98,7 @@ public struct MetadataDocument: Codable, Equatable, Sendable {
         fields: MetadataFields,
         tags: [MetadataTag] = [],
         rawTagBlock: Data? = nil,
+        rawMetadataBlocks: [String: Data]? = nil,
         sourceEncoding: String? = nil,
         timing: MetadataTiming? = nil,
         technicalFacts: [String: String] = [:],
@@ -103,6 +108,7 @@ public struct MetadataDocument: Codable, Equatable, Sendable {
         self.fields = fields
         self.tags = tags
         self.rawTagBlock = rawTagBlock
+        self.rawMetadataBlocks = rawMetadataBlocks
         self.sourceEncoding = sourceEncoding
         self.timing = timing
         self.technicalFacts = technicalFacts
