@@ -91,23 +91,6 @@ import Testing
     ))
 }
 
-@Test func psfFormatReaderHarvestsTagsAndTiming() throws {
-    var data = Data([0x50, 0x53, 0x46, 0x41])
-    data.append(Data(repeating: 0, count: 12))
-    data.append(Data("[TAG]\ntitle=Song\ngame=Game\nartist=Artist\nlength=1:23.500\nfade=4.250\n".utf8))
-
-    let result = try #require(PSFFormatDataReader.readResult(
-        data: data,
-        pathExtension: "psf",
-        displayName: "song.psf"
-    ))
-    #expect(result.tags["title"] == "Song")
-    #expect(result.metadata.game == "Game")
-    #expect(result.metadata.author == "Artist")
-    #expect(result.metadata.playLengthMs == 83_500)
-    #expect(result.metadata.fadeLengthMs == 4_250)
-}
-
 @Test func sidFormatReaderHarvestsHeaderFacts() throws {
     var data = Data(repeating: 0, count: 0x7A)
     data.replaceSubrange(0..<4, with: Data("PSID".utf8))

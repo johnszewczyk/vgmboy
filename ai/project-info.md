@@ -19,7 +19,8 @@ SPCBoyWK behavior. ScanSong receives VGMBoy-built inspection executables.
   including SPC ID666/xID6 metadata and tagless defaults, AY
   signed-relative-pointer/subsong/title/comment/50 Hz length facts, SAP
   header/subsong/native-TIME facts, and HES header tags with companion-M3U
-  track/timing data; it has no playback decoder dependency.
+  track/timing data. PSF-family `[TAG]` metadata belongs to MetaManCore; this
+  reader package has no playback decoder dependency.
 - `Sources/VGMBoyKit/FormatRegistry.swift` — decoder-owned format families plus the
   complete `playbackDescriptors` projection consumed by CocoaSpice and SPCBoyWK.
 - `Sources/VGMBoyKit/PlaybackPreferences.swift` — shared timing, fade, EQ, volume,
