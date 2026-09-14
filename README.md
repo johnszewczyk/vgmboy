@@ -6,8 +6,8 @@ is a thin JSON interface for scripting and support work. Applications should
 import the library rather than shelling out to the CLI.
 
 MetaMan currently has complete S98, VGM/VGZ, PSF-style tag, SPC ID666/xID6,
-SID PSID/RSID, APE, and CRI/Monster ADX readers. The S98 reader handles
-header/device information, the full v3 tag block (including
+SID PSID/RSID, APE, CRI/Monster ADX, and Atomic Planet AUS readers. The S98
+reader handles header/device information, the full v3 tag block (including
 arbitrary and repeated keys), legacy pre-v3 titles, and timing from the
 register-command stream. The VGM reader handles the common header, timing
 fields, gzip-compressed VGZ input, and the complete standard GD3 field
@@ -23,6 +23,7 @@ both GD3 language variants, and original tag bytes remain available to clients.
 | SID (PSID / RSID) | Direct fixed-header parser; no playback core | Title, author, release text, technical header facts, and retained raw header; no duration inferred from flags | Not implemented |
 | APE | Direct descriptor, seek-table, APEv2, and leading ID3v2 parser; no audio decoder | Ordered text tags, normalized common fields, exact ID3v2/APEv2 blocks, technical header facts, and sample-count duration | Not implemented |
 | CRI / Monster ADX | Direct CRI type-03/04/05 and Monster Games header parser; no audio decoder | Filename-derived title, source label, exact header bytes, sample/channel/loop facts, and sample-derived loop/play timing | Not implemented |
+| Atomic Planet AUS | Direct 32-byte header and loop-timing parser; no audio decoder | Filename-derived title, source label, exact header bytes, codec/sample/channel/loop facts, and sample-derived loop/play timing | Not implemented |
 
 This is a library first, not a CLI-only tool. The `metaman` executable is an
 optional JSON frontend; CocoaSpice, ScanSong, and future clients can consume
@@ -176,6 +177,23 @@ includes its per-file process startup. This is a local-root timing, not a
 whole-scan guarantee or a before/after comparison with the former in-process
 ScanSong parser.
 
+The Atomic Planet AUS reader retains the full 32-byte header and exposes codec,
+sample rate/count, channel count, both loop indicators, and raw plus effective
+loop bounds. Recognized headers produce the same filename-derived title,
+metadata source, and two-loop/ten-second-fade timing as the former ScanSong
+reader; invalid loop ranges are excluded from timing while their source values
+remain available. Non-`AUS ` payloads named `.aus` remain on ScanSong's
+vgmstream fallback route. Playback remains in VGMBoy, and this ownership move
+does not remove vgmstream from ScanSong because it remains required for those
+aliases and other stream formats.
+
+The read-only CocoaSpice root-1 comparison covers all 440 AUS rows in the Mega
+Man Anniversary Collection archive. MetaMan, the ScanSong schema adapter, the
+saved catalog, and vgmstream match exactly for all 440 rows. Optimized Release
+inspection averaged 0.197 ms/file through MetaMan and 171.546 ms/file through
+the vgmstream CLI, including per-file process startup. This is a local
+per-file comparison, not a whole-scan guarantee.
+
 ## Use
 
 ```swift
@@ -196,11 +214,13 @@ swift run --package-path MetaMan metaman read song.spc
 swift run --package-path MetaMan metaman read song.sid
 swift run --package-path MetaMan metaman read song.ape
 swift run --package-path MetaMan metaman read song.adx
+swift run --package-path MetaMan metaman read song.aus
 ```
 
 JSON includes normalized fields, the ordered decoded tags, the original tag
 block as base64 (and named raw blocks for multi-block formats such as SPC and
-APE), timing, technical facts, source encoding, and parser
+APE, plus native header blocks for ADX and AUS), timing, technical facts,
+source encoding, and parser
 diagnostics. MetaMan currently reads only; no writer or metadata mutation API
 is implied. Future writers must be format-specific and preserve unknown data.
 
@@ -209,10 +229,10 @@ is implied. Future writers must be format-specific and preserve unknown data.
 MetaMan has no dependency on ScanSong, VGMBoy, or a playback decoder. ScanSong
 adapts `MetadataDocument` into its catalog schema; other clients can consume
 the same library result directly. The current registry contains S98, VGM/VGZ,
-SPC, SID, APE, ADX, and PSF/PSF2/SSF/USF/2SF readers. Remaining direct-parser
+SPC, SID, APE, ADX, AUS, and PSF/PSF2/SSF/USF/2SF readers. Remaining direct-parser
 ownership is split between `VGMBoyFormatDataCore` (AY, NSF/GBS/NSFE, SAP, and
 HES), `VGMBoySNDH` (SNDH), and ScanSong (KSS, specialized GSF/QSF, content-aware
-ATRAC3/AUS/Sony MSF/SVAG/XA, and Core Audio standard audio). These are the
+ATRAC3/Sony MSF/SVAG/XA, and Core Audio standard audio). These are the
 current migration surface; decoder-backed plugin routes are not extracted by
 publishing only partial metadata. Multi-track families need a track-aware
 neutral document contract before they can share MetaMan without flattening

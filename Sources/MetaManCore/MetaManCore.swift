@@ -38,6 +38,11 @@ public enum MetaManCore {
             identifier: "adx",
             fileExtensions: ["adx"],
             methodology: "Direct CRI/Monster ADX header and loop-timing parser; non-ADX aliases sharing .adx are not classified as ADX."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "aus",
+            fileExtensions: ["aus"],
+            methodology: "Direct Atomic Planet header and loop-timing parser; preserves the complete header and native facts without decoding audio or classifying non-AUS aliases."
         )
     ]
 
@@ -96,8 +101,19 @@ public enum MetaManCore {
             return try ADXMetadataReader.read(data: data, displayName: displayName)
         }
 
+        if normalizedFormat == "aus" {
+            guard AtomicPlanetAUSMetadataReader.matches(data) else {
+                throw MetadataReadError.unsupportedFormat("Atomic Planet AUS signature")
+            }
+            return try AtomicPlanetAUSMetadataReader.read(data: data, displayName: displayName)
+        }
+
         if normalizedFormat == nil && ADXMetadataReader.matches(data) {
             return try ADXMetadataReader.read(data: data, displayName: displayName)
+        }
+
+        if normalizedFormat == nil && AtomicPlanetAUSMetadataReader.matches(data) {
+            return try AtomicPlanetAUSMetadataReader.read(data: data, displayName: displayName)
         }
 
         throw MetadataReadError.unsupportedFormat(normalizedFormat ?? "unknown content")
