@@ -48,6 +48,11 @@ public enum MetaManCore {
             identifier: "at3",
             fileExtensions: ["at3"],
             methodology: "Direct RIFF/WAVE ATRAC3 and ATRAC3+ chunk, INFO-tag, and loop-timing parser; preserves non-audio chunks without decoding audio or claiming unrelated .at3 aliases."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "msf",
+            fileExtensions: ["msf"],
+            methodology: "Direct Sony MSF header and MPEG-frame-boundary parser for PCM, PSX ADPCM, ATRAC3, and MPEG timing; preserves the complete native header without audio decoding or claiming non-Sony aliases."
         )
     ]
 
@@ -67,6 +72,7 @@ public enum MetaManCore {
         let normalized = formatHint.trimmingCharacters(in: CharacterSet(charactersIn: ". ")).lowercased()
         return switch normalized {
         case "at3": RIFFATRAC3MetadataReader.supports(fileURL: fileURL)
+        case "msf": SonyMSFMetadataReader.supports(fileURL: fileURL)
         default: false
         }
     }
@@ -131,6 +137,13 @@ public enum MetaManCore {
             return try RIFFATRAC3MetadataReader.read(data: data, displayName: displayName)
         }
 
+        if normalizedFormat == "msf" {
+            guard SonyMSFMetadataReader.matches(data) else {
+                throw MetadataReadError.unsupportedFormat("Sony MSF signature")
+            }
+            return try SonyMSFMetadataReader.read(data: data, displayName: displayName)
+        }
+
         if normalizedFormat == nil && ADXMetadataReader.matches(data) {
             return try ADXMetadataReader.read(data: data, displayName: displayName)
         }
@@ -141,6 +154,10 @@ public enum MetaManCore {
 
         if normalizedFormat == nil && RIFFATRAC3MetadataReader.matches(data) {
             return try RIFFATRAC3MetadataReader.read(data: data, displayName: displayName)
+        }
+
+        if normalizedFormat == nil && SonyMSFMetadataReader.matches(data) {
+            return try SonyMSFMetadataReader.read(data: data, displayName: displayName)
         }
 
         throw MetadataReadError.unsupportedFormat(normalizedFormat ?? "unknown content")
