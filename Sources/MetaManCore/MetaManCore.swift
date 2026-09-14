@@ -13,6 +13,11 @@ public enum MetaManCore {
             identifier: "vgm",
             fileExtensions: ["vgm", "vgz"],
             methodology: "Direct VGM header and complete GD3 parser; gzip input is inflated with a 256 MiB output bound; no playback decoder."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "psf-family",
+            fileExtensions: PSFMetadataReader.supportedExtensions.sorted(),
+            methodology: "Direct PSF-style [TAG] footer parser for PSF, PSF2, SSF, USF, and 2SF; no playback decoder."
         )
     ]
 
@@ -45,6 +50,11 @@ public enum MetaManCore {
         }
         if isVGMHint || VGMMetadataReader.matches(vgmData) {
             return try VGMMetadataReader.read(data: vgmData, displayName: displayName)
+        }
+
+        let isPSFHint = normalizedFormat.map(PSFMetadataReader.supportedExtensions.contains) ?? false
+        if isPSFHint || (normalizedFormat == nil && PSFMetadataReader.matches(data)) {
+            return try PSFMetadataReader.read(data: data, formatHint: normalizedFormat, displayName: displayName)
         }
 
         throw MetadataReadError.unsupportedFormat(normalizedFormat ?? "unknown content")

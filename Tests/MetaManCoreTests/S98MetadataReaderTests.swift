@@ -106,11 +106,12 @@ func s98MalformedInputsFailSafely() throws {
     }
 }
 
-@Test("S98 and VGM format registry describes direct read-only parsers")
-func s98AndVGMReadersAreRegisteredAsDirectFormatDataParsing() {
-    #expect(MetaManCore.supportedFormats.map(\.identifier) == ["s98", "vgm"])
+@Test("S98, VGM, and PSF families are registered as direct read-only parsers")
+func s98VGMAndPSFFamiliesAreRegisteredAsDirectFormatDataParsing() {
+    #expect(MetaManCore.supportedFormats.map(\.identifier) == ["s98", "vgm", "psf-family"])
     #expect(MetaManCore.supportedFormats[0].fileExtensions == ["s98"])
     #expect(MetaManCore.supportedFormats[0].methodology.contains("no playback decoder"))
+    #expect(MetaManCore.supportedFormats[2].fileExtensions.contains("mini2sf"))
 }
 
 private func makeS98(

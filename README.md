@@ -5,18 +5,19 @@ other media files. Its reusable product is `MetaManCore`; the `metaman` command
 is a thin JSON interface for scripting and support work. Applications should
 import the library rather than shelling out to the CLI.
 
-MetaMan currently has complete S98 and VGM/VGZ readers. The S98 reader handles
-header/device information, the full v3 tag block (including arbitrary and
-repeated keys), legacy pre-v3 titles, and timing from the register-command
-stream. The VGM reader handles the common header, timing fields, gzip-compressed
-VGZ input, and the complete standard GD3 field sequence. Neither reader
-instantiates a playback core. Unknown fields, both GD3 language variants, and
-original tag bytes remain available to clients.
+MetaMan currently has complete S98, VGM/VGZ, and PSF-style tag readers. The S98
+reader handles header/device information, the full v3 tag block (including
+arbitrary and repeated keys), legacy pre-v3 titles, and timing from the
+register-command stream. The VGM reader handles the common header, timing
+fields, gzip-compressed VGZ input, and the complete standard GD3 field
+sequence. These readers do not instantiate a playback core. Unknown fields,
+both GD3 language variants, and original tag bytes remain available to clients.
 
 | Format | Read path | Metadata / timing | Write support |
 | --- | --- | --- | --- |
 | S98 v0-v3 | Direct header, tag-block, device-table, and command-stream parser | Ordered raw tags, normalized common fields, technical header facts, and stream timing | Not implemented |
 | VGM / VGZ | Direct 64-byte header and GD3 parser; bounded gzip inflate for compressed input | All 11 ordered GD3 fields (plus future extras), original-language values, release date, converter, notes, header facts, and 44.1 kHz sample timing | Not implemented |
+| PSF / PSF2 / SSF / USF / 2SF | Direct PSF-style header and `[TAG]` footer parser; no playback core | Ordered tags including duplicates and unknown keys, raw footer bytes, normalized identity, authored length/fade, and console identity by extension | Not implemented |
 
 This is a library first, not a CLI-only tool. The `metaman` executable is an
 optional JSON frontend; CocoaSpice, ScanSong, and future clients can consume
@@ -59,8 +60,23 @@ at 44.1 kHz; no audio is rendered. VGZ data is inflated in-process with a
 `rawTagBlock`. See the [VGM specification](https://vgmrips.net/wiki/VGM_Specification)
 and [GD3 specification](https://vgmrips.net/wiki/GD3_Specification).
 
-ScanSong uses MetaMan for both VGM and S98. Its VGM adapter keeps the
-English-first common fields and GD3-notes comment projection; the shared
+The PSF-family reader covers `.psf`/`.minipsf`, `.psf2`/`.minipsf2`,
+`.ssf`/`.minissf`, `.usf`/`.miniusf`, and `.2sf`/`.mini2sf`. It reads their
+shared `[TAG]` footer without validating or emulating the compressed program
+body; authored `length` and `fade` tags provide timing. Ordered duplicate and
+unknown tags, the original footer, UTF-8 diagnostics, and the header fields
+used to locate that footer remain available. GSF and QSF are intentionally not
+included in this generic reader because their complete scanner routes also
+validate format-specific blocks and dependency chains.
+
+Against the read-only live root-1 catalog, all 14,994 PSF-family rows across
+308 source containers matched exactly, including track structure, metadata,
+and authored timing. Optimized Release inspection measured 0.071 ms median and
+0.090 ms p95 per member. This is a local-corpus comparison and timing, not a
+cross-machine guarantee.
+
+ScanSong uses MetaMan for S98, VGM/VGZ, and PSF-family tag extraction. Its VGM
+adapter keeps the English-first common fields and GD3-notes comment projection; the shared
 document also exposes release date and converter. Against the current live
 root-1 catalog (42,147 VGM/VGZ rows), 42,099 rows matched exactly and 48 had
 only a system-label difference: MetaMan preserved the literal English GD3
@@ -86,6 +102,7 @@ for tag in document.tags {
 ```sh
 swift run --package-path MetaMan metaman read song.s98
 swift run --package-path MetaMan metaman read song.vgz
+swift run --package-path MetaMan metaman read song.minipsf
 ```
 
 JSON includes normalized fields, the ordered decoded tags, the original tag
@@ -97,8 +114,9 @@ is implied. Future writers must be format-specific and preserve unknown data.
 
 MetaMan has no dependency on ScanSong, VGMBoy, or a playback decoder. ScanSong
 adapts `MetadataDocument` into its catalog schema; other clients can consume
-the same library result directly. The current registry contains S98 and
-VGM/VGZ. Other ScanSong readers have not yet been migrated.
+the same library result directly. The current registry contains S98, VGM/VGZ,
+and PSF/PSF2/SSF/USF/2SF tag readers. Other ScanSong readers have not yet been
+migrated.
 
 This repository currently has no Git remote. ScanSong consumes it as a sibling
 path dependency; independent checkouts and other clients need a published
