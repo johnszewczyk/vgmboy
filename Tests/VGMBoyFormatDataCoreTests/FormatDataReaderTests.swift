@@ -54,58 +54,6 @@ import Testing
     }
 }
 
-@Test func spcFormatReaderPreservesBinaryID666Facts() throws {
-    var data = Data(repeating: 0, count: 0x10200)
-    data.replaceSubrange(0..<27, with: Data("SNES-SPC700 Sound File Data".utf8))
-    data[0x23] = 0x1A
-    writeText(&data, at: 0x2E, value: "Song")
-    writeText(&data, at: 0x4E, value: "Game")
-    writeText(&data, at: 0xB0, value: "Artist")
-    data[0xA9] = 30
-    data[0xAC] = 0x88
-    data[0xAD] = 0x13
-
-    let metadata = try SPCFormatDataReader.read(data: data, displayName: "song.spc")
-    #expect(metadata.song == "Song")
-    #expect(metadata.game == "Game")
-    #expect(metadata.author == "Artist")
-    #expect(metadata.playLengthMs == 30_000)
-    #expect(metadata.fadeLengthMs == 5_000)
-}
-
-@Test func spcFormatReaderUsesInfoOnlyDefaultsWhenBothTagFormatsAreAbsent() throws {
-    var data = Data(repeating: 0, count: 0x10200)
-    data.replaceSubrange(0..<27, with: Data("SNES-SPC700 Sound File Data".utf8))
-
-    let metadata = try SPCFormatDataReader.read(data: data, displayName: "untagged.spc")
-    #expect(metadata == FormatMetadata(
-        game: "",
-        song: "",
-        system: "Super Nintendo",
-        author: "",
-        comment: "",
-        introLengthMs: -1,
-        loopLengthMs: -1,
-        playLengthMs: 150_000,
-        fadeLengthMs: 0
-    ))
-}
-
-@Test func sidFormatReaderHarvestsHeaderFacts() throws {
-    var data = Data(repeating: 0, count: 0x7A)
-    data.replaceSubrange(0..<4, with: Data("PSID".utf8))
-    data[0x05] = 2
-    writeText(&data, at: 0x16, value: "Willow")
-    writeText(&data, at: 0x2E, value: "Tester")
-    data[0x77] = 30
-
-    let metadata = try #require(try SIDFormatDataReader.read(data: data, displayName: "Willow.sid"))
-    #expect(metadata.game == "Willow")
-    #expect(metadata.song == "Willow")
-    #expect(metadata.author == "Tester")
-    #expect(metadata.playLengthMs == 30_000)
-}
-
 @Test func nsfAndGBSReadersHarvestCompleteFileHeadersWithoutPlayback() throws {
     var nsf = Data(repeating: 0, count: 0x80)
     nsf.replaceSubrange(0..<5, with: Data([0x4E, 0x45, 0x53, 0x4D, 0x1A]))

@@ -14,7 +14,8 @@ Last reviewed: **2026-09-13**
 | ID | Source/version | Playback bridge | ScanSong boundary | Formats and special data |
 | --- | --- | --- | --- | --- |
 | `libgme` | Game Music Emu 0.6.5 through Homebrew | `CGameMusicEmu` | ScanSong tests only as a parity oracle; no production scanner link | Playback supports AY, GBS, HES, KSS, NSF, NSFE, SAP, SPC |
-| `VGMBoyFormatDataCore` | Foundation-only shared readers | None | Direct byte metadata route | SPC ID666/xID6 and tagless defaults, AY, NSF/GBS/NSFE, SAP, HES/M3U, SID |
+| `VGMBoyFormatDataCore` | Foundation-only shared readers | None | Direct byte metadata route | AY, NSF/GBS/NSFE, SAP, HES/M3U |
+| `MetaManCore` | Sibling decoder-independent metadata package | None | Shared direct metadata route | SID, SPC, S98, VGM/VGZ, PSF-family tags |
 | `libvgm` | `867223e7c33d63de115d1ab955f784c44f19040a` | `CLibVGM` | Native libVGM route | GYM, S98, DRO |
 | `psgplay` | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | `CPSGPlay` / `VGMBoySNDH` | Shared SNDH inspector | Atari ST SNDH; declared subtunes become playlist rows |
 | `mdxmini` | `003531a471c1955f4ed4357d0e2a6cba809c34a0` plus vendored LZX code | `CMDX` | `vgmboy-mdx-inspect` | X68000 MDX and PDX; sibling banks, legacy `\name`, inner LZX 0.32/0.42 |
@@ -26,7 +27,7 @@ Last reviewed: **2026-09-13**
 | `mgba` | mGBA 0.11.0 source snapshot; tree SHA-256 `b7b71f64dab500433f3662b818e3521cf67524dcdee1a9952c1f555629ff55c0` | `CHighlyComplete` | GSF playback only; ScanSong reads GSF containers directly | GSF and miniGSF playback; PSFLib assembles dependency chains. The scanner neither links nor prepares mGBA. |
 | `2sf2wav` | DeSmuME 0.9.9 svn 4608 source snapshot; tree SHA-256 `c3e329f9cf72881d25dabb03b9a89ebd4125ca9bd6d44c26f642589c622a9fb7` | `C2SF` | Native 2SF route | 2SF and mini2SF; relative library dependencies |
 | `psflib` | VGMBoy-managed source snapshot; tree SHA-256 `c3adb7ea371fbeeedc68b3747c314419b52d9cb46aa0d75f177f428bcdb7d021` | Used by PSF-family bridges | Dependency support, not a standalone route | PSF and GSF library resolution |
-| `libsidplayfp` | Homebrew libsidplayfp 3.1.0 | `CSIDPlayFP` | Native SID route | SID |
+| `libsidplayfp` | Homebrew libsidplayfp 3.1.0 | `CSIDPlayFP` | VGMBoy playback only; ScanSong reads PSID/RSID header metadata through MetaManCore | SID |
 | `libopenmpt` | Homebrew libopenmpt 0.8.9 | `COpenMPT` | `openmpt123`/module route | MOD, XM, IT, S3M, and registered tracker modules |
 | `ffmpeg-audio` | Homebrew FFmpeg 8.1.2_1 | `CFFmpeg` | Playback only; ScanSong reads APE directly | APE (Monkey's Audio), MP2, and TAK; one finite playback stream |
 
@@ -42,8 +43,8 @@ boundary where required.
 AY, HES, KSS, SAP, SPC, NSF/GBS, and NSFE all have direct metadata routes in
 ScanSong. AY's relative-pointer subtune table and native duration frames,
 SAP's header/TIME fields, and HES's header/M3U mapping are read without
-starting a core. The SPC route handles both ID666/xID6 tags and tagless
-info-only defaults; the production ScanSong library, CLI, and app do not link
+starting a core. SPC ID666/xID6 tags and tagless info-only defaults are read
+through MetaManCore; the production ScanSong library, CLI, and app do not link
 libgme. Tests retain it only as a reader-parity oracle. SPC playback remains
 owned by VGMBoy's libgme integration. NSF/GBS headers have no authored
 per-track names or finite timing, so their direct scanner route preserves the
@@ -122,7 +123,8 @@ payloads, and library references directly without initializing the native core.
 
 ### SID and tracker modules
 
-SID uses libsidplayfp through the shared transport. Tracker modules use
+SID metadata is read from PSID/RSID headers by MetaManCore in ScanSong; SID
+playback still uses libsidplayfp through the shared transport. Tracker modules use
 libopenmpt and are admitted as structurally known single rows unless the native
 module exposes a different supported structure. Neither route converts source
 modules to an intermediate audio file for cataloging.
