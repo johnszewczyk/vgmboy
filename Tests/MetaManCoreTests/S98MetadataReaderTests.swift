@@ -106,9 +106,9 @@ func s98MalformedInputsFailSafely() throws {
     }
 }
 
-@Test("S98, VGM, PSF, SPC, SID, APE, ADX, AUS, ATRAC3, and MSF are registered as direct readers")
+@Test("S98, VGM, PSF, SPC, SID, APE, ADX, AUS, ATRAC3, MSF, and SVAG are direct readers")
 func supportedFormatsAreRegisteredAsDirectFormatDataParsers() {
-    #expect(MetaManCore.supportedFormats.map(\.identifier) == ["s98", "vgm", "psf-family", "spc", "sid", "ape", "adx", "aus", "at3", "msf"])
+    #expect(MetaManCore.supportedFormats.map(\.identifier) == ["s98", "vgm", "psf-family", "spc", "sid", "ape", "adx", "aus", "at3", "msf", "svag"])
     #expect(MetaManCore.supportedFormats[0].fileExtensions == ["s98"])
     #expect(MetaManCore.supportedFormats[0].methodology.contains("no playback decoder"))
     #expect(MetaManCore.supportedFormats[2].fileExtensions.contains("mini2sf"))
@@ -126,6 +126,8 @@ func supportedFormatsAreRegisteredAsDirectFormatDataParsers() {
     #expect(MetaManCore.supportedFormats[8].methodology.contains("RIFF/WAVE ATRAC3"))
     #expect(MetaManCore.supportedFormats[9].fileExtensions == ["msf"])
     #expect(MetaManCore.supportedFormats[9].methodology.contains("Direct Sony MSF"))
+    #expect(MetaManCore.supportedFormats[10].fileExtensions == ["svag"])
+    #expect(MetaManCore.supportedFormats[10].methodology.contains("Konami/SNK SVAG"))
 }
 
 private func makeS98(

@@ -53,10 +53,18 @@ public enum MetaManCore {
             identifier: "msf",
             fileExtensions: ["msf"],
             methodology: "Direct Sony MSF header and MPEG-frame-boundary parser for PCM, PSX ADPCM, ATRAC3, and MPEG timing; preserves the complete native header without audio decoding or claiming non-Sony aliases."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "svag",
+            fileExtensions: ["svag"],
+            methodology: "Direct Konami/SNK SVAG header and PS-ADPCM sample/loop parser; preserves source header facts and does not decode audio or claim unrelated .svag aliases."
         )
     ]
 
     public static func read(fileURL: URL) throws -> MetadataDocument {
+        if fileURL.pathExtension.lowercased() == "svag" {
+            return try SVAGMetadataReader.read(fileURL: fileURL)
+        }
         let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
         return try read(
             data: data,
@@ -73,6 +81,7 @@ public enum MetaManCore {
         return switch normalized {
         case "at3": RIFFATRAC3MetadataReader.supports(fileURL: fileURL)
         case "msf": SonyMSFMetadataReader.supports(fileURL: fileURL)
+        case "svag": SVAGMetadataReader.supports(fileURL: fileURL)
         default: false
         }
     }
@@ -144,6 +153,13 @@ public enum MetaManCore {
             return try SonyMSFMetadataReader.read(data: data, displayName: displayName)
         }
 
+        if normalizedFormat == "svag" {
+            guard SVAGMetadataReader.matches(data) else {
+                throw MetadataReadError.unsupportedFormat("Konami/SNK SVAG signature")
+            }
+            return try SVAGMetadataReader.read(data: data, displayName: displayName)
+        }
+
         if normalizedFormat == nil && ADXMetadataReader.matches(data) {
             return try ADXMetadataReader.read(data: data, displayName: displayName)
         }
@@ -158,6 +174,10 @@ public enum MetaManCore {
 
         if normalizedFormat == nil && SonyMSFMetadataReader.matches(data) {
             return try SonyMSFMetadataReader.read(data: data, displayName: displayName)
+        }
+
+        if normalizedFormat == nil && SVAGMetadataReader.matches(data) {
+            return try SVAGMetadataReader.read(data: data, displayName: displayName)
         }
 
         throw MetadataReadError.unsupportedFormat(normalizedFormat ?? "unknown content")
