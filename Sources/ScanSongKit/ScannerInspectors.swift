@@ -312,18 +312,25 @@ private enum SPCInspector {
 
 private enum AYInspector {
     static func inspect(fileURL: URL, route: ScannerRoute) throws -> ScanInspection {
-        let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
-        let facts: AYFormatFacts
+        let result: MetadataReadResult
         do {
-            facts = try AYFormatDataReader.read(data: data, displayName: fileURL.lastPathComponent)
-        } catch let error as FormatDataError {
-            throw ScannerInspectionError.malformedFile(error.message)
+            result = try MetaManCore.readResult(fileURL: fileURL)
+        } catch let error as MetadataReadError {
+            throw ScannerInspectionError.malformedFile(error.localizedDescription)
+        } catch {
+            throw ScannerInspectionError.library(
+                "Could not read AY source \(fileURL.lastPathComponent): \(error.localizedDescription)"
+            )
         }
-        let tracks = facts.tracks.map { track in
+
+        let tracks = result.tracks.enumerated().map { ordinal, track in
             ScanTrackMetadata(
-                trackIndex: track.sourceTrackIndex,
-                trackCount: facts.trackCount,
-                metadata: ScannerMetadata(formatMetadata: track.metadata)
+                trackIndex: track.sourceTrackIndex ?? ordinal,
+                trackCount: result.tracks.count,
+                metadata: ScannerMetadata(
+                    metadataDocument: track.document,
+                    includeDateAndEncodedByInComment: false
+                )
             )
         }
         return ScanInspection(route: route, tracks: tracks)

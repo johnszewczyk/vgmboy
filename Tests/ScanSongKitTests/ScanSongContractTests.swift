@@ -209,7 +209,7 @@ func sapDirectRouteInspectsHeaderWithoutGameMusicEmu() async throws {
     #expect(inspection.tracks[1].metadata?.playLengthMs == 35_500)
 }
 
-@Test("AY direct route enumerates native subtunes without libgme")
+@Test("MetaMan AY route enumerates native subtunes without libgme")
 func ayDirectRouteInspectsHeaderWithoutGameMusicEmu() async throws {
     let data = makeAYData(
         author: "Composer",
@@ -235,8 +235,59 @@ func ayDirectRouteInspectsHeaderWithoutGameMusicEmu() async throws {
     #expect(inspection.tracks.map { $0.metadata?.playLengthMs } == [2_500, 1_000])
 }
 
+@Test("MetaMan AY documents preserve the former ScanSong metadata projection")
+func ayMetaManResultMatchesPreviousScannerContract() throws {
+    let data = makeAYData(
+        author: "  Composer  ",
+        comment: "Copyright 1987",
+        tracks: [("Opening", 125), ("Ending", 50), ("<?>", 0)]
+    )
+    let result = try MetaManCore.readResult(data: data, formatHint: "ay", displayName: "projection.ay")
+
+    let metamanProjection = result.tracks.map {
+        ScannerMetadata(metadataDocument: $0.document, includeDateAndEncodedByInComment: false)
+    }
+    let previousScannerContract = [
+        ScannerMetadata(
+            game: "",
+            song: "Opening",
+            system: "ZX Spectrum",
+            author: "Composer",
+            comment: "Copyright 1987",
+            introLengthMs: -1,
+            loopLengthMs: -1,
+            playLengthMs: 2_500,
+            fadeLengthMs: -1
+        ),
+        ScannerMetadata(
+            game: "",
+            song: "Ending",
+            system: "ZX Spectrum",
+            author: "Composer",
+            comment: "Copyright 1987",
+            introLengthMs: -1,
+            loopLengthMs: -1,
+            playLengthMs: 1_000,
+            fadeLengthMs: -1
+        ),
+        ScannerMetadata(
+            game: "",
+            song: "",
+            system: "ZX Spectrum",
+            author: "Composer",
+            comment: "Copyright 1987",
+            introLengthMs: -1,
+            loopLengthMs: -1,
+            playLengthMs: 150_000,
+            fadeLengthMs: -1
+        )
+    ]
+    #expect(result.tracks.map(\.sourceTrackIndex) == [0, 1, 2])
+    #expect(metamanProjection == previousScannerContract)
+}
+
 @Test(
-    "AY direct route matches libgme info-only metadata across the fixture corpus",
+    "MetaMan AY route matches libgme info-only metadata across the fixture corpus",
     .enabled(
         if: ProcessInfo.processInfo.environment["SCANSONG_AY_FIXTURE_DIR"] != nil,
         "Set SCANSONG_AY_FIXTURE_DIR to run the corpus-backed AY parity check."

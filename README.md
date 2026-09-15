@@ -103,8 +103,8 @@ error.
   ordinary suffixes, and each archive is staged as a complete set so UADE can
   resolve player/sample companions before it publishes real subsong rows.
 - Direct NSF/GBS/NSFE header and chunk enumeration, AY relative-pointer
-  header/subsong/title/comment/timing extraction, SAP header/subsong/native TIME,
-  and HES header/M3U inspection without opening libgme; KSS keeps its 256-slot
+  metadata through MetaManCore, SAP header/subsong/native TIME, and HES
+  header/M3U inspection without opening libgme; KSS keeps its 256-slot
   info-only fallback. SPC ID666/xID6 metadata is read by MetaManCore, including
   the established libgme-compatible catalog defaults for tagless SPCs. ScanSong
   projects the shared document into the existing schema; its app and CLI do
