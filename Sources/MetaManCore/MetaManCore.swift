@@ -73,6 +73,24 @@ public enum MetaManCore {
         )
     }
 
+    /// Reads one source file into an ordered track result. Existing direct
+    /// readers currently publish one logical track; multi-track readers can
+    /// return repeated source indices without losing playlist occurrences.
+    public static func readResult(fileURL: URL) throws -> MetadataReadResult {
+        let document = try read(fileURL: fileURL)
+        return MetadataReadResult(tracks: [MetadataTrack(document: document)])
+    }
+
+    /// Data-based counterpart to `readResult(fileURL:)`.
+    public static func readResult(
+        data: Data,
+        formatHint: String? = nil,
+        displayName: String? = nil
+    ) throws -> MetadataReadResult {
+        let document = try read(data: data, formatHint: formatHint, displayName: displayName)
+        return MetadataReadResult(tracks: [MetadataTrack(document: document)])
+    }
+
     /// Content probe used by clients routing ambiguous file extensions. This
     /// does not decode audio or produce metadata; false means the specified
     /// direct reader does not claim this payload, not that no decoder supports it.

@@ -33,6 +33,13 @@ optional JSON frontend; CocoaSpice, ScanSong, and future clients can consume
 `MetaManCore` directly. File reading and tag interpretation stay together in
 the core, while clients own their transport, catalog, and UI concerns.
 
+`MetaManCore.readResult` is the ordered per-file/per-track contract. Each
+`MetadataTrack` carries a complete `MetadataDocument` and an optional
+format-native `sourceTrackIndex`; result-array order is authoritative, and
+repeated source indices remain separate entries. Current readers publish one
+track per file through this API. Multi-track reader migrations will use the
+same contract rather than collapsing playlist occurrences into one document.
+
 The S98 parser stops timing at the format's `FD` end command. A header loop
 pointer is accepted only when it identifies an event before that end; stale
 pointers after `FD` are diagnosed and omitted instead of becoming a fabricated
