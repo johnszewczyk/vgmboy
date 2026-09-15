@@ -78,8 +78,8 @@
   `ScanInspection` and are the only layer permitted to invoke their parser;
   they never write the catalog directly.
 - Dependency-free byte facts are parsed by VGMBoy's `VGMBoyFormatDataCore`:
-  NSF/GBS/NSFE/SAP headers, and HES headers and companion M3U playlists.
-  `MetaManCore` parses AY relative-pointer metadata, APE, CRI/Monster ADX, Atomic
+  NSF/GBS/NSFE headers, and HES headers and companion M3U playlists.
+  `MetaManCore` parses AY relative-pointer and SAP directive metadata, APE, CRI/Monster ADX, Atomic
   Planet AUS, RIFF ATRAC3/ATRAC3+, Konami/SNK SVAG, SID PSID/RSID, SPC ID666/xID6,
   S98, VGM/VGZ, and PSF/PSF2/SSF/USF/2SF tag data.
   NSF/GBS/NSFE/HES enumeration and native metadata are complete at the
@@ -88,11 +88,11 @@
   libgme remains a playback concern for those formats and the scanner's other
   decoder-backed families.
   ScanSong owns source I/O, scanner metadata conversion, and catalog
-  publication; `MetaManCore` owns AY, APE, ADX, AUS, ATRAC3, SVAG, SID, SPC, S98,
+  publication; `MetaManCore` owns AY, SAP, APE, ADX, AUS, ATRAC3, SVAG, SID, SPC, S98,
   VGM/VGZ, and PSF-family metadata parsing, including bounded VGZ decompression
   and named source metadata blocks.
   These routes do not link `VGMBoyKit` or start a playback decoder.
-- AY, APE, ADX, AUS, ATRAC3, SVAG, SID, SPC, S98, VGM/VGZ, and PSF-family metadata are
+- AY, SAP, APE, ADX, AUS, ATRAC3, SVAG, SID, SPC, S98, VGM/VGZ, and PSF-family metadata are
   parsed by the sibling `MetaManCore` package. It preserves ordered tags and source bytes
   (including separately named ID666 and xID6 SPC blocks), with a ScanSong-only
   adapter to schema 23. Direct S98 timing uses the actual loop offset; libvgm
@@ -227,13 +227,13 @@
 - Archive paths, symlinks, member count/name size, and expanded bytes are
   validated before records are accepted.
 - Required adapters currently include direct MetaManCore AY relative-pointer,
-  APE header/tag, SID PSID/RSID, and SPC ID666/xID6 (including tagless defaults), SAP,
+  APE header/tag, SID PSID/RSID, SPC ID666/xID6 (including tagless defaults), and SAP,
   HES header/M3U, and KSS header readers that preserve their former
   libgme info-only contracts without starting a core (SAP emits its declared
   subsongs and reads authored TIME/loop-start facts; HES publishes the
   playlist's authored tracks, or 256 compatibility slots without a playlist;
   KSS keeps its 256-slot fallback); the dependency-free `VGMBoyFormatDataCore`
-  readers for NSF/GBS/NSFE/SAP headers and HES; MetaManCore handles AY, APE,
+  readers for NSF/GBS/NSFE headers and HES; MetaManCore handles AY, SAP, APE,
   CRI/Monster ADX, SID PSID/RSID, SPC ID666/xID6, VGM/VGZ, S98, and
   PSF-family tags; the
   Core Audio standard-audio inspector for FLAC/Vorbis comments and exact

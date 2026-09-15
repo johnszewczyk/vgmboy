@@ -18,9 +18,9 @@ does not turn arbitrary decoder failures into one-track records.
 
 ## Dependency-free format data
 
-The fixed-byte metadata readers for NSF/GBS/NSFE/SAP headers and HES headers
+The fixed-byte metadata readers for NSF/GBS/NSFE headers and HES headers
 with companion M3U playlists live in `VGMBoyFormatDataCore`; AY's signed
-relative-pointer reader is in MetaManCore. APE, CRI/Monster ADX, RIFF ATRAC3/ATRAC3+,
+relative-pointer reader and SAP's directive-header reader are in MetaManCore. APE, CRI/Monster ADX, RIFF ATRAC3/ATRAC3+,
 Sony MSF, SID PSID/RSID, SPC ID666/xID6, S98, VGM/VGZ, and PSF/PSF2/SSF/USF/2SF
 metadata are also read through MetaManCore, which owns the Konami/SNK SVAG header reader.
 ScanSong supplies source files and maps neutral metadata into its catalog
@@ -80,7 +80,7 @@ when the current playback registry does not yet admit it.
 | `nsfe-direct` | `.nsfe` | One row per NSFE playlist entry | `VGMBoyFormatDataCore` NSFE chunk reader | No emulator is started; source labels/times are mapped through the optional playlist, including duplicates. |
 | `kss-direct` | `.kss` | 256 compatibility slots | ScanSong KSS header reader | Header-only; this preserves libgme's info-only fallback, not an authored song count. KSS M3U files are not consumed. |
 | `ay-direct` | `.ay` | One row per AY header-declared subtune | `MetaManCore` ZXAYEMUL reader | No decoder; signed relative pointers expose titles, author/comment, raw metadata blocks, and native 50 Hz track lengths. |
-| `sap-direct` | `.sap` | One row per `SONGS` header entry (default one) | `VGMBoyFormatDataCore` SAP header reader | No emulator; native `TIME` facts map finite durations or loop-start intro times. |
+| `sap-direct` | `.sap` | One row per `SONGS` header entry (default one) | `MetaManCore` SAP information-header reader | No emulator; retains the bounded raw header and ordered directives; native `TIME` facts map finite durations or loop-start intro times. |
 | `hes-direct` | `.hes` | One row per sibling-M3U entry, or 256 compatibility slots without one | `VGMBoyFormatDataCore` HES header and M3U reader | No emulator; M3U is support data and supplies the authored track map and timings. |
 | `openmpt` | `.669`, `.dmf`, `.far`, `.it`, `.mod`, `.mptm`, `.mtm`, `.okt`, `.ptm`, `.s3m`, `.stm`, `.ult`, `.xm` | One structurally-known row | Optional/deferred; metadata may be empty | No scanner-side module conversion or archive expansion. |
 | `standard-audio` | `.aif`, `.aiff`, `.flac`, `.m4a`, `.mp3`, `.ogg`, `.wav` | One track | Core Audio duration and common tags; FLAC Vorbis comments | Exact decoded duration is preferred. |
@@ -166,14 +166,17 @@ the former ScanSong reader.
 
 ### SAP: direct header, track, and timing facts
 
-`.sap` uses `sap-direct` and `SAPFormatDataReader` in the Foundation-only
-`VGMBoyFormatDataCore`; ScanSong does not open libgme or start the Atari CPU and
-POKEY playback core. The reader validates the SAP signature, header lines,
-binary-data marker, any present player type (B/C only), optional `SONGS` count,
-and bounded numeric fields. `SONGS` defaults to one as it does in libgme's
-information-only reader. `NAME` and `AUTHOR` become game and author; the system
-is `Atari XL`. SAP `DATE` remains available as a source fact, matching the old
-scanner projection that did not map copyright into the catalog comment.
+`.sap` uses `sap-direct` and `SAPMetadataReader` in MetaManCore; ScanSong does
+not open libgme or start the Atari CPU and POKEY playback core. Starting after
+the five-byte `SAP\r\n` signature, the reader walks CR/LF directive lines to
+the first `FF FF` binary-data marker, validates the player type (B/C only),
+optional `SONGS` count, and bounded numeric fields, and retains the exact
+header and ordered directives—including unknown keys. `SONGS` defaults to one
+as it does in libgme's information-only reader. `NAME` and `AUTHOR` become game
+and author; the system is `Atari XL`. SAP `DATE` remains available as a source
+fact, matching the old scanner projection that did not map copyright into the
+catalog comment. Detailed parser offsets/layouts are in MetaMan's
+[format layout map](../../MetaMan/FORMAT-LAYOUTS.md).
 
 The reader retains one `TIME` hint per corresponding subsong. The [SAP format
 specification](https://asap.sourceforge.net/sap-format.html) defines a plain
@@ -184,11 +187,13 @@ ScanSong therefore maps plain time to `play_length_ms`, loop-start time to
 header-authored timing that the previous libgme info-only route did not expose;
 it does not infer loop length or a finite end for an indefinitely looping song.
 
-Corpus parity covers all 6,335 SAP sources under the local ASMA fixture tree:
-5,577 are accepted and 758 rejected by both readers. Track counts, ordering,
-and all prior scanner metadata fields match; the only intentional differences
-are the verified SAP `TIME` enrichments. No SAP rows exist in the inspected
-CocoaSpice catalog for live-row comparison.
+The earlier corpus parity comparison covered all 6,335 SAP sources under the
+local ASMA fixture tree: 5,577 were accepted and 758 rejected by both the
+former SAP reader and libgme. That run predates the MetaMan cutover. The current
+test compares MetaMan-backed ScanSong results with libgme when
+`SCANSONG_SAP_FIXTURE_DIR` is set; rerun it before claiming post-cutover corpus
+parity. No SAP rows exist in the inspected CocoaSpice catalog for live-row
+comparison.
 
 ### HES: complete header and M3U route
 

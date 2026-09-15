@@ -339,18 +339,25 @@ private enum AYInspector {
 
 private enum SAPInspector {
     static func inspect(fileURL: URL, route: ScannerRoute) throws -> ScanInspection {
-        let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
-        let facts: SAPFormatFacts
+        let result: MetadataReadResult
         do {
-            facts = try SAPFormatDataReader.read(data: data, displayName: fileURL.lastPathComponent)
-        } catch let error as FormatDataError {
-            throw ScannerInspectionError.malformedFile(error.message)
+            result = try MetaManCore.readResult(fileURL: fileURL)
+        } catch let error as MetadataReadError {
+            throw ScannerInspectionError.malformedFile(error.localizedDescription)
+        } catch {
+            throw ScannerInspectionError.library(
+                "Could not read SAP source \(fileURL.lastPathComponent): \(error.localizedDescription)"
+            )
         }
-        let tracks = facts.tracks.enumerated().map { index, track in
+
+        let tracks = result.tracks.enumerated().map { ordinal, track in
             ScanTrackMetadata(
-                trackIndex: index,
-                trackCount: facts.trackCount,
-                metadata: ScannerMetadata(formatMetadata: track.metadata)
+                trackIndex: track.sourceTrackIndex ?? ordinal,
+                trackCount: result.tracks.count,
+                metadata: ScannerMetadata(
+                    metadataDocument: track.document,
+                    includeDateAndEncodedByInComment: false
+                )
             )
         }
         return ScanInspection(route: route, tracks: tracks)

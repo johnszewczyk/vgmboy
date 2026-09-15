@@ -181,7 +181,7 @@ func kssDirectRouteRejectsMalformedHeaders() async throws {
     }
 }
 
-@Test("SAP direct route enumerates declared subsongs without libgme")
+@Test("MetaMan SAP route enumerates declared subsongs without libgme")
 func sapDirectRouteInspectsHeaderWithoutGameMusicEmu() async throws {
     var data = Data("SAP\r\n".utf8)
     data.append(Data("AUTHOR \"Composer\"\r\nNAME \"SAP Game\"\r\nSONGS 2\r\nTYPE B\r\nINIT 1CE5\r\nPLAYER 1D09\r\nTIME 00:20.000 LOOP\r\nTIME 00:35.500\r\n".utf8))
@@ -207,6 +207,33 @@ func sapDirectRouteInspectsHeaderWithoutGameMusicEmu() async throws {
     #expect(inspection.tracks[0].metadata?.playLengthMs == 150_000)
     #expect(inspection.tracks[1].metadata?.introLengthMs == -1)
     #expect(inspection.tracks[1].metadata?.playLengthMs == 35_500)
+}
+
+@Test("MetaMan SAP documents preserve the former ScanSong metadata projection")
+func sapMetaManResultMatchesPreviousScannerContract() throws {
+    let header = """
+    AUTHOR "Composer"
+    NAME "Sample Game"
+    DATE "1992"
+    SONGS 3
+    TIME 01:20.125 LOOP
+    TIME 0:45.5
+    """
+    var data = Data("SAP\r\n".utf8)
+    data.append(Data(header.replacingOccurrences(of: "\n", with: "\r\n").utf8))
+    data.append(contentsOf: [0x0D, 0x0A, 0xFF, 0xFF, 0, 0, 0, 0])
+    let result = try MetaManCore.readResult(data: data, formatHint: "sap", displayName: "projection.sap")
+    let actual = result.tracks.map {
+        ScannerMetadata(metadataDocument: $0.document, includeDateAndEncodedByInComment: false)
+    }
+    let previousContract = [
+        ScannerMetadata(game: "Sample Game", song: "", system: "Atari XL", author: "Composer", comment: "", introLengthMs: 80_125, loopLengthMs: -1, playLengthMs: 150_000, fadeLengthMs: -1),
+        ScannerMetadata(game: "Sample Game", song: "", system: "Atari XL", author: "Composer", comment: "", introLengthMs: -1, loopLengthMs: -1, playLengthMs: 45_500, fadeLengthMs: -1),
+        ScannerMetadata(game: "Sample Game", song: "", system: "Atari XL", author: "Composer", comment: "", introLengthMs: -1, loopLengthMs: -1, playLengthMs: 150_000, fadeLengthMs: -1)
+    ]
+    #expect(result.tracks.compactMap(\.sourceTrackIndex) == [0, 1, 2])
+    #expect(actual == previousContract)
+    #expect(result.tracks[0].document.fields.copyright == "1992")
 }
 
 @Test("MetaMan AY route enumerates native subtunes without libgme")
@@ -456,22 +483,18 @@ func sapFixtureDirectoryMatchesLibGMEInfoOnly() async throws {
         }
         var fileMatches = false
         if let reference, let candidate {
-            let facts = try SAPFormatDataReader.read(
-                data: Data(contentsOf: fileURL, options: .mappedIfSafe),
-                displayName: fileURL.lastPathComponent
-            )
-            fileMatches = reference.count == candidate.count && facts.tracks.count == candidate.count
+            let metaResult = try MetaManCore.readResult(fileURL: fileURL)
+            fileMatches = reference.count == candidate.count && metaResult.tracks.count == candidate.count
             if fileMatches {
                 for index in reference.indices {
                     let expected = reference[index]
                     let actual = candidate[index]
-                    let hint = facts.tracks[index].timeHint
-                    let expectedIntro = hint.map {
-                        $0.loops ? $0.milliseconds : expected.introLengthMs
-                    } ?? expected.introLengthMs
-                    let expectedPlay = hint.map {
-                        $0.loops ? expected.playLengthMs : $0.milliseconds
-                    } ?? expected.playLengthMs
+                    let document = metaResult.tracks[index].document
+                    let timing = try #require(document.timing)
+                    let hasTimeHint = document.technicalFacts["timeHintMilliseconds"] != nil
+                    let timeIsLoopStart = document.technicalFacts["timeHintIsLoopStart"] == "true"
+                    let expectedIntro = timeIsLoopStart ? timing.introLengthMs : expected.introLengthMs
+                    let expectedPlay = hasTimeHint && !timeIsLoopStart ? timing.playLengthMs : expected.playLengthMs
                     if expected.game != actual.game
                         || expected.song != actual.song
                         || expected.system != actual.system

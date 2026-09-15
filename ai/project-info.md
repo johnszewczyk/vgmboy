@@ -10,9 +10,9 @@ publication. The product is the sole catalog writer consumed by CocoaSpice and S
 
 - `ScanSongKit` — host-independent scanning and catalog engine.
 - `VGMBoyFormatDataCore` — dependency-free byte readers supplied by VGMBoy for
-  NSF/GBS/NSFE/SAP, and HES/M3U metadata that does not require a playback
+  NSF/GBS/NSFE and HES/M3U metadata that does not require a playback
   decoder.
-- `MetaManCore` — shared decoder-independent metadata reading for AY, APE, ADX, AUS,
+- `MetaManCore` — shared decoder-independent metadata reading for AY, SAP, APE, ADX, AUS,
   RIFF ATRAC3/ATRAC3+, Sony MSF, Konami/SNK SVAG, SID PSID/RSID, SPC ID666/xID6,
   S98, VGM/VGZ, and PSF/PSF2/SSF/USF/2SF tag footers. ScanSong maps neutral
   documents to schema 23.
@@ -140,16 +140,19 @@ collapsed into one ignored-format bucket:
 - HES inspection applies a same-basename sibling `.m3u` when present. The
   playlist is not catalogued as a track itself, but it maps raw HES address
   slots to authored music/SFX tracks and their lengths.
-- SAP inspection uses the Foundation-only `SAPFormatDataReader` for subsong
-  count, header identity, and per-track `TIME` hints; finite times become play
-  lengths and `LOOP` times become intro-to-loop positions. SAP no longer uses
-  libgme in ScanSong. AY inspection consumes MetaManCore's ordered per-track
+- SAP inspection consumes MetaManCore's ordered per-track header documents for
+  subsong count, all directives, identity, and native `TIME` hints; finite
+  times become play lengths and `LOOP` times become intro-to-loop positions.
+  SAP no longer uses libgme in ScanSong. AY inspection also consumes
+  MetaManCore's ordered per-track
   result, preserving signed relative-pointer metadata, native subtune ordering,
   and per-track 50 Hz lengths. The fixture-gated AY parity test covers the
   Project AY archive's 1,175 files, but requires `SCANSONG_AY_FIXTURE_DIR`;
   that corpus run was not available during the MetaMan cutover verification.
-  SAP corpus parity covers all 6,335 local ASMA files; no SAP rows were present
-  in the inspected CocoaSpice catalog.
+  The earlier SAP corpus comparison covered all 6,335 local ASMA files using
+  the former direct reader; the current parity test is fixture-gated by
+  `SCANSONG_SAP_FIXTURE_DIR`. No SAP rows were present in the inspected
+  CocoaSpice catalog.
 - Silent Hill: Shattered Memories `.ss2` members fail to open. `.ss2` is an
   established route, so these remain visible archive-member failures and are
   not ignored.

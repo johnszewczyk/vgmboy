@@ -102,8 +102,8 @@ error.
   members are recognized by the shared UADE prefix manifest as well as by
   ordinary suffixes, and each archive is staged as a complete set so UADE can
   resolve player/sample companions before it publishes real subsong rows.
-- Direct NSF/GBS/NSFE header and chunk enumeration, AY relative-pointer
-  metadata through MetaManCore, SAP header/subsong/native TIME, and HES
+- Direct NSF/GBS/NSFE header and chunk enumeration, AY relative-pointer and
+  SAP header/subsong/native TIME metadata through MetaManCore, and HES
   header/M3U inspection without opening libgme; KSS keeps its 256-slot
   info-only fallback. SPC ID666/xID6 metadata is read by MetaManCore, including
   the established libgme-compatible catalog defaults for tagless SPCs. ScanSong
