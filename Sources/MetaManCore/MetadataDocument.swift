@@ -154,11 +154,13 @@ public struct MetadataFormatDescriptor: Codable, Equatable, Sendable {
 public enum MetadataReadError: LocalizedError, Equatable {
     case unsupportedFormat(String)
     case malformedFile(String)
+    case trackAwareResultRequired(String)
 
     public var errorDescription: String? {
         switch self {
         case .unsupportedFormat(let format): "No MetaMan reader is registered for \(format)."
         case .malformedFile(let message): message
+        case .trackAwareResultRequired(let format): "\(format) can contain multiple tracks; use MetaManCore.readResult instead."
         }
     }
 }

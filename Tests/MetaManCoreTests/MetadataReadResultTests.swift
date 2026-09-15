@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MetaManCore
 
-@Test("Existing direct readers expose a one-entry ordered result")
+@Test("Single-track readers expose a one-entry ordered result")
 func directReaderProvidesOneTrackResult() throws {
     let result = try MetaManCore.readResult(
         data: makeMinimalVGM(totalSamples: 44_100),

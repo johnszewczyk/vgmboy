@@ -5,6 +5,11 @@ import Foundation
 public enum MetaManCore {
     public static let supportedFormats = [
         MetadataFormatDescriptor(
+            identifier: "ay",
+            fileExtensions: ["ay"],
+            methodology: "Direct ZXAYEMUL header and relative-pointer parser with per-subtune 50 Hz lengths; no playback decoder."
+        ),
+        MetadataFormatDescriptor(
             identifier: "s98",
             fileExtensions: ["s98"],
             methodology: "Direct header, tag-block, device-table, and command-timing parser; no playback decoder."
@@ -73,10 +78,15 @@ public enum MetaManCore {
         )
     }
 
-    /// Reads one source file into an ordered track result. Existing direct
-    /// readers currently publish one logical track; multi-track readers can
-    /// return repeated source indices without losing playlist occurrences.
+    /// Reads one source file into an ordered track result. Single-track
+    /// readers publish one entry; multi-track readers retain native indices
+    /// and ordered occurrences without flattening them into one document.
     public static func readResult(fileURL: URL) throws -> MetadataReadResult {
+        let formatHint = fileURL.pathExtension.lowercased()
+        if formatHint != "svag" {
+            let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
+            return try readResult(data: data, formatHint: formatHint, displayName: fileURL.lastPathComponent)
+        }
         let document = try read(fileURL: fileURL)
         return MetadataReadResult(tracks: [MetadataTrack(document: document)])
     }
@@ -87,6 +97,12 @@ public enum MetaManCore {
         formatHint: String? = nil,
         displayName: String? = nil
     ) throws -> MetadataReadResult {
+        let cleanedHint = formatHint?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let format = cleanedHint.map { $0.hasPrefix(".") ? String($0.dropFirst()) : $0 }
+        let normalizedFormat = format?.isEmpty == false ? format : nil
+        if normalizedFormat == "ay" || (normalizedFormat == nil && AYMetadataReader.matches(data)) {
+            return try AYMetadataReader.readResult(data: data, displayName: displayName)
+        }
         let document = try read(data: data, formatHint: formatHint, displayName: displayName)
         return MetadataReadResult(tracks: [MetadataTrack(document: document)])
     }
@@ -112,6 +128,11 @@ public enum MetaManCore {
         let cleanedHint = formatHint?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let format = cleanedHint.map { $0.hasPrefix(".") ? String($0.dropFirst()) : $0 }
         let normalizedFormat = format?.isEmpty == false ? format : nil
+
+        if normalizedFormat == "ay" || (normalizedFormat == nil && AYMetadataReader.matches(data)) {
+            _ = try AYMetadataReader.readResult(data: data, displayName: displayName)
+            throw MetadataReadError.trackAwareResultRequired("AY")
+        }
 
         if normalizedFormat == "s98" || (normalizedFormat == nil && S98MetadataReader.matches(data)) {
             return try S98MetadataReader.read(data: data)

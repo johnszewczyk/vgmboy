@@ -5,7 +5,7 @@ other media files. Its reusable product is `MetaManCore`; the `metaman` command
 is a thin JSON interface for scripting and support work. Applications should
 import the library rather than shelling out to the CLI.
 
-MetaMan currently has complete S98, VGM/VGZ, PSF-style tag, SPC ID666/xID6,
+MetaMan currently has complete AY, S98, VGM/VGZ, PSF-style tag, SPC ID666/xID6,
 SID PSID/RSID, APE, CRI/Monster ADX, Atomic Planet AUS, RIFF ATRAC3/ATRAC3+,
 Sony MSF, and Konami/SNK SVAG readers. The S98 reader handles header/device
 information, its complete v3 tag block (including arbitrary and repeated
@@ -16,6 +16,7 @@ both GD3 language variants, and original tag bytes remain available to clients.
 
 | Format | Read path | Metadata / timing | Write support |
 | --- | --- | --- | --- |
+| AY | Direct ZXAYEMUL header and signed relative-pointer parser; no playback player | Ordered per-subtune documents, raw header/table/text/info blocks, source facts, and native 50 Hz lengths with the prior 150-second fallback | Not implemented |
 | S98 v0-v3 | Direct header, tag-block, device-table, and command-stream parser | Ordered raw tags, normalized common fields, technical header facts, and stream timing | Not implemented |
 | VGM / VGZ | Direct 64-byte header and GD3 parser; bounded gzip inflate for compressed input | All 11 ordered GD3 fields (plus future extras), original-language values, release date, converter, notes, header facts, and 44.1 kHz sample timing | Not implemented |
 | PSF / PSF2 / SSF / USF / 2SF | Direct PSF-style header and `[TAG]` footer parser; no playback core | Ordered tags including duplicates and unknown keys, raw footer bytes, normalized identity, authored length/fade, and console identity by extension | Not implemented |
@@ -36,9 +37,21 @@ the core, while clients own their transport, catalog, and UI concerns.
 `MetaManCore.readResult` is the ordered per-file/per-track contract. Each
 `MetadataTrack` carries a complete `MetadataDocument` and an optional
 format-native `sourceTrackIndex`; result-array order is authoritative, and
-repeated source indices remain separate entries. Current readers publish one
-track per file through this API. Multi-track reader migrations will use the
-same contract rather than collapsing playlist occurrences into one document.
+repeated source indices remain separate entries. AY is the first migrated
+multi-track reader; single-track readers publish one entry. Use
+`metaman read-tracks <file>` for the ordered JSON result. The legacy
+`metaman read <file>` command remains a single-document API and rejects
+multi-track AY input rather than silently discarding subtunes.
+
+The AY reader validates the `ZXAYEMUL` header and complete track-pointer table,
+follows bounded signed big-endian relative pointers, and reads each title,
+file-level author/comment, and six-byte per-track info record. It retains the
+header, pointer table, and referenced text/info bytes in named raw metadata
+blocks, with version, player id, first-track byte, native source index, and
+50 Hz frame count in `technicalFacts`. Positive frame counts map to
+milliseconds (`frames * 20`); absent or zero lengths retain the previous
+150-second info-only fallback. Intro, loop, and fade remain unknown (`-1`),
+matching the previous ScanSong projection. No embedded Z80 player is run.
 
 The S98 parser stops timing at the format's `FD` end command. A header loop
 pointer is accepted only when it identifies an event before that end; stale
@@ -295,17 +308,18 @@ is implied. Future writers must be format-specific and preserve unknown data.
 
 MetaMan has no dependency on ScanSong, VGMBoy, or a playback decoder. ScanSong
 adapts `MetadataDocument` into its catalog schema; other clients can consume
-the same library result directly. The current registry contains S98, VGM/VGZ,
+the same library result directly. The current registry contains AY, S98, VGM/VGZ,
 SPC, SID, APE, ADX, AUS, ATRAC3, Sony MSF, Konami/SNK SVAG, and
 PSF/PSF2/SSF/USF/2SF readers.
-Remaining direct-parser ownership is split between `VGMBoyFormatDataCore` (AY,
-NSF/GBS/NSFE, SAP, and HES), `VGMBoySNDH` (SNDH), and ScanSong (KSS,
+Remaining direct-parser ownership is split between `VGMBoyFormatDataCore`
+(NSF/GBS/NSFE, SAP, and HES), `VGMBoySNDH` (SNDH), and ScanSong (KSS,
 specialized GSF/QSF, Sony XA, and Core Audio standard audio). These are the
 current migration surface; decoder-backed plugin routes are not extracted by
-publishing only partial metadata. Multi-track families need a track-aware
-neutral document contract before they can share MetaMan without flattening
-subsong metadata. Playback plugins and decoders remain in VGMBoy regardless
-of where metadata parsing lives.
+publishing only partial metadata. AY is now track-aware in MetaMan; the other
+multi-track families remain outside MetaMan until their complete source,
+playlist, and timing behavior can be represented without flattening subtunes.
+Playback plugins and decoders remain in VGMBoy regardless of where metadata
+parsing lives.
 
 This repository currently has no Git remote. ScanSong consumes it as a sibling
 path dependency; independent checkouts and other clients need a published

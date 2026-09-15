@@ -3,16 +3,20 @@ import Darwin
 import MetaManCore
 
 let arguments = Array(CommandLine.arguments.dropFirst())
-guard arguments.count == 2, arguments[0] == "read" else {
-    fputs("Usage: metaman read <file>\n", stderr)
+guard arguments.count == 2, ["read", "read-tracks"].contains(arguments[0]) else {
+    fputs("Usage: metaman read <file> | metaman read-tracks <file>\n", stderr)
     exit(EXIT_FAILURE)
 }
 
 do {
-    let document = try MetaManCore.read(fileURL: URL(fileURLWithPath: arguments[1]))
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-    var output = try encoder.encode(document)
+    var output: Data
+    if arguments[0] == "read-tracks" {
+        output = try encoder.encode(MetaManCore.readResult(fileURL: URL(fileURLWithPath: arguments[1])))
+    } else {
+        output = try encoder.encode(MetaManCore.read(fileURL: URL(fileURLWithPath: arguments[1])))
+    }
     output.append(0x0A)
     FileHandle.standardOutput.write(output)
 } catch {
