@@ -10,6 +10,11 @@ public enum MetaManCore {
             methodology: "Direct ZXAYEMUL header and relative-pointer parser with per-subtune 50 Hz lengths; no playback decoder."
         ),
         MetadataFormatDescriptor(
+            identifier: "sap",
+            fileExtensions: ["sap"],
+            methodology: "Direct SAP CRLF information-header parser with ordered SONGS/TIME subtunes, retained unknown directives, and no playback decoder."
+        ),
+        MetadataFormatDescriptor(
             identifier: "s98",
             fileExtensions: ["s98"],
             methodology: "Direct header, tag-block, device-table, and command-timing parser; no playback decoder."
@@ -103,6 +108,9 @@ public enum MetaManCore {
         if normalizedFormat == "ay" || (normalizedFormat == nil && AYMetadataReader.matches(data)) {
             return try AYMetadataReader.readResult(data: data, displayName: displayName)
         }
+        if normalizedFormat == "sap" || (normalizedFormat == nil && SAPMetadataReader.matches(data)) {
+            return try SAPMetadataReader.readResult(data: data, displayName: displayName)
+        }
         let document = try read(data: data, formatHint: formatHint, displayName: displayName)
         return MetadataReadResult(tracks: [MetadataTrack(document: document)])
     }
@@ -132,6 +140,10 @@ public enum MetaManCore {
         if normalizedFormat == "ay" || (normalizedFormat == nil && AYMetadataReader.matches(data)) {
             _ = try AYMetadataReader.readResult(data: data, displayName: displayName)
             throw MetadataReadError.trackAwareResultRequired("AY")
+        }
+        if normalizedFormat == "sap" || (normalizedFormat == nil && SAPMetadataReader.matches(data)) {
+            _ = try SAPMetadataReader.readResult(data: data, displayName: displayName)
+            throw MetadataReadError.trackAwareResultRequired("SAP")
         }
 
         if normalizedFormat == "s98" || (normalizedFormat == nil && S98MetadataReader.matches(data)) {
