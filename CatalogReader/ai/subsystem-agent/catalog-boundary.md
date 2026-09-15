@@ -32,26 +32,12 @@ row models, queue publication, and UI.
 - CatalogPlaylistCore preserves the folder-first and metadata-first modes as
   projection choices, not host-specific fallback behavior. The selected game,
   root, and projected system must identify the same rows in both frontends.
-- Browser-derived game labels keep their raw database value for identity and
-  selection, while shared presentation strips known container and compressed
-  playable-format suffixes such as `.tar.zst`, `.sndh.zst`, and `.mdx.zst`.
-  Both the Games sidebar and Games playlist use this same display rule.
 - Games playlist selection keeps folder-system and metadata-system branches
   separate with `UNION ALL` so SQLite can use
   `tracks_game_sidebar_index`. Replacing those branches with one broad `OR`
   predicate is a performance regression even when it returns the same rows.
 - Games playlist activation accepts multiple stable sidebar identities in one
-  read-only query and returns the catalog metadata projection, including
-  Dumper when the optional schema-23 column exists. Older schema-23 catalogs
-  without that column read an empty value.
-- Catalog track projections expose the member leaf filename for archive-backed
-  rows separately from the physical source/container path. Frontends use that
-  leaf for `File` and retain the source path for `Path` and playback identity.
-- `CatalogPlaylistPresentation` owns the UI-neutral display projection for
-  catalog-backed rows: source/member filename, indexed filename, extension-free
-  display name, title fallback, and rounded duration label. Frontends must
-  consume these values for database-backed playlists and keep only local/import
-  fallbacks in their own presentation layers.
+  read-only query and returns exactly the original fourteen projected columns.
 - When ScanSong marks either sidebar projection dirty during a scan,
   `CatalogReader` derives that projection from visible tracks until ScanSong
   republishes the materialized buckets. This keeps CocoaSpice and SPCBoyWK
@@ -59,7 +45,7 @@ row models, queue publication, and UI.
 
 ## Files
 
-- [CatalogReader.swift](../../Sources/CatalogReader/CatalogReader.swift)
-- [CatalogReaderTests.swift](../../Tests/CatalogReaderTests/CatalogReaderTests.swift)
-- [CatalogPlaylistCore.swift](../../Sources/CatalogPlaylistCore/CatalogPlaylistCore.swift)
-- [main.swift](../../Sources/CatalogReaderElectronBridge/main.swift)
+- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogReader/CatalogReader.swift`
+- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Tests/CatalogReaderTests/CatalogReaderTests.swift`
+- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogPlaylistCore/CatalogPlaylistCore.swift`
+- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogReaderElectronBridge/main.swift`

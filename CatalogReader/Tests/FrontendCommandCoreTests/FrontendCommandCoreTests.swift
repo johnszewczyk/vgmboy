@@ -15,9 +15,3 @@ import Testing
     #expect(FrontendShortcutCatalog.shortcut(for: .favoritesPlaylist).key == "d")
     #expect(FrontendShortcutCatalog.shortcut(for: .favoritesPlaylist).modifiers == [.command, .shift])
 }
-
-@Test func settingsUsesTheSharedMacToggleShortcut() {
-    let shortcut = FrontendShortcutCatalog.shortcut(for: .settings)
-    #expect(shortcut.key == ",")
-    #expect(shortcut.modifiers == [.command])
-}

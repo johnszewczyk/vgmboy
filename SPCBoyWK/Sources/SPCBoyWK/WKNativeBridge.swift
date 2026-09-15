@@ -2,6 +2,7 @@ import AppKit
 import ArchiveCacheCore
 import CatalogReader
 import CatalogPlaylistCore
+import CatalogPlaylistPresentationCore
 import CatalogBrowserCore
 import CatalogSessionCore
 import FavoriteStoreCore
@@ -23,13 +24,58 @@ import WebKit
 /// decisions are delegated to WKPlaybackBridge rather than owned by this
 /// catalog bridge, keeping playback policy in the shared native boundary.
 final class WKNativeBridge: NSObject, WKScriptMessageHandler {
+    /// Bounded native retention for the currently projected catalog playlists.
+    /// WebKit can request an explicit shared sort using only its session and
+    /// row IDs; it never sends display/metadata fields back for re-comparison.
+    private final class CatalogPlaylistSortStore: @unchecked Sendable {
+        private let lock = NSLock()
+        private var recordsBySessionID: [String: [String: CatalogPlaylistSortRecord]] = [:]
+        private var sessionOrder: [String] = []
+        private let maximumSessionCount = 8
+
+        func store(_ records: [CatalogPlaylistSortRecord]) -> String {
+            let sessionID = UUID().uuidString
+            let recordsByID = Dictionary(records.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            lock.lock()
+            recordsBySessionID[sessionID] = recordsByID
+            sessionOrder.append(sessionID)
+            while sessionOrder.count > maximumSessionCount {
+                recordsBySessionID.removeValue(forKey: sessionOrder.removeFirst())
+            }
+            lock.unlock()
+            return sessionID
+        }
+
+        func orderedIDs(
+            sessionID: String,
+            expectedIDs: [String],
+            column: CatalogPlaylistSortColumn,
+            direction: CatalogPlaylistSortDirection
+        ) throws -> [String] {
+            lock.lock()
+            let recordsByID = recordsBySessionID[sessionID]
+            lock.unlock()
+            guard let recordsByID,
+                  expectedIDs.count == recordsByID.count,
+                  Set(expectedIDs).count == expectedIDs.count,
+                  Set(expectedIDs) == Set(recordsByID.keys) else {
+                throw BridgeError.invalidArguments
+            }
+            return CatalogPlaylistSorting.orderedIDs(
+                records: expectedIDs.compactMap { recordsByID[$0] },
+                column: column,
+                direction: direction
+            )
+        }
+    }
+
+    nonisolated private static let catalogPlaylistSortStore = CatalogPlaylistSortStore()
     private let catalogURL: URL
     private let isOptionsWindow: Bool
     private let catalogSessions = CatalogSessionCoordinator()
     private weak var playbackEventWebView: WKWebView?
 
     var onOpenOptionsWindow: (() -> Void)?
-    var onToggleOptionsWindow: (() -> Void)?
     var onCloseOptionsWindow: (() -> Void)?
     var onChooseRootFolder: (() -> String?)?
     var onChoosePath: (() -> String?)?
@@ -93,7 +139,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         supportsTempo: Bool,
         hasNaturalEnding: Bool
     ) -> [String: Any] {
-        [
+        return [
             "id": id,
             "extensions": extensions.sorted(),
             "supportsLongPlay": supportsLongPlay,
@@ -106,13 +152,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
     func userScript() -> WKUserScript {
         let optionsWindowFlag = isOptionsWindow ? "true" : "false"
-        let animationContract = Self.json([
-            "frameRate": FrontendAnimationContract.frameRate,
-            "easing": FrontendAnimationContract.easingName
-        ])
         return WKUserScript(source: """
         (() => {
-          window.SPCBoyFrontendAnimationContract = \(animationContract);
           const pending = new Map();
           const listeners = new Map();
           let nextRequestID = 1;
@@ -157,9 +198,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             databaseFileTree: (...args) => request("databaseFileTree", args),
             databaseSearchGames: (...args) => request("databaseSearchGames", args),
             databaseGameTracks: (...args) => request("databaseGameTracks", args),
+            databasePlaylistSort: (...args) => request("databasePlaylistSort", args),
+            playlistProjectionSort: (...args) => request("playlistProjectionSort", args),
             databaseGroupState: (...args) => request("databaseGroupState", args),
             catalogSessionInvalidate: (...args) => request("catalogSessionInvalidate", args),
-            playbackQueueTransition: (...args) => request("playbackQueueTransition", args),
+            playbackQueueAdjacent: (...args) => request("playbackQueueAdjacent", args),
             playbackCompletionRetire: (...args) => request("playbackCompletionRetire", args),
             playbackFadeDuration: (...args) => request("playbackFadeDuration", args),
             databaseFileTracks: (...args) => request("databaseFileTracks", args),
@@ -184,7 +227,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             chooseAACExportDirectory: () => request("chooseAACExportDirectory"),
             defaultAACExportDirectory: () => request("defaultAACExportDirectory"),
             openOptionsWindow: () => request("openOptionsWindow"),
-            toggleOptionsWindow: () => request("toggleOptionsWindow"),
             closeOptionsWindow: () => request("closeOptionsWindow"),
             openPath: (...args) => request("openPath", args),
             chooseRootFolder: (...args) => request("chooseRootFolder", args),
@@ -236,12 +278,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
         print("[SPCBoy WK] request \(method)")
 
-        if method == "openOptionsWindow" || method == "toggleOptionsWindow" || method == "closeOptionsWindow" {
-            let handler: (() -> Void)? = switch method {
-            case "openOptionsWindow": onOpenOptionsWindow
-            case "toggleOptionsWindow": onToggleOptionsWindow
-            default: onCloseOptionsWindow
-            }
+        if method == "openOptionsWindow" || method == "closeOptionsWindow" {
+            let handler = method == "openOptionsWindow" ? onOpenOptionsWindow : onCloseOptionsWindow
             Task { @MainActor in handler?() }
             Task {
                 await Self.reply(to: message.webView, id: id, success: true, valueJSON: "null")
@@ -395,38 +433,16 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     }
 
     private func completionRetirementResponse(_ args: [Any]) throws -> Any {
-        guard let request = args.first as? [String: Any],
-              let statePayload = request["state"] as? [String: Any],
-              let intent = request["intent"] as? [String: Any],
-              let rawGeneration = request["generation"] as? NSNumber else {
+        guard let payload = args.first as? [String: Any] else {
             throw BridgeError.invalidArguments
         }
-        let state = PlaybackQueueState(
-            currentTrackID: statePayload["currentTrackId"] as? String,
-            selectedTrackID: statePayload["selectedTrackId"] as? String,
-            pendingTrackID: statePayload["pendingTrackId"] as? String
-        )
-        let repeatMode: PlaybackRepeatMode = switch intent["repeatMode"] as? String {
-        case "one": .song
-        case "all": .playlist
-        default: .off
-        }
-        let lifecycleRequest = PlaybackContinuationRequest(
-            generation: rawGeneration.intValue,
-            state: state,
-            playlistIDs: Self.stringArray(request["playlistIds"]),
-            repeatMode: repeatMode
-        )
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        let lifecycleRequest = try JSONDecoder().decode(PlaybackContinuationRequest.self, from: data)
         guard let decision = WKPlaybackBridge.shared.retireCompletedPlayback(lifecycleRequest) else {
             return NSNull()
         }
         SPCArchiveMaterialization.release()
-        switch decision.action {
-        case .stop:
-            return ["action": "stop"]
-        case .play(let trackID):
-            return ["action": "play", "trackId": trackID]
-        }
+        return try Self.object(PlaybackContinuationResponse(decision: decision))
     }
 
     @MainActor
@@ -521,76 +537,40 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return try searchGames(query, catalogURL: catalogURL)
         case "databaseGameTracks":
             return try gameTracks(args.first, catalogURL: catalogURL)
+        case "databasePlaylistSort":
+            return try playlistSortedIDs(args.first)
+        case "playlistProjectionSort":
+            return try projectionPlaylistSortedIDs(args.first)
         case "databaseGroupState":
-            guard let state = args.first as? [String: Any],
-                  let action = args.dropFirst().first as? String else {
+            guard let payload = args.first as? [String: Any],
+                  JSONSerialization.isValidJSONObject(payload) else {
                 throw BridgeError.invalidArguments
             }
-            return try databaseGroupState(
-                state: state,
-                action: action,
-                groupName: args.dropFirst(2).first as? String,
-                gameID: args.dropFirst(3).first as? String
+            let request = try JSONDecoder().decode(
+                CatalogBrowserGroupStateRequest.self,
+                from: JSONSerialization.data(withJSONObject: payload)
             )
-        case "playbackQueueTransition":
-            guard let request = args.first as? [String: Any],
-                  let statePayload = request["state"] as? [String: Any],
-                  let intent = request["intent"] as? [String: Any] else {
+            return try Self.object(request.response)
+        case "playbackQueueAdjacent":
+            guard let payload = args.first as? [String: Any],
+                  JSONSerialization.isValidJSONObject(payload) else {
                 throw BridgeError.invalidArguments
             }
-            let state = PlaybackQueueState(
-                currentTrackID: statePayload["currentTrackId"] as? String,
-                selectedTrackID: statePayload["selectedTrackId"] as? String,
-                pendingTrackID: statePayload["pendingTrackId"] as? String
+            let request = try JSONDecoder().decode(
+                PlaybackQueueAdjacentRequest.self,
+                from: JSONSerialization.data(withJSONObject: payload)
             )
-            let playlistIDs = stringArray(request["playlistIds"])
-            switch intent["kind"] as? String {
-            case "transportTarget":
-                return state.transportTargetID(playlistIDs: playlistIDs) ?? NSNull()
-            case "adjacent":
-                guard let direction = PlaybackQueueDirection(rawValue: intent["direction"] as? String ?? ""),
-                      let targetID = state.adjacentTargetID(
-                          playlistIDs: playlistIDs,
-                          direction: direction,
-                          wraps: intent["wraps"] as? Bool ?? false
-                      ) else {
-                    return NSNull()
-                }
-                return targetID
-            case "completion":
-                let repeatMode: PlaybackRepeatMode = switch intent["repeatMode"] as? String {
-                case "one": .song
-                case "all": .playlist
-                default: .off
-                }
-                return state.completionTargetID(
-                    playlistIDs: playlistIDs,
-                    repeatMode: repeatMode
-                ) ?? NSNull()
-            case "replace":
-                let replacement = state.replacing(
-                    playlistIDs: playlistIDs,
-                    preservePlayback: intent["preservePlayback"] as? Bool ?? false
-                )
-                return [
-                    "currentTrackId": replacement.currentTrackID.map { $0 as Any } ?? NSNull(),
-                    "selectedTrackId": replacement.selectedTrackID.map { $0 as Any } ?? NSNull(),
-                    "pendingTrackId": replacement.pendingTrackID.map { $0 as Any } ?? NSNull()
-                ]
-            default:
-                throw BridgeError.invalidArguments
-            }
+            return try Self.object(request.response)
         case "playbackFadeDuration":
-            let duration = PlaybackFadePolicy.queuedSkipDuration(
-                enabled: args.first as? Bool ?? false,
-                isPlaying: args.dropFirst().first as? Bool ?? false,
-                hasCurrentTrack: args.dropFirst(2).first as? Bool ?? false,
-                elapsedSeconds: double(args.dropFirst(3).first) ?? 0,
-                preFadeSeconds: double(args.dropFirst(4).first) ?? 0,
-                fadeSeconds: double(args.dropFirst(5).first) ?? 0,
-                totalSeconds: double(args.dropFirst(6).first) ?? 0
+            guard let payload = args.first as? [String: Any],
+                  JSONSerialization.isValidJSONObject(payload) else {
+                throw BridgeError.invalidArguments
+            }
+            let request = try JSONDecoder().decode(
+                PlaybackQueuedSkipFadeRequest.self,
+                from: JSONSerialization.data(withJSONObject: payload)
             )
-            return duration.map { $0 * 1_000 } ?? NSNull()
+            return request.durationMilliseconds ?? NSNull()
         case "databaseFileTracks":
             return try fileTracks(args.first, catalogURL: catalogURL, folders: false)
         case "databaseFolderTracks":
@@ -672,44 +652,49 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         return []
     }
 
-    nonisolated private static func databaseGroupState(
-        state: [String: Any],
-        action: String,
-        groupName: String?,
-        gameID: String?
-    ) throws -> [String: Any] {
-        let current = CatalogBrowserGroupState(
-            expandedGroupNames: Set(stringArray(state["expandedGroupNames"])),
-            selectedGroupName: state["selectedGroupName"] as? String,
-            selectedGameID: state["selectedGameID"] as? String
-        )
-        let next: CatalogBrowserGroupState
-        switch action {
-        case "toggle":
-            guard let groupName, !groupName.isEmpty else { throw BridgeError.invalidArguments }
-            next = current.applying(.toggleGroup(groupName))
-        case "select":
-            guard let groupName, !groupName.isEmpty else { throw BridgeError.invalidArguments }
-            next = current.applying(.selectGroup(groupName))
-        case "selectGame":
-            guard let groupName, !groupName.isEmpty, let gameID, !gameID.isEmpty else {
-                throw BridgeError.invalidArguments
-            }
-            next = current.applying(.selectGame(groupName: groupName, gameID: gameID))
-        case "allCollapsed":
-            let collapsed = state["collapsed"] as? Bool ?? true
-            next = current.applying(.setAllCollapsed(
-                collapsed,
-                knownGroupNames: Set(stringArray(state["knownGroupNames"]))
-            ))
-        default:
+    /// Applies the shared catalog playlist comparator to a bounded native
+    /// projection session. WebKit supplies only its session and row IDs;
+    /// display/metadata values remain in the shared projection.
+    nonisolated private static func playlistSortedIDs(_ value: Any?) throws -> [String] {
+        guard let request = value as? [String: Any],
+              let sessionID = request["sessionId"] as? String,
+              let columnRawValue = request["column"] as? String,
+              let column = CatalogPlaylistSortColumn(frontendColumn: columnRawValue),
+              let directionRawValue = request["direction"] as? String,
+              let direction = CatalogPlaylistSortDirection(rawValue: directionRawValue),
+              let ids = request["ids"] as? [String] else {
             throw BridgeError.invalidArguments
         }
-        return [
-            "expandedGroupNames": Array(next.expandedGroupNames).sorted(),
-            "selectedGroupName": next.selectedGroupName ?? NSNull(),
-            "selectedGameID": next.selectedGameID ?? NSNull()
-        ]
+        return try catalogPlaylistSortStore.orderedIDs(
+            sessionID: sessionID,
+            expectedIDs: ids,
+            column: column,
+            direction: direction
+        )
+    }
+
+    /// Applies the same shared comparator to a bounded local, mixed, or
+    /// Favorites projection. Unlike a catalog session, these current display
+    /// rows only exist in the frontend, so the bridge accepts the typed shared
+    /// DTO and never lets JavaScript compare values itself.
+    nonisolated private static func projectionPlaylistSortedIDs(_ value: Any?) throws -> [String] {
+        guard let value,
+              JSONSerialization.isValidJSONObject(value) else {
+            throw BridgeError.invalidArguments
+        }
+        let request = try JSONDecoder().decode(
+            CatalogPlaylistSortRequest.self,
+            from: JSONSerialization.data(withJSONObject: value)
+        )
+        guard let column = request.column,
+              Set(request.records.map(\.id)).count == request.records.count else {
+            throw BridgeError.invalidArguments
+        }
+        return CatalogPlaylistSorting.orderedIDs(
+            records: request.records,
+            column: column,
+            direction: request.direction
+        )
     }
 
     nonisolated private static func location(catalogURL: URL, reloaded: Bool) throws -> [String: Any] {
@@ -731,19 +716,17 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         }
     }
 
-    nonisolated private static func games(catalogURL: URL) throws -> [[String: Any]] {
+    nonisolated private static func games(catalogURL: URL) throws -> [String: Any] {
         let projected = CatalogBrowserProjection.games(from: try openCatalog(catalogURL).gameBuckets())
-        return projected.map {
-            [
-                "rootId": $0.rootID,
-                "rootPath": $0.rootPath,
-                "rootName": URL(fileURLWithPath: $0.rootPath).lastPathComponent,
-                "name": $0.name,
-                "displayName": $0.displayName,
-                "system": $0.system,
-                "trackCount": $0.trackCount
-            ]
-        }
+        return [
+            "games": projected.map(gameResponse),
+            "groups": CatalogBrowserProjection.groups(from: projected).map { group in
+                [
+                    "name": group.name,
+                    "gameIDs": group.games.map(\.id)
+                ]
+            }
+        ]
     }
 
     nonisolated private static func files(catalogURL: URL) throws -> [[String: Any]] {
@@ -821,13 +804,27 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             CatalogBrowserProjection.games(from: try openCatalog(catalogURL).gameBuckets()),
             query: query
         )
-        return projected.map {
-            ["rootId": $0.rootID, "rootPath": $0.rootPath, "rootName": URL(fileURLWithPath: $0.rootPath).lastPathComponent, "name": $0.name, "displayName": $0.displayName, "system": $0.system, "trackCount": $0.trackCount]
-        }
+        return projected.map(gameResponse)
     }
 
-    nonisolated private static func gameTracks(_ value: Any?, catalogURL: URL) throws -> [[String: Any]] {
-        guard let values = value as? [[String: Any]] else { return [] }
+    nonisolated private static func gameResponse(_ game: CatalogBrowserGame) -> [String: Any] {
+        [
+            "rootId": game.rootID,
+            "rootPath": game.rootPath,
+            "rootName": game.rootDisplayName,
+            "name": game.name,
+            "displayName": game.displayName,
+            "system": game.system,
+            "consoleGroupName": game.consoleGroupName,
+            "trackCount": game.trackCount,
+            "searchText": game.searchText
+        ]
+    }
+
+    nonisolated private static func gameTracks(_ value: Any?, catalogURL: URL) throws -> [String: Any] {
+        guard let values = value as? [[String: Any]] else {
+            return ["rows": [], "columnContentHints": [String: String]()]
+        }
         var selections: [CatalogPlaylistGameSelection] = []
         var rootPaths: [Int64: String] = [:]
         for game in values {
@@ -838,16 +835,20 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 rootPaths[rootID] = rootPath
             }
         }
-        let tracks = try CatalogPlaylistReader.tracksForGames(
-            databaseURL: catalogURL,
-            selections: selections,
-            preferFoldersOverMetadata: true
+        let projection = CatalogPlaylistPresentation.project(
+            tracks: try CatalogPlaylistReader.tracksForGames(
+                databaseURL: catalogURL,
+                selections: selections,
+                preferFoldersOverMetadata: true
+            )
         )
-        return tracks.map { playlistTrackResponse($0, rootPath: rootPath(for: $0, roots: rootPaths)) }
+        return playlistProjectionResponse(projection, roots: rootPaths)
     }
 
-    nonisolated private static func fileTracks(_ value: Any?, catalogURL: URL, folders: Bool) throws -> [[String: Any]] {
-        guard let values = value as? [[String: Any]] else { return [] }
+    nonisolated private static func fileTracks(_ value: Any?, catalogURL: URL, folders: Bool) throws -> [String: Any] {
+        guard let values = value as? [[String: Any]] else {
+            return ["rows": [], "columnContentHints": [String: String]()]
+        }
         let catalog = try openCatalog(catalogURL)
         let roots = Dictionary(uniqueKeysWithValues: try catalog.roots().map { ($0.id, $0.path) })
         var tracks: [CatalogTrack] = []
@@ -866,35 +867,87 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             }
             tracks = try catalog.tracks(sourceSelections: selections)
         }
-        return tracks.map { trackResponse($0, rootPath: roots[$0.rootID] ?? "") }
+        return playlistProjectionResponse(
+            CatalogPlaylistPresentation.project(tracks: tracks),
+            roots: roots
+        )
     }
 
-    nonisolated private static func trackResponse(_ track: CatalogTrack, rootPath: String) -> [String: Any] {
+    nonisolated private static func playlistProjectionResponse(
+        _ projection: CatalogPlaylistPresentationProjection,
+        roots: [Int64: String]
+    ) -> [String: Any] {
+        let sortSessionID = catalogPlaylistSortStore.store(
+            projection.rows.enumerated().map { offset, track in
+                CatalogPlaylistSortRecord(
+                    id: playlistTrackID(for: track),
+                    naturalOrder: offset,
+                    fileText: track.display.fileText,
+                    titleText: track.display.titleText,
+                    gameText: track.display.gameText,
+                    authorText: track.display.authorText,
+                    systemText: track.display.systemText,
+                    pathText: track.sourcePath,
+                    lengthMilliseconds: track.lengthMilliseconds
+                )
+            }
+        )
+        return [
+            "rows": projection.rows.map {
+                playlistTrackResponse(
+                    $0,
+                    rootPath: $0.rootID.flatMap { roots[$0] } ?? rootPath(for: $0, roots: roots)
+                )
+            },
+            "columnContentHints": columnContentHintResponse(projection.columnContentHints),
+            "sortSessionId": sortSessionID
+        ]
+    }
+
+    nonisolated private static func columnContentHintResponse(
+        _ hints: CatalogPlaylistColumnContentHints
+    ) -> [String: String] {
+        [
+            "index": hints.indexText,
+            "filename": hints.fileText,
+            "title": hints.titleText,
+            "game": hints.gameText,
+            "artist": hints.authorText,
+            "system": hints.systemText,
+            "lengthLabel": hints.lengthText
+        ]
+    }
+
+    nonisolated private static func playlistTrackResponse(
+        _ track: CatalogPlaylistPresentationRow,
+        rootPath: String
+    ) -> [String: Any] {
         let path = track.sourcePath
-        let display = CatalogPlaylistPresentation.display(for: track)
+        let archivePath = track.archivePath
+        let archiveEntry = track.archiveEntry
         let favoriteIdentity = FavoriteTrackIdentity(
-            sourcePath: track.archivePath ?? path,
-            archiveEntry: track.archiveEntry,
+            sourcePath: archivePath ?? path,
+            archiveEntry: archiveEntry,
             trackIndex: track.trackIndex,
             trackCount: track.trackCount
         )
         return [
-            "playlistId": PlaylistTrackIdentity.trackID(
-                sourcePath: track.archivePath ?? path,
-                archiveEntry: track.archiveEntry,
-                trackIndex: track.trackIndex
-            ),
+            "playlistId": playlistTrackID(for: track),
             "favoriteId": favoriteIdentity.id,
-            "metadataTrackId": track.id,
+            "metadataTrackId": track.metadataTrackID ?? 0,
             "metadataLoaded": true,
             "rootPath": rootPath,
             "path": path,
-            "sourceFilename": display.sourceFilename,
-            "filename": display.sourceFilename,
-            "displayFilename": display.filename,
-            "displayName": display.displayName,
-            "archivePath": track.archivePath ?? NSNull(),
-            "archiveEntry": track.archiveEntry ?? NSNull(),
+            "filename": track.display.sourceFilename,
+            "fileText": track.display.fileText,
+            "displayName": track.display.displayName,
+            "titleText": track.display.titleText,
+            "gameText": track.display.gameText,
+            "authorText": track.display.authorText,
+            "systemText": track.display.systemText,
+            "lengthText": track.display.lengthText,
+            "archivePath": archivePath ?? NSNull(),
+            "archiveEntry": archiveEntry ?? NSNull(),
             "trackIndex": track.trackIndex,
             "trackCount": track.trackCount,
             // Catalog-backed rows already carry their metadata. Do not stat
@@ -904,64 +957,29 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "modifiedAt": 0,
             "sourceSignature": NSNull(),
             "scanVersion": 0,
-            "title": display.title,
+            "title": track.title,
             "game": track.game,
             "artist": track.author,
-            "dumper": track.dumper,
             "system": track.system,
-            "playLengthMs": display.lengthMilliseconds,
-            "lengthLabel": display.lengthLabel,
-            "basePlaybackSeconds": Double(display.lengthMilliseconds) / 1_000
+            "playLengthMs": track.lengthMilliseconds
         ]
     }
 
-    nonisolated private static func playlistTrackResponse(_ track: CatalogPlaylistTrack, rootPath: String) -> [String: Any] {
-        let path = track.sourcePath
-        let display = CatalogPlaylistPresentation.display(for: track)
-        let archivePath = track.archivePath?.isEmpty == false ? track.archivePath : nil
-        let archiveEntry = track.archiveEntry?.isEmpty == false ? track.archiveEntry : nil
-        let favoriteIdentity = FavoriteTrackIdentity(
-            sourcePath: archivePath ?? path,
-            archiveEntry: archiveEntry,
-            trackIndex: track.trackIndex,
-            trackCount: track.trackCount
+    nonisolated private static func playlistTrackID(
+        for track: CatalogPlaylistPresentationRow
+    ) -> String {
+        PlaylistTrackIdentity.trackID(
+            sourcePath: track.archivePath ?? track.sourcePath,
+            archiveEntry: track.archiveEntry,
+            trackIndex: track.trackIndex
         )
-        return [
-            "playlistId": PlaylistTrackIdentity.trackID(
-                sourcePath: archivePath ?? path,
-                archiveEntry: archiveEntry,
-                trackIndex: track.trackIndex
-            ),
-            "favoriteId": favoriteIdentity.id,
-            "metadataTrackId": 0,
-            "metadataLoaded": true,
-            "rootPath": rootPath,
-            "path": path,
-            "sourceFilename": display.sourceFilename,
-            "filename": display.sourceFilename,
-            "displayFilename": display.filename,
-            "displayName": display.displayName,
-            "archivePath": archivePath ?? NSNull(),
-            "archiveEntry": archiveEntry ?? NSNull(),
-            "trackIndex": track.trackIndex,
-            "trackCount": track.trackCount,
-            "fileSize": 0,
-            "modifiedAt": 0,
-            "sourceSignature": NSNull(),
-            "scanVersion": 0,
-            "title": display.title,
-            "game": track.game,
-            "artist": track.author,
-            "dumper": track.dumper,
-            "system": track.system,
-            "playLengthMs": display.lengthMilliseconds,
-            "lengthLabel": display.lengthLabel,
-            "basePlaybackSeconds": Double(display.lengthMilliseconds) / 1_000
-        ]
     }
 
-    nonisolated private static func rootPath(for track: CatalogPlaylistTrack, roots: [Int64: String]) -> String {
-        let archivePath = track.archivePath?.isEmpty == false ? track.archivePath : nil
+    nonisolated private static func rootPath(
+        for track: CatalogPlaylistPresentationRow,
+        roots: [Int64: String]
+    ) -> String {
+        let archivePath = track.archivePath
         let sourcePath = URL(fileURLWithPath: archivePath ?? track.sourcePath).standardizedFileURL.path
         return roots.values
             .filter { root in
@@ -1086,7 +1104,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 "title": basename,
                 "game": game,
                 "artist": "",
-                "dumper": "",
                 "system": system,
                 "playLengthMs": item.naturalPlayMilliseconds
             ]
@@ -1177,7 +1194,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 "title": snapshot.title,
                 "game": snapshot.game,
                 "artist": snapshot.author,
-                "dumper": "—",
                 "system": snapshot.system,
                 "trackIndex": identity.trackIndex,
                 "trackCount": identity.trackCount,
@@ -1221,7 +1237,9 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         let defaults = UserDefaults.standard
         if let data = defaults.data(forKey: frontendSettingsKey) {
             var snapshot = try JSONDecoder().decode(SPCBoyPreferencesSnapshot.self, from: data)
+            snapshot.normalizeForPersistence()
             snapshot.apply(frontendInterface: FrontendPreferencesStore(defaults: defaults, keys: .spcBoyWK).load())
+            defaults.set(try JSONEncoder().encode(snapshot), forKey: frontendSettingsKey)
             return snapshot
         }
         var snapshot = SPCBoyPreferencesSnapshot()

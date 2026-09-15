@@ -28,13 +28,6 @@ public enum ScanDiagnosticSanitizer {
 public enum ScanLogFormatter {
     public static let header = "status | detail | path"
 
-    /// Explicitly ignored files are an intentional policy outcome, not a scan
-    /// diagnostic. Keep them in the scanner result for internal accounting, but
-    /// leave them out of user-facing logs and reportable skip counts.
-    public static func reportableSkipped(_ skipped: [ScanSkippedFile]) -> [ScanSkippedFile] {
-        skipped.filter { $0.reason != .explicitlyIgnored }
-    }
-
     public static func lines(
         status: String,
         summary: String,
@@ -71,7 +64,7 @@ public enum ScanLogFormatter {
             )
         })
 
-        lines.append(contentsOf: skippedLines(reportableSkipped(skipped), rootPath: rootPath))
+        lines.append(contentsOf: skippedLines(skipped, rootPath: rootPath))
         return lines
     }
 

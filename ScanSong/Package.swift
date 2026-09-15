@@ -11,9 +11,11 @@ let package = Package(
         .executable(name: "ScanSong", targets: ["ScanSongApp"])
     ],
     dependencies: [
-        .package(path: "../VGMBoy")
+        .package(path: "../VGMBoy"),
+        .package(path: "../MetaMan")
     ],
     targets: [
+        // Test-only decoder oracles for reader parity; production scanner targets do not depend on these cores.
         .systemLibrary(
             name: "CGameMusicEmu",
             path: "Sources/CGME",
@@ -23,9 +25,10 @@ let package = Package(
         .target(
             name: "ScanSongKit",
             dependencies: [
-                "CGameMusicEmu",
                 .product(name: "VGMBoyFormatCore", package: "VGMBoy"),
-                .product(name: "VGMBoySNDH", package: "VGMBoy")
+                .product(name: "VGMBoyFormatDataCore", package: "VGMBoy"),
+                .product(name: "VGMBoySNDH", package: "VGMBoy"),
+                .product(name: "MetaManCore", package: "MetaMan")
             ],
             linkerSettings: [
                 .linkedLibrary("sqlite3"),
@@ -41,7 +44,16 @@ let package = Package(
                 .linkedFramework("SwiftUI")
             ]
         ),
-        .testTarget(name: "ScanSongKitTests", dependencies: ["ScanSongKit"])
+        .testTarget(
+            name: "ScanSongKitTests",
+            dependencies: [
+                "ScanSongKit",
+                "CGameMusicEmu",
+                .product(name: "MetaManCore", package: "MetaMan"),
+                .product(name: "VGMBoyFormatDataCore", package: "VGMBoy"),
+                .product(name: "VGMBoyKit", package: "VGMBoy")
+            ]
+        )
     ],
     swiftLanguageModes: [.v6]
 )

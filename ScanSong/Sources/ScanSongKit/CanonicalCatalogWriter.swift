@@ -433,10 +433,10 @@ public final class CanonicalCatalogWriter: @unchecked Sendable {
             try execute(
                 """
                 INSERT INTO track_metadata
-                    (track_id, title, game, author, dumper, system, comment, intro_length_ms,
+                    (track_id, title, game, author, system, comment, intro_length_ms,
                      loop_length_ms, play_length_ms, fade_length_ms, metadata_scanned_at)
                 SELECT staged.id, metadata.title, metadata.game, metadata.author,
-                       COALESCE(metadata.dumper, ''), metadata.system, metadata.comment, metadata.intro_length_ms,
+                       metadata.system, metadata.comment, metadata.intro_length_ms,
                        metadata.loop_length_ms, metadata.play_length_ms,
                        metadata.fade_length_ms, metadata.metadata_scanned_at
                 FROM tracks staged
@@ -638,7 +638,6 @@ public final class CanonicalCatalogWriter: @unchecked Sendable {
     private func prepareSchema() throws {
         let version = try scalarInt("PRAGMA user_version;")
         if version == CanonicalCatalog.schemaVersion {
-            try ensureDumperColumn()
             _ = try CanonicalCatalog.inspect(databaseURL: databaseURL)
             return
         }
@@ -719,26 +718,18 @@ public final class CanonicalCatalogWriter: @unchecked Sendable {
         try execute(
             """
             INSERT INTO track_metadata
-                (track_id, title, game, author, dumper, system, comment, intro_length_ms,
+                (track_id, title, game, author, system, comment, intro_length_ms,
                  loop_length_ms, play_length_ms, fade_length_ms, metadata_scanned_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             [
                 .integer(sqlite3_last_insert_rowid(database)), .text(metadata.song), .text(metadata.game),
-                .text(metadata.author), .text(metadata.dumper), .text(metadata.system), .text(metadata.comment),
+                .text(metadata.author), .text(metadata.system), .text(metadata.comment),
                 .integer(Int64(metadata.introLengthMs)), .integer(Int64(metadata.loopLengthMs)),
                 .integer(Int64(metadata.playLengthMs)), .integer(Int64(metadata.fadeLengthMs)),
                 .real(Date().timeIntervalSince1970)
             ]
         )
-    }
-
-    private func ensureDumperColumn() throws {
-        let columns = try query("PRAGMA table_info(track_metadata);") { statement in
-            Self.string(statement, 1)
-        }
-        guard !columns.contains("dumper") else { return }
-        try execute("ALTER TABLE track_metadata ADD COLUMN dumper TEXT NOT NULL DEFAULT '';" )
     }
 
     private func upsertInventory(
@@ -1009,26 +1000,22 @@ public enum CatalogIdentity {
 
     private static func normalizeSystem(_ value: String) -> String? {
         let key = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        // System names come from directory components, not arbitrary title
-        // text. Substring matching makes short aliases such as `gc` leak out
-        // of game names (for example, `WreckingCrew`) and corrupt the
-        // browser-system projection for unrelated formats.
-        return aliases[key]
+        if let alias = aliases[key] { return alias }
+        let longestMatch = aliases.keys
+            .filter(key.contains)
+            .max { $0.count < $1.count }
+        return longestMatch.flatMap { aliases[$0] }
     }
 
     private static func stripArchiveExtension(_ name: String) -> String {
         let lower = name.lowercased()
         for suffix in [".tar.zstd", ".tar.zst", ".tzst", ".zip", ".7z", ".rar", ".rsn", ".zstd", ".zst"] where lower.hasSuffix(suffix) {
-            let stem = String(name.dropLast(suffix.count))
-            // A plain .zst/.zstd source is a compressed single music file,
-            // not a tar container. The first removal leaves (for example)
-            // `track.sndh`; remove that known playable suffix as well so the
-            // browser game is a title rather than a filename.
-            if suffix == ".zst" || suffix == ".zstd",
-               let formatSuffix = [".sndh", ".mdx"].first(where: { stem.lowercased().hasSuffix($0) }) {
-                return String(stem.dropLast(formatSuffix.count))
+            let archiveBase = String(name.dropLast(suffix.count))
+            let playableURL = URL(fileURLWithPath: archiveBase)
+            if BuiltInScannerPlugins.registry.route(pathExtension: playableURL.pathExtension) != nil {
+                return playableURL.deletingPathExtension().lastPathComponent
             }
-            return stem
+            return archiveBase
         }
         return URL(fileURLWithPath: name).deletingPathExtension().lastPathComponent
     }

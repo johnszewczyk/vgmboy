@@ -15,6 +15,10 @@ applies shared timing, loads and seeks VGMBoy, and starts playback before return
 status snapshot. The WebKit layer does not run a second archive, decoder, or metadata-hydration
 task.
 
+A newly selected track always starts at `0:00`. Only an explicit seek repositions an already-loaded
+track; changing sidebar sources or replacing a playlist never leaves a residual selection or
+transport position behind.
+
 Pause/resume and seek operate on the already-loaded VGMBoy session through the shared `play` and
 `seek` control commands. They do not reload the file, rematerialize an archive, or recompute the
 track's timing window. The frontend generation guard still discards a late status response from
@@ -40,10 +44,13 @@ with an adjacent PDX bank as dependency data; PDX is not a playlist track.
 
 Selecting a catalog game fills the playlist directly from indexed catalog rows;
 it does not rescan the source folders or wait for a second metadata pass.
+Changing the sidebar source leaves that new playlist unselected; the moving
+selection bar appears only after selecting a playlist row.
 
 Selecting catalog files or folders uses the same shared CatalogReader projections
 as CocoaSpice. JSON is only the bridge transport; it does not define a second
-playlist query implementation.
+playlist query implementation. Catalog rows keep their natural shared order unless the user
+explicitly sorts a display column; length analysis for presentation never reorders the playlist.
 
 Command-Shift-D replaces the current playlist with a snapshot of shared Favorites;
 it does not change the sidebar mode or trigger a catalog reload.

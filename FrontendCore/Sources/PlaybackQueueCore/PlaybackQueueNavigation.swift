@@ -34,6 +34,39 @@ public struct PlaybackContinuationDecision: Equatable, Sendable, Codable {
     }
 }
 
+/// JSON-safe projection of a continuation decision at a renderer bridge.
+/// It intentionally contains only the already-decided action and stable track
+/// ID, so WebKit/AppKit adapters need not reinterpret queue policy or encode
+/// associated-enum details themselves.
+public enum PlaybackContinuationResponseAction: String, Codable, Equatable, Sendable {
+    case stop
+    case play
+}
+
+public struct PlaybackContinuationResponse: Codable, Equatable, Sendable {
+    public let action: PlaybackContinuationResponseAction
+    public let trackID: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case action
+        case trackID = "trackId"
+    }
+
+    public init(action: PlaybackContinuationResponseAction, trackID: String? = nil) {
+        self.action = action
+        self.trackID = trackID
+    }
+
+    public init(decision: PlaybackContinuationDecision) {
+        switch decision.action {
+        case .stop:
+            self.init(action: .stop)
+        case let .play(trackID):
+            self.init(action: .play, trackID: trackID)
+        }
+    }
+}
+
 /// Complete, presentation-free input to the shared completion lifecycle.
 /// Frontends may encode/decode this value at a bridge boundary, but they must
 /// not reconstruct its fields into a second completion policy.
@@ -53,6 +86,13 @@ public struct PlaybackContinuationRequest: Equatable, Sendable, Codable {
         self.state = state
         self.playlistIDs = playlistIDs
         self.repeatMode = repeatMode
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case generation
+        case state
+        case playlistIDs = "playlistIds"
+        case repeatMode
     }
 }
 
@@ -155,6 +195,12 @@ public struct PlaybackQueueState: Equatable, Sendable, Codable {
         self.pendingTrackID = pendingTrackID
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case currentTrackID = "currentTrackId"
+        case selectedTrackID = "selectedTrackId"
+        case pendingTrackID = "pendingTrackId"
+    }
+
     public func replacing(
         playlistIDs: [String],
         preservePlayback: Bool
@@ -222,6 +268,58 @@ public struct PlaybackQueueState: Equatable, Sendable, Codable {
             playlistIDs: playlistIDs,
             repeatMode: repeatMode
         )
+    }
+}
+
+/// UI-neutral adjacent-navigation input at a renderer bridge.
+///
+/// A frontend sends stable IDs and an explicit direction; the shared queue
+/// state owns the anchor and wrapping rules. The coding keys deliberately
+/// match the narrow WebKit wire contract rather than exposing Swift spelling.
+public struct PlaybackQueueAdjacentRequest: Equatable, Sendable, Codable {
+    public let state: PlaybackQueueState
+    public let playlistIDs: [String]
+    public let direction: PlaybackQueueDirection
+    public let wraps: Bool
+
+    public init(
+        state: PlaybackQueueState,
+        playlistIDs: [String],
+        direction: PlaybackQueueDirection,
+        wraps: Bool
+    ) {
+        self.state = state
+        self.playlistIDs = playlistIDs
+        self.direction = direction
+        self.wraps = wraps
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case state
+        case playlistIDs = "playlistIds"
+        case direction
+        case wraps
+    }
+
+    public var response: PlaybackQueueAdjacentResponse {
+        PlaybackQueueAdjacentResponse(trackID: state.adjacentTargetID(
+            playlistIDs: playlistIDs,
+            direction: direction,
+            wraps: wraps
+        ))
+    }
+}
+
+/// Explicit, presentation-free adjacent-navigation result for renderer code.
+public struct PlaybackQueueAdjacentResponse: Equatable, Sendable, Codable {
+    public let trackID: String?
+
+    public init(trackID: String?) {
+        self.trackID = trackID
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case trackID = "trackId"
     }
 }
 

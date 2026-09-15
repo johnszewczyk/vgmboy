@@ -1,0 +1,39 @@
+{
+  "contract": "cocoaspice-spcboy-sidebar-search-view",
+  "version": 2,
+  "cases": [
+    {
+      "id": "paths-remain-a-catalog-projection-after-search-clears",
+      "initialMode": "paths",
+      "steps": [
+        { "setQuery": "", "expected": { "storedMode": "paths", "query": "", "view": "paths", "contentMode": "tree", "resultSource": "catalog-path-index", "isTemporary": false } },
+        { "setQuery": "Castlevania", "expected": { "storedMode": "paths", "query": "Castlevania", "view": "search", "contentMode": "database", "resultSource": "catalog-console-index", "isTemporary": true } },
+        { "setQuery": "", "expected": { "storedMode": "paths", "query": "", "view": "paths", "contentMode": "tree", "resultSource": "catalog-path-index", "isTemporary": false } }
+      ]
+    },
+    {
+      "id": "consoles-remain-a-catalog-projection-after-search-clears",
+      "initialMode": "consoles",
+      "steps": [
+        { "setQuery": "  Silent Hill  ", "expected": { "storedMode": "consoles", "query": "Silent Hill", "view": "search", "contentMode": "database", "resultSource": "catalog-console-index", "isTemporary": true } },
+        { "setQuery": "", "expected": { "storedMode": "consoles", "query": "", "view": "consoles", "contentMode": "database", "resultSource": "catalog-console-index", "isTemporary": false } }
+      ]
+    },
+    {
+      "id": "disk-path-is-distinct-from-catalog-views",
+      "initialMode": "diskPath",
+      "steps": [
+        { "setQuery": "", "expected": { "storedMode": "diskPath", "query": "", "view": "diskPath", "contentMode": "tree", "resultSource": "disk-path-tree", "isTemporary": false } },
+        { "setMode": "paths", "expected": { "storedMode": "paths", "query": "", "view": "paths", "contentMode": "tree", "resultSource": "catalog-path-index", "isTemporary": false } },
+        { "setMode": "consoles", "expected": { "storedMode": "consoles", "query": "", "view": "consoles", "contentMode": "database", "resultSource": "catalog-console-index", "isTemporary": false } }
+      ]
+    },
+    {
+      "id": "whitespace-does-not-open-search",
+      "initialMode": "consoles",
+      "steps": [
+        { "setQuery": " \t ", "expected": { "storedMode": "consoles", "query": "", "view": "consoles", "contentMode": "database", "resultSource": "catalog-console-index", "isTemporary": false } }
+      ]
+    }
+  ]
+}

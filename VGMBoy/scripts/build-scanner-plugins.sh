@@ -5,72 +5,80 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SHARED_VENDOR_DIR="${VGMBoy_SHARED_VENDOR_DIR:-$ROOT_DIR/vendor}"
 BUILD_DIR="$ROOT_DIR/.build/scanner-plugins"
 VGMSTREAM_SOURCE="$SHARED_VENDOR_DIR/vgmstream"
+VGMSTREAM_PATCH="$ROOT_DIR/patches/vgmstream-cocoaspice.patch"
 VGMSTREAM_BUILD="$BUILD_DIR/vgmstream"
 VGMSTREAM_OUTPUT="$BUILD_DIR/vgmstream-cli"
-QSF_OUTPUT="$BUILD_DIR/vgmboy-qsf-inspect"
 MDX_OUTPUT="$BUILD_DIR/vgmboy-mdx-inspect"
 AMIGA_OUTPUT="$BUILD_DIR/vgmboy-amiga-inspect"
-FFMPEG_OUTPUT="$BUILD_DIR/vgmboy-ffmpeg-inspect"
-ZXTUNE_OUTPUT="$BUILD_DIR/vgmboy-zxtune-inspect"
 SCANNER_STAMP="$BUILD_DIR/scanner-inputs.sha256"
-MODULE_CACHE_DIR="${CLANG_MODULE_CACHE_PATH:-$ROOT_DIR/.build/module-cache}"
-SWIFT_CACHE_DIR="${XDG_CACHE_HOME:-$ROOT_DIR/.build/swift-cache}"
-mkdir -p "$MODULE_CACHE_DIR" "$SWIFT_CACHE_DIR"
-export CLANG_MODULE_CACHE_PATH="$MODULE_CACHE_DIR"
-export SWIFTPM_MODULECACHE_OVERRIDE="$MODULE_CACHE_DIR"
-export XDG_CACHE_HOME="$SWIFT_CACHE_DIR"
 
-"$ROOT_DIR/scripts/build-dependencies.sh"
+# Remove retired ScanSong helpers that can survive in this shared output
+# directory across scanner-route changes.
+for obsolete_output in "$BUILD_DIR/vgmboy-qsf-inspect" "$BUILD_DIR/vgmboy-ffmpeg-inspect"; do
+    if [[ -f "$obsolete_output" ]]; then
+        rm -f "$obsolete_output"
+        echo "Removed retired ScanSong helper: $(basename "$obsolete_output")"
+    fi
+done
+
+[[ -d "$VGMSTREAM_SOURCE" ]] || { echo "Missing shared vgmstream source: $VGMSTREAM_SOURCE" >&2; exit 1; }
+command -v cmake >/dev/null 2>&1 || { echo "Missing cmake" >&2; exit 1; }
+
+# The full VGMBoy playback dependency builder applies this compatibility patch
+# as part of its vgmstream build. Apply it here too, without invoking or staging
+# unrelated playback decoders for a ScanSong build.
+if [[ -e "$VGMSTREAM_SOURCE/.git" ]]; then
+    if git -C "$VGMSTREAM_SOURCE" apply --check "$VGMSTREAM_PATCH" >/dev/null 2>&1; then
+        git -C "$VGMSTREAM_SOURCE" apply "$VGMSTREAM_PATCH"
+    elif ! git -C "$VGMSTREAM_SOURCE" apply --reverse --check "$VGMSTREAM_PATCH" >/dev/null 2>&1; then
+        echo "vgmstream source does not match the VGMBoy compatibility patch" >&2
+        exit 1
+    fi
+else
+    if patch --dry-run --forward -p1 -d "$VGMSTREAM_SOURCE" < "$VGMSTREAM_PATCH" >/dev/null 2>&1; then
+        patch --forward -p1 -d "$VGMSTREAM_SOURCE" < "$VGMSTREAM_PATCH" >/dev/null
+    elif ! patch --dry-run --reverse -p1 -d "$VGMSTREAM_SOURCE" < "$VGMSTREAM_PATCH" >/dev/null 2>&1; then
+        echo "vgmstream source does not match the VGMBoy compatibility patch" >&2
+        exit 1
+    fi
+fi
 
 scanner_signature="$({
     shasum -a 256 \
         "$ROOT_DIR/scripts/build-scanner-plugins.sh" \
-        "$ROOT_DIR/scripts/build-qsf-inspector.sh" \
-        "$ROOT_DIR/Sources/VGMBoyQSFInspect/main.c" \
+        "$VGMSTREAM_PATCH" \
         "$ROOT_DIR/Sources/VGMBoyMDXInspect/main.swift" \
         "$ROOT_DIR/Sources/VGMBoyAmigaInspect/main.swift" \
-        "$ROOT_DIR/Sources/VGMBoyFFmpegInspect/main.swift" \
-        "$ROOT_DIR/Sources/VGMBoyZXTuneInspect/main.swift" \
-        "$ROOT_DIR/Sources/VGMBoyKit/ZXTuneDecoder.swift" \
-        "$ROOT_DIR/Sources/VGMBoyKit/ZXTuneInspector.swift" \
-        "$ROOT_DIR/Sources/CZXTune/vgmboy_zxtune.cpp" \
-        "$ROOT_DIR/Sources/CZXTune/zxtune_inspect.cpp" \
-        "$ROOT_DIR/Sources/CZXTune/include/vgmboy_zxtune.h" \
-        "$ROOT_DIR/scripts/build-zxtune.sh" \
-        "$ROOT_DIR/Sources/VGMBoyKit/AmigaDecoder.swift" \
-        "$ROOT_DIR/Sources/VGMBoyKit/FFmpegAudioDecoder.swift" \
-        "$ROOT_DIR/Sources/VGMBoyKit/FFmpegInspector.swift" \
-        "$ROOT_DIR/Sources/CFFmpeg/vgmboy_ffmpeg.c" \
-        "$ROOT_DIR/Sources/CFFmpeg/include/vgmboy_ffmpeg.h" \
+        "$ROOT_DIR/Sources/VGMBoyScannerInspectionCore/MDXInspection.swift" \
+        "$ROOT_DIR/Sources/VGMBoyScannerInspectionCore/AmigaInspection.swift" \
         "$ROOT_DIR/Sources/CUADE/vgmboy_uade.c" \
         "$ROOT_DIR/Sources/CUADE/include/vgmboy_uade.h" \
-        "$ROOT_DIR/Sources/VGMBoyFormatCore/AmigaFormatManifest.swift" \
-        "$ROOT_DIR/Package.swift" \
-        "$ROOT_DIR/Sources/VGMBoyKit/MDXDecoder.swift" \
         "$ROOT_DIR/Sources/CMDX/mdx_bridge.c" \
+        "$ROOT_DIR/Sources/CMDX/include/mdx_bridge.h" \
+        "$ROOT_DIR/Package.swift" \
         "$ROOT_DIR/vendor/mdxmini/src/"*.c \
-        "$ROOT_DIR/vendor/mdxmini/src/"*.h \
-        "$ROOT_DIR/.build/dependency-stamps/qsf.sha256" \
-        "$ROOT_DIR/.build/dependency-stamps/vgmstream.sha256"
+        "$ROOT_DIR/vendor/mdxmini/src/"*.h
     printf '%s\n' "$VGMSTREAM_SOURCE"
+    find "$VGMSTREAM_SOURCE" -type f \
+        -not -path '*/.git/*' \
+        -not -path "$VGMSTREAM_SOURCE/dependencies/ffmpeg/*" \
+        -print0 \
+        | sort -z \
+        | xargs -0 shasum -a 256
     cmake --version | head -n 1
     "${CC:-cc}" --version | head -n 1
     pkg-config --modversion libavcodec vorbisfile ogg 2>/dev/null || true
+    pkg-config --modversion uade 2>/dev/null || true
 } | shasum -a 256 | awk '{ print $1 }')"
 
-if [[ -x "$VGMSTREAM_OUTPUT" && -x "$QSF_OUTPUT" && -x "$MDX_OUTPUT" && -x "$AMIGA_OUTPUT" && -x "$FFMPEG_OUTPUT" && -x "$ZXTUNE_OUTPUT" && -f "$SCANNER_STAMP" \
+if [[ -x "$VGMSTREAM_OUTPUT" && -x "$MDX_OUTPUT" && -x "$AMIGA_OUTPUT" && -f "$SCANNER_STAMP" \
       && "$(<"$SCANNER_STAMP")" == "$scanner_signature" ]]; then
     echo "VGMBoy scanner plugins are current ($scanner_signature)"
     echo "vgmstream: $VGMSTREAM_OUTPUT"
-    echo "qsf: $QSF_OUTPUT"
     echo "mdx: $MDX_OUTPUT"
     echo "amiga: $AMIGA_OUTPUT"
-    echo "ffmpeg: $FFMPEG_OUTPUT"
-    echo "zxtune: $ZXTUNE_OUTPUT"
     exit 0
 fi
-
-"$ROOT_DIR/scripts/build-qsf-inspector.sh" >/dev/null
 
 swift build --disable-sandbox --package-path "$ROOT_DIR" --configuration release --product vgmboy-amiga-inspect >/dev/null
 AMIGA_BUILT="$ROOT_DIR/.build/arm64-apple-macosx/release/vgmboy-amiga-inspect"
@@ -83,20 +91,6 @@ MDX_BUILT="$ROOT_DIR/.build/arm64-apple-macosx/release/vgmboy-mdx-inspect"
 [[ -x "$MDX_BUILT" ]] || { echo "Missing built MDX inspector: $MDX_BUILT" >&2; exit 1; }
 cp -X "$MDX_BUILT" "$MDX_OUTPUT"
 chmod 755 "$MDX_OUTPUT"
-
-swift build --disable-sandbox --package-path "$ROOT_DIR" --configuration release --product vgmboy-ffmpeg-inspect >/dev/null
-FFMPEG_BUILT="$ROOT_DIR/.build/arm64-apple-macosx/release/vgmboy-ffmpeg-inspect"
-[[ -x "$FFMPEG_BUILT" ]] || { echo "Missing built FFmpeg inspector: $FFMPEG_BUILT" >&2; exit 1; }
-cp -X "$FFMPEG_BUILT" "$FFMPEG_OUTPUT"
-chmod 755 "$FFMPEG_OUTPUT"
-
-ZXTUNE_BUILT="$ROOT_DIR/.build/zxtune/vgmboy-zxtune-inspect"
-[[ -x "$ZXTUNE_BUILT" ]] || { echo "Missing built ZXTune inspector: $ZXTUNE_BUILT" >&2; exit 1; }
-cp -X "$ZXTUNE_BUILT" "$ZXTUNE_OUTPUT"
-chmod 755 "$ZXTUNE_OUTPUT"
-
-[[ -d "$VGMSTREAM_SOURCE" ]] || { echo "Missing shared vgmstream source: $VGMSTREAM_SOURCE" >&2; exit 1; }
-command -v cmake >/dev/null 2>&1 || { echo "Missing cmake" >&2; exit 1; }
 
 # CMake caches the absolute source directory. Older frontend builds used a
 # CocoaSpice-owned checkout at this same build path; CMake refuses to reuse
@@ -140,9 +134,5 @@ printf '%s\n' "$scanner_signature" > "$SCANNER_STAMP"
 
 echo "Built VGMBoy scanner plugins"
 echo "vgmstream: $VGMSTREAM_OUTPUT"
-echo "qsf: $QSF_OUTPUT"
 echo "mdx: $MDX_OUTPUT"
 echo "amiga: $AMIGA_OUTPUT"
-echo "ffmpeg: $FFMPEG_OUTPUT"
-echo "zxtune: $ZXTUNE_OUTPUT"
-echo "highly-complete: build through VGMBoy Package.swift product"

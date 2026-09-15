@@ -128,12 +128,6 @@ public enum FormatRegistry {
         supportsTempo: false
     )
 
-    public static let zxtuneFamily = DecoderFamily(
-        id: "zxtune-aym",
-        supportsLongPlay: true,
-        supportsTempo: false
-    )
-
     public static let amigaFamily = DecoderFamily(
         id: "amiga-uade",
         supportsLongPlay: true,
@@ -189,15 +183,6 @@ public enum FormatRegistry {
         "669", "dmf", "far", "it", "mod", "mptm", "mtm", "okt", "ptm", "s3m", "stm", "ult", "xm"
     ]
 
-    /// Direct ZXTune AY-family formats. `.ay` remains owned by Game Music
-    /// Emu, while `.ayl` is intentionally not admitted: the upstream ZXTune
-    /// plugin set has no AYL playlist decoder and the collection uses that
-    /// suffix for a separate wrapper format.
-    public static let zxtuneExtensions: Set<String> = [
-        "as0", "asc", "ftc", "gtr", "psc", "psg", "psm", "pt1", "pt2", "pt3",
-        "sqt", "st1", "st3", "stc", "stp", "vtx", "ym"
-    ]
-
     /// Amiga music uses replayer prefixes (for example `p4x.earth`) rather
     /// than a conventional suffix. Keep this separate from extensions so
     /// names such as `stage.p4x` are not admitted accidentally.
@@ -220,7 +205,6 @@ public enum FormatRegistry {
         PlaybackFormatDescriptor(id: "qsf", family: qsfFamily, extensions: qsfExtensions),
         PlaybackFormatDescriptor(id: "sidplayfp", family: sidplayfpFamily, extensions: sidplayfpExtensions),
         PlaybackFormatDescriptor(id: "openmpt", family: openMPTFamily, extensions: openMPTExtensions),
-        PlaybackFormatDescriptor(id: "zxtune-aym", family: zxtuneFamily, extensions: zxtuneExtensions),
         // UADE admits Amiga replayer prefixes through descriptor(for:) rather
         // than pretending those prefixes are ordinary filename extensions.
         PlaybackFormatDescriptor(id: "amiga-uade", family: amigaFamily, extensions: [])
@@ -250,9 +234,6 @@ public enum FormatRegistry {
         }
         if openMPTExtensions.contains(ext) {
             return openMPTFamily
-        }
-        if zxtuneExtensions.contains(ext) {
-            return zxtuneFamily
         }
         if libvgmExtensions.contains(ext) {
             return libvgmFamily
@@ -291,18 +272,6 @@ public enum FormatRegistry {
             return amigaFamily
         }
         return nil
-    }
-
-    /// Resolve a decoder family from a filename extension supplied by a
-    /// frontend. Frontends commonly have the extension without a filename
-    /// (for example, `spc`); routing it through `family(for:)` directly would
-    /// ask NSString for the extension of a bare word and return no family.
-    public static func familyForExtension(_ extensionName: String) -> DecoderFamily? {
-        let normalized = extensionName
-            .trimmingCharacters(in: CharacterSet(charactersIn: ". "))
-            .lowercased()
-        guard !normalized.isEmpty else { return nil }
-        return family(for: "source.\(normalized)")
     }
 
     /// Returns the format-owned archive preparation requirement for a set of

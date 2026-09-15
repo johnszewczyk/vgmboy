@@ -22,8 +22,18 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
     enum RepeatMode: String, Codable, Sendable { case off, all, one }
     enum SidebarMode: String, Codable, Sendable { case paths, consoles, diskPath, favorites }
     enum FavoriteOrder: String, Codable, Sendable { case historical, alphabetical }
-    enum PlaylistSortColumn: String, Codable, Sendable { case filename, title, game, artist, dumper, system, path, lengthLabel }
-    enum SortDirection: String, Codable, Sendable { case ascending, descending }
+
+    private static let playlistColumnSchema = FrontendPlaylistColumnSchema(columns: [
+        .init(id: "favorite", isReorderable: false, isSortable: false),
+        .init(id: "index", isSortable: false),
+        .init(id: "filename"),
+        .init(id: "title"),
+        .init(id: "game"),
+        .init(id: "artist"),
+        .init(id: "system"),
+        .init(id: "path"),
+        .init(id: "lengthLabel")
+    ])
 
     var manualPlayTimeSeconds: Int?
     var unknownDurationSeconds: Int?
@@ -49,7 +59,6 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
     var favoriteSortOrder: FavoriteOrder?
     var selectedDatabaseGameKey: String?
     var collapsedConsoleNames: [String]?
-    var lastSelectedTrackId: String?
     var uiFontSizePt: Double?
     var sidebarFontSizePt: Double?
     var sidebarTextColor: String?
@@ -69,9 +78,11 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
     var columnOrder: [String]?
     var columnWidths: [String: Double]?
     var columnVisibility: [String: Bool]?
+    var playlistColumnSizing: FrontendPlaylistColumnSizing?
     var columnAutoSize: Bool?
-    var sortColumn: PlaylistSortColumn?
-    var sortDirection: SortDirection?
+    var playlistSortEnabled: Bool?
+    var sortColumn: String?
+    var sortDirection: String?
     var autoResizeAnimationMilliseconds: Int?
     var selectionAnimationMilliseconds: Int?
     var autoResizeAnimationEnabled: Bool?
@@ -82,15 +93,7 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
     init(jsonObject: [String: Any]) throws {
         let data = try JSONSerialization.data(withJSONObject: jsonObject)
         self = try JSONDecoder().decode(Self.self, from: data)
-        normalizeSharedPlaybackPreferences()
-        autoResizeAnimationMilliseconds = FrontendAnimationTimings.clamp(
-            autoResizeAnimationMilliseconds ?? FrontendAnimationTimings.defaultDurationMilliseconds
-        )
-        selectionAnimationMilliseconds = FrontendAnimationTimings.clamp(
-            selectionAnimationMilliseconds ?? FrontendAnimationTimings.defaultDurationMilliseconds
-        )
-        autoResizeAnimationEnabled = autoResizeAnimationEnabled ?? true
-        selectionAnimationEnabled = selectionAnimationEnabled ?? true
+        normalizeForPersistence()
     }
 
     init() {
@@ -118,8 +121,11 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
         selectionAnimationMilliseconds = FrontendAnimationTimings.defaultDurationMilliseconds
         autoResizeAnimationEnabled = true
         selectionAnimationEnabled = true
+        playlistColumnSizing = FrontendPlaylistColumnSizing()
+        playlistSortEnabled = false
         mainWindowAlwaysOnTop = false
         settingsWindowAlwaysOnTop = false
+        normalizeForPersistence()
     }
 
     func jsonObject() throws -> [String: Any] {
@@ -154,6 +160,25 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
         columnAutoSize = preferences.columnAutoSize
         mainWindowAlwaysOnTop = preferences.windows.mainAlwaysOnTop
         settingsWindowAlwaysOnTop = preferences.windows.settingsAlwaysOnTop
+    }
+
+    /// Repairs the durable, renderer-neutral preference subset before it is
+    /// exposed to WebKit or written back to the app-specific JSON container.
+    mutating func normalizeForPersistence() {
+        normalizeSharedPlaybackPreferences()
+        normalizePlaylistColumnPreferences()
+        autoResizeAnimationMilliseconds = FrontendAnimationTimings.clamp(
+            autoResizeAnimationMilliseconds ?? FrontendAnimationTimings.defaultDurationMilliseconds
+        )
+        selectionAnimationMilliseconds = FrontendAnimationTimings.clamp(
+            selectionAnimationMilliseconds ?? FrontendAnimationTimings.defaultDurationMilliseconds
+        )
+        autoResizeAnimationEnabled = autoResizeAnimationEnabled ?? true
+        selectionAnimationEnabled = selectionAnimationEnabled ?? true
+        playlistColumnSizing = FrontendPlaylistColumnSizing(
+            horizontalPaddingPerSide: playlistColumnSizing?.horizontalPaddingPerSide
+                ?? FrontendPlaylistColumnSizing.defaultHorizontalPaddingPerSide
+        )
     }
 
     private mutating func normalizeSharedPlaybackPreferences() {
@@ -198,5 +223,22 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
             denominator: shared.libvgmTempo.denominator
         )
         libvgmPlaybackSpeedEnabled = shared.libvgmTempoEnabled
+    }
+
+    private mutating func normalizePlaylistColumnPreferences() {
+        let layout = Self.playlistColumnSchema.normalizedLayout(
+            order: columnOrder,
+            visibility: columnVisibility
+        )
+        let sort = Self.playlistColumnSchema.normalizedSort(
+            isEnabled: playlistSortEnabled,
+            columnID: sortColumn,
+            direction: sortDirection.flatMap(FrontendPlaylistSortDirection.init(rawValue:))
+        )
+        columnOrder = layout.order
+        columnVisibility = layout.visibility
+        playlistSortEnabled = sort.isEnabled
+        sortColumn = sort.columnID
+        sortDirection = sort.direction.rawValue
     }
 }

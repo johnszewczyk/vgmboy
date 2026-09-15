@@ -10,7 +10,7 @@ BUILD_DIR="$ROOT_DIR/.build/psgplay"
   exit 1
 }
 [[ -f "$SOURCE_DIR/lib/cf2149/module/cf2149.c" ]] || {
-  echo "psgplay submodules are not initialized; run git submodule update --init --recursive" >&2
+  echo "Incomplete vendored psgplay source snapshot: missing lib/cf2149/module/cf2149.c" >&2
   exit 1
 }
 

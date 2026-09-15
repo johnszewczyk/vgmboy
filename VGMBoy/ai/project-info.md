@@ -14,6 +14,13 @@ SPCBoyWK behavior. ScanSong receives VGMBoy-built inspection executables.
 ## Major Components
 
 - `Sources/VGMBoyKit` — the audio core and decoder boundary.
+- `Sources/VGMBoyFormatDataCore` — Foundation-only format-byte readers shared
+  with ScanSong where they provide the complete scanner metadata contract:
+  NSF/GBS/NSFE header/subsong facts, and HES header tags with companion-M3U
+  track/timing data. AY, SPC ID666/xID6, and PSF-family `[TAG]` metadata
+  belong to MetaManCore; SAP metadata also lives in MetaManCore, while all
+  playback, including SAP, SPC, and AY, remains in VGMBoy.
+  This reader package has no playback decoder dependency.
 - `Sources/VGMBoyKit/FormatRegistry.swift` — decoder-owned format families plus the
   complete `playbackDescriptors` projection consumed by CocoaSpice and SPCBoyWK.
 - `Sources/VGMBoyKit/PlaybackPreferences.swift` — shared timing, fade, EQ, volume,
@@ -23,9 +30,9 @@ SPCBoyWK behavior. ScanSong receives VGMBoy-built inspection executables.
   capability map that native and non-native frontends can mirror.
 - `Sources/VGMBoyElectronBridge` — the retained narrow process boundary for the archived
   Electron SPCBoy path; native SPCBoyWK does not use it.
-- `Sources/VGMBoyHighlyCompleteInspect`, `Sources/VGMBoyMDXInspect`,
-  `Sources/VGMBoyAmigaInspect`, and `Sources/VGMBoyFFmpegInspect` — narrow
-  inspection boundaries used by ScanSong.
+- `Sources/VGMBoyMDXInspect` and `Sources/VGMBoyAmigaInspect` — narrow
+  inspection boundaries used by ScanSong. GSF, QSF, and APE metadata are read
+  directly by ScanSong without a playback-decoder inspector process.
 - `Sources/vgmboy` and `Sources/VGMBoyApp` — command-line and native test clients.
 - `vendor/`, `patches/`, and `scripts/` — shared upstream source, compatibility patches, and
   dependency/scanner-plugin build inputs.
@@ -60,8 +67,9 @@ SPCBoyWK behavior. ScanSong receives VGMBoy-built inspection executables.
 - Keep the kit's public API surface small and deliberate; the CLI and the SwiftUI app are two thin
   skins over one core.
 - ScanSong remains a separate catalog-writer product. ScanSong consumes
-  VGMBoy-built inspection executables, but never links VGMBoyKit or invokes a
-  player frontend.
+  VGMBoy-built inspection executables and the dependency-free
+  `VGMBoyFormatDataCore` product, but never links VGMBoyKit or invokes a player
+  frontend.
 - ScanSong may consume VGMBoy-built inspection executables, but it does not link VGMBoyKit or
   invoke a player frontend. Keep inspection packaging behind `build-scanner-plugins.sh`.
 

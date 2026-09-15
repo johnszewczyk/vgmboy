@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "lastReviewed": "2026-09-07",
+  "lastReviewed": "2026-08-30",
   "reviewIntervalDays": 90,
   "policy": "Review upstream milestones quarterly and before a release. Do not adopt a decoder update without the format regression corpus and representative playback checks.",
   "plugins": [
@@ -35,19 +35,6 @@
       "upstream": "https://github.com/frno7/psgplay.git",
       "milestoneCheck": "release-or-tag",
       "formats": ["SNDH"]
-    },
-    {
-      "id": "zxtune-aym",
-      "name": "ZXTune AY-family",
-      "kind": "snapshot",
-      "source": "vendor/zxtune",
-      "current": "c93e81d081685ea2c7cd21fe0077e93d84b4d88d",
-      "sourceIdentity": "upstream git commit plus tracked Apple libc++ compatibility patch",
-      "upstream": "https://github.com/vitamin-caig/zxtune.git",
-      "milestoneCheck": "release-or-tag",
-      "license": "LGPL-3.0",
-      "patches": ["patches/zxtune-modern-libcxx.patch"],
-      "formats": ["AS0", "ASC", "FTC", "GTR", "PSC", "PSG", "PSM", "PT1", "PT2", "PT3", "SQT", "ST1", "ST3", "STC", "STP", "VTX", "YM"]
     },
     {
       "id": "mdxmini",

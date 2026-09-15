@@ -10,6 +10,7 @@ public final class PlaybackController: @unchecked Sendable {
         var path: String
         var trackIndex: Int
         var tempo: Double
+        var sourceData: Data?
     }
 
     private let lock = NSLock()
@@ -78,6 +79,21 @@ public final class PlaybackController: @unchecked Sendable {
                 status: session.status(),
                 message: error.localizedDescription
             )
+            emit(event)
+            return event
+        }
+    }
+
+    /// Loads a small in-memory source without changing the JSON control
+    /// protocol. Used for seekable UAC members whose decoder accepts bytes.
+    public func loadInMemory(sourceData: Data, payload: PlaybackControlPayload) -> PlaybackControlEvent {
+        do {
+            try load(payload, sourceData: sourceData)
+            let event = PlaybackControlEvent(kind: .response, status: session.status())
+            emit(event)
+            return event
+        } catch {
+            let event = PlaybackControlEvent(kind: .error, status: session.status(), message: error.localizedDescription)
             emit(event)
             return event
         }
@@ -160,6 +176,10 @@ public final class PlaybackController: @unchecked Sendable {
     }
 
     private func load(_ payload: PlaybackControlPayload) throws {
+        try load(payload, sourceData: nil)
+    }
+
+    private func load(_ payload: PlaybackControlPayload, sourceData: Data?) throws {
         guard let path = payload.path, !path.isEmpty else {
             throw PlaybackControlError.invalidPayload("Load requires a path.")
         }
@@ -175,8 +195,8 @@ public final class PlaybackController: @unchecked Sendable {
             throw PlaybackControlError.invalidPayload("Track index must be non-negative and the file format must be supported.")
         }
         let plan = makePlan(family: family)
-        _ = try session.load(path: path, trackIndex: trackIndex, plan: plan, tempo: tempo)
-        lock.lock(); loaded = LoadedTrack(path: path, trackIndex: trackIndex, tempo: tempo); lock.unlock()
+        _ = try session.load(path: path, sourceData: sourceData, trackIndex: trackIndex, plan: plan, tempo: tempo)
+        lock.lock(); loaded = LoadedTrack(path: path, trackIndex: trackIndex, tempo: tempo, sourceData: sourceData); lock.unlock()
     }
 
     private func configurePlaybackMode(_ payload: PlaybackControlPayload, reloadCurrent: Bool = true) throws {
@@ -200,7 +220,10 @@ public final class PlaybackController: @unchecked Sendable {
         lock.unlock()
         guard reloadCurrent, let current else { return }
         let previousStatus = session.status()
-        try load(PlaybackControlPayload(path: current.path, trackIndex: current.trackIndex, tempo: current.tempo))
+        try load(
+            PlaybackControlPayload(path: current.path, trackIndex: current.trackIndex, tempo: current.tempo),
+            sourceData: current.sourceData
+        )
         if previousStatus.elapsedSeconds > 0 { try session.seek(to: previousStatus.elapsedSeconds) }
         if previousStatus.isPlaying { try session.play() }
     }
@@ -231,23 +254,32 @@ public final class PlaybackController: @unchecked Sendable {
         unknownDurationMilliseconds: Int? = nil,
         family: DecoderFamily
     ) -> PlaybackPlan {
-        let unknown = max(
-            1_000,
-            unknownDurationMilliseconds ?? PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000
-        )
-        let requestedPlay = mode == .fileDefault
-            ? playMilliseconds
-            : playMilliseconds ?? unknown
-        let request = PlaybackTimingRequest(
-            playbackMode: mode,
-            playMilliseconds: requestedPlay,
-            fadeMilliseconds: max(0, fadeMilliseconds),
-            unknownDurationMilliseconds: unknown
-        )
-        return PlaybackTimingPolicy.plan(
-            metadata: nil,
-            family: family,
-            request: request
+        let play = max(0, (playMilliseconds ?? unknownDurationMilliseconds ?? 150_000) / 1_000)
+        let fade = max(0, fadeMilliseconds / 1_000)
+        switch mode {
+        case .fileDefault:
+            return PlaybackPlan(
+                preFadeSeconds: play,
+                fadeSeconds: fade,
+                isLongPlay: false,
+                usesNativeEnding: family.hasNaturalEnding && fade == 0,
+                usesDecoderNaturalDuration: playMilliseconds == nil
+            )
+        case .longPlay:
+            guard family.supportsLongPlay else { return fileDefaultPlan(play: play, fade: fade, family: family) }
+            return PlaybackPlan(preFadeSeconds: play, fadeSeconds: fade, isLongPlay: true, usesNativeEnding: false)
+        case .timed:
+            return PlaybackPlan(preFadeSeconds: play, fadeSeconds: fade, isLongPlay: false, usesNativeEnding: false)
+        }
+    }
+
+    private static func fileDefaultPlan(play: Int, fade: Int, family: DecoderFamily) -> PlaybackPlan {
+        PlaybackPlan(
+            preFadeSeconds: play,
+            fadeSeconds: fade,
+            isLongPlay: false,
+            usesNativeEnding: family.hasNaturalEnding && fade == 0,
+            usesDecoderNaturalDuration: false
         )
     }
 

@@ -10,9 +10,9 @@ rm -rf "$DESTINATION"
 mkdir -p "$(dirname "$DESTINATION")"
 ditto "$SOURCE_DIR/" "$DESTINATION/"
 
-# The vendor checkout is an upstream gitlink. Apply VGMBoy's compatibility
-# patch only to the disposable build copy so the checkout remains inspectable
-# and the build does not depend on hidden working-tree edits.
+# The vendor source is a flattened upstream snapshot. Apply VGMBoy's
+# compatibility patch only to the disposable build copy so the checked-in
+# snapshot remains inspectable and the build has no hidden source edits.
 rm -rf "$DESTINATION/.git" "$DESTINATION/obj"
 find "$DESTINATION" -type f -name .DS_Store -delete
 patch --batch --forward --directory "$DESTINATION" --strip=1 < "$PATCH_FILE" >/dev/null

@@ -2,6 +2,7 @@ import AppKit
 import ArchiveCacheCore
 import FrontendPreferencesCore
 import CatalogBrowserCore
+import CatalogPlaylistPresentationCore
 import CatalogReader
 import CatalogSessionCore
 import Foundation
@@ -62,6 +63,21 @@ struct SidebarViewResolution: Equatable, Sendable {
     let isTemporary: Bool
 }
 
+private extension CatalogPlaylistSortColumn {
+    var cocoaSpiceTitle: String {
+        switch self {
+        case .index: "#"
+        case .file: "File"
+        case .title: "Title"
+        case .game: "Game"
+        case .author: "Author"
+        case .system: "System"
+        case .path: "Path"
+        case .length: "Length"
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class PlayerViewModel {
@@ -70,6 +86,18 @@ final class PlayerViewModel {
         subsystem: "com.local.cocoaspice",
         category: "playlist-load"
     )
+    private static let playlistColumnSchema = FrontendPlaylistColumnSchema(columns: [
+        .init(id: "favorite", isReorderable: false, isSortable: false),
+        .init(id: "index"),
+        .init(id: "file"),
+        .init(id: "title"),
+        .init(id: "game"),
+        .init(id: "author"),
+        .init(id: "system"),
+        .init(id: "path"),
+        .init(id: "length"),
+        .init(id: "fileSize", isSortable: false)
+    ])
     enum RepeatMode: String, CaseIterable, Identifiable {
         case off, playlist, song
         var id: Self { self }
@@ -115,43 +143,6 @@ final class PlayerViewModel {
             case .primary: "Primary"
             case .tertiary: "Tertiary"
             }
-        }
-    }
-
-    enum PlaylistSortColumn: String, CaseIterable, Identifiable {
-        case index
-        case file
-        case title
-        case game
-        case author
-        case dumper
-        case system
-        case path
-        case length
-
-        var id: String { rawValue }
-
-        var title: String {
-            switch self {
-            case .index: "#"
-            case .file: "File"
-            case .title: "Title"
-            case .game: "Game"
-            case .author: "Author"
-            case .dumper: "Dumper"
-            case .system: "System"
-            case .path: "Path"
-            case .length: "Length"
-            }
-        }
-    }
-
-    enum PlaylistSortDirection: String, Sendable {
-        case ascending
-        case descending
-
-        mutating func toggle() {
-            self = self == .ascending ? .descending : .ascending
         }
     }
 
@@ -219,9 +210,6 @@ final class PlayerViewModel {
         get { interfaceMonospaceFont }
         set { interfaceMonospaceFont = newValue }
     }
-    /// Vertical space between playlist rows, in points. The row itself keeps
-    /// the compact text height; this value is the separate inter-row gap.
-    var playlistRowGapPoints: CGFloat = 0
     var sidebarBrowserMode: SidebarBrowserMode = .games
     var effectiveSidebarBrowserMode: SidebarBrowserMode {
         Self.effectiveSidebarBrowserMode(storedMode: sidebarBrowserMode, searchText: sidebarSearchQuery)
@@ -404,8 +392,8 @@ final class PlayerViewModel {
     private var playlistDurationTrackIDs: Set<TrackItem.ID> = []
     private var playlistDurationTotalSeconds = 0
     var playlistColumnWidthHints: PlaylistColumnWidthHints?
-    var playlistSortColumn: PlaylistSortColumn?
-    var playlistSortDirection: PlaylistSortDirection = .ascending
+    var playlistSortColumn: CatalogPlaylistSortColumn?
+    var playlistSortDirection: CatalogPlaylistSortDirection = .ascending
     var currentTrack: TrackItem?
     var currentMetadata: TrackMetadata?
     var equalizerEnabled = false {
@@ -1464,12 +1452,10 @@ final class PlayerViewModel {
         return lastSelectedIndex < playlist.index(before: playlist.endIndex)
     }
 
-    func togglePlaylistSort(by column: PlaylistSortColumn) {
-        let nextDirection: PlaylistSortDirection
+    func togglePlaylistSort(by column: CatalogPlaylistSortColumn) {
+        let nextDirection: CatalogPlaylistSortDirection
         if playlistSortColumn == column {
-            var toggled = playlistSortDirection
-            toggled.toggle()
-            nextDirection = toggled
+            nextDirection = playlistSortDirection == .ascending ? .descending : .ascending
         } else {
             nextDirection = .ascending
         }
@@ -1556,7 +1542,6 @@ final class PlayerViewModel {
             playlistFontSize: playlistFontSize,
             playlistTextColor: playlistTextColor.rawValue,
             playlistMonospaceFont: playlistMonospaceFont,
-            playlistRowGapPoints: playlistRowGapPoints,
             sidebarSystemMode: sidebarSystemMode,
             preferEmbeddedConsoleTags: preferEmbeddedConsoleTags,
             sidebarBrowserModeRawValue: sidebarBrowserMode.rawValue,
@@ -1689,11 +1674,6 @@ final class PlayerViewModel {
 
     func setPlaylistMonospaceFont(_ enabled: Bool) {
         setDatabaseSidebarMonospaceFont(enabled)
-    }
-
-    func setPlaylistRowGapPoints(_ gap: CGFloat) {
-        playlistRowGapPoints = gap.isFinite ? max(0, gap.rounded()) : 0
-        savePreferencesNow()
     }
 
     func setSidebarSystemMode(_ enabled: Bool) {
@@ -1947,7 +1927,7 @@ final class PlayerViewModel {
     }
 
     func sidebarSystemName(for item: DatabaseGameItem) -> String {
-        item.systemName.isEmpty ? "Unknown System" : item.systemName
+        CatalogBrowser.consoleGroupName(for: item)
     }
 
     func moveSelectedTracksUp() {
@@ -2001,8 +1981,8 @@ final class PlayerViewModel {
     }
 
     private func applyPlaylistSort(
-        column: PlaylistSortColumn,
-        direction: PlaylistSortDirection,
+        column: CatalogPlaylistSortColumn,
+        direction: CatalogPlaylistSortDirection,
         updateStatus: Bool = true
     ) {
         let manualOrder = playlistManualOrder
@@ -2025,7 +2005,7 @@ final class PlayerViewModel {
 
         playlist = sorted
         if updateStatus {
-            statusText = "Sorted queue by \(column.title)"
+            statusText = "Sorted queue by \(column.cocoaSpiceTitle)"
         }
     }
 
@@ -2262,7 +2242,7 @@ final class PlayerViewModel {
     }
 
     private func requestAdjacentPlayback(_ track: TrackItem) {
-        guard let fadeDuration = PlaybackFadePolicy.queuedSkipDuration(
+        guard let fadeDuration = PlaybackQueuedSkipFadeRequest(
             enabled: fadedSkipEnabled,
             isPlaying: isPlaying,
             hasCurrentTrack: currentTrack != nil,
@@ -2270,7 +2250,7 @@ final class PlayerViewModel {
             preFadeSeconds: Double(effectivePreFadeSeconds),
             fadeSeconds: Double(fadeSeconds),
             totalSeconds: Double(totalPlaybackSeconds)
-        ) else {
+        ).duration else {
             requestPlayback(for: track)
             return
         }
@@ -2374,7 +2354,7 @@ final class PlayerViewModel {
 
     private func applyPlaybackTempoIfNeeded(for backendID: String) {
         guard let currentTrack,
-              FormatRegistry.familyForExtension(currentTrack.playablePathExtension)?.id == backendID,
+              FormatRegistry.family(for: currentTrack.playablePathExtension)?.id == backendID,
               !isLoading else { return }
         let tempo = playbackTempo(for: currentTrack)
         isLoading = true
@@ -2582,7 +2562,7 @@ final class PlayerViewModel {
 
     private func playbackTempo(forPathExtension pathExtension: String?) -> PlaybackTempo {
         guard let pathExtension,
-              let family = FormatRegistry.familyForExtension(pathExtension),
+              let family = FormatRegistry.family(for: "source.\(pathExtension)"),
               family.supportsTempo else {
             return .defaultValue
         }
@@ -2725,7 +2705,6 @@ final class PlayerViewModel {
             fadeSeconds: plan.fadeSeconds,
             usesNativeEnding: plan.usesNativeEnding,
             isLongPlay: plan.isLongPlay,
-            usesDecoderNaturalDuration: plan.usesDecoderNaturalDuration,
             unknownDurationSeconds: plan.unknownDurationSeconds
         )
     }
@@ -3145,10 +3124,6 @@ final class PlayerViewModel {
         if let storedSidebarChildIndentPoints = preferences.databaseSidebarChildIndentPoints {
             databaseSidebarChildIndentPoints = min(max(CGFloat(storedSidebarChildIndentPoints).rounded(), 0), 32)
         }
-        if let storedPlaylistRowGapPoints = preferences.playlistRowGapPoints,
-           storedPlaylistRowGapPoints.isFinite {
-            playlistRowGapPoints = max(0, CGFloat(storedPlaylistRowGapPoints).rounded())
-        }
         databaseSidebarHidesFileExtensions = preferences.databaseSidebarHidesFileExtensions
         sidebarSystemMode = preferences.sidebarSystemMode
         preferEmbeddedConsoleTags = preferences.preferEmbeddedConsoleTags
@@ -3159,12 +3134,13 @@ final class PlayerViewModel {
            !sidebarSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             applyDatabaseGroupState(.replaceExpandedGroups(Set(visibleDatabaseGameItems.map { sidebarSystemName(for: $0) })))
         }
-        if let storedSortColumn = preferences.playlistSortColumnRawValue.flatMap(PlaylistSortColumn.init(rawValue:)) {
-            playlistSortColumn = storedSortColumn
-        }
-        if let storedSortDirection = preferences.playlistSortDirectionRawValue.flatMap(PlaylistSortDirection.init(rawValue:)) {
-            playlistSortDirection = storedSortDirection
-        }
+        let sort = Self.playlistColumnSchema.normalizedSort(
+            isEnabled: preferences.playlistSortColumnRawValue != nil,
+            columnID: preferences.playlistSortColumnRawValue,
+            direction: preferences.playlistSortDirectionRawValue.flatMap(FrontendPlaylistSortDirection.init(rawValue:))
+        )
+        playlistSortColumn = sort.columnID.flatMap(CatalogPlaylistSortColumn.init(rawValue:))
+        playlistSortDirection = CatalogPlaylistSortDirection(rawValue: sort.direction.rawValue) ?? .ascending
     }
 
     func saveSessionStateNow() {
@@ -3276,8 +3252,12 @@ final class PlayerViewModel {
     }
 
     private func restorePlaylistColumnState(_ state: RestoredPlaylistColumnState) {
-        pendingPlaylistColumnOrder = state.order
-        pendingPlaylistColumnVisibility = state.visibility
+        let layout = Self.playlistColumnSchema.normalizedLayout(
+            order: state.order,
+            visibility: state.visibility
+        )
+        pendingPlaylistColumnOrder = layout.order
+        pendingPlaylistColumnVisibility = layout.visibility
         pendingPlaylistColumnWidths = state.widths
     }
 
@@ -3305,9 +3285,51 @@ final class PlayerViewModel {
         refreshPlaylistTotalDurationReadout()
         playlistColumnWidthHints = nil
         refreshPlaylistMetadata(limit: 128)
+        hydrateRestoredPlaylistMetadata()
         if session.deferredTrackCount > 0 {
             statusText = "Restored \(session.tracks.count.formatted()) queue tracks; \(session.deferredTrackCount.formatted()) deferred to keep startup responsive"
         }
+    }
+
+    private func hydrateRestoredPlaylistMetadata() {
+        guard !localBrowserEnabled,
+              let databaseURL = libraryDatabaseURL,
+              !playlist.isEmpty else { return }
+
+        let generation = playlistMetadataTaskOwner.begin()
+        let restoredTracks = playlist
+        let sourcePaths = Array(Set(restoredTracks.map { $0.url.path }))
+        let task = Task { [weak self] in
+            let loaded = await Task.detached(priority: .utility) {
+                try? LibraryDatabase.tracksAndMetadataForPaths(
+                    databaseURL: databaseURL,
+                    paths: sourcePaths
+                )
+            }.value
+            guard !Task.isCancelled,
+                  let self,
+                  self.playlistMetadataTaskOwner.isCurrent(generation),
+                  let loaded else {
+                self?.playlistMetadataTaskOwner.finish(generation: generation)
+                return
+            }
+
+            let restoredIDs = Set(restoredTracks.map(\.id))
+            let updates = loaded.metadata.filter { restoredIDs.contains($0.key) }
+            guard !updates.isEmpty else {
+                self.playlistMetadataTaskOwner.finish(generation: generation)
+                return
+            }
+
+            self.metadataCache.merge(updates) { _, replacement in replacement }
+            self.playlistColumnWidthHints = Self.buildPlaylistColumnWidthHints(
+                tracks: self.playlist,
+                metadata: self.metadataCache
+            )
+            self.playlistMetadataLoadToken += 1
+            self.playlistMetadataTaskOwner.finish(generation: generation)
+        }
+        playlistMetadataTaskOwner.install(task, generation: generation)
     }
 
     private func orderedSelectedPlaylistTracks() -> [TrackItem] {
@@ -3438,23 +3460,33 @@ final class PlayerViewModel {
     }
 
     func rememberPlaylistColumnOrder(_ order: [String]) {
-        pendingPlaylistColumnOrder = order
+        let layout = Self.playlistColumnSchema.normalizedLayout(
+            order: order,
+            visibility: pendingPlaylistColumnVisibility
+        )
+        pendingPlaylistColumnOrder = layout.order
+        pendingPlaylistColumnVisibility = layout.visibility
     }
 
     func rememberPlaylistColumnVisibility(_ visibility: [String: Bool]) {
-        pendingPlaylistColumnVisibility = visibility
+        let layout = Self.playlistColumnSchema.normalizedLayout(
+            order: pendingPlaylistColumnOrder,
+            visibility: visibility
+        )
+        pendingPlaylistColumnOrder = layout.order
+        pendingPlaylistColumnVisibility = layout.visibility
     }
 
     func rememberPlaylistColumnWidths(_ widths: [String: Double]) {
         pendingPlaylistColumnWidths = widths
     }
 
-    private func playlistSortDependsOnMetadata(_ column: PlaylistSortColumn?) -> Bool {
+    private func playlistSortDependsOnMetadata(_ column: CatalogPlaylistSortColumn?) -> Bool {
         guard let column else { return false }
         switch column {
         case .index, .file, .path:
             return false
-        case .title, .game, .author, .dumper, .system, .length:
+        case .title, .game, .author, .system, .length:
             return true
         }
     }
@@ -3469,10 +3501,6 @@ final class PlayerViewModel {
 
     func authorText(for track: TrackItem) -> String {
         PlaylistPresentation.authorText(for: metadataCache[track.id])
-    }
-
-    func dumperText(for track: TrackItem) -> String {
-        PlaylistPresentation.dumperText(for: metadataCache[track.id])
     }
 
     func systemText(for track: TrackItem) -> String {
@@ -3515,7 +3543,7 @@ final class PlayerViewModel {
     nonisolated private static func compareTracks(
         _ lhs: TrackItem,
         _ rhs: TrackItem,
-        by column: PlaylistSortColumn,
+        by column: CatalogPlaylistSortColumn,
         manualOrder: [String: Int],
         metadata: [String: TrackMetadata]
     ) -> ComparisonResult {

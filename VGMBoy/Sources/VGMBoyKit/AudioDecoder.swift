@@ -51,8 +51,6 @@ enum DecoderFactory {
             return try SIDDecoder(path: path, sampleRate: sampleRate)
         case "openmpt":
             return try OpenMPTDecoder(path: path, sampleRate: sampleRate)
-        case "zxtune-aym":
-            return try ZXTuneDecoder(path: path, sampleRate: sampleRate)
         case "amiga-uade":
             return try AmigaDecoder(path: path, sampleRate: sampleRate)
         case "libvgm":
@@ -82,7 +80,14 @@ enum DecoderFactory {
         }
     }
 
-    static func make(path: String, sampleRate: Int = 44_100) throws -> any AudioDecoder {
+    static func make(path: String, sourceData: Data? = nil, sampleRate: Int = 44_100) throws -> any AudioDecoder {
+        if let sourceData {
+            guard URL(fileURLWithPath: path).pathExtension.lowercased() == "spc",
+                  FormatRegistry.family(for: path)?.id == "libgme" else {
+                throw DecoderFactoryError.unsupportedFamily("in-memory \(URL(fileURLWithPath: path).pathExtension)")
+            }
+            return try GMEDecoder(data: sourceData, sampleRate: sampleRate)
+        }
         if NDSWAVDetection.isSWAV(path) {
             return try NDSSWAVDecoder(path: path, sampleRate: sampleRate)
         }

@@ -16,6 +16,13 @@ and playable-member lifetime shared by native frontends.
   cache-backed atomic materialization.
 - `ArchiveManifestReader` owns temporary non-cache manifest reads with frontend-
   supplied extraction.
+- `UACContainerCore` validates the Zstandard skippable metadata frame,
+  bounded JSON manifest, seekable-Zstandard table, and TAR member ranges;
+  writes the metadata frame around a prebuilt TAR+Zstandard payload; and can
+  copy the payload byte-for-byte when needed. TAR creation and Zstandard
+  compression remain package-builder operations.
+- UAC manifest decompression is injected by the host through a bounded
+  `UACManifestFrameDecoder`; archive services do not launch or bundle a codec.
 - `ArchiveCacheCore` owns stable source identity, durable/disposable roots,
   recovery, free-space and size policy, touching, bounded LRU pruning, and cache
   leases.
@@ -28,6 +35,8 @@ and playable-member lifetime shared by native frontends.
 - A warm cache hit is usable only when the requested playable member exists and
   is nonempty.
 - Selected-entry and complete-set materialization remain distinct contracts.
+- UAC member paths are manifest-relative archive paths, never filesystem
+  locations; invalid manifests must not fall back to another container route.
 - Scanner discovery, scanner resource policy, and catalog grouping remain in
   ScanSong.
 
@@ -42,6 +51,7 @@ and playable-member lifetime shared by native frontends.
 
 - `Sources/ArchiveMaterializationCore/`
 - `Sources/ArchiveCacheCore/`
+- `Sources/UACContainerCore/`
 - `Tests/ArchiveMaterializationCoreTests/`
 - `Tests/ArchiveCacheCoreTests/`
-
+- `Tests/UACContainerCoreTests/`

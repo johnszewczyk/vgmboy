@@ -50,17 +50,16 @@ repository-level summary readable.
 | [libvgm](https://github.com/ValleyBell/libvgm) | `867223e7c33d63de115d1ab955f784c44f19040a` | [github.com/ValleyBell/libvgm](https://github.com/ValleyBell/libvgm) | VGM, VGZ, GYM, S98, DRO | `CLibVGM` bridge; source and static-library build are owned by VGMBoy. |
 | [psgplay](https://github.com/frno7/psgplay) | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | [github.com/frno7/psgplay](https://github.com/frno7/psgplay) | SNDH | `CPSGPlay` bridge and `VGMBoySNDH` metadata product; enumerates SNDH subtunes and renders Atari ST PSG audio. A deterministic 1,024-file sample selected and rendered 2,030 subtunes; the full corpus remains unqualified. |
 | [mdxmini](https://github.com/mistydemeo/mdxmini) | `003531a471c1955f4ed4357d0e2a6cba809c34a0` | [github.com/mistydemeo/mdxmini](https://github.com/mistydemeo/mdxmini) | MDX, with adjacent PDX sample banks | `CMDX` bridge; one logical MDX sequence per playlist item, case-insensitive PDX resolution, native duration, X68000 LZX 0.32/0.42 normalization for MDX bodies and PDX banks, and a matching `vgmboy-mdx-inspect` scanner executable. GPL-2.0-or-later. |
-| [ZXTune](https://github.com/vitamin-caig/zxtune) | `c93e81d081685ea2c7cd21fe0077e93d84b4d88d` plus `patches/zxtune-modern-libcxx.patch` | [github.com/vitamin-caig/zxtune](https://github.com/vitamin-caig/zxtune) | ASC, FTC, GTR, PSC, PSG, PSM, PT1/PT2/PT3, SQT, ST1/ST3/STC/STP, VTX, YM, AS0 | Focused AY-family bridge (`CZXTune`) and native `vgmboy-zxtune-inspect` scanner handoff. The direct plugin set is registered explicitly so unrelated ZXTune archive/player dependencies are not pulled into VGMBoy. `.ayl` and `.ts` remain outside the admitted set pending dedicated fixture-qualified routes. LGPL-3.0. |
 | [UADE](https://github.com/dv1/uade) | Homebrew `uade` 3.05 | [github.com/dv1/uade](https://github.com/dv1/uade) | Amiga EaglePlayer modules, including prefix-led `mod.*`, `p4x.*`, TFMX, MED, and custom players | `CUADE` bridge; content-aware prefix routing, complete Amiga archive-set materialization, UADE subsong enumeration, native PCM, and the matching `vgmboy-amiga-inspect` scanner executable. GPL-2.0-only; the installed runtime/data directory is required at run time. |
 | [Highly Complete](https://github.com/mgba-emu/mgba) (mGBA + PSFLib) | mGBA 0.11.0 source snapshot + PSFLib source snapshot; tree digests in `vendor/PROVENANCE.md` | [github.com/mgba-emu/mgba](https://github.com/mgba-emu/mgba) | GSF, miniGSF | `CHighlyComplete` bridge; PSFLib resolves the complete miniGSF chain, then mGBA runs the assembled GBA ROM. The bridge resamples mGBA's live native rate into VGMBoy's fixed output rate. |
 | 2sf2wav | DeSmuME 0.9.9 svn 4608 source snapshot; tree digest in `vendor/PROVENANCE.md` | — | 2SF, mini2SF | `C2SF` bridge over the static DS core. It validates relative mini2SF libraries and explicitly tears down process-global DS state before any replacement decoder is created. |
 | [vgmstream](https://github.com/vgmstream/vgmstream) | `807b4948cfc1de0cd90e377e9c56f74664c54a1c` + shared compatibility patch | [github.com/vgmstream/vgmstream](https://github.com/vgmstream/vgmstream) / [vgmstream.org](https://vgmstream.org) | ADX, XA, AT3, FSB, VAG, AIFC, OGG, and the other extensions in `FormatRegistry.vgmstreamExtensions` | `CVGmstream` bridge plus the VGMBoy-built `vgmstream-cli` scanner plugin; built with FFmpeg and Vorbis support. |
 | [lazyusf2](https://gitlab.com/kode54/lazyusf2) | `421f00bcaa1988b8e1825e91780129f24fbd1aa0` | [gitlab.com/kode54/lazyusf2](https://gitlab.com/kode54/lazyusf2) | USF, miniUSF | `CLazyUSF` bridge; companion `.usflib` files must be present beside a miniUSF. These streams have no natural ending, so VGMBoy always applies a finite playback window. |
 | [Play!](https://github.com/jpd002/Play-) PSF core | `50aedca2639521bc498ace0b2be1ea012801a86a` + VGMBoy PSF-core-only patch | [github.com/jpd002/Play-](https://github.com/jpd002/Play-) / [purei.org](https://purei.org) | PSF, miniPSF, PSF2, miniPSF2 | `CPlayPSF` bridge over the `PsfCore` static archive. The required patch is `patches/play-psfcore-only.patch`; companion `.psflib` files must be present beside a miniPSF. |
-| [Audio Overload SDK](https://github.com/nmlgc/aosdk) QSF engine | `e359a6e5154b2ba8499fb1f24a1f5f8a18538a61` plus VGMBoy compatibility patch | [github.com/nmlgc/aosdk](https://github.com/nmlgc/aosdk) | QSF, miniQSF | `CQSF` provides native PCM, seeking, timing tags, and `.qsflib` dependency resolution. Because the engine is process-global, one decoder holds an exclusive lifetime lease and concurrent QSF work fails explicitly. The same engine builds the `vgmboy-qsf-inspect` scanner plugin. Builds apply `patches/aosdk-qsf-lifecycle.patch` only to a disposable source copy. |
+| [Audio Overload SDK](https://github.com/nmlgc/aosdk) QSF engine | `e359a6e5154b2ba8499fb1f24a1f5f8a18538a61` plus VGMBoy compatibility patch | [github.com/nmlgc/aosdk](https://github.com/nmlgc/aosdk) | QSF, miniQSF | `CQSF` provides playback PCM, seeking, timing tags, and `.qsflib` dependency resolution. Because the engine is process-global, one decoder holds an exclusive lifetime lease and concurrent playback work fails explicitly. ScanSong reads QSF metadata and container structure directly without the QSound core. Builds apply `patches/aosdk-qsf-lifecycle.patch` only to a disposable source copy. |
 | [libsidplayfp](https://github.com/libsidplayfp/libsidplayfp) | Homebrew `libsidplayfp` 3.1.0 build | [github.com/libsidplayfp/libsidplayfp](https://github.com/libsidplayfp/libsidplayfp) | SID | `CSIDPlayFP` bridge; SID output joins the same direct audio transport. |
 | [libopenmpt](https://lib.openmpt.org/libopenmpt/) | Homebrew `libopenmpt` 0.8.9 build | [github.com/OpenMPT/openmpt](https://github.com/OpenMPT/openmpt) / [lib.openmpt.org](https://lib.openmpt.org/libopenmpt/) | MOD, XM, IT, S3M and registered tracker modules | `COpenMPT` bridge; modules use the same direct audio transport. |
-| [FFmpeg](https://ffmpeg.org/) | Homebrew FFmpeg 8.1.2_1 | [ffmpeg.org](https://ffmpeg.org/) | APE (Monkey's Audio), MP2, TAK | `CFFmpeg` bridge; finite decoded PCM and container duration are shared by playback and the `vgmboy-ffmpeg-inspect` scanner executable. |
+| [FFmpeg](https://ffmpeg.org/) | Homebrew FFmpeg 8.1.2_1 | [ffmpeg.org](https://ffmpeg.org/) | APE (Monkey's Audio), MP2, TAK | `CFFmpeg` playback bridge; ScanSong reads APE metadata directly. |
 
 `StandardAudioDecoder` uses AVFoundation for ordinary macOS-admitted formats. The separate
 `CFFmpeg` bridge handles APE, MP2, and TAK without a frontend process fallback. APE remains the
@@ -76,13 +75,13 @@ or install a broad package manager graph of its own.
 | Dependency | Version or source state | Role |
 | --- | --- | --- |
 | VGMBoy shared source garden | `vendor/` in this checkout | Canonical upstream source inputs and compatibility patches for every VGMBoy bridge and scanner-facing plugin. |
-| [mGBA](https://github.com/mgba-emu/mgba) | VGMBoy `vendor/mgba` 0.11.0 source snapshot; tree digest in `vendor/PROVENANCE.md` | Linked by the Highly Complete bridge and prepared for ScanSong through `scripts/build-scanner-plugins.sh`. |
-| [psgplay](https://github.com/frno7/psgplay) | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` plus recursive submodules | Built as `libpsgplay.a` by `scripts/build-psgplay.sh` and staged for the SNDH bridge. |
+| [mGBA](https://github.com/mgba-emu/mgba) | VGMBoy `vendor/mgba` 0.11.0 source snapshot; tree digest in `vendor/PROVENANCE.md` | Linked by the Highly Complete playback bridge. The current shared dependency build prepares it as collateral, but ScanSong's direct GSF reader does not link or run it. |
+| [psgplay](https://github.com/frno7/psgplay) | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` plus required nested source snapshots | Nested sources are ordinary files in the family repository. Built as `libpsgplay.a` by `scripts/build-psgplay.sh` and staged for the SNDH bridge. |
 | [UADE](https://github.com/dv1/uade) | Homebrew `uade` 3.05; shared library and runtime data | Supplies `libuade`/`uadecore` plus EaglePlayer configuration and emulation data used by `CUADE` and `vgmboy-amiga-inspect`. |
 | 2sf2wav | VGMBoy `vendor/2sf2wav` DeSmuME 0.9.9 svn 4608 source snapshot; tree digest in `vendor/PROVENANCE.md` | Built as `lib2sf.a` through `scripts/build-2sf.sh` and linked by the 2SF bridge. |
 | Swift Package Manager | tools version 6.1; Swift language mode 6 | Builds `VGMBoyKit`, `vgmboy-cli`, and the `VGMBoy` test app. |
 | [CMake](https://cmake.org/) | 4.4.2 in the development environment | Builds libvgm, vgmstream, and the Play! PSF core through VGMBoy scripts. |
-| [FFmpeg](https://ffmpeg.org/) | 8.1.2_1 (`libavcodec` ABI 62.28.102, `libavformat` 62.12.102, `libavutil` 60.26.102, `libswresample` 6.3.102) | Enabled in the vgmstream static build and linked directly by `CFFmpeg` for APE/MP2/TAK playback and scanner inspection. |
+| [FFmpeg](https://ffmpeg.org/) | 8.1.2_1 (`libavcodec` ABI 62.28.102, `libavformat` 62.12.102, `libavutil` 60.26.102, `libswresample` 6.3.102) | Enabled in the vgmstream static build and linked directly by `CFFmpeg` for APE/MP2/TAK playback. ScanSong reads APE metadata independently. |
 | [libvorbis](https://xiph.org/vorbis/) | 1.3.7 | Enabled in the vgmstream static build. |
 | [libogg](https://xiph.org/ogg/) | 1.3.6 | Enabled in the vgmstream static build. |
 | PSFLib source snapshot | VGMBoy-managed `vendor/psflib`; tree digest in `vendor/PROVENANCE.md` | Compiled with lazyusf2 and Highly Complete to resolve PSF-family dependency chains. |
@@ -121,43 +120,11 @@ treated as a same-directory basename; absolute paths and traversal syntax are
 not admitted. `mdx_get_tracks()` continues to describe driver channels, not
 playlist rows, so each MDX remains one logical track.
 
-### ZXTune AY-family validation boundary
-
-ZXTune is integrated as a narrow native bridge for the tracker formats found
-in the aggregate Bulba AY collection. The direct route registers the upstream
-player plugins for AS0, ASC, FTC, GTR, PSC, PSG, PSM, PT1, PT2, PT3, SQT, ST1,
-ST3, STC, STP, VTX, and YM, then renders signed stereo PCM through the common
-`AudioDecoder` contract. The scanner invokes the standalone
-`vgmboy-zxtune-inspect` binary so cataloging does not link ScanSong to
-VGMBoyKit or to the full ZXTune application graph.
-
-The first qualified fixtures include PT2, STC, ASC, PT3, VTX, and YM members
-from the real Bulba archive. Each opened, returned metadata, and rendered
-non-silent PCM. The broader aggregate remains a sampling target: admission
-means that the route is available, not that every file in a large collection
-has been certified. `.ayl` is intentionally not admitted because the upstream
-source does not provide the required playlist decoder; `.ts` is held back from
-this focused bridge because its upstream support is coupled to the wider plugin
-enumeration graph. Those decisions are recorded rather than silently routing
-unknown files through Amiga or Game Music Emu.
-
-### Long Play and timing contract
-
-Long Play is configured by the shared playback session and exposed through the
-same `DecoderFamily` flags to CocoaSpice and SPCBoyWK. A loop-capable decoder
-receives its loop policy and continues rendering at its native clock; Long Play
-does not rewrite source bytes, alter authored metadata, or force a universal
-duration. A decoder with no natural ending is bounded by the shared timing
-policy. Tempo is advertised only by families whose bridge implements it, and
-the ordinary end-time/default-duration setting remains separate from the
-decoder's stream clock.
-
 ## Build and run
 
 From this directory:
 
 ```bash
-git submodule update --init --recursive
 swift test --package-path . --disable-sandbox
 ./scripts/audit-plugin-versions.sh
 ./scripts/check-plugin-docs.sh

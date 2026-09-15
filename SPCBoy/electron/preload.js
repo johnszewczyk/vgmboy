@@ -1,0 +1,111 @@
+const { contextBridge, ipcRenderer } = require("electron");
+
+// The renderer needs playback-mode ownership for scheduling, but it must not
+// maintain a second format table. Keep this deliberately data-only surface so
+// extension admission and Electron routing still have one source of truth.
+// Sandboxed Electron preloads cannot require sibling app modules. Receive the
+// registry once from the main process before publishing the narrow bridge.
+const rendererPlaybackBackends = Object.freeze((ipcRenderer.sendSync("app:playback-backends") || []).map((backend) => Object.freeze({
+  id: backend.id,
+  displayName: backend.displayName,
+  supportsLongPlay: Boolean(backend.supportsLongPlay),
+  playbackMode: backend.playbackMode,
+  playbackSpeedMode: backend.playbackSpeedMode || null,
+  playbackSpeedExtensions: Object.freeze([...(backend.playbackSpeedExtensions || [])]),
+  extensions: Object.freeze([...backend.extensions])
+})));
+
+contextBridge.exposeInMainWorld("spcBoy", {
+  isOptionsWindow: process.argv.includes("--spcboy-options-window"),
+  isScanLogWindow: process.argv.includes("--spcboy-scan-log-window"),
+  playbackBackends: rendererPlaybackBackends,
+  openOptionsWindow: () => ipcRenderer.invoke("app:open-options"),
+  closeOptionsWindow: () => ipcRenderer.invoke("app:close-options"),
+  openScanLog: (root) => ipcRenderer.invoke("app:open-scan-log", root),
+  onScanLogData: (callback) => ipcRenderer.on("scan-log:data", (_event, root) => callback(root)),
+  setPlaybackSettings: (settings) => ipcRenderer.send("app:playback-settings-changed", settings),
+  setRoutingPreferences: (preferences) => ipcRenderer.invoke("app:routing-preferences-set", preferences || {}),
+  onRoutingPreferencesChanged: (callback) => ipcRenderer.on("app:routing-preferences-changed", (_event, preferences) => callback(preferences || {})),
+  setAppearanceSettings: (settings) => ipcRenderer.send("app:appearance-settings-changed", settings || {}),
+  bootstrap: () => ipcRenderer.invoke("app:bootstrap"),
+  chooseRootFolder: () => ipcRenderer.invoke("library:choose-root"),
+  openPath: (inputPath) => ipcRenderer.invoke("library:open-path", inputPath),
+  selectFolder: (folderPath) => ipcRenderer.invoke("library:select-folder", folderPath),
+  listFolder: (folderPath) => ipcRenderer.invoke("library:list-folder", folderPath),
+  selectFile: (filePath) => ipcRenderer.invoke("library:select-file", filePath),
+  showInFinder: (targetPath) => ipcRenderer.invoke("library:show-in-finder", targetPath),
+  refreshTree: (rootPath, selectedFolderPath) =>
+    ipcRenderer.invoke("library:refresh-tree", rootPath, selectedFolderPath),
+  databaseRoots: () => ipcRenderer.invoke("library:database-roots"),
+  databaseLocation: () => ipcRenderer.invoke("library:database-location"),
+  reloadDatabaseLibrary: () => ipcRenderer.invoke("library:database-reload"),
+  chooseDatabaseLocation: () => ipcRenderer.invoke("library:database-location-choose"),
+  useDefaultDatabaseLocation: () => ipcRenderer.invoke("library:database-location-default"),
+  databaseGames: () => ipcRenderer.invoke("library:database-games"),
+  databaseSearchGames: (query) => ipcRenderer.invoke("library:database-search-games", query),
+  databaseGameTracks: (games) => ipcRenderer.invoke("library:database-game-tracks", games),
+  databaseFiles: () => ipcRenderer.invoke("library:database-files"),
+  databaseFileTracks: (files) => ipcRenderer.invoke("library:database-file-tracks", files),
+  databaseFolderTracks: (folders) => ipcRenderer.invoke("library:database-folder-tracks", folders),
+  showSidebarViewMenu: () => ipcRenderer.invoke("library:show-sidebar-view-menu"),
+  archiveCacheSummary: () => ipcRenderer.invoke("library:archive-cache-summary"),
+  clearArchiveCache: () => ipcRenderer.invoke("library:archive-cache-clear"),
+  configureArchiveCache: (settings) => ipcRenderer.invoke("library:archive-cache-configure", settings || {}),
+  inspectTrack: (trackPath, sourceName) => ipcRenderer.invoke("playlist:inspect-track", trackPath, sourceName),
+  hydrateLooseMetadata: (track) => ipcRenderer.invoke("playlist:hydrate-loose-metadata", track || {}),
+  hydrateArchiveMetadata: (tracks) => ipcRenderer.invoke("playlist:hydrate-archive-metadata", tracks),
+  materializeTrack: (archivePath, archiveEntry) => ipcRenderer.invoke("playlist:materialize-track", archivePath, archiveEntry),
+  releaseMaterializedTrack: () => ipcRenderer.invoke("playlist:release-materialized-track"),
+  nativePlaybackInit: () =>
+    ipcRenderer.invoke("playback:native-init"),
+  nativePlaybackLoad: (trackPath, trackIndex, startMs, playMs, fadeMs, playbackMode, speed) =>
+    ipcRenderer.invoke("playback:native-load", trackPath, trackIndex, startMs, playMs, fadeMs, playbackMode, speed),
+  nativePlaybackPlay: () =>
+    ipcRenderer.invoke("playback:native-play"),
+  nativePlaybackPause: () =>
+    ipcRenderer.invoke("playback:native-pause"),
+  nativePlaybackStop: () =>
+    ipcRenderer.invoke("playback:native-stop"),
+  nativePlaybackUnload: () =>
+    ipcRenderer.invoke("playback:native-unload"),
+  nativePlaybackRampGain: (gain, durationMs) =>
+    ipcRenderer.invoke("playback:native-ramp-gain", gain, durationMs),
+  nativePlaybackSeek: (startMs) =>
+    ipcRenderer.invoke("playback:native-seek", startMs),
+  nativePlaybackState: () =>
+    ipcRenderer.invoke("playback:native-state"),
+  nativePlaybackAudioConfig: (volume, equalizerEnabled, bandGains) =>
+    ipcRenderer.invoke("playback:native-audio-config", volume, Boolean(equalizerEnabled), bandGains),
+  nativePlaybackClose: () =>
+    ipcRenderer.invoke("playback:native-close"),
+  setPlaybackPowerSaveBlocker: (enabled) =>
+    ipcRenderer.invoke("playback:set-power-save-blocker", Boolean(enabled)),
+  onLibrarySnapshot: (handler) => {
+    ipcRenderer.removeAllListeners("library:snapshot");
+    ipcRenderer.on("library:snapshot", (_event, snapshot) => handler(snapshot));
+  },
+  onCatalogReloaded: (handler) => {
+    ipcRenderer.removeAllListeners("library:catalog-reloaded");
+    ipcRenderer.on("library:catalog-reloaded", (_event, location) => handler(location || null));
+  },
+  onPlaybackSettingsChanged: (handler) => {
+    ipcRenderer.removeAllListeners("app:playback-settings-changed");
+    ipcRenderer.on("app:playback-settings-changed", (_event, settings) => handler(settings || {}));
+  },
+  onAppearanceSettingsChanged: (handler) => {
+    ipcRenderer.removeAllListeners("app:appearance-settings-changed");
+    ipcRenderer.on("app:appearance-settings-changed", (_event, settings) => handler(settings || {}));
+  },
+  onTransportShortcut: (handler) => {
+    ipcRenderer.removeAllListeners("transport:shortcut");
+    ipcRenderer.on("transport:shortcut", (_event, action) => handler(action));
+  },
+  onLibraryCommand: (handler) => {
+    ipcRenderer.removeAllListeners("library:command");
+    ipcRenderer.on("library:command", (_event, command) => handler(command));
+  },
+  onNativePlaybackState: (handler) => {
+    ipcRenderer.removeAllListeners("playback:native-state-changed");
+    ipcRenderer.on("playback:native-state-changed", (_event, snapshot) => handler(snapshot));
+  }
+});

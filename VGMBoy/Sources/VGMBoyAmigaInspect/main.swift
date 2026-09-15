@@ -1,5 +1,5 @@
 import Foundation
-import VGMBoyKit
+import VGMBoyAmigaInspectionCore
 
 guard CommandLine.arguments.count == 2 else {
     FileHandle.standardError.write(Data("usage: vgmboy-amiga-inspect <file>\n".utf8))

@@ -1,0 +1,9 @@
+.build/
+dist/
+DerivedData/
+*.xcworkspace
+*.xcodeproj
+.DS_Store
+node_modules/
+native/vgmboy-electron-bridge
+native/catalog-reader-electron-bridge

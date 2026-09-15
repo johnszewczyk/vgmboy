@@ -8,6 +8,9 @@ public enum ArchiveContainerKind: String, CaseIterable, Equatable, Sendable {
     case rsn
     case tar
     case tarZstandard
+    /// UAC is a Zstandard skippable metadata frame followed by a standard
+    /// TAR+Zstandard frame, so the ordinary streaming TAR pipeline applies.
+    case uac
     /// A single playable payload compressed directly with Zstandard, such as
     /// `track.vgm.zst`. This is intentionally distinct from TAR.ZST: it has
     /// no member listing and cannot satisfy a complete-set requirement.
@@ -27,6 +30,7 @@ public enum ArchiveContainerKind: String, CaseIterable, Equatable, Sendable {
             return
         }
         switch extensionName {
+        case "uac": self = .uac
         case "zip": self = .zip
         case "7z": self = .sevenZip
         case "lha": self = .lha
@@ -36,6 +40,10 @@ public enum ArchiveContainerKind: String, CaseIterable, Equatable, Sendable {
         case "zst", "zstd": self = .singleFileZstandard
         default: return nil
         }
+    }
+
+    public var usesTarZstandardPipeline: Bool {
+        self == .tarZstandard || self == .uac
     }
 }
 
@@ -74,14 +82,14 @@ public enum ArchiveToolRouting {
         case .tar:
             return .process(
                 executableName: "tar",
-                arguments: ["-xOf", archiveURL.path, entryPath]
+                arguments: ["-xOf", archiveURL.path, tarMemberSelectionPattern(entryPath)]
             )
-        case .tarZstandard:
+        case .tarZstandard, .uac:
             return .zstandardTar(
                 zstdExecutableName: "zstd",
                 zstdArguments: ["-d", "-q", "-c", archiveURL.path],
                 tarExecutableName: "tar",
-                tarArguments: ["-xOf", "-", entryPath],
+                tarArguments: ["-xOf", "-", tarMemberSelectionPattern(entryPath)],
                 allowEarlyConsumerExit: true
             )
         case .singleFileZstandard:
@@ -90,6 +98,10 @@ public enum ArchiveToolRouting {
                 arguments: ["-d", "-q", "-c", "--", archiveURL.path]
             )
         }
+    }
+
+    private static func tarMemberSelectionPattern(_ entryPath: String) -> String {
+        ArchiveEntryPath.tarMemberSelectionPatterns([entryPath]).first ?? entryPath
     }
 
     public static func completeSet(
@@ -113,7 +125,7 @@ public enum ArchiveToolRouting {
                 executableName: "tar",
                 arguments: ["-xf", archiveURL.path, "-C", destinationURL.path]
             )
-        case .tarZstandard:
+        case .tarZstandard, .uac:
             return .zstandardTar(
                 zstdExecutableName: "zstd",
                 zstdArguments: ["-d", "-q", "-c", archiveURL.path],
@@ -154,7 +166,7 @@ public enum ArchiveToolRouting {
                 arguments: ["-xf", archiveURL.path, "-C", destinationURL.path]
                     + ArchiveEntryPath.tarMemberSelectionPatterns(entryPaths)
             )
-        case .tarZstandard:
+        case .tarZstandard, .uac:
             return .zstandardTar(
                 zstdExecutableName: "zstd",
                 zstdArguments: ["-d", "-q", "-c", archiveURL.path],

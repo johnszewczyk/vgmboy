@@ -6,6 +6,9 @@ import ScanSongKit
 /// The catalog remains one self-contained SQLite file; these human-readable
 /// logs are optional per-source results and never affect a scan.
 enum ScannerScanLogStore {
+    static let maximumReadBytes = 2 * 1_024 * 1_024
+    static let maximumRenderedLines = 2_000
+
     static func exists(databaseURL: URL, rootID: Int64) -> Bool {
         FileManager.default.fileExists(atPath: fileURL(databaseURL: databaseURL, rootID: rootID).path)
     }
@@ -18,11 +21,20 @@ enum ScannerScanLogStore {
         let url = fileURL(databaseURL: databaseURL, rootID: rootID)
         guard let handle = try? FileHandle(forReadingFrom: url) else { return [] }
         defer { try? handle.close() }
-        let data = handle.readDataToEndOfFile()
-        guard let contents = String(data: data, encoding: .utf8) else {
+        guard let data = try? handle.read(upToCount: maximumReadBytes),
+              let contents = String(data: data, encoding: .utf8) else {
             return ["Unable to read the last scan log."]
         }
-        return contents.split(whereSeparator: \.isNewline).map(String.init)
+        var lines = contents.split(whereSeparator: \.isNewline).map(String.init)
+        let fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        if fileSize > maximumReadBytes {
+            lines.append("Log truncated after \(maximumReadBytes / 1_024 / 1_024) MiB to keep this window responsive.")
+        }
+        if lines.count > maximumRenderedLines {
+            lines = Array(lines.prefix(maximumRenderedLines - 1))
+            lines.append("Log truncated after \(maximumRenderedLines) lines to keep this window responsive.")
+        }
+        return lines
     }
 
     static func writeLastResult(
@@ -41,8 +53,7 @@ enum ScannerScanLogStore {
         } else if let result {
             let sourceFailures = result.failures.filter { $0.identity.archiveEntry == nil }.count
             let memberFailures = result.failures.count - sourceFailures
-            let reportableSkipped = ScanLogFormatter.reportableSkipped(result.skipped)
-            resultText = "\(result.discoveredSourceCount) discovered, \(result.scannedSourceCount) scanned, \(result.trackCount) tracks, \(result.reusedSourceCount) reused, \(sourceFailures) source failures, \(memberFailures) member failures, \(reportableSkipped.count) skipped"
+            resultText = "\(result.discoveredSourceCount) discovered, \(result.scannedSourceCount) scanned, \(result.trackCount) tracks, \(result.reusedSourceCount) reused, \(sourceFailures) source failures, \(memberFailures) member failures, \(result.skipped.count) skipped"
         } else {
             resultText = "\(tally.sourceCount) files, \(root.lastScanTrackCount) tracks"
         }
@@ -56,7 +67,9 @@ enum ScannerScanLogStore {
 
         do {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try lines.joined(separator: "\n").appending("\n").write(to: url, atomically: true, encoding: .utf8)
+            let bounded = Array(lines.prefix(maximumRenderedLines - 1))
+                + (lines.count > maximumRenderedLines ? ["Log truncated after \(maximumRenderedLines) lines."] : [])
+            try bounded.joined(separator: "\n").appending("\n").write(to: url, atomically: true, encoding: .utf8)
         } catch {
             // Logging must never make a successful scan fail.
         }

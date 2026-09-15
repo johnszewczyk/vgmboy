@@ -1,4 +1,4 @@
-# Container Proposal
+# UAC Container and Archive Boundary
 
 ## Purpose
 
@@ -28,54 +28,62 @@ This convention is not required for ZIP files because ZIP has an internal
 member name and listing. It is needed here because standalone Zstandard does
 not provide that archive layer.
 
-## Proposed CS indexed archive/capsule
+## UAC per-game package
 
-The larger opportunity is not to invent a replacement audio encoding. It is to
-define a CS-aware archive that preserves the original playable files while
-making their catalog metadata available without opening a decoder.
+The larger opportunity is not to invent a replacement audio encoding. UAC is
+the selected name for a per-game package that preserves the original playable
+files while making catalog metadata available without opening a decoder. Its
+binary contract lives in
+[`FrontendCore/ai/subsystem-agent/uac-format.md`](../FrontendCore/ai/subsystem-agent/uac-format.md).
 
-The working conversion should therefore be lossless at the payload level:
+The package conversion should therefore be lossless at the member level:
 
 ```text
-original.nsf  ->  CS capsule containing original.nsf bytes
+original.nsf  ->  game.uac containing the original.nsf bytes
 ```
 
-Unpacking the capsule must reproduce the complete original `.nsf` byte for
+Unpacking the UAC must reproduce the complete original `.nsf` byte for
 byte. The packer must not normalize, merge, rewrite, or translate NSF, SPC,
 VGM, QSF, or other source formats. A `.nsf` remains an NSF; it is simply a
-named payload member inside the capsule. Multi-file sets retain every original
+named payload member inside the UAC. Multi-file sets retain every original
 file, including dependency files such as `miniqsf` libraries, rather than
 creating a synthetic replacement file.
 
-The capsule would put a bounded manifest/index near the beginning of the file,
-followed by payload members stored in independently addressable Zstandard
-frames. A manifest entry can contain:
+UAC starts with a standard Zstandard skippable frame containing a bounded,
+uncompressed manifest. A normal Zstandard frame follows, containing one ordinary
+TAR archive. Zstandard-aware consumers skip the metadata frame and continue
+decoding the TAR frame, so the existing `zstd -dc | tar` path reads UAC without
+an intermediate payload copy or custom playback decompressor. The manifest is
+readable without decompressing the TAR frame. It groups variants under one
+logical game and lists the preserved members. A manifest entry can contain:
 
 - original basename and format extension
 - raw payload size and BLAKE3 identity
-- compressed-frame offset and size
 - game, track, author, system, comment, timing, loop, and fade metadata
 - track ordinal and total track count
 - decoder/backend and dependency relationships
 - metadata provenance and generator version
 
-ScanSong could catalog the manifest without extraction or decoder startup.
-CocoaSpice could locate the selected payload, decompress only that frame, and
-pass the original bytes to VGMBoy. Independent frames preserve random access
-and parallelism; an optional solid group mode can improve compression for
-related dependency files when random access is less important.
+The top-level transformation ledger records required set changes by operation
+class and retains the source-member hash/path, output-member hash/path,
+tool/version, timestamp, and rationale. Repacking and packaging are distinct
+operations; this is the trace of how the annual member differs from its
+source-state record.
+
+ScanSong can catalog declared members and metadata without extraction or decoder
+startup. CocoaSpice can list tracks from the manifest, then stream the
+Zstandard TAR through its existing selected-member extractor. This keeps the
+container simple and broadly tool-readable, but selected-member extraction
+still scans/decompresses the TAR stream; UAC v1 does not promise random access.
 
 The manifest is the fast catalog view, not a substitute for source truth. The
 raw-member hash and extraction-size checks must remain authoritative. Metadata
 can be regenerated from the preserved source if a future scanner improves its
-interpretation. An optional editable metadata overlay may be useful, but it
-must never silently alter the preserved payload or its provenance.
+interpretation; a metadata-only correction rewrites the skippable frame and
+copies the compressed TAR frame unchanged, with provenance recorded.
 
-The extension is intentionally undecided. `UAC` sounds universal and implies
-a broader standard than this format needs. `CUP` is a good CocoaSpice joke but
-does not explain the format outside the app. A descriptive working name such
-as `CS Capsule` or `CS Archive` is clearer until the header and ownership
-boundary are settled.
+The extension is `.uac`; it is a collection format owned by this project
+family, not a claim that it is an industry-wide standard.
 
 ## Container taxonomy and precedence
 
@@ -86,7 +94,7 @@ boundary are settled.
 | `set.tar` | Multi-member TAR | TAR listing | Selected member or complete set |
 | `set.tar.zst`, `set.tar.zstd`, `set.tzst` | TAR compressed with Zstandard | Decompress into TAR listing/extraction stream | Selected member or complete set |
 | `track.ext.zst`, `track.ext.zstd` | One payload compressed with Zstandard | One implicit member from the basename | Decompress that one payload |
-| `set.<future-cs-extension>` | Metadata-indexed CS archive/capsule | Read front manifest/index | Selected original payload or dependency set |
+| `game.uac` | One-game package with variants and indexed metadata | Read uncompressed UAC manifest | Existing Zstandard-to-TAR selected-member or complete-set path |
 
 Detection must check TAR+Zstandard names before the standalone suffix. Thus
 `set.tar.zst` and `set.tar.zstd` can never fall through to standalone handling.
@@ -101,9 +109,9 @@ and shared playback materialization.
    extracted file using the normal registered format route.
 2. CocoaSpice and SPCBoyWK own presentation, queue behavior, and frontend
    adapters. They do not access playback codecs or duplicate archive engines.
-3. FrontendCore owns the shared native archive taxonomy, command routing,
-   cache-backed playback materialization, path validation, and the selected
-   member versus complete-set boundary.
+3. FrontendCore owns UAC frame/manifest validation and encoding, shared archive
+   taxonomy, command routing, cache-backed playback materialization, path
+   validation, and the selected-member versus complete-set boundary.
 4. VGMBoy owns format admission at playback, decoder access, timing, fade, and
    output. The frontends pass VGMBoy a normal extracted file path, never a
    decoder-specific archive implementation.
@@ -134,8 +142,8 @@ opens a playable path, not an arbitrary decompression stream. Large payloads
 must be decompressed somewhere before path-based playback; small payloads do
 not justify a second streaming/cache protocol.
 
-TAR+Zstandard retains its existing stream topology (`zstd -dc` into TAR) for
-listing and selected extraction. A future streaming design would need an
+TAR+Zstandard and UAC share the existing stream topology (`zstd -dc` into TAR)
+for listing and selected extraction. A future decoder-streaming design would need an
 explicit VGMBoy stream/file-descriptor contract, bounded output handling,
 cancellation, cache policy, and format-specific seek requirements. It should
 not be introduced by treating standalone `.zst` as a fake ZIP archive.
@@ -152,9 +160,15 @@ not be introduced by treating standalone `.zst` as a fake ZIP archive.
 
 ## Current implementation status
 
-The shared `ArchiveMaterializationCore` recognizes
-`singleFileZstandard`, routes its payload through `zstd -d -q -c`, and rejects
-complete-set requests for that container. ScanSong recognizes and scans the
-implicit member. CocoaSpice recognizes the same member during dropped-file
-playlist construction. SPCBoyWK already reaches the same shared playback
-materializer through its thin native adapter.
+`UACContainerCore` reads and writes the bounded Zstandard skippable-frame
+manifest prefix while preserving a supplied TAR+Zstandard payload byte-for-byte.
+ArchiveMaterializationCore recognizes `.uac` and routes it through the existing
+Zstandard-to-TAR selected-member and complete-set paths. CocoaSpice lists
+members from the manifest and derives an incremental-scan signature from its
+SHA-256. AudioMan still needs the set packer/provenance mapping, and ScanSong
+still needs direct UAC manifest ingestion before the end-to-end annual-set
+workflow is complete. Standalone Zstandard materialization remains a separate
+single-payload path.
+
+The compatibility premise is defined by the [Zstandard frame format](https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md):
+compliant decoders skip skippable frames and continue with the next frame.

@@ -27,17 +27,11 @@ dependency_signature() {
         else
             git -C "$ROOT_DIR" rev-parse "HEAD:$source_relative" 2>/dev/null || true
             git -C "$ROOT_DIR" diff --binary HEAD -- "$source_relative"
-            # A checked-out gitlink has no diff visible from the parent
-            # repository. Hash its working tree too, so local compatibility
-            # changes cannot be hidden behind a stale dependency product.
+            # Include the source working tree as well as the root-repository
+            # diff so local or newly added source files cannot hide behind a
+            # stale dependency product.
             if [[ -d "$ROOT_DIR/$source_relative" ]]; then
-                find "$ROOT_DIR/$source_relative" \
-                    \( -path "$ROOT_DIR/$source_relative/bin" \
-                    -o -path "$ROOT_DIR/$source_relative/lib" \
-                    -o -path "$ROOT_DIR/$source_relative/obj" \
-                    -o -path "$ROOT_DIR/$source_relative/pkg" \
-                    -o -path "$ROOT_DIR/$source_relative/Builds" \) -prune -o \
-                    -type f -print0 \
+                find "$ROOT_DIR/$source_relative" -type f -print0 \
                     | sort -z \
                     | xargs -0 shasum -a 256
             fi
@@ -65,9 +59,9 @@ ensure_dependency() {
         echo "Missing $name dependency product: $ROOT_DIR/$output_relative" >&2
         exit 1
     }
-    # A build script may apply a tracked compatibility patch to a gitlink
-    # source tree. Record the post-build source state, not the pre-patch one,
-    # so the next invocation can reuse the product deterministically.
+    # A build script may apply a compatibility patch to its source input.
+    # Record the post-build input state so the next invocation can reuse the
+    # product deterministically.
     signature="$(dependency_signature "$source_relative" "scripts/$build_script" "$@")"
     printf '%s\n' "$signature" > "$stamp"
 }
@@ -98,7 +92,6 @@ ensure_dependency play-psf vendor/play .build/play-psf/libcocoaspice_play_psf.a 
 ensure_dependency qsf vendor/aosdk .build/qsf/libvgmboy_qsf.a build-qsf.sh patches/aosdk-qsf-lifecycle.patch
 ensure_dependency vgmstream vendor/vgmstream .build/vgmstream/src/libvgmstream.a build-vgmstream.sh patches/vgmstream-cocoaspice.patch
 ensure_dependency psgplay vendor/psgplay .build/psgplay/libpsgplay.a build-psgplay.sh
-ensure_dependency zxtune vendor/zxtune .build/zxtune/source-revision build-zxtune.sh patches/zxtune-modern-libcxx.patch
 
 copy_dependency libvgm "$SOURCE_BUILD_ROOT/libvgm"
 copy_dependency mgba "$SOURCE_BUILD_ROOT/mgba"
@@ -108,6 +101,5 @@ copy_dependency play-psf "$SOURCE_BUILD_ROOT/play-psf"
 copy_dependency qsf "$SOURCE_BUILD_ROOT/qsf"
 copy_dependency vgmstream "$SOURCE_BUILD_ROOT/vgmstream"
 copy_dependency psgplay "$SOURCE_BUILD_ROOT/psgplay"
-copy_dependency zxtune "$SOURCE_BUILD_ROOT/zxtune"
 
 echo "VGMBoy dependencies ready: $DEPENDENCY_ROOT"

@@ -1,6 +1,5 @@
 import Foundation
 import SQLite3
-import CatalogReader
 
 private let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
@@ -18,7 +17,7 @@ public struct CatalogPlaylistGameSelection: Hashable, Sendable {
     }
 }
 
-/// The exact Games playlist projection used by CocoaSpice's
+/// The exact fourteen-column Games playlist projection used by CocoaSpice's
 /// original reader. It intentionally contains no database row ID or fallback
 /// fields: applications derive their own identity from the source tuple.
 public struct CatalogPlaylistTrack: Equatable, Sendable {
@@ -30,20 +29,12 @@ public struct CatalogPlaylistTrack: Equatable, Sendable {
     public let title: String
     public let game: String
     public let author: String
-    public let dumper: String
     public let system: String
     public let comment: String
     public let introLengthMilliseconds: Int
     public let loopLengthMilliseconds: Int
     public let lengthMilliseconds: Int
     public let fadeLengthMilliseconds: Int
-
-    /// The file represented by this row. Archive-backed rows use the member
-    /// leaf; `sourcePath` remains the catalog's physical source/container path.
-    public var leafFilename: String {
-        let path = archiveEntry?.isEmpty == false ? archiveEntry! : sourcePath
-        return URL(fileURLWithPath: path).lastPathComponent
-    }
 
     public init(
         sourcePath: String,
@@ -59,8 +50,7 @@ public struct CatalogPlaylistTrack: Equatable, Sendable {
         introLengthMilliseconds: Int,
         loopLengthMilliseconds: Int,
         lengthMilliseconds: Int,
-        fadeLengthMilliseconds: Int,
-        dumper: String = ""
+        fadeLengthMilliseconds: Int
     ) {
         self.sourcePath = sourcePath
         self.archivePath = archivePath
@@ -70,102 +60,12 @@ public struct CatalogPlaylistTrack: Equatable, Sendable {
         self.title = title
         self.game = game
         self.author = author
-        self.dumper = dumper
         self.system = system
         self.comment = comment
         self.introLengthMilliseconds = introLengthMilliseconds
         self.loopLengthMilliseconds = loopLengthMilliseconds
         self.lengthMilliseconds = lengthMilliseconds
         self.fadeLengthMilliseconds = fadeLengthMilliseconds
-    }
-}
-
-/// The text projection shared by native catalog consumers. This is deliberately
-/// a value-only catalog result, not a table row or UI model. Frontends may add
-/// their own columns and layout, but the source/member filename, title
-/// fallback, track suffix, and duration label must not drift between them.
-public struct CatalogPlaylistDisplayValues: Equatable, Sendable {
-    public let sourceFilename: String
-    public let filename: String
-    public let displayName: String
-    public let title: String
-    public let lengthMilliseconds: Int
-    public let lengthLabel: String
-
-    public init(
-        sourceFilename: String,
-        filename: String,
-        displayName: String,
-        title: String,
-        lengthMilliseconds: Int,
-        lengthLabel: String
-    ) {
-        self.sourceFilename = sourceFilename
-        self.filename = filename
-        self.displayName = displayName
-        self.title = title
-        self.lengthMilliseconds = lengthMilliseconds
-        self.lengthLabel = lengthLabel
-    }
-}
-
-/// Shared, UI-neutral text rules for catalog-backed playlist rows.
-public enum CatalogPlaylistPresentation {
-    public static func display(for track: CatalogPlaylistTrack) -> CatalogPlaylistDisplayValues {
-        make(
-            sourceFilename: track.leafFilename,
-            trackIndex: track.trackIndex,
-            trackCount: track.trackCount,
-            title: track.title,
-            lengthMilliseconds: track.lengthMilliseconds
-        )
-    }
-
-    public static func display(for track: CatalogTrack) -> CatalogPlaylistDisplayValues {
-        make(
-            sourceFilename: track.leafFilename,
-            trackIndex: track.trackIndex,
-            trackCount: track.trackCount,
-            title: track.title,
-            lengthMilliseconds: track.lengthMilliseconds
-        )
-    }
-
-    /// Removes the playable format extension and known archive/compression
-    /// wrappers from a leaf filename while leaving the source filename intact.
-    public static func withoutDisplayedExtension(_ filename: String) -> String {
-        CatalogDisplayName.file(filename)
-    }
-
-    public static func lengthLabel(milliseconds: Int) -> String {
-        guard milliseconds > 0 else { return "—" }
-        let totalSeconds = Int((Double(milliseconds) / 1_000).rounded())
-        return String(format: "%d:%02d", totalSeconds / 60, totalSeconds % 60)
-    }
-
-    public static func isMeaningful(_ value: String) -> Bool {
-        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return !normalized.isEmpty && normalized != "—"
-    }
-
-    private static func make(
-        sourceFilename: String,
-        trackIndex: Int,
-        trackCount: Int,
-        title: String,
-        lengthMilliseconds: Int
-    ) -> CatalogPlaylistDisplayValues {
-        let suffix = max(1, trackCount) > 1 ? " [\(max(0, trackIndex) + 1)]" : ""
-        let displayName = "\(withoutDisplayedExtension(sourceFilename))\(suffix)"
-        let filename = "\(sourceFilename)\(suffix)"
-        return CatalogPlaylistDisplayValues(
-            sourceFilename: sourceFilename,
-            filename: filename,
-            displayName: displayName,
-            title: title.isEmpty ? displayName : title,
-            lengthMilliseconds: max(0, lengthMilliseconds),
-            lengthLabel: lengthLabel(milliseconds: lengthMilliseconds)
-        )
     }
 }
 
@@ -193,17 +93,6 @@ public enum CatalogPlaylistReader {
     ) throws -> [CatalogPlaylistTrack] {
         guard !selections.isEmpty else { return [] }
 
-        var database: OpaquePointer?
-        guard sqlite3_open_v2(databaseURL.path, &database, SQLITE_OPEN_READONLY, nil) == SQLITE_OK,
-              let database else {
-            let message = database.map { String(cString: sqlite3_errmsg($0)) } ?? "SQLite could not open the catalog."
-            sqlite3_close(database)
-            throw CatalogPlaylistCoreError.sqlite(message)
-        }
-        defer { sqlite3_close(database) }
-        let hasDumperColumn = try tableHasColumn(database, table: "track_metadata", column: "dumper")
-        let dumperExpression = hasDumperColumn ? "COALESCE(m.dumper, '')" : "''"
-
         enum BindValue {
             case integer(Int64)
             case text(String)
@@ -222,9 +111,8 @@ public enum CatalogPlaylistReader {
         t.track_index AS track_index,
         t.track_count AS track_count,
         COALESCE(m.title, '') AS title,
-        COALESCE(NULLIF(NULLIF(m.game, ''), '?'), NULLIF(t.browser_game, ''), '') AS game,
+        COALESCE(NULLIF(m.game, ''), NULLIF(t.browser_game, ''), '') AS game,
         COALESCE(m.author, '') AS author,
-        \(dumperExpression) AS dumper,
         COALESCE(m.system, '') AS system,
         COALESCE(m.comment, '') AS comment,
         COALESCE(m.intro_length_ms, 0) AS intro_length_ms,
@@ -302,7 +190,6 @@ public enum CatalogPlaylistReader {
             title,
             game,
             author,
-            dumper,
             system,
             comment,
             intro_length_ms,
@@ -312,6 +199,15 @@ public enum CatalogPlaylistReader {
         FROM (\(branches.joined(separator: " UNION ALL ")))
         ORDER BY order_game ASC, order_title ASC, order_folder ASC, order_filename ASC, order_index ASC;
         """
+
+        var database: OpaquePointer?
+        guard sqlite3_open_v2(databaseURL.path, &database, SQLITE_OPEN_READONLY, nil) == SQLITE_OK,
+              let database else {
+            let message = database.map { String(cString: sqlite3_errmsg($0)) } ?? "SQLite could not open the catalog."
+            sqlite3_close(database)
+            throw CatalogPlaylistCoreError.sqlite(message)
+        }
+        defer { sqlite3_close(database) }
 
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
@@ -344,15 +240,14 @@ public enum CatalogPlaylistReader {
                 trackIndex: Int(sqlite3_column_int(statement, 3)),
                 trackCount: Int(sqlite3_column_int(statement, 4)),
                 title: text(statement, index: 5),
-                game: displayGame(text(statement, index: 6)),
+                game: text(statement, index: 6),
                 author: text(statement, index: 7),
-                system: text(statement, index: 9),
-                comment: text(statement, index: 10),
-                introLengthMilliseconds: Int(sqlite3_column_int(statement, 11)),
-                loopLengthMilliseconds: Int(sqlite3_column_int(statement, 12)),
-                lengthMilliseconds: Int(sqlite3_column_int(statement, 13)),
-                fadeLengthMilliseconds: Int(sqlite3_column_int(statement, 14)),
-                dumper: text(statement, index: 8)
+                system: text(statement, index: 8),
+                comment: text(statement, index: 9),
+                introLengthMilliseconds: Int(sqlite3_column_int(statement, 10)),
+                loopLengthMilliseconds: Int(sqlite3_column_int(statement, 11)),
+                lengthMilliseconds: Int(sqlite3_column_int(statement, 12)),
+                fadeLengthMilliseconds: Int(sqlite3_column_int(statement, 13))
             ))
         }
         guard sqlite3_errcode(database) == SQLITE_OK || sqlite3_errcode(database) == SQLITE_DONE else {
@@ -366,28 +261,8 @@ public enum CatalogPlaylistReader {
         return String(cString: value)
     }
 
-    private static func displayGame(_ value: String) -> String {
-        CatalogDisplayName.game(value)
-    }
-
     private static func nullableText(_ statement: OpaquePointer?, index: Int32) -> String? {
         guard let value = sqlite3_column_text(statement, index) else { return nil }
         return String(cString: value)
-    }
-
-    private static func tableHasColumn(_ database: OpaquePointer, table: String, column: String) throws -> Bool {
-        var statement: OpaquePointer?
-        let sql = "PRAGMA table_info(\(table));"
-        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
-            throw CatalogPlaylistCoreError.sqlite(String(cString: sqlite3_errmsg(database)))
-        }
-        defer { sqlite3_finalize(statement) }
-        while sqlite3_step(statement) == SQLITE_ROW {
-            if text(statement, index: 1) == column { return true }
-        }
-        guard sqlite3_errcode(database) == SQLITE_OK || sqlite3_errcode(database) == SQLITE_DONE else {
-            throw CatalogPlaylistCoreError.sqlite(String(cString: sqlite3_errmsg(database)))
-        }
-        return false
     }
 }

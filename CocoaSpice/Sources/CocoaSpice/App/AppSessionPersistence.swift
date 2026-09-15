@@ -41,7 +41,6 @@ enum AppDefaultsKey {
     static let playlistFontSize = "CocoaSpice.playlistFontSize"
     static let playlistTextColor = "CocoaSpice.playlistTextColor"
     static let playlistMonospaceFont = "CocoaSpice.playlistMonospaceFont"
-    static let playlistRowGapPoints = "CocoaSpice.playlistRowGapPoints"
     static let sidebarSystemMode = "CocoaSpice.sidebarSystemMode"
     static let preferEmbeddedConsoleTags = "CocoaSpice.preferEmbeddedConsoleTags"
     static let sidebarBrowserMode = "CocoaSpice.sidebarBrowserMode"
@@ -93,7 +92,6 @@ struct RestoredPlaybackPreferences {
     let playlistFontSize: Double?
     let playlistTextColor: String?
     let playlistMonospaceFont: Bool
-    let playlistRowGapPoints: Double?
     let sidebarSystemMode: Bool
     let preferEmbeddedConsoleTags: Bool
     let sidebarBrowserModeRawValue: String?
@@ -198,7 +196,6 @@ enum AppSessionPersistence {
             playlistFontSize: defaults.object(forKey: AppDefaultsKey.playlistFontSize) as? Double,
             playlistTextColor: defaults.string(forKey: AppDefaultsKey.playlistTextColor),
             playlistMonospaceFont: defaults.object(forKey: AppDefaultsKey.playlistMonospaceFont) as? Bool ?? false,
-            playlistRowGapPoints: defaults.object(forKey: AppDefaultsKey.playlistRowGapPoints) as? Double,
             sidebarSystemMode: defaults.object(forKey: AppDefaultsKey.sidebarSystemMode) as? Bool ?? false,
             preferEmbeddedConsoleTags: defaults.object(forKey: AppDefaultsKey.preferEmbeddedConsoleTags) as? Bool ?? false,
             sidebarBrowserModeRawValue: defaults.string(forKey: AppDefaultsKey.sidebarBrowserMode),
@@ -254,7 +251,6 @@ enum AppSessionPersistence {
         playlistFontSize: CGFloat,
         playlistTextColor: String,
         playlistMonospaceFont: Bool,
-        playlistRowGapPoints: CGFloat,
         sidebarSystemMode: Bool,
         preferEmbeddedConsoleTags: Bool,
         sidebarBrowserModeRawValue: String,
@@ -303,7 +299,6 @@ enum AppSessionPersistence {
         defaults.set(Double(playlistFontSize), forKey: AppDefaultsKey.playlistFontSize)
         defaults.set(playlistTextColor, forKey: AppDefaultsKey.playlistTextColor)
         defaults.set(playlistMonospaceFont, forKey: AppDefaultsKey.playlistMonospaceFont)
-        defaults.set(Double(playlistRowGapPoints), forKey: AppDefaultsKey.playlistRowGapPoints)
         defaults.set(sidebarSystemMode, forKey: AppDefaultsKey.sidebarSystemMode)
         defaults.set(preferEmbeddedConsoleTags, forKey: AppDefaultsKey.preferEmbeddedConsoleTags)
         defaults.set(sidebarBrowserModeRawValue, forKey: AppDefaultsKey.sidebarBrowserMode)

@@ -49,9 +49,8 @@ Removing a scan path only detaches it and retains its records.
 
 Each path shows its last scan time, source count, active track count, and issue
 count. Its last-result log uses uniform `status | detail | path` rows. It records
-the root summary, actual failure records, and compact unsupported-format diagnostics;
-files explicitly ignored by the File Types policy are omitted; successful archive
-members are never expanded into a file list, while an
+the root summary, actual failure records, and compact ignored/unrecognized diagnostics;
+successful archive members are never expanded into a file list, while an
 archive-member failure keeps its `archive#member` path. Scanner-owned scratch
 prefixes are removed from diagnostic details so the archive member path remains
 the useful identifier. Path status is grey before a completed scan, green when
@@ -103,15 +102,16 @@ error.
   members are recognized by the shared UADE prefix manifest as well as by
   ordinary suffixes, and each archive is staged as a complete set so UADE can
   resolve player/sample companions before it publishes real subsong rows.
-- Native libgme enumeration and timing for NSF, NSFE, GBS, AY, HES, KSS, SAP,
-  and related registered formats, supplemented by direct NSF/GBS header metadata.
-  The current AY route is the `.ay` container; ZX Spectrum tracker and playlist
-  families in aggregate AY collections are not admitted until a decoder-backed
-  scanner route is qualified. Their suffixes are also excluded from the shared
-  Amiga prefix fallback so they cannot become false UADE candidates.
-- Direct bounded SPC ID666/xID6 harvesting, PSF-style footer tags (including
-  QSF/GSF length and fade tags), VGM/VGZ GD3/timing, and Commodore 64 SID
-  PSID/RSID header reads.
+- Direct NSF/GBS/NSFE header and chunk enumeration, AY relative-pointer and
+  SAP header/subsong/native TIME metadata through MetaManCore, and HES
+  header/M3U inspection without opening libgme; KSS keeps its 256-slot
+  info-only fallback. SPC ID666/xID6 metadata is read by MetaManCore, including
+  the established libgme-compatible catalog defaults for tagless SPCs. ScanSong
+  projects the shared document into the existing schema; its app and CLI do
+  not link or invoke libgme for SPC inspection.
+- SPC ID666/xID6, PSF/PSF2, SSF, USF, and 2SF tags plus VGM/VGZ GD3/timing
+  through MetaManCore; GSF/QSF retain their specialized container readers, and
+  SID PSID/RSID headers are also read by MetaManCore.
 - Direct SNDH tag/subtune/timing harvesting through VGMBoy's shared `VGMBoySNDH`
   product. SNDH files are enumerated into their actual Atari ST subtunes; the
   scanner does not start playback just to publish metadata.
@@ -157,11 +157,24 @@ error.
   `music.mod` remains OpenMPT. UADE's declared subsong range becomes the
   playlist rows; same-archive player/sample companions remain dependency data,
   not duplicate sources. The source bytes are retained and never converted.
-- Monkey's Audio (`.ape`) through VGMBoy's shared FFmpeg bridge and the bundled
-  `vgmboy-ffmpeg-inspect` adapter. Each file is one finite track; FFmpeg reads
-  its native duration and common title/album/artist/comment tags. ScanSong
-  keeps the original lossless APE bytes, does not transcode or expand them, and
-  records a real metadata failure when the decoder cannot open a file.
+- Monkey's Audio (`.ape`) through MetaManCore's direct APE header/tag reader.
+  It derives one-track duration from sample blocks and rate, reads native
+  APEv2 and leading ID3v2 tags, and checks the bounded frame/seek structure
+  without starting FFmpeg or audio emulation. The source bytes are retained;
+  VGMBoy still uses FFmpeg for playback.
+- CRI/Monster ADX metadata through MetaManCore's header reader. It preserves
+  type-03/04/05 and encrypted type-04 timing, including vgmstream's default
+  loop/fade play window. Content under `.adx` that is Ogg, RIFF, or another
+  non-CRI/Monster alias retains the vgmstream route.
+- Sony CD-XA sector and interleaved subsong metadata through a ScanSong-owned
+  reader; other formats that reuse `.xa` retain the vgmstream route.
+- Atomic Planet AUS header timing and loop metadata through MetaManCore;
+  reader; other content under `.aus` remains eligible for the vgmstream route.
+- Sony MSF codec, stream-name, loop, and duration metadata through MetaManCore;
+  TamaSoft's `MSF ` signature and other non-Sony `.msf` aliases retain the
+  vgmstream route.
+- Konami and SNK SVAG header, native fact, duration, and loop metadata through
+  MetaManCore; unrelated `.svag` signatures retain the vgmstream route.
 - Structurally known single rows for standard audio (including OGG Vorbis),
   modules, and registered formats whose optional metadata can remain empty.
 - Tracker/module rows (S3M, MOD, IT, XM, MTM, STM, and related) via
@@ -170,28 +183,31 @@ error.
   from the VGMBoy-managed source snapshot and compatibility patch to open raw vgmstream formats and enumerate
   real subsongs before publishing rows. TXTP and HD-bank structures are
   materialized and inspected through the same route.
-- A VGMBoy-built Highly Complete plugin that ScanSong bundles to open GSF and
-  miniGSF through the inspection adapter. A miniGSF is accepted only when its required
-  `.gsflib` dependency is present in the extracted source archive; every
-  validated file becomes its real single playable row with its authored tags.
-- A VGMBoy-built QSF plugin that opens QSF and miniQSF through the Audio Overload
-  QSound engine. A miniQSF is accepted only when its required `.qsflib`
-  dependency is present in the extracted source archive; every validated file
-  becomes its real single playable row.
+- A ScanSong-owned GSF/miniGSF reader that validates PSF v0x22 headers, CRCs,
+  zlib payloads, GBA executable segments and ROM-header signatures, and the
+  complete `_lib` dependency chain while extracting authored tags and legacy
+  timing semantics. It does not launch or link mGBA; VGMBoy retains Highly
+  Complete/mGBA for playback. Scanner inspectors now build through a narrow
+  VGMBoy inspection target rather than VGMBoyKit, and scanner-plugin preparation
+  no longer runs VGMBoy's full playback dependency builder.
+- A ScanSong-owned QSF/miniQSF reader that validates PSF v0x41 containers, CRCs,
+  bounded zlib data, QSound blocks, and referenced `.qsflib` files without
+  starting the playback core. It extracts authored tags and timing directly;
+  VGMBoy retains the QSound core for playback.
 
 The complete per-plugin contract—including route policy, native metadata
 source, dependency and archive handling, multi-track expansion, playback
 boundaries, and retained failure behavior—is maintained in
-[`ai/subsystem-agent/format-accommodations.md`](ai/subsystem-agent/format-accommodations.md).
+[`ai/subsystem-agent/format-accommodations.md`](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-agent/format-accommodations.md).
 
 Decoder provenance and milestone versions are maintained centrally by VGMBoy
-in [`Docs/plugin-versions.json`](../VGMBoy/Docs/plugin-versions.json).
+in [`Docs/plugin-versions.json`](/Users/john/Downloads/Code/VGMMan/VGMBoy/Docs/plugin-versions.json).
 ScanSong consumes the staged scanner products and does not maintain a second
 decoder-version list. Run VGMBoy's read-only audit before a release or after
 the documented review interval; adopting a newer decoder still requires
 rebuilding the scanner product and running its format-specific fixtures.
 The human-readable plugin matrix and dependency notes are in
-[`VGMBoy/Docs/plugin-catalog.md`](../VGMBoy/Docs/plugin-catalog.md).
+[`VGMBoy/Docs/plugin-catalog.md`](/Users/john/Downloads/Code/VGMMan/VGMBoy/Docs/plugin-catalog.md).
 
 Standalone Zstandard inputs use the explicit `name.ext.zst` or
 `name.ext.zstd` convention: `ext` is the required inner playable format name,

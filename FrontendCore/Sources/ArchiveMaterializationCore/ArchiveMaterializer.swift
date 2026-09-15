@@ -1,4 +1,5 @@
 import Foundation
+import UACContainerCore
 import VGMBoyFormatCore
 
 /// A shared native materializer for a catalog-selected archive entry.
@@ -18,13 +19,16 @@ public final class ArchiveMaterializer: @unchecked Sendable {
     private let configuration: ArchiveMaterializerConfiguration
     private let processRunner: ArchiveProcessRunner
     private let session: ArchiveMaterializationSession
+    private let decompressUACManifestFrame: UACManifestFrameDecoder?
 
     public init(
         configuration: ArchiveMaterializerConfiguration = .default,
-        session: ArchiveMaterializationSession = ArchiveMaterializationSession()
+        session: ArchiveMaterializationSession = ArchiveMaterializationSession(),
+        decompressUACManifestFrame: UACManifestFrameDecoder? = nil
     ) {
         self.configuration = configuration
         self.session = session
+        self.decompressUACManifestFrame = decompressUACManifestFrame
         self.processRunner = ArchiveProcessRunner(configuration: .init(
             environment: ProcessInfo.processInfo.environment,
             temporaryFilePrefix: "FrontendCore-materializer",
@@ -62,6 +66,7 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         let output = directory.appendingPathComponent(normalizedEntry)
 
         do {
+            try validateUACIfNeeded(archiveURL, entryPath: normalizedEntry)
             switch requirement {
             case .selectedEntry:
                 try extractArchiveEntry(archiveURL: archiveURL, entry: normalizedEntry, output: output)
@@ -123,12 +128,23 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         }
     }
 
+    private func validateUACIfNeeded(_ archiveURL: URL, entryPath: String) throws {
+        guard ArchiveContainerKind(archiveURL: archiveURL) == .uac else { return }
+        let container = try UACContainerReader.read(
+            from: archiveURL,
+            decompressManifestFrame: decompressUACManifestFrame
+        )
+        guard container.manifest.members.contains(where: { $0.path == entryPath }) else {
+            throw ArchiveMaterializationError.invalidEntry
+        }
+    }
+
     private func extractArchiveEntryOnce(archiveURL: URL, entry: String, output: URL) throws {
         try? FileManager.default.removeItem(at: output)
         guard let kind = ArchiveContainerKind(archiveURL: archiveURL) else {
             throw ArchiveMaterializationError.toolUnavailable("supported archive format")
         }
-        if kind == .tarZstandard {
+        if kind.usesTarZstandardPipeline {
             try extractTarZstd(archiveURL: archiveURL, entry: entry, output: output)
         } else {
             try extractWithArchiveTool(

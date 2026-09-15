@@ -1,35 +1,20 @@
 (() => {
-  const RAW_BACKENDS = window.spcBoyWK?.playbackBackends;
-  if (!Array.isArray(RAW_BACKENDS)) {
+  const BACKENDS = window.spcBoyWK?.playbackBackends;
+  if (!Array.isArray(BACKENDS)) {
     throw new Error("Playback backend registry is unavailable from the SPCBoy WK native bridge.");
   }
-  function normalizedExtension(value) {
-    const source = String(value || "").trim().toLowerCase();
-    const separator = source.lastIndexOf(".");
-    return (separator >= 0 ? source.slice(separator + 1) : source).replace(/^\.+/, "");
-  }
-
-  const BACKENDS = Object.freeze(RAW_BACKENDS.map((backend) => Object.freeze({
-    ...backend,
-    extensions: Object.freeze((backend.extensions || []).map(normalizedExtension).filter(Boolean)),
-    playbackSpeedExtensions: Object.freeze(
-      (backend.playbackSpeedExtensions || []).map(normalizedExtension).filter(Boolean)
-    )
-  })));
   const CANDIDATES_BY_EXTENSION = new Map();
-
   for (const backend of BACKENDS) {
     for (const extension of backend.extensions) {
-      const normalized = normalizedExtension(extension);
-      if (!normalized) continue;
-      const candidates = [...(CANDIDATES_BY_EXTENSION.get(normalized) || [])];
+      const candidates = [...(CANDIDATES_BY_EXTENSION.get(extension) || [])];
       candidates.push(backend);
-      CANDIDATES_BY_EXTENSION.set(normalized, Object.freeze(candidates));
+      CANDIDATES_BY_EXTENSION.set(extension, Object.freeze(candidates));
     }
   }
 
   function candidatesForPath(filePath) {
-    const extension = normalizedExtension(filePath);
+    const source = String(filePath || "");
+    const extension = source.slice(source.lastIndexOf(".")).toLowerCase();
     return CANDIDATES_BY_EXTENSION.get(extension) || Object.freeze([]);
   }
 

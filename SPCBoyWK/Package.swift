@@ -21,6 +21,7 @@ let package = Package(
                 .product(name: "FrontendCommandCore", package: "CatalogReader"),
                 .product(name: "CatalogReader", package: "CatalogReader"),
                 .product(name: "CatalogPlaylistCore", package: "CatalogReader"),
+                .product(name: "CatalogPlaylistPresentationCore", package: "CatalogReader"),
                 .product(name: "CatalogSessionCore", package: "CatalogReader"),
                 .product(name: "ArchiveCacheCore", package: "FrontendCore"),
                 .product(name: "ArchiveMaterializationCore", package: "FrontendCore"),

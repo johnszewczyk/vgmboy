@@ -21,6 +21,7 @@ let package = Package(
             dependencies: [
                 .product(name: "CatalogReader", package: "CatalogReader"),
                 .product(name: "CatalogPlaylistCore", package: "CatalogReader"),
+                .product(name: "CatalogPlaylistPresentationCore", package: "CatalogReader"),
                 .product(name: "FrontendCommandCore", package: "CatalogReader"),
                 .product(name: "CatalogBrowserCore", package: "CatalogReader"),
                 .product(name: "CatalogSessionCore", package: "CatalogReader"),
@@ -34,6 +35,7 @@ let package = Package(
                 .product(name: "PlaybackTransportCore", package: "FrontendCore"),
                 .product(name: "ArchiveCacheCore", package: "FrontendCore"),
                 .product(name: "ArchiveMaterializationCore", package: "FrontendCore"),
+                .product(name: "UACContainerCore", package: "FrontendCore"),
                 .product(name: "VGMBoyKit", package: "VGMBoy"),
                 .product(name: "VGMBoyEndpointCore", package: "VGMBoy")
             ],
@@ -46,7 +48,10 @@ let package = Package(
         ),
         .testTarget(
             name: "CocoaSpiceTests",
-            dependencies: ["CocoaSpice"],
+            dependencies: [
+                "CocoaSpice",
+                .product(name: "UACContainerCore", package: "FrontendCore")
+            ],
             resources: [
                 .copy("cross-app-sidebar-search-view-v1.json"),
                 .copy("cross-app-playlist-activation-v1.json")

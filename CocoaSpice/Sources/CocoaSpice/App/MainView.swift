@@ -378,15 +378,17 @@ private enum DatabaseSidebarTableChrome {
         )
     }
 
-    static func updateSelectionHighlight(in tableView: NSTableView, animated: Bool) {
+    static func updateSelectionHighlight(
+        in tableView: NSTableView,
+        animationMilliseconds: Int,
+        animated: Bool
+    ) {
         let selectedRows = tableView.selectedRowIndexes.filter {
             $0 >= 0 && $0 < tableView.numberOfRows
         }
         let rowRects = selectedRows.map(tableView.rect(ofRow:))
         let highlight = (tableView as? DatabaseSidebarNativeTableView)?.selectionHighlightView
-        let stored = UserDefaults.standard.object(forKey: AppDefaultsKey.selectionAnimationMilliseconds) as? NSNumber
-        let enabled = UserDefaults.standard.object(forKey: AppDefaultsKey.selectionAnimationEnabled) as? Bool ?? true
-        highlight?.animationDuration = enabled ? Double(stored?.intValue ?? 200) / 1_000 : 0
+        highlight?.animationDuration = Double(max(0, animationMilliseconds)) / 1_000
         highlight?.update(
             selectionRects: rowRects,
             primaryRect: selectedRows.count == 1 ? rowRects.first : nil,
@@ -552,7 +554,11 @@ private struct DatabaseGameListView: NSViewRepresentable {
                 selectionChanged = true
             }
             if refreshHighlight || selectionChanged {
-                DatabaseSidebarTableChrome.updateSelectionHighlight(in: tableView, animated: false)
+                DatabaseSidebarTableChrome.updateSelectionHighlight(
+                    in: tableView,
+                    animationMilliseconds: model.effectiveSelectionAnimationMilliseconds,
+                    animated: false
+                )
             }
         }
 
@@ -605,7 +611,11 @@ private struct DatabaseGameListView: NSViewRepresentable {
             let primaryID = items.last?.id
             model.selectDatabaseGames(ids: ids, primaryID: primaryID)
             reloadVisibleRows()
-            DatabaseSidebarTableChrome.updateSelectionHighlight(in: tableView, animated: true)
+            DatabaseSidebarTableChrome.updateSelectionHighlight(
+                in: tableView,
+                animationMilliseconds: model.effectiveSelectionAnimationMilliseconds,
+                animated: true
+            )
         }
 
         @objc func handleDoubleAction(_ sender: Any?) {
@@ -691,12 +701,11 @@ private struct DatabaseGameListView: NSViewRepresentable {
             let items = model.visibleDatabaseGameItems
             guard model.sidebarSystemMode else { return items.map(SidebarRow.game) }
 
-            let grouped = Dictionary(grouping: items, by: model.sidebarSystemName(for:))
-            return grouped.keys.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
-                .flatMap { systemName in
-                    let isExpanded = model.expandedDatabaseSystems.contains(systemName)
-                    let children = isExpanded ? (grouped[systemName] ?? []).map(SidebarRow.game) : []
-                    return [.system(systemName, isExpanded: isExpanded)] + children
+            return CatalogBrowser.databaseGameGroups(from: items)
+                .flatMap { group in
+                    let isExpanded = model.expandedDatabaseSystems.contains(group.name)
+                    let children = isExpanded ? group.items.map(SidebarRow.game) : []
+                    return [.system(group.name, isExpanded: isExpanded)] + children
                 }
         }
     }
@@ -896,7 +905,11 @@ private struct DatabaseFileListView: NSViewRepresentable {
                 selectionChanged = true
             }
             if refreshHighlight || selectionChanged {
-                DatabaseSidebarTableChrome.updateSelectionHighlight(in: tableView, animated: false)
+                DatabaseSidebarTableChrome.updateSelectionHighlight(
+                    in: tableView,
+                    animationMilliseconds: model.effectiveSelectionAnimationMilliseconds,
+                    animated: false
+                )
             }
         }
 
@@ -980,7 +993,11 @@ private struct DatabaseFileListView: NSViewRepresentable {
                 model.activateDatabaseFile(item, replace: true)
             }
             reloadVisibleRows()
-            DatabaseSidebarTableChrome.updateSelectionHighlight(in: tableView, animated: true)
+            DatabaseSidebarTableChrome.updateSelectionHighlight(
+                in: tableView,
+                animationMilliseconds: model.effectiveSelectionAnimationMilliseconds,
+                animated: true
+            )
         }
 
         @objc func handleDoubleAction(_ sender: Any?) {

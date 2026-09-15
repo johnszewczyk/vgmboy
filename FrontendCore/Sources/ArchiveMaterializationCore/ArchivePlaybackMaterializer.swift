@@ -1,5 +1,6 @@
 import ArchiveCacheCore
 import Foundation
+import UACContainerCore
 import VGMBoyFormatCore
 
 /// Cache-backed materialization for a catalog-selected archive member.
@@ -15,12 +16,14 @@ public final class ArchivePlaybackMaterializer: @unchecked Sendable {
     private let cacheMaterializer: ArchiveCacheMaterializer
     private let playbackLease: ArchivePlaybackLease
     private let preferenceKeys: ArchiveCachePreferenceKeys
+    private let decompressUACManifestFrame: UACManifestFrameDecoder?
 
     public init(
         cacheRootURL: URL,
         preferenceKeys: ArchiveCachePreferenceKeys,
         playbackLease: ArchivePlaybackLease = ArchivePlaybackLease(),
-        capacityProvider: ArchiveCacheStore.CapacityProvider? = nil
+        capacityProvider: ArchiveCacheStore.CapacityProvider? = nil,
+        decompressUACManifestFrame: UACManifestFrameDecoder? = nil
     ) {
         let cacheStore = ArchiveCacheStore(
             cacheRootURL: cacheRootURL,
@@ -33,6 +36,7 @@ public final class ArchivePlaybackMaterializer: @unchecked Sendable {
             playbackLease: playbackLease
         )
         self.preferenceKeys = preferenceKeys
+        self.decompressUACManifestFrame = decompressUACManifestFrame
     }
 
     /// Returns the selected playable file, never the cache root directory.
@@ -47,10 +51,18 @@ public final class ArchivePlaybackMaterializer: @unchecked Sendable {
         guard FileManager.default.fileExists(atPath: archiveURL.path) else {
             throw ArchiveMaterializationError.missingSource(archiveURL.path)
         }
-
         let normalizedEntry = ArchiveEntryPath.normalized(entryPath)
         guard !normalizedEntry.isEmpty, ArchiveEntryPath.isSafe(normalizedEntry) else {
             throw ArchiveMaterializationError.invalidEntry
+        }
+        if ArchiveContainerKind(archiveURL: archiveURL) == .uac {
+            let container = try UACContainerReader.read(
+                from: archiveURL,
+                decompressManifestFrame: decompressUACManifestFrame
+            )
+            guard container.manifest.members.contains(where: { $0.path == normalizedEntry }) else {
+                throw ArchiveMaterializationError.invalidEntry
+            }
         }
 
         let policy = ArchiveCachePolicy.load(keys: preferenceKeys)
@@ -71,12 +83,6 @@ public final class ArchivePlaybackMaterializer: @unchecked Sendable {
                     outputURL: temporaryURL
                 )
             }
-            try prepareMDXDependency(
-                archiveURL: archiveURL,
-                selectedEntry: normalizedEntry,
-                memberURL: memberURL
-            )
-
         case .completeSet, .completeSetWithLazyUSFAliases:
             if try archiveKind(for: archiveURL) == .singleFileZstandard {
                 throw ArchiveMaterializationError.extractFailed(
@@ -154,134 +160,6 @@ public final class ArchivePlaybackMaterializer: @unchecked Sendable {
             throw ArchiveMaterializationError.toolUnavailable("supported archive format")
         }
         return kind
-    }
-
-    /// MDX modules declare a companion PDX sample bank in their header. A
-    /// catalog entry for a standalone `.MDX.zst` contains only that module,
-    /// so selected-entry extraction must also stage the explicitly declared
-    /// sibling beside it. The same rule applies to MDX members inside normal
-    /// archives, where the dependency is another archive member.
-    private func prepareMDXDependency(
-        archiveURL: URL,
-        selectedEntry: String,
-        memberURL: URL
-    ) throws {
-        guard URL(fileURLWithPath: selectedEntry).pathExtension.lowercased() == "mdx" else {
-            return
-        }
-        let data = try Data(contentsOf: memberURL)
-        guard let dependencyName = mdxDependencyName(in: data) else { return }
-        let dependencyEntry = try resolveMDXDependency(dependencyName, relativeTo: selectedEntry)
-        let dependencyURL = memberURL.deletingLastPathComponent()
-            .appendingPathComponent(dependencyEntry, isDirectory: false)
-        if isNonEmptyFile(dependencyURL) { return }
-
-        try FileManager.default.createDirectory(
-            at: dependencyURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        let temporaryURL = dependencyURL
-            .deletingLastPathComponent()
-            .appendingPathComponent(".\(UUID().uuidString).partial", isDirectory: false)
-        defer { try? FileManager.default.removeItem(at: temporaryURL) }
-
-        if try archiveKind(for: archiveURL) == .singleFileZstandard {
-            guard let sourceURL = mdxSiblingURL(named: dependencyName, beside: archiveURL) else {
-                throw ArchiveMaterializationError.extractFailed(
-                    "Required MDX dependency is missing: \(dependencyName)."
-                )
-            }
-            if ArchiveContainerKind(archiveURL: sourceURL) == .singleFileZstandard {
-                try ArchiveMaterializer.shared.execute(
-                    ArchiveToolRouting.selectedEntryToStdout(
-                        kind: .singleFileZstandard,
-                        archiveURL: sourceURL,
-                        entryPath: sourceURL.deletingPathExtension().lastPathComponent
-                    ),
-                    outputURL: temporaryURL
-                )
-            } else {
-                try FileManager.default.copyItem(at: sourceURL, to: temporaryURL)
-            }
-        } else {
-            try ArchiveMaterializer.shared.execute(
-                ArchiveToolRouting.selectedEntryToStdout(
-                    kind: try archiveKind(for: archiveURL),
-                    archiveURL: archiveURL,
-                    entryPath: dependencyEntry
-                ),
-                outputURL: temporaryURL
-            )
-        }
-
-        guard isNonEmptyFile(temporaryURL) else {
-            throw ArchiveMaterializationError.emptyOutput
-        }
-        if FileManager.default.fileExists(atPath: dependencyURL.path) {
-            try FileManager.default.removeItem(at: dependencyURL)
-        }
-        try FileManager.default.moveItem(at: temporaryURL, to: dependencyURL)
-    }
-
-    private func mdxDependencyName(in data: Data) -> String? {
-        let marker = Data([0x0D, 0x0A, 0x1A])
-        guard let markerRange = data.range(of: marker) else { return nil }
-        let remainder = data[markerRange.upperBound...]
-        guard let terminator = remainder.firstIndex(of: 0x00) else { return nil }
-        let rawName = remainder[..<terminator]
-        guard !rawName.isEmpty else { return nil }
-        var name = String(data: Data(rawName), encoding: .shiftJIS)
-            ?? String(data: Data(rawName), encoding: .utf8)
-            ?? String(decoding: rawName, as: UTF8.self)
-        while name.hasPrefix("\\") { name.removeFirst() }
-        guard !name.isEmpty else { return nil }
-        if URL(fileURLWithPath: name).pathExtension.isEmpty { name += ".pdx" }
-        return name
-    }
-
-    private func resolveMDXDependency(_ dependency: String, relativeTo selectedEntry: String) throws -> String {
-        guard !dependency.hasPrefix("/"), !dependency.contains("\\") else {
-            throw ArchiveMaterializationError.invalidEntry
-        }
-        let base = URL(fileURLWithPath: "/\(selectedEntry)").deletingLastPathComponent()
-        let resolved = base.appendingPathComponent(dependency).standardizedFileURL.path
-        let relative = String(resolved.dropFirst())
-        let normalized = ArchiveEntryPath.normalized(relative)
-        guard !normalized.isEmpty, ArchiveEntryPath.isSafe(normalized) else {
-            throw ArchiveMaterializationError.invalidEntry
-        }
-        return normalized
-    }
-
-    private func mdxSiblingURL(named name: String, beside archiveURL: URL) -> URL? {
-        let requestedURL = archiveURL.deletingLastPathComponent().appendingPathComponent(name)
-        if isRegularFile(requestedURL) { return requestedURL }
-        let directory = requestedURL.deletingLastPathComponent()
-        let requestedName = requestedURL.lastPathComponent
-        guard let entries = try? FileManager.default.contentsOfDirectory(
-            at: directory,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        ) else { return nil }
-        let names = [requestedName, "\(requestedName).zst", "\(requestedName).zstd"]
-        return entries
-            .filter(isRegularFile)
-            .first { candidate in
-                names.contains { candidate.lastPathComponent.caseInsensitiveCompare($0) == .orderedSame }
-            }
-    }
-
-    private func isRegularFile(_ url: URL) -> Bool {
-        (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
-    }
-
-    private func isNonEmptyFile(_ url: URL) -> Bool {
-        guard isRegularFile(url),
-              let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
-              let byteCount = (attributes[.size] as? NSNumber)?.int64Value else {
-            return false
-        }
-        return byteCount > 0
     }
 
     private func validatePlayableOutput(_ url: URL) throws {

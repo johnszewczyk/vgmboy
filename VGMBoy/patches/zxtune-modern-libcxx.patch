@@ -1,9 +1,0 @@
-diff --git a/src/core/plugins/archives/raw_supp.cpp b/src/core/plugins/archives/raw_supp.cpp
---- a/src/core/plugins/archives/raw_supp.cpp
-+++ b/src/core/plugins/archives/raw_supp.cpp
-@@ -430,1 +430,1 @@
--      if (!Subdata.unique())
-+      if (Subdata.use_count() != 1)
-@@ -856,1 +856,1 @@
--        if (!subLocation.unique())
-+        if (subLocation.use_count() != 1)

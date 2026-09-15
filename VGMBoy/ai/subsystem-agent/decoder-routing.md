@@ -49,25 +49,18 @@ deliberately exclusive to one family.
   body and decoding whole-file LZX PDX banks before table parsing. A legacy
   leading backslash in a PDX basename is normalized narrowly; absolute and
   traversal paths remain invalid.
-- ZXTune AY-family tracker files route to `zxtune-aym`. The admitted suffix set
-  is explicit (`as0`, `asc`, `ftc`, `gtr`, `psc`, `psg`, `psm`, `pt1`, `pt2`,
-  `pt3`, `sqt`, `st1`, `st3`, `stc`, `stp`, `vtx`, `ym`) and is shared with
-  ScanSong's native `vgmboy-zxtune-inspect` handoff. `.ayl` and `.ts` are not
-  fallback candidates: the former lacks the required upstream playlist
-  decoder, and the latter is outside the focused direct-plugin graph until it
-  has fixture-qualified support.
 - `hasNaturalEnding == false` (lazyusf/USF and sidplayfp/SID) forces a capped decode window so a looping core can
-  never run indefinitely. `PlaybackTimingPolicy.plan` carries this through the bounded plan. SID metadata
-  currently reports no natural duration, so its normal non-Long-Play window is the shared unknown-duration
-  setting rather than a file-derived length.
+  never run indefinitely. `TimingPolicy.plan` carries this through `usesNativeEnding`. SID
+  metadata currently reports no natural duration, so its normal non-Long-Play window is the
+  shared unknown-duration setting rather than a file-derived length.
 - `appliesFadeInternally` distinguishes cores with native fade (libgme, libvgm) from PCM
   streamers (Highly Complete, vgmstream, lazyusf, playpsf, OpenMPT) that delegate the fade to
   `PlaybackSession`.
 - Standard audio, including FLAC, is finite and never supports Long Play. Its AVAudioFile reader
   is reopened for track starts and seeks so the macOS compressed-file reader and converter state
   are reset without using the unsupported FLAC `framePosition` setter.
-- APE, MP2, and TAK use the finite `FFmpegAudioDecoder` route. APE's native container duration
-  and common tags are exposed through the same bridge to `vgmboy-ffmpeg-inspect` for ScanSong;
+- APE, MP2, and TAK use the finite `FFmpegAudioDecoder` playback route. ScanSong reads APE
+  container timing and common tags directly, with no FFmpeg scanner process or playback-core link;
   the source is never converted into a different catalog format.
 - Highly Complete bridge calls are serialized through one gate. Its native GBA rate may change
   while mGBA runs, so the bridge resamples to VGMBoy's requested output rate and reports output-frame position.
@@ -99,16 +92,16 @@ deliberately exclusive to one family.
 
 ## Files
 
-- [FormatRegistry.swift](../../Sources/VGMBoyKit/FormatRegistry.swift)
-- [AudioDecoder.swift](../../Sources/VGMBoyKit/AudioDecoder.swift)
-- [FFmpegAudioDecoder.swift](../../Sources/VGMBoyKit/FFmpegAudioDecoder.swift)
-- [GMEDecoder.swift](../../Sources/VGMBoyKit/GMEDecoder.swift)
-- [SIDDecoder.swift](../../Sources/VGMBoyKit/SIDDecoder.swift)
-- [OpenMPTDecoder.swift](../../Sources/VGMBoyKit/OpenMPTDecoder.swift)
-- [VGMDecoder.swift](../../Sources/VGMBoyKit/VGMDecoder.swift)
-- [HighlyCompleteDecoder.swift](../../Sources/VGMBoyKit/HighlyCompleteDecoder.swift)
-- [TwoSFDecoder.swift](../../Sources/VGMBoyKit/TwoSFDecoder.swift)
-- [VgmstreamDecoder.swift](../../Sources/VGMBoyKit/VgmstreamDecoder.swift)
-- [LazyUSFDecoder.swift](../../Sources/VGMBoyKit/LazyUSFDecoder.swift)
-- [PlayPSFDecoder.swift](../../Sources/VGMBoyKit/PlayPSFDecoder.swift)
-- [QSFDecoder.swift](../../Sources/VGMBoyKit/QSFDecoder.swift)
+- [FormatRegistry.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/FormatRegistry.swift)
+- [AudioDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/AudioDecoder.swift)
+- [FFmpegAudioDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/FFmpegAudioDecoder.swift)
+- [GMEDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/GMEDecoder.swift)
+- [SIDDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/SIDDecoder.swift)
+- [OpenMPTDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/OpenMPTDecoder.swift)
+- [VGMDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/VGMDecoder.swift)
+- [HighlyCompleteDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/HighlyCompleteDecoder.swift)
+- [TwoSFDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/TwoSFDecoder.swift)
+- [VgmstreamDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/VgmstreamDecoder.swift)
+- [LazyUSFDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/LazyUSFDecoder.swift)
+- [PlayPSFDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/PlayPSFDecoder.swift)
+- [QSFDecoder.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/QSFDecoder.swift)

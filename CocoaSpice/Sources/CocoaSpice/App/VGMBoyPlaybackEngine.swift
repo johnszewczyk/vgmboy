@@ -71,9 +71,9 @@ final class PlaybackEngine: @unchecked Sendable {
         // therefore be visibly stopped and surface its materialization error.
         await transport.stop()
         currentTrack = nil
-        let url = try ZipArchiveSupport.materializePlayableFile(for: track)
+        let playableTrack = try transportTrack(for: track)
         try await transport.play(
-            track: PlaybackTransportTrack(id: track.id, path: url.path, trackIndex: track.trackIndex),
+            track: playableTrack,
             plan: plan,
             tempo: tempo,
             requestID: requestID
@@ -150,11 +150,11 @@ final class PlaybackEngine: @unchecked Sendable {
             return decision
         }
 
-        let url = try ZipArchiveSupport.materializePlayableFile(for: track)
+        let playableTrack = try transportTrack(for: track)
         let start = PlaybackContinuationStart(
-            track: PlaybackTransportTrack(id: track.id, path: url.path, trackIndex: track.trackIndex),
+            track: playableTrack,
             payload: PlaybackControlPayload(
-                path: url.path,
+                path: playableTrack.path,
                 trackIndex: track.trackIndex,
                 tempo: tempo.multiplier,
                 playbackMode: plan.isLongPlay ? .longPlay : .fileDefault,
@@ -167,6 +167,20 @@ final class PlaybackEngine: @unchecked Sendable {
         try await transport.startContinuation(start)
         currentTrack = track
         return decision
+    }
+
+    private func transportTrack(for track: TrackItem) throws -> PlaybackTransportTrack {
+        if let data = try ZipArchiveSupport.seekableUACSPCData(for: track),
+           let entryPath = track.archiveEntryPath {
+            return PlaybackTransportTrack(
+                id: track.id,
+                path: entryPath,
+                trackIndex: track.trackIndex,
+                sourceData: data
+            )
+        }
+        let url = try ZipArchiveSupport.materializePlayableFile(for: track)
+        return PlaybackTransportTrack(id: track.id, path: url.path, trackIndex: track.trackIndex)
     }
 
     func isCurrentGeneration(_ generation: Int) async -> Bool {

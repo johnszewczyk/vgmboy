@@ -60,9 +60,11 @@ CocoaSpice admits the formats registered by the bundled VGMBoy core. The authori
 plugin list, upstream revisions, and direct build dependencies are maintained in
 [VGMBoy’s README](../VGMBoy/README.md).
 
-Supported archive containers are ZIP, 7z, LHA, RSN, and TAR+Zstandard (`.tar.zst`/`.tzst`).
-CocoaSpice owns archive materialization policy; VGMBoy receives a playable file path rather than
-an archive. LHA-backed Amiga modules are materialized as a complete set because UADE modules
+Supported archive containers are ZIP, 7z, LHA, RSN, TAR+Zstandard (`.tar.zst`/`.tzst`), and UAC
+(`.uac`). UAC listing reads raw or Zstandard-compressed manifests through a bounded host decoder.
+Seekable UAC SPC members use indexed Zstandard-frame reads and libgme's in-memory input; the
+decompressed SPC is not written to the playback cache. Other archive-backed formats still use the
+configured cache, and LHA-backed Amiga modules are materialized as a complete set because UADE modules
 identify their replayer in filename prefixes and may require sibling data files.
 
 ## Build and run
@@ -89,4 +91,4 @@ frontend.
 
 CocoaSpice bundles VGMBoyKit and therefore redistributes upstream components under their own
 terms. Preserve the relevant notices in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md). The
-decoder source garden and its build ownership live in the sibling VGMBoy repository.
+decoder source garden and its build ownership live in the sibling VGMBoy package.

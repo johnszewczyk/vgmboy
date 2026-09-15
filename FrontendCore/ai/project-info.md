@@ -8,6 +8,7 @@ native CocoaSpice and SPCBoyWK frontends.
 ## Major Components
 
 - Archive listing, process execution, materialization, cache, and lease cores.
+- UAC skippable-frame/manifest parsing and byte-preserving envelope writing.
 - Local-file browser, favorite identity/store, and playlist identity cores.
 - Typed frontend preference validation and storage coordination.
 - Playback request, queue, and native transport coordination.

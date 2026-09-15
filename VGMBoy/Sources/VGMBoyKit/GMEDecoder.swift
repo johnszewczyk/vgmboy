@@ -54,6 +54,22 @@ final class GMEDecoder: AudioDecoder, @unchecked Sendable {
         self.emu = created
     }
 
+    /// Opens an in-memory SPC member. libgme copies the supplied bytes, so
+    /// the caller may release the UAC frame/member buffers after construction.
+    init(data: Data, sampleRate: Int = 44_100) throws {
+        self.sampleRate = sampleRate
+        var created: OpaquePointer?
+        let error = data.withUnsafeBytes { bytes in
+            gme_open_data(bytes.baseAddress, bytes.count, &created, Int32(sampleRate))
+        }
+        guard error == nil, let created else {
+            throw GMEDecoderError.loadFailed(
+                error.map { String(cString: $0) } ?? "Unknown error."
+            )
+        }
+        self.emu = created
+    }
+
     deinit {
         gme_delete(emu)
     }
@@ -99,8 +115,7 @@ final class GMEDecoder: AudioDecoder, @unchecked Sendable {
             introMs: Int(info.intro_length),
             loopMs: Int(info.loop_length),
             playMs: Int(info.play_length),
-            fadeMs: Int(info.fade_length),
-            dumper: String(cString: info.dumper)
+            fadeMs: Int(info.fade_length)
         )
     }
 

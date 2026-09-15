@@ -1,5 +1,4 @@
 import Foundation
-import CatalogPlaylistCore
 import PlaylistIdentityCore
 
 enum TrackSource: Hashable, Sendable {
@@ -119,8 +118,17 @@ enum TrackSource: Hashable, Sendable {
 }
 
 enum FilenamePresentation {
+    private static let compoundArchiveSuffixes = [
+        ".tar.zst", ".tar.zstd", ".tar.gz", ".tar.bz2", ".tar.xz", ".tar.lz", ".tar.lz4"
+    ]
+
     static func withoutDisplayedExtension(_ filename: String) -> String {
-        CatalogPlaylistPresentation.withoutDisplayedExtension(filename)
+        let lowercased = filename.lowercased()
+        if let suffix = compoundArchiveSuffixes.first(where: { lowercased.hasSuffix($0) }) {
+            return String(filename.dropLast(suffix.count))
+        }
+        let stem = URL(fileURLWithPath: filename).deletingPathExtension().lastPathComponent
+        return stem.isEmpty ? filename : stem
     }
 }
 
@@ -176,7 +184,6 @@ struct DatabaseGameItem: Identifiable, Hashable, Sendable {
     let systemName: String
     let trackCount: Int
     let displayName: String
-    let searchableName: String
 
     var id: String { "\(rootID)\u{1F}\(name)\u{1F}\(systemName)" }
     var rootDisplayName: String {
@@ -190,8 +197,6 @@ struct DatabaseGameItem: Identifiable, Hashable, Sendable {
         self.systemName = systemName.trimmingCharacters(in: .whitespacesAndNewlines)
         self.trackCount = trackCount
         self.displayName = (displayName ?? self.name).trimmingCharacters(in: .whitespacesAndNewlines)
-        let rootName = URL(fileURLWithPath: rootPath, isDirectory: true).lastPathComponent
-        self.searchableName = "\(self.name) \(self.systemName) \(rootName)".lowercased()
     }
 }
 
@@ -333,7 +338,6 @@ struct PlaylistColumnWidthHints: Equatable, Sendable {
     let titleText: String
     let gameText: String
     let authorText: String
-    let dumperText: String
     let systemText: String
     let lengthText: String
 }

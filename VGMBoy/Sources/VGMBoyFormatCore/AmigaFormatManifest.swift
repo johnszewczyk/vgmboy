@@ -8,15 +8,6 @@ import Foundation
 /// format-core product so ScanSong and VGMBoy make the same admission
 /// decision without depending on either frontend.
 public enum AmigaFormatManifest {
-    /// Extensions used by the ZX Spectrum AY-family collections. These files
-    /// often have names that begin with an Amiga prefix (`STAR.pt2`,
-    /// `SKT.pt3`, or `ML.4 95.ayl`). They are not Amiga modules, so the
-    /// path-prefix fallback must not admit them to UADE.
-    public static let knownNonAmigaExtensions: Set<String> = [
-        "as0", "asc", "ayl", "ftc", "fxm", "gtr", "org", "psc", "psm",
-        "pt1", "pt2", "pt3", "psg", "rus", "sqt", "st1", "st3", "stc", "stc_", "stp", "vtx", "ym", "zx"
-    ]
-
     public static let prefixes: Set<String> = Set("""
         !pm!, 1gu, 1pj, 2gu, 2pj, 3gu, 3octstr, 3pj, 4gu, 4pj, 5gu, 5pj, 5thaugrel,
         5thaugstr, 6gu, 6pj, 7gu, 7pj, 7thdimstr, 8gu, 8pj, 9pj, 40a, 40b, 41a,
@@ -54,11 +45,7 @@ public enum AmigaFormatManifest {
     /// Returns the longest matching Amiga prefix for a complete path.
     /// Longest-match handling matters for entries such as `tfmx1.5`.
     public static func prefix(for path: String) -> String? {
-        let url = URL(fileURLWithPath: path)
-        let name = url.lastPathComponent.lowercased()
-        guard !knownNonAmigaExtensions.contains(url.pathExtension.lowercased()) else {
-            return nil
-        }
+        let name = URL(fileURLWithPath: path).lastPathComponent.lowercased()
         return prefixes
             .sorted { $0.count > $1.count }
             .first { name == $0 || name.hasPrefix($0 + ".") }

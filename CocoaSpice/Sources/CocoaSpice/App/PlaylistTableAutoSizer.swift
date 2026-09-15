@@ -1,4 +1,5 @@
 import AppKit
+import FrontendPreferencesCore
 import SwiftUI
 
 struct PlaylistTableAutoSizer: NSViewRepresentable {
@@ -85,8 +86,6 @@ struct PlaylistTableAutoSizer: NSViewRepresentable {
                 widestWidth(in: model.playlist) { model.gameText(for: $0) }
             case "Author":
                 widestWidth(in: model.playlist) { model.authorText(for: $0) }
-            case "Dumper":
-                widestWidth(in: model.playlist) { model.dumperText(for: $0) }
             case "System":
                 widestWidth(in: model.playlist) { model.systemText(for: $0) }
             case "Path":
@@ -97,7 +96,8 @@ struct PlaylistTableAutoSizer: NSViewRepresentable {
                 tableColumn.width
             }
 
-            let padding = tableView.intercellSpacing.width + 20
+            let padding = tableView.intercellSpacing.width
+                + CGFloat(FrontendPlaylistColumnSizing.defaultHorizontalPaddingPerSide * 2)
             return max(headerWidth, contentWidth) + padding
         }
 

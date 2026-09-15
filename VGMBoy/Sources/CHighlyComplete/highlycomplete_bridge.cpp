@@ -648,37 +648,6 @@ int32_t loadGSFFile(HighlyCompleteHandle* handle, const char* path, char** error
     return 0;
 }
 
-int32_t inspectGSFFile(
-    const char* path,
-    highlycomplete_metadata_t* metadata,
-    int32_t* trackCount,
-    char** errorMessage
-) {
-    MetadataCollector collector;
-    int version = psf_load(
-        path,
-        &kPSFCallbacks,
-        0x22,
-        nullptr,
-        nullptr,
-        gsfInfoCallback,
-        &collector,
-        1
-    );
-    if (version != 0x22) {
-        setError(errorMessage, "HighlyComplete could not decode this GSF/miniGSF file.");
-        return 1;
-    }
-
-    if (metadata != nullptr) {
-        populateMetadata(metadata, collector);
-    }
-    if (trackCount != nullptr) {
-        *trackCount = 1;
-    }
-    return 0;
-}
-
 } // namespace
 
 highlycomplete_player_handle_t highlycomplete_player_create(
@@ -800,18 +769,6 @@ int32_t highlycomplete_player_played_frames(highlycomplete_player_handle_t handl
         return 0;
     }
     return static_cast<int32_t>(handle->playedFrames);
-}
-
-int32_t highlycomplete_inspect_file(
-    const char* path,
-    highlycomplete_metadata_t* metadata,
-    int32_t* track_count,
-    char** error_message
-) {
-    if (track_count != nullptr) {
-        *track_count = 0;
-    }
-    return inspectGSFFile(path, metadata, track_count, error_message);
 }
 
 void highlycomplete_metadata_clear(highlycomplete_metadata_t* metadata) {

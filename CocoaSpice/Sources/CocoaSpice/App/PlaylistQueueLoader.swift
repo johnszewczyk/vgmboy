@@ -220,7 +220,6 @@ enum PlaylistQueueLoader {
                 titleText: "",
                 gameText: "",
                 authorText: "",
-                dumperText: "",
                 systemText: "",
                 lengthText: "—"
             )

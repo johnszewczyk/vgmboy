@@ -4,10 +4,7 @@ import Observation
 /// Shared interaction timings for the native and WebKit frontends.
 public struct FrontendAnimationTimings: Codable, Equatable, Sendable {
     public static let defaultDurationMilliseconds = 200
-    /// Durations are user-controlled timing values. Zero remains the explicit
-    /// way to make a transition immediate, but there is no arbitrary upper
-    /// limit that turns a long requested animation into a different one.
-    public static let allowedMilliseconds = 0...Int.max
+    public static let allowedMilliseconds = 0...1_000
 
     public var autoResizeEnabled: Bool
     public var selectionEnabled: Bool
@@ -44,7 +41,7 @@ public struct FrontendAnimationTimings: Codable, Equatable, Sendable {
     }
 
     public static func clamp(_ value: Int) -> Int {
-        max(value, allowedMilliseconds.lowerBound)
+        min(max(value, allowedMilliseconds.lowerBound), allowedMilliseconds.upperBound)
     }
 }
 
@@ -220,6 +217,168 @@ public final class FrontendPreferencesCoordinator {
             return
         }
         store.save(value)
+    }
+}
+
+/// Renderer-neutral spacing used when a playlist column is only as wide as
+/// its displayed header. The renderers still measure fonts and convert this
+/// value into their native width units.
+public struct FrontendPlaylistColumnSizing: Codable, Equatable, Sendable {
+    public static let defaultHorizontalPaddingPerSide = 8.0
+    public static let allowedHorizontalPaddingPerSide = 0.0...16.0
+
+    public let horizontalPaddingPerSide: Double
+
+    public init(horizontalPaddingPerSide: Double = Self.defaultHorizontalPaddingPerSide) {
+        self.horizontalPaddingPerSide = min(
+            max(horizontalPaddingPerSide, Self.allowedHorizontalPaddingPerSide.lowerBound),
+            Self.allowedHorizontalPaddingPerSide.upperBound
+        )
+    }
+
+    public var horizontalPadding: Double {
+        horizontalPaddingPerSide * 2
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case horizontalPaddingPerSide
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            horizontalPaddingPerSide: try container.decodeIfPresent(Double.self, forKey: .horizontalPaddingPerSide)
+                ?? Self.defaultHorizontalPaddingPerSide
+        )
+    }
+}
+
+/// A renderer-neutral playlist column capability. Labels, widths, and the
+/// mechanics of moving or hiding a column stay with the renderer; this only
+/// describes the durable preference rules shared by every frontend.
+public struct FrontendPlaylistColumnDefinition: Codable, Equatable, Sendable {
+    public let id: String
+    public let isReorderable: Bool
+    public let isSortable: Bool
+    public let isVisibleByDefault: Bool
+
+    public init(
+        id: String,
+        isReorderable: Bool = true,
+        isSortable: Bool = true,
+        isVisibleByDefault: Bool = true
+    ) {
+        self.id = id
+        self.isReorderable = isReorderable
+        self.isSortable = isSortable
+        self.isVisibleByDefault = isVisibleByDefault
+    }
+}
+
+/// The validated, renderer-neutral part of a playlist's column preferences.
+/// Width units intentionally remain local: CocoaSpice uses points while the
+/// WebKit frontend uses percentage tracks.
+public struct FrontendPlaylistColumnLayout: Codable, Equatable, Sendable {
+    public let order: [String]
+    public let visibility: [String: Bool]
+
+    public init(order: [String], visibility: [String: Bool]) {
+        self.order = order
+        self.visibility = visibility
+    }
+}
+
+public enum FrontendPlaylistSortDirection: String, Codable, Equatable, Sendable {
+    case ascending
+    case descending
+}
+
+/// An explicit playlist sort request. A missing or invalid column is always
+/// inactive, so legacy preferences cannot accidentally replace natural catalog
+/// order when a frontend loads.
+public struct FrontendPlaylistSortPreference: Codable, Equatable, Sendable {
+    public let isEnabled: Bool
+    public let columnID: String?
+    public let direction: FrontendPlaylistSortDirection
+
+    public init(
+        isEnabled: Bool,
+        columnID: String?,
+        direction: FrontendPlaylistSortDirection
+    ) {
+        self.isEnabled = isEnabled
+        self.columnID = columnID
+        self.direction = direction
+    }
+}
+
+/// Validates the shared meaning of playlist layout and sort preferences while
+/// allowing each renderer to choose its own visible column identifiers.
+///
+/// A non-reorderable column remains at its schema position. Persisted order
+/// only rearranges reorderable columns, and invalid or stale IDs are ignored.
+/// The resulting layout always retains at least one visible column.
+public struct FrontendPlaylistColumnSchema: Equatable, Sendable {
+    public let columns: [FrontendPlaylistColumnDefinition]
+
+    public init(columns: [FrontendPlaylistColumnDefinition]) {
+        precondition(!columns.isEmpty, "A playlist column schema needs at least one column.")
+        precondition(
+            Set(columns.map(\.id)).count == columns.count && columns.allSatisfy { !$0.id.isEmpty },
+            "Playlist column identifiers must be non-empty and unique."
+        )
+        self.columns = columns
+    }
+
+    public func normalizedLayout(
+        order: [String]?,
+        visibility: [String: Bool]?
+    ) -> FrontendPlaylistColumnLayout {
+        let knownIDs = Set(columns.map(\.id))
+        var requestedReorderableIDs: [String] = []
+        var seenIDs: Set<String> = []
+
+        for id in order ?? [] where knownIDs.contains(id) && seenIDs.insert(id).inserted {
+            guard columns.first(where: { $0.id == id })?.isReorderable == true else { continue }
+            requestedReorderableIDs.append(id)
+        }
+
+        for column in columns where column.isReorderable && !seenIDs.contains(column.id) {
+            requestedReorderableIDs.append(column.id)
+        }
+
+        var reorderableIterator = requestedReorderableIDs.makeIterator()
+        let normalizedOrder = columns.map { column in
+            column.isReorderable ? reorderableIterator.next()! : column.id
+        }
+
+        var normalizedVisibility = Dictionary(uniqueKeysWithValues: columns.map { column in
+            (column.id, visibility?[column.id] ?? column.isVisibleByDefault)
+        })
+        if !normalizedVisibility.values.contains(true), let firstColumn = columns.first {
+            normalizedVisibility[firstColumn.id] = true
+        }
+
+        return FrontendPlaylistColumnLayout(
+            order: normalizedOrder,
+            visibility: normalizedVisibility
+        )
+    }
+
+    public func normalizedSort(
+        isEnabled: Bool?,
+        columnID: String?,
+        direction: FrontendPlaylistSortDirection?
+    ) -> FrontendPlaylistSortPreference {
+        let validColumnID = columnID.flatMap { id in
+            columns.first(where: { $0.id == id && $0.isSortable })?.id
+        }
+        let isActive = isEnabled == true && validColumnID != nil
+        return FrontendPlaylistSortPreference(
+            isEnabled: isActive,
+            columnID: isActive ? validColumnID : nil,
+            direction: direction ?? .ascending
+        )
     }
 }
 

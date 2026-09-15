@@ -3,8 +3,7 @@
 ## Display
 
 - Display: file metadata in a headed table.
-- Columns: favorite, index, file, title, game, author, dumper, system, path, and length. The favorite glyph is immediately before #; its filled state uses the configured playlist text color.
-- Dumper: catalog-backed SPC rows show the authored dumper tag; rows without one show an em dash.
+- Columns: favorite, index, file, title, game, author, system, path, and length. The favorite glyph is immediately before #; its filled state uses the configured playlist text color.
 - Columns: missing metadata falls back to useful file or folder text.
 - Columns: includes a user-configurable Size column for direct files; archive entries show an unavailable marker until archive-entry sizing is modeled separately.
 - Metadata: catalog-backed queues display only the fields published in the selected catalog; incomplete fields remain incomplete until ScanSong republishes them.
@@ -16,7 +15,6 @@
 - Columns: the header menu can auto-size one column or all visible columns.
 - Columns: Path shows the complete filesystem source path. Archive tracks retain their member provenance as `archive-path#member-path`.
 - Font: an Interface preference can render all playlist text columns in a monospaced font.
-- Rows: the Interface > Playlist Options > Row Gap setting controls the vertical space between playlist rows in points; zero keeps the compact default.
 
 ## Selection
 
@@ -35,7 +33,7 @@
   configured AAC Export Folder. It uses the active Long Play/end-fade timing and does not interrupt
   current playback. The filename begins with the catalog track title, or the displayed playlist name
   when that title is absent.
-- Files: Finder drops add supported files, folders, and ZIP, 7z, LHA, or RSN archives.
+- Files: Finder drops add supported files, folders, and supported archives, including UAC packages.
 - Files: queueing a folder expands supported archive members and multi-track containers into playlist leaves.
 - Playlists: dropping an `.m3u` appends its playable entries to the current queue.
 - Playlists: `Open Playlist…` and opening an `.m3u` from Finder replace the current queue.
@@ -47,5 +45,5 @@
 
 ## Files
 
-- [PlaylistTableView.swift](../../Sources/CocoaSpice/App/PlaylistTableView.swift)
-- [PlayerViewModel.swift](../../Sources/CocoaSpice/App/PlayerViewModel.swift)
+- [PlaylistTableView.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlaylistTableView.swift)
+- [PlayerViewModel.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlayerViewModel.swift)

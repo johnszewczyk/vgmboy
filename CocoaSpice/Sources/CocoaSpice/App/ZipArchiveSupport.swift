@@ -3,11 +3,12 @@ import Dispatch
 import ArchiveCacheCore
 import ArchiveMaterializationCore
 import Foundation
+import UACContainerCore
 
 enum ZipArchiveSupport {
     static var cacheDirectoryURL: URL { cacheRootURL() }
 
-    static let supportedArchiveExtensions: Set<String> = ["zip", "7z", "lha", "rsn", "tzst", "zst", "zstd"]
+    static let supportedArchiveExtensions: Set<String> = ["zip", "7z", "lha", "rsn", "tzst", "zst", "zstd", "uac"]
     private static let archiveListingTimeout: TimeInterval = 30
     private static let archiveExtractionTimeout: TimeInterval = 600
     private static let archiveListingMaximumBytes = 64 * 1024 * 1024
@@ -41,7 +42,8 @@ enum ZipArchiveSupport {
         preferenceKeys: ArchiveCachePreferenceKeys(
             modeKey: AppDefaultsKey.archiveCacheMode,
             limitKey: AppDefaultsKey.archiveCacheLimitBytes
-        )
+        ),
+        decompressUACManifestFrame: UACManifestFrameCodec.decoder
     )
 
     struct ArchiveEntry: Hashable, Sendable {
@@ -242,6 +244,8 @@ enum ZipArchiveSupport {
             let report = String(decoding: data, as: UTF8.self)
             guard report.contains("Check: XXH64") else { return nil }
             return "zstd-report:\n\(report)"
+        case .uac:
+            return try listEntries(in: archiveURL).scanSignature
         case .rsn:
             return nil
         case .singleFileZstandard:
@@ -265,15 +269,38 @@ enum ZipArchiveSupport {
         }
     }
 
+    /// Reads one SPC directly from an indexed UAC TAR+Zstandard payload.
+    /// The selected member and its intersecting frames are held in memory;
+    /// this path creates no decompressed playback-cache file.
+    static func seekableUACSPCData(for track: TrackItem) throws -> Data? {
+        guard track.playablePathExtension == "spc",
+              case let .zipEntry(archiveURL, entryPath) = track.source,
+              archiveURL.pathExtension.lowercased() == "uac" else {
+            return nil
+        }
+        let memberFile = try UACSeekableMemberFile(
+            url: archiveURL,
+            memberPath: entryPath,
+            maximumCachedFrames: 2,
+            decompressManifestFrame: UACManifestFrameCodec.decoder,
+            decompressFrame: UACSeekableFrameCodec.decoder
+        )
+        guard memberFile.size > 0, memberFile.size <= 16 * 1024 * 1024 else {
+            throw ArchiveError.listingLimitExceeded("The selected SPC member is empty or exceeds the 16 MiB in-memory playback limit.")
+        }
+        return try memberFile.read(at: 0, byteCount: Int(memberFile.size))
+    }
+
     static func materializeEntry(archiveURL: URL, entryPath: String) throws -> URL {
         let archiveURL = archiveURL.standardizedFileURL
         let normalizedEntryPath = normalizeEntryPath(entryPath)
+        try validateUACIfNeeded(archiveURL, memberPaths: [normalizedEntryPath])
 
         // A TAR+Zstandard stream must be decompressed from its beginning, but
         // a selected-entry decoder still needs only one member. Extract that
         // member into its durable selection cache; expanding every sibling
         // makes small SPC playback wait on an unrelated archive-sized write.
-        if archiveKind(for: archiveURL) == .tarZstandard {
+        if archiveKind(for: archiveURL).usesTarZstandardPipeline {
             let rootURL = try materializeEntries(at: archiveURL, entryPaths: [normalizedEntryPath])
             let memberURL = archiveMemberURL(in: rootURL, entryPath: normalizedEntryPath)
             guard FileManager.default.fileExists(atPath: memberURL.path) else {
@@ -312,9 +339,10 @@ enum ZipArchiveSupport {
         guard isSafeEntryPath(normalizedEntryPath) else {
             throw ArchiveError.invalidEntryPath(entryPath)
         }
+        try validateUACIfNeeded(archiveURL, memberPaths: [normalizedEntryPath])
 
         return try ArchiveManifestReader().read(entryPath: normalizedEntryPath) { rootURL, memberURL in
-            if archiveKind(for: archiveURL) == .tarZstandard {
+            if archiveKind(for: archiveURL).usesTarZstandardPipeline {
                 try extractTarZstandardEntries(
                     from: archiveURL,
                     entryPaths: [normalizedEntryPath],
@@ -335,6 +363,7 @@ enum ZipArchiveSupport {
 
     static func materializeArchive(at archiveURL: URL) throws -> URL {
         let archiveURL = archiveURL.standardizedFileURL
+        try validateUACIfNeeded(archiveURL)
         guard archiveKind(for: archiveURL) != .singleFileZstandard else {
             throw ArchiveError.unsupportedArchive(archiveURL)
         }
@@ -361,6 +390,7 @@ enum ZipArchiveSupport {
     /// member only adds startup and temporary-file overhead.
     static func materializeEntries(at archiveURL: URL, entryPaths: [String]) throws -> URL {
         let archiveURL = archiveURL.standardizedFileURL
+        try validateUACIfNeeded(archiveURL, memberPaths: entryPaths.map(normalizeEntryPath))
         guard archiveKind(for: archiveURL) != .singleFileZstandard else {
             throw ArchiveError.unsupportedArchive(archiveURL)
         }
@@ -371,7 +401,7 @@ enum ZipArchiveSupport {
                 entryPaths: entryPaths,
                 policy: policy
             ) { stagingURL, normalizedPaths in
-                if archiveKind(for: archiveURL) == .tarZstandard {
+                if archiveKind(for: archiveURL).usesTarZstandardPipeline {
                     try extractTarZstandardEntries(
                         from: archiveURL,
                         entryPaths: normalizedPaths,
@@ -488,6 +518,20 @@ enum ZipArchiveSupport {
             return try parseListingErrors {
                 try ArchiveListingParser.parseTarListing(data)
             }
+        case .uac:
+            let container = try UACContainerReader.read(
+                from: archiveURL,
+                decompressManifestFrame: UACManifestFrameCodec.decoder
+            )
+            let entries = container.manifest.members.map(\.path)
+            guard entries.count <= ArchiveListingParser.maximumEntries,
+                  entries.allSatisfy({ $0.utf8.count <= ArchiveListingParser.maximumEntryNameBytes }) else {
+                throw ArchiveError.listingLimitExceeded("manifest member paths exceed the supported listing bounds")
+            }
+            return ArchiveListing(
+                entries: entries,
+                scanSignature: "uac-manifest-sha256:\(container.manifestSHA256)"
+            )
         case .singleFileZstandard:
             throw ArchiveError.unsupportedArchive(archiveURL)
         }
@@ -513,6 +557,18 @@ enum ZipArchiveSupport {
         ArchiveContainerKind(archiveURL: archiveURL) ?? .rsn
     }
 
+    private static func validateUACIfNeeded(_ archiveURL: URL, memberPaths: [String] = []) throws {
+        guard archiveKind(for: archiveURL) == .uac else { return }
+        let container = try UACContainerReader.read(
+            from: archiveURL,
+            decompressManifestFrame: UACManifestFrameCodec.decoder
+        )
+        let declaredMembers = Set(container.manifest.members.map(\.path))
+        guard memberPaths.allSatisfy(declaredMembers.contains) else {
+            throw ArchiveError.invalidEntryPath(memberPaths.first(where: { !declaredMembers.contains($0) }) ?? "")
+        }
+    }
+
     private static func standaloneEntry(in archiveURL: URL) -> ArchiveEntry? {
         guard archiveKind(for: archiveURL) == .singleFileZstandard else { return nil }
         let entryPath = archiveURL.deletingPathExtension().lastPathComponent
@@ -520,7 +576,7 @@ enum ZipArchiveSupport {
         return ArchiveEntry(archiveURL: archiveURL, entryPath: entryPath)
     }
 
-    private static func executable(named name: String) throws -> String {
+    static func executable(named name: String) throws -> String {
         let environmentKey: String
         switch name {
         case "7zz": environmentKey = "COCOASPICE_7Z_BINARY"

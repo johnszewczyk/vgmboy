@@ -1,7 +1,6 @@
 # Options
 
 - Windows has independent Always on Top switches for the main and Options windows; both default off. Main keeps CocoaSpice above other apps; Options keeps the Options window above the main window.
-- Cmd-Comma toggles the Options window. It opens the existing scene when dismissed and dismisses that scene when visible; the shortcut comes from the shared frontend command catalog.
 
 ## Database
 
@@ -47,8 +46,8 @@
   playlist on selection; single-track files queue only on double-click or
   Return. Double-Click Enqueues remains a browser behavior control for Games.
 - Every Options panel places a horizontal rule below its heading. Checkbox options use a leading checkbox with any explanatory text aligned beneath its label.
-- Playlist Options: Column Auto-size defaults on and automatically resizes columns for content width on selection. Row Gap controls the separate vertical space between playlist rows in points and defaults to 0.
-- Animations: Auto-Resize and Selection Bar are independently checkbox-enabled (both default on) and retain their configured nonnegative durations when disabled; zero is immediate, and disabling one makes its effective duration 0 ms. Auto-Resize uses elapsed-time interpolation at the shared 60 Hz cadence with ease-in-out timing, not a fixed step count.
+- Playlist Options: Column Auto-size defaults on and automatically resizes columns for content width on selection.
+- Animations: Auto-Resize and Selection Bar are independently checkbox-enabled (both default on) and retain their configured 0–1000 ms values when disabled; disabling one makes its effective duration 0 ms.
 - Shared ownership: preference persistence and cache policy come from FrontendCore; playback timing and AAC conversion come from VGMBoyKit. CocoaSpice supplies only its native controls, destination-folder choice, and archive materialization adapter.
 
 ## Window
@@ -56,7 +55,7 @@
 - Options opens in a native titled macOS window.
 - The window initially opens at 800pt wide and 600pt tall, can be freely resized down to 320pt by 240pt, and remembers its last size and position.
 - Windows Reset restores the default size and centered position for the main, Options, and About windows.
-- Interface > Animations exposes checkbox-enabled auto-resize and playlist/sidebar selection-bar durations. Both default on at 200 ms and accept any nonnegative duration; zero is immediate.
+- Interface > Animations exposes checkbox-enabled auto-resize and playlist/sidebar selection-bar durations. Both default on at 200 ms and accept 0–1000 ms.
 - The Options sidebar is alphabetized within two groups: CocoaSpice contains Database, Interface, and Windows; VGMBoy contains Audio, Diagnostics, and Playback.
 - The former Plugins inventory page is not part of Options. Component ownership and licenses remain documented in VGMBoy.
 
@@ -66,4 +65,4 @@
 
 ## Files
 
-- [OptionsView.swift](../../Sources/CocoaSpice/App/OptionsView.swift)
+- [OptionsView.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/OptionsView.swift)

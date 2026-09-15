@@ -1,11 +1,7 @@
+import CatalogPlaylistPresentationCore
 import Foundation
-import CatalogPlaylistCore
 
 enum PlaylistPresentation {
-    static func isMeaningfulColumnText(_ text: String) -> Bool {
-        CatalogPlaylistPresentation.isMeaningful(text)
-    }
-
     static func titleText(for track: TrackItem, metadata: TrackMetadata?) -> String {
         metadata?.song.nonEmpty ?? track.displayName
     }
@@ -18,17 +14,15 @@ enum PlaylistPresentation {
         metadata?.author.nonEmpty ?? "—"
     }
 
-    static func dumperText(for metadata: TrackMetadata?) -> String {
-        metadata?.dumper.nonEmpty ?? "—"
-    }
-
     static func systemText(for metadata: TrackMetadata?) -> String {
         metadata?.system.nonEmpty ?? "—"
     }
 
     static func lengthText(for metadata: TrackMetadata?) -> String {
         guard let metadata else { return "—" }
-        return CatalogPlaylistPresentation.lengthLabel(milliseconds: metadata.playLengthMs)
+        let seconds = max(0, metadata.playLengthMs > 0 ? metadata.playLengthMs / 1000 : 0)
+        guard seconds > 0 else { return "—" }
+        return formatTime(seconds)
     }
 
     static func filterTracks(
@@ -47,7 +41,6 @@ enum PlaylistPresentation {
                 titleText(for: track, metadata: trackMetadata),
                 gameText(for: track, metadata: trackMetadata),
                 authorText(for: trackMetadata),
-                dumperText(for: trackMetadata),
                 systemText(for: trackMetadata)
             ]
             .joined(separator: " ")
@@ -65,7 +58,6 @@ enum PlaylistPresentation {
         var widestTitleText = ""
         var widestGameText = ""
         var widestAuthorText = ""
-        var widestDumperText = ""
         var widestSystemText = ""
         var widestLengthText = "—"
 
@@ -75,7 +67,6 @@ enum PlaylistPresentation {
             widestTitleText = longerText(widestTitleText, titleText(for: track, metadata: trackMetadata))
             widestGameText = longerText(widestGameText, gameText(for: track, metadata: trackMetadata))
             widestAuthorText = longerText(widestAuthorText, authorText(for: trackMetadata))
-            widestDumperText = longerText(widestDumperText, dumperText(for: trackMetadata))
             widestSystemText = longerText(widestSystemText, systemText(for: trackMetadata))
             widestLengthText = longerText(widestLengthText, lengthText(for: trackMetadata))
         }
@@ -86,7 +77,6 @@ enum PlaylistPresentation {
             titleText: widestTitleText,
             gameText: widestGameText,
             authorText: widestAuthorText,
-            dumperText: widestDumperText,
             systemText: widestSystemText,
             lengthText: widestLengthText
         )
@@ -95,33 +85,15 @@ enum PlaylistPresentation {
     static func compareTracks(
         _ lhs: TrackItem,
         _ rhs: TrackItem,
-        by column: PlayerViewModel.PlaylistSortColumn,
+        by column: CatalogPlaylistSortColumn,
         manualOrder: [String: Int],
         metadata: [String: TrackMetadata]
     ) -> ComparisonResult {
-        let lhsMetadata = metadata[lhs.id]
-        let rhsMetadata = metadata[rhs.id]
-
-        switch column {
-        case .index:
-            return compare(manualOrder[lhs.id] ?? .max, manualOrder[rhs.id] ?? .max)
-        case .file:
-            return compare(lhs.filename, rhs.filename)
-        case .title:
-            return compare(titleText(for: lhs, metadata: lhsMetadata), titleText(for: rhs, metadata: rhsMetadata))
-        case .game:
-            return compare(gameText(for: lhs, metadata: lhsMetadata), gameText(for: rhs, metadata: rhsMetadata))
-        case .author:
-            return compare(authorText(for: lhsMetadata), authorText(for: rhsMetadata))
-        case .dumper:
-            return compare(dumperText(for: lhsMetadata), dumperText(for: rhsMetadata))
-        case .system:
-            return compare(systemText(for: lhsMetadata), systemText(for: rhsMetadata))
-        case .path:
-            return compare(lhs.fullPathText, rhs.fullPathText)
-        case .length:
-            return compare(lhsMetadata?.playLengthMs ?? 0, rhsMetadata?.playLengthMs ?? 0)
-        }
+        CatalogPlaylistSorting.compare(
+            sortRecord(for: lhs, manualOrder: manualOrder, metadata: metadata[lhs.id]),
+            sortRecord(for: rhs, manualOrder: manualOrder, metadata: metadata[rhs.id]),
+            by: column
+        )
     }
 
     static func formatTime(_ totalSeconds: Int) -> String {
@@ -130,13 +102,22 @@ enum PlaylistPresentation {
         return String(format: "%d:%02d", minutes, seconds)
     }
 
-    private static func compare(_ lhs: String, _ rhs: String) -> ComparisonResult {
-        lhs.localizedStandardCompare(rhs)
-    }
-
-    private static func compare(_ lhs: Int, _ rhs: Int) -> ComparisonResult {
-        if lhs == rhs { return .orderedSame }
-        return lhs < rhs ? .orderedAscending : .orderedDescending
+    private static func sortRecord(
+        for track: TrackItem,
+        manualOrder: [String: Int],
+        metadata: TrackMetadata?
+    ) -> CatalogPlaylistSortRecord {
+        CatalogPlaylistSortRecord(
+            id: track.id,
+            naturalOrder: manualOrder[track.id] ?? .max,
+            fileText: track.filename,
+            titleText: titleText(for: track, metadata: metadata),
+            gameText: gameText(for: track, metadata: metadata),
+            authorText: authorText(for: metadata),
+            systemText: systemText(for: metadata),
+            pathText: track.fullPathText,
+            lengthMilliseconds: metadata?.playLengthMs ?? 0
+        )
     }
 
     private static func longerText(_ lhs: String, _ rhs: String) -> String {

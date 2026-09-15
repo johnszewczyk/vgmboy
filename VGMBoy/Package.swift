@@ -24,10 +24,6 @@ let qsfBuildDirectory = "\(dependencyRoot)/qsf"
 let psgPlayVendorDirectory = "\(sharedVendorRoot)/psgplay"
 let psgPlayBuildDirectory = "\(dependencyRoot)/psgplay"
 let mdxMiniVendorDirectory = "\(sharedVendorRoot)/mdxmini/src"
-let zxtuneVendorDirectory = "\(sharedVendorRoot)/zxtune"
-let zxtuneBuildDirectory = "\(dependencyRoot)/zxtune"
-let zxtuneLibraryDirectory = "\(zxtuneBuildDirectory)/lib/darwin/release"
-let zxtuneScanResultObject = "\(zxtuneBuildDirectory)/scan_result.cpp.o"
 let uadeIncludeDirectory = "/opt/homebrew/opt/uade/include"
 let uadeLibraryDirectory = "/opt/homebrew/opt/uade/lib"
 
@@ -36,20 +32,19 @@ let package = Package(
     platforms: [.macOS("26.0")],
     products: [
         .library(name: "VGMBoyFormatCore", targets: ["VGMBoyFormatCore"]),
+        .library(name: "VGMBoyFormatDataCore", targets: ["VGMBoyFormatDataCore"]),
         .library(name: "VGMBoySNDH", targets: ["VGMBoySNDH"]),
         .library(name: "VGMBoyKit", targets: ["VGMBoyKit"]),
         .library(name: "VGMBoyEndpointCore", targets: ["VGMBoyEndpointCore"]),
         .executable(name: "vgmboy-cli", targets: ["vgmboy"]),
         .executable(name: "vgmboy-electron-bridge", targets: ["VGMBoyElectronBridge"]),
-        .executable(name: "vgmboy-highly-complete-inspect", targets: ["VGMBoyHighlyCompleteInspect"]),
         .executable(name: "vgmboy-mdx-inspect", targets: ["VGMBoyMDXInspect"]),
         .executable(name: "vgmboy-amiga-inspect", targets: ["VGMBoyAmigaInspect"]),
-        .executable(name: "vgmboy-ffmpeg-inspect", targets: ["VGMBoyFFmpegInspect"]),
-        .executable(name: "vgmboy-zxtune-inspect", targets: ["VGMBoyZXTuneInspect"]),
         .executable(name: "VGMBoy", targets: ["VGMBoyApp"])
     ],
     targets: [
         .target(name: "VGMBoyFormatCore", path: "Sources/VGMBoyFormatCore"),
+        .target(name: "VGMBoyFormatDataCore", path: "Sources/VGMBoyFormatDataCore"),
         .target(name: "VGMBoyEndpointCore", path: "Sources/VGMBoyEndpointCore"),
         .target(
             name: "VGMBoyCPSGPlay",
@@ -289,58 +284,28 @@ let package = Package(
             ]
         ),
         .target(
+            name: "VGMBoyMDXInspectionCore",
+            dependencies: ["VGMBoyCMDX"],
+            path: "Sources/VGMBoyScannerInspectionCore",
+            exclude: ["AmigaInspection.swift"],
+            sources: ["MDXInspection.swift"]
+        ),
+        .target(
+            name: "VGMBoyAmigaInspectionCore",
+            dependencies: ["VGMBoyCUADE"],
+            path: "Sources/VGMBoyScannerInspectionCore",
+            exclude: ["MDXInspection.swift"],
+            sources: ["AmigaInspection.swift"]
+        ),
+        .target(
             name: "VGMBoyCAudioUnit",
             path: "Sources/CAudioUnit",
             publicHeadersPath: "include",
             linkerSettings: [.linkedFramework("AudioToolbox")]
         ),
         .target(
-            name: "VGMBoyCZXTune",
-            path: "Sources/CZXTune",
-            sources: ["vgmboy_zxtune.cpp"],
-            publicHeadersPath: "include",
-            cxxSettings: [
-                .unsafeFlags([
-                    "-std=c++20",
-                    "-I\(zxtuneVendorDirectory)",
-                    "-I\(zxtuneVendorDirectory)/include",
-                    "-I\(zxtuneVendorDirectory)/src",
-                    "-I\(zxtuneVendorDirectory)/3rdparty/fmt/include"
-                ])
-            ],
-            linkerSettings: [
-                .unsafeFlags([
-                    "-L\(zxtuneLibraryDirectory)",
-                    zxtuneScanResultObject,
-                    "-lcore_plugins_players",
-                    "-lmodule_players",
-                    "-lmodule_properties",
-                    "-lmodule_conversion",
-                    "-lformats_chiptune",
-                    "-lformats_multitrack",
-                    "-ldevices_aym",
-                    "-ldevices_aym_dumper",
-                    "-lsound",
-                    "-lbinary_format",
-                    "-lbinary",
-                    "-lbinary_compression",
-                    "-lanalysis",
-                    "-lparameters",
-                    "-lstrings",
-                    "-ltools",
-                    "-ldebug",
-                    "-lplatform",
-                    "-lasync",
-                    "-ll10n_stub",
-                    "-llhasa",
-                    "-lz80ex",
-                    "-lz"
-                ])
-            ]
-        ),
-        .target(
             name: "VGMBoyKit",
-            dependencies: ["VGMBoyFormatCore", "VGMBoySNDH", "VGMBoyCPSGPlay", "VGMBoyCMDX", "VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCFFmpeg", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCQSF", "VGMBoyCSIDPlayFP", "VGMBoyCOpenMPT", "VGMBoyCUADE", "VGMBoyCAudioUnit", "VGMBoyCZXTune"],
+            dependencies: ["VGMBoyFormatCore", "VGMBoySNDH", "VGMBoyCPSGPlay", "VGMBoyCMDX", "VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCFFmpeg", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCQSF", "VGMBoyCSIDPlayFP", "VGMBoyCOpenMPT", "VGMBoyCUADE", "VGMBoyCAudioUnit"],
             linkerSettings: [
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("AudioToolbox")
@@ -355,24 +320,12 @@ let package = Package(
             dependencies: ["VGMBoyKit"]
         ),
         .executableTarget(
-            name: "VGMBoyHighlyCompleteInspect",
-            dependencies: ["VGMBoyKit"]
-        ),
-        .executableTarget(
             name: "VGMBoyMDXInspect",
-            dependencies: ["VGMBoyKit"]
+            dependencies: ["VGMBoyMDXInspectionCore"]
         ),
         .executableTarget(
             name: "VGMBoyAmigaInspect",
-            dependencies: ["VGMBoyKit"]
-        ),
-        .executableTarget(
-            name: "VGMBoyFFmpegInspect",
-            dependencies: ["VGMBoyKit"]
-        ),
-        .executableTarget(
-            name: "VGMBoyZXTuneInspect",
-            dependencies: ["VGMBoyKit"]
+            dependencies: ["VGMBoyAmigaInspectionCore"]
         ),
         .executableTarget(
             name: "VGMBoyApp",
@@ -384,8 +337,13 @@ let package = Package(
         ),
         .testTarget(
             name: "VGMBoyKitTests",
-            dependencies: ["VGMBoyKit", "VGMBoySNDH", "VGMBoyEndpointCore", "VGMBoyCAudioUnit"],
+            dependencies: ["VGMBoyKit", "VGMBoySNDH", "VGMBoyEndpointCore", "VGMBoyCAudioUnit", "VGMBoyMDXInspectionCore", "VGMBoyAmigaInspectionCore"],
             path: "Tests/VGMBoyKitTests"
+        ),
+        .testTarget(
+            name: "VGMBoyFormatDataCoreTests",
+            dependencies: ["VGMBoyFormatDataCore"],
+            path: "Tests/VGMBoyFormatDataCoreTests"
         )
     ],
     swiftLanguageModes: [.v6]

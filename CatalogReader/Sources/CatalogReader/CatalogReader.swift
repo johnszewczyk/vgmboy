@@ -51,42 +51,6 @@ public struct CatalogGameBucket: Identifiable, Equatable, Sendable {
     public var id: String { "\(rootID)\u{1F}\(game)\u{1F}\(system)" }
 }
 
-/// Presentation-only cleanup for browser-derived game labels. The raw bucket
-/// value remains the stable database identity; this strips only suffixes that
-/// identify a known container or compressed single-file format.
-public enum CatalogDisplayName {
-    private static let knownGameSuffixes = [
-        ".tar.zstd", ".tar.zst", ".tar.gz", ".tar.bz2", ".tar.xz", ".tar.lz", ".tar.lz4",
-        ".tzst", ".zip", ".7z", ".rar", ".rsn",
-        ".sndh.zstd", ".sndh.zst", ".mdx.zstd", ".mdx.zst", ".sndh", ".mdx"
-    ]
-
-    public static func game(_ value: String) -> String {
-        stripKnownSuffix(value)
-    }
-
-    /// Presentation-only filename cleanup shared by catalog playlist
-    /// projections. Known archive/compression wrappers are removed as a unit;
-    /// otherwise the final playable-format extension is removed.
-    public static func file(_ value: String) -> String {
-        let leaf = URL(fileURLWithPath: value).lastPathComponent
-        let known = stripKnownSuffix(leaf)
-        if known != leaf {
-            return known
-        }
-        let stem = URL(fileURLWithPath: leaf).deletingPathExtension().lastPathComponent
-        return stem.isEmpty ? leaf : stem
-    }
-
-    private static func stripKnownSuffix(_ value: String) -> String {
-        let lowercased = value.lowercased()
-        for suffix in knownGameSuffixes where lowercased.hasSuffix(suffix) {
-            return String(value.dropLast(suffix.count))
-        }
-        return value
-    }
-}
-
 /// One published Files-sidebar source leaf. This is intentionally a source
 /// projection, not one row per playable subtrack.
 public struct CatalogFileBucket: Identifiable, Equatable, Sendable {
@@ -137,7 +101,6 @@ public struct CatalogTrack: Identifiable, Equatable, Sendable {
     public let title: String
     public let game: String
     public let author: String
-    public let dumper: String
     public let system: String
     public let comment: String
     public let browserGame: String
@@ -147,14 +110,7 @@ public struct CatalogTrack: Identifiable, Equatable, Sendable {
     public let lengthMilliseconds: Int
     public let fadeLengthMilliseconds: Int
 
-    /// The file represented by this row. Archive-backed rows use the member
-    /// leaf; `sourcePath` remains the catalog's physical source/container path.
-    public var leafFilename: String {
-        let path = archiveEntry?.isEmpty == false ? archiveEntry! : sourcePath
-        return URL(fileURLWithPath: path).lastPathComponent
-    }
-
-    public init(id: Int64, rootID: Int64, sourcePath: String, archivePath: String?, archiveEntry: String?, trackIndex: Int, trackCount: Int, title: String, game: String, author: String, system: String, comment: String, browserGame: String, browserSystem: String, introLengthMilliseconds: Int, loopLengthMilliseconds: Int, lengthMilliseconds: Int, fadeLengthMilliseconds: Int, dumper: String = "") {
+    public init(id: Int64, rootID: Int64, sourcePath: String, archivePath: String?, archiveEntry: String?, trackIndex: Int, trackCount: Int, title: String, game: String, author: String, system: String, comment: String, browserGame: String, browserSystem: String, introLengthMilliseconds: Int, loopLengthMilliseconds: Int, lengthMilliseconds: Int, fadeLengthMilliseconds: Int) {
         self.id = id
         self.rootID = rootID
         self.sourcePath = sourcePath
@@ -165,7 +121,6 @@ public struct CatalogTrack: Identifiable, Equatable, Sendable {
         self.title = title
         self.game = game
         self.author = author
-        self.dumper = dumper
         self.system = system
         self.comment = comment
         self.browserGame = browserGame
@@ -192,7 +147,6 @@ public enum CatalogReaderError: LocalizedError {
 public final class ReadOnlyCatalog: @unchecked Sendable {
     public static let supportedSchemaVersion = 23
     private let database: OpaquePointer
-    private let hasDumperColumn: Bool
     public let databaseURL: URL
 
     public init(databaseURL: URL) throws {
@@ -214,11 +168,10 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
         }
         database = handle
         sqlite3_busy_timeout(handle, 10_000)
-        let schema = try Self.scalarInt(handle, sql: "PRAGMA user_version;")
+        let schema = try scalarInt("PRAGMA user_version;")
         guard schema == Self.supportedSchemaVersion else {
             throw CatalogReaderError.unsupportedSchema(schema)
         }
-        hasDumperColumn = try Self.tableHasColumn(handle, table: "track_metadata", column: "dumper")
         established = true
     }
 
@@ -381,8 +334,8 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
         var statement: OpaquePointer?
         let sql = """
         SELECT t.id, t.root_id, t.path, NULLIF(t.archive_path, ''), NULLIF(t.archive_entry, ''), t.track_index, t.track_count,
-               COALESCE(m.title, ''), COALESCE(m.game, ''), COALESCE(m.author, ''),
-               \(dumperExpression), COALESCE(m.system, ''), COALESCE(m.comment, ''),
+               COALESCE(m.title, ''), COALESCE(NULLIF(m.game, ''), NULLIF(t.browser_game, ''), ''), COALESCE(m.author, ''),
+               COALESCE(m.system, ''), COALESCE(m.comment, ''),
                COALESCE(t.browser_game, ''), COALESCE(t.browser_system, ''),
                COALESCE(m.intro_length_ms, 0), COALESCE(m.loop_length_ms, 0),
                COALESCE(m.play_length_ms, 0), COALESCE(m.fade_length_ms, 0)
@@ -415,8 +368,8 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
             : "COALESCE(NULLIF(m.system, ''), NULLIF(t.browser_system, ''), '')"
         let sql = """
         SELECT t.id, t.root_id, t.path, NULLIF(t.archive_path, ''), NULLIF(t.archive_entry, ''), t.track_index, t.track_count,
-               COALESCE(m.title, ''), COALESCE(m.game, ''), COALESCE(m.author, ''),
-               \(dumperExpression), COALESCE(m.system, ''), COALESCE(m.comment, ''),
+               COALESCE(m.title, ''), COALESCE(NULLIF(m.game, ''), NULLIF(t.browser_game, ''), ''), COALESCE(m.author, ''),
+               COALESCE(m.system, ''), COALESCE(m.comment, ''),
                COALESCE(t.browser_game, ''), COALESCE(t.browser_system, ''),
                COALESCE(m.intro_length_ms, 0), COALESCE(m.loop_length_ms, 0),
                COALESCE(m.play_length_ms, 0), COALESCE(m.fade_length_ms, 0)
@@ -548,8 +501,8 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
     ) throws -> [CatalogTrack] {
         let sql = """
         SELECT t.id, t.root_id, t.path, NULLIF(t.archive_path, ''), NULLIF(t.archive_entry, ''), t.track_index, t.track_count,
-               COALESCE(m.title, ''), COALESCE(m.game, ''), COALESCE(m.author, ''),
-               \(dumperExpression), COALESCE(m.system, ''), COALESCE(m.comment, ''),
+               COALESCE(m.title, ''), COALESCE(NULLIF(m.game, ''), NULLIF(t.browser_game, ''), ''), COALESCE(m.author, ''),
+               COALESCE(m.system, ''), COALESCE(m.comment, ''),
                COALESCE(t.browser_game, ''), COALESCE(t.browser_system, ''),
                COALESCE(m.intro_length_ms, 0), COALESCE(m.loop_length_ms, 0),
                COALESCE(m.play_length_ms, 0), COALESCE(m.fade_length_ms, 0)
@@ -631,53 +584,15 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
     }
 
     private static func track(_ statement: OpaquePointer) -> CatalogTrack {
-        let embeddedGame = string(statement, 8)
-        let browserGame = string(statement, 13)
-        let game = CatalogDisplayName.game(
-            embeddedGame.isEmpty || embeddedGame == "?" ? browserGame : embeddedGame
-        )
-        return CatalogTrack(
+        CatalogTrack(
             id: sqlite3_column_int64(statement, 0), rootID: sqlite3_column_int64(statement, 1),
             sourcePath: string(statement, 2), archivePath: nullableString(statement, 3), archiveEntry: nullableString(statement, 4),
             trackIndex: Int(sqlite3_column_int64(statement, 5)), trackCount: Int(sqlite3_column_int64(statement, 6)),
-            title: string(statement, 7), game: game, author: string(statement, 9),
-            system: string(statement, 11), comment: string(statement, 12),
-            browserGame: string(statement, 13), browserSystem: string(statement, 14),
-            introLengthMilliseconds: Int(sqlite3_column_int64(statement, 15)), loopLengthMilliseconds: Int(sqlite3_column_int64(statement, 16)),
-            lengthMilliseconds: Int(sqlite3_column_int64(statement, 17)), fadeLengthMilliseconds: Int(sqlite3_column_int64(statement, 18)),
-            dumper: string(statement, 10)
+            title: string(statement, 7), game: string(statement, 8), author: string(statement, 9),
+            system: string(statement, 10), comment: string(statement, 11),
+            browserGame: string(statement, 12), browserSystem: string(statement, 13),
+            introLengthMilliseconds: Int(sqlite3_column_int64(statement, 14)), loopLengthMilliseconds: Int(sqlite3_column_int64(statement, 15)),
+            lengthMilliseconds: Int(sqlite3_column_int64(statement, 16)), fadeLengthMilliseconds: Int(sqlite3_column_int64(statement, 17))
         )
-    }
-
-    private var dumperExpression: String {
-        hasDumperColumn ? "COALESCE(m.dumper, '')" : "''"
-    }
-
-    private static func tableHasColumn(_ database: OpaquePointer, table: String, column: String) throws -> Bool {
-        var statement: OpaquePointer?
-        let sql = "PRAGMA table_info(\(table));"
-        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
-            throw CatalogReaderError.sqlite(String(cString: sqlite3_errmsg(database)))
-        }
-        defer { sqlite3_finalize(statement) }
-        while sqlite3_step(statement) == SQLITE_ROW {
-            if string(statement, 1) == column { return true }
-        }
-        guard sqlite3_errcode(database) == SQLITE_OK || sqlite3_errcode(database) == SQLITE_DONE else {
-            throw CatalogReaderError.sqlite(String(cString: sqlite3_errmsg(database)))
-        }
-        return false
-    }
-
-    private static func scalarInt(_ database: OpaquePointer, sql: String) throws -> Int {
-        var statement: OpaquePointer?
-        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
-            throw CatalogReaderError.sqlite(String(cString: sqlite3_errmsg(database)))
-        }
-        defer { sqlite3_finalize(statement) }
-        guard sqlite3_step(statement) == SQLITE_ROW else {
-            throw CatalogReaderError.sqlite(String(cString: sqlite3_errmsg(database)))
-        }
-        return Int(sqlite3_column_int64(statement, 0))
     }
 }

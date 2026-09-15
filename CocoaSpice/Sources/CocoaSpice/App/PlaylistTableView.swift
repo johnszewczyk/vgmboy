@@ -1,15 +1,14 @@
 import AppKit
+import CatalogPlaylistPresentationCore
 import FrontendPreferencesCore
 import OSLog
 import SwiftUI
 
-enum PlaylistTableMetrics {
-    /// Keep row text geometry separate from inter-row spacing. The table's
-    /// rowHeight and delegate callback must use the same value or AppKit can
-    /// lay out adjacent recycled rows against different metrics.
-    static func rowHeight(for fontSize: CGFloat) -> CGFloat {
-        max(18, fontSize + 6)
-    }
+private enum PlaylistHeaderMetrics {
+    static let horizontalPaddingPerSide = CGFloat(FrontendPlaylistColumnSizing.defaultHorizontalPaddingPerSide)
+    static let horizontalPadding = CGFloat(FrontendPlaylistColumnSizing.defaultHorizontalPaddingPerSide * 2)
+    static let sortIndicatorWidth: CGFloat = 8
+    static let sortIndicatorGap: CGFloat = 4
 }
 
 struct PlaylistTableView: NSViewRepresentable {
@@ -28,15 +27,11 @@ struct PlaylistTableView: NSViewRepresentable {
         tableView.allowsColumnResizing = true
         tableView.allowsMultipleSelection = true
         tableView.allowsEmptySelection = true
-        tableView.rowHeight = PlaylistTableMetrics.rowHeight(for: model.playlistFontSize)
-        tableView.intercellSpacing = NSSize(width: 0, height: model.playlistRowGapPoints)
+        tableView.rowHeight = 17
+        tableView.intercellSpacing = NSSize(width: 0, height: 0)
         tableView.focusRingType = .none
         tableView.style = .fullWidth
         tableView.selectionHighlightStyle = .none
-        // The custom capsule lives below the table's row views. Keep the
-        // native table background transparent so it is visible in the
-        // playlist just as it is in the sidebar tables.
-        tableView.backgroundColor = .clear
         tableView.usesAutomaticRowHeights = false
         tableView.delegate = context.coordinator
         tableView.dataSource = context.coordinator
@@ -88,7 +83,7 @@ struct PlaylistTableView: NSViewRepresentable {
             subsystem: "com.local.cocoaspice",
             category: "playlist-load"
         )
-        private let columnResizeFrameNanoseconds = FrontendAnimationContract.frameNanoseconds
+        private let columnResizeAnimationFrameIntervalNanoseconds: UInt64 = 1_000_000_000 / 60
         private let autoSizeSampleLimit = 200
         private let autoSizeDebounceNanoseconds: UInt64 = 120_000_000
 
@@ -98,17 +93,15 @@ struct PlaylistTableView: NSViewRepresentable {
             let widthHints: PlaylistColumnWidthHints?
             let fontSize: CGFloat
             let monospace: Bool
-            let metadataLoadToken: Int
         }
 
-        private enum Column: String, CaseIterable, Hashable {
+        private enum Column: String, CaseIterable {
             case favorite
             case index
             case file
             case title
             case game
             case author
-            case dumper
             case system
             case path
             case length
@@ -122,41 +115,10 @@ struct PlaylistTableView: NSViewRepresentable {
                 case .title: "Title"
                 case .game: "Game"
                 case .author: "Author"
-                case .dumper: "Dumper"
                 case .system: "System"
                 case .path: "Path"
                 case .length: "Length"
                 case .fileSize: "Size"
-                }
-            }
-
-            var defaultWidth: CGFloat {
-                switch self {
-                case .favorite: 32
-                case .index: 36
-                case .file: 220
-                case .title: 220
-                case .game: 220
-                case .author: 150
-                case .dumper: 150
-                case .system: 80
-                case .path: 320
-                case .length: 70
-                case .fileSize: 80
-                }
-            }
-
-            var minWidth: CGFloat {
-                switch self {
-                case .favorite: 32
-                case .index: 32
-                case .file, .title, .game: 120
-                case .author: 90
-                case .dumper: 90
-                case .system: 60
-                case .path: 160
-                case .length: 60
-                case .fileSize: 60
                 }
             }
 
@@ -180,31 +142,8 @@ struct PlaylistTableView: NSViewRepresentable {
                 title
             }
 
-            var sortColumn: PlayerViewModel.PlaylistSortColumn? {
-                switch self {
-                case .favorite:
-                    nil
-                case .index:
-                    .index
-                case .file:
-                    .file
-                case .title:
-                    .title
-                case .game:
-                    .game
-                case .author:
-                    .author
-                case .dumper:
-                    .dumper
-                case .system:
-                    .system
-                case .path:
-                    .path
-                case .length:
-                    .length
-                case .fileSize:
-                    nil
-                }
+            var sortColumn: CatalogPlaylistSortColumn? {
+                CatalogPlaylistSortColumn(frontendColumn: rawValue)
             }
         }
 
@@ -219,8 +158,8 @@ struct PlaylistTableView: NSViewRepresentable {
         private var lastPrimarySelectedTrackID: String?
         private var lastCurrentTrackID: String?
         private var lastIsPlaying = false
-        private var lastSortColumn: PlayerViewModel.PlaylistSortColumn?
-        private var lastSortDirection: PlayerViewModel.PlaylistSortDirection = .ascending
+        private var lastSortColumn: CatalogPlaylistSortColumn?
+        private var lastSortDirection: CatalogPlaylistSortDirection = .ascending
         private var lastFontSize: CGFloat?
         private var lastTextColor: PlayerViewModel.DatabaseSidebarTextColor?
         private var lastMonospaceFont: Bool?
@@ -229,10 +168,6 @@ struct PlaylistTableView: NSViewRepresentable {
         private var autoSizeTask: Task<Void, Never>?
         private var suppressWidthPersistence = false
         private var columnResizeTask: Task<Void, Never>?
-        private var automaticallyHiddenColumns: Set<Column> = []
-        private var visibilityAnimationTarget: [String: Bool]?
-        private var pendingVisibilityAnimation: [(NSTableColumn, Bool, CGFloat, CGFloat)] = []
-        private var pendingAutoSizeAfterVisibility = false
 
         init(model: PlayerViewModel) {
             self._model = Bindable(model)
@@ -253,9 +188,13 @@ struct PlaylistTableView: NSViewRepresentable {
 
             for column in resolvedColumnOrder() {
                 let tableColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(column.rawValue))
-                tableColumn.headerCell = SortableTableHeaderCell(textCell: column.title)
-                tableColumn.minWidth = column.minWidth
-                tableColumn.width = storedWidth(for: column) ?? column.defaultWidth
+                let headerCell = SortableTableHeaderCell(textCell: column.title)
+                tableColumn.headerCell = headerCell
+                let minimumWidth = minimumColumnWidth(for: column, headerCell: headerCell)
+                tableColumn.minWidth = minimumWidth
+                tableColumn.width = model.columnAutoSizeEnabled
+                    ? minimumWidth
+                    : storedWidth(for: column) ?? minimumWidth
                 tableColumn.resizingMask = column.userConfigurable ? [.userResizingMask] : []
                 tableView.addTableColumn(tableColumn)
             }
@@ -286,16 +225,12 @@ struct PlaylistTableView: NSViewRepresentable {
             let fontChanged = model.playlistFontSize != lastFontSize
                 || model.playlistTextColor != lastTextColor
                 || model.playlistMonospaceFont != lastMonospaceFont
-            let gapChanged = tableView.intercellSpacing.height != model.playlistRowGapPoints
-            let rowHeight = PlaylistTableMetrics.rowHeight(for: model.playlistFontSize)
+            let rowHeight = max(18, model.playlistFontSize + 6)
             if tableView.rowHeight != rowHeight {
                 tableView.rowHeight = rowHeight
             }
-            if gapChanged {
-                tableView.intercellSpacing = NSSize(width: 0, height: model.playlistRowGapPoints)
-            }
 
-            if rowsChanged || favoritesChanged || sortChanged || fontChanged || gapChanged {
+            if rowsChanged || favoritesChanged || sortChanged || fontChanged {
                 let reloadStartedAt = ContinuousClock.now
                 tableView.reloadData()
                 let reloadElapsed = reloadStartedAt.duration(to: .now)
@@ -331,8 +266,7 @@ struct PlaylistTableView: NSViewRepresentable {
                     trackCount: model.visiblePlaylist.count,
                     widthHints: model.playlistColumnWidthHints,
                     fontSize: model.playlistFontSize,
-                    monospace: model.playlistMonospaceFont,
-                    metadataLoadToken: model.playlistMetadataLoadToken
+                    monospace: model.playlistMonospaceFont
                 )
             )
 
@@ -357,7 +291,7 @@ struct PlaylistTableView: NSViewRepresentable {
 
         nonisolated func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
             MainActor.assumeIsolated {
-                PlaylistTableMetrics.rowHeight(for: model.playlistFontSize)
+                max(18, model.playlistFontSize + 6)
             }
         }
 
@@ -449,15 +383,17 @@ struct PlaylistTableView: NSViewRepresentable {
                 switch column {
                 case .favorite:
                     let cell = makeFavoriteCell(in: tableView)
-                    favoriteButton(in: cell)?.tag = row
-                    favoriteButton(in: cell)?.image = NSImage(
-                        systemSymbolName: model.isFavorite(track) ? "star.fill" : "star",
-                        accessibilityDescription: "Favorite"
-                    )
-                    favoriteButton(in: cell)?.contentTintColor = switch model.playlistTextColor {
-                    case .primary: NSColor.labelColor
-                    case .secondary: NSColor.secondaryLabelColor
-                    case .tertiary: NSColor.tertiaryLabelColor
+                    if let button = favoriteButton(in: cell) {
+                        button.tag = row
+                        button.image = NSImage(
+                            systemSymbolName: model.isFavorite(track) ? "star.fill" : "star",
+                            accessibilityDescription: "Favorite"
+                        )
+                        button.contentTintColor = switch model.playlistTextColor {
+                        case .primary: NSColor.labelColor
+                        case .secondary: NSColor.secondaryLabelColor
+                        case .tertiary: NSColor.tertiaryLabelColor
+                        }
                     }
                     return cell
                 case .index:
@@ -470,8 +406,6 @@ struct PlaylistTableView: NSViewRepresentable {
                     return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.gameText(for: track), isCurrentTrack: model.currentTrack?.id == track.id)
                 case .author:
                     return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.authorText(for: track), isCurrentTrack: model.currentTrack?.id == track.id)
-                case .dumper:
-                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.dumperText(for: track), isCurrentTrack: model.currentTrack?.id == track.id)
                 case .system:
                     return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.systemText(for: track), isCurrentTrack: model.currentTrack?.id == track.id)
                 case .path:
@@ -491,9 +425,12 @@ struct PlaylistTableView: NSViewRepresentable {
                     return 0
                 }
 
-                let headerWidth = textWidth(playlistColumn.title, font: NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .semibold))
+                let headerWidth = headerContentWidth(
+                    for: playlistColumn,
+                    headerCell: tableView.tableColumns[column].headerCell
+                )
                 let contentWidth = widestWidth(for: playlistColumn)
-                return max(headerWidth, contentWidth) + 20
+                return max(headerWidth, contentWidth) + PlaylistHeaderMetrics.horizontalPadding
             }
         }
 
@@ -517,11 +454,6 @@ struct PlaylistTableView: NSViewRepresentable {
 
         nonisolated func tableView(_ tableView: NSTableView, userDidChangeVisibilityOf tableColumns: [NSTableColumn]) {
             MainActor.assumeIsolated {
-                for tableColumn in tableColumns {
-                    if let column = Column(rawValue: tableColumn.identifier.rawValue) {
-                        automaticallyHiddenColumns.remove(column)
-                    }
-                }
                 persistVisibility()
             }
         }
@@ -584,6 +516,8 @@ struct PlaylistTableView: NSViewRepresentable {
             button.setButtonType(.momentaryChange)
             button.target = self
             button.action = #selector(handleFavoriteButton(_:))
+            button.alignment = .center
+            button.setAccessibilityLabel("Favorite")
             cell.addSubview(button)
             NSLayoutConstraint.activate([
                 button.centerXAnchor.constraint(equalTo: cell.centerXAnchor),
@@ -612,8 +546,6 @@ struct PlaylistTableView: NSViewRepresentable {
                 NSLayoutConstraint.activate([
                     textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
                     textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
-                    textField.topAnchor.constraint(greaterThanOrEqualTo: cell.topAnchor),
-                    textField.bottomAnchor.constraint(lessThanOrEqualTo: cell.bottomAnchor),
                     textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
                 ])
 
@@ -675,90 +607,13 @@ struct PlaylistTableView: NSViewRepresentable {
 
         private func applyVisibility(to tableView: NSTableView) {
             let visibility = storedVisibility()
-            var desired = tableView.tableColumns.compactMap { tableColumn -> (NSTableColumn, Bool)? in
-                guard let playlistColumn = Column(rawValue: tableColumn.identifier.rawValue) else { return nil }
-                let isHidden = playlistColumn.visibilityConfigurable
-                    && (visibility[playlistColumn.rawValue] == false || automaticallyHiddenColumns.contains(playlistColumn))
-                return (tableColumn, isHidden)
-            }
-
-            if desired.allSatisfy({ $0.1 }), let firstColumn = tableView.tableColumns.first {
-                desired = desired.map { ($0.0, $0.0 === firstColumn ? false : true) }
-            }
-
-            let target = Dictionary(uniqueKeysWithValues: desired.map {
-                ($0.0.identifier.rawValue, $0.1)
-            })
-            let changed = desired.contains { tableColumn, isHidden in
-                (visibilityAnimationTarget?[tableColumn.identifier.rawValue] ?? tableColumn.isHidden) != isHidden
-            }
-            if changed {
-                animateVisibility(to: desired, target: target, in: tableView)
-            }
-        }
-
-        private func animateVisibility(
-            to desired: [(NSTableColumn, Bool)],
-            target: [String: Bool],
-            in tableView: NSTableView
-        ) {
-            pendingAutoSizeAfterVisibility = false
-            columnResizeTask?.cancel()
-            finishVisibilityAnimation()
-            visibilityAnimationTarget = target
-
-            let original = desired.map { tableColumn, isHidden in
-                (tableColumn, isHidden, tableColumn.width, tableColumn.minWidth)
-            }
-            pendingVisibilityAnimation = original
-
-            let currentTotal = tableView.tableColumns
-                .filter { !$0.isHidden }
-                .reduce(CGFloat.zero) { $0 + max(0, $1.width) }
-            let animationTotal = max(currentTotal, tableView.bounds.width, 1)
-            // Fixed affordances (currently the favorite star) must retain
-            // their compact width while flexible metadata columns absorb the
-            // available table width. Treating every visible column as a
-            // proportional content column lets the star consume the whole
-            // table after an animated visibility change.
-            let fixedWidths = desired.map { tableColumn, isHidden -> CGFloat in
-                guard !isHidden,
-                      let column = Column(rawValue: tableColumn.identifier.rawValue),
-                      !column.canAutoSize else { return 0 }
-                return max(tableColumn.minWidth, storedWidth(for: column) ?? column.defaultWidth)
-            }
-            let fixedTotal = fixedWidths.reduce(0, +)
-            let flexibleWeights = desired.map { tableColumn, isHidden -> CGFloat in
-                guard !isHidden,
-                      let column = Column(rawValue: tableColumn.identifier.rawValue),
-                      column.canAutoSize else { return 0 }
-                guard !tableColumn.isHidden else {
-                    return storedWidth(for: column) ?? column.defaultWidth
-                }
-                return max(1, tableColumn.width)
-            }
-            let flexibleTotal = max(flexibleWeights.reduce(0, +), 1)
-            let flexibleAvailable = max(0, animationTotal - fixedTotal)
-
-            for (tableColumn, isHidden) in desired {
-                tableColumn.minWidth = 0
-                if !isHidden {
-                    if tableColumn.isHidden { tableColumn.width = 0 }
-                    tableColumn.isHidden = false
+            for column in tableView.tableColumns {
+                guard let playlistColumn = Column(rawValue: column.identifier.rawValue) else { continue }
+                let isHidden = playlistColumn.visibilityConfigurable && visibility[playlistColumn.rawValue] == false
+                if column.isHidden != isHidden {
+                    column.isHidden = isHidden
                 }
             }
-
-            let targets = desired.enumerated().map { index, item in
-                guard !item.1,
-                      let column = Column(rawValue: item.0.identifier.rawValue) else {
-                    return (item.0, CGFloat.zero)
-                }
-                if !column.canAutoSize {
-                    return (item.0, fixedWidths[index])
-                }
-                return (item.0, flexibleAvailable * flexibleWeights[index] / flexibleTotal)
-            }
-            applyColumnWidths(targets, preservingVisibilityAnimation: true)
         }
 
         private func reloadVisibleRows(in tableView: NSTableView) {
@@ -784,7 +639,7 @@ struct PlaylistTableView: NSViewRepresentable {
             let metadataColumns = IndexSet(tableView.tableColumns.enumerated().compactMap { index, tableColumn in
                 guard let column = Column(rawValue: tableColumn.identifier.rawValue) else { return nil }
                 return switch column {
-                case .title, .game, .author, .dumper, .system, .length:
+                case .title, .game, .author, .system, .length:
                     index
                 case .favorite, .index, .file, .path, .fileSize:
                     nil
@@ -810,6 +665,7 @@ struct PlaylistTableView: NSViewRepresentable {
                     headerCell.sortDirection = sortDirection
                     changed = true
                 }
+                tableColumn.minWidth = minimumColumnWidth(for: column, headerCell: headerCell)
             }
 
             if changed {
@@ -820,9 +676,7 @@ struct PlaylistTableView: NSViewRepresentable {
         private func resolvedColumnOrder() -> [Column] {
             let stored = model.pendingPlaylistColumnOrder ?? []
             let mapped = stored.compactMap(Column.init(rawValue:))
-            let configurable = mapped.filter { $0.isReorderable }
-            let missing = Column.allCases.filter { $0.isReorderable && !configurable.contains($0) }
-            return [.favorite] + configurable + missing
+            return mapped.count == Column.allCases.count ? mapped : Column.allCases
         }
 
         private func storedVisibility() -> [String: Bool] {
@@ -830,15 +684,27 @@ struct PlaylistTableView: NSViewRepresentable {
         }
 
         private func storedWidth(for column: Column) -> CGFloat? {
-            // Non-configurable affordances (currently the favorite star) do
-            // not have a user-owned width. Ignore stale persisted values so a
-            // previous layout bug cannot make them absorb the table again.
-            guard column.userConfigurable else { return nil }
             let widths = model.pendingPlaylistColumnWidths ?? [:]
             guard let width = widths[column.rawValue] else {
                 return nil
             }
             return CGFloat(width)
+        }
+
+        private func headerTextWidth(for headerCell: NSTableHeaderCell) -> CGFloat {
+            let font = headerCell.font ?? NSFont.systemFont(ofSize: NSFont.smallSystemFontSize, weight: .semibold)
+            return textWidth(headerCell.stringValue, font: font)
+        }
+
+        private func headerContentWidth(for column: Column, headerCell: NSTableHeaderCell) -> CGFloat {
+            let sortIndicatorWidth = (headerCell as? SortableTableHeaderCell)?.sortDirection == nil
+                ? 0
+                : PlaylistHeaderMetrics.sortIndicatorWidth + PlaylistHeaderMetrics.sortIndicatorGap
+            return headerTextWidth(for: headerCell) + sortIndicatorWidth
+        }
+
+        private func minimumColumnWidth(for column: Column, headerCell: NSTableHeaderCell) -> CGFloat {
+            headerContentWidth(for: column, headerCell: headerCell) + PlaylistHeaderMetrics.horizontalPadding
         }
 
         private func persistOrder() {
@@ -854,12 +720,8 @@ struct PlaylistTableView: NSViewRepresentable {
 
         private func persistVisibility() {
             guard let tableView else { return }
-            let stored = storedVisibility()
             let visibility: [String: Bool] = Dictionary(uniqueKeysWithValues: tableView.tableColumns.compactMap { column in
                 guard let playlistColumn = Column(rawValue: column.identifier.rawValue), playlistColumn.visibilityConfigurable else { return nil }
-                if automaticallyHiddenColumns.contains(playlistColumn) {
-                    return (playlistColumn.rawValue, stored[playlistColumn.rawValue] ?? true)
-                }
                 return (playlistColumn.rawValue, !column.isHidden)
             })
             model.rememberPlaylistColumnVisibility(visibility)
@@ -912,8 +774,6 @@ struct PlaylistTableView: NSViewRepresentable {
                 autoSizeTask?.cancel()
                 autoSizeTask = nil
                 pendingAutoSizeSignature = nil
-                lastAutoSizeSignature = nil
-                restoreAutomaticallyHiddenColumns()
                 return
             }
             guard signature.trackCount > 0 else {
@@ -921,7 +781,6 @@ struct PlaylistTableView: NSViewRepresentable {
                 autoSizeTask = nil
                 pendingAutoSizeSignature = nil
                 lastAutoSizeSignature = nil
-                restoreAutomaticallyHiddenColumns()
                 return
             }
             guard signature != lastAutoSizeSignature,
@@ -944,16 +803,6 @@ struct PlaylistTableView: NSViewRepresentable {
 
         private func autoSizeVisibleColumns() {
             guard let tableView else { return }
-            if automaticallyHideEmptyColumns(in: tableView) {
-                pendingAutoSizeAfterVisibility = true
-                // A disabled animation has already finalized the visibility
-                // change synchronously, so continue directly into measurement.
-                if model.effectiveAutoResizeAnimationMilliseconds == 0 {
-                    pendingAutoSizeAfterVisibility = false
-                    autoSizeVisibleColumns()
-                }
-                return
-            }
             let targets = tableView.tableColumns.enumerated().compactMap { columnIndex, tableColumn -> (NSTableColumn, CGFloat)? in
                 guard !tableColumn.isHidden,
                       Column(rawValue: tableColumn.identifier.rawValue)?.canAutoSize == true else {
@@ -964,58 +813,6 @@ struct PlaylistTableView: NSViewRepresentable {
             applyColumnWidths(targets)
         }
 
-        private func restoreAutomaticallyHiddenColumns() {
-            guard let tableView else {
-                automaticallyHiddenColumns.removeAll()
-                return
-            }
-
-            pendingAutoSizeAfterVisibility = false
-            columnResizeTask?.cancel()
-            finishVisibilityAnimation()
-            let visibility = storedVisibility()
-            for tableColumn in tableView.tableColumns {
-                guard let column = Column(rawValue: tableColumn.identifier.rawValue),
-                      automaticallyHiddenColumns.contains(column) else {
-                    continue
-                }
-                tableColumn.isHidden = visibility[column.rawValue] == false
-            }
-            automaticallyHiddenColumns.removeAll()
-        }
-
-        @discardableResult
-        private func automaticallyHideEmptyColumns(in tableView: NSTableView) -> Bool {
-            guard !model.visiblePlaylist.isEmpty else { return false }
-            let visibility = storedVisibility()
-            var changed = false
-
-            for tableColumn in tableView.tableColumns {
-                guard let column = Column(rawValue: tableColumn.identifier.rawValue), column.canAutoSize else {
-                    continue
-                }
-
-                if visibility[column.rawValue] == false {
-                    changed = automaticallyHiddenColumns.remove(column) != nil || changed
-                    continue
-                }
-
-                if hasMeaningfulValue(for: column) {
-                    changed = automaticallyHiddenColumns.remove(column) != nil || changed
-                } else {
-                    if automaticallyHiddenColumns.insert(column).inserted { changed = true }
-                }
-            }
-            if changed { applyVisibility(to: tableView) }
-            return changed
-        }
-
-        private func hasMeaningfulValue(for column: Column) -> Bool {
-            model.visiblePlaylist.contains { track in
-                PlaylistPresentation.isMeaningfulColumnText(value(for: column, track: track))
-            }
-        }
-
         private func fittedWidth(for columnIndex: Int, in tableView: NSTableView) -> CGFloat {
             let tableColumn = tableView.tableColumns[columnIndex]
             let measuredWidth = self.tableView(tableView, sizeToFitWidthOfColumn: columnIndex)
@@ -1024,76 +821,52 @@ struct PlaylistTableView: NSViewRepresentable {
         }
 
         private func applyColumnWidths(_ targets: [(NSTableColumn, CGFloat)]) {
-            applyColumnWidths(targets, preservingVisibilityAnimation: false)
-        }
-
-        private func applyColumnWidths(
-            _ targets: [(NSTableColumn, CGFloat)],
-            preservingVisibilityAnimation: Bool
-        ) {
             guard !targets.isEmpty else { return }
 
             columnResizeTask?.cancel()
-            if !preservingVisibilityAnimation { finishVisibilityAnimation() }
             let startWidths = targets.map { $0.0.width }
             let duration = model.effectiveAutoResizeAnimationMilliseconds
             suppressWidthPersistence = true
 
             if duration == 0 {
                 for (tableColumn, finalWidth) in targets { tableColumn.width = finalWidth }
-                if preservingVisibilityAnimation { finishVisibilityAnimation() }
                 suppressWidthPersistence = false
                 persistWidths()
                 return
             }
-            let startedAt = DispatchTime.now().uptimeNanoseconds
-            let durationMilliseconds = Double(duration)
+            let durationNanoseconds = UInt64(duration) * 1_000_000
+            let frameIntervalNanoseconds = columnResizeAnimationFrameIntervalNanoseconds
 
             columnResizeTask = Task { @MainActor [weak self] in
                 guard let self else { return }
+                let startUptime = DispatchTime.now().uptimeNanoseconds
                 while true {
-                    try? await Task.sleep(nanoseconds: self.columnResizeFrameNanoseconds)
-                    guard !Task.isCancelled else { return }
-                    let elapsedMilliseconds = Double(DispatchTime.now().uptimeNanoseconds - startedAt) / 1_000_000
-                    let progress = FrontendAnimationContract.easedProgress(
-                        elapsedMilliseconds: elapsedMilliseconds,
-                        durationMilliseconds: duration
+                    let elapsedNanoseconds = DispatchTime.now().uptimeNanoseconds &- startUptime
+                    let linearProgress = min(
+                        1,
+                        CGFloat(Double(elapsedNanoseconds) / Double(durationNanoseconds))
                     )
+                    let progress = linearProgress < 0.5
+                        ? 2 * linearProgress * linearProgress
+                        : 1 - (pow(-2 * linearProgress + 2, 2) / 2)
                     for (index, target) in targets.enumerated() {
                         let (tableColumn, finalWidth) = target
-                        tableColumn.width = startWidths[index] + ((finalWidth - startWidths[index]) * CGFloat(progress))
+                        tableColumn.width = startWidths[index] + ((finalWidth - startWidths[index]) * progress)
                     }
-                    if elapsedMilliseconds >= durationMilliseconds { break }
+
+                    if linearProgress >= 1 {
+                        break
+                    }
+
+                    try? await Task.sleep(nanoseconds: frameIntervalNanoseconds)
+                    guard !Task.isCancelled else { return }
                 }
 
                 guard !Task.isCancelled else { return }
-                if preservingVisibilityAnimation { self.finishVisibilityAnimation() }
                 self.suppressWidthPersistence = false
                 self.persistWidths()
                 self.columnResizeTask = nil
             }
-        }
-
-        private func finishVisibilityAnimation() {
-            guard !pendingVisibilityAnimation.isEmpty else {
-                visibilityAnimationTarget = nil
-                return
-            }
-
-            let pending = pendingVisibilityAnimation
-            pendingVisibilityAnimation.removeAll()
-            visibilityAnimationTarget = nil
-            let shouldAutoSize = pendingAutoSizeAfterVisibility
-            pendingAutoSizeAfterVisibility = false
-
-            for (tableColumn, isHidden, originalWidth, originalMinWidth) in pending {
-                tableColumn.minWidth = 0
-                tableColumn.isHidden = isHidden
-                if isHidden { tableColumn.width = originalWidth }
-                tableColumn.minWidth = originalMinWidth
-            }
-
-            if shouldAutoSize { autoSizeVisibleColumns() }
         }
 
         private func droppedFileURLs(from info: NSDraggingInfo) -> [URL] {
@@ -1258,7 +1031,6 @@ struct PlaylistTableView: NSViewRepresentable {
         private func toggleColumnVisibility(_ sender: NSMenuItem) {
             guard let rawValue = sender.representedObject as? String,
                   let tableView,
-                  let column = Column(rawValue: rawValue),
                   let tableColumn = tableView.tableColumns.first(where: { $0.identifier.rawValue == rawValue }) else {
                 return
             }
@@ -1266,7 +1038,6 @@ struct PlaylistTableView: NSViewRepresentable {
             guard tableColumn.isHidden || tableView.tableColumns.contains(where: { !$0.isHidden && $0 !== tableColumn }) else {
                 return
             }
-            automaticallyHiddenColumns.remove(column)
             tableColumn.isHidden.toggle()
             persistVisibility()
         }
@@ -1318,8 +1089,6 @@ struct PlaylistTableView: NSViewRepresentable {
                 hints.gameText
             case .author:
                 hints.authorText
-            case .dumper:
-                hints.dumperText
             case .system:
                 hints.systemText
             case .path:
@@ -1345,8 +1114,6 @@ struct PlaylistTableView: NSViewRepresentable {
                 model.gameText(for: track)
             case .author:
                 model.authorText(for: track)
-            case .dumper:
-                model.dumperText(for: track)
             case .system:
                 model.systemText(for: track)
             case .path:
@@ -1514,8 +1281,7 @@ private final class PlaylistNativeTableView: NSTableView {
 }
 
 private final class SortableTableHeaderCell: NSTableHeaderCell {
-    var sortDirection: PlayerViewModel.PlaylistSortDirection?
-
+    var sortDirection: CatalogPlaylistSortDirection?
     override func drawInterior(withFrame cellFrame: NSRect, in controlView: NSView) {
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.alignment = .center
@@ -1528,14 +1294,26 @@ private final class SortableTableHeaderCell: NSTableHeaderCell {
 
         let attributedTitle = NSAttributedString(string: stringValue, attributes: attributes)
         let titleSize = attributedTitle.size()
-        let titleFrame = NSRect(
-            x: cellFrame.origin.x,
-            y: cellFrame.origin.y + floor((cellFrame.height - titleSize.height) / 2.0),
-            width: cellFrame.width,
-            height: titleSize.height
-        )
-
-        attributedTitle.draw(in: titleFrame)
+        let sortIndicatorReservation = sortDirection == nil
+            ? 0
+            : PlaylistHeaderMetrics.sortIndicatorWidth + PlaylistHeaderMetrics.sortIndicatorGap
+        let titleY = cellFrame.origin.y + floor((cellFrame.height - titleSize.height) / 2.0)
+        if sortIndicatorReservation == 0 {
+            attributedTitle.draw(in: NSRect(
+                x: cellFrame.origin.x,
+                y: titleY,
+                width: cellFrame.width,
+                height: titleSize.height
+            ))
+        } else {
+            let titleFrame = NSRect(
+                x: cellFrame.origin.x + sortIndicatorReservation,
+                y: titleY,
+                width: max(0, cellFrame.width - sortIndicatorReservation),
+                height: titleSize.height
+            )
+            attributedTitle.draw(in: titleFrame)
+        }
 
         guard let sortDirection,
               let image = NSImage(
@@ -1546,9 +1324,9 @@ private final class SortableTableHeaderCell: NSTableHeaderCell {
         }
 
         let indicatorRect = NSRect(
-            x: cellFrame.minX + 6,
+            x: cellFrame.minX + PlaylistHeaderMetrics.horizontalPaddingPerSide,
             y: cellFrame.minY + floor((cellFrame.height - 8) / 2.0),
-            width: 8,
+            width: PlaylistHeaderMetrics.sortIndicatorWidth,
             height: 8
         )
         image.draw(in: indicatorRect)

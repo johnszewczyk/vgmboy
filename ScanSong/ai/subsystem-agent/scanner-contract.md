@@ -71,20 +71,60 @@
 - The folder projection recognizes the collection's console directory, such as
   `set/Nintendo DS/game.tar.zst`. Players may choose that value or embedded
   metadata when grouping; ScanSong never rewrites rows for the preference.
-- SPC metadata preserves the ID666/xID6 `Dumper` field in `track_metadata`;
-  non-SPC routes publish the empty value until their native metadata contracts
-  expose an equivalent field.
 - Structure policy is independent from optional metadata policy. Required child
   or dependency enumeration cannot be deferred.
 - A scanner plugin has a `ScannerPluginDescriptor` for routing and a
   `ScanFormatHandler` for structure and metadata. Handlers return a complete
   `ScanInspection` and are the only layer permitted to invoke their parser;
   they never write the catalog directly.
-- Built-in handlers are organized by decoder family rather than one central
-  inspector switch: GME, PSF-style tags, VGM/VGZ metadata, SNDH, SID, standard
-  audio, and OpenMPT each own a focused handler file. The registry is wiring
-  only; format-specific metadata readers stay beside their handler, while
-  shared readers used by external adapters remain reusable utilities.
+- Dependency-free byte facts are parsed by VGMBoy's `VGMBoyFormatDataCore`:
+  NSF/GBS/NSFE headers, and HES headers and companion M3U playlists.
+  `MetaManCore` parses AY relative-pointer and SAP directive metadata, APE, CRI/Monster ADX, Atomic
+  Planet AUS, RIFF ATRAC3/ATRAC3+, Konami/SNK SVAG, SID PSID/RSID, SPC ID666/xID6,
+  S98, VGM/VGZ, and PSF/PSF2/SSF/USF/2SF tag data.
+  NSF/GBS/NSFE/HES enumeration and native metadata are complete at the
+  header, chunk, or playlist boundary. SPC tagless defaults are also resolved
+  in MetaManCore, so the production ScanSong targets do not link libgme;
+  libgme remains a playback concern for those formats and the scanner's other
+  decoder-backed families.
+  ScanSong owns source I/O, scanner metadata conversion, and catalog
+  publication; `MetaManCore` owns AY, SAP, APE, ADX, AUS, ATRAC3, SVAG, SID, SPC, S98,
+  VGM/VGZ, and PSF-family metadata parsing, including bounded VGZ decompression
+  and named source metadata blocks.
+  These routes do not link `VGMBoyKit` or start a playback decoder.
+- AY, SAP, APE, ADX, AUS, ATRAC3, SVAG, SID, SPC, S98, VGM/VGZ, and PSF-family metadata are
+  parsed by the sibling `MetaManCore` package. It preserves ordered tags and source bytes
+  (including separately named ID666 and xID6 SPC blocks), with a ScanSong-only
+  adapter to schema 23. Direct S98 timing uses the actual loop offset; libvgm
+  remains only a test oracle for that route.
+- MetaManCore owns a direct CRI/Monster ADX reader for type 03/04/05, encrypted
+  type-04 headers, and Monster Games ADX. It derives loop length from native
+  sample bounds and preserves vgmstream's two-loop plus ten-second fade default
+  when computing play length. `.adx` files without recognized CRI/Monster
+  headers remain on vgmstream; the supported CRI ADX paths do not launch or
+  link a playback decoder.
+- `MetaManCore` owns the direct Atomic Planet AUS reader for `AUS ` signatures.
+  It preserves all 32 header bytes, codec/sample/channel/loop facts,
+  invalid-loop cleanup, and the prior CLI play projection without opening
+  PS-ADPCM or Xbox IMA payload decoders. Non-AUS `.aus` aliases remain on
+  vgmstream.
+- `MetaManCore` owns the direct RIFF ATRAC3/ATRAC3+ reader for the WAVE codec
+  tag or extensible GUID. It preserves ordered INFO tags, source chunks, native
+  fact/loop data, and the scanner's existing timing projection. Nonmatching
+  `.at3` aliases remain on vgmstream.
+- ScanSong owns a direct Sony CD-XA sector reader for recognized raw-sector and
+  RIFF/CDXA signatures. It preserves vgmstream's XA validation, interleaved
+  file/channel subsong order, labels, and sample timing without ADPCM decoding.
+  Other `.xa` aliases remain on vgmstream.
+- MetaManCore owns the complete direct Sony MSF container reader for recognized
+  MSF headers. It retains the source header and derives PCM, PSX ADPCM, ATRAC3,
+  and MPEG sample/loop timing without audio decoding; the adapter preserves the
+  CLI's loop/fade projection and invalid-loop cleanup. `MSF ` and other
+  non-Sony `.msf` aliases remain on vgmstream.
+- MetaManCore owns direct Konami/SNK SVAG readers for the `Svag` and `VAGm`
+  headers. The reader retains source header and loop facts, derives PS-ADPCM
+  timing without decoding audio, and leaves other `.svag` signatures on
+  vgmstream.
 - Unknown inputs and unavailable required adapters are typed diagnostics, never
   invented playable rows or calls into a host scanner.
 - The persisted ScanSong file-type policy ignores only documented decoder-absent
@@ -102,10 +142,10 @@
   scan-log entries. An archive may publish valid sibling tracks while preserving
   the failed member for retry and diagnosis.
 - TAR.ZST listing and extraction stream `zstd -dc` into `tar`; ScanSong does not
-  create a second full temporary TAR. A producer `SIGPIPE`/broken-pipe result
-  is accepted only when `tar` exited successfully after consuming the archive;
-  a nonzero `tar` result or any other producer failure remains an extraction
-  failure.
+  create a second full temporary TAR and does not close the producer pipe before
+  the consumer finishes. If `tar` accepts its end markers before draining the
+  compressed frame and `zstd` exits nonzero, ScanSong accepts the archive only
+  after a separate `zstd -t` validates the complete source.
 - Standard output contains JSONL events only, with explicit contract name,
   version, and monotonically increasing sequence. Progress diagnostics are
   rate-limited to phase changes, phase completion, or one event per second so
@@ -138,13 +178,12 @@
   per-archive expanded-byte limit therefore cannot multiply across the source
   pipeline. TAR.ZST archives use a cancellation-safe `zstd -dc` to `tar`
   pipeline for listing and extraction, without first creating a second full
-  `expanded.tar`; an expected producer pipe closure is tolerated only after a
-  successful `tar` completion. Stale scanner scratch roots older than one day
-  are reaped when a new extraction begins. Extracted underscore aliases such as
+  `expanded.tar`; stale scanner scratch roots older than one day are reaped
+  when a new extraction begins. Extracted underscore aliases such as
   `_.ldat.txth` are normalized to the decoder's canonical `.ldat.txth` name
   inside disposable scratch storage.
 - Archive member inspection runs under the shared bounded permit pool
-  (`ScanResourceScheduler`) so subprocess adapters (vgmstream, Highly Complete)
+  (`ScanResourceScheduler`) so subprocess adapters (vgmstream, MDX, UADE)
   run concurrently while records keep deterministic member order. Loose
   inspection and catalog persistence remain ordered.
 - Fingerprint reuse compares the persisted epoch `modified_at` double rather
@@ -187,22 +226,30 @@
   narrowly, while absolute and traversal spellings remain unsafe.
 - Archive paths, symlinks, member count/name size, and expanded bytes are
   validated before records are accepted.
-- Required adapters currently include libgme enumeration and timing, direct
-  NSF/GBS header harvesting, in-process SPC ID666 and xID6 harvesting, PSF-style
-  tags for PSF/QSF/GSF families, VGM/VGZ GD3 and timing reads, direct
-  Commodore 64 SID PSID/RSID header reads, the
+- Required adapters currently include direct MetaManCore AY relative-pointer,
+  APE header/tag, SID PSID/RSID, SPC ID666/xID6 (including tagless defaults), and SAP,
+  HES header/M3U, and KSS header readers that preserve their former
+  libgme info-only contracts without starting a core (SAP emits its declared
+  subsongs and reads authored TIME/loop-start facts; HES publishes the
+  playlist's authored tracks, or 256 compatibility slots without a playlist;
+  KSS keeps its 256-slot fallback); the dependency-free `VGMBoyFormatDataCore`
+  readers for NSF/GBS/NSFE headers and HES; MetaManCore handles AY, SAP, APE,
+  CRI/Monster ADX, SID PSID/RSID, SPC ID666/xID6, VGM/VGZ, S98, and
+  PSF-family tags; the
   Core Audio standard-audio inspector for FLAC/Vorbis comments and exact
   decoded duration (with AVFoundation metadata fallback for other ordinary
   audio),
-  the VGMBoy-built FFmpeg inspector for APE duration and common tags,
+  the MetaManCore APE header/tag reader for APE timing and common tags,
   scanner-owned vgmstream CLI plugin for raw vgmstream formats, TXTP structures,
-  and HD-bank structures, the scanner-owned
-  Highly Complete inspection plugin for GSF/miniGSF, and OpenMPT tracker/module
+  and HD-bank structures, the direct PSF v0x22/GSF dependency reader for
+  GSF/miniGSF, and OpenMPT tracker/module
   intake (S3M, MOD, IT, XM, MTM, STM, and related) as structurally-known single
   rows. ScanSong never invokes CocoaSpice's app or a player-owned helper. A
-  missing executable is a typed adapter failure. The Highly Complete adapter creates a parser handle before reading
-  metadata, so a miniGSF is rejected unless its extracted sibling dependencies
-  resolve. GSF/miniGSF exposes exactly one validated track per file.
+  missing executable is a typed adapter failure. The GSF reader validates the
+  complete dependency chain, compressed payload CRC/zlib stream, executable
+  segment bounds, and assembled GBA ROM signature without constructing mGBA.
+  Outer-file tags take priority for playable length; `intro_length_ms` retains
+  the prior nested-tag contract. GSF/miniGSF exposes one validated track/file.
   Dependency-enumerated formats without their own plugin fail explicitly.
 - GameCube intake is fixture-backed: primary DSP, ADP, AGSC, H4M, LDAT,
   LOGG, RSF, THP, and TXTP members route through the bundled vgmstream
@@ -229,24 +276,28 @@
   `.pcm`, or `.mdx` are preserved. Standalone compressed MDX sources receive
   special dependency preparation: their adjacent or root-scoped compressed
   dependency is decompressed into the same scratch set before inspection.
-- HES inspection applies a same-basename sibling `.m3u` when one is present.
-  The playlist remains a non-track support file, while its authored track
-  mapping and timing determine the HES rows published by the scanner.
+- HES inspection uses `hes-direct` and the Foundation-only
+  `HESFormatDataReader`. A same-basename sibling `.m3u` remains non-track
+  support data; its authored track mapping, titles, and timing determine the
+  published HES rows. Without a playlist, the reader preserves the 256-slot
+  compatibility listing and the prior scanner's suppressed-timing behavior.
+  Fixture and read-only CocoaSpice catalog parity checks gate this route.
 - Native CLI inspectors share one bounded process runner with a 30-second
   deadline, 4 MiB stdout, 256 KiB stderr, concurrent draining, and cancellation
   termination. Decoder-family adapters remain separate files.
 
 ## Files
 
-- [CatalogScanner.swift](../../Sources/ScanSongKit/CatalogScanner.swift)
-- [CanonicalCatalogWriter.swift](../../Sources/ScanSongKit/CanonicalCatalogWriter.swift)
-- [CanonicalCatalogSchema.swift](../../Sources/ScanSongKit/CanonicalCatalogSchema.swift)
-- [CatalogLinkAuditor.swift](../../Sources/ScanSongKit/CatalogLinkAuditor.swift)
-- [ScannerInspectors.swift](../../Sources/ScanSongKit/ScannerInspectors.swift)
-- [InspectorProcessRunner.swift](../../Sources/ScanSongKit/InspectorProcessRunner.swift)
-- [TXTPDependencyResolver.swift](../../Sources/ScanSongKit/TXTPDependencyResolver.swift)
-- [ArchiveMemberEnumerator.swift](../../Sources/ScanSongKit/ArchiveMemberEnumerator.swift)
-- [StandaloneArchiveExtractor.swift](../../Sources/ScanSongKit/StandaloneArchiveExtractor.swift)
-- [format-accommodations.md](format-accommodations.md)
-- [ScanSongCommand.swift](../../Sources/scansong/ScanSongCommand.swift)
-- [ScanSongApp.swift](../../Sources/ScanSongApp/ScanSongApp.swift)
+- [CatalogScanner.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/CatalogScanner.swift)
+- [CanonicalCatalogWriter.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/CanonicalCatalogWriter.swift)
+- [CanonicalCatalogSchema.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/CanonicalCatalogSchema.swift)
+- [CatalogLinkAuditor.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/CatalogLinkAuditor.swift)
+- [ScannerInspectors.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/ScannerInspectors.swift)
+- [VGMBoyFormatDataCore](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyFormatDataCore)
+- [InspectorProcessRunner.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/InspectorProcessRunner.swift)
+- [TXTPDependencyResolver.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/TXTPDependencyResolver.swift)
+- [ArchiveMemberEnumerator.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/ArchiveMemberEnumerator.swift)
+- [StandaloneArchiveExtractor.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/StandaloneArchiveExtractor.swift)
+- [format-accommodations.md](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-agent/format-accommodations.md)
+- [ScanSongCommand.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/scansong/ScanSongCommand.swift)
+- [ScanSongApp.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongApp/ScanSongApp.swift)

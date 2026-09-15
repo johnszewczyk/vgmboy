@@ -1,0 +1,35 @@
+# Playback
+
+## Formats
+
+- Playback: the bundled VGMBoy bridge routes registered game-music, tracker, standard-audio, streamed-console, Nintendo DS, and PSF-family formats through the shared playback core.
+- Playback: tracker modules (`.669`, `.dmf`, `.far`, `.it`, `.mod`, `.mptm`, `.mtm`, `.okt`, `.ptm`, `.s3m`, `.stm`, `.ult`, `.xm`) use OpenMPT; `.aif`, `.aiff`, `.flac`, `.m4a`, `.mp3`, `.ogg`, and `.wav` files use standard audio decoding.
+- Playback: PlayStation 2 includes PSF2/minipsf2 plus vgmstream families such as `.ads`, `.adp`, `.adx`, `.aus`, `.ss2`, `.svag`, and `.xmd`; PSP includes `.at3` and `.rws`; PlayStation 3 includes `.msf`, `.txtp`, `.hd`/`.hbd`, Bink audio (`.bik`, `.bk2`, `.bika`, `.ps3`), and `.xvag`. These archive members are scanned and played through the same vgmstream route as loose files.
+- Playback: Nintendo DS `SWAV` payloads stored in `.wav` files route through vgmstream, while headerless signed 8-bit mono `_NN.wav` payloads at 22,050 Hz use the raw PCM route; both are recognized from file contents during scanning and playback.
+
+## Controls
+
+- Controls: previous, play-pause, next, Long Play loop glyph, Repeat, and progress seeking. Active Long Play and Repeat glyphs use the configured accent color.
+- Controls: double-click and Enter activate tracks.
+- Controls: keyboard shortcuts and Media Session transport when supported.
+
+## Timing
+
+- Time: playlist rows retain decoder-reported duration; Now Playing shows Long Play duration plus fade when enabled.
+- Long Play: manual duration and fade controls apply only to backends that expose
+  loop-capable timing. Standard audio files such as FLAC always use their
+  decoder-reported natural duration; the fade remains an end-of-track output
+  effect and does not turn a file into a loop.
+- Timing: with Long Play off, a track plays its decoder-reported natural duration, including the first track played after selecting a folder or archive.
+- Playback Speed: libgme supports SPC, NSF/NSFE, GBS, HES, KSS, AY, and SAP; libvgm supports GYM, S98, VGM, and VGZ. Each encoder has an independent enable setting and accepts a reduced exact decimal or fraction.
+- Playback Speed: a speed change applies only while its compatible encoder owns the active track. Source-rate conversion for streamed formats remains playback correction, not a generic speed or pitch control.
+- Playback: every admitted format uses bundled VGMBoy native output with seeking; the Electron UI
+  does not create a second audio graph or per-format fallback.
+- Playback: vgmstream source rates are resampled to the native 44.1 kHz stereo output, including 3DO SNDS streams that otherwise play at the wrong speed.
+- Transport: pause, stop, and track replacement use a 10 ms output de-click envelope. The envelope is too short to alter a track's musical attack; it only removes the discontinuity at the output boundary.
+- Queued Skips: the current live track fades through the configured fade duration, then the requested adjacent track starts. It never reloads a tail of the current track to manufacture that fade.
+
+## Files
+
+- [web/app-playback.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/app-playback.js)
+- [web/playback-speed.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/playback-speed.js)

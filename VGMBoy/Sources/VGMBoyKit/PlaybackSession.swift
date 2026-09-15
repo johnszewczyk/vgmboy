@@ -138,6 +138,7 @@ final class PlaybackSession: @unchecked Sendable {
 
     public func load(
         path: String,
+        sourceData: Data? = nil,
         trackIndex: Int,
         plan: PlaybackPlan,
         tempo: Double
@@ -150,7 +151,7 @@ final class PlaybackSession: @unchecked Sendable {
                     (path as NSString).pathExtension
                 )
             }
-            let decoder = try DecoderFactory.make(path: path, sampleRate: sampleRate)
+            let decoder = try DecoderFactory.make(path: path, sourceData: sourceData, sampleRate: sampleRate)
             try decoder.startTrack(trackIndex)
             decoder.setTempo(tempo)
 

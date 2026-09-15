@@ -13,6 +13,5 @@ facing UI, so its default routes are agent engineering notes.
 - Prefer typed values and injected operations over frontend-specific models,
   persistence keys, executable paths, or presentation errors.
 - Preserve independent tests for every public target.
-- Keep migration plans and parity ledgers in the VGMMan coordination directory,
-  not in `project-info.md`.
-
+- Keep migration plans and parity ledgers at the VGMMan family root, not in
+  this package's `project-info.md`.

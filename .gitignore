@@ -7,11 +7,15 @@
 # Repositories and submodule metadata are imported as source snapshots here.
 **/.git/
 
+# Task-local toolchain caches (for example, writable Swift/Clang module caches).
+/.task-cache/
+
 # Local source archives and fixture payloads do not belong in the software repo.
 *.zip
+*.tar
 *.tar.gz
 *.tar.zst
+*.tgz
 
 # macOS metadata.
 .DS_Store
-

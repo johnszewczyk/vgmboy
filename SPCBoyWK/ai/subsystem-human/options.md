@@ -1,10 +1,10 @@
 # Options
 
 - SPCBoy-owned pages mirror CocoaSpice organizationally: Database, Interface, and Windows, while VGMBoy pages provide Audio, Diagnostics, Playback, and Routing in the same WebKit settings window.
-- Interface > Animations exposes checkbox-enabled Auto-Resize and Selection Bar timings; both default on at 200 ms and accept any nonnegative duration. Zero is immediate. Disabling one uses an effective 0 ms duration while retaining the configured value.
-- Cmd-Comma toggles the separate Settings window: it opens it when dismissed and dismisses it when visible. The native menu and the toolbar Options button share the same window boundary; the toolbar button remains an explicit open action.
+- Interface > Animations exposes checkbox-enabled Auto-Resize and Selection Bar timings; both default on at 200 ms and accept 0–1000 ms. Disabling one uses an effective 0 ms duration while retaining the configured value.
 - Playlist Options exposes Column Auto-size, enabled by default, with the description “Automatically resize columns for content width on selection.”
 - Interface Style combines font size, font color, and monospace controls for the database sidebar and playlist; the single setting is applied to both surfaces.
+- The Selection Bar uses the chosen accent color without changing sidebar or playlist text color. Choose accent and text colors that provide the desired contrast.
 - Windows has independent Always on Top switches for Main Window and Options Window; both default off. Main keeps the main window on top of other apps; Options keeps the options window on top of the main window.
 - Archive Cache uses the shared 2 GB default and 2, 4, 8, or 16 GB choices.
 - AAC Export exposes a destination folder and a playlist context-menu action. New installs default to Downloads, matching CocoaSpice. SPCBoy supplies the selected path, timing plan, and destination; VGMBoyKit performs the offline conversion, including archive-member materialization through the native bridge. Only one export runs at a time. Folder chooser controls use the shared folder glyph.
@@ -58,6 +58,6 @@ store and remain separate from the read-only schema-23 scan catalog.
 
 ## Files
 
-- `../../Sources/SPCBoyWK/Resources/index.html`
-- `../../Sources/SPCBoyWK/Resources/styles.css`
-- `../../Sources/SPCBoyWK/main.swift`
+- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/index.html`
+- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/styles.css`
+- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/main.swift`

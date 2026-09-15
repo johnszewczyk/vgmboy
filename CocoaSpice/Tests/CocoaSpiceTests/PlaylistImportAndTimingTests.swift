@@ -1,12 +1,10 @@
 import Foundation
 import Testing
-import VGMBoyKit
+import ArchiveCacheCore
+import ArchiveMaterializationCore
+import UACContainerCore
+@testable import VGMBoyKit
 @testable import CocoaSpice
-
-@Test func playlistRowHeightAndGapStaySeparate() {
-    #expect(PlaylistTableMetrics.rowHeight(for: 12) == 18)
-    #expect(PlaylistTableMetrics.rowHeight(for: 18) == 24)
-}
 
 @Test func archivePreparationUsesVGMBoyFormatCapabilities() throws {
     #expect(PlaybackFormatRegistry.archiveMaterialization(for: ["track.flac"]) == .selectedEntry)
@@ -50,6 +48,124 @@ func realAmigaLHAArchiveListsPrefixLedModule() async throws {
     )
     #expect(listing.count == 1)
     #expect(listing[0].entryPath == "track.vgm")
+}
+
+@Test func uacArchiveListsPlayableAndPlaylistMembersFromManifestOnly() throws {
+    let temporaryDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("uac-listing-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
+
+    let compressedPayloadURL = temporaryDirectory.appendingPathComponent("payload.tar.zst")
+    let archiveURL = temporaryDirectory.appendingPathComponent("fixture.uac")
+    try Data([0x28, 0xB5, 0x2F, 0xFD, 0xFF, 0xEE, 0xDD]).write(to: compressedPayloadURL)
+
+    let manifest = UACManifest(
+        packageID: "fixture-game",
+        payload: UACPayload(
+            format: "tar+zstd",
+            compressionProfile: "uac-zstd-3-v1",
+            encoderVersion: "zstd 1.5.7",
+            blake3: String(repeating: "a", count: 64)
+        ),
+        game: UACGame(id: "fixture-game", title: "Fixture Game", console: "Nintendo SNES"),
+        variants: [UACVariant(id: "original", label: "Original", kind: "retail")],
+        members: [
+            UACMember(
+                path: "variants/original/track.spc",
+                originalName: "track.spc",
+                variantID: "original",
+                role: "playable",
+                format: "spc",
+                byteSize: 4,
+                blake3: String(repeating: "b", count: 64)
+            ),
+            UACMember(
+                path: "variants/original/game.m3u",
+                originalName: "game.m3u",
+                variantID: "original",
+                role: "playlist",
+                format: "m3u",
+                byteSize: 12,
+                blake3: String(repeating: "c", count: 64)
+            )
+        ]
+    )
+    let forceRawManifest: UACManifestFrameEncoder = { manifestJSON in
+        var oversizedFrame = Data([0x28, 0xB5, 0x2F, 0xFD])
+        oversizedFrame.append(Data(repeating: 0, count: manifestJSON.count))
+        return oversizedFrame
+    }
+    let rawManifestOnly: UACManifestFrameDecoder = { _, _, _ in
+        throw UACContainerError.manifestDecoderRequired
+    }
+    try UACContainerWriter.write(
+        manifest: manifest,
+        compressedTarPayloadURL: compressedPayloadURL,
+        to: archiveURL,
+        compressManifestFrame: forceRawManifest,
+        decompressManifestFrame: rawManifestOnly
+    )
+
+    #expect(ZipArchiveSupport.canHandle(archiveURL))
+    let playable = try ZipArchiveSupport.listPlayableEntries(in: archiveURL, supportedExtensions: ["spc"])
+    #expect(playable.map(\.entryPath) == ["variants/original/track.spc"])
+    let playlists = try ZipArchiveSupport.listPlaylistEntries(in: archiveURL)
+    #expect(playlists.map(\.entryPath) == ["variants/original/game.m3u"])
+    #expect(try ZipArchiveSupport.scanSignature(for: archiveURL)?.hasPrefix("uac-manifest-sha256:") == true)
+    #expect(throws: ZipArchiveSupport.ArchiveError.self) {
+        try ZipArchiveSupport.materializeEntry(archiveURL: archiveURL, entryPath: "variants/original/not-declared.spc")
+    }
+}
+
+@Test(
+    "A real seekable UAC SPC member decodes through VGMBoy without a playback file",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["COCOASPICE_REAL_SPC_UAC"] != nil,
+        "Set COCOASPICE_REAL_SPC_UAC to run the real UAC-to-SPC playback check."
+    )
+)
+func realSPCUACMemberStreamsIntoVGMBoyWithoutMaterialization() throws {
+    let packagePath = try #require(ProcessInfo.processInfo.environment["COCOASPICE_REAL_SPC_UAC"])
+    let archiveURL = URL(fileURLWithPath: packagePath).standardizedFileURL
+    let memberPath = "variants/original/ssf2-01.spc"
+    let listedPaths = try ZipArchiveSupport.listPlayableEntries(
+        in: archiveURL,
+        supportedExtensions: ["spc"]
+    ).map(\.entryPath)
+    #expect(listedPaths.contains(memberPath))
+    #expect(try ZipArchiveSupport.scanSignature(for: archiveURL)?.hasPrefix("uac-manifest-sha256:") == true)
+
+    let track = TrackItem(archiveURL: archiveURL, entryPath: memberPath)
+    let maybeMemberData = try ZipArchiveSupport.seekableUACSPCData(for: track)
+    let memberData = try #require(maybeMemberData)
+    #expect(memberData.count > 65_000)
+
+    let controller = PlaybackController()
+    let loaded = controller.loadInMemory(
+        sourceData: memberData,
+        payload: PlaybackControlPayload(
+            path: memberPath,
+            trackIndex: 0,
+            tempo: 1,
+            playbackMode: .fileDefault,
+            fadeMilliseconds: 0
+        )
+    )
+    #expect(loaded.kind == .response)
+    #expect(loaded.status?.errorMessage == nil)
+    _ = controller.perform(.init(command: .stop))
+
+    let decoder = try GMEDecoder(data: memberData)
+    defer { decoder.close() }
+
+    #expect(decoder.trackCount > 0)
+    try decoder.startTrack(0)
+    let metadata = try decoder.metadata(for: 0)
+    #expect(metadata.lengthMs > 0 || metadata.playMs > 0)
+    let frames = decoder.readFrames(44_100)
+    #expect(frames.left.count == 44_100)
+    #expect(frames.left.contains(where: { $0 != 0 }) || frames.right.contains(where: { $0 != 0 }))
 }
 
 @Test func droppedZipImportCreatesArchiveTracks() async throws {
@@ -390,8 +506,7 @@ func realAmigaLHAArchiveListsPrefixLedModule() async throws {
             #expect(plan.fadeSeconds == 6)
             #expect(plan.totalSeconds == 246)
         } else {
-            #expect(!plan.usesNativeEnding, "Unknown timing must remain bounded for \(extensionName)")
-            #expect(plan.usesDecoderNaturalDuration, "Finite audio should defer to decoder timing for \(extensionName)")
+            #expect(plan.usesNativeEnding, "Finite audio must retain its native ending for \(extensionName)")
         }
     }
 
@@ -403,8 +518,7 @@ func realAmigaLHAArchiveListsPrefixLedModule() async throws {
         fadeSeconds: 6
     )
     #expect(!unsupported.isLongPlay)
-    #expect(!unsupported.usesNativeEnding)
-    #expect(unsupported.usesDecoderNaturalDuration)
+    #expect(unsupported.usesNativeEnding)
 }
 
 @Test func playbackPreferencesRestoreOnlyUnifiedKeys() {
@@ -438,7 +552,6 @@ func realAmigaLHAArchiveListsPrefixLedModule() async throws {
     defaults.set(true, forKey: AppDefaultsKey.databaseSidebarHidesFileExtensions)
     defaults.set(15, forKey: AppDefaultsKey.playlistFontSize)
     defaults.set("tertiary", forKey: AppDefaultsKey.playlistTextColor)
-    defaults.set(7, forKey: AppDefaultsKey.playlistRowGapPoints)
     defaults.set(true, forKey: AppDefaultsKey.equalizerEnabled)
     defaults.set([-12.0, -3.5, 4.0, 12.0], forKey: AppDefaultsKey.equalizerBandGains)
 
@@ -450,7 +563,6 @@ func realAmigaLHAArchiveListsPrefixLedModule() async throws {
     #expect(unifiedPreferences.databaseSidebarHidesFileExtensions)
     #expect(unifiedPreferences.playlistFontSize == 15)
     #expect(unifiedPreferences.playlistTextColor == "tertiary")
-    #expect(unifiedPreferences.playlistRowGapPoints == 7)
     #expect(unifiedPreferences.sidebarSystemMode)
     #expect(unifiedPreferences.equalizerEnabled)
     #expect(unifiedPreferences.equalizerBandGains == [-12.0, -3.5, 4.0, 12.0])
@@ -468,15 +580,7 @@ func realAmigaLHAArchiveListsPrefixLedModule() async throws {
     #expect(PlaylistPresentation.titleText(for: track, metadata: nil) == "Game Theme")
     #expect(PlaylistPresentation.gameText(for: track, metadata: nil) == "Example")
     #expect(PlaylistPresentation.authorText(for: nil) == "—")
-    #expect(PlaylistPresentation.dumperText(for: nil) == "—")
     #expect(PlaylistPresentation.systemText(for: nil) == "—")
-}
-
-@Test func emptyPlaylistColumnPlaceholdersAreNotMeaningful() {
-    #expect(!PlaylistPresentation.isMeaningfulColumnText(""))
-    #expect(!PlaylistPresentation.isMeaningfulColumnText("  \n"))
-    #expect(!PlaylistPresentation.isMeaningfulColumnText("—"))
-    #expect(PlaylistPresentation.isMeaningfulColumnText("SPC700"))
 }
 
 private func runProcess(

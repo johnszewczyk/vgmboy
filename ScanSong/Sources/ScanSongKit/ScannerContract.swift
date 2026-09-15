@@ -1,4 +1,5 @@
 import Foundation
+import MetaManCore
 import VGMBoyFormatCore
 
 public enum ScanSongContract {
@@ -105,14 +106,7 @@ public struct ScannerPluginRegistry: Sendable {
         }) else {
             return nil
         }
-        return ScannerRoute(
-            pluginID: descriptor.pluginID,
-            formatExtension: normalized,
-            supportsArchiveMembers: descriptor.supportsArchiveMembers,
-            supportsMultiTrack: descriptor.supportsMultiTrack,
-            structurePolicy: descriptor.structurePolicy,
-            metadataPolicy: descriptor.metadataPolicy
-        )
+        return Self.route(for: descriptor, extensionName: normalized)
     }
 
 
@@ -121,11 +115,43 @@ public struct ScannerPluginRegistry: Sendable {
     }
 
     /// Routes ordinary suffixes first, then Amiga's replayer-prefix names
-    /// (`p4x.earth`, `mod.xpose-end`, etc.). Prefix routing is path-aware and
-    /// is intentionally not folded into the generic extension API.
+    /// (`p4x.earth`, `mod.xpose-end`, etc.). ADX, AT3, AUS, MSF, SVAG, and XA are
+    /// content-aware: RIFF ATRAC3/ATRAC3+, Sony MSF, and Konami/SNK SVAG are
+    /// probed by MetaManCore; Sony XA is probed by ScanSong. Other
+    /// aliases retain vgmstream. These rules are not folded into the extension API.
     public func route(forPath path: String, archiveMember: Bool = false) -> ScannerRoute? {
+        let fileURL = URL(fileURLWithPath: path)
+        let extensionName = ScannerPluginDescriptor.normalize(fileURL.pathExtension)
+        let contentRoutedPlugin: String?
+        switch extensionName {
+        case "adx": contentRoutedPlugin = Self.isDirectADX(at: fileURL) ? "adx-direct" : "vgmstream"
+        case "at3":
+            contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "at3")
+                ? "at3-direct"
+                : "vgmstream"
+        case "aus": contentRoutedPlugin = Self.isDirectAUS(at: fileURL) ? "aus-direct" : "vgmstream"
+        case "msf":
+            contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "msf")
+                ? "sony-msf-direct"
+                : "vgmstream"
+        case "svag":
+            contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "svag")
+                ? "svag-direct"
+                : "vgmstream"
+        case "xa": contentRoutedPlugin = Self.isDirectXA(at: fileURL) ? "xa-direct" : "vgmstream"
+        default: contentRoutedPlugin = nil
+        }
+        if let pluginID = contentRoutedPlugin {
+            if let descriptor = descriptors.first(where: {
+                $0.pluginID == pluginID
+                    && $0.supportedExtensions.contains(extensionName)
+                    && (!archiveMember || $0.supportsArchiveMembers)
+            }) {
+                return Self.route(for: descriptor, extensionName: extensionName)
+            }
+        }
         if let route = route(
-            pathExtension: URL(fileURLWithPath: path).pathExtension,
+            pathExtension: extensionName,
             archiveMember: archiveMember
         ) {
             return route
@@ -144,6 +170,49 @@ public struct ScannerPluginRegistry: Sendable {
             structurePolicy: descriptor.structurePolicy,
             metadataPolicy: descriptor.metadataPolicy
         )
+    }
+
+    private static func route(for descriptor: ScannerPluginDescriptor, extensionName: String) -> ScannerRoute {
+        ScannerRoute(
+            pluginID: descriptor.pluginID,
+            formatExtension: extensionName,
+            supportsArchiveMembers: descriptor.supportsArchiveMembers,
+            supportsMultiTrack: descriptor.supportsMultiTrack,
+            structurePolicy: descriptor.structurePolicy,
+            metadataPolicy: descriptor.metadataPolicy
+        )
+    }
+
+    private static func isDirectADX(at fileURL: URL) -> Bool {
+        guard let file = try? FileHandle(forReadingFrom: fileURL) else { return false }
+        defer { try? file.close() }
+        guard let header = try? file.read(upToCount: 4) else { return false }
+        let bytes = [UInt8](header)
+        let monster = bytes.count >= 4
+            && bytes[0] == 0x02 && bytes[1] == 0x00 && bytes[2] == 0x00 && bytes[3] == 0x00
+        let cri = bytes.count >= 2 && bytes[0] == 0x80 && bytes[1] == 0x00
+        return monster || cri
+    }
+
+    private static func isDirectXA(at fileURL: URL) -> Bool {
+        guard let file = try? FileHandle(forReadingFrom: fileURL) else { return false }
+        defer { try? file.close() }
+        guard let header = try? file.read(upToCount: 0x2C) else { return false }
+        let bytes = [UInt8](header)
+        let rawSync: [UInt8] = [0x00] + Array(repeating: 0xFF, count: 10) + [0x00]
+        let rawXA = bytes.count >= rawSync.count && bytes.prefix(rawSync.count).elementsEqual(rawSync)
+        let riffCDXA = bytes.count >= 0x10
+            && bytes[0..<4].elementsEqual(Array("RIFF".utf8))
+            && bytes[0x08..<0x0C].elementsEqual(Array("CDXA".utf8))
+            && bytes[0x0C..<0x10].elementsEqual(Array("fmt ".utf8))
+        return rawXA || riffCDXA
+    }
+
+    private static func isDirectAUS(at fileURL: URL) -> Bool {
+        guard let file = try? FileHandle(forReadingFrom: fileURL) else { return false }
+        defer { try? file.close() }
+        guard let header = try? file.read(upToCount: 4), header.count == 4 else { return false }
+        return header.elementsEqual(Array("AUS ".utf8))
     }
 }
 

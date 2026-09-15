@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import PlaybackTransportCore
 
@@ -45,4 +46,26 @@ func queuedSkipIsBoundedByRemainingWindow() {
         fadeSeconds: 6,
         totalSeconds: 155
     ) == 1)
+}
+
+@Test
+func queuedSkipRequestCarriesTheCommonPolicyInput() throws {
+    let request = PlaybackQueuedSkipFadeRequest(
+        enabled: true,
+        isPlaying: true,
+        hasCurrentTrack: true,
+        elapsedSeconds: 10,
+        preFadeSeconds: 150,
+        fadeSeconds: 6,
+        totalSeconds: 156
+    )
+
+    let decoded = try JSONDecoder().decode(
+        PlaybackQueuedSkipFadeRequest.self,
+        from: JSONEncoder().encode(request)
+    )
+
+    #expect(decoded == request)
+    #expect(request.duration == 6)
+    #expect(request.durationMilliseconds == 6_000)
 }

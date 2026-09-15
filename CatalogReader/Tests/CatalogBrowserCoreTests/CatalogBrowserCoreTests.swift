@@ -1,5 +1,6 @@
 import CatalogReader
 import CatalogBrowserCore
+import Foundation
 import Testing
 
 @Test func sidebarRowIntentIsRendererIndependent() {
@@ -36,15 +37,29 @@ import Testing
     #expect(games[0].id != games[1].id)
 }
 
-@Test func gameProjectionHidesKnownFormatSuffixesFromFallbackDisplayNames() {
+@Test func gameProjectionPublishesTheCompleteNormalizedSearchValue() {
+    let game = CatalogBrowserGame(bucket: .init(
+        rootID: 1,
+        rootPath: "/music/JoshW",
+        game: "ActRaiser",
+        system: "SNES",
+        trackCount: 1
+    ), displayName: "ActRaiser (SNES)")
+
+    #expect(game.searchText == "actraiser snes joshw actraiser (snes)")
+}
+
+@Test func gameProjectionSuppliesNaturalConsoleGroupsIncludingUnknownSystems() {
     let games = CatalogBrowserProjection.games(from: [
-        CatalogGameBucket(rootID: 1, rootPath: "/music", game: "song.sndh", system: "", trackCount: 1),
-        CatalogGameBucket(rootID: 1, rootPath: "/music", game: "track.MDX", system: "", trackCount: 1),
-        CatalogGameBucket(rootID: 1, rootPath: "/music", game: "Game.tar.zst", system: "", trackCount: 1)
+        .init(rootID: 1, rootPath: "/music/A", game: "Ten", system: "System 10", trackCount: 1),
+        .init(rootID: 1, rootPath: "/music/A", game: "Two", system: "System 2", trackCount: 1),
+        .init(rootID: 1, rootPath: "/music/A", game: "Mystery", system: "", trackCount: 1)
     ])
 
-    #expect(games.map(\.displayName) == ["Game", "song", "track"])
-    #expect(games.map(\.name) == ["Game.tar.zst", "song.sndh", "track.MDX"])
+    let groups = CatalogBrowserProjection.groups(from: games)
+
+    #expect(groups.map(\.name) == ["System 2", "System 10", "Unknown Console"])
+    #expect(groups.map { $0.games.map(\.name) } == [["Two"], ["Ten"], ["Mystery"]])
 }
 
 @Test func searchIndexReusesOnlyExtendingQueriesAndRestartsAfterBackspace() {
@@ -98,6 +113,17 @@ import Testing
     #expect(nodes[0].children[0].children[0].children.last?.file?.path.hasSuffix("/01.vgm") == true)
 }
 
+@Test func fileTreeProjectionUsesNaturalOrderingForNumberedFiles() {
+    let root = "/music/Library"
+    let files = [
+        CatalogFileBucket(rootID: 1, rootPath: root, folderPath: "\(root)/Game", path: "\(root)/Game/Track 10.vgm", isArchive: false, trackCount: 1),
+        CatalogFileBucket(rootID: 1, rootPath: root, folderPath: "\(root)/Game", path: "\(root)/Game/Track 2.vgm", isArchive: false, trackCount: 1)
+    ]
+
+    let nodes = CatalogFileTreeIndex(files: files).nodes()
+    #expect(nodes[0].children[0].children.map(\.title) == ["Track 2.vgm", "Track 10.vgm"])
+}
+
 @Test func fileSearchIndexSupportsCancellationAndSharedSearchFields() {
     let files = [
         CatalogFileBucket(rootID: 1, rootPath: "/music/Library", folderPath: "/music/Library/NES", path: "/music/Library/NES/ActRaiser.nsf", isArchive: true, trackCount: 1),
@@ -119,4 +145,21 @@ import Testing
     state = state.applying(.selectGame(groupName: "SNES", gameID: "game-1"))
     #expect(state.selectedGroupName == "SNES")
     #expect(state.selectedGameID == "game-1")
+}
+
+@Test func groupStateRequestUsesOneTypedWireTransition() throws {
+    let request = CatalogBrowserGroupStateRequest(
+        state: .init(expandedGroupNames: ["SNES"], selectedGroupName: "SNES"),
+        action: .setAllCollapsed(true, knownGroupNames: ["SNES", "NES"])
+    )
+
+    let encoded = try JSONEncoder().encode(request)
+    let decoded = try JSONDecoder().decode(CatalogBrowserGroupStateRequest.self, from: encoded)
+    let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    let action = try #require(object["action"] as? [String: Any])
+
+    #expect(decoded == request)
+    #expect(action["kind"] as? String == "allCollapsed")
+    #expect(action["knownGroupNames"] as? [String] == ["NES", "SNES"])
+    #expect(request.response.expandedGroupNames.isEmpty)
 }

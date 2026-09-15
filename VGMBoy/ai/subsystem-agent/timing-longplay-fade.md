@@ -12,11 +12,9 @@ the only standard mode that supplies a manual play length. An explicit `timed` r
 reserved for a caller that has an actual finite duration, such as a deliberate faded skip.
 Frontends must not manufacture a timed request with a missing duration.
 
-`PlaybackTimingPolicy.plan` turns a requested `PlaybackTimingRequest` and
-`PlaybackTimingMetadata` into a `PlaybackTimingPlan`
+`TimingPolicy.plan` turns a requested mode and `TrackMetadata` into a `PlaybackPlan`
 (`preFadeSeconds`, `fadeSeconds`, `isLongPlay`, `usesNativeEnding`, `totalSeconds`).
-`PlaybackController` and both frontend adapters use this same typed planner. `PlaybackSession.load`
-applies the plan: for a native ending it uses decoder-native ending only
+`PlaybackSession.load` applies the plan: for a native ending it uses decoder-native ending only
 when the decoder also owns its fade. Libvgm exposes natural timing but its bridge does not start
 an internal fade at an ordinary file end, so it uses the same session-boundary fade as Highly
 Complete/mGBA. Capped windows call `configureFade` and cap the stream at `totalSeconds * sampleRate`.
@@ -58,7 +56,7 @@ refill and prime.
 
 ## Files
 
-- [PlaybackTimingPolicy.swift](../../Sources/VGMBoyKit/PlaybackTimingPolicy.swift)
-- [PlaybackTimingRequest.swift](../../Sources/VGMBoyKit/PlaybackTimingRequest.swift)
-- [PlaybackSession.swift](../../Sources/VGMBoyKit/PlaybackSession.swift)
-- [TrackMetadata.swift](../../Sources/VGMBoyKit/TrackMetadata.swift)
+- [TimingPolicy.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/TimingPolicy.swift)
+- [PlaybackTimingRequest.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/PlaybackTimingRequest.swift)
+- [PlaybackSession.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/PlaybackSession.swift)
+- [TrackMetadata.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/TrackMetadata.swift)

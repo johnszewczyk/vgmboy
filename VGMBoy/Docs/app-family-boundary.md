@@ -24,14 +24,17 @@ inspection builds for the CocoaSpice, SPCBoy WK, and ScanSong products.
   and audio output.
 - ScanSong receives scanner executables from VGMBoy and never invokes a player frontend or a
   frontend-owned plugin helper.
+- `VGMBoyFormatDataCore` contains only bounded Foundation byte readers for
+  metadata facts that do not require a playback decoder. ScanSong may consume
+  this narrow product without acquiring VGMBoyKit or any decoder linkage.
 - Shared decoder source, compatibility patches, and dependency builds live in VGMBoy. The
   frontends do not carry duplicate decoder source trees or plugin build scripts.
 
 ## Files
 
-- [Package.swift](../Package.swift)
-- [build-app.sh](../build-app.sh)
-- [build-integration.md](../ai/subsystem-agent/build-integration.md)
-- [CocoaSpice project info](../../CocoaSpice/ai/project-info.md)
-- [SPCBoy WK project info](../../SPCBoyWK/ai/project-info.md)
-- [ScanSong project info](../../ScanSong/ai/project-info.md)
+- [Package.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Package.swift)
+- [build-app.sh](/Users/john/Downloads/Code/VGMMan/VGMBoy/build-app.sh)
+- [build-integration.md](/Users/john/Downloads/Code/VGMMan/VGMBoy/ai/subsystem-agent/build-integration.md)
+- [CocoaSpice project info](/Users/john/Downloads/Code/VGMMan/CocoaSpice/ai/project-info.md)
+- [SPCBoy WK project info](/Users/john/Downloads/Code/VGMMan/SPCBoyWK/ai/project-info.md)
+- [ScanSong project info](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/project-info.md)
