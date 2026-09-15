@@ -27,6 +27,12 @@ history to retain. Dirty source from the existing CocoaSpice and FrontendCore
 checkouts is represented in the family tree. Build caches and packaged outputs
 are local, reproducible artifacts, not source history.
 
+The former standalone GitHub repositories for CocoaSpice, ScanSong, and the
+retired Electron SPCBoy remain untouched and unarchived. Their histories are
+preserved here, but this family repository's `main` is the only canonical
+source of current work. Archive the old remotes only after checking for outside
+consumers and links that still depend on those repository URLs.
+
 ## Dependency source
 
 `VGMBoy/vendor/` contains the decoder source snapshots needed by the family as
