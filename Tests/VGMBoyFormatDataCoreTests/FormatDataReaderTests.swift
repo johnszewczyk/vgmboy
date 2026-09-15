@@ -2,58 +2,6 @@ import Foundation
 import Testing
 @testable import VGMBoyFormatDataCore
 
-@Test func ayFormatReaderExtractsRelativeMetadataAndAuthoredLengthsWithoutPlayback() throws {
-    let data = makeAYData(
-        author: "  Composer  ",
-        comment: " Copyright 1987 ",
-        tracks: [("Opening", 125), ("Loop", 0)]
-    )
-    let facts = try AYFormatDataReader.read(data: data, displayName: "fixture.ay")
-
-    #expect(facts.version == 1)
-    #expect(facts.playerID == 3)
-    #expect(facts.firstTrack == 1)
-    #expect(facts.trackCount == 2)
-    #expect(facts.author == "Composer")
-    #expect(facts.comment == "Copyright 1987")
-    #expect(facts.tracks.map(\.sourceTrackIndex) == [0, 1])
-    #expect(facts.tracks.map(\.title) == ["Opening", "Loop"])
-    #expect(facts.tracks.map(\.lengthFrames) == [125, 0])
-    #expect(facts.tracks[0].metadata == FormatMetadata(
-        game: "",
-        song: "Opening",
-        system: "ZX Spectrum",
-        author: "Composer",
-        comment: "Copyright 1987",
-        introLengthMs: -1,
-        loopLengthMs: -1,
-        playLengthMs: 2_500,
-        fadeLengthMs: -1
-    ))
-    #expect(facts.tracks[1].metadata.playLengthMs == 150_000)
-}
-
-@Test func ayFormatReaderUsesHeaderTrackCountAndRejectsOnlyInvalidTopLevelData() throws {
-    let data = makeAYData(author: "<?> ", comment: "", tracks: [("?", 0)])
-    let facts = try AYFormatDataReader.read(data: data, displayName: "defaults.ay")
-    #expect(facts.trackCount == 1)
-    #expect(facts.author.isEmpty)
-    #expect(facts.comment.isEmpty)
-    #expect(facts.tracks[0].title.isEmpty)
-    #expect(facts.tracks[0].metadata.playLengthMs == 150_000)
-
-    var truncatedTable = Data(repeating: 0, count: 0x14)
-    truncatedTable.replaceSubrange(0..<8, with: Data("ZXAYEMUL".utf8))
-    truncatedTable[16] = 1
-    writeAYRelativePointer(&truncatedTable, at: 18, target: 0x14)
-    #expect(throws: FormatDataError.self) {
-        try AYFormatDataReader.read(data: truncatedTable, displayName: "truncated.ay")
-    }
-    #expect(throws: FormatDataError.self) {
-        try AYFormatDataReader.read(data: Data(repeating: 0, count: 0x20), displayName: "invalid.ay")
-    }
-}
-
 @Test func nsfAndGBSReadersHarvestCompleteFileHeadersWithoutPlayback() throws {
     var nsf = Data(repeating: 0, count: 0x80)
     nsf.replaceSubrange(0..<5, with: Data([0x4E, 0x45, 0x53, 0x4D, 0x1A]))
@@ -385,48 +333,6 @@ private func makeSAPData(_ header: String) -> Data {
     if !normalized.hasSuffix("\r\n") { data.append(Data("\r\n".utf8)) }
     data.append(contentsOf: [0xFF, 0xFF, 0, 0, 0, 0, 0])
     return data
-}
-
-private func makeAYData(author: String, comment: String, tracks: [(String, UInt16)]) -> Data {
-    precondition((1...256).contains(tracks.count))
-    var data = Data(repeating: 0, count: 0x14)
-    data.replaceSubrange(0..<8, with: Data("ZXAYEMUL".utf8))
-    data[8] = 1
-    data[9] = 3
-    data[16] = UInt8(tracks.count - 1)
-    data[17] = 1
-
-    let authorOffset = appendAYCString(author, to: &data)
-    writeAYRelativePointer(&data, at: 12, target: authorOffset)
-    let commentOffset = appendAYCString(comment, to: &data)
-    writeAYRelativePointer(&data, at: 14, target: commentOffset)
-    let titleOffsets = tracks.map { appendAYCString($0.0, to: &data) }
-
-    let tableOffset = data.count
-    data.append(contentsOf: repeatElement(0, count: tracks.count * 4))
-    writeAYRelativePointer(&data, at: 18, target: tableOffset)
-    for (index, track) in tracks.enumerated() {
-        let rowOffset = tableOffset + index * 4
-        writeAYRelativePointer(&data, at: rowOffset, target: titleOffsets[index])
-        let infoOffset = data.count
-        data.append(contentsOf: [0, 0, 0, 0, UInt8(track.1 >> 8), UInt8(track.1 & 0xFF)])
-        writeAYRelativePointer(&data, at: rowOffset + 2, target: infoOffset)
-    }
-    return data
-}
-
-private func appendAYCString(_ value: String, to data: inout Data) -> Int {
-    let offset = data.count
-    data.append(contentsOf: value.utf8)
-    data.append(0)
-    return offset
-}
-
-private func writeAYRelativePointer(_ data: inout Data, at offset: Int, target: Int) {
-    let relative = Int16(target - offset)
-    let encoded = UInt16(bitPattern: relative)
-    data[offset] = UInt8(encoded >> 8)
-    data[offset + 1] = UInt8(encoded & 0xFF)
 }
 
 private func writeHESTextField(_ data: inout Data, at offset: Int, value: String) {

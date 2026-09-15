@@ -7,15 +7,15 @@ this page records what each input does at the VGMBoy and ScanSong boundaries.
 It describes the current implementation, not a claim that every file in a
 format family is playable.
 
-Last reviewed: **2026-09-13**
+Last reviewed: **2026-09-14**
 
 ## Decoder matrix
 
 | ID | Source/version | Playback bridge | ScanSong boundary | Formats and special data |
 | --- | --- | --- | --- | --- |
 | `libgme` | Game Music Emu 0.6.5 through Homebrew | `CGameMusicEmu` | ScanSong tests only as a parity oracle; no production scanner link | Playback supports AY, GBS, HES, KSS, NSF, NSFE, SAP, SPC |
-| `VGMBoyFormatDataCore` | Foundation-only shared readers | None | Direct byte metadata route | AY, NSF/GBS/NSFE, SAP, HES/M3U |
-| `MetaManCore` | Sibling decoder-independent metadata package | None | Shared direct metadata route | SID, SPC, S98, VGM/VGZ, PSF-family tags |
+| `VGMBoyFormatDataCore` | Foundation-only shared readers | None | Direct byte metadata route | NSF/GBS/NSFE, SAP, HES/M3U |
+| `MetaManCore` | Sibling decoder-independent metadata package | None | Shared direct metadata route | AY, SID, SPC, S98, VGM/VGZ, PSF-family tags |
 | `libvgm` | `867223e7c33d63de115d1ab955f784c44f19040a` | `CLibVGM` | Native libVGM route | GYM, S98, DRO |
 | `psgplay` | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | `CPSGPlay` / `VGMBoySNDH` | Shared SNDH inspector | Atari ST SNDH; declared subtunes become playlist rows |
 | `mdxmini` | `003531a471c1955f4ed4357d0e2a6cba809c34a0` plus vendored LZX code | `CMDX` | `vgmboy-mdx-inspect` | X68000 MDX and PDX; sibling banks, legacy `\name`, inner LZX 0.32/0.42 |
