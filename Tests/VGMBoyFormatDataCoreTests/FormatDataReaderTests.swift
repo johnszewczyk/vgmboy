@@ -202,83 +202,6 @@ import Testing
     }
 }
 
-@Test func sapReaderExtractsInfoOnlyMetadataAndRetainsNativeTimeHints() throws {
-    let facts = try SAPFormatDataReader.read(
-        data: makeSAPData("""
-        AUTHOR "Composer"
-        NAME "Sample Game"
-        DATE "1992"
-        SONGS 3
-        TYPE C
-        MUSIC 8000
-        PLAYER 9000
-        FASTPLAY 156
-        STEREO
-        TIME 01:20.125 LOOP
-        TIME 0:45.5
-        TIME invalid
-        """),
-        displayName: "sample.sap"
-    )
-
-    #expect(facts.playerType == 0x43)
-    #expect(facts.trackCount == 3)
-    #expect(facts.initAddress == nil)
-    #expect(facts.playerAddress == 0x9000)
-    #expect(facts.musicAddress == 0x8000)
-    #expect(facts.fastPlayScanlines == 156)
-    #expect(facts.isStereo)
-    #expect(facts.game == "Sample Game")
-    #expect(facts.author == "Composer")
-    #expect(facts.copyright == "1992")
-    #expect(facts.tracks.map { $0.metadata.game } == Array(repeating: "Sample Game", count: 3))
-    #expect(facts.tracks.map { $0.metadata.system } == Array(repeating: "Atari XL", count: 3))
-    #expect(facts.tracks.map { $0.metadata.author } == Array(repeating: "Composer", count: 3))
-    #expect(facts.tracks.allSatisfy { $0.metadata.song.isEmpty && $0.metadata.comment.isEmpty })
-    #expect(facts.tracks.allSatisfy {
-        $0.metadata.loopLengthMs == -1 && $0.metadata.fadeLengthMs == -1
-    })
-    #expect(facts.tracks[0].timeHint == SAPTimeHint(milliseconds: 80_125, loops: true))
-    #expect(facts.tracks[0].metadata.introLengthMs == 80_125)
-    #expect(facts.tracks[0].metadata.playLengthMs == 150_000)
-    #expect(facts.tracks[1].timeHint == SAPTimeHint(milliseconds: 45_500, loops: false))
-    #expect(facts.tracks[1].metadata.introLengthMs == -1)
-    #expect(facts.tracks[1].metadata.playLengthMs == 45_500)
-    #expect(facts.tracks[2].timeHint == nil)
-    #expect(facts.tracks[2].metadata.introLengthMs == -1)
-    #expect(facts.tracks[2].metadata.playLengthMs == 150_000)
-}
-
-@Test func sapReaderUsesLibGMEDefaultTrackCountAndCleansUnknownIdentity() throws {
-    let facts = try SAPFormatDataReader.read(
-        data: makeSAPData("""
-        TYPE B
-        NAME "?"
-        AUTHOR "<?>"
-        """),
-        displayName: "single.sap"
-    )
-    #expect(facts.trackCount == 1)
-    #expect(facts.game.isEmpty)
-    #expect(facts.author.isEmpty)
-    #expect(facts.tracks.count == 1)
-    #expect(facts.tracks[0].timeHint == nil)
-}
-
-@Test func sapReaderRejectsMalformedHeadersAndCounts() throws {
-    for malformed in [
-        Data(repeating: 0, count: 20),
-        Data("SAP\r\nTYPE D\r\n\u{FFFD}\u{FFFD}".utf8),
-        makeSAPData("TYPE B\r\nSONGS 0"),
-        makeSAPData("TYPE B\r\nSONGS 65537"),
-        makeSAPData("TYPE B\r\nINIT XYZ")
-    ] {
-        #expect(throws: FormatDataError.self) {
-            try SAPFormatDataReader.read(data: malformed, displayName: "invalid.sap")
-        }
-    }
-}
-
 @Test(
     "NSFE fixture directory parses without playback",
     .enabled(
@@ -321,17 +244,6 @@ private func makeHESData() -> Data {
     data.replaceSubrange(16..<20, with: Data("DATA".utf8))
     writeLittleEndian(&data, at: 20, value: 0x1020)
     writeLittleEndian(&data, at: 24, value: 0x4000)
-    return data
-}
-
-private func makeSAPData(_ header: String) -> Data {
-    var data = Data("SAP\r\n".utf8)
-    let normalized = header
-        .replacingOccurrences(of: "\r\n", with: "\n")
-        .replacingOccurrences(of: "\n", with: "\r\n")
-    data.append(Data(normalized.utf8))
-    if !normalized.hasSuffix("\r\n") { data.append(Data("\r\n".utf8)) }
-    data.append(contentsOf: [0xFF, 0xFF, 0, 0, 0, 0, 0])
     return data
 }
 

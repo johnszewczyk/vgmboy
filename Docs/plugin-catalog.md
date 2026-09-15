@@ -14,8 +14,8 @@ Last reviewed: **2026-09-14**
 | ID | Source/version | Playback bridge | ScanSong boundary | Formats and special data |
 | --- | --- | --- | --- | --- |
 | `libgme` | Game Music Emu 0.6.5 through Homebrew | `CGameMusicEmu` | ScanSong tests only as a parity oracle; no production scanner link | Playback supports AY, GBS, HES, KSS, NSF, NSFE, SAP, SPC |
-| `VGMBoyFormatDataCore` | Foundation-only shared readers | None | Direct byte metadata route | NSF/GBS/NSFE, SAP, HES/M3U |
-| `MetaManCore` | Sibling decoder-independent metadata package | None | Shared direct metadata route | AY, SID, SPC, S98, VGM/VGZ, PSF-family tags |
+| `VGMBoyFormatDataCore` | Foundation-only shared readers | None | Direct byte metadata route | NSF/GBS/NSFE, HES/M3U |
+| `MetaManCore` | Sibling decoder-independent metadata package | None | Shared direct metadata route | AY, SAP, SID, SPC, S98, VGM/VGZ, PSF-family tags |
 | `libvgm` | `867223e7c33d63de115d1ab955f784c44f19040a` | `CLibVGM` | Native libVGM route | GYM, S98, DRO |
 | `psgplay` | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | `CPSGPlay` / `VGMBoySNDH` | Shared SNDH inspector | Atari ST SNDH; declared subtunes become playlist rows |
 | `mdxmini` | `003531a471c1955f4ed4357d0e2a6cba809c34a0` plus vendored LZX code | `CMDX` | `vgmboy-mdx-inspect` | X68000 MDX and PDX; sibling banks, legacy `\name`, inner LZX 0.32/0.42 |
@@ -42,7 +42,7 @@ boundary where required.
 
 AY, HES, KSS, SAP, SPC, NSF/GBS, and NSFE all have direct metadata routes in
 ScanSong. AY's relative-pointer subtune table and native duration frames,
-SAP's header/TIME fields, and HES's header/M3U mapping are read without
+SAP's MetaManCore directive-header reader and HES's header/M3U mapping are read without
 starting a core. SPC ID666/xID6 tags and tagless info-only defaults are read
 through MetaManCore; the production ScanSong library, CLI, and app do not link
 libgme. Tests retain it only as a reader-parity oracle. SPC playback remains

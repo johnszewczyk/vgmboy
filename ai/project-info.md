@@ -16,10 +16,10 @@ SPCBoyWK behavior. ScanSong receives VGMBoy-built inspection executables.
 - `Sources/VGMBoyKit` — the audio core and decoder boundary.
 - `Sources/VGMBoyFormatDataCore` — Foundation-only format-byte readers shared
   with ScanSong where they provide the complete scanner metadata contract:
-  NSF/GBS/NSFE, SAP
-  header/subsong/native-TIME facts, and HES header tags with companion-M3U
+  NSF/GBS/NSFE header/subsong facts, and HES header tags with companion-M3U
   track/timing data. AY, SPC ID666/xID6, and PSF-family `[TAG]` metadata
-  belong to MetaManCore; playback, including SPC and AY, remains in VGMBoy.
+  belong to MetaManCore; SAP metadata also lives in MetaManCore, while all
+  playback, including SAP, SPC, and AY, remains in VGMBoy.
   This reader package has no playback decoder dependency.
 - `Sources/VGMBoyKit/FormatRegistry.swift` — decoder-owned format families plus the
   complete `playbackDescriptors` projection consumed by CocoaSpice and SPCBoyWK.
