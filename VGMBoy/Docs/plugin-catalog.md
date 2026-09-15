@@ -14,7 +14,7 @@ Last reviewed: **2026-09-15**
 | ID | Source/version | Playback bridge | ScanSong boundary | Formats and special data |
 | --- | --- | --- | --- | --- |
 | `libgme` | Game Music Emu 0.6.5 through Homebrew | `CGameMusicEmu` | ScanSong tests only as a parity oracle; no production scanner link | Playback supports AY, GBS, HES, KSS, NSF, NSFE, SAP, SPC |
-| `MetaManCore` | Sibling decoder-independent metadata package | None | Shared direct metadata route | AY, SAP, NSF/GBS/NSFE, HES/M3U, SNDH/ICE!, SID, SPC, S98, VGM/VGZ, PSF-family tags, and supported stream headers |
+| `MetaManCore` | Sibling decoder-independent metadata package | None | Shared direct metadata route | AY, SAP, NSF/GBS/NSFE, HES/M3U, SNDH/ICE!, GSF/miniGSF, SID, SPC, S98, VGM/VGZ, PSF-family tags, and supported stream headers |
 | `libvgm` | `867223e7c33d63de115d1ab955f784c44f19040a` | `CLibVGM` | Native libVGM route | GYM, S98, DRO |
 | `psgplay` | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | `CPSGPlay` | VGMBoy playback; legacy metadata API is test-only oracle | Atari ST SNDH playback; ScanSong production metadata is read by MetaManCore |
 | `mdxmini` | `003531a471c1955f4ed4357d0e2a6cba809c34a0` plus vendored LZX code | `CMDX` | `vgmboy-mdx-inspect` | X68000 MDX and PDX; sibling banks, legacy `\name`, inner LZX 0.32/0.42 |
@@ -23,7 +23,7 @@ Last reviewed: **2026-09-15**
 | `lazyusf2` | `421f00bcaa1988b8e1825e91780129f24fbd1aa0` | `CLazyUSF` | Native dependency-aware route | USF and miniUSF; `.usflib` companions |
 | `play-psf` | `50aedca2639521bc498ace0b2be1ea012801a86a` plus PSF-core patch | `CPlayPSF` | Native PSF route | PSF, miniPSF, PSF2, miniPSF2; `.psflib` companions |
 | `aosdk-qsf` | `e359a6e5154b2ba8499fb1f24a1f5f8a18538a61` plus lifecycle patch | `CQSF` | Playback only; ScanSong uses its own direct reader | QSF and miniQSF; `.qsflib` companions |
-| `mgba` | mGBA 0.11.0 source snapshot; tree SHA-256 `b7b71f64dab500433f3662b818e3521cf67524dcdee1a9952c1f555629ff55c0` | `CHighlyComplete` | GSF playback only; ScanSong reads GSF containers directly | GSF and miniGSF playback; PSFLib assembles dependency chains. The scanner neither links nor prepares mGBA. |
+| `mgba` | mGBA 0.11.0 source snapshot; tree SHA-256 `b7b71f64dab500433f3662b818e3521cf67524dcdee1a9952c1f555629ff55c0` | `CHighlyComplete` | GSF playback only; MetaManCore reads GSF metadata and validates the dependency/ROM-header structure | GSF and miniGSF playback; PSFLib assembles dependency chains. The scanner neither links nor prepares mGBA. |
 | `2sf2wav` | DeSmuME 0.9.9 svn 4608 source snapshot; tree SHA-256 `c3e329f9cf72881d25dabb03b9a89ebd4125ca9bd6d44c26f642589c622a9fb7` | `C2SF` | Native 2SF route | 2SF and mini2SF; relative library dependencies |
 | `psflib` | VGMBoy-managed source snapshot; tree SHA-256 `c3adb7ea371fbeeedc68b3747c314419b52d9cb46aa0d75f177f428bcdb7d021` | Used by PSF-family bridges | Dependency support, not a standalone route | PSF and GSF library resolution |
 | `libsidplayfp` | Homebrew libsidplayfp 3.1.0 | `CSIDPlayFP` | VGMBoy playback only; ScanSong reads PSID/RSID header metadata through MetaManCore | SID |

@@ -42,7 +42,7 @@ timing calculation, or transport policy.
 
 MetaMan is the shared decoder-independent metadata boundary. It now has
 complete readers for AY, SAP, NSF, GBS, NSFE, HES, SNDH, KSS/KSSX, Sony XA,
-S98, VGM/VGZ, the PSF-style
+GSF/miniGSF, S98, VGM/VGZ, the PSF-style
 PSF/PSF2/SSF/USF/2SF family, SPC, SID, APE, CRI/Monster ADX, Atomic Planet
 AUS, RIFF ATRAC3/ATRAC3+,
 Sony MSF, and Konami/SNK SVAG. The per-format byte layouts, pointer bases,
@@ -65,10 +65,14 @@ Remaining metadata-reader targets are grouped by the boundary they need:
   through MetaMan plus the adapter, 0.056 ms/file through the former reader,
   and 236.895 ms/file through vgmstream CLI, including process startup. The
   richer neutral document adds about 0.099 ms/file over the former parser.
-  The current full Debug package suites pass 87 MetaMan tests and 123 ScanSong
-  tests. VGMBoy's focused format-data suite has previously passed; its corpus
-  comparison remains fixture-gated. The single-track direct-reader set is
-  complete for the formats currently claimed by MetaMan.
+  The MetaMan Debug suite passes all 92 tests. ScanSongKit builds, and all 123
+  ScanSong test cases pass from a test-only package harness. The ordinary
+  `swift test --package-path ScanSong` command still fails while SwiftPM links
+  the standalone `ScanSong` and `scansong` executables (`_ScanSongApp_main` /
+  `_scansong_main` unresolved); this is separate from the scanner library and
+  harness test results. VGMBoy's focused format-data suite has previously
+  passed; its corpus comparison remains fixture-gated. The single-track
+  direct-reader set is complete for the formats currently claimed by MetaMan.
 - **Track-aware result contract:** MetaMan defines an ordered
   `MetadataReadResult` of `MetadataTrack` documents with optional native
   source indices; list order is authoritative and repeated indices remain
@@ -129,11 +133,18 @@ Remaining metadata-reader targets are grouped by the boundary they need:
   verified because `SCANSONG_SAP_FIXTURE_DIR` is unset. The AY corpus test is
   likewise fixture-gated. All current direct multi-track readers—AY, SAP, NSF,
   GBS, NSFE, HES, SNDH, KSS, and XA—now live in MetaMan.
-- **Next complete scanner-owned reader:** GSF/miniGSF is the next target. Its
-  full read requires source plus a bounded dependency set so CRC/zlib/GBA
-  segments, library chain, tags, and timing move together; moving only its tag
-  parser is explicitly out of scope. QSF/miniQSF follows as a separate full
-  extraction using the same context boundary for QSound libraries and blocks.
+- **GSF/miniGSF complete reader:** moved into MetaManCore as one unit: PSF
+  v0x22 bounds, CRC/zlib validation, ordered/unknown/repeated tags, declared
+  PSFLib chains, GBA executable-segment assembly and image-header checks, and
+  the existing timing/catalog projection. ScanSong now only routes and adapts
+  the document; mGBA remains playback-only. New MetaMan contract tests and the
+  GSF scanner-route test pass; the complete 123-test ScanSong suite also passes
+  in the test-only harness. Live root-1 catalog parity and paired Release
+  timing remain unverified because `SCANSONG_GSF_LIVE_DB` is unset; run those
+  before claiming corpus-level parity or 1:1 performance.
+- **Next complete scanner-owned reader:** QSF/miniQSF. Move the PSF v0x41
+  container, CRC/zlib, QSound data-block bounds, all declared QSFLib
+  dependencies, tags, and timing together. Do not migrate footer tags alone.
 - **Audio containers:** Core Audio is currently the scanner's native
   standard-audio reader. Treat it as a separate platform-boundary decision,
   not as a playback-plugin removal.
@@ -160,14 +171,17 @@ to this document.
 
 ## GitHub backup status
 
-The local VGMMan checkout is already one repository root for MetaMan, ScanSong,
-VGMBoy, CocoaSpice, SPCBoyWK, and the shared clients; `origin` points to
-`johnszewczyk/vgmboy`. GitHub still lists the separate public `CocoaSpice`,
-`scansong`, and `spcboy` repositories as unarchived. No remote commit, push, or
-archive has been made in this pass: the connected GitHub tools are read-only
-for repository changes here. Keep those repositories intact until the current
-family tree is committed and pushed, then verify the remote tree before
-archiving the superseded repositories.
+The local VGMMan checkout is the single source tree for MetaMan, ScanSong,
+VGMBoy, CocoaSpice, SPCBoyWK, and shared clients; `origin` is
+`johnszewczyk/vgmboy`. The preceding family commit was pushed and remote `main`
+was verified at `0fb5493d` before this GSF cutover. Keep the cutover and docs
+in this same family repository and verify `main` after the fast-forward push.
+The three old public component repositories—`CocoaSpice`, `scansong`, and
+`spcboy`—still exist and are confirmed unarchived; they have not been deleted.
+The GitHub browser session is signed out and the authenticated connector has no
+repository-settings/archive write operation. Once an authenticated settings
+path is available, archive these superseded repos (reversible) and verify the
+archived state; do not delete them.
 
 ## Contribution rule
 

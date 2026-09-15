@@ -6,12 +6,12 @@
 
 ## ScanSong boundary
 
-This note covers playback only. ScanSong reads GSF/miniGSF containers,
-compressed payloads, executable segments, tags, and library chains with its own
-direct metadata reader; it does not use `CHighlyComplete` or link/run mGBA.
-VGMBoy still retains this bridge for actual GSF playback. The scanner-plugin
-builder is now isolated from the broad playback dependency builder and does not
-prepare mGBA for ScanSong.
+This note covers playback only. MetaManCore reads GSF/miniGSF containers,
+compressed payloads, executable segments, tags, GBA image headers, and library
+chains; ScanSong adapts those results and does not use `CHighlyComplete` or
+link/run mGBA. VGMBoy retains this bridge for actual GSF playback. The
+scanner-plugin builder is isolated from the broad playback dependency builder
+and does not prepare mGBA for ScanSong.
 
 ## Ownership
 

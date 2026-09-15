@@ -89,9 +89,9 @@ executables.
 - Konami/SNK SVAG metadata is read by MetaManCore's direct header reader;
   vgmstream remains the fallback for unknown `.svag` aliases and scanner
   support for other formats.
-- GSF/miniGSF metadata and structure are read by ScanSong's direct PSF/GSF
-  parser; Highly Complete/mGBA remains a VGMBoy playback route, not a scanner
-  process or runtime link.
+- GSF/miniGSF metadata and structure are read by MetaManCore's complete
+  PSF/GSF parser; ScanSong adapts the document. Highly Complete/mGBA remains a
+  VGMBoy playback route, not a scanner process or runtime link.
 - QSF/miniQSF metadata and structure are read by ScanSong's direct PSF/QSound
   parser; AOSDK remains a VGMBoy playback route, not a scanner process.
 

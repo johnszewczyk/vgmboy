@@ -39,8 +39,15 @@ is repaired and repeatedly verified.
 
 ## Current Package Evidence
 
-- **MetaMan:** the full Debug suite passes all 87 tests.
-- **ScanSong:** the full Debug suite passes all 123 tests. A read-only root-1
+- **MetaMan:** the full Debug suite passes all 92 tests, including the complete
+  GSF/miniGSF reader and recursive PSFLib-context fixtures.
+- **ScanSong:** `ScanSongKit` builds, and all 123 test cases pass from an
+  isolated test-only package harness that excludes the app and CLI executables.
+  The ordinary `swift test --package-path ScanSong` command still attempts to
+  link both executables and fails with unresolved `_ScanSongApp_main` and
+  `_scansong_main` symbols (plus a missing `CoreAudioTypes` linker warning).
+  This does not invalidate the library build or isolated test result, but the
+  app/CLI executable link remains an open gate. A read-only root-1
   XA differential through the production MetaMan-backed scanner route matches
   all 867 catalog rows across 827 files and 18 archives. Running this corpus
   test alongside the timing-sensitive process-runner test once caused that
@@ -64,10 +71,12 @@ is repaired and repeatedly verified.
 A full family verification was not run; these per-package results do not imply
 that the whole family is green.
 
-On this host, set `SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"` when running
-the family check: the default Command Line Tools SDK stub is rejected by the
-installed linker. Redirect Swift and Clang module caches to a writable
-task-local directory if the default user cache is unavailable in the sandbox.
+On this host, `xcrun --sdk macosx --show-sdk-path` currently fails because the
+selected Command Line Tools SDK path is missing; SwiftPM resolves the Xcode
+26.5 SDK instead. SwiftPM's default user caches are also not writable in this
+workspace. Use a writable task-local Clang/Swift module cache and
+`--disable-sandbox` when nested SwiftPM sandboxing is denied; these settings
+do not bypass the separate ScanSong executable-link issue above.
 
 ## Evidence Levels
 

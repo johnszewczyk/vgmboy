@@ -1,9 +1,11 @@
 import Foundation
 
-/// Related-file data supplied by a client for formats whose metadata or track
-/// map depends on a companion source (for example HES plus M3U). Callers bound
-/// the admitted files and aggregate bytes; MetaMan never opens paths named here.
+/// Named related-file bytes for data-based readers whose metadata or track map
+/// depends on companions. File-URL convenience readers resolve only the
+/// format-declared companions they explicitly support; this context never
+/// authorizes arbitrary path access.
 public struct MetadataCompanionFile: Equatable, Sendable {
+    /// Path relative to the source file's containing directory.
     public let relativePath: String
     public let data: Data
 
@@ -38,7 +40,25 @@ public struct MetadataReadContext: Equatable, Sendable {
         }
     }
 
+    func companionData(named relativePath: String) -> Data? {
+        guard let requestedPath = Self.normalizedRelativePath(relativePath) else { return nil }
+        return companionFiles.first { companion in
+            guard let candidatePath = Self.normalizedRelativePath(companion.relativePath) else { return false }
+            return candidatePath.caseInsensitiveCompare(requestedPath) == .orderedSame
+        }?.data
+    }
+
     func appending(_ companion: MetadataCompanionFile) -> MetadataReadContext {
         MetadataReadContext(companionFiles: companionFiles + [companion])
+    }
+
+    private static func normalizedRelativePath(_ path: String) -> String? {
+        guard !path.isEmpty, !path.hasPrefix("/"), !path.hasPrefix("\\"), !path.contains("\0") else {
+            return nil
+        }
+        let components = path.replacingOccurrences(of: "\\", with: "/")
+            .split(separator: "/", omittingEmptySubsequences: true)
+        guard !components.isEmpty, !components.contains("..") else { return nil }
+        return components.filter { $0 != "." }.joined(separator: "/")
     }
 }

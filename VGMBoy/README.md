@@ -75,7 +75,7 @@ or install a broad package manager graph of its own.
 | Dependency | Version or source state | Role |
 | --- | --- | --- |
 | VGMBoy shared source garden | `vendor/` in this checkout | Canonical upstream source inputs and compatibility patches for every VGMBoy bridge and scanner-facing plugin. |
-| [mGBA](https://github.com/mgba-emu/mgba) | VGMBoy `vendor/mgba` 0.11.0 source snapshot; tree digest in `vendor/PROVENANCE.md` | Linked by the Highly Complete playback bridge. The current shared dependency build prepares it as collateral, but ScanSong's direct GSF reader does not link or run it. |
+| [mGBA](https://github.com/mgba-emu/mgba) | VGMBoy `vendor/mgba` 0.11.0 source snapshot; tree digest in `vendor/PROVENANCE.md` | Linked by the Highly Complete playback bridge. MetaManCore validates GSF metadata and structure without linking or running mGBA. |
 | [psgplay](https://github.com/frno7/psgplay) | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` plus required nested source snapshots | Nested sources are ordinary files in the family repository. Built as `libpsgplay.a` by `scripts/build-psgplay.sh` and staged for the SNDH bridge. |
 | [UADE](https://github.com/dv1/uade) | Homebrew `uade` 3.05; shared library and runtime data | Supplies `libuade`/`uadecore` plus EaglePlayer configuration and emulation data used by `CUADE` and `vgmboy-amiga-inspect`. |
 | 2sf2wav | VGMBoy `vendor/2sf2wav` DeSmuME 0.9.9 svn 4608 source snapshot; tree digest in `vendor/PROVENANCE.md` | Built as `lib2sf.a` through `scripts/build-2sf.sh` and linked by the 2SF bridge. |

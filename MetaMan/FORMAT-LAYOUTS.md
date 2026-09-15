@@ -299,6 +299,51 @@ offset. If `[TAG]` is present there, the remaining text is parsed as ordered
 body is deliberately not interpreted by this metadata reader. See
 [PSFMetadataReader.swift](Sources/MetaManCore/PSFMetadataReader.swift).
 
+### GSF / miniGSF / PSF v0x22
+
+GSF uses the 16-byte PSF v0x22 container header described above. All integers
+are little-endian. The reader bounds the reserved and compressed regions,
+checks CRC-32 over exactly the compressed bytes, then inflates the executable.
+The `[TAG]` marker is accepted only at
+`0x10 + reservedSize + compressedSize`; the tag bytes through EOF are retained
+verbatim, while the NUL-terminated UTF-8 view preserves source order, repeated
+names, and unknown keys.
+
+| Source position | Meaning |
+| --- | --- |
+| `0x00..0x03` | `PSF` plus version `0x22`. |
+| `0x04..0x07` | Reserved-region byte count. |
+| `0x08..0x0B` | Compressed executable byte count. |
+| `0x0C..0x0F` | CRC-32 of the compressed executable region. |
+| `0x10..` | Reserved bytes followed by the zlib-compressed GSF executable. |
+| `0x10 + reservedSize + compressedSize` | Optional `[TAG]` marker, then original tag bytes. |
+
+The inflated executable begins with a 12-byte segment header. Bytes `0x00..03`
+are included in the executable and size accounting; bytes `0x04..07` provide
+the little-endian load offset masked with `0x01FFFFFF`; bytes `0x08..0B`
+declare the segment's image span. Bytes `0x0C..EOF` are placed at that offset
+in the assembled GBA image. Declared but absent tails are treated as unknown,
+not trusted zeroes. Load order is `_lib` before the current segment, then
+contiguous `_lib2`, `_lib3`, and later references until the first gap. Each
+library's own `_lib` is visited before its executable segment. This is why a
+footer-only PSF reader is not a complete GSF reader.
+
+Recognition needs only assembled ROM bytes `0x00..0xB2`. Byte `0x03` must be
+`0xEA`; byte `0xB2` is the standard `0x96` signature, with the legacy fallback
+allowed only when `0x04..0x9F` are all zero. The seven ARM exception vectors
+are also checked to reject a BIOS image. These checks mirror mGBA's image
+admission without running the core. The reader retains every source's exact
+16-byte PSF header and raw tag block, plus path, CRC, reserved/compressed sizes,
+segment offset/declared size, inflated length, and final image size as facts.
+
+The file-URL entry point opens only explicitly referenced relative library
+paths, rejects traversal and symlink escapes, and applies 128 MiB per-container,
+512 MiB aggregate, 256-file, depth-10, 64 MiB inflated-segment, and 64 MiB
+assembled-image limits. Data-based reads instead require named library bytes
+in `MetadataReadContext`. Root `length`/`fade` values and dependency fallback
+retain the previous catalog projection, including the legacy nested-length
+intro value. See [GSFMetadataReader.swift](Sources/MetaManCore/GSFMetadataReader.swift).
+
 ### SPC / ID666 / xID6
 
 The standard file body ends at `0x10200`; the 27-byte `SNES-SPC700 Sound File

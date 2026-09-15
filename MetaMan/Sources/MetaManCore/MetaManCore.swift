@@ -60,6 +60,11 @@ public enum MetaManCore {
             methodology: "Direct PSF-style [TAG] footer parser for PSF, PSF2, SSF, USF, and 2SF; no playback decoder."
         ),
         MetadataFormatDescriptor(
+            identifier: "gsf",
+            fileExtensions: GSFMetadataReader.supportedExtensions.sorted(),
+            methodology: "Complete PSF v0x22 reader: validates CRC/zlib, parses ordered tags, resolves the bounded PSFLib chain, stitches GBA load segments, and checks the GBA ROM header without mGBA."
+        ),
+        MetadataFormatDescriptor(
             identifier: "spc",
             fileExtensions: ["spc"],
             methodology: "Direct SPC ID666/xID6 header and chunk parser; preserves both original tag blocks and does not start the playback emulator."
@@ -106,7 +111,13 @@ public enum MetaManCore {
         )
     ]
 
-    public static func read(fileURL: URL) throws -> MetadataDocument {
+    public static func read(
+        fileURL: URL,
+        context: MetadataReadContext = MetadataReadContext()
+    ) throws -> MetadataDocument {
+        if GSFMetadataReader.supportedExtensions.contains(fileURL.pathExtension.lowercased()) {
+            return try GSFMetadataReader.read(fileURL: fileURL, context: context)
+        }
         if fileURL.pathExtension.lowercased() == "svag" {
             return try SVAGMetadataReader.read(fileURL: fileURL)
         }
@@ -126,6 +137,10 @@ public enum MetaManCore {
         context: MetadataReadContext = MetadataReadContext()
     ) throws -> MetadataReadResult {
         let formatHint = fileURL.pathExtension.lowercased()
+        if GSFMetadataReader.supportedExtensions.contains(formatHint) {
+            let document = try GSFMetadataReader.read(fileURL: fileURL, context: context)
+            return MetadataReadResult(tracks: [MetadataTrack(document: document)])
+        }
         if formatHint != "svag" {
             let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
             let resolvedContext = try contextIncludingHESPlaylist(for: fileURL, context: context)
@@ -150,6 +165,10 @@ public enum MetaManCore {
         let cleanedHint = formatHint?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let format = cleanedHint.map { $0.hasPrefix(".") ? String($0.dropFirst()) : $0 }
         let normalizedFormat = format?.isEmpty == false ? format : nil
+        if GSFMetadataReader.supportedExtensions.contains(normalizedFormat ?? "")
+            || (normalizedFormat == nil && GSFMetadataReader.matches(data)) {
+            return try GSFMetadataReader.readResult(data: data, displayName: displayName, context: context)
+        }
         if SNDHMetadataReader.hasSupportedHint(normalizedFormat)
             || (normalizedFormat == nil && SNDHMetadataReader.matches(data)) {
             return try SNDHMetadataReader.readResult(data: data, displayName: displayName)
@@ -203,11 +222,17 @@ public enum MetaManCore {
     public static func read(
         data: Data,
         formatHint: String? = nil,
-        displayName: String? = nil
+        displayName: String? = nil,
+        context: MetadataReadContext = MetadataReadContext()
     ) throws -> MetadataDocument {
         let cleanedHint = formatHint?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let format = cleanedHint.map { $0.hasPrefix(".") ? String($0.dropFirst()) : $0 }
         let normalizedFormat = format?.isEmpty == false ? format : nil
+
+        if GSFMetadataReader.supportedExtensions.contains(normalizedFormat ?? "")
+            || (normalizedFormat == nil && GSFMetadataReader.matches(data)) {
+            return try GSFMetadataReader.read(data: data, displayName: displayName, context: context)
+        }
 
         if SNDHMetadataReader.hasSupportedHint(normalizedFormat)
             || (normalizedFormat == nil && SNDHMetadataReader.matches(data)) {

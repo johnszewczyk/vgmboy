@@ -109,7 +109,7 @@ func s98MalformedInputsFailSafely() throws {
 @Test("All registered formats identify their direct metadata-reading boundary")
 func supportedFormatsAreRegisteredAsDirectFormatDataParsers() {
     let formats = MetaManCore.supportedFormats
-    #expect(formats.map(\.identifier) == ["ay", "sap", "nsf", "gbs", "nsfe", "hes", "sndh", "kss", "s98", "vgm", "psf-family", "spc", "sid", "ape", "adx", "aus", "at3", "msf", "svag", "xa"])
+    #expect(formats.map(\.identifier) == ["ay", "sap", "nsf", "gbs", "nsfe", "hes", "sndh", "kss", "s98", "vgm", "psf-family", "gsf", "spc", "sid", "ape", "adx", "aus", "at3", "msf", "svag", "xa"])
     let byID = Dictionary(uniqueKeysWithValues: formats.map { ($0.identifier, $0) })
     #expect(byID["ay"]?.fileExtensions == ["ay"])
     #expect(byID["ay"]?.methodology.contains("no playback decoder") == true)
@@ -128,6 +128,8 @@ func supportedFormatsAreRegisteredAsDirectFormatDataParsers() {
     #expect(byID["s98"]?.fileExtensions == ["s98"])
     #expect(byID["s98"]?.methodology.contains("no playback decoder") == true)
     #expect(byID["psf-family"]?.fileExtensions.contains("mini2sf") == true)
+    #expect(byID["gsf"]?.fileExtensions == ["gsf", "minigsf"])
+    #expect(byID["gsf"]?.methodology.contains("PSFLib chain") == true)
     #expect(byID["spc"]?.fileExtensions == ["spc"])
     #expect(byID["spc"]?.methodology.contains("does not start the playback emulator") == true)
     #expect(byID["sid"]?.fileExtensions == ["sid"])

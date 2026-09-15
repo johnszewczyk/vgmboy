@@ -6,7 +6,7 @@ is a thin JSON interface for scripting and support work. Applications should
 import the library rather than shelling out to the CLI.
 
 MetaMan currently has complete AY, SAP, NSF, GBS, NSFE, HES, SNDH, KSS, S98,
-VGM/VGZ, PSF-style tag, SPC ID666/xID6, SID PSID/RSID, APE, CRI/Monster ADX,
+VGM/VGZ, generic PSF-style tags, complete GSF/miniGSF, SPC ID666/xID6, SID PSID/RSID, APE, CRI/Monster ADX,
 Atomic Planet AUS, RIFF ATRAC3/ATRAC3+, Sony MSF, Konami/SNK SVAG, and Sony
 CD-XA readers. SAP enumerates declared
 subtunes from ordered header directives and retains native `TIME` hints. The
@@ -34,6 +34,7 @@ fixed offsets or that the decoder is needed to locate every field.
 | S98 v0-v3 | Direct header, tag-block, device-table, and command-stream parser | Ordered raw tags, normalized common fields, technical header facts, and stream timing | Not implemented |
 | VGM / VGZ | Direct 64-byte header and GD3 parser; bounded gzip inflate for compressed input | All 11 ordered GD3 fields (plus future extras), original-language values, release date, converter, notes, header facts, and 44.1 kHz sample timing | Not implemented |
 | PSF / PSF2 / SSF / USF / 2SF | Direct PSF-style header and `[TAG]` footer parser; no playback core | Ordered tags including duplicates and unknown keys, raw footer bytes, normalized identity, authored length/fade, and console identity by extension | Not implemented |
+| GSF / miniGSF | Complete PSF v0x22 container, GBA segment, and PSFLib-chain validation; no mGBA | Ordered source tags, raw PSF headers/tag blocks, dependency and segment facts, GBA ROM-header validation, and inherited timing | Not implemented |
 | SPC | Direct text/binary ID666 header and xID6 chunk parser; no playback emulator | Ordered metadata, dump date, dumper/emulator facts, soundtrack fields, native timing, and separately retained ID666/xID6 source blocks | Not implemented |
 | SID (PSID / RSID) | Direct fixed-header parser; no playback core | Title, author, release text, technical header facts, and retained raw header; no duration inferred from flags | Not implemented |
 | APE | Direct descriptor, seek-table, APEv2, and leading ID3v2 parser; no audio decoder | Ordered text tags, normalized common fields, exact ID3v2/APEv2 blocks, technical header facts, and sample-count duration | Not implemented |
@@ -53,10 +54,11 @@ the core, while clients own their transport, catalog, and UI concerns.
 `MetadataTrack` carries a complete `MetadataDocument` and an optional
 format-native `sourceTrackIndex`; result-array order is authoritative, and
 repeated source indices remain separate entries. AY, SAP, NSF, GBS, NSFE,
-HES, SNDH, KSS, and Sony XA use this contract; single-track readers publish one entry. The file-URL
-API loads only a same-basename sibling M3U for HES. Archive/caller-managed
-companions can be passed as bounded named bytes through `MetadataReadContext`;
-MetaMan never follows playlist paths or opens arbitrary companion paths. Use
+HES, SNDH, KSS, and Sony XA use this contract; GSF publishes one validated
+entry. The file-URL API loads only format-declared companions: a same-basename
+M3U for HES and explicitly named, source-directory-confined PSFLib files for
+GSF. Data callers pass bounded named companion bytes through
+`MetadataReadContext`; MetaMan does not follow playlist text or arbitrary paths. Use
 `metaman read-tracks <file>` for the ordered JSON result. The legacy
 `metaman read <file>` command remains a single-document API and rejects these
 track-aware formats rather than silently discarding subtunes. SNDH tags `##`,
@@ -160,9 +162,27 @@ The PSF-family reader covers `.psf`/`.minipsf`, `.psf2`/`.minipsf2`,
 shared `[TAG]` footer without validating or emulating the compressed program
 body; authored `length` and `fade` tags provide timing. Ordered duplicate and
 unknown tags, the original footer, UTF-8 diagnostics, and the header fields
-used to locate that footer remain available. GSF and QSF are intentionally not
-included in this generic reader because their complete scanner routes also
-validate format-specific blocks and dependency chains.
+used to locate that footer remain available. GSF and QSF are not handled by
+this generic reader because they require complete format-specific container
+and dependency validation. GSF now has its own complete MetaMan reader; QSF is
+the remaining ScanSong-owned specialized reader.
+
+The GSF reader validates PSF version `0x22`, the declared reserved/compressed
+ranges, CRC-32, and the zlib stream for the root and each declared PSFLib. It
+retains ordered source tags (including repeated and unknown keys), exact PSF
+header/tag blocks, and per-source container/segment facts. It follows `_lib`,
+then contiguous `_lib2`, `_lib3`, and later references in the established
+load order; nested `_lib` is visited before its owning executable segment. The
+12-byte GSF executable header supplies a masked load offset at `0x04` and
+declared image size at `0x08`, followed by segment bytes at `0x0C`. Segments
+are stitched only far enough to validate the GBA image header against the old
+mGBA recognition/fallback and BIOS-rejection checks; no GBA code is executed.
+Root authored `length`/`fade` values and inherited library tags retain
+ScanSong's existing timing projection. File reads reject path traversal and
+symlink escapes, limit each container to 128 MiB, aggregate dependency bytes to
+512 MiB, the chain to 256 files / depth 10, inflated segments to 64 MiB, and
+the assembled ROM image to 64 MiB. See the offset-by-offset
+[GSF layout](FORMAT-LAYOUTS.md#gsf--minigsf--psf-v0x22) for details.
 
 Against the read-only live root-1 catalog, all 14,994 PSF-family rows across
 308 source containers matched exactly, including track structure, metadata,
@@ -363,6 +383,7 @@ swift run --package-path MetaMan metaman read song.aus
 swift run --package-path MetaMan metaman read song.at3
 swift run --package-path MetaMan metaman read song.msf
 swift run --package-path MetaMan metaman read song.svag
+swift run --package-path MetaMan metaman read song.minigsf
 ```
 
 JSON includes normalized fields, the ordered decoded tags, the original tag
@@ -378,11 +399,11 @@ MetaMan has no dependency on ScanSong, VGMBoy, or a playback decoder. ScanSong
 adapts `MetadataDocument` into its catalog schema; other clients can consume
 the same library result directly. The current registry contains AY, SAP,
 NSF/GBS/NSFE, HES, SNDH, KSS, S98, VGM/VGZ, SPC, SID, APE, ADX, AUS, ATRAC3,
-Sony MSF, Konami/SNK SVAG, Sony XA, and PSF/PSF2/SSF/USF/2SF readers.
+Sony MSF, Konami/SNK SVAG, Sony XA, PSF/PSF2/SSF/USF/2SF, and GSF/miniGSF readers.
 SNDH is now fully read by MetaManCore; VGMBoy's old SNDH wrapper remains only as
 a test oracle while PSGPlay remains available for playback. KSS has also moved
-to MetaManCore. Remaining direct parser ownership is split between ScanSong
-(specialized GSF/QSF and Core Audio standard audio). These are the
+to MetaManCore, as has the complete GSF reader. Remaining direct parser
+ownership is split between ScanSong (specialized QSF and Core Audio standard audio). These are the
 current migration surface; decoder-backed plugin routes are not extracted by
 publishing only partial metadata. AY, SAP, NSF, GBS, NSFE, HES, SNDH, KSS, and Sony XA
 use the ordered result contract, including playlist repeats and native source

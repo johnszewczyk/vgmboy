@@ -14,8 +14,8 @@ SPCBoyWK behavior. ScanSong receives VGMBoy-built inspection executables.
 ## Major Components
 
 - `Sources/VGMBoyKit` — the audio core and decoder boundary.
-- `MetaManCore` — decoder-independent HES/M3U, NSF/GBS/NSFE, AY, SAP, and
-  other complete metadata readers. It has no playback-decoder dependency;
+- `MetaManCore` — decoder-independent HES/M3U, NSF/GBS/NSFE, AY, SAP, GSF,
+  and other complete metadata readers. It has no playback-decoder dependency;
   VGMBoy continues to own playback for those formats.
 - `Sources/VGMBoyKit/FormatRegistry.swift` — decoder-owned format families plus the
   complete `playbackDescriptors` projection consumed by CocoaSpice and SPCBoyWK.
@@ -27,8 +27,8 @@ SPCBoyWK behavior. ScanSong receives VGMBoy-built inspection executables.
 - `Sources/VGMBoyElectronBridge` — the retained narrow process boundary for the archived
   Electron SPCBoy path; native SPCBoyWK does not use it.
 - `Sources/VGMBoyMDXInspect` and `Sources/VGMBoyAmigaInspect` — narrow
-  inspection boundaries used by ScanSong. GSF, QSF, and APE metadata are read
-  directly by ScanSong without a playback-decoder inspector process.
+  inspection boundaries used by ScanSong. MetaManCore reads GSF and APE
+  metadata; ScanSong still owns direct QSF metadata/container validation.
 - `Sources/vgmboy` and `Sources/VGMBoyApp` — command-line and native test clients.
 - `vendor/`, `patches/`, and `scripts/` — shared upstream source, compatibility patches, and
   dependency/scanner-plugin build inputs.

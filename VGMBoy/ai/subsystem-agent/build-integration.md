@@ -59,7 +59,8 @@ for ScanSong's external inspection executables.
   scanner-plugin build must reuse its product instead of recompiling the
   vgmstream source tree during every ScanSong package.
 - ScanSong receives the built vgmstream CLI, MDX inspector, and Amiga inspector
-  from VGMBoy. ScanSong owns direct APE, GSF/miniGSF, and QSF/miniQSF readers;
+  from VGMBoy. MetaManCore owns direct APE and GSF/miniGSF readers; ScanSong
+  retains the specialized QSF/miniQSF reader;
   no Highly Complete or QSF inspector executable is part of the scanner handoff.
   The scanner-plugin builder removes retired QSF and FFmpeg inspector binaries
   from its shared output folder without touching their playback libraries.

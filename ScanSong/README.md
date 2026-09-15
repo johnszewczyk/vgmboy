@@ -190,13 +190,14 @@ error.
   from the VGMBoy-managed source snapshot and compatibility patch to open raw vgmstream formats and enumerate
   real subsongs before publishing rows. TXTP and HD-bank structures are
   materialized and inspected through the same route.
-- A ScanSong-owned GSF/miniGSF reader that validates PSF v0x22 headers, CRCs,
+- MetaManCore's complete GSF/miniGSF reader validates PSF v0x22 headers, CRCs,
   zlib payloads, GBA executable segments and ROM-header signatures, and the
-  complete `_lib` dependency chain while extracting authored tags and legacy
+  complete `_lib` dependency chain while retaining authored tags and legacy
   timing semantics. It does not launch or link mGBA; VGMBoy retains Highly
-  Complete/mGBA for playback. Scanner inspectors now build through a narrow
-  VGMBoy inspection target rather than VGMBoyKit, and scanner-plugin preparation
-  no longer runs VGMBoy's full playback dependency builder.
+  Complete/mGBA for playback. ScanSong only adapts the shared result. Scanner
+  inspectors build through narrow VGMBoy inspection targets rather than
+  VGMBoyKit, and scanner-plugin preparation does not run VGMBoy's full playback
+  dependency builder.
 - A ScanSong-owned QSF/miniQSF reader that validates PSF v0x41 containers, CRCs,
   bounded zlib data, QSound blocks, and referenced `.qsflib` files without
   starting the playback core. It extracts authored tags and timing directly;

@@ -56,7 +56,7 @@ independent media sources are not playback targets.
 | `mdx` | `.mdx` | VGMBoy-built `vgmboy-mdx-inspect` still supplies decoder-derived enumeration and metadata; dependencies are materialized but not published as tracks. |
 | `standard-audio` | `.aac`, `.aif`, `.aiff`, `.caf`, `.flac`, `.m4a`, `.mp3`, `.wav`, `.wave` | Core Audio supplies duration/common tags, with FLAC Vorbis comments. `.ogg` is routed through this scanner handler too. `.aac`, `.caf`, and `.wave` do not currently have ScanSong routes. |
 | `ffmpeg-audio` | `.ape`, `.mp2`, `.tak` | `.ape` uses MetaManCore's direct header/tag reader. `.mp2` and `.tak` do not currently have ScanSong routes. |
-| `highly-complete` | `.gsf`, `.minigsf` | ScanSong-owned PSF v0x22/container reader validates payloads and dependency chains without mGBA. |
+| `highly-complete` | `.gsf`, `.minigsf` | MetaManCore validates PSF v0x22 payloads, GBA segments, and dependency chains without mGBA. |
 | `twosf` | `.2sf`, `.mini2sf` | `MetaManCore` PSF-style `[TAG]` reader; it does not start the playback core. |
 | `vgmstream` | `.aa3`, `.adp`, `.adx`, `.adpcm`, `.ads`, `.agsc`, `.ahx`, `.aifc`, `.at3`, `.aus`, `.bk2`, `.bik`, `.bika`, `.bnk`, `.dsp`, `.dvi`, `.fsb`, `.genh`, `.h4m`, `.hbd`, `.hd`, `.iecs`, `.int`, `.ldat`, `.logg`, `.mib`, `.msf`, `.mtaf`, `.ogg`, `.ps3`, `.rsf`, `.rws`, `.s14`, `.ss2`, `.stream`, `.strm`, `.svag`, `.swav`, `.thp`, `.txtp`, `.vag`, `.xa`, `.xmd`, `.xvag` | `.adx`, `.at3`, `.aus`, `.msf`, and `.svag` use MetaManCore's content-aware readers, while `.xa` uses ScanSong's direct reader; nonmatching aliases retain vgmstream. `.txtp` and HD-bank inputs use vgmstream with dependency preparation. Other routed streams use `vgmstream-cli -I`. `.ogg` currently uses the Core Audio scanner route. |
 | `lazyusf` | `.usf`, `.miniusf` | `MetaManCore` PSF-style `[TAG]` reader; `.usflib` remains dependency data, not a track. |
@@ -121,7 +121,7 @@ track fields and does not expose those additional manifest fields in CocoaSpice.
 | `sndh-direct` | `.sndh` | One row per declared subtune | `MetaManCore.readResult` with bounded ICE! expansion | PSGPlay is not linked for production metadata inspection. |
 | `mdx` | `.mdx` | One logical sequence row | VGMBoy-built `vgmboy-mdx-inspect` | A declared PDX bank is prepared but never published as a track. |
 | `amiga-uade` | UADE replayer prefixes (`mod.*`, `p4x.*`, `med.*`, TFMX, and custom players) | One row per UADE subsong | VGMBoy-built `vgmboy-amiga-inspect` | `.lha` and loose sets are materialized as complete sets; companions remain dependency data. |
-| `gsf-direct` | `.gsf`, `.minigsf` | One validated row | ScanSong PSF v0x22/GSF reader | CRC, zlib payload, GBA segment, and complete miniGSF dependency chain are validated without mGBA. |
+| `gsf-direct` | `.gsf`, `.minigsf` | One validated row | MetaManCore complete PSF v0x22/GSF reader | CRC, zlib payload, ordered tags, GBA segment chain, and PSFLib dependencies are validated without mGBA. |
 | `highly-theoretical` | `.ssf`, `.minissf` | One structurally-known row | `MetaManCore` PSF-style `[TAG]` footer reader | Metadata is available; current VGMBoy/CocoaSpice playback admission remains a gap. |
 | `lazyusf` | `.usf`, `.miniusf` | One structurally-known row | `MetaManCore` PSF-style `[TAG]` footer reader | `.usflib` is playback dependency data, never a row. |
 | `twosf` | `.2sf`, `.mini2sf` | One structurally-known row | `MetaManCore` PSF-style `[TAG]` footer reader | `.2sflib` is dependency data, never a row. |
@@ -367,23 +367,27 @@ keeps the following distinctions visible:
 
 ### GSF / miniGSF
 
-`gsf-direct` reads the PSF v0x22 container without starting mGBA. It checks the
-compressed-payload CRC and zlib stream, validates every GSF executable segment,
-and resolves `_lib`, then sequential `_lib2`, `_lib3`, etc. dependencies to the
-PSFLib depth limit. It checks the assembled GBA header bytes in PSFLib load
-order against mGBA's ROM signature/fallback and BIOS rejection rules; it does
-not construct or execute a GBA core. Missing dependencies, unsafe paths,
-malformed segments, CRC failures, broken zlib streams, and unrecognized ROM
-images remain explicit failures. Outer-file tags win for authored metadata and
-`play_length_ms`; dependency tags fill missing values, while legacy
-`intro_length_ms` follows the old inspector's final nested `length` callback.
-Both time interpretations are parsed directly from tags, including the legacy
-C numeric-prefix behavior. Fallback song names use the source filename. Each
-valid GSF/miniGSF file contributes one track. VGMBoy continues to use Highly
-Complete/mGBA for actual GSF playback. ScanSong no longer bundles or invokes a
-Highly Complete inspector, and its GSF runtime route does not link mGBA. The
-scanner-plugin build no longer calls VGMBoy's broad playback dependency builder,
-so it does not prepare mGBA as scanner build-time collateral.
+`gsf-direct` delegates to MetaManCore's complete PSF v0x22 reader; it does not
+start mGBA. The reader checks each compressed-payload CRC and zlib stream,
+validates every GSF executable segment, and resolves `_lib`, then contiguous
+`_lib2`, `_lib3`, etc. references to the PSFLib depth limit. It checks the
+assembled GBA header bytes in load order against mGBA's ROM signature/fallback
+and BIOS-rejection rules, without constructing or executing a GBA core. Missing
+dependencies, unsafe paths, malformed segments, CRC failures, broken zlib
+streams, and unrecognized ROM images remain explicit failures. Ordered tags,
+including duplicates and unknown keys, exact per-source PSF headers/tag blocks,
+and dependency/segment facts now live in MetaMan. Outer-file tags win for
+authored metadata and `play_length_ms`; dependency tags fill missing values,
+while legacy `intro_length_ms` follows the old inspector's final nested
+`length` callback. Both time interpretations retain the old numeric-prefix
+behavior. File reads confine dependencies to the source directory and cap a
+container at 128 MiB, aggregate dependency bytes at 512 MiB, the chain at 256
+files/depth 10, and inflated/assembled data at 64 MiB. Fallback song names use
+the source filename, and each valid GSF/miniGSF file contributes one track.
+VGMBoy continues to use Highly Complete/mGBA for playback. ScanSong no longer
+owns GSF parsing, bundles or invokes a Highly Complete inspector, or links mGBA
+for the GSF route. Scanner-plugin preparation also does not call VGMBoy's broad
+playback dependency builder.
 
 ### QSF / miniQSF
 
@@ -411,9 +415,9 @@ containers matched the saved catalog's metadata, timing, and track structure
 exactly. Optimized Release inspection measured 0.071 ms median and 0.090 ms p95
 per member; this is a local-corpus result, not a cross-machine guarantee.
 
-GSF/miniGSF and QSF/miniQSF remain on their specialized ScanSong readers because
-their complete scanner contracts include payload, block, and dependency-chain
-validation beyond generic `[TAG]` extraction.
+GSF/miniGSF now has a complete MetaMan reader. QSF/miniQSF remains on its
+specialized ScanSong reader because its complete contract includes QSound block
+validation and QSFLib dependency handling beyond generic `[TAG]` extraction.
 
 Their sidecars are never independent scanner sources. The recognized support
 names are `.psflib`, `.2sflib`, `.ssflib`, and `.usflib`; they are omitted from

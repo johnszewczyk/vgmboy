@@ -1380,7 +1380,7 @@ func cocoaSpiceGSFFailedRowsRemainClassifiableWithoutDecoder() async throws {
             for entry in archive.entries {
                 let memberURL = try findExtractedArchiveMember(named: entry, under: payloadURL)
                 do {
-                    _ = try GSFMetadataReader.read(fileURL: memberURL)
+                    _ = try MetaManCore.readResult(fileURL: memberURL)
                     newlyReadable.append("\(archive.path):\(entry)")
                 } catch {
                     rejected.append("\(entry): \(error.localizedDescription)")
@@ -3650,7 +3650,10 @@ private func inspectLiveGSFArchive(
         let source = "\(archive.path):\(liveFile.entryPath)"
         do {
             let memberURL = try findExtractedArchiveMember(named: liveFile.entryPath, under: payloadURL)
-            let metadata = try GSFMetadataReader.read(fileURL: memberURL)
+            let metadata = ScannerMetadata(
+                metadataDocument: try MetaManCore.read(fileURL: memberURL),
+                includeDateAndEncodedByInComment: false
+            )
             compare("trackIndex", 0, liveFile.trackIndex, source: source)
             compare("trackCount", 1, liveFile.trackCount, source: source)
             compare("song", metadata.song, liveFile.song, source: source)
