@@ -32,9 +32,11 @@ let package = Package(
     platforms: [.macOS("26.0")],
     products: [
         .library(name: "VGMBoyFormatCore", targets: ["VGMBoyFormatCore"]),
-        .library(name: "VGMBoyFormatDataCore", targets: ["VGMBoyFormatDataCore"]),
         .library(name: "VGMBoySNDH", targets: ["VGMBoySNDH"]),
         .library(name: "VGMBoyKit", targets: ["VGMBoyKit"]),
+        // Exposes libVGM only to downstream parity-test targets. Production
+        // ScanSongKit must not depend on this product.
+        .library(name: "VGMBoyLibVGMOracle", targets: ["VGMBoyCLibVGM"]),
         .library(name: "VGMBoyEndpointCore", targets: ["VGMBoyEndpointCore"]),
         .executable(name: "vgmboy-cli", targets: ["vgmboy"]),
         .executable(name: "vgmboy-electron-bridge", targets: ["VGMBoyElectronBridge"]),
@@ -44,7 +46,6 @@ let package = Package(
     ],
     targets: [
         .target(name: "VGMBoyFormatCore", path: "Sources/VGMBoyFormatCore"),
-        .target(name: "VGMBoyFormatDataCore", path: "Sources/VGMBoyFormatDataCore"),
         .target(name: "VGMBoyEndpointCore", path: "Sources/VGMBoyEndpointCore"),
         .target(
             name: "VGMBoyCPSGPlay",
@@ -340,11 +341,6 @@ let package = Package(
             dependencies: ["VGMBoyKit", "VGMBoySNDH", "VGMBoyEndpointCore", "VGMBoyCAudioUnit", "VGMBoyMDXInspectionCore", "VGMBoyAmigaInspectionCore"],
             path: "Tests/VGMBoyKitTests"
         ),
-        .testTarget(
-            name: "VGMBoyFormatDataCoreTests",
-            dependencies: ["VGMBoyFormatDataCore"],
-            path: "Tests/VGMBoyFormatDataCoreTests"
-        )
     ],
     swiftLanguageModes: [.v6]
 )

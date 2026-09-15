@@ -14,13 +14,9 @@ SPCBoyWK behavior. ScanSong receives VGMBoy-built inspection executables.
 ## Major Components
 
 - `Sources/VGMBoyKit` — the audio core and decoder boundary.
-- `Sources/VGMBoyFormatDataCore` — Foundation-only format-byte readers shared
-  with ScanSong where they provide the complete scanner metadata contract:
-  NSF/GBS/NSFE header/subsong facts, and HES header tags with companion-M3U
-  track/timing data. AY, SPC ID666/xID6, and PSF-family `[TAG]` metadata
-  belong to MetaManCore; SAP metadata also lives in MetaManCore, while all
-  playback, including SAP, SPC, and AY, remains in VGMBoy.
-  This reader package has no playback decoder dependency.
+- `MetaManCore` — decoder-independent HES/M3U, NSF/GBS/NSFE, AY, SAP, and
+  other complete metadata readers. It has no playback-decoder dependency;
+  VGMBoy continues to own playback for those formats.
 - `Sources/VGMBoyKit/FormatRegistry.swift` — decoder-owned format families plus the
   complete `playbackDescriptors` projection consumed by CocoaSpice and SPCBoyWK.
 - `Sources/VGMBoyKit/PlaybackPreferences.swift` — shared timing, fade, EQ, volume,
@@ -67,9 +63,8 @@ SPCBoyWK behavior. ScanSong receives VGMBoy-built inspection executables.
 - Keep the kit's public API surface small and deliberate; the CLI and the SwiftUI app are two thin
   skins over one core.
 - ScanSong remains a separate catalog-writer product. ScanSong consumes
-  VGMBoy-built inspection executables and the dependency-free
-  `VGMBoyFormatDataCore` product, but never links VGMBoyKit or invokes a player
-  frontend.
+  VGMBoy-built inspection executables and MetaManCore metadata, but never links
+  VGMBoyKit or invokes a player frontend.
 - ScanSong may consume VGMBoy-built inspection executables, but it does not link VGMBoyKit or
   invoke a player frontend. Keep inspection packaging behind `build-scanner-plugins.sh`.
 

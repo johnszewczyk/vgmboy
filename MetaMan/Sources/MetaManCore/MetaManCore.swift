@@ -15,6 +15,36 @@ public enum MetaManCore {
             methodology: "Direct SAP CRLF information-header parser with ordered SONGS/TIME subtunes, retained unknown directives, and no playback decoder."
         ),
         MetadataFormatDescriptor(
+            identifier: "nsf",
+            fileExtensions: ["nsf"],
+            methodology: "Direct fixed-header reader for identity, playback setup, and declared tracks; no playback decoder or emulator is started, and absent authored timing keeps scanner-compatible defaults."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "gbs",
+            fileExtensions: ["gbs"],
+            methodology: "Direct fixed-header reader for identity, timer/address facts, and declared tracks; no playback decoder or Game Boy emulation is started."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "nsfe",
+            fileExtensions: ["nsfe"],
+            methodology: "Direct bounded chunk walk for NSFE identity, playlist, per-track labels/authors/time/fade, and hardware facts; audio DATA is validated and counted, never decoded."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "hes",
+            fileExtensions: ["hes"],
+            methodology: "Direct HES header and bounded same-basename M3U reader; retains ordered address slots, authored titles/timing, raw source blocks, and header facts without PC Engine emulation."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "sndh",
+            fileExtensions: ["sndh"],
+            methodology: "Direct executable-vector-bounded SNDH tag and subtune timing parser with bounded ICE! expansion; no Atari ST playback core."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "kss",
+            fileExtensions: ["kss"],
+            methodology: "Direct KSCC/KSSX header reader for hardware flags, payload facts, and KSSX-declared tracks; no Z80 or playback core."
+        ),
+        MetadataFormatDescriptor(
             identifier: "s98",
             fileExtensions: ["s98"],
             methodology: "Direct header, tag-block, device-table, and command-timing parser; no playback decoder."
@@ -68,6 +98,11 @@ public enum MetaManCore {
             identifier: "svag",
             fileExtensions: ["svag"],
             methodology: "Direct Konami/SNK SVAG header and PS-ADPCM sample/loop parser; preserves source header facts and does not decode audio or claim unrelated .svag aliases."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "xa",
+            fileExtensions: ["xa"],
+            methodology: "Direct Sony CD-XA sector walk for interleaved file/channel subsongs and sample timing; validates raw-sector frames without decoding audio and does not claim unrelated .xa aliases."
         )
     ]
 
@@ -86,11 +121,20 @@ public enum MetaManCore {
     /// Reads one source file into an ordered track result. Single-track
     /// readers publish one entry; multi-track readers retain native indices
     /// and ordered occurrences without flattening them into one document.
-    public static func readResult(fileURL: URL) throws -> MetadataReadResult {
+    public static func readResult(
+        fileURL: URL,
+        context: MetadataReadContext = MetadataReadContext()
+    ) throws -> MetadataReadResult {
         let formatHint = fileURL.pathExtension.lowercased()
         if formatHint != "svag" {
             let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
-            return try readResult(data: data, formatHint: formatHint, displayName: fileURL.lastPathComponent)
+            let resolvedContext = try contextIncludingHESPlaylist(for: fileURL, context: context)
+            return try readResult(
+                data: data,
+                formatHint: formatHint,
+                displayName: fileURL.lastPathComponent,
+                context: resolvedContext
+            )
         }
         let document = try read(fileURL: fileURL)
         return MetadataReadResult(tracks: [MetadataTrack(document: document)])
@@ -100,11 +144,38 @@ public enum MetaManCore {
     public static func readResult(
         data: Data,
         formatHint: String? = nil,
-        displayName: String? = nil
+        displayName: String? = nil,
+        context: MetadataReadContext = MetadataReadContext()
     ) throws -> MetadataReadResult {
         let cleanedHint = formatHint?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let format = cleanedHint.map { $0.hasPrefix(".") ? String($0.dropFirst()) : $0 }
         let normalizedFormat = format?.isEmpty == false ? format : nil
+        if SNDHMetadataReader.hasSupportedHint(normalizedFormat)
+            || (normalizedFormat == nil && SNDHMetadataReader.matches(data)) {
+            return try SNDHMetadataReader.readResult(data: data, displayName: displayName)
+        }
+        if normalizedFormat == "kss" || (normalizedFormat == nil && KSSMetadataReader.matches(data)) {
+            return try KSSMetadataReader.readResult(data: data, displayName: displayName)
+        }
+        if normalizedFormat == "xa" || (normalizedFormat == nil && SonyXAMetadataReader.matches(data)) {
+            return try SonyXAMetadataReader.read(data: data, displayName: displayName)
+        }
+        if HESMetadataReader.hasSupportedHint(normalizedFormat)
+            || (normalizedFormat == nil && HESMetadataReader.matches(data)) {
+            return try HESMetadataReader.readResult(
+                data: data,
+                context: context,
+                displayName: displayName ?? "HES"
+            )
+        }
+        if GameMusicMetadataReader.hasSupportedHint(normalizedFormat)
+            || (normalizedFormat == nil && GameMusicMetadataReader.matches(data)) {
+            return try GameMusicMetadataReader.readResult(
+                data: data,
+                formatHint: normalizedFormat,
+                displayName: displayName
+            )
+        }
         if normalizedFormat == "ay" || (normalizedFormat == nil && AYMetadataReader.matches(data)) {
             return try AYMetadataReader.readResult(data: data, displayName: displayName)
         }
@@ -124,6 +195,7 @@ public enum MetaManCore {
         case "at3": RIFFATRAC3MetadataReader.supports(fileURL: fileURL)
         case "msf": SonyMSFMetadataReader.supports(fileURL: fileURL)
         case "svag": SVAGMetadataReader.supports(fileURL: fileURL)
+        case "xa": SonyXAMetadataReader.supports(fileURL: fileURL)
         default: false
         }
     }
@@ -136,6 +208,40 @@ public enum MetaManCore {
         let cleanedHint = formatHint?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let format = cleanedHint.map { $0.hasPrefix(".") ? String($0.dropFirst()) : $0 }
         let normalizedFormat = format?.isEmpty == false ? format : nil
+
+        if SNDHMetadataReader.hasSupportedHint(normalizedFormat)
+            || (normalizedFormat == nil && SNDHMetadataReader.matches(data)) {
+            _ = try SNDHMetadataReader.readResult(data: data, displayName: displayName)
+            throw MetadataReadError.trackAwareResultRequired("SNDH")
+        }
+        if normalizedFormat == "kss" || (normalizedFormat == nil && KSSMetadataReader.matches(data)) {
+            let result = try KSSMetadataReader.readResult(data: data, displayName: displayName)
+            throw MetadataReadError.trackAwareResultRequired(result.tracks.first?.document.format.uppercased() ?? "KSS")
+        }
+        if normalizedFormat == "xa" || (normalizedFormat == nil && SonyXAMetadataReader.matches(data)) {
+            _ = try SonyXAMetadataReader.read(data: data, displayName: displayName)
+            throw MetadataReadError.trackAwareResultRequired("Sony XA")
+        }
+
+        if HESMetadataReader.hasSupportedHint(normalizedFormat)
+            || (normalizedFormat == nil && HESMetadataReader.matches(data)) {
+            _ = try HESMetadataReader.readResult(
+                data: data,
+                context: MetadataReadContext(),
+                displayName: displayName ?? "HES"
+            )
+            throw MetadataReadError.trackAwareResultRequired("HES")
+        }
+
+        if GameMusicMetadataReader.hasSupportedHint(normalizedFormat)
+            || (normalizedFormat == nil && GameMusicMetadataReader.matches(data)) {
+            let result = try GameMusicMetadataReader.readResult(
+                data: data,
+                formatHint: normalizedFormat,
+                displayName: displayName
+            )
+            throw MetadataReadError.trackAwareResultRequired(result.tracks.first?.document.format.uppercased() ?? "NSF-family")
+        }
 
         if normalizedFormat == "ay" || (normalizedFormat == nil && AYMetadataReader.matches(data)) {
             _ = try AYMetadataReader.readResult(data: data, displayName: displayName)
@@ -232,5 +338,38 @@ public enum MetaManCore {
         }
 
         throw MetadataReadError.unsupportedFormat(normalizedFormat ?? "unknown content")
+    }
+
+    private static func contextIncludingHESPlaylist(
+        for fileURL: URL,
+        context: MetadataReadContext
+    ) throws -> MetadataReadContext {
+        guard fileURL.pathExtension.caseInsensitiveCompare("hes") == .orderedSame,
+              !context.containsCompanion(beside: fileURL.lastPathComponent, fileExtension: "m3u") else {
+            return context
+        }
+
+        let baseURL = fileURL.deletingPathExtension()
+        let candidates = [baseURL.appendingPathExtension("m3u"), baseURL.appendingPathExtension("M3U")]
+        guard let playlistURL = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path) }) else {
+            return context
+        }
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: playlistURL.path)
+        if let size = (attributes[.size] as? NSNumber)?.intValue,
+           size > HESMetadataReader.playlistByteLimit {
+            throw MetadataReadError.malformedFile(
+                "HES companion M3U is invalid or too large: \(fileURL.lastPathComponent)"
+            )
+        }
+        let data = try Data(contentsOf: playlistURL, options: .mappedIfSafe)
+        guard data.count <= HESMetadataReader.playlistByteLimit else {
+            throw MetadataReadError.malformedFile(
+                "HES companion M3U is invalid or too large: \(fileURL.lastPathComponent)"
+            )
+        }
+        return context.appending(
+            MetadataCompanionFile(relativePath: playlistURL.lastPathComponent, data: data)
+        )
     }
 }

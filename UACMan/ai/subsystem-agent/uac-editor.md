@@ -5,7 +5,12 @@
 - `UACManCore` edits known JSON fields while retaining unmodeled keys in the
   original manifest document, performs selected-member batch edits, and
   projects MetaMan SPC results into game/member metadata.
-- `FrontendCore/UACContainerCore` validates the UAC and rewrites its envelope.
+- `Application/Sources/UACManMetadataCLI` exposes the same
+  `SPCMetadataHarvester` and
+  `SPCMetadataProjector` for raw-directory creation-time import. It depends on
+  MetaManCore; it must not add a second SPC parser.
+- `Wrapper/UACWrapperCore` validates the current wrapper and rewrites its
+  envelope; it does not define the future native-container implementation.
 - The app-local Zstandard CLI adapter only supplies bounded manifest encode and
   decode operations plus bounded seekable-frame decode/checksum validation; it
   does not own container semantics.
@@ -31,6 +36,11 @@
 - Native SPC harvesting is currently limited to seekable
   `tar+zstd-seekable` payloads. Use `UACSeekableMemberFile` and validate the
   seek-table frame checksum; do not extract members to edit manifest metadata.
+- Creation-time SPC harvesting reads bounded raw members from the staged input
+  directory before packing. A failed or partial read must abort publication of
+  the UAC; imported fields fill missing recipe values and never rewrite SPC
+  bytes. Shared values are promoted only when all successfully read members
+  agree, and failures/diagnostics remain visible to the caller.
 - Refuse to save if the package's file identity, modification stamp, size, or
   manifest digest changed since it was opened.
 - Bound decoded manifest output by the declared size and the shared 16 MiB /
@@ -38,12 +48,13 @@
 
 ## Files
 
-- `Sources/UACManCore/UACManifestEditor.swift`
-- `Sources/UACManApp/UACManModel.swift`
-- `Sources/UACManApp/ZstandardCLIManifestCodec.swift`
-- `Sources/UACManApp/MetadataObjectEditor.swift`
-- `Sources/UACManCore/SPCMetadataHarvester.swift`
-- `Sources/UACManCore/SPCMetadataProjection.swift`
-- `Sources/UACManCore/UACSeekableFrameChecksum.swift`
-- `../../../FrontendCore/Sources/UACContainerCore/UACContainerReader.swift`
-- `../../../FrontendCore/Sources/UACContainerCore/UACContainerWriter.swift`
+- `Application/Sources/UACManCore/UACManifestEditor.swift`
+- `Application/Sources/UACManApp/UACManModel.swift`
+- `Application/Sources/UACManApp/ZstandardCLIManifestCodec.swift`
+- `Application/Sources/UACManApp/MetadataObjectEditor.swift`
+- `Application/Sources/UACManCore/SPCMetadataHarvester.swift`
+- `Application/Sources/UACManCore/SPCMetadataProjection.swift`
+- `Application/Sources/UACManMetadataCLI/main.swift`
+- `Wrapper/Sources/UACWrapperCore/UACContainerReader.swift`
+- `Wrapper/Sources/UACWrapperCore/UACSeekableFrameChecksum.swift`
+- `Wrapper/Sources/UACWrapperCore/UACContainerWriter.swift`

@@ -6,6 +6,17 @@ public struct ExtractedScanArchive: Sendable {
         public let fileURL: URL
         public let fingerprint: ScanFingerprint
         public let route: ScannerRoute
+        public init(
+            entryPath: String,
+            fileURL: URL,
+            fingerprint: ScanFingerprint,
+            route: ScannerRoute
+        ) {
+            self.entryPath = entryPath
+            self.fileURL = fileURL
+            self.fingerprint = fingerprint
+            self.route = route
+        }
     }
 
     public struct SkippedMember: Sendable {
@@ -26,6 +37,7 @@ public enum StandaloneArchiveError: LocalizedError {
     case commandFailed(tool: String, status: Int32, detail: String)
     case unsafeEntry(String)
     case resourceLimit(String)
+    case uacManifestOnly
 
     public var errorDescription: String? {
         switch self {
@@ -36,6 +48,7 @@ public enum StandaloneArchiveError: LocalizedError {
             return "\(tool) failed with exit code \(status)\(suffix)"
         case .unsafeEntry(let entry): return "Archive contains an unsafe member path: \(entry)"
         case .resourceLimit(let message): return message
+        case .uacManifestOnly: return "UAC packages use manifest-only scanning and are not extracted by the archive scanner."
         }
     }
 }
@@ -61,8 +74,12 @@ public struct StandaloneArchiveExtractor: Sendable {
 
     public static func isSupportedArchive(_ url: URL) -> Bool {
         let name = url.lastPathComponent.lowercased()
-        return [".7z", ".lha", ".rar", ".rsn", ".tar.zst", ".tar.zstd", ".tzst", ".zip", ".zst", ".zstd"]
+        return [".7z", ".lha", ".rar", ".rsn", ".tar.zst", ".tar.zstd", ".tzst", ".uac", ".zip", ".zst", ".zstd"]
             .contains { name.hasSuffix($0) }
+    }
+
+    public static func isUAC(_ url: URL) -> Bool {
+        url.pathExtension.lowercased() == "uac"
     }
 
     /// A standalone Zstandard file has one implicit member. The outer name
@@ -92,6 +109,9 @@ public struct StandaloneArchiveExtractor: Sendable {
         ignoredFileExtensions: Set<String> = [],
         dependencySearchRoot: URL? = nil
     ) async throws -> ExtractedScanArchive {
+        guard !Self.isUAC(archiveURL) else {
+            throw StandaloneArchiveError.uacManifestOnly
+        }
         try Task.checkCancellation()
         let root = try makeScratchDirectory()
         let payload = root.appendingPathComponent("payload", isDirectory: true)

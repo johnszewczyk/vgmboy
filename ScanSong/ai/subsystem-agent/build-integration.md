@@ -11,10 +11,11 @@ executables.
 - VGMBoy's [plugin milestone manifest](/Users/john/Downloads/Code/VGMMan/VGMBoy/Docs/plugin-versions.json)
   and [read-only audit script](/Users/john/Downloads/Code/VGMMan/VGMBoy/scripts/audit-plugin-versions.sh)
   are the source of truth for upstream revision review; ScanSong does not keep a second version list.
-- ScanSong depends on VGMBoy's lightweight `VGMBoyFormatCore` and `VGMBoySNDH` products
-  for typed format admission; it does not link VGMBoyKit or native decoders.
+- ScanSong depends on VGMBoy's lightweight `VGMBoyFormatCore` product for typed
+  format admission; it does not link VGMBoyKit or native decoders for its
+  in-process metadata readers. `VGMBoySNDH` is a test-only decoder oracle.
 - ScanSong consumes the local sibling `MetaManCore` Swift package for APE, ADX,
-  AUS, ATRAC3, Sony MSF, Konami/SNK SVAG, SID, SPC, S98, VGM/VGZ, and
+  AUS, ATRAC3, Sony MSF, Konami/SNK SVAG, SID, SPC, SNDH, S98, VGM/VGZ, and
   PSF-family metadata.
   MetaManCore owns bounded VGZ gzip expansion and has no
   VGMBoy, ScanSong, or playback-decoder dependency; test-only libvgm comparisons
@@ -68,9 +69,9 @@ executables.
   boundary instead of replacing a live scanner process.
 - An unavailable staged inspector is reported by the scanner adapter and does not become a player
   launch or permission request.
-- SNDH metadata is read through the shared `VGMBoySNDH` product; ScanSong owns only
-  route registration and catalog projection, while VGMBoy owns the PSGPlay source,
-  C bridge, and staged static library.
+- SNDH metadata is read through MetaManCore, including its bounded ICE!
+  expansion. The old `VGMBoySNDH` API is retained only by ScanSong tests as a
+  reader oracle; PSGPlay remains in VGMBoy for playback.
 - MDX metadata is read through the VGMBoy-built `vgmboy-mdx-inspect` process;
   ScanSong owns only route registration and catalog projection.
 - Amiga metadata is read through the VGMBoy-built `vgmboy-amiga-inspect` process;

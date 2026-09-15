@@ -47,4 +47,4 @@ Decoder and scanner documentation:
 - [`VGMBoy plugin catalog`](/Users/john/Downloads/Code/VGMMan/VGMBoy/Docs/plugin-catalog.md) — decoder pins, provenance, scanner products, dependencies, and format boundaries.
 - [`ScanSong format accommodations`](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-agent/format-accommodations.md) — scanner-side routing, archive, sidecar, and multitrack behavior.
 - [`MetaMan`](/Users/john/Downloads/Code/VGMMan/MetaMan/README.md) — supported metadata readers, methodology, library/CLI use, and migration boundary.
-- [`UACMan`](/Users/john/Downloads/Code/VGMMan/UACMan/README.md) — build/run and current package-editing scope.
+- [`UACMan`](/Users/john/Downloads/Code/VGMMan/UACMan/README.md) — metadata application, reversible wrapper, and future native-container boundary.

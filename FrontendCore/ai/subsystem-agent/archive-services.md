@@ -16,11 +16,9 @@ and playable-member lifetime shared by native frontends.
   cache-backed atomic materialization.
 - `ArchiveManifestReader` owns temporary non-cache manifest reads with frontend-
   supplied extraction.
-- `UACContainerCore` validates the Zstandard skippable metadata frame,
-  bounded JSON manifest, seekable-Zstandard table, and TAR member ranges;
-  writes the metadata frame around a prebuilt TAR+Zstandard payload; and can
-  copy the payload byte-for-byte when needed. TAR creation and Zstandard
-  compression remain package-builder operations.
+- `ArchiveMaterializationCore` consumes `UACWrapperCore`, owned by
+  `UACMan/Wrapper`, to validate the wrapper manifest and route members for
+  playback. FrontendCore does not own UAC encoding or package creation.
 - UAC manifest decompression is injected by the host through a bounded
   `UACManifestFrameDecoder`; archive services do not launch or bundle a codec.
 - `ArchiveCacheCore` owns stable source identity, durable/disposable roots,
@@ -51,7 +49,5 @@ and playable-member lifetime shared by native frontends.
 
 - `Sources/ArchiveMaterializationCore/`
 - `Sources/ArchiveCacheCore/`
-- `Sources/UACContainerCore/`
 - `Tests/ArchiveMaterializationCoreTests/`
 - `Tests/ArchiveCacheCoreTests/`
-- `Tests/UACContainerCoreTests/`

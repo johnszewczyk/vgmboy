@@ -1,4 +1,5 @@
 import Foundation
+import MetaManCore
 import SQLite3
 import Testing
 @testable import ScanSongKit
@@ -73,14 +74,14 @@ func xaMetadataReaderHandlesWrappedAndMalformedSources() throws {
 
     var badFrame = makeXASector()
     badFrame[0x18] = 0xF1
-    #expect(throws: ScannerInspectionError.self) {
+    #expect(throws: MetadataReadError.self) {
         try XAMetadataReader.read(
             data: makeXARaw([badFrame, makeXASector(), makeXASector()]),
             displayName: "bad-frame.xa"
         )
     }
 
-    #expect(throws: ScannerInspectionError.self) {
+    #expect(throws: MetadataReadError.self) {
         try XAMetadataReader.read(
             data: makeXARaw((0..<3).map { _ in makeXASector(header: 0x03) }),
             displayName: "bad-channels.xa"
@@ -433,4 +434,30 @@ private func makeXASector(
         sector.replaceSubrange(offset..<(offset + frameHeader.count), with: frameHeader)
     }
     return sector
+}
+
+/// Test compatibility projection for the former reader API. Production
+/// parsing now belongs to MetaMan; scanner-route tests below exercise the real
+/// inspector adapter.
+private enum XAMetadataReader {
+    static func read(fileURL: URL) throws -> [ScanTrackMetadata] {
+        project(try MetaManCore.readResult(fileURL: fileURL))
+    }
+
+    static func read(data: Data, displayName: String) throws -> [ScanTrackMetadata] {
+        project(try MetaManCore.readResult(data: data, formatHint: "xa", displayName: displayName))
+    }
+
+    private static func project(_ result: MetadataReadResult) -> [ScanTrackMetadata] {
+        result.tracks.enumerated().map { index, track in
+            ScanTrackMetadata(
+                trackIndex: index,
+                trackCount: result.tracks.count,
+                metadata: ScannerMetadata(
+                    metadataDocument: track.document,
+                    includeDateAndEncodedByInComment: false
+                )
+            )
+        }
+    }
 }

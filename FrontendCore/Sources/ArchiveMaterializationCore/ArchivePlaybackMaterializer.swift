@@ -1,6 +1,6 @@
 import ArchiveCacheCore
 import Foundation
-import UACContainerCore
+import UACWrapperCore
 import VGMBoyFormatCore
 
 /// Cache-backed materialization for a catalog-selected archive member.

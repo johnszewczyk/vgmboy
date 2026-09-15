@@ -31,6 +31,7 @@
 - Queue edits include cut, paste, delete, move, and drag-reorder.
 - Direct Finder imports use filename-derived display fallbacks; they do not inspect media for metadata.
 - Database-backed queues use only their published metadata snapshot. They do not inspect media or materialize archives during hydration; VGMBoy receives the selected playable item only when playback begins.
+- For `.uac` rows, the UAC manifest is the sole metadata authority. CocoaSpice must not invoke MetaMan or any source-format tag reader for a contained member; playback may decode the selected member's payload, but those bytes never repair or replace the catalog metadata.
 - Database-backed queue loads distinguish a successful empty result from a SQLite failure. A query failure is logged and shown in status without replacing or partially updating the current queue; combined file/folder selections are applied atomically only after every query succeeds.
 - Queue publication computes its column hints from the stored metadata snapshot and does not schedule background hydration.
 

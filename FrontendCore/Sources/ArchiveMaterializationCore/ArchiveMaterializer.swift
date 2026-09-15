@@ -1,5 +1,5 @@
 import Foundation
-import UACContainerCore
+import UACWrapperCore
 import VGMBoyFormatCore
 
 /// A shared native materializer for a catalog-selected archive entry.

@@ -27,9 +27,10 @@ deliberately exclusive to one family.
 - `VGMBoyFormatCore.VGMStreamFormatManifest` is the decoder-owned, database-free
   source of truth for vgmstream playback and ScanSong admission roles. Manifest
   membership never replaces native open, enumeration, timing, and fixture proof.
-- SNDH routes to `psgplay`. The shared `VGMBoySNDH` product reads SNDH tags and
-  subtune timing without starting playback; `SNDHDecoder` uses the same
-  vendored `psgplay` engine for subtune selection and stereo PCM rendering.
+- SNDH playback routes to `psgplay`. ScanSong metadata is now read by the
+  independent MetaManCore parser; `VGMBoySNDH` remains only as a test oracle
+  for legacy-reader parity. `SNDHDecoder` uses the vendored `psgplay` engine
+  for subtune selection and stereo PCM rendering.
   Every declared subtune is a playlist-selectable track. The native bridge
   retains the source buffer until an uncompressed SNDH has been copied into
   its handle; freeing that buffer before the copy can corrupt the tag area and

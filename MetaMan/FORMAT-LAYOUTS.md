@@ -14,6 +14,178 @@ checks, preserves source bytes, and derives timing without producing audio.
 
 ## Reader layouts
 
+### NSF / NESM
+
+NSF has a fixed 128-byte header. Multi-byte addresses and speed fields are
+little-endian; the 8-byte strings are decoded up to their first NUL and
+trimmed. MetaMan publishes one ordered result entry per declared track and
+retains the complete header; it does not read or execute the music program.
+
+| Source position | Meaning |
+| --- | --- |
+| `0x00..0x04` | `NESM` plus `0x1A` signature. |
+| `0x05`, `0x06`, `0x07` | Version, track count, and first-track index. |
+| `0x08..0x0D` | Load, init, and play addresses as three little-endian 16-bit values. |
+| `0x0E..0x2D`, `0x2E..0x4D`, `0x4E..0x6D` | Game, artist, and copyright/comment fields (32 bytes each). |
+| `0x6E..0x6F` | NTSC speed in microseconds per frame. |
+| `0x70..0x77` | Eight initial bank values. |
+| `0x78..0x79` | PAL speed in microseconds per frame. |
+| `0x7A`, `0x7B` | Playback flags and expansion-audio flags. |
+
+### GBS
+
+GBS has a fixed 112-byte header. Addresses are little-endian; the three
+32-byte text fields are decoded through their first NUL and trimmed. Each
+header-declared track becomes a result entry with its native zero-based source
+index. No Game Boy CPU emulation is used to invent per-track titles or timing.
+
+| Source position | Meaning |
+| --- | --- |
+| `0x00..0x02` | `GBS` signature. |
+| `0x03`, `0x04`, `0x05` | Version, track count, and first-track index. |
+| `0x06..0x0D` | Load, init, play, and stack addresses as four little-endian 16-bit values. |
+| `0x0E`, `0x0F` | Timer modulo and timer control. |
+| `0x10..0x2F`, `0x30..0x4F`, `0x50..0x6F` | Game, artist, and copyright/comment fields (32 bytes each). |
+
+### HES / companion extended M3U
+
+HES begins with a fixed `0xD0`-byte header. All multi-byte header integers
+below are little-endian. The three text fields begin at `0x40`; each occupies
+either `0x20` or `0x30` bytes according to the terminator/extension bytes in
+that field. Their order is game, author, copyright. Text is trimmed and
+decoded as UTF-8 with Windows-1252 fallback. The full fixed header is retained.
+
+| Source position | Meaning |
+| --- | --- |
+| `0x00..0x03` | `HESM` signature. |
+| `0x04`, `0x05` | HES version and first track. |
+| `0x06..0x07` | Init address, little-endian 16-bit. |
+| `0x08..0x0F` | Eight bank registers. |
+| `0x10..0x13` | Data-chunk identifier (normally `DATA`). |
+| `0x14..0x17` | Declared data-chunk size, little-endian 32-bit. |
+| `0x18..0x1B` | Data load address, little-endian 32-bit. |
+| `0x40` onward | Three variable-width NUL-terminated text fields: game, author, copyright. |
+
+A same-basename `.m3u` is optional support data, not a track. MetaMan's
+file-URL convenience reads only that sibling; other clients can supply the
+bounded bytes in `MetadataReadContext`. The reader caps the playlist at 4 MiB
+and 65,536 parsed rows, rejects NUL bytes and playlists with no usable rows,
+and retains the full M3U bytes. UTF-8 is preferred, with Windows-1252 fallback.
+Ordered comment tags are retained, including unknown key/value comments.
+
+Each track line maps a path to a source address slot. `$hh` is a hexadecimal
+zero-based HES slot; a decimal value is a one-based ordinal (zero retains the
+legacy `-1` sentinel). A bare path follows libgme's slot-zero/default row
+behavior. Escaped commas in names are unescaped. The parser reads total length,
+loop position/body, and fade fields without executing HES code. Positive total
+length is authoritative; otherwise a positive intro plus twice the loop body
+is used, falling back to 150 seconds. Without M3U, the reader preserves the
+256-slot compatibility address space and unknown intro/loop/fade facts; the
+ScanSong adapter retains its historical zero-time catalog projection.
+
+See [HESMetadataReader.swift](Sources/MetaManCore/HESMetadataReader.swift).
+
+### KSS / KSCC / KSSX
+
+KSS has a 16-byte base header. Addresses and KSSX numeric extension fields are
+little-endian. MetaMan retains the base header and, only when a `KSSX` source
+declares an extension size of exactly `0x10` and the complete extension is
+present, its 16-byte extension block. It does not parse or emulate the music
+payload.
+
+| Source position | Meaning |
+| --- | --- |
+| `0x00..0x03` | `KSCC` or `KSSX` signature. |
+| `0x04..0x05`, `0x06..0x07` | Load address and load size, little-endian 16-bit. |
+| `0x08..0x09`, `0x0A..0x0B` | Init and play addresses, little-endian 16-bit. |
+| `0x0C`, `0x0D` | First bank and bank-mode bytes. |
+| `0x0E`, `0x0F` | Extra-header byte count and device flags. |
+| KSSX `0x10..0x13` | Declared payload size, little-endian 32-bit. |
+| KSSX `0x14..0x17` | Reserved bytes; preserved in the raw extension block. |
+| KSSX `0x18..0x19`, `0x1A..0x1B` | First and last source-track indices, little-endian 16-bit. MetaMan retains `lastTrack + 1` as `declaredTrackCount`. |
+| KSSX `0x1C..0x1F` | PSG, SCC, MSX Music, and MSX Audio volume bytes. |
+
+For catalog compatibility, the ordered result continues to expose the same 256
+info-only slots and 150-second play-length fallback as ScanSong and the
+installed libgme 0.6.5 oracle, even when the KSSX extension declares a smaller
+track range. The extension range remains visible as source facts instead of
+being silently promoted to a new catalog track count. MetaMan's normalized
+system field preserves ScanSong's established device-flag labels, leaving the
+scanner to adapt the shared document without reinterpreting the header. KSS M3U
+sidecars are not consumed. See
+[KSSMetadataReader.swift](Sources/MetaManCore/KSSMetadataReader.swift).
+
+### Sony CD-XA sectors
+
+MetaMan reads XA sector structure and timing without decoding the ADPCM
+payload. Raw sectors are 0x930 (2352) bytes; the accepted RIFF/CDXA wrapper
+places the first raw sector at absolute offset 0x2C. The source must identify
+one of those containers, and raw input receives vgmstream-compatible frame
+sanity checks before the ordered sector walk.
+
+| Source position | Meaning |
+| --- | --- |
+| Raw sector +0x00..+0x0B | Raw-sector sync: 00 FF FF FF FF FF FF FF FF FF FF 00; not required inside RIFF/CDXA. |
+| Raw sector +0x10..+0x13 | First four-byte subheader: file number, channel number, submode, coding info. All sector metadata is read from this copy. |
+| Raw sector +0x14..+0x17 | Duplicate subheader copy; retained in the source but not used for metadata selection. |
+| Raw sector +0x18..+0x917 | 0x900-byte sector payload. For raw input, its 18 0x80-byte audio frames are probed in the first three audio sectors; ADPCM samples are not decoded. |
+| Raw sector +0x918..+0x92F | Trailing sector bytes; not part of the sample-count calculation. |
+| RIFF 0x00..0x03, 0x08..0x0B, 0x0C..0x0F | RIFF, CDXA, and fmt signature checks. The current metadata route begins sector walking at 0x2C; it does not parse RIFF chunk lengths. |
+
+Submode bit 0x04 marks audio, while bits 0x08 and 0x02 exclude data
+and Form-2-video sectors from the audio walk. Bit 0x80 marks per-channel end
+of track and resets that channel's state. File/channel pairs are tracked
+independently across at most 128 channel slots; the scanner-compatible visible
+subsong cap is 1,000. When there are multiple subsongs, the title is the
+four-digit hexadecimal file/channel pair; a single subsong uses the filename
+without its extension.
+
+Coding-info bits 0..1 select mono/stereo, bits 2..3 select 37,800/18,900 Hz,
+and bits 4..5 select 4/8-bit samples. Unsupported codes and 8-bit mono fail.
+Form-2 submode bit 0x20 selects 18 XA frames per sector instead of 16.
+Samples per sector are (28 * subframes / channels) * formFrames, where
+subframes is 8 for 4-bit or 4 for 8-bit audio. Play time is the accumulated
+audio-sector count times samples per sector divided by sample rate. Source facts
+retain this calculation's configuration and counts on each track.
+
+The first three raw audio sectors validate duplicated frame-header bytes,
+predictor/shift ranges, and a nonblank first frame. Before the first audio
+sector, at most 32 non-audio sectors are skipped. A 100-byte first raw sector
+prefix remains accepted when the available header/frame bytes pass the same
+legacy probe; out-of-range frame bytes are zero-filled. The reader folds
+vgmstream's modulo-32-bit sparse-file probe after EOF rather than revisiting
+the same sector headers indefinitely. Unrecognized .xa aliases remain
+outside this parser and are routed by ScanSong to vgmstream.
+
+See [SonyXAMetadataReader.swift](Sources/MetaManCore/SonyXAMetadataReader.swift).
+
+### NSFE
+
+NSFE starts with `NSFE`; chunks then repeat as a little-endian 32-bit payload
+length, four-byte identifier, and payload. Chunk identifiers are case-sensitive.
+The reader bounds-checks every chunk, requires `INFO`, `DATA`, and `NEND` in
+valid order, validates playlist references, and counts but neither copies nor
+decodes the audio `DATA` payload. The ordered MetaMan result applies `PLST`
+(including repeated source indices); absent/empty `PLST` means source order.
+
+| Chunk | Payload interpretation |
+| --- | --- |
+| `INFO` | Minimum 8 bytes: little-endian load/init/play addresses at `+0..+5`, region and expansion flags at `+6` and `+7`; optional track count at `+8` (default 1), first-track index at `+9` (default 0). |
+| `DATA` | Audio payload; validated and counted, never parsed as metadata or decoded. |
+| `NEND` | Ends the file walk after required `INFO` and `DATA`. |
+| `auth` | NUL-separated game, artist, copyright, and ripper strings. |
+| `tlbl`, `taut` | NUL-separated source-track labels and per-track authors. |
+| `time`, `fade` | Signed little-endian 32-bit millisecond arrays in source-track order; partial trailing bytes are diagnosed and ignored. Positive `time` is finite play length; absent/nonpositive time keeps the 150-second scanner fallback. Nonnegative fade values are retained. |
+| `plst`, `psfx` | Byte arrays of source-track indices; `plst` determines visible order and may repeat tracks, `psfx` marks sound-effect tracks. |
+| `BANK`, `RATE`, `regn`, `NSF2`, `VRC7` | Bank bytes; NTSC/PAL/Dendy speed values; region override/preference; NSF2 flags; VRC7 variant and optional patch bytes. |
+| `text` | NUL-separated notes; the first string contributes to the scanner comment. |
+| Other lowercase-leading IDs | Optional chunks. Their complete framed bytes are retained in the non-audio raw block. Unknown uppercase-leading IDs are unsupported mandatory chunks and fail. |
+
+The NSFE raw metadata block keeps the `NSFE` signature and all non-`DATA`
+chunk frames in source order. Each track document also exposes native source
+index, visible index, timing, playlist, hardware, and payload-size facts.
+See [GameMusicMetadataReader.swift](Sources/MetaManCore/GameMusicMetadataReader.swift).
+
 ### AY / ZXAYEMUL
 
 | Source position | Meaning |
@@ -49,6 +221,33 @@ the first applies to source track 0, the next to track 1, and so on.
 | Other directives | Kept in ordered decoded tags and the raw header even if MetaMan has no normalized field for them. |
 
 See [SAPMetadataReader.swift](Sources/MetaManCore/SAPMetadataReader.swift).
+
+### SNDH / Atari ST
+
+SNDH is executable 68000 music data. MetaMan inspects only its bounded header
+and tag area; it never follows an executable vector or enters the music
+routines. Header integers and pointers below are big-endian.
+
+| Source position / tag | Meaning |
+| --- | --- |
+| `0x00`, `0x04`, `0x08` | Three executable-vector branch slots. The reader recognizes short `BRA`, word `BRA`, and PC-relative `JMP` forms and uses the smallest valid in-file target as the tag-area bound. |
+| `0x0C..0x0F` | ASCII `SNDH` marker. |
+| `0x10...` | Ordered tag block. Parsing stops at `HDNS` or the executable-vector bound; the consumed bytes, including `HDNS` when present, are retained. |
+| `TITL`, `COMM`, `RIPP`, `CONV`, `YEAR` | NUL-terminated Atari ST text. Normalized title/artist/year come from `TITL`/`COMM`/`YEAR`; all recognized tags remain ordered. |
+| `TA`, `TB`, `TC`, `TD`, `!V` | NUL-terminated decimal timer rates. The first encountered timer tag supplies `FRMS` timing; a missing or zero rate defaults to 50 Hz. |
+| `##` | Two ASCII decimal digits declaring subtune count. The reader validates a positive count and caps it at 10,000. |
+| `!#` | NUL-terminated decimal, one-based default subtune. Out-of-range values normalize to subtune 1. |
+| `!#SN`, `FLAG` | One big-endian 16-bit relative offset per subtune, based at the tag's first byte, followed by bounded NUL-terminated Atari ST strings. Table targets must land beyond the pointer table. |
+| `TIME` | One big-endian 16-bit seconds value per subtune. Used when no corresponding `FRMS` entry exists. |
+| `FRMS` | One big-endian 32-bit frame count per subtune. Duration is rounded from `frames / timer-rate` to milliseconds. |
+| `FLAG~` | One NUL-terminated Atari ST text value; retained as an ordered tag. |
+| `ICE!` wrapper `0x00..0x0B` | ICE signature, big-endian packed size at `0x04`, and expanded size at `0x08`. The reverse-bitstream expander validates both lengths and caps output at 256 MiB before the SNDH header walk. |
+
+Outer `.zst` library wrappers are transport and are materialized by ScanSong
+before the `.sndh` member reaches MetaMan. `ICE!` is a distinct inner wrapper
+handled by MetaMan itself. See
+[SNDHMetadataReader.swift](Sources/MetaManCore/SNDHMetadataReader.swift) and
+[ICEMetadataDecompressor.swift](Sources/MetaManCore/ICEMetadataDecompressor.swift).
 
 ### S98 v0-v3
 

@@ -38,8 +38,8 @@ byte-for-byte.
 
 ## Files
 
-- `Sources/UACManApp/ContentView.swift`
-- `Sources/UACManApp/MetadataObjectEditor.swift`
-- `Sources/UACManApp/UACManModel.swift`
-- `Sources/UACManCore/SPCMetadataHarvester.swift`
-- `Sources/UACManCore/SPCMetadataProjection.swift`
+- `Application/Sources/UACManApp/ContentView.swift`
+- `Application/Sources/UACManApp/MetadataObjectEditor.swift`
+- `Application/Sources/UACManApp/UACManModel.swift`
+- `Application/Sources/UACManCore/SPCMetadataHarvester.swift`
+- `Application/Sources/UACManCore/SPCMetadataProjection.swift`

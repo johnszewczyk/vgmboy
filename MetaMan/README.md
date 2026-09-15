@@ -5,9 +5,10 @@ other media files. Its reusable product is `MetaManCore`; the `metaman` command
 is a thin JSON interface for scripting and support work. Applications should
 import the library rather than shelling out to the CLI.
 
-MetaMan currently has complete AY, SAP, S98, VGM/VGZ, PSF-style tag, SPC
-ID666/xID6, SID PSID/RSID, APE, CRI/Monster ADX, Atomic Planet AUS, RIFF
-ATRAC3/ATRAC3+, Sony MSF, and Konami/SNK SVAG readers. SAP enumerates declared
+MetaMan currently has complete AY, SAP, NSF, GBS, NSFE, HES, SNDH, KSS, S98,
+VGM/VGZ, PSF-style tag, SPC ID666/xID6, SID PSID/RSID, APE, CRI/Monster ADX,
+Atomic Planet AUS, RIFF ATRAC3/ATRAC3+, Sony MSF, Konami/SNK SVAG, and Sony
+CD-XA readers. SAP enumerates declared
 subtunes from ordered header directives and retains native `TIME` hints. The
 S98 reader handles header/device information, its complete v3 tag block (including arbitrary and repeated
 keys), legacy pre-v3 titles, and register-command timing. The VGM reader
@@ -25,6 +26,11 @@ fixed offsets or that the decoder is needed to locate every field.
 | --- | --- | --- | --- |
 | AY | Direct ZXAYEMUL header and signed relative-pointer parser; no playback player | Ordered per-subtune documents, raw header/table/text/info blocks, source facts, and native 50 Hz lengths with the prior 150-second fallback | Not implemented |
 | SAP | Direct CR/LF information-header and `FF FF` data-marker parser; no playback core | Ordered `SONGS` subtunes, directives/tags, source header bytes, and per-track finite or loop-start `TIME` hints | Not implemented |
+| NSF / GBS | Direct fixed-header readers; no emulator | Ordered header-declared tracks, fixed identity fields, raw headers, and playback/timer setup facts; scanner-compatible unknown/default timing | Not implemented |
+| NSFE | Direct bounded chunk reader; embedded NSF `DATA` is not decoded | Ordered visible tracks with source indices, repeated `PLST` entries, labels/authors, authored time/fade, hardware facts, and retained non-audio chunks | Not implemented |
+| HES | Direct `HESM` header and bounded same-basename M3U parser; no PC Engine emulation | Ordered playlist rows with address slots, titles, identity, intro/loop/play/fade timing, raw header and playlist bytes; 256 compatibility slots without M3U | Not implemented |
+| SNDH | Direct executable-vector-bounded tag/subtune/timing parser with bounded ICE! expansion; no Atari ST playback core | Ordered subtunes, Atari ST text, retained tag bytes, native TIME/FRMS timing, and source facts | Not implemented |
+| KSS / KSSX | Direct fixed header plus bounded KSSX extension reader; no Z80 or playback core | 256 compatibility entries, hardware flags, raw header blocks, and declared KSSX data/track facts; established info-only timing defaults | Not implemented |
 | S98 v0-v3 | Direct header, tag-block, device-table, and command-stream parser | Ordered raw tags, normalized common fields, technical header facts, and stream timing | Not implemented |
 | VGM / VGZ | Direct 64-byte header and GD3 parser; bounded gzip inflate for compressed input | All 11 ordered GD3 fields (plus future extras), original-language values, release date, converter, notes, header facts, and 44.1 kHz sample timing | Not implemented |
 | PSF / PSF2 / SSF / USF / 2SF | Direct PSF-style header and `[TAG]` footer parser; no playback core | Ordered tags including duplicates and unknown keys, raw footer bytes, normalized identity, authored length/fade, and console identity by extension | Not implemented |
@@ -36,6 +42,7 @@ fixed offsets or that the decoder is needed to locate every field.
 | RIFF/WAVE ATRAC3/ATRAC3+ | Direct RIFF chunk reader for codec `0x0270` and the ATRAC3+ extensible GUID; no audio decoder | Ordered `LIST/INFO` tags, exact named non-audio chunks, codec/fact/loop facts, and vgmstream-compatible play timing | Not implemented |
 | Sony MSF | Direct 64-byte container-header and MPEG frame-boundary parser; no audio decoder | Header stream name, exact header bytes, codec/channel/rate/loop facts, and PCM/PSX ADPCM/ATRAC3/MPEG sample timing; non-Sony aliases are not claimed | Not implemented |
 | Konami / SNK SVAG | Direct `Svag` and `VAGm` header parsers; no audio decoder | Exact structural header bytes, native codec/channel/rate/interleave/block/loop facts, and validated sample-derived loop/play timing; unrelated `.svag` aliases are not claimed | Not implemented |
+| Sony CD-XA | Direct raw-sector and RIFF/CDXA parser; no ADPCM decoder | Ordered file/channel subsongs, sector/sample facts, and sector-derived duration; unrelated `.xa` aliases are not claimed | Not implemented |
 
 This is a library first, not a CLI-only tool. The `metaman` executable is an
 optional JSON frontend; CocoaSpice, ScanSong, and future clients can consume
@@ -45,11 +52,51 @@ the core, while clients own their transport, catalog, and UI concerns.
 `MetaManCore.readResult` is the ordered per-file/per-track contract. Each
 `MetadataTrack` carries a complete `MetadataDocument` and an optional
 format-native `sourceTrackIndex`; result-array order is authoritative, and
-repeated source indices remain separate entries. AY and SAP use this contract;
-single-track readers publish one entry. Use `metaman read-tracks <file>` for
-the ordered JSON result. The legacy `metaman read <file>` command remains a
-single-document API and rejects AY or SAP rather than silently discarding
-subtunes.
+repeated source indices remain separate entries. AY, SAP, NSF, GBS, NSFE,
+HES, SNDH, KSS, and Sony XA use this contract; single-track readers publish one entry. The file-URL
+API loads only a same-basename sibling M3U for HES. Archive/caller-managed
+companions can be passed as bounded named bytes through `MetadataReadContext`;
+MetaMan never follows playlist paths or opens arbitrary companion paths. Use
+`metaman read-tracks <file>` for the ordered JSON result. The legacy
+`metaman read <file>` command remains a single-document API and rejects these
+track-aware formats rather than silently discarding subtunes. SNDH tags `##`,
+`!#`, `!#SN`, `TIME`, and `FRMS` retain native order; the reader applies the
+Atari ST character map and defaults missing or zero frame-timer rates to 50 Hz.
+
+KSS retains the fixed 16-byte `KSCC`/`KSSX` header and, for a valid KSSX
+extension of exactly 16 bytes, its additional 16-byte header. It records the
+load/init/play addresses, banking/device flags, declared payload size, track
+range, and mixer-volume bytes without executing the Z80 program. To preserve
+the current ScanSong/catalog and installed libgme 0.6.5 info-only behavior,
+the ordered result still publishes the 256-slot compatibility range even when
+KSSX declares a smaller track range; that native range is exposed separately
+as `declaredFirstTrack`, `declaredLastTrack`, and `declaredTrackCount`. The
+normalized system field preserves ScanSong's established device-flag labels;
+the scanner now only adapts the shared document. KSS M3U playlists remain
+unconsumed. The field offsets are listed in
+[FORMAT-LAYOUTS.md](FORMAT-LAYOUTS.md).
+
+The Sony XA reader recognizes raw 2352-byte sectors and RIFF/CDXA-wrapped
+sectors, then walks their subheaders to enumerate ordered file/channel
+subsongs. It applies the vgmstream-compatible audio-sector predicate,
+per-channel end-of-track reset, coding-mode/sample-rate rules, and raw-sector
+frame sanity probe; it does not decode ADPCM. Each document keeps the visible
+title, source label, sector count, XA file/channel configuration, coding info,
+sample rate, sample count per sector, and derived duration. Single-track names
+fall back to the source filename; multiple tracks use the four-digit
+file/channel code. ScanSong routes matching XA signatures and adapts the
+ordered result, leaving unrelated `.xa` aliases on vgmstream. The byte layout
+and bounds are in [FORMAT-LAYOUTS.md](FORMAT-LAYOUTS.md).
+
+The HES reader validates the fixed `HESM` header, reads its three variable-width
+text fields, and retains header facts and exact source bytes. Its M3U parser is
+bounded to 4 MiB and 65,536 rows; it preserves ordered comments/tags and row
+order, maps hexadecimal address slots and decimal ordinals, and reads authored
+titles and intro/loop/play/fade times. Without M3U it returns libgme-compatible
+256 address slots, unknown intro/loop/fade facts, and the 150-second fallback.
+For catalog compatibility, ScanSong alone maps those fallback timing fields to
+zero as the former scanner did. See the HES entry in
+[FORMAT-LAYOUTS.md](FORMAT-LAYOUTS.md).
 
 The AY reader validates the `ZXAYEMUL` header and complete track-pointer table,
 follows bounded signed big-endian relative pointers, and reads each title,
@@ -304,6 +351,7 @@ for tag in document.tags {
 
 ```sh
 swift run --package-path MetaMan metaman read-tracks song.sap
+swift run --package-path MetaMan metaman read-tracks song.hes
 swift run --package-path MetaMan metaman read song.s98
 swift run --package-path MetaMan metaman read song.vgz
 swift run --package-path MetaMan metaman read song.minipsf
@@ -328,18 +376,31 @@ is implied. Future writers must be format-specific and preserve unknown data.
 
 MetaMan has no dependency on ScanSong, VGMBoy, or a playback decoder. ScanSong
 adapts `MetadataDocument` into its catalog schema; other clients can consume
-the same library result directly. The current registry contains AY, SAP, S98,
-VGM/VGZ, SPC, SID, APE, ADX, AUS, ATRAC3, Sony MSF, Konami/SNK SVAG, and
-PSF/PSF2/SSF/USF/2SF readers.
-Remaining direct-parser ownership is split between `VGMBoyFormatDataCore`
-(NSF/GBS/NSFE and HES), `VGMBoySNDH` (SNDH), and ScanSong (KSS,
-specialized GSF/QSF, Sony XA, and Core Audio standard audio). These are the
+the same library result directly. The current registry contains AY, SAP,
+NSF/GBS/NSFE, HES, SNDH, KSS, S98, VGM/VGZ, SPC, SID, APE, ADX, AUS, ATRAC3,
+Sony MSF, Konami/SNK SVAG, Sony XA, and PSF/PSF2/SSF/USF/2SF readers.
+SNDH is now fully read by MetaManCore; VGMBoy's old SNDH wrapper remains only as
+a test oracle while PSGPlay remains available for playback. KSS has also moved
+to MetaManCore. Remaining direct parser ownership is split between ScanSong
+(specialized GSF/QSF and Core Audio standard audio). These are the
 current migration surface; decoder-backed plugin routes are not extracted by
-publishing only partial metadata. AY and SAP are now track-aware in MetaMan;
-the other multi-track families remain outside MetaMan until their complete source,
-playlist, and timing behavior can be represented without flattening subtunes.
+publishing only partial metadata. AY, SAP, NSF, GBS, NSFE, HES, SNDH, KSS, and Sony XA
+use the ordered result contract, including playlist repeats and native source
+indices. KSS remains complete for ScanSong's existing 256-slot info-only
+behavior; native KSSX track declarations are preserved as source facts, not
+silently substituted for the compatibility listing. Sony XA's complete
+source-sector, interleave, and timing parser now lives in MetaMan; ScanSong
+retains content routing and schema projection only.
 Playback plugins and decoders remain in VGMBoy regardless of where metadata
 parsing lives.
+
+The target ScanSong boundary is orchestration rather than format interpretation:
+discover files, route supported sources, materialize bounded archive or
+dependency context, pass sources to MetaMan, and transactionally publish the
+resulting documents into the catalog. ScanSong still owns its database,
+scanner UI/CLI, scheduling, and source safety; it should not grow a second set
+of format parsers. OS-provided metadata such as Core Audio can remain behind a
+platform adapter until MetaMan has an explicit supported abstraction for it.
 
 MetaMan is maintained in the VGMMan family repository. ScanSong and other
 family clients resolve it from the shared checkout, so its source and reader

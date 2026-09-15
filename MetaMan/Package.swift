@@ -15,6 +15,8 @@ let package = Package(
             publicHeadersPath: "include",
             linkerSettings: [.linkedLibrary("z")]
         ),
+        // Format readers are discovered as one MetaManCore source set; keep
+        // format registration and byte-layout ownership inside that target.
         .target(name: "MetaManCore", dependencies: ["MetaManZlib"]),
         .executableTarget(name: "metaman", dependencies: ["MetaManCore"]),
         .testTarget(name: "MetaManCoreTests", dependencies: ["MetaManCore"])

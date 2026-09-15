@@ -7,17 +7,16 @@ this page records what each input does at the VGMBoy and ScanSong boundaries.
 It describes the current implementation, not a claim that every file in a
 format family is playable.
 
-Last reviewed: **2026-09-14**
+Last reviewed: **2026-09-15**
 
 ## Decoder matrix
 
 | ID | Source/version | Playback bridge | ScanSong boundary | Formats and special data |
 | --- | --- | --- | --- | --- |
 | `libgme` | Game Music Emu 0.6.5 through Homebrew | `CGameMusicEmu` | ScanSong tests only as a parity oracle; no production scanner link | Playback supports AY, GBS, HES, KSS, NSF, NSFE, SAP, SPC |
-| `VGMBoyFormatDataCore` | Foundation-only shared readers | None | Direct byte metadata route | NSF/GBS/NSFE, HES/M3U |
-| `MetaManCore` | Sibling decoder-independent metadata package | None | Shared direct metadata route | AY, SAP, SID, SPC, S98, VGM/VGZ, PSF-family tags |
+| `MetaManCore` | Sibling decoder-independent metadata package | None | Shared direct metadata route | AY, SAP, NSF/GBS/NSFE, HES/M3U, SNDH/ICE!, SID, SPC, S98, VGM/VGZ, PSF-family tags, and supported stream headers |
 | `libvgm` | `867223e7c33d63de115d1ab955f784c44f19040a` | `CLibVGM` | Native libVGM route | GYM, S98, DRO |
-| `psgplay` | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | `CPSGPlay` / `VGMBoySNDH` | Shared SNDH inspector | Atari ST SNDH; declared subtunes become playlist rows |
+| `psgplay` | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | `CPSGPlay` | VGMBoy playback; legacy metadata API is test-only oracle | Atari ST SNDH playback; ScanSong production metadata is read by MetaManCore |
 | `mdxmini` | `003531a471c1955f4ed4357d0e2a6cba809c34a0` plus vendored LZX code | `CMDX` | `vgmboy-mdx-inspect` | X68000 MDX and PDX; sibling banks, legacy `\name`, inner LZX 0.32/0.42 |
 | `uade` | Homebrew UADE 3.05 | `CUADE` | `vgmboy-amiga-inspect` | Amiga EaglePlayer modules, TFMX, MED, and prefix-led replayers |
 | `vgmstream` | `807b4948cfc1de0cd90e377e9c56f74664c54a1c` plus compatibility patch | `CVGmstream` | Bundled `vgmstream-cli` | Console streamed audio, TXTP, HD/HBD/IECS-related routes |
@@ -42,9 +41,8 @@ boundary where required.
 ### Game Music Emu (`libgme`)
 
 AY, HES, KSS, SAP, SPC, NSF/GBS, and NSFE all have direct metadata routes in
-ScanSong. AY's relative-pointer subtune table and native duration frames,
-SAP's MetaManCore directive-header reader and HES's header/M3U mapping are read without
-starting a core. SPC ID666/xID6 tags and tagless info-only defaults are read
+ScanSong. AY's relative-pointer subtune table, HES header/M3U mapping, and
+SAP's directive-header data are read without starting a core. SPC ID666/xID6 tags and tagless info-only defaults are read
 through MetaManCore; the production ScanSong library, CLI, and app do not link
 libgme. Tests retain it only as a reader-parity oracle. SPC playback remains
 owned by VGMBoy's libgme integration. NSF/GBS headers have no authored
@@ -60,18 +58,18 @@ NSF payload remains playback data owned by the libgme-backed VGMBoy player.
 
 libVGM remains the playback decoder route for VGM/VGZ, GYM, S98, and DRO.
 ScanSong's VGM/VGZ header, GD3, and timing reader now lives in the separate
-MetaManCore package; VGMBoyFormatDataCore no longer owns a duplicate VGM
-metadata parser. Tempo support is exposed only for families where the bridge
+MetaManCore package. Tempo support is exposed only for families where the bridge
 has verified it.
 
 ### PSGPlay (`psgplay`)
 
 SNDH is executable Atari ST music data, so extension admission is not a promise
-of conventional music or audible output. PSGPlay enumerates declared subtunes;
-the scanner publishes contiguous zero-based track indices and repeats the
-shared metadata for each row. A file that opens but produces no meaningful
-audio remains a fixture-level compatibility result, not a reason to invent a
-track or hide the source.
+of conventional music or audible output. MetaManCore reads the bounded header,
+declared subtunes, tags, and timing without PSGPlay; the scanner publishes
+contiguous zero-based track indices and repeats shared metadata for each row.
+The legacy `VGMBoySNDH` API remains a test-only parity oracle. A file that opens
+but produces no meaningful audio remains a playback fixture-level
+compatibility result, not a reason to invent a track or hide the source.
 
 ### mdxmini and X68000 MDX/PDX
 

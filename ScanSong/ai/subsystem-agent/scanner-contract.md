@@ -77,18 +77,17 @@
   `ScanFormatHandler` for structure and metadata. Handlers return a complete
   `ScanInspection` and are the only layer permitted to invoke their parser;
   they never write the catalog directly.
-- Dependency-free byte facts are parsed by VGMBoy's `VGMBoyFormatDataCore`:
-  NSF/GBS/NSFE headers, and HES headers and companion M3U playlists.
-  `MetaManCore` parses AY relative-pointer and SAP directive metadata, APE, CRI/Monster ADX, Atomic
+- Dependency-free byte facts for NSF/GBS/NSFE/HES, AY, SAP, APE, CRI/Monster ADX, Atomic
   Planet AUS, RIFF ATRAC3/ATRAC3+, Konami/SNK SVAG, SID PSID/RSID, SPC ID666/xID6,
   S98, VGM/VGZ, and PSF/PSF2/SSF/USF/2SF tag data.
-  NSF/GBS/NSFE/HES enumeration and native metadata are complete at the
-  header, chunk, or playlist boundary. SPC tagless defaults are also resolved
+  MetaManCore owns complete ordered NSF/GBS/NSFE/HES reader results; HES
+  companion M3U bytes are supplied as bounded metadata context.
+  These readers preserve their header, chunk, or playlist boundary. SPC tagless defaults are also resolved
   in MetaManCore, so the production ScanSong targets do not link libgme;
   libgme remains a playback concern for those formats and the scanner's other
   decoder-backed families.
   ScanSong owns source I/O, scanner metadata conversion, and catalog
-  publication; `MetaManCore` owns AY, SAP, APE, ADX, AUS, ATRAC3, SVAG, SID, SPC, S98,
+  publication; `MetaManCore` owns AY, SAP, NSF/GBS/NSFE/HES, APE, ADX, AUS, ATRAC3, SVAG, SID, SPC, S98,
   VGM/VGZ, and PSF-family metadata parsing, including bounded VGZ decompression
   and named source metadata blocks.
   These routes do not link `VGMBoyKit` or start a playback decoder.
@@ -224,6 +223,13 @@
   X68000 LZX 0.32/0.42 MDX body and whole-file LZX PDX form; source bytes stay
   untouched. A legacy leading backslash in a dependency basename is normalized
   narrowly, while absolute and traversal spellings remain unsafe.
+- UAC is scanned from its validated manifest through UACWrapperCore. The
+  scanner does not expand or hash the TAR+Zstandard payload and never invokes
+  an inner-format reader. Supported members, track metadata, raw member hashes,
+  and sizes come from manifest records; the declared game title and console
+  supply browser grouping. Missing, null, or invalid UAC tag fields stay
+  blank/default. CocoaSpice must use catalog/UAC metadata, never native tags
+  read from a UAC member. Payload bytes are decoded only for playback.
 - Archive paths, symlinks, member count/name size, and expanded bytes are
   validated before records are accepted.
 - Required adapters currently include direct MetaManCore AY relative-pointer,
@@ -232,8 +238,8 @@
   libgme info-only contracts without starting a core (SAP emits its declared
   subsongs and reads authored TIME/loop-start facts; HES publishes the
   playlist's authored tracks, or 256 compatibility slots without a playlist;
-  KSS keeps its 256-slot fallback); the dependency-free `VGMBoyFormatDataCore`
-  readers for NSF/GBS/NSFE headers and HES; MetaManCore handles AY, SAP, APE,
+  KSS keeps its 256-slot fallback); MetaManCore handles complete ordered
+  NSF/GBS/NSFE readers and AY, SAP, APE,
   CRI/Monster ADX, SID PSID/RSID, SPC ID666/xID6, VGM/VGZ, S98, and
   PSF-family tags; the
   Core Audio standard-audio inspector for FLAC/Vorbis comments and exact
@@ -262,12 +268,13 @@
 - vgmstream extensions and admission roles come from VGMBoy's database-free
   `VGMBoyFormatCore`; ScanSong retains native inspection, archive handling, and
   schema-23 publication ownership.
-- SNDH admission uses the direct `psgplay` route and the shared `VGMBoySNDH`
-  metadata product. Each declared subtune becomes one scanner track with its
-  SNDH timing and a contiguous zero-based `track_index`; every row repeats the
-  file's declared `track_count`. The PSG engine is not started during metadata
-  inspection. Playback selection is validated separately in VGMBoy because
-  scanner publication alone cannot prove that a native subtune can restart.
+- SNDH admission uses the `sndh-direct` MetaManCore reader. Its bounded tag
+  walk, Atari ST text mapping, and ICE! expander enumerate declared subtunes
+  without linking PSGPlay. Each subtune becomes one scanner track with SNDH
+  timing and a contiguous zero-based `track_index`; every row repeats the
+  declared `track_count`. Playback selection is validated separately in
+  VGMBoy because scanner publication alone cannot prove that a native subtune
+  can restart. `VGMBoySNDH` remains test-only as the legacy metadata oracle.
 - MDX admission uses the VGMBoy-built `vgmboy-mdx-inspect` process adapter.
   Every `.mdx` source publishes exactly one logical track. PDX, SMP, and PCM
   members are sidecar data, not playable sources or scanner tracks; MDX
@@ -276,12 +283,13 @@
   `.pcm`, or `.mdx` are preserved. Standalone compressed MDX sources receive
   special dependency preparation: their adjacent or root-scoped compressed
   dependency is decompressed into the same scratch set before inspection.
-- HES inspection uses `hes-direct` and the Foundation-only
-  `HESFormatDataReader`. A same-basename sibling `.m3u` remains non-track
-  support data; its authored track mapping, titles, and timing determine the
-  published HES rows. Without a playlist, the reader preserves the 256-slot
-  compatibility listing and the prior scanner's suppressed-timing behavior.
-  Fixture and read-only CocoaSpice catalog parity checks gate this route.
+- HES inspection uses `hes-direct` and MetaManCore's complete ordered reader.
+  A same-basename sibling `.m3u` remains non-track support data; its authored
+  track mapping, titles, and timing determine the published HES rows. Without
+  a playlist, the reader preserves the 256-slot compatibility listing and the
+  prior scanner's suppressed-timing behavior. Synthetic adapter tests pass;
+  fixture and read-only CocoaSpice catalog parity checks remain the cutover
+  gate.
 - Native CLI inspectors share one bounded process runner with a 30-second
   deadline, 4 MiB stdout, 256 KiB stderr, concurrent draining, and cancellation
   termination. Decoder-family adapters remain separate files.
@@ -293,7 +301,6 @@
 - [CanonicalCatalogSchema.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/CanonicalCatalogSchema.swift)
 - [CatalogLinkAuditor.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/CatalogLinkAuditor.swift)
 - [ScannerInspectors.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/ScannerInspectors.swift)
-- [VGMBoyFormatDataCore](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyFormatDataCore)
 - [InspectorProcessRunner.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/InspectorProcessRunner.swift)
 - [TXTPDependencyResolver.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/TXTPDependencyResolver.swift)
 - [ArchiveMemberEnumerator.swift](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/ArchiveMemberEnumerator.swift)

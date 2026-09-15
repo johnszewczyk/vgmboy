@@ -9,13 +9,17 @@ publication. The product is the sole catalog writer consumed by CocoaSpice and S
 ## Major Components
 
 - `ScanSongKit` — host-independent scanning and catalog engine.
-- `VGMBoyFormatDataCore` — dependency-free byte readers supplied by VGMBoy for
-  NSF/GBS/NSFE and HES/M3U metadata that does not require a playback
-  decoder.
-- `MetaManCore` — shared decoder-independent metadata reading for AY, SAP, APE, ADX, AUS,
-  RIFF ATRAC3/ATRAC3+, Sony MSF, Konami/SNK SVAG, SID PSID/RSID, SPC ID666/xID6,
-  S98, VGM/VGZ, and PSF/PSF2/SSF/USF/2SF tag footers. ScanSong maps neutral
-  documents to schema 23.
+- ScanSong's intended role is orchestration: source discovery, safe file and
+  archive handling, metadata-reader routing, and catalog publication. Complete
+  format interpretation belongs in MetaMan; scanner UI/CLI and database
+  ownership stay here.
+- `MetaManCore` — shared decoder-independent metadata reading for AY, SAP,
+  NSF/GBS/NSFE, HES/M3U, APE, ADX, AUS,
+  RIFF ATRAC3/ATRAC3+, Sony MSF, Konami/SNK SVAG, Sony XA, SID PSID/RSID,
+  SPC ID666/xID6, S98, VGM/VGZ, and PSF/PSF2/SSF/USF/2SF tag footers. ScanSong maps neutral
+  ordered track documents to schema 23. All complete direct format readers
+  listed here are owned by MetaMan; ScanSong retains routing, safe source and
+  archive handling, dependency preparation, and schema-23 projection.
 - `scansong` — versioned JSONL command-line boundary.
 - `ScanSong` — native catalog-management interface.
 - `build-app.sh` and `launch.sh` — fresh packaging and launch boundary.
@@ -33,7 +37,8 @@ builder or prepare mGBA/QSF as scanner build-time collateral.
 CRI/Monster ADX headers and native loop timing are read through MetaManCore;
 the vgmstream helper remains for other streams and non-ADX payloads that reuse
 `.adx` (including Ogg and RIFF).
-Sony CD-XA sectors and interleaved subsongs are also read in-process; unrelated
+Sony CD-XA sectors and interleaved subsongs are read completely by MetaManCore;
+ScanSong retains only content-aware routing and catalog projection. Unrelated
 formats using `.xa` remain on the vgmstream route.
 Atomic Planet AUS headers are read by MetaManCore, which preserves the exact
 32-byte header and native codec/sample/channel/loop facts while projecting
@@ -54,12 +59,15 @@ Known Konami and SNK SVAG headers are read through MetaManCore, with unrelated
 - Scanner ownership and protocol: [scanner-contract.md](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-agent/scanner-contract.md)
 - Per-plugin intake behavior: [format-accommodations.md](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-agent/format-accommodations.md)
 - Build and plugin packaging: [build-integration.md](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-agent/build-integration.md)
+- UAC manifest-only catalog boundary: [player-integration.md](/Users/john/Downloads/Code/VGMMan/UACMan/ai/subsystem-agent/player-integration.md)
 - Command-line behavior: [cli.md](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-human/cli.md)
 - Native catalog management: [catalog-management.md](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-human/catalog-management.md)
 
 ## Local Rules
 
 - ScanSong is the sole schema-23 catalog writer.
+- For `.uac`, project catalog fields from the manifest only; do not parse
+  enclosed native tags as an automatic fallback.
 - Player apps read the catalog; they do not receive scanner write access.
 - ScanSong receives inspection executables from VGMBoy and never invokes a player frontend.
 - Human notes describe implemented UI behavior; agent notes describe scanner ownership and failure boundaries.
@@ -137,9 +145,11 @@ collapsed into one ignored-format bucket:
   separately from regressions.
   GYM remains a legacy structure-known libVGM route without scanner metadata;
   it is not a MetaMan migration target.
-- HES inspection applies a same-basename sibling `.m3u` when present. The
-  playlist is not catalogued as a track itself, but it maps raw HES address
-  slots to authored music/SFX tracks and their lengths.
+- HES inspection passes the source and bounded same-basename sibling `.m3u`
+  context to MetaMan. The playlist is not catalogued as a track itself; it maps
+  raw HES address slots to authored music/SFX tracks and timing. Without it,
+  the ordered 256-slot compatibility listing remains, with the legacy zero-time
+  catalog projection.
 - SAP inspection consumes MetaManCore's ordered per-track header documents for
   subsong count, all directives, identity, and native `TIME` hints; finite
   times become play lengths and `LOOP` times become intro-to-loop positions.

@@ -41,8 +41,10 @@ timing calculation, or transport policy.
 ## Open verification gates
 
 MetaMan is the shared decoder-independent metadata boundary. It now has
-complete readers for AY, SAP, S98, VGM/VGZ, the PSF-style PSF/PSF2/SSF/USF/2SF
-family, SPC, SID, APE, CRI/Monster ADX, Atomic Planet AUS, RIFF ATRAC3/ATRAC3+,
+complete readers for AY, SAP, NSF, GBS, NSFE, HES, SNDH, KSS/KSSX, Sony XA,
+S98, VGM/VGZ, the PSF-style
+PSF/PSF2/SSF/USF/2SF family, SPC, SID, APE, CRI/Monster ADX, Atomic Planet
+AUS, RIFF ATRAC3/ATRAC3+,
 Sony MSF, and Konami/SNK SVAG. The per-format byte layouts, pointer bases,
 chunk boundaries, and stream walks are documented in `MetaMan/FORMAT-LAYOUTS.md`.
 ADX, AUS, ATRAC3, MSF, and SVAG retain their existing
@@ -63,13 +65,10 @@ Remaining metadata-reader targets are grouped by the boundary they need:
   through MetaMan plus the adapter, 0.056 ms/file through the former reader,
   and 236.895 ms/file through vgmstream CLI, including process startup. The
   richer neutral document adds about 0.099 ms/file over the former parser.
-  MetaMan Debug and Release suites each pass 66 tests; ScanSong Debug and
-  Release suites each pass 113 tests, with fixture-gated checks skipped when
-  their inputs are unavailable. VGMBoy's focused format-data suite passes 7
-  tests; six focused VGMBoy format-data tests pass, while its NSFE corpus test
-  is fixture-gated. No further single-track reader is currently queued; the
-  next boundary is the track-aware
-  result contract.
+  The current full Debug package suites pass 87 MetaMan tests and 123 ScanSong
+  tests. VGMBoy's focused format-data suite has previously passed; its corpus
+  comparison remains fixture-gated. The single-track direct-reader set is
+  complete for the formats currently claimed by MetaMan.
 - **Track-aware result contract:** MetaMan defines an ordered
   `MetadataReadResult` of `MetadataTrack` documents with optional native
   source indices; list order is authoritative and repeated indices remain
@@ -79,18 +78,62 @@ Remaining metadata-reader targets are grouped by the boundary they need:
   SAP retains its bounded CR/LF header, ordered/unknown directives, per-track
   TIME facts, and the prior catalog timing projection. The duplicate
   `VGMBoyFormatDataCore` SAP reader is removed; VGMBoy retains SAP playback.
+  NSF/GBS/NSFE now join the ordered result contract. Their fixed-header and
+  chunk readers live in MetaMan; ScanSong adapts the ordered documents, and
+  the duplicate NSF/GBS/NSFE reader sources/tests have been removed from
+  `VGMBoyFormatDataCore`. HES/M3U has also moved in full: MetaMan owns the HES
+  header, bounded playlist parsing, ordered rows, native slot indices, and
+  timing; ScanSong is only the compatibility/catalog adapter. SNDH, KSS/KSSX,
+  and Sony XA have now also moved completely into MetaMan. Their scanner paths
+  only adapt ordered documents into schema 23; the prior SNDH oracle remains
+  test-only, and the playback engines remain in VGMBoy.
+  A read-only Release comparison of the MetaMan documents mapped to ScanSong's
+  catalog fields matched all 66 live archive members and 1,418 root-1 rows:
+  12,762 exact fields, 1,418 comment enrichments, 1,418 authored-fade
+  enrichments, and zero mismatches. Parsing averaged 0.313 ms/member, excluding
+  archive extraction; this is a measurement, not a speedup claim, because the
+  old in-process reader was not benchmarked in the same run. The production
+  ScanSongKit target builds. HES live parity against the CocoaSpice root-1
+  catalog extracted 291/291 archives and compared 294 source files / 4,925
+  tracks: all 44,325 title, identity, comment, and timing fields matched with
+  zero mismatches. The HES route preserves the sibling-M3U track map and the
+  no-playlist compatibility listing. A paired 101-pass info-only benchmark
+  on the public ZXTune Raiden HES sample with a synthetic three-row M3U measured
+  0.456 ms for ScanSong/MetaMan versus 0.057 ms for libgme (~8.0x slower, both
+  still sub-millisecond). Since the former ScanSong route used the Swift
+  `HESFormatDataReader`, not libgme, this is a format-reference measurement,
+  not a like-for-like regression or a 1:1 parity claim; compare against the
+  pre-extraction reader before drawing that conclusion. ScanSong's
+  executable-product link
+  failure is no longer current: the full ScanSong package test target links
+  and passes. SNDH's full root-26 comparison covered 5,897 files and 11,758
+  tracks with 94,064 exact text-field checks and zero mismatches; that corpus
+  contained no ICE-compressed sources, so ICE behavior is covered separately
+  by a synthetic fixture against PSGPlay and the production scanner route.
+  The paired 256-track SNDH benchmark measured 27.435 ms for MetaMan parsing
+  versus 12.077 ms for the former parser; the full scanner projections measured
+  33.783 ms versus 26.525 ms. The extraction preserves data but is not a 1:1
+  speed claim; its absolute additional parse cost is about 15 ms per file for
+  that unusually track-heavy sample.
+  KSS root-1 live parity covered 368 archives and 94,208 rows with zero
+  mismatches. Its same-file paired Release benchmark measured 0.113667 ms for
+  MetaMan plus the scanner adapter versus 0.027875 ms for the former inspector
+  (0.085792 ms additional per file; not 1:1 timing).
+  Sony XA now uses the same complete-reader boundary. Its root-1 production
+  route matches all 867 saved rows in 827 files across 18 archives; the latest
+  route mean was 0.716 ms/file. Unrelated XA aliases still route to vgmstream.
+  This corpus run was kept separate from the full package suite because it
+  temporarily starves a timeout-sensitive subprocess test when run concurrently.
   SAP's synthetic scanner projection passes in both Debug and Release. The
   pre-cutover 6,335-file ASMA comparison is documented, but post-cutover corpus parity is not
   verified because `SCANSONG_SAP_FIXTURE_DIR` is unset. The AY corpus test is
-  likewise fixture-gated. Remaining multi-track candidates are NSF/GBS/NSFE,
-  HES, SNDH, KSS, and XA; NSF/GBS/NSFE are next for fixed-header/chunk-layout
-  review and complete projection comparison before moving their reader.
-  GSF/QSF dependency-aware results need a bounded source/dependency context
-  before their full readers can move.
-- **Dependency-aware direct readers:** GSF/miniGSF and QSF/miniQSF already
-  avoid playback cores but validate companion libraries and container blocks.
-  A future MetaMan API must accept a bounded source/dependency context; do not
-  move only their tag parsing.
+  likewise fixture-gated. All current direct multi-track readers—AY, SAP, NSF,
+  GBS, NSFE, HES, SNDH, KSS, and XA—now live in MetaMan.
+- **Next complete scanner-owned reader:** GSF/miniGSF is the next target. Its
+  full read requires source plus a bounded dependency set so CRC/zlib/GBA
+  segments, library chain, tags, and timing move together; moving only its tag
+  parser is explicitly out of scope. QSF/miniQSF follows as a separate full
+  extraction using the same context boundary for QSound libraries and blocks.
 - **Audio containers:** Core Audio is currently the scanner's native
   standard-audio reader. Treat it as a separate platform-boundary decision,
   not as a playback-plugin removal.
@@ -114,6 +157,17 @@ Remaining family playback work is fixture coverage:
 The current evidence and its limits live in `PARITY-WIP-REPORT.md`. Run
 `scripts/verify-family.sh` for a new family check; do not append run histories
 to this document.
+
+## GitHub backup status
+
+The local VGMMan checkout is already one repository root for MetaMan, ScanSong,
+VGMBoy, CocoaSpice, SPCBoyWK, and the shared clients; `origin` points to
+`johnszewczyk/vgmboy`. GitHub still lists the separate public `CocoaSpice`,
+`scansong`, and `spcboy` repositories as unarchived. No remote commit, push, or
+archive has been made in this pass: the connected GitHub tools are read-only
+for repository changes here. Keep those repositories intact until the current
+family tree is committed and pushed, then verify the remote tree before
+archiving the superseded repositories.
 
 ## Contribution rule
 

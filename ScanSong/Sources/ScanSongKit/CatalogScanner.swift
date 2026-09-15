@@ -1,4 +1,5 @@
 import Foundation
+import UACWrapperCore
 
 private final class MonotonicScanProgress: @unchecked Sendable {
     private let lock = NSLock()
@@ -179,9 +180,42 @@ public final class CatalogScanner: @unchecked Sendable {
             // writer and must not interleave with concurrent inspection commits.
             timeline.enter(.inspection)
             var pending: [ScanCandidate] = []
-            for candidate in candidates {
+            var uacContainersByPath: [String: UACContainer] = [:]
+            for discoveredCandidate in candidates {
                 try Task.checkCancellation()
-                emit(.inspection, currentPath: candidate.identityDescription)
+                emit(.inspection, currentPath: discoveredCandidate.identityDescription)
+                var candidate = discoveredCandidate
+                var preloadedUACContainer: UACContainer?
+                if StandaloneArchiveExtractor.isUAC(discoveredCandidate.sourceURL) {
+                    do {
+                        let container = try UACContainerReader.read(
+                            from: discoveredCandidate.sourceURL,
+                            decompressManifestFrame: UACManifestFrameCodec.decoder
+                        )
+                        preloadedUACContainer = container
+                        let statSignature = [
+                            "uac-manifest",
+                            container.manifestSHA256,
+                            String(discoveredCandidate.fingerprint.fileSize),
+                            String(discoveredCandidate.fingerprint.modifiedAt.timeIntervalSince1970.bitPattern)
+                        ].joined(separator: ":")
+                        candidate = ScanCandidate(
+                            identity: discoveredCandidate.identity,
+                            fingerprint: ScanFingerprint(
+                                fileSize: discoveredCandidate.fingerprint.fileSize,
+                                modifiedAt: discoveredCandidate.fingerprint.modifiedAt,
+                                contentSignature: statSignature
+                            ),
+                            sourceURL: discoveredCandidate.sourceURL,
+                            route: discoveredCandidate.route
+                        )
+                    } catch {
+                        // Preserve invalid packages as scan candidates so they
+                        // are reported through the normal per-source failure path.
+                        pending.append(discoveredCandidate)
+                        continue
+                    }
+                }
 
                 if let completed = try writer.completedFingerprint(
                     stageID: stageID,
@@ -206,11 +240,14 @@ public final class CatalogScanner: @unchecked Sendable {
                     reused += 1
                     continue
                 }
+                if let preloadedUACContainer {
+                    uacContainersByPath[candidate.identity.path] = preloadedUACContainer
+                }
                 pending.append(candidate)
             }
 
-            // Concurrent inspection pipeline. Multiple sources extract and
-            // inspect at once, but all member inspections share one permit pool
+            // Concurrent inspection pipeline. Multiple sources inspect at once,
+            // but all member inspections share one permit pool
             // so the total subprocess count stays bounded. The writer is only
             // touched here (serial checkpoint commits), never by pipeline tasks.
             let inspectionProcessed = processed
@@ -219,6 +256,7 @@ public final class CatalogScanner: @unchecked Sendable {
                 pending,
                 pipelineLimit: archivePipelineLimit,
                 dependencySearchRoot: rootURL,
+                uacContainersByPath: uacContainersByPath,
                 progress: { [progress, rootPath = root.path, discovered, inspectionProcessed, inspectionFailed] phase, currentPath, detail, phaseCompleted, _ in
                     let globalPhaseCompleted = phaseCompleted.map {
                         min(discovered, inspectionProcessed + $0)
@@ -437,6 +475,7 @@ public final class CatalogScanner: @unchecked Sendable {
         _ pending: [ScanCandidate],
         pipelineLimit: Int,
         dependencySearchRoot: URL,
+        uacContainersByPath: [String: UACContainer],
         progress: @escaping @Sendable (ScanLifecyclePhase, String?, String?, Int?, Int?) -> Void
     ) async throws -> [String: CandidateInspectionOutcome] {
         var outcomes: [String: CandidateInspectionOutcome] = [:]
@@ -454,6 +493,7 @@ public final class CatalogScanner: @unchecked Sendable {
                         let outcome = await self.inspectCandidate(
                             candidate,
                             dependencySearchRoot: dependencySearchRoot,
+                            uacContainer: uacContainersByPath[candidate.identity.path],
                             progress: progress
                         )
                         return (candidate.identity.path, outcome)
@@ -473,17 +513,27 @@ public final class CatalogScanner: @unchecked Sendable {
     private func inspectCandidate(
         _ candidate: ScanCandidate,
         dependencySearchRoot: URL,
+        uacContainer: UACContainer?,
         progress: @escaping @Sendable (ScanLifecyclePhase, String?, String?, Int?, Int?) -> Void
     ) async -> CandidateInspectionOutcome {
         do {
             try Task.checkCancellation()
             let inspection: CandidateInspection
-            if StandaloneArchiveExtractor.isSupportedArchive(candidate.sourceURL) {
+            if StandaloneArchiveExtractor.isUAC(candidate.sourceURL) {
+                progress(.archiveListing, candidate.identityDescription, "Reading UAC manifest…", nil, nil)
+                inspection = try await self.inspectArchive(
+                    candidate,
+                    dependencySearchRoot: dependencySearchRoot,
+                    uacContainer: uacContainer,
+                    progress: progress
+                )
+            } else if StandaloneArchiveExtractor.isSupportedArchive(candidate.sourceURL) {
                 inspection = try await archiveExtractionScheduler.withPermit {
                     progress(.archiveListing, candidate.identityDescription, "Extracting \(candidate.sourceURL.lastPathComponent)…", nil, nil)
                     return try await self.inspectArchive(
                         candidate,
                         dependencySearchRoot: dependencySearchRoot,
+                        uacContainer: nil,
                         progress: progress
                     )
                 }
@@ -528,8 +578,22 @@ public final class CatalogScanner: @unchecked Sendable {
     private func inspectArchive(
         _ candidate: ScanCandidate,
         dependencySearchRoot: URL,
+        uacContainer preloadedUACContainer: UACContainer?,
         progress: @escaping @Sendable (ScanLifecyclePhase, String?, String?, Int?, Int?) -> Void
     ) async throws -> CandidateInspection {
+        if StandaloneArchiveExtractor.isUAC(candidate.sourceURL) {
+            let container: UACContainer
+            if let preloadedUACContainer {
+                container = preloadedUACContainer
+            } else {
+                container = try UACContainerReader.read(
+                    from: candidate.sourceURL,
+                    decompressManifestFrame: UACManifestFrameCodec.decoder
+                )
+            }
+            return projectUACManifest(container, candidate: candidate)
+        }
+
         let archive = try await archiveExtractor.extractForScan(
             archiveURL: candidate.sourceURL,
             registry: registry,
@@ -617,6 +681,60 @@ public final class CatalogScanner: @unchecked Sendable {
             }
         }
         return CandidateInspection(records: records, failures: failures, skipped: skipped)
+    }
+
+    private func projectUACManifest(
+        _ container: UACContainer,
+        candidate: ScanCandidate
+    ) -> CandidateInspection {
+        var records: [CatalogTrackRecord] = []
+        var skipped: [ScanSkippedFile] = []
+
+        for member in container.manifest.members {
+            let pathExtension = URL(fileURLWithPath: member.path).pathExtension
+            let extensionName = ScannerFormatPolicy.normalize(member.format ?? pathExtension)
+            let identity = ScanItemIdentity(
+                rootID: candidate.identity.rootID,
+                path: candidate.identity.path,
+                archiveEntry: member.path
+            )
+            if ignoredFileExtensions.contains(extensionName) {
+                skipped.append(ScanSkippedFile(
+                    identity: identity,
+                    extensionName: extensionName,
+                    reason: .explicitlyIgnored
+                ))
+                continue
+            }
+            guard let route = registry.route(pathExtension: extensionName, archiveMember: true) else {
+                if !extensionName.isEmpty {
+                    skipped.append(ScanSkippedFile(
+                        identity: identity,
+                        extensionName: extensionName,
+                        reason: .unsupportedFormat
+                    ))
+                }
+                continue
+            }
+
+            records.append(CatalogTrackRecord(
+                sourcePath: candidate.identity.path,
+                archiveEntry: member.path,
+                route: route,
+                fingerprint: ScanFingerprint(
+                    fileSize: Int64(clamping: member.byteSize),
+                    modifiedAt: candidate.fingerprint.modifiedAt,
+                    contentSignature: "uac-member-blake3:\(member.blake3)"
+                ),
+                trackIndex: 0,
+                trackCount: 1,
+                metadata: UACCatalogMetadataAdapter.project(member.metadata),
+                browserGameOverride: container.manifest.game.title,
+                browserSystemOverride: container.manifest.game.console
+            ))
+        }
+
+        return CandidateInspection(records: records, failures: [], skipped: skipped)
     }
 
     private func inspect(fileURL: URL, route: ScannerRoute) async throws -> ScanInspection {

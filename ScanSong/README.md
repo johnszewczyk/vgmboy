@@ -102,19 +102,21 @@ error.
   members are recognized by the shared UADE prefix manifest as well as by
   ordinary suffixes, and each archive is staged as a complete set so UADE can
   resolve player/sample companions before it publishes real subsong rows.
-- Direct NSF/GBS/NSFE header and chunk enumeration, AY relative-pointer and
-  SAP header/subsong/native TIME metadata through MetaManCore, and HES
-  header/M3U inspection without opening libgme; KSS keeps its 256-slot
-  info-only fallback. SPC ID666/xID6 metadata is read by MetaManCore, including
+- Direct NSF/GBS/NSFE header and chunk enumeration, AY relative-pointer,
+  SAP header/subsong/native TIME, HES header/M3U, and KSS/KSSX header metadata
+  through MetaManCore without opening libgme. KSS keeps its 256-slot info-only
+  listing while retaining KSSX's declared track range as source facts. SPC
+  ID666/xID6 metadata is read by MetaManCore, including
   the established libgme-compatible catalog defaults for tagless SPCs. ScanSong
   projects the shared document into the existing schema; its app and CLI do
   not link or invoke libgme for SPC inspection.
 - SPC ID666/xID6, PSF/PSF2, SSF, USF, and 2SF tags plus VGM/VGZ GD3/timing
   through MetaManCore; GSF/QSF retain their specialized container readers, and
   SID PSID/RSID headers are also read by MetaManCore.
-- Direct SNDH tag/subtune/timing harvesting through VGMBoy's shared `VGMBoySNDH`
-  product. SNDH files are enumerated into their actual Atari ST subtunes; the
-  scanner does not start playback just to publish metadata.
+- Direct SNDH tag/subtune/timing harvesting through MetaManCore, including
+  executable-vector bounds, Atari ST text, TIME/FRMS timing, and bounded ICE!
+  expansion. Production ScanSong no longer links `VGMBoySNDH` or PSGPlay for
+  SNDH metadata; the old reader remains test-only as a parity oracle.
 - SNDH rows use contiguous zero-based `track_index` values and repeat the
   declared `track_count` on every subtune row, so database/game/file playlist
   activation can select each subtune without reopening the scanner. VGMBoy's
@@ -122,6 +124,11 @@ error.
   failures, including 4-Mat's eight-subtune Shadow Dancer; this remains decoder
   evidence, not a claim that every file in the 5,897-file Atari ST corpus is
   conventional music or supported.
+- The direct reader was compared read-only with all 5,897 live CocoaSpice SNDH
+  sources and 11,758 catalog subtune rows. The legacy reader, MetaMan, scanner
+  projection, and catalog matched across 94,064 text-field checks plus timing
+  and track-identity fields, with zero mismatches. Parser-only performance is
+  recorded in `WIP-PLAN.md`; common outer `.zst` materialization is excluded.
 - MDX modules through the VGMBoy-built `vgmboy-mdx-inspect` adapter. Each MDX
   publishes one logical track with its native duration and title; declared
   sample/data companions are dependency data and are not published as
@@ -166,8 +173,8 @@ error.
   type-03/04/05 and encrypted type-04 timing, including vgmstream's default
   loop/fade play window. Content under `.adx` that is Ogg, RIFF, or another
   non-CRI/Monster alias retains the vgmstream route.
-- Sony CD-XA sector and interleaved subsong metadata through a ScanSong-owned
-  reader; other formats that reuse `.xa` retain the vgmstream route.
+- Sony CD-XA sector and interleaved subsong metadata through MetaManCore; other
+  formats that reuse `.xa` retain the vgmstream route.
 - Atomic Planet AUS header timing and loop metadata through MetaManCore;
   reader; other content under `.aus` remains eligible for the vgmstream route.
 - Sony MSF codec, stream-name, loop, and duration metadata through MetaManCore;

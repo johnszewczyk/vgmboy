@@ -15,9 +15,9 @@ independent Git repositories.
   and the native scanner application.
 - `MetaMan`: decoder-independent format metadata readers, shared result model,
   and a thin JSON command-line frontend.
-- `UACMan`: native UAC package browser/editor; package IO is shared through
-  FrontendCore, while the current metadata codec adapter uses the installed
-  Zstandard CLI.
+- `UACMan`: native metadata browser/editor, current reversible wrapper and
+  pack/inspect/unpack tooling, plus a reserved future native-container
+  component. Playback and scanner consumers depend on its wrapper library.
 - `CatalogReader`: read-only schema-23 access and catalog/browser projections.
 - `FrontendCore`: UI-neutral archive, preferences, favorites, queue, request,
   and transport policy.
@@ -41,7 +41,8 @@ independent Git repositories.
   `ScanSong/ai/subsystem-agent/format-accommodations.md`
 - UAC package browsing/editing:
   `UACMan/AGENTS.md`, `UACMan/README.md`, and
-  `FrontendCore/ai/subsystem-agent/uac-format.md`
+  `UACMan/ai/subsystem-agent/uac-wrapper-format.md`; player/scanner integration:
+  `UACMan/ai/subsystem-agent/player-integration.md`
 - Read-only catalog queries and shared browser projections:
   `CatalogReader/AGENTS.md`
 - Shared frontend policy and archive/cache infrastructure:

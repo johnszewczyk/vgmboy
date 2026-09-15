@@ -3,12 +3,15 @@ import Foundation
 import MetaManCore
 import SQLite3
 import Testing
-import VGMBoyFormatDataCore
+import UACWrapperCore
+import VGMBoySNDH
 import zlib
 @testable import ScanSongKit
 
 @Test func builtInPoliciesPreserveRequiredStructureWork() throws {
     let registry = BuiltInScannerPlugins.registry
+    #expect(BuiltInScannerPlugins.archiveExtensions.contains("uac"))
+    #expect(StandaloneArchiveExtractor.isSupportedArchive(URL(fileURLWithPath: "/tmp/test.uac")))
     #expect(registry.route(pathExtension: "spc")?.metadataPolicy == .direct)
     #expect(registry.route(pathExtension: "spc")?.pluginID == "spc-direct")
     #expect(registry.route(pathExtension: ".NSF")?.structurePolicy == .enumerate)
@@ -44,7 +47,7 @@ import zlib
     #expect(registry.route(pathExtension: "ay")?.pluginID == "ay-direct")
     #expect(registry.route(pathExtension: "ay")?.metadataPolicy == .direct)
     #expect(registry.route(pathExtension: "ay")?.structurePolicy == .enumerate)
-    #expect(registry.route(pathExtension: "sndh")?.pluginID == "psgplay")
+    #expect(registry.route(pathExtension: "sndh")?.pluginID == "sndh-direct")
     #expect(registry.route(pathExtension: "sndh")?.structurePolicy == .enumerate)
     #expect(registry.route(pathExtension: "sndh")?.metadataPolicy == .direct)
     #expect(registry.route(pathExtension: "mdx")?.pluginID == "mdx")
@@ -179,6 +182,297 @@ func kssDirectRouteRejectsMalformedHeaders() async throws {
             try await handler.inspect(fileURL: fileURL, route: route)
         }
     }
+}
+
+@Test("KSSX declared track count matches libgme info-only and the MetaMan scanner route")
+func kssxNativeTrackCountMatchesInfoOnlyOracle() async throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("scansong-kssx-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    var data = Data(repeating: 0, count: 0x20)
+    data.replaceSubrange(0..<4, with: Data("KSSX".utf8))
+    data[0x0E] = 0x10
+    data[0x0F] = 0x02
+    data[0x18] = 1
+    data[0x1A] = 2
+    let fileURL = directory.appendingPathComponent("native-count.kss")
+    try data.write(to: fileURL)
+
+    let oracle = try #require(gmeInfoOnlyMetadata(fileURL: fileURL))
+    #expect(oracle.count == 256)
+    let route = try #require(BuiltInScannerPlugins.registry.route(forPath: fileURL.path))
+    let handler = try #require(BuiltInFormatInspectors.registry.handler(for: route))
+    let inspection = try await handler.inspect(fileURL: fileURL, route: route)
+    #expect(inspection.tracks.count == oracle.count)
+    #expect(inspection.tracks.map(\.trackIndex) == Array(0..<oracle.count))
+    #expect(inspection.tracks.allSatisfy { $0.trackCount == oracle.count })
+    #expect(inspection.tracks.first?.metadata == oracle.first)
+}
+
+@Test(
+    "MetaMan KSS result matches read-only live CocoaSpice catalog rows",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["SCANSONG_KSS_LIVE_DB"] != nil,
+        "Set SCANSONG_KSS_LIVE_DB to compare KSS extraction against the saved catalog."
+    )
+)
+func kssMetaManMatchesLiveCocoaSpiceCatalog() async throws {
+    let databasePath = try #require(ProcessInfo.processInfo.environment["SCANSONG_KSS_LIVE_DB"])
+    let rootID = Int(ProcessInfo.processInfo.environment["SCANSONG_KSS_LIVE_ROOT_ID"] ?? "1") ?? 1
+    let rows = try readLiveKSSRows(databaseURL: URL(fileURLWithPath: databasePath), rootID: rootID)
+    let rowsByPath = Dictionary(grouping: rows, by: \.sourcePath)
+    let requestedLimit = Int(ProcessInfo.processInfo.environment["SCANSONG_KSS_LIVE_LIMIT"] ?? "")
+    let selectedPaths = Array(rowsByPath.keys.sorted().prefix(max(0, requestedLimit ?? rowsByPath.count)))
+    #expect(!selectedPaths.isEmpty, "No KSS rows were found for catalog root \(rootID).")
+
+    let registry = BuiltInScannerPlugins.registry
+    let extractor = StandaloneArchiveExtractor()
+    let route = try #require(registry.route(pathExtension: "kss"))
+    let handler = try #require(BuiltInFormatInspectors.registry.handler(for: route))
+    var comparedRows = 0
+    var mismatches: [String] = []
+
+    for sourcePath in selectedPaths {
+        let sourceRows = try #require(rowsByPath[sourcePath])
+        var extracted: ExtractedScanArchive?
+        defer {
+            if let extracted { extractor.discard(extracted) }
+        }
+
+        let fileURL: URL
+        if let archivePath = sourceRows.first?.archivePath, !archivePath.isEmpty {
+            do {
+                extracted = try await extractor.extractForScan(
+                    archiveURL: URL(fileURLWithPath: archivePath),
+                    registry: registry
+                )
+            } catch {
+                mismatches.append("\(sourcePath): archive extraction failed: \(error.localizedDescription)")
+                continue
+            }
+            guard let member = extracted?.members.first(where: {
+                $0.entryPath == sourceRows.first?.archiveEntry
+            }) else {
+                mismatches.append("\(sourcePath): catalog KSS archive member was not materialized")
+                continue
+            }
+            fileURL = member.fileURL
+        } else {
+            fileURL = URL(fileURLWithPath: sourcePath)
+        }
+
+        let inspection: ScanInspection
+        do {
+            inspection = try await handler.inspect(fileURL: fileURL, route: route)
+        } catch {
+            mismatches.append("\(sourcePath): MetaMan scanner route failed: \(error.localizedDescription)")
+            continue
+        }
+        guard inspection.tracks.count == sourceRows.count else {
+            mismatches.append("\(sourcePath): tracks \(inspection.tracks.count) != catalog rows \(sourceRows.count)")
+            continue
+        }
+
+        for row in sourceRows {
+            guard row.trackIndex >= 0, row.trackIndex < inspection.tracks.count else {
+                mismatches.append("\(sourcePath) #\(row.trackIndex): catalog track index is outside the direct result")
+                continue
+            }
+            let direct = inspection.tracks[row.trackIndex]
+            if direct.trackIndex != row.trackIndex
+                || direct.trackCount != row.trackCount
+                || direct.metadata != row.expected {
+                if mismatches.count < 30 {
+                    mismatches.append("\(sourcePath) #\(row.trackIndex): \(String(describing: direct.metadata)) != \(row.expected)")
+                }
+            } else {
+                comparedRows += 1
+            }
+        }
+    }
+
+    print("KSS live parity: root=\(rootID), selectedFiles=\(selectedPaths.count)/\(rowsByPath.count), comparedRows=\(comparedRows), mismatches=\(mismatches.count)")
+    for mismatch in mismatches.prefix(30) { print("KSS live parity mismatch: \(mismatch)") }
+    #expect(comparedRows == selectedPaths.reduce(0) { $0 + (rowsByPath[$1]?.count ?? 0) })
+    #expect(mismatches.isEmpty)
+}
+
+@Test("KSS vendored sample MetaMan result matches libgme info-only fields")
+func kssVendoredSampleMatchesInfoOnlyOracle() throws {
+    let repositoryRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let sampleURL = repositoryRoot.appendingPathComponent(
+        "VGMBoy/vendor/zxtune/samples/chiptunes/Multi/kss/MSX_Fan.kss"
+    )
+    #expect(FileManager.default.fileExists(atPath: sampleURL.path))
+
+    let result = try MetaManCore.readResult(fileURL: sampleURL)
+    let oracle = try #require(gmeInfoOnlyMetadata(fileURL: sampleURL))
+    #expect(result.tracks.count == oracle.count)
+    #expect(result.tracks.count == 256)
+    #expect(result.tracks.map(\.sourceTrackIndex) == Array(0..<oracle.count).map { Optional($0) })
+
+    let document = result.tracks[0].document
+    let reference = oracle[0]
+    #expect((document.fields.game ?? "") == reference.game)
+    #expect((document.fields.title ?? "") == reference.song)
+    #expect((document.fields.system ?? "") == reference.system)
+    #expect((document.fields.artist ?? "") == reference.author)
+    #expect((document.fields.comment ?? "") == reference.comment)
+    #expect(document.timing?.introLengthMs == reference.introLengthMs)
+    #expect(document.timing?.loopLengthMs == reference.loopLengthMs)
+    #expect(document.timing?.playLengthMs == reference.playLengthMs)
+    #expect(document.timing?.fadeLengthMs == reference.fadeLengthMs)
+}
+
+@Test(
+    "KSS MetaMan adapter stays equivalent to the former scanner and paired performance",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["SCANSONG_KSS_PERF_FIXTURE"] != nil,
+        "Set SCANSONG_KSS_PERF_FIXTURE to run the paired KSS inspector benchmark."
+    )
+)
+func kssMetaManAndLegacyInspectorPairedPerformance() async throws {
+    let path = try #require(ProcessInfo.processInfo.environment["SCANSONG_KSS_PERF_FIXTURE"])
+    let fileURL = URL(fileURLWithPath: path)
+    let route = try #require(BuiltInScannerPlugins.registry.route(forPath: fileURL.path))
+    let handler = try #require(BuiltInFormatInspectors.registry.handler(for: route))
+    let legacy = try legacyKSSInspectorReference(fileURL: fileURL)
+    let current = try await handler.inspect(fileURL: fileURL, route: route)
+    #expect(current.tracks.count == legacy.count)
+    for (index, track) in current.tracks.enumerated() {
+        #expect(track.trackIndex == index)
+        #expect(track.trackCount == legacy.count)
+        #expect(track.metadata == legacy[index].metadata)
+    }
+
+    var directSamples: [UInt64] = []
+    var legacySamples: [UInt64] = []
+    let iterations = 101
+    for iteration in 0..<iterations {
+        if iteration.isMultiple(of: 2) {
+            let legacyStart = DispatchTime.now().uptimeNanoseconds
+            _ = try legacyKSSInspectorReference(fileURL: fileURL)
+            legacySamples.append(DispatchTime.now().uptimeNanoseconds - legacyStart)
+            let directStart = DispatchTime.now().uptimeNanoseconds
+            _ = try await handler.inspect(fileURL: fileURL, route: route)
+            directSamples.append(DispatchTime.now().uptimeNanoseconds - directStart)
+        } else {
+            let directStart = DispatchTime.now().uptimeNanoseconds
+            _ = try await handler.inspect(fileURL: fileURL, route: route)
+            directSamples.append(DispatchTime.now().uptimeNanoseconds - directStart)
+            let legacyStart = DispatchTime.now().uptimeNanoseconds
+            _ = try legacyKSSInspectorReference(fileURL: fileURL)
+            legacySamples.append(DispatchTime.now().uptimeNanoseconds - legacyStart)
+        }
+    }
+
+    let directMedianMs = medianMilliseconds(directSamples)
+    let legacyMedianMs = medianMilliseconds(legacySamples)
+    print("KSS paired inspect medians (same file, \(iterations) alternating passes): MetaMan+adapter=\(directMedianMs) ms, former ScanSong inspector=\(legacyMedianMs) ms, ratio=\(directMedianMs / legacyMedianMs)x")
+    #expect(directMedianMs > 0)
+    #expect(legacyMedianMs > 0)
+}
+
+private func legacyKSSInspectorReference(
+    fileURL: URL
+) throws -> [ScanTrackMetadata] {
+    let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
+    guard data.count >= 0x10,
+          data.starts(with: Data("KSCC".utf8)) || data.starts(with: Data("KSSX".utf8)) else {
+        throw ScannerInspectionError.malformedFile("Invalid or truncated KSS header in \(fileURL.lastPathComponent).")
+    }
+
+    let flags = data[0x0F]
+    var system = "MSX"
+    if flags & 0x02 != 0 {
+        system = "Sega Master System"
+        if flags & 0x04 != 0 { system = "Game Gear" }
+        if flags & 0x01 != 0 { system = "Sega Mega Drive" }
+    }
+    let metadata = ScannerMetadata(
+        game: "",
+        song: "",
+        system: system,
+        author: "",
+        comment: "",
+        introLengthMs: -1,
+        loopLengthMs: -1,
+        playLengthMs: 150_000,
+        fadeLengthMs: -1
+    )
+    return (0..<256).map { index in
+        ScanTrackMetadata(trackIndex: index, trackCount: 256, metadata: metadata)
+    }
+}
+
+private struct LiveKSSRow {
+    let sourcePath: String
+    let archivePath: String
+    let archiveEntry: String
+    let trackIndex: Int
+    let trackCount: Int
+    let expected: ScannerMetadata
+}
+
+private func readLiveKSSRows(databaseURL: URL, rootID: Int) throws -> [LiveKSSRow] {
+    var database: OpaquePointer?
+    let openStatus = sqlite3_open_v2(databaseURL.path, &database, SQLITE_OPEN_READONLY, nil)
+    guard openStatus == SQLITE_OK, let database else {
+        let message = database.map { String(cString: sqlite3_errmsg($0)) } ?? "SQLite could not open the live catalog."
+        sqlite3_close(database)
+        throw NSError(domain: "ScanSongKSSLiveTests", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+    }
+    defer { sqlite3_close(database) }
+    sqlite3_busy_timeout(database, 10_000)
+
+    let sql = """
+        SELECT t.path, COALESCE(t.archive_path, ''), COALESCE(t.archive_entry, ''),
+               t.track_index, t.track_count,
+               m.title, m.game, m.system, m.author, m.comment,
+               m.intro_length_ms, m.loop_length_ms, m.play_length_ms, m.fade_length_ms
+          FROM tracks t
+          JOIN track_metadata m ON m.track_id=t.id
+         WHERE t.root_id=?1 AND lower(t.extension)='kss'
+         ORDER BY t.path, t.track_index
+        """
+    var statement: OpaquePointer?
+    guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
+          let statement else {
+        throw NSError(domain: "ScanSongKSSLiveTests", code: 2, userInfo: [NSLocalizedDescriptionKey: String(cString: sqlite3_errmsg(database))])
+    }
+    defer { sqlite3_finalize(statement) }
+    guard sqlite3_bind_int(statement, 1, Int32(rootID)) == SQLITE_OK else {
+        throw NSError(domain: "ScanSongKSSLiveTests", code: 3)
+    }
+
+    var rows: [LiveKSSRow] = []
+    while sqlite3_step(statement) == SQLITE_ROW {
+        rows.append(LiveKSSRow(
+            sourcePath: sqliteText(statement, 0),
+            archivePath: sqliteText(statement, 1),
+            archiveEntry: sqliteText(statement, 2),
+            trackIndex: Int(sqlite3_column_int64(statement, 3)),
+            trackCount: Int(sqlite3_column_int64(statement, 4)),
+            expected: ScannerMetadata(
+                game: sqliteText(statement, 6),
+                song: sqliteText(statement, 5),
+                system: sqliteText(statement, 7),
+                author: sqliteText(statement, 8),
+                comment: sqliteText(statement, 9),
+                introLengthMs: Int(sqlite3_column_int64(statement, 10)),
+                loopLengthMs: Int(sqlite3_column_int64(statement, 11)),
+                playLengthMs: Int(sqlite3_column_int64(statement, 12)),
+                fadeLengthMs: Int(sqlite3_column_int64(statement, 13))
+            )
+        ))
+    }
+    return rows
 }
 
 @Test("MetaMan SAP route enumerates declared subsongs without libgme")
@@ -1459,23 +1753,43 @@ func mdxArchiveFixtureMaterializesDependency() async throws {
 }
 
 @Test(
-    "SNDH fixture publishes PSGPlay subtunes and timing",
+    "SNDH scanner projection matches the decoder metadata oracle",
     .enabled(
         if: ProcessInfo.processInfo.environment["SCANSONG_SNDH_FIXTURE"] != nil,
         "Set SCANSONG_SNDH_FIXTURE to run the Zone Warrior scanner check."
     )
 )
-func sndhFixtureInspectsThroughPSGPlay() async throws {
+func sndhFixtureMatchesDecoderMetadataOracle() async throws {
     let path = try #require(ProcessInfo.processInfo.environment["SCANSONG_SNDH_FIXTURE"])
     let fileURL = URL(fileURLWithPath: path)
+    let source = try Data(contentsOf: fileURL)
+    let oracle = try VGMBoySNDH.SNDHMetadataReader.read(data: source)
+    let direct = try MetaManCore.readResult(data: source, formatHint: "sndh", displayName: fileURL.lastPathComponent)
     let route = try #require(BuiltInScannerPlugins.registry.route(pathExtension: fileURL.pathExtension))
     let handler = try #require(BuiltInFormatInspectors.registry.handler(for: route))
     let inspection = try await handler.inspect(fileURL: fileURL, route: route)
+
+    #expect(route.pluginID == "sndh-direct")
+    #expect(direct.tracks.count == oracle.tracks.count)
+    #expect(direct.tracks.map(\.sourceTrackIndex) == (1...oracle.tracks.count).map { Optional($0) })
+    #expect(direct.tracks.map { $0.document.fields.title ?? "" } == oracle.tracks.map {
+        $0.subtuneName.isEmpty ? oracle.title : $0.subtuneName
+    })
+    #expect(direct.tracks.allSatisfy {
+        $0.document.fields.artist == (oracle.composer.isEmpty ? nil : oracle.composer)
+    })
+    #expect(direct.tracks.allSatisfy {
+        $0.document.fields.year == (oracle.year.isEmpty ? nil : oracle.year)
+    })
+    #expect(direct.tracks.map { $0.document.timing?.playLengthMs ?? 0 } == oracle.tracks.map { $0.durationMilliseconds })
     #expect(!inspection.tracks.isEmpty)
     #expect(inspection.tracks.allSatisfy { $0.trackCount == inspection.tracks.count })
     #expect(inspection.tracks.map(\.trackIndex) == Array(0..<inspection.tracks.count))
     #expect(inspection.tracks.allSatisfy { ($0.metadata?.playLengthMs ?? 0) > 0 })
     #expect(inspection.tracks.first?.metadata?.system == "Atari ST")
+    #expect(inspection.tracks.map { $0.metadata?.song } == direct.tracks.map { $0.document.fields.title })
+    #expect(inspection.tracks.map { $0.metadata?.author } == direct.tracks.map { Optional($0.document.fields.artist ?? "") })
+    #expect(inspection.tracks.map { $0.metadata?.comment } == direct.tracks.map { Optional($0.document.fields.year ?? "") })
 }
 
 @Test(
@@ -1500,6 +1814,52 @@ func hesFixtureInspectsCompanionPlaylist() async throws {
     #expect(inspection.tracks[12].metadata?.song == "Stage Clear")
     #expect(inspection.tracks[12].metadata?.playLengthMs == 4_000)
     #expect(inspection.tracks.compactMap(\.metadata) == libGMEBaseline)
+}
+
+@Test("HES scanner route consumes MetaMan track documents with legacy catalog defaults")
+func hesScannerRouteUsesMetaManForPlaylistAndCompatibilityRows() async throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("scansong-hes-metaman-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let hes = makeScanSongHESFixture()
+    let playlistURL = directory.appendingPathComponent("playlist.M3U")
+    let playlistSource = directory.appendingPathComponent("playlist.hes")
+    try hes.write(to: playlistSource, options: .atomic)
+    try Data("# Game: Catalog Game\n# Composer: Fixture Composer\nplaylist.hes, $0C, Menu Theme, 0:10.000, 0:03.000-, 0:01.000\n".utf8)
+        .write(to: playlistURL, options: .atomic)
+
+    let route = try #require(BuiltInScannerPlugins.registry.route(pathExtension: "hes"))
+    let handler = try #require(BuiltInFormatInspectors.registry.handler(for: route))
+    let playlistInspection = try await handler.inspect(fileURL: playlistSource, route: route)
+    #expect(playlistInspection.tracks.count == 1)
+    #expect(playlistInspection.tracks[0].trackIndex == 0)
+    #expect(playlistInspection.tracks[0].metadata?.game == "Catalog Game")
+    #expect(playlistInspection.tracks[0].metadata?.song == "Menu Theme")
+    #expect(playlistInspection.tracks[0].metadata?.author == "")
+    #expect(playlistInspection.tracks[0].metadata?.introLengthMs == 3_000)
+    #expect(playlistInspection.tracks[0].metadata?.loopLengthMs == 7_000)
+    #expect(playlistInspection.tracks[0].metadata?.playLengthMs == 10_000)
+    #expect(playlistInspection.tracks[0].metadata?.fadeLengthMs == 1_000)
+
+    let noPlaylistSource = directory.appendingPathComponent("unlisted.hes")
+    try hes.write(to: noPlaylistSource, options: .atomic)
+    let noPlaylistInspection = try await handler.inspect(fileURL: noPlaylistSource, route: route)
+    #expect(noPlaylistInspection.tracks.count == 256)
+    #expect(noPlaylistInspection.tracks.allSatisfy { $0.metadata?.playLengthMs == 0 })
+    #expect(noPlaylistInspection.tracks.allSatisfy { $0.metadata?.introLengthMs == 0 })
+}
+
+private func makeScanSongHESFixture() -> Data {
+    var data = Data(repeating: 0, count: 0xD0)
+    data.replaceSubrange(0..<4, with: Data("HESM".utf8))
+    data[4] = 1
+    data[5] = 1
+    data[6] = 0x34
+    data[7] = 0x12
+    data.replaceSubrange(16..<20, with: Data("DATA".utf8))
+    return data
 }
 
 @Test(
@@ -2091,6 +2451,139 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
     )
     sqlite3_close(database)
     #expect(row == [String(result.trackCount), String(result.trackCount)])
+}
+
+@Test func uacSPCMembersUseOnlyManifestTrackMetadataInCocoaSpiceCatalog() async throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ScanSong-uac-spc-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    var spc = makeSPCFile(id666Flag: 0x1A)
+    writeBytes(&spc, at: 0x2E, value: "ID666 Song")
+    writeBytes(&spc, at: 0x4E, value: "Track Game Variant")
+    writeBytes(&spc, at: 0xB1, value: "Artist")
+    // A truncated xID6 signature is recoverable. The SPC inspector can still
+    // read these native tags, but UAC catalog fields must not use them.
+    spc.append(contentsOf: Data("xid6".utf8))
+
+    let payloadRoot = directory.appendingPathComponent("payload", isDirectory: true)
+    let memberPath = "variants/original/track.spc"
+    let memberURL = payloadRoot.appendingPathComponent(memberPath)
+    try FileManager.default.createDirectory(
+        at: memberURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    try spc.write(to: memberURL)
+
+    let rawTarURL = directory.appendingPathComponent("payload.tar")
+    try runFixtureTool(
+        "/usr/bin/tar",
+        ["-cf", rawTarURL.path, "-C", payloadRoot.path, "variants"]
+    )
+    let compressedPayloadURL = directory.appendingPathComponent("payload.tar.zst")
+    try runFixtureTool(
+        "/opt/homebrew/bin/zstd",
+        ["-q", "-3", "-f", "-o", compressedPayloadURL.path, rawTarURL.path]
+    )
+
+    let gameHash = String(repeating: "a", count: 64)
+    let memberHash = String(repeating: "b", count: 64)
+    let manifest = UACManifest(
+        packageID: "scansong-uac-spc-fixture",
+        payload: UACPayload(
+            format: "tar+zstd",
+            compressionProfile: "uac-zstd-3-v1",
+            encoderVersion: "test",
+            blake3: gameHash
+        ),
+        game: UACGame(
+            id: "uac-game-id",
+            title: "Canonical Package Title",
+            console: "Nintendo SNES"
+        ),
+        variants: [UACVariant(id: "original", label: "Original", kind: "source")],
+        members: [
+            UACMember(
+                path: memberPath,
+                originalName: "track.spc",
+                variantID: "original",
+                role: "track",
+                format: "spc",
+                byteSize: UInt64(spc.count),
+                blake3: memberHash,
+                metadata: [
+                    "game": .string("UAC Track Game"),
+                    "title": .string("Manifest Edited Title")
+                ]
+            )
+        ]
+    )
+    let packageURL = directory.appendingPathComponent("Game.uac")
+    try UACContainerWriter.write(
+        manifest: manifest,
+        compressedTarPayloadURL: compressedPayloadURL,
+        to: packageURL,
+        compressManifestFrame: { data in
+            try runZstandard(data, arguments: ["-q", "-3", "-c"])
+        },
+        decompressManifestFrame: { data, expectedByteCount, maximumMemoryByteCount in
+            let output = try runZstandard(
+                data,
+                arguments: ["-q", "-d", "-c", "--memory=\(max(1, maximumMemoryByteCount / (1024 * 1024)))MB"]
+            )
+            guard output.count == expectedByteCount else {
+                throw FixtureToolError.outputSizeMismatch
+            }
+            return output
+        }
+    )
+
+    let root = directory.appendingPathComponent("Library/Nintendo SNES", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    try FileManager.default.moveItem(at: packageURL, to: root.appendingPathComponent("Game.uac"))
+
+    let databaseURL = directory.appendingPathComponent("Library.sqlite")
+    let result = try await CatalogScanner(
+        databaseURL: databaseURL,
+        handlers: ScanPluginHandlerRegistry(handlers: [])
+    )
+        .scan(rootURL: root.deletingLastPathComponent(), mode: .newScan)
+    #expect(result.trackCount == 1)
+    #expect(result.failures.isEmpty)
+
+    var database: OpaquePointer?
+    #expect(sqlite3_open_v2(databaseURL.path, &database, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
+    let row = try querySingleRow(
+        database: try #require(database),
+        sql: """
+        SELECT t.archive_entry, t.browser_game, t.browser_system,
+               m.game, m.title, m.author
+          FROM tracks t JOIN track_metadata m ON m.track_id=t.id
+         LIMIT 1;
+        """
+    )
+    sqlite3_close(database)
+    #expect(row == [
+        memberPath,
+        "Canonical Package Title",
+        "Nintendo SNES",
+        "UAC Track Game",
+        "Manifest Edited Title",
+        ""
+    ])
+}
+
+@Test func uacCannotEnterThePayloadExtractionPath() async {
+    do {
+        _ = try await StandaloneArchiveExtractor().extractForScan(
+            archiveURL: URL(fileURLWithPath: "/tmp/trusted.uac")
+        )
+        Issue.record("UAC must be scanned from its manifest, not expanded as an archive.")
+    } catch StandaloneArchiveError.uacManifestOnly {
+        // Expected: payload expansion belongs to playback, not catalog scan.
+    } catch {
+        Issue.record("Unexpected UAC extraction-path error: \(error.localizedDescription)")
+    }
 }
 
 @Test func catalogScannerPersistsTheNativeSPCPlayLength() async throws {
@@ -3776,6 +4269,63 @@ private func makeSPCFile(id666Flag: UInt8) -> Data {
     data.replaceSubrange(0..<27, with: Data("SNES-SPC700 Sound File Data".utf8))
     data[0x23] = id666Flag
     return data
+}
+
+private func runFixtureTool(_ executablePath: String, _ arguments: [String]) throws {
+    let process = Process()
+    let errorPipe = Pipe()
+    process.executableURL = URL(fileURLWithPath: executablePath)
+    process.arguments = arguments
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = errorPipe
+    try process.run()
+    process.waitUntilExit()
+    guard process.terminationStatus == 0 else {
+        let error = String(
+            data: errorPipe.fileHandleForReading.readDataToEndOfFile(),
+            encoding: .utf8
+        ) ?? "command failed"
+        throw NSError(
+            domain: "ScanSongTests",
+            code: 25,
+            userInfo: [NSLocalizedDescriptionKey: "\(URL(fileURLWithPath: executablePath).lastPathComponent): \(error)"]
+        )
+    }
+}
+
+private func runZstandard(_ data: Data, arguments: [String]) throws -> Data {
+    let directoryURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ScanSong-test-zstd-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(
+        at: directoryURL,
+        withIntermediateDirectories: true,
+        attributes: [.posixPermissions: 0o700]
+    )
+    defer { try? FileManager.default.removeItem(at: directoryURL) }
+    let inputURL = directoryURL.appendingPathComponent("input.bin")
+    try data.write(to: inputURL)
+
+    let process = Process()
+    let outputPipe = Pipe()
+    process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/zstd")
+    process.arguments = arguments + ["--", inputURL.path]
+    process.standardOutput = outputPipe
+    process.standardError = FileHandle.nullDevice
+    try process.run()
+    let output = outputPipe.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    guard process.terminationStatus == 0 else {
+        throw NSError(
+            domain: "ScanSongTests",
+            code: 26,
+            userInfo: [NSLocalizedDescriptionKey: "zstd failed to encode/decode a UAC test fixture."]
+        )
+    }
+    return output
+}
+
+private enum FixtureToolError: Error {
+    case outputSizeMismatch
 }
 
 private func writeBytes(_ data: inout Data, at offset: Int, value: String) {

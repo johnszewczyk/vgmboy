@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import ArchiveCacheCore
 import ArchiveMaterializationCore
-import UACContainerCore
+import UACWrapperCore
 @testable import VGMBoyKit
 @testable import CocoaSpice
 

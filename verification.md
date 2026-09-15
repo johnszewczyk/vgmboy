@@ -3,8 +3,10 @@
 ## Scope
 
 `scripts/verify-family.sh` records the state of this single family repository
-and checks all eight maintained Swift packages/apps: CatalogReader, VGMBoy,
-FrontendCore, MetaMan, UACMan, ScanSong, CocoaSpice, and SPCBoyWK.
+and checks all nine maintained Swift packages/apps: CatalogReader, VGMBoy,
+FrontendCore, MetaMan, UACMan, UACMan/Wrapper, ScanSong, CocoaSpice, and
+SPCBoyWK. The wrapper has its own package check so the app and consumer
+dependencies do not hide a wrapper regression.
 The archived Electron source under `SPCBoy/` is retained for recovery but is
 not a supported build or release target and is not run by the verifier.
 
@@ -35,16 +37,32 @@ FrontendCore currently runs with `--no-parallel` as an explicit temporary
 workaround. Remove that flag after the default-parallel archive-test lifecycle
 is repaired and repeatedly verified.
 
-## Current Known Test Gap
+## Current Package Evidence
 
-The latest local family run builds all packages and passes CatalogReader,
-FrontendCore, MetaMan, UACMan, ScanSong, CocoaSpice, and SPCBoyWK checks. VGMBoy's
-suite runs 79 tests but currently reports four issues in two audio-dependent
-tests: AAC export returns `.audioToolbox(1718449215)`, and live transport does
-not report playing after start/resume (resume is returned as an error). Treat
-these as unresolved playback/test failures until they are reproduced and
-explained; the rest of the VGMBoy suite passes. The temporary evidence directory
-contains the exact command and log for this run.
+- **MetaMan:** the full Debug suite passes all 87 tests.
+- **ScanSong:** the full Debug suite passes all 123 tests. A read-only root-1
+  XA differential through the production MetaMan-backed scanner route matches
+  all 867 catalog rows across 827 files and 18 archives. Running this corpus
+  test alongside the timing-sensitive process-runner test once caused that
+  unrelated test to exceed its two-second timeout; a clean full-suite rerun
+  without the corpus environment passed.
+- **UACMan:** `UACMan/Wrapper` passes all 18 Swift tests and 5 Python tests;
+  `UACMan` passes all 13 Swift tests. The relocated wrapper/application source
+  paths are included in these package checks.
+- **UAC integration reference:** a prior synthetic PSID v2 member passed the
+  Release MetaMan CLI through `pack` and `pack-source-tree`, then unpack;
+  projected metadata survived and source bytes matched exactly.
+- **FrontendCore blocked:** both its full suite and a filtered archive-
+  materialization test stop before tests while SwiftPM compiles VGMBoy's
+  `CHighlyComplete/highlycomplete_bridge.cpp`; the vendored include
+  `mgba/flags.h` is missing. No FrontendCore tests ran in this pass.
+- **Not freshly verified:** VGMBoy and CocoaSpice full package suites, the
+  remaining family verifier checks, and packaged UI/playback. The earlier
+  CocoaSpice build report named the same missing mGBA header, but CocoaSpice
+  itself was not retried here.
+
+A full family verification was not run; these per-package results do not imply
+that the whole family is green.
 
 On this host, set `SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"` when running
 the family check: the default Command Line Tools SDK stub is rejected by the

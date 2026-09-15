@@ -1,5 +1,5 @@
 import Foundation
-import UACContainerCore
+import UACWrapperCore
 
 /// Decodes one independently compressed UAC TAR frame for the virtual-member
 /// reader. Only the compressed frame is staged as a private temporary input;

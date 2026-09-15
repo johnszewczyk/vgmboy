@@ -12,7 +12,8 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../VGMBoy"),
-        .package(path: "../MetaMan")
+        .package(path: "../MetaMan"),
+        .package(name: "UACWrapper", path: "../UACMan/Wrapper")
     ],
     targets: [
         // Test-only decoder oracles for reader parity; production scanner targets do not depend on these cores.
@@ -26,9 +27,8 @@ let package = Package(
             name: "ScanSongKit",
             dependencies: [
                 .product(name: "VGMBoyFormatCore", package: "VGMBoy"),
-                .product(name: "VGMBoyFormatDataCore", package: "VGMBoy"),
-                .product(name: "VGMBoySNDH", package: "VGMBoy"),
-                .product(name: "MetaManCore", package: "MetaMan")
+                .product(name: "MetaManCore", package: "MetaMan"),
+                .product(name: "UACWrapperCore", package: "UACWrapper")
             ],
             linkerSettings: [
                 .linkedLibrary("sqlite3"),
@@ -50,8 +50,9 @@ let package = Package(
                 "ScanSongKit",
                 "CGameMusicEmu",
                 .product(name: "MetaManCore", package: "MetaMan"),
-                .product(name: "VGMBoyFormatDataCore", package: "VGMBoy"),
-                .product(name: "VGMBoyKit", package: "VGMBoy")
+                .product(name: "VGMBoySNDH", package: "VGMBoy"),
+                .product(name: "VGMBoyLibVGMOracle", package: "VGMBoy"),
+                .product(name: "UACWrapperCore", package: "UACWrapper")
             ]
         )
     ],

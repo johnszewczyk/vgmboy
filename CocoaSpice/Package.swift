@@ -13,6 +13,7 @@ let package = Package(
     dependencies: [
         .package(path: "../CatalogReader"),
         .package(path: "../FrontendCore"),
+        .package(name: "UACWrapper", path: "../UACMan/Wrapper"),
         .package(path: "../VGMBoy")
     ],
     targets: [
@@ -35,7 +36,7 @@ let package = Package(
                 .product(name: "PlaybackTransportCore", package: "FrontendCore"),
                 .product(name: "ArchiveCacheCore", package: "FrontendCore"),
                 .product(name: "ArchiveMaterializationCore", package: "FrontendCore"),
-                .product(name: "UACContainerCore", package: "FrontendCore"),
+                .product(name: "UACWrapperCore", package: "UACWrapper"),
                 .product(name: "VGMBoyKit", package: "VGMBoy"),
                 .product(name: "VGMBoyEndpointCore", package: "VGMBoy")
             ],
@@ -50,7 +51,7 @@ let package = Package(
             name: "CocoaSpiceTests",
             dependencies: [
                 "CocoaSpice",
-                .product(name: "UACContainerCore", package: "FrontendCore")
+                .product(name: "UACWrapperCore", package: "UACWrapper")
             ],
             resources: [
                 .copy("cross-app-sidebar-search-view-v1.json"),

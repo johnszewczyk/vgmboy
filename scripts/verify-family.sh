@@ -5,12 +5,12 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FAMILY_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MODE="verify"
 RESULT_ROOT=""
-PROJECTS=(CatalogReader VGMBoy FrontendCore MetaMan UACMan ScanSong CocoaSpice SPCBoyWK)
+PROJECTS=(CatalogReader VGMBoy FrontendCore MetaMan UACMan UACMan/Wrapper ScanSong CocoaSpice SPCBoyWK)
 
 usage() {
   echo "Usage: $0 [--inventory-only] [--output-dir PATH]"
   echo
-  echo "Records the single VGMMan repository state and checks all eight packages."
+  echo "Records the single VGMMan repository state and checks all nine packages."
   echo "The default mode also runs the family package and renderer checks."
 }
 
@@ -181,6 +181,7 @@ if [[ "$MODE" == "verify" ]]; then
   run_check vgmboy-tests VGMBoy swift test --disable-sandbox --jobs 1
   run_check frontendcore-tests FrontendCore swift test --disable-sandbox
   run_check metaman-tests MetaMan swift test --disable-sandbox
+  run_check uac-wrapper-tests UACMan/Wrapper swift test --disable-sandbox
   run_check uacman-tests UACMan swift test --disable-sandbox
   run_check scansong-tests ScanSong swift test --disable-sandbox --jobs 1
   run_check cocoaspice-tests CocoaSpice swift test --disable-sandbox --jobs 1

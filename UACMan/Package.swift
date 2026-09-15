@@ -7,35 +7,47 @@ let package = Package(
     platforms: [.macOS(.v26)],
     products: [
         .library(name: "UACManCore", targets: ["UACManCore"]),
-        .executable(name: "UACManApp", targets: ["UACManApp"])
+        .executable(name: "UACManApp", targets: ["UACManApp"]),
+        .executable(name: "UACManMetadataCLI", targets: ["UACManMetadataCLI"])
     ],
     dependencies: [
-        .package(path: "../FrontendCore"),
+        .package(name: "UACWrapper", path: "Wrapper"),
         .package(path: "../MetaMan")
     ],
     targets: [
         .target(
             name: "UACManCore",
             dependencies: [
-                .product(name: "UACContainerCore", package: "FrontendCore"),
+                .product(name: "UACWrapperCore", package: "UACWrapper"),
                 .product(name: "MetaManCore", package: "MetaMan")
-            ]
+            ],
+            path: "Application/Sources/UACManCore"
         ),
         .executableTarget(
             name: "UACManApp",
             dependencies: [
                 "UACManCore",
-                .product(name: "UACContainerCore", package: "FrontendCore"),
+                .product(name: "UACWrapperCore", package: "UACWrapper"),
                 .product(name: "MetaManCore", package: "MetaMan")
-            ]
+            ],
+            path: "Application/Sources/UACManApp"
+        ),
+        .executableTarget(
+            name: "UACManMetadataCLI",
+            dependencies: [
+                "UACManCore",
+                .product(name: "UACWrapperCore", package: "UACWrapper")
+            ],
+            path: "Application/Sources/UACManMetadataCLI"
         ),
         .testTarget(
             name: "UACManCoreTests",
             dependencies: [
                 "UACManCore",
-                .product(name: "UACContainerCore", package: "FrontendCore"),
+                .product(name: "UACWrapperCore", package: "UACWrapper"),
                 .product(name: "MetaManCore", package: "MetaMan")
-            ]
+            ],
+            path: "Application/Tests/UACManCoreTests"
         )
     ],
     swiftLanguageModes: [.v6]

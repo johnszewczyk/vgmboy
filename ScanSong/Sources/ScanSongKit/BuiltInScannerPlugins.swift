@@ -39,7 +39,7 @@ public enum BuiltInScannerPlugins {
         .init(pluginID: "xa-direct", displayName: "Sony XA sector reader", supportedExtensions: ["xa"], structurePolicy: .enumerate, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "vgm-direct", displayName: "VGM/VGZ header reader", supportedExtensions: ["vgm", "vgz"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "s98-direct", displayName: "S98 header, tags, and event reader", supportedExtensions: ["s98"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
-        .init(pluginID: "psgplay", displayName: "PSGPlay", supportedExtensions: ["sndh"], structurePolicy: .enumerate, metadataPolicy: .direct, priority: 10),
+        .init(pluginID: "sndh-direct", displayName: "MetaMan SNDH reader", supportedExtensions: ["sndh"], structurePolicy: .enumerate, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "gsf-direct", displayName: "GSF PSF container reader", supportedExtensions: ["gsf", "minigsf"], structurePolicy: .dependencyEnumerate, metadataPolicy: .direct, priority: 10),
         .init(pluginID: "highly-theoretical", displayName: "Highly Theoretical", supportedExtensions: ["ssf", "minissf"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 10),
         .init(pluginID: "lazyusf", displayName: "LazyUSF", supportedExtensions: ["usf", "miniusf"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 10),
@@ -72,5 +72,5 @@ public enum BuiltInScannerPlugins {
         descriptors: directMetadataDescriptors + decoderMetadataDescriptors + deferredMetadataDescriptors
     )
 
-    public static let archiveExtensions: Set<String> = ["7z", "lha", "rar", "rsn", "tar.zst", "tar.zstd", "tzst", "zip", "zst", "zstd"]
+    public static let archiveExtensions: Set<String> = ["7z", "lha", "rar", "rsn", "tar.zst", "tar.zstd", "tzst", "uac", "zip", "zst", "zstd"]
 }

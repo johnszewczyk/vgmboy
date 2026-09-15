@@ -1,4 +1,4 @@
-# UACMan agent routing
+# UACMan
 
 ## Product
 
@@ -6,33 +6,33 @@ UACMan is the native macOS browser/editor for UAC package metadata.
 
 ## Major Components
 
-- `UACManCore`: format-neutral JSON editing, SPC metadata projection/harvest,
-  and seek-table checksum validation.
-- `UACManApp`: SPC member browser/editor, batch metadata tools, and the app-local
-  Zstandard command-line adapter.
+- `Application/`: `UACManApp`, metadata editing/projection, and the
+  MetaMan-backed creation-time metadata CLI.
+- `Wrapper/`: an independent Swift package for current `.uac`
+  TAR+seekable-Zstandard wrapper reading/writing, plus the Python
+  pack/inspect/unpack tool and wrapper tests.
+- `Container/`: reserved for a future native audio container; no native
+  replacement format is implemented here yet.
 - `MetaManCore`: read-only native format metadata extraction; UACMan consumes
   its SPC reader and never writes native SPC tag bytes.
-- `FrontendCore/UACContainerCore`: UAC envelope validation and byte-preserving
-  manifest rewrite.
 
 ## Task Routing
 
 - Visible browser/editor behavior: `subsystem-human/metadata-browser.md`.
 - Manifest editing and save invariants: `subsystem-agent/uac-editor.md`.
-- Binary contract and shared reader/writer: `../../FrontendCore/ai/subsystem-agent/uac-format.md`.
+- Current wrapper binary contract and reader/writer:
+  `subsystem-agent/uac-wrapper-format.md`.
+- Player and scanner consumer boundaries:
+  `subsystem-agent/player-integration.md`.
 
 ## Local Rules
 
+- ScanSong treats the UAC manifest as authoritative and does not open enclosed
+  native files to fill missing fields. Native SPC harvesting is an explicit
+  UACMan creation/editor action through MetaManCore, not a catalog fallback.
 - Metadata edits do not change the compressed payload or original member bytes.
-- Shared soundtrack facts live in `game.metadata`; track-specific projections,
-  ordered native tags, parser diagnostics/facts, and raw-block byte counts live
-  in `member.metadata`. The original native block bytes remain in the unchanged
-  SPC member payload rather than being duplicated in the manifest.
-- Import requires a seekable `tar+zstd-seekable` payload. It fills missing
-  values by default and promotes only unanimous complete fields to the shared
-  record; track-level projections are kept even when they agree.
-- The Zstandard process adapter is a prototype host integration, not a
-  bundled codec dependency.
+- MetaManCore owns native SPC tag reading; UACMan does not rewrite native
+  source-format tag bytes.
 
 ## Human Docs
 

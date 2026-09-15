@@ -3,7 +3,7 @@ import Dispatch
 import ArchiveCacheCore
 import ArchiveMaterializationCore
 import Foundation
-import UACContainerCore
+import UACWrapperCore
 
 enum ZipArchiveSupport {
     static var cacheDirectoryURL: URL { cacheRootURL() }

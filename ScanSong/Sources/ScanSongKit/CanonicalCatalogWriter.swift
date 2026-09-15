@@ -84,6 +84,8 @@ public struct CatalogTrackRecord: Sendable {
     public let trackIndex: Int
     public let trackCount: Int
     public let metadata: ScannerMetadata?
+    public let browserGameOverride: String?
+    public let browserSystemOverride: String?
 
     public init(
         sourcePath: String,
@@ -92,7 +94,9 @@ public struct CatalogTrackRecord: Sendable {
         fingerprint: ScanFingerprint,
         trackIndex: Int,
         trackCount: Int,
-        metadata: ScannerMetadata?
+        metadata: ScannerMetadata?,
+        browserGameOverride: String? = nil,
+        browserSystemOverride: String? = nil
     ) {
         self.sourcePath = sourcePath
         self.archiveEntry = archiveEntry
@@ -101,6 +105,8 @@ public struct CatalogTrackRecord: Sendable {
         self.trackIndex = trackIndex
         self.trackCount = trackCount
         self.metadata = metadata
+        self.browserGameOverride = browserGameOverride
+        self.browserSystemOverride = browserSystemOverride
     }
 }
 
@@ -690,12 +696,18 @@ public final class CanonicalCatalogWriter: @unchecked Sendable {
         let folderPath = record.archiveEntry == nil
             ? sourceURL.deletingLastPathComponent().path
             : sourceURL.deletingLastPathComponent().path
-        let browserGame = CatalogIdentity.browserGame(
-            metadataGame: record.metadata?.game ?? "",
-            sourcePath: record.sourcePath,
-            archiveEntry: record.archiveEntry
-        )
-        let browserSystem = CatalogIdentity.browserSystem(sourcePath: record.sourcePath, rootPath: rootPath)
+        let browserGameOverride = record.browserGameOverride?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let browserGame = browserGameOverride.flatMap { $0.isEmpty ? nil : $0 }
+            ?? CatalogIdentity.browserGame(
+                metadataGame: record.metadata?.game ?? "",
+                sourcePath: record.sourcePath,
+                archiveEntry: record.archiveEntry
+            )
+        let browserSystemOverride = record.browserSystemOverride?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let browserSystem = browserSystemOverride.flatMap { $0.isEmpty ? nil : $0 }
+            ?? CatalogIdentity.browserSystem(sourcePath: record.sourcePath, rootPath: rootPath)
         try execute(
             """
             INSERT INTO tracks
@@ -1009,7 +1021,7 @@ public enum CatalogIdentity {
 
     private static func stripArchiveExtension(_ name: String) -> String {
         let lower = name.lowercased()
-        for suffix in [".tar.zstd", ".tar.zst", ".tzst", ".zip", ".7z", ".rar", ".rsn", ".zstd", ".zst"] where lower.hasSuffix(suffix) {
+        for suffix in [".tar.zstd", ".tar.zst", ".tzst", ".uac", ".zip", ".7z", ".rar", ".rsn", ".zstd", ".zst"] where lower.hasSuffix(suffix) {
             let archiveBase = String(name.dropLast(suffix.count))
             let playableURL = URL(fileURLWithPath: archiveBase)
             if BuiltInScannerPlugins.registry.route(pathExtension: playableURL.pathExtension) != nil {
@@ -1019,4 +1031,5 @@ public enum CatalogIdentity {
         }
         return URL(fileURLWithPath: name).deletingPathExtension().lastPathComponent
     }
+
 }

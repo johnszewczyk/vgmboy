@@ -6,7 +6,6 @@ let package = Package(
     name: "FrontendCore",
     platforms: [.macOS(.v26)],
     products: [
-        .library(name: "UACContainerCore", targets: ["UACContainerCore"]),
         .library(name: "ArchiveMaterializationCore", targets: ["ArchiveMaterializationCore"]),
         .library(name: "ArchiveCacheCore", targets: ["ArchiveCacheCore"]),
         .library(name: "LocalFileBrowserCore", targets: ["LocalFileBrowserCore"]),
@@ -19,15 +18,15 @@ let package = Package(
         .library(name: "PlaybackTransportCore", targets: ["PlaybackTransportCore"])
     ],
     dependencies: [
-        .package(path: "../VGMBoy")
+        .package(path: "../VGMBoy"),
+        .package(name: "UACWrapper", path: "../UACMan/Wrapper")
     ],
     targets: [
-        .target(name: "UACContainerCore"),
         .target(
             name: "ArchiveMaterializationCore",
             dependencies: [
                 "ArchiveCacheCore",
-                "UACContainerCore",
+                .product(name: "UACWrapperCore", package: "UACWrapper"),
                 .product(name: "VGMBoyFormatCore", package: "VGMBoy")
             ]
         ),
@@ -52,7 +51,6 @@ let package = Package(
             ]
         ),
         .testTarget(name: "ArchiveMaterializationCoreTests", dependencies: ["ArchiveMaterializationCore"]),
-        .testTarget(name: "UACContainerCoreTests", dependencies: ["UACContainerCore"]),
         .testTarget(name: "ArchiveCacheCoreTests", dependencies: ["ArchiveCacheCore"]),
         .testTarget(name: "LocalFileBrowserCoreTests", dependencies: ["LocalFileBrowserCore"]),
         .testTarget(name: "FavoriteTrackCoreTests", dependencies: ["FavoriteTrackCore"]),

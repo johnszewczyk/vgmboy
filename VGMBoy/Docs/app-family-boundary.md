@@ -24,9 +24,10 @@ inspection builds for the CocoaSpice, SPCBoy WK, and ScanSong products.
   and audio output.
 - ScanSong receives scanner executables from VGMBoy and never invokes a player frontend or a
   frontend-owned plugin helper.
-- `VGMBoyFormatDataCore` contains only bounded Foundation byte readers for
-  metadata facts that do not require a playback decoder. ScanSong may consume
-  this narrow product without acquiring VGMBoyKit or any decoder linkage.
+- ScanSong consumes complete decoder-independent format metadata through
+  MetaManCore. VGMBoy owns playback decoders and the narrow inspection
+  executables required for formats that still need decoder-backed enumeration;
+  ScanSong does not link VGMBoyKit.
 - Shared decoder source, compatibility patches, and dependency builds live in VGMBoy. The
   frontends do not carry duplicate decoder source trees or plugin build scripts.
 

@@ -1,8 +1,8 @@
 import Foundation
-import UACContainerCore
+import UACWrapperCore
 
 /// Host-side Zstandard adapter for UAC's independently compressed manifest.
-/// UACContainerCore owns the format contract; CocoaSpice owns executable
+/// UACWrapperCore owns the format contract; CocoaSpice owns executable
 /// discovery and enforces the declared output and decoder-memory bounds.
 enum UACManifestFrameCodec {
     static var decoder: UACManifestFrameDecoder {

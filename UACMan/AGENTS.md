@@ -1,8 +1,10 @@
 # UACMan instructions
 
-Read `project-info.md`, then `ai/AGENTS.md`, then `ai/project-info.md`, and
-follow the specific human or agent subsystem route for the task.
+Read `ai/project-info.md`, then `ai/AGENTS.md`, then the routed subsystem
+note. There is no root-level `project-info.md` in this component.
 
-Keep UACMan a package browser/editor, not a player or native-format parser.
-Use FrontendCore for UAC binary parsing and payload-preserving rewrites. Never
-rebuild, decompress, retag, or recompress payload members for a manifest edit.
+UACMan owns three distinct boundaries: the metadata application, the current
+reversible archive wrapper, and a reserved future native-container component.
+Keep native tag reading in MetaMan and playback in VGMBoy/CocoaSpice. Wrapper
+manifest edits must preserve payload members byte-for-byte; do not rebuild,
+decompress, retag, or recompress them to change metadata.
