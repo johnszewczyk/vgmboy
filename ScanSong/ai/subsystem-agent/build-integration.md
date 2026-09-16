@@ -16,7 +16,7 @@ executables.
   in-process metadata readers. `VGMBoySNDH` is a test-only decoder oracle.
 - ScanSong consumes the local sibling `MetaManCore` Swift package for APE, ADX,
   AUS, ATRAC3, Sony MSF, Sony SSHD/ADS, headerless PlayStation MIB,
-  Konami/SNK SVAG and XMD, Nintendo DSP/RS03/THP, Nintendo DS STRM, SID, SPC, SNDH,
+  Nintendo DTK and TXTH-described IMA ADP, Konami/SNK SVAG and XMD, Nintendo DSP/RS03/THP, Nintendo DS STRM, SID, SPC, SNDH,
   S98, VGM/VGZ,
   PSF-family, GSF, and QSF metadata.
   MetaManCore owns bounded VGZ gzip expansion and has no
@@ -66,6 +66,10 @@ executables.
   PS-ADPCM probe and timing reader and never start `vgmstream-cli`; invalid
   `.mib` probes retain the helper route. The distinct `.mib`/`.mih` bank layout
   is not silently classified as headerless MIB.
+- Validated headerless Nintendo DTK and exact TXTH-described IMA `.adp`
+  payloads use MetaManCore's in-process reader and never start `vgmstream-cli`.
+  Unknown `.adp` aliases retain the helper route; the hidden TXTH sidecar is
+  metadata context and never becomes a duplicate scan item.
 - Bink `.bika` metadata is read through MetaManCore's complete container
   header/frame/packet walk; Bink playback remains in VGMBoy and `.bik`/`.bk2`
   movie inspection remains on vgmstream.

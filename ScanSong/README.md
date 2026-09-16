@@ -195,6 +195,10 @@ error.
 - Self-contained Bink `.bika` container headers, frame offsets, and packet
   sample counts are read through MetaManCore without starting the Bink decoder;
   `.bik`/`.bk2` movies remain on the vgmstream playback/inspection route.
+- Mixed `.adp` inputs are content-routed: headerless Nintendo GameCube DTK and
+  exact `.adp.txth`-described raw IMA are read by MetaManCore, while unrelated
+  `.adp` aliases remain on vgmstream. The direct reader retains the DTK probe
+  or TXTH sidecar and never publishes a partial layout.
 - Nintendo DS standard STRM and Final Fantasy Tactics A2 RIFF/IMA metadata
   through MetaManCore; only validated layouts leave the `.strm` decoder route,
   and unrelated aliases retain vgmstream fallback.

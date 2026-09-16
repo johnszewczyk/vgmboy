@@ -794,6 +794,66 @@ vgmstream route. The live corpus contains 327 files in eight archives, all
 with no `.mih` companion entries. See
 [MIBMetadataReader.swift](Sources/MetaManCore/MIBMetadataReader.swift).
 
+### Mixed ADP layouts
+
+The `.adp` suffix is shared by unrelated decoder formats. MetaMan claims only
+the two layouts that can be completely identified from the source and its
+declared companion. ScanSong probes the content before selecting
+`adp-direct`; an unrecognized `.adp` remains on vgmstream rather than being
+partially extracted.
+
+#### Headerless Nintendo GameCube DTK
+
+This is the GameCube DVD hardware DTK stream with no file header. The probe is
+the same bounded signature used by the reference decoder: ten complete frames,
+or `0x140` bytes, must be available. Every frame has a 0x20-byte stride; the
+first header byte has an index nibble no greater than 4 and a shift nibble no
+greater than `0x0C`, bytes `+0x00/+0x01` repeat at `+0x02/+0x03`, and no more
+than three of the ten headers may be `0x0000`.
+
+| Offset / scope | Width / encoding | Meaning |
+| --- | --- | --- |
+| `0x00` of each `0x20`-byte frame | u8 | Predictor/index and shift header; high nibble `0..4`, low nibble `0..0x0C`. |
+| `0x01` of each frame | u8 | Second header byte; it must repeat at `+0x03`. |
+| `0x02..0x03` of each frame | 2 bytes | Error-correction repeat of the first two header bytes. |
+| `0x04..0x1F` of each frame | 28 bytes | Nintendo DTK encoded payload; the reader does not decode it. |
+| `0x00..0x13F` | 0x140 bytes | Required ten-frame bounded probe. |
+| Full file | — | `floor(fileBytes / 0x20) * 28` stereo samples at 48,000 Hz; there are no embedded tags or loops. |
+
+The live DTK corpus contains 175 `.adp` members. The first frame is retained
+as `dtkProbeHeader`; the filename stem is the only available visible title.
+
+#### Raw IMA with `.adp.txth`
+
+The Contra archive stores raw IMA bytes and a hidden `.ADP.txth` sidecar. The
+sidecar is not a source track; it is the complete layout declaration for the
+adjacent `.ADP` members. MetaMan accepts the exact supported directive set
+below, retains the original sidecar bytes, and rejects additional directives
+until their semantics can also be represented completely.
+
+| Sidecar directive | Value / meaning |
+| --- | --- |
+| `codec` | `IMA`; 4-bit IMA ADPCM. |
+| `sample_rate` | Positive sample rate in Hz; the live sidecar declares `48000`. |
+| `channels` | One or two interleaved channels; the live sidecar declares mono. |
+| `num_samples` | Must be `data_size`; for IMA this is converted to `fileBytes * 2 / channels` samples. |
+| Sidecar extent | UTF-8 text, bounded to 64 KiB, beside the source as `.adp.txth` case-insensitively. |
+
+The live sidecar contains no title, artist, game, loop, or fade metadata, so
+the source filename supplies the title and timing is finite. The nine live
+TXTH-described files are not confused with headerless DTK even though both
+use `.adp`.
+
+The live read-only comparison covered all 184 `.adp` rows/files: direct
+MetaMan, the ScanSong adapter, the saved catalog, and fresh vgmstream matched
+exactly. Release inspection averaged 0.129 ms/file directly versus 96.569
+ms/file through the CLI, including per-file process startup. These are local
+corpus measurements, not a whole-scan or cross-machine guarantee.
+
+See [ADPMetadataReader.swift](Sources/MetaManCore/ADPMetadataReader.swift)
+and the reference dispatch in
+[`ngc_adpdtk.c`](../VGMBoy/vendor/vgmstream/src/meta/ngc_adpdtk.c).
+
 ### Bink audio containers (`.bika`)
 
 The live `.bika` members are self-contained RAD Game Tools Bink containers

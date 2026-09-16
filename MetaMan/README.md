@@ -11,6 +11,7 @@ SPC ID666/xID6, SID PSID/RSID, APE, CRI/Monster ADX,
 Atomic Planet AUS, RIFF ATRAC3/ATRAC3+, Sony MSF, Sony SSHD/ADS,
 Konami/SNK SVAG, Konami XMD v1/v2, Sony CD-XA, headerless PlayStation MIB,
 Bink audio containers,
+headerless Nintendo GameCube DTK and exact TXTH-described IMA ADP streams,
 standard Nintendo DS STRM, Final Fantasy Tactics A2 RIFF/IMA, Nintendo DSP,
 Retro Studios RS03, and Nintendo THP audio readers. SAP enumerates declared
 subtunes from ordered header directives and retains native `TIME` hints. The
@@ -52,6 +53,8 @@ fixed offsets or that the decoder is needed to locate every field.
 | Sony SSHD / ADS | Direct `SShd` header and bounded PS-ADPCM/PCM/DVI-IMA frame-timing reader; no audio decoder | Codec/channel/rate/interleave facts, wrapper/header bytes, encoded-body bounds, decoder-compatible loop-address handling, and scanner timing; nonmatching `.ads` aliases are not claimed | Not implemented |
 | Headerless PlayStation MIB | Direct PS-ADPCM frame probe and channel/interleave/loop inference; no audio decoder | Extension-defined 44.1 kHz, raw probe block, inferred layout, decoder-compatible sample/timing facts, and filename fallback; `.mib` files that fail the probe remain on vgmstream fallback | Not implemented |
 | Bink audio (`.bika`) | Direct Bink header, offset-table, and audio-packet walk; no Bink decoder | Filename fallback, retained container header, stream/channel/rate facts, decoded sample count, and packet-derived finite duration; `.bik` movie inputs remain outside this reader | Not implemented |
+| Nintendo GameCube DTK (`.adp`) | Direct first-ten-frame headerless DTK probe and frame/sample arithmetic; no decoder | Filename fallback, raw probe frame, stereo/48 kHz facts, and finite duration; unknown `.adp` aliases remain on vgmstream | Not implemented |
+| TXTH-described IMA (`.adp` + `.adp.txth`) | Direct bounded TXTH directive parser and IMA bytes-to-samples arithmetic; no decoder | Retained sidecar, ordered directives, codec/channel/rate facts, and finite duration; unsupported TXTH directives remain on vgmstream | Not implemented |
 | Sony CD-XA | Direct raw-sector and RIFF/CDXA parser; no ADPCM decoder | Ordered file/channel subsongs, sector/sample facts, and sector-derived duration; unrelated `.xa` aliases are not claimed | Not implemented |
 | Nintendo DS STRM | Direct standard `STRM`/`HEAD`/`DATA` container and sample-header reader; no playback core | Codec, channels, rate, sample/loop counts, interleave facts, exact header blocks, and scanner-compatible sample timing | Not implemented |
 | Nintendo DS FFTA2 STRM | Direct Square Enix RIFF/IMA fixed-header reader; no playback core | Header-derived sample count, channel/rate/loop facts, exact header block, and scanner-compatible sample timing; supports `.bin` and `.strm` | Not implemented |
@@ -445,6 +448,29 @@ for the CLI, including its per-file process startup. These are local per-file
 measurements, not a whole-scan or cross-machine guarantee. See the
 [MIB layout](FORMAT-LAYOUTS.md#headerless-playstation-mib).
 
+### Mixed `.adp` layouts
+
+`.adp` is a collision extension rather than one format. ScanSong content-probes
+it and routes only complete layouts to MetaMan: headerless Nintendo GameCube
+DTK, or raw IMA accompanied by an exact `.adp.txth` declaration. Other
+`.adp` signatures remain on the vgmstream fallback, so the direct route never
+publishes a partial interpretation. In the live CocoaSpice catalog, 175 of
+184 `.adp` members are Nintendo DTK streams and the remaining nine are the
+Contra archive's raw mono IMA members with its hidden `.ADP.txth` sidecar.
+
+The DTK reader preserves the first frame as a probe block and derives
+`floor(fileBytes / 0x20) * 28` stereo samples at 48 kHz. The TXTH reader
+supports the complete live declaration `codec = IMA`, `sample_rate`,
+`channels`, and `num_samples = data_size`; it retains the original sidecar
+and applies IMA's two samples per byte per channel. See the
+[ADP layout](FORMAT-LAYOUTS.md#mixed-adp-layouts).
+
+The read-only live comparison covered all 184 `.adp` rows/files: direct
+MetaMan, the ScanSong adapter, the saved catalog, and fresh vgmstream matched
+exactly. Release inspection averaged 0.129 ms/file directly versus 96.569
+ms/file through the CLI, including per-file process startup. This is local
+corpus evidence, not a whole-scan or cross-machine guarantee.
+
 ## Use
 
 ```swift
@@ -490,7 +516,8 @@ MetaMan has no dependency on ScanSong, VGMBoy, or a playback decoder. ScanSong
 adapts `MetadataDocument` into its catalog schema; other clients can consume
 the same library result directly. The current registry contains AY, SAP,
 NSF/GBS/NSFE, HES, SNDH, KSS, S98, VGM/VGZ, SPC, SID, APE, ADX, AUS, ATRAC3,
-Sony MSF, Sony SSHD/ADS, headerless PlayStation MIB, Konami/SNK SVAG, Sony XA, PSF/PSF2/SSF/USF/2SF, GSF/miniGSF, and
+Sony MSF, Sony SSHD/ADS, headerless PlayStation MIB, Nintendo DTK and
+TXTH-described IMA ADP, Konami/SNK SVAG, Sony XA, PSF/PSF2/SSF/USF/2SF, GSF/miniGSF, and
 QSF/miniQSF readers.
 SNDH is now fully read by MetaManCore; VGMBoy's old SNDH wrapper remains only as
 a test oracle while PSGPlay remains available for playback. KSS has also moved

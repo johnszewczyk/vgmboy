@@ -109,7 +109,7 @@ func s98MalformedInputsFailSafely() throws {
 @Test("All registered formats identify their direct metadata-reading boundary")
 func supportedFormatsAreRegisteredAsDirectFormatDataParsers() {
     let formats = MetaManCore.supportedFormats
-    #expect(formats.map(\.identifier) == ["ay", "sap", "nsf", "gbs", "nsfe", "hes", "sndh", "kss", "s98", "vgm", "psf-family", "gsf", "qsf", "spc", "sid", "ape", "adx", "aus", "at3", "msf", "svag", "xmd", "sony-sshd", "ps-headerless-mib", "bink-audio", "xa", "nds-strm", "nds-strm-ffta2", "ngc-dsp-standard", "rs03", "ngc-thp-audio"])
+    #expect(formats.map(\.identifier) == ["ay", "sap", "nsf", "gbs", "nsfe", "hes", "sndh", "kss", "s98", "vgm", "psf-family", "gsf", "qsf", "spc", "sid", "ape", "adx", "aus", "at3", "msf", "svag", "xmd", "sony-sshd", "ps-headerless-mib", "bink-audio", "ngc-dtk-adp", "txth-ima-adp", "xa", "nds-strm", "nds-strm-ffta2", "ngc-dsp-standard", "rs03", "ngc-thp-audio"])
     let byID = Dictionary(uniqueKeysWithValues: formats.map { ($0.identifier, $0) })
     #expect(byID["ay"]?.fileExtensions == ["ay"])
     #expect(byID["ay"]?.methodology.contains("no playback decoder") == true)

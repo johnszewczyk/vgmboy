@@ -91,6 +91,10 @@
   VGM/VGZ, and PSF-family metadata parsing, including bounded VGZ decompression
   and named source metadata blocks.
   These routes do not link `VGMBoyKit` or start a playback decoder.
+- MetaManCore owns the complete metadata projection for identifiable `.adp`
+  layouts: headerless Nintendo DTK and exact `.adp.txth` raw IMA. ScanSong
+  content-probes the collision extension; unknown `.adp` aliases remain on
+  vgmstream, and the sidecar remains dependency context rather than a scan row.
 - AY, SAP, APE, ADX, AUS, ATRAC3, SVAG, SID, SPC, S98, VGM/VGZ, and PSF-family metadata are
   parsed by the sibling `MetaManCore` package. It preserves ordered tags and source bytes
   (including separately named ID666 and xID6 SPC blocks), with a ScanSong-only
@@ -257,7 +261,7 @@
   Outer-file tags take priority for playable length; `intro_length_ms` retains
   the prior nested-tag contract. GSF/miniGSF exposes one validated track/file.
   Dependency-enumerated formats without their own plugin fail explicitly.
-- GameCube intake is fixture-backed: primary DSP, ADP, AGSC, H4M, LDAT,
+- GameCube intake is fixture-backed: primary DSP, AGSC, H4M, LDAT,
   LOGG, RSF, THP, and TXTP members route through the bundled vgmstream
   inspector. Extracted TXTH files, including archive-specific `_.ext.txth`
   aliases normalized to `.<ext>.txth`, and bank/data files remain dependencies
