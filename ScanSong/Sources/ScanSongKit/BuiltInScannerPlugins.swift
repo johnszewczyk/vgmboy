@@ -16,7 +16,7 @@ public enum BuiltInScannerPlugins {
     )
 
     public static let directVGMStreamExtensions =
-        VGMStreamFormatManifest.directScannerExtensions.subtracting(["ads", "adx", "at3", "aus", "mib", "msf", "strm", "svag", "xa", "xmd"])
+        VGMStreamFormatManifest.directScannerExtensions.subtracting(["ads", "adx", "at3", "aus", "bika", "mib", "msf", "strm", "svag", "xa", "xmd"])
 
     // Keep scanner methodologies visible at the route declaration site.
     // `.direct` means no playback decoder process is needed; a format may
@@ -39,6 +39,7 @@ public enum BuiltInScannerPlugins {
         .init(pluginID: "xmd-direct", displayName: "MetaMan Konami XMD reader", supportedExtensions: ["xmd"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "sshd-direct", displayName: "MetaMan Sony SSHD/ADS reader", supportedExtensions: ["ads"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "mib-direct", displayName: "MetaMan headerless PlayStation PS-ADPCM reader", supportedExtensions: ["mib"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
+        .init(pluginID: "bink-audio-direct", displayName: "MetaMan Bink audio header reader", supportedExtensions: ["bika"], structurePolicy: .enumerate, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "dsp-direct", displayName: "MetaMan Nintendo DSP/RS03/THP readers", supportedExtensions: ["dsp"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "nds-strm-direct", displayName: "MetaMan Nintendo DS STRM reader", supportedExtensions: ["strm"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "xa-direct", displayName: "Sony XA sector reader", supportedExtensions: ["xa"], structurePolicy: .enumerate, metadataPolicy: .direct, priority: 20),

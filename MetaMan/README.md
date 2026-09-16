@@ -10,6 +10,7 @@ VGM/VGZ, generic PSF-style tags, complete GSF/miniGSF and QSF/miniQSF,
 SPC ID666/xID6, SID PSID/RSID, APE, CRI/Monster ADX,
 Atomic Planet AUS, RIFF ATRAC3/ATRAC3+, Sony MSF, Sony SSHD/ADS,
 Konami/SNK SVAG, Konami XMD v1/v2, Sony CD-XA, headerless PlayStation MIB,
+Bink audio containers,
 standard Nintendo DS STRM, Final Fantasy Tactics A2 RIFF/IMA, Nintendo DSP,
 Retro Studios RS03, and Nintendo THP audio readers. SAP enumerates declared
 subtunes from ordered header directives and retains native `TIME` hints. The
@@ -50,6 +51,7 @@ fixed offsets or that the decoder is needed to locate every field.
 | Konami XMD v1/v2 | Direct 12-byte Silent Hill 4 or 17-byte Castlevania header reader; audio payload is not read by the file-URL API | Raw header, channels/rate/data extent, ADPCM frame/sample counts, loop facts, and the scanner's two-pass/10-second-fade duration projection | Not implemented |
 | Sony SSHD / ADS | Direct `SShd` header and bounded PS-ADPCM/PCM/DVI-IMA frame-timing reader; no audio decoder | Codec/channel/rate/interleave facts, wrapper/header bytes, encoded-body bounds, decoder-compatible loop-address handling, and scanner timing; nonmatching `.ads` aliases are not claimed | Not implemented |
 | Headerless PlayStation MIB | Direct PS-ADPCM frame probe and channel/interleave/loop inference; no audio decoder | Extension-defined 44.1 kHz, raw probe block, inferred layout, decoder-compatible sample/timing facts, and filename fallback; `.mib` files that fail the probe remain on vgmstream fallback | Not implemented |
+| Bink audio (`.bika`) | Direct Bink header, offset-table, and audio-packet walk; no Bink decoder | Filename fallback, retained container header, stream/channel/rate facts, decoded sample count, and packet-derived finite duration; `.bik` movie inputs remain outside this reader | Not implemented |
 | Sony CD-XA | Direct raw-sector and RIFF/CDXA parser; no ADPCM decoder | Ordered file/channel subsongs, sector/sample facts, and sector-derived duration; unrelated `.xa` aliases are not claimed | Not implemented |
 | Nintendo DS STRM | Direct standard `STRM`/`HEAD`/`DATA` container and sample-header reader; no playback core | Codec, channels, rate, sample/loop counts, interleave facts, exact header blocks, and scanner-compatible sample timing | Not implemented |
 | Nintendo DS FFTA2 STRM | Direct Square Enix RIFF/IMA fixed-header reader; no playback core | Header-derived sample count, channel/rate/loop facts, exact header block, and scanner-compatible sample timing; supports `.bin` and `.strm` | Not implemented |

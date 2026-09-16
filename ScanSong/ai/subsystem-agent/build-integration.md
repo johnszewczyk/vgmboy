@@ -66,6 +66,9 @@ executables.
   PS-ADPCM probe and timing reader and never start `vgmstream-cli`; invalid
   `.mib` probes retain the helper route. The distinct `.mib`/`.mih` bank layout
   is not silently classified as headerless MIB.
+- Bink `.bika` metadata is read through MetaManCore's complete container
+  header/frame/packet walk; Bink playback remains in VGMBoy and `.bik`/`.bk2`
+  movie inspection remains on vgmstream.
 - Validated Konami XMD v1/v2 headers use MetaManCore's in-process reader and
   never start `vgmstream-cli`; unrecognized `.xmd` payloads retain the helper
   route.

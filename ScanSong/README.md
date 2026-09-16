@@ -192,6 +192,9 @@ error.
   eight-archive live corpus matches the saved catalog and fresh vgmstream
   inspection; invalid `.mib` probes retain vgmstream fallback. The separate
   `.mib`/`.mih` bank layout is not conflated with this route.
+- Self-contained Bink `.bika` container headers, frame offsets, and packet
+  sample counts are read through MetaManCore without starting the Bink decoder;
+  `.bik`/`.bk2` movies remain on the vgmstream playback/inspection route.
 - Nintendo DS standard STRM and Final Fantasy Tactics A2 RIFF/IMA metadata
   through MetaManCore; only validated layouts leave the `.strm` decoder route,
   and unrelated aliases retain vgmstream fallback.

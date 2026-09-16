@@ -125,6 +125,11 @@ public enum MetaManCore {
             methodology: "Direct headerless PlayStation PS-ADPCM frame probe with vgmstream-compatible channel, interleave, loop, and timing inference; no playback decoder."
         ),
         MetadataFormatDescriptor(
+            identifier: "bink-audio",
+            fileExtensions: BinkAudioMetadataReader.supportedExtensions,
+            methodology: "Direct Bink container header, frame-offset, and audio-packet walk for stream timing; no Bink decoder."
+        ),
+        MetadataFormatDescriptor(
             identifier: "xa",
             fileExtensions: ["xa"],
             methodology: "Direct Sony CD-XA sector walk for interleaved file/channel subsongs and sample timing; validates raw-sector frames without decoding audio and does not claim unrelated .xa aliases."
@@ -178,6 +183,9 @@ public enum MetaManCore {
         if fileURL.pathExtension.lowercased() == "mib" {
             return try MIBMetadataReader.read(fileURL: fileURL)
         }
+        if fileURL.pathExtension.lowercased() == "bika" {
+            return try BinkAudioMetadataReader.read(fileURL: fileURL)
+        }
         let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
         return try read(
             data: data,
@@ -213,6 +221,9 @@ public enum MetaManCore {
         if formatHint == "mib" {
             let document = try MIBMetadataReader.read(fileURL: fileURL)
             return MetadataReadResult(tracks: [MetadataTrack(document: document)])
+        }
+        if formatHint == "bika" {
+            return try BinkAudioMetadataReader.readResult(fileURL: fileURL)
         }
         if formatHint != "svag" {
             let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
@@ -278,6 +289,9 @@ public enum MetaManCore {
         if normalizedFormat == "sap" || (normalizedFormat == nil && SAPMetadataReader.matches(data)) {
             return try SAPMetadataReader.readResult(data: data, displayName: displayName)
         }
+        if normalizedFormat == "bika" || (normalizedFormat == nil && BinkAudioMetadataReader.matches(data)) {
+            return try BinkAudioMetadataReader.readResult(data: data, displayName: displayName)
+        }
         let document = try read(data: data, formatHint: formatHint, displayName: displayName)
         return MetadataReadResult(tracks: [MetadataTrack(document: document)])
     }
@@ -294,6 +308,7 @@ public enum MetaManCore {
         case "xmd": KonamiXMDMetadataReader.supports(fileURL: fileURL)
         case "ads": SonySSHDMetadataReader.supports(fileURL: fileURL)
         case "mib": MIBMetadataReader.supports(fileURL: fileURL)
+        case "bika": BinkAudioMetadataReader.supports(fileURL: fileURL)
         case "dsp": NintendoDSPMetadataReader.supports(fileURL: fileURL)
         case "xa": SonyXAMetadataReader.supports(fileURL: fileURL)
         case "strm":
@@ -442,6 +457,10 @@ public enum MetaManCore {
 
         if normalizedFormat == "mib" || (normalizedFormat == nil && MIBMetadataReader.matches(data)) {
             return try MIBMetadataReader.read(data: data, displayName: displayName)
+        }
+
+        if normalizedFormat == "bika" || (normalizedFormat == nil && BinkAudioMetadataReader.matches(data)) {
+            return try BinkAudioMetadataReader.read(data: data, displayName: displayName)
         }
 
         if normalizedFormat == "dsp" || (normalizedFormat == nil && NintendoDSPMetadataReader.matches(data)) {

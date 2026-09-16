@@ -191,6 +191,28 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
             return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+        case "bink-audio-direct":
+            let result: MetadataReadResult
+            do {
+                result = try MetaManCore.readResult(fileURL: fileURL)
+            } catch let error as MetadataReadError {
+                throw ScannerInspectionError.malformedFile(error.localizedDescription)
+            } catch {
+                throw ScannerInspectionError.library(
+                    "Could not read Bink audio source \(fileURL.lastPathComponent): \(error.localizedDescription)"
+                )
+            }
+            let tracks = result.tracks.enumerated().map { index, track in
+                ScanTrackMetadata(
+                    trackIndex: index,
+                    trackCount: result.tracks.count,
+                    metadata: ScannerMetadata(
+                        metadataDocument: track.document,
+                        includeDateAndEncodedByInComment: false
+                    )
+                )
+            }
+            return ScanInspection(route: route, tracks: tracks)
         case "dsp-direct":
             let document: MetadataDocument
             do {

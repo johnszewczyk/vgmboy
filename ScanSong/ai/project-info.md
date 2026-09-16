@@ -16,6 +16,7 @@ publication. The product is the sole catalog writer consumed by CocoaSpice and S
 - `MetaManCore` — shared decoder-independent metadata reading for AY, SAP,
   NSF/GBS/NSFE, HES/M3U, APE, ADX, AUS,
   RIFF ATRAC3/ATRAC3+, Sony MSF, Sony SSHD/ADS, headerless PlayStation MIB,
+  Bink audio containers,
   Konami/SNK SVAG and XMD, Nintendo DSP/RS03/THP, Sony XA, SID PSID/RSID,
   SPC ID666/xID6, S98, VGM/VGZ, and PSF/PSF2/SSF/USF/2SF tag footers. ScanSong maps neutral
   ordered track documents to schema 23. All complete direct format readers
@@ -64,6 +65,10 @@ PS-ADPCM probe and decoder-compatible channel/interleave/loop/timing inference;
 invalid probes retain vgmstream fallback. The separate `.mib`/`.mih` bank
 layout is not conflated with the live headerless route. Playback remains in
 VGMBoy.
+Bink `.bika` members use MetaManCore's complete container, frame-offset, and
+audio-packet sample-count walk; the live 68-file corpus matches the saved
+catalog and fresh vgmstream inspection. Bink playback remains in VGMBoy, while
+`.bik`/`.bk2` movie inspection remains on the vgmstream route.
 
 ## Task Routing
 

@@ -794,6 +794,47 @@ vgmstream route. The live corpus contains 327 files in eight archives, all
 with no `.mih` companion entries. See
 [MIBMetadataReader.swift](Sources/MetaManCore/MIBMetadataReader.swift).
 
+### Bink audio containers (`.bika`)
+
+The live `.bika` members are self-contained RAD Game Tools Bink containers
+with their extension changed to distinguish demuxed audio members from movie
+`.bik` inputs. MetaMan reads the container header, stream table, frame-offset
+table, and audio-packet headers; it never runs the Bink transform decoder.
+The packet walk is required because Bink audio is variable-sized and the main
+header does not store the decoded sample count.
+
+| Offset / scope | Width / encoding | Meaning |
+| --- | --- | --- |
+| `0x00` | 4 bytes, big-endian | `BIK` or `KB2` signature plus the revision byte. |
+| `0x04` | u32 LE | Declared file size minus eight; it must equal the physical file size minus eight. |
+| `0x08` | u32 LE | Video frame count; the direct reader bounds it to one million before walking the offset table. |
+| `0x0C` | u32 LE | Largest frame size, retained as a source fact when clients need it. |
+| `0x10` | u32 LE | Repeated frame count used by Bink files; it is retained in the raw header but does not replace `0x08`. |
+| `0x14`, `0x18` | s32 LE each | Video width and height. |
+| `0x1C`, `0x20` | u32 LE each | Video frame-rate dividend and divisor. |
+| `0x24` | u32 LE | Video flags. Bit `0x000004` inserts six 16-bit values; bit `0x010000` inserts twelve 16-bit values before the audio tables. |
+| `0x28` | s32 LE | Number of audio streams, bounded to 1..256. |
+| After `0x2C` | optional u32 and variable blocks | BIK revisions `k+` or KB2 revisions `i+` add a color-flags word; the video-flag blocks follow when present. |
+| Stream table 1 | u32 LE per stream | Maximum packet sizes. |
+| Stream table 2 | u16 LE + u16 LE per stream | Sample rate and audio flags. Flag `0x2000` selects stereo; flag `0x1000` identifies DCT rather than RDFT audio. |
+| Stream table 3 | u32 LE per stream | Native stream IDs. |
+| Frame-offset table | u32 LE per frame | Absolute frame offsets; the low keyframe bit is masked before seeking. A trailing u32 repeats the declared physical file size. |
+| Each frame, per audio stream | u32 LE | Audio packet size excluding this size field. |
+| Each non-empty audio packet +`0x04` | u32 LE | Decoded byte count for that packet; summing this value and dividing by `2 * channels` yields decoded samples. |
+| Full file | — | `play_length_ms = decodedSampleCount * 1000 / sampleRate`; Bink inputs have no decoder-reported loop markers in this route. |
+
+MetaMan publishes one ordered `MetadataTrack` per audio stream. The legacy
+vgmstream Bink parser uses the same frame-offset and packet-sample walk, so the
+reader can be completely independent for metadata while Bink playback remains
+in VGMBoy. The live one-archive corpus contains 68 `.bika` files: all 68 direct
+rows match the saved catalog, all 68 decoder rows match it, and all 68 direct
+rows match the fresh vgmstream reference. Release inspection averaged
+3.118 ms/file directly versus 91.143 ms/file through the CLI reference.
+`.bik`/`.bk2` movie extensions remain on the vgmstream playback/inspection
+boundary and are not silently claimed by the `.bika` metadata reader.
+
+See [BinkAudioMetadataReader.swift](Sources/MetaManCore/BinkAudioMetadataReader.swift).
+
 ## What this says about decoder independence
 
 For some formats the answer really is a header/tag layout plus bounded parsing.
