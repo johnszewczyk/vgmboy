@@ -6,7 +6,8 @@ is a thin JSON interface for scripting and support work. Applications should
 import the library rather than shelling out to the CLI.
 
 MetaMan currently has complete AY, SAP, NSF, GBS, NSFE, HES, SNDH, KSS, S98,
-VGM/VGZ, generic PSF-style tags, complete GSF/miniGSF, SPC ID666/xID6, SID PSID/RSID, APE, CRI/Monster ADX,
+VGM/VGZ, generic PSF-style tags, complete GSF/miniGSF and QSF/miniQSF,
+SPC ID666/xID6, SID PSID/RSID, APE, CRI/Monster ADX,
 Atomic Planet AUS, RIFF ATRAC3/ATRAC3+, Sony MSF, Konami/SNK SVAG, and Sony
 CD-XA readers. SAP enumerates declared
 subtunes from ordered header directives and retains native `TIME` hints. The
@@ -35,6 +36,7 @@ fixed offsets or that the decoder is needed to locate every field.
 | VGM / VGZ | Direct 64-byte header and GD3 parser; bounded gzip inflate for compressed input | All 11 ordered GD3 fields (plus future extras), original-language values, release date, converter, notes, header facts, and 44.1 kHz sample timing | Not implemented |
 | PSF / PSF2 / SSF / USF / 2SF | Direct PSF-style header and `[TAG]` footer parser; no playback core | Ordered tags including duplicates and unknown keys, raw footer bytes, normalized identity, authored length/fade, and console identity by extension | Not implemented |
 | GSF / miniGSF | Complete PSF v0x22 container, GBA segment, and PSFLib-chain validation; no mGBA | Ordered source tags, raw PSF headers/tag blocks, dependency and segment facts, GBA ROM-header validation, and inherited timing | Not implemented |
+| QSF / miniQSF | Complete PSF v0x41 container, QSound-block, and declared QSFLib validation; no playback core | Ordered root tags, raw PSF headers/tag blocks, source/block facts, and authored length/fade | Not implemented |
 | SPC | Direct text/binary ID666 header and xID6 chunk parser; no playback emulator | Ordered metadata, dump date, dumper/emulator facts, soundtrack fields, native timing, and separately retained ID666/xID6 source blocks | Not implemented |
 | SID (PSID / RSID) | Direct fixed-header parser; no playback core | Title, author, release text, technical header facts, and retained raw header; no duration inferred from flags | Not implemented |
 | APE | Direct descriptor, seek-table, APEv2, and leading ID3v2 parser; no audio decoder | Ordered text tags, normalized common fields, exact ID3v2/APEv2 blocks, technical header facts, and sample-count duration | Not implemented |
@@ -164,8 +166,7 @@ body; authored `length` and `fade` tags provide timing. Ordered duplicate and
 unknown tags, the original footer, UTF-8 diagnostics, and the header fields
 used to locate that footer remain available. GSF and QSF are not handled by
 this generic reader because they require complete format-specific container
-and dependency validation. GSF now has its own complete MetaMan reader; QSF is
-the remaining ScanSong-owned specialized reader.
+and dependency validation. Each has a complete MetaMan reader.
 
 The GSF reader validates PSF version `0x22`, the declared reserved/compressed
 ranges, CRC-32, and the zlib stream for the root and each declared PSFLib. It
@@ -183,6 +184,30 @@ symlink escapes, limit each container to 128 MiB, aggregate dependency bytes to
 512 MiB, the chain to 256 files / depth 10, inflated segments to 64 MiB, and
 the assembled ROM image to 64 MiB. See the offset-by-offset
 [GSF layout](FORMAT-LAYOUTS.md#gsf--minigsf--psf-v0x22) for details.
+
+### QSF / miniQSF complete reader
+
+MetaMan validates the root PSF version `0x41`, reserved/compressed ranges,
+CRC-32, bounded zlib output, and every QSound data block. It preserves the
+root's ordered tags and exact tag bytes, plus each source's PSF header, any
+reserved bytes, and block-kind/address/length facts. Root tags provide the
+normalized fields and authored timing; duplicate tags remain in order while
+the compatibility projection uses the last value, as the former ScanSong
+reader did. A missing title falls back to the source filename. The timing
+parser retains the QSound playback bridge's numeric-prefix behavior and
+44.1-kHz frame quantization. Intro and loop remain zero, matching the previous
+scanner projection.
+
+The root's `_lib` through `_lib9` names are checked in loader order. Every
+referenced QSFLib is validated as a PSF container and its decompressed QSound
+blocks are checked, but library tags do not override root metadata and library
+`_lib` values are not followed recursively. File-URL reads load only these
+declared siblings, reject traversal and symlink escapes, limit each container
+to 64 MiB, aggregate dependency data to 512 MiB, inflated data to 32 MiB plus
+the QSF header allowance, and tag blocks to 4 MiB. Data-based reads require
+the caller to provide the named companions through `MetadataReadContext`.
+The offset-by-offset [QSF layout](FORMAT-LAYOUTS.md#qsf--miniqsf--psf-v0x41)
+documents the header, tag, and data-block fields.
 
 Against the read-only live root-1 catalog, all 14,994 PSF-family rows across
 308 source containers matched exactly, including track structure, metadata,
@@ -384,6 +409,7 @@ swift run --package-path MetaMan metaman read song.at3
 swift run --package-path MetaMan metaman read song.msf
 swift run --package-path MetaMan metaman read song.svag
 swift run --package-path MetaMan metaman read song.minigsf
+swift run --package-path MetaMan metaman read song.miniqsf
 ```
 
 JSON includes normalized fields, the ordered decoded tags, the original tag
@@ -399,13 +425,14 @@ MetaMan has no dependency on ScanSong, VGMBoy, or a playback decoder. ScanSong
 adapts `MetadataDocument` into its catalog schema; other clients can consume
 the same library result directly. The current registry contains AY, SAP,
 NSF/GBS/NSFE, HES, SNDH, KSS, S98, VGM/VGZ, SPC, SID, APE, ADX, AUS, ATRAC3,
-Sony MSF, Konami/SNK SVAG, Sony XA, PSF/PSF2/SSF/USF/2SF, and GSF/miniGSF readers.
+Sony MSF, Konami/SNK SVAG, Sony XA, PSF/PSF2/SSF/USF/2SF, GSF/miniGSF, and
+QSF/miniQSF readers.
 SNDH is now fully read by MetaManCore; VGMBoy's old SNDH wrapper remains only as
 a test oracle while PSGPlay remains available for playback. KSS has also moved
-to MetaManCore, as has the complete GSF reader. Remaining direct parser
-ownership is split between ScanSong (specialized QSF and Core Audio standard audio). These are the
-current migration surface; decoder-backed plugin routes are not extracted by
-publishing only partial metadata. AY, SAP, NSF, GBS, NSFE, HES, SNDH, KSS, and Sony XA
+to MetaManCore, as have the complete GSF and QSF readers. Remaining direct
+parser ownership is Core Audio standard audio in ScanSong; decoder-backed
+plugin routes are not extracted by publishing only partial metadata. AY, SAP,
+NSF, GBS, NSFE, HES, SNDH, KSS, and Sony XA
 use the ordered result contract, including playlist repeats and native source
 indices. KSS remains complete for ScanSong's existing 256-slot info-only
 behavior; native KSSX track declarations are preserved as source facts, not

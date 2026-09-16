@@ -30,8 +30,8 @@ does not link VGMBoyKit, invoke a decoder, or transcode the source. VGMBoy
 retains FFmpeg for playback.
 GSF/miniGSF use MetaManCore's complete PSF v0x22 reader for container/CRC/zlib
 validation, GBA segment stitching, PSFLib resolution, ordered tags, and
-authored timing. QSF/miniQSF still use the ScanSong-owned in-process reader
-for PSF v0x41 containers, QSound blocks, QSFLib dependencies, tags, and timing.
+authored timing. QSF/miniQSF use MetaManCore's complete PSF v0x41, QSound-block,
+tag/timing, and direct QSFLib-validation reader.
 Neither route starts mGBA/Highly Complete or the QSound playback core. Those
 cores remain in VGMBoy for playback. Scanner inspectors use VGMBoy's narrow inspection target;
 scanner-plugin preparation does not invoke the broad playback dependency
@@ -126,9 +126,9 @@ collapsed into one ignored-format bucket:
   for PSF/PSF2, SSF, USF, and 2SF without starting their playback plugins.
   GSF/miniGSF use MetaManCore's complete PSF v0x22/container reader, including
   compressed payload validation, GBA segment stitching, and the dependency
-  chain; mGBA remains playback-only. QSF/miniQSF still use ScanSong's PSF
-  v0x41/container and QSound block reader, validating sibling QSFLib
-  dependencies and extracting tags/timing without playback code.
+  chain; mGBA remains playback-only. QSF/miniQSF use MetaManCore's PSF v0x41
+  container and QSound block reader, validating declared QSFLib dependencies
+  and extracting tags/timing without playback code.
   NSF/GBS use a
   dependency-free header route for enumeration and native text metadata; their
   formats do not contain authored per-track names or timing, so the reader

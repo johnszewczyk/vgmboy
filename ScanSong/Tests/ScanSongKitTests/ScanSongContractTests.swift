@@ -1469,7 +1469,7 @@ func cocoaSpiceQSFFailedRowsRemainClassifiableWithoutDecoder() async throws {
         for entry in archive.entries {
             let memberURL = try findExtractedArchiveMember(named: entry, under: extractionDirectory)
             do {
-                _ = try QSFMetadataReader.read(fileURL: memberURL)
+                _ = try MetaManCore.read(fileURL: memberURL)
                 newlyReadable.append("\(archive.path):\(entry)")
             } catch {
                 rejected.append("\(entry): \(error.localizedDescription)")

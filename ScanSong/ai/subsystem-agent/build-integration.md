@@ -15,8 +15,8 @@ executables.
   format admission; it does not link VGMBoyKit or native decoders for its
   in-process metadata readers. `VGMBoySNDH` is a test-only decoder oracle.
 - ScanSong consumes the local sibling `MetaManCore` Swift package for APE, ADX,
-  AUS, ATRAC3, Sony MSF, Konami/SNK SVAG, SID, SPC, SNDH, S98, VGM/VGZ, and
-  PSF-family metadata.
+  AUS, ATRAC3, Sony MSF, Konami/SNK SVAG, SID, SPC, SNDH, S98, VGM/VGZ,
+  PSF-family, GSF, and QSF metadata.
   MetaManCore owns bounded VGZ gzip expansion and has no
   VGMBoy, ScanSong, or playback-decoder dependency; test-only libvgm comparisons
   stay in ScanSong.
@@ -35,9 +35,9 @@ executables.
 - `build-app.sh` removes `.build` before a release build so stale scanner binaries cannot survive
   a fresh packaging run.
 - A missing inspection executable is a typed adapter failure; the scanner does not invent a row or
-  invoke another application as a fallback. GSF/miniGSF are read in-process by
-  ScanSong, as are QSF/miniQSF; neither requires a bundled Highly Complete or
-  QSF inspection executable. APE is also read in-process. MDX and Amiga
+  invoke another application as a fallback. MetaManCore reads GSF/miniGSF and
+  QSF/miniQSF in-process; neither requires a bundled Highly Complete or QSF
+  inspection executable. APE is also read in-process. MDX and Amiga
   inspectors use respective VGMBoy per-format inspection targets and native
   bridges, not VGMBoyKit. Scanner-plugin preparation builds the scanner handoff
   directly; it does not invoke VGMBoy's broad playback dependency builder or
@@ -92,8 +92,8 @@ executables.
 - GSF/miniGSF metadata and structure are read by MetaManCore's complete
   PSF/GSF parser; ScanSong adapts the document. Highly Complete/mGBA remains a
   VGMBoy playback route, not a scanner process or runtime link.
-- QSF/miniQSF metadata and structure are read by ScanSong's direct PSF/QSound
-  parser; AOSDK remains a VGMBoy playback route, not a scanner process.
+- QSF/miniQSF metadata and structure are read by MetaManCore's complete
+  PSF/QSound parser; AOSDK remains a VGMBoy playback route, not a scanner process.
 
 ## Files
 

@@ -344,6 +344,59 @@ in `MetadataReadContext`. Root `length`/`fade` values and dependency fallback
 retain the previous catalog projection, including the legacy nested-length
 intro value. See [GSFMetadataReader.swift](Sources/MetaManCore/GSFMetadataReader.swift).
 
+### QSF / miniQSF / PSF v0x41
+
+QSF uses the common 16-byte PSF container header, with version `0x41` required
+for the playable root. The reader checks declared ranges and CRC-32 over only
+the compressed region, inflates it with a 32 MiB + 12-byte bound, then walks
+the decompressed QSound data blocks. `[TAG]` is accepted only at the exact end
+of the reserved and compressed regions. The complete root tag block and each
+container's 16-byte header, reserved bytes, and tag block are retained; the
+compressed program/audio payload is structurally inspected but not copied into
+the metadata result.
+
+| Source position | Meaning |
+| --- | --- |
+| `0x00..0x02` | ASCII `PSF` signature. |
+| `0x03` | Root version `0x41`; QSFLib dependencies require the `PSF` signature but retain the former reader's permissive version check. |
+| `0x04..0x07` | Reserved-region byte count, little-endian 32-bit. |
+| `0x08..0x0B` | Compressed QSound program byte count, little-endian 32-bit. |
+| `0x0C..0x0F` | CRC-32 of the compressed region, little-endian 32-bit. |
+| `0x10..0x10+reservedSize-1` | Reserved bytes. The following `compressedSize` bytes contain the zlib stream. |
+| `0x10 + reservedSize + compressedSize` | Optional `[TAG]` marker; the exact marker and following bytes through EOF are retained. |
+
+The inflated QSF body is a sequential series of data blocks. Each block starts
+with an 11-byte header followed by the declared payload; no decoder is started.
+
+| Block-relative position | Meaning |
+| --- | --- |
+| `+0` | Kind byte: `0x5A` (`Z`) Z80 program ROM, `0x53` (`S`) QSound sample ROM, `0x4B` (`K`) Kabuki decryption keys; other kinds remain playback-loader-ignored. |
+| `+1..+2` | Legacy block header bytes not interpreted by the metadata reader. |
+| `+3..+6` | Destination offset in the target ROM/key space, little-endian 32-bit. |
+| `+7..+10` | Payload byte count, little-endian 32-bit. |
+| `+11..+11+length-1` | Block data. |
+
+The reader requires each declared payload to fit the inflated source and each
+destination range to avoid integer overflow. Z80 ranges may end at or before
+512 KiB; sample-ROM ranges may end at or before 8 MiB; key blocks must contain
+at least 11 bytes. Unknown block kinds are accepted without imposing a format
+rule the playback loader does not enforce. The ordered tag view is UTF-8,
+stops at the first NUL, preserves duplicate/unknown entries, and is bounded to
+4 MiB. Field lookup is case-insensitive and last-value-wins to match the old
+ScanSong projection. `length` and `fade` use the QSound bridge's
+`minutes:seconds`/numeric-prefix parsing and 44.1 kHz frame quantization.
+
+The root's `_lib`, `_lib2`, ... `_lib9` entries are checked in numeric load
+order. Those direct QSFLib containers have the same CRC, zlib, block-bound, and
+tag validation; their metadata does not override the root, and their own
+library references are not followed. File-URL reads resolve only these
+relative siblings, reject traversal and symlink escapes, cap each container at
+64 MiB and aggregate dependency bytes at 512 MiB. Data-based reads require the
+caller to provide named companions in `MetadataReadContext`. The document
+keeps root authored fields/timing and reports source paths, sizes, CRCs, and
+block kind/offset/length facts. See
+[QSFMetadataReader.swift](Sources/MetaManCore/QSFMetadataReader.swift).
+
 ### SPC / ID666 / xID6
 
 The standard file body ends at `0x10200`; the 27-byte `SNES-SPC700 Sound File

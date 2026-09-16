@@ -61,7 +61,7 @@ independent media sources are not playback targets.
 | `vgmstream` | `.aa3`, `.adp`, `.adx`, `.adpcm`, `.ads`, `.agsc`, `.ahx`, `.aifc`, `.at3`, `.aus`, `.bk2`, `.bik`, `.bika`, `.bnk`, `.dsp`, `.dvi`, `.fsb`, `.genh`, `.h4m`, `.hbd`, `.hd`, `.iecs`, `.int`, `.ldat`, `.logg`, `.mib`, `.msf`, `.mtaf`, `.ogg`, `.ps3`, `.rsf`, `.rws`, `.s14`, `.ss2`, `.stream`, `.strm`, `.svag`, `.swav`, `.thp`, `.txtp`, `.vag`, `.xa`, `.xmd`, `.xvag` | `.adx`, `.at3`, `.aus`, `.msf`, and `.svag` use MetaManCore's content-aware readers, while `.xa` uses ScanSong's direct reader; nonmatching aliases retain vgmstream. `.txtp` and HD-bank inputs use vgmstream with dependency preparation. Other routed streams use `vgmstream-cli -I`. `.ogg` currently uses the Core Audio scanner route. |
 | `lazyusf` | `.usf`, `.miniusf` | `MetaManCore` PSF-style `[TAG]` reader; `.usflib` remains dependency data, not a track. |
 | `playpsf` | `.psf`, `.minipsf`, `.psf2`, `.minipsf2` | `MetaManCore` PSF-style `[TAG]` reader; libraries remain dependency data. |
-| `qsf` | `.qsf`, `.miniqsf` | ScanSong-owned PSF v0x41/QSound container reader validates payload blocks, tags, and dependencies without the QSound core. |
+| `qsf` | `.qsf`, `.miniqsf` | MetaManCore's complete PSF v0x41/QSound reader validates payload blocks, root tags, and declared dependencies without the QSound core. |
 | `sidplayfp` | `.sid` | `MetaManCore` reads PSID/RSID header metadata; the playback decoder remains in VGMBoy. |
 | `openmpt` | `.669`, `.dmf`, `.far`, `.it`, `.mod`, `.mptm`, `.mtm`, `.okt`, `.ptm`, `.s3m`, `.stm`, `.ult`, `.xm` | ScanSong admits one known-structure row, but metadata remains optional/deferred; no playback decoder inspection runs. |
 | `amiga-uade` | UADE replayer prefixes such as `mod.*`, `p4x.*`, `med.*`, and TFMX | VGMBoy-built `vgmboy-amiga-inspect` still supplies subsong enumeration and metadata; complete-set dependencies are materialized first. |
@@ -130,8 +130,8 @@ track fields and does not expose those additional manifest fields in CocoaSpice.
 | `vgmstream-hd-bank` | `.hd`, `.hbd`, `.iecs` | One row per resolved subsong | `vgmstream-cli` after dependency preparation | Bank/control sidecars are support data; IECS remains a known adapter boundary. |
 | `play-psf1` | `.psf`, `.minipsf` | One structurally-known row | `MetaManCore` PSF-style `[TAG]` footer reader | `.psflib` is playback dependency data, never a row. |
 | `play-psf2` | `.psf2`, `.minipsf2` | One structurally-known row | `MetaManCore` PSF-style `[TAG]` footer reader | `.psflib` is playback dependency data, never a row. |
-| `qsf-direct` | `.qsf` | One validated row | ScanSong QSF PSF/data-block reader | CRC, bounded zlib output, QSound block ranges, and any referenced `.qsflib` files are validated without a QSound core. |
-| `qsf-mini-direct` | `.miniqsf` | One validated row | ScanSong QSF PSF/data-block reader | Referenced `_lib` through `_lib9` libraries must be available beside the source and pass container/block validation. |
+| `qsf-direct` | `.qsf` | One validated row | MetaManCore complete QSF reader plus ScanSong schema adapter | CRC, bounded zlib output, QSound block ranges, and any referenced `.qsflib` files are validated without a QSound core. |
+| `qsf-mini-direct` | `.miniqsf` | One validated row | MetaManCore complete QSF reader plus ScanSong schema adapter | Referenced `_lib` through `_lib9` libraries must be available beside the source and pass container/block validation. |
 | `sid` | `.sid` | One structurally-known row | `MetaManCore` PSID/RSID header reader | One file row; no finite duration is invented when the header has none. |
 
 The route table is deliberately not a claim that every registered source is
@@ -391,14 +391,17 @@ playback dependency builder.
 
 ### QSF / miniQSF
 
-`qsf-direct` and `qsf-mini-direct` parse QSF's PSF v0x41 container in ScanSong.
-They verify compressed-payload CRCs and bounded zlib streams, validate each
-QSound data block against the legacy ROM bounds, and resolve `_lib` through
-`_lib9` sibling dependencies without starting the Z80/QSound playback core.
-Root tags provide title, game, artist, comment, length, and fade; length/fade
-are converted to milliseconds using the playback bridge's parsing semantics.
-The scanner publishes one QSound track per source. VGMBoy retains its QSF core
-for playback.
+`qsf-direct` and `qsf-mini-direct` route to MetaManCore's complete QSF reader
+and adapt its neutral document to schema 23. It verifies PSF v0x41 (root),
+compressed-payload CRCs and bounded zlib streams, validates each QSound data
+block against the legacy ROM bounds, and resolves `_lib` through `_lib9`
+declared sibling dependencies without starting the Z80/QSound playback core.
+Root tags provide title, game, artist, comment, length, and fade; ordered
+duplicate/unknown tags and raw header/tag blocks remain available in MetaMan.
+Length/fade retain the playback bridge's parsing semantics. Libraries are
+validated directly but are not recursively traversed; their tags do not
+override the root's metadata. The scanner publishes one QSound track per
+source. VGMBoy retains its QSF core for playback.
 
 ### PSF, PSF2, SSF, USF, and 2SF
 
@@ -415,16 +418,16 @@ containers matched the saved catalog's metadata, timing, and track structure
 exactly. Optimized Release inspection measured 0.071 ms median and 0.090 ms p95
 per member; this is a local-corpus result, not a cross-machine guarantee.
 
-GSF/miniGSF now has a complete MetaMan reader. QSF/miniQSF remains on its
-specialized ScanSong reader because its complete contract includes QSound block
-validation and QSFLib dependency handling beyond generic `[TAG]` extraction.
+GSF/miniGSF and QSF/miniQSF now both have complete MetaMan readers. Their
+format-specific container, payload, and dependency validation is not duplicated
+by ScanSong; generic PSF-family readers remain footer-only by design.
 
 Their sidecars are never independent scanner sources. The recognized support
-names are `.psflib`, `.2sflib`, `.ssflib`, and `.usflib`; they are omitted from
-archive `unrecognized` diagnostics and from standalone `.zst` discovery. The
-actual playback materializer must still stage the complete dependency set for
-formats whose core requires it. ScanSong does not claim successful playback
-solely because a PSF footer was readable.
+names are `.psflib`, `.2sflib`, `.gsflib`, `.qsflib`, `.ssflib`, and `.usflib`;
+they are omitted from archive `unrecognized` diagnostics and from standalone
+`.zst` discovery. The actual playback materializer must still stage the
+complete dependency set for formats whose core requires it. ScanSong does not
+claim successful playback solely because a PSF footer was readable.
 
 ## libVGM
 

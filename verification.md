@@ -39,20 +39,24 @@ is repaired and repeatedly verified.
 
 ## Current Package Evidence
 
-- **MetaMan:** the full Debug suite passes all 92 tests, including the complete
-  GSF/miniGSF reader and recursive PSFLib-context fixtures.
-- **ScanSong:** `ScanSongKit` builds, and all 123 test cases pass from an
-  isolated test-only package harness that excludes the app and CLI executables.
-  The ordinary `swift test --package-path ScanSong` command still attempts to
-  link both executables and fails with unresolved `_ScanSongApp_main` and
-  `_scansong_main` symbols (plus a missing `CoreAudioTypes` linker warning).
-  This does not invalidate the library build or isolated test result, but the
-  app/CLI executable link remains an open gate. A read-only root-1
-  XA differential through the production MetaMan-backed scanner route matches
-  all 867 catalog rows across 827 files and 18 archives. Running this corpus
-  test alongside the timing-sensitive process-runner test once caused that
-  unrelated test to exceed its two-second timeout; a clean full-suite rerun
-  without the corpus environment passed.
+- **MetaMan:** the full Debug suite passes all 99 tests, including complete
+  GSF/miniGSF and QSF/miniQSF readers, declared dependency validation, raw-byte
+  retention, and malformed-container fixtures.
+- **ScanSong:** the production `ScanSongKit` and all scanner test sources compile
+  in an isolated harness that excludes the app and CLI executables. All 124
+  scanner tests pass in that harness; the QSF-only read-only live
+  catalog checks also pass after the final parser change. Root-1 parity covers
+  18 archives / 720 rows with 7,920 exact field checks, zero improvements, and
+  zero mismatches. One previously failed `vsav04.miniqsf` is now structurally
+  readable; the catalog was not changed. The ordinary
+  `swift test --package-path ScanSong` command still fails while linking both
+  executables with unresolved `_ScanSongApp_main` and `_scansong_main` symbols
+  (plus a `CoreAudioTypes` linker warning); the app/CLI link remains open.
+  The earlier read-only XA differential matched all 867 catalog rows across
+  827 files and 18 archives. Running that corpus test alongside the
+  timing-sensitive process-runner test previously caused that unrelated test
+  to exceed its two-second timeout; a clean suite run without corpus variables
+  passed.
 - **UACMan:** `UACMan/Wrapper` passes all 18 Swift tests and 5 Python tests;
   `UACMan` passes all 13 Swift tests. The relocated wrapper/application source
   paths are included in these package checks.

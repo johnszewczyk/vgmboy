@@ -129,7 +129,7 @@ private func makePSF(tagText: String?) -> Data {
 }
 
 private func makePSF(tagBytes: Data?) -> Data {
-    var data = Data([0x50, 0x53, 0x46, 0x41])
+    var data = Data([0x50, 0x53, 0x46, 0x01])
     data.append(contentsOf: repeatElement(0, count: 12))
     if let tagBytes {
         data.append(Data("[TAG]".utf8))

@@ -65,6 +65,11 @@ public enum MetaManCore {
             methodology: "Complete PSF v0x22 reader: validates CRC/zlib, parses ordered tags, resolves the bounded PSFLib chain, stitches GBA load segments, and checks the GBA ROM header without mGBA."
         ),
         MetadataFormatDescriptor(
+            identifier: "qsf",
+            fileExtensions: QSFMetadataReader.supportedExtensions.sorted(),
+            methodology: "Complete PSF v0x41 reader: validates CRC/zlib, ordered tags, QSound block bounds, and declared QSFLib companions without the QSound playback core."
+        ),
+        MetadataFormatDescriptor(
             identifier: "spc",
             fileExtensions: ["spc"],
             methodology: "Direct SPC ID666/xID6 header and chunk parser; preserves both original tag blocks and does not start the playback emulator."
@@ -115,6 +120,9 @@ public enum MetaManCore {
         fileURL: URL,
         context: MetadataReadContext = MetadataReadContext()
     ) throws -> MetadataDocument {
+        if QSFMetadataReader.supportedExtensions.contains(fileURL.pathExtension.lowercased()) {
+            return try QSFMetadataReader.read(fileURL: fileURL, context: context)
+        }
         if GSFMetadataReader.supportedExtensions.contains(fileURL.pathExtension.lowercased()) {
             return try GSFMetadataReader.read(fileURL: fileURL, context: context)
         }
@@ -137,6 +145,10 @@ public enum MetaManCore {
         context: MetadataReadContext = MetadataReadContext()
     ) throws -> MetadataReadResult {
         let formatHint = fileURL.pathExtension.lowercased()
+        if QSFMetadataReader.supportedExtensions.contains(formatHint) {
+            let document = try QSFMetadataReader.read(fileURL: fileURL, context: context)
+            return MetadataReadResult(tracks: [MetadataTrack(document: document)])
+        }
         if GSFMetadataReader.supportedExtensions.contains(formatHint) {
             let document = try GSFMetadataReader.read(fileURL: fileURL, context: context)
             return MetadataReadResult(tracks: [MetadataTrack(document: document)])
@@ -165,6 +177,10 @@ public enum MetaManCore {
         let cleanedHint = formatHint?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let format = cleanedHint.map { $0.hasPrefix(".") ? String($0.dropFirst()) : $0 }
         let normalizedFormat = format?.isEmpty == false ? format : nil
+        if QSFMetadataReader.supportedExtensions.contains(normalizedFormat ?? "")
+            || (normalizedFormat == nil && QSFMetadataReader.matches(data)) {
+            return try QSFMetadataReader.readResult(data: data, displayName: displayName, context: context)
+        }
         if GSFMetadataReader.supportedExtensions.contains(normalizedFormat ?? "")
             || (normalizedFormat == nil && GSFMetadataReader.matches(data)) {
             return try GSFMetadataReader.readResult(data: data, displayName: displayName, context: context)
@@ -228,6 +244,11 @@ public enum MetaManCore {
         let cleanedHint = formatHint?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let format = cleanedHint.map { $0.hasPrefix(".") ? String($0.dropFirst()) : $0 }
         let normalizedFormat = format?.isEmpty == false ? format : nil
+
+        if QSFMetadataReader.supportedExtensions.contains(normalizedFormat ?? "")
+            || (normalizedFormat == nil && QSFMetadataReader.matches(data)) {
+            return try QSFMetadataReader.read(data: data, displayName: displayName, context: context)
+        }
 
         if GSFMetadataReader.supportedExtensions.contains(normalizedFormat ?? "")
             || (normalizedFormat == nil && GSFMetadataReader.matches(data)) {

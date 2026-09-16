@@ -110,9 +110,9 @@ error.
   the established libgme-compatible catalog defaults for tagless SPCs. ScanSong
   projects the shared document into the existing schema; its app and CLI do
   not link or invoke libgme for SPC inspection.
-- SPC ID666/xID6, PSF/PSF2, SSF, USF, and 2SF tags plus VGM/VGZ GD3/timing
-  through MetaManCore; GSF/QSF retain their specialized container readers, and
-  SID PSID/RSID headers are also read by MetaManCore.
+- SPC ID666/xID6, PSF/PSF2, SSF, USF, and 2SF tags plus VGM/VGZ GD3/timing,
+  complete GSF/miniGSF and QSF/miniQSF containers, and SID PSID/RSID headers
+  through MetaManCore. ScanSong adapts the shared documents into schema 23.
 - Direct SNDH tag/subtune/timing harvesting through MetaManCore, including
   executable-vector bounds, Atari ST text, TIME/FRMS timing, and bounded ICE!
   expansion. Production ScanSong no longer links `VGMBoySNDH` or PSGPlay for
@@ -198,8 +198,8 @@ error.
   inspectors build through narrow VGMBoy inspection targets rather than
   VGMBoyKit, and scanner-plugin preparation does not run VGMBoy's full playback
   dependency builder.
-- A ScanSong-owned QSF/miniQSF reader that validates PSF v0x41 containers, CRCs,
-  bounded zlib data, QSound blocks, and referenced `.qsflib` files without
+- MetaManCore's complete QSF/miniQSF reader validates PSF v0x41 containers,
+  CRCs, bounded zlib data, QSound blocks, and declared `.qsflib` files without
   starting the playback core. It extracts authored tags and timing directly;
   VGMBoy retains the QSound core for playback.
 
