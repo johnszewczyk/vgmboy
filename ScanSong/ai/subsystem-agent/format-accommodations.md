@@ -60,7 +60,7 @@ independent media sources are not playback targets.
 | `ffmpeg-audio` | `.ape`, `.mp2`, `.tak` | `.ape` uses MetaManCore's direct header/tag reader. `.mp2` and `.tak` do not currently have ScanSong routes. |
 | `highly-complete` | `.gsf`, `.minigsf` | MetaManCore validates PSF v0x22 payloads, GBA segments, and dependency chains without mGBA. |
 | `twosf` | `.2sf`, `.mini2sf` | `MetaManCore` PSF-style `[TAG]` reader; it does not start the playback core. |
-| `vgmstream` | `.aa3`, `.adp`, `.adx`, `.adpcm`, `.ads`, `.agsc`, `.ahx`, `.aifc`, `.at3`, `.aus`, `.bk2`, `.bik`, `.bnk`, `.dsp`, `.dvi`, `.fsb`, `.genh`, `.h4m`, `.hbd`, `.hd`, `.iecs`, `.int`, `.ldat`, `.logg`, `.mib`, `.msf`, `.mtaf`, `.ogg`, `.ps3`, `.rsf`, `.rws`, `.s14`, `.ss2`, `.stream`, `.strm`, `.svag`, `.swav`, `.thp`, `.txtp`, `.vag`, `.xa`, `.xmd`, `.xvag` | Validated `.adp` DTK/TXTH layouts, `.ads`/`.ss2`, `.adx`, `.ahx`, `.at3`, `.aus`, `.dsp`, `.msf`, `.svag`, and `.xmd` use content-aware MetaManCore readers with vgmstream fallback for unrecognized aliases; validated headerless `.mib` uses the MIB reader with vgmstream fallback for failed probes; `.bika` now uses MetaMan's complete Bink container walk; `.xa` uses ScanSong's direct reader, and validated Nintendo DS standard/FFTA2 `.strm` layouts use MetaManCore. `.txtp` and HD-bank inputs use vgmstream with dependency preparation. Other routed streams use `vgmstream-cli -I`. `.ogg` currently uses the Core Audio scanner route. |
+| `vgmstream` | `.aa3`, `.adp`, `.adx`, `.adpcm`, `.ads`, `.agsc`, `.ahx`, `.aifc`, `.at3`, `.aus`, `.bk2`, `.bik`, `.bnk`, `.dsp`, `.dvi`, `.fsb`, `.genh`, `.h4m`, `.hbd`, `.hd`, `.iecs`, `.int`, `.ldat`, `.logg`, `.mib`, `.msf`, `.mtaf`, `.ogg`, `.ps3`, `.rsf`, `.rws`, `.s14`, `.ss2`, `.stream`, `.strm`, `.svag`, `.swav`, `.thp`, `.txtp`, `.vag`, `.xa`, `.xmd`, `.xvag` | Validated `.adp` DTK/TXTH layouts, `.ads`/`.ss2`, `.adx`, `.ahx`, `.at3`, `.aus`, `.dsp`/`.thp`, `.msf`, `.svag`, and `.xmd` use content-aware MetaManCore readers with vgmstream fallback for unrecognized aliases; validated headerless `.mib` uses the MIB reader with vgmstream fallback for failed probes; `.bika` uses MetaMan's complete Bink container walk; `.xa` uses ScanSong's direct reader, and validated Nintendo DS standard/FFTA2 `.strm` layouts use MetaManCore. `.txtp` and HD-bank inputs use vgmstream with dependency preparation. Other routed streams use `vgmstream-cli -I`. `.ogg` currently uses the Core Audio scanner route. |
 | `lazyusf` | `.usf`, `.miniusf` | `MetaManCore` PSF-style `[TAG]` reader; `.usflib` remains dependency data, not a track. |
 | `playpsf` | `.psf`, `.minipsf`, `.psf2`, `.minipsf2` | `MetaManCore` PSF-style `[TAG]` reader; libraries remain dependency data. |
 | `qsf` | `.qsf`, `.miniqsf` | MetaManCore's complete PSF v0x41/QSound reader validates payload blocks, root tags, and declared dependencies without the QSound core. |
@@ -123,7 +123,7 @@ track fields and does not expose those additional manifest fields in CocoaSpice.
 | `adp-direct` | Headerless Nintendo DTK or exact `.adp.txth` IMA layout in `.adp` | One track | MetaManCore content probe and complete layout reader | 175 live DTK members and nine TXTH-described Contra members are direct; unknown `.adp` aliases remain on vgmstream and the hidden sidecar is dependency context. |
 | `ahx-direct` | Validated CRI AHX in `.ahx` | One track | MetaManCore bounded AHX header and fixed-bitrate payload reader | The live root-1 corpus contains 11 files with exact saved-catalog and fresh-vgmstream parity; invalid `.ahx` aliases remain on vgmstream. |
 | `dvi-direct` | Validated Konami Saturn `DVI.` in `.dvi` | One track | MetaManCore bounded DVI header and stereo IMA timing reader | The live root-1 corpus contains 45 files with exact saved-catalog and fresh-vgmstream parity; Capcom `IDVI` aliases and incomplete payloads remain on vgmstream. |
-| `dsp-direct` | Standard Nintendo DSPADPCM, Retro Studios `RS03`, or Nintendo THP audio in `.dsp` | One track | MetaManCore's three signature-dispatched header readers | Preserves raw header/layout and native sample/loop facts; unknown `.dsp` signatures use vgmstream. |
+| `dsp-direct` | Standard Nintendo DSPADPCM and Retro Studios `RS03` in `.dsp`; Nintendo THP audio in `.dsp` or `.thp` | One track | MetaManCore's three signature-dispatched header readers | Preserves raw header/layout and native sample/loop facts; unrecognized `.dsp`/`.thp` payloads use vgmstream. |
 | `nds-strm-direct` | Nintendo DS standard `STRM`/`HEAD`/`DATA` or FFTA2 `RIFF`/`IMA ` in `.strm` | One track | `MetaManCore` standard STRM and FFTA2 readers | Preserves codec, channel, sample, loop, and interleave facts plus scanner-compatible duration; unrelated `.strm` aliases use vgmstream. |
 | `xa-direct` | Sony CD-XA in `.xa` | One row per XA file/channel subsong | MetaManCore Sony XA sector reader | Preserves interleaved channel enumeration, source facts, and sector-derived timing; RIFF/CDXA wrappers are accepted. Other `.xa` formats use vgmstream. |
 | `vgm-direct` | `.vgm`, `.vgz` | One stream row | `MetaManCore` VGM/VGZ header, GD3, and sample timing | VGZ is bounded gzip decompression, not a generic archive; no decoder is started. |
@@ -136,7 +136,7 @@ track fields and does not expose those additional manifest fields in CocoaSpice.
 | `highly-theoretical` | `.ssf`, `.minissf` | One structurally-known row | `MetaManCore` PSF-style `[TAG]` footer reader | Metadata is available; current VGMBoy/CocoaSpice playback admission remains a gap. |
 | `lazyusf` | `.usf`, `.miniusf` | One structurally-known row | `MetaManCore` PSF-style `[TAG]` footer reader | `.usflib` is playback dependency data, never a row. |
 | `twosf` | `.2sf`, `.mini2sf` | One structurally-known row | `MetaManCore` PSF-style `[TAG]` footer reader | `.2sflib` is dependency data, never a row. |
-| `vgmstream` | Remaining raw-stream extensions listed below plus nonmatching `.adp`, `.adx`, `.ads`/`.ss2`, `.at3`, `.aus`, `.dsp`, `.msf`, `.strm`, `.svag`, `.xmd`, and `.xa` aliases | One row per reported subsong | VGMBoy-built `vgmstream-cli` | Native `-I` inspection; subsong count is bounded. Recognized ADP DTK/TXTH, CRI/Monster ADX, RIFF ATRAC3, Atomic Planet AUS, standard DSPADPCM, Retro Studios RS03, THP audio, Sony MSF, Sony SSHD, Konami/SNK SVAG and XMD, both Nintendo DS STRM layouts, Sony XA, and Bink `.bika` use direct readers. |
+| `vgmstream` | Remaining raw-stream extensions listed below plus nonmatching `.adp`, `.adx`, `.ads`/`.ss2`, `.at3`, `.aus`, `.dsp`/`.thp`, `.msf`, `.strm`, `.svag`, `.xmd`, and `.xa` aliases | One row per reported subsong | VGMBoy-built `vgmstream-cli` | Native `-I` inspection; subsong count is bounded. Recognized ADP DTK/TXTH, CRI/Monster ADX, RIFF ATRAC3, Atomic Planet AUS, standard DSPADPCM, Retro Studios RS03, THP audio, Sony MSF, Sony SSHD, Konami/SNK SVAG and XMD, both Nintendo DS STRM layouts, Sony XA, and Bink `.bika` use direct readers. |
 | `vgmstream-txtp` | `.txtp` | One row per resolved subsong | `vgmstream-cli` after dependency preparation | Authored TXTP structure is authoritative. |
 | `vgmstream-hd-bank` | `.hd`, `.hbd`, `.iecs` | One row per resolved subsong | `vgmstream-cli` after dependency preparation | Bank/control sidecars are support data; IECS remains a known adapter boundary. |
 | `play-psf1` | `.psf`, `.minipsf` | One structurally-known row | `MetaManCore` PSF-style `[TAG]` footer reader | `.psflib` is playback dependency data, never a row. |
@@ -652,20 +652,19 @@ extraction in the test is serialized and temporary.
 
 ### Nintendo DSP, RS03, and THP audio
 
-The `.dsp` suffix covers three layouts in the live catalog: standard Nintendo
-DSPADPCM's big-endian `0x60`-byte header, Retro Studios' `RS03` header (magic
-`0x52530003`), and a Nintendo THP movie container whose audio component is
-DSP. MetaMan reads only
-these headers/component descriptors, retains their raw metadata blocks, and
-derives the scanner's sample/loop timing without decoding audio. Content
-signatures select the reader; other `.dsp` aliases continue through vgmstream.
+The `.dsp` suffix covers standard Nintendo DSPADPCM's big-endian `0x60`-byte
+header, Retro Studios' `RS03` header (magic `0x52530003`), and THP movie audio.
+The `.thp` suffix now selects the same THP component/audio-header reader.
+MetaMan retains the native header blocks and derives sample/loop timing without
+decoding audio or video. Content signatures select the direct method;
+unrecognized `.dsp` and `.thp` payloads continue through vgmstream.
 
-The read-only root-1 catalog comparison covers 211 files in two archives:
-118 standard DSP, 84 RS03, and 9 THP-audio streams. Signature routing sent all
-211 through MetaMan; every saved row matched exactly, including track shape,
-metadata, and timing. This is saved-catalog parity; no fresh vgmstream CLI
-comparison or paired performance run was available, so no decoder speedup is
-claimed. The test extracts one archive at a time and removes its scratch data.
+The `.dsp` live comparison covers 211 files in two archives: 118 standard DSP,
+84 RS03, and 9 THP-audio streams. The separate root-1 `.thp` catalog contains
+one movie in one archive; its saved row, direct MetaMan result, and fresh
+vgmstream result match exactly. One file is not a representative performance
+sample; the existing `.dsp` corpus remains saved-catalog parity only. Live
+tests extract one archive at a time and remove scratch data.
 
 ### Konami XMD
 
@@ -843,8 +842,10 @@ The GameCube primary set is:
 .adp .agsc .dsp .h4m .ldat .logg .rsf .thp .txtp
 ```
 
-These members are admitted only through the bundled vgmstream inspector. The
-archive materializer normalizes underscore-prefixed aliases such as
+These members use direct MetaMan inspection when the content signature is a
+supported DSP/RS03/THP layout; remaining GameCube primary members use the
+bundled vgmstream inspector. The archive materializer normalizes
+underscore-prefixed aliases such as
 `_.ldat.txth` to `.ldat.txth` inside scratch storage. `.txth`, `.bd`, `.sbb`,
 and other bank/control files are dependencies, not duplicate playlist rows.
 The RE2 GameCube archive is the regression fixture for this boundary: primary

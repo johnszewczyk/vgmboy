@@ -85,11 +85,29 @@ func dspSignatureMatchingRejectsUnknownAndMalformedSources() throws {
     }
 }
 
+@Test("THP filename suffix uses the complete Nintendo movie audio metadata reader")
+func thpFileURLUsesDirectReader() throws {
+    let fileURL = try writeDSPFixture(makeTHP(bigEndian: true), name: "mission.thp")
+    defer { try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent()) }
+
+    #expect(MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "thp"))
+    let document = try MetaManCore.read(fileURL: fileURL)
+    #expect(document.format == "ngc-thp-audio")
+    #expect(document.fields.title == "mission")
+    #expect(document.timing?.playLengthMs == 2_000)
+    #expect(document.rawMetadataBlocks?["thpAudioHeader"]?.count == 0x10)
+
+    let result = try MetaManCore.readResult(fileURL: fileURL)
+    #expect(result.tracks.count == 1)
+    #expect(result.tracks[0].document == document)
+}
+
 @Test("DSP format registry lists each independently recognized layout")
 func dspFormatsAreRegisteredSeparately() {
     let formats = MetaManCore.supportedFormats.filter { ["ngc-dsp-standard", "rs03", "ngc-thp-audio"].contains($0.identifier) }
     #expect(formats.map(\.identifier) == ["ngc-dsp-standard", "rs03", "ngc-thp-audio"])
-    #expect(formats.allSatisfy { $0.fileExtensions == ["dsp"] })
+    #expect(formats.dropLast().allSatisfy { $0.fileExtensions == ["dsp"] })
+    #expect(formats.last?.fileExtensions == ["dsp", "thp"])
 }
 
 private func makeStandardDSP(loopFlag: UInt16) -> Data {

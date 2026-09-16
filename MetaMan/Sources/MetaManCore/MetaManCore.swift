@@ -176,8 +176,8 @@ public enum MetaManCore {
         ),
         MetadataFormatDescriptor(
             identifier: "ngc-thp-audio",
-            fileExtensions: ["dsp"],
-            methodology: "Direct Nintendo THP component-table and audio-header reader for DSP audio; retains bounded component/header blocks without decoding video or audio."
+            fileExtensions: ["dsp", "thp"],
+            methodology: "Direct Nintendo THP component-table and audio-header reader; retains bounded component/header blocks without decoding video or audio."
         )
     ]
 
@@ -365,7 +365,7 @@ public enum MetaManCore {
         case "adp": ADPMetadataReader.supports(fileURL: fileURL)
         case "ahx": AHXMetadataReader.supports(fileURL: fileURL)
         case "dvi": DVIMetadataReader.supports(fileURL: fileURL)
-        case "dsp": NintendoDSPMetadataReader.supports(fileURL: fileURL)
+        case "dsp", "thp": NintendoDSPMetadataReader.supports(fileURL: fileURL)
         case "xa": SonyXAMetadataReader.supports(fileURL: fileURL)
         case "strm":
             NDSSTRMMetadataReader.supports(fileURL: fileURL)
@@ -536,7 +536,8 @@ public enum MetaManCore {
             return try DVIMetadataReader.read(data: data, displayName: displayName)
         }
 
-        if normalizedFormat == "dsp" || (normalizedFormat == nil && NintendoDSPMetadataReader.matches(data)) {
+        if normalizedFormat == "dsp" || normalizedFormat == "thp"
+            || (normalizedFormat == nil && NintendoDSPMetadataReader.matches(data)) {
             return try NintendoDSPMetadataReader.read(data: data, displayName: displayName)
         }
 

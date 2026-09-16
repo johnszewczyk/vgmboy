@@ -300,10 +300,11 @@ reader. The full fixed header and raw byte offsets are preserved.
 
 #### Nintendo THP audio component
 
-THP is a movie container, not a DSP-header alias. The reader accepts THP
-versions 1.0 and 1.1, follows its bounded component table to the audio
-component, and reads the same channel/rate/sample fields used by the
-vgmstream info path. It does not walk or decode movie blocks.
+THP is a movie container, not a DSP-header alias. The reader accepts `.thp`
+files and the same content under `.dsp`, for versions 1.0 and 1.1. It follows
+the bounded component table to the audio component and reads the same
+channel/rate/sample fields used by the vgmstream info path. It does not walk
+or decode movie blocks.
 
 | Source position | Meaning |
 | --- | --- |

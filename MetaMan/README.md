@@ -64,7 +64,7 @@ fixed offsets or that the decoder is needed to locate every field.
 | Nintendo DS FFTA2 STRM | Direct Square Enix RIFF/IMA fixed-header reader; no playback core | Header-derived sample count, channel/rate/loop facts, exact header block, and scanner-compatible sample timing; supports `.bin` and `.strm` | Not implemented |
 | Nintendo DSP (standard) | Direct big-endian 0x60-byte DSPADPCM header reader; no audio decoder | Codec coefficients, sample/nibble counts, loop points, exact header, and scanner-compatible timing | Not implemented |
 | Retro Studios RS03 | Direct `RS03` fixed-header reader; no audio decoder | Channel/interleave facts, byte-addressed loops, sample timing, and exact header | Not implemented |
-| Nintendo THP audio | Direct versioned THP component-table and DSP audio-header walk; no video or audio decoder | Channels, sample rate/count, component layout, raw header blocks, and finite timing | Not implemented |
+| Nintendo THP audio | Direct versioned THP component-table and audio-header walk for `.thp` files and THP content in `.dsp`; no video or audio decoder | Channels, sample rate/count, component layout, raw header blocks, and finite timing | Not implemented |
 
 This is a library first, not a CLI-only tool. The `metaman` executable is an
 optional JSON frontend; CocoaSpice, ScanSong, and future clients can consume

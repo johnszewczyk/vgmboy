@@ -213,7 +213,8 @@ error.
   through MetaManCore; only validated layouts leave the `.strm` decoder route,
   and unrelated aliases retain vgmstream fallback.
 - Standard Nintendo DSPADPCM, Retro Studios RS03, and THP-audio headers through
-  MetaManCore; other `.dsp` signatures retain the vgmstream route.
+  MetaManCore. THP movies are direct for `.thp` and content-matched `.dsp`;
+  unknown or non-THP aliases retain vgmstream fallback.
 - Structurally known single rows for standard audio (including OGG Vorbis),
   modules, and registered formats whose optional metadata can remain empty.
 - Tracker/module rows (S3M, MOD, IT, XM, MTM, STM, and related) via

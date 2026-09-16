@@ -125,7 +125,7 @@ public struct ScannerPluginRegistry: Sendable {
 
     /// Routes ordinary suffixes first, then Amiga's replayer-prefix names
     /// (`p4x.earth`, `mod.xpose-end`, etc.). ADX, ADP, AHX, AT3, AUS, MSF, STRM, SVAG,
-    /// DSP, DVI, XMD, SSHD/ADS/SS2, and XA are content-aware: ScanSong probes ADX and
+    /// DSP, THP, DVI, XMD, SSHD/ADS/SS2, and XA are content-aware: ScanSong probes ADX and
     /// AUS; MetaManCore probes RIFF ATRAC3, Sony MSF, Nintendo DS STRM,
     /// Konami/SNK SVAG and XMD, Sony SSHD/ADS/SS2, Nintendo DSP/RS03/THP, and Sony
     /// XA. Both `.ads` and `.ss2` use the complete Sony SSHD reader. DVI is
@@ -178,8 +178,8 @@ public struct ScannerPluginRegistry: Sendable {
             contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "dvi")
                 ? "dvi-direct"
                 : "vgmstream"
-        case "dsp":
-            contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "dsp")
+        case "dsp", "thp":
+            contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: extensionName)
                 ? "dsp-direct"
                 : "vgmstream"
         case "strm":
