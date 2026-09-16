@@ -261,9 +261,9 @@
   NSF/GBS/NSFE readers and AY, SAP, APE,
   CRI/Monster ADX, SID PSID/RSID, SPC ID666/xID6, VGM/VGZ, S98, and
   PSF-family tags; the
-  Core Audio standard-audio inspector for FLAC/Vorbis comments and exact
-  decoded duration (with AVFoundation metadata fallback for other ordinary
-  audio),
+  MetaManCore standard-audio file-URL reader for FLAC/Vorbis comments and
+  exact decoded duration (with AVFoundation metadata fallback for other
+  ordinary audio),
   the MetaManCore APE header/tag reader for APE timing and common tags,
   scanner-owned vgmstream CLI plugin for raw vgmstream formats, TXTP structures,
   and HD-bank structures, the direct PSF v0x22/GSF dependency reader for

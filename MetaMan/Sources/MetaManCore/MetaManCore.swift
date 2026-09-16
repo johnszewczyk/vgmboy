@@ -188,6 +188,11 @@ public enum MetaManCore {
             identifier: "genh",
             fileExtensions: ["genh"],
             methodology: "Direct bounded GENH generic-header reader for codec, layout, optional DSP/encoder fields, and sample/loop timing; no payload codec or audio decoder is opened."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "standard-audio",
+            fileExtensions: StandardAudioMetadataReader.supportedExtensions.sorted(),
+            methodology: "File-URL reader using AVFoundation common tags and decoded frame counts; FLAC Vorbis comments are parsed and retained directly. Requires Apple's media framework, not a bundled playback decoder."
         )
     ]
 
@@ -195,6 +200,9 @@ public enum MetaManCore {
         fileURL: URL,
         context: MetadataReadContext = MetadataReadContext()
     ) throws -> MetadataDocument {
+        if StandardAudioMetadataReader.supportedExtensions.contains(fileURL.pathExtension.lowercased()) {
+            return try StandardAudioMetadataReader.read(fileURL: fileURL)
+        }
         if QSFMetadataReader.supportedExtensions.contains(fileURL.pathExtension.lowercased()) {
             return try QSFMetadataReader.read(fileURL: fileURL, context: context)
         }
@@ -248,6 +256,10 @@ public enum MetaManCore {
         context: MetadataReadContext = MetadataReadContext()
     ) throws -> MetadataReadResult {
         let formatHint = fileURL.pathExtension.lowercased()
+        if StandardAudioMetadataReader.supportedExtensions.contains(formatHint) {
+            let document = try StandardAudioMetadataReader.read(fileURL: fileURL)
+            return MetadataReadResult(tracks: [MetadataTrack(document: document)])
+        }
         if QSFMetadataReader.supportedExtensions.contains(formatHint) {
             let document = try QSFMetadataReader.read(fileURL: fileURL, context: context)
             return MetadataReadResult(tracks: [MetadataTrack(document: document)])

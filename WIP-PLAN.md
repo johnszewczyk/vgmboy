@@ -157,27 +157,30 @@ Remaining metadata-reader targets are grouped by the boundary they need:
   new file-URL reader parses the root once before resolving dependencies;
   this avoids a double parse present in its initial implementation, not in the
   former ScanSong reader.
-- **Next full-format investigation — FSB:** the root-1 CocoaSpice catalog has
-  84 `.fsb` rows/files in one archive (126,183,712 bytes total); all 84 are
-  single-track FSB5 v1 banks using codec `0x0F` (Vorbis), and that archive has
-  no sibling `.fev`. All 84 saved titles equal their filename stems, the saved
-  game/system fields are blank, and 67 rows have a loop duration. This is useful
-  corpus coverage, not proof that all `.fsb` sources share this layout. The
-  complete boundary is FSB1–FSB5, including
-  legacy versioned/basic/duplicate sample headers, FSB5 packed modes and
-  extra-record chains, optional FEV stream-name overrides, and any timing or
-  validity differences that currently come from codec initialization (notably
-  MPEG/XMA paths). Do not implement or route an FSB5-only extraction. First
-  establish synthetic coverage for every version and the FEV naming boundary;
-  then compare the live corpus, saved catalog, and fresh vgmstream before
-  cutting over the `.fsb` route.
-- **Selection rule:** continue surveying active decoder/inspector routes by
-  live corpus and source signature, but only begin a cutover when one complete
-  format boundary can be validated. Do not create suffix-only or version-only
-  direct paths for ambiguous or multi-version families.
-- **Audio containers:** Core Audio is currently the scanner's native
-  standard-audio reader. Treat it as a separate platform-boundary decision,
-  not as a playback-plugin removal.
+- **Standard audio extraction — complete:** moved ScanSong's complete existing
+  `standard-audio` reader into MetaManCore's file-URL API for `.aif`, `.aiff`,
+  `.flac`, `.m4a`, `.mp3`, `.ogg`, and `.wav`. The reader preserves AVFoundation
+  common-tag and exact decoded-frame duration behavior; FLAC comment order,
+  duplicates, unknown keys, and source comment bytes are now retained. ScanSong
+  owns only route selection and schema-23 projection. This removes the last
+  ordinary-audio metadata implementation from ScanSong, but AVFoundation
+  remains an OS framework dependency; it does not remove or replace a playback
+  plugin. The ScanSong target no longer declares AVFoundation as a direct
+  linker dependency. Verification: all 145 MetaMan tests passed; all 148 ScanSongKit tests
+  passed under a temporary test-only manifest that excluded the known failing
+  ScanSongApp link target. The read-only CocoaSpice catalog check compared all
+  1,471 rows in 127 source archives against both MetaMan and a frozen test-only
+  copy of the former ScanSong reader: zero mismatches. Warmed, alternating-order
+  means were 1.571 ms/file for MetaMan and 1.560 ms/file for the old reader
+  (0.7% slower, within this single-run measurement noise). The temporary
+  ScanSongApp exclusion was reverted; the production app target remains in the
+  package. Only ScanSongKit's obsolete direct AVFoundation linker entry was
+  intentionally removed.
+- **Next scope:** keep this extraction pass limited to readers that already
+  existed inside ScanSong and can move completely into MetaMan. Do not start
+  new vgmstream format implementations or cut over decoder-backed routes as a
+  side effect of this migration. Preserve those routes until a separate
+  complete-reader plan is explicitly selected.
 - **Still decoder/inspector-backed:** The remaining vgmstream format set,
   MDX, and UADE/Amiga require format-specific full-reader feasibility work;
   OpenMPT currently contributes only an optional/deferred scanner row. Do not

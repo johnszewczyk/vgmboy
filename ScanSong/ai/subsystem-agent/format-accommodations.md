@@ -57,11 +57,11 @@ independent media sources are not playback targets.
 | `libvgm` | `.vgm`, `.vgz`, `.gym`, `.s98`, `.dro` | `.vgm`/`.vgz` use MetaManCore's direct GD3/header-timing reader and `.s98` uses its direct header/device/tag/event reader. `.gym` remains one structure-known row without metadata and is not an extraction target; `.dro` has no ScanSong route. |
 | `psgplay` | `.sndh` | MetaManCore bounded header/tag/ICE! reader; PSGPlay remains the playback engine and is not linked for production scanning. |
 | `mdx` | `.mdx` | VGMBoy-built `vgmboy-mdx-inspect` still supplies decoder-derived enumeration and metadata; dependencies are materialized but not published as tracks. |
-| `standard-audio` | `.aac`, `.aif`, `.aiff`, `.caf`, `.flac`, `.m4a`, `.mp3`, `.wav`, `.wave` | Core Audio supplies duration/common tags, with FLAC Vorbis comments. `.ogg` is routed through this scanner handler too. `.aac`, `.caf`, and `.wave` do not currently have ScanSong routes. |
+| `standard-audio` | `.aac`, `.aif`, `.aiff`, `.caf`, `.flac`, `.m4a`, `.mp3`, `.wav`, `.wave` | MetaManCore's file-URL reader uses AVFoundation for duration/common tags and directly retains FLAC Vorbis comments. `.ogg` is routed through this scanner handler too. `.aac`, `.caf`, and `.wave` do not currently have ScanSong routes. |
 | `ffmpeg-audio` | `.ape`, `.mp2`, `.tak` | `.ape` uses MetaManCore's direct header/tag reader. `.mp2` and `.tak` do not currently have ScanSong routes. |
 | `highly-complete` | `.gsf`, `.minigsf` | MetaManCore validates PSF v0x22 payloads, GBA segments, and dependency chains without mGBA. |
 | `twosf` | `.2sf`, `.mini2sf` | `MetaManCore` PSF-style `[TAG]` reader; it does not start the playback core. |
-| `vgmstream` | `.aa3`, `.adp`, `.adx`, `.adpcm`, `.ads`, `.agsc`, `.ahx`, `.aifc`, `.at3`, `.aus`, `.bk2`, `.bik`, `.bnk`, `.dsp`, `.dvi`, `.fsb`, `.genh`, `.h4m`, `.hbd`, `.hd`, `.iecs`, `.int`, `.ldat`, `.logg`, `.mib`, `.msf`, `.mtaf`, `.ogg`, `.ps3`, `.rsf`, `.rws`, `.s14`, `.ss2`, `.stream`, `.strm`, `.svag`, `.swav`, `.thp`, `.txtp`, `.vag`, `.xa`, `.xmd`, `.xvag` | Validated `.adp` DTK/TXTH layouts, `.ads`/`.ss2`, `.adx`, `.ahx`, `.at3`, `.aus`, `.dsp`/`.thp`, `.msf`, `.svag`, and `.xmd` use content-aware MetaManCore readers with vgmstream fallback for unrecognized aliases; validated headerless `.mib` uses the MIB reader with vgmstream fallback for failed probes; `.bika` uses MetaMan's complete Bink container walk; `.xa` uses ScanSong's direct reader, and validated Nintendo DS standard/FFTA2 `.strm` layouts use MetaManCore. `.txtp` and HD-bank inputs use vgmstream with dependency preparation. Other routed streams use `vgmstream-cli -I`. `.ogg` currently uses the Core Audio scanner route. |
+| `vgmstream` | `.aa3`, `.adp`, `.adx`, `.adpcm`, `.ads`, `.agsc`, `.ahx`, `.aifc`, `.at3`, `.aus`, `.bk2`, `.bik`, `.bnk`, `.dsp`, `.dvi`, `.fsb`, `.genh`, `.h4m`, `.hbd`, `.hd`, `.iecs`, `.int`, `.ldat`, `.logg`, `.mib`, `.msf`, `.mtaf`, `.ogg`, `.ps3`, `.rsf`, `.rws`, `.s14`, `.ss2`, `.stream`, `.strm`, `.svag`, `.swav`, `.thp`, `.txtp`, `.vag`, `.xa`, `.xmd`, `.xvag` | Validated `.adp` DTK/TXTH layouts, `.ads`/`.ss2`, `.adx`, `.ahx`, `.at3`, `.aus`, `.dsp`/`.thp`, `.msf`, `.svag`, and `.xmd` use content-aware MetaManCore readers with vgmstream fallback for unrecognized aliases; validated headerless `.mib` uses the MIB reader with vgmstream fallback for failed probes; `.bika` uses MetaMan's complete Bink container walk; `.xa` uses ScanSong's direct reader, and validated Nintendo DS standard/FFTA2 `.strm` layouts use MetaManCore. `.txtp` and HD-bank inputs use vgmstream with dependency preparation. Other routed streams use `vgmstream-cli -I`. `.ogg` is routed to MetaManCore's standard-audio reader in ScanSong. |
 | `lazyusf` | `.usf`, `.miniusf` | `MetaManCore` PSF-style `[TAG]` reader; `.usflib` remains dependency data, not a track. |
 | `playpsf` | `.psf`, `.minipsf`, `.psf2`, `.minipsf2` | `MetaManCore` PSF-style `[TAG]` reader; libraries remain dependency data. |
 | `qsf` | `.qsf`, `.miniqsf` | MetaManCore's complete PSF v0x41/QSound reader validates payload blocks, root tags, and declared dependencies without the QSound core. |
@@ -110,7 +110,7 @@ track fields and does not expose those additional manifest fields in CocoaSpice.
 | `hes-direct` | `.hes` | One row per sibling-M3U entry, or 256 compatibility slots without one | `MetaManCore.readResult` HES header/M3U reader | No emulator; MetaMan receives only the same-basename sibling M3U, which remains support data and supplies the authored track map and timings. |
 | `sndh-direct` | `.sndh` | One row per declared subtune | `MetaManCore.readResult` with bounded ICE! expansion | PSGPlay remains playback-only; the previous metadata API is a test-only oracle. |
 | `openmpt` | `.669`, `.dmf`, `.far`, `.it`, `.mod`, `.mptm`, `.mtm`, `.okt`, `.ptm`, `.s3m`, `.stm`, `.ult`, `.xm` | One structurally-known row | Optional/deferred; metadata may be empty | No scanner-side module conversion or archive expansion. |
-| `standard-audio` | `.aif`, `.aiff`, `.flac`, `.m4a`, `.mp3`, `.ogg`, `.wav` | One track | Core Audio duration and common tags; FLAC Vorbis comments | Exact decoded duration is preferred. |
+| `standard-audio` | `.aif`, `.aiff`, `.flac`, `.m4a`, `.mp3`, `.ogg`, `.wav` | One track | MetaManCore file-URL reader: AVFoundation duration/common tags; ordered FLAC Vorbis comments | Exact decoded duration is preferred; ScanSong only routes and projects the document. |
 | `ape-direct` | `.ape` | One validated single row | `MetaManCore` APE descriptor, seek-table, APEv2, and ID3v2 reader | Header-derived duration, ordered tags, and original tag blocks; no decoder startup. |
 | `adx-direct` | CRI/Monster ADX in `.adx` | One track | `MetaManCore` CRI/Monster header and loop-timing reader | Preserves native sample/loop bounds and vgmstream's default two-loop/10-second-fade play window; non-ADX signatures (including Ogg and RIFF aliases) use vgmstream. |
 | `aus-direct` | Atomic Planet AUS in `.aus` | One track | `MetaManCore` Atomic Planet AUS header reader | Preserves the exact 32-byte header, native codec/sample/channel/loop facts, and vgmstream's default play window without starting PS-ADPCM or Xbox IMA decoding; other `.aus` payloads use vgmstream. |
@@ -922,14 +922,17 @@ before they should become catalog sources.
 
 ## Standard audio and modules
 
-### Core Audio
+### Standard audio through MetaManCore / AVFoundation
 
 `.aif`, `.aiff`, `.flac`, `.m4a`, `.mp3`, `.ogg`, and `.wav` are one-track
-standard audio. ScanSong prefers `AVAudioFile`'s exact decoded frame count and
-sample rate for duration, then falls back to `AVURLAsset`. Common tags are
-mapped to the catalog; FLAC Vorbis comments are read directly for album,
-title, artist, album artist, composer, and comment. No game-music timing model
-is invented for ordinary audio.
+standard audio. MetaManCore prefers `AVAudioFile`'s exact decoded frame count
+and sample rate for duration, then falls back to `AVURLAsset`. It retains
+AVFoundation common tags and directly parses FLAC Vorbis comments, preserving
+their order, duplicate/unknown keys, and source block. The convenience
+projection retains the former album/title/artist/comment precedence; ScanSong
+only adapts that document to schema 23. No game-music timing model is invented
+for ordinary audio. AVFoundation remains an OS framework dependency, not a
+bundled playback decoder.
 
 ### OpenMPT modules
 

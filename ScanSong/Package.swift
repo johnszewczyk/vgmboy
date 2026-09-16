@@ -30,10 +30,7 @@ let package = Package(
                 .product(name: "MetaManCore", package: "MetaMan"),
                 .product(name: "UACWrapperCore", package: "UACWrapper")
             ],
-            linkerSettings: [
-                .linkedLibrary("sqlite3"),
-                .linkedFramework("AVFoundation")
-            ]
+            linkerSettings: [.linkedLibrary("sqlite3")]
         ),
         .executableTarget(name: "scansong", dependencies: ["ScanSongKit"]),
         .executableTarget(

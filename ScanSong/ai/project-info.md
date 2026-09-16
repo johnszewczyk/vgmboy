@@ -18,7 +18,8 @@ publication. The product is the sole catalog writer consumed by CocoaSpice and S
   RIFF ATRAC3/ATRAC3+, Sony MSF, Sony SSHD (`.ads`/`.ss2`), headerless PlayStation MIB,
   Bink audio containers, Konami Saturn DVI,
   Konami/SNK SVAG and XMD, Nintendo DSP/RS03/THP, Sony XA, SID PSID/RSID,
-  SPC ID666/xID6, S98, VGM/VGZ, generic vgmstream GENH headers, AGSC banks, and PSF/PSF2/SSF/USF/2SF tag footers. ScanSong maps neutral
+  SPC ID666/xID6, S98, VGM/VGZ, standard audio through AVFoundation, generic
+  vgmstream GENH headers, AGSC banks, and PSF/PSF2/SSF/USF/2SF tag footers. ScanSong maps neutral
   ordered track documents to schema 23. All complete direct format readers
   listed here are owned by MetaMan; ScanSong retains routing, safe source and
   archive handling, dependency preparation, and schema-23 projection.

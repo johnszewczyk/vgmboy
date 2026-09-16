@@ -15,7 +15,7 @@ headerless Nintendo GameCube DTK and exact TXTH-described IMA ADP streams,
 CRI AHX,
 Konami Saturn DVI,
 standard Nintendo DS STRM, Final Fantasy Tactics A2 RIFF/IMA, Nintendo DSP,
-Retro Studios RS03 and AGSC banks, generic vgmstream GENH headers, and Nintendo THP audio readers. SAP enumerates declared
+Retro Studios RS03 and AGSC banks, generic vgmstream GENH headers, Nintendo THP audio, and AVFoundation-backed standard audio readers. SAP enumerates declared
 subtunes from ordered header directives and retains native `TIME` hints. The
 S98 reader handles header/device information, its complete v3 tag block (including arbitrary and repeated
 keys), legacy pre-v3 titles, and register-command timing. The VGM reader
@@ -46,6 +46,7 @@ fixed offsets or that the decoder is needed to locate every field.
 | SPC | Direct text/binary ID666 header and xID6 chunk parser; no playback emulator | Ordered metadata, dump date, dumper/emulator facts, soundtrack fields, native timing, and separately retained ID666/xID6 source blocks | Not implemented |
 | SID (PSID / RSID) | Direct fixed-header parser; no playback core | Title, author, release text, technical header facts, and retained raw header; no duration inferred from flags | Not implemented |
 | APE | Direct descriptor, seek-table, APEv2, and leading ID3v2 parser; no audio decoder | Ordered text tags, normalized common fields, exact ID3v2/APEv2 blocks, technical header facts, and sample-count duration | Not implemented |
+| Standard audio (`.aif`, `.aiff`, `.flac`, `.m4a`, `.mp3`, `.ogg`, `.wav`) | File-URL reader through AVFoundation; FLAC Vorbis comments parsed directly | Common AVFoundation tags and decoded-frame duration; FLAC comments retain order, duplicate/unknown keys, and the original comment block | Not implemented |
 | CRI / Monster ADX | Direct CRI type-03/04/05 and Monster Games header parser; no audio decoder | Filename-derived title, source label, exact header bytes, sample/channel/loop facts, and sample-derived loop/play timing | Not implemented |
 | Atomic Planet AUS | Direct 32-byte header and loop-timing parser; no audio decoder | Filename-derived title, source label, exact header bytes, codec/sample/channel/loop facts, and sample-derived loop/play timing | Not implemented |
 | RIFF/WAVE ATRAC3/ATRAC3+ | Direct RIFF chunk reader for codec `0x0270` and the ATRAC3+ extensible GUID; no audio decoder | Ordered `LIST/INFO` tags, exact named non-audio chunks, codec/fact/loop facts, and vgmstream-compatible play timing | Not implemented |
@@ -87,6 +88,9 @@ GSF. Data callers pass bounded named companion bytes through
 track-aware formats rather than silently discarding subtunes. SNDH tags `##`,
 `!#`, `!#SN`, `TIME`, and `FRMS` retain native order; the reader applies the
 Atari ST character map and defaults missing or zero frame-timer rates to 50 Hz.
+Standard audio is intentionally file-URL-only: AVFoundation must inspect the
+source file to provide common tags and duration; a `Data` buffer is not
+materialized to a temporary media file.
 
 KSS retains the fixed 16-byte `KSCC`/`KSSX` header and, for a valid KSSX
 extension of exactly 16 bytes, its additional 16-byte header. It records the
@@ -562,18 +566,21 @@ is implied. Future writers must be format-specific and preserve unknown data.
 
 ## Integration boundary
 
-MetaMan has no dependency on ScanSong, VGMBoy, or a playback decoder. ScanSong
-adapts `MetadataDocument` into its catalog schema; other clients can consume
-the same library result directly. The current registry contains AY, SAP,
+MetaMan has no dependency on ScanSong, VGMBoy, or a bundled playback decoder.
+The standard-audio reader uses Apple's AVFoundation framework for file-based
+metadata and duration; it does not link a playback plugin. ScanSong adapts
+`MetadataDocument` into its catalog schema; other clients can consume the same
+library result directly. The current registry contains AY, SAP,
 NSF/GBS/NSFE, HES, SNDH, KSS, S98, VGM/VGZ, SPC, SID, APE, ADX, AUS, ATRAC3,
 Sony MSF, Sony SSHD (`.ads`/`.ss2`), headerless PlayStation MIB, Nintendo DTK and
-TXTH-described IMA ADP, CRI AHX, Konami Saturn DVI, Konami/SNK SVAG, Sony XA, PSF/PSF2/SSF/USF/2SF, GSF/miniGSF, and
-QSF/miniQSF readers.
+TXTH-described IMA ADP, CRI AHX, Konami Saturn DVI, Konami/SNK SVAG, Sony XA,
+PSF/PSF2/SSF/USF/2SF, GSF/miniGSF, QSF/miniQSF, and standard-audio readers.
 SNDH is now fully read by MetaManCore; VGMBoy's old SNDH wrapper remains only as
 a test oracle while PSGPlay remains available for playback. KSS has also moved
-to MetaManCore, as have the complete GSF and QSF readers. Remaining direct
-parser ownership is Core Audio standard audio in ScanSong; decoder-backed
-plugin routes are not extracted by publishing only partial metadata. AY, SAP,
+to MetaManCore, as have the complete GSF and QSF readers. Standard-audio
+parsing now lives in MetaManCore; ScanSong retains routing and schema
+projection only. Decoder-backed plugin routes are not extracted by publishing
+only partial metadata. AY, SAP,
 NSF, GBS, NSFE, HES, SNDH, KSS, and Sony XA
 use the ordered result contract, including playlist repeats and native source
 indices. KSS remains complete for ScanSong's existing 256-slot info-only
@@ -589,8 +596,9 @@ discover files, route supported sources, materialize bounded archive or
 dependency context, pass sources to MetaMan, and transactionally publish the
 resulting documents into the catalog. ScanSong still owns its database,
 scanner UI/CLI, scheduling, and source safety; it should not grow a second set
-of format parsers. OS-provided metadata such as Core Audio can remain behind a
-platform adapter until MetaMan has an explicit supported abstraction for it.
+of format parsers. Core Audio-backed standard audio is now an explicit
+MetaManCore file-URL reader; the OS media framework remains a platform runtime
+dependency, not a bundled decoder dependency.
 
 MetaMan is maintained in the VGMMan family repository. ScanSong and other
 family clients resolve it from the shared checkout, so its source and reader

@@ -2020,7 +2020,7 @@ func hesDirectAndLibGMEInfoOnlyPerformance() async throws {
 }
 
 @Test(
-    "Core Audio inspection publishes FLAC metadata and duration",
+    "MetaMan standard-audio route publishes FLAC metadata and duration",
     .enabled(
         if: ProcessInfo.processInfo.environment["SCANSONG_FLAC_FIXTURE"] != nil,
         "Set SCANSONG_FLAC_FIXTURE to run the archive-backed FLAC metadata check."

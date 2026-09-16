@@ -366,7 +366,16 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
         case "sndh-direct":
             return try SNDHInspector.inspect(fileURL: fileURL, route: route)
         case "standard-audio":
-            let metadata = try StandardAudioInspector.inspect(fileURL: fileURL)
+            let document: MetadataDocument
+            do {
+                document = try MetaManCore.read(fileURL: fileURL)
+            } catch let error as MetadataReadError {
+                throw ScannerInspectionError.malformedFile(error.localizedDescription)
+            }
+            let metadata = ScannerMetadata(
+                metadataDocument: document,
+                includeDateAndEncodedByInComment: false
+            )
             return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
         case "openmpt":
             return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: nil)])

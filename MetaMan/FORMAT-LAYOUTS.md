@@ -14,6 +14,35 @@ checks, preserves source bytes, and derives timing without producing audio.
 
 ## Reader layouts
 
+### Standard audio and FLAC Vorbis comments
+
+The ordinary audio reader uses AVFoundation's file-URL APIs for common tags
+and duration. It first asks `AVAudioFile` for the decoded frame count and
+sample rate; if that fails, it uses `AVURLAsset` duration. This route covers
+`.aif`, `.aiff`, `.flac`, `.m4a`, `.mp3`, `.ogg`, and `.wav`. Those framework
+values are not fixed source offsets and no audio is rendered by a bundled
+playback decoder.
+
+For FLAC, MetaMan additionally walks metadata blocks and parses the Vorbis
+comment block directly. Offsets below are relative to the start of the FLAC
+file except where identified as block-relative:
+
+| Source position | Meaning |
+| --- | --- |
+| `0x00..0x03` | `fLaC` stream marker. |
+| `0x04` onward | Repeated four-byte metadata-block headers followed by each declared payload. Header byte 0 uses bit 7 for the last-block flag and bits 0–6 for block type; bytes 1–3 are the payload size as a 24-bit big-endian integer. |
+| Block type `4` payload, `+0x00..0x03` | Vendor-string byte length, little-endian UInt32. |
+| Block type `4` payload, `+0x04...` | Vendor bytes, followed by a little-endian UInt32 comment count. |
+| After comment count | Repeated little-endian UInt32 byte length, then that many UTF-8 bytes containing `NAME=value`. |
+
+The reader preserves comment order, duplicate keys, unknown names, and the
+exact Vorbis-comment payload in `MetadataDocument.tags` and `rawTagBlock`.
+Convenience fields use the last nonempty value for duplicate FLAC keys to
+match the former ScanSong projection: album becomes both `game` and `album`,
+title becomes `title`, and artist selection is `ARTIST`, `ALBUMARTIST`, then
+`COMPOSER`. Common AVFoundation metadata is the fallback. The scanner still
+projects only its existing schema-23 fields.
+
 ### NSF / NESM
 
 NSF has a fixed 128-byte header. Multi-byte addresses and speed fields are
