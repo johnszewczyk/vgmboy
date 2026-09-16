@@ -127,7 +127,7 @@ public struct ScannerPluginRegistry: Sendable {
     /// (`p4x.earth`, `mod.xpose-end`, etc.). ADX, ADP, AHX, AT3, AUS, MSF, STRM, SVAG,
     /// DSP, THP, DVI, XMD, SSHD/ADS/SS2, and XA are content-aware: ScanSong probes ADX and
     /// AUS; MetaManCore probes RIFF ATRAC3, Sony MSF, Nintendo DS STRM,
-    /// Konami/SNK SVAG and XMD, Sony SSHD/ADS/SS2, Nintendo DSP/RS03/THP, and Sony
+    /// Konami/SNK SVAG and XMD, Sony SSHD/ADS/SS2, Nintendo DSP/RS03/THP, Retro Studios AGSC, and Sony
     /// XA. Both `.ads` and `.ss2` use the complete Sony SSHD reader. DVI is
     /// direct only for the complete Konami `DVI.` layout; Capcom
     /// `IDVI` aliases retain vgmstream. ADP is direct only for the complete
@@ -181,6 +181,10 @@ public struct ScannerPluginRegistry: Sendable {
         case "dsp", "thp":
             contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: extensionName)
                 ? "dsp-direct"
+                : "vgmstream"
+        case "agsc":
+            contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "agsc")
+                ? "agsc-direct"
                 : "vgmstream"
         case "strm":
             contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "strm")

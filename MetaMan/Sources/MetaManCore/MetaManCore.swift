@@ -178,6 +178,11 @@ public enum MetaManCore {
             identifier: "ngc-thp-audio",
             fileExtensions: ["dsp", "thp"],
             methodology: "Direct Nintendo THP component-table and audio-header reader; retains bounded component/header blocks without decoding video or audio."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "agsc",
+            fileExtensions: ["agsc"],
+            methodology: "Direct Retro Studios AGSC v1/v2 chunk and subsong-table reader; retains the bank name, DSP records, and coefficients and derives sample/loop timing without decoding audio."
         )
     ]
 
@@ -214,6 +219,10 @@ public enum MetaManCore {
         }
         if fileURL.pathExtension.caseInsensitiveCompare("dvi") == .orderedSame {
             return try DVIMetadataReader.read(fileURL: fileURL)
+        }
+        if fileURL.pathExtension.caseInsensitiveCompare("agsc") == .orderedSame {
+            _ = try AGSCMetadataReader.readResult(fileURL: fileURL)
+            throw MetadataReadError.trackAwareResultRequired("AGSC")
         }
         let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
         return try read(
@@ -266,6 +275,9 @@ public enum MetaManCore {
             let document = try DVIMetadataReader.read(fileURL: fileURL)
             return MetadataReadResult(tracks: [MetadataTrack(document: document)])
         }
+        if formatHint == "agsc" {
+            return try AGSCMetadataReader.readResult(fileURL: fileURL)
+        }
         if formatHint != "svag" {
             let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
             let resolvedContext = try contextIncludingHESPlaylist(for: fileURL, context: context)
@@ -290,6 +302,9 @@ public enum MetaManCore {
         let cleanedHint = formatHint?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let format = cleanedHint.map { $0.hasPrefix(".") ? String($0.dropFirst()) : $0 }
         let normalizedFormat = format?.isEmpty == false ? format : nil
+        if normalizedFormat == "agsc" || (normalizedFormat == nil && AGSCMetadataReader.matches(data)) {
+            return try AGSCMetadataReader.readResult(data: data, displayName: displayName)
+        }
         if QSFMetadataReader.supportedExtensions.contains(normalizedFormat ?? "")
             || (normalizedFormat == nil && QSFMetadataReader.matches(data)) {
             return try QSFMetadataReader.readResult(data: data, displayName: displayName, context: context)
@@ -366,6 +381,7 @@ public enum MetaManCore {
         case "ahx": AHXMetadataReader.supports(fileURL: fileURL)
         case "dvi": DVIMetadataReader.supports(fileURL: fileURL)
         case "dsp", "thp": NintendoDSPMetadataReader.supports(fileURL: fileURL)
+        case "agsc": AGSCMetadataReader.supports(fileURL: fileURL)
         case "xa": SonyXAMetadataReader.supports(fileURL: fileURL)
         case "strm":
             NDSSTRMMetadataReader.supports(fileURL: fileURL)
@@ -384,6 +400,13 @@ public enum MetaManCore {
         let cleanedHint = formatHint?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let format = cleanedHint.map { $0.hasPrefix(".") ? String($0.dropFirst()) : $0 }
         let normalizedFormat = format?.isEmpty == false ? format : nil
+
+        if normalizedFormat == "agsc" || (normalizedFormat == nil && AGSCMetadataReader.matches(data)) {
+            let result = try AGSCMetadataReader.readResult(data: data, displayName: displayName)
+            throw MetadataReadError.trackAwareResultRequired(
+                result.tracks.first?.document.format.uppercased() ?? "AGSC"
+            )
+        }
 
         if QSFMetadataReader.supportedExtensions.contains(normalizedFormat ?? "")
             || (normalizedFormat == nil && QSFMetadataReader.matches(data)) {

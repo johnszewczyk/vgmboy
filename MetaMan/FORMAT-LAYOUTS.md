@@ -333,6 +333,46 @@ and the decoder-reference layouts in
 [`rs03.c`](../VGMBoy/vendor/vgmstream/src/meta/rs03.c), and
 [`thp.c`](../VGMBoy/vendor/vgmstream/src/meta/thp.c).
 
+### Retro Studios AGSC banks
+
+AGSC has two chunk organizations. Version 1 begins with a bounded NUL string
+(normally `Audio/`), followed by the bank-name string. Version 2 begins with a
+big-endian `1`, then its bank name and a two-byte song identifier. The decoder
+uses the bank name as the visible stream name in both versions. Strings follow
+vgmstream's 0x20-byte reader limit; a full-width field consumes the extra byte
+between fields even if it is not NUL-terminated.
+
+| Position | Meaning |
+| --- | --- |
+| v1 `0x00` | First string, normally `Audio/`; its first four bytes are the `Audi` version-1 signature. |
+| v1 after first string | Bank/stream name, read with the same 0x20-byte bound. |
+| v1 after name | Two consecutive chunks, each `u32BE size` followed by that many opaque bytes. |
+| v1 after unknown chunks | Audio chunk: `u32BE data size`, then encoded audio bytes. The following header chunk is `u32BE header size` plus header bytes. |
+| v2 `0x00..0x03` | `u32BE(1)` version marker. |
+| v2 `0x04` | Bank/stream name, followed by its two-byte song id. |
+| v2 after song id | Four `u32BE` sizes in order: unknown chunk 1, unknown chunk 2, header, audio data. Their chunk bodies follow in that same order. |
+| Header chunk `+0x00..0x1F`, per stream | `+0x00` id; `+0x04` encoded-stream offset relative to audio data; `+0x08` unknown; `+0x0C` mixer value (commonly `0x3C00`); `+0x0E` sample rate (`u16BE`); `+0x10` sample count (`s32BE`); `+0x14` loop start (`s32BE`); `+0x18` loop length (`s32BE`); `+0x1C` coefficient offset (`s32BE`). |
+| Header chunk after stream records | A four-byte `0xFFFFFFFF` marker, followed by one 0x28-byte DSP coefficient block per stream. Stream count follows vgmstream's formula `(headerSize - 4) / (0x20 + 0x28)`. |
+
+Version 1 stores audio before the header chunk; version 2 stores header before
+audio. The reader bounds-checks both chunk layouts, the encoded extent derived
+from `sampleCount / 14 * 8`, each loop and coefficient range, and caps
+enumeration at 1,000 rows. Per-track title is the bank name; channel count is
+mono as declared by vgmstream's AGSC initializer. A nonzero loop length is
+projected as `loopStart + loopLength - 1` (vgmstream's inclusive loop end);
+loop duration uses the same `end - start` sample count as ScanSong's `-I`
+adapter. For looped files the scanner play-time projection is
+`loopStart + 2 * (loopEnd - loopStart) + 10 seconds`; unlooped files use the
+native sample count. This retains vgmstream's play duration without emulating
+or decoding audio. Coefficient pointers are based at `headerOffset + 8` and are
+bounds-checked against the complete source file. The live Retro Studios bank
+uses a coefficient range that extends eight bytes beyond the declared header
+chunk, so chunk-local bounds would reject valid content. The raw name, each
+stream record, its coefficient block, and both opaque chunks are retained per
+result entry.
+
+See [AGSCMetadataReader.swift](Sources/MetaManCore/AGSCMetadataReader.swift).
+
 ### AY / ZXAYEMUL
 
 | Source position | Meaning |

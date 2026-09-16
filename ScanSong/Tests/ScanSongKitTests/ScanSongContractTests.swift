@@ -112,7 +112,8 @@ import zlib
     #expect(registry.route(pathExtension: "xmd")?.pluginID == "vgmstream")
     #expect(registry.route(pathExtension: "hd")?.pluginID == "vgmstream-hd-bank")
     for ext in BuiltInScannerPlugins.gameCubeVGMStreamExtensions {
-        #expect(registry.route(pathExtension: ext)?.pluginID == "vgmstream")
+        let expectedPlugin = ext == "agsc" ? "agsc-direct" : "vgmstream"
+        #expect(registry.route(pathExtension: ext)?.pluginID == expectedPlugin)
     }
     #expect(registry.route(pathExtension: "txth") == nil)
     #expect(registry.route(pathExtension: "sbb") == nil)

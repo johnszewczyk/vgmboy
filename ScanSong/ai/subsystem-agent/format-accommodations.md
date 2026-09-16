@@ -124,6 +124,7 @@ track fields and does not expose those additional manifest fields in CocoaSpice.
 | `ahx-direct` | Validated CRI AHX in `.ahx` | One track | MetaManCore bounded AHX header and fixed-bitrate payload reader | The live root-1 corpus contains 11 files with exact saved-catalog and fresh-vgmstream parity; invalid `.ahx` aliases remain on vgmstream. |
 | `dvi-direct` | Validated Konami Saturn `DVI.` in `.dvi` | One track | MetaManCore bounded DVI header and stereo IMA timing reader | The live root-1 corpus contains 45 files with exact saved-catalog and fresh-vgmstream parity; Capcom `IDVI` aliases and incomplete payloads remain on vgmstream. |
 | `dsp-direct` | Standard Nintendo DSPADPCM and Retro Studios `RS03` in `.dsp`; Nintendo THP audio in `.dsp` or `.thp` | One track | MetaManCore's three signature-dispatched header readers | Preserves raw header/layout and native sample/loop facts; unrecognized `.dsp`/`.thp` payloads use vgmstream. |
+| `agsc-direct` | Retro Studios AGSC bank versions 1 and 2 in `.agsc` | One row per bank stream | MetaManCore's bounded chunk and DSP-table reader | Reads the internal stream name, sample/rate/loop values, and coefficient-table references without DSP decoding; unrecognized `.agsc` payloads use vgmstream. |
 | `nds-strm-direct` | Nintendo DS standard `STRM`/`HEAD`/`DATA` or FFTA2 `RIFF`/`IMA ` in `.strm` | One track | `MetaManCore` standard STRM and FFTA2 readers | Preserves codec, channel, sample, loop, and interleave facts plus scanner-compatible duration; unrelated `.strm` aliases use vgmstream. |
 | `xa-direct` | Sony CD-XA in `.xa` | One row per XA file/channel subsong | MetaManCore Sony XA sector reader | Preserves interleaved channel enumeration, source facts, and sector-derived timing; RIFF/CDXA wrappers are accepted. Other `.xa` formats use vgmstream. |
 | `vgm-direct` | `.vgm`, `.vgz` | One stream row | `MetaManCore` VGM/VGZ header, GD3, and sample timing | VGZ is bounded gzip decompression, not a generic archive; no decoder is started. |
@@ -136,7 +137,7 @@ track fields and does not expose those additional manifest fields in CocoaSpice.
 | `highly-theoretical` | `.ssf`, `.minissf` | One structurally-known row | `MetaManCore` PSF-style `[TAG]` footer reader | Metadata is available; current VGMBoy/CocoaSpice playback admission remains a gap. |
 | `lazyusf` | `.usf`, `.miniusf` | One structurally-known row | `MetaManCore` PSF-style `[TAG]` footer reader | `.usflib` is playback dependency data, never a row. |
 | `twosf` | `.2sf`, `.mini2sf` | One structurally-known row | `MetaManCore` PSF-style `[TAG]` footer reader | `.2sflib` is dependency data, never a row. |
-| `vgmstream` | Remaining raw-stream extensions listed below plus nonmatching `.adp`, `.adx`, `.ads`/`.ss2`, `.at3`, `.aus`, `.dsp`/`.thp`, `.msf`, `.strm`, `.svag`, `.xmd`, and `.xa` aliases | One row per reported subsong | VGMBoy-built `vgmstream-cli` | Native `-I` inspection; subsong count is bounded. Recognized ADP DTK/TXTH, CRI/Monster ADX, RIFF ATRAC3, Atomic Planet AUS, standard DSPADPCM, Retro Studios RS03, THP audio, Sony MSF, Sony SSHD, Konami/SNK SVAG and XMD, both Nintendo DS STRM layouts, Sony XA, and Bink `.bika` use direct readers. |
+| `vgmstream` | Remaining raw-stream extensions listed below plus nonmatching `.adp`, `.adx`, `.agsc`, `.ads`/`.ss2`, `.at3`, `.aus`, `.dsp`/`.thp`, `.msf`, `.strm`, `.svag`, `.xmd`, and `.xa` aliases | One row per reported subsong | VGMBoy-built `vgmstream-cli` | Native `-I` inspection; subsong count is bounded. Recognized ADP DTK/TXTH, CRI/Monster ADX, Retro Studios AGSC, RIFF ATRAC3, Atomic Planet AUS, standard DSPADPCM, Retro Studios RS03, THP audio, Sony MSF, Sony SSHD, Konami/SNK SVAG and XMD, both Nintendo DS STRM layouts, Sony XA, and Bink `.bika` use direct readers. |
 | `vgmstream-txtp` | `.txtp` | One row per resolved subsong | `vgmstream-cli` after dependency preparation | Authored TXTP structure is authoritative. |
 | `vgmstream-hd-bank` | `.hd`, `.hbd`, `.iecs` | One row per resolved subsong | `vgmstream-cli` after dependency preparation | Bank/control sidecars are support data; IECS remains a known adapter boundary. |
 | `play-psf1` | `.psf`, `.minipsf` | One structurally-known row | `MetaManCore` PSF-style `[TAG]` footer reader | `.psflib` is playback dependency data, never a row. |
@@ -818,11 +819,11 @@ The vgmstream extension set is owned by VGMBoy's
 .mib .msf .mtaf .rws .ss2 .stream .strm .svag .vag .xmd
 ```
 
-Although `.adx`, `.ads`, `.ss2`, `.ahx`, `.at3`, `.aus`, `.dsp`, `.msf`, `.strm`, `.svag`, `.xmd`, and `.xa` remain in VGMBoy's
+Although `.adx`, `.ads`, `.ss2`, `.ahx`, `.agsc`, `.at3`, `.aus`, `.dsp`, `.msf`, `.strm`, `.svag`, `.xmd`, and `.xa` remain in VGMBoy's
 upstream manifest, ScanSong removes them from generic extension-only routing.
 Recognized CRI/Monster ADX, Sony SSHD (`.ads`/`.ss2`), headerless PlayStation MIB, RIFF ATRAC3, Atomic Planet AUS, Sony MSF,
 Konami/SNK SVAG and XMD, standard Nintendo DSPADPCM, Retro Studios RS03, Nintendo THP
-audio, CRI AHX, Nintendo DS standard STRM (`STRM`/`HEAD`/`DATA`) and FFTA2 (`RIFF`/`IMA `),
+audio, complete Retro Studios AGSC v1/v2 banks, CRI AHX, Nintendo DS standard STRM (`STRM`/`HEAD`/`DATA`) and FFTA2 (`RIFF`/`IMA `),
 and Sony XA signatures use direct readers; `.bika` uses the complete Bink
 container reader described above. Other aliases
 retain the vgmstream fallback. For the
@@ -842,14 +843,31 @@ The GameCube primary set is:
 .adp .agsc .dsp .h4m .ldat .logg .rsf .thp .txtp
 ```
 
-These members use direct MetaMan inspection when the content signature is a
-supported DSP/RS03/THP layout; remaining GameCube primary members use the
+These members use direct MetaMan inspection for complete recognized
+DSP/RS03/THP and AGSC layouts; remaining GameCube primary members use the
 bundled vgmstream inspector. The archive materializer normalizes
 underscore-prefixed aliases such as
 `_.ldat.txth` to `.ldat.txth` inside scratch storage. `.txth`, `.bd`, `.sbb`,
 and other bank/control files are dependencies, not duplicate playlist rows.
 The RE2 GameCube archive is the regression fixture for this boundary: primary
 `.ldat` members must resolve their TXTH aliases and produce real metadata.
+
+### Retro Studios AGSC
+
+MetaMan reads both AGSC bank organizations, preserving the internal stream
+name and one row per DSP record. It follows the vgmstream coefficient-pointer
+base, including valid records whose 40-byte coefficient read extends eight
+bytes beyond the declared header chunk. Sample and loop fields reproduce the
+scanner's two-loop/10-second-fade duration projection; no audio decoding runs.
+Unsupported or malformed `.agsc` content remains on the decoder route.
+
+The root-1 live catalog has two Metroid Prime 2 AGSC files. The direct MetaMan
+rows, saved decoder-produced rows, and fresh vgmstream `-I` rows match exactly
+(2/2 each, including names and play/loop timing). The paired run averaged
+0.099 ms per direct inspection versus 215.132 ms per vgmstream CLI inspection;
+with only two files, this is a startup-sensitive measurement, not a general
+performance claim. The executable parity test is
+[`AGSCMetadataReaderTests.swift`](../../Tests/ScanSongKitTests/AGSCMetadataReaderTests.swift).
 
 ### TXTP and HD-bank structures
 
