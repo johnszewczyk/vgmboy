@@ -199,6 +199,10 @@ error.
   exact `.adp.txth`-described raw IMA are read by MetaManCore, while unrelated
   `.adp` aliases remain on vgmstream. The direct reader retains the DTK probe
   or TXTH sidecar and never publishes a partial layout.
+- CRI AHX `.ahx` metadata is content-routed through MetaManCore's bounded
+  header/fixed-bitrate reader. It preserves the declared sample count separately
+  from the scanner-compatible payload duration; unrelated `.ahx` aliases remain
+  on vgmstream.
 - Nintendo DS standard STRM and Final Fantasy Tactics A2 RIFF/IMA metadata
   through MetaManCore; only validated layouts leave the `.strm` decoder route,
   and unrelated aliases retain vgmstream fallback.

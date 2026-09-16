@@ -23,7 +23,7 @@ in `MetaManCore`; HES companion M3U data is supplied through the metadata
 context. AY's signed relative-pointer reader and SAP's
 directive-header reader are also in MetaManCore. APE, CRI/Monster ADX, RIFF ATRAC3/ATRAC3+,
 Sony MSF, Sony SSHD/ADS, headerless PlayStation MIB, Bink audio containers,
-Nintendo DTK and TXTH-described IMA ADP, SID PSID/RSID, SPC ID666/xID6, S98, VGM/VGZ, and PSF/PSF2/SSF/USF/2SF
+Nintendo DTK and TXTH-described IMA ADP, CRI AHX, SID PSID/RSID, SPC ID666/xID6, S98, VGM/VGZ, and PSF/PSF2/SSF/USF/2SF
 metadata are also read through MetaManCore, which owns the Konami/SNK SVAG header reader.
 ScanSong supplies source files and maps neutral metadata into its catalog
 schema. These metadata routes do not require a playback decoder. Decoder-backed
@@ -32,7 +32,7 @@ existing routes.
 
 MetaManCore owns AY, SAP, NSF/GBS/NSFE, HES, SNDH, APE, ADX, ATRAC3, Sony MSF,
 Sony SSHD/ADS, headerless PlayStation MIB, Bink audio containers, Nintendo DTK and
-TXTH-described IMA ADP, SVAG, SID, SPC, S98, VGM/VGZ,
+TXTH-described IMA ADP, CRI AHX, SVAG, SID, SPC, S98, VGM/VGZ,
 and supported PSF-family metadata parsers plus the neutral metadata document;
 ScanSong owns source routing and the schema-23 adapter. The package does not
 link a playback decoder.
@@ -60,7 +60,7 @@ independent media sources are not playback targets.
 | `ffmpeg-audio` | `.ape`, `.mp2`, `.tak` | `.ape` uses MetaManCore's direct header/tag reader. `.mp2` and `.tak` do not currently have ScanSong routes. |
 | `highly-complete` | `.gsf`, `.minigsf` | MetaManCore validates PSF v0x22 payloads, GBA segments, and dependency chains without mGBA. |
 | `twosf` | `.2sf`, `.mini2sf` | `MetaManCore` PSF-style `[TAG]` reader; it does not start the playback core. |
-| `vgmstream` | `.aa3`, `.adp`, `.adx`, `.adpcm`, `.ads`, `.agsc`, `.ahx`, `.aifc`, `.at3`, `.aus`, `.bk2`, `.bik`, `.bnk`, `.dsp`, `.dvi`, `.fsb`, `.genh`, `.h4m`, `.hbd`, `.hd`, `.iecs`, `.int`, `.ldat`, `.logg`, `.mib`, `.msf`, `.mtaf`, `.ogg`, `.ps3`, `.rsf`, `.rws`, `.s14`, `.ss2`, `.stream`, `.strm`, `.svag`, `.swav`, `.thp`, `.txtp`, `.vag`, `.xa`, `.xmd`, `.xvag` | Validated `.adp` DTK/TXTH layouts, `.ads`, `.adx`, `.at3`, `.aus`, `.dsp`, `.msf`, `.svag`, and `.xmd` use content-aware MetaManCore readers with vgmstream fallback for unrecognized aliases; validated headerless `.mib` uses the MIB reader with vgmstream fallback for failed probes; `.bika` now uses MetaMan's complete Bink container walk; `.xa` uses ScanSong's direct reader, and validated Nintendo DS standard/FFTA2 `.strm` layouts use MetaManCore. `.txtp` and HD-bank inputs use vgmstream with dependency preparation. Other routed streams use `vgmstream-cli -I`. `.ogg` currently uses the Core Audio scanner route. |
+| `vgmstream` | `.aa3`, `.adp`, `.adx`, `.adpcm`, `.ads`, `.agsc`, `.ahx`, `.aifc`, `.at3`, `.aus`, `.bk2`, `.bik`, `.bnk`, `.dsp`, `.dvi`, `.fsb`, `.genh`, `.h4m`, `.hbd`, `.hd`, `.iecs`, `.int`, `.ldat`, `.logg`, `.mib`, `.msf`, `.mtaf`, `.ogg`, `.ps3`, `.rsf`, `.rws`, `.s14`, `.ss2`, `.stream`, `.strm`, `.svag`, `.swav`, `.thp`, `.txtp`, `.vag`, `.xa`, `.xmd`, `.xvag` | Validated `.adp` DTK/TXTH layouts, `.ads`, `.adx`, `.ahx`, `.at3`, `.aus`, `.dsp`, `.msf`, `.svag`, and `.xmd` use content-aware MetaManCore readers with vgmstream fallback for unrecognized aliases; validated headerless `.mib` uses the MIB reader with vgmstream fallback for failed probes; `.bika` now uses MetaMan's complete Bink container walk; `.xa` uses ScanSong's direct reader, and validated Nintendo DS standard/FFTA2 `.strm` layouts use MetaManCore. `.txtp` and HD-bank inputs use vgmstream with dependency preparation. Other routed streams use `vgmstream-cli -I`. `.ogg` currently uses the Core Audio scanner route. |
 | `lazyusf` | `.usf`, `.miniusf` | `MetaManCore` PSF-style `[TAG]` reader; `.usflib` remains dependency data, not a track. |
 | `playpsf` | `.psf`, `.minipsf`, `.psf2`, `.minipsf2` | `MetaManCore` PSF-style `[TAG]` reader; libraries remain dependency data. |
 | `qsf` | `.qsf`, `.miniqsf` | MetaManCore's complete PSF v0x41/QSound reader validates payload blocks, root tags, and declared dependencies without the QSound core. |
@@ -121,6 +121,7 @@ track fields and does not expose those additional manifest fields in CocoaSpice.
 | `mib-direct` | Validated headerless PlayStation PS-ADPCM in `.mib` | One track | MetaManCore bounded PS-frame probe and channel/interleave/loop/timing reader | The live eight-archive corpus contains 327 files and matches the saved catalog, ScanSong adapter, and fresh vgmstream exactly. Invalid `.mib` probes retain vgmstream fallback; the separate `.mib`/`.mih` bank layout is not conflated with this route. |
 | `bink-audio-direct` | Self-contained RAD Game Tools Bink audio containers in `.bika` | One row per Bink audio stream | MetaManCore Bink header, frame-offset, and packet-sample walk | The live one-archive corpus contains 68 files and matches the saved catalog, ScanSong adapter, and fresh vgmstream exactly. `.bik`/`.bk2` movies remain on the vgmstream playback/inspection boundary. |
 | `adp-direct` | Headerless Nintendo DTK or exact `.adp.txth` IMA layout in `.adp` | One track | MetaManCore content probe and complete layout reader | 175 live DTK members and nine TXTH-described Contra members are direct; unknown `.adp` aliases remain on vgmstream and the hidden sidecar is dependency context. |
+| `ahx-direct` | Validated CRI AHX in `.ahx` | One track | MetaManCore bounded AHX header and fixed-bitrate payload reader | The live root-1 corpus contains 11 files with exact saved-catalog and fresh-vgmstream parity; invalid `.ahx` aliases remain on vgmstream. |
 | `dsp-direct` | Standard Nintendo DSPADPCM, Retro Studios `RS03`, or Nintendo THP audio in `.dsp` | One track | MetaManCore's three signature-dispatched header readers | Preserves raw header/layout and native sample/loop facts; unknown `.dsp` signatures use vgmstream. |
 | `nds-strm-direct` | Nintendo DS standard `STRM`/`HEAD`/`DATA` or FFTA2 `RIFF`/`IMA ` in `.strm` | One track | `MetaManCore` standard STRM and FFTA2 readers | Preserves codec, channel, sample, loop, and interleave facts plus scanner-compatible duration; unrelated `.strm` aliases use vgmstream. |
 | `xa-direct` | Sony CD-XA in `.xa` | One row per XA file/channel subsong | MetaManCore Sony XA sector reader | Preserves interleaved channel enumeration, source facts, and sector-derived timing; RIFF/CDXA wrappers are accepted. Other `.xa` formats use vgmstream. |
@@ -769,6 +770,25 @@ direct/catalog/decoder parity; Release inspection averaged 0.129 ms/file
 direct versus 96.569 ms/file through the CLI, including per-file process
 startup. These are local corpus measurements.
 
+### CRI AHX
+
+`.ahx` is content-routed because the suffix belongs to CRI's AHX payload family
+but the direct route must not claim arbitrary aliases. `ahx-direct` validates
+the `0x8000` signature, the header-relative `(c)CRI` marker, fixed first-frame
+word `FF F5 E0 C0`, mono channel, positive rate, and version `0x06`. It reads
+only the bounded header and optional footer. Duration is computed from
+`fileBytes - dataOffset` at the fixed 160,000-bit/s payload rate, preserving the
+declared header sample count separately. The ScanSong projection keeps the
+filename stem and `FFmpeg format (CRI ADX)` source label used by the existing
+catalog. No AHX/MPEG audio decoding is started; unknown `.ahx` files retain
+the vgmstream fallback.
+
+The root-1 live comparison covers all 11 AHX rows/files with exact
+direct/catalog/decoder parity. Release inspection averaged 0.160 ms/file
+direct versus 35.398 ms/file through the CLI, including process startup. See
+the [AHX offset map](../../MetaMan/FORMAT-LAYOUTS.md#cri-ahx) and
+[AHX parity test](../../ScanSong/Tests/ScanSongKitTests/AHXMetadataReaderTests.swift).
+
 ### Raw stream suffixes
 
 The vgmstream extension set is owned by VGMBoy's
@@ -779,11 +799,11 @@ The vgmstream extension set is owned by VGMBoy's
 .mib .msf .mtaf .rws .ss2 .stream .strm .svag .vag .xmd
 ```
 
-Although `.adx`, `.ads`, `.at3`, `.aus`, `.dsp`, `.msf`, `.strm`, `.svag`, `.xmd`, and `.xa` remain in VGMBoy's
+Although `.adx`, `.ads`, `.ahx`, `.at3`, `.aus`, `.dsp`, `.msf`, `.strm`, `.svag`, `.xmd`, and `.xa` remain in VGMBoy's
 upstream manifest, ScanSong removes them from generic extension-only routing.
 Recognized CRI/Monster ADX, Sony SSHD/ADS, headerless PlayStation MIB, RIFF ATRAC3, Atomic Planet AUS, Sony MSF,
 Konami/SNK SVAG and XMD, standard Nintendo DSPADPCM, Retro Studios RS03, Nintendo THP
-audio, Nintendo DS standard STRM (`STRM`/`HEAD`/`DATA`) and FFTA2 (`RIFF`/`IMA `),
+audio, CRI AHX, Nintendo DS standard STRM (`STRM`/`HEAD`/`DATA`) and FFTA2 (`RIFF`/`IMA `),
 and Sony XA signatures use direct readers; `.bika` uses the complete Bink
 container reader described above. Other aliases
 retain the vgmstream fallback. For the

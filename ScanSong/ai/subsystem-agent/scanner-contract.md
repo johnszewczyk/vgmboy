@@ -95,6 +95,11 @@
   layouts: headerless Nintendo DTK and exact `.adp.txth` raw IMA. ScanSong
   content-probes the collision extension; unknown `.adp` aliases remain on
   vgmstream, and the sidecar remains dependency context rather than a scan row.
+- MetaManCore owns the complete direct projection for validated CRI `.ahx`
+  payloads. ScanSong content-probes the signature, dynamic `(c)CRI` marker,
+  first AHX frame, and header fields; malformed or unrelated `.ahx` aliases
+  remain on vgmstream. The reader preserves the declared sample count while
+  reproducing the existing fixed-bitrate payload duration.
 - AY, SAP, APE, ADX, AUS, ATRAC3, SVAG, SID, SPC, S98, VGM/VGZ, and PSF-family metadata are
   parsed by the sibling `MetaManCore` package. It preserves ordered tags and source bytes
   (including separately named ID666 and xID6 SPC blocks), with a ScanSong-only
@@ -128,6 +133,8 @@
   headers. The reader retains source header and loop facts, derives PS-ADPCM
   timing without decoding audio, and leaves other `.svag` signatures on
   vgmstream.
+- Validated CRI AHX `.ahx` payloads use `ahx-direct` and MetaManCore without
+  starting `vgmstream-cli`; invalid aliases retain the fallback route.
 - Unknown inputs and unavailable required adapters are typed diagnostics, never
   invented playable rows or calls into a host scanner.
 - The persisted ScanSong file-type policy ignores only documented decoder-absent

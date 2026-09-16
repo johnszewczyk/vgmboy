@@ -108,6 +108,7 @@ public struct ScannerPluginRegistry: Sendable {
                 && $0.pluginID != "sshd-direct"
                 && $0.pluginID != "mib-direct"
                 && $0.pluginID != "adp-direct"
+                && $0.pluginID != "ahx-direct"
                 && $0.supportedExtensions.contains(normalized)
                 && (!archiveMember || $0.supportsArchiveMembers)
         }) else {
@@ -122,7 +123,7 @@ public struct ScannerPluginRegistry: Sendable {
     }
 
     /// Routes ordinary suffixes first, then Amiga's replayer-prefix names
-    /// (`p4x.earth`, `mod.xpose-end`, etc.). ADX, ADP, AT3, AUS, MSF, STRM, SVAG,
+    /// (`p4x.earth`, `mod.xpose-end`, etc.). ADX, ADP, AHX, AT3, AUS, MSF, STRM, SVAG,
     /// DSP, XMD, SSHD/ADS, and XA are content-aware: ScanSong probes ADX and
     /// AUS; MetaManCore probes RIFF ATRAC3, Sony MSF, Nintendo DS STRM,
     /// Konami/SNK SVAG and XMD, Sony SSHD/ADS, Nintendo DSP/RS03/THP, and Sony
@@ -165,6 +166,10 @@ public struct ScannerPluginRegistry: Sendable {
         case "adp":
             contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "adp")
                 ? "adp-direct"
+                : "vgmstream"
+        case "ahx":
+            contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "ahx")
+                ? "ahx-direct"
                 : "vgmstream"
         case "dsp":
             contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "dsp")

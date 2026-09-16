@@ -12,6 +12,7 @@ Atomic Planet AUS, RIFF ATRAC3/ATRAC3+, Sony MSF, Sony SSHD/ADS,
 Konami/SNK SVAG, Konami XMD v1/v2, Sony CD-XA, headerless PlayStation MIB,
 Bink audio containers,
 headerless Nintendo GameCube DTK and exact TXTH-described IMA ADP streams,
+CRI AHX,
 standard Nintendo DS STRM, Final Fantasy Tactics A2 RIFF/IMA, Nintendo DSP,
 Retro Studios RS03, and Nintendo THP audio readers. SAP enumerates declared
 subtunes from ordered header directives and retains native `TIME` hints. The
@@ -55,6 +56,7 @@ fixed offsets or that the decoder is needed to locate every field.
 | Bink audio (`.bika`) | Direct Bink header, offset-table, and audio-packet walk; no Bink decoder | Filename fallback, retained container header, stream/channel/rate facts, decoded sample count, and packet-derived finite duration; `.bik` movie inputs remain outside this reader | Not implemented |
 | Nintendo GameCube DTK (`.adp`) | Direct first-ten-frame headerless DTK probe and frame/sample arithmetic; no decoder | Filename fallback, raw probe frame, stereo/48 kHz facts, and finite duration; unknown `.adp` aliases remain on vgmstream | Not implemented |
 | TXTH-described IMA (`.adp` + `.adp.txth`) | Direct bounded TXTH directive parser and IMA bytes-to-samples arithmetic; no decoder | Retained sidecar, ordered directives, codec/channel/rate facts, and finite duration; unsupported TXTH directives remain on vgmstream | Not implemented |
+| CRI AHX | Direct bounded header and fixed 160 kbps payload-duration reader; no MPEG/AHX decoder | Filename-derived title, exact AHX header/footer blocks, rate/channel/type/encryption facts, declared and scanner-projected sample counts, and finite duration | Not implemented |
 | Sony CD-XA | Direct raw-sector and RIFF/CDXA parser; no ADPCM decoder | Ordered file/channel subsongs, sector/sample facts, and sector-derived duration; unrelated `.xa` aliases are not claimed | Not implemented |
 | Nintendo DS STRM | Direct standard `STRM`/`HEAD`/`DATA` container and sample-header reader; no playback core | Codec, channels, rate, sample/loop counts, interleave facts, exact header blocks, and scanner-compatible sample timing | Not implemented |
 | Nintendo DS FFTA2 STRM | Direct Square Enix RIFF/IMA fixed-header reader; no playback core | Header-derived sample count, channel/rate/loop facts, exact header block, and scanner-compatible sample timing; supports `.bin` and `.strm` | Not implemented |
@@ -471,6 +473,26 @@ exactly. Release inspection averaged 0.129 ms/file directly versus 96.569
 ms/file through the CLI, including per-file process startup. This is local
 corpus evidence, not a whole-scan or cross-machine guarantee.
 
+### CRI AHX
+
+`.ahx` uses a compact CRI header followed by a fixed-bitrate MPEG/AHX payload.
+MetaMan validates the `0x8000` signature, the header-relative `(c)CRI` marker,
+the fixed first-frame word `FF F5 E0 C0`, mono/channel and version fields, then
+derives the scanner-visible sample count from payload bytes at 160,000 bits per
+second. It retains the authored sample count at `0x0C` separately instead of
+silently treating that field as the current scanner duration. The filename stem
+is the visible title and the established `FFmpeg format (CRI ADX)` source label
+is preserved. The reader records the bounded header, an optional `AHXE(c)CRI`
+footer, encryption/type facts, and does not decode audio or open the playback
+path. Invalid `.ahx` aliases remain on vgmstream.
+
+The root-1 read-only comparison covered all 11 live AHX rows/files: direct
+MetaMan, the ScanSong adapter, the saved catalog, and fresh vgmstream matched
+exactly. Release inspection averaged 0.160 ms/file directly versus 35.398
+ms/file through the CLI, including process startup. These are local corpus
+measurements, not a whole-scan or cross-machine guarantee. See the
+[AHX layout](FORMAT-LAYOUTS.md#cri-ahx).
+
 ## Use
 
 ```swift
@@ -499,6 +521,7 @@ swift run --package-path MetaMan metaman read song.msf
 swift run --package-path MetaMan metaman read song.svag
 swift run --package-path MetaMan metaman read song.ads
 swift run --package-path MetaMan metaman read song.mib
+swift run --package-path MetaMan metaman read song.ahx
 swift run --package-path MetaMan metaman read song.minigsf
 swift run --package-path MetaMan metaman read song.miniqsf
 ```
@@ -517,7 +540,7 @@ adapts `MetadataDocument` into its catalog schema; other clients can consume
 the same library result directly. The current registry contains AY, SAP,
 NSF/GBS/NSFE, HES, SNDH, KSS, S98, VGM/VGZ, SPC, SID, APE, ADX, AUS, ATRAC3,
 Sony MSF, Sony SSHD/ADS, headerless PlayStation MIB, Nintendo DTK and
-TXTH-described IMA ADP, Konami/SNK SVAG, Sony XA, PSF/PSF2/SSF/USF/2SF, GSF/miniGSF, and
+TXTH-described IMA ADP, CRI AHX, Konami/SNK SVAG, Sony XA, PSF/PSF2/SSF/USF/2SF, GSF/miniGSF, and
 QSF/miniQSF readers.
 SNDH is now fully read by MetaManCore; VGMBoy's old SNDH wrapper remains only as
 a test oracle while PSGPlay remains available for playback. KSS has also moved

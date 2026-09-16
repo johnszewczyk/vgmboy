@@ -854,6 +854,39 @@ See [ADPMetadataReader.swift](Sources/MetaManCore/ADPMetadataReader.swift)
 and the reference dispatch in
 [`ngc_adpdtk.c`](../VGMBoy/vendor/vgmstream/src/meta/ngc_adpdtk.c).
 
+### CRI AHX
+
+AHX is recognized only when its compact header, dynamic CRI marker, and first
+fixed AHX frame are all present. The reader uses the header and payload extent
+for metadata; it does not run the MPEG/AHX playback decoder.
+
+| Offset / scope | Width / encoding | Meaning |
+| --- | --- | --- |
+| `0x00` | u16 BE | `0x8000` AHX signature. |
+| `0x02` | u16 BE | Relative header field; `dataOffset = value + 4`. |
+| `0x04` | u8 | AHX type; the direct route accepts `0x10` and `0x11`. |
+| `0x05..0x06` | 2 bytes | Reserved zeros required by the direct probe. |
+| `0x07` | u8 | Channel count; the live CRI layout is mono (`1`). |
+| `0x08` | s32 BE | Sample rate in Hz. |
+| `0x0C` | s32 BE | Authored/declared sample count, retained as a source fact. |
+| `0x12` | u8 | AHX version marker; direct files use `0x06`. |
+| `0x13` | u8 | Encryption type, retained without attempting decryption. |
+| `dataOffset - 0x06` | 2 bytes | Dynamic `(c` marker. |
+| `dataOffset - 0x04` | 4 bytes | Dynamic `)CRI` marker. |
+| `dataOffset` | 4 bytes | Fixed first AHX frame word `FF F5 E0 C0`. |
+| `dataOffset .. fileEnd` | variable | Fixed 160,000-bit/s payload used for scanner-compatible duration. |
+| `fileEnd - 0x10` | 16 bytes, optional | `80 01 00 0C AHXE(c)CRI 00 00` footer retained when present. |
+
+For the current scanner projection, `payloadBytes = fileBytes - dataOffset`,
+`decodedSampleCount = round(payloadBytes * sampleRate * 8 / 160000)`, and
+`playLengthMs = floor(decodedSampleCount * 1000 / sampleRate)`. The two sample
+counts are intentionally distinct: the header's declared count is preserved,
+while the payload-derived count reproduces the existing FFmpeg inspection.
+The live 11-file corpus matched saved catalog rows and fresh vgmstream rows
+exactly; direct Release inspection averaged 0.160 ms/file versus 35.398 ms/file
+for the CLI. See
+[AHXMetadataReader.swift](Sources/MetaManCore/AHXMetadataReader.swift).
+
 ### Bink audio containers (`.bika`)
 
 The live `.bika` members are self-contained RAD Game Tools Bink containers

@@ -140,6 +140,11 @@ public enum MetaManCore {
             methodology: "Direct exact .adp.txth parser for raw IMA layout, sample-rate/channel facts, and bytes-to-samples timing; the original sidecar is retained and unknown TXTH directives fall back to the decoder."
         ),
         MetadataFormatDescriptor(
+            identifier: "ahx",
+            fileExtensions: ["ahx"],
+            methodology: "Direct CRI AHX header and fixed-bitrate payload-duration reader; preserves the declared sample count separately and does not open the MPEG/AHX playback path."
+        ),
+        MetadataFormatDescriptor(
             identifier: "xa",
             fileExtensions: ["xa"],
             methodology: "Direct Sony CD-XA sector walk for interleaved file/channel subsongs and sample timing; validates raw-sector frames without decoding audio and does not claim unrelated .xa aliases."
@@ -199,6 +204,9 @@ public enum MetaManCore {
         if fileURL.pathExtension.caseInsensitiveCompare("adp") == .orderedSame {
             return try ADPMetadataReader.read(fileURL: fileURL, context: context)
         }
+        if fileURL.pathExtension.caseInsensitiveCompare("ahx") == .orderedSame {
+            return try AHXMetadataReader.read(fileURL: fileURL)
+        }
         let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
         return try read(
             data: data,
@@ -240,6 +248,10 @@ public enum MetaManCore {
         }
         if formatHint == "adp" {
             let document = try ADPMetadataReader.read(fileURL: fileURL, context: context)
+            return MetadataReadResult(tracks: [MetadataTrack(document: document)])
+        }
+        if formatHint == "ahx" {
+            let document = try AHXMetadataReader.read(fileURL: fileURL)
             return MetadataReadResult(tracks: [MetadataTrack(document: document)])
         }
         if formatHint != "svag" {
@@ -313,6 +325,10 @@ public enum MetaManCore {
             let document = try ADPMetadataReader.read(data: data, displayName: displayName, context: context)
             return MetadataReadResult(tracks: [MetadataTrack(document: document)])
         }
+        if normalizedFormat == "ahx" || (normalizedFormat == nil && AHXMetadataReader.matches(data)) {
+            let document = try AHXMetadataReader.read(data: data, displayName: displayName)
+            return MetadataReadResult(tracks: [MetadataTrack(document: document)])
+        }
         let document = try read(data: data, formatHint: formatHint, displayName: displayName)
         return MetadataReadResult(tracks: [MetadataTrack(document: document)])
     }
@@ -331,6 +347,7 @@ public enum MetaManCore {
         case "mib": MIBMetadataReader.supports(fileURL: fileURL)
         case "bika": BinkAudioMetadataReader.supports(fileURL: fileURL)
         case "adp": ADPMetadataReader.supports(fileURL: fileURL)
+        case "ahx": AHXMetadataReader.supports(fileURL: fileURL)
         case "dsp": NintendoDSPMetadataReader.supports(fileURL: fileURL)
         case "xa": SonyXAMetadataReader.supports(fileURL: fileURL)
         case "strm":
@@ -487,6 +504,10 @@ public enum MetaManCore {
 
         if normalizedFormat == "adp" || (normalizedFormat == nil && ADPMetadataReader.matches(data)) {
             return try ADPMetadataReader.read(data: data, displayName: displayName, context: context)
+        }
+
+        if normalizedFormat == "ahx" || (normalizedFormat == nil && AHXMetadataReader.matches(data)) {
+            return try AHXMetadataReader.read(data: data, displayName: displayName)
         }
 
         if normalizedFormat == "dsp" || (normalizedFormat == nil && NintendoDSPMetadataReader.matches(data)) {
