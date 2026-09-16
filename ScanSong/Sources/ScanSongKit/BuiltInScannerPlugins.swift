@@ -16,7 +16,7 @@ public enum BuiltInScannerPlugins {
     )
 
     public static let directVGMStreamExtensions =
-        VGMStreamFormatManifest.directScannerExtensions.subtracting(["adx", "at3", "aus", "msf", "strm", "svag", "xa", "xmd"])
+        VGMStreamFormatManifest.directScannerExtensions.subtracting(["ads", "adx", "at3", "aus", "msf", "strm", "svag", "xa", "xmd"])
 
     // Keep scanner methodologies visible at the route declaration site.
     // `.direct` means no playback decoder process is needed; a format may
@@ -37,6 +37,7 @@ public enum BuiltInScannerPlugins {
         .init(pluginID: "sony-msf-direct", displayName: "MetaMan Sony MSF reader", supportedExtensions: ["msf"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "svag-direct", displayName: "MetaMan Konami/SNK SVAG reader", supportedExtensions: ["svag"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "xmd-direct", displayName: "MetaMan Konami XMD reader", supportedExtensions: ["xmd"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
+        .init(pluginID: "sshd-direct", displayName: "MetaMan Sony SSHD/ADS reader", supportedExtensions: ["ads"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "dsp-direct", displayName: "MetaMan Nintendo DSP/RS03/THP readers", supportedExtensions: ["dsp"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "nds-strm-direct", displayName: "MetaMan Nintendo DS STRM reader", supportedExtensions: ["strm"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "xa-direct", displayName: "Sony XA sector reader", supportedExtensions: ["xa"], structurePolicy: .enumerate, metadataPolicy: .direct, priority: 20),
@@ -62,7 +63,7 @@ public enum BuiltInScannerPlugins {
         .init(pluginID: "amiga-uade", displayName: "UADE", supportedExtensions: AmigaFormatManifest.prefixes, supportsMultiTrack: true, structurePolicy: .enumerate, metadataPolicy: .decoder, priority: 20),
         .init(pluginID: "vgmstream-hd-bank", displayName: "vgmstream", supportedExtensions: ["hd", "hbd", "iecs"], structurePolicy: .dependencyEnumerate, metadataPolicy: .decoder, priority: 10),
         .init(pluginID: "vgmstream-txtp", displayName: "vgmstream", supportedExtensions: ["txtp"], structurePolicy: .dependencyEnumerate, metadataPolicy: .decoder, priority: 10),
-        .init(pluginID: "vgmstream", displayName: "vgmstream", supportedExtensions: directVGMStreamExtensions.union(["adx", "at3", "aus", "msf", "strm", "svag", "xa", "xmd"]), structurePolicy: .enumerate, metadataPolicy: .decoder, priority: 10)
+        .init(pluginID: "vgmstream", displayName: "vgmstream", supportedExtensions: directVGMStreamExtensions.union(["ads", "adx", "at3", "aus", "msf", "strm", "svag", "xa", "xmd"]), structurePolicy: .enumerate, metadataPolicy: .decoder, priority: 10)
     ]
 
     // Structural admission is useful, but metadata remains intentionally

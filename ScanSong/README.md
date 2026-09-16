@@ -184,6 +184,9 @@ error.
   MetaManCore; unrelated `.svag` signatures retain the vgmstream route.
 - Konami XMD v1/v2 header, sample, loop, and scanner-duration metadata through
   MetaManCore; unrecognized `.xmd` payloads retain the vgmstream route.
+- Sony SSHD/ADS headers, wrapper offsets, encoded-frame timing, and decoder-
+  compatible loop handling through MetaManCore; only validated `.ads` payloads
+  use the direct route, while aliases retain vgmstream fallback.
 - Nintendo DS standard STRM and Final Fantasy Tactics A2 RIFF/IMA metadata
   through MetaManCore; only validated layouts leave the `.strm` decoder route,
   and unrelated aliases retain vgmstream fallback.

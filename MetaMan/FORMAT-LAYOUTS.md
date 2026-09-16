@@ -728,6 +728,47 @@ the source sample/loop facts and this scanner-compatible play-length projection
 without audio decoding. See
 [KonamiXMDMetadataReader.swift](Sources/MetaManCore/KonamiXMDMetadataReader.swift).
 
+### Sony SSHD / ADS
+
+The native stream begins with a 40-byte `SShd` header. The reader also
+accepts the two vgmstream container wrappers when the inner stream is valid:
+`ADSC` version 1 places the stream at `0x08`, and Cavia's ASCII
+`cavi a stream` wrapper places it at `0x7D8`. Offsets below are relative to
+the inner `SShd` stream, not the outer file.
+
+| Offset | Width / encoding | Meaning |
+| --- | --- | --- |
+| `0x00..0x03` | 4 bytes | ASCII `SShd` signature. |
+| `0x04` | u32 LE | Header-size variant: `0x18`, `0x20`, or inner file size minus `8`. |
+| `0x08` | u32 LE | Codec: `0x01`/`0x80000001` PCM16LE, `0x02`/`0x10` PS-ADPCM. The `0x01` + 12,000 Hz + `0x200` interleave combination is the video DVI-IMA variant. |
+| `0x0C` | s32 LE | Source sample rate. DVI-IMA is normalized to 48,000 Hz. |
+| `0x10` | s32 LE | Channel count. |
+| `0x14` | u32 LE | Source interleave block size. DVI-IMA uses an effective `0x40` block size. |
+| `0x18` | u32 LE | Raw loop-start value; maker-specific address or sample units. `0xFFFFFFFF` means unset. |
+| `0x1C` | u32 LE | Raw loop-end value; `0xFFFFFFFF` is the open-ended marker. |
+| `0x20..0x23` | 4 bytes | ASCII `SSbd` body marker. |
+| `0x24` | u32 LE | Declared encoded body size. It is clamped to the physical remainder and corrected for the known doubled-size layout. |
+| `0x28...` | bytes | Encoded stream body. It normally starts at `0x28`, at `0x800` for sector-padded files, or at `0xFF8` for the ADSC alignment case. |
+
+PS-ADPCM uses 16-byte frames per channel and contributes 28 samples per
+frame. PCM16LE uses two bytes per sample per channel. DVI IMA uses two samples
+per encoded byte per channel. The reader scans only the trailing PS-ADPCM
+interleave for vgmstream's `0x07`, zero, `0x77777777`, Cavia-silent, and
+Capcom-silent padding frames; those bytes are excluded from the sample count.
+
+SSHD loop fields are not one universal unit. The reader mirrors the decoder's
+ordered branches: Capcom codec `0x02` uses `loopStart * 0x10`, `PAD!` uses PCM
+bytes, sector-aligned Cavia values subtract `0x800`, unaligned values use
+`* 0x10`, paired values may use `* 0x200`, `* 0x70`, or `* 0x20`, and large
+paired values are already samples. A recognized non-looping PS-ADPCM sound
+effect is identified from the `0x00077777` marker after the candidate end.
+Projected looping uses the scanner's loop start plus two loop bodies and a
+ten-second fade; invalid or out-of-range loops remain raw technical facts but
+are removed from projected timing. The reader retains the first `0x28` bytes
+of the inner header as `sshdHeader` and never copies or decodes audio payload.
+
+See [SonySSHDMetadataReader.swift](Sources/MetaManCore/SonySSHDMetadataReader.swift).
+
 ## What this says about decoder independence
 
 For some formats the answer really is a header/tag layout plus bounded parsing.

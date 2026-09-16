@@ -8,8 +8,8 @@ import the library rather than shelling out to the CLI.
 MetaMan currently has complete AY, SAP, NSF, GBS, NSFE, HES, SNDH, KSS, S98,
 VGM/VGZ, generic PSF-style tags, complete GSF/miniGSF and QSF/miniQSF,
 SPC ID666/xID6, SID PSID/RSID, APE, CRI/Monster ADX,
-Atomic Planet AUS, RIFF ATRAC3/ATRAC3+, Sony MSF, Konami/SNK SVAG, Konami XMD
-v1/v2, Sony CD-XA,
+Atomic Planet AUS, RIFF ATRAC3/ATRAC3+, Sony MSF, Sony SSHD/ADS,
+Konami/SNK SVAG, Konami XMD v1/v2, Sony CD-XA,
 standard Nintendo DS STRM, Final Fantasy Tactics A2 RIFF/IMA, Nintendo DSP,
 Retro Studios RS03, and Nintendo THP audio readers. SAP enumerates declared
 subtunes from ordered header directives and retains native `TIME` hints. The
@@ -48,6 +48,7 @@ fixed offsets or that the decoder is needed to locate every field.
 | Sony MSF | Direct 64-byte container-header and MPEG frame-boundary parser; no audio decoder | Header stream name, exact header bytes, codec/channel/rate/loop facts, and PCM/PSX ADPCM/ATRAC3/MPEG sample timing; non-Sony aliases are not claimed | Not implemented |
 | Konami / SNK SVAG | Direct `Svag` and `VAGm` header parsers; no audio decoder | Exact structural header bytes, native codec/channel/rate/interleave/block/loop facts, and validated sample-derived loop/play timing; unrelated `.svag` aliases are not claimed | Not implemented |
 | Konami XMD v1/v2 | Direct 12-byte Silent Hill 4 or 17-byte Castlevania header reader; audio payload is not read by the file-URL API | Raw header, channels/rate/data extent, ADPCM frame/sample counts, loop facts, and the scanner's two-pass/10-second-fade duration projection | Not implemented |
+| Sony SSHD / ADS | Direct `SShd` header and bounded PS-ADPCM/PCM/DVI-IMA frame-timing reader; no audio decoder | Codec/channel/rate/interleave facts, wrapper/header bytes, encoded-body bounds, decoder-compatible loop-address handling, and scanner timing; nonmatching `.ads` aliases are not claimed | Not implemented |
 | Sony CD-XA | Direct raw-sector and RIFF/CDXA parser; no ADPCM decoder | Ordered file/channel subsongs, sector/sample facts, and sector-derived duration; unrelated `.xa` aliases are not claimed | Not implemented |
 | Nintendo DS STRM | Direct standard `STRM`/`HEAD`/`DATA` container and sample-header reader; no playback core | Codec, channels, rate, sample/loop counts, interleave facts, exact header blocks, and scanner-compatible sample timing | Not implemented |
 | Nintendo DS FFTA2 STRM | Direct Square Enix RIFF/IMA fixed-header reader; no playback core | Header-derived sample count, channel/rate/loop facts, exact header block, and scanner-compatible sample timing; supports `.bin` and `.strm` | Not implemented |
@@ -402,6 +403,27 @@ a diagnostic. Valid loops keep ScanSong's two iterations plus ten-second fade
 projection. The parser never decodes PS-ADPCM, and its content probe leaves
 unrelated `.svag` aliases available to other readers.
 
+The Sony SSHD/ADS reader validates the fixed `SShd`/`SSbd` layout and the two
+known containers: `ADSC` begins the inner stream at `0x08`, while the Cavia
+`cavi a stream` wrapper begins it at `0x7D8`. It reads the codec, rate,
+channels, interleave, raw loop values, and declared body size, applies the
+decoder's body-size correction and start-padding rules, and measures timing
+from encoded frames. Codec `0x01`/`0x80000001` is PCM16LE except for the
+12 kHz/`0x200` video hijack, which is exposed as 48 kHz DVI IMA with an
+effective `0x40` interleave; codec `0x02`/`0x10` is interleaved PS-ADPCM.
+The loop-address variants, padding-frame trimming, invalid-loop cleanup, and
+two-loop/ten-second-fade projection mirror the vgmstream metadata setup. No
+audio is decoded. ScanSong routes only validated `.ads` payloads here and
+keeps vgmstream fallback for nonmatching aliases.
+
+The read-only root-1 comparison covered all 52 ADS rows/files across two
+archives: direct MetaMan, the ScanSong adapter, the saved catalog, and a fresh
+vgmstream CLI matched exactly. In the same Debug run, direct inspection
+averaged 3.980 ms/file versus 152.280 ms/file for the CLI, including process
+startup. This is local corpus evidence, not a whole-scan or cross-machine
+performance guarantee. The byte map is in
+[FORMAT-LAYOUTS.md](FORMAT-LAYOUTS.md#sony-sshd--ads).
+
 ## Use
 
 ```swift
@@ -428,6 +450,7 @@ swift run --package-path MetaMan metaman read song.aus
 swift run --package-path MetaMan metaman read song.at3
 swift run --package-path MetaMan metaman read song.msf
 swift run --package-path MetaMan metaman read song.svag
+swift run --package-path MetaMan metaman read song.ads
 swift run --package-path MetaMan metaman read song.minigsf
 swift run --package-path MetaMan metaman read song.miniqsf
 ```
@@ -445,7 +468,7 @@ MetaMan has no dependency on ScanSong, VGMBoy, or a playback decoder. ScanSong
 adapts `MetadataDocument` into its catalog schema; other clients can consume
 the same library result directly. The current registry contains AY, SAP,
 NSF/GBS/NSFE, HES, SNDH, KSS, S98, VGM/VGZ, SPC, SID, APE, ADX, AUS, ATRAC3,
-Sony MSF, Konami/SNK SVAG, Sony XA, PSF/PSF2/SSF/USF/2SF, GSF/miniGSF, and
+Sony MSF, Sony SSHD/ADS, Konami/SNK SVAG, Sony XA, PSF/PSF2/SSF/USF/2SF, GSF/miniGSF, and
 QSF/miniQSF readers.
 SNDH is now fully read by MetaManCore; VGMBoy's old SNDH wrapper remains only as
 a test oracle while PSGPlay remains available for playback. KSS has also moved

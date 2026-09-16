@@ -115,6 +115,11 @@ public enum MetaManCore {
             methodology: "Direct Konami XMD v1/v2 header and ADPCM frame-timing reader; retains the complete header and reproduces the scanner's default loop/fade projection without decoding audio."
         ),
         MetadataFormatDescriptor(
+            identifier: "sony-sshd",
+            fileExtensions: ["ads"],
+            methodology: "Direct Sony SSHD/ADS header and encoded-frame timing reader; reproduces the complete vgmstream loop/address handling without decoding PCM, PS-ADPCM, or IMA audio."
+        ),
+        MetadataFormatDescriptor(
             identifier: "xa",
             fileExtensions: ["xa"],
             methodology: "Direct Sony CD-XA sector walk for interleaved file/channel subsongs and sample timing; validates raw-sector frames without decoding audio and does not claim unrelated .xa aliases."
@@ -162,6 +167,9 @@ public enum MetaManCore {
         if fileURL.pathExtension.lowercased() == "xmd" {
             return try KonamiXMDMetadataReader.read(fileURL: fileURL)
         }
+        if fileURL.pathExtension.lowercased() == "ads" {
+            return try SonySSHDMetadataReader.read(fileURL: fileURL)
+        }
         let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
         return try read(
             data: data,
@@ -188,6 +196,10 @@ public enum MetaManCore {
         }
         if formatHint == "xmd" {
             let document = try KonamiXMDMetadataReader.read(fileURL: fileURL)
+            return MetadataReadResult(tracks: [MetadataTrack(document: document)])
+        }
+        if formatHint == "ads" {
+            let document = try SonySSHDMetadataReader.read(fileURL: fileURL)
             return MetadataReadResult(tracks: [MetadataTrack(document: document)])
         }
         if formatHint != "svag" {
@@ -268,6 +280,7 @@ public enum MetaManCore {
         case "msf": SonyMSFMetadataReader.supports(fileURL: fileURL)
         case "svag": SVAGMetadataReader.supports(fileURL: fileURL)
         case "xmd": KonamiXMDMetadataReader.supports(fileURL: fileURL)
+        case "ads": SonySSHDMetadataReader.supports(fileURL: fileURL)
         case "dsp": NintendoDSPMetadataReader.supports(fileURL: fileURL)
         case "xa": SonyXAMetadataReader.supports(fileURL: fileURL)
         case "strm":
@@ -408,6 +421,10 @@ public enum MetaManCore {
 
         if normalizedFormat == "xmd" || (normalizedFormat == nil && KonamiXMDMetadataReader.matches(data)) {
             return try KonamiXMDMetadataReader.read(data: data, displayName: displayName)
+        }
+
+        if normalizedFormat == "ads" || (normalizedFormat == nil && SonySSHDMetadataReader.matches(data)) {
+            return try SonySSHDMetadataReader.read(data: data, displayName: displayName)
         }
 
         if normalizedFormat == "dsp" || (normalizedFormat == nil && NintendoDSPMetadataReader.matches(data)) {

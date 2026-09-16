@@ -15,7 +15,7 @@ executables.
   format admission; it does not link VGMBoyKit or native decoders for its
   in-process metadata readers. `VGMBoySNDH` is a test-only decoder oracle.
 - ScanSong consumes the local sibling `MetaManCore` Swift package for APE, ADX,
-  AUS, ATRAC3, Sony MSF, Konami/SNK SVAG and XMD, Nintendo DSP/RS03/THP, Nintendo DS STRM, SID, SPC, SNDH,
+  AUS, ATRAC3, Sony MSF, Sony SSHD/ADS, Konami/SNK SVAG and XMD, Nintendo DSP/RS03/THP, Nintendo DS STRM, SID, SPC, SNDH,
   S98, VGM/VGZ,
   PSF-family, GSF, and QSF metadata.
   MetaManCore owns bounded VGZ gzip expansion and has no
@@ -58,6 +58,9 @@ executables.
   the helper route.
 - Known Konami/SNK SVAG signatures use MetaManCore's in-process metadata reader
   and never start `vgmstream-cli`; other `.svag` aliases retain the helper route.
+- Validated Sony SSHD/ADS headers use MetaManCore's in-process metadata reader
+  and never start `vgmstream-cli`; nonmatching `.ads` aliases retain the helper
+  route.
 - Validated Konami XMD v1/v2 headers use MetaManCore's in-process reader and
   never start `vgmstream-cli`; unrecognized `.xmd` payloads retain the helper
   route.
