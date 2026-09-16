@@ -64,6 +64,16 @@ func sonySSHDReaderDetectionAndValidation() throws {
         try MetaManCore.read(data: makeSonySSHD(codec: 0x99), formatHint: "ads")
     }
 
+    let ss2Document = try MetaManCore.read(
+        data: makeSonySSHD(bodySize: 384, loopStart: UInt32.max, loopEnd: UInt32.max),
+        formatHint: "ss2",
+        displayName: "demuxed.ss2"
+    )
+    #expect(ss2Document.format == "ss2")
+    #expect(ss2Document.fields.title == "demuxed")
+    #expect(ss2Document.fields.comment == "Sony SSHD header")
+    #expect(ss2Document.timing?.playLengthMs == 7)
+
     var container = Data("ADSC".utf8)
     appendUInt32LE(1, to: &container)
     container.append(source)
@@ -78,14 +88,18 @@ func sonySSHDReaderDetectionAndValidation() throws {
     defer { try? FileManager.default.removeItem(at: directory) }
     let knownURL = directory.appendingPathComponent("known.ads")
     let aliasURL = directory.appendingPathComponent("alias.ads")
+    let knownSS2URL = directory.appendingPathComponent("known.ss2")
     try source.write(to: knownURL)
     try Data("OggS".utf8).write(to: aliasURL)
+    try source.write(to: knownSS2URL)
     #expect(MetaManCore.canReadDirectly(fileURL: knownURL, formatHint: "ads"))
     #expect(!MetaManCore.canReadDirectly(fileURL: aliasURL, formatHint: "ads"))
+    #expect(MetaManCore.canReadDirectly(fileURL: knownSS2URL, formatHint: "ss2"))
     #expect(try MetaManCore.read(fileURL: knownURL).rawMetadataBlocks?["sshdHeader"]?.count == 0x28)
+    #expect(try MetaManCore.read(fileURL: knownSS2URL).format == "ss2")
 
     let descriptor = try #require(MetaManCore.supportedFormats.first { $0.identifier == "sony-sshd" })
-    #expect(descriptor.fileExtensions == ["ads"])
+    #expect(descriptor.fileExtensions == ["ads", "ss2"])
     #expect(descriptor.methodology.contains("without decoding"))
 }
 

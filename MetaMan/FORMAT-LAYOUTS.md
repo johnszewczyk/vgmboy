@@ -730,6 +730,11 @@ without audio decoding. See
 
 ### Sony SSHD / ADS
 
+The same `SShd`/`SSbd` byte layout is also used under the `.ss2` suffix
+(described by vgmstream as a demuxed-video stream alias). `.ss2` adds no
+separate offset map; the content signature and full SSHD header validation
+decide whether MetaMan claims it.
+
 The native stream begins with a 40-byte `SShd` header. The reader also
 accepts the two vgmstream container wrappers when the inner stream is valid:
 `ADSC` version 1 places the stream at `0x08`, and Cavia's ASCII

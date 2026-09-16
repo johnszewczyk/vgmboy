@@ -125,10 +125,11 @@ public struct ScannerPluginRegistry: Sendable {
 
     /// Routes ordinary suffixes first, then Amiga's replayer-prefix names
     /// (`p4x.earth`, `mod.xpose-end`, etc.). ADX, ADP, AHX, AT3, AUS, MSF, STRM, SVAG,
-    /// DSP, DVI, XMD, SSHD/ADS, and XA are content-aware: ScanSong probes ADX and
+    /// DSP, DVI, XMD, SSHD/ADS/SS2, and XA are content-aware: ScanSong probes ADX and
     /// AUS; MetaManCore probes RIFF ATRAC3, Sony MSF, Nintendo DS STRM,
-    /// Konami/SNK SVAG and XMD, Sony SSHD/ADS, Nintendo DSP/RS03/THP, and Sony
-    /// XA. DVI is direct only for the complete Konami `DVI.` layout; Capcom
+    /// Konami/SNK SVAG and XMD, Sony SSHD/ADS/SS2, Nintendo DSP/RS03/THP, and Sony
+    /// XA. Both `.ads` and `.ss2` use the complete Sony SSHD reader. DVI is
+    /// direct only for the complete Konami `DVI.` layout; Capcom
     /// `IDVI` aliases retain vgmstream. ADP is direct only for the complete
     /// Nintendo DTK or exact TXTH IMA layouts; other aliases retain vgmstream.
     /// MIB is content-routed because the extension is shared by multiple
@@ -157,8 +158,8 @@ public struct ScannerPluginRegistry: Sendable {
             contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "xmd")
                 ? "xmd-direct"
                 : "vgmstream"
-        case "ads":
-            contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "ads")
+        case "ads", "ss2":
+            contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: extensionName)
                 ? "sshd-direct"
                 : "vgmstream"
         case "mib":

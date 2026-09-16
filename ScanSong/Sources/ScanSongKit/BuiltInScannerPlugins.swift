@@ -16,7 +16,7 @@ public enum BuiltInScannerPlugins {
     )
 
     public static let directVGMStreamExtensions =
-        VGMStreamFormatManifest.directScannerExtensions.subtracting(["ads", "adp", "adx", "ahx", "at3", "aus", "bika", "dvi", "mib", "msf", "strm", "svag", "xa", "xmd"])
+        VGMStreamFormatManifest.directScannerExtensions.subtracting(["ads", "adp", "adx", "ahx", "at3", "aus", "bika", "dvi", "mib", "msf", "ss2", "strm", "svag", "xa", "xmd"])
 
     // Keep scanner methodologies visible at the route declaration site.
     // `.direct` means no playback decoder process is needed; a format may
@@ -37,7 +37,7 @@ public enum BuiltInScannerPlugins {
         .init(pluginID: "sony-msf-direct", displayName: "MetaMan Sony MSF reader", supportedExtensions: ["msf"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "svag-direct", displayName: "MetaMan Konami/SNK SVAG reader", supportedExtensions: ["svag"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "xmd-direct", displayName: "MetaMan Konami XMD reader", supportedExtensions: ["xmd"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
-        .init(pluginID: "sshd-direct", displayName: "MetaMan Sony SSHD/ADS reader", supportedExtensions: ["ads"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
+        .init(pluginID: "sshd-direct", displayName: "MetaMan Sony SSHD reader", supportedExtensions: ["ads", "ss2"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "mib-direct", displayName: "MetaMan headerless PlayStation PS-ADPCM reader", supportedExtensions: ["mib"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "adp-direct", displayName: "MetaMan Nintendo DTK/TXTH IMA reader", supportedExtensions: ["adp"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "ahx-direct", displayName: "MetaMan CRI AHX header reader", supportedExtensions: ["ahx"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
@@ -68,7 +68,7 @@ public enum BuiltInScannerPlugins {
         .init(pluginID: "amiga-uade", displayName: "UADE", supportedExtensions: AmigaFormatManifest.prefixes, supportsMultiTrack: true, structurePolicy: .enumerate, metadataPolicy: .decoder, priority: 20),
         .init(pluginID: "vgmstream-hd-bank", displayName: "vgmstream", supportedExtensions: ["hd", "hbd", "iecs"], structurePolicy: .dependencyEnumerate, metadataPolicy: .decoder, priority: 10),
         .init(pluginID: "vgmstream-txtp", displayName: "vgmstream", supportedExtensions: ["txtp"], structurePolicy: .dependencyEnumerate, metadataPolicy: .decoder, priority: 10),
-        .init(pluginID: "vgmstream", displayName: "vgmstream", supportedExtensions: directVGMStreamExtensions.union(["ads", "adp", "adx", "ahx", "at3", "aus", "dvi", "mib", "msf", "strm", "svag", "xa", "xmd"]), structurePolicy: .enumerate, metadataPolicy: .decoder, priority: 10)
+        .init(pluginID: "vgmstream", displayName: "vgmstream", supportedExtensions: directVGMStreamExtensions.union(["ads", "adp", "adx", "ahx", "at3", "aus", "dvi", "mib", "msf", "ss2", "strm", "svag", "xa", "xmd"]), structurePolicy: .enumerate, metadataPolicy: .decoder, priority: 10)
     ]
 
     // Structural admission is useful, but metadata remains intentionally

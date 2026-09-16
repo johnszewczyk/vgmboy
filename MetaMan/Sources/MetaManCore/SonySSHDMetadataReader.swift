@@ -28,21 +28,30 @@ enum SonySSHDMetadataReader {
 
     static func read(fileURL: URL) throws -> MetadataDocument {
         let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
-        return try read(data: data, displayName: fileURL.lastPathComponent)
+        return try read(
+            data: data,
+            displayName: fileURL.lastPathComponent,
+            format: fileURL.pathExtension.lowercased()
+        )
     }
 
-    static func read(data: Data, displayName: String?) throws -> MetadataDocument {
+    static func read(
+        data: Data,
+        displayName: String?,
+        format: String = "ads"
+    ) throws -> MetadataDocument {
         guard let sourceOffset = layoutOffset(in: data, physicalSize: data.count) else {
-            throw MetadataReadError.unsupportedFormat("Sony SSHD/ADS header")
+            throw MetadataReadError.unsupportedFormat("Sony SSHD header")
         }
         let source = Data(data[sourceOffset...])
-        return try readSource(source, sourceOffset: sourceOffset, displayName: displayName)
+        return try readSource(source, sourceOffset: sourceOffset, displayName: displayName, format: format)
     }
 
     private static func readSource(
         _ data: Data,
         sourceOffset: Int,
-        displayName: String?
+        displayName: String?,
+        format: String
     ) throws -> MetadataDocument {
         guard data.count >= headerSize,
               let headerMarker = string(data, at: 0x00, count: 4), headerMarker == "SShd",
@@ -241,7 +250,7 @@ enum SonySSHDMetadataReader {
         }
 
         return MetadataDocument(
-            format: "ads",
+            format: format == "ss2" ? "ss2" : "ads",
             fields: MetadataFields(title: title, comment: "Sony SSHD header"),
             rawMetadataBlocks: ["sshdHeader": Data(data.prefix(headerSize))],
             timing: MetadataTiming(

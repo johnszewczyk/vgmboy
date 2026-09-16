@@ -15,7 +15,7 @@ publication. The product is the sole catalog writer consumed by CocoaSpice and S
   ownership stay here.
 - `MetaManCore` — shared decoder-independent metadata reading for AY, SAP,
   NSF/GBS/NSFE, HES/M3U, APE, ADX, AUS,
-  RIFF ATRAC3/ATRAC3+, Sony MSF, Sony SSHD/ADS, headerless PlayStation MIB,
+  RIFF ATRAC3/ATRAC3+, Sony MSF, Sony SSHD (`.ads`/`.ss2`), headerless PlayStation MIB,
   Bink audio containers, Konami Saturn DVI,
   Konami/SNK SVAG and XMD, Nintendo DSP/RS03/THP, Sony XA, SID PSID/RSID,
   SPC ID666/xID6, S98, VGM/VGZ, and PSF/PSF2/SSF/USF/2SF tag footers. ScanSong maps neutral
@@ -57,9 +57,10 @@ sample/loop timing, stream names, and retained source facts; `MSF ` and other
 non-Sony aliases remain on the vgmstream route. VGMBoy keeps the playback path.
 Known Konami and SNK SVAG headers are read through MetaManCore, with unrelated
 `.svag` signatures retaining the vgmstream route.
-Validated Sony SSHD/ADS headers, including ADSC/Cavia wrapper offsets and
-decoder-compatible encoded timing, are also read through MetaManCore; other
-`.ads` payloads retain vgmstream fallback. Playback remains in VGMBoy.
+Validated Sony SSHD headers under `.ads` and `.ss2`, including ADSC/Cavia
+wrapper offsets and decoder-compatible encoded timing, are read through
+MetaManCore; nonmatching suffix aliases retain vgmstream fallback. Playback
+remains in VGMBoy.
 Validated headerless PlayStation `.mib` streams use MetaManCore's bounded
 PS-ADPCM probe and decoder-compatible channel/interleave/loop/timing inference;
 invalid probes retain vgmstream fallback. The separate `.mib`/`.mih` bank
@@ -182,9 +183,10 @@ collapsed into one ignored-format bucket:
   the former direct reader; the current parity test is fixture-gated by
   `SCANSONG_SAP_FIXTURE_DIR`. No SAP rows were present in the inspected
   CocoaSpice catalog.
-- Silent Hill: Shattered Memories `.ss2` members fail to open. `.ss2` is an
-  established route, so these remain visible archive-member failures and are
-  not ignored.
+- Silent Hill: Shattered Memories has 58 live `.ss2` members. The direct
+  metadata route, saved catalog, and fresh vgmstream `-I` inspection now match
+  for all of them. This verifies metadata inspection, not CocoaSpice playback;
+  keep those as separate evidence gates if the playback issue resurfaces.
 - Silent Hill HD Collection `.hd` members fail to open through the current
   `.hd`/`.hbd`/`.iecs` adapter. The archive contains IECS `.hd` indexes with
   `.td` control data and separate Sony `.msf` ATRAC streams. The direct MSF
