@@ -157,9 +157,24 @@ Remaining metadata-reader targets are grouped by the boundary they need:
   new file-URL reader parses the root once before resolving dependencies;
   this avoids a double parse present in its initial implementation, not in the
   former ScanSong reader.
-- **Next extraction:** survey the remaining decoder/inspector-backed routes
-  by actual source signatures and format families before selecting a complete
-  parser boundary. Do not extract a suffix-only parser for ambiguous aliases.
+- **Next full-format investigation — FSB:** the root-1 CocoaSpice catalog has
+  84 `.fsb` rows/files in one archive (126,183,712 bytes total); all 84 are
+  single-track FSB5 v1 banks using codec `0x0F` (Vorbis), and that archive has
+  no sibling `.fev`. All 84 saved titles equal their filename stems, the saved
+  game/system fields are blank, and 67 rows have a loop duration. This is useful
+  corpus coverage, not proof that all `.fsb` sources share this layout. The
+  complete boundary is FSB1–FSB5, including
+  legacy versioned/basic/duplicate sample headers, FSB5 packed modes and
+  extra-record chains, optional FEV stream-name overrides, and any timing or
+  validity differences that currently come from codec initialization (notably
+  MPEG/XMA paths). Do not implement or route an FSB5-only extraction. First
+  establish synthetic coverage for every version and the FEV naming boundary;
+  then compare the live corpus, saved catalog, and fresh vgmstream before
+  cutting over the `.fsb` route.
+- **Selection rule:** continue surveying active decoder/inspector routes by
+  live corpus and source signature, but only begin a cutover when one complete
+  format boundary can be validated. Do not create suffix-only or version-only
+  direct paths for ambiguous or multi-version families.
 - **Audio containers:** Core Audio is currently the scanner's native
   standard-audio reader. Treat it as a separate platform-boundary decision,
   not as a playback-plugin removal.

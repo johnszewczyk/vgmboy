@@ -837,6 +837,14 @@ one-based `-s` selector and becomes a separate catalog row. A file that the
 decoder cannot open remains a visible failure, even when its extension is in
 the manifest.
 
+`.fsb` remains entirely on vgmstream. The family includes FSB1–FSB5 layouts;
+FSB1–4 have versioned sample headers (including variable-sized/basic and
+duplicate entries), while FSB5 uses packed sample modes and chained extra
+records. Both readers can also use a sibling `.fev` file to replace a bank's
+embedded or filename-derived stream name. Do not route only FSB5 to MetaMan: a
+direct cutover must cover the full FSB family and preserve applicable FEV name
+resolution as well as decoder-derived timing/acceptance behavior.
+
 ### GameCube primary streams
 
 The GameCube primary set is:
