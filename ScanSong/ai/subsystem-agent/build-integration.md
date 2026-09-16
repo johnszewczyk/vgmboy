@@ -15,7 +15,8 @@ executables.
   format admission; it does not link VGMBoyKit or native decoders for its
   in-process metadata readers. `VGMBoySNDH` is a test-only decoder oracle.
 - ScanSong consumes the local sibling `MetaManCore` Swift package for APE, ADX,
-  AUS, ATRAC3, Sony MSF, Konami/SNK SVAG, SID, SPC, SNDH, S98, VGM/VGZ,
+  AUS, ATRAC3, Sony MSF, Konami/SNK SVAG and XMD, Nintendo DSP/RS03/THP, Nintendo DS STRM, SID, SPC, SNDH,
+  S98, VGM/VGZ,
   PSF-family, GSF, and QSF metadata.
   MetaManCore owns bounded VGZ gzip expansion and has no
   VGMBoy, ScanSong, or playback-decoder dependency; test-only libvgm comparisons
@@ -57,6 +58,15 @@ executables.
   the helper route.
 - Known Konami/SNK SVAG signatures use MetaManCore's in-process metadata reader
   and never start `vgmstream-cli`; other `.svag` aliases retain the helper route.
+- Validated Konami XMD v1/v2 headers use MetaManCore's in-process reader and
+  never start `vgmstream-cli`; unrecognized `.xmd` payloads retain the helper
+  route.
+- Standard Nintendo DSPADPCM, Retro Studios `RS03`, and Nintendo THP-audio
+  signatures use MetaManCore's in-process header readers and never start
+  `vgmstream-cli`; other `.dsp` aliases retain the helper route.
+- Validated Nintendo DS standard `STRM`/`HEAD`/`DATA` and FFTA2 `RIFF`/`IMA `
+  content use MetaManCore's in-process header/timing readers and never start
+  `vgmstream-cli`; other `.strm` aliases retain the helper route.
 - SPC ID666/xID6 blocks, S98 header/tags/event timing, VGM/VGZ headers/GD3/sample
   timing, and PSF-family `[TAG]` fields are read by MetaManCore; these routes do
   not invoke playback cores for metadata. SPC playback remains in VGMBoy.

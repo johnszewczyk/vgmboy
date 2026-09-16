@@ -152,6 +152,45 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
             return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+        case "xmd-direct":
+            let document: MetadataDocument
+            do {
+                document = try MetaManCore.read(fileURL: fileURL)
+            } catch let error as MetadataReadError {
+                throw ScannerInspectionError.malformedFile(error.localizedDescription)
+            } catch {
+                throw ScannerInspectionError.library(
+                    "Could not read Konami XMD source \(fileURL.lastPathComponent): \(error.localizedDescription)"
+                )
+            }
+            let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+        case "dsp-direct":
+            let document: MetadataDocument
+            do {
+                document = try MetaManCore.read(fileURL: fileURL)
+            } catch let error as MetadataReadError {
+                throw ScannerInspectionError.malformedFile(error.localizedDescription)
+            } catch {
+                throw ScannerInspectionError.library(
+                    "Could not read Nintendo DSP source \(fileURL.lastPathComponent): \(error.localizedDescription)"
+                )
+            }
+            let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+        case "nds-strm-direct":
+            let document: MetadataDocument
+            do {
+                document = try MetaManCore.read(fileURL: fileURL)
+            } catch let error as MetadataReadError {
+                throw ScannerInspectionError.malformedFile(error.localizedDescription)
+            } catch {
+                throw ScannerInspectionError.library(
+                    "Could not read Nintendo DS STRM source \(fileURL.lastPathComponent): \(error.localizedDescription)"
+                )
+            }
+            let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
         case "xa-direct":
             let result: MetadataReadResult
             do {

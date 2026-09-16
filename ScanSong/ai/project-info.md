@@ -15,7 +15,7 @@ publication. The product is the sole catalog writer consumed by CocoaSpice and S
   ownership stay here.
 - `MetaManCore` — shared decoder-independent metadata reading for AY, SAP,
   NSF/GBS/NSFE, HES/M3U, APE, ADX, AUS,
-  RIFF ATRAC3/ATRAC3+, Sony MSF, Konami/SNK SVAG, Sony XA, SID PSID/RSID,
+  RIFF ATRAC3/ATRAC3+, Sony MSF, Konami/SNK SVAG and XMD, Nintendo DSP/RS03/THP, Sony XA, SID PSID/RSID,
   SPC ID666/xID6, S98, VGM/VGZ, and PSF/PSF2/SSF/USF/2SF tag footers. ScanSong maps neutral
   ordered track documents to schema 23. All complete direct format readers
   listed here are owned by MetaMan; ScanSong retains routing, safe source and

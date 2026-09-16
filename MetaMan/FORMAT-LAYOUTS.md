@@ -186,6 +186,152 @@ chunk frames in source order. Each track document also exposes native source
 index, visible index, timing, playlist, hardware, and payload-size facts.
 See [GameMusicMetadataReader.swift](Sources/MetaManCore/GameMusicMetadataReader.swift).
 
+### Nintendo DS STRM
+
+The reader accepts a bounded Nintendo DS STRM container signature, validates
+its `HEAD` chunk and the following `DATA` chunk header, and never decodes the
+sample payload. Header and chunk integers are little-endian except for the
+four-byte byte-order marker, which is compared in big-endian display order.
+
+| Source position | Meaning |
+| --- | --- |
+| `0x00..0x03` | `STRM` signature. |
+| `0x04..0x07` | Byte-order marker: `0xFFFE0001` or `0xFEFF0001`. |
+| `0x08..0x0B` | Declared file size, little-endian 32-bit. |
+| `0x0C..0x0D`, `0x0E..0x0F` | Declared header size and block count, little-endian 16-bit. |
+| `0x10..0x13` | `HEAD` chunk identifier. |
+| `0x14..0x17` | `HEAD` chunk size; the supported layout is `0x50`. |
+| `0x18`, `0x19`, `0x1A` | Codec (`0` PCM8, `1` PCM16LE, `2` Nintendo DS IMA ADPCM), loop-enabled flag, and channel count (1 or 2). |
+| `0x1C..0x1D` | Sample rate in Hz, little-endian 16-bit. |
+| `0x20..0x23`, `0x24..0x27` | Loop-start sample and total sample count, little-endian 32-bit. |
+| `0x28..0x2B` | Sample-data offset from file start, little-endian 32-bit; must point after the `DATA` chunk header and within the source. |
+| `0x30..0x33`, `0x38..0x3B` | Interleave block size and final interleave-block size, little-endian 32-bit. |
+| `0x60..0x63`, `0x64..0x67` | `DATA` identifier and declared chunk size. The sample payload normally begins at `0x68`; the header's data offset is authoritative. |
+
+The preserved raw blocks are the complete fixed `0x60`-byte STRM/HEAD header
+and the eight-byte DATA chunk header. Timing uses integer sample arithmetic
+and floors to milliseconds: loop length is zero when looping is disabled, or
+`max(0, samples - loopStart) / rate` when enabled; finite play length is
+`samples / rate`. For looped tracks, the legacy
+vgmstream info projection is retained: `loopStart + 2 * loopLength + 10 *
+rate` frames before conversion to milliseconds. The loop-enabled flag controls
+both whether loop duration is exposed and whether the extended play-window
+formula is applied. Other formats sharing `.strm` remain outside this reader. See
+[NDSSTRMMetadataReader.swift](Sources/MetaManCore/NDSSTRMMetadataReader.swift).
+
+### Nintendo DS FFTA2 RIFF/IMA
+
+Final Fantasy Tactics A2 uses a separate Square Enix stream container. The
+signature is `RIFF` at byte zero and `IMA ` at `0x08`; unlike ordinary RIFF,
+the little-endian size at `0x04` equals the complete file size. The content
+probe requires that declared size to equal the physical file length.
+
+| Source position | Meaning |
+| --- | --- |
+| `0x00..0x03` | `RIFF` signature. |
+| `0x04..0x07` | Complete file size, little-endian 32-bit; the reader uses `size - 0x2C` as the decoder-compatible sample count. |
+| `0x08..0x0B` | `IMA ` codec marker. |
+| `0x0C..0x0F` | Sample rate in Hz, little-endian 32-bit. |
+| `0x20..0x23` | Loop-start sample; nonzero enables looping. |
+| `0x24..0x27` | Channel count, little-endian 32-bit (validated as 1 or 2). |
+| `0x28..0x2B` | Loop-end sample, little-endian 32-bit. |
+| `0x2C...` | Interleaved IMA sample payload; the legacy layout uses `0x80`-byte interleave blocks. Payload bytes are not decoded or retained. |
+
+The exact `0x2C`-byte header is retained as a raw metadata block. Loop length
+is zero when the loop-start field is zero; otherwise it is
+`(loopEnd - loopStart) / rate`. A looped play window is
+`loopStart + 2 * loopLength + 10 * rate` frames, matching the former
+vgmstream scanner projection. Non-looped play length is `sampleCount / rate`.
+The normalized title is the filename without its extension and the metadata
+source is `Square Enix RIFF IMA header`. See
+[NDSSTRMMetadataReader.swift](Sources/MetaManCore/NDSSTRMMetadataReader.swift).
+
+### Nintendo DSPADPCM, Retro Studios RS03, and THP audio
+
+These are three unrelated `.dsp` layouts. ScanSong dispatches by content; the
+extension-only route remains vgmstream, and unrecognized `.dsp` payloads keep
+that decoder fallback.
+
+#### Standard Nintendo DSPADPCM
+
+The standard stream has a big-endian `0x60`-byte header followed by mono
+DSPADPCM data. It has no magic, so recognition validates the header and checks
+that the first audio frame's predictor/scale byte agrees with the header. A
+matching second header at `0x60` or `0x10000` is not claimed as standard mono.
+
+| Source position | Meaning |
+| --- | --- |
+| `0x00..0x03`, `0x04..0x07`, `0x08..0x0B` | Sample count, nibble count, and rate (big-endian 32-bit). |
+| `0x0C..0x0D`, `0x0E..0x0F` | Loop flag (`0` or `1`) and codec format (`0`), big-endian 16-bit. |
+| `0x10..0x13`, `0x14..0x17`, `0x18..0x1B` | Loop-start nibble, loop-end nibble, and initial nibble offset. |
+| `0x1C..0x3B` | Sixteen big-endian signed ADPCM coefficients. |
+| `0x3C..0x3D` | Gain. |
+| `0x3E..0x3F`, `0x40..0x43` | Initial predictor/scale and two initial history samples. |
+| `0x44..0x49` | Loop predictor/scale and two loop history samples. |
+| `0x4A..0x4D` | Optional channel and block-size hints from DSPADPCM tool variants. |
+| `0x60...` | Encoded audio; never decoded or retained. |
+
+Nibble positions map to samples as `floor(nibbles / 16) * 14` when the
+remainder is zero, or `floor(nibbles / 16) * 14 + remainder - 2` otherwise;
+the calculation is signed because remainder `1` maps to `-1`. The decoder's
+inclusive loop end adds one sample and clamps to the declared sample count. ScanSong keeps its established
+projection (`intro=0`, loop span from native loop samples, and the vgmstream
+two-repeat/10-second-fade play window for looped sources). The raw header and
+native offsets remain available in the MetaMan document.
+
+#### Retro Studios RS03
+
+The decoder calls this Metroid Prime 2 layout `RS03`; its four signature bytes
+are `52 53 00 03` (`0x52530003`), not ASCII `RS03`. It begins with a `0x60`-byte
+big-endian header and `0x8F00`-byte audio interleave blocks.
+
+| Source position | Meaning |
+| --- | --- |
+| `0x00..0x03` | Magic value `0x52530003` (bytes `52 53 00 03`). |
+| `0x04..0x07`, `0x08..0x0B`, `0x0C..0x0F` | Channel count, total samples, and sample rate (big-endian 32-bit). |
+| `0x14..0x15` | Loop flag (big-endian 16-bit). |
+| `0x18..0x1B`, `0x1C..0x1F` | Loop-start and loop-end byte offsets. Each maps to `floor(bytes / 8) * 14` samples. |
+| `0x20..0x5F` | Sixteen big-endian coefficients per channel, spaced `0x20` bytes apart. |
+| `0x60...` | Interleaved encoded DSP audio; never decoded or retained. |
+
+Loop and play timing use the native sample rate and loop bounds with the same
+scanner-compatible two-repeat/10-second-fade policy as the standard DSP
+reader. The full fixed header and raw byte offsets are preserved.
+
+#### Nintendo THP audio component
+
+THP is a movie container, not a DSP-header alias. The reader accepts THP
+versions 1.0 and 1.1, follows its bounded component table to the audio
+component, and reads the same channel/rate/sample fields used by the
+vgmstream info path. It does not walk or decode movie blocks.
+
+| Source position | Meaning |
+| --- | --- |
+| `0x00..0x03`, `0x04..0x07` | `THP\0` signature and version (`0x00010000` or `0x00011000`; byte order follows the version word). |
+| `0x08..0x0F` | Maximum buffer and maximum audio sizes. |
+| `0x14..0x1F` | Block count, first-block size, and declared data size. |
+| `0x20..0x23` | File offset of the component descriptor table. |
+| `0x28..0x2B` | First audio block offset. |
+| Component type table | Component count, then a fixed 16-byte type array (`0` video, `1` audio). |
+| Component headers | Video headers before audio: width/height in v1.0, plus a format word in v1.1. |
+| Audio component header | Audio channel count, sample rate, and sample count; v1.1 adds a format word. |
+
+If the component-table pointer at `0x20` is `T`, the component count is at
+`T`, the fixed type array begins at `T + 4`, and component headers begin at
+`T + 0x14`. The audio-header position is that header start plus the sizes of
+the preceding video headers (`8` bytes in v1.0, `12` in v1.1). The audio
+header is `12` bytes in v1.0 and `16` in v1.1; its first three 32-bit values
+are channels, sample rate, and sample count.
+
+No loop is declared by this THP info layout; play time is sample count divided
+by rate. The file header, component types, intervening component headers, and
+audio header are retained as separate raw metadata blocks. See
+[NintendoDSPMetadataReader.swift](Sources/MetaManCore/NintendoDSPMetadataReader.swift)
+and the decoder-reference layouts in
+[`ngc_dsp_std.c`](../VGMBoy/vendor/vgmstream/src/meta/ngc_dsp_std.c),
+[`rs03.c`](../VGMBoy/vendor/vgmstream/src/meta/rs03.c), and
+[`thp.c`](../VGMBoy/vendor/vgmstream/src/meta/thp.c).
+
 ### AY / ZXAYEMUL
 
 | Source position | Meaning |
@@ -546,6 +692,41 @@ through channel count and 16-byte ADPCM blocks; SNK loop/block values are
 already block indices. Invalid loop bounds remain technical facts but are
 omitted from projected timing. See
 [SVAGMetadataReader.swift](Sources/MetaManCore/SVAGMetadataReader.swift).
+
+### Konami XMD v1/v2
+
+The extension contains two header layouts. XMD v1 has no fixed magic; the
+scanner claims it only when its channel/rate/data bounds are plausible. XMD v2
+starts with the ASCII bytes `xmd`. File-URL reads inspect only the fixed header
+and filesystem size; audio payload bytes are not loaded or decoded.
+
+| Version | Offset | Width / encoding | Meaning |
+| --- | --- | --- | --- |
+| v1 (Silent Hill 4) | `0x00` | u8 | Channel count. |
+| v1 | `0x01` | u16 LE | Sample rate in Hz. |
+| v1 | `0x03` | u32 LE | Encoded data byte count. |
+| v1 | `0x07` | u8 | Nonzero enables looping. |
+| v1 | `0x08` | u32 LE | Loop-start byte offset in encoded data. |
+| v1 | `0x0C` | — | Encoded data begins. The fixed header is 12 bytes. |
+| v2 (Castlevania: Curse of Darkness) | `0x00..0x02` | 3 bytes | ASCII `xmd` signature. |
+| v2 | `0x03` | u8 | Channel count. |
+| v2 | `0x04` | u16 LE | Sample rate in Hz. |
+| v2 | `0x06` | u32 LE | Encoded data byte count. |
+| v2 | `0x0A` | u8 | Nonzero enables looping. |
+| v2 | `0x0B` | u32 LE | Loop-start byte offset in encoded data. |
+| v2 | `0x0F..0x10` | 2 bytes | Unknown header values, retained verbatim. |
+| v2 | `0x11` | — | Encoded data begins. The fixed header is 17 bytes. |
+
+V1 uses 13-byte frames with 16 samples per frame; v2 uses 21-byte frames with
+32 samples per frame. To match vgmstream's integer arithmetic, the reader
+divides encoded bytes by frame size, then by channel count, before multiplying
+by samples per frame. The loop-start byte offset is converted with the same
+operation order. With looping disabled, the scanner play length is the stream
+sample count. With looping enabled, the former CLI metadata projection uses
+loop-start samples plus two loop bodies and a ten-second fade. MetaMan retains
+the source sample/loop facts and this scanner-compatible play-length projection
+without audio decoding. See
+[KonamiXMDMetadataReader.swift](Sources/MetaManCore/KonamiXMDMetadataReader.swift).
 
 ## What this says about decoder independence
 

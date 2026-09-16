@@ -182,6 +182,13 @@ error.
   vgmstream route.
 - Konami and SNK SVAG header, native fact, duration, and loop metadata through
   MetaManCore; unrelated `.svag` signatures retain the vgmstream route.
+- Konami XMD v1/v2 header, sample, loop, and scanner-duration metadata through
+  MetaManCore; unrecognized `.xmd` payloads retain the vgmstream route.
+- Nintendo DS standard STRM and Final Fantasy Tactics A2 RIFF/IMA metadata
+  through MetaManCore; only validated layouts leave the `.strm` decoder route,
+  and unrelated aliases retain vgmstream fallback.
+- Standard Nintendo DSPADPCM, Retro Studios RS03, and THP-audio headers through
+  MetaManCore; other `.dsp` signatures retain the vgmstream route.
 - Structurally known single rows for standard audio (including OGG Vorbis),
   modules, and registered formats whose optional metadata can remain empty.
 - Tracker/module rows (S3M, MOD, IT, XM, MTM, STM, and related) via

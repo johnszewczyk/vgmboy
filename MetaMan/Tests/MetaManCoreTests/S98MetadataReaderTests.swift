@@ -109,7 +109,7 @@ func s98MalformedInputsFailSafely() throws {
 @Test("All registered formats identify their direct metadata-reading boundary")
 func supportedFormatsAreRegisteredAsDirectFormatDataParsers() {
     let formats = MetaManCore.supportedFormats
-    #expect(formats.map(\.identifier) == ["ay", "sap", "nsf", "gbs", "nsfe", "hes", "sndh", "kss", "s98", "vgm", "psf-family", "gsf", "qsf", "spc", "sid", "ape", "adx", "aus", "at3", "msf", "svag", "xa"])
+    #expect(formats.map(\.identifier) == ["ay", "sap", "nsf", "gbs", "nsfe", "hes", "sndh", "kss", "s98", "vgm", "psf-family", "gsf", "qsf", "spc", "sid", "ape", "adx", "aus", "at3", "msf", "svag", "xmd", "xa", "nds-strm", "nds-strm-ffta2", "ngc-dsp-standard", "rs03", "ngc-thp-audio"])
     let byID = Dictionary(uniqueKeysWithValues: formats.map { ($0.identifier, $0) })
     #expect(byID["ay"]?.fileExtensions == ["ay"])
     #expect(byID["ay"]?.methodology.contains("no playback decoder") == true)
@@ -145,9 +145,15 @@ func supportedFormatsAreRegisteredAsDirectFormatDataParsers() {
     #expect(byID["msf"]?.fileExtensions == ["msf"])
     #expect(byID["msf"]?.methodology.contains("Direct Sony MSF") == true)
     #expect(byID["svag"]?.fileExtensions == ["svag"])
+    #expect(byID["xmd"]?.fileExtensions == ["xmd"])
+    #expect(byID["xmd"]?.methodology.contains("Konami XMD v1/v2") == true)
     #expect(byID["xa"]?.fileExtensions == ["xa"])
     #expect(byID["xa"]?.methodology.contains("interleaved file/channel subsongs") == true)
     #expect(byID["svag"]?.methodology.contains("Konami/SNK SVAG") == true)
+    #expect(byID["nds-strm"]?.fileExtensions == ["strm"])
+    #expect(byID["nds-strm"]?.methodology.contains("standard Nintendo DS STRM") == true)
+    #expect(byID["nds-strm-ffta2"]?.fileExtensions == ["bin", "strm"])
+    #expect(byID["nds-strm-ffta2"]?.methodology.contains("Final Fantasy Tactics A2") == true)
 }
 
 private func makeS98(

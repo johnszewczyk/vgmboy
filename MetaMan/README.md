@@ -8,8 +8,10 @@ import the library rather than shelling out to the CLI.
 MetaMan currently has complete AY, SAP, NSF, GBS, NSFE, HES, SNDH, KSS, S98,
 VGM/VGZ, generic PSF-style tags, complete GSF/miniGSF and QSF/miniQSF,
 SPC ID666/xID6, SID PSID/RSID, APE, CRI/Monster ADX,
-Atomic Planet AUS, RIFF ATRAC3/ATRAC3+, Sony MSF, Konami/SNK SVAG, and Sony
-CD-XA readers. SAP enumerates declared
+Atomic Planet AUS, RIFF ATRAC3/ATRAC3+, Sony MSF, Konami/SNK SVAG, Konami XMD
+v1/v2, Sony CD-XA,
+standard Nintendo DS STRM, Final Fantasy Tactics A2 RIFF/IMA, Nintendo DSP,
+Retro Studios RS03, and Nintendo THP audio readers. SAP enumerates declared
 subtunes from ordered header directives and retains native `TIME` hints. The
 S98 reader handles header/device information, its complete v3 tag block (including arbitrary and repeated
 keys), legacy pre-v3 titles, and register-command timing. The VGM reader
@@ -45,7 +47,13 @@ fixed offsets or that the decoder is needed to locate every field.
 | RIFF/WAVE ATRAC3/ATRAC3+ | Direct RIFF chunk reader for codec `0x0270` and the ATRAC3+ extensible GUID; no audio decoder | Ordered `LIST/INFO` tags, exact named non-audio chunks, codec/fact/loop facts, and vgmstream-compatible play timing | Not implemented |
 | Sony MSF | Direct 64-byte container-header and MPEG frame-boundary parser; no audio decoder | Header stream name, exact header bytes, codec/channel/rate/loop facts, and PCM/PSX ADPCM/ATRAC3/MPEG sample timing; non-Sony aliases are not claimed | Not implemented |
 | Konami / SNK SVAG | Direct `Svag` and `VAGm` header parsers; no audio decoder | Exact structural header bytes, native codec/channel/rate/interleave/block/loop facts, and validated sample-derived loop/play timing; unrelated `.svag` aliases are not claimed | Not implemented |
+| Konami XMD v1/v2 | Direct 12-byte Silent Hill 4 or 17-byte Castlevania header reader; audio payload is not read by the file-URL API | Raw header, channels/rate/data extent, ADPCM frame/sample counts, loop facts, and the scanner's two-pass/10-second-fade duration projection | Not implemented |
 | Sony CD-XA | Direct raw-sector and RIFF/CDXA parser; no ADPCM decoder | Ordered file/channel subsongs, sector/sample facts, and sector-derived duration; unrelated `.xa` aliases are not claimed | Not implemented |
+| Nintendo DS STRM | Direct standard `STRM`/`HEAD`/`DATA` container and sample-header reader; no playback core | Codec, channels, rate, sample/loop counts, interleave facts, exact header blocks, and scanner-compatible sample timing | Not implemented |
+| Nintendo DS FFTA2 STRM | Direct Square Enix RIFF/IMA fixed-header reader; no playback core | Header-derived sample count, channel/rate/loop facts, exact header block, and scanner-compatible sample timing; supports `.bin` and `.strm` | Not implemented |
+| Nintendo DSP (standard) | Direct big-endian 0x60-byte DSPADPCM header reader; no audio decoder | Codec coefficients, sample/nibble counts, loop points, exact header, and scanner-compatible timing | Not implemented |
+| Retro Studios RS03 | Direct `RS03` fixed-header reader; no audio decoder | Channel/interleave facts, byte-addressed loops, sample timing, and exact header | Not implemented |
+| Nintendo THP audio | Direct versioned THP component-table and DSP audio-header walk; no video or audio decoder | Channels, sample rate/count, component layout, raw header blocks, and finite timing | Not implemented |
 
 This is a library first, not a CLI-only tool. The `metaman` executable is an
 optional JSON frontend; CocoaSpice, ScanSong, and future clients can consume
@@ -91,6 +99,18 @@ fall back to the source filename; multiple tracks use the four-digit
 file/channel code. ScanSong routes matching XA signatures and adapts the
 ordered result, leaving unrelated `.xa` aliases on vgmstream. The byte layout
 and bounds are in [FORMAT-LAYOUTS.md](FORMAT-LAYOUTS.md).
+
+The standard Nintendo DS STRM reader recognizes `STRM` with valid `HEAD` and
+`DATA` headers. It reads codec, channels, sample rate/count, loop points, and
+interleave facts without decoding or retaining sample payload. The FFTA2
+variant is distinct: it begins `RIFF`/`IMA `, stores its complete file size at
+`0x04`, and exposes the loop start/end and sample rate in its fixed header.
+Both readers preserve only their fixed metadata headers. To match the former
+scanner projection, looped play time is loop start plus two loop bodies plus a
+ten-second fade; loop length is zero when looping is disabled. ScanSong routes
+both validated layouts directly and keeps vgmstream fallback for unrelated
+`.strm` aliases. See [FORMAT-LAYOUTS.md](FORMAT-LAYOUTS.md#nintendo-ds-strm)
+and [the FFTA2 layout](FORMAT-LAYOUTS.md#nintendo-ds-ffta2-riffima).
 
 The HES reader validates the fixed `HESM` header, reads its three variable-width
 text fields, and retains header facts and exact source bytes. Its M3U parser is

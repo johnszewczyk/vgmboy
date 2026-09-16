@@ -110,9 +110,39 @@ public enum MetaManCore {
             methodology: "Direct Konami/SNK SVAG header and PS-ADPCM sample/loop parser; preserves source header facts and does not decode audio or claim unrelated .svag aliases."
         ),
         MetadataFormatDescriptor(
+            identifier: "xmd",
+            fileExtensions: ["xmd"],
+            methodology: "Direct Konami XMD v1/v2 header and ADPCM frame-timing reader; retains the complete header and reproduces the scanner's default loop/fade projection without decoding audio."
+        ),
+        MetadataFormatDescriptor(
             identifier: "xa",
             fileExtensions: ["xa"],
             methodology: "Direct Sony CD-XA sector walk for interleaved file/channel subsongs and sample timing; validates raw-sector frames without decoding audio and does not claim unrelated .xa aliases."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "nds-strm",
+            fileExtensions: ["strm"],
+            methodology: "Direct standard Nintendo DS STRM header, codec, channel, loop, and sample-timing reader; validates the STRM/HEAD/DATA structure and does not decode audio."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "nds-strm-ffta2",
+            fileExtensions: ["bin", "strm"],
+            methodology: "Direct Final Fantasy Tactics A2 RIFF/IMA header and loop-timing reader; validates the Square Enix size, channel, and loop bounds without decoding audio."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "ngc-dsp-standard",
+            fileExtensions: ["dsp"],
+            methodology: "Direct big-endian Nintendo DSPADPCM header reader for standard mono DSP streams; retains codec coefficients and sample/loop facts without decoding audio."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "rs03",
+            fileExtensions: ["dsp"],
+            methodology: "Direct Retro Studios RS03 signature/header reader for channel, sample, interleave, and loop facts; no DSP decoding."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "ngc-thp-audio",
+            fileExtensions: ["dsp"],
+            methodology: "Direct Nintendo THP component-table and audio-header reader for DSP audio; retains bounded component/header blocks without decoding video or audio."
         )
     ]
 
@@ -128,6 +158,9 @@ public enum MetaManCore {
         }
         if fileURL.pathExtension.lowercased() == "svag" {
             return try SVAGMetadataReader.read(fileURL: fileURL)
+        }
+        if fileURL.pathExtension.lowercased() == "xmd" {
+            return try KonamiXMDMetadataReader.read(fileURL: fileURL)
         }
         let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
         return try read(
@@ -151,6 +184,10 @@ public enum MetaManCore {
         }
         if GSFMetadataReader.supportedExtensions.contains(formatHint) {
             let document = try GSFMetadataReader.read(fileURL: fileURL, context: context)
+            return MetadataReadResult(tracks: [MetadataTrack(document: document)])
+        }
+        if formatHint == "xmd" {
+            let document = try KonamiXMDMetadataReader.read(fileURL: fileURL)
             return MetadataReadResult(tracks: [MetadataTrack(document: document)])
         }
         if formatHint != "svag" {
@@ -230,7 +267,13 @@ public enum MetaManCore {
         case "at3": RIFFATRAC3MetadataReader.supports(fileURL: fileURL)
         case "msf": SonyMSFMetadataReader.supports(fileURL: fileURL)
         case "svag": SVAGMetadataReader.supports(fileURL: fileURL)
+        case "xmd": KonamiXMDMetadataReader.supports(fileURL: fileURL)
+        case "dsp": NintendoDSPMetadataReader.supports(fileURL: fileURL)
         case "xa": SonyXAMetadataReader.supports(fileURL: fileURL)
+        case "strm":
+            NDSSTRMMetadataReader.supports(fileURL: fileURL)
+                || NDSSTRMFFTA2MetadataReader.supports(fileURL: fileURL)
+        case "bin": NDSSTRMFFTA2MetadataReader.supports(fileURL: fileURL)
         default: false
         }
     }
@@ -361,6 +404,25 @@ public enum MetaManCore {
                 throw MetadataReadError.unsupportedFormat("Konami/SNK SVAG signature")
             }
             return try SVAGMetadataReader.read(data: data, displayName: displayName)
+        }
+
+        if normalizedFormat == "xmd" || (normalizedFormat == nil && KonamiXMDMetadataReader.matches(data)) {
+            return try KonamiXMDMetadataReader.read(data: data, displayName: displayName)
+        }
+
+        if normalizedFormat == "dsp" || (normalizedFormat == nil && NintendoDSPMetadataReader.matches(data)) {
+            return try NintendoDSPMetadataReader.read(data: data, displayName: displayName)
+        }
+
+        if (normalizedFormat == "strm" || normalizedFormat == "bin" || normalizedFormat == "nds-strm-ffta2")
+            && NDSSTRMFFTA2MetadataReader.matches(data) {
+            return try NDSSTRMFFTA2MetadataReader.read(data: data, displayName: displayName)
+        }
+        if normalizedFormat == "strm" || (normalizedFormat == nil && NDSSTRMMetadataReader.matches(data)) {
+            return try NDSSTRMMetadataReader.read(data: data, displayName: displayName)
+        }
+        if normalizedFormat == nil && NDSSTRMFFTA2MetadataReader.matches(data) {
+            return try NDSSTRMFFTA2MetadataReader.read(data: data, displayName: displayName)
         }
 
         if normalizedFormat == nil && ADXMetadataReader.matches(data) {
