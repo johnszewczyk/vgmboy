@@ -125,10 +125,10 @@ public struct ScannerPluginRegistry: Sendable {
 
     /// Routes ordinary suffixes first, then Amiga's replayer-prefix names
     /// (`p4x.earth`, `mod.xpose-end`, etc.). ADX, ADP, AHX, AT3, AUS, MSF, STRM, SVAG,
-    /// DSP, THP, DVI, XMD, SSHD/ADS/SS2, and XA are content-aware: ScanSong probes ADX and
+    /// DSP, THP, DVI, GENH, XMD, SSHD/ADS/SS2, and XA are content-aware: ScanSong probes ADX and
     /// AUS; MetaManCore probes RIFF ATRAC3, Sony MSF, Nintendo DS STRM,
-    /// Konami/SNK SVAG and XMD, Sony SSHD/ADS/SS2, Nintendo DSP/RS03/THP, Retro Studios AGSC, and Sony
-    /// XA. Both `.ads` and `.ss2` use the complete Sony SSHD reader. DVI is
+    /// Konami/SNK SVAG and XMD, Sony SSHD/ADS/SS2, Nintendo DSP/RS03/THP, Retro Studios AGSC, GENH,
+    /// and Sony XA. Both `.ads` and `.ss2` use the complete Sony SSHD reader. DVI is
     /// direct only for the complete Konami `DVI.` layout; Capcom
     /// `IDVI` aliases retain vgmstream. ADP is direct only for the complete
     /// Nintendo DTK or exact TXTH IMA layouts; other aliases retain vgmstream.
@@ -185,6 +185,10 @@ public struct ScannerPluginRegistry: Sendable {
         case "agsc":
             contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "agsc")
                 ? "agsc-direct"
+                : "vgmstream"
+        case "genh":
+            contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "genh")
+                ? "genh-direct"
                 : "vgmstream"
         case "strm":
             contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "strm")

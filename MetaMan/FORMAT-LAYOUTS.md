@@ -373,6 +373,58 @@ result entry.
 
 See [AGSCMetadataReader.swift](Sources/MetaManCore/AGSCMetadataReader.swift).
 
+### vgmstream GENH generic headers
+
+GENH is a small generic wrapper around otherwise headerless or externally
+described streams. The fixed header is little-endian and begins with `GENH`.
+MetaMan reads the header fields and never opens the codec named by the header.
+The decoder reference is
+[`genh.c`](../VGMBoy/vendor/vgmstream/src/meta/genh.c).
+
+| Offset | Width | Meaning |
+| --- | ---: | --- |
+| `0x00` | 4 | ASCII `GENH` signature. |
+| `0x04` | 4 | Channel count, signed 32-bit interpretation. |
+| `0x08` | 4 | Interleave size in bytes. |
+| `0x0C` | 4 | Sample rate, signed 32-bit interpretation. |
+| `0x10` | 4 | Loop-start sample, signed 32-bit; `-1` is the usual no-loop marker. |
+| `0x14` | 4 | Loop-end sample, signed 32-bit. |
+| `0x18` | 4 | Codec ID: 0 PS-ADPCM, 1 Xbox IMA, 2 GameCube DTK, 3/4 PCM16 BE/LE, 5 PCM8, 6 SDX2, 7 DVI IMA, 8 MPEG, 9 IMA, 10 AICA, 11 MS ADPCM, 12 Nintendo DSP, 13 interleaved unsigned PCM8, 14 PS-ADPCM bad-flags, 15 Microsoft IMA, 16 unsigned PCM8, 17 Apple IMA4, 18/19 ATRAC3/ATRAC3+, 20/21 XMA1/XMA2, 22 FFmpeg format, 23 AC-3, 24 PC-FX ADPCM, 25/26 signed/unsigned PCM4, 27 OKI16, 28 AAC. |
+| `0x1C` | 4 | Audio-data start offset. |
+| `0x20` | 4 | Declared header size. Must be at least `0x24` and no greater than the audio offset. |
+| `0x24` | 4 | Optional DSP coefficient base when header size is at least `0x30`. |
+| `0x28` | 4 | Optional DSP coefficient spacing for more than two channels; for stereo, the decoder interprets this as the right-channel coefficient base and derives spacing. |
+| `0x2C` | 4 | Optional DSP coefficient interleave type. |
+| `0x30` | 4 | Optional coefficient flags when header size is at least `0x34`: bit 0 selects split coefficient arrays; bit 1 selects little-endian coefficients (otherwise big-endian). |
+| `0x34`, `0x38` | 4 each | Optional second DSP coefficient base and spacing/right-channel base when header size is at least `0x3C`. |
+| `0x40` | 4 | Optional signed sample count when header size is at least `0x100`; if not positive, vgmstream falls back to the loop-end field at `0x14`. |
+| `0x44` | 4 | Optional signed encoder skip-sample count. |
+| `0x48` | 1 | Optional skip-sample mode (`0` auto, `1` force the value at `0x44`). |
+| `0x49` | 1 | Optional ATRAC3/ATRAC3+ codec-mode fallback when `0x4B` is zero. |
+| `0x4A` | 1 | Optional XMA1/XMA2 codec-mode fallback when `0x4B` is zero. |
+| `0x4B` | 1 | Optional primary codec-mode byte. |
+| `0x50` | 4 | Optional data-byte count; zero means bytes from audio offset to end of file. |
+| `0x54` | 4 | Optional final interleave size. |
+
+The legacy compatibility case is exact: when `0x20` is zero, vgmstream
+replaces both the declared header size and audio offset with `0x800`; MetaMan
+does the same and preserves those `0x800` source bytes. For ordinary headers,
+the raw block extends from file offset zero through the declared header size.
+For sample timing, a positive extended sample count wins, otherwise the
+signed loop-end value is used. A valid loop uses `loopEnd - loopStart`
+samples; the scanner-compatible looped play projection is
+`loopStart + 2 * loopLength + 10 * sampleRate` samples. Non-looped play time
+uses the selected sample count. Milliseconds are integer-truncated sample
+counts divided by the declared rate. The filename stem supplies the title;
+the comment/source label is `GENH generic header`.
+
+GENH is one stream per file. Its generic header does not contain an internal
+game/song tag or enumerate tracks; it only describes the payload's codec and
+layout. MetaMan exposes codec/layout facts, optional DSP and encoder fields,
+source bytes, and timing without loading the audio decoder. A suffix alias
+whose signature or header is invalid remains eligible for vgmstream fallback.
+See [GENHMetadataReader.swift](Sources/MetaManCore/GENHMetadataReader.swift).
+
 ### AY / ZXAYEMUL
 
 | Source position | Meaning |

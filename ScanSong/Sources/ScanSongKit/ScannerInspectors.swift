@@ -287,6 +287,19 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 )
             }
             return ScanInspection(route: route, tracks: tracks)
+        case "genh-direct":
+            let document: MetadataDocument
+            do {
+                document = try MetaManCore.read(fileURL: fileURL)
+            } catch let error as MetadataReadError {
+                throw ScannerInspectionError.malformedFile(error.localizedDescription)
+            } catch {
+                throw ScannerInspectionError.library(
+                    "Could not read GENH source \(fileURL.lastPathComponent): \(error.localizedDescription)"
+                )
+            }
+            let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
         case "nds-strm-direct":
             let document: MetadataDocument
             do {

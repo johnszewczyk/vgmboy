@@ -15,7 +15,7 @@ headerless Nintendo GameCube DTK and exact TXTH-described IMA ADP streams,
 CRI AHX,
 Konami Saturn DVI,
 standard Nintendo DS STRM, Final Fantasy Tactics A2 RIFF/IMA, Nintendo DSP,
-Retro Studios RS03 and AGSC banks, and Nintendo THP audio readers. SAP enumerates declared
+Retro Studios RS03 and AGSC banks, generic vgmstream GENH headers, and Nintendo THP audio readers. SAP enumerates declared
 subtunes from ordered header directives and retains native `TIME` hints. The
 S98 reader handles header/device information, its complete v3 tag block (including arbitrary and repeated
 keys), legacy pre-v3 titles, and register-command timing. The VGM reader
@@ -66,6 +66,7 @@ fixed offsets or that the decoder is needed to locate every field.
 | Retro Studios RS03 | Direct `RS03` fixed-header reader; no audio decoder | Channel/interleave facts, byte-addressed loops, sample timing, and exact header | Not implemented |
 | Nintendo THP audio | Direct versioned THP component-table and audio-header walk for `.thp` files and THP content in `.dsp`; no video or audio decoder | Channels, sample rate/count, component layout, raw header blocks, and finite timing | Not implemented |
 | Retro Studios AGSC | Direct v1/v2 chunk walk and ordered stream-table reader; no DSP decoder | Internal bank name, per-track sample/rate/loop data, source records and coefficients, and decoder-compatible timing | Not implemented |
+| vgmstream GENH | Direct generic-header reader; no payload codec or audio decoder | Codec/layout IDs, optional DSP coefficients and encoder fields, source header bytes, and sample/loop timing; legacy zero-size headers preserve vgmstream's 0x800-byte compatibility rule | Not implemented |
 
 This is a library first, not a CLI-only tool. The `metaman` executable is an
 optional JSON frontend; CocoaSpice, ScanSong, and future clients can consume
@@ -76,7 +77,7 @@ the core, while clients own their transport, catalog, and UI concerns.
 `MetadataTrack` carries a complete `MetadataDocument` and an optional
 format-native `sourceTrackIndex`; result-array order is authoritative, and
 repeated source indices remain separate entries. AY, SAP, NSF, GBS, NSFE,
-HES, SNDH, KSS, Sony XA, and Retro Studios AGSC use this contract; GSF publishes
+HES, SNDH, KSS, Sony XA, Retro Studios AGSC, and GENH use this contract; GSF publishes
 one validated entry. The file-URL API loads only format-declared companions: a same-basename
 M3U for HES and explicitly named, source-directory-confined PSFLib files for
 GSF. Data callers pass bounded named companion bytes through

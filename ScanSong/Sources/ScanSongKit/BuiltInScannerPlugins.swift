@@ -16,7 +16,7 @@ public enum BuiltInScannerPlugins {
     )
 
     public static let directVGMStreamExtensions =
-        VGMStreamFormatManifest.directScannerExtensions.subtracting(["ads", "adp", "adx", "agsc", "ahx", "at3", "aus", "bika", "dvi", "mib", "msf", "ss2", "strm", "svag", "thp", "xa", "xmd"])
+        VGMStreamFormatManifest.directScannerExtensions.subtracting(["ads", "adp", "adx", "agsc", "ahx", "at3", "aus", "bika", "dvi", "genh", "mib", "msf", "ss2", "strm", "svag", "thp", "xa", "xmd"])
 
     // Keep scanner methodologies visible at the route declaration site.
     // `.direct` means no playback decoder process is needed; a format may
@@ -45,6 +45,7 @@ public enum BuiltInScannerPlugins {
         .init(pluginID: "bink-audio-direct", displayName: "MetaMan Bink audio header reader", supportedExtensions: ["bika"], structurePolicy: .enumerate, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "dsp-direct", displayName: "MetaMan Nintendo DSP/RS03/THP readers", supportedExtensions: ["dsp", "thp"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "agsc-direct", displayName: "MetaMan Retro Studios AGSC reader", supportedExtensions: ["agsc"], structurePolicy: .enumerate, metadataPolicy: .direct, priority: 20),
+        .init(pluginID: "genh-direct", displayName: "MetaMan GENH generic header reader", supportedExtensions: ["genh"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "nds-strm-direct", displayName: "MetaMan Nintendo DS STRM reader", supportedExtensions: ["strm"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "xa-direct", displayName: "Sony XA sector reader", supportedExtensions: ["xa"], structurePolicy: .enumerate, metadataPolicy: .direct, priority: 20),
         .init(pluginID: "vgm-direct", displayName: "VGM/VGZ header reader", supportedExtensions: ["vgm", "vgz"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 20),
@@ -69,7 +70,7 @@ public enum BuiltInScannerPlugins {
         .init(pluginID: "amiga-uade", displayName: "UADE", supportedExtensions: AmigaFormatManifest.prefixes, supportsMultiTrack: true, structurePolicy: .enumerate, metadataPolicy: .decoder, priority: 20),
         .init(pluginID: "vgmstream-hd-bank", displayName: "vgmstream", supportedExtensions: ["hd", "hbd", "iecs"], structurePolicy: .dependencyEnumerate, metadataPolicy: .decoder, priority: 10),
         .init(pluginID: "vgmstream-txtp", displayName: "vgmstream", supportedExtensions: ["txtp"], structurePolicy: .dependencyEnumerate, metadataPolicy: .decoder, priority: 10),
-        .init(pluginID: "vgmstream", displayName: "vgmstream", supportedExtensions: directVGMStreamExtensions.union(["ads", "adp", "adx", "agsc", "ahx", "at3", "aus", "dvi", "mib", "msf", "ss2", "strm", "svag", "thp", "xa", "xmd"]), structurePolicy: .enumerate, metadataPolicy: .decoder, priority: 10)
+        .init(pluginID: "vgmstream", displayName: "vgmstream", supportedExtensions: directVGMStreamExtensions.union(["ads", "adp", "adx", "agsc", "ahx", "at3", "aus", "dvi", "genh", "mib", "msf", "ss2", "strm", "svag", "thp", "xa", "xmd"]), structurePolicy: .enumerate, metadataPolicy: .decoder, priority: 10)
     ]
 
     // Structural admission is useful, but metadata remains intentionally
