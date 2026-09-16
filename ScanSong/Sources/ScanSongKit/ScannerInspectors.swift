@@ -178,6 +178,19 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
             return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+        case "mib-direct":
+            let document: MetadataDocument
+            do {
+                document = try MetaManCore.read(fileURL: fileURL)
+            } catch let error as MetadataReadError {
+                throw ScannerInspectionError.malformedFile(error.localizedDescription)
+            } catch {
+                throw ScannerInspectionError.library(
+                    "Could not read headerless MIB source \(fileURL.lastPathComponent): \(error.localizedDescription)"
+                )
+            }
+            let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
         case "dsp-direct":
             let document: MetadataDocument
             do {

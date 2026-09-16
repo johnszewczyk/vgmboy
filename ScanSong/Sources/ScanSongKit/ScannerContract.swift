@@ -106,6 +106,7 @@ public struct ScannerPluginRegistry: Sendable {
                 && $0.pluginID != "dsp-direct"
                 && $0.pluginID != "xmd-direct"
                 && $0.pluginID != "sshd-direct"
+                && $0.pluginID != "mib-direct"
                 && $0.supportedExtensions.contains(normalized)
                 && (!archiveMember || $0.supportsArchiveMembers)
         }) else {
@@ -125,7 +126,8 @@ public struct ScannerPluginRegistry: Sendable {
     /// AUS; MetaManCore probes RIFF ATRAC3, Sony MSF, Nintendo DS STRM,
     /// Konami/SNK SVAG and XMD, Sony SSHD/ADS, Nintendo DSP/RS03/THP, and Sony
     /// XA. Other aliases retain vgmstream.
-    /// These rules are not folded
+    /// MIB is content-routed because the extension is shared by multiple
+    /// PlayStation stream layouts. These rules are not folded
     /// into the extension API.
     public func route(forPath path: String, archiveMember: Bool = false) -> ScannerRoute? {
         let fileURL = URL(fileURLWithPath: path)
@@ -153,6 +155,10 @@ public struct ScannerPluginRegistry: Sendable {
         case "ads":
             contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "ads")
                 ? "sshd-direct"
+                : "vgmstream"
+        case "mib":
+            contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "mib")
+                ? "mib-direct"
                 : "vgmstream"
         case "dsp":
             contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "dsp")

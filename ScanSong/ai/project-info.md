@@ -15,7 +15,8 @@ publication. The product is the sole catalog writer consumed by CocoaSpice and S
   ownership stay here.
 - `MetaManCore` — shared decoder-independent metadata reading for AY, SAP,
   NSF/GBS/NSFE, HES/M3U, APE, ADX, AUS,
-  RIFF ATRAC3/ATRAC3+, Sony MSF, Sony SSHD/ADS, Konami/SNK SVAG and XMD, Nintendo DSP/RS03/THP, Sony XA, SID PSID/RSID,
+  RIFF ATRAC3/ATRAC3+, Sony MSF, Sony SSHD/ADS, headerless PlayStation MIB,
+  Konami/SNK SVAG and XMD, Nintendo DSP/RS03/THP, Sony XA, SID PSID/RSID,
   SPC ID666/xID6, S98, VGM/VGZ, and PSF/PSF2/SSF/USF/2SF tag footers. ScanSong maps neutral
   ordered track documents to schema 23. All complete direct format readers
   listed here are owned by MetaMan; ScanSong retains routing, safe source and
@@ -58,6 +59,11 @@ Known Konami and SNK SVAG headers are read through MetaManCore, with unrelated
 Validated Sony SSHD/ADS headers, including ADSC/Cavia wrapper offsets and
 decoder-compatible encoded timing, are also read through MetaManCore; other
 `.ads` payloads retain vgmstream fallback. Playback remains in VGMBoy.
+Validated headerless PlayStation `.mib` streams use MetaManCore's bounded
+PS-ADPCM probe and decoder-compatible channel/interleave/loop/timing inference;
+invalid probes retain vgmstream fallback. The separate `.mib`/`.mih` bank
+layout is not conflated with the live headerless route. Playback remains in
+VGMBoy.
 
 ## Task Routing
 

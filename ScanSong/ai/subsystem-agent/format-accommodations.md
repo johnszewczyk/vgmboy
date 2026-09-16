@@ -22,7 +22,7 @@ The complete NSF/GBS/NSFE/HES readers, including ordered track documents, live
 in `MetaManCore`; HES companion M3U data is supplied through the metadata
 context. AY's signed relative-pointer reader and SAP's
 directive-header reader are also in MetaManCore. APE, CRI/Monster ADX, RIFF ATRAC3/ATRAC3+,
-Sony MSF, Sony SSHD/ADS, SID PSID/RSID, SPC ID666/xID6, S98, VGM/VGZ, and PSF/PSF2/SSF/USF/2SF
+Sony MSF, Sony SSHD/ADS, headerless PlayStation MIB, SID PSID/RSID, SPC ID666/xID6, S98, VGM/VGZ, and PSF/PSF2/SSF/USF/2SF
 metadata are also read through MetaManCore, which owns the Konami/SNK SVAG header reader.
 ScanSong supplies source files and maps neutral metadata into its catalog
 schema. These metadata routes do not require a playback decoder. Decoder-backed
@@ -30,7 +30,7 @@ enumeration, timing, dependency validation, and rendering remain on their
 existing routes.
 
 MetaManCore owns AY, SAP, NSF/GBS/NSFE, HES, SNDH, APE, ADX, ATRAC3, Sony MSF,
-Sony SSHD/ADS, SVAG, SID, SPC, S98, VGM/VGZ,
+Sony SSHD/ADS, headerless PlayStation MIB, SVAG, SID, SPC, S98, VGM/VGZ,
 and supported PSF-family metadata parsers plus the neutral metadata document;
 ScanSong owns source routing and the schema-23 adapter. The package does not
 link a playback decoder.
@@ -58,7 +58,7 @@ independent media sources are not playback targets.
 | `ffmpeg-audio` | `.ape`, `.mp2`, `.tak` | `.ape` uses MetaManCore's direct header/tag reader. `.mp2` and `.tak` do not currently have ScanSong routes. |
 | `highly-complete` | `.gsf`, `.minigsf` | MetaManCore validates PSF v0x22 payloads, GBA segments, and dependency chains without mGBA. |
 | `twosf` | `.2sf`, `.mini2sf` | `MetaManCore` PSF-style `[TAG]` reader; it does not start the playback core. |
-| `vgmstream` | `.aa3`, `.adp`, `.adx`, `.adpcm`, `.ads`, `.agsc`, `.ahx`, `.aifc`, `.at3`, `.aus`, `.bk2`, `.bik`, `.bika`, `.bnk`, `.dsp`, `.dvi`, `.fsb`, `.genh`, `.h4m`, `.hbd`, `.hd`, `.iecs`, `.int`, `.ldat`, `.logg`, `.mib`, `.msf`, `.mtaf`, `.ogg`, `.ps3`, `.rsf`, `.rws`, `.s14`, `.ss2`, `.stream`, `.strm`, `.svag`, `.swav`, `.thp`, `.txtp`, `.vag`, `.xa`, `.xmd`, `.xvag` | Validated `.ads`, `.adx`, `.at3`, `.aus`, `.dsp`, `.msf`, `.svag`, and `.xmd` use content-aware MetaManCore readers with vgmstream fallback for unrecognized aliases; `.xa` uses ScanSong's direct reader, and validated Nintendo DS standard/FFTA2 `.strm` layouts use MetaManCore. `.txtp` and HD-bank inputs use vgmstream with dependency preparation. Other routed streams use `vgmstream-cli -I`. `.ogg` currently uses the Core Audio scanner route. |
+| `vgmstream` | `.aa3`, `.adp`, `.adx`, `.adpcm`, `.ads`, `.agsc`, `.ahx`, `.aifc`, `.at3`, `.aus`, `.bk2`, `.bik`, `.bika`, `.bnk`, `.dsp`, `.dvi`, `.fsb`, `.genh`, `.h4m`, `.hbd`, `.hd`, `.iecs`, `.int`, `.ldat`, `.logg`, `.mib`, `.msf`, `.mtaf`, `.ogg`, `.ps3`, `.rsf`, `.rws`, `.s14`, `.ss2`, `.stream`, `.strm`, `.svag`, `.swav`, `.thp`, `.txtp`, `.vag`, `.xa`, `.xmd`, `.xvag` | Validated `.ads`, `.adx`, `.at3`, `.aus`, `.dsp`, `.msf`, `.svag`, and `.xmd` use content-aware MetaManCore readers with vgmstream fallback for unrecognized aliases; validated headerless `.mib` uses the MIB reader with vgmstream fallback for failed probes; `.xa` uses ScanSong's direct reader, and validated Nintendo DS standard/FFTA2 `.strm` layouts use MetaManCore. `.txtp` and HD-bank inputs use vgmstream with dependency preparation. Other routed streams use `vgmstream-cli -I`. `.ogg` currently uses the Core Audio scanner route. |
 | `lazyusf` | `.usf`, `.miniusf` | `MetaManCore` PSF-style `[TAG]` reader; `.usflib` remains dependency data, not a track. |
 | `playpsf` | `.psf`, `.minipsf`, `.psf2`, `.minipsf2` | `MetaManCore` PSF-style `[TAG]` reader; libraries remain dependency data. |
 | `qsf` | `.qsf`, `.miniqsf` | MetaManCore's complete PSF v0x41/QSound reader validates payload blocks, root tags, and declared dependencies without the QSound core. |
@@ -116,6 +116,7 @@ track fields and does not expose those additional manifest fields in CocoaSpice.
 | `svag-direct` | Konami/SNK SVAG in `.svag` | One track | MetaManCore Konami/SNK SVAG header reader | Retains header and native PS-ADPCM sample/loop facts; unknown `.svag` signatures use vgmstream. |
 | `xmd-direct` | Validated Konami XMD v1/v2 in `.xmd` | One track | MetaManCore bounded XMD header reader | Retains versioned header, native frame/sample/loop facts, and scanner-compatible play time; unknown payloads use vgmstream. |
 | `sshd-direct` | Validated Sony SSHD/ADS in `.ads` | One track | MetaManCore Sony SSHD/ADS header and encoded-frame reader | Handles native `SShd` plus ADSC/Cavia wrappers, loop-address variants, and padding-frame timing without decoding; nonmatching `.ads` uses vgmstream. |
+| `mib-direct` | Validated headerless PlayStation PS-ADPCM in `.mib` | One track | MetaManCore bounded PS-frame probe and channel/interleave/loop/timing reader | The live eight-archive corpus contains 327 files and matches the saved catalog, ScanSong adapter, and fresh vgmstream exactly. Invalid `.mib` probes retain vgmstream fallback; the separate `.mib`/`.mih` bank layout is not conflated with this route. |
 | `dsp-direct` | Standard Nintendo DSPADPCM, Retro Studios `RS03`, or Nintendo THP audio in `.dsp` | One track | MetaManCore's three signature-dispatched header readers | Preserves raw header/layout and native sample/loop facts; unknown `.dsp` signatures use vgmstream. |
 | `nds-strm-direct` | Nintendo DS standard `STRM`/`HEAD`/`DATA` or FFTA2 `RIFF`/`IMA ` in `.strm` | One track | `MetaManCore` standard STRM and FFTA2 readers | Preserves codec, channel, sample, loop, and interleave facts plus scanner-compatible duration; unrelated `.strm` aliases use vgmstream. |
 | `xa-direct` | Sony CD-XA in `.xa` | One row per XA file/channel subsong | MetaManCore Sony XA sector reader | Preserves interleaved channel enumeration, source facts, and sector-derived timing; RIFF/CDXA wrappers are accepted. Other `.xa` formats use vgmstream. |
@@ -699,6 +700,26 @@ through the direct route versus 152.280 ms/file through the vgmstream CLI,
 including process startup. This is local corpus evidence, not a whole-scan or
 cross-machine performance guarantee. See the [SSHD/ADS layout](../../MetaMan/FORMAT-LAYOUTS.md#sony-sshd--ads).
 
+### Headerless PlayStation MIB
+
+The live `.mib` sources are raw PlayStation PS-ADPCM streams with no fixed
+container header, text tags, or stored sample-rate field. `mib-direct` uses
+MetaManCore's `0x2000`-byte PS-frame probe, extension-defined 44.1 kHz, and a
+full frame walk to infer channel count, interleave, loop markers, sample count,
+and scanner timing. The implementation preserves the reference's legacy loop
+arithmetic, including the mono loop-start multiplier, and retains the first
+frame as a raw probe block. The filename stem is the only title source because
+these live streams contain no text metadata.
+
+The read-only root-1 comparison covered all 327 MIB rows/files across eight
+archives. Direct MetaMan, the ScanSong schema adapter, the saved catalog, and
+fresh vgmstream inspection matched exactly for all 327 rows. In the optimized
+Release run, direct inspection averaged 6.833 ms/file versus 72.767 ms/file
+through the vgmstream CLI, including per-file process startup. Invalid probes
+retain the vgmstream fallback. The separate `.mib` + `.mih` bank handler is a
+different layout and is not claimed by this extraction. See the [MIB layout](../../MetaMan/FORMAT-LAYOUTS.md#headerless-playstation-mib)
+and [MIB parity test](../../ScanSong/Tests/ScanSongKitTests/MIBMetadataReaderTests.swift).
+
 ### Raw stream suffixes
 
 The vgmstream extension set is owned by VGMBoy's
@@ -711,7 +732,7 @@ The vgmstream extension set is owned by VGMBoy's
 
 Although `.adx`, `.ads`, `.at3`, `.aus`, `.dsp`, `.msf`, `.strm`, `.svag`, `.xmd`, and `.xa` remain in VGMBoy's
 upstream manifest, ScanSong removes them from generic extension-only routing.
-Recognized CRI/Monster ADX, Sony SSHD/ADS, RIFF ATRAC3, Atomic Planet AUS, Sony MSF,
+Recognized CRI/Monster ADX, Sony SSHD/ADS, headerless PlayStation MIB, RIFF ATRAC3, Atomic Planet AUS, Sony MSF,
 Konami/SNK SVAG and XMD, standard Nintendo DSPADPCM, Retro Studios RS03, Nintendo THP
 audio, Nintendo DS standard STRM (`STRM`/`HEAD`/`DATA`) and FFTA2 (`RIFF`/`IMA `),
 and Sony XA signatures use direct readers. Other aliases

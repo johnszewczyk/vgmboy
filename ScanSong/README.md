@@ -187,6 +187,11 @@ error.
 - Sony SSHD/ADS headers, wrapper offsets, encoded-frame timing, and decoder-
   compatible loop handling through MetaManCore; only validated `.ads` payloads
   use the direct route, while aliases retain vgmstream fallback.
+- Headerless PlayStation `.mib` streams through MetaManCore's bounded PS-ADPCM
+  probe and decoder-compatible channel/interleave/loop/timing inference. The
+  eight-archive live corpus matches the saved catalog and fresh vgmstream
+  inspection; invalid `.mib` probes retain vgmstream fallback. The separate
+  `.mib`/`.mih` bank layout is not conflated with this route.
 - Nintendo DS standard STRM and Final Fantasy Tactics A2 RIFF/IMA metadata
   through MetaManCore; only validated layouts leave the `.strm` decoder route,
   and unrelated aliases retain vgmstream fallback.

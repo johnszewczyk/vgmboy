@@ -9,7 +9,7 @@ MetaMan currently has complete AY, SAP, NSF, GBS, NSFE, HES, SNDH, KSS, S98,
 VGM/VGZ, generic PSF-style tags, complete GSF/miniGSF and QSF/miniQSF,
 SPC ID666/xID6, SID PSID/RSID, APE, CRI/Monster ADX,
 Atomic Planet AUS, RIFF ATRAC3/ATRAC3+, Sony MSF, Sony SSHD/ADS,
-Konami/SNK SVAG, Konami XMD v1/v2, Sony CD-XA,
+Konami/SNK SVAG, Konami XMD v1/v2, Sony CD-XA, headerless PlayStation MIB,
 standard Nintendo DS STRM, Final Fantasy Tactics A2 RIFF/IMA, Nintendo DSP,
 Retro Studios RS03, and Nintendo THP audio readers. SAP enumerates declared
 subtunes from ordered header directives and retains native `TIME` hints. The
@@ -49,6 +49,7 @@ fixed offsets or that the decoder is needed to locate every field.
 | Konami / SNK SVAG | Direct `Svag` and `VAGm` header parsers; no audio decoder | Exact structural header bytes, native codec/channel/rate/interleave/block/loop facts, and validated sample-derived loop/play timing; unrelated `.svag` aliases are not claimed | Not implemented |
 | Konami XMD v1/v2 | Direct 12-byte Silent Hill 4 or 17-byte Castlevania header reader; audio payload is not read by the file-URL API | Raw header, channels/rate/data extent, ADPCM frame/sample counts, loop facts, and the scanner's two-pass/10-second-fade duration projection | Not implemented |
 | Sony SSHD / ADS | Direct `SShd` header and bounded PS-ADPCM/PCM/DVI-IMA frame-timing reader; no audio decoder | Codec/channel/rate/interleave facts, wrapper/header bytes, encoded-body bounds, decoder-compatible loop-address handling, and scanner timing; nonmatching `.ads` aliases are not claimed | Not implemented |
+| Headerless PlayStation MIB | Direct PS-ADPCM frame probe and channel/interleave/loop inference; no audio decoder | Extension-defined 44.1 kHz, raw probe block, inferred layout, decoder-compatible sample/timing facts, and filename fallback; `.mib` files that fail the probe remain on vgmstream fallback | Not implemented |
 | Sony CD-XA | Direct raw-sector and RIFF/CDXA parser; no ADPCM decoder | Ordered file/channel subsongs, sector/sample facts, and sector-derived duration; unrelated `.xa` aliases are not claimed | Not implemented |
 | Nintendo DS STRM | Direct standard `STRM`/`HEAD`/`DATA` container and sample-header reader; no playback core | Codec, channels, rate, sample/loop counts, interleave facts, exact header blocks, and scanner-compatible sample timing | Not implemented |
 | Nintendo DS FFTA2 STRM | Direct Square Enix RIFF/IMA fixed-header reader; no playback core | Header-derived sample count, channel/rate/loop facts, exact header block, and scanner-compatible sample timing; supports `.bin` and `.strm` | Not implemented |
@@ -424,6 +425,24 @@ startup. This is local corpus evidence, not a whole-scan or cross-machine
 performance guarantee. The byte map is in
 [FORMAT-LAYOUTS.md](FORMAT-LAYOUTS.md#sony-sshd--ads).
 
+### Headerless PlayStation MIB
+
+The live `.mib` target is a headerless PS-ADPCM stream, not the separate
+`.mib`/`.mih` bank layout. MetaMan validates the first `0x2000` bytes as PS
+frames, fixes the `.mib` rate at 44,100 Hz, and scans frame markers to infer
+channels, interleave, loop bounds, and sample timing. It retains the first
+`0x10` bytes as a probe block and uses the filename stem for the title; no
+embedded text metadata exists in this layout. Invalid probes remain eligible
+for the vgmstream fallback rather than being claimed by the direct route.
+
+The read-only root-1 comparison covered all 327 MIB rows/files across eight
+archives. Direct MetaMan, the ScanSong adapter, the saved catalog, and a fresh
+vgmstream `-I` inspection matched exactly for all 327 rows. In the optimized
+Release run, direct inspection averaged 6.833 ms/file versus 72.767 ms/file
+for the CLI, including its per-file process startup. These are local per-file
+measurements, not a whole-scan or cross-machine guarantee. See the
+[MIB layout](FORMAT-LAYOUTS.md#headerless-playstation-mib).
+
 ## Use
 
 ```swift
@@ -451,6 +470,7 @@ swift run --package-path MetaMan metaman read song.at3
 swift run --package-path MetaMan metaman read song.msf
 swift run --package-path MetaMan metaman read song.svag
 swift run --package-path MetaMan metaman read song.ads
+swift run --package-path MetaMan metaman read song.mib
 swift run --package-path MetaMan metaman read song.minigsf
 swift run --package-path MetaMan metaman read song.miniqsf
 ```
@@ -468,7 +488,7 @@ MetaMan has no dependency on ScanSong, VGMBoy, or a playback decoder. ScanSong
 adapts `MetadataDocument` into its catalog schema; other clients can consume
 the same library result directly. The current registry contains AY, SAP,
 NSF/GBS/NSFE, HES, SNDH, KSS, S98, VGM/VGZ, SPC, SID, APE, ADX, AUS, ATRAC3,
-Sony MSF, Sony SSHD/ADS, Konami/SNK SVAG, Sony XA, PSF/PSF2/SSF/USF/2SF, GSF/miniGSF, and
+Sony MSF, Sony SSHD/ADS, headerless PlayStation MIB, Konami/SNK SVAG, Sony XA, PSF/PSF2/SSF/USF/2SF, GSF/miniGSF, and
 QSF/miniQSF readers.
 SNDH is now fully read by MetaManCore; VGMBoy's old SNDH wrapper remains only as
 a test oracle while PSGPlay remains available for playback. KSS has also moved

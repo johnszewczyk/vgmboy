@@ -769,6 +769,31 @@ of the inner header as `sshdHeader` and never copies or decodes audio payload.
 
 See [SonySSHDMetadataReader.swift](Sources/MetaManCore/SonySSHDMetadataReader.swift).
 
+### Headerless PlayStation MIB
+
+The live `.mib` files are raw PlayStation ADPCM streams with no container
+header, text tag block, or stored sample-rate field. The extension supplies
+44,100 Hz. MetaMan uses the same bounded probe and inference rules as
+vgmstream's headerless PS-ADPCM reader, but does not instantiate its decoder.
+
+| Offset / scope | Width / encoding | Meaning |
+| --- | --- | --- |
+| `0x00` of each `0x10`-byte frame | u8 | PS-ADPCM predictor/shift byte; its high nibble must be `0..5` during the `0x2000`-byte format probe. |
+| `0x01` of each frame | u8 | PS-ADPCM flags; values above `0x07` fail the probe. `0x06` marks a loop start, `0x03` a loop end unless byte `0x03` is `0x77`, and `0x04` marks a loop-to-end start. |
+| `0x02..0x0F` of each frame | 14 bytes | ADPCM payload and channel-boundary comparison data. Channel inference ignores `0x00..0x01` when comparing a non-empty frame with the first frame. |
+| `0x00`, then every `0x10` bytes | — | Frame stride. The full-file walk uses repeated empty-frame signatures to infer interleave and channel count; interleave defaults to `0x10`. |
+| `0x00..0x1FFF` | up to `0x2000` bytes | Bounded PS-ADPCM validity probe; no fixed file header is assumed. |
+| Extension | — | `.mib` selects 44,100 Hz. The separate `.mib` + `.mih` bank handler is not this live layout and is not claimed by this reader. |
+| Full file | — | Decoded samples are `floor(fileBytes / 0x10 / channels) * 28`. Loop byte positions are converted with the decoder-compatible mono/interleaved formulas, including the legacy mono start multiplier. |
+
+The reader retains the first frame as `mibProbeHeader`, exposes raw loop and
+inference facts, and falls back to the source filename for the title because
+the raw stream contains no text metadata. ScanSong content-routes validated
+headerless `.mib` files to this reader; a probe failure remains on the generic
+vgmstream route. The live corpus contains 327 files in eight archives, all
+with no `.mih` companion entries. See
+[MIBMetadataReader.swift](Sources/MetaManCore/MIBMetadataReader.swift).
+
 ## What this says about decoder independence
 
 For some formats the answer really is a header/tag layout plus bounded parsing.

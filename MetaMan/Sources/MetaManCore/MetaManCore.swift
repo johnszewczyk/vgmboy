@@ -120,6 +120,11 @@ public enum MetaManCore {
             methodology: "Direct Sony SSHD/ADS header and encoded-frame timing reader; reproduces the complete vgmstream loop/address handling without decoding PCM, PS-ADPCM, or IMA audio."
         ),
         MetadataFormatDescriptor(
+            identifier: "ps-headerless-mib",
+            fileExtensions: ["mib"],
+            methodology: "Direct headerless PlayStation PS-ADPCM frame probe with vgmstream-compatible channel, interleave, loop, and timing inference; no playback decoder."
+        ),
+        MetadataFormatDescriptor(
             identifier: "xa",
             fileExtensions: ["xa"],
             methodology: "Direct Sony CD-XA sector walk for interleaved file/channel subsongs and sample timing; validates raw-sector frames without decoding audio and does not claim unrelated .xa aliases."
@@ -170,6 +175,9 @@ public enum MetaManCore {
         if fileURL.pathExtension.lowercased() == "ads" {
             return try SonySSHDMetadataReader.read(fileURL: fileURL)
         }
+        if fileURL.pathExtension.lowercased() == "mib" {
+            return try MIBMetadataReader.read(fileURL: fileURL)
+        }
         let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
         return try read(
             data: data,
@@ -200,6 +208,10 @@ public enum MetaManCore {
         }
         if formatHint == "ads" {
             let document = try SonySSHDMetadataReader.read(fileURL: fileURL)
+            return MetadataReadResult(tracks: [MetadataTrack(document: document)])
+        }
+        if formatHint == "mib" {
+            let document = try MIBMetadataReader.read(fileURL: fileURL)
             return MetadataReadResult(tracks: [MetadataTrack(document: document)])
         }
         if formatHint != "svag" {
@@ -281,6 +293,7 @@ public enum MetaManCore {
         case "svag": SVAGMetadataReader.supports(fileURL: fileURL)
         case "xmd": KonamiXMDMetadataReader.supports(fileURL: fileURL)
         case "ads": SonySSHDMetadataReader.supports(fileURL: fileURL)
+        case "mib": MIBMetadataReader.supports(fileURL: fileURL)
         case "dsp": NintendoDSPMetadataReader.supports(fileURL: fileURL)
         case "xa": SonyXAMetadataReader.supports(fileURL: fileURL)
         case "strm":
@@ -425,6 +438,10 @@ public enum MetaManCore {
 
         if normalizedFormat == "ads" || (normalizedFormat == nil && SonySSHDMetadataReader.matches(data)) {
             return try SonySSHDMetadataReader.read(data: data, displayName: displayName)
+        }
+
+        if normalizedFormat == "mib" || (normalizedFormat == nil && MIBMetadataReader.matches(data)) {
+            return try MIBMetadataReader.read(data: data, displayName: displayName)
         }
 
         if normalizedFormat == "dsp" || (normalizedFormat == nil && NintendoDSPMetadataReader.matches(data)) {
