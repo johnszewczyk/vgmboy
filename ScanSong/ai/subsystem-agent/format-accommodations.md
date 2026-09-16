@@ -23,7 +23,7 @@ in `MetaManCore`; HES companion M3U data is supplied through the metadata
 context. AY's signed relative-pointer reader and SAP's
 directive-header reader are also in MetaManCore. APE, CRI/Monster ADX, RIFF ATRAC3/ATRAC3+,
 Sony MSF, Sony SSHD/ADS, headerless PlayStation MIB, Bink audio containers,
-Nintendo DTK and TXTH-described IMA ADP, CRI AHX, SID PSID/RSID, SPC ID666/xID6, S98, VGM/VGZ, and PSF/PSF2/SSF/USF/2SF
+Nintendo DTK and TXTH-described IMA ADP, CRI AHX, Konami Saturn DVI, SID PSID/RSID, SPC ID666/xID6, S98, VGM/VGZ, and PSF/PSF2/SSF/USF/2SF
 metadata are also read through MetaManCore, which owns the Konami/SNK SVAG header reader.
 ScanSong supplies source files and maps neutral metadata into its catalog
 schema. These metadata routes do not require a playback decoder. Decoder-backed
@@ -32,7 +32,7 @@ existing routes.
 
 MetaManCore owns AY, SAP, NSF/GBS/NSFE, HES, SNDH, APE, ADX, ATRAC3, Sony MSF,
 Sony SSHD/ADS, headerless PlayStation MIB, Bink audio containers, Nintendo DTK and
-TXTH-described IMA ADP, CRI AHX, SVAG, SID, SPC, S98, VGM/VGZ,
+TXTH-described IMA ADP, CRI AHX, Konami Saturn DVI, SVAG, SID, SPC, S98, VGM/VGZ,
 and supported PSF-family metadata parsers plus the neutral metadata document;
 ScanSong owns source routing and the schema-23 adapter. The package does not
 link a playback decoder.
@@ -122,6 +122,7 @@ track fields and does not expose those additional manifest fields in CocoaSpice.
 | `bink-audio-direct` | Self-contained RAD Game Tools Bink audio containers in `.bika` | One row per Bink audio stream | MetaManCore Bink header, frame-offset, and packet-sample walk | The live one-archive corpus contains 68 files and matches the saved catalog, ScanSong adapter, and fresh vgmstream exactly. `.bik`/`.bk2` movies remain on the vgmstream playback/inspection boundary. |
 | `adp-direct` | Headerless Nintendo DTK or exact `.adp.txth` IMA layout in `.adp` | One track | MetaManCore content probe and complete layout reader | 175 live DTK members and nine TXTH-described Contra members are direct; unknown `.adp` aliases remain on vgmstream and the hidden sidecar is dependency context. |
 | `ahx-direct` | Validated CRI AHX in `.ahx` | One track | MetaManCore bounded AHX header and fixed-bitrate payload reader | The live root-1 corpus contains 11 files with exact saved-catalog and fresh-vgmstream parity; invalid `.ahx` aliases remain on vgmstream. |
+| `dvi-direct` | Validated Konami Saturn `DVI.` in `.dvi` | One track | MetaManCore bounded DVI header and stereo IMA timing reader | The live root-1 corpus contains 45 files with exact saved-catalog and fresh-vgmstream parity; Capcom `IDVI` aliases and incomplete payloads remain on vgmstream. |
 | `dsp-direct` | Standard Nintendo DSPADPCM, Retro Studios `RS03`, or Nintendo THP audio in `.dsp` | One track | MetaManCore's three signature-dispatched header readers | Preserves raw header/layout and native sample/loop facts; unknown `.dsp` signatures use vgmstream. |
 | `nds-strm-direct` | Nintendo DS standard `STRM`/`HEAD`/`DATA` or FFTA2 `RIFF`/`IMA ` in `.strm` | One track | `MetaManCore` standard STRM and FFTA2 readers | Preserves codec, channel, sample, loop, and interleave facts plus scanner-compatible duration; unrelated `.strm` aliases use vgmstream. |
 | `xa-direct` | Sony CD-XA in `.xa` | One row per XA file/channel subsong | MetaManCore Sony XA sector reader | Preserves interleaved channel enumeration, source facts, and sector-derived timing; RIFF/CDXA wrappers are accepted. Other `.xa` formats use vgmstream. |
@@ -788,6 +789,24 @@ direct/catalog/decoder parity. Release inspection averaged 0.160 ms/file
 direct versus 35.398 ms/file through the CLI, including process startup. See
 the [AHX offset map](../../MetaMan/FORMAT-LAYOUTS.md#cri-ahx) and
 [AHX parity test](../../ScanSong/Tests/ScanSongKitTests/AHXMetadataReaderTests.swift).
+
+### Konami Saturn DVI
+
+`.dvi` is content-routed because it is shared by Konami Saturn `DVI.` and
+unrelated Capcom `IDVI` streams. `dvi-direct` accepts only the complete
+big-endian header: payload offset at `0x04`, sample count at `0x08`, and loop
+start at `0x0C` (`-1` means no loop). It retains the complete pre-payload
+header, requires `fileBytes - dataOffset == sampleCount`, and derives stereo
+Intel DVI/IMA timing at 44.1 kHz with 4-byte interleave. Looping duration uses
+the decoder-compatible `loopStart + 2 * loopLength + 44100 * 10` projection.
+No IMA decoder is started; `IDVI`, incomplete, and otherwise unknown `.dvi`
+payloads retain vgmstream fallback.
+
+The root-1 live comparison covers all 45 DVI rows/files with exact
+direct/catalog/decoder parity. Release inspection averaged 0.291 ms/file
+direct versus 330.900 ms/file through the CLI, including process startup. See
+the [DVI offset map](../../MetaMan/FORMAT-LAYOUTS.md#konami-saturn-dvi) and
+[DVI parity test](../../ScanSong/Tests/ScanSongKitTests/DVIMetadataReaderTests.swift).
 
 ### Raw stream suffixes
 

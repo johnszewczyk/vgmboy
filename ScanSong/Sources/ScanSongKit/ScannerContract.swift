@@ -109,6 +109,7 @@ public struct ScannerPluginRegistry: Sendable {
                 && $0.pluginID != "mib-direct"
                 && $0.pluginID != "adp-direct"
                 && $0.pluginID != "ahx-direct"
+                && $0.pluginID != "dvi-direct"
                 && $0.supportedExtensions.contains(normalized)
                 && (!archiveMember || $0.supportsArchiveMembers)
         }) else {
@@ -124,11 +125,12 @@ public struct ScannerPluginRegistry: Sendable {
 
     /// Routes ordinary suffixes first, then Amiga's replayer-prefix names
     /// (`p4x.earth`, `mod.xpose-end`, etc.). ADX, ADP, AHX, AT3, AUS, MSF, STRM, SVAG,
-    /// DSP, XMD, SSHD/ADS, and XA are content-aware: ScanSong probes ADX and
+    /// DSP, DVI, XMD, SSHD/ADS, and XA are content-aware: ScanSong probes ADX and
     /// AUS; MetaManCore probes RIFF ATRAC3, Sony MSF, Nintendo DS STRM,
     /// Konami/SNK SVAG and XMD, Sony SSHD/ADS, Nintendo DSP/RS03/THP, and Sony
-    /// XA. ADP is direct only for the complete Nintendo DTK or exact TXTH IMA
-    /// layouts; other aliases retain vgmstream.
+    /// XA. DVI is direct only for the complete Konami `DVI.` layout; Capcom
+    /// `IDVI` aliases retain vgmstream. ADP is direct only for the complete
+    /// Nintendo DTK or exact TXTH IMA layouts; other aliases retain vgmstream.
     /// MIB is content-routed because the extension is shared by multiple
     /// PlayStation stream layouts. These rules are not folded
     /// into the extension API.
@@ -170,6 +172,10 @@ public struct ScannerPluginRegistry: Sendable {
         case "ahx":
             contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "ahx")
                 ? "ahx-direct"
+                : "vgmstream"
+        case "dvi":
+            contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "dvi")
+                ? "dvi-direct"
                 : "vgmstream"
         case "dsp":
             contentRoutedPlugin = MetaManCore.canReadDirectly(fileURL: fileURL, formatHint: "dsp")

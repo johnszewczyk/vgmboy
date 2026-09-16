@@ -887,6 +887,29 @@ exactly; direct Release inspection averaged 0.160 ms/file versus 35.398 ms/file
 for the CLI. See
 [AHXMetadataReader.swift](Sources/MetaManCore/AHXMetadataReader.swift).
 
+### Konami Saturn DVI
+
+The `.dvi` suffix is shared by Konami Saturn `DVI.` streams and unrelated
+Capcom `IDVI` streams. MetaMan claims only the complete `DVI.` layout below.
+All multi-byte values are signed big-endian 32-bit integers.
+
+| Offset / scope | Width / encoding | Meaning |
+| --- | --- | --- |
+| `0x00..0x03` | 4 bytes | ASCII `DVI.` signature. `IDVI` is deliberately not claimed. |
+| `0x04..0x07` | s32 BE | Payload/data offset; live files use `0x800`. |
+| `0x08..0x0B` | s32 BE | Total sample count. |
+| `0x0C..0x0F` | s32 BE | Loop-start sample; `-1` means no loop. |
+| `0x10..dataOffset-1` | raw bytes | Pre-payload header/ADPCM state; retained as `dviHeader`. |
+| `dataOffset..fileEnd` | raw bytes | Stereo Intel DVI/IMA payload, 4-byte interleave, 44.1 kHz. |
+| Whole file | invariant | `fileBytes - dataOffset == sampleCount`; otherwise the direct route rejects the source as incomplete or ambiguous. |
+
+For a non-looping source, play samples equal the header sample count. For a
+looping source, the scanner-compatible finite projection is
+`loopStart + 2 * (sampleCount - loopStart) + 44100 * 10`; milliseconds are
+integer floor division by 44,100. The direct reader retains the complete
+pre-payload header but never decodes the IMA payload. See
+[DVIMetadataReader.swift](Sources/MetaManCore/DVIMetadataReader.swift).
+
 ### Bink audio containers (`.bika`)
 
 The live `.bika` members are self-contained RAD Game Tools Bink containers

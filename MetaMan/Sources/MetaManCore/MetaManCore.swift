@@ -145,6 +145,11 @@ public enum MetaManCore {
             methodology: "Direct CRI AHX header and fixed-bitrate payload-duration reader; preserves the declared sample count separately and does not open the MPEG/AHX playback path."
         ),
         MetadataFormatDescriptor(
+            identifier: "dvi",
+            fileExtensions: ["dvi"],
+            methodology: "Direct Konami Saturn DVI. header and stereo IMA timing reader; preserves the complete pre-payload header without opening the IMA playback path, while unrelated IDVI aliases remain available to the fallback decoder."
+        ),
+        MetadataFormatDescriptor(
             identifier: "xa",
             fileExtensions: ["xa"],
             methodology: "Direct Sony CD-XA sector walk for interleaved file/channel subsongs and sample timing; validates raw-sector frames without decoding audio and does not claim unrelated .xa aliases."
@@ -207,6 +212,9 @@ public enum MetaManCore {
         if fileURL.pathExtension.caseInsensitiveCompare("ahx") == .orderedSame {
             return try AHXMetadataReader.read(fileURL: fileURL)
         }
+        if fileURL.pathExtension.caseInsensitiveCompare("dvi") == .orderedSame {
+            return try DVIMetadataReader.read(fileURL: fileURL)
+        }
         let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
         return try read(
             data: data,
@@ -252,6 +260,10 @@ public enum MetaManCore {
         }
         if formatHint == "ahx" {
             let document = try AHXMetadataReader.read(fileURL: fileURL)
+            return MetadataReadResult(tracks: [MetadataTrack(document: document)])
+        }
+        if formatHint == "dvi" {
+            let document = try DVIMetadataReader.read(fileURL: fileURL)
             return MetadataReadResult(tracks: [MetadataTrack(document: document)])
         }
         if formatHint != "svag" {
@@ -329,6 +341,10 @@ public enum MetaManCore {
             let document = try AHXMetadataReader.read(data: data, displayName: displayName)
             return MetadataReadResult(tracks: [MetadataTrack(document: document)])
         }
+        if normalizedFormat == "dvi" || (normalizedFormat == nil && DVIMetadataReader.matches(data)) {
+            let document = try DVIMetadataReader.read(data: data, displayName: displayName)
+            return MetadataReadResult(tracks: [MetadataTrack(document: document)])
+        }
         let document = try read(data: data, formatHint: formatHint, displayName: displayName)
         return MetadataReadResult(tracks: [MetadataTrack(document: document)])
     }
@@ -348,6 +364,7 @@ public enum MetaManCore {
         case "bika": BinkAudioMetadataReader.supports(fileURL: fileURL)
         case "adp": ADPMetadataReader.supports(fileURL: fileURL)
         case "ahx": AHXMetadataReader.supports(fileURL: fileURL)
+        case "dvi": DVIMetadataReader.supports(fileURL: fileURL)
         case "dsp": NintendoDSPMetadataReader.supports(fileURL: fileURL)
         case "xa": SonyXAMetadataReader.supports(fileURL: fileURL)
         case "strm":
@@ -508,6 +525,10 @@ public enum MetaManCore {
 
         if normalizedFormat == "ahx" || (normalizedFormat == nil && AHXMetadataReader.matches(data)) {
             return try AHXMetadataReader.read(data: data, displayName: displayName)
+        }
+
+        if normalizedFormat == "dvi" || (normalizedFormat == nil && DVIMetadataReader.matches(data)) {
+            return try DVIMetadataReader.read(data: data, displayName: displayName)
         }
 
         if normalizedFormat == "dsp" || (normalizedFormat == nil && NintendoDSPMetadataReader.matches(data)) {

@@ -203,6 +203,11 @@ error.
   header/fixed-bitrate reader. It preserves the declared sample count separately
   from the scanner-compatible payload duration; unrelated `.ahx` aliases remain
   on vgmstream.
+- Konami Saturn `DVI.` streams in `.dvi` are content-routed through MetaManCore.
+  The complete pre-payload header, stereo IMA facts, loop timing, and finite
+  duration are read without a decoder; Capcom `IDVI` aliases and incomplete
+  payloads retain vgmstream fallback. The live root-1 corpus covers 45 files
+  with exact saved-catalog/decoder parity.
 - Nintendo DS standard STRM and Final Fantasy Tactics A2 RIFF/IMA metadata
   through MetaManCore; only validated layouts leave the `.strm` decoder route,
   and unrelated aliases retain vgmstream fallback.

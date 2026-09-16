@@ -100,6 +100,11 @@
   first AHX frame, and header fields; malformed or unrelated `.ahx` aliases
   remain on vgmstream. The reader preserves the declared sample count while
   reproducing the existing fixed-bitrate payload duration.
+- MetaManCore owns the complete direct projection for Konami Saturn `DVI.`
+  `.dvi` payloads. The reader preserves the full pre-payload header, validates
+  the offset/sample-count/payload-size relationship, and reproduces the
+  decoder's stereo IMA loop projection. Capcom `IDVI` aliases and incomplete
+  layouts remain on vgmstream; ScanSong never publishes a partial DVI row.
 - AY, SAP, APE, ADX, AUS, ATRAC3, SVAG, SID, SPC, S98, VGM/VGZ, and PSF-family metadata are
   parsed by the sibling `MetaManCore` package. It preserves ordered tags and source bytes
   (including separately named ID666 and xID6 SPC blocks), with a ScanSong-only
@@ -135,6 +140,9 @@
   vgmstream.
 - Validated CRI AHX `.ahx` payloads use `ahx-direct` and MetaManCore without
   starting `vgmstream-cli`; invalid aliases retain the fallback route.
+- Validated Konami Saturn `DVI.` `.dvi` payloads use `dvi-direct` and MetaManCore
+  without starting `vgmstream-cli`; `IDVI` and incomplete aliases retain the
+  fallback route.
 - Unknown inputs and unavailable required adapters are typed diagnostics, never
   invented playable rows or calls into a host scanner.
 - The persisted ScanSong file-type policy ignores only documented decoder-absent
