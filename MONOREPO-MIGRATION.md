@@ -21,10 +21,12 @@ recoverable unreachable commit, and current working-tree source are preserved
 in the family tree and `archive/SPCBoy/...` refs. It is archival only; routine
 verification covers the native `SPCBoyWK` app instead.
 
-ViewBoy is a separate maintained frontend package. Its former standalone Git
-history is retained at `archive/ViewBoy/heads/main`; its current source is
-`ViewBoy/` and its build output is local-only. Keep it separate from SPCBoyWK:
-the apps have distinct bundle identities, preference keys, and presentation.
+ViewBoy is a separate maintained frontend package, originally forked from the
+SPCBoyWK WebKit frontend. Its former standalone Git history is retained at
+`archive/ViewBoy/heads/main`; its current source is `ViewBoy/` and its build
+output is local-only. Keep it separate from SPCBoyWK: the apps have distinct
+bundle identities, preference keys, and presentation while using the shared
+family packages.
 
 UACMan had no Git repository when it was brought into the family tree; its
 current source and tests are included, but there is no earlier UACMan commit

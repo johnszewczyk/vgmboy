@@ -1,9 +1,9 @@
 # Local recovery inventory
 
-These ignored payloads were retained while the component repositories and
+These recovery records were retained while component repositories and
 standalone frontends were consolidated into this family repository. They are
 not active source or build inputs. Git preserves maintained source and imported
-history; these files preserve unique local archives and fixtures.
+history; the ignored payloads below preserve unique local archives and fixtures.
 
 | Path | SHA-256 | Purpose and source |
 | --- | --- | --- |
@@ -11,8 +11,9 @@ history; these files preserve unique local archives and fixtures.
 | `CocoaSpice/CocoaSpice-project-backup-2026-07-08.tar.gz` | `a77d7731e01823cbf2d3771354e67920eb8889e6b1892a540b3dbf088f44a4b9` | Earlier CocoaSpice source backup; maintained source is `../CocoaSpice/`. |
 | `ViewBoy/ViewBoy-legacy-2026-09-01.zip` | `8ffa7797888aa131e2a087755d01266e9ff11e509af2cb5507b90369a30d9b6d` | Earlier ViewBoy backup; maintained source is `../ViewBoy/`, and imported history is `archive/ViewBoy/heads/main`. |
 | `fixtures/Silent Hill 2 (EMU).zophar.zip` | `c4f1579ffbcf2199cbb6b4cc5a6d2be2a3cf8cbb155fdfe51a9db15bd02f3007` | Unique local playback/test fixture retained from the legacy checkout staging tree. |
+| [`legacy-documentation/CocoaSpice-container-proposal.md.txt`](legacy-documentation/CocoaSpice-container-proposal.md.txt) | `b8b0162702041f2c108210d8203746c19c8b5979261d3db8d0bfe49a8ad6770e` | Superseded proposal preserved verbatim from `VGMMan-legacy-checkouts-2026-09-15/CocoaSpice/container-proposal.md`; its retirement is explained in `legacy-documentation/README.md`. |
 
-The archives are intentionally ignored by Git and can be large. Keep them in
-this folder when cleaning generated build output or retiring duplicate
-checkouts. Do not treat these historical bundles as the current source of
-truth.
+The payload archives are intentionally ignored by Git and can be large. Keep
+them here when cleaning generated build output or retiring duplicate checkouts.
+Do not treat these historical bundles as the current source of truth. The
+retired proposal is tracked text for provenance, not a supported format design.

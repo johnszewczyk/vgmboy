@@ -44,7 +44,7 @@ Boundary checks around the same work:
   config change.
 - The packaged ViewBoy window opened and rendered its library, navigation, and
   playback controls. It had no selected catalog or live playback fixture.
-- The family documentation link check resolved all 419 local Markdown links
+- The family documentation link check resolved all 421 local Markdown links
   outside vendored dependency documentation; no broken links remained.
 
 ## Commands
