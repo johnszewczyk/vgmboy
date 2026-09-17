@@ -1681,10 +1681,11 @@ function selectPlaylistTrack(trackId, { focus = false, extend = false, range = f
   if (previousIds.size !== selection.selectedIds.length || selection.selectedIds.some((id) => !previousIds.has(id))) persistSettings();
 
   for (const [id, row] of playlistRowsByTrackId) updatePlaylistRowState(row, id);
-  const nextRow = playlistRowsByTrackId.get(track.id) || null;
-  selectedPlaylistRow = nextRow;
+  const primaryRow = selection.primaryId ? playlistRowsByTrackId.get(selection.primaryId) || null : null;
+  const clickedRow = playlistRowsByTrackId.get(track.id) || null;
+  selectedPlaylistRow = primaryRow;
   scheduleSelectionIndicators();
-  if (focus) nextRow?.focus({ preventScroll: true });
+  if (focus) clickedRow?.focus({ preventScroll: true });
   return track;
 }
 

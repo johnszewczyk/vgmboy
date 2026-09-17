@@ -16,6 +16,10 @@ const uiSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/app-ui.js"),
   "utf8"
 );
+const playlistControllerSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-controller.js"),
+  "utf8"
+);
 const indexSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/index.html"),
   "utf8"
@@ -300,9 +304,7 @@ function makeHarness() {
     loadUI() {
       app.persistSettings = () => {};
       state.selectedTrackIds = state.selectedTrackId ? [state.selectedTrackId] : [];
-      vm.runInNewContext(fs.readFileSync(
-        path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/playlist-controller.js"), "utf8"
-      ), context, { filename: "playlist-controller.js" });
+      vm.runInNewContext(playlistControllerSource, context, { filename: "playlist-controller.js" });
       vm.runInNewContext(uiSource, context, { filename: "app-ui.js" });
     },
     flushAnimationFrame(elapsedMilliseconds = 500) {
@@ -633,6 +635,26 @@ test("SPCBoyWK uses one accent selection capsule without recoloring selected tex
   assert.doesNotMatch(stylesSource, /\.playlist-row\.is-selected > td[\s\S]*?\{[^}]*color:/);
   assert.doesNotMatch(stylesSource, /button:is\(\.tree-node, \.database-game-row, \.database-console-row\)\.is-selected\s*\{[^}]*color:/);
   assert.doesNotMatch(stylesSource, /button:not\([^\n]*\):is\([^\n]*\.is-selected/);
+});
+
+test("SPCBoyWK selection capsule follows the surviving primary after modifier-toggle", () => {
+  const selectionWindow = {};
+  vm.runInNewContext(playlistControllerSource, { window: selectionWindow }, { filename: "playlist-controller.js" });
+  const controller = selectionWindow.SPCBoyPlaylistController;
+  const playlist = [{ id: "row-a" }, { id: "row-b" }];
+  const reduce = (current, trackId, modifiers = {}) => controller.reduceSelection({
+    playlist,
+    selectedIds: current.selectedIds,
+    anchorId: current.anchorId
+  }, trackId, modifiers);
+
+  let selection = reduce({ selectedIds: [], anchorId: null }, "row-a");
+  selection = reduce(selection, "row-b", { extend: true });
+  selection = reduce(selection, "row-b", { extend: true });
+
+  assert.equal(Array.from(selection.selectedIds).join(","), "row-a");
+  assert.equal(selection.primaryId, "row-a");
+  assert.match(uiSource, /state\.selectedTrackId = selection\.primaryId;[\s\S]*?const primaryRow = selection\.primaryId \? playlistRowsByTrackId\.get\(selection\.primaryId\)[\s\S]*?selectedPlaylistRow = primaryRow;[\s\S]*?if \(focus\) clickedRow\?\.focus/);
 });
 
 test("SPCBoyWK clears playlist selection when a sidebar source replaces the visible list", () => {
