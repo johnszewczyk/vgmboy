@@ -11,6 +11,9 @@ VGMSTREAM_OUTPUT="$BUILD_DIR/vgmstream-cli"
 MDX_OUTPUT="$BUILD_DIR/vgmboy-mdx-inspect"
 AMIGA_OUTPUT="$BUILD_DIR/vgmboy-amiga-inspect"
 SCANNER_STAMP="$BUILD_DIR/scanner-inputs.sha256"
+MACOS_SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+
+mkdir -p "$BUILD_DIR"
 
 # Remove retired ScanSong helpers that can survive in this shared output
 # directory across scanner-route changes.
@@ -69,6 +72,7 @@ scanner_signature="$({
     "${CC:-cc}" --version | head -n 1
     pkg-config --modversion libavcodec vorbisfile ogg 2>/dev/null || true
     pkg-config --modversion uade 2>/dev/null || true
+    printf '%s\n' "$MACOS_SDKROOT"
 } | shasum -a 256 | awk '{ print $1 }')"
 
 if [[ -x "$VGMSTREAM_OUTPUT" && -x "$MDX_OUTPUT" && -x "$AMIGA_OUTPUT" && -f "$SCANNER_STAMP" \
@@ -105,7 +109,11 @@ if [[ -f "$VGMSTREAM_BUILD/CMakeCache.txt" ]]; then
     fi
 fi
 
+# CMake otherwise discovers the Command Line Tools SDK through its MacOSX.sdk
+# symlink, which can be newer than the linker selected by xcode-select. Pin the
+# C build to the active Xcode toolchain's matching SDK.
 cmake -S "$VGMSTREAM_SOURCE" -B "$VGMSTREAM_BUILD" \
+    -DCMAKE_OSX_SYSROOT="$MACOS_SDKROOT" \
     -DBUILD_CLI=ON \
     -DBUILD_AUDACIOUS=OFF \
     -DBUILD_STATIC=OFF \

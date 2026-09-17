@@ -33,54 +33,39 @@ duration, exit status, and complete log is retained in the result directory.
 
 `--inventory-only` records source and tool state without building or testing.
 
-FrontendCore currently runs with `--no-parallel` as an explicit temporary
-workaround. Remove that flag after the default-parallel archive-test lifecycle
-is repaired and repeatedly verified.
-
 ## Current Package Evidence
 
-- **MetaMan:** the full Debug suite passes all 99 tests, including complete
-  GSF/miniGSF and QSF/miniQSF readers, declared dependency validation, raw-byte
-  retention, and malformed-container fixtures.
-- **ScanSong:** the production `ScanSongKit` and all scanner test sources compile
-  in an isolated harness that excludes the app and CLI executables. All 124
-  scanner tests pass in that harness; the QSF-only read-only live
-  catalog checks also pass after the final parser change. Root-1 parity covers
-  18 archives / 720 rows with 7,920 exact field checks, zero improvements, and
-  zero mismatches. One previously failed `vsav04.miniqsf` is now structurally
-  readable; the catalog was not changed. The ordinary
-  `swift test --package-path ScanSong` command still fails while linking both
-  executables with unresolved `_ScanSongApp_main` and `_scansong_main` symbols
-  (plus a `CoreAudioTypes` linker warning); the app/CLI link remains open.
-  The earlier read-only XA differential matched all 867 catalog rows across
-  827 files and 18 archives. Running that corpus test alongside the
-  timing-sensitive process-runner test previously caused that unrelated test
-  to exceed its two-second timeout; a clean suite run without corpus variables
-  passed.
-- **UACMan:** `UACMan/Wrapper` passes all 18 Swift tests and 5 Python tests;
-  `UACMan` passes all 13 Swift tests. The relocated wrapper/application source
-  paths are included in these package checks.
-- **UAC integration reference:** a prior synthetic PSID v2 member passed the
-  Release MetaMan CLI through `pack` and `pack-source-tree`, then unpack;
-  projected metadata survived and source bytes matched exactly.
-- **FrontendCore blocked:** both its full suite and a filtered archive-
-  materialization test stop before tests while SwiftPM compiles VGMBoy's
-  `CHighlyComplete/highlycomplete_bridge.cpp`; the vendored include
-  `mgba/flags.h` is missing. No FrontendCore tests ran in this pass.
-- **Not freshly verified:** VGMBoy and CocoaSpice full package suites, the
-  remaining family verifier checks, and packaged UI/playback. The earlier
-  CocoaSpice build report named the same missing mGBA header, but CocoaSpice
-  itself was not retried here.
+- The family check passes CatalogReader (25 tests), FrontendCore (84),
+  MetaMan (148), UACWrapper (18 Swift tests), UACMan (15), ScanSong (148), and
+  CocoaSpice (58). UACWrapper's separate Python suite also passes all five
+  tests.
+- **VGMBoy:** the package builds and 68 of 72 tests pass. Four AAC/live-output
+  assertions fail because this host has no CoreAudio output device and its
+  AudioToolbox AAC path returns `1718449215` (`fmt?`); a separate `afconvert`
+  probe fails the same way. The playback code and tests are unchanged here.
+  Rerun those integration checks on a Mac with an output device and working
+  AAC encoder; this environment cannot establish that boundary.
+- **SPCBoyWK:** the Swift package builds; its JavaScript syntax checks and
+  renderer/transport tests pass.
+- **ScanSong packaged UI:** `ScanSong/build-app.sh` completes a clean release
+  build, including the three VGMBoy scanner helpers. LaunchPad's ScanSong row
+  then builds and opens the app; the visible window reports schema 23 and the
+  existing 530,403-track catalog. No new scan was started for this check.
+- **LaunchPad:** its standalone Swift package builds. It is a separate Git
+  repository from this family and has no configured remote.
+- **Native dependency build:** VGMBoy's dependency build passes. The 2SF
+  builder now stages its make copy under `.build` so the tracked vendor archive
+  remains unchanged.
 
-A full family verification was not run; these per-package results do not imply
-that the whole family is green.
+The family check exits nonzero on this host because VGMBoy's system-audio
+integration checks cannot run here; the other package checks pass. Its evidence
+directory and full logs are emitted by `verify-family.sh`.
 
-On this host, `xcrun --sdk macosx --show-sdk-path` currently fails because the
-selected Command Line Tools SDK path is missing; SwiftPM resolves the Xcode
-26.5 SDK instead. SwiftPM's default user caches are also not writable in this
-workspace. Use a writable task-local Clang/Swift module cache and
-`--disable-sandbox` when nested SwiftPM sandboxing is denied; these settings
-do not bypass the separate ScanSong executable-link issue above.
+This host selects Xcode 26.6 and its macOS 26.5 SDK through `xcode-select` and
+`xcrun`. The Command Line Tools SDK symlink is newer and must not be mixed with
+the selected Xcode linker; the ScanSong CMake build pins the active SDK.
+SwiftPM's default cache location is read-only in this workspace, so package
+checks need a task-local module and cache directory.
 
 ## Evidence Levels
 
@@ -105,13 +90,19 @@ Git, not the documentation tree, retains prior runs and investigations.
 ## Usage
 
 ```sh
-SDKROOT="$(xcrun --sdk macosx --show-sdk-path)" ./scripts/verify-family.sh
+mkdir -p .build/verification-module-cache .build/verification-cache
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+SDKROOT="$(xcrun --sdk macosx --show-sdk-path)" \
+CLANG_MODULE_CACHE_PATH="$PWD/.build/verification-module-cache" \
+SWIFTPM_MODULECACHE_OVERRIDE="$PWD/.build/verification-module-cache" \
+XDG_CACHE_HOME="$PWD/.build/verification-cache" \
+  ./scripts/verify-family.sh
 ./scripts/verify-family.sh --inventory-only
 ./scripts/verify-family.sh --output-dir /private/tmp/vgmman-release-evidence
 ```
 
 ## Boundary
 
-The verifier does not commit, stash, reset, copy source trees, or change Git
-configuration. SwiftPM may update each package's ignored `.build` scratch
-directory during verification.
+The verifier does not commit, stash, reset, or change Git configuration.
+Native builders may copy inputs and write derived dependencies beneath ignored
+`.build` directories; maintained source inputs should remain unchanged.

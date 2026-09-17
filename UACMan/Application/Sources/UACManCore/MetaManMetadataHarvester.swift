@@ -21,14 +21,17 @@ public struct MetaManMetadataHarvestOutcome: Sendable {
 public enum MetaManMetadataHarvester {
     private static let maximumMemberSize: UInt64 = 64 * 1024 * 1024
 
-    /// Harvests a directory for one MetaMan-supported file extension.
-    /// Track-aware results are rejected until UAC has an explicit mapping from
-    /// one source member to its ordered logical tracks.
+    /// Harvests a directory of native source files for one format extension.
+    /// UAC packages are read through the wrapper API, not this single-source
+    /// directory harvester; multi-track results are never flattened.
     public static func harvest(
         directoryURL: URL,
         formatExtension: String
     ) throws -> MetaManMetadataHarvestOutcome {
         let ext = formatExtension.trimmingCharacters(in: CharacterSet(charactersIn: ". ")).lowercased()
+        guard ext != "uac" else {
+            throw MetaManMetadataHarvesterError.containerFormat(ext)
+        }
         guard !ext.isEmpty,
               MetaManCore.supportedFormats.contains(where: { $0.fileExtensions.contains(ext) }) else {
             throw MetaManMetadataHarvesterError.unsupportedFormat(ext)
@@ -92,6 +95,7 @@ public enum MetaManMetadataHarvester {
 }
 
 private enum MetaManMetadataHarvesterError: Error, LocalizedError {
+    case containerFormat(String)
     case unsupportedFormat(String)
     case notDirectory(String)
     case cannotEnumerate(String)
@@ -102,6 +106,7 @@ private enum MetaManMetadataHarvesterError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
+        case .containerFormat(let format): ".\(format) is a package container; use the UAC wrapper reader instead of the native-source directory harvester."
         case .unsupportedFormat(let format): "MetaMan does not advertise direct metadata support for .\(format) files."
         case .notDirectory(let path): "Metadata input is not a real directory: \(path)"
         case .cannotEnumerate(let path): "Cannot enumerate metadata input: \(path)"

@@ -4,7 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "UACWrapper",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS("14.0")],
     products: [
         .library(name: "UACWrapperCore", targets: ["UACWrapperCore"])
     ],

@@ -17,8 +17,12 @@ public struct MetadataTrack: Codable, Equatable, Sendable {
 /// than sorting or deduplicating by `sourceTrackIndex`.
 public struct MetadataReadResult: Codable, Equatable, Sendable {
     public let tracks: [MetadataTrack]
+    /// Package-level document for containers whose metadata scopes a set of
+    /// member tracks. Nil for ordinary single-file and multi-track formats.
+    public let containerDocument: MetadataDocument?
 
-    public init(tracks: [MetadataTrack]) {
+    public init(tracks: [MetadataTrack], containerDocument: MetadataDocument? = nil) {
         self.tracks = tracks
+        self.containerDocument = containerDocument
     }
 }

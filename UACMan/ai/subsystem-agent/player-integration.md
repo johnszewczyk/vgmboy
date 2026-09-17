@@ -10,8 +10,9 @@ and manifest contract.
 
 - `UACMan/Wrapper` owns manifest and seek-table parsing, validation, and the
   shared member reader.
-- ScanSong owns catalog publication. It projects catalog fields from the UAC
-  manifest and uses the declared member hash for member identity.
+- ScanSong owns catalog publication. It passes `.uac` file URLs to
+  `MetaManCore.readResult`, projects the returned member documents to schema
+  23, and uses the declared member hash for member identity.
 - FrontendCore owns shared path-based archive materialization and cache policy;
   it consumes `UACWrapperCore` but does not implement UAC parsing.
 - CocoaSpice owns UAC playback adaptation. For SPC playback it passes a
@@ -26,8 +27,10 @@ and manifest contract.
   members or parse enclosed native tags to fill absent UAC metadata. An
   explicit UACMan harvest/edit operation may request SPC reading through
   MetaManCore.
-- Consumers use `UACWrapperCore` for format parsing; do not fork the UAC
-  manifest or seek-table logic in ScanSong, FrontendCore, or players.
+- `MetaManCore` owns UAC package/member metadata documents and uses
+  `UACWrapperCore` for framing, manifest, and seek-table parsing. Other
+  consumers may use `UACWrapperCore` for container operations; do not fork UAC
+  parsing in ScanSong, FrontendCore, or players.
 - Seekable SPC playback reads only the frames intersecting the selected member
   and does not write the decompressed SPC to a playback cache.
 - Path-based playback remains materialized through FrontendCore when a decoder

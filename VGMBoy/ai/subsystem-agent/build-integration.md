@@ -30,6 +30,10 @@ for ScanSong's external inspection executables.
   includes source contents and the patch so edits cannot hide behind a stale
   built product.
 - Compiled archives and scanner-plugin outputs belong under VGMBoy's `.build`.
+- `build-scanner-plugins.sh` creates `.build/scanner-plugins` before staging
+  products, so a clean checkout can build ScanSong without prior output state.
+- Its CMake build uses the SDK reported by the active `xcrun`, keeping the
+  selected compiler and SDK in sync when the Command Line Tools SDK is newer.
 - The MDX scanner handoff is the release `vgmboy-mdx-inspect` product copied to
   `.build/scanner-plugins`; its vendored mdxmini source and compatibility patch
   participate in the scanner input signature.

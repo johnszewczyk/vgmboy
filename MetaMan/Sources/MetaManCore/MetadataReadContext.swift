@@ -1,5 +1,15 @@
 import Foundation
 
+/// Host-supplied decompressor for bounded metadata frames inside containers.
+/// MetaMan owns the container and metadata parsing; hosts choose their codec
+/// implementation without making MetaManCore spawn a process or link a
+/// platform-specific Zstandard runtime.
+public typealias MetadataContainerFrameDecoder = @Sendable (
+    _ compressedFrame: Data,
+    _ expectedByteCount: Int,
+    _ maximumMemoryByteCount: Int
+) throws -> Data
+
 /// Named related-file bytes for data-based readers whose metadata or track map
 /// depends on companions. File-URL convenience readers resolve only the
 /// format-declared companions they explicitly support; this context never

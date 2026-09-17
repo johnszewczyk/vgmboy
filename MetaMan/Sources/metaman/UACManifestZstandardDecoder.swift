@@ -1,32 +1,16 @@
 import Foundation
 import MetaManCore
 
-/// Host-provided bounded Zstandard codec. MetaManCore owns UAC parsing and
-/// metadata projection; ScanSong supplies the process-based codec already
-/// used for UAC manifest frames, without expanding the TAR/audio payload.
-enum UACManifestFrameCodec {
-    static var decoder: MetadataContainerFrameDecoder {
-        { frame, expectedByteCount, maximumMemoryByteCount in
-            try decode(
-                frame,
-                expectedByteCount: expectedByteCount,
-                maximumMemoryByteCount: maximumMemoryByteCount
-            )
-        }
-    }
-
-    private static func decode(
-        _ frame: Data,
-        expectedByteCount: Int,
-        maximumMemoryByteCount: Int
-    ) throws -> Data {
-        guard expectedByteCount > 0,
-              maximumMemoryByteCount > 0 else {
-            throw UACManifestFrameCodecError.invalidLimit
+/// The CLI supplies the optional UAC manifest codec. The reusable MetaManCore
+/// library remains process-free and lets applications provide their own codec.
+enum UACManifestZstandardDecoder {
+    static let decode: MetadataContainerFrameDecoder = { frame, expectedByteCount, maximumMemoryByteCount in
+        guard expectedByteCount > 0, maximumMemoryByteCount > 0 else {
+            throw DecoderError.invalidLimit
         }
 
         let directoryURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ScanSong-UACManifest-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("MetaMan-UACManifest-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(
             at: directoryURL,
             withIntermediateDirectories: true,
@@ -47,30 +31,28 @@ enum UACManifestFrameCodec {
         do {
             try process.run()
         } catch {
-            throw UACManifestFrameCodecError.launchFailed(error.localizedDescription)
+            throw DecoderError.launchFailed(error.localizedDescription)
         }
 
         let outputHandle = outputPipe.fileHandleForReading
         var output = Data()
         while true {
             let remainingWithSentinel = expectedByteCount - output.count + 1
-            let requestedCount = min(64 * 1024, max(1, remainingWithSentinel))
-            guard let chunk = try outputHandle.read(upToCount: requestedCount), !chunk.isEmpty else {
-                break
-            }
+            let count = min(64 * 1024, max(1, remainingWithSentinel))
+            guard let chunk = try outputHandle.read(upToCount: count), !chunk.isEmpty else { break }
             guard chunk.count <= expectedByteCount - output.count else {
                 if process.isRunning { process.terminate() }
                 process.waitUntilExit()
-                throw UACManifestFrameCodecError.outputLimitExceeded
+                throw DecoderError.outputLimitExceeded
             }
             output.append(chunk)
         }
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
-            throw UACManifestFrameCodecError.commandFailed(process.terminationStatus)
+            throw DecoderError.commandFailed(process.terminationStatus)
         }
         guard output.count == expectedByteCount else {
-            throw UACManifestFrameCodecError.decodedSizeMismatch
+            throw DecoderError.decodedSizeMismatch
         }
         return output
     }
@@ -87,13 +69,13 @@ enum UACManifestFrameCodec {
         guard let executable = candidates.first(where: {
             FileManager.default.isExecutableFile(atPath: $0.path)
         }) else {
-            throw UACManifestFrameCodecError.commandNotFound
+            throw DecoderError.commandNotFound
         }
         return executable
     }
 }
 
-private enum UACManifestFrameCodecError: Error, LocalizedError {
+private enum DecoderError: Error, LocalizedError {
     case commandNotFound
     case invalidLimit
     case launchFailed(String)
@@ -104,7 +86,7 @@ private enum UACManifestFrameCodecError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .commandNotFound:
-            "ScanSong needs the zstd command-line tool to read compressed UAC manifests."
+            "metaman requires the zstd command-line tool for compressed UAC manifests."
         case .invalidLimit:
             "The UAC manifest decoder received an invalid output or memory limit."
         case .launchFailed(let message):

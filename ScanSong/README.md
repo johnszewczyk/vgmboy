@@ -98,6 +98,10 @@ error.
 
 - ZIP, 7z, RAR/RSN, TAR.ZST, and TZST archives with bounded complete
   materialization, path/symlink validation, cancellation, and cleanup.
+- UAC packages use MetaMan's bounded manifest/member documents to publish
+  catalog rows; only a compressed metadata frame is decompressed. Scanning
+  trusts the manifest's member metadata and hashes without expanding or
+  inspecting the TAR/audio payload.
 - LHA archives through the same bounded 7zz materialization boundary. Amiga
   members are recognized by the shared UADE prefix manifest as well as by
   ordinary suffixes, and each archive is staged as a complete set so UADE can

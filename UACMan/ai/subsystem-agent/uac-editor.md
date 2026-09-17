@@ -9,8 +9,8 @@
   `SPCMetadataHarvester` and
   `SPCMetadataProjector` for raw-directory creation-time import. It depends on
   MetaManCore; it must not add a second SPC parser.
-- `Wrapper/UACWrapperCore` validates the current wrapper and rewrites its
-  envelope; it does not define the future native-container implementation.
+- `Wrapper/UACWrapperCore` validates the supported wrapper and rewrites its
+  envelope; it does not implement a native audio container.
 - The app-local Zstandard CLI adapter only supplies bounded manifest encode and
   decode operations plus bounded seekable-frame decode/checksum validation; it
   does not own container semantics.

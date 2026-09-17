@@ -1,10 +1,21 @@
-# Future native container
+# Closed native SPC investigation
 
-This directory is reserved for a future UAC-native stream container that may
-replace legacy per-system audio formats. No native-container specification or
-implementation lives here yet.
+Status: closed by design decision. The project will not convert existing SPCs
+into a derived event stream or require per-game emulator capture. No improvement
+to provenance, playback fidelity, or preservation follows from that conversion
+when the existing SPC member is the only source artifact.
 
-Until that work is specified and supported by the required readers and
-playback tools, `.uac` remains the reversible wrapper defined by
-[`../Wrapper/README.md`](../Wrapper/README.md). Wrapper metadata, application
-editing, and native-container work remain separate components.
+The supported path is the reversible UAC wrapper: retain the original SPC bytes,
+harvest its metadata through MetaMan, and keep metadata independently readable
+in the UAC manifest. The earlier true-stream prototype and beta proposal were
+closed and removed from the maintained package. No native SPC conversion or
+playback implementation is supported.
+
+The UAC wrapper also supports MetaMan's common single-track projection for VGM
+and VGZ, including GD3 metadata for Sega Mega Drive/Genesis logs. The wrapper
+retains the original VGM/VGZ member bytes.
+
+No custom SPC compression scheme is approved. Solid compression already offers
+cross-file dictionary reuse; the earlier eight-fixture measurements are
+historical and do not establish a set-wide size claim. They do not justify a
+custom transform or change the reversible-wrapper decision.

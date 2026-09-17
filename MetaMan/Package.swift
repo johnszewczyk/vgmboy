@@ -9,6 +9,9 @@ let package = Package(
         .library(name: "MetaManCore", targets: ["MetaManCore"]),
         .executable(name: "metaman", targets: ["metaman"])
     ],
+    dependencies: [
+        .package(name: "UACWrapper", path: "../UACMan/Wrapper")
+    ],
     targets: [
         .target(
             name: "MetaManZlib",
@@ -17,9 +20,21 @@ let package = Package(
         ),
         // Format readers are discovered as one MetaManCore source set; keep
         // format registration and byte-layout ownership inside that target.
-        .target(name: "MetaManCore", dependencies: ["MetaManZlib"]),
+        .target(
+            name: "MetaManCore",
+            dependencies: [
+                "MetaManZlib",
+                .product(name: "UACWrapperCore", package: "UACWrapper")
+            ]
+        ),
         .executableTarget(name: "metaman", dependencies: ["MetaManCore"]),
-        .testTarget(name: "MetaManCoreTests", dependencies: ["MetaManCore"])
+        .testTarget(
+            name: "MetaManCoreTests",
+            dependencies: [
+                "MetaManCore",
+                .product(name: "UACWrapperCore", package: "UACWrapper")
+            ]
+        )
     ],
     swiftLanguageModes: [.v6]
 )

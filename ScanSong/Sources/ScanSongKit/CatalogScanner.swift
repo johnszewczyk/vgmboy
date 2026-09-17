@@ -1,5 +1,5 @@
 import Foundation
-import UACWrapperCore
+import MetaManCore
 
 private final class MonotonicScanProgress: @unchecked Sendable {
     private let lock = NSLock()
@@ -180,22 +180,25 @@ public final class CatalogScanner: @unchecked Sendable {
             // writer and must not interleave with concurrent inspection commits.
             timeline.enter(.inspection)
             var pending: [ScanCandidate] = []
-            var uacContainersByPath: [String: UACContainer] = [:]
+            var uacMetadataByPath: [String: MetadataReadResult] = [:]
             for discoveredCandidate in candidates {
                 try Task.checkCancellation()
                 emit(.inspection, currentPath: discoveredCandidate.identityDescription)
                 var candidate = discoveredCandidate
-                var preloadedUACContainer: UACContainer?
+                var preloadedUACMetadata: MetadataReadResult?
                 if StandaloneArchiveExtractor.isUAC(discoveredCandidate.sourceURL) {
                     do {
-                        let container = try UACContainerReader.read(
-                            from: discoveredCandidate.sourceURL,
-                            decompressManifestFrame: UACManifestFrameCodec.decoder
+                        let metadata = try MetaManCore.readResult(
+                            fileURL: discoveredCandidate.sourceURL,
+                            decompressContainerManifestFrame: UACManifestFrameCodec.decoder
                         )
-                        preloadedUACContainer = container
+                        guard let manifestSHA256 = metadata.containerDocument?.technicalFacts["uac.manifestSHA256"] else {
+                            throw ScannerInspectionError.malformedFile("MetaMan returned no UAC package manifest metadata.")
+                        }
+                        preloadedUACMetadata = metadata
                         let statSignature = [
                             "uac-manifest",
-                            container.manifestSHA256,
+                            manifestSHA256,
                             String(discoveredCandidate.fingerprint.fileSize),
                             String(discoveredCandidate.fingerprint.modifiedAt.timeIntervalSince1970.bitPattern)
                         ].joined(separator: ":")
@@ -240,8 +243,8 @@ public final class CatalogScanner: @unchecked Sendable {
                     reused += 1
                     continue
                 }
-                if let preloadedUACContainer {
-                    uacContainersByPath[candidate.identity.path] = preloadedUACContainer
+                if let preloadedUACMetadata {
+                    uacMetadataByPath[candidate.identity.path] = preloadedUACMetadata
                 }
                 pending.append(candidate)
             }
@@ -256,7 +259,7 @@ public final class CatalogScanner: @unchecked Sendable {
                 pending,
                 pipelineLimit: archivePipelineLimit,
                 dependencySearchRoot: rootURL,
-                uacContainersByPath: uacContainersByPath,
+                uacMetadataByPath: uacMetadataByPath,
                 progress: { [progress, rootPath = root.path, discovered, inspectionProcessed, inspectionFailed] phase, currentPath, detail, phaseCompleted, _ in
                     let globalPhaseCompleted = phaseCompleted.map {
                         min(discovered, inspectionProcessed + $0)
@@ -475,7 +478,7 @@ public final class CatalogScanner: @unchecked Sendable {
         _ pending: [ScanCandidate],
         pipelineLimit: Int,
         dependencySearchRoot: URL,
-        uacContainersByPath: [String: UACContainer],
+        uacMetadataByPath: [String: MetadataReadResult],
         progress: @escaping @Sendable (ScanLifecyclePhase, String?, String?, Int?, Int?) -> Void
     ) async throws -> [String: CandidateInspectionOutcome] {
         var outcomes: [String: CandidateInspectionOutcome] = [:]
@@ -493,7 +496,7 @@ public final class CatalogScanner: @unchecked Sendable {
                         let outcome = await self.inspectCandidate(
                             candidate,
                             dependencySearchRoot: dependencySearchRoot,
-                            uacContainer: uacContainersByPath[candidate.identity.path],
+                            uacMetadata: uacMetadataByPath[candidate.identity.path],
                             progress: progress
                         )
                         return (candidate.identity.path, outcome)
@@ -513,7 +516,7 @@ public final class CatalogScanner: @unchecked Sendable {
     private func inspectCandidate(
         _ candidate: ScanCandidate,
         dependencySearchRoot: URL,
-        uacContainer: UACContainer?,
+        uacMetadata: MetadataReadResult?,
         progress: @escaping @Sendable (ScanLifecyclePhase, String?, String?, Int?, Int?) -> Void
     ) async -> CandidateInspectionOutcome {
         do {
@@ -524,7 +527,7 @@ public final class CatalogScanner: @unchecked Sendable {
                 inspection = try await self.inspectArchive(
                     candidate,
                     dependencySearchRoot: dependencySearchRoot,
-                    uacContainer: uacContainer,
+                    uacMetadata: uacMetadata,
                     progress: progress
                 )
             } else if StandaloneArchiveExtractor.isSupportedArchive(candidate.sourceURL) {
@@ -533,7 +536,7 @@ public final class CatalogScanner: @unchecked Sendable {
                     return try await self.inspectArchive(
                         candidate,
                         dependencySearchRoot: dependencySearchRoot,
-                        uacContainer: nil,
+                        uacMetadata: nil,
                         progress: progress
                     )
                 }
@@ -578,20 +581,15 @@ public final class CatalogScanner: @unchecked Sendable {
     private func inspectArchive(
         _ candidate: ScanCandidate,
         dependencySearchRoot: URL,
-        uacContainer preloadedUACContainer: UACContainer?,
+        uacMetadata preloadedUACMetadata: MetadataReadResult?,
         progress: @escaping @Sendable (ScanLifecyclePhase, String?, String?, Int?, Int?) -> Void
     ) async throws -> CandidateInspection {
         if StandaloneArchiveExtractor.isUAC(candidate.sourceURL) {
-            let container: UACContainer
-            if let preloadedUACContainer {
-                container = preloadedUACContainer
-            } else {
-                container = try UACContainerReader.read(
-                    from: candidate.sourceURL,
-                    decompressManifestFrame: UACManifestFrameCodec.decoder
-                )
-            }
-            return projectUACManifest(container, candidate: candidate)
+            let metadata = try preloadedUACMetadata ?? MetaManCore.readResult(
+                fileURL: candidate.sourceURL,
+                decompressContainerManifestFrame: UACManifestFrameCodec.decoder
+            )
+            return try projectUACMetadata(metadata, candidate: candidate)
         }
 
         let archive = try await archiveExtractor.extractForScan(
@@ -683,20 +681,29 @@ public final class CatalogScanner: @unchecked Sendable {
         return CandidateInspection(records: records, failures: failures, skipped: skipped)
     }
 
-    private func projectUACManifest(
-        _ container: UACContainer,
+    private func projectUACMetadata(
+        _ metadata: MetadataReadResult,
         candidate: ScanCandidate
-    ) -> CandidateInspection {
+    ) throws -> CandidateInspection {
+        guard let containerDocument = metadata.containerDocument,
+              containerDocument.technicalFacts["uac.manifestSHA256"] != nil else {
+            throw ScannerInspectionError.malformedFile("MetaMan returned no UAC package manifest metadata.")
+        }
         var records: [CatalogTrackRecord] = []
         var skipped: [ScanSkippedFile] = []
 
-        for member in container.manifest.members {
-            let pathExtension = URL(fileURLWithPath: member.path).pathExtension
-            let extensionName = ScannerFormatPolicy.normalize(member.format ?? pathExtension)
+        for track in metadata.tracks {
+            let document = track.document
+            guard let memberPath = document.technicalFacts["uac.memberPath"] else {
+                throw ScannerInspectionError.malformedFile("MetaMan returned a UAC track without its member path.")
+            }
+            let pathExtension = URL(fileURLWithPath: memberPath).pathExtension
+            let memberFormat = document.technicalFacts["uac.memberFormat"]
+            let extensionName = ScannerFormatPolicy.normalize(memberFormat ?? pathExtension)
             let identity = ScanItemIdentity(
                 rootID: candidate.identity.rootID,
                 path: candidate.identity.path,
-                archiveEntry: member.path
+                archiveEntry: memberPath
             )
             if ignoredFileExtensions.contains(extensionName) {
                 skipped.append(ScanSkippedFile(
@@ -719,18 +726,18 @@ public final class CatalogScanner: @unchecked Sendable {
 
             records.append(CatalogTrackRecord(
                 sourcePath: candidate.identity.path,
-                archiveEntry: member.path,
+                archiveEntry: memberPath,
                 route: route,
                 fingerprint: ScanFingerprint(
-                    fileSize: Int64(clamping: member.byteSize),
+                    fileSize: Int64(clamping: UInt64(document.technicalFacts["uac.memberByteSize"] ?? "") ?? 0),
                     modifiedAt: candidate.fingerprint.modifiedAt,
-                    contentSignature: "uac-member-blake3:\(member.blake3)"
+                    contentSignature: "uac-member-blake3:\(document.technicalFacts["uac.memberBLAKE3"] ?? "")"
                 ),
                 trackIndex: 0,
                 trackCount: 1,
-                metadata: UACCatalogMetadataAdapter.project(member.metadata),
-                browserGameOverride: container.manifest.game.title,
-                browserSystemOverride: container.manifest.game.console
+                metadata: UACCatalogMetadataAdapter.project(document),
+                browserGameOverride: containerDocument.fields.title ?? "",
+                browserSystemOverride: containerDocument.fields.system ?? ""
             ))
         }
 

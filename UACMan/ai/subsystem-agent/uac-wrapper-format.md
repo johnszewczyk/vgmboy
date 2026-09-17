@@ -223,8 +223,9 @@ does not synthesize an M3U when no original playlist member was included.
   workflow and supplies its selected source records and recipe.
 - CocoaSpice owns presentation and queue policy; it consumes manifest metadata
   and delegates archive materialization to FrontendCore.
-- ScanSong owns catalog publication and consumes UAC member metadata from the
-  shared manifest contract; player apps do not write catalog records.
+- MetaManCore owns UAC package/member metadata documents and consumes the
+  shared UACWrapperCore parser. ScanSong projects those documents and owns
+  catalog publication; player apps do not write catalog records.
 - The outer UAC and member hashes are not a license to delete original source
   packages or source-state manifests.
 

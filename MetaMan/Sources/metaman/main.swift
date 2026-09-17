@@ -13,7 +13,10 @@ do {
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
     var output: Data
     if arguments[0] == "read-tracks" {
-        output = try encoder.encode(MetaManCore.readResult(fileURL: URL(fileURLWithPath: arguments[1])))
+        output = try encoder.encode(MetaManCore.readResult(
+            fileURL: URL(fileURLWithPath: arguments[1]),
+            decompressContainerManifestFrame: UACManifestZstandardDecoder.decode
+        ))
     } else {
         output = try encoder.encode(MetaManCore.read(fileURL: URL(fileURLWithPath: arguments[1])))
     }

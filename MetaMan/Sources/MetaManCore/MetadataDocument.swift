@@ -88,6 +88,10 @@ public struct MetadataDocument: Codable, Equatable, Sendable {
     /// format stores more than one independent block. Optional for backward-
     /// compatible decoding of documents written before this property existed.
     public let rawMetadataBlocks: [String: Data]?
+    /// Typed, arbitrary metadata retained without string flattening. For a
+    /// container this may hold its complete manifest; member documents may
+    /// retain the member's scoped metadata and extension values.
+    public let structuredMetadata: MetadataJSONValue?
     public let sourceEncoding: String?
     public let timing: MetadataTiming?
     public let technicalFacts: [String: String]
@@ -99,6 +103,7 @@ public struct MetadataDocument: Codable, Equatable, Sendable {
         tags: [MetadataTag] = [],
         rawTagBlock: Data? = nil,
         rawMetadataBlocks: [String: Data]? = nil,
+        structuredMetadata: MetadataJSONValue? = nil,
         sourceEncoding: String? = nil,
         timing: MetadataTiming? = nil,
         technicalFacts: [String: String] = [:],
@@ -109,6 +114,7 @@ public struct MetadataDocument: Codable, Equatable, Sendable {
         self.tags = tags
         self.rawTagBlock = rawTagBlock
         self.rawMetadataBlocks = rawMetadataBlocks
+        self.structuredMetadata = structuredMetadata
         self.sourceEncoding = sourceEncoding
         self.timing = timing
         self.technicalFacts = technicalFacts

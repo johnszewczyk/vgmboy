@@ -6,7 +6,7 @@ is a thin JSON interface for scripting and support work. Applications should
 import the library rather than shelling out to the CLI.
 
 MetaMan currently has complete AY, SAP, NSF, GBS, NSFE, HES, SNDH, KSS, S98,
-VGM/VGZ, generic PSF-style tags, complete GSF/miniGSF and QSF/miniQSF,
+VGM/VGZ, UAC manifests, generic PSF-style tags, complete GSF/miniGSF and QSF/miniQSF,
 SPC ID666/xID6, SID PSID/RSID, APE, CRI/Monster ADX,
 Atomic Planet AUS, RIFF ATRAC3/ATRAC3+, Sony MSF, Sony SSHD (`.ads`/`.ss2`),
 Konami/SNK SVAG, Konami XMD v1/v2, Sony CD-XA, headerless PlayStation MIB,
@@ -40,6 +40,7 @@ fixed offsets or that the decoder is needed to locate every field.
 | KSS / KSSX | Direct fixed header plus bounded KSSX extension reader; no Z80 or playback core | 256 compatibility entries, hardware flags, raw header blocks, and declared KSSX data/track facts; established info-only timing defaults | Not implemented |
 | S98 v0-v3 | Direct header, tag-block, device-table, and command-stream parser | Ordered raw tags, normalized common fields, technical header facts, and stream timing | Not implemented |
 | VGM / VGZ | Direct 64-byte header and GD3 parser; bounded gzip inflate for compressed input | All 11 ordered GD3 fields (plus future extras), original-language values, release date, converter, notes, header facts, and 44.1 kHz sample timing | Not implemented |
+| UAC | Direct bounded manifest read through `UACWrapperCore`; file-URL only, with a host-supplied decoder for compressed manifest JSON; never expands the TAR/audio payload | Full typed manifest and original JSON on `containerDocument`; playable-member documents follow manifest order, while ordered playlists and repeated references remain in the package document instead of becoming duplicate member rows | Not implemented |
 | PSF / PSF2 / SSF / USF / 2SF | Direct PSF-style header and `[TAG]` footer parser; no playback core | Ordered tags including duplicates and unknown keys, raw footer bytes, normalized identity, authored length/fade, and console identity by extension | Not implemented |
 | GSF / miniGSF | Complete PSF v0x22 container, GBA segment, and PSFLib-chain validation; no mGBA | Ordered source tags, raw PSF headers/tag blocks, dependency and segment facts, GBA ROM-header validation, and inherited timing | Not implemented |
 | QSF / miniQSF | Complete PSF v0x41 container, QSound-block, and declared QSFLib validation; no playback core | Ordered root tags, raw PSF headers/tag blocks, source/block facts, and authored length/fade | Not implemented |
@@ -78,10 +79,18 @@ the core, while clients own their transport, catalog, and UI concerns.
 `MetadataTrack` carries a complete `MetadataDocument` and an optional
 format-native `sourceTrackIndex`; result-array order is authoritative, and
 repeated source indices remain separate entries. AY, SAP, NSF, GBS, NSFE,
-HES, SNDH, KSS, Sony XA, Retro Studios AGSC, and GENH use this contract; GSF publishes
+HES, SNDH, KSS, Sony XA, Retro Studios AGSC, GENH, and UAC use this contract; GSF publishes
 one validated entry. The file-URL API loads only format-declared companions: a same-basename
 M3U for HES and explicitly named, source-directory-confined PSFLib files for
-GSF. Data callers pass bounded named companion bytes through
+GSF. UAC returns the package-level manifest as `containerDocument`, retaining
+the exact manifest JSON, typed arbitrary values, and authored playlist order;
+its track results describe the playable-member inventory in manifest order.
+Playlist references, including repeats and per-entry overrides, are not
+flattened into duplicate member rows. Raw JSON manifests need no codec.
+Compressed UAC manifests use the bounded `decompressContainerManifestFrame`
+callback; `MetaManCore` owns the container and metadata parsing but leaves the
+Zstandard implementation to the host. The `metaman` CLI supplies a bounded
+`zstd`-command adapter. Data callers pass bounded named companion bytes through
 `MetadataReadContext`; MetaMan does not follow playlist text or arbitrary paths. Use
 `metaman read-tracks <file>` for the ordered JSON result. The legacy
 `metaman read <file>` command remains a single-document API and rejects these
@@ -540,6 +549,7 @@ swift run --package-path MetaMan metaman read-tracks song.sap
 swift run --package-path MetaMan metaman read-tracks song.hes
 swift run --package-path MetaMan metaman read song.s98
 swift run --package-path MetaMan metaman read song.vgz
+swift run --package-path MetaMan metaman read-tracks game.uac
 swift run --package-path MetaMan metaman read song.minipsf
 swift run --package-path MetaMan metaman read song.spc
 swift run --package-path MetaMan metaman read song.sid

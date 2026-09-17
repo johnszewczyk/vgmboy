@@ -7,9 +7,9 @@ struct ContentView: View {
     @State private var searchText = ""
     @State private var isBatchEditorPresented = false
     @State private var confirmReplaceHarvest = false
-    @State private var sortOrder = [KeyPathComparator(\SPCMemberRow.titleSortValue)]
+    @State private var sortOrder = [KeyPathComparator(\UACMemberRow.titleSortValue)]
 
-    private var visibleMembers: [SPCMemberRow] {
+    private var visibleMembers: [UACMemberRow] {
         guard !searchText.isEmpty else { return model.members }
         return model.members.filter {
             ($0.title ?? "").localizedCaseInsensitiveContains(searchText)
@@ -116,9 +116,9 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if model.members.isEmpty {
                     ContentUnavailableView(
-                        "No SPC members",
+                        "No playable members",
                         systemImage: "music.note",
-                        description: Text("This package has \(model.allMemberCount) member(s), but none are SPC files.")
+                        description: Text("This package has \(model.allMemberCount) member(s), but none are marked playable.")
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -180,7 +180,7 @@ struct ContentView: View {
             }
             .searchable(text: $searchText, placement: .sidebar, prompt: "Filter tracks")
             .navigationTitle(model.documentURL?.lastPathComponent ?? "UACMan")
-            .navigationSubtitle(model.members.isEmpty ? "UAC metadata" : "\(model.members.count) SPC file(s)")
+            .navigationSubtitle(model.members.isEmpty ? "UAC metadata" : "\(model.members.count) playable file(s)")
         }
         .toolbar {
             ToolbarItem(placement: .automatic) {
@@ -197,9 +197,9 @@ struct ContentView: View {
                             confirmReplaceHarvest = true
                         }
                     } label: {
-                        Label("Harvest Tags", systemImage: "arrow.down.doc")
+                        Label("Re-read SPC Tags", systemImage: "arrow.down.doc")
                     }
-                    .disabled(model.members.isEmpty || !model.canHarvestSPCMetadata)
+                    .disabled(!model.canHarvestSPCMetadata)
                     .help(model.canHarvestSPCMetadata
                         ? "Read native tags from contained SPC tracks"
                         : "Native-tag harvest requires a seekable tar+zstd-seekable UAC")
@@ -220,7 +220,7 @@ struct ContentView: View {
         ContentUnavailableView {
             Label("UAC Metadata", systemImage: "shippingbox")
         } description: {
-            Text("Open a UAC package to browse soundtrack-level metadata and edit its SPC tracks.")
+            Text("Open a UAC package to browse soundtrack metadata and edit its playable members.")
         } actions: {
             Button("Open UAC…", action: model.openPanel)
                 .keyboardShortcut("o")
@@ -316,7 +316,7 @@ struct ContentView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-                Text("MetaMan reads SPC ID666/xID6 into the UAC draft, retaining ordered duplicate tags and raw-block sizes. Original tag bytes stay inside the untouched SPC members instead of being duplicated in the manifest. Save changes only the manifest and preserves the compressed payload byte-for-byte.")
+                Text("MetaMan can harvest supported single-track formats such as VGM/VGZ during packaging; SPC ID666/xID6 can also be re-read from seekable packages. Source members remain unchanged. Saving edits the manifest and preserves the compressed payload byte-for-byte.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -354,7 +354,7 @@ struct ContentView: View {
                     LabeledContent("Selected tracks") {
                         Text("\(model.selectedMemberPaths.count)")
                     }
-                    Text("Only selected SPC tracks are affected. Changes remain in the unsaved draft until Save; Revert restores the opened package.")
+                    Text("Only selected playable members are affected. Changes remain in the unsaved draft until Save; Revert restores the opened package.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

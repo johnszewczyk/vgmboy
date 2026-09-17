@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 import UACWrapperCore
 import UACManCore
 
-struct SPCMemberRow: Identifiable, Hashable {
+struct UACMemberRow: Identifiable, Hashable {
     let path: String
     let name: String
     let bytes: UInt64
@@ -50,8 +50,8 @@ struct SPCMemberRow: Identifiable, Hashable {
         )
     }
 
-    func updatingMetadata(_ metadata: [String: UACJSONValue]) -> SPCMemberRow {
-        SPCMemberRow(
+    func updatingMetadata(_ metadata: [String: UACJSONValue]) -> UACMemberRow {
+        UACMemberRow(
             path: path,
             name: name,
             bytes: bytes,
@@ -123,7 +123,7 @@ final class UACManModel {
     var memberExtensionsJSON = "{}"
     var selectedMemberPath: String?
     var selectedMemberPaths: Set<String> = []
-    var members: [SPCMemberRow] = []
+    var members: [UACMemberRow] = []
     var hasUnsavedChanges = false
     var isHarvestingMetadata = false
     var harvestProgressMessage = ""
@@ -154,6 +154,15 @@ final class UACManModel {
     var canHarvestSPCMetadata: Bool {
         loadedContainer?.manifest.payload.format == "tar+zstd-seekable"
             && loadedContainer?.seekTable != nil
+            && !spcMemberPaths.isEmpty
+    }
+
+    private var spcMemberPaths: [String] {
+        loadedContainer?.manifest.members.compactMap { member in
+            let format = member.format?.lowercased()
+                ?? URL(fileURLWithPath: member.originalName).pathExtension.lowercased()
+            return format == "spc" ? member.path : nil
+        } ?? []
     }
 
     func openCommandLineFileIfPresent() {
@@ -194,10 +203,7 @@ final class UACManModel {
                 from: standardizedURL,
                 decompressManifestFrame: codec.decoder
             )
-            let spcMembers = container.manifest.members.filter { member in
-                member.format?.lowercased() == "spc"
-                    || URL(fileURLWithPath: member.originalName).pathExtension.lowercased() == "spc"
-            }
+            let playableMembers = container.manifest.members.filter { $0.role == "playable" }
 
             documentURL = standardizedURL
             loadedContainer = container
@@ -209,7 +215,7 @@ final class UACManModel {
             consoleName = container.manifest.game.console
             gameMetadataJSON = try UACManifestEditor.prettyJSON(container.manifest.game.metadata)
             gameExtensionsJSON = try UACManifestEditor.prettyJSON(container.manifest.game.extensions)
-            members = spcMembers.map { SPCMemberRow(member: $0) }
+            members = playableMembers.map { UACMemberRow(member: $0) }
             selectedMemberPath = members.first?.path
             selectedMemberPaths = []
             if let first = members.first {
@@ -220,7 +226,7 @@ final class UACManModel {
             }
             hasUnsavedChanges = false
             errorMessage = nil
-            statusMessage = "Loaded \(members.count) SPC member(s) · \(allMemberCount) total package member(s)."
+            statusMessage = "Loaded \(members.count) playable member(s) · \(allMemberCount) total package member(s)."
         } catch {
             errorMessage = String(describing: error)
         }
@@ -311,10 +317,10 @@ final class UACManModel {
         guard !isHarvestingMetadata else { return }
         guard let documentURL else { return }
         guard canHarvestSPCMetadata else {
-            errorMessage = "Native SPC tag harvest currently requires a seekable tar+zstd-seekable UAC payload."
+            errorMessage = "Native SPC tag harvest requires SPC members in a seekable tar+zstd-seekable UAC payload."
             return
         }
-        guard !members.isEmpty else {
+        guard !spcMemberPaths.isEmpty else {
             errorMessage = "This UAC has no SPC members to harvest."
             return
         }
@@ -328,7 +334,7 @@ final class UACManModel {
         isHarvestingMetadata = true
         harvestProgressMessage = "Preparing SPC metadata reader…"
         statusMessage = "Reading embedded SPC headers through the UAC seek table."
-        let memberPaths = members.map(\.path)
+        let memberPaths = spcMemberPaths
         let manifestDecoder = codec.decoder
         let frameDecoder = codec.seekableFrameDecoder
         let packageURL = documentURL

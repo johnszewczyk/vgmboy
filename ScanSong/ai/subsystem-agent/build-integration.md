@@ -15,13 +15,14 @@ executables.
   format admission; it does not link VGMBoyKit or native decoders for its
   in-process metadata readers. `VGMBoySNDH` is a test-only decoder oracle.
 - ScanSong consumes the local sibling `MetaManCore` Swift package for APE, ADX,
-  AUS, ATRAC3, Sony MSF, Sony SSHD/ADS, headerless PlayStation MIB,
-  Nintendo DTK and TXTH-described IMA ADP, CRI AHX, Konami Saturn DVI, Konami/SNK SVAG and XMD, Nintendo DSP/RS03/THP, Nintendo DS STRM, SID, SPC, SNDH,
-  S98, VGM/VGZ,
-  PSF-family, GSF, and QSF metadata.
-  MetaManCore owns bounded VGZ gzip expansion and has no
-  VGMBoy, ScanSong, or playback-decoder dependency; test-only libvgm comparisons
-  stay in ScanSong.
+  AUS, ATRAC3, Sony MSF/SSHD/XA, headerless PlayStation MIB, Nintendo DTK and
+  TXTH-described IMA ADP, CRI AHX, Konami Saturn DVI, Konami/SNK SVAG and XMD,
+  Nintendo DSP/RS03/THP, Nintendo DS STRM, SID, SPC, SNDH, S98, VGM/VGZ,
+  UAC, PSF-family, GSF, and QSF metadata. MetaManCore owns bounded VGZ gzip
+  expansion and UAC manifest interpretation; ScanSong supplies the bounded
+  Zstandard callback for compressed UAC manifests. MetaManCore has no VGMBoy,
+  ScanSong, or playback-decoder dependency; test-only libvgm comparisons stay
+  in ScanSong.
 - `ScanSong/build-app.sh` asks VGMBoy to build the vgmstream CLI, MDX inspector, and UADE-backed Amiga inspector,
   then copies those products into the ScanSong bundle.
 - `ScanSong/launch.sh` packages a fresh app, asks the older ScanSong process to
@@ -36,6 +37,10 @@ executables.
   expected by the scanner adapters.
 - `build-app.sh` removes `.build` before a release build so stale scanner binaries cannot survive
   a fresh packaging run.
+- The VGMBoy scanner-plugin helper creates its destination before copying
+  helpers, pins CMake to the active Xcode macOS SDK, and includes that SDK path
+  in the build signature. This keeps CMake's compiler test on the same SDK as
+  the selected linker.
 - A missing inspection executable is a typed adapter failure; the scanner does not invent a row or
   invoke another application as a fallback. MetaManCore reads GSF/miniGSF and
   QSF/miniQSF in-process; neither requires a bundled Highly Complete or QSF
@@ -51,9 +56,15 @@ executables.
 - Atomic Planet AUS metadata uses MetaManCore's in-process header reader and
   never starts `vgmstream-cli` for recognized `AUS ` content; other `.aus`
   aliases retain the helper route.
-- Sony CD-XA sector streams use ScanSong's in-process structure/timing reader
-  and never start `vgmstream-cli`; other formats sharing `.xa` remain on that
-  helper route.
+- Sony CD-XA sector streams use MetaManCore's in-process structure/timing
+  reader and never start `vgmstream-cli`; other formats sharing `.xa` remain on
+  that helper route.
+- UAC catalog rows use MetaManCore package/member documents. ScanSong decompresses
+  only a compressed manifest frame through its bounded host callback; catalog
+  scans never decompress, hash, or inspect the TAR/audio payload.
+  Compressed manifests require the `zstd` command-line tool on `PATH` or at a
+  supported Homebrew/system path; ScanSong does not bundle it. Uncompressed
+  manifests do not require zstd.
 - Recognized Sony MSF files use MetaManCore's in-process container/metadata
   reader and never start `vgmstream-cli`; `MSF ` and other `.msf` aliases retain
   the helper route.

@@ -79,12 +79,14 @@ when the current playback registry does not yet admit it.
 ### UAC packages
 
 .uac is a metadata-bearing TAR+Zstandard package, not a playable media
-extension. ScanSong reads and validates its bounded UAC manifest (and the
-seek-table structure when present), then projects supported playable member
-records directly into the catalog. It does not expand, hash, or inspect the
-TAR+Zstandard payload during scanning; declared member sizes and BLAKE3 values
-are trusted rather than recomputed. A playable member is represented from its
-manifest record and does not need an inner-format inspector.
+extension. ScanSong passes the `.uac` file URL to `MetaManCore.readResult`,
+which uses the shared `UACWrapperCore` parser to validate its bounded manifest
+and seek-table structure, then returns package and playable-member documents.
+ScanSong projects those documents into the catalog. Neither MetaMan nor
+ScanSong expands, hashes, or inspects the TAR/audio payload during scanning;
+declared member sizes and BLAKE3 values are trusted rather than recomputed. A
+playable member is represented from its manifest record and does not need an
+inner-format inspector.
 
 The UAC game title and console select the catalog's browser grouping only.
 UAC member fields exclusively define the schema-23 track fields CocoaSpice
@@ -214,7 +216,7 @@ as it does in libgme's information-only reader. `NAME` and `AUTHOR` become game
 and author; the system is `Atari XL`. SAP `DATE` remains available as a source
 fact, matching the old scanner projection that did not map copyright into the
 catalog comment. Detailed parser offsets/layouts are in MetaMan's
-[format layout map](../../MetaMan/FORMAT-LAYOUTS.md).
+[format layout map](../../../MetaMan/FORMAT-LAYOUTS.md).
 
 The reader retains one `TIME` hint per corresponding subsong. The [SAP format
 specification](https://asap.sourceforge.net/sap-format.html) defines a plain
@@ -680,7 +682,7 @@ For catalog compatibility, looped files use the CLI's default two loop passes
 plus its ten-second fade; this duration is a playback projection, not an
 authored file tag. Invalid signatures/ranges remain on the vgmstream fallback.
 The exact byte fields and formulas are in MetaMan's
-[XMD layout](../../MetaMan/FORMAT-LAYOUTS.md#konami-xmd-v1v2).
+[XMD layout](../../../MetaMan/FORMAT-LAYOUTS.md#konami-xmd-v1v2).
 
 The read-only root-1 catalog comparison covered all 237 Silent Hill 4 XMD
 files from one archive. Every row matched both the saved decoder-produced
@@ -707,7 +709,7 @@ archives (52 `.ads`, 144 `.ss2`). Direct MetaMan, the ScanSong schema adapter,
 the saved catalog, and fresh vgmstream matched exactly. In Debug, direct
 inspection averaged 4.217 ms/file versus 104.329 ms/file through the CLI,
 including process startup. This is local corpus evidence, not a whole-scan or
-cross-machine performance guarantee. See the [SSHD/ADS/SS2 layout](../../MetaMan/FORMAT-LAYOUTS.md#sony-sshd--ads).
+cross-machine performance guarantee. See the [SSHD/ADS/SS2 layout](../../../MetaMan/FORMAT-LAYOUTS.md#sony-sshd--ads).
 
 ### Headerless PlayStation MIB
 
@@ -726,8 +728,8 @@ fresh vgmstream inspection matched exactly for all 327 rows. In the optimized
 Release run, direct inspection averaged 6.833 ms/file versus 72.767 ms/file
 through the vgmstream CLI, including per-file process startup. Invalid probes
 retain the vgmstream fallback. The separate `.mib` + `.mih` bank handler is a
-different layout and is not claimed by this extraction. See the [MIB layout](../../MetaMan/FORMAT-LAYOUTS.md#headerless-playstation-mib)
-and [MIB parity test](../../ScanSong/Tests/ScanSongKitTests/MIBMetadataReaderTests.swift).
+different layout and is not claimed by this extraction. See the [MIB layout](../../../MetaMan/FORMAT-LAYOUTS.md#headerless-playstation-mib)
+and [MIB parity test](../../Tests/ScanSongKitTests/MIBMetadataReaderTests.swift).
 
 ### Bink audio containers
 
@@ -746,8 +748,8 @@ The read-only root-1 comparison covered the complete one-archive corpus: all
 vgmstream inspection. Release direct inspection averaged 3.118 ms/file versus
 91.143 ms/file through the vgmstream CLI, including per-file process startup.
 `.bik`/`.bk2` movie inputs remain on the vgmstream playback/inspection boundary;
-this extraction only claims the `.bika` route. See the [Bink layout](../../MetaMan/FORMAT-LAYOUTS.md#bink-audio-containers-bika)
-and [Bink parity test](../../ScanSong/Tests/ScanSongKitTests/BinkAudioMetadataReaderTests.swift).
+this extraction only claims the `.bika` route. See the [Bink layout](../../../MetaMan/FORMAT-LAYOUTS.md#bink-audio-containers-bika)
+and [Bink parity test](../../Tests/ScanSongKitTests/BinkAudioMetadataReaderTests.swift).
 
 ### Mixed `.adp` layouts
 
@@ -766,9 +768,9 @@ members. No title, artist, game, loop, or fade tags exist in either layout, so
 the filename supplies the title and timing is finite. An incomplete DTK probe,
 an absent/malformed sidecar, or any unsupported TXTH directive is routed to
 vgmstream instead of producing a partial direct row. The byte map is in
-[FORMAT-LAYOUTS.md](../../MetaMan/FORMAT-LAYOUTS.md#mixed-adp-layouts), and
+[FORMAT-LAYOUTS.md](../../../MetaMan/FORMAT-LAYOUTS.md#mixed-adp-layouts), and
 the route behavior is covered by
-[ADPMetadataReaderTests.swift](../../ScanSong/Tests/ScanSongKitTests/ADPMetadataReaderTests.swift).
+[ADPMetadataReaderTests.swift](../../Tests/ScanSongKitTests/ADPMetadataReaderTests.swift).
 The read-only live comparison covers all 184 rows/files with exact
 direct/catalog/decoder parity; Release inspection averaged 0.129 ms/file
 direct versus 96.569 ms/file through the CLI, including per-file process
@@ -790,8 +792,8 @@ the vgmstream fallback.
 The root-1 live comparison covers all 11 AHX rows/files with exact
 direct/catalog/decoder parity. Release inspection averaged 0.160 ms/file
 direct versus 35.398 ms/file through the CLI, including process startup. See
-the [AHX offset map](../../MetaMan/FORMAT-LAYOUTS.md#cri-ahx) and
-[AHX parity test](../../ScanSong/Tests/ScanSongKitTests/AHXMetadataReaderTests.swift).
+the [AHX offset map](../../../MetaMan/FORMAT-LAYOUTS.md#cri-ahx) and
+[AHX parity test](../../Tests/ScanSongKitTests/AHXMetadataReaderTests.swift).
 
 ### Konami Saturn DVI
 
@@ -808,8 +810,8 @@ payloads retain vgmstream fallback.
 The root-1 live comparison covers all 45 DVI rows/files with exact
 direct/catalog/decoder parity. Release inspection averaged 0.291 ms/file
 direct versus 330.900 ms/file through the CLI, including process startup. See
-the [DVI offset map](../../MetaMan/FORMAT-LAYOUTS.md#konami-saturn-dvi) and
-[DVI parity test](../../ScanSong/Tests/ScanSongKitTests/DVIMetadataReaderTests.swift).
+the [DVI offset map](../../../MetaMan/FORMAT-LAYOUTS.md#konami-saturn-dvi) and
+[DVI parity test](../../Tests/ScanSongKitTests/DVIMetadataReaderTests.swift).
 
 ### Raw stream suffixes
 
@@ -898,7 +900,7 @@ vgmstream `-I` run (94/94/94 exact, with no mismatches). Mean inspection was
 0.185 ms/file through MetaMan versus 195.186 ms/file through the CLI,
 including per-file process startup; this is a local, startup-sensitive
 measurement rather than a cross-machine guarantee. Byte offsets are listed in MetaMan's
-[GENH format layout](../../MetaMan/FORMAT-LAYOUTS.md#vgmstream-genh-generic-headers),
+[GENH format layout](../../../MetaMan/FORMAT-LAYOUTS.md#vgmstream-genh-generic-headers),
 and the parity harness is
 [`GENHMetadataReaderTests.swift`](../../Tests/ScanSongKitTests/GENHMetadataReaderTests.swift).
 

@@ -55,6 +55,11 @@ public enum MetaManCore {
             methodology: "Direct VGM header and complete GD3 parser; gzip input is inflated with a 256 MiB output bound; no playback decoder."
         ),
         MetadataFormatDescriptor(
+            identifier: "uac",
+            fileExtensions: ["uac"],
+            methodology: "Direct bounded UAC manifest reader; returns the package document and member metadata without decompressing the TAR/audio payload."
+        ),
+        MetadataFormatDescriptor(
             identifier: "psf-family",
             fileExtensions: PSFMetadataReader.supportedExtensions.sorted(),
             methodology: "Direct PSF-style [TAG] footer parser for PSF, PSF2, SSF, USF, and 2SF; no playback decoder."
@@ -200,6 +205,9 @@ public enum MetaManCore {
         fileURL: URL,
         context: MetadataReadContext = MetadataReadContext()
     ) throws -> MetadataDocument {
+        if fileURL.pathExtension.caseInsensitiveCompare("uac") == .orderedSame {
+            throw MetadataReadError.trackAwareResultRequired("UAC")
+        }
         if StandardAudioMetadataReader.supportedExtensions.contains(fileURL.pathExtension.lowercased()) {
             return try StandardAudioMetadataReader.read(fileURL: fileURL)
         }
@@ -251,11 +259,21 @@ public enum MetaManCore {
     /// Reads one source file into an ordered track result. Single-track
     /// readers publish one entry; multi-track readers retain native indices
     /// and ordered occurrences without flattening them into one document.
+    /// `decompressContainerManifestFrame` is required only when a UAC stores
+    /// its independent JSON manifest as a Zstandard frame; it receives the
+    /// manifest's declared output and decoder-memory bounds.
     public static func readResult(
         fileURL: URL,
-        context: MetadataReadContext = MetadataReadContext()
+        context: MetadataReadContext = MetadataReadContext(),
+        decompressContainerManifestFrame: MetadataContainerFrameDecoder? = nil
     ) throws -> MetadataReadResult {
         let formatHint = fileURL.pathExtension.lowercased()
+        if formatHint == "uac" {
+            return try UACMetadataReader.read(
+                fileURL: fileURL,
+                decompressManifestFrame: decompressContainerManifestFrame
+            )
+        }
         if StandardAudioMetadataReader.supportedExtensions.contains(formatHint) {
             let document = try StandardAudioMetadataReader.read(fileURL: fileURL)
             return MetadataReadResult(tracks: [MetadataTrack(document: document)])
@@ -326,6 +344,9 @@ public enum MetaManCore {
         let cleanedHint = formatHint?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let format = cleanedHint.map { $0.hasPrefix(".") ? String($0.dropFirst()) : $0 }
         let normalizedFormat = format?.isEmpty == false ? format : nil
+        if normalizedFormat == "uac" {
+            throw MetadataReadError.malformedFile("UAC is a file-URL container; use readResult(fileURL:) to read its bounded manifest.")
+        }
         if normalizedFormat == "genh" || (normalizedFormat == nil && GENHMetadataReader.matches(data)) {
             let document = try GENHMetadataReader.read(data: data, displayName: displayName)
             return MetadataReadResult(tracks: [MetadataTrack(document: document)])

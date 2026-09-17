@@ -27,8 +27,7 @@ let package = Package(
             name: "ScanSongKit",
             dependencies: [
                 .product(name: "VGMBoyFormatCore", package: "VGMBoy"),
-                .product(name: "MetaManCore", package: "MetaMan"),
-                .product(name: "UACWrapperCore", package: "UACWrapper")
+                .product(name: "MetaManCore", package: "MetaMan")
             ],
             linkerSettings: [.linkedLibrary("sqlite3")]
         ),

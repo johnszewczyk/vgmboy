@@ -17,11 +17,13 @@ layout.
   preserved at [`SPCBoy/`](SPCBoy/) as an archived, non-release source tree.
 - `ScanSong`: ScanSong catalog writer and scanner application.
 - `MetaMan`: decoder-independent metadata-reading library and thin JSON CLI;
-  currently owns complete S98, VGM/VGZ, PSF-style, SPC, SID, APE, and
-  CRI/Monster ADX readers.
-- `UACMan`: native package browser/editor for UAC game and SPC-member
-  metadata; it uses the shared UAC envelope code and does not alter member
-  payload bytes when saving metadata.
+  it reads the current supported format set, including UAC manifests and
+  member metadata. See [`MetaMan/README.md`](MetaMan/README.md) for the reader
+  catalog and boundaries.
+- `UACMan`: native package browser/editor for UAC package and member metadata.
+  It uses MetaMan for native-source harvesting and preserves member and
+  compressed payload bytes when saving manifest edits. SPC event-stream
+  conversion is closed.
 - `CatalogReader`: read-only catalog and catalog-browser packages.
 - `FrontendCore`: shared frontend commands, local-file browser, archive
   materialization/cache, archive playback adapter, preferences, queue, and
@@ -47,4 +49,4 @@ Decoder and scanner documentation:
 - [`VGMBoy plugin catalog`](/Users/john/Downloads/Code/VGMMan/VGMBoy/Docs/plugin-catalog.md) — decoder pins, provenance, scanner products, dependencies, and format boundaries.
 - [`ScanSong format accommodations`](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-agent/format-accommodations.md) — scanner-side routing, archive, sidecar, and multitrack behavior.
 - [`MetaMan`](/Users/john/Downloads/Code/VGMMan/MetaMan/README.md) — supported metadata readers, methodology, library/CLI use, and migration boundary.
-- [`UACMan`](/Users/john/Downloads/Code/VGMMan/UACMan/README.md) — metadata application, reversible wrapper, and future native-container boundary.
+- [`UACMan`](/Users/john/Downloads/Code/VGMMan/UACMan/README.md) — metadata application, reversible wrapper, and closed SPC successor research.

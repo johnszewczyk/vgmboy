@@ -14,6 +14,19 @@ checks, preserves source bytes, and derives timing without producing audio.
 
 ## Reader layouts
 
+### UAC manifests
+
+The file-URL reader delegates UAC framing, manifest bounds, SHA-256 validation,
+manifest structure, and seek-table validation to `UACWrapperCore`. It reads the
+bounded UACM skippable frame and, when present, calls the host's bounded
+`decompressContainerManifestFrame` callback for the independent compressed JSON
+frame. It does not decompress or hash the TAR/audio payload. The package-level
+`MetadataDocument` retains the exact decoded manifest bytes and a typed JSON
+value for the complete manifest; the ordered result also returns a member
+document for each playable member. See
+[`uac-wrapper-format.md`](../UACMan/ai/subsystem-agent/uac-wrapper-format.md)
+for the complete binary and manifest contract.
+
 ### Standard audio and FLAC Vorbis comments
 
 The ordinary audio reader uses AVFoundation's file-URL APIs for common tags
