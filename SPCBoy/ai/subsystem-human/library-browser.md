@@ -44,6 +44,6 @@
 
 ## Files
 
-- [electron/main.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/main.js)
-- [electron/catalog-reader-client.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/catalog-reader-client.js)
-- [web/app-ui.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/app-ui.js)
+- [electron/main.js](../../electron/main.js)
+- [electron/catalog-reader-client.js](../../electron/catalog-reader-client.js)
+- [web/app-ui.js](../../web/app-ui.js)

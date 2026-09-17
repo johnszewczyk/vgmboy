@@ -22,10 +22,10 @@
 
 ## Files
 
-- [web/app-ui.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/app-ui.js)
-- [web/sidebar-view-state.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/sidebar-view-state.js)
-- [main.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/main.js)
-- [preload.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/preload.js)
-- [catalog-reader-client.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/catalog-reader-client.js)
-- [latest-request-coalescer.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/latest-request-coalescer.js)
-- [Cross-app search-view fixture](/Users/john/Downloads/Code/VGMMan/SPCBoy/test/cross-app-sidebar-search-view-v1.json)
+- [web/app-ui.js](../../web/app-ui.js)
+- [web/sidebar-view-state.js](../../web/sidebar-view-state.js)
+- [main.js](../../electron/main.js)
+- [preload.js](../../electron/preload.js)
+- [catalog-reader-client.js](../../electron/catalog-reader-client.js)
+- [latest-request-coalescer.js](../../electron/latest-request-coalescer.js)
+- [Cross-app search-view fixture](../../test/cross-app-sidebar-search-view-v1.json)

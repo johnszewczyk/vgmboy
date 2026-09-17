@@ -42,7 +42,7 @@ opens or manipulates an audio device.
 
 ## Files
 
-- [AudioOutput.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/AudioOutput.swift)
-- [vgmboy_audio_unit.c](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/CAudioUnit/vgmboy_audio_unit.c)
-- [vgmboy_audio_unit.h](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/CAudioUnit/include/vgmboy_audio_unit.h)
-- [PlaybackSession.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/PlaybackSession.swift)
+- [AudioOutput.swift](../../Sources/VGMBoyKit/AudioOutput.swift)
+- [vgmboy_audio_unit.c](../../Sources/CAudioUnit/vgmboy_audio_unit.c)
+- [vgmboy_audio_unit.h](../../Sources/CAudioUnit/include/vgmboy_audio_unit.h)
+- [PlaybackSession.swift](../../Sources/VGMBoyKit/PlaybackSession.swift)

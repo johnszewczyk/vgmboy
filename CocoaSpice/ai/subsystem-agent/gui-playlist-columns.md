@@ -34,6 +34,6 @@
 
 ## Files
 
-- [PlaylistTableView.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlaylistTableView.swift)
-- [PlaylistTableAutoSizer.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlaylistTableAutoSizer.swift)
-- [PlayerViewModel.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlayerViewModel.swift)
+- [PlaylistTableView.swift](../../Sources/CocoaSpice/App/PlaylistTableView.swift)
+- [PlaylistTableAutoSizer.swift](../../Sources/CocoaSpice/App/PlaylistTableAutoSizer.swift)
+- [PlayerViewModel.swift](../../Sources/CocoaSpice/App/PlayerViewModel.swift)

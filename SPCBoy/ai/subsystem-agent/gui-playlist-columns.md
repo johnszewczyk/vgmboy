@@ -29,6 +29,6 @@
 
 ## Files
 
-- [web/app-core.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/app-core.js)
-- [web/app-ui.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/app-ui.js)
-- [web/styles.css](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/styles.css)
+- [web/app-core.js](../../web/app-core.js)
+- [web/app-ui.js](../../web/app-ui.js)
+- [web/styles.css](../../web/styles.css)

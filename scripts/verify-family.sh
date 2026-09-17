@@ -5,12 +5,12 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FAMILY_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MODE="verify"
 RESULT_ROOT=""
-PROJECTS=(CatalogReader VGMBoy FrontendCore MetaMan UACMan UACMan/Wrapper ScanSong CocoaSpice SPCBoyWK)
+PROJECTS=(CatalogReader VGMBoy FrontendCore MetaMan UACMan UACMan/Wrapper ScanSong CocoaSpice SPCBoyWK ViewBoy)
 
 usage() {
   echo "Usage: $0 [--inventory-only] [--output-dir PATH]"
   echo
-  echo "Records the single VGMMan repository state and checks all nine packages."
+  echo "Records the single VGMMan repository state and checks all ${#PROJECTS[@]} packages."
   echo "The default mode also runs the family package and renderer checks."
 }
 
@@ -182,6 +182,7 @@ if [[ "$MODE" == "verify" ]]; then
   run_check frontendcore-tests FrontendCore swift test --disable-sandbox
   run_check metaman-tests MetaMan swift test --disable-sandbox
   run_check uac-wrapper-tests UACMan/Wrapper swift test --disable-sandbox
+  run_check uac-wrapper-python-tests UACMan python3 -B -m unittest discover -s Wrapper/python/tests
   run_check uacman-tests UACMan swift test --disable-sandbox
   run_check scansong-tests ScanSong swift test --disable-sandbox --jobs 1
   run_check cocoaspice-tests CocoaSpice swift test --disable-sandbox --jobs 1
@@ -190,6 +191,11 @@ if [[ "$MODE" == "verify" ]]; then
   run_check spcboywk-app-playback-check SPCBoyWK node --check Sources/SPCBoyWK/Resources/app-playback.js
   run_check spcboywk-app-ui-check SPCBoyWK node --check Sources/SPCBoyWK/Resources/app-ui.js
   run_check spcboywk-renderer-tests SPCBoyWK node --test Tests/SPCBoyWKTransport.test.js
+  run_check viewboy-build ViewBoy ./build.sh
+  run_check viewboy-app-core-check ViewBoy node --check Sources/ViewBoy/Resources/app-core.js
+  run_check viewboy-app-playback-check ViewBoy node --check Sources/ViewBoy/Resources/app-playback.js
+  run_check viewboy-app-ui-check ViewBoy node --check Sources/ViewBoy/Resources/app-ui.js
+  run_check viewboy-renderer-tests ViewBoy node --test Tests/ViewBoyTransport.test.js
 fi
 
 {

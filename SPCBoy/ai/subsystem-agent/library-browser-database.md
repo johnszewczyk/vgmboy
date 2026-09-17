@@ -64,9 +64,9 @@
 
 ## Files
 
-- [catalog-reader-client.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/catalog-reader-client.js)
-- [CatalogReader bridge](/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogReaderElectronBridge/main.swift)
-- [latest-request-coalescer.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/latest-request-coalescer.js)
-- [main.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/main.js)
-- [app-library.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/app-library.js)
-- [preload.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/preload.js)
+- [catalog-reader-client.js](../../electron/catalog-reader-client.js)
+- [CatalogReader bridge](../../../CatalogReader/Sources/CatalogReaderElectronBridge/main.swift)
+- [latest-request-coalescer.js](../../electron/latest-request-coalescer.js)
+- [main.js](../../electron/main.js)
+- [app-library.js](../../web/app-library.js)
+- [preload.js](../../electron/preload.js)

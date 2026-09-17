@@ -1,284 +1,48 @@
 # ScanSong
 
-ScanSong is the native Swift catalog writer for CocoaSpice, SPCBoy,
-and future app-family frontends. The players browse a selected schema-23 SQLite
-catalog through read-only connections; they do not scan into or modify it.
+ScanSong is the VGMMan family’s source inspector and schema-23 catalog writer.
+It has a reusable `ScanSongKit`, a JSONL CLI (`scansong`), and a native macOS
+catalog-management app. Player apps read the published catalog; they do not
+scan or modify it.
 
-The repository contains:
+ScanSong discovers loose sources and supported archives, resumes complete
+source/archive checkpoints, and publishes each refreshed source atomically. A
+failed refresh retains the last known-good catalog rows. UAC scans trust the
+bounded package manifest and do not expand or inspect the enclosed audio/TAR
+payload.
 
-- `ScanSongKit`, the host-independent scanner, archive, metadata, staging,
-  resume, and schema-23 publication implementation.
-- `scansong`, a versioned JSONL command-line boundary for Electron and tests.
-- `ScanSong`, a small native macOS GUI for managing one catalog file,
-  adding roots, scanning, cancelling, resuming, and reading per-path logs.
+## Build and run
 
-## Use the native app
-
-```bash
+```sh
+./build-app.sh
 ./launch.sh
-```
-
-`launch.sh` always removes the prior SwiftPM build and assembled app, performs a
-clean release build, ad-hoc signs the new bundle, asks any existing ScanSong
-process to close cooperatively, and opens that exact bundle as a new instance
-only after the prior process exits. Use
-`build-app.sh` alone when a clean build without launch is required.
-
-ScanSong is also registered in `/Users/john/Downloads/Code/LaunchPad/apps.txt`.
-Its LaunchPad row runs the same clean `build-app.sh` contract before opening the
-new bundle.
-
-Choose an existing schema-23 catalog, use **Use Default**, or choose **Add New**
-to create a fresh `Library.sqlite` at a new path. Only one catalog is selected
-at a time; Add New never replaces an existing database. Existing attached paths
-load from the catalog automatically. **Add Path** adds complete folder roots;
-each path can be enabled for **Scan All** or scanned directly.
-Every path has Scan, Show Last Scan Log, and Remove controls. **Deep Scan**
-forces reinspection of every source and all currently available metadata
-adapters; ordinary Scan is the fast path and reuses matching completed sources.
-Cancelling retains complete source/archive checkpoints, and the next matching
-scan resumes after rediscovery validates them.
-
-**Check Links** verifies every indexed physical source. Missing or moved paths
-are marked inactive, so neither player shows them, while their tracks,
-metadata, fingerprints, archive identities, and scan inventory remain in the
-catalog. If a source returns at the same path, the next check restores it.
-**Clean Links** is the explicit destructive operation that permanently purges
-only inactive catalog records after confirmation; it never deletes media files.
-Removing a scan path only detaches it and retains its records.
-
-Each path shows its last scan time, source count, active track count, and issue
-count. Its last-result log uses uniform `status | detail | path` rows. It records
-the root summary, actual failure records, and compact ignored/unrecognized diagnostics;
-successful archive members are never expanded into a file list, while an
-archive-member failure keeps its `archive#member` path. Scanner-owned scratch
-prefixes are removed from diagnostic details so the archive member path remains
-the useful identifier. Path status is grey before a completed scan, green when
-all supported sources completed cleanly, yellow when
-failed or inactive sources need attention, and red when a completed scan has no
-playable files.
-
-ScanSong publishes a root atomically. A failed refresh retains the last
-known-good rows for that source and reports the new failure. Player reads and
-playback may continue while ScanSong scans: the app holds an advisory
-writer lease only to prevent a second scanner from modifying the same catalog.
-No player-state lock is shown. If SQLite reports the catalog busy after its
-wait, the scanner leaves the catalog consistent and asks you to retry. Required structural parsers fail
-explicitly when their native adapter is unavailable; the scanner does not
-invent a single track or invoke a player-owned fallback.
-
-## Command line
-
-```bash
+swift test --disable-sandbox
 swift run scansong plugins
 swift run scansong probe --recursive --strict /path/to/folder
-swift run scansong catalog create /path/to/Library.sqlite
-swift run scansong catalog validate /path/to/Library.sqlite
-swift run scansong catalog roots /path/to/Library.sqlite
-swift run scansong scan /path/to/Library.sqlite /path/to/root
-swift run scansong scan --new /path/to/Library.sqlite /path/to/root
-swift run scansong scan --permits 16 /path/to/Library.sqlite /path/to/root
-swift run scansong scan --archive-limit 8 /path/to/Library.sqlite /path/to/root
 ```
 
-`probe` is always dry-run. `scan` writes only the selected catalog. Standard
-output is reserved for ordered, versioned JSONL events; errors and unsupported
-required adapters produce a nonzero exit status. SIGINT and SIGTERM cancel
-cooperatively after completed checkpoints have been saved.
+`launch.sh` builds a fresh release app before opening it. The app can select an
+existing schema-23 catalog or create a new one, attach scan roots, scan or resume
+roots, inspect per-path logs, and check or clean links. **Clean Links** removes
+inactive catalog records only after confirmation; it never deletes source
+files. A normal scan reuses completed matching work; Deep Scan forces
+reinspection.
 
-ScanSong preserves the catalog's existing durable SQLite journal mode. New
-catalogs start in SQLite's default rollback-journal (`DELETE`) mode; existing
-WAL catalogs stay in WAL mode so player reads and scanner writes can coexist.
-Do not copy a live WAL catalog without its `-wal` and `-shm` companion files.
-ScanSong never switches journal mode during a scan or link-maintenance
-operation, so an open player does not turn that operation into a catalog-busy
-error.
+The `scansong` CLI writes versioned JSONL events to stdout; errors and required
+unsupported adapters return a nonzero status. `probe` is dry-run and `scan`
+writes only the catalog path supplied to it.
 
-## Implemented intake
+## Ownership and routes
 
-- ZIP, 7z, RAR/RSN, TAR.ZST, and TZST archives with bounded complete
-  materialization, path/symlink validation, cancellation, and cleanup.
-- UAC packages use MetaMan's bounded manifest/member documents to publish
-  catalog rows; only a compressed metadata frame is decompressed. Scanning
-  trusts the manifest's member metadata and hashes without expanding or
-  inspecting the TAR/audio payload.
-- LHA archives through the same bounded 7zz materialization boundary. Amiga
-  members are recognized by the shared UADE prefix manifest as well as by
-  ordinary suffixes, and each archive is staged as a complete set so UADE can
-  resolve player/sample companions before it publishes real subsong rows.
-- Direct NSF/GBS/NSFE header and chunk enumeration, AY relative-pointer,
-  SAP header/subsong/native TIME, HES header/M3U, and KSS/KSSX header metadata
-  through MetaManCore without opening libgme. KSS keeps its 256-slot info-only
-  listing while retaining KSSX's declared track range as source facts. SPC
-  ID666/xID6 metadata is read by MetaManCore, including
-  the established libgme-compatible catalog defaults for tagless SPCs. ScanSong
-  projects the shared document into the existing schema; its app and CLI do
-  not link or invoke libgme for SPC inspection.
-- SPC ID666/xID6, PSF/PSF2, SSF, USF, and 2SF tags plus VGM/VGZ GD3/timing,
-  complete GSF/miniGSF and QSF/miniQSF containers, and SID PSID/RSID headers
-  through MetaManCore. ScanSong adapts the shared documents into schema 23.
-- Direct SNDH tag/subtune/timing harvesting through MetaManCore, including
-  executable-vector bounds, Atari ST text, TIME/FRMS timing, and bounded ICE!
-  expansion. Production ScanSong no longer links `VGMBoySNDH` or PSGPlay for
-  SNDH metadata; the old reader remains test-only as a parity oracle.
-- SNDH rows use contiguous zero-based `track_index` values and repeat the
-  declared `track_count` on every subtune row, so database/game/file playlist
-  activation can select each subtune without reopening the scanner. VGMBoy's
-  deterministic 1,024-file corpus sample rendered 2,030 subtunes with zero
-  failures, including 4-Mat's eight-subtune Shadow Dancer; this remains decoder
-  evidence, not a claim that every file in the 5,897-file Atari ST corpus is
-  conventional music or supported.
-- The direct reader was compared read-only with all 5,897 live CocoaSpice SNDH
-  sources and 11,758 catalog subtune rows. The legacy reader, MetaMan, scanner
-  projection, and catalog matched across 94,064 text-field checks plus timing
-  and track-identity fields, with zero mismatches. Parser-only performance is
-  recorded in `WIP-PLAN.md`; common outer `.zst` materialization is excluded.
-- MDX modules through the VGMBoy-built `vgmboy-mdx-inspect` adapter. Each MDX
-  publishes one logical track with its native duration and title; declared
-  sample/data companions are dependency data and are not published as
-  standalone rows. The X68000 library commonly stores these as separate
-  `name.MDX.zst` and `name.PDX.zst` files. For a compressed MDX, ScanSong reads
-  the MDX header, resolves its declared dependency beside the source
-  case-insensitively, decompresses it when necessary, and places it beside the
-  MDX in disposable scratch before invoking the VGMBoy inspector.
-  Extensionless references retain the historical `.pdx` inference, but an
-  explicit extension is never rewritten: `NOS.SMP`, `THRICE.PCM`, and
-  `KONAMI.MDX` remain those exact logical names. The shared mdxmini boundary
-  also decodes inner X68000 LZX 0.32/0.42 MDX bodies and whole-file LZX PDX
-  banks; the original `.zst`, MDX, and dependency source bytes are never
-  rewritten. Dependency wrappers are therefore not independent scan items;
-  an absent declared dependency remains an explicit MDX failure. Some X68000
-  libraries keep dependencies in a separate subfolder rather than beside each
-  module; names are read using the format's legacy Shift-JIS encoding, and the
-  legacy leading `\bos` spelling is normalized to a same-directory basename
-  while absolute and traversal spellings remain unsafe. When a scan root is
-  supplied, ScanSong builds one root-scoped dependency index for PDX, SMP, PCM,
-  and MDX sidecars and resolves the closest matching name deterministically
-  (local sibling first, then nearest shared folder, then stable path order). It
-  never searches outside the supplied scan root or invents a dependency from
-  another scan. Before invoking mdxmini, the inspector verifies that the
-  declared dependency was materialized and reports
-  `Required MDX dependency is missing: name.` when it was not; missing-
-  dependency failures are therefore distinguishable from decoder rejection.
-  Failure rows are emitted per declaring module, so repeated missing-name rows
-  may refer to one shared dependency rather than distinct missing banks.
-- Amiga modules through VGMBoy's `vgmboy-amiga-inspect` UADE adapter. Amiga
-  names such as `mod.*`, `p4x.*`, `med.*`, `mdat.*`, `smpl.*`, and custom
-  EaglePlayer prefixes are routed by content-name convention while ordinary
-  `music.mod` remains OpenMPT. UADE's declared subsong range becomes the
-  playlist rows; same-archive player/sample companions remain dependency data,
-  not duplicate sources. The source bytes are retained and never converted.
-- Monkey's Audio (`.ape`) through MetaManCore's direct APE header/tag reader.
-  It derives one-track duration from sample blocks and rate, reads native
-  APEv2 and leading ID3v2 tags, and checks the bounded frame/seek structure
-  without starting FFmpeg or audio emulation. The source bytes are retained;
-  VGMBoy still uses FFmpeg for playback.
-- CRI/Monster ADX metadata through MetaManCore's header reader. It preserves
-  type-03/04/05 and encrypted type-04 timing, including vgmstream's default
-  loop/fade play window. Content under `.adx` that is Ogg, RIFF, or another
-  non-CRI/Monster alias retains the vgmstream route.
-- Sony CD-XA sector and interleaved subsong metadata through MetaManCore; other
-  formats that reuse `.xa` retain the vgmstream route.
-- Atomic Planet AUS header timing and loop metadata through MetaManCore;
-  reader; other content under `.aus` remains eligible for the vgmstream route.
-- Sony MSF codec, stream-name, loop, and duration metadata through MetaManCore;
-  TamaSoft's `MSF ` signature and other non-Sony `.msf` aliases retain the
-  vgmstream route.
-- Konami and SNK SVAG header, native fact, duration, and loop metadata through
-  MetaManCore; unrelated `.svag` signatures retain the vgmstream route.
-- Konami XMD v1/v2 header, sample, loop, and scanner-duration metadata through
-  MetaManCore; unrecognized `.xmd` payloads retain the vgmstream route.
-- Sony SSHD headers under `.ads` and `.ss2` through MetaManCore. Both suffixes
-  use the same byte layout, including ADSC/Cavia wrapper offsets, encoded-frame
-  timing, and decoder-compatible loop handling; nonmatching aliases retain
-  vgmstream fallback. Playback remains owned by VGMBoy.
-- Headerless PlayStation `.mib` streams through MetaManCore's bounded PS-ADPCM
-  probe and decoder-compatible channel/interleave/loop/timing inference. The
-  eight-archive live corpus matches the saved catalog and fresh vgmstream
-  inspection; invalid `.mib` probes retain vgmstream fallback. The separate
-  `.mib`/`.mih` bank layout is not conflated with this route.
-- Self-contained Bink `.bika` container headers, frame offsets, and packet
-  sample counts are read through MetaManCore without starting the Bink decoder;
-  `.bik`/`.bk2` movies remain on the vgmstream playback/inspection route.
-- Mixed `.adp` inputs are content-routed: headerless Nintendo GameCube DTK and
-  exact `.adp.txth`-described raw IMA are read by MetaManCore, while unrelated
-  `.adp` aliases remain on vgmstream. The direct reader retains the DTK probe
-  or TXTH sidecar and never publishes a partial layout.
-- CRI AHX `.ahx` metadata is content-routed through MetaManCore's bounded
-  header/fixed-bitrate reader. It preserves the declared sample count separately
-  from the scanner-compatible payload duration; unrelated `.ahx` aliases remain
-  on vgmstream.
-- Konami Saturn `DVI.` streams in `.dvi` are content-routed through MetaManCore.
-  The complete pre-payload header, stereo IMA facts, loop timing, and finite
-  duration are read without a decoder; Capcom `IDVI` aliases and incomplete
-  payloads retain vgmstream fallback. The live root-1 corpus covers 45 files
-  with exact saved-catalog/decoder parity.
-- Nintendo DS standard STRM and Final Fantasy Tactics A2 RIFF/IMA metadata
-  through MetaManCore; only validated layouts leave the `.strm` decoder route,
-  and unrelated aliases retain vgmstream fallback.
-- Standard Nintendo DSPADPCM, Retro Studios RS03, and THP-audio headers through
-  MetaManCore. THP movies are direct for `.thp` and content-matched `.dsp`;
-  unknown or non-THP aliases retain vgmstream fallback.
-- Structurally known single rows for standard audio (including OGG Vorbis),
-  modules, and registered formats whose optional metadata can remain empty.
-- Tracker/module rows (S3M, MOD, IT, XM, MTM, STM, and related) via
-  `openmpt123` inspection, one structurally-known row per module.
-- A VGMBoy-built vgmstream plugin that ScanSong bundles as `vgmstream-cli`
-  from the VGMBoy-managed source snapshot and compatibility patch to open raw vgmstream formats and enumerate
-  real subsongs before publishing rows. TXTP and HD-bank structures are
-  materialized and inspected through the same route.
-- MetaManCore's complete GSF/miniGSF reader validates PSF v0x22 headers, CRCs,
-  zlib payloads, GBA executable segments and ROM-header signatures, and the
-  complete `_lib` dependency chain while retaining authored tags and legacy
-  timing semantics. It does not launch or link mGBA; VGMBoy retains Highly
-  Complete/mGBA for playback. ScanSong only adapts the shared result. Scanner
-  inspectors build through narrow VGMBoy inspection targets rather than
-  VGMBoyKit, and scanner-plugin preparation does not run VGMBoy's full playback
-  dependency builder.
-- MetaManCore's complete QSF/miniQSF reader validates PSF v0x41 containers,
-  CRCs, bounded zlib data, QSound blocks, and declared `.qsflib` files without
-  starting the playback core. It extracts authored tags and timing directly;
-  VGMBoy retains the QSound core for playback.
+MetaMan owns direct format metadata readers. ScanSong adapts their ordered
+results into schema 23, owns scanner-specific archive/source handling, and
+bundles VGMBoy-built inspection helpers only where required. It does not invoke
+player apps or link the playback kit.
 
-The complete per-plugin contract—including route policy, native metadata
-source, dependency and archive handling, multi-track expansion, playback
-boundaries, and retained failure behavior—is maintained in
-[`ai/subsystem-agent/format-accommodations.md`](/Users/john/Downloads/Code/VGMMan/ScanSong/ai/subsystem-agent/format-accommodations.md).
-
-Decoder provenance and milestone versions are maintained centrally by VGMBoy
-in [`Docs/plugin-versions.json`](/Users/john/Downloads/Code/VGMMan/VGMBoy/Docs/plugin-versions.json).
-ScanSong consumes the staged scanner products and does not maintain a second
-decoder-version list. Run VGMBoy's read-only audit before a release or after
-the documented review interval; adopting a newer decoder still requires
-rebuilding the scanner product and running its format-specific fixtures.
-The human-readable plugin matrix and dependency notes are in
-[`VGMBoy/Docs/plugin-catalog.md`](/Users/john/Downloads/Code/VGMMan/VGMBoy/Docs/plugin-catalog.md).
-
-Standalone Zstandard inputs use the explicit `name.ext.zst` or
-`name.ext.zstd` convention: `ext` is the required inner playable format name,
-and the scan produces one implicit member. A bare `file.zst` with no inferable
-playable suffix is rejected. `*.tar.zst` and `*.tar.zstd` are always treated as
-multi-member TAR containers. MDX is the intentional exception to the
-single-payload rule: a `name.MDX.zst` may require a separately compressed
-`name.PDX.zst` sibling, which is materialized only as MDX dependency data.
-
-ScanSong does not yet embed every playback codec. Each intake plugin owns
-its structural and metadata boundary and returns only tracks it actually opens.
-Formats without an implementable scanner adapter are documented in
-`ai/project-info.md` and are visible under Options > File Types. They are
-ignored by default; supported formats are still inspected so corruption remains
-an explicit archive-member failure rather than a hidden source.
-
-Formats without a scanner adapter (for example SNSF and the WonderSwan/Game
-Gear oddball families) are not indexed; those sources report
-`No supported playable tracks were found` until an adapter or decoder core is
-added. SNSF is a PSF-family format whose decoding requires an SPC700 player
-core.
-
-## Verify
-
-```bash
-swift test --disable-sandbox
-swift build --disable-sandbox --configuration release --product scansong
-swift build --disable-sandbox --configuration release --product ScanSong
-```
+Read [AGENTS.md](AGENTS.md), then [`ai/project-info.md`](ai/project-info.md).
+The focused inspection, archive, and failure contracts are in
+[`ai/subsystem-agent/format-accommodations.md`](ai/subsystem-agent/format-accommodations.md);
+user-visible app behavior is in `ai/subsystem-human/`. The authoritative
+plugin/dependency matrix is
+[`../VGMBoy/Docs/plugin-catalog.md`](../VGMBoy/Docs/plugin-catalog.md), and the
+native metadata reader map is [`../MetaMan/FORMAT-LAYOUTS.md`](../MetaMan/FORMAT-LAYOUTS.md).

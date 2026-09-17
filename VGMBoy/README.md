@@ -1,19 +1,20 @@
 # VGMBoy
 
-VGMBoy is the shared macOS game-music playback and inspection-plugin core for the
-CocoaSpice/SPCBoy/ScanSong app family. It owns format routing, decoder integration, timing, Long Play,
-tempo, fade, ten-band EQ, and the audio device. Its command-line tool, small
-SwiftUI test app, and CocoaSpice are clients of the same `VGMBoyKit` transport.
+VGMBoy is the shared macOS game-music playback and inspection-plugin core for
+the VGMMan family. It owns format routing, decoder integration, timing, Long
+Play, tempo, fade, ten-band EQ, and the audio device. Its command-line and
+SwiftUI test clients exercise the same `VGMBoyKit` used by CocoaSpice, SPCBoyWK,
+and ViewBoy.
 
 `VGMBoyEndpointCore` is the small, platform-neutral endpoint map for those
 clients. It names the shared playback, audio, diagnostics, and export routes;
 the typed `PlaybackControlProtocol` remains the native Swift payload contract.
 
 VGMBoy is intentionally database-free. ScanSong remains the sole schema-23
-catalog writer. CocoaSpice links `VGMBoyKit` in-process; SPCBoy WK links the
-same core directly through its native endpoint adapter. The legacy Electron
-SPCBoy path remains separate until it is retired; ScanSong bundles the
-inspection executables produced by VGMBoy.
+catalog writer. The maintained player apps bundle `VGMBoyKit` in-process
+through host-specific adapters. The Electron SPCBoy tree is archived; ScanSong
+bundles VGMBoy-built inspection executables where a direct MetaMan reader is
+not sufficient.
 
 ## How the app family works
 
@@ -22,7 +23,7 @@ inspection executables produced by VGMBoy.
 | ScanSong | Publishes the shared SQLite catalog and stored sidebar/playlist projections; bundles VGMBoy inspection plugins for intake. |
 | CocoaSpice | Reads that catalog, owns playlist and queue policy, materializes selected archive members, and forwards playback controls to bundled VGMBoyKit. |
 | VGMBoyKit | Decodes a supplied playable path, owns timing/EQ/audio output, and reports status and natural end. |
-| SPCBoy WK | Reads the same catalog independently, materializes files app-side, and sends playback commands through the shared VGMBoy endpoint surface. |
+| SPCBoyWK and ViewBoy | Read the same catalog independently and use shared archive and playback contracts through their native bridges. |
 
 VGMBoy is not a daemon. Every host bundles the core into its own process. A host supplies a path
 and subtrack index through PlaybackControl v1; VGMBoy never reads or writes catalogs and never
@@ -154,8 +155,8 @@ checks before changing the manifest's `lastReviewed` date.
 - `VGMBoyKit` owns decoding, playback timing, and the macOS audio device.
 - The CLI and SwiftUI app are test skins over that one core.
 - ScanSong remains the only schema-23 catalog writer.
-- CocoaSpice links VGMBoyKit directly; SPCBoy runs the same code through its
-  private bundled bridge. Neither host has a second playback engine.
+- CocoaSpice, SPCBoyWK, and ViewBoy bundle the same VGMBoyKit behind
+  host-specific adapters. None has a second playback engine.
 
 For current engineering constraints and routing, see
 [ai/project-info.md](ai/project-info.md) and

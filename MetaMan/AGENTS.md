@@ -1,5 +1,9 @@
 # MetaMan instructions
 
+Read [`ai/AGENTS.md`](ai/AGENTS.md), then
+[`ai/project-info.md`](ai/project-info.md), then the focused format or API note
+identified there.
+
 - `MetaManCore` is the product boundary. Keep the CLI thin; apps must be able
   to import the library without spawning a process.
 - The core must not depend on ScanSong, VGMBoy, CocoaSpice, or playback
@@ -15,5 +19,6 @@
 - Decoder-based comparisons belong in test-only oracle tests. Record
   intentional correctness improvements separately; do not inherit a decoder
   defect merely to achieve byte-for-byte behavioral parity.
-- Keep the format/methodology table in `README.md` current. GYM is not an
+- Keep format layouts, supported facts, and methodology in
+  `FORMAT-LAYOUTS.md`; keep the README as an entry point. GYM is not an
   extraction target.

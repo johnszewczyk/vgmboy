@@ -4,8 +4,8 @@
 
 ScanSong is the native catalog-management app and command-line scanner for the
 VGMMan library. Its `ScanSongKit` package discovers source files, inspects
-supported formats, and writes schema-23 catalogs consumed by CocoaSpice and
-SPCBoyWK.
+supported formats, and writes schema-23 catalogs read by CocoaSpice, SPCBoyWK,
+and ViewBoy.
 
 ## Ownership
 

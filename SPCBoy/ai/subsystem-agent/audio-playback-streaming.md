@@ -35,8 +35,8 @@
 
 ## Files
 
-- [electron/native-audio-tools.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/native-audio-tools.js)
-- [electron/native-helper-client.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/native-helper-client.js)
-- [electron/playback-core.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/playback-core.js)
-- [electron/playlist-track-inspector.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/playlist-track-inspector.js)
-- [web/app-playback.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/app-playback.js)
+- [electron/native-audio-tools.js](../../electron/native-audio-tools.js)
+- [electron/native-helper-client.js](../../electron/native-helper-client.js)
+- [electron/playback-core.js](../../electron/playback-core.js)
+- [electron/playlist-track-inspector.js](../../electron/playlist-track-inspector.js)
+- [web/app-playback.js](../../web/app-playback.js)

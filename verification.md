@@ -2,92 +2,61 @@
 
 ## Scope
 
-`scripts/verify-family.sh` records the state of this single family repository
-and checks all nine maintained Swift packages/apps: CatalogReader, VGMBoy,
-FrontendCore, MetaMan, UACMan, UACMan/Wrapper, ScanSong, CocoaSpice, and
-SPCBoyWK. The wrapper has its own package check so the app and consumer
-dependencies do not hide a wrapper regression.
-The archived Electron source under `SPCBoy/` is retained for recovery but is
-not a supported build or release target and is not run by the verifier.
+`scripts/verify-family.sh` inventories the VGMMan Git repository and checks its
+ten maintained Swift packages/apps: CatalogReader, VGMBoy, FrontendCore,
+MetaMan, UACMan, UACMan/Wrapper, ScanSong, CocoaSpice, SPCBoyWK, and ViewBoy.
+It also runs UACWrapper’s Python CLI tests and both active WebKit renderers’
+syntax and transport suites. Archived Electron source under `SPCBoy/` is
+recovery-only and is excluded from routine builds.
 
-## Inventory
+The checker records branch and dirty state, Git archive refs, toolchain details,
+commands, durations, and full logs. It does not stage, commit, stash, reset, or
+change Git configuration.
 
-Every run records:
+## Current evidence — 2026-09-16
 
-- root branch, HEAD, upstream, ahead/behind counts, and dirty-file count;
-- a SHA-256 hash of the binary tracked patch;
-- paths and SHA-256 hashes for untracked regular files without copying them;
-- the family repository's archived component-history refs;
-- submodule state (the family tree currently has no Git submodules);
-- macOS, architecture, Xcode, Swift, Homebrew, and relevant formula prefixes.
+A full family run completed at `/private/tmp/vgmman-doc-cleanup-verification`.
+The dependency builder passed. Package suites passed for CatalogReader (25),
+FrontendCore (84), MetaMan (148), UACWrapper Swift (18), UACMan (15), ScanSong
+(148), and CocoaSpice (58). SPCBoyWK built and its JavaScript syntax and
+renderer/transport checks passed (65 tests). ViewBoy built and packaged with
+`./build.sh`; its JavaScript syntax checks passed and its renderer/transport
+suite passed all 22 tests. The UACWrapper Python suite also passed all five
+tests in a targeted run.
 
-The default output is a new private temporary directory. Use `--output-dir`
-only for an explicit retained evidence location.
+VGMBoy is the only failing package check: 68 of 72 tests passed. The four
+issues are in two AudioToolbox/live-transport integration tests: AAC export
+returned `.audioToolbox(1718449215)`, and the transport test could not start or
+resume playback. The unit and other package suites are green. Recheck these
+integration paths on a host with a working audio output and AAC encoder before
+calling the full family suite green.
 
-## Checks
+Boundary checks around the same work:
 
-The default mode first builds VGMBoy's pinned native dependency products, then
-runs package checks in dependency order, builds SPCBoyWK, and runs its
-JavaScript syntax and renderer/transport tests. Every command,
-duration, exit status, and complete log is retained in the result directory.
+- ScanSong’s release product built in an isolated build directory, its current
+  app bundle passed strict code-signature verification, and its running UI
+  showed the selected schema-23 catalog with 13 paths and 530,403 tracks. No
+  second instance or scan was started.
+- LaunchPad’s `./launch.sh` build completed. Its 16 configured rows have valid
+  field counts, project directories, and local build-script paths. The
+  refreshed process launched, but accessibility inspection of its new window
+  timed out; the app-row click path was therefore not revalidated after the
+  config change.
+- The packaged ViewBoy window opened and rendered its library, navigation, and
+  playback controls. It had no selected catalog or live playback fixture.
+- The family documentation link check resolved all 419 local Markdown links
+  outside vendored dependency documentation; no broken links remained.
 
-`--inventory-only` records source and tool state without building or testing.
+## Commands
 
-## Current Package Evidence
+```sh
+./scripts/verify-family.sh
+./scripts/verify-family.sh --inventory-only
+./scripts/verify-family.sh --output-dir /private/tmp/vgmman-family-evidence
+```
 
-- The family check passes CatalogReader (25 tests), FrontendCore (84),
-  MetaMan (148), UACWrapper (18 Swift tests), UACMan (15), ScanSong (148), and
-  CocoaSpice (58). UACWrapper's separate Python suite also passes all five
-  tests.
-- **VGMBoy:** the package builds and 68 of 72 tests pass. Four AAC/live-output
-  assertions fail because this host has no CoreAudio output device and its
-  AudioToolbox AAC path returns `1718449215` (`fmt?`); a separate `afconvert`
-  probe fails the same way. The playback code and tests are unchanged here.
-  Rerun those integration checks on a Mac with an output device and working
-  AAC encoder; this environment cannot establish that boundary.
-- **SPCBoyWK:** the Swift package builds; its JavaScript syntax checks and
-  renderer/transport tests pass.
-- **ScanSong packaged UI:** `ScanSong/build-app.sh` completes a clean release
-  build, including the three VGMBoy scanner helpers. LaunchPad's ScanSong row
-  then builds and opens the app; the visible window reports schema 23 and the
-  existing 530,403-track catalog. No new scan was started for this check.
-- **LaunchPad:** its standalone Swift package builds. It is a separate Git
-  repository from this family and has no configured remote.
-- **Native dependency build:** VGMBoy's dependency build passes. The 2SF
-  builder now stages its make copy under `.build` so the tracked vendor archive
-  remains unchanged.
-
-The family check exits nonzero on this host because VGMBoy's system-audio
-integration checks cannot run here; the other package checks pass. Its evidence
-directory and full logs are emitted by `verify-family.sh`.
-
-This host selects Xcode 26.6 and its macOS 26.5 SDK through `xcode-select` and
-`xcrun`. The Command Line Tools SDK symlink is newer and must not be mixed with
-the selected Xcode linker; the ScanSong CMake build pins the active SDK.
-SwiftPM's default cache location is read-only in this workspace, so package
-checks need a task-local module and cache directory.
-
-## Evidence Levels
-
-Verification claims stay explicit:
-
-- **Contract**: focused/package tests prove shared policy, typed bridge codecs,
-  and renderer ordering behavior.
-- **Package**: the participating targets build and their full suites pass.
-- **Packaged UI**: a newly built app launches and visibly reaches the named UI
-  state.
-- **Live fixture**: a real catalog item or source file crosses the relevant
-  catalog/materializer/decoder/transport boundary and reaches the stated user
-  result.
-
-Record fixture paths and exact UI actions for the last level. Missing archive
-paths, unavailable hardware, code-signing trust, capacity, or an automation
-limitation remain evidence gaps, not a source regression. The current
-cross-frontend evidence index belongs in `PARITY-WIP-REPORT.md`; extraction
-ownership belongs in `WIP-PLAN.md`. Keep these documents current-state only;
-Git, not the documentation tree, retains prior runs and investigations.
-
-## Usage
+The default evidence directory is a new private temporary directory. If the
+Swift user cache is unavailable, use a writable task-local module/cache path:
 
 ```sh
 mkdir -p .build/verification-module-cache .build/verification-cache
@@ -97,12 +66,18 @@ CLANG_MODULE_CACHE_PATH="$PWD/.build/verification-module-cache" \
 SWIFTPM_MODULECACHE_OVERRIDE="$PWD/.build/verification-module-cache" \
 XDG_CACHE_HOME="$PWD/.build/verification-cache" \
   ./scripts/verify-family.sh
-./scripts/verify-family.sh --inventory-only
-./scripts/verify-family.sh --output-dir /private/tmp/vgmman-release-evidence
 ```
 
-## Boundary
+## Evidence levels
 
-The verifier does not commit, stash, reset, or change Git configuration.
-Native builders may copy inputs and write derived dependencies beneath ignored
-`.build` directories; maintained source inputs should remain unchanged.
+- **Contract:** focused tests cover shared policies, typed bridge codecs, and
+  renderer behavior.
+- **Package:** builds and test suites cover participating code, subject to
+  host-dependent integration failures above.
+- **Packaged UI:** a newly built app starts and reaches a visible interface.
+- **Live fixture:** a real catalog/source crosses the relevant archive,
+  decoder, and playback boundary to the stated result.
+
+Keep fixture paths, UI actions, and hardware limitations explicit. Missing
+fixtures, unavailable host hardware, signing trust, or automation limits remain
+evidence gaps rather than source guarantees.

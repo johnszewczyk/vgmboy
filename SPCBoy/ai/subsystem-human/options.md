@@ -41,5 +41,5 @@
 
 ## Files
 
-- [web/app-ui.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/app-ui.js)
-- [web/app-core.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/app-core.js)
+- [web/app-ui.js](../../web/app-ui.js)
+- [web/app-core.js](../../web/app-core.js)

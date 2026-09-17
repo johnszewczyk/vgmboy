@@ -1,6 +1,6 @@
 # UACMan instructions
 
-Read `ai/project-info.md`, then `ai/AGENTS.md`, then the routed subsystem
+Read `ai/AGENTS.md`, then `ai/project-info.md`, then the routed subsystem
 note. There is no root-level `project-info.md` in this component.
 
 UACMan owns two supported boundaries: the metadata application and the current

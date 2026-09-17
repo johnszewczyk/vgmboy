@@ -340,13 +340,13 @@ raw filesystem scanning or a second catalog implementation.
 
 ## Files
 
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/main.swift`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/WKNativeBridge.swift`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/WKPlaybackBridge.swift`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Package.swift`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/app-playback.js`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/app-ui.js`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/options-controller.js`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/playlist-controller.js`
-- `/Users/john/Downloads/Code/VGMMan/SPCBoyWK/Sources/SPCBoyWK/Resources/sidebar-controller.js`
-- `/Users/john/Downloads/Code/VGMMan/FrontendCore/Sources/PlaybackQueueCore/PlaybackQueueNavigation.swift`
+- `../../Sources/SPCBoyWK/main.swift`
+- `../../Sources/SPCBoyWK/WKNativeBridge.swift`
+- `../../Sources/SPCBoyWK/WKPlaybackBridge.swift`
+- `../../Package.swift`
+- `../../Sources/SPCBoyWK/Resources/app-playback.js`
+- `../../Sources/SPCBoyWK/Resources/app-ui.js`
+- `../../Sources/SPCBoyWK/Resources/options-controller.js`
+- `../../Sources/SPCBoyWK/Resources/playlist-controller.js`
+- `../../Sources/SPCBoyWK/Resources/sidebar-controller.js`
+- `../../../FrontendCore/Sources/PlaybackQueueCore/PlaybackQueueNavigation.swift`

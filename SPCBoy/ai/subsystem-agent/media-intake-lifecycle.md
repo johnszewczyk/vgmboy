@@ -48,8 +48,8 @@
 
 ## Files
 
-- [media-source-discovery.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/media-source-discovery.js)
-- [playlist-archive-discovery.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/playlist-archive-discovery.js)
-- [playlist-track-inspector.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/playlist-track-inspector.js)
-- [bounded-work.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/bounded-work.js)
-- [archive-resolver.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/archive-resolver.js)
+- [media-source-discovery.js](../../electron/media-source-discovery.js)
+- [playlist-archive-discovery.js](../../electron/playlist-archive-discovery.js)
+- [playlist-track-inspector.js](../../electron/playlist-track-inspector.js)
+- [bounded-work.js](../../electron/bounded-work.js)
+- [archive-resolver.js](../../electron/archive-resolver.js)

@@ -2,11 +2,11 @@
 
 ## Display
 
-- Window: left sidebar, right playlist, and bottom transport bar.
+- Window: left sidebar, right playlist workspace, and bottom transport bar. The playlist workspace shows tabs when multiple playlists are open, with New and Close controls beside them.
 - Development build: `launch.sh` produces a self-consistent `SPCBoy.app` bundle whose `CFBundleExecutable` and executable file are both named `SPCBoy`.
 - Sidebar: search field and folder tree.
 - Sidebar selection: a final file/archive leaf previews its playable contents in the playlist; folders only unfold on selection and require Enter or double-click to load and play their contents.
-- Playlist: tracks from the selected folder. Its Path column starts with the configured library root’s name, then the relative path (for example, `JoshW/3DO/...` and archive `#member` suffixes), never the machine-specific absolute source path.
+- Playlist: each tab retains its loaded playlist. Sidebar selection still updates only the active tab; switching tabs does not change the sidebar tree. Its Path column starts with the configured library root’s name, then the relative path (for example, `JoshW/3DO/...` and archive `#member` suffixes), never the machine-specific absolute source path.
 - Bottom bar: individually pill-shaped Previous, Play/Pause, Next, Equalizer, Long Play, and Repeat controls use consistent Lucide SVG icons. Equalizer is a direct on/off toggle synchronized with Playback settings; Long Play, Repeat, and Equalizer brighten with the same selected 30-to-40 RGB fill as the Folder/Database view buttons. The progress slider is a flat 2 px rail with a small circular thumb and uniform control padding.
 - Clock: the elapsed, track, and playlist time readout—including its separators—uses the system fixed-width font.
 - Selection: Sidebar and playlist selection highlights are each a single rounded accent bar that moves to the selected row with a 100 ms eased transition, without animating row text.
@@ -20,5 +20,5 @@
 
 ## Files
 
-- [web/index.html](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/index.html)
-- [web/styles.css](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/styles.css)
+- [web/index.html](../../web/index.html)
+- [web/styles.css](../../web/styles.css)

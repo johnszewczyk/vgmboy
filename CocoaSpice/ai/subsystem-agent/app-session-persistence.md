@@ -39,8 +39,8 @@
 
 ## Files
 
-- [AppSessionPersistence.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/AppSessionPersistence.swift)
-- [PlayerViewModel.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlayerViewModel.swift)
-- [FrontendPreferencesCoordinator.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/FrontendPreferencesCoordinator.swift)
-- [PlaylistQueueCoordinator.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlaylistQueueCoordinator.swift)
-- [LibraryDatabase.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/LibraryDatabase.swift)
+- [AppSessionPersistence.swift](../../Sources/CocoaSpice/App/AppSessionPersistence.swift)
+- [PlayerViewModel.swift](../../Sources/CocoaSpice/App/PlayerViewModel.swift)
+- [FrontendPreferencesCoordinator.swift](../../Sources/CocoaSpice/App/FrontendPreferencesCoordinator.swift)
+- [PlaylistQueueCoordinator.swift](../../Sources/CocoaSpice/App/PlaylistQueueCoordinator.swift)
+- [LibraryDatabase.swift](../../Sources/CocoaSpice/App/LibraryDatabase.swift)

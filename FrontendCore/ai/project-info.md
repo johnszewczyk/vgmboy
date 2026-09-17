@@ -3,7 +3,7 @@
 ## Product
 
 `FrontendCore` is the shared UI-neutral policy and service package used by the
-native CocoaSpice and SPCBoyWK frontends.
+CocoaSpice, SPCBoyWK, and ViewBoy frontends.
 
 ## Major Components
 

@@ -3,7 +3,7 @@
 ## Product
 
 `CatalogReader` is the shared read-only catalog and browser-behavior package
-for the CocoaSpice family of frontends.
+for the active VGMMan player frontends: CocoaSpice, SPCBoyWK, and ViewBoy.
 
 ## Major Components
 
@@ -21,8 +21,16 @@ for the CocoaSpice family of frontends.
 
 Agent engineering notes:
 
-- Catalog ownership: [catalog-boundary.md](subsystem-agent/catalog-boundary.md)
-- Shared browser behavior: [catalog-browser-core.md](subsystem-agent/catalog-browser-core.md)
+- Catalog ownership and schema contract:
+  [catalog-boundary.md](subsystem-agent/catalog-boundary.md)
+- Shared browser state, grouping, and search:
+  [catalog-browser-core.md](subsystem-agent/catalog-browser-core.md)
+- Playlist row text, filename identity, and duration projection:
+  [catalog-playlist-presentation-core.md](subsystem-agent/catalog-playlist-presentation-core.md)
+- Read-only session generations and stale-task cancellation:
+  [catalog-session-core.md](subsystem-agent/catalog-session-core.md)
+- Native/WebKit semantic command definitions:
+  [frontend-command-core.md](subsystem-agent/frontend-command-core.md)
 
 ## Local Rules
 
@@ -33,4 +41,4 @@ Agent engineering notes:
 
 ## Human Docs
 
-- `Docs/` is the human-side folder and is not default engineering intake.
+- `ai/subsystem-human/` contains human-facing behavior notes routed by the owning frontend.

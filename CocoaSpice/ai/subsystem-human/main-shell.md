@@ -26,6 +26,6 @@
 
 ## Files
 
-- [MainView.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/MainView.swift)
-- [CocoaSpiceApp.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/CocoaSpiceApp.swift)
-- [AboutView.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/AboutView.swift)
+- [MainView.swift](../../Sources/CocoaSpice/App/MainView.swift)
+- [CocoaSpiceApp.swift](../../Sources/CocoaSpice/App/CocoaSpiceApp.swift)
+- [AboutView.swift](../../Sources/CocoaSpice/App/AboutView.swift)

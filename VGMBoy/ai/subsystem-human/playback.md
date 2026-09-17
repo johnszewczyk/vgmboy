@@ -69,6 +69,6 @@ number rather than overwriting an existing file.
 
 ## Files
 
-- [VGMBoyCommand.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/vgmboy/VGMBoyCommand.swift)
-- [PlayerViewModel.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyApp/PlayerViewModel.swift)
-- [ContentView.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyApp/ContentView.swift)
+- [VGMBoyCommand.swift](../../Sources/vgmboy/VGMBoyCommand.swift)
+- [PlayerViewModel.swift](../../Sources/VGMBoyApp/PlayerViewModel.swift)
+- [ContentView.swift](../../Sources/VGMBoyApp/ContentView.swift)

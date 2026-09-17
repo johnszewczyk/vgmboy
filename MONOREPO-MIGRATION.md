@@ -21,6 +21,11 @@ recoverable unreachable commit, and current working-tree source are preserved
 in the family tree and `archive/SPCBoy/...` refs. It is archival only; routine
 verification covers the native `SPCBoyWK` app instead.
 
+ViewBoy is a separate maintained frontend package. Its former standalone Git
+history is retained at `archive/ViewBoy/heads/main`; its current source is
+`ViewBoy/` and its build output is local-only. Keep it separate from SPCBoyWK:
+the apps have distinct bundle identities, preference keys, and presentation.
+
 UACMan had no Git repository when it was brought into the family tree; its
 current source and tests are included, but there is no earlier UACMan commit
 history to retain. Dirty source from the existing CocoaSpice and FrontendCore
@@ -47,12 +52,13 @@ build prerequisites.
 The root `.gitignore` excludes generated `.build`/`DerivedData` output,
 packaged `dist` applications, `node_modules`, local `.git` metadata, `.DS_Store`,
 and local ZIP/TAR archives and fixture payloads. These files are not part of
-the GitHub source backup. The local `SPCBoy-electron.zip` is retained as an
-ignored recovery bundle; its current source and Git history are already
-represented by `SPCBoy/` and the `archive/SPCBoy/...` refs, while its generated
-dependencies and app bundles are intentionally excluded. Never remove local
-fixtures or archives as part of repository cleanup without a separate, explicit
-request.
+the GitHub source backup. Ignored local archives and fixtures are retained
+below `LocalRecovery/`; see `LocalRecovery/README.md` for paths, hashes, and
+provenance. The legacy component-checkout staging tree and standalone ViewBoy
+checkout are redundant: their tracked history is retained in this repository
+and their maintained current sources are checked in here. Do not rebuild those
+source trees beside the family repository. Do not remove `LocalRecovery/`
+payloads as part of ordinary source cleanup.
 
 ## Build and verify
 

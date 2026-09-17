@@ -31,5 +31,5 @@
 
 ## Files
 
-- [web/app-playback.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/app-playback.js)
-- [web/playback-speed.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/playback-speed.js)
+- [web/app-playback.js](../../web/app-playback.js)
+- [web/playback-speed.js](../../web/playback-speed.js)

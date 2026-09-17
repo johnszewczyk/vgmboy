@@ -1,90 +1,55 @@
 # Project Info
 
-## Product and repository
+## Product
 
-`VGMMan` is the game-music application family and its single canonical Git
-repository. The GitHub repository is `johnszewczyk/vgmboy`; the family root
-contains every maintained application and shared package. Component folders
-remain independent Swift package, UI, and release boundaries, but are not
-independent Git repositories.
+VGMMan is the canonical Git repository for the game-music application family.
+Apps retain separate package, app, and release boundaries; family source and
+history live in this repository.
 
-## Major Components
+## Ownership and task routing
 
-- `VGMBoy`: decoder routing, timing, playback, audio output, and scanner helpers.
-- `ScanSong`: discovery, inspection orchestration, schema-23 catalog writing,
-  and the native scanner application.
-- `MetaMan`: decoder-independent format metadata readers, shared result model,
-  and a thin JSON command-line frontend.
-- `UACMan`: native metadata browser/editor, current reversible wrapper and
-  pack/inspect/unpack tooling, plus a reserved future native-container
-  component. Playback and scanner consumers depend on its wrapper library.
-- `CatalogReader`: read-only schema-23 access and catalog/browser projections.
-- `FrontendCore`: UI-neutral archive, preferences, favorites, queue, request,
-  and transport policy.
-- `CocoaSpice`: native AppKit/SwiftUI playlist frontend.
-- `SPCBoyWK`: native WebKit frontend and typed host bridge.
+| Work | Owner and route |
+| --- | --- |
+| Format admission, decoding, timing, transport, and audio output | [VGMBoy/AGENTS.md](VGMBoy/AGENTS.md) |
+| Source discovery, inspection orchestration, and schema-23 catalog writes | [ScanSong/AGENTS.md](ScanSong/AGENTS.md) |
+| Decoder-independent native-format metadata | [MetaMan/AGENTS.md](MetaMan/AGENTS.md) |
+| UAC editing, wrapper format, and package consumers | [UACMan/AGENTS.md](UACMan/AGENTS.md) |
+| Read-only catalog access and browser projections | [CatalogReader/AGENTS.md](CatalogReader/AGENTS.md) |
+| Shared archive/cache, preferences, queue, and transport policy | [FrontendCore/AGENTS.md](FrontendCore/AGENTS.md) |
+| AppKit/SwiftUI presentation | [CocoaSpice/AGENTS.md](CocoaSpice/AGENTS.md) |
+| Native WebKit player and typed host bridge | [SPCBoyWK/AGENTS.md](SPCBoyWK/AGENTS.md) |
+| Phosphor-styled WebKit player | [ViewBoy/AGENTS.md](ViewBoy/AGENTS.md) |
+| Archived Electron source, recovery only | [SPCBoy/AGENTS.md](SPCBoy/AGENTS.md) |
 
-## Archived Components
+For a component task, follow its `AGENTS.md` → `ai/AGENTS.md` →
+`ai/project-info.md` → focused-note route. See `README.md` for the family
+index.
 
-- `SPCBoy`: retired Electron frontend source. Kept for recovery and historical
-  reference; it is not an active release target and is excluded from routine
-  family verification. `SPCBoyWK` is the maintained native frontend.
+## Repository rules
 
-## Task Routing
+- Run Git commands from this root. Component folders are not nested Git
+  repositories or submodules. Cross-package changes belong in one family-root
+  commit.
+- Catalog writes belong to ScanSong; player frontends use read-only catalog
+  access. Native-format metadata parsing belongs to MetaMan; UAC package parsing
+  belongs to UACMan; playback decoding belongs to VGMBoy.
+- Shared frontend policy belongs in CatalogReader or FrontendCore. Keep
+  AppKit, SwiftUI, WebKit, and renderer-specific behavior in each app.
+- UAC is a reversible wrapper around original format members. Native SPC
+  conversion was closed; do not add capture or repackaging work.
+- Generated builds, app bundles, local archives, and fixture payloads are
+  excluded from Git. `LocalRecovery/README.md` inventories retained local
+  recovery assets.
+- Compilation is package evidence, not proof of packaged UI or audible output.
+  Use `verification.md` for current checks and evidence limits.
 
-- Decoder, format admission, timing, playback, audio, or scanner-helper work:
-  `VGMBoy/AGENTS.md`
-- Scanning, inspection orchestration, catalog publication, or scanner UI:
-  `ScanSong/AGENTS.md`
-- Metadata format readers, normalized/raw metadata contracts, or parser tests:
-  `MetaMan/AGENTS.md`, `MetaMan/README.md`, and
-  `ScanSong/ai/subsystem-agent/format-accommodations.md`
-- UAC package browsing/editing:
-  `UACMan/AGENTS.md`, `UACMan/README.md`, and
-  `UACMan/ai/subsystem-agent/uac-wrapper-format.md`; player/scanner integration:
-  `UACMan/ai/subsystem-agent/player-integration.md`
-- Read-only catalog queries and shared browser projections:
-  `CatalogReader/AGENTS.md`
-- Shared frontend policy and archive/cache infrastructure:
-  `FrontendCore/AGENTS.md`
-- Native CocoaSpice presentation and integration:
-  `CocoaSpice/AGENTS.md`
-- SPCBoyWK WebKit presentation, native host, and bridge:
-  `SPCBoyWK/AGENTS.md`
-- Archived Electron-source review, when explicitly needed: `SPCBoy/AGENTS.md`
-- Active cross-frontend parity evidence: `PARITY-WIP-REPORT.md`
-- Active shared-core coordination: `WIP-PLAN.md`
-- Single-repository source-state and family check evidence: `verification.md`
-- Repository layout, archived component refs, and source exclusions:
-  `MONOREPO-MIGRATION.md`
+## Family documents
 
-## Repository and local rules
-
-- Run Git operations from this directory. Commit family changes here; do not
-  create or update a nested component repository.
-- Earlier component histories are retained under `archive/<component>/...`
-  refs in this same Git repository. They are archival only; current source of
-  truth is the family tree on `main`.
-- Retired SPCBoy Electron branches and its recovered source snapshot are also
-  preserved under `SPCBoy/` and `archive/SPCBoy/...` refs.
-- `VGMBoy/vendor/` contains checked-in upstream source snapshots with versions
-  and provenance documented in `VGMBoy/Docs/` and `VGMBoy/vendor/PROVENANCE.md`.
-  There are no Git submodules to initialize.
-- Build output, packaged apps, Node modules, local archives, and fixture payloads
-  are ignored and are not GitHub backups. Keep reproducible build instructions
-  and upstream pins in source documentation instead.
-- Shared behavior belongs in the narrow owning package, not copied between
-  frontends.
-- Catalog writes belong only to ScanSong; player frontends are read-only.
-- Decoder, timing, and audio ownership belong to VGMBoy.
-- Frontend-specific AppKit, SwiftUI, WebKit, focus, and selection presentation
-  stay in the owning frontend.
-- Verify the combined package set at the family root and inspect the root Git
-  status before committing.
-- Compilation alone does not prove packaged, visible, or audible behavior.
-
-## Human Docs
-
-- `README.md` is the compact family overview.
-- Working plans and parity reports are coordination evidence, not default child-
-  repository intake.
+- Shared ownership and remaining cross-app gates: [WIP-PLAN.md](WIP-PLAN.md).
+- Frontend parity evidence: [PARITY-WIP-REPORT.md](PARITY-WIP-REPORT.md).
+- Build/test coverage and current evidence: [verification.md](verification.md).
+- History and recovery layout: [MONOREPO-MIGRATION.md](MONOREPO-MIGRATION.md).
+- Workspace-wide documentation method: [DocMan](../DocMan/AGENTS.md) and
+  [documentation-method.md](../DocMan/docs-agent/documentation-method.md).
+- User-facing behavior lives under each app’s `ai/subsystem-human/`; shared
+  decoder and dependency references live in `VGMBoy/Docs/`.

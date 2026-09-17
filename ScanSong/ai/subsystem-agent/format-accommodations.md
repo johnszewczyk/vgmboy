@@ -5,7 +5,7 @@
 This document describes the scanner's current behavior for every registered
 intake route. It is intentionally more specific than a list of decoder names:
 an extension is admitted only according to the route in
-[`BuiltInScannerPlugins.swift`](/Users/john/Downloads/Code/VGMMan/ScanSong/Sources/ScanSongKit/BuiltInScannerPlugins.swift), and a row is published only according to that route's structure and metadata handler.
+[`BuiltInScannerPlugins.swift`](../../Sources/ScanSongKit/BuiltInScannerPlugins.swift), and a row is published only according to that route's structure and metadata handler.
 
 Scanner admission, metadata availability, and playback compatibility are
 separate facts. A format may have a useful scanner row while its playback
@@ -43,7 +43,7 @@ link a playback decoder.
 Every playable media format admitted by ScanSong is in the eventual
 single-player coverage target: CocoaSpice should be able to play the media it
 can catalog. VGMBoy's
-[`FormatRegistry.playbackDescriptors`](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/FormatRegistry.swift)
+[`FormatRegistry.playbackDescriptors`](../../../VGMBoy/Sources/VGMBoyKit/FormatRegistry.swift)
 describes current playback support, not the metadata-reader extraction
 boundary. The matrix below summarizes current playback families; the route
 summary lists every ScanSong-recognized media format and its current metadata
@@ -152,7 +152,7 @@ track fields and does not expose those additional manifest fields in CocoaSpice.
 
 The route table is deliberately not a claim that every registered source is
 playable in every frontend. VGMBoy's playback registry and the scanner's
-registry are separate contracts; the [VGMBoy format registry](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/FormatRegistry.swift) is the playback source of truth.
+registry are separate contracts; the [VGMBoy format registry](../../../VGMBoy/Sources/VGMBoyKit/FormatRegistry.swift) is the playback source of truth.
 
 ## Game Music Emu family
 
@@ -816,7 +816,7 @@ the [DVI offset map](../../../MetaMan/FORMAT-LAYOUTS.md#konami-saturn-dvi) and
 ### Raw stream suffixes
 
 The vgmstream extension set is owned by VGMBoy's
-[`VGMStreamFormatManifest.swift`](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyFormatCore/VGMStreamFormatManifest.swift):
+[`VGMStreamFormatManifest.swift`](../../../VGMBoy/Sources/VGMBoyFormatCore/VGMStreamFormatManifest.swift):
 
 ```text
 .aa3 .ads .ahx .aifc .at3 .aus .bik .bnk .dvi .fsb .genh .int

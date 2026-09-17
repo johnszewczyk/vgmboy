@@ -56,7 +56,7 @@ refill and prime.
 
 ## Files
 
-- [TimingPolicy.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/TimingPolicy.swift)
-- [PlaybackTimingRequest.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/PlaybackTimingRequest.swift)
-- [PlaybackSession.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/PlaybackSession.swift)
-- [TrackMetadata.swift](/Users/john/Downloads/Code/VGMMan/VGMBoy/Sources/VGMBoyKit/TrackMetadata.swift)
+- [TimingPolicy.swift](../../Sources/VGMBoyKit/TimingPolicy.swift)
+- [PlaybackTimingRequest.swift](../../Sources/VGMBoyKit/PlaybackTimingRequest.swift)
+- [PlaybackSession.swift](../../Sources/VGMBoyKit/PlaybackSession.swift)
+- [TrackMetadata.swift](../../Sources/VGMBoyKit/TrackMetadata.swift)

@@ -2,15 +2,17 @@
 
 ## Product
 
-`SPCBoy (WK)` is an independent native macOS WebKit frontend for SPCBoy.
+`SPCBoyWK` is a maintained, independent native macOS WebKit player in the
+VGMMan family. It is a separate product from the archived Electron SPCBoy and
+from the phosphor-skinned ViewBoy frontend.
 
 ## Major Components
 
 - AppKit window and WKWebView host.
-- The current SPCBoy renderer skin, adapted for the native WebKit bridge.
+- The WebKit renderer, adapted for a narrow typed native bridge.
 - Shared `CatalogBrowserCore` sidebar behavior.
 - Read-only `CatalogReader` integration.
-- In-process VGMBoy playback integration, added behind the native bridge.
+- In-process VGMBoy playback through the native bridge.
 - Shared versioned VGMBoy endpoint capability map (`VGMBoyEndpointCore`).
 - Shared VGMBoy tempo contract for libgme and libvgm playback settings.
 - Shared selected-entry or dependency-complete archive materialization through
@@ -64,4 +66,4 @@ Agent engineering notes:
 
 ## Human Docs
 
-- `Docs/` is the human-side folder and is not default engineering intake.
+- `ai/subsystem-human/` contains routed user-facing behavior notes.

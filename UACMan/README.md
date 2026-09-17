@@ -13,9 +13,10 @@ The app reads native SPC tags from a seekable `tar+zstd-seekable` UAC wrapper.
 The `UACManMetadataCLI` product reads source directories through MetaManCore for
 creation-time harvest. SPC keeps its soundtrack-aware projection; VGM and VGZ
 use the common member projection, including GD3 metadata such as Genesis game,
-system, composer, and timing fields. Track-aware results are not flattened into
-member metadata. Original members remain byte-identical; metadata saves rewrite
-only the manifest and preserve the compressed payload byte-for-byte.
+system, composer, and timing fields. Track-aware results are rejected instead
+of being flattened into member metadata. Original members remain byte-identical;
+metadata saves rewrite only the manifest and preserve the compressed payload
+byte-for-byte.
 
 Build the CLI bridge with `swift build -c release --product UACManMetadataCLI`.
 Its `harvest-spc-directory <path>` command emits the specialized SPC projection.
@@ -28,8 +29,8 @@ VGM/VGZ fits UAC's current single-member model: each file maps to one playable
 member, while its logged chip commands and GD3 system field identify the
 hardware used. NSF is also readable by MetaMan, but its files declare multiple
 logical songs; the current single-track directory harvester rejects those
-results instead of flattening them into one member record. A future source
-import path would need to map each MetaMan result into member/playlist data.
+results instead of flattening them into one member record. Importing those
+formats requires a member/playlist model that can retain each ordered result.
 
 Build and launch the app bundle with:
 

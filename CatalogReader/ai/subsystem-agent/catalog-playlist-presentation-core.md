@@ -40,5 +40,5 @@ content strings for column measurement.
 
 ## Files
 
-- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogPlaylistPresentationCore/CatalogPlaylistPresentationCore.swift`
-- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Tests/CatalogPlaylistPresentationCoreTests/CatalogPlaylistPresentationCoreTests.swift`
+- `../../Sources/CatalogPlaylistPresentationCore/CatalogPlaylistPresentationCore.swift`
+- `../../Tests/CatalogPlaylistPresentationCoreTests/CatalogPlaylistPresentationCoreTests.swift`

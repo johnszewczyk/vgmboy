@@ -1,7 +1,7 @@
 # AGENTS
 
 Read this file, then `project-info.md`, then follow the owning component's
-`AGENTS.md` chain.
+`AGENTS.md` → `ai/AGENTS.md` → `ai/project-info.md` → focused-note route.
 
 This directory is the single Git repository for the VGMMan application family.
 Component directories are package and release boundaries, not independent Git
@@ -17,6 +17,7 @@ Preserve component ownership, provenance, and release boundaries. Compilation
 alone does not prove packaged, visible, or audible behavior; use the family
 verification script and state any live-fixture gaps explicitly.
 
-`SPCBoy/` is the archived Electron frontend, retained as source/history only;
-do not treat it as an active app target or add it to the maintained test matrix
-without an explicit request.
+`SPCBoy/` is archived Electron source, retained for recovery only. The active
+player apps are CocoaSpice, SPCBoyWK, and ViewBoy. Keep all three as separate
+presentation clients over the shared catalog, frontend, and playback packages;
+do not merge one skin into another.

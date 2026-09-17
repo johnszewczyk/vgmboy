@@ -45,7 +45,7 @@ row models, queue publication, and UI.
 
 ## Files
 
-- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogReader/CatalogReader.swift`
-- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Tests/CatalogReaderTests/CatalogReaderTests.swift`
-- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogPlaylistCore/CatalogPlaylistCore.swift`
-- `/Users/john/Downloads/Code/VGMMan/CatalogReader/Sources/CatalogReaderElectronBridge/main.swift`
+- `../../Sources/CatalogReader/CatalogReader.swift`
+- `../../Tests/CatalogReaderTests/CatalogReaderTests.swift`
+- `../../Sources/CatalogPlaylistCore/CatalogPlaylistCore.swift`
+- `../../Sources/CatalogReaderElectronBridge/main.swift`

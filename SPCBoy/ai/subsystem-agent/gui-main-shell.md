@@ -11,7 +11,8 @@
 
 - The window is a two-region layout with a left sidebar and right content area.
 - The sidebar runs full height and contains the search field and recursive folder tree.
-- The main content area contains the explicitly activated folder/file playlist; restoring a large browser root does not eagerly enumerate it into the playlist.
+- The main content area contains persistent playlist tabs above the single table. The strip is hidden for one tab; New and Close controls remain visible. Restoring a large browser root does not eagerly enumerate it into a playlist.
+- The one-row selection indicators are repositioned after selection, render, and observed sidebar or playlist viewport size changes; their CSS transition remains 100 ms.
 - The bottom bar holds previous, play-pause, next, a progress slider, and elapsed or total readout.
 - Options open in a separate native window rather than an inline drawer.
 - Options are a separate 800 by 600 native child BrowserWindow parented to the main window; it stays above SPCBoy's main window without system-level always-on-top behavior. Focus restoration raises only the requested live window, so focusing Options cannot recursively reorder every auxiliary window.
@@ -26,8 +27,8 @@
 
 ## Files
 
-- [web/index.html](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/index.html)
-- [web/styles.css](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/styles.css)
-- [web/app.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/app.js)
-- [web/app-ui.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/app-ui.js)
-- [electron/main.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/main.js)
+- [web/index.html](../../web/index.html)
+- [web/styles.css](../../web/styles.css)
+- [web/app.js](../../web/app.js)
+- [web/app-ui.js](../../web/app-ui.js)
+- [electron/main.js](../../electron/main.js)

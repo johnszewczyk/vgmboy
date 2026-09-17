@@ -2,8 +2,10 @@
 
 This is an archived Electron source tree inside the VGMMan family repository,
 not an independent Git repository. Do not initialize a nested repository or
-restore a separate remote. The maintained frontend is `../SPCBoyWK`; make
-changes here only for an explicit archival or compatibility request.
+restore a separate remote. The active frontends are `../CocoaSpice/`, `../SPCBoyWK/`, and
+`../ViewBoy/`; SPCBoyWK is the closest native counterpart to this archived
+Electron client. Make changes here only for an explicit archival or
+compatibility request.
 
 Read this file, then `ai/project-info.md`, then the narrow note named by the task.
 

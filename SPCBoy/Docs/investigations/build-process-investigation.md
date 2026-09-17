@@ -16,5 +16,5 @@ The launch bundle is still staged into `/tmp/SPCBoy-launch-bundle` on each start
 
 ## Files
 
-- [launch.sh](/Users/john/Downloads/Code/VGMMan/SPCBoy/launch.sh)
-- [ai/subsystem-agent/build-runtime-bundle.md](/Users/john/Downloads/Code/VGMMan/SPCBoy/ai/subsystem-agent/build-runtime-bundle.md)
+- [launch.sh](../../launch.sh)
+- [ai/subsystem-agent/build-runtime-bundle.md](../../ai/subsystem-agent/build-runtime-bundle.md)

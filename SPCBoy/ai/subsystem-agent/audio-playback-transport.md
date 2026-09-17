@@ -27,7 +27,7 @@
 
 ## Files
 
-- [electron/main.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/main.js)
-- [electron/preload.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/electron/preload.js)
-- [web/app-playback.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/app-playback.js)
-- [web/app.js](/Users/john/Downloads/Code/VGMMan/SPCBoy/web/app.js)
+- [electron/main.js](../../electron/main.js)
+- [electron/preload.js](../../electron/preload.js)
+- [web/app-playback.js](../../web/app-playback.js)
+- [web/app.js](../../web/app.js)

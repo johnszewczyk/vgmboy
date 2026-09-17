@@ -45,8 +45,8 @@
 
 ## Files
 
-- [MainView.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/MainView.swift)
-- [PlayerViewModel.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/PlayerViewModel.swift)
-- [NativeSearchField.swift](/Users/john/Downloads/Code/VGMMan/CocoaSpice/Sources/CocoaSpice/App/NativeSearchField.swift)
-- [FavoriteTrackCore.swift](/Users/john/Downloads/Code/VGMMan/FrontendCore/Sources/FavoriteTrackCore/FavoriteTrackCore.swift)
-- [FavoriteStore.swift](/Users/john/Downloads/Code/VGMMan/FrontendCore/Sources/FavoriteStoreCore/FavoriteStore.swift)
+- [MainView.swift](../../Sources/CocoaSpice/App/MainView.swift)
+- [PlayerViewModel.swift](../../Sources/CocoaSpice/App/PlayerViewModel.swift)
+- [NativeSearchField.swift](../../Sources/CocoaSpice/App/NativeSearchField.swift)
+- [FavoriteTrackCore.swift](../../../FrontendCore/Sources/FavoriteTrackCore/FavoriteTrackCore.swift)
+- [FavoriteStore.swift](../../../FrontendCore/Sources/FavoriteStoreCore/FavoriteStore.swift)
