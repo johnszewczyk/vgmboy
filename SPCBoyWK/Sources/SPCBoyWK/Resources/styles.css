@@ -107,8 +107,6 @@ body.is-file-drag-over::after {
 }
 
 .app-shell {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
   height: 100vh;
 }
 
@@ -145,7 +143,7 @@ body.is-file-drag-over::after {
   display: grid;
   grid-template-columns: calc(var(--sidebar-width-percent) * 1%) 0.2rem minmax(0, 1fr);
   min-height: 0;
-  height: 100%;
+  height: 100vh;
   background: var(--bg-chrome);
 }
 
@@ -177,7 +175,7 @@ body.is-file-drag-over::after {
 
 .sidebar {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -345,7 +343,7 @@ body.is-file-drag-over::after {
 
 .content {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-height: 0;
   overflow: hidden;
   background: var(--bg-panel);
@@ -353,7 +351,7 @@ body.is-file-drag-over::after {
 
 .transport-toolbar {
   display: grid;
-  grid-template-columns: minmax(8rem, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--toolbar-gap);
   width: 100%;
@@ -372,6 +370,23 @@ body.is-file-drag-over::after {
   justify-content: flex-start;
   min-width: 0;
   width: 100%;
+}
+
+.playlist-bottom-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--toolbar-gap);
+  width: 100%;
+  height: var(--top-toolbar-height);
+  min-width: 0;
+  padding: var(--top-toolbar-inset);
+  overflow: hidden;
+  background: var(--bg-sidebar);
+}
+
+.playlist-bottom-toolbar .progress-slider-shell {
+  width: 100%;
+  min-width: 0;
 }
 
 .playlist-tabs-toolbar {
@@ -967,7 +982,8 @@ body.is-file-drag-over::after {
   font-variant-numeric: tabular-nums;
 }
 
-.transport-toolbar .tool-button {
+.transport-toolbar .tool-button,
+.playlist-bottom-toolbar .tool-button {
   height: var(--control-height);
   min-height: var(--control-height);
   padding: 0 0.5rem;
@@ -978,7 +994,9 @@ body.is-file-drag-over::after {
 }
 
 .transport-toolbar .tool-button.is-selected,
-.transport-toolbar .tool-button[aria-pressed="true"] {
+.transport-toolbar .tool-button[aria-pressed="true"],
+.playlist-bottom-toolbar .tool-button.is-selected,
+.playlist-bottom-toolbar .tool-button[aria-pressed="true"] {
   background: var(--accent);
   color: var(--accent-ink);
 }
