@@ -50,14 +50,29 @@ deliberately exclusive to one family.
   body and decoding whole-file LZX PDX banks before table parsing. A legacy
   leading backslash in a PDX basename is normalized narrowly; absolute and
   traversal paths remain invalid.
+- SAP routes exclusively to ASAP, not libgme. The vendored ASAP 8.0.0 parser
+  and decoder support TYPE B, C, D, and S; SONGS is capped at 32 and tempo is
+  disabled. Long Play remains available for open-ended SAP playback. SAP TIME
+  directives provide track timing, while MetaManCore owns catalog metadata
+  inspection and ScanSong consumes that parser without linking playback code.
+  The ASMA playback fixture verifies B/C/D/S decoding and iterates all 32 songs
+  in a multitrack B file before rendering its final song.
 - `hasNaturalEnding == false` (lazyusf/USF and sidplayfp/SID) forces a capped decode window so a looping core can
   never run indefinitely. `TimingPolicy.plan` carries this through `usesNativeEnding`. SID
   metadata currently reports no natural duration, so its normal non-Long-Play window is the
-  shared unknown-duration setting rather than a file-derived length.
+  shared unknown-duration setting rather than a file-derived length. SID playback selects the
+  default subtune with `SidTune::selectSong(0)` before initial load. ScanSong and VGMBoy expose
+  every libsidplayfp-supported song (up to 256); playback track indexes are zero-based and map
+  to PSID/RSID song numbers starting at 1.
 - `appliesFadeInternally` distinguishes cores with native fade (libgme, libvgm) from PCM
-  streamers (Highly Complete, vgmstream, lazyusf, playpsf, OpenMPT) that delegate the fade to
-  `PlaybackSession`.
-- Standard audio, including FLAC, is finite and never supports Long Play. Its AVAudioFile reader
+  streamers (ASAP, Highly Complete, vgmstream, lazyusf, playpsf, OpenMPT) that delegate the fade
+  to `PlaybackSession`.
+- Standard audio, including FLAC, is finite and never supports Long Play unless
+  an authored loop object is supplied. FLAC and APE comments use the shared
+  `LOOP_*` sample vocabulary; a UAC `metadata.loop` object supplied through
+  the playback payload takes precedence. The session performs the sample-boundary
+  seek, so the source decoder remains a finite PCM reader.
+  Its AVAudioFile reader
   is reopened for track starts and seeks so the macOS compressed-file reader and converter state
   are reset without using the unsupported FLAC `framePosition` setter.
 - APE, MP2, and TAK use the finite `FFmpegAudioDecoder` playback route. ScanSong reads APE
@@ -97,6 +112,9 @@ deliberately exclusive to one family.
 - [AudioDecoder.swift](../../Sources/VGMBoyKit/AudioDecoder.swift)
 - [FFmpegAudioDecoder.swift](../../Sources/VGMBoyKit/FFmpegAudioDecoder.swift)
 - [GMEDecoder.swift](../../Sources/VGMBoyKit/GMEDecoder.swift)
+- [ASAPDecoder.swift](../../Sources/VGMBoyKit/ASAPDecoder.swift)
+- [vgmboy_asap.c](../../Sources/CASAP/vgmboy_asap.c)
+- [vgmboy_asap.h](../../Sources/CASAP/include/vgmboy_asap.h)
 - [SIDDecoder.swift](../../Sources/VGMBoyKit/SIDDecoder.swift)
 - [OpenMPTDecoder.swift](../../Sources/VGMBoyKit/OpenMPTDecoder.swift)
 - [VGMDecoder.swift](../../Sources/VGMBoyKit/VGMDecoder.swift)

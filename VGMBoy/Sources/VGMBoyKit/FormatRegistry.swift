@@ -48,6 +48,12 @@ public enum FormatRegistry {
         supportsTempo: true
     )
 
+    public static let asapFamily = DecoderFamily(
+        id: "asap",
+        supportsLongPlay: true,
+        supportsTempo: false
+    )
+
     public static let libvgmFamily = DecoderFamily(
         id: "libvgm",
         supportsLongPlay: true,
@@ -68,13 +74,20 @@ public enum FormatRegistry {
 
     public static let standardAudioFamily = DecoderFamily(
         id: "standardaudio",
-        supportsLongPlay: false,
+        // Standard audio can carry sample loop tags (FLAC Vorbis comments,
+        // WAV/RIFF loop chunks mirrored into tags, and UAC-projected tags).
+        // Long Play is therefore a transport capability even though the
+        // decoder itself has no native loop engine.
+        supportsLongPlay: true,
         supportsTempo: false
     )
 
     public static let ffmpegAudioFamily = DecoderFamily(
         id: "ffmpegaudio",
-        supportsLongPlay: false,
+        // APE is decoded through FFmpeg, while sample-accurate loop jumps are
+        // owned by PlaybackSession. Keep it eligible for Long Play just like
+        // FLAC/WAV so tagged APE tracks behave consistently.
+        supportsLongPlay: true,
         supportsTempo: false
     )
 
@@ -135,8 +148,10 @@ public enum FormatRegistry {
     )
 
     public static let libgmeExtensions: Set<String> = [
-        "ay", "gbs", "hes", "kss", "nsf", "nsfe", "sap", "spc"
+        "ay", "gbs", "hes", "kss", "nsf", "nsfe", "spc"
     ]
+
+    public static let asapExtensions: Set<String> = ["sap"]
 
     public static let libvgmExtensions: Set<String> = [
         "vgm", "vgz", "gym", "s98", "dro"
@@ -192,6 +207,7 @@ public enum FormatRegistry {
     /// exposed by the existing CocoaSpice and SPCBoyWK controls.
     public static let playbackDescriptors: [PlaybackFormatDescriptor] = [
         PlaybackFormatDescriptor(id: "libgme", family: libgmeFamily, extensions: libgmeExtensions),
+        PlaybackFormatDescriptor(id: "asap", family: asapFamily, extensions: asapExtensions),
         PlaybackFormatDescriptor(id: "libvgm", family: libvgmFamily, extensions: libvgmExtensions),
         PlaybackFormatDescriptor(id: "psgplay", family: psgPlayFamily, extensions: psgPlayExtensions),
         PlaybackFormatDescriptor(id: "mdx", family: mdxFamily, extensions: mdxExtensions),
@@ -228,6 +244,9 @@ public enum FormatRegistry {
         let ext = normalizedExtension(for: path)
         if libgmeExtensions.contains(ext) {
             return libgmeFamily
+        }
+        if asapExtensions.contains(ext) {
+            return asapFamily
         }
         if sidplayfpExtensions.contains(ext) {
             return sidplayfpFamily

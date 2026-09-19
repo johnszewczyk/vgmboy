@@ -6,7 +6,7 @@
 - Left pane: database browser.
 - Right pane: editable playlist.
 - Main-window navigation toolbar: individual Console View, Path View,
-  Favorites, and (when enabled) Local Files view items, plus a fold/unfold-all
+  Favorites, plus a fold/unfold-all
   item beside the native sidebar disclosure control. These remain individual
   native toolbar items rather than a grouped capsule.
 - Main transport toolbar: previous, play-pause, next, Long Play, repeat, random playback, and Equalizer on/off. The infinity button turns Long Play on or off.

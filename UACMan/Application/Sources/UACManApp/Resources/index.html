@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none';">
+  <title>UACMan</title>
+  <link rel="stylesheet" href="workspace.css">
+  <script src="workspace.js" defer></script>
+</head>
+<body>
+  <header class="appbar">
+    <div class="brand"><div class="brand-mark">U</div><div><strong>UACMan</strong><small>Package metadata workspace</small></div></div>
+    <div class="document-heading"><strong id="document-name">No package open</strong><span id="document-path">Choose a collection or open one UAC file</span></div>
+    <div class="actions">
+      <button class="button secondary" data-action="openCollection"><span class="icon">▤</span> Collection</button>
+      <button class="button secondary" data-action="openUAC"><span class="icon">＋</span> Open UAC</button>
+      <div class="divider"></div>
+      <button class="button secondary" data-action="revert" id="revert-button" disabled>Revert</button>
+      <button class="button primary" data-action="save" id="save-button" disabled>Save changes</button>
+    </div>
+  </header>
+
+  <div id="notice" class="notice hidden"></div>
+  <div id="error-banner" class="error-banner hidden"><span id="error-text"></span><button data-action="dismissError" aria-label="Dismiss">×</button></div>
+
+  <main class="workspace" id="workspace">
+    <aside class="collection-panel panel" id="library-panel">
+      <div class="panel-heading"><div><span class="eyebrow">LIBRARY</span><h2>Collections</h2></div><button class="icon-button" data-action="rescanCollection" id="rescan-button" title="Rescan collection" disabled>↻</button></div>
+      <div class="collection-root" id="collection-root">No collection selected</div>
+      <label class="search"><span>⌕</span><input id="collection-filter" placeholder="Filter packages" autocomplete="off"><kbd>⌘ F</kbd></label>
+      <div class="collection-list" id="collection-list"></div>
+      <div class="collection-foot" id="collection-foot">Open a folder to browse its UAC packages.</div>
+      <details class="issues hidden" id="issues-details"><summary>Unreadable packages <span id="issue-count"></span></summary><div id="issues-list"></div></details>
+    </aside>
+
+    <section class="members-panel panel">
+      <nav class="main-view-tabs" aria-label="Package workspace"><div class="tab-buttons"><button data-action="mainView" data-view="members" id="members-view-button" class="active">Tracks</button><button data-action="mainView" data-view="package" id="package-view-button">Package Tags</button><button data-action="mainView" data-view="track" id="track-view-button">Track Tags</button><button data-action="mainView" data-view="technical" id="technical-view-button">Technical</button><button data-action="mainView" data-view="schema" id="schema-view-button">Meta Tags</button><button data-action="mainView" data-view="tree" id="tree-view-button">Tree</button></div><label class="search member-search" id="member-filter-wrap"><span>⌕</span><input id="member-filter" placeholder="Search title, artist, album, filename, path…" autocomplete="off"><kbd>⌘ K</kbd></label></nav>
+      <div class="members-view" id="members-view">
+        <div class="table-scroll" id="table-scroll"><table class="member-table"><thead><tr id="member-headings"><th class="check-col"></th><th data-sort="role">Role <span></span></th><th data-sort="format">Format <span></span></th><th data-sort="name">File <span></span></th></tr></thead><tbody id="member-rows"></tbody></table>
+          <div class="empty-state" id="empty-state"><div class="empty-icon">▤</div><h3>Open a package to get started</h3><p>Browse a collection or open a UAC package. The member table includes streams, artwork, cue sheets, and documents.</p><button class="button primary" data-action="openUAC">Open a UAC file</button></div>
+        </div>
+      </div>
+      <div class="metadata-view hidden" id="metadata-view"><div id="inspector-content" class="inspector-content"></div></div>
+      <footer class="statusbar"><span class="status-dot"></span><span id="status-message">Ready</span><span id="member-summary">No package open</span><span id="table-selection-summary"></span><span class="status-spacer"></span><span id="encoding-info"></span></footer>
+    </section>
+  </main>
+
+</body>
+</html>

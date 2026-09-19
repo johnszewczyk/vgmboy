@@ -72,7 +72,7 @@ func realAmigaLHAArchiveListsPrefixLedModule() async throws {
         variants: [UACVariant(id: "original", label: "Original", kind: "retail")],
         members: [
             UACMember(
-                path: "variants/original/track.spc",
+                path: "track.spc",
                 originalName: "track.spc",
                 variantID: "original",
                 role: "playable",
@@ -81,7 +81,7 @@ func realAmigaLHAArchiveListsPrefixLedModule() async throws {
                 blake3: String(repeating: "b", count: 64)
             ),
             UACMember(
-                path: "variants/original/game.m3u",
+                path: "game.m3u",
                 originalName: "game.m3u",
                 variantID: "original",
                 role: "playlist",
@@ -109,12 +109,12 @@ func realAmigaLHAArchiveListsPrefixLedModule() async throws {
 
     #expect(ZipArchiveSupport.canHandle(archiveURL))
     let playable = try ZipArchiveSupport.listPlayableEntries(in: archiveURL, supportedExtensions: ["spc"])
-    #expect(playable.map(\.entryPath) == ["variants/original/track.spc"])
+    #expect(playable.map(\.entryPath) == ["track.spc"])
     let playlists = try ZipArchiveSupport.listPlaylistEntries(in: archiveURL)
-    #expect(playlists.map(\.entryPath) == ["variants/original/game.m3u"])
+    #expect(playlists.map(\.entryPath) == ["game.m3u"])
     #expect(try ZipArchiveSupport.scanSignature(for: archiveURL)?.hasPrefix("uac-manifest-sha256:") == true)
     #expect(throws: ZipArchiveSupport.ArchiveError.self) {
-        try ZipArchiveSupport.materializeEntry(archiveURL: archiveURL, entryPath: "variants/original/not-declared.spc")
+        try ZipArchiveSupport.materializeEntry(archiveURL: archiveURL, entryPath: "not-declared.spc")
     }
 }
 
@@ -347,7 +347,28 @@ func realSPCUACMemberStreamsIntoVGMBoyWithoutMaterialization() throws {
     #expect(model.currentTrackSupportsLongPlay)
 
     model.currentTrack = TrackItem(url: URL(fileURLWithPath: "/tmp/test.flac"))
-    #expect(!model.currentTrackSupportsLongPlay)
+    #expect(model.currentTrackSupportsLongPlay)
+}
+
+@Test(
+    "UAC member loop metadata reaches the playback transport",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["COCOASPICE_SOTN_UAC"] != nil,
+        "Set COCOASPICE_SOTN_UAC to the canonical SOTN UAC to run the native XA loop check."
+    )
+)
+func uacMemberLoopMetadataIsProjected() throws {
+    let uacPath = try #require(ProcessInfo.processInfo.environment["COCOASPICE_SOTN_UAC"])
+    let track = TrackItem(
+        archiveURL: URL(fileURLWithPath: uacPath),
+        entryPath: "audio/XA_STR1-0232_1e01.xa"
+    )
+    let loopValue = try ZipArchiveSupport.loopMetadata(for: track)
+    let loop = try #require(loopValue)
+    #expect(loop.startSample == 8_614_368)
+    #expect(loop.endSample == 16_581_600)
+    #expect(loop.sampleRateHz == 37_800)
+    #expect(loop.repeatCount == nil)
 }
 
 @Test func optionsControlSurfaceIsVersionedAndCodable() throws {
@@ -461,7 +482,7 @@ func realSPCUACMemberStreamsIntoVGMBoyWithoutMaterialization() throws {
     #expect(longPlay.preFadeSeconds == 240)
 }
 
-@Test func longPlayLeavesFiniteCoreAudioDurationUntouched() {
+@Test func longPlayUsesManualWindowForTaggedOrdinaryAudio() {
     let metadata = TrackMetadata(
         game: "",
         song: "",
@@ -482,9 +503,9 @@ func realSPCUACMemberStreamsIntoVGMBoyWithoutMaterialization() throws {
         fadeSeconds: 6
     )
 
-    #expect(!plan.isLongPlay)
+    #expect(plan.isLongPlay)
     #expect(!plan.usesNativeEnding)
-    #expect(plan.totalSeconds == 96)
+    #expect(plan.totalSeconds == 246)
 }
 
 @Test func longPlayPlanAppliesOnlyToLoopCapableDecoderExtensions() throws {

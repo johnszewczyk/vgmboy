@@ -115,6 +115,8 @@ final class PlaybackSession: @unchecked Sendable {
     private var currentTrackIndex = 0
     private var decoderFamily: String?
     private var currentTempo = 1.0
+    private var playbackLoop: PlaybackLoopMetadata?
+    private var remainingLoopRepeats: Int?
     private var reachedEnd = false
     private var errorMessage: String?
     private var isLoaded = false
@@ -141,7 +143,8 @@ final class PlaybackSession: @unchecked Sendable {
         sourceData: Data? = nil,
         trackIndex: Int,
         plan: PlaybackPlan,
-        tempo: Double
+        tempo: Double,
+        loop: PlaybackLoopMetadata? = nil
     ) throws {
         try queue.sync {
             releaseCurrent()
@@ -156,7 +159,16 @@ final class PlaybackSession: @unchecked Sendable {
             decoder.setTempo(tempo)
 
             let metadata = try decoder.metadata(for: trackIndex)
-            if plan.usesNativeEnding {
+            let validLoop = loop.flatMap { $0.isValid ? $0 : nil }
+            if validLoop != nil, !plan.isLongPlay, plan.usesDecoderNaturalDuration {
+                // An authored loop is an explicit native ending. Leave the
+                // decoder open-ended and let the session perform the sample
+                // boundary jump. UAC-supplied metadata reaches this path
+                // before any member tags and therefore always wins.
+                decoder.configureNativeEnding(playMs: 0, fadeMs: 0)
+                capFrames = 0
+                fadeFrames = 0
+            } else if plan.usesNativeEnding {
                 if metadata.hasTiming {
                     let fadeMilliseconds = max(0, metadata.fadeMs)
                     if decoder.appliesFadeInternally {
@@ -210,6 +222,8 @@ final class PlaybackSession: @unchecked Sendable {
             }
 
             self.decoder = decoder
+            playbackLoop = validLoop
+            remainingLoopRepeats = validLoop?.repeatCount
             currentTrackIndex = trackIndex
             decoderFamily = family.id
             currentTempo = tempo
@@ -286,6 +300,29 @@ final class PlaybackSession: @unchecked Sendable {
         }
         queue.sync {
             output.setEqualizer(configuration)
+        }
+    }
+
+    /// Applies the complete output snapshot under one session-queue turn.
+    /// Individual output controls used to publish three intermediate status
+    /// events when a frontend changed one setting. Besides causing visible
+    /// readout churn, those events could overlap a start or replacement and
+    /// make the renderer observe an in-between audio configuration.
+    public func configureAudio(
+        volume: Float,
+        equalizer: EqualizerConfiguration,
+        monoEnabled: Bool
+    ) throws {
+        guard volume.isFinite, (0...1).contains(volume) else {
+            throw PlaybackControlError.invalidPayload("Output volume must be finite and between 0 and 1.")
+        }
+        guard equalizer.isValid else {
+            throw PlaybackControlError.invalidPayload("Equalizer requires exactly 10 finite gains.")
+        }
+        queue.sync {
+            output.setVolume(volume)
+            output.setEqualizer(equalizer)
+            output.setMonoEnabled(monoEnabled)
         }
     }
 
@@ -384,7 +421,7 @@ final class PlaybackSession: @unchecked Sendable {
             let chunkStart = decoder.absolutePlayedFrames
             let frames: (left: [Float], right: [Float])
             do {
-                frames = try decoder.readFrames(chunkFrameCount)
+                frames = try readPlaybackFrames(decoder: decoder, requested: chunkFrameCount)
             } catch {
                 stopRefillTimer()
                 output.pause()
@@ -437,7 +474,7 @@ final class PlaybackSession: @unchecked Sendable {
                 break
             }
             let chunkStart = decoder.absolutePlayedFrames
-            let frames = try decoder.readFrames(chunkFrameCount)
+            let frames = try readPlaybackFrames(decoder: decoder, requested: chunkFrameCount)
             let faded = applyFadeIfNeeded(decoder, chunkStart: chunkStart, left: frames.left, right: frames.right)
             if output.write(left: faded.left, right: faded.right) == 0 {
                 break
@@ -471,6 +508,38 @@ final class PlaybackSession: @unchecked Sendable {
         return Float(min(1, max(0, gain)))
     }
 
+    /// Reads up to the loop boundary and seeks back to its start when the
+    /// boundary is reached. The decoder remains unaware of package metadata;
+    /// this keeps UAC precedence and tag handling in one transport layer.
+    private func readPlaybackFrames(
+        decoder: any AudioDecoder,
+        requested: Int
+    ) throws -> (left: [Float], right: [Float]) {
+        guard requested > 0 else { return ([], []) }
+        guard let loop = playbackLoop,
+              loop.isValid,
+              loop.sampleRateHz > 0 else {
+            return try decoder.readFrames(requested)
+        }
+        let startOutput = Int64((Double(loop.startSample) * Double(sampleRate) / Double(loop.sampleRateHz)).rounded())
+        let endOutput = Int64((Double(loop.endSample) * Double(sampleRate) / Double(loop.sampleRateHz)).rounded())
+        guard endOutput > startOutput else { return try decoder.readFrames(requested) }
+
+        if decoder.absolutePlayedFrames >= endOutput {
+            if let remaining = remainingLoopRepeats {
+                guard remaining > 0 else {
+                    playbackLoop = nil
+                    return try decoder.readFrames(requested)
+                }
+                remainingLoopRepeats = remaining - 1
+            }
+            decoder.seek(milliseconds: Int((Double(loop.startSample) * 1_000 / Double(loop.sampleRateHz)).rounded()))
+        }
+
+        let available = max(1, endOutput - decoder.absolutePlayedFrames)
+        return try decoder.readFrames(min(requested, Int(min(Int64(requested), available))))
+    }
+
     private func releaseCurrent() {
         stopRefillTimer()
         // Preserve queued PCM while AudioOutput ramps it to silence.  Clearing
@@ -481,6 +550,8 @@ final class PlaybackSession: @unchecked Sendable {
         decoder = nil
         decoderFamily = nil
         currentTempo = 1
+        playbackLoop = nil
+        remainingLoopRepeats = nil
         capFrames = 0
         fadeFrames = 0
         reachedEnd = false

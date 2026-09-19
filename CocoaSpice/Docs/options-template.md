@@ -90,7 +90,7 @@
 
 | Control | Detail | Value field | Default |
 | --- | --- | --- | --- |
-| [ ] `libgme` | `SPC, NSF/NSFE, GBS, HES, KSS, AY, and SAP` | `[text field: 1]` | `1×` |
+| [ ] `libgme` | `SPC, NSF/NSFE, GBS, HES, KSS, and AY` | `[text field: 1]` | `1×` |
 | [ ] `libvgm` | `GYM, S98, VGM, VGZ, and DRO` | `[text field: 1]` | `1×` |
 
 **Tempo field format:** placeholder `1`, rounded-border style, width `72`.  
@@ -281,18 +281,6 @@
 
 ## `CocoaSpice / Database`
 
-### Local Files
-
-**Control:** [ ] `Use Local Files`
-
-> Browse one folder directly. The database library is disabled while this is on.
-
-**Path bar:** `{{selected local folder path}}`  
-**Empty state:** `No local folder selected`  
-**Button:** folder icon, accessibility label `Browse`
-
-**Default:** off.
-
 ### Favorites
 
 **Label:** `Order`
@@ -307,11 +295,9 @@
 **Path bar:** `{{model.configuredLibraryDatabasePath}}`  
 **Button:** folder icon, accessibility label `Browse`
 
-> CocoaSpice reads this schema-23 catalog. ScanSong owns scan paths, scanning, link checks, and cleanup.
+> CocoaSpice reads this schema-24 catalog. ScanSong owns scan paths, scanning, link checks, and cleanup.
 
 **Buttons, in order:** `Use Default` · `Reload Library` · `Show in Finder`
-
-**Disabled state:** this card is disabled and displayed at `0.55` opacity while `Use Local Files` is on.
 
 ### Cache
 

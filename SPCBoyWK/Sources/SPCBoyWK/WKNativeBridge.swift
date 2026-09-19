@@ -9,7 +9,6 @@ import FavoriteStoreCore
 import FavoriteTrackCore
 import FrontendPreferencesCore
 import Foundation
-import LocalFileBrowserCore
 import PlaybackQueueCore
 import PlaybackTransportCore
 import PlaylistIdentityCore
@@ -77,8 +76,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
     var onOpenOptionsWindow: (() -> Void)?
     var onCloseOptionsWindow: (() -> Void)?
-    var onChooseRootFolder: (() -> String?)?
-    var onChoosePath: (() -> String?)?
+    var onCloseMainWindow: (() -> Void)?
     var onChooseAACExportDirectory: (() -> String?)?
     var onAppearanceSettingsChanged: (([String: Any]) -> Void)?
     var onFrontendSettingsChanged: ((SPCBoyPreferencesSnapshot) -> Void)?
@@ -190,7 +188,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             isOptionsWindow: \(optionsWindowFlag),
             playbackBackends: \(Self.json(Self.playbackBackendManifest)),
             bootstrap: (...args) => request("bootstrap", args),
-            refreshTree: (...args) => request("refreshTree", args),
+            playlistTabsLoad: () => request("playlistTabsLoad"),
+            playlistTabsSave: (...args) => request("playlistTabsSave", args),
             databaseLocation: (...args) => request("databaseLocation", args),
             databaseRoots: (...args) => request("databaseRoots", args),
             databaseGames: (...args) => request("databaseGames", args),
@@ -198,6 +197,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             databaseFileTree: (...args) => request("databaseFileTree", args),
             databaseSearchGames: (...args) => request("databaseSearchGames", args),
             databaseGameTracks: (...args) => request("databaseGameTracks", args),
+            databaseFileTracks: (...args) => request("databaseFileTracks", args),
+            databaseFolderTracks: (...args) => request("databaseFolderTracks", args),
             databasePlaylistSort: (...args) => request("databasePlaylistSort", args),
             playlistProjectionSort: (...args) => request("playlistProjectionSort", args),
             databaseGroupState: (...args) => request("databaseGroupState", args),
@@ -205,13 +206,9 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             playbackQueueAdjacent: (...args) => request("playbackQueueAdjacent", args),
             playbackCompletionRetire: (...args) => request("playbackCompletionRetire", args),
             playbackFadeDuration: (...args) => request("playbackFadeDuration", args),
-            databaseFileTracks: (...args) => request("databaseFileTracks", args),
-            databaseFolderTracks: (...args) => request("databaseFolderTracks", args),
             favoritesList: (...args) => request("favoritesList", args),
             favoritesToggle: (...args) => request("favoritesToggle", args),
             favoritesRevision: () => request("favoritesRevision"),
-            resolveSidebarState: (...args) => request("resolveSidebarState", args),
-            resolveSidebarRowIntent: (...args) => request("resolveSidebarRowIntent", args),
             frontendOptionsManifest: () => request("frontendOptionsManifest"),
             frontendSettingsLoad: (...args) => request("frontendSettingsLoad", args),
             frontendSettingsSave: (...args) => request("frontendSettingsSave", args),
@@ -228,12 +225,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             defaultAACExportDirectory: () => request("defaultAACExportDirectory"),
             openOptionsWindow: () => request("openOptionsWindow"),
             closeOptionsWindow: () => request("closeOptionsWindow"),
-            openPath: (...args) => request("openPath", args),
-            chooseRootFolder: (...args) => request("chooseRootFolder", args),
-            choosePath: (...args) => request("choosePath", args),
-            listFolder: (...args) => request("listFolder", args),
-            selectFolder: (...args) => request("selectFolder", args),
-            selectFile: (...args) => request("selectFile", args),
+            closeMainWindow: () => request("closeMainWindow"),
             showInFinder: (...args) => request("showInFinder", args),
             nativePlaybackInit: (...args) => request("nativePlaybackInit", args),
             nativePlaybackAudioConfig: (...args) => request("nativePlaybackAudioConfig", args),
@@ -278,8 +270,13 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
         print("[SPCBoy WK] request \(method)")
 
-        if method == "openOptionsWindow" || method == "closeOptionsWindow" {
-            let handler = method == "openOptionsWindow" ? onOpenOptionsWindow : onCloseOptionsWindow
+        if method == "openOptionsWindow" || method == "closeOptionsWindow" || method == "closeMainWindow" {
+            let handler: (() -> Void)?
+            switch method {
+            case "openOptionsWindow": handler = onOpenOptionsWindow
+            case "closeOptionsWindow": handler = onCloseOptionsWindow
+            default: handler = onCloseMainWindow
+            }
             Task { @MainActor in handler?() }
             Task {
                 await Self.reply(to: message.webView, id: id, success: true, valueJSON: "null")
@@ -336,52 +333,14 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return
         }
 
-        if method == "chooseRootFolder" || method == "choosePath" || method == "chooseAACExportDirectory" {
-            let chooser: (() -> String?)?
-            switch method {
-            case "chooseRootFolder": chooser = onChooseRootFolder
-            case "choosePath": chooser = onChoosePath
-            default: chooser = onChooseAACExportDirectory
-            }
-            let catalogURL = self.catalogURL
-            let catalogGeneration = (method == "chooseRootFolder" || method == "choosePath")
-                ? catalogSessions.begin(.playlist)
-                : nil
+        if method == "chooseAACExportDirectory" {
+            let chooser = onChooseAACExportDirectory
             Task { @MainActor in
                 guard let selectedPath = chooser?() else {
                     await Self.reply(to: message.webView, id: id, success: true, valueJSON: "null")
                     return
                 }
-                if method == "chooseAACExportDirectory" {
-                    await Self.reply(to: message.webView, id: id, success: true, valueJSON: Self.json(selectedPath))
-                    return
-                }
-                Task.detached(priority: .userInitiated) {
-                    let response: (success: Bool, valueJSON: String)
-                    do {
-                        let result = try Self.handle(method: "openPath", args: [selectedPath], catalogURL: catalogURL)
-                        response = (true, Self.json(result))
-                    } catch {
-                        response = (false, Self.json(["message": error.localizedDescription]))
-                    }
-                    await MainActor.run {
-                        let stale = catalogGeneration.map {
-                            !self.catalogSessions.isCurrent($0, for: .playlist)
-                        } ?? false
-                        if let catalogGeneration, !stale {
-                            self.catalogSessions.finish(catalogGeneration, for: .playlist)
-                        }
-                        let valueJSON = stale ? Self.json(["stale": true]) : response.valueJSON
-                        Task {
-                            await Self.reply(
-                                to: message.webView,
-                                id: id,
-                                success: stale || response.success,
-                                valueJSON: valueJSON
-                            )
-                        }
-                    }
-                }
+                await Self.reply(to: message.webView, id: id, success: true, valueJSON: Self.json(selectedPath))
             }
             return
         }
@@ -490,22 +449,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         switch method {
         case "bootstrap":
             return emptySnapshot()
-        case "refreshTree":
-            guard let rootPath = args.first as? String, !rootPath.isEmpty else { return emptySnapshot() }
-            let selectedPath = args.dropFirst().first as? String
-            return try localSnapshot(rootPath: rootPath, selectedPath: selectedPath)
-        case "openPath":
-            guard let inputPath = args.first as? String, !inputPath.isEmpty else { return emptySnapshot() }
-            return try localSnapshotForInput(inputPath)
-        case "listFolder":
-            guard let folderPath = args.first as? String else { return [] }
-            return try localChildren(folderPath)
-        case "selectFolder":
-            guard let folderPath = args.first as? String else { return emptySelection() }
-            return try localSelection(folderPath, file: false)
-        case "selectFile":
-            guard let filePath = args.first as? String else { return emptySelection() }
-            return try localSelection(filePath, file: true)
+        case "playlistTabsLoad":
+            return try PlaylistTabsStore.shared.load()
+        case "playlistTabsSave":
+            guard let payload = args.first as? [String: Any] else { throw BridgeError.invalidArguments }
+            return try PlaylistTabsStore.shared.save(payload)
         case "showInFinder":
             guard let path = args.first as? String else { return false }
             NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path).standardizedFileURL])
@@ -537,6 +485,10 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return try searchGames(query, catalogURL: catalogURL)
         case "databaseGameTracks":
             return try gameTracks(args.first, catalogURL: catalogURL)
+        case "databaseFileTracks":
+            return try fileTracks(args.first, catalogURL: catalogURL, folders: false)
+        case "databaseFolderTracks":
+            return try fileTracks(args.first, catalogURL: catalogURL, folders: true)
         case "databasePlaylistSort":
             return try playlistSortedIDs(args.first)
         case "playlistProjectionSort":
@@ -571,10 +523,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 from: JSONSerialization.data(withJSONObject: payload)
             )
             return request.durationMilliseconds ?? NSNull()
-        case "databaseFileTracks":
-            return try fileTracks(args.first, catalogURL: catalogURL, folders: false)
-        case "databaseFolderTracks":
-            return try fileTracks(args.first, catalogURL: catalogURL, folders: true)
         case "favoritesList":
             return try favoriteResponses(FavoriteStore().snapshots(), order: favoriteSortOrder(args.first))
         case "favoritesToggle":
@@ -584,17 +532,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return try favoriteResponses(store.snapshots(), order: favoriteSortOrder(args.dropFirst().first))
         case "favoritesRevision":
             return try FavoriteStore().revision()
-        case "resolveSidebarState":
-            return sidebarState(mode: args.first as? String, query: args.dropFirst().first as? String)
-        case "resolveSidebarRowIntent":
-            guard let kindRaw = args.first as? String,
-                  let gestureRaw = args.dropFirst().first as? String,
-                  let kind = SidebarRowKind(rawValue: kindRaw),
-                  let gesture = SidebarRowGesture(rawValue: gestureRaw) else {
-                throw BridgeError.invalidArguments
-            }
-            let wasSelected = args.dropFirst(2).first as? Bool ?? false
-            return SidebarRowInteraction.intent(kind: kind, gesture: gesture, wasSelected: wasSelected).rawValue
         case "frontendOptionsManifest":
             return try Self.object(FrontendOptionsManifest.v1)
         case "frontendSettingsLoad":
@@ -794,9 +731,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             }
         }
 
-        return index.nodes().map { node in
-            responseNode(node, isRoot: true)
-        }
+        return index.nodes().map { responseNode($0, isRoot: true) }
     }
 
     nonisolated private static func searchGames(_ query: String, catalogURL: URL) throws -> [[String: Any]] {
@@ -809,6 +744,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
     nonisolated private static func gameResponse(_ game: CatalogBrowserGame) -> [String: Any] {
         [
+            "id": game.id,
             "rootId": game.rootID,
             "rootPath": game.rootPath,
             "rootName": game.rootDisplayName,
@@ -861,16 +797,12 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             }
         } else {
             let selections = values.compactMap { item -> CatalogSourceSelection? in
-                guard let rootID = int64(item["rootId"]),
-                      let path = item["path"] as? String else { return nil }
+                guard let rootID = int64(item["rootId"]), let path = item["path"] as? String else { return nil }
                 return CatalogSourceSelection(rootID: rootID, path: path)
             }
             tracks = try catalog.tracks(sourceSelections: selections)
         }
-        return playlistProjectionResponse(
-            CatalogPlaylistPresentation.project(tracks: tracks),
-            roots: roots
-        )
+        return playlistProjectionResponse(CatalogPlaylistPresentation.project(tracks: tracks), roots: roots)
     }
 
     nonisolated private static func playlistProjectionResponse(
@@ -989,149 +921,10 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             .max(by: { $0.count < $1.count }) ?? ""
     }
 
-    nonisolated private static func localSnapshotForInput(_ inputPath: String) throws -> [String: Any] {
-        let inputURL = URL(fileURLWithPath: inputPath).standardizedFileURL
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: inputURL.path, isDirectory: &isDirectory) else {
-            throw LocalFileBrowserError.missingPath(inputURL.path)
-        }
-        let rootURL = isDirectory.boolValue ? inputURL : inputURL.deletingLastPathComponent()
-        let selectedPath = isDirectory.boolValue ? inputURL.path : rootURL.path
-        return try localSnapshot(rootPath: rootURL.path, selectedPath: selectedPath, playlistPath: isDirectory.boolValue ? nil : inputURL.path)
-    }
-
-    nonisolated private static func localSnapshot(rootPath: String, selectedPath: String?, playlistPath: String? = nil) throws -> [String: Any] {
-        let session = try localSession(rootPath: rootPath)
-        let root = try session.rootNode()
-        let selected = selectedPath.flatMap { try? session.resolve(path: $0) }?.path ?? session.rootURL.path
-        let playlist = playlistPath.flatMap { try? localTracks(for: $0, rootPath: session.rootURL.path) } ?? []
-        return [
-            "rootPath": session.rootURL.path,
-            "tree": try jsonNodes([root]),
-            "selectedFolderPath": selected,
-            "selectedBrowserPath": playlistPath ?? selected,
-            "playlist": playlist,
-            "sidebarMode": "diskPath",
-            "sidebarQuery": "",
-            "selectedDatabaseGameKey": NSNull()
-        ]
-    }
-
-    nonisolated private static func localChildren(_ folderPath: String) throws -> [[String: Any]] {
-        let session = try localSession(rootPath: folderPath)
-        return try jsonNodes(session.children(of: session.rootURL))
-    }
-
-    nonisolated private static func localSelection(_ path: String, file: Bool) throws -> [String: Any] {
-        let inputURL = URL(fileURLWithPath: path).standardizedFileURL
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: inputURL.path, isDirectory: &isDirectory) else {
-            throw LocalFileBrowserError.missingPath(inputURL.path)
-        }
-        if file && (isDirectory.boolValue || FormatRegistry.family(for: inputURL.path) == nil) {
-            throw LocalFileBrowserError.unsupportedTarget(inputURL.path)
-        }
-        let folderURL = isDirectory.boolValue ? inputURL : inputURL.deletingLastPathComponent()
-        let session = try localSession(rootPath: folderURL.path)
-        let playlist = try localTracks(for: isDirectory.boolValue ? folderURL.path : inputURL.path, rootPath: session.rootURL.path)
-        return [
-            "selectedFolderPath": folderURL.path,
-            "selectedBrowserPath": inputURL.path,
-            "playlist": playlist
-        ]
-    }
-
-    nonisolated private static func localSession(rootPath: String) throws -> LocalFileBrowserSession {
-        try LocalFileBrowserSession(rootURL: URL(fileURLWithPath: rootPath)) { url in
-            FormatRegistry.family(for: url.path) != nil
-        }
-    }
-
-    nonisolated private static func localTracks(for path: String, rootPath: String) throws -> [[String: Any]] {
-        let targetURL = URL(fileURLWithPath: path).standardizedFileURL
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: targetURL.path, isDirectory: &isDirectory) else {
-            throw LocalFileBrowserError.missingPath(targetURL.path)
-        }
-        let urls: [URL]
-        if isDirectory.boolValue {
-            urls = try FileManager.default.contentsOfDirectory(
-                at: targetURL,
-                includingPropertiesForKeys: [.isRegularFileKey],
-                options: [.skipsHiddenFiles]
-            )
-            .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }
-            .filter { FormatRegistry.family(for: $0.path) != nil }
-            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
-        } else {
-            urls = [targetURL]
-        }
-
-        return try urls.flatMap { try localTrackRows(for: $0, rootPath: rootPath) }
-    }
-
-    nonisolated private static func localTrackRows(for url: URL, rootPath: String) throws -> [[String: Any]] {
-        let structure = try? PlaybackStructureReader.read(path: url.path)
-        let trackStructures = structure?.tracks ?? [.init(index: 0, naturalPlayMilliseconds: 0, fadeMilliseconds: 0)]
-        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
-        let fileSize = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
-        let modifiedAt = ((attributes?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0) * 1_000
-        let filename = url.lastPathComponent
-        let basename = url.deletingPathExtension().lastPathComponent
-        let game = url.deletingLastPathComponent().lastPathComponent
-        let system = FormatRegistry.family(for: url.path)?.id ?? ""
-        return trackStructures.map { item in
-            let favoriteIdentity = FavoriteTrackIdentity(
-                sourcePath: url.path,
-                trackIndex: item.index,
-                trackCount: trackStructures.count
-            )
-            return [
-                "playlistId": "local-\(url.path)-\(item.index)",
-                "favoriteId": favoriteIdentity.id,
-                "metadataTrackId": 0,
-                "rootPath": rootPath,
-                "path": url.path,
-                "filename": filename,
-                "archivePath": NSNull(),
-                "archiveEntry": NSNull(),
-                "trackIndex": item.index,
-                "trackCount": trackStructures.count,
-                "fileSize": fileSize,
-                "modifiedAt": modifiedAt,
-                "sourceSignature": NSNull(),
-                "scanVersion": 0,
-                "title": basename,
-                "game": game,
-                "artist": "",
-                "system": system,
-                "playLengthMs": item.naturalPlayMilliseconds
-            ]
-        }
-    }
-
-    nonisolated private static func jsonNodes(_ nodes: [LocalFileBrowserNode]) throws -> [[String: Any]] {
-        try nodes.map { node in
-            [
-                "id": node.id,
-                "kind": node.kind.rawValue,
-                "name": node.name,
-                "path": node.path,
-                "parentPath": node.parentPath ?? NSNull(),
-                "children": try jsonNodes(node.children),
-                "childrenLoaded": node.childrenLoaded,
-                "alwaysExpanded": node.alwaysExpanded
-            ]
-        }
-    }
-
     nonisolated private static func emptySnapshot() -> [String: Any] {
         ["rootPath": NSNull(), "tree": [], "selectedFolderPath": NSNull(), "selectedBrowserPath": NSNull(), "playlist": []]
     }
 
-    nonisolated private static func emptySelection() -> [String: Any] {
-        ["selectedFolderPath": NSNull(), "selectedBrowserPath": NSNull(), "playlist": []]
-    }
 
     nonisolated private static func favoriteSnapshots(_ value: Any?) -> [FavoriteTrackSnapshot] {
         guard let rows = value as? [[String: Any]] else { return [] }
@@ -1210,21 +1003,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         }
     }
 
-    nonisolated private static func sidebarState(mode: String?, query: String?) -> [String: Any] {
-        let state = CatalogBrowserState(
-            mode: CatalogBrowserMode(rawValue: mode ?? "") ?? .consoles,
-            query: query ?? ""
-        )
-        return [
-            "storedMode": state.storedMode.rawValue,
-            "query": state.query,
-            "view": state.view.rawValue,
-            "contentMode": state.contentMode.rawValue,
-            "resultSource": state.resultSource.rawValue,
-            "isTemporary": state.view == .search
-        ]
-    }
-
     nonisolated private static func formatDuration(_ seconds: Double) -> String {
         guard seconds > 0 else { return "—" }
         let total = Int(seconds.rounded())
@@ -1232,6 +1010,19 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     }
 
     nonisolated private static let frontendSettingsKey = "SPCBoyWK.frontendPreferencesV2"
+    nonisolated private static let appVolumeRepairKey = "SPCBoyWK.appVolumeRepairV1"
+
+    nonisolated private static func repairLegacyZeroVolume(
+        _ snapshot: inout SPCBoyPreferencesSnapshot,
+        defaults: UserDefaults
+    ) {
+        guard !defaults.bool(forKey: appVolumeRepairKey) else { return }
+        if snapshot.appVolume == 0 {
+            snapshot.appVolume = 1
+            snapshot.normalizeForPersistence()
+        }
+        defaults.set(true, forKey: appVolumeRepairKey)
+    }
 
     nonisolated private static func frontendSettingsLoad() throws -> SPCBoyPreferencesSnapshot {
         let defaults = UserDefaults.standard
@@ -1239,12 +1030,14 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             var snapshot = try JSONDecoder().decode(SPCBoyPreferencesSnapshot.self, from: data)
             snapshot.normalizeForPersistence()
             snapshot.apply(frontendInterface: FrontendPreferencesStore(defaults: defaults, keys: .spcBoyWK).load())
+            repairLegacyZeroVolume(&snapshot, defaults: defaults)
             defaults.set(try JSONEncoder().encode(snapshot), forKey: frontendSettingsKey)
             return snapshot
         }
         var snapshot = SPCBoyPreferencesSnapshot()
         let frontendPreferences = FrontendPreferencesStore(defaults: defaults, keys: .spcBoyWK).load()
         snapshot.apply(frontendInterface: frontendPreferences)
+        repairLegacyZeroVolume(&snapshot, defaults: defaults)
         let data = try JSONEncoder().encode(snapshot)
         defaults.set(data, forKey: frontendSettingsKey)
         return snapshot

@@ -19,7 +19,7 @@ remains independent while Settings is open.
 ## Components
 
 Settings groups app-owned controls above VGMBoy playback controls in the same compact sidebar used
-by the current renderer skin. App controls cover Interface, Windows, database location, and browser behavior.
+by the current renderer skin. App controls cover Interface, Windows, and database location.
 VGMBoy controls cover playback, routing, tempo, fade, volume, mono, equalizer, and archive-cache behavior.
 Diagnostics is its own VGMBoy page and reports live transport, buffer, output, decode, and underrun values.
 Its page title is page-level content; Transport, Buffer, and Decoder are separate sibling panels.
@@ -32,9 +32,8 @@ SPCBoy a catalog writer; ScanSong remains responsible for scanning and publicati
 
 ## Database panel layout
 
-The Database page begins with Local Files and Favorites panels. Local Files stores one selected folder;
-enabling it disables the catalog controls and opens that folder in the direct browser. Favorites chooses
-Historical or Alphabetical display without changing shared history.
+The Database page begins with the Favorites panel. Favorites chooses Historical or Alphabetical display
+without changing shared history.
 Database actions run as three equal-width controls across the bottom of that panel—Use Default,
 Reload Library, and Show in Finder. The catalog browse action is the folder button at the end of the
 path bar. Archive Cache uses the identical empty placeholder readout and uses Use Default, Clear Cache,
@@ -48,8 +47,7 @@ seconds; Faded Skip is an option within that panel and does not have a separate 
 
 Faded Skip is presented inline in the Play Time panel with End Fade behavior; it has no separate panel. SPCBoy WK's toolbar is rendered by WKWebView HTML. It uses the shared native playback command boundary, but it is not the same native SwiftUI macOS toolbar view used by CocoaSpice.
 
-Favorites is a playlist projection, not a library/sidebar view. Local Files remains an explicit
-configured state rather than part of the two-view catalog toggle. Command-Shift-D
+Favorites is a playlist projection, not a library/sidebar view. Command-Shift-D
 replaces the playlist with a snapshot of shared Favorites without changing the
 sidebar. Command-D toggles the selected track or selected database game/group.
 Both playlist headers use a visible star for the favorite column. Command-click and Shift-click select

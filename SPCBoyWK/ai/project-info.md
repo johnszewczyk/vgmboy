@@ -3,8 +3,9 @@
 ## Product
 
 `SPCBoyWK` is a maintained, independent native macOS WebKit player in the
-VGMMan family. It is a separate product from the archived Electron SPCBoy and
-from the phosphor-skinned ViewBoy frontend.
+VGMMan family. It is a separate product from the phosphor-skinned ViewBoy
+frontend. The Electron SPCBoy code is historical recovery material, not a
+LaunchPad app or an active implementation target.
 
 ## Major Components
 
@@ -12,12 +13,12 @@ from the phosphor-skinned ViewBoy frontend.
 - The WebKit renderer, adapted for a narrow typed native bridge.
 - Shared `CatalogBrowserCore` sidebar behavior.
 - Read-only `CatalogReader` integration.
+- Database-only Console View and read-only catalog Path View with persisted playlist tabs.
 - In-process VGMBoy playback through the native bridge.
 - Shared versioned VGMBoy endpoint capability map (`VGMBoyEndpointCore`).
 - Shared VGMBoy tempo contract for libgme and libvgm playback settings.
 - Shared selected-entry or dependency-complete archive materialization through
   FrontendCore.
-- Shared explicit local-folder navigation through `LocalFileBrowserCore`.
 - Shared `PlaybackRequestCore` lifecycle and serial VGMBoy command execution.
 - Shared `PlaybackTransportCore` native transport lifecycle and
   `PlaybackTransportStatusPayload` bridge projection.
@@ -32,21 +33,22 @@ centered inside them. Header items use a `0.25rem` gap, matching sidebar
 controls; both content panes use the same `0.2rem` row padding and `1rem`
 effective text inset. Playlist column resizing uses the shared configurable
 `200ms` default CSS width transition and the shared eight-point-per-side
-header-minimum padding contract. WK now uses the Electron client's proven structure: a
-header table and body table with matching column widths inside one shared
-horizontal scroll surface. Release persists the result and pointer capture
-keeps the gesture alive after it leaves the narrow divider.
+header-minimum padding contract. The header and body tables use matching column
+widths inside one shared horizontal scroll surface. Release persists the result
+and pointer capture keeps the gesture alive after it leaves the narrow divider.
 
 ## Task Routing
 
 Human-facing behavior:
 
+- Playlist tabs and their shortcuts: [playlist-tabs.md](subsystem-human/playlist-tabs.md)
 - Options and settings window: [options.md](subsystem-human/options.md)
 - Playback and transport: [playback.md](subsystem-human/playback.md)
 
 Agent engineering notes:
 
 - Shared sidebar behavior: [shared-sidebar-core.md](subsystem-agent/shared-sidebar-core.md)
+- Playlist-tab persistence and host boundary: [playlist-tabs.md](subsystem-agent/playlist-tabs.md)
 - WebKit host boundary: [webkit-host.md](subsystem-agent/webkit-host.md)
 
 ## Local Rules
@@ -58,7 +60,7 @@ Agent engineering notes:
 - Keep playback ownership in VGMBoy; this project owns presentation and host integration.
 - Do not add decoder, metadata-inspection, or format-admission implementations
   here; use VGMBoyKit/VGMBoyFormatCore and the packaged endpoint surface.
-- Keep local navigation in `LocalFileBrowserCore`; keep queue construction and presentation in the frontend adapter, while archive-member materialization runs through the native bridge and shared `ArchiveMaterializationCore`.
+- Keep queue construction and presentation in the frontend adapter, while archive-member materialization runs through the native bridge and shared `ArchiveMaterializationCore`.
 - Do not add a private archive extractor; use `ArchiveMaterializationCore`.
 - Keep Settings as a separate native window; do not restore the in-pane overlay
   as the root window's primary Settings surface.

@@ -17,6 +17,8 @@ typedef struct {
 
 vgmboy_sid_handle_t vgmboy_sid_open(const char* path, int32_t sample_rate, char** error_message);
 void vgmboy_sid_close(vgmboy_sid_handle_t handle);
+uint32_t vgmboy_sid_track_count(vgmboy_sid_handle_t handle);
+int32_t vgmboy_sid_start_track(vgmboy_sid_handle_t handle, int32_t track_index, char** error_message);
 int32_t vgmboy_sid_read_metadata(vgmboy_sid_handle_t handle, vgmboy_sid_metadata_t* metadata, char** error_message);
 int32_t vgmboy_sid_render_s16(vgmboy_sid_handle_t handle, int32_t requested_frames, int16_t* samples, int32_t* rendered_frames, char** error_message);
 int32_t vgmboy_sid_seek_milliseconds(vgmboy_sid_handle_t handle, int32_t milliseconds, char** error_message);

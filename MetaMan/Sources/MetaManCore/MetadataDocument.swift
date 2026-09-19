@@ -94,6 +94,10 @@ public struct MetadataDocument: Codable, Equatable, Sendable {
     public let structuredMetadata: MetadataJSONValue?
     public let sourceEncoding: String?
     public let timing: MetadataTiming?
+    /// Sample-accurate playback loop, when the source carries one. This is
+    /// additive to the millisecond timing projection and preserves the exact
+    /// units needed by a player.
+    public let loop: MetadataLoop?
     public let technicalFacts: [String: String]
     public let diagnostics: [String]
 
@@ -106,6 +110,7 @@ public struct MetadataDocument: Codable, Equatable, Sendable {
         structuredMetadata: MetadataJSONValue? = nil,
         sourceEncoding: String? = nil,
         timing: MetadataTiming? = nil,
+        loop: MetadataLoop? = nil,
         technicalFacts: [String: String] = [:],
         diagnostics: [String] = []
     ) {
@@ -117,8 +122,30 @@ public struct MetadataDocument: Codable, Equatable, Sendable {
         self.structuredMetadata = structuredMetadata
         self.sourceEncoding = sourceEncoding
         self.timing = timing
+        self.loop = loop
         self.technicalFacts = technicalFacts
         self.diagnostics = diagnostics
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case format, fields, tags, rawTagBlock, rawMetadataBlocks,
+             structuredMetadata, sourceEncoding, timing, loop, technicalFacts,
+             diagnostics
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        format = try values.decode(String.self, forKey: .format)
+        fields = try values.decode(MetadataFields.self, forKey: .fields)
+        tags = try values.decodeIfPresent([MetadataTag].self, forKey: .tags) ?? []
+        rawTagBlock = try values.decodeIfPresent(Data.self, forKey: .rawTagBlock)
+        rawMetadataBlocks = try values.decodeIfPresent([String: Data].self, forKey: .rawMetadataBlocks)
+        structuredMetadata = try values.decodeIfPresent(MetadataJSONValue.self, forKey: .structuredMetadata)
+        sourceEncoding = try values.decodeIfPresent(String.self, forKey: .sourceEncoding)
+        timing = try values.decodeIfPresent(MetadataTiming.self, forKey: .timing)
+        loop = try values.decodeIfPresent(MetadataLoop.self, forKey: .loop)
+        technicalFacts = try values.decodeIfPresent([String: String].self, forKey: .technicalFacts) ?? [:]
+        diagnostics = try values.decodeIfPresent([String].self, forKey: .diagnostics) ?? []
     }
 
     /// Returns every value for a tag name, preserving original order.

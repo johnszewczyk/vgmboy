@@ -270,8 +270,6 @@ if (window.spcBoyWK?.onAppearanceSettingsChanged) {
 
 if (window.spcBoyWK?.onFrontendSettingsChanged) {
   window.spcBoyWK.onFrontendSettingsChanged((settings) => {
-    const wasEnabled = state.localBrowserEnabled;
-    const previousRootPath = state.rootPath;
     const previousFavoriteSortOrder = state.favoriteSortOrder;
     const previousTiming = {
       manualPlayTimeSeconds: state.manualPlayTimeSeconds,
@@ -290,8 +288,11 @@ if (window.spcBoyWK?.onFrontendSettingsChanged) {
       || previousTiming.longPlayEnabled !== state.longPlayEnabled
       || previousTiming.fadeEnabled !== state.fadeEnabled
       || previousTiming.spcFadeSeconds !== state.spcFadeSeconds;
-    state.rootPath = settings.rootPath || state.rootPath;
-    state.localBrowserEnabled = Boolean(settings.localBrowserEnabled && state.rootPath);
+    state.rootPath = null;
+    state.localBrowserEnabled = false;
+    state.selectedFolderPath = null;
+    state.selectedBrowserPath = null;
+    state.sidebarMode = state.sidebarMode === "paths" ? "paths" : "consoles";
     state.favoriteSortOrder = settings.favoriteSortOrder === "alphabetical" ? "alphabetical" : "historical";
     if (settings.autoResizeAnimationMilliseconds !== undefined) {
       state.autoResizeAnimationMilliseconds = app.normalizeAnimationMilliseconds(settings.autoResizeAnimationMilliseconds);
@@ -303,20 +304,7 @@ if (window.spcBoyWK?.onFrontendSettingsChanged) {
     if (settings.selectionAnimationEnabled !== undefined) state.selectionAnimationEnabled = settings.selectionAnimationEnabled !== false;
     if (settings.mainWindowAlwaysOnTop !== undefined) state.mainWindowAlwaysOnTop = Boolean(settings.mainWindowAlwaysOnTop);
     if (settings.settingsWindowAlwaysOnTop !== undefined) state.settingsWindowAlwaysOnTop = Boolean(settings.settingsWindowAlwaysOnTop);
-    if (!window.spcBoyWK.isOptionsWindow && state.localBrowserEnabled && (!wasEnabled || previousRootPath !== state.rootPath || state.sidebarMode !== "diskPath")) {
-      window.spcBoyWK.refreshTree(state.rootPath, state.selectedFolderPath || state.rootPath)
-        .then((snapshot) => {
-          Object.assign(state, snapshot);
-          state.sidebarMode = "diskPath";
-          app.ui.renderAll();
-        })
-        .catch((error) => console.error("[SPCBoy] local settings sync failed", error));
-    } else if (!window.spcBoyWK.isOptionsWindow && wasEnabled && !state.localBrowserEnabled) {
-      state.sidebarMode = "consoles";
-      app.ui.setSidebarMode("consoles").catch((error) => console.error(error));
-    } else {
-      app.ui.renderAll();
-    }
+    app.ui.renderAll();
     if (!window.spcBoyWK.isOptionsWindow && timingChanged) {
       app.playback.refreshPlaybackForTimingChange().catch((error) => console.error("[SPCBoy] playback timing sync failed", error));
     }
@@ -385,37 +373,6 @@ refs.libraryDatabaseDefaultButton.addEventListener("click", () => {
   });
 });
 
-refs.localBrowserBrowseButton.addEventListener("click", () => {
-  window.spcBoyWK.chooseRootFolder()
-    .then((snapshot) => {
-      if (!snapshot) return;
-      state.localBrowserEnabled = true;
-      app.ui.applyLibrarySnapshot(snapshot);
-    })
-    .catch((error) => console.error("[SPCBoy] local folder selection failed", error));
-});
-
-refs.localBrowserEnabledCheckbox.addEventListener("change", (event) => {
-  const enabled = event.target.checked;
-  if (enabled && !state.rootPath) {
-    refs.localBrowserBrowseButton.click();
-    event.target.checked = false;
-    return;
-  }
-  state.localBrowserEnabled = enabled;
-  if (enabled) {
-    state.sidebarMode = "diskPath";
-    window.spcBoyWK.refreshTree(state.rootPath, state.selectedFolderPath || state.rootPath)
-      .then((snapshot) => app.ui.applyLibrarySnapshot(snapshot))
-      .catch((error) => console.error("[SPCBoy] local browser activation failed", error));
-  } else {
-    state.sidebarMode = "consoles";
-    app.ui.setSidebarMode("consoles").catch((error) => console.error(error));
-  }
-  app.persistSettings();
-  app.ui.renderAll();
-});
-
 refs.favoriteHistoricalSortCheckbox.addEventListener("change", (event) => {
   state.favoriteSortOrder = event.target.checked ? "historical" : "alphabetical";
   app.persistSettings();
@@ -474,49 +431,6 @@ refs.optionsOverlay.addEventListener("click", (event) => {
   }
 });
 
-let dragDepth = 0;
-
-function droppedPath(event) {
-  const file = [...(event.dataTransfer?.files || [])][0];
-  return file?.path || null;
-}
-
-function hasDroppedFiles(event) {
-  return Array.from(event.dataTransfer?.types || []).includes("Files");
-}
-
-document.addEventListener("dragenter", (event) => {
-  if (!hasDroppedFiles(event)) return;
-  event.preventDefault();
-  dragDepth += 1;
-  document.body.classList.add("is-file-drag-over");
-});
-
-document.addEventListener("dragleave", (event) => {
-  if (!hasDroppedFiles(event)) return;
-  event.preventDefault();
-  dragDepth = Math.max(0, dragDepth - 1);
-  if (!dragDepth) document.body.classList.remove("is-file-drag-over");
-});
-
-document.addEventListener("dragover", (event) => {
-  if (!hasDroppedFiles(event)) return;
-  event.preventDefault();
-  event.dataTransfer.dropEffect = "copy";
-});
-
-document.addEventListener("drop", (event) => {
-  if (!hasDroppedFiles(event)) return;
-  event.preventDefault();
-  dragDepth = 0;
-  document.body.classList.remove("is-file-drag-over");
-  const inputPath = droppedPath(event);
-  if (!inputPath) return;
-  window.spcBoyWK.openPath(inputPath)
-    .then((snapshot) => app.ui.applyLibrarySnapshot(snapshot))
-    .catch((error) => console.error("[SPCBoy] dropped path failed", error));
-});
-
 refs.sidebarSearchInput.addEventListener("input", (event) => {
   app.ui.updateSidebarSearch(event.target.value).catch((error) => console.error("[SPCBoy] sidebar search failed", error));
 });
@@ -547,32 +461,6 @@ if (window.spcBoyWK?.onTransportShortcut) {
     if (action === "next") {
       app.playback.playAdjacent(1);
     }
-  });
-}
-
-if (window.spcBoyWK?.onLibrarySnapshot) {
-  window.spcBoyWK.onLibrarySnapshot((snapshot) => {
-    if (!snapshot) {
-      return;
-    }
-
-    app.ui.applyLibrarySnapshot(snapshot);
-  });
-}
-
-if (window.spcBoyWK?.onLibraryCommand) {
-  window.spcBoyWK.onLibraryCommand((command) => {
-    if (command?.type === "sidebar-view") {
-      app.ui.setSidebarMode(command.view).catch((error) => console.error("[SPCBoy] sidebar view switch failed", error));
-      return;
-    }
-    if (command?.type !== "open-root") {
-      return;
-    }
-
-    app.ui.openLibraryRoot().catch((error) => {
-      console.error(error);
-    });
   });
 }
 
@@ -689,6 +577,14 @@ window.addEventListener("keydown", (event) => {
   }
 
   if (event.key === "Enter" && !state.optionsOpen) {
+    // Native controls already dispatch their own activation click for Enter.
+    // Letting this document handler continue would also activate the current
+    // playlist selection, which can replay the first row after a toolbar
+    // button receives focus.
+    const nativeControlTarget = target instanceof HTMLElement && (
+      target.matches("button, select, option, a, input, [role=button], [role=tab]")
+    );
+    if (nativeControlTarget) return;
     event.preventDefault();
     app.ui.activateFocusedItem(event.target).then((handled) => {
       if (handled) return;
@@ -705,6 +601,10 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
     app.ui.setOptionsOpen(false);
   }
+});
+
+window.addEventListener("pagehide", () => {
+  app.persistSettings();
 });
 
 app.ui.bootstrap().catch((error) => {

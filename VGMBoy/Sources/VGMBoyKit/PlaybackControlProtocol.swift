@@ -181,6 +181,9 @@ public struct PlaybackControlPayload: Codable, Sendable, Equatable {
     public var monoEnabled: Bool?
     public var exportDirectory: String?
     public var exportFilenameStem: String?
+    /// Authoritative loop metadata supplied by a UAC manifest. When present,
+    /// it overrides any loop comments in the materialized member.
+    public var loop: PlaybackLoopMetadata?
 
     public init(
         path: String? = nil,
@@ -197,7 +200,8 @@ public struct PlaybackControlPayload: Codable, Sendable, Equatable {
         rampMilliseconds: Int? = nil,
         monoEnabled: Bool? = nil,
         exportDirectory: String? = nil,
-        exportFilenameStem: String? = nil
+        exportFilenameStem: String? = nil,
+        loop: PlaybackLoopMetadata? = nil
     ) {
         self.path = path
         self.trackIndex = trackIndex
@@ -214,6 +218,7 @@ public struct PlaybackControlPayload: Codable, Sendable, Equatable {
         self.monoEnabled = monoEnabled
         self.exportDirectory = exportDirectory
         self.exportFilenameStem = exportFilenameStem
+        self.loop = loop
     }
 }
 

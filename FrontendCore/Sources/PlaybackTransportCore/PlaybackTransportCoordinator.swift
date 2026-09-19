@@ -11,12 +11,14 @@ public struct PlaybackTransportTrack: Equatable, Sendable {
     public let path: String
     public let trackIndex: Int
     public let sourceData: Data?
+    public let loop: PlaybackLoopMetadata?
 
-    public init(id: String, path: String, trackIndex: Int = 0, sourceData: Data? = nil) {
+    public init(id: String, path: String, trackIndex: Int = 0, sourceData: Data? = nil, loop: PlaybackLoopMetadata? = nil) {
         self.id = id
         self.path = path
         self.trackIndex = max(0, trackIndex)
         self.sourceData = sourceData
+        self.loop = loop
     }
 }
 
@@ -58,6 +60,7 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
     public let longPlayEnabled: Bool
     public let timedOverride: Bool
     public let unknownDurationMilliseconds: Int
+    public let loop: PlaybackLoopMetadata?
 
     public init(
         trackID: String,
@@ -71,7 +74,8 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
         tempo: PlaybackTempo = .defaultValue,
         longPlayEnabled: Bool = false,
         timedOverride: Bool = false,
-        unknownDurationMilliseconds: Int = PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000
+        unknownDurationMilliseconds: Int = PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000,
+        loop: PlaybackLoopMetadata? = nil
     ) {
         self.trackID = trackID
         self.sourcePath = sourcePath
@@ -85,6 +89,7 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
         self.longPlayEnabled = longPlayEnabled
         self.timedOverride = timedOverride
         self.unknownDurationMilliseconds = max(1_000, unknownDurationMilliseconds)
+        self.loop = loop
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -100,6 +105,7 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
         case longPlayEnabled
         case timedOverride
         case unknownDurationMilliseconds
+        case loop
     }
 
     /// Resolves the common transport input only after the adapter has supplied
@@ -128,7 +134,7 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
         }
         let normalizedTempo = PlaybackTempo(numerator: tempo.numerator, denominator: tempo.denominator)
         return PlaybackContinuationStart(
-            track: .init(id: trackID, path: resolvedPath, trackIndex: trackIndex),
+            track: .init(id: trackID, path: resolvedPath, trackIndex: trackIndex, loop: loop),
             payload: .init(
                 path: resolvedPath,
                 trackIndex: trackIndex,
@@ -136,7 +142,8 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
                 playbackMode: timing.playbackMode,
                 playMilliseconds: timing.playMilliseconds,
                 fadeMilliseconds: timing.fadeMilliseconds,
-                unknownDurationMilliseconds: timing.unknownDurationMilliseconds
+                unknownDurationMilliseconds: timing.unknownDurationMilliseconds,
+                loop: loop
             ),
             requestID: requestID,
             startMilliseconds: startMilliseconds
@@ -626,19 +633,8 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     ) throws -> PlaybackTransportStatus {
         try queue.sync {
             let preferences = request.preferences
-            try requireSuccess(controller.perform(.init(
-                command: .setOutputVolume,
-                payload: .init(outputVolume: preferences.outputVolume)
-            )))
-            try requireSuccess(controller.perform(.init(
-                command: .setEqualizer,
-                payload: .init(equalizer: preferences.equalizer)
-            )))
-            try requireSuccess(controller.perform(.init(
-                command: .setMonoEnabled,
-                payload: .init(monoEnabled: preferences.monoEnabled)
-            )))
-            return status(controller.perform(.init(command: .status)).status)
+            try controller.configureAudio(preferences)
+            return status(controller.status())
         }
     }
 
@@ -726,7 +722,8 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             playbackMode: timing.playbackMode,
             playMilliseconds: timing.playMilliseconds,
             fadeMilliseconds: timing.fadeMilliseconds,
-            unknownDurationMilliseconds: timing.unknownDurationMilliseconds
+            unknownDurationMilliseconds: timing.unknownDurationMilliseconds,
+            loop: track.loop
         )
         let event: PlaybackControlEvent
         if let sourceData = track.sourceData {

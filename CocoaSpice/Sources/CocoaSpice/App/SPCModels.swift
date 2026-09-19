@@ -204,17 +204,20 @@ struct TrackItem: Identifiable, Hashable, Sendable {
     let source: TrackSource
     let trackIndex: Int
     let trackCount: Int
+    let trackNumber: Int?
 
-    init(url: URL, trackIndex: Int = 0, trackCount: Int = 1) {
+    init(url: URL, trackIndex: Int = 0, trackCount: Int = 1, trackNumber: Int? = nil) {
         self.source = TrackSource(fileURL: url)
         self.trackIndex = max(0, trackIndex)
         self.trackCount = max(1, trackCount)
+        self.trackNumber = trackNumber
     }
 
-    init(archiveURL: URL, entryPath: String, trackIndex: Int = 0, trackCount: Int = 1) {
+    init(archiveURL: URL, entryPath: String, trackIndex: Int = 0, trackCount: Int = 1, trackNumber: Int? = nil) {
         self.source = TrackSource(archiveURL: archiveURL, entryPath: entryPath)
         self.trackIndex = max(0, trackIndex)
         self.trackCount = max(1, trackCount)
+        self.trackNumber = trackNumber
     }
 
     var url: URL { source.sourceURL }
@@ -284,7 +287,8 @@ struct TrackItem: Identifiable, Hashable, Sendable {
             path: url.path,
             entryPath: archiveEntryPath,
             trackIndex: trackIndex,
-            trackCount: trackCount
+            trackCount: trackCount,
+            trackNumber: trackNumber
         )
         guard let data = try? JSONEncoder().encode(payload),
               let encoded = String(data: data, encoding: .utf8) else {
@@ -301,13 +305,15 @@ struct TrackItem: Identifiable, Hashable, Sendable {
                     archiveURL: URL(fileURLWithPath: payload.path),
                     entryPath: entryPath,
                     trackIndex: payload.trackIndex,
-                    trackCount: payload.trackCount
+                    trackCount: payload.trackCount,
+                    trackNumber: payload.trackNumber
                 )
             }
             return TrackItem(
                 url: URL(fileURLWithPath: payload.path),
                 trackIndex: payload.trackIndex,
-                trackCount: payload.trackCount
+                trackCount: payload.trackCount,
+                trackNumber: payload.trackNumber
             )
         }
 
@@ -330,6 +336,7 @@ private struct PersistedTrackItem: Codable {
     let entryPath: String?
     let trackIndex: Int
     let trackCount: Int
+    let trackNumber: Int?
 }
 
 struct PlaylistColumnWidthHints: Equatable, Sendable {

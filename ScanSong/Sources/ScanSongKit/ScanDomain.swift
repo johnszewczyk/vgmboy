@@ -10,6 +10,18 @@ public struct ScannerMetadata: Codable, Equatable, Sendable {
     public let loopLengthMs: Int
     public let playLengthMs: Int
     public let fadeLengthMs: Int
+    /// Canonical one-based source/package track number, when supplied by
+    /// source metadata (for example UAC TRACKNUMBER). This is distinct from
+    /// `ScanTrackMetadata.trackIndex`, which is the decoder's zero-based
+    /// subsong index.
+    public let trackNumber: Int?
+    /// Exact source-unit loop facts when the format exposes them. The
+    /// established schema-24 catalog continues to persist millisecond timing;
+    /// these fields remain available to scanner clients and UAC projection.
+    public let loopStartSample: Int64?
+    public let loopEndSample: Int64?
+    public let loopSampleRateHz: Int?
+    public let loopSource: String?
 
     public init(
         game: String,
@@ -20,7 +32,12 @@ public struct ScannerMetadata: Codable, Equatable, Sendable {
         introLengthMs: Int,
         loopLengthMs: Int,
         playLengthMs: Int,
-        fadeLengthMs: Int
+        fadeLengthMs: Int,
+        trackNumber: Int? = nil,
+        loopStartSample: Int64? = nil,
+        loopEndSample: Int64? = nil,
+        loopSampleRateHz: Int? = nil,
+        loopSource: String? = nil
     ) {
         self.game = game
         self.song = song
@@ -31,6 +48,11 @@ public struct ScannerMetadata: Codable, Equatable, Sendable {
         self.loopLengthMs = loopLengthMs
         self.playLengthMs = playLengthMs
         self.fadeLengthMs = fadeLengthMs
+        self.trackNumber = trackNumber.map { max(1, $0) }
+        self.loopStartSample = loopStartSample
+        self.loopEndSample = loopEndSample
+        self.loopSampleRateHz = loopSampleRateHz
+        self.loopSource = loopSource
     }
 }
 

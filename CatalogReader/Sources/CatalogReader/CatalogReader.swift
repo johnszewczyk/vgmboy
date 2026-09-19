@@ -98,6 +98,7 @@ public struct CatalogTrack: Identifiable, Equatable, Sendable {
     public let archiveEntry: String?
     public let trackIndex: Int
     public let trackCount: Int
+    public let trackNumber: Int?
     public let title: String
     public let game: String
     public let author: String
@@ -110,7 +111,7 @@ public struct CatalogTrack: Identifiable, Equatable, Sendable {
     public let lengthMilliseconds: Int
     public let fadeLengthMilliseconds: Int
 
-    public init(id: Int64, rootID: Int64, sourcePath: String, archivePath: String?, archiveEntry: String?, trackIndex: Int, trackCount: Int, title: String, game: String, author: String, system: String, comment: String, browserGame: String, browserSystem: String, introLengthMilliseconds: Int, loopLengthMilliseconds: Int, lengthMilliseconds: Int, fadeLengthMilliseconds: Int) {
+    public init(id: Int64, rootID: Int64, sourcePath: String, archivePath: String?, archiveEntry: String?, trackIndex: Int, trackCount: Int, trackNumber: Int? = nil, title: String, game: String, author: String, system: String, comment: String, browserGame: String, browserSystem: String, introLengthMilliseconds: Int, loopLengthMilliseconds: Int, lengthMilliseconds: Int, fadeLengthMilliseconds: Int) {
         self.id = id
         self.rootID = rootID
         self.sourcePath = sourcePath
@@ -118,6 +119,7 @@ public struct CatalogTrack: Identifiable, Equatable, Sendable {
         self.archiveEntry = archiveEntry
         self.trackIndex = trackIndex
         self.trackCount = trackCount
+        self.trackNumber = trackNumber
         self.title = title
         self.game = game
         self.author = author
@@ -145,7 +147,7 @@ public enum CatalogReaderError: LocalizedError {
 }
 
 public final class ReadOnlyCatalog: @unchecked Sendable {
-    public static let supportedSchemaVersion = 23
+    public static let supportedSchemaVersion = 24
     private let database: OpaquePointer
     public let databaseURL: URL
 
@@ -333,7 +335,7 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
         ].compactMap { $0 }.joined(separator: " AND ")
         var statement: OpaquePointer?
         let sql = """
-        SELECT t.id, t.root_id, t.path, NULLIF(t.archive_path, ''), NULLIF(t.archive_entry, ''), t.track_index, t.track_count,
+        SELECT t.id, t.root_id, t.path, NULLIF(t.archive_path, ''), NULLIF(t.archive_entry, ''), t.track_index, t.track_count, t.track_number,
                COALESCE(m.title, ''), COALESCE(NULLIF(m.game, ''), NULLIF(t.browser_game, ''), ''), COALESCE(m.author, ''),
                COALESCE(m.system, ''), COALESCE(m.comment, ''),
                COALESCE(t.browser_game, ''), COALESCE(t.browser_system, ''),
@@ -367,7 +369,7 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
             ? "COALESCE(NULLIF(t.browser_system, ''), NULLIF(m.system, ''), '')"
             : "COALESCE(NULLIF(m.system, ''), NULLIF(t.browser_system, ''), '')"
         let sql = """
-        SELECT t.id, t.root_id, t.path, NULLIF(t.archive_path, ''), NULLIF(t.archive_entry, ''), t.track_index, t.track_count,
+        SELECT t.id, t.root_id, t.path, NULLIF(t.archive_path, ''), NULLIF(t.archive_entry, ''), t.track_index, t.track_count, t.track_number,
                COALESCE(m.title, ''), COALESCE(NULLIF(m.game, ''), NULLIF(t.browser_game, ''), ''), COALESCE(m.author, ''),
                COALESCE(m.system, ''), COALESCE(m.comment, ''),
                COALESCE(t.browser_game, ''), COALESCE(t.browser_system, ''),
@@ -402,7 +404,7 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
     }
 
     /// Fetches exact visible source leaves without materializing an entire
-    /// root. Electron uses this through the bridge for Files-view activation.
+    /// root. Host bridges use this for Files-view activation.
     public func tracks(rootID: Int64, sourcePaths: [String]) throws -> [CatalogTrack] {
         let paths = Array(Set(sourcePaths.filter { !$0.isEmpty })).sorted()
         guard !paths.isEmpty else { return [] }
@@ -500,7 +502,7 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
         deadSourcePredicate: String = "d.path=COALESCE(t.archive_path, t.path)"
     ) throws -> [CatalogTrack] {
         let sql = """
-        SELECT t.id, t.root_id, t.path, NULLIF(t.archive_path, ''), NULLIF(t.archive_entry, ''), t.track_index, t.track_count,
+        SELECT t.id, t.root_id, t.path, NULLIF(t.archive_path, ''), NULLIF(t.archive_entry, ''), t.track_index, t.track_count, t.track_number,
                COALESCE(m.title, ''), COALESCE(NULLIF(m.game, ''), NULLIF(t.browser_game, ''), ''), COALESCE(m.author, ''),
                COALESCE(m.system, ''), COALESCE(m.comment, ''),
                COALESCE(t.browser_game, ''), COALESCE(t.browser_system, ''),
@@ -588,11 +590,12 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
             id: sqlite3_column_int64(statement, 0), rootID: sqlite3_column_int64(statement, 1),
             sourcePath: string(statement, 2), archivePath: nullableString(statement, 3), archiveEntry: nullableString(statement, 4),
             trackIndex: Int(sqlite3_column_int64(statement, 5)), trackCount: Int(sqlite3_column_int64(statement, 6)),
-            title: string(statement, 7), game: string(statement, 8), author: string(statement, 9),
-            system: string(statement, 10), comment: string(statement, 11),
-            browserGame: string(statement, 12), browserSystem: string(statement, 13),
-            introLengthMilliseconds: Int(sqlite3_column_int64(statement, 14)), loopLengthMilliseconds: Int(sqlite3_column_int64(statement, 15)),
-            lengthMilliseconds: Int(sqlite3_column_int64(statement, 16)), fadeLengthMilliseconds: Int(sqlite3_column_int64(statement, 17))
+            trackNumber: sqlite3_column_type(statement, 7) == SQLITE_NULL ? nil : Int(sqlite3_column_int64(statement, 7)),
+            title: string(statement, 8), game: string(statement, 9), author: string(statement, 10),
+            system: string(statement, 11), comment: string(statement, 12),
+            browserGame: string(statement, 13), browserSystem: string(statement, 14),
+            introLengthMilliseconds: Int(sqlite3_column_int64(statement, 15)), loopLengthMilliseconds: Int(sqlite3_column_int64(statement, 16)),
+            lengthMilliseconds: Int(sqlite3_column_int64(statement, 17)), fadeLengthMilliseconds: Int(sqlite3_column_int64(statement, 18))
         )
     }
 }

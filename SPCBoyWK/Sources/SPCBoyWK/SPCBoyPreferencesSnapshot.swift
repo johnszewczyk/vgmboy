@@ -165,6 +165,13 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
     /// Repairs the durable, renderer-neutral preference subset before it is
     /// exposed to WebKit or written back to the app-specific JSON container.
     mutating func normalizeForPersistence() {
+        // SPCBoyWK is intentionally database-only. Clear legacy local-browser
+        // values whenever preferences cross the native persistence boundary.
+        rootPath = nil
+        localBrowserEnabled = false
+        selectedFolderPath = nil
+        selectedBrowserPath = nil
+        sidebarMode = sidebarMode == .paths ? .paths : .consoles
         normalizeSharedPlaybackPreferences()
         normalizePlaylistColumnPreferences()
         autoResizeAnimationMilliseconds = FrontendAnimationTimings.clamp(

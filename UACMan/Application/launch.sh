@@ -27,10 +27,17 @@ swift build \
   -Xswiftc -module-cache-path \
   -Xswiftc "$MODULE_CACHE"
 
+rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp "$SWIFTPM_DIR/release/UACManApp" "$APP_DIR/Contents/MacOS/UACManApp"
 cp "$APPLICATION_DIR/Resources/Info.plist" "$APP_DIR/Contents/Info.plist"
 cp "$APPLICATION_DIR/Resources/PkgInfo" "$APP_DIR/Contents/PkgInfo"
+cp "$APPLICATION_DIR/DocumentIcon/UACDocumentIcon.icns" "$APP_DIR/Contents/Resources/UACDocumentIcon.icns"
+RESOURCE_BUNDLE="$SWIFTPM_DIR/release/UACMan_UACManApp.bundle"
+[[ -d "$RESOURCE_BUNDLE" ]] || { echo "Missing WKWebView workspace resources: $RESOURCE_BUNDLE" >&2; exit 1; }
+ditto "$RESOURCE_BUNDLE" "$APP_DIR/Contents/Resources/UACMan_UACManApp.bundle"
+codesign --force --deep --sign - --identifier org.vgmman.UACMan "$APP_DIR"
+codesign --verify --deep --strict "$APP_DIR"
 if [[ "$BUILD_ONLY" == "1" ]]; then
   exit 0
 fi

@@ -277,6 +277,7 @@ extension LibraryDatabase {
             t.archive_entry,
             t.track_index,
             t.track_count,
+            t.track_number,
             COALESCE(m.title, ''),
             COALESCE(m.game, ''),
             r.path
@@ -335,10 +336,10 @@ extension LibraryDatabase {
 
         while sqlite3_step(fileStatement) == SQLITE_ROW {
             let path = sqliteString(fileStatement, index: 0)
-            let title = sqliteNullableString(fileStatement, index: 5)?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let game = sqliteNullableString(fileStatement, index: 6)?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let rootPath = sqliteString(fileStatement, index: 7)
-            let track = track(from: fileStatement, pathIndex: 0, archivePathIndex: 1, archiveEntryIndex: 2, trackIndex: 3, trackCount: 4)
+            let title = sqliteNullableString(fileStatement, index: 6)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let game = sqliteNullableString(fileStatement, index: 7)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let rootPath = sqliteString(fileStatement, index: 8)
+            let track = track(from: fileStatement, pathIndex: 0, archivePathIndex: 1, archiveEntryIndex: 2, trackIndex: 3, trackCount: 4, trackNumber: 5)
             items.append(
                 SidebarSearchItem(
                     url: track.url,
@@ -401,13 +402,15 @@ extension LibraryDatabase {
                 archiveURL: URL(fileURLWithPath: archivePath, isDirectory: false),
                 entryPath: archiveEntry,
                 trackIndex: row.trackIndex,
-                trackCount: row.trackCount
+                trackCount: row.trackCount,
+                trackNumber: row.trackNumber
             )
         }
         return TrackItem(
             url: URL(fileURLWithPath: row.sourcePath, isDirectory: false),
             trackIndex: row.trackIndex,
-            trackCount: row.trackCount
+            trackCount: row.trackCount,
+            trackNumber: row.trackNumber
         )
     }
 
@@ -417,11 +420,13 @@ extension LibraryDatabase {
         archivePathIndex: Int32,
         archiveEntryIndex: Int32,
         trackIndex: Int32,
-        trackCount: Int32
+        trackCount: Int32,
+        trackNumber: Int32
     ) -> TrackItem {
         let path = sqliteString(statement, index: pathIndex)
         let index = Int(sqlite3_column_int(statement, trackIndex))
         let count = Int(sqlite3_column_int(statement, trackCount))
+        let sourceTrackNumber = sqlite3_column_type(statement, trackNumber) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, trackNumber))
         if let archivePath = sqliteNullableString(statement, index: archivePathIndex),
            let archiveEntry = sqliteNullableString(statement, index: archiveEntryIndex),
            !archivePath.isEmpty,
@@ -430,13 +435,15 @@ extension LibraryDatabase {
                 archiveURL: URL(fileURLWithPath: archivePath, isDirectory: false),
                 entryPath: archiveEntry,
                 trackIndex: index,
-                trackCount: count
+                trackCount: count,
+                trackNumber: sourceTrackNumber
             )
         }
         return TrackItem(
             url: URL(fileURLWithPath: path, isDirectory: false),
             trackIndex: index,
-            trackCount: count
+            trackCount: count,
+            trackNumber: sourceTrackNumber
         )
     }
 }

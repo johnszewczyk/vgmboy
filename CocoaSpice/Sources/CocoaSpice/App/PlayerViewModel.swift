@@ -10,7 +10,6 @@ import FavoriteStoreCore
 import FavoriteTrackCore
 import OSLog
 import Observation
-import LocalFileBrowserCore
 import PlaybackQueueCore
 import PlaybackTransportCore
 import UniformTypeIdentifiers
@@ -19,7 +18,6 @@ import VGMBoyKit
 enum SidebarBrowserMode: String, CaseIterable, Identifiable {
     case games
     case files
-    case localFiles
 
     var id: String { rawValue }
 
@@ -27,7 +25,6 @@ enum SidebarBrowserMode: String, CaseIterable, Identifiable {
         switch self {
         case .games: "Console View"
         case .files: "Path View"
-        case .localFiles: "Local Files"
         }
     }
 
@@ -35,17 +32,8 @@ enum SidebarBrowserMode: String, CaseIterable, Identifiable {
         switch self {
         case .games: "square.grid.2x2"
         case .files: "folder"
-        case .localFiles: "externaldrive"
         }
     }
-}
-
-struct LocalBrowserSidebarRow: Identifiable, Equatable, Sendable {
-    let node: LocalFileBrowserNode
-    let depth: Int
-    let isExpanded: Bool
-
-    var id: String { node.id }
 }
 
 enum SidebarPresentationView: String, Sendable {
@@ -67,6 +55,7 @@ private extension CatalogPlaylistSortColumn {
     var cocoaSpiceTitle: String {
         switch self {
         case .index: "#"
+        case .trackNumber: "Track #"
         case .file: "File"
         case .title: "Title"
         case .game: "Game"
@@ -89,6 +78,7 @@ final class PlayerViewModel {
     private static let playlistColumnSchema = FrontendPlaylistColumnSchema(columns: [
         .init(id: "favorite", isReorderable: false, isSortable: false),
         .init(id: "index"),
+        .init(id: "trackNumber"),
         .init(id: "file"),
         .init(id: "title"),
         .init(id: "game"),
@@ -224,7 +214,6 @@ final class PlayerViewModel {
         storedMode: SidebarBrowserMode,
         searchText: String
     ) -> SidebarBrowserMode {
-        if storedMode == .localFiles { return .localFiles }
         return sidebarViewResolution(storedMode: storedMode, searchText: searchText).contentMode == .folders
             ? SidebarBrowserMode.files
             : SidebarBrowserMode.games
@@ -236,7 +225,6 @@ final class PlayerViewModel {
     ) -> SidebarViewResolution {
         let sharedMode: CatalogBrowserMode = switch storedMode {
         case .files: .paths
-        case .localFiles: .diskPath
         case .games: .consoles
         }
         let shared = CatalogBrowserState(mode: sharedMode, query: searchText)
@@ -334,20 +322,12 @@ final class PlayerViewModel {
             )
         }
     }
-    var localBrowserEnabled = false
-    var localBrowserPath = ""
-    let localBrowser = LocalBrowserCoordinator()
-    var localBrowserRows: [LocalBrowserSidebarRow] { localBrowser.rows }
-    var selectedLocalBrowserPath: String? { localBrowser.selectedPath }
-
     var sidebarDisclosureControlEnabled: Bool {
         switch effectiveSidebarBrowserMode {
         case .games:
             sidebarSystemMode && !databaseGameItems.isEmpty
         case .files:
             !databaseFileSidebar.allFolderIDs.isEmpty
-        case .localFiles:
-            localBrowser.canToggleAllFolders
         }
     }
 
@@ -368,8 +348,6 @@ final class PlayerViewModel {
             applyDatabaseGroupState(.setAllCollapsed(shouldCollapse, knownGroupNames: knownGroups))
         case .files:
             databaseFileSidebar.setAllFoldersCollapsed(shouldCollapse)
-        case .localFiles:
-            localBrowser.setAllFoldersCollapsed(shouldCollapse)
         }
     }
 
@@ -379,8 +357,6 @@ final class PlayerViewModel {
             !expandedDatabaseSystems.isEmpty
         case .files:
             !databaseFileSidebar.expandedFolderIDs.isEmpty
-        case .localFiles:
-            localBrowser.hasExpandedDescendantFolders
         }
     }
     var playlistContentRevision: Int { queue.contentRevision }
@@ -457,15 +433,12 @@ final class PlayerViewModel {
             databaseSidebarLoader.fileLoadingStatus.isEmpty
                 ? "Preparing the folder tree…"
                 : databaseSidebarLoader.fileLoadingStatus
-        case .localFiles:
-            "Reading Local Files"
         }
     }
     var databaseSidebarLoadError: String? {
         switch effectiveSidebarBrowserMode {
         case .games: databaseSidebarLoader.gameLoadError
         case .files: databaseSidebarLoader.fileLoadError
-        case .localFiles: nil
         }
     }
 
@@ -476,10 +449,6 @@ final class PlayerViewModel {
     /// Reloads the externally published catalog snapshot. Playback keeps its
     /// loaded queue; only the Database browser is refreshed.
     func reloadLibrary() {
-        guard !localBrowserEnabled else {
-            libraryDatabaseLocationStatus = "Turn off Local Files before reloading the database library."
-            return
-        }
         guard libraryDatabase != nil else {
             libraryDatabaseLocationStatus = "Library database is unavailable."
             return
@@ -746,7 +715,7 @@ final class PlayerViewModel {
             libraryDatabaseLocationStatus = "Library database unavailable: \(error.localizedDescription)"
         }
         restorePlaybackPreferences(restoredState.playbackPreferences)
-        restoreLocalBrowserPreferences()
+        restoreLibraryPreferences()
         restoreFavorites()
         Task { [weak self] in
             let recovery = await Task.detached(priority: .utility) {
@@ -756,33 +725,23 @@ final class PlayerViewModel {
             self?.statusText = "Recovered \(recovery.rootCount) abandoned CocoaSpice cache items (\(ByteCountFormatter.string(fromByteCount: recovery.byteCount, countStyle: .file)))."
         }
         reloadCatalogRoots()
-        if localBrowserEnabled {
-            configureLocalBrowser(path: localBrowserPath)
-        } else {
-            reloadDatabaseSidebar()
-        }
+        reloadDatabaseSidebar()
         restorePersistedPlaylist(restoredState.sessionState)
         restorePlaylistColumnState(restoredState.playlistColumnState)
         sidebarSearchText = restoredState.sidebarSearchText
         startPlaybackTimer()
-        if !localBrowserEnabled {
-            restoreInitialSidebarMode(
-                lastRootPath: restoredState.lastRootPath,
-                lastLibrarySelectedFolderPath: restoredState.lastLibrarySelectedFolderPath
-            )
-        }
+        restoreInitialSidebarMode(
+            lastRootPath: restoredState.lastRootPath,
+            lastLibrarySelectedFolderPath: restoredState.lastLibrarySelectedFolderPath
+        )
         updateRemoteTransportState()
     }
 
-    private func restoreLocalBrowserPreferences() {
+    private func restoreLibraryPreferences() {
         let defaults = UserDefaults.standard
         favoriteSortOrder = FavoriteSortOrder(
             rawValue: defaults.string(forKey: AppDefaultsKey.favoriteSortOrder) ?? "historical"
         ) ?? .historical
-        localBrowserPath = defaults.string(forKey: AppDefaultsKey.localBrowserPath) ?? ""
-        localBrowserEnabled = defaults.bool(forKey: AppDefaultsKey.localBrowserEnabled)
-            && !localBrowserPath.isEmpty
-        if localBrowserEnabled { sidebarBrowserMode = .localFiles }
     }
 
     func setAutoResizeAnimationMilliseconds(_ value: Int) {
@@ -818,126 +777,6 @@ final class PlayerViewModel {
         favoriteSortOrder = order
         UserDefaults.standard.set(order.rawValue, forKey: AppDefaultsKey.favoriteSortOrder)
         favorites.presentationChanged()
-    }
-
-    func setLocalBrowserEnabled(_ enabled: Bool) {
-        if enabled && localBrowserPath.isEmpty {
-            chooseLocalBrowserRoot()
-            return
-        }
-        localBrowserEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: AppDefaultsKey.localBrowserEnabled)
-        if enabled {
-            sidebarBrowserMode = .localFiles
-            configureLocalBrowser(path: localBrowserPath)
-        } else {
-            sidebarBrowserMode = .games
-            localBrowser.clear()
-            loadDatabaseSidebarIfNeeded()
-        }
-        savePreferencesNow()
-    }
-
-    func chooseLocalBrowserRoot() {
-        let panel = NSOpenPanel()
-        panel.title = "Choose Local Files Folder"
-        panel.prompt = "Choose Folder"
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        if !localBrowserPath.isEmpty {
-            panel.directoryURL = URL(fileURLWithPath: localBrowserPath, isDirectory: true)
-        }
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        openLocalBrowserPath(url)
-    }
-
-    func openLocalBrowserPath() {
-        let panel = NSOpenPanel()
-        panel.title = "Open Local Path"
-        panel.prompt = "Open"
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = true
-        panel.allowsMultipleSelection = false
-        if !localBrowserPath.isEmpty {
-            panel.directoryURL = URL(fileURLWithPath: localBrowserPath, isDirectory: true)
-        }
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        openLocalBrowserPath(url)
-    }
-
-    func openLocalBrowserPath(_ inputURL: URL) {
-        let url = inputURL.standardizedFileURL
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
-            statusText = "Local path does not exist: \(url.path)"
-            return
-        }
-        let root = isDirectory.boolValue ? url : url.deletingLastPathComponent()
-        localBrowserPath = root.path
-        localBrowserEnabled = true
-        sidebarBrowserMode = .localFiles
-        UserDefaults.standard.set(root.path, forKey: AppDefaultsKey.localBrowserPath)
-        UserDefaults.standard.set(true, forKey: AppDefaultsKey.localBrowserEnabled)
-        configureLocalBrowser(path: root.path)
-        if !isDirectory.boolValue { activateLocalBrowserPath(url.path) }
-        savePreferencesNow()
-    }
-
-    func selectLocalBrowserRow(_ row: LocalBrowserSidebarRow) {
-        localBrowser.select(path: row.node.path)
-        statusText = row.node.kind == .folder
-            ? "Browsing \(row.node.name)"
-            : row.node.name
-        if row.node.kind == .folder, playlistFollowsCursor {
-            queueFolder(URL(fileURLWithPath: row.node.path), replace: true)
-        }
-    }
-
-    func toggleLocalBrowserFolder(_ path: String) {
-        do { try localBrowser.toggleFolder(path: path) }
-        catch { statusText = error.localizedDescription }
-    }
-
-    func activateLocalBrowserPath(_ path: String, enqueue: Bool = false) {
-        guard let url = try? localBrowser.resolve(path: path) else { return }
-        var isDirectory: ObjCBool = false
-        FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
-        if isDirectory.boolValue {
-            queueFolder(url, replace: !enqueue, preservePlayback: !enqueue)
-            return
-        }
-        let generation = queueBuildTaskOwner.begin()
-        statusText = "Loading \(url.lastPathComponent)…"
-        let task = Task { [weak self] in
-            guard let self else { return }
-            let loaded = await PlaylistQueueLoader.loadDroppedTracks(from: [url])
-            guard self.queueBuildTaskOwner.isCurrent(generation) else { return }
-            self.applyQueuedTracks(
-                loaded.tracks,
-                from: url.deletingLastPathComponent(),
-                replace: !enqueue,
-                preservePlayback: !enqueue,
-                seedMetadataCache: loaded.metadata,
-                widthHints: loaded.widthHints,
-                autoplay: !enqueue
-            )
-            self.queueBuildTaskOwner.finish(generation: generation)
-        }
-        queueBuildTaskOwner.install(task, generation: generation)
-    }
-
-    private func configureLocalBrowser(path: String) {
-        guard !path.isEmpty else { return }
-        do {
-            let root = try localBrowser.configure(path: path) {
-                PlaybackFormatRegistry.admits(fileURL: $0) || ZipArchiveSupport.canHandle($0)
-            }
-            statusText = "Browsing local files in \(root.name)"
-        } catch {
-            localBrowser.clear()
-            statusText = error.localizedDescription
-        }
     }
 
     private func loadRoot(url: URL) {
@@ -1697,13 +1536,9 @@ final class PlayerViewModel {
     }
 
     func setSidebarBrowserMode(_ mode: SidebarBrowserMode) {
-        if localBrowserEnabled, mode != .localFiles {
-            statusText = "Turn off Local Files in Options to use the database library."
-            return
-        }
         sidebarBrowserMode = mode
         applySidebarSearch()
-        if mode != .localFiles { loadDatabaseSidebarIfNeeded() }
+        loadDatabaseSidebarIfNeeded()
         savePreferencesNow()
     }
 
@@ -1719,7 +1554,6 @@ final class PlayerViewModel {
     }
 
     func cycleLibrarySidebarMode() {
-        guard !localBrowserEnabled else { return }
         let modes: [SidebarBrowserMode] = [.games, .files]
         let index = modes.firstIndex(of: sidebarBrowserMode) ?? -1
         setSidebarBrowserMode(modes[(index + 1) % modes.count])
@@ -3176,11 +3010,6 @@ final class PlayerViewModel {
     }
 
     private func applySidebarSearch() {
-        if sidebarBrowserMode == .localFiles {
-            databaseSidebar.searchText = ""
-            databaseFileSidebarSearchTaskOwner.cancel()
-            return
-        }
         let hasQuery = !sidebarSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         if hasQuery || sidebarBrowserMode == .games {
             databaseFileSidebarSearchTaskOwner.cancel()
@@ -3292,8 +3121,7 @@ final class PlayerViewModel {
     }
 
     private func hydrateRestoredPlaylistMetadata() {
-        guard !localBrowserEnabled,
-              let databaseURL = libraryDatabaseURL,
+        guard let databaseURL = libraryDatabaseURL,
               !playlist.isEmpty else { return }
 
         let generation = playlistMetadataTaskOwner.begin()
@@ -3484,7 +3312,7 @@ final class PlayerViewModel {
     private func playlistSortDependsOnMetadata(_ column: CatalogPlaylistSortColumn?) -> Bool {
         guard let column else { return false }
         switch column {
-        case .index, .file, .path:
+        case .index, .trackNumber, .file, .path:
             return false
         case .title, .game, .author, .system, .length:
             return true
@@ -3529,9 +3357,17 @@ final class PlayerViewModel {
     }
 
     func indexText(for track: TrackItem) -> String {
-        guard let index = playlist.firstIndex(of: track) else { return "—" }
+        guard let index = playlistManualOrder[track.id] else { return "—" }
         return String(index + 1)
     }
+
+    /// Displays SongScan's canonical one-based source track number. An absent
+    /// tag remains blank; playlist position belongs exclusively to the `#`
+    /// column and must never become synthetic source metadata.
+    func trackNumberText(for track: TrackItem) -> String {
+        track.trackNumber.map(String.init) ?? "—"
+    }
+
 
     nonisolated private static func buildPlaylistColumnWidthHints(
         tracks: [TrackItem],

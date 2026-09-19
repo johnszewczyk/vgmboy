@@ -59,11 +59,12 @@ public enum BuiltInScannerPlugins {
         .init(pluginID: "qsf-direct", displayName: "QSF PSF container reader", supportedExtensions: ["qsf"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 10),
         .init(pluginID: "qsf-mini-direct", displayName: "miniQSF PSF container reader", supportedExtensions: ["miniqsf"], structurePolicy: .dependencyEnumerate, metadataPolicy: .direct, priority: 10),
         .init(pluginID: "play-psf2", displayName: "Play! PSF2", supportedExtensions: ["psf2", "minipsf2"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 10),
-        .init(pluginID: "sid", displayName: "SID", supportedExtensions: ["sid"], structurePolicy: .knownSingle, metadataPolicy: .direct, priority: 10)
+        .init(pluginID: "sid", displayName: "SID", supportedExtensions: ["sid"], structurePolicy: .enumerate, metadataPolicy: .direct, priority: 10)
     ]
 
-    // These routes still need their playback/inspection implementation to
-    // provide enumeration or decoder-owned timing and metadata.
+    // These routes still need a playback/inspection implementation for
+    // decoder acceptance, subsong enumeration, or metadata not yet covered
+    // by a complete direct reader.
     private static let decoderMetadataDescriptors: [ScannerPluginDescriptor] = [
         .init(pluginID: "libvgm", displayName: "libVGM", supportedExtensions: ["gym"], structurePolicy: .knownSingle, metadataPolicy: .decoder, priority: 10),
         .init(pluginID: "mdx", displayName: "mdxmini", supportedExtensions: ["mdx"], structurePolicy: .knownSingle, metadataPolicy: .decoder, priority: 10),

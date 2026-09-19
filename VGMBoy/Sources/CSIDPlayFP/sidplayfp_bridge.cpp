@@ -25,6 +25,7 @@ struct SidPlayer {
   SIDLiteBuilder* builder = nullptr;
   sidplayfp player;
   uint32_t cpuClock = kCpuClockPAL;
+  uint32_t trackCount = 1;
   int32_t sampleRate = kDefaultSampleRate;
   int64_t playedFrames = 0;
   std::vector<short> overflow;
@@ -72,7 +73,12 @@ SidPlayer* openPlayer(const char* path, int32_t sampleRate, char** errorMessage)
     delete result;
     return nullptr;
   }
-  result->cpuClock = cpuClock(result->tune->getInfo());
+  // libsidplayfp requires selecting a subsong before load(); otherwise the
+  // tune can open successfully but render only a constant SID output level.
+  result->tune->selectSong(0);
+  const SidTuneInfo* info = result->tune->getInfo();
+  result->trackCount = info ? std::max(1U, info->songs()) : 1U;
+  result->cpuClock = cpuClock(info);
   result->builder = new (std::nothrow) SIDLiteBuilder("vgmboy-sidlite");
   if (!result->builder) {
     setError(errorMessage, "Out of memory creating SID emulator");
@@ -110,6 +116,34 @@ extern "C" void vgmboy_sid_close(vgmboy_sid_handle_t handle) {
   delete player->builder;
   delete player->tune;
   delete player;
+}
+
+extern "C" uint32_t vgmboy_sid_track_count(vgmboy_sid_handle_t handle) {
+  const SidPlayer* player = static_cast<const SidPlayer*>(handle);
+  return player ? player->trackCount : 0;
+}
+
+extern "C" int32_t vgmboy_sid_start_track(vgmboy_sid_handle_t handle, int32_t track_index, char** error_message) {
+  SidPlayer* player = static_cast<SidPlayer*>(handle);
+  if (!player || !player->tune || track_index < 0 || static_cast<uint32_t>(track_index) >= player->trackCount) {
+    setError(error_message, "SID track index is unavailable");
+    return 1;
+  }
+
+  const unsigned int songNumber = static_cast<unsigned int>(track_index) + 1;
+  if (player->tune->selectSong(songNumber) != songNumber) {
+    setError(error_message, "libsidplayfp could not select the requested SID subtune");
+    return 1;
+  }
+  if (!player->player.reset()) {
+    setError(error_message, playerError(player->player));
+    return 1;
+  }
+  player->cpuClock = cpuClock(player->tune->getInfo());
+  player->overflow.clear();
+  player->overflowConsumed = 0;
+  player->playedFrames = 0;
+  return 0;
 }
 
 extern "C" int32_t vgmboy_sid_read_metadata(vgmboy_sid_handle_t handle, vgmboy_sid_metadata_t* metadata, char** error_message) {

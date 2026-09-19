@@ -29,6 +29,7 @@ public struct CatalogPlaylistPresentationRow: Equatable, Sendable {
     public let archiveEntry: String?
     public let trackIndex: Int
     public let trackCount: Int
+    public let trackNumber: Int?
     public let title: String
     public let game: String
     public let author: String
@@ -67,6 +68,7 @@ public struct CatalogPlaylistPresentationProjection: Equatable, Sendable {
 public struct CatalogPlaylistSortRecord: Codable, Equatable, Sendable {
     public let id: String
     public let naturalOrder: Int
+    public let trackNumber: Int?
     public let fileText: String
     public let titleText: String
     public let gameText: String
@@ -84,10 +86,12 @@ public struct CatalogPlaylistSortRecord: Codable, Equatable, Sendable {
         authorText: String,
         systemText: String,
         pathText: String,
-        lengthMilliseconds: Int
+        lengthMilliseconds: Int,
+        trackNumber: Int? = nil
     ) {
         self.id = id
         self.naturalOrder = naturalOrder
+        self.trackNumber = trackNumber
         self.fileText = fileText
         self.titleText = titleText
         self.gameText = gameText
@@ -100,6 +104,7 @@ public struct CatalogPlaylistSortRecord: Codable, Equatable, Sendable {
 
 public enum CatalogPlaylistSortColumn: String, CaseIterable, Codable, Sendable {
     case index
+    case trackNumber
     case file
     case title
     case game
@@ -114,6 +119,7 @@ public enum CatalogPlaylistSortColumn: String, CaseIterable, Codable, Sendable {
     public init?(frontendColumn: String) {
         switch frontendColumn {
         case "index": self = .index
+        case "trackNumber", "track-number": self = .trackNumber
         case "file", "filename": self = .file
         case "title": self = .title
         case "game": self = .game
@@ -165,6 +171,13 @@ public enum CatalogPlaylistSorting {
         direction: CatalogPlaylistSortDirection
     ) -> [String] {
         records.sorted { lhs, rhs in
+            if column == .trackNumber,
+               (lhs.trackNumber == nil) != (rhs.trackNumber == nil) {
+                // Missing source tags stay at the end in both directions;
+                // reversing tagged values must not turn "—" into a fake
+                // numbered track.
+                return lhs.trackNumber != nil
+            }
             let comparison = compare(lhs, rhs, by: column)
             if comparison == .orderedSame {
                 return lhs.naturalOrder < rhs.naturalOrder
@@ -183,6 +196,8 @@ public enum CatalogPlaylistSorting {
         switch column {
         case .index:
             return compare(lhs.naturalOrder, rhs.naturalOrder)
+        case .trackNumber:
+            return compareOptional(lhs.trackNumber, rhs.trackNumber)
         case .file:
             return lhs.fileText.localizedStandardCompare(rhs.fileText)
         case .title:
@@ -204,6 +219,22 @@ public enum CatalogPlaylistSorting {
         if lhs == rhs { return .orderedSame }
         return lhs < rhs ? .orderedAscending : .orderedDescending
     }
+
+    /// Tagged tracks sort numerically; untagged tracks remain grouped after
+    /// tagged tracks in either direction instead of acquiring a synthetic
+    /// playlist number.
+    private static func compareOptional(_ lhs: Int?, _ rhs: Int?) -> ComparisonResult {
+        switch (lhs, rhs) {
+        case let (left?, right?):
+            return compare(left, right)
+        case (nil, nil):
+            return .orderedSame
+        case (nil, _):
+            return .orderedDescending
+        case (_, nil):
+            return .orderedAscending
+        }
+    }
 }
 
 public enum CatalogPlaylistPresentation {
@@ -219,6 +250,7 @@ public enum CatalogPlaylistPresentation {
                 archiveEntry: $0.archiveEntry,
                 trackIndex: $0.trackIndex,
                 trackCount: $0.trackCount,
+                trackNumber: $0.trackNumber,
                 title: $0.title,
                 game: $0.game,
                 author: $0.author,
@@ -244,6 +276,7 @@ public enum CatalogPlaylistPresentation {
                 archiveEntry: $0.archiveEntry,
                 trackIndex: $0.trackIndex,
                 trackCount: $0.trackCount,
+                trackNumber: $0.trackNumber,
                 title: $0.title,
                 game: $0.game,
                 author: $0.author,
@@ -265,6 +298,7 @@ public enum CatalogPlaylistPresentation {
         let archiveEntry: String?
         let trackIndex: Int
         let trackCount: Int
+        let trackNumber: Int?
         let title: String
         let game: String
         let author: String
@@ -322,6 +356,7 @@ public enum CatalogPlaylistPresentation {
             archiveEntry: archiveEntry,
             trackIndex: index,
             trackCount: count,
+            trackNumber: input.trackNumber,
             title: input.title,
             game: input.game,
             author: input.author,

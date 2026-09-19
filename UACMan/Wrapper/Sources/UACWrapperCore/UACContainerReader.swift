@@ -278,7 +278,7 @@ public enum UACContainerReader {
     }
 
     public static func validate(_ manifest: UACManifest) throws {
-        guard manifest.manifestVersion == 1,
+        guard (1...2).contains(manifest.manifestVersion),
               !manifest.packageID.isEmpty,
               !manifest.game.id.isEmpty,
               !manifest.game.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -338,7 +338,10 @@ public enum UACContainerReader {
                       !hash.algorithm.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                       !hash.profile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                       !hash.digest.isEmpty,
-                      hash.digest.allSatisfy({ $0.isHexDigit && !$0.isUppercase }),
+                      // Hash records may use either case for algorithms such
+                      // as CRC32. BLAKE3-256 remains canonical lowercase via
+                      // the algorithm-specific check below.
+                      hash.digest.allSatisfy({ $0.isHexDigit }),
                       hash.algorithm != "blake3-256" || Self.isBLAKE3(hash.digest),
                       hashRecordKeys.insert(key).inserted else {
                     throw UACContainerError.invalidManifest("Invalid or duplicate member hash record: \(member.path)")
@@ -353,9 +356,12 @@ public enum UACContainerReader {
                     throw UACContainerError.memberSeekRangeOutOfBounds(member.path)
                 }
             }
-            if let variantID = member.variantID,
-               !member.path.hasPrefix("variants/\(variantID)/") {
-                throw UACContainerError.invalidManifest("Variant member is outside its isolated variant directory: \(member.path)")
+            if let variantID = member.variantID {
+                let isNamespaced = member.path.hasPrefix("variants/\(variantID)/")
+                let requiresNamespace = manifest.manifestVersion == 1 || variantIDs.count > 1
+                if requiresNamespace && !isNamespaced {
+                    throw UACContainerError.invalidManifest("Variant member is outside its isolated variant directory: \(member.path)")
+                }
             }
             if member.variantID == nil,
                !(member.path.hasPrefix("assets/") || member.path.hasPrefix("shared/")) {
@@ -407,6 +413,17 @@ public enum UACContainerReader {
                       entry.targetMemberBlake3.map({ $0 == targetMember.blake3 }) ?? true,
                       playlist.variantID.map({ targetMember.variantID == nil || targetMember.variantID == $0 }) ?? true else {
                     throw UACContainerError.invalidManifest("Playlist entry does not resolve to a compatible member: \(playlist.id) -> \(entry.targetMemberPath)")
+                }
+                if entry.entryKind == "subsong" {
+                    guard let trackIndex = entry.trackIndex,
+                          let decodedIndex = Int(trackIndex),
+                          decodedIndex >= 0,
+                          String(decodedIndex) == trackIndex,
+                          targetMember.role == "playable" || targetMember.role == "track" else {
+                        throw UACContainerError.invalidManifest(
+                            "Subsong playlist entries require a playable member and a nonnegative decimal track index: \(playlist.id) -> \(entry.targetMemberPath)"
+                        )
+                    }
                 }
             }
         }
@@ -484,7 +501,7 @@ public struct UACManifest: Codable, Equatable, Sendable {
     public let extensions: [String: UACJSONValue]
 
     public init(
-        manifestVersion: Int = 1,
+        manifestVersion: Int = 2,
         packageID: String,
         payload: UACPayload,
         game: UACGame,

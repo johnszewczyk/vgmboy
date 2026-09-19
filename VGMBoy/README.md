@@ -12,9 +12,9 @@ the typed `PlaybackControlProtocol` remains the native Swift payload contract.
 
 VGMBoy is intentionally database-free. ScanSong remains the sole schema-23
 catalog writer. The maintained player apps bundle `VGMBoyKit` in-process
-through host-specific adapters. The Electron SPCBoy tree is archived; ScanSong
-bundles VGMBoy-built inspection executables where a direct MetaMan reader is
-not sufficient.
+through host-specific adapters. The Electron SPCBoy bridge exists only for
+recovery of the archived player. ScanSong bundles VGMBoy-built inspection
+executables where a direct MetaMan reader is not sufficient.
 
 ## How the app family works
 
@@ -47,10 +47,11 @@ repository-level summary readable.
 
 | Plugin | Current version or revision | Upstream repository or home | Formats routed here | VGMBoy integration |
 | --- | --- | --- | --- | --- |
-| [Game Music Emu / libgme](https://github.com/libgme/game-music-emu) | 0.6.5 (Homebrew `game-music-emu` / `pkg-config`) | [github.com/libgme/game-music-emu](https://github.com/libgme/game-music-emu) | AY, GBS, HES, KSS, NSF, NSFE, SAP, SPC | `CGameMusicEmu` system-library target; native long-play and tempo support. |
+| [Game Music Emu / libgme](https://github.com/libgme/game-music-emu) | 0.6.5 (Homebrew `game-music-emu` / `pkg-config`) | [github.com/libgme/game-music-emu](https://github.com/libgme/game-music-emu) | AY, GBS, HES, KSS, NSF, NSFE, SPC | `CGameMusicEmu` system-library target; native long-play and tempo support. |
+| [ASAP](https://asap.sourceforge.net/) | 8.0.0 from the vendored ZXTune snapshot `c93e81d081685ea2c7cd21fe0077e93d84b4d88d` | [asap.sourceforge.net](https://asap.sourceforge.net/) | SAP TYPE B/C/D/S | `VGMBoyCASAP` and `ASAPDecoder`; native long-play, no tempo control. GPL-2.0-or-later. |
 | [libvgm](https://github.com/ValleyBell/libvgm) | `867223e7c33d63de115d1ab955f784c44f19040a` | [github.com/ValleyBell/libvgm](https://github.com/ValleyBell/libvgm) | VGM, VGZ, GYM, S98, DRO | `CLibVGM` bridge; source and static-library build are owned by VGMBoy. |
 | [psgplay](https://github.com/frno7/psgplay) | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | [github.com/frno7/psgplay](https://github.com/frno7/psgplay) | SNDH | `CPSGPlay` playback bridge; its former `VGMBoySNDH` metadata API is now a test-only ScanSong oracle. ScanSong production reads SNDH through MetaManCore. A deterministic 1,024-file sample selected and rendered 2,030 subtunes; the full playback corpus remains unqualified. |
-| [mdxmini](https://github.com/mistydemeo/mdxmini) | `003531a471c1955f4ed4357d0e2a6cba809c34a0` | [github.com/mistydemeo/mdxmini](https://github.com/mistydemeo/mdxmini) | MDX, with adjacent PDX sample banks | `CMDX` bridge; one logical MDX sequence per playlist item, case-insensitive PDX resolution, native duration, X68000 LZX 0.32/0.42 normalization for MDX bodies and PDX banks, and a matching `vgmboy-mdx-inspect` scanner executable. GPL-2.0-or-later. |
+| [mdxmini](https://github.com/mistydemeo/mdxmini) | `003531a471c1955f4ed4357d0e2a6cba809c34a0` | [github.com/mistydemeo/mdxmini](https://github.com/mistydemeo/mdxmini) | MDX, with adjacent PDX sample banks | `CMDX` playback bridge; one logical MDX sequence per playlist item, case-insensitive PDX resolution, native player timing, X68000 LZX 0.32/0.42 normalization for MDX bodies and PDX banks. The ScanSong `vgmboy-mdx-inspect` process only validates that a module and its dependencies open; MetaMan owns scanner metadata and timing. GPL-2.0-or-later. |
 | [UADE](https://github.com/dv1/uade) | Homebrew `uade` 3.05 | [github.com/dv1/uade](https://github.com/dv1/uade) | Amiga EaglePlayer modules, including prefix-led `mod.*`, `p4x.*`, TFMX, MED, and custom players | `CUADE` bridge; content-aware prefix routing, complete Amiga archive-set materialization, UADE subsong enumeration, native PCM, and the matching `vgmboy-amiga-inspect` scanner executable. GPL-2.0-only; the installed runtime/data directory is required at run time. |
 | [Highly Complete](https://github.com/mgba-emu/mgba) (mGBA + PSFLib) | mGBA 0.11.0 source snapshot + PSFLib source snapshot; tree digests in `vendor/PROVENANCE.md` | [github.com/mgba-emu/mgba](https://github.com/mgba-emu/mgba) | GSF, miniGSF | `CHighlyComplete` bridge; PSFLib resolves the complete miniGSF chain, then mGBA runs the assembled GBA ROM. The bridge resamples mGBA's live native rate into VGMBoy's fixed output rate. |
 | 2sf2wav | DeSmuME 0.9.9 svn 4608 source snapshot; tree digest in `vendor/PROVENANCE.md` | — | 2SF, mini2SF | `C2SF` bridge over the static DS core. It validates relative mini2SF libraries and explicitly tears down process-global DS state before any replacement decoder is created. |

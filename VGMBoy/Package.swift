@@ -23,6 +23,7 @@ let playPSFVendorDirectory = "\(sharedVendorRoot)/play/tools/PsfPlayer/Source"
 let qsfBuildDirectory = "\(dependencyRoot)/qsf"
 let psgPlayVendorDirectory = "\(sharedVendorRoot)/psgplay"
 let psgPlayBuildDirectory = "\(dependencyRoot)/psgplay"
+let asapVendorDirectory = "\(sharedVendorRoot)/zxtune/3rdparty/asap"
 let mdxMiniVendorDirectory = "\(sharedVendorRoot)/mdxmini/src"
 let uadeIncludeDirectory = "/opt/homebrew/opt/uade/include"
 let uadeLibraryDirectory = "/opt/homebrew/opt/uade/lib"
@@ -89,6 +90,13 @@ let package = Package(
             path: "Sources/CGameMusicEmu",
             pkgConfig: "libgme",
             providers: [.brew(["game-music-emu"])]
+        ),
+        .target(
+            name: "VGMBoyCASAP",
+            path: "Sources/CASAP",
+            publicHeadersPath: "include",
+            cSettings: [.unsafeFlags(["-I\(asapVendorDirectory)"])],
+            linkerSettings: [.linkedLibrary("m")]
         ),
         .target(
             name: "VGMBoyCLibVGM",
@@ -306,7 +314,7 @@ let package = Package(
         ),
         .target(
             name: "VGMBoyKit",
-            dependencies: ["VGMBoyFormatCore", "VGMBoySNDH", "VGMBoyCPSGPlay", "VGMBoyCMDX", "VGMBoyCGameMusicEmu", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCFFmpeg", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCQSF", "VGMBoyCSIDPlayFP", "VGMBoyCOpenMPT", "VGMBoyCUADE", "VGMBoyCAudioUnit"],
+            dependencies: ["VGMBoyFormatCore", "VGMBoySNDH", "VGMBoyCPSGPlay", "VGMBoyCMDX", "VGMBoyCGameMusicEmu", "VGMBoyCASAP", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCFFmpeg", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCQSF", "VGMBoyCSIDPlayFP", "VGMBoyCOpenMPT", "VGMBoyCUADE", "VGMBoyCAudioUnit"],
             linkerSettings: [
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("AudioToolbox")

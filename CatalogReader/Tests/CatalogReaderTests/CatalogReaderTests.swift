@@ -20,18 +20,18 @@ private func fixtureCatalog() throws -> URL {
     guard sqlite3_open(url.path, &database) == SQLITE_OK else { throw NSError(domain: "CatalogReaderTests", code: 2) }
     defer { sqlite3_close(database) }
     try execute(database, """
-        PRAGMA user_version = 23;
+        PRAGMA user_version = 24;
         CREATE TABLE library_roots (id INTEGER PRIMARY KEY, path TEXT NOT NULL, is_enabled INTEGER NOT NULL, is_attached INTEGER NOT NULL, last_scan_track_count INTEGER NOT NULL, game_sidebar_buckets_dirty INTEGER NOT NULL DEFAULT 0, file_sidebar_buckets_dirty INTEGER NOT NULL DEFAULT 0);
-        CREATE TABLE tracks (id INTEGER PRIMARY KEY, root_id INTEGER NOT NULL, folder_path TEXT NOT NULL, path TEXT NOT NULL, filename TEXT NOT NULL, browser_game TEXT NOT NULL, browser_system TEXT NOT NULL, track_index INTEGER NOT NULL, track_count INTEGER NOT NULL, archive_path TEXT, archive_entry TEXT);
+        CREATE TABLE tracks (id INTEGER PRIMARY KEY, root_id INTEGER NOT NULL, folder_path TEXT NOT NULL, path TEXT NOT NULL, filename TEXT NOT NULL, browser_game TEXT NOT NULL, browser_system TEXT NOT NULL, track_index INTEGER NOT NULL, track_count INTEGER NOT NULL, track_number INTEGER, archive_path TEXT, archive_entry TEXT);
         CREATE INDEX tracks_browser_bucket_index ON tracks(root_id, browser_game, browser_system);
         CREATE TABLE track_metadata (track_id INTEGER PRIMARY KEY, title TEXT, game TEXT, author TEXT, system TEXT, comment TEXT, intro_length_ms INTEGER, loop_length_ms INTEGER, play_length_ms INTEGER, fade_length_ms INTEGER);
         CREATE TABLE dead_sources (root_id INTEGER NOT NULL, path TEXT NOT NULL);
         CREATE TABLE game_sidebar_buckets (root_id INTEGER, browser_game TEXT, browser_system TEXT, track_count INTEGER);
         CREATE TABLE file_sidebar_buckets (root_id INTEGER, folder_path TEXT, path TEXT, is_archive INTEGER, track_count INTEGER);
         INSERT INTO library_roots VALUES (1, '/music', 1, 1, 2, 0, 0);
-        INSERT INTO tracks VALUES (1, 1, '/music/Game', '/music/Game/Track 9.spc', 'Track 9.spc', 'Game', 'SNES', 0, 1, NULL, NULL);
-        INSERT INTO tracks VALUES (2, 1, '/music/Game', '/music/Game/Track 10.spc', 'Track 10.spc', 'Game', 'SNES', 0, 1, NULL, NULL);
-        INSERT INTO tracks VALUES (3, 1, '/music/TG16', '/music/TG16/Chew-Man-Fu.tar.zst', 'Chew-Man-Fu.tar.zst', 'Chew Man Fu', '', 0, 1, '/music/TG16/Chew-Man-Fu.tar.zst', NULL);
+        INSERT INTO tracks VALUES (1, 1, '/music/Game', '/music/Game/Track 9.spc', 'Track 9.spc', 'Game', 'SNES', 0, 1, 9, NULL, NULL);
+        INSERT INTO tracks VALUES (2, 1, '/music/Game', '/music/Game/Track 10.spc', 'Track 10.spc', 'Game', 'SNES', 0, 1, 10, NULL, NULL);
+        INSERT INTO tracks VALUES (3, 1, '/music/TG16', '/music/TG16/Chew-Man-Fu.tar.zst', 'Chew-Man-Fu.tar.zst', 'Chew Man Fu', '', 0, 1, NULL, '/music/TG16/Chew-Man-Fu.tar.zst', NULL);
         INSERT INTO track_metadata VALUES (1, 'Track 9', 'Game', 'Composer', 'SNES', '', 0, 0, 90000, 0);
         INSERT INTO track_metadata VALUES (2, 'Track 10', '', 'Composer', 'SNES', '', 0, 0, 100000, 0);
         INSERT INTO track_metadata VALUES (3, 'Chew Man Fu', 'Chew Man Fu', 'Composer', 'PC Engine', '', 0, 0, 120000, 0);
@@ -95,6 +95,7 @@ private func fixtureCatalog() throws -> URL {
 
     #expect(tracks.map(\.title) == ["Chew Man Fu", "Track 10", "Track 9"])
     #expect(tracks.first(where: { $0.title == "Track 10" })?.game == "Game")
+    #expect(tracks.first(where: { $0.title == "Track 10" })?.trackNumber == 10)
     #expect(tracks.map(\.lengthMilliseconds) == [120000, 100000, 90000])
 
     let metadataFallbackTracks = try CatalogPlaylistReader.tracksForGames(

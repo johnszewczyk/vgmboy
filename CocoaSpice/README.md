@@ -1,7 +1,7 @@
 # CocoaSpice
 
 CocoaSpice is the native AppKit/SwiftUI player frontend for the VGMMan family.
-It reads ScanSong’s schema-23 catalog, builds editable playlists, materializes
+It reads ScanSong’s schema-24 catalog, builds editable playlists, materializes
 archive members for playback, and bundles VGMBoyKit in-process. ScanSong owns
 catalog writes; VGMBoy owns decoding, timing, transport, and audio output.
 
@@ -16,8 +16,8 @@ catalog writes; VGMBoy owns decoding, timing, transport, and audio output.
 | VGMBoy | Playback admission, decoding, timing, and audio output. |
 | CocoaSpice | Native presentation, local UI state, and host adapters. |
 
-SPCBoyWK and ViewBoy are separate active WebKit frontends in this same family.
-The older Electron SPCBoy directory is retained as archived source.
+SPCBoyWK and ViewBoy are separate WebKit frontends in this same family. The
+legacy Electron SPCBoy is recovery material and is not an active app target.
 
 ## Build and run
 

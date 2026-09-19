@@ -172,3 +172,24 @@ import Testing
     #expect(decoded == request)
     #expect(decoded.column == CatalogPlaylistSortColumn.file)
 }
+
+@Test func trackNumberSortUsesTaggedValuesAndLeavesUntaggedRowsBlank() {
+    let records = [
+        CatalogPlaylistSortRecord(
+            id: "untagged", naturalOrder: 0, fileText: "untagged.xa", titleText: "",
+            gameText: "", authorText: "", systemText: "", pathText: "", lengthMilliseconds: 0
+        ),
+        CatalogPlaylistSortRecord(
+            id: "track-12", naturalOrder: 1, fileText: "song.xa", titleText: "",
+            gameText: "", authorText: "", systemText: "", pathText: "", lengthMilliseconds: 0, trackNumber: 12
+        ),
+        CatalogPlaylistSortRecord(
+            id: "track-2", naturalOrder: 2, fileText: "song.xa", titleText: "",
+            gameText: "", authorText: "", systemText: "", pathText: "", lengthMilliseconds: 0, trackNumber: 2
+        )
+    ]
+
+    #expect(CatalogPlaylistSortColumn(frontendColumn: "trackNumber") == .trackNumber)
+    #expect(CatalogPlaylistSorting.orderedIDs(records: records, column: .trackNumber, direction: .ascending) == ["track-2", "track-12", "untagged"])
+    #expect(CatalogPlaylistSorting.orderedIDs(records: records, column: .trackNumber, direction: .descending) == ["track-12", "track-2", "untagged"])
+}

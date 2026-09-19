@@ -7,7 +7,7 @@ ten maintained Swift packages/apps: CatalogReader, VGMBoy, FrontendCore,
 MetaMan, UACMan, UACMan/Wrapper, ScanSong, CocoaSpice, SPCBoyWK, and ViewBoy.
 It also runs UACWrapper’s Python CLI tests and both active WebKit renderers’
 syntax and transport suites. Archived Electron source under `SPCBoy/` is
-recovery-only and is excluded from routine builds.
+recovery-only, excluded from routine builds, and not a LaunchPad target.
 
 The checker records branch and dirty state, Git archive refs, toolchain details,
 commands, durations, and full logs. It does not stage, commit, stash, reset, or

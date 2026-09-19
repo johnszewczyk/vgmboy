@@ -2,14 +2,23 @@
 
 ## Product
 
-MetaMan owns decoder-independent metadata readers for game-music and audio
-formats. Apps link `MetaManCore` directly; metadata inspection does not launch
-playback decoders.
+MetaMan owns the direct, decoder-independent metadata readers for its
+explicitly registered game-music and audio formats. Apps link `MetaManCore`
+directly; the core does not launch subprocesses or depend on emulator or
+VGMMan playback plugins. Coverage is the registered list, not every format
+recognized by VGMBoy or ScanSong.
+
+The Swift package has one local package dependency, `UACWrapperCore`; MetaManCore
+also uses system zlib, and its standard-audio reader uses Apple's AVFoundation.
+Compressed UAC manifests require a host-supplied bounded decompression
+callback; the `metaman` CLI currently implements it by running the external
+`zstd` tool.
 
 ## Ownership
 
 - `MetaManCore` parses format-native tags, source facts, timing, dependencies,
-  and ordered track documents where the source format contains them.
+  and ordered track documents where the registered source reader supports
+  them.
 - The command-line target is a thin inspection client.
 - ScanSong adapts reader results into its schema-23 catalog. It owns discovery
   and catalog writes, not duplicate native parsers.

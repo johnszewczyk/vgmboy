@@ -20,7 +20,8 @@ recovery layout.
 | [SPCBoyWK](SPCBoyWK/README.md) | Native WebKit player frontend. |
 | [ViewBoy](ViewBoy/README.md) | Independent phosphor-styled WebKit player frontend. |
 
-The older Electron `SPCBoy/` tree is archived source, not a release target.
+The legacy Electron player is recovery-only; LaunchPad targets SPCBoyWK. The
+verified Electron archive is listed in [`LocalRecovery/README.md`](LocalRecovery/README.md).
 LaunchPad remains a sibling workspace tool because it launches projects beyond
 this family.
 

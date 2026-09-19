@@ -6,7 +6,7 @@ import SQLite3
 /// is created and maintained by ScanSong; this type never opens a writable
 /// SQLite connection or performs schema maintenance.
 final class LibraryDatabase: @unchecked Sendable {
-    static let schemaVersion = 23
+    static let schemaVersion = 24
     static let performanceLogger = Logger(
         subsystem: "com.local.cocoaspice",
         category: "catalog-read"

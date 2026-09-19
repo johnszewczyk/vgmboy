@@ -59,6 +59,18 @@ func sapDefaultsAndPlaceholders() throws {
     #expect(result.tracks[0].document.timing?.playLengthMs == 150_000)
 }
 
+@Test("SAP reader recognizes each ASAP player type without losing the source type")
+func sapReaderRecognizesASAPPlayerTypes() throws {
+    for type in ["B", "C", "D", "S"] {
+        let typeSpecificAddress = type == "C" ? "MUSIC 8000" : "INIT 8000"
+        let fixture = makeSAPFixture("TYPE \(type)\n\(typeSpecificAddress)")
+        let result = try MetaManCore.readResult(data: fixture.data, formatHint: "sap", displayName: "type-\(type).sap")
+
+        #expect(result.tracks.count == 1)
+        #expect(result.tracks[0].document.technicalFacts["playerType"] == type)
+    }
+}
+
 @Test("SAP URL dispatch is track-aware and the single-document API refuses flattening")
 func sapFileURLUsesTrackAwareAPI() throws {
     let fixture = makeSAPFixture("SONGS 2\r\nTIME 0:30\r\nTIME 0:45")
@@ -80,8 +92,9 @@ func sapFileURLUsesTrackAwareAPI() throws {
 func sapRejectsMalformedHeadersAndCounts() {
     for data in [
         Data(repeating: 0, count: 20),
-        Data("SAP\r\nTYPE D\r\n\u{FFFD}\u{FFFD}".utf8),
+        makeSAPFixture("TYPE X").data,
         makeSAPFixture("SONGS 0").data,
+        makeSAPFixture("SONGS 33").data,
         makeSAPFixture("SONGS 65537").data,
         makeSAPFixture("INIT XYZ").data,
         makeSAPFixture("FASTPLAY 0").data,

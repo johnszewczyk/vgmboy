@@ -733,8 +733,8 @@ public final class CatalogScanner: @unchecked Sendable {
                     modifiedAt: candidate.fingerprint.modifiedAt,
                     contentSignature: "uac-member-blake3:\(document.technicalFacts["uac.memberBLAKE3"] ?? "")"
                 ),
-                trackIndex: 0,
-                trackCount: 1,
+                trackIndex: max(0, Int(document.technicalFacts["uac.trackIndex"] ?? "") ?? 0),
+                trackCount: max(1, Int(document.technicalFacts["uac.trackCount"] ?? "") ?? 1),
                 metadata: UACCatalogMetadataAdapter.project(document),
                 browserGameOverride: containerDocument.fields.title ?? "",
                 browserSystemOverride: containerDocument.fields.system ?? ""

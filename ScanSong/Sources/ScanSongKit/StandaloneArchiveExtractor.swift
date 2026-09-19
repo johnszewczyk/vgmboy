@@ -1,4 +1,5 @@
 import Foundation
+import MetaManCore
 
 public struct ExtractedScanArchive: Sendable {
     public struct Member: Sendable {
@@ -252,8 +253,8 @@ public struct StandaloneArchiveExtractor: Sendable {
         dependencySearchRoot: URL?
     ) async throws {
         let mdxURL = payloadURL.appendingPathComponent(entryPath)
-        let data = try Data(contentsOf: mdxURL)
-        guard let dependencyName = MDXDependencyReader.dependencyName(in: data) else { return }
+        let document = try MetaManCore.read(fileURL: mdxURL)
+        guard let dependencyName = MDXDependencyReader.dependencyName(in: document) else { return }
         guard Self.isSafeRelativePath(dependencyName) else {
             throw StandaloneArchiveError.unsafeEntry(dependencyName)
         }
@@ -446,30 +447,18 @@ public struct StandaloneArchiveExtractor: Sendable {
 }
 
 enum MDXDependencyReader {
-    /// Returns the dependency name as declared by the MDX header.
+    /// Applies ScanSong's companion-path compatibility rules to MetaMan's
+    /// decoded source value. Byte-level MDX metadata parsing belongs to MetaMan.
     ///
     /// X68000 files commonly omit the `.PDX` suffix, so that suffix remains
     /// the inference for an extensionless reference. An explicit alternate
     /// extension is authoritative: `NOS.SMP` must stay `NOS.SMP`, not become
     /// the impossible `NOS.SMP.PDX`.
-    static func dependencyName(in data: Data) -> String? {
-        let marker = Data([0x0D, 0x0A, 0x1A])
-        guard let markerRange = data.range(of: marker) else { return nil }
-        let dependencyStart = markerRange.upperBound
-        guard dependencyStart < data.endIndex else { return nil }
-        let remainder = data[dependencyStart...]
-        guard let terminator = remainder.firstIndex(of: 0x00) else { return nil }
-        let rawName = remainder[..<terminator]
-        guard !rawName.isEmpty else { return nil }
-        // MDX files traditionally store the companion dependency in the X68000
-        // locale encoding. Decoding those bytes as UTF-8 turns a valid
-        // Japanese filename into replacement characters (and can introduce
-        // apparent path separators), which then looks like an unsafe member.
-        // Prefer Shift-JIS, with UTF-8 as a compatibility fallback for newer
-        // hand-authored modules.
-        var name = String(data: Data(rawName), encoding: .shiftJIS)
-            ?? String(data: Data(rawName), encoding: .utf8)
-            ?? String(decoding: rawName, as: UTF8.self)
+    static func dependencyName(in document: MetadataDocument) -> String? {
+        guard case .object(let values)? = document.structuredMetadata,
+              case .string(let rawName)? = values["pdxName"],
+              !rawName.isEmpty else { return nil }
+        var name = rawName
         // A legacy X68000 writer used `\name` for a same-directory dependency
         // basename. Strip only those leading backslashes; traversal and any
         // remaining backslash syntax stay rejected by isSafeRelativePath.

@@ -8,7 +8,16 @@ APP_DIR="$BUILD_DIR/app/ScanSong.app"
 VGMBoy_DIR="$SCRIPT_DIR/../VGMBoy"
 VGMBoy_SCANNER_PLUGIN_BUILDER="$VGMBoy_DIR/scripts/build-scanner-plugins.sh"
 
-rm -rf "$BUILD_DIR"
+# Keep SwiftPM's derived objects for normal development builds. Rebuilding the
+# release product from an empty package directory costs about a minute here,
+# while the app bundle itself must still be recreated so removed resources or
+# scanner helpers cannot survive packaging. Set SCANSONG_CLEAN_BUILD=1 when a
+# deliberately clean SwiftPM build is required.
+if [[ "${SCANSONG_CLEAN_BUILD:-0}" == "1" ]]; then
+    rm -rf "$BUILD_DIR"
+else
+    rm -rf "$APP_DIR"
+fi
 mkdir -p "$MODULE_CACHE" "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 export CLANG_MODULE_CACHE_PATH="$MODULE_CACHE"
 export SWIFTPM_MODULECACHE_OVERRIDE="$MODULE_CACHE"

@@ -10,7 +10,7 @@
 
 - The sidebar search field stays at the top of the left pane.
 - The search field now sits tighter to the top chrome with the extra top gap removed.
-- The left pane is either the scanned persistent database browser or an explicitly enabled local-files browser rooted at one user-selected folder.
+- The left pane is the scanned persistent database browser. Arbitrary disk browsing is intentionally outside the sidebar boundary.
 - The bottom sidebar mode switch has been removed.
 - The primary sidebar view is a dense native list of database game rows. Options can enable `Group by Console`, stored internally as `sidebarSystemMode`, which renders expandable console rows with game leaves underneath.
 - Sidebar search filters the database list instead of switching to a separate legacy result view.
@@ -26,12 +26,12 @@
   place library controls in the sidebar column toolbar or transport group.
   The library-mode control cycles exactly `Console View` and `Path View`; it is
   not a dropdown.
-- The View menu exposes those exact two library commands plus the separate `Local Files` command through `FrontendCommandCore`. The Favorites Playlist command uses Command-Shift-D and does not change the sidebar. Command-O opens a file or folder as the local-browser context.
+- The View menu exposes those exact two library commands through `FrontendCommandCore`. The Favorites Playlist command uses Command-Shift-D and does not change the sidebar.
 
 ## Rules
 
 - Keep the left pane as a source browser, not the active queue.
-- Local browsing must use `LocalFileBrowserCore`, stay rooted at the chosen folder, and never become a recursive scan. While enabled, database browsing is disabled.
+- Do not add an arbitrary disk browser to the sidebar. Direct file, folder, and supported archive drops belong to the playlist import path and must not read database metadata.
 - Keep sidebar behavior separate from queue behavior.
 - Keep catalog aggregation in the shared CatalogBrowserCore/CatalogReader boundary. Favorite membership and history live in FrontendCore's shared native sidecar and must not be written into the scan catalog.
 - CocoaSpice reloads the shared favorites store when the app becomes active.

@@ -1,6 +1,6 @@
 # ScanSong
 
-ScanSong is the VGMMan family’s source inspector and schema-23 catalog writer.
+ScanSong is the VGMMan family’s source inspector and schema-24 catalog writer.
 It has a reusable `ScanSongKit`, a JSONL CLI (`scansong`), and a native macOS
 catalog-management app. Player apps read the published catalog; they do not
 scan or modify it.

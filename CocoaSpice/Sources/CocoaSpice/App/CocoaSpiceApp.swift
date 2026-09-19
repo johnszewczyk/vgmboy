@@ -140,11 +140,6 @@ private struct CocoaSpiceCommands: Commands {
         }
 
         CommandGroup(after: .newItem) {
-            Button("Open Path...") {
-                model.openLocalBrowserPath()
-            }
-            .keyboardShortcut("o", modifiers: .command)
-
             Button("Open Playlist...") {
                 model.loadPlaylistM3U()
             }
@@ -199,29 +194,17 @@ private struct CocoaSpiceCommands: Commands {
                 model.setSidebarBrowserMode(.games)
             }
             .keyboardShortcut("2", modifiers: .command)
-            .disabled(model.localBrowserEnabled)
 
             Button(FrontendSidebarView.paths.title) {
                 model.setSidebarBrowserMode(.files)
             }
             .keyboardShortcut("1", modifiers: .command)
-            .disabled(model.localBrowserEnabled)
 
             Button("Favorites Playlist") {
                 model.showFavoritesPlaylist()
             }
             .keyboardShortcut("d", modifiers: [.command, .shift])
 
-            Divider()
-
-            Button("Local Files") {
-                if model.localBrowserEnabled {
-                    model.setSidebarBrowserMode(.localFiles)
-                } else {
-                    model.openLocalBrowserPath()
-                }
-            }
-            .keyboardShortcut("3", modifiers: .command)
         }
 
         CommandGroup(replacing: .appSettings) {

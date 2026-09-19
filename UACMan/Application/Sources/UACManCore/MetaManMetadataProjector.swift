@@ -27,13 +27,32 @@ public enum MetaManMetadataProjector {
                 member[key] = .string(value)
             }
         }
-        if let timing = document.timing,
-           timing.introLengthMs != 0 || timing.loopLengthMs != 0
-            || timing.playLengthMs != 0 || timing.fadeLengthMs != 0 {
-            member["introLengthMs"] = .integer(Int64(timing.introLengthMs))
-            member["loopLengthMs"] = .integer(Int64(timing.loopLengthMs))
-            member["playLengthMs"] = .integer(Int64(timing.playLengthMs))
-            member["fadeLengthMs"] = .integer(Int64(timing.fadeLengthMs))
+        if let timing = document.timing {
+            // Zero and negative values are the readers' "not supplied" defaults.
+            // Do not materialize those defaults as package tags; a present value
+            // must describe a measured duration.
+            if timing.introLengthMs > 0 {
+                member["introLengthMs"] = .integer(Int64(timing.introLengthMs))
+            }
+            if timing.loopLengthMs > 0 {
+                member["loopLengthMs"] = .integer(Int64(timing.loopLengthMs))
+            }
+            if timing.playLengthMs > 0 {
+                member["playLengthMs"] = .integer(Int64(timing.playLengthMs))
+            }
+            if timing.fadeLengthMs > 0 {
+                member["fadeLengthMs"] = .integer(Int64(timing.fadeLengthMs))
+            }
+        }
+        if let loop = document.loop {
+            member["loop"] = .object([
+                "mode": .string(loop.mode),
+                "startSamples": .integer(loop.startSample),
+                "endSamples": .integer(loop.endSample),
+                "sampleRateHz": .integer(Int64(loop.sampleRateHz)),
+                "repeat": .string(loop.repeatCount.map(String.init) ?? "forever"),
+                "source": .string(loop.source ?? "metaman")
+            ])
         }
 
         var native: [String: UACJSONValue] = [
@@ -56,6 +75,39 @@ public enum MetaManMetadataProjector {
             native["rawTagBlockByteCount"] = .integer(Int64(rawTagBlock.count))
         }
         member["nativeMetadata"] = .object(native)
+        return member
+    }
+
+    /// Multi-track members receive only metadata that describes the whole
+    /// source. Track-specific values stay on their ordered playlist entries.
+    public static func sharedMemberFields(
+        from documents: [MetadataDocument],
+        sourceTrackIndices: [Int]
+    ) -> [String: UACJSONValue] {
+        guard let first = documents.first else { return [:] }
+        let commonFields: [(String, (MetadataDocument) -> String?)] = [
+            ("game", { $0.fields.game }),
+            ("system", { $0.fields.system }),
+            ("artist", { $0.fields.artist }),
+            ("album", { $0.fields.album }),
+            ("date", { $0.fields.date }),
+            ("year", { $0.fields.year }),
+            ("genre", { $0.fields.genre }),
+            ("comment", { $0.fields.comment }),
+            ("copyright", { $0.fields.copyright }),
+            ("encodedBy", { $0.fields.encodedBy })
+        ]
+        var member: [String: UACJSONValue] = [:]
+        for (key, valueForDocument) in commonFields {
+            let values = documents.map { valueForDocument($0)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "" }
+            guard let value = values.first, !value.isEmpty, values.allSatisfy({ $0 == value }) else { continue }
+            member[key] = .string(value)
+        }
+        member["nativeMetadata"] = .object([
+            "format": .string(first.format),
+            "trackCount": .integer(Int64(documents.count)),
+            "sourceTrackIndices": .array(sourceTrackIndices.map { .integer(Int64($0)) })
+        ])
         return member
     }
 }

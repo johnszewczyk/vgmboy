@@ -33,18 +33,25 @@ final class SIDDecoder: AudioDecoder, @unchecked Sendable {
         vgmboy_sid_close(handle)
     }
 
-    var trackCount: Int { 1 }
+    var trackCount: Int { Int(vgmboy_sid_track_count(handle)) }
     var systemName: String { "Commodore 64" }
     var absolutePlayedFrames: Int64 { vgmboy_sid_played_frames(handle) }
     var trackEnded: Bool { false }
 
     func startTrack(_ index: Int) throws {
-        guard index == 0 else { throw SIDDecoderError.openFailed("SID files expose one tune.") }
-        seek(milliseconds: 0)
+        guard index >= 0, index < trackCount, index <= Int(Int32.max) else {
+            throw SIDDecoderError.openFailed("SID track index is unavailable.")
+        }
+        var error: UnsafeMutablePointer<CChar>?
+        guard vgmboy_sid_start_track(handle, Int32(index), &error) == 0 else {
+            throw SIDDecoderError.openFailed(Self.takeError(&error))
+        }
     }
 
     func metadata(for index: Int) throws -> TrackMetadata {
-        guard index == 0 else { throw SIDDecoderError.metadataFailed("SID track index is unavailable.") }
+        guard index >= 0, index < trackCount else {
+            throw SIDDecoderError.metadataFailed("SID track index is unavailable.")
+        }
         var raw = vgmboy_sid_metadata_t()
         var error: UnsafeMutablePointer<CChar>?
         defer { vgmboy_sid_metadata_clear(&raw) }
@@ -52,7 +59,7 @@ final class SIDDecoder: AudioDecoder, @unchecked Sendable {
             throw SIDDecoderError.metadataFailed(Self.takeError(&error))
         }
         return TrackMetadata(
-            index: 0,
+            index: index,
             song: Self.string(raw.title),
             game: "",
             author: Self.string(raw.artist),

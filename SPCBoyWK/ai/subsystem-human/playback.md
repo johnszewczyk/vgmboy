@@ -47,6 +47,11 @@ it does not rescan the source folders or wait for a second metadata pass.
 Changing the sidebar source leaves that new playlist unselected; the moving
 selection bar appears only after selecting a playlist row.
 
+The sidebar supports Up/Down navigation and Enter activation in both Path and
+Console views. Console View moves through visible console headings and expanded
+game rows; Enter plays the focused game or console while keeping focus in the
+sidebar.
+
 Selecting catalog files or folders uses the same shared CatalogReader projections
 as CocoaSpice. JSON is only the bridge transport; it does not define a second
 playlist query implementation. Catalog rows keep their natural shared order unless the user

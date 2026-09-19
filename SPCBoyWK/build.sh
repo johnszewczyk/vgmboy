@@ -12,11 +12,15 @@ mkdir -p "$BUILD_DIR"
 
 if [[ -d /Applications/Xcode.app/Contents/Developer ]]; then
   export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+  export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
 fi
 
 export CLANG_MODULE_CACHE_PATH="$BUILD_DIR/module-cache"
 export SWIFTPM_MODULECACHE_OVERRIDE="$BUILD_DIR/module-cache"
 export XDG_CACHE_HOME="$BUILD_DIR/cache"
+
+VGMBoy_DIR="$ROOT_DIR/../VGMBoy"
+"$VGMBoy_DIR/scripts/build-dependencies.sh"
 
 swift build --build-path "$BUILD_DIR" --configuration release --product SPCBoyWK
 

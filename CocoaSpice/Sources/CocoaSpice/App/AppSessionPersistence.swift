@@ -45,8 +45,6 @@ enum AppDefaultsKey {
     static let preferEmbeddedConsoleTags = "CocoaSpice.preferEmbeddedConsoleTags"
     static let sidebarBrowserMode = "CocoaSpice.sidebarBrowserMode"
     static let favoriteSortOrder = "CocoaSpice.favoriteSortOrder"
-    static let localBrowserEnabled = "CocoaSpice.localBrowserEnabled"
-    static let localBrowserPath = "CocoaSpice.localBrowserPath"
     static let autoResizeAnimationMilliseconds = "CocoaSpice.autoResizeAnimationMilliseconds"
     static let selectionAnimationMilliseconds = "CocoaSpice.selectionAnimationMilliseconds"
     static let autoResizeAnimationEnabled = "CocoaSpice.autoResizeAnimationEnabled"

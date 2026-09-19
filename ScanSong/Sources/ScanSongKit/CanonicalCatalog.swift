@@ -16,7 +16,7 @@ public struct CanonicalCatalogSummary: Codable, Equatable, Sendable {
 }
 
 public enum CanonicalCatalog {
-    public static let schemaVersion = 23
+    public static let schemaVersion = 24
     public static let requiredTables: Set<String> = [
         "library_roots",
         "tracks",

@@ -83,6 +83,7 @@ public struct CatalogTrackRecord: Sendable {
     public let fingerprint: ScanFingerprint
     public let trackIndex: Int
     public let trackCount: Int
+    public let trackNumber: Int?
     public let metadata: ScannerMetadata?
     public let browserGameOverride: String?
     public let browserSystemOverride: String?
@@ -95,6 +96,7 @@ public struct CatalogTrackRecord: Sendable {
         trackIndex: Int,
         trackCount: Int,
         metadata: ScannerMetadata?,
+        trackNumber: Int? = nil,
         browserGameOverride: String? = nil,
         browserSystemOverride: String? = nil
     ) {
@@ -104,6 +106,7 @@ public struct CatalogTrackRecord: Sendable {
         self.fingerprint = fingerprint
         self.trackIndex = trackIndex
         self.trackCount = trackCount
+        self.trackNumber = trackNumber ?? metadata?.trackNumber
         self.metadata = metadata
         self.browserGameOverride = browserGameOverride
         self.browserSystemOverride = browserSystemOverride
@@ -297,7 +300,7 @@ public final class CanonicalCatalogWriter: @unchecked Sendable {
     }
 
     /// Removes every indexed record and scan path while retaining the selected
-    /// schema-23 database file for immediate reuse.
+    /// schema-24 database file for immediate reuse.
     public func resetCatalog() throws {
         try execute("BEGIN IMMEDIATE;")
         do {
@@ -427,10 +430,10 @@ public final class CanonicalCatalogWriter: @unchecked Sendable {
                 """
                 INSERT INTO tracks
                     (root_id, folder_path, path, filename, extension, browser_game,
-                     browser_system, track_index, track_count, file_size, modified_at,
+                     browser_system, track_index, track_count, track_number, file_size, modified_at,
                      discovered_at, archive_path, archive_entry)
                 SELECT ?, folder_path, path, filename, extension, browser_game,
-                       browser_system, track_index, track_count, file_size, modified_at,
+                       browser_system, track_index, track_count, track_number, file_size, modified_at,
                        discovered_at, archive_path, archive_entry
                 FROM tracks WHERE root_id=? AND path=?;
                 """,
@@ -647,8 +650,14 @@ public final class CanonicalCatalogWriter: @unchecked Sendable {
             _ = try CanonicalCatalog.inspect(databaseURL: databaseURL)
             return
         }
+        if version == 23 {
+            try execute("ALTER TABLE tracks ADD COLUMN track_number INTEGER;")
+            try execute("PRAGMA user_version=24;")
+            _ = try CanonicalCatalog.inspect(databaseURL: databaseURL)
+            return
+        }
         guard version == 0 else {
-            throw Self.error("ScanSong does not migrate legacy catalog schema \(version). Choose a schema-23 catalog or a new database path.")
+            throw Self.error("ScanSong does not migrate legacy catalog schema \(version). Choose a schema-24 catalog or a new database path.")
         }
         try CanonicalCatalogSchema.install { try execute($0) }
     }
@@ -712,14 +721,15 @@ public final class CanonicalCatalogWriter: @unchecked Sendable {
             """
             INSERT INTO tracks
                 (root_id, folder_path, path, filename, extension, browser_game,
-                 browser_system, track_index, track_count, file_size, modified_at,
+                 browser_system, track_index, track_count, track_number, file_size, modified_at,
                  discovered_at, archive_path, archive_entry)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             [
                 .integer(stageID), .text(folderPath), .text(record.sourcePath), .text(filename),
                 .text(extensionName), .text(browserGame), .text(browserSystem),
                 .integer(Int64(record.trackIndex)), .integer(Int64(record.trackCount)),
+                record.trackNumber.map { .integer(Int64($0)) } ?? .null,
                 .integer(record.fingerprint.fileSize), .real(record.fingerprint.modifiedAt.timeIntervalSince1970),
                 .real(Date().timeIntervalSince1970),
                 record.archiveEntry == nil ? .null : .text(record.sourcePath),

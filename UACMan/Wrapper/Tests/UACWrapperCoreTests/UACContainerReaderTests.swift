@@ -30,6 +30,74 @@ import Testing
     #expect(container.manifest.transformations.first?.inputs.first?.sourcePath == "old/track.spc")
 }
 
+@Test func readsManifestVersionTwoWithOneFlatVariant() throws {
+    var manifest = try #require(
+        JSONSerialization.jsonObject(with: Data(validManifestJSON.utf8)) as? [String: Any]
+    )
+    manifest["manifestVersion"] = 2
+    var members = try #require(manifest["members"] as? [[String: Any]])
+    members[0]["path"] = "track.spc"
+    manifest["members"] = members
+    var transformations = try #require(manifest["transformations"] as? [[String: Any]])
+    var outputs = try #require(transformations[0]["outputs"] as? [[String: Any]])
+    outputs[0]["memberPath"] = "track.spc"
+    transformations[0]["outputs"] = outputs
+    manifest["transformations"] = transformations
+    let manifestData = try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])
+    let fixture = try makeFixture(payload: Data([0x28, 0xB5, 0x2F, 0xFD, 0x01]), manifestData: manifestData)
+    defer { try? FileManager.default.removeItem(at: fixture.url) }
+
+    let container = try UACContainerReader.read(from: fixture.url)
+    #expect(container.manifest.manifestVersion == 2)
+    #expect(container.manifest.members.first?.path == "track.spc")
+}
+
+@Test func acceptsUppercaseHexForNonBLAKE3HashRecords() throws {
+    var manifest = try #require(
+        JSONSerialization.jsonObject(with: Data(validManifestJSON.utf8)) as? [String: Any]
+    )
+    var members = try #require(manifest["members"] as? [[String: Any]])
+    members[0]["hashes"] = [[
+        "scope": "raw-member",
+        "algorithm": "crc32-iso-hdlc",
+        "profile": "fixture-v1",
+        "digest": "DEADBEEF",
+        "byteSize": 4,
+    ]]
+    manifest["members"] = members
+    let manifestData = try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])
+    let fixture = try makeFixture(payload: Data([0x28, 0xB5, 0x2F, 0xFD, 0x01]), manifestData: manifestData)
+    defer { try? FileManager.default.removeItem(at: fixture.url) }
+
+    let container = try UACContainerReader.read(from: fixture.url)
+    #expect(container.manifest.members.first?.hashes.first?.digest == "DEADBEEF")
+}
+
+@Test func versionTwoStillNamespacesMembersWhenMultipleVariantsExist() throws {
+    var manifest = try #require(
+        JSONSerialization.jsonObject(with: Data(validManifestJSON.utf8)) as? [String: Any]
+    )
+    manifest["manifestVersion"] = 2
+    var variants = try #require(manifest["variants"] as? [[String: Any]])
+    variants.append(["id": "alternate", "label": "Alternate", "kind": "regional"])
+    manifest["variants"] = variants
+    var members = try #require(manifest["members"] as? [[String: Any]])
+    members[0]["path"] = "track.spc"
+    manifest["members"] = members
+    var transformations = try #require(manifest["transformations"] as? [[String: Any]])
+    var outputs = try #require(transformations[0]["outputs"] as? [[String: Any]])
+    outputs[0]["memberPath"] = "track.spc"
+    transformations[0]["outputs"] = outputs
+    manifest["transformations"] = transformations
+    let manifestData = try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])
+    let fixture = try makeFixture(payload: Data([0x28, 0xB5, 0x2F, 0xFD, 0x01]), manifestData: manifestData)
+    defer { try? FileManager.default.removeItem(at: fixture.url) }
+
+    #expect(throws: UACContainerError.self) {
+        try UACContainerReader.read(from: fixture.url)
+    }
+}
+
 @Test func readsCompressedManifestThroughInjectedBoundedDecoder() throws {
     let manifestData = Data(validManifestJSON.utf8)
     let compressedFrame = Data([0x28, 0xB5, 0x2F, 0xFD, 0x01, 0x02])
@@ -354,6 +422,35 @@ import Testing
     }
 }
 
+@Test func rejectsSubsongEntriesWithoutAPlayableTrackIndex() throws {
+    var manifest = try #require(
+        JSONSerialization.jsonObject(with: Data(validManifestJSON.utf8)) as? [String: Any]
+    )
+    manifest["playlists"] = [[
+        "id": "tracks",
+        "variantID": "original",
+        "entries": [[
+            "targetMemberPath": "variants/original/track.spc",
+            "entryKind": "subsong",
+            "trackIndex": "-1",
+            "extraFields": [:],
+            "extensions": [:],
+        ]],
+        "metadata": [:],
+        "extensions": [:],
+    ]]
+    let manifestData = try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])
+    let fixture = try makeFixture(
+        payload: Data([0x28, 0xB5, 0x2F, 0xFD, 0x01]),
+        manifestData: manifestData
+    )
+    defer { try? FileManager.default.removeItem(at: fixture.url) }
+
+    #expect(throws: UACContainerError.self) {
+        try UACContainerReader.read(from: fixture.url)
+    }
+}
+
 private struct Fixture {
     let url: URL
     let copyURL: URL
@@ -470,7 +567,7 @@ private let validManifestJSON = """
   "variants": [{"id": "original", "label": "Original", "kind": "retail", "canonicalReleaseIDs": ["1234"], "metadata": {}, "extensions": {}}],
   "members": [{"path": "variants/original/track.spc", "originalName": "track.spc", "variantID": "original", "sourceIDs": ["source-a"], "role": "playable", "format": "spc", "byteSize": 4, "blake3": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "streamBlake3": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "metadata": {"track": 1}, "extensions": {}}],
   "sources": [{"id": "source-a", "collection": "Example source", "setName": "SNES", "sourceName": "Fixture package.zip", "sourceURL": "https://example.invalid/fixture", "packageBlake3": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "observedAt": "2026-09-13T00:00:00Z", "metadata": {}, "extensions": {}}],
-  "transformations": [{"id": "rename-track-1", "operation": "rename", "inputs": [{"sourceID": "source-a", "sourcePath": "old/track.spc", "blake3": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "streamBlake3": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}], "outputs": [{"memberPath": "variants/original/track.spc", "blake3": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}], "tool": "AudioMan", "toolVersion": "fixture-1", "appliedAt": "2026-09-13T00:00:01Z", "reason": "Apply canonical track naming", "details": {"reviewed": true}}],
+  "transformations": [{"id": "rename-track-1", "operation": "rename", "inputs": [{"sourceID": "source-a", "sourcePath": "old/track.spc", "blake3": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "streamBlake3": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}], "outputs": [{"memberPath": "variants/original/track.spc", "blake3": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}], "tool": "FixtureNormalizer", "toolVersion": "fixture-1", "appliedAt": "2026-09-13T00:00:01Z", "reason": "Apply canonical track naming", "details": {"reviewed": true}}],
   "extensions": {"x-test": {"flag": true}}
 }
 """

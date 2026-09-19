@@ -6,12 +6,19 @@ import UniformTypeIdentifiers
 import UACWrapperCore
 import UACManCore
 
-struct UACMemberRow: Identifiable, Hashable {
+struct UACMemberRow: Identifiable {
     let path: String
     let name: String
+    let variantID: String?
+    let variantLabel: String?
+    let role: String
+    let format: String?
     let bytes: UInt64
     let rawHash: String
     let streamHash: String?
+    let hashes: [UACHashRecord]
+    let metadata: [String: UACJSONValue]
+    let extensions: [String: UACJSONValue]
     let title: String?
     let artist: String?
     let album: String?
@@ -27,6 +34,8 @@ struct UACMemberRow: Identifiable, Hashable {
     var yearSortValue: String { year ?? "" }
     var genreSortValue: String { genre?.localizedLowercase ?? "" }
     var playLengthSortValue: Int64 { playLengthMs ?? -1 }
+    var roleSortValue: String { role.localizedLowercase }
+    var formatSortValue: String { format?.localizedLowercase ?? "" }
 
     var durationText: String {
         guard let playLengthMs, playLengthMs > 0 else { return "—" }
@@ -39,14 +48,20 @@ struct UACMemberRow: Identifiable, Hashable {
             : "\(totalSeconds / 60):\(String(format: "%02lld", seconds))"
     }
 
-    init(member: UACMember) {
+    init(member: UACMember, variantLabel: String?) {
         self.init(
             path: member.path,
             name: member.originalName,
+            variantID: member.variantID,
+            variantLabel: variantLabel,
+            role: member.role,
+            format: member.format ?? URL(fileURLWithPath: member.path).pathExtension,
             bytes: member.byteSize,
             rawHash: member.blake3,
             streamHash: member.streamBlake3,
-            metadata: member.metadata
+            hashes: member.hashes,
+            metadata: member.metadata,
+            extensions: member.extensions
         )
     }
 
@@ -54,26 +69,45 @@ struct UACMemberRow: Identifiable, Hashable {
         UACMemberRow(
             path: path,
             name: name,
+            variantID: variantID,
+            variantLabel: variantLabel,
+            role: role,
+            format: format,
             bytes: bytes,
             rawHash: rawHash,
             streamHash: streamHash,
-            metadata: metadata
+            hashes: hashes,
+            metadata: metadata,
+            extensions: self.extensions
         )
     }
 
     private init(
         path: String,
         name: String,
+        variantID: String?,
+        variantLabel: String?,
+        role: String,
+        format: String?,
         bytes: UInt64,
         rawHash: String,
         streamHash: String?,
-        metadata: [String: UACJSONValue]
+        hashes: [UACHashRecord],
+        metadata: [String: UACJSONValue],
+        extensions: [String: UACJSONValue]
     ) {
         self.path = path
         self.name = name
+        self.variantID = variantID
+        self.variantLabel = variantLabel
+        self.role = role
+        self.format = format
         self.bytes = bytes
         self.rawHash = rawHash
         self.streamHash = streamHash
+        self.hashes = hashes
+        self.metadata = metadata
+        self.extensions = extensions
         title = Self.text(metadata["title"])
         artist = Self.text(metadata["artist"])
         album = Self.text(metadata["album"])
@@ -113,6 +147,11 @@ struct UACMemberRow: Identifiable, Hashable {
 @MainActor
 @Observable
 final class UACManModel {
+    private enum PreferenceKey {
+        static let lastDocumentPath = "UACMan.lastDocumentPath"
+        static let lastCollectionPath = "UACMan.lastCollectionPath"
+    }
+
     var documentURL: URL?
     var packageID = ""
     var packageTitle = ""
@@ -124,6 +163,12 @@ final class UACManModel {
     var selectedMemberPath: String?
     var selectedMemberPaths: Set<String> = []
     var members: [UACMemberRow] = []
+    var collectionRootURL: URL?
+    var collectionEntries: [UACCollectionEntry] = []
+    var collectionIssues: [UACCollectionIssue] = []
+    var selectedCollectionPackagePath: String?
+    var isScanningCollection = false
+    var collectionStatusMessage = "Choose a folder to browse its UAC packages."
     var hasUnsavedChanges = false
     var isHarvestingMetadata = false
     var harvestProgressMessage = ""
@@ -137,6 +182,8 @@ final class UACManModel {
     @ObservationIgnored private var openedSnapshot: OpenedFileSnapshot?
     @ObservationIgnored private var handledCommandLineFile = false
     @ObservationIgnored private var harvestTask: Task<Void, Never>?
+    @ObservationIgnored private var collectionScanTask: Task<Void, Never>?
+    @ObservationIgnored private var collectionScanID: UUID?
 
     var selectedMember: UACMember? {
         guard let selectedMemberPath else { return nil }
@@ -150,6 +197,99 @@ final class UACManModel {
     }
 
     var allMemberCount: Int { loadedContainer?.manifest.members.count ?? 0 }
+
+    private static func webMemberSnapshot(_ member: UACMemberRow) -> [String: Any] {
+        [
+            "path": member.path,
+            "name": member.name,
+            "variantID": member.variantID ?? "",
+            "variantLabel": member.variantLabel ?? "",
+            "role": member.role,
+            "format": member.format ?? "",
+            "bytes": member.bytes,
+            "rawHash": member.rawHash,
+            "streamHash": member.streamHash ?? NSNull(),
+            "hashes": member.hashes.map { hash in
+                [
+                    "scope": hash.scope,
+                    "profile": hash.profile,
+                    "digest": hash.digest,
+                    "byteSize": hash.byteSize ?? NSNull()
+                ] as [String: Any]
+            },
+            "title": member.title ?? "",
+            "artist": member.artist ?? "",
+            "album": member.album ?? "",
+            "year": member.year ?? "",
+            "genre": member.genre ?? "",
+            "metadata": member.metadata.mapValues(Self.foundationValue),
+            "extensions": member.extensions.mapValues(Self.foundationValue),
+            "duration": member.durationText,
+            "playLengthMs": member.playLengthMs ?? NSNull()
+        ]
+    }
+
+    var webSnapshot: [String: Any] {
+        [
+            "documentName": documentURL?.lastPathComponent ?? "",
+            "documentPath": documentURL?.path ?? "",
+            "packageID": packageID,
+            "packageTitle": packageTitle,
+            "consoleName": consoleName,
+            "gameMetadataJSON": gameMetadataJSON,
+            "gameExtensionsJSON": gameExtensionsJSON,
+            "memberMetadataJSON": memberMetadataJSON,
+            "memberExtensionsJSON": memberExtensionsJSON,
+            "memberHashes": selectedMember?.hashes.map { hash in
+                [
+                    "scope": hash.scope,
+                    "profile": hash.profile,
+                    "digest": hash.digest,
+                    "byteSize": hash.byteSize ?? NSNull()
+                ] as [String: Any]
+            } ?? [],
+            "selectedMemberPath": selectedMemberPath ?? NSNull(),
+            "selectedMemberPaths": Array(selectedMemberPaths).sorted(),
+            "variantCount": loadedContainer?.manifest.variants.count ?? 0,
+            "members": members.map(Self.webMemberSnapshot),
+            "collectionRoot": collectionRootURL?.path ?? "",
+            "collectionStatus": collectionStatusMessage,
+            "collectionEntries": collectionEntries.map { entry in
+                [
+                    "relativePath": entry.relativePath,
+                    "packageID": entry.packageID,
+                    "title": entry.title,
+                    "console": entry.console,
+                    "totalMemberCount": entry.totalMemberCount,
+                    "playableMemberCount": entry.playableMemberCount,
+                    "fileByteCount": entry.fileByteCount
+                ] as [String: Any]
+            },
+            "collectionIssues": collectionIssues.map { ["relativePath": $0.relativePath, "message": $0.message] },
+            "selectedCollectionPackagePath": selectedCollectionPackagePath ?? NSNull(),
+            "isScanningCollection": isScanningCollection,
+            "allMemberCount": allMemberCount,
+            "manifestEncodingDescription": manifestEncodingDescription,
+            "hasUnsavedChanges": hasUnsavedChanges,
+            "isHarvestingMetadata": isHarvestingMetadata,
+            "harvestProgressMessage": harvestProgressMessage,
+            "canHarvestSPCMetadata": canHarvestSPCMetadata,
+            "statusMessage": statusMessage,
+            "errorMessage": errorMessage ?? NSNull()
+        ]
+    }
+
+    private static func foundationValue(_ value: UACJSONValue) -> Any {
+        switch value {
+        case .null: return NSNull()
+        case .bool(let value): return value
+        case .integer(let value): return value
+        case .number(let value): return value
+        case .string(let value): return value
+        case .array(let values): return values.map(foundationValue)
+        case .object(let values): return values.mapValues(foundationValue)
+        }
+    }
 
     var canHarvestSPCMetadata: Bool {
         loadedContainer?.manifest.payload.format == "tar+zstd-seekable"
@@ -168,9 +308,22 @@ final class UACManModel {
     func openCommandLineFileIfPresent() {
         guard !handledCommandLineFile else { return }
         handledCommandLineFile = true
-        guard let argument = ProcessInfo.processInfo.arguments.dropFirst().first,
-              !argument.hasPrefix("-") else { return }
-        openDocument(URL(fileURLWithPath: argument))
+        if let argument = ProcessInfo.processInfo.arguments.dropFirst().first,
+           !argument.hasPrefix("-") {
+            openDocument(URL(fileURLWithPath: argument))
+            return
+        }
+
+        let defaults = UserDefaults.standard
+        if let path = defaults.string(forKey: PreferenceKey.lastDocumentPath),
+           FileManager.default.fileExists(atPath: path) {
+            openDocument(URL(fileURLWithPath: path))
+            return
+        }
+        if let path = defaults.string(forKey: PreferenceKey.lastCollectionPath),
+           FileManager.default.fileExists(atPath: path) {
+            openCollection(URL(fileURLWithPath: path))
+        }
     }
 
     func openPanel() {
@@ -184,9 +337,84 @@ final class UACManModel {
         openDocument(url)
     }
 
+    func openCollectionPanel() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsOtherFileTypes = false
+        panel.prompt = "Browse Collection"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        openCollection(url)
+    }
+
+    func openCollection(_ url: URL) {
+        let root = url.standardizedFileURL
+        UserDefaults.standard.set(root.path, forKey: PreferenceKey.lastCollectionPath)
+        collectionScanTask?.cancel()
+        let scanID = UUID()
+        collectionScanID = scanID
+        collectionRootURL = root
+        collectionEntries = []
+        collectionIssues = []
+        selectedCollectionPackagePath = nil
+        isScanningCollection = true
+        collectionStatusMessage = "Reading UAC manifests…"
+        errorMessage = nil
+
+        let manifestDecoder = codec.decoder
+        collectionScanTask = Task.detached(priority: .userInitiated) { [weak self] in
+            do {
+                let result = try UACCollectionScanner.scan(root: root) { packageURL in
+                    try UACContainerReader.read(
+                        from: packageURL,
+                        decompressManifestFrame: manifestDecoder
+                    ).manifest
+                }
+                await self?.finishCollectionScan(result, scanID: scanID, root: root)
+            } catch is CancellationError {
+                await self?.cancelCollectionScan(scanID: scanID)
+            } catch {
+                await self?.failCollectionScan(error, scanID: scanID, root: root)
+            }
+        }
+    }
+
+    func cancelCurrentCollectionScan() {
+        collectionScanTask?.cancel()
+    }
+
+    func selectCollectionPackage(_ relativePath: String) {
+        guard let collectionRootURL,
+              collectionEntries.contains(where: { $0.relativePath == relativePath }) else { return }
+        guard relativePath != selectedCollectionPackagePath else { return }
+        guard confirmDiscardIfNeeded() else { return }
+
+        let previousSelection = selectedCollectionPackagePath
+        let packageURL = collectionRootURL.appendingPathComponent(relativePath).standardizedFileURL
+        selectedCollectionPackagePath = relativePath
+        loadDocumentWithoutPrompt(packageURL)
+        if documentURL != packageURL {
+            selectedCollectionPackagePath = previousSelection
+        }
+    }
+
     func openDocument(_ url: URL) {
         guard confirmDiscardIfNeeded() else { return }
-        loadDocumentWithoutPrompt(url)
+        let standardizedURL = url.standardizedFileURL
+        let collectionRelativePath = collectionEntries.first {
+            collectionRootURL?.appendingPathComponent($0.relativePath).standardizedFileURL == standardizedURL
+        }?.relativePath
+        loadDocumentWithoutPrompt(standardizedURL)
+        guard documentURL == standardizedURL else { return }
+        if let collectionRelativePath {
+            selectedCollectionPackagePath = collectionRelativePath
+        } else {
+            collectionScanTask?.cancel()
+            collectionRootURL = nil
+            collectionEntries = []
+            collectionIssues = []
+            selectedCollectionPackagePath = nil
+        }
     }
 
     private func loadDocumentWithoutPrompt(_ url: URL) {
@@ -203,9 +431,8 @@ final class UACManModel {
                 from: standardizedURL,
                 decompressManifestFrame: codec.decoder
             )
-            let playableMembers = container.manifest.members.filter { $0.role == "playable" }
-
             documentURL = standardizedURL
+            UserDefaults.standard.set(standardizedURL.path, forKey: PreferenceKey.lastDocumentPath)
             loadedContainer = container
             originalManifestJSON = container.manifestJSON
             draftManifestJSON = container.manifestJSON
@@ -215,7 +442,10 @@ final class UACManModel {
             consoleName = container.manifest.game.console
             gameMetadataJSON = try UACManifestEditor.prettyJSON(container.manifest.game.metadata)
             gameExtensionsJSON = try UACManifestEditor.prettyJSON(container.manifest.game.extensions)
-            members = playableMembers.map { UACMemberRow(member: $0) }
+            let variantLabels = Dictionary(uniqueKeysWithValues: container.manifest.variants.map { ($0.id, $0.label) })
+            members = container.manifest.members.map { member in
+                UACMemberRow(member: member, variantLabel: member.variantID.flatMap { variantLabels[$0] })
+            }
             selectedMemberPath = members.first?.path
             selectedMemberPaths = []
             if let first = members.first {
@@ -226,7 +456,8 @@ final class UACManModel {
             }
             hasUnsavedChanges = false
             errorMessage = nil
-            statusMessage = "Loaded \(members.count) playable member(s) · \(allMemberCount) total package member(s)."
+            let playableCount = container.manifest.members.filter { $0.role == "playable" || $0.role == "track" }.count
+            statusMessage = "Loaded \(members.count) package member(s), including \(playableCount) playable member(s)."
         } catch {
             errorMessage = String(describing: error)
         }
@@ -287,7 +518,7 @@ final class UACManModel {
         searchText: String
     ) {
         guard !selectedMemberPaths.isEmpty else {
-            errorMessage = "Select one or more tracks before applying a batch edit."
+            errorMessage = "Select one or more package members before applying a batch edit."
             return
         }
         do {
@@ -307,10 +538,193 @@ final class UACManModel {
             }
             hasUnsavedChanges = draftManifestJSON != originalManifestJSON
             errorMessage = nil
-            statusMessage = "Applied \(operation.title.lowercased()) to \(selectedMemberPaths.count) selected track(s). Revert is available until saved."
+            statusMessage = "Applied \(operation.title.lowercased()) to \(selectedMemberPaths.count) selected member(s). Revert is available until saved."
         } catch {
             errorMessage = String(describing: error)
         }
+    }
+
+    func renameMetadataKey(from oldKey: String, to newKey: String) {
+        let oldKey = oldKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let newKey = newKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !oldKey.isEmpty, !newKey.isEmpty, oldKey != newKey else { return }
+        do {
+            try flushEditorBuffers()
+            guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any] else {
+                throw UACManifestEditorError.invalidManifestJSON
+            }
+            let oldParts = oldKey.hasPrefix("extension.") ? ("extensions", String(oldKey.dropFirst("extension.".count))) : ("metadata", oldKey)
+            let newParts = newKey.hasPrefix("extension.") ? ("extensions", String(newKey.dropFirst("extension.".count))) : ("metadata", newKey)
+            guard oldParts.0 == newParts.0 else {
+                throw UACManifestEditorError.invalidMetadataJSON("Metadata and extension namespaces cannot be mixed in one rename.")
+            }
+            var renamed = 0
+            func rename(in object: inout [String: Any]) throws {
+                guard object[oldParts.1] != nil else { return }
+                guard object[newParts.1] == nil else {
+                    throw UACManifestEditorError.invalidMetadataJSON("The destination tag already exists: \(newKey)")
+                }
+                object[newParts.1] = object.removeValue(forKey: oldParts.1)
+                renamed += 1
+            }
+            if var game = root["game"] as? [String: Any], var fields = game[oldParts.0] as? [String: Any] {
+                try rename(in: &fields)
+                game[oldParts.0] = fields
+                root["game"] = game
+            }
+            if var members = root["members"] as? [[String: Any]] {
+                for index in members.indices {
+                    guard var fields = members[index][oldParts.0] as? [String: Any] else { continue }
+                    try rename(in: &fields)
+                    members[index][oldParts.0] = fields
+                }
+                root["members"] = members
+            }
+            guard renamed > 0 else {
+                throw UACManifestEditorError.invalidMetadataJSON("Tag not found in this package: \(oldKey)")
+            }
+            draftManifestJSON = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .prettyPrinted])
+            let manifest = try UACManifestEditor.decode(draftManifestJSON)
+            gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata)
+            gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
+            refreshMemberSummaries(from: manifest)
+            if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
+            hasUnsavedChanges = draftManifestJSON != originalManifestJSON
+            statusMessage = "Renamed \(oldKey) to \(newKey) in \(renamed) location(s). Save to commit the package change."
+            errorMessage = nil
+        } catch {
+            errorMessage = String(describing: error)
+        }
+    }
+
+    func addMetadataKey(key rawKey: String, scope: String, value rawValue: String) {
+        let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { errorMessage = "Enter a tag name."; return }
+        do {
+            try flushEditorBuffers()
+            guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any] else { throw UACManifestEditorError.invalidManifestJSON }
+            let targetAllTracks = scope == "tracks"
+            let jsonValue: Any = value.isEmpty ? "" : value
+            func insert(_ fields: inout [String: Any]) throws {
+                guard fields[key] == nil else { throw UACManifestEditorError.invalidMetadataJSON("The tag already exists: \(key)") }
+                fields[key] = jsonValue
+            }
+            var changed = 0
+            if !targetAllTracks, var game = root["game"] as? [String: Any] {
+                var fields = game["metadata"] as? [String: Any] ?? [:]
+                try insert(&fields); game["metadata"] = fields; root["game"] = game; changed = 1
+            } else if targetAllTracks, var members = root["members"] as? [[String: Any]] {
+                for index in members.indices {
+                    var fields = members[index]["metadata"] as? [String: Any] ?? [:]
+                    if fields[key] == nil { fields[key] = jsonValue; members[index]["metadata"] = fields; changed += 1 }
+                }
+                root["members"] = members
+            }
+            guard changed > 0 else { throw UACManifestEditorError.invalidMetadataJSON("No tracks are available for this tag.") }
+            draftManifestJSON = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .prettyPrinted])
+            let manifest = try UACManifestEditor.decode(draftManifestJSON)
+            gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata)
+            gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
+            refreshMemberSummaries(from: manifest)
+            if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
+            hasUnsavedChanges = draftManifestJSON != originalManifestJSON
+            statusMessage = "Added \(key) to \(targetAllTracks ? "all tracks" : "the package"). Save to commit the package change."
+            errorMessage = nil
+        } catch { errorMessage = String(describing: error) }
+    }
+
+    func deleteMetadataKey(key rawKey: String) {
+        let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return }
+        do {
+            try flushEditorBuffers()
+            guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any] else { throw UACManifestEditorError.invalidManifestJSON }
+            var removed = 0
+            func remove(_ fields: inout [String: Any]) { if fields.removeValue(forKey: key) != nil { removed += 1 } }
+            if var game = root["game"] as? [String: Any], var fields = game["metadata"] as? [String: Any] { remove(&fields); game["metadata"] = fields; root["game"] = game }
+            if var members = root["members"] as? [[String: Any]] { for index in members.indices { if var fields = members[index]["metadata"] as? [String: Any] { remove(&fields); members[index]["metadata"] = fields } }; root["members"] = members }
+            guard removed > 0 else { throw UACManifestEditorError.invalidMetadataJSON("Tag not found in this package: \(key)") }
+            draftManifestJSON = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .prettyPrinted])
+            let manifest = try UACManifestEditor.decode(draftManifestJSON)
+            gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata)
+            refreshMemberSummaries(from: manifest)
+            if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
+            hasUnsavedChanges = draftManifestJSON != originalManifestJSON
+            statusMessage = "Deleted \(key) from \(removed) location(s). Save to commit the package change."
+            errorMessage = nil
+        } catch { errorMessage = String(describing: error) }
+    }
+
+    func updateMetadataValue(key rawKey: String, value rawValue: String) {
+        let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return }
+        do {
+            try flushEditorBuffers()
+            guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any] else { throw UACManifestEditorError.invalidManifestJSON }
+            var changed = 0
+            func update(_ fields: inout [String: Any]) { if fields[key] != nil { fields[key] = rawValue; changed += 1 } }
+            if var game = root["game"] as? [String: Any], var fields = game["metadata"] as? [String: Any] { update(&fields); game["metadata"] = fields; root["game"] = game }
+            if var members = root["members"] as? [[String: Any]] { for index in members.indices { if var fields = members[index]["metadata"] as? [String: Any] { update(&fields); members[index]["metadata"] = fields } }; root["members"] = members }
+            guard changed > 0 else { throw UACManifestEditorError.invalidMetadataJSON("Tag not found in this package: \(key)") }
+            draftManifestJSON = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .prettyPrinted])
+            let manifest = try UACManifestEditor.decode(draftManifestJSON)
+            gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata); refreshMemberSummaries(from: manifest)
+            if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
+            hasUnsavedChanges = draftManifestJSON != originalManifestJSON; statusMessage = "Updated \(key) in \(changed) location(s). Save to commit the package change."; errorMessage = nil
+        } catch { errorMessage = String(describing: error) }
+    }
+
+    func commitMetadataRow(key rawKey: String, newKey rawNewKey: String, value: String?) {
+        let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines), newKey = rawNewKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty, !newKey.isEmpty else { errorMessage = "Tag name cannot be empty."; return }
+        do {
+            try flushEditorBuffers(); guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any] else { throw UACManifestEditorError.invalidManifestJSON }
+            var changed = 0
+            if var game = root["game"] as? [String: Any], var fields = game["metadata"] as? [String: Any], let old = fields[key] {
+                if newKey != key, fields[newKey] != nil { throw UACManifestEditorError.invalidMetadataJSON("The destination tag already exists: \(newKey)") }
+                fields.removeValue(forKey: key); fields[newKey] = value ?? old; game["metadata"] = fields; root["game"] = game; changed += 1
+            }
+            if var members = root["members"] as? [[String: Any]] {
+                for index in members.indices where members[index]["metadata"] is [String: Any] {
+                    var fields = members[index]["metadata"] as! [String: Any]
+                    guard let old = fields[key] else { continue }
+                    if newKey != key, fields[newKey] != nil { throw UACManifestEditorError.invalidMetadataJSON("The destination tag already exists: \(newKey)") }
+                    fields.removeValue(forKey: key); fields[newKey] = value ?? old; members[index]["metadata"] = fields; changed += 1
+                }
+                root["members"] = members
+            }
+            guard changed > 0 else { throw UACManifestEditorError.invalidMetadataJSON("Tag not found in this package: \(key)") }
+            draftManifestJSON = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .prettyPrinted]); let manifest = try UACManifestEditor.decode(draftManifestJSON)
+            gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata); refreshMemberSummaries(from: manifest); if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
+            hasUnsavedChanges = draftManifestJSON != originalManifestJSON; statusMessage = "Updated \(key) in \(changed) location(s). Save to commit the package change."; errorMessage = nil
+        } catch { errorMessage = String(describing: error) }
+    }
+
+    func commitTechnicalRow(scope: String, track: String, key: String, newKey: String, value: String) {
+        guard !key.isEmpty, !newKey.isEmpty else { errorMessage = "Technical field names cannot be empty."; return }
+        guard scope.contains("Tags") else { errorMessage = "Computed identity fields cannot be edited."; return }
+        do {
+            try flushEditorBuffers(); guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any] else { throw UACManifestEditorError.invalidManifestJSON }
+            var changed = false
+            func update(_ fields: inout [String: Any]) { guard fields[key] != nil else { return }; fields.removeValue(forKey: key); fields[newKey] = value; changed = true }
+            if scope.hasPrefix("Package"), var game = root["game"] as? [String: Any], var fields = game["metadata"] as? [String: Any] { update(&fields); game["metadata"] = fields; root["game"] = game }
+            if scope.hasPrefix("Track"), var members = root["members"] as? [[String: Any]] { for index in members.indices { guard let number = members[index]["metadata"] as? [String: Any], number[key] != nil else { continue }; var fields = number; update(&fields); members[index]["metadata"] = fields }; root["members"] = members }
+            guard changed else { throw UACManifestEditorError.invalidMetadataJSON("Technical field cannot be edited: \(key)") }
+            draftManifestJSON = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .prettyPrinted]); let manifest = try UACManifestEditor.decode(draftManifestJSON); gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata); refreshMemberSummaries(from: manifest); hasUnsavedChanges = draftManifestJSON != originalManifestJSON; statusMessage = "Updated technical field. Save to commit the package change."; errorMessage = nil
+        } catch { errorMessage = String(describing: error) }
+    }
+
+    func deleteTechnicalRow(scope: String, track: String, key: String) {
+        guard scope.contains("Tags") else { errorMessage = "Computed identity fields cannot be deleted."; return }
+        do {
+            try flushEditorBuffers(); guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any] else { throw UACManifestEditorError.invalidManifestJSON }
+            var changed = false
+            if scope.hasPrefix("Package"), var game = root["game"] as? [String: Any], var fields = game["metadata"] as? [String: Any] { changed = fields.removeValue(forKey: key) != nil; game["metadata"] = fields; root["game"] = game }
+            if scope.hasPrefix("Track"), var members = root["members"] as? [[String: Any]] { for index in members.indices { if var fields = members[index]["metadata"] as? [String: Any], fields.removeValue(forKey: key) != nil { members[index]["metadata"] = fields; changed = true } }; root["members"] = members }
+            guard changed else { throw UACManifestEditorError.invalidMetadataJSON("Technical field cannot be deleted: \(key)") }
+            draftManifestJSON = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .prettyPrinted]); let manifest = try UACManifestEditor.decode(draftManifestJSON); gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata); refreshMemberSummaries(from: manifest); hasUnsavedChanges = draftManifestJSON != originalManifestJSON; statusMessage = "Deleted technical field. Save to commit the package change."; errorMessage = nil
+        } catch { errorMessage = String(describing: error) }
     }
 
     func harvestSPCMetadata(replaceExisting: Bool = false) {
@@ -531,6 +945,38 @@ final class UACManModel {
         } catch {
             errorMessage = String(describing: error)
         }
+    }
+
+    private func finishCollectionScan(
+        _ result: UACCollectionScanResult,
+        scanID: UUID,
+        root: URL
+    ) {
+        guard collectionScanID == scanID, collectionRootURL == root else { return }
+        collectionScanTask = nil
+        isScanningCollection = false
+        collectionEntries = result.entries
+        collectionIssues = result.issues
+        if result.entries.isEmpty && result.issues.isEmpty {
+            collectionStatusMessage = "No .uac packages found in this folder."
+        } else {
+            collectionStatusMessage = "\(result.entries.count) package(s) · \(result.issues.count) unreadable item(s)"
+        }
+    }
+
+    private func cancelCollectionScan(scanID: UUID) {
+        guard collectionScanID == scanID else { return }
+        collectionScanTask = nil
+        isScanningCollection = false
+        collectionStatusMessage = "Collection scan cancelled."
+    }
+
+    private func failCollectionScan(_ error: Error, scanID: UUID, root: URL) {
+        guard collectionScanID == scanID, collectionRootURL == root else { return }
+        collectionScanTask = nil
+        isScanningCollection = false
+        collectionStatusMessage = "Could not read this collection folder."
+        errorMessage = String(describing: error)
     }
 
     private func failSPCMetadataHarvest(_ error: Error, packageURL: URL) {

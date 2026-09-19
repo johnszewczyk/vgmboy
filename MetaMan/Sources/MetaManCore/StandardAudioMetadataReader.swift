@@ -28,6 +28,11 @@ public enum StandardAudioMetadataReader {
         let flacComments = fileExtension == "flac" ? readFLACComments(fileURL: fileURL) : nil
         let flacTags = flacComments?.tags ?? []
         let flacValues = projectedFLACValues(from: flacTags)
+        let loop = MetadataLoopParser.parse(
+            tags: flacTags,
+            sampleRateHz: Int(durationFacts.additionalFacts["sampleRateHz"] ?? "0"),
+            sourceFallback: "audio-tag"
+        )
         let commentTags = commonTags + flacTags
         let album = flacValues["ALBUM"] ?? commonValues[AVMetadataKey.commonKeyAlbumName.rawValue]
         let artist = flacValues["ARTIST"]
@@ -60,10 +65,11 @@ public enum StandardAudioMetadataReader {
             sourceEncoding: flacComments == nil ? nil : "UTF-8",
             timing: MetadataTiming(
                 introLengthMs: 0,
-                loopLengthMs: 0,
+                loopLengthMs: loop?.loopLengthMs ?? 0,
                 playLengthMs: durationMilliseconds,
                 fadeLengthMs: 0
             ),
+            loop: loop,
             technicalFacts: [
                 "fileExtension": fileExtension,
                 "durationSource": durationFacts.source,

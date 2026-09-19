@@ -1,7 +1,7 @@
 import Foundation
 import SQLite3
 
-/// Query-only view of a validated schema-23 catalog.
+/// Query-only view of a validated schema-24 catalog.
 ///
 /// Scanner presentation must remain able to display attached paths while a
 /// player has the catalog open. Mutations remain exclusively in

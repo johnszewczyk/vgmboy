@@ -27,7 +27,10 @@ title, and track window. Supported options:
 
 ## Supported Formats
 
-- Chip music (libgme): `.ay`, `.gbs`, `.hes`, `.kss`, `.nsf`, `.nsfe`, `.sap`, `.spc`
+- Chip music (libgme): `.ay`, `.gbs`, `.hes`, `.kss`, `.nsf`, `.nsfe`, `.spc`
+- Commodore 64 (libsidplayfp): `.sid` (exposes every declared subtune as a
+  playlist track and selects the requested subtune on playback)
+- Atari XL (ASAP): `.sap` (TYPE B, C, D, and S; native speed)
 - Sega/console logs (libvgm): `.vgm`, `.vgz`, `.gym`, `.s98`, `.dro`
 - Tracker modules (libopenmpt): `.669`, `.dmf`, `.far`, `.it`, `.mod`, `.mptm`, `.mtm`, `.okt`,
   `.ptm`, `.s3m`, `.stm`, `.ult`, and `.xm`

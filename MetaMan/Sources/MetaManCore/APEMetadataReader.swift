@@ -40,6 +40,11 @@ public enum APEMetadataReader {
             let album = firstValue(values["album"]) ?? firstValue(values["album_name"])
             let artist = firstValue(values["artist"]) ?? firstValue(values["album_artist"])
             let comment = values["comment"].map { $0.components(separatedBy: "\0").first ?? "" }
+            let loop = MetadataLoopParser.parse(
+                tags: tags,
+                sampleRateHz: Int(header.sampleRate),
+                sourceFallback: "audio-tag"
+            )
 
             var rawBlocks: [String: Data] = [:]
             if id3.containerOffset > 0 {
@@ -83,10 +88,11 @@ public enum APEMetadataReader {
                 rawMetadataBlocks: rawBlocks.isEmpty ? nil : rawBlocks,
                 timing: MetadataTiming(
                     introLengthMs: 0,
-                    loopLengthMs: 0,
+                    loopLengthMs: loop?.loopLengthMs ?? 0,
                     playLengthMs: header.durationMilliseconds,
                     fadeLengthMs: 0
                 ),
+                loop: loop,
                 technicalFacts: technicalFacts
             )
         } catch let error as MetadataReadError {

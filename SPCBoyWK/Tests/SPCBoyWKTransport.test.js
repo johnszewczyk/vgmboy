@@ -12,6 +12,10 @@ const appCoreSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/app-core.js"),
   "utf8"
 );
+const appSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/app.js"),
+  "utf8"
+);
 const uiSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/SPCBoyWK/Resources/app-ui.js"),
   "utf8"
@@ -81,14 +85,17 @@ function deferFirstBridgeReply(bridge, method, matches = () => true) {
 }
 
 function element() {
-  return {
+  const result = {
     className: "",
-    classList: { add() {}, remove() {} },
+    classList: { add() {}, remove() {}, toggle() {} },
     style: { setProperty() {} },
     textContent: "",
     value: "",
     querySelector() { return { setAttribute() {} }; }
   };
+  result.attributes = {};
+  result.setAttribute = (name, value) => { result.attributes[name] = value; };
+  return result;
 }
 
 function snapshot(generation, transportState = "playing") {
@@ -171,6 +178,10 @@ function makeHarness() {
     progressSlider: element(),
     progressSliderShell: element(),
     playButton: element(),
+    equalizerEnabledCheckbox: element(),
+    equalizerToolbarButton: element(),
+    equalizerBandInputs: [],
+    equalizerBandValues: [],
     spcLengthInput: element(),
     spcUnknownDurationInput: element(),
     spcFadeInput: element(),
@@ -281,6 +292,7 @@ function makeHarness() {
   window.SPCBoyApp = app;
   const context = {
     console,
+    CSS: { escape: (value) => String(value) },
     navigator: {},
     document: { addEventListener() {} },
     window,
@@ -312,7 +324,8 @@ function makeHarness() {
       const pending = [...animationFrames.entries()];
       animationFrames.clear();
       pending.forEach(([, callback]) => callback(clockNow));
-    }
+    },
+    pendingAnimationFrameCount() { return animationFrames.size; }
   };
 }
 
@@ -624,17 +637,139 @@ test("SPCBoyWK ignores delayed native status events", () => {
   assert.equal(state.nativePlayback.statusSequence, 20);
 });
 
-test("SPCBoyWK uses one accent selection capsule without recoloring selected text", () => {
+test("SPCBoyWK selection capsule leaves playlist text colors unchanged", () => {
   assert.match(stylesSource, /\.list-selection-indicator[\s\S]*?background: var\(--accent\)/);
+  assert.match(stylesSource, /\.list-selection-indicator\s*\{[^}]*transition: transform var\(--selection-animation-duration\)/);
+  assert.doesNotMatch(stylesSource, /\.list-selection-indicator\s*\{[^}]*transition:[^}]*opacity/);
+  assert.doesNotMatch(stylesSource, /\.list-selection-indicator\s*\{[^}]*transition:[^}]*,\s*(?:width|height)\s+var\(--selection-animation-duration\)/);
   assert.match(stylesSource, /\.list-selection-indicator\.is-hidden\s*\{\s*transition: none;/);
+  assert.match(stylesSource, /\.playlist-row\.is-current:not\(\.is-selected\) td\s*\{\s*color: var\(--accent\);\s*\}/);
+  assert.doesNotMatch(stylesSource, /\.playlist-row\.is-selected[^{}]*\{[^}]*\bcolor\s*:/);
   assert.match(stylesSource, /button:is\(\.tree-node, \.database-game-row, \.database-console-row\)\.is-selected\s*\{[^}]*background: transparent;[^}]*box-shadow: none;/);
   assert.doesNotMatch(stylesSource, /\.database-game-row\s*\{[^}]*transition:\s*color/);
   assert.doesNotMatch(stylesSource, /\.database-console-row\s*\{[^}]*transition:\s*color/);
   assert.doesNotMatch(stylesSource, /\.tree-node\s*\{[^}]*transition:\s*color/);
   assert.doesNotMatch(stylesSource, /\.playlist-table th,\s*\.playlist-table td\s*\{[^}]*transition:[^}]*color/);
-  assert.doesNotMatch(stylesSource, /\.playlist-row\.is-selected > td[\s\S]*?\{[^}]*color:/);
+  assert.doesNotMatch(stylesSource, /\.playlist-row\.is-selected > td[\s\S]*?\{[^}]*color:\s*var\(--accent\)/);
   assert.doesNotMatch(stylesSource, /button:is\(\.tree-node, \.database-game-row, \.database-console-row\)\.is-selected\s*\{[^}]*color:/);
   assert.doesNotMatch(stylesSource, /button:not\([^\n]*\):is\([^\n]*\.is-selected/);
+});
+
+test("SPCBoyWK preserves sidebar selection while database rows render in batches", () => {
+  assert.match(uiSource, /let databaseRowsRenderPending = false;/);
+  assert.match(uiSource, /function resetSidebarContent\(\)[\s\S]*?databaseRowRenderGeneration \+= 1;\s*databaseRowsRenderPending = false;/);
+  assert.match(uiSource, /function syncSelectionIndicators\(\)[\s\S]*?const sidebarPositioned = sidebarTarget[\s\S]*?const selectedDatabaseGameIsPending = databaseRowsRenderPending[\s\S]*?state\.selectedDatabaseGameKey[\s\S]*?visibleDatabaseGames\(\)\.some\([\s\S]*?if \(!sidebarPositioned && !selectedDatabaseGameIsPending\) hideSelectionIndicator\(sidebarIndicator\);/);
+  assert.match(uiSource, /function makeDatabaseGameButton\(game\)[\s\S]*?const isSelected = state\.selectedDatabaseGameKey === databaseGameKey\(game\);\s*button\.className = `database-game-row\$\{isSelected \? " is-selected" : ""\}`;\s*if \(isSelected\) selectedDatabaseGameButton = button;/);
+  assert.match(uiSource, /function appendDatabaseGameRowsInBatches\(\)[\s\S]*?databaseRowsRenderPending = pendingRows\.length > 0;[\s\S]*?databaseRowsRenderPending = false;\s*scheduleSelectionIndicators\(\);/);
+});
+
+test("SPCBoyWK keeps arrow navigation and the selection indicator in the database sidebar", async () => {
+  const { app, window, loadUI } = makeHarness();
+  const games = [
+    { id: "game-1", consoleGroupName: "NES" },
+    { id: "game-2", consoleGroupName: "NES" }
+  ];
+  app.state.databaseGames = games;
+  app.state.databaseSearchGames = null;
+  app.state.databaseGameGroups = [{ name: "NES", gameIDs: games.map((game) => game.id) }];
+  app.state.selectedDatabaseGameKey = null;
+  app.state.selectedDatabaseConsoleName = null;
+
+  const focused = { current: null };
+  const makeRow = (className, dataset) => {
+    const classes = new Set(className.split(" "));
+    return {
+      dataset,
+      classList: {
+        add(name) { classes.add(name); },
+        remove(name) { classes.delete(name); },
+        contains(name) { return classes.has(name); }
+      },
+      focus() { focused.current = this; }
+    };
+  };
+  const heading = makeRow("database-console-row", { databaseConsoleName: "NES" });
+  const firstGame = makeRow("database-game-row", { databaseGameKey: "game-1" });
+  const secondGame = makeRow("database-game-row", { databaseGameKey: "game-2" });
+  const rows = [heading, firstGame, secondGame];
+  app.refs.treeRoot = {
+    querySelectorAll(selector) {
+      if (selector.startsWith(".database-console-row, .database-console-games")) return rows;
+      if (selector === ".database-game-row.is-selected, .database-console-row.is-selected") {
+        return rows.filter((row) => row.classList.contains("is-selected"));
+      }
+      return [];
+    }
+  };
+  window.spcBoyWK.databaseGroupState = async ({ state, action }) => ({
+    expandedGroupNames: state.expandedGroupNames,
+    selectedGroupName: action.groupName,
+    selectedGameID: action.gameId || null
+  });
+  loadUI();
+
+  assert.equal(app.ui.moveDatabaseSidebarSelection(heading, 1), true);
+  assert.equal(focused.current, firstGame);
+  assert.equal(app.state.selectedDatabaseGameKey, "game-1");
+  assert.equal(firstGame.classList.contains("is-selected"), true);
+
+  assert.equal(app.ui.moveDatabaseSidebarSelection(firstGame, -1), true);
+  assert.equal(focused.current, heading);
+  assert.equal(app.state.selectedDatabaseGameKey, null);
+  assert.equal(app.state.selectedDatabaseConsoleName, "NES");
+  assert.equal(heading.classList.contains("is-selected"), true);
+
+  assert.equal(app.ui.moveDatabaseSidebarSelection(heading, 1), true);
+  assert.equal(focused.current, firstGame);
+  assert.equal(app.ui.moveDatabaseSidebarSelection(firstGame, 1), true);
+  assert.equal(focused.current, secondGame);
+  assert.equal(app.state.selectedDatabaseGameKey, "game-2");
+
+  assert.equal(app.ui.moveDatabaseSidebarSelection(secondGame, 1), true);
+  assert.equal(focused.current, secondGame, "navigation at the end stays focused in the sidebar");
+  assert.match(uiSource, /if \(event\.key === "ArrowDown" \|\| event\.key === "ArrowUp"\) \{\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*moveDatabaseSidebarSelection/);
+  assert.match(uiSource, /selectDatabaseSidebarRow\(button, \{ focus: true \}\);\s*loadDatabaseGame\(game\)\.then\(\(loaded\) => \{[\s\S]*?playVisibleTrack\(targetID, 0\)/);
+});
+
+test("SPCBoyWK keeps the playlist capsule stable through missing row frames and playback refresh", () => {
+  const { app, loadUI, flushAnimationFrame, pendingAnimationFrameCount } = makeHarness();
+  const indicator = {
+    hidden: false,
+    classList: {
+      add(name) { if (name === "is-hidden") indicator.hidden = true; },
+      remove(name) { if (name === "is-hidden") indicator.hidden = false; },
+      contains(name) { return name === "is-hidden" && indicator.hidden; }
+    },
+    style: { opacity: "1" }
+  };
+  const sidebarIndicator = {
+    classList: { add() {}, remove() {}, contains() { return true; } },
+    style: { opacity: "0" }
+  };
+  app.refs.treeRoot = {
+    querySelector(selector) { return selector === ".list-selection-indicator" ? sidebarIndicator : null; }
+  };
+  app.refs.playlistSelectionIndicator = indicator;
+  app.refs.playlistBodyWrap = { scrollTop: 0, addEventListener() {} };
+  app.refs.playlistBody = { querySelector() { return null; } };
+  loadUI();
+
+  app.ui.moveSelection(1);
+  assert.equal(app.state.selectedTrackId, "track-a");
+  assert.equal(pendingAnimationFrameCount(), 1);
+  flushAnimationFrame();
+  assert.equal(indicator.hidden, false);
+  assert.equal(indicator.style.opacity, "1");
+
+  app.ui.refreshPlaylistPlaybackState();
+  assert.equal(pendingAnimationFrameCount(), 0);
+});
+
+test("SPCBoyWK fills the favorite star without coloring its surrounding button", () => {
+  assert.match(stylesSource, /button:not\(\.favorite-toggle\):not\(\.tree-node\):not\(\.database-game-row\):not\(\.database-console-row\):is\(:active, \[aria-pressed="true"\]\)\s*\{[^}]*background: var\(--accent\)/);
+  assert.match(stylesSource, /button:not\(\.favorite-toggle\):not\(\.tree-node\):not\(\.database-game-row\):not\(\.database-console-row\):is\(:active, \[aria-pressed="true"\]\) \.ui-icon/);
+  assert.match(stylesSource, /\.favorite-toggle\.is-favorite\s*\{\s*background: transparent;\s*color: var\(--accent\);\s*\}/);
+  assert.match(stylesSource, /\.favorite-toggle\.is-favorite \.ui-icon\s*\{\s*fill: currentColor;\s*\}/);
 });
 
 test("SPCBoyWK selection capsule follows the surviving primary after modifier-toggle", () => {
@@ -657,17 +792,59 @@ test("SPCBoyWK selection capsule follows the surviving primary after modifier-to
   assert.match(uiSource, /state\.selectedTrackId = selection\.primaryId;[\s\S]*?const primaryRow = selection\.primaryId \? playlistRowsByTrackId\.get\(selection\.primaryId\)[\s\S]*?selectedPlaylistRow = primaryRow;[\s\S]*?if \(focus\) clickedRow\?\.focus/);
 });
 
-test("SPCBoyWK clears playlist selection when a sidebar source replaces the visible list", () => {
+test("SPCBoyWK clears playlist selection for database-backed sidebar sources", () => {
   assert.doesNotMatch(uiSource, /function resolveSelectedTrackId\(/);
   assert.doesNotMatch(appCoreSource, /lastSelectedTrackId/);
   assert.doesNotMatch(uiSource, /lastSelectedTrackId/);
   assert.doesNotMatch(preferencesSnapshotSource, /lastSelectedTrackId/);
   assert.match(uiSource, /function clearPlaylistSelection\(\)\s*\{[\s\S]*state\.selectedTrackId = null;[\s\S]*state\.selectedTrackIds = \[\];[\s\S]*state\.playlistSelectionAnchorId = null;[\s\S]*selectedPlaylistRow = null;/);
-  assert.match(uiSource, /function positionSelectionIndicator\([\s\S]*?!target[\s\S]*?indicator\.classList\.add\("is-hidden"\)/);
+  assert.match(uiSource, /function hideSelectionIndicator\(indicator\)[\s\S]*?indicator\.classList\.add\("is-hidden"\)/);
+  assert.match(uiSource, /else if \(!hasPlaylistSelection\)\s*\{\s*hideSelectionIndicator\(refs\.playlistSelectionIndicator\);/);
   assert.match(uiSource, /async function showFavoritesPlaylist\(\)\s*\{[\s\S]*state\.playlist = \[\.\.\.state\.favorites\];[\s\S]*?clearPlaylistSelection\(\);/);
-  assert.match(uiSource, /async function loadDatabaseGamesIntoPlaylist\(games\)\s*\{[\s\S]*state\.playlist = databaseRowsToPlaylistTracks\(rows\);[\s\S]*clearPlaylistSelection\(\);/);
-  assert.match(uiSource, /function applyLibrarySnapshot\(snapshot\)\s*\{[\s\S]*clearPlaylistSelection\(\);/);
-  assert.match(uiSource, /async function applyFolderSelection\(selection\)\s*\{[\s\S]*state\.playlist = selection\.playlist;[\s\S]*?clearPlaylistSelection\(\);/);
+  assert.match(uiSource, /async function loadDatabaseGamesIntoPlaylist\(games, \{ title = null \} = \{\}\)\s*\{[\s\S]*state\.playlist = databaseRowsToPlaylistTracks\(rows\);[\s\S]*clearPlaylistSelection\(\);/);
+  assert.match(uiSource, /async function applyFolderSelection\(selection, targetTabID = state\.activePlaylistTabId, title = null\)\s*\{[\s\S]*state\.playlist = selection\.playlist;[\s\S]*?clearPlaylistSelection\(\);/);
+});
+
+test("SPCBoyWK is database-only", () => {
+  assert.match(indexSource, /sidebar-view-toggle-button/);
+  assert.doesNotMatch(indexSource, /options-local-files-panel|local-browser-enabled-checkbox/);
+  assert.doesNotMatch(appSource, /chooseRootFolder|refreshTree|openPath|applyLibrarySnapshot|onLibrarySnapshot|onLibraryCommand/);
+  assert.doesNotMatch(appDelegateSource, /Open Path|Local Files|sidebarDiskPath|chooseRootFolder|onChoosePath/);
+  assert.match(appDelegateSource, /sidebarPaths|sidebarConsoles/);
+  assert.doesNotMatch(nativeBridgeSource, /LocalFileBrowserCore|case "refreshTree"|case "openPath"|case "listFolder"|case "selectFolder"|case "selectFile"/);
+  assert.match(nativeBridgeSource, /case "databaseFileTree"[\s\S]*CatalogFileTreeIndex/);
+  assert.match(appCoreSource, /state\.sidebarMode = parsed\.sidebarMode === "paths" \? "paths" : "consoles";/);
+  assert.match(uiSource, /state\.sidebarMode = state\.sidebarMode === "paths" \? "paths" : "consoles";[\s\S]*state\.sidebarView = Object\.freeze\(localSidebarView\(state\.sidebarMode/);
+});
+
+test("SPCBoyWK keeps compact playlist tabs in the WebKit toolbar and persists their state natively", () => {
+  assert.match(indexSource, /id="playlist-tabs-toolbar" class="playlist-tabs-toolbar is-hidden"/);
+  assert.match(appCoreSource, /playlistTabs: \[\]/);
+  assert.match(uiSource, /function createPlaylistTab\(\{ duplicateActive = true/);
+  assert.match(uiSource, /function closePlaylistTab\(tabID = state\.activePlaylistTabId\)/);
+  assert.match(uiSource, /function restorePlaylistTabs\(value\)/);
+  assert.match(uiSource, /window\.spcBoyWK\.playlistTabsSave\(payload\)/);
+  assert.match(nativeBridgeSource, /case "playlistTabsLoad":[\s\S]*PlaylistTabsStore\.shared\.load\(\)/);
+  assert.match(nativeBridgeSource, /case "playlistTabsSave":[\s\S]*PlaylistTabsStore\.shared\.save\(payload\)/);
+  assert.match(appDelegateSource, /NSWindow\.allowsAutomaticWindowTabbing = false/);
+  assert.match(appDelegateSource, /keyEquivalent: "t"/);
+  assert.match(appDelegateSource, /dispatchClosePlaylistTab\(\)/);
+  assert.match(stylesSource, /\.playlist-tabs-toolbar[\s\S]*height: calc\(var\(--top-toolbar-control-height\) \+ var\(--top-toolbar-inset\)\)/);
+  assert.match(stylesSource, /\.playlist-tabs-toolbar[\s\S]*padding: var\(--top-toolbar-inset\) var\(--top-toolbar-inset\) 0;/);
+  assert.match(stylesSource, /\.playlist-tab\s*\{[^}]*height: var\(--top-toolbar-control-height\)/);
+  assert.match(stylesSource, /\.playlist-tab-select\.is-active \{ color: var\(--accent\); \}/);
+  assert.doesNotMatch(stylesSource, /\.playlist-tab-select\.is-active \{[^}]*background:/);
+});
+
+test("SPCBoyWK shares toolbar space across rounded playlist tabs and maps Command-1 through Command-9", () => {
+  assert.match(stylesSource, /\.playlist-tabs\s*\{[^}]*gap: var\(--toolbar-gap\)/);
+  assert.match(stylesSource, /\.playlist-tab\s*\{[^}]*flex: 1 1 0;[^}]*min-width: 0;[^}]*border-radius: var\(--control-radius\);[^}]*background: var\(--bg-chrome\)/);
+  assert.match(stylesSource, /\.playlist-tab-select\s*\{[^}]*flex: 1 1 0;[^}]*min-width: 0;[^}]*text-overflow: ellipsis/);
+  assert.ok(appDelegateSource.includes("for index in 1...9"));
+  assert.ok(appDelegateSource.includes("keyEquivalent: String(index)"));
+  assert.ok(appDelegateSource.includes("tabItem.keyEquivalentModifierMask = [.command]"));
+  assert.match(appDelegateSource, /const playlistTabPrefix = "selectPlaylistTab:"[\s\S]*activatePlaylistTabAtIndex\?\.\(index\)/);
+  assert.match(uiSource, /function activatePlaylistTabAtIndex\(index\)[\s\S]*state\.playlistTabs\?\.\[index\][\s\S]*activatePlaylistTab\(tab\.id\)/);
 });
 
 test("SPCBoyWK preserves shared catalog order until a user explicitly sorts", () => {
@@ -703,7 +880,6 @@ test("SPCBoyWK preserves shared catalog order until a user explicitly sorts", ()
 test("SPCBoyWK renders the shared catalog playlist presentation projection", () => {
   assert.match(nativeBridgeSource, /import CatalogPlaylistPresentationCore/);
   assert.match(nativeBridgeSource, /CatalogPlaylistPresentation\.project\([\s\S]*CatalogPlaylistReader\.tracksForGames/);
-  assert.match(nativeBridgeSource, /CatalogPlaylistPresentation\.project\(tracks: tracks\)/);
   assert.equal((nativeBridgeSource.match(/private static func playlistTrackResponse\(/g) || []).length, 1);
   assert.match(nativeBridgeSource, /"columnContentHints": columnContentHintResponse\(projection\.columnContentHints\)/);
   assert.match(nativeBridgeSource, /"fileText": track\.display\.fileText/);
@@ -754,7 +930,7 @@ test("SPCBoyWK decodes typed completion and adjacent-navigation payloads", () =>
 });
 
 test("SPCBoyWK submits the shared typed queued-fade request", () => {
-  const fadeCase = nativeBridgeSource.match(/case "playbackFadeDuration"[\s\S]*?(?=case "databaseFileTracks")/)?.[0] || "";
+  const fadeCase = nativeBridgeSource.match(/case "playbackFadeDuration"[\s\S]*?(?=case "favoritesList")/)?.[0] || "";
 
   assert.match(fadeCase, /JSONDecoder\(\)\.decode\([\s\S]*?PlaybackQueuedSkipFadeRequest\.self/);
   assert.match(fadeCase, /request\.durationMilliseconds/);
@@ -791,7 +967,14 @@ test("SPCBoyWK sends one typed audio-output snapshot to the shared transport", (
   assert.match(audioCase, /transport\.configureAudio\(request\)/);
   assert.doesNotMatch(audioCase, /args\[|PlaybackPreferences\(|setOutputVolume|setEqualizer|setMonoEnabled/);
   assert.match(playbackSource, /nativePlaybackAudioConfig\(\{[\s\S]*?appVolume: state\.appVolume,[\s\S]*?monoEnabled: state\.monoEnabled/);
-  assert.match(uiSource, /const settings = audioSettingsPayload\(\);[\s\S]*?nativePlaybackAudioConfig\?\.\(settings\)/);
+  assert.match(uiSource, /const settings = audioSettingsPayload\(\);[\s\S]*?configureAudioSettings\?\.\(settings\)/);
+  assert.match(playbackSource, /function configureAudioSettings\(settings = \{\}\)[\s\S]*?pendingAudioSettings[\s\S]*?while \(pendingAudioSettings\)/);
+});
+
+test("SPCBoyWK lets native controls own Enter activation", () => {
+  assert.match(appSource, /if \(event\.key === "Enter" && !state\.optionsOpen\) \{[\s\S]*?target\.matches\("button, select, option, a, input, \[role=button\], \[role=tab\]"\)[\s\S]*?if \(nativeControlTarget\) return;/);
+  assert.match(uiSource, /if \(event\.target !== row && event\.target\?\.closest\?\.\("button, input, select, a, \[contenteditable=true\]"\)\) return;/);
+  assert.match(uiSource, /selectPlaylistTrack\(track\.id, \{ focus: true \}\)/);
 });
 
 test("SPCBoyWK uses native in-place tempo and AAC cancellation events", () => {
@@ -855,6 +1038,47 @@ test("SPCBoyWK allows every playlist column to be hidden except an empty table",
   assert.doesNotMatch(appCoreSource, /function normalizeColumnVisibility\(/);
 });
 
+test("SPCBoyWK auto-fit animates table expansion and preserves header column transitions", () => {
+  const autoSizeStart = uiSource.indexOf("function autoSizeColumns()");
+  const autoSizeEnd = uiSource.indexOf("function autoSizeColumn(", autoSizeStart);
+  const autoSizeSource = uiSource.slice(autoSizeStart, autoSizeEnd);
+  const renderAutoSizeMatch = uiSource.match(/if \(shouldAutoSize\) \{([\s\S]*?)\n  \}/);
+
+  assert.ok(autoSizeStart >= 0 && autoSizeEnd > autoSizeStart);
+  assert.match(autoSizeSource, /const width = `\$\{Math\.max\(availableWidth, totalWidth\)\}px`;/);
+  assert.match(autoSizeSource, /playlistTable\.style\.width = width;/);
+  assert.match(autoSizeSource, /playlistTable\.style\.minWidth = `\$\{availableWidth\}px`;/);
+  assert.doesNotMatch(autoSizeSource, /playlistTable\.style\.minWidth = width/);
+  assert.ok(renderAutoSizeMatch);
+  assert.match(renderAutoSizeMatch[1], /autoSizeColumns\(\);[\s\S]*syncPlaylistColumnWidths\(\);/);
+  assert.doesNotMatch(renderAutoSizeMatch[1], /renderPlaylistHeader\(\)/);
+  assert.match(stylesSource, /\.playlist-table\s*\{[^}]*transition: width var\(--column-resize-duration\)/);
+  assert.match(stylesSource, /\.playlist-table th,\s*\.playlist-table td\s*\{[^}]*transition: width var\(--column-resize-duration\)/);
+});
+
+test("SPCBoyWK keeps the sidebar selection indicator mounted during tree rebuilds", () => {
+  const resetStart = uiSource.indexOf("function resetSidebarContent()");
+  const resetEnd = uiSource.indexOf("function hideSelectionIndicator", resetStart);
+  const resetSource = uiSource.slice(resetStart, resetEnd);
+
+  assert.ok(resetStart >= 0 && resetEnd > resetStart);
+  assert.match(resetSource, /for \(const child of \[\.\.\.refs\.treeRoot\.children\]\)/);
+  assert.match(resetSource, /child !== indicator\) child\.remove\(\)/);
+  assert.doesNotMatch(resetSource, /replaceChildren\(indicator\)/);
+});
+
+test("SPCBoyWK auto-fits virtualized playlists and refits restored tabs", () => {
+  const renderStart = uiSource.indexOf("function renderPlaylist(");
+  const renderEnd = uiSource.indexOf("function scheduleMetadataRefresh", renderStart);
+  const renderSource = uiSource.slice(renderStart, renderEnd);
+
+  assert.ok(renderStart >= 0 && renderEnd > renderStart);
+  assert.match(renderSource, /const playlistSignature = playlistAutoSizeSignature\(\);/);
+  assert.doesNotMatch(renderSource, /const playlistSignature = virtualized \? null/);
+  assert.match(uiSource, /state\.columnAutoSize = Boolean\(enabled\);\s*if \(state\.columnAutoSize\) autoSizedPlaylistSignature = null;/);
+  assert.match(uiSource, /state\.catalogPlaylistSortSessionId = tab\.catalogPlaylistSortSessionId \|\| null;\s*\/\/ Column widths/);
+});
+
 test("SPCBoyWK consumes the shared header sizing setting", () => {
   assert.match(preferencesSnapshotSource, /playlistColumnSizing: FrontendPlaylistColumnSizing\?/);
   assert.match(preferencesSnapshotSource, /playlistColumnSizing = FrontendPlaylistColumnSizing\(\)/);
@@ -881,12 +1105,14 @@ test("SPCBoyWK filters database search locally without a debounce", () => {
 
 test("SPCBoyWK renders the native catalog console-group projection without a second sort", () => {
   assert.match(nativeBridgeSource, /CatalogBrowserProjection\.groups\(from: projected\)/);
+  assert.match(nativeBridgeSource, /"id": game\.id/);
   assert.match(nativeBridgeSource, /"gameIDs": group\.games\.map\(\\\.id\)/);
   assert.match(nativeBridgeSource, /"consoleGroupName": game\.consoleGroupName/);
   assert.match(nativeBridgeSource, /case "databaseGroupState"[\s\S]*?JSONDecoder\(\)\.decode\([\s\S]*?CatalogBrowserGroupStateRequest\.self/);
   assert.match(nativeBridgeSource, /Self\.object\(request\.response\)/);
   assert.doesNotMatch(nativeBridgeSource, /private static func databaseGroupState/);
   assert.match(uiSource, /function visibleDatabaseGameGroups\(\)/);
+  assert.match(uiSource, /function databaseGameKey\(game\)\s*\{\s*return game\.id;\s*\}/);
   assert.match(uiSource, /function databaseConsoleName\(game\)[\s\S]*?game\.consoleGroupName/);
   assert.match(uiSource, /state\.databaseGameGroups/);
   assert.match(uiSource, /databaseGroupState\([\s\S]*?state: databaseGroupStateSnapshot\(\),[\s\S]*?kind: action/);
@@ -894,8 +1120,12 @@ test("SPCBoyWK renders the native catalog console-group projection without a sec
   assert.doesNotMatch(uiSource, /groupedGames\.keys\(\)\.sort/);
 });
 
-test("SPCBoyWK catalog roots are foldable in Path View", () => {
-  assert.doesNotMatch(nativeBridgeSource, /"alwaysExpanded": isRoot/);
+test("SPCBoyWK exposes the read-only catalog path tree without local browsing", () => {
+  assert.match(indexSource, /sidebar-view-toggle-button/);
+  assert.doesNotMatch(indexSource, /options-local-files-panel/);
+  assert.match(nativeBridgeSource, /case "databaseFileTree"[\s\S]*CatalogFileTreeIndex/);
+  assert.match(uiSource, /async function loadDatabaseFiles\(\)/);
+  assert.match(uiSource, /function cycleSidebarMode\(\)/);
 });
 
 test("SPCBoyWK focused activation preserves the CocoaSpice playable identity contract", async () => {
@@ -1211,6 +1441,96 @@ test("SPCBoyWK pause, resume, and seek keep the loaded session", async () => {
   await app.playback.restartAt(2);
   assert.equal(app.state.elapsedSeconds, 2);
   assert.equal(startRequests.length, 1);
+});
+
+test("SPCBoyWK Play/Pause pauses a native session when renderer playback identity is stale", async () => {
+  const { app, window, startRequests } = makeHarness();
+  await app.playback.playTrack("track-a");
+  app.state.isPlaying = false;
+  app.state.nativePlayback.transportState = "playing";
+  app.state.currentTrackId = null;
+  app.state.currentTrackInfo = null;
+  let pauseCalls = 0;
+  window.spcBoyWK.nativePlaybackPause = async () => {
+    pauseCalls += 1;
+    return snapshot(app.state.nativePlayback.generation, "paused");
+  };
+
+  await app.playback.togglePlayback();
+
+  assert.equal(pauseCalls, 1);
+  assert.equal(app.state.isPlaying, false);
+  assert.equal(app.state.nativePlayback.transportState, "paused");
+  assert.equal(startRequests.length, 1);
+});
+
+test("SPCBoyWK accepts the current start reply after an older native status overlaps it", async () => {
+  const { app, window } = makeHarness();
+  window.spcBoyWK.nativePlaybackStart = async () => {
+    app.playback.handleNativePlaybackState({
+      ...snapshot(6, "paused"),
+      status_sequence: 20,
+      position_ms: 5_000
+    });
+    return {
+      ...snapshot(7, "playing"),
+      position_ms: 1_000
+    };
+  };
+
+  await app.playback.playTrack("track-a");
+
+  assert.equal(app.state.currentTrackId, "track-a");
+  assert.equal(app.state.nativePlayback.generation, 7);
+  assert.equal(app.state.nativePlayback.transportState, "playing");
+  assert.equal(app.state.isPlaying, true);
+  assert.equal(app.state.elapsedSeconds, 1);
+});
+
+test("SPCBoyWK starts a selected track from the active playlist tab after another tab owned playback", async () => {
+  const { app, startRequests } = makeHarness();
+  const otherTrack = { ...app.state.playlist[0], id: "track-b", path: "/tmp/other-tab.flac" };
+  app.state.playingPlaylist = [...app.state.playlist];
+  app.state.playbackTabId = "tab-a";
+  app.state.activePlaylistTabId = "tab-b";
+  app.state.playlist = [otherTrack];
+  app.state.selectedTrackId = otherTrack.id;
+  app.state.currentTrackId = null;
+  app.state.currentTrackInfo = otherTrack;
+
+  await app.playback.togglePlayback();
+
+  assert.equal(app.state.currentTrackId, otherTrack.id);
+  assert.equal(app.state.playbackTabId, "tab-b");
+  assert.deepEqual(Array.from(app.state.playingPlaylist, (track) => track.id), [otherTrack.id]);
+  assert.equal(startRequests.at(-1).path, otherTrack.path);
+});
+
+test("SPCBoyWK playback does not move the user's playlist selection", async () => {
+  const { app } = makeHarness();
+  const otherTrack = { ...app.state.playlist[0], id: "track-b", path: "/tmp/selected.flac" };
+  app.state.playlist.push(otherTrack);
+  app.state.selectedTrackId = otherTrack.id;
+
+  await app.playback.playTrack("track-a");
+
+  assert.equal(app.state.currentTrackId, "track-a");
+  assert.equal(app.state.selectedTrackId, otherTrack.id);
+});
+
+test("SPCBoyWK equalizer changes update controls without rebuilding the playlist", () => {
+  const { app, loadUI } = makeHarness();
+  app.state.equalizerBandGains = [0];
+  loadUI();
+  let renderCount = 0;
+  app.ui.renderAll = () => { renderCount += 1; };
+
+  app.ui.setEqualizerEnabled(true);
+
+  assert.equal(app.state.equalizerEnabled, true);
+  assert.equal(app.refs.equalizerEnabledCheckbox.checked, true);
+  assert.equal(app.refs.equalizerToolbarButton.attributes["aria-pressed"], "true");
+  assert.equal(renderCount, 0);
 });
 
 for (const method of ["nativePlaybackPause", "setPlaybackPowerSaveBlocker"]) {

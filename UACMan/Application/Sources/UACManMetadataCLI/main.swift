@@ -5,6 +5,7 @@ import UACManCore
 private struct HarvestResponse: Encodable {
     let schemaVersion = 1
     let memberMetadata: [String: [String: UACJSONValue]]
+    let trackMetadata: [String: [MetaManMetadataTrackProjection]]
     let gameMetadata: [String: UACJSONValue]
     let sharedFieldConflicts: [String]
     let diagnosticCount: Int
@@ -26,6 +27,7 @@ private enum UACManMetadataCLI {
                     memberMetadata: Dictionary(uniqueKeysWithValues: outcome.items.map {
                         ($0.memberPath, $0.projection.memberFields)
                     }),
+                    trackMetadata: [:],
                     gameMetadata: shared.fields,
                     sharedFieldConflicts: shared.conflicts,
                     diagnosticCount: outcome.diagnosticCount,
@@ -38,6 +40,7 @@ private enum UACManMetadataCLI {
                 )
                 response = HarvestResponse(
                     memberMetadata: outcome.memberMetadata,
+                    trackMetadata: outcome.trackMetadata,
                     gameMetadata: [:],
                     sharedFieldConflicts: [],
                     diagnosticCount: outcome.diagnosticCount,
@@ -72,7 +75,7 @@ private enum CLIError: Error, LocalizedError {
         case .usage:
             "usage: UACManMetadataCLI harvest-spc-directory <directory> | harvest-format-directory <extension> <directory>"
         case .harvestFailures(let count):
-            "MetaMan could not read \(count) SPC file(s); no metadata should be imported."
+            "MetaMan could not read \(count) source file(s); no metadata should be imported."
         }
     }
 }

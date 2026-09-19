@@ -14,6 +14,8 @@ struct UACManApp: App {
             CommandGroup(replacing: .newItem) {
                 Button("Open UAC…", action: model.openPanel)
                     .keyboardShortcut("o")
+                Button("Open Collection…", action: model.openCollectionPanel)
+                    .keyboardShortcut("o", modifiers: [.command, .shift])
             }
             CommandGroup(after: .newItem) {
                 Button("Save UAC Metadata", action: model.save)

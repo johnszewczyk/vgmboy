@@ -95,9 +95,10 @@ struct PlaylistTableView: NSViewRepresentable {
             let monospace: Bool
         }
 
-        private enum Column: String, CaseIterable {
+        private enum Column: String, CaseIterable, Hashable {
             case favorite
             case index
+            case trackNumber
             case file
             case title
             case game
@@ -111,6 +112,7 @@ struct PlaylistTableView: NSViewRepresentable {
                 switch self {
                 case .favorite: "★"
                 case .index: "#"
+                case .trackNumber: "Track #"
                 case .file: "File"
                 case .title: "Title"
                 case .game: "Game"
@@ -168,6 +170,7 @@ struct PlaylistTableView: NSViewRepresentable {
         private var autoSizeTask: Task<Void, Never>?
         private var suppressWidthPersistence = false
         private var columnResizeTask: Task<Void, Never>?
+        private var automaticallyHiddenColumns: Set<Column> = []
 
         init(model: PlayerViewModel) {
             self._model = Bindable(model)
@@ -398,6 +401,8 @@ struct PlaylistTableView: NSViewRepresentable {
                     return cell
                 case .index:
                     return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.indexText(for: track), isCurrentTrack: model.currentTrack?.id == track.id, monospace: true)
+                case .trackNumber:
+                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.trackNumberText(for: track), isCurrentTrack: model.currentTrack?.id == track.id, monospace: true)
                 case .file:
                     return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: track.filename, isCurrentTrack: model.currentTrack?.id == track.id)
                 case .title:
@@ -609,7 +614,8 @@ struct PlaylistTableView: NSViewRepresentable {
             let visibility = storedVisibility()
             for column in tableView.tableColumns {
                 guard let playlistColumn = Column(rawValue: column.identifier.rawValue) else { continue }
-                let isHidden = playlistColumn.visibilityConfigurable && visibility[playlistColumn.rawValue] == false
+                let isHidden = playlistColumn.visibilityConfigurable
+                    && (visibility[playlistColumn.rawValue] == false || automaticallyHiddenColumns.contains(playlistColumn))
                 if column.isHidden != isHidden {
                     column.isHidden = isHidden
                 }
@@ -641,7 +647,7 @@ struct PlaylistTableView: NSViewRepresentable {
                 return switch column {
                 case .title, .game, .author, .system, .length:
                     index
-                case .favorite, .index, .file, .path, .fileSize:
+                case .favorite, .index, .trackNumber, .file, .path, .fileSize:
                     nil
                 }
             })
@@ -803,6 +809,7 @@ struct PlaylistTableView: NSViewRepresentable {
 
         private func autoSizeVisibleColumns() {
             guard let tableView else { return }
+            updateAutomaticContentVisibility(in: tableView)
             let targets = tableView.tableColumns.enumerated().compactMap { columnIndex, tableColumn -> (NSTableColumn, CGFloat)? in
                 guard !tableColumn.isHidden,
                       Column(rawValue: tableColumn.identifier.rawValue)?.canAutoSize == true else {
@@ -811,6 +818,61 @@ struct PlaylistTableView: NSViewRepresentable {
                 return (tableColumn, fittedWidth(for: columnIndex, in: tableView))
             }
             applyColumnWidths(targets)
+        }
+
+        private func updateAutomaticContentVisibility(in tableView: NSTableView) {
+            let visibility = storedVisibility()
+            let contentColumns = Set(Column.allCases.filter(columnHasContent))
+
+            for tableColumn in tableView.tableColumns {
+                guard let column = Column(rawValue: tableColumn.identifier.rawValue),
+                      column.canAutoSize else { continue }
+
+                // A persisted false is an explicit user choice. Automatic
+                // content visibility only owns columns that remain visible in
+                // the user's layout preferences.
+                if visibility[column.rawValue] == false {
+                    automaticallyHiddenColumns.remove(column)
+                    continue
+                }
+
+                if contentColumns.contains(column) {
+                    if automaticallyHiddenColumns.remove(column) != nil {
+                        tableColumn.isHidden = false
+                    }
+                } else {
+                    automaticallyHiddenColumns.insert(column)
+                    tableColumn.isHidden = true
+                }
+            }
+        }
+
+        private func columnHasContent(_ column: Column) -> Bool {
+            guard !model.visiblePlaylist.isEmpty else { return false }
+            switch column {
+            case .favorite, .index, .file, .path:
+                return true
+            case .fileSize:
+                // CocoaSpice deliberately does not stat source files during
+                // table rendering, so the placeholder is not content.
+                return false
+            case .trackNumber:
+                return model.visiblePlaylist.contains { track in
+                    hasMeaningfulContent(value(for: column, track: track))
+                }
+            case .title, .game, .author, .system, .length:
+                if let hint = widthHintValue(for: column) {
+                    return hasMeaningfulContent(hint)
+                }
+                return model.visiblePlaylist.contains { track in
+                    hasMeaningfulContent(value(for: column, track: track))
+                }
+            }
+        }
+
+        private func hasMeaningfulContent(_ value: String) -> Bool {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            return !trimmed.isEmpty && trimmed != "—"
         }
 
         private func fittedWidth(for columnIndex: Int, in tableView: NSTableView) -> CGFloat {
@@ -1031,13 +1093,15 @@ struct PlaylistTableView: NSViewRepresentable {
         private func toggleColumnVisibility(_ sender: NSMenuItem) {
             guard let rawValue = sender.representedObject as? String,
                   let tableView,
-                  let tableColumn = tableView.tableColumns.first(where: { $0.identifier.rawValue == rawValue }) else {
+                  let tableColumn = tableView.tableColumns.first(where: { $0.identifier.rawValue == rawValue }),
+                  let column = Column(rawValue: rawValue) else {
                 return
             }
 
             guard tableColumn.isHidden || tableView.tableColumns.contains(where: { !$0.isHidden && $0 !== tableColumn }) else {
                 return
             }
+            automaticallyHiddenColumns.remove(column)
             tableColumn.isHidden.toggle()
             persistVisibility()
         }
@@ -1060,7 +1124,7 @@ struct PlaylistTableView: NSViewRepresentable {
         private func widestWidth(for column: Column) -> CGFloat {
             let font = model.playlistMonospaceFont
                 ? NSFont.monospacedSystemFont(ofSize: model.playlistFontSize, weight: .regular)
-                : (column == .index || column == .length
+                : (column == .index || column == .trackNumber || column == .length
                     ? NSFont.monospacedDigitSystemFont(ofSize: model.playlistFontSize, weight: .regular)
                     : NSFont.systemFont(ofSize: model.playlistFontSize))
 
@@ -1081,6 +1145,8 @@ struct PlaylistTableView: NSViewRepresentable {
                 nil
             case .index:
                 hints.indexText
+            case .trackNumber:
+                nil
             case .file:
                 hints.fileText
             case .title:
@@ -1106,6 +1172,8 @@ struct PlaylistTableView: NSViewRepresentable {
                 ""
             case .index:
                 model.indexText(for: track)
+            case .trackNumber:
+                model.trackNumberText(for: track)
             case .file:
                 track.filename
             case .title:

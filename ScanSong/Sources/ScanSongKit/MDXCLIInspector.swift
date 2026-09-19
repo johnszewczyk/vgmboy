@@ -1,8 +1,9 @@
 import Foundation
+import MetaManCore
 
-/// ScanSong-owned MDX adapter. The executable is built by VGMBoy so the
-/// scanner and playback use the same mdxmini implementation without linking
-/// ScanSongKit to the playback core.
+/// ScanSong-owned MDX structure/dependency adapter. MetaMan owns title and
+/// bounded MML timing; the VGMBoy helper only validates that the player can
+/// open the module and its required dependency set.
 public struct MDXCLIInspector: ScanFormatHandler {
     public let descriptor: ScannerPluginDescriptor
 
@@ -11,15 +12,13 @@ public struct MDXCLIInspector: ScanFormatHandler {
     }
 
     public func inspect(fileURL: URL, route: ScannerRoute) async throws -> ScanInspection {
-        let mdxData: Data
+        let document: MetadataDocument
         do {
-            mdxData = try Data(contentsOf: fileURL)
-        } catch {
-            throw ScannerInspectionError.library(
-                "Could not read MDX payload \(fileURL.lastPathComponent): \(error.localizedDescription)"
-            )
+            document = try MetaManCore.read(fileURL: fileURL)
+        } catch let error as MetadataReadError {
+            throw ScannerInspectionError.malformedFile(error.localizedDescription)
         }
-        if let dependencyName = MDXDependencyReader.dependencyName(in: mdxData) {
+        if let dependencyName = MDXDependencyReader.dependencyName(in: document) {
             guard StandaloneArchiveExtractor.isSafeRelativePath(dependencyName) else {
                 throw ScannerInspectionError.malformedFile(
                     "MDX declares an unsafe dependency path: \(dependencyName)."
@@ -45,17 +44,18 @@ public struct MDXCLIInspector: ScanFormatHandler {
                 "MDX reported an invalid track count (\(info.trackCount)) for \(fileURL.lastPathComponent)."
             )
         }
-        let title = info.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = document.fields.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let timing = document.timing
         let metadata = ScannerMetadata(
-            game: info.game,
+            game: document.fields.game ?? "",
             song: title.isEmpty ? fileURL.deletingPathExtension().lastPathComponent : title,
-            system: info.system,
-            author: info.artist,
-            comment: info.comment,
-            introLengthMs: max(0, info.introLengthMs),
-            loopLengthMs: max(0, info.loopLengthMs),
-            playLengthMs: max(0, info.playLengthMs),
-            fadeLengthMs: max(0, info.fadeLengthMs)
+            system: document.fields.system ?? "",
+            author: document.fields.artist ?? "",
+            comment: document.fields.comment ?? "",
+            introLengthMs: max(0, timing?.introLengthMs ?? 0),
+            loopLengthMs: max(0, timing?.loopLengthMs ?? 0),
+            playLengthMs: max(0, timing?.playLengthMs ?? 0),
+            fadeLengthMs: max(0, timing?.fadeLengthMs ?? 0)
         )
         return ScanInspection(route: route, tracks: [
             ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)
@@ -82,14 +82,5 @@ public struct MDXCLIInspector: ScanFormatHandler {
 }
 
 private struct MDXInfo: Decodable, Sendable {
-    let title: String
-    let game: String
-    let system: String
-    let artist: String
-    let comment: String
-    let introLengthMs: Int
-    let loopLengthMs: Int
-    let playLengthMs: Int
-    let fadeLengthMs: Int
     let trackCount: Int
 }

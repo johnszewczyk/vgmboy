@@ -17,7 +17,7 @@ public struct CatalogPlaylistGameSelection: Hashable, Sendable {
     }
 }
 
-/// The exact fourteen-column Games playlist projection used by CocoaSpice's
+/// The exact Games playlist projection used by CocoaSpice's
 /// original reader. It intentionally contains no database row ID or fallback
 /// fields: applications derive their own identity from the source tuple.
 public struct CatalogPlaylistTrack: Equatable, Sendable {
@@ -26,6 +26,7 @@ public struct CatalogPlaylistTrack: Equatable, Sendable {
     public let archiveEntry: String?
     public let trackIndex: Int
     public let trackCount: Int
+    public let trackNumber: Int?
     public let title: String
     public let game: String
     public let author: String
@@ -42,6 +43,7 @@ public struct CatalogPlaylistTrack: Equatable, Sendable {
         archiveEntry: String?,
         trackIndex: Int,
         trackCount: Int,
+        trackNumber: Int? = nil,
         title: String,
         game: String,
         author: String,
@@ -57,6 +59,7 @@ public struct CatalogPlaylistTrack: Equatable, Sendable {
         self.archiveEntry = archiveEntry
         self.trackIndex = trackIndex
         self.trackCount = trackCount
+        self.trackNumber = trackNumber
         self.title = title
         self.game = game
         self.author = author
@@ -110,6 +113,7 @@ public enum CatalogPlaylistReader {
         t.archive_entry AS archive_entry,
         t.track_index AS track_index,
         t.track_count AS track_count,
+        t.track_number AS track_number,
         COALESCE(m.title, '') AS title,
         COALESCE(NULLIF(m.game, ''), NULLIF(t.browser_game, ''), '') AS game,
         COALESCE(m.author, '') AS author,
@@ -187,6 +191,7 @@ public enum CatalogPlaylistReader {
             archive_entry,
             track_index,
             track_count,
+            track_number,
             title,
             game,
             author,
@@ -239,15 +244,16 @@ public enum CatalogPlaylistReader {
                 archiveEntry: nullableText(statement, index: 2),
                 trackIndex: Int(sqlite3_column_int(statement, 3)),
                 trackCount: Int(sqlite3_column_int(statement, 4)),
-                title: text(statement, index: 5),
-                game: text(statement, index: 6),
-                author: text(statement, index: 7),
-                system: text(statement, index: 8),
-                comment: text(statement, index: 9),
-                introLengthMilliseconds: Int(sqlite3_column_int(statement, 10)),
-                loopLengthMilliseconds: Int(sqlite3_column_int(statement, 11)),
-                lengthMilliseconds: Int(sqlite3_column_int(statement, 12)),
-                fadeLengthMilliseconds: Int(sqlite3_column_int(statement, 13))
+                trackNumber: sqlite3_column_type(statement, 5) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 5)),
+                title: text(statement, index: 6),
+                game: text(statement, index: 7),
+                author: text(statement, index: 8),
+                system: text(statement, index: 9),
+                comment: text(statement, index: 10),
+                introLengthMilliseconds: Int(sqlite3_column_int(statement, 11)),
+                loopLengthMilliseconds: Int(sqlite3_column_int(statement, 12)),
+                lengthMilliseconds: Int(sqlite3_column_int(statement, 13)),
+                fadeLengthMilliseconds: Int(sqlite3_column_int(statement, 14))
             ))
         }
         guard sqlite3_errcode(database) == SQLITE_OK || sqlite3_errcode(database) == SQLITE_DONE else {

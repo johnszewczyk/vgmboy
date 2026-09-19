@@ -378,19 +378,42 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
             )
             return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
         case "openmpt":
+            if fileURL.pathExtension.caseInsensitiveCompare("mod") == .orderedSame {
+                do {
+                    let document = try MetaManCore.read(fileURL: fileURL)
+                    let metadata = ScannerMetadata(
+                        metadataDocument: document,
+                        includeDateAndEncodedByInComment: false
+                    )
+                    return ScanInspection(
+                        route: route,
+                        tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)]
+                    )
+                } catch MetadataReadError.unsupportedFormat(_) {
+                    return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: nil)])
+                } catch let error as MetadataReadError {
+                    throw ScannerInspectionError.malformedFile(error.localizedDescription)
+                }
+            }
             return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: nil)])
         case "sid":
-            let document: MetadataDocument
+            let result: MetadataReadResult
             do {
-                document = try MetaManCore.read(fileURL: fileURL)
+                result = try MetaManCore.readResult(fileURL: fileURL)
             } catch let error as MetadataReadError {
                 throw ScannerInspectionError.malformedFile(error.localizedDescription)
             }
-            let metadata = ScannerMetadata(
-                metadataDocument: document,
-                includeDateAndEncodedByInComment: false
-            )
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            let tracks = result.tracks.enumerated().map { ordinal, track in
+                ScanTrackMetadata(
+                    trackIndex: track.sourceTrackIndex ?? ordinal,
+                    trackCount: result.tracks.count,
+                    metadata: ScannerMetadata(
+                        metadataDocument: track.document,
+                        includeDateAndEncodedByInComment: false
+                    )
+                )
+            }
+            return ScanInspection(route: route, tracks: tracks)
         default:
             if route.structurePolicy != .knownSingle {
                 throw ScannerInspectionError.missingRequiredAdapter(

@@ -18,15 +18,17 @@ and manifest contract.
 - CocoaSpice owns UAC playback adaptation. For SPC playback it passes a
   seekable UAC member to the in-memory decoder path; formats requiring a file
   path use FrontendCore materialization.
-- VGMBoy owns decoder admission and playback behavior. AudioMan owns `/audio`
-  source selection and package recipes, not UAC implementation.
+- VGMBoy owns decoder admission and playback behavior. AudioMan is a downstream
+  `/audio` operator that chooses source sets and package recipes; it does not
+  own, link, or implement UACMan.
 
 ## Invariants
 
 - Treat the UAC manifest as authoritative during catalog scans. Do not unpack
   members or parse enclosed native tags to fill absent UAC metadata. An
-  explicit UACMan harvest/edit operation may request SPC reading through
-  MetaManCore.
+  explicit UACMan harvest/edit operation may request native reading through
+  MetaManCore. UAC `subsong` entries carry the decoder track index and
+  per-track metadata for NSF-family members.
 - `MetaManCore` owns UAC package/member metadata documents and uses
   `UACWrapperCore` for framing, manifest, and seek-table parsing. Other
   consumers may use `UACWrapperCore` for container operations; do not fork UAC

@@ -5,7 +5,7 @@ import Foundation
 enum SAPMetadataReader {
     private static let signature = Array("SAP\r\n".utf8)
     private static let maximumHeaderBytes = 1 * 1_024 * 1_024
-    private static let maximumTrackCount = 65_536
+    private static let maximumTrackCount = 32
     private static let defaultPlayLengthMs = 150_000
 
     private struct TimeHint {
@@ -106,7 +106,8 @@ enum SAPMetadataReader {
                 }
                 trackCount = parsed
             case "TYPE":
-                guard let type = valueBytes.first, type == 0x42 || type == 0x43 else {
+                guard let type = valueBytes.first,
+                      type == 0x42 || type == 0x43 || type == 0x44 || type == 0x53 else {
                     throw malformed("SAP player type is unsupported by the scanner", name)
                 }
                 playerType = type
@@ -124,6 +125,9 @@ enum SAPMetadataReader {
             case "DATE":
                 copyright = directive.value
             case "TIME":
+                guard timeHints.count < maximumTrackCount else {
+                    throw malformed("SAP has too many TIME directives", name)
+                }
                 let hint = parseTimeHint(directive.value)
                 timeHints.append(hint)
                 if hint == nil {

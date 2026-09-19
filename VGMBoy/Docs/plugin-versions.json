@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "lastReviewed": "2026-08-30",
+  "lastReviewed": "2026-09-17",
   "reviewIntervalDays": 90,
   "policy": "Review upstream milestones quarterly and before a release. Do not adopt a decoder update without the format regression corpus and representative playback checks.",
   "plugins": [
@@ -12,7 +12,20 @@
       "current": "0.6.5",
       "upstream": "https://github.com/libgme/game-music-emu",
       "milestoneCheck": "release-or-tag",
-      "formats": ["AY", "GBS", "HES", "KSS", "NSF", "NSFE", "SAP", "SPC"]
+      "formats": ["AY", "GBS", "HES", "KSS", "NSF", "NSFE", "SPC"]
+    },
+    {
+      "id": "asap",
+      "name": "ASAP",
+      "kind": "snapshot",
+      "source": "vendor/zxtune",
+      "current": "8.0.0",
+      "sourceIdentity": "ZXTune commit c93e81d081685ea2c7cd21fe0077e93d84b4d88d; ASAP version from 3rdparty/asap/asap.spec",
+      "snapshotDigest": "163526dcd19c65808623f1115d5c62e7ab878bf4f794ec191d2f566ee8e33a5a",
+      "upstream": "https://github.com/vitamin-caig/zxtune",
+      "milestoneCheck": "manual",
+      "license": "GPL-2.0-or-later",
+      "formats": ["SAP TYPE B", "SAP TYPE C", "SAP TYPE D", "SAP TYPE S"]
     },
     {
       "id": "libvgm",

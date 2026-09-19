@@ -25,6 +25,11 @@ FFMPEG_SOURCES=(
   "/opt/homebrew/opt/ffmpeg/lib/libswresample.dylib"
 )
 
+if [[ -d /Applications/Xcode.app/Contents/Developer ]]; then
+  export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+  export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+fi
+
 if [[ ! -f "$LIBGME_SOURCE" ]]; then
   echo "Missing $LIBGME_SOURCE"
   echo "Install it with: brew install game-music-emu"

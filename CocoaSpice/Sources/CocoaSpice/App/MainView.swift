@@ -16,9 +16,6 @@ struct MainView: View {
         .toolbar {
             ToolbarItem(placement: .navigation) { sidebarToolbarButton(.games) }
             ToolbarItem(placement: .navigation) { sidebarToolbarButton(.files) }
-            if model.localBrowserEnabled {
-                ToolbarItem(placement: .navigation) { sidebarToolbarButton(.localFiles) }
-            }
             ToolbarItem(placement: .navigation) {
                 Button {
                     model.toggleSidebarDisclosureAll()
@@ -77,7 +74,7 @@ struct MainView: View {
             VStack(spacing: 0) {
                 NativeSearchField(
                     text: $model.sidebarSearchText,
-                    placeholder: model.localBrowserEnabled ? "Search Local Files" : "Search Library",
+                    placeholder: "Search Library",
                     debounceInterval: 0.1,
                     initialDebounceInterval: 0.25
                 )
@@ -85,7 +82,7 @@ struct MainView: View {
                 .padding(.top, 0)
                 .padding(.bottom, 2)
 
-                if !model.localBrowserEnabled, let error = model.databaseSidebarLoadError {
+                if let error = model.databaseSidebarLoadError {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
@@ -103,9 +100,7 @@ struct MainView: View {
                 }
 
                 Group {
-                    if model.sidebarBrowserMode == .localFiles {
-                        LocalBrowserSidebarListView(model: model)
-                    } else if model.effectiveSidebarBrowserMode == .games
+                    if model.effectiveSidebarBrowserMode == .games
                         ? model.isLoadingDatabaseSidebar
                         : model.isLoadingDatabaseFileSidebar {
                         VStack(spacing: 10) {
@@ -228,56 +223,6 @@ private struct MainWindowLevelConfigurator: NSViewRepresentable {
         DispatchQueue.main.async {
             nsView.window?.cocoaSpiceRole = .main
             nsView.window?.level = alwaysOnTop ? .floating : .normal
-        }
-    }
-}
-
-private struct LocalBrowserSidebarListView: View {
-    @Bindable var model: PlayerViewModel
-
-    private var rows: [LocalBrowserSidebarRow] {
-        let query = model.sidebarSearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return query.isEmpty ? model.localBrowserRows : model.localBrowserRows.filter { $0.node.name.lowercased().contains(query) }
-    }
-
-    var body: some View {
-        if rows.isEmpty {
-            ContentUnavailableView(
-                model.localBrowserPath.isEmpty ? "No Local Folder" : "No Local Files",
-                systemImage: "externaldrive",
-                description: Text("Choose a readable folder on the Database page in Options.")
-            )
-        } else {
-            List(rows) { row in
-                HStack(spacing: model.databaseSidebarDisclosureGapPoints) {
-                    if row.node.kind == .folder {
-                        Button { model.toggleLocalBrowserFolder(row.node.path) } label: {
-                            Image(systemName: row.isExpanded ? "chevron.down" : "chevron.right")
-                                .font(.system(size: 9, weight: .semibold))
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        Color.clear.frame(width: 9, height: 9)
-                    }
-                    Text(row.node.name)
-                        .font(.system(size: model.databaseSidebarFontSize, design: model.databaseSidebarMonospaceFont ? .monospaced : .default))
-                        .foregroundStyle(Color(nsColor: DatabaseSidebarTableChrome.textColor(model.databaseSidebarTextColor)))
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
-                }
-                .padding(.leading, CGFloat(row.depth) * model.databaseSidebarChildIndentPoints)
-                .contentShape(Rectangle())
-                .onTapGesture { model.selectLocalBrowserRow(row) }
-                .onTapGesture(count: 2) { model.activateLocalBrowserPath(row.node.path) }
-                .contextMenu {
-                    Button("Set as Playlist") { model.activateLocalBrowserPath(row.node.path) }
-                    Button("Add to Playlist") { model.activateLocalBrowserPath(row.node.path, enqueue: true) }
-                    Button("Show in Finder") {
-                        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: row.node.path)])
-                    }
-                }
-            }
-            .listStyle(.plain)
         }
     }
 }

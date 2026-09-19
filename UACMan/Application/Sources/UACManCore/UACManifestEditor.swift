@@ -134,16 +134,26 @@ public enum UACManifestEditor {
             var metadata = members[index]["metadata"] as? [String: Any] ?? [:]
             switch operation {
             case .set:
-                metadata[fieldKey] = value
+                if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    metadata.removeValue(forKey: fieldKey)
+                } else {
+                    metadata[fieldKey] = value
+                }
             case .fillMissing:
                 let existing = metadata[fieldKey]
                 let isEmptyString = (existing as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? false
-                if existing == nil || existing is NSNull || isEmptyString {
+                if !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   existing == nil || existing is NSNull || isEmptyString {
                     metadata[fieldKey] = value
                 }
             case .replaceText:
                 if let existing = metadata[fieldKey] as? String {
-                    metadata[fieldKey] = existing.replacingOccurrences(of: searchText, with: value)
+                    let replacement = existing.replacingOccurrences(of: searchText, with: value)
+                    if replacement.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        metadata.removeValue(forKey: fieldKey)
+                    } else {
+                        metadata[fieldKey] = replacement
+                    }
                 }
             case .remove:
                 metadata.removeValue(forKey: fieldKey)
@@ -171,7 +181,14 @@ public enum UACManifestEditor {
               let object = value as? [String: Any] else {
             throw UACManifestEditorError.invalidMetadataJSON(field)
         }
-        return object
+        guard field.localizedCaseInsensitiveContains("metadata") else { return object }
+        return object.filter { _, value in
+            if value is NSNull { return false }
+            if let text = value as? String {
+                return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+            return true
+        }
     }
 
     private static func validatedJSON(_ object: [String: Any]) throws -> Data {

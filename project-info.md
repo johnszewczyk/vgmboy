@@ -19,7 +19,7 @@ history live in this repository.
 | AppKit/SwiftUI presentation | [CocoaSpice/AGENTS.md](CocoaSpice/AGENTS.md) |
 | Native WebKit player and typed host bridge | [SPCBoyWK/AGENTS.md](SPCBoyWK/AGENTS.md) |
 | Phosphor-styled WebKit player | [ViewBoy/AGENTS.md](ViewBoy/AGENTS.md) |
-| Archived Electron source, recovery only | [SPCBoy/AGENTS.md](SPCBoy/AGENTS.md) |
+| Legacy Electron recovery material | [LocalRecovery/README.md](LocalRecovery/README.md) |
 
 For a component task, follow its `AGENTS.md` → `ai/AGENTS.md` →
 `ai/project-info.md` → focused-note route. See `README.md` for the family

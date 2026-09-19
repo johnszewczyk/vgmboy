@@ -11,9 +11,11 @@ in the UAC manifest. The earlier true-stream prototype and beta proposal were
 closed and removed from the maintained package. No native SPC conversion or
 playback implementation is supported.
 
-The UAC wrapper also supports MetaMan's common single-track projection for VGM
-and VGZ, including GD3 metadata for Sega Mega Drive/Genesis logs. The wrapper
-retains the original VGM/VGZ member bytes.
+The UAC wrapper also supports MetaMan's common projection for VGM and VGZ,
+including GD3 metadata for Sega Mega Drive/Genesis logs. For NSF, NSFE, and
+GBS, the wrapper records each MetaMan track as an ordered subsong entry that
+points into the unchanged original member. The wrapper retains original member
+bytes for every format.
 
 No custom SPC compression scheme is approved. Solid compression already offers
 cross-file dictionary reuse; the earlier eight-fixture measurements are

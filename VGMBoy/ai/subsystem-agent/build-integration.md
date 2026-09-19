@@ -46,8 +46,10 @@ for ScanSong's external inspection executables.
 - Scanner inspection APIs are split by format. The MDX inspector depends on
   `VGMBoyMDXInspectionCore` plus `VGMBoyCMDX`; the Amiga inspector depends on
   `VGMBoyAmigaInspectionCore` plus `VGMBoyCUADE`. Neither depends on the
-  all-decoder `VGMBoyKit` umbrella. Their native MDX/UADE inspection behavior
-  and output fields remain unchanged.
+  all-decoder `VGMBoyKit` umbrella. The MDX scanner process only confirms that
+  mdxmini can open the module and its dependencies; MetaMan owns scan metadata
+  and duration. The Amiga inspector continues to return UADE subsongs and
+  their metadata.
 - APE is no longer a scanner-helper product. ScanSong reads its native header
   timing and tags directly; `CFFmpeg` remains a VGMBoy playback dependency for
   APE, MP2, and TAK.

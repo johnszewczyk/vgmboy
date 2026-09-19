@@ -67,13 +67,15 @@ enum PlaylistM3UCodec {
                         archiveURL: resolvedURL,
                         entryPath: entryPath,
                         trackIndex: pendingPersistedTrack.trackIndex,
-                        trackCount: pendingPersistedTrack.trackCount
+                        trackCount: pendingPersistedTrack.trackCount,
+                        trackNumber: pendingPersistedTrack.trackNumber
                     )
                 } else {
                     restoredTrack = TrackItem(
                         url: resolvedURL,
                         trackIndex: pendingPersistedTrack.trackIndex,
-                        trackCount: pendingPersistedTrack.trackCount
+                        trackCount: pendingPersistedTrack.trackCount,
+                        trackNumber: pendingPersistedTrack.trackNumber
                     )
                 }
 

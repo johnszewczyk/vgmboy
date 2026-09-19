@@ -35,6 +35,29 @@ import UACWrapperCore
     #expect(String(decoding: edited, as: UTF8.self).contains("futureMemberField"))
 }
 
+@Test func metadataEditorsDoNotPersistEmptyTagValues() throws {
+    let edited = try UACManifestEditor.updateMemberFields(
+        in: Data(manifestJSON.utf8),
+        memberPath: "variants/original/track.spc",
+        metadataJSON: "{\"title\":\"   \",\"artist\":null,\"trackNumber\":7}",
+        extensionsJSON: "{}"
+    )
+    let manifest = try UACManifestEditor.decode(edited)
+    let member = try #require(manifest.members.first)
+    #expect(member.metadata["title"] == nil)
+    #expect(member.metadata["artist"] == nil)
+    #expect(member.metadata["trackNumber"] == .integer(7))
+
+    let removed = try UACManifestEditor.applyBatchMetadataEdit(
+        in: edited,
+        memberPaths: ["variants/original/track.spc"],
+        key: "trackNumber",
+        operation: .set,
+        value: "   "
+    )
+    #expect(try UACManifestEditor.decode(removed).members.first?.metadata["trackNumber"] == nil)
+}
+
 @Test func rejectsNonObjectMetadataEditors() {
     #expect(throws: UACManifestEditorError.invalidMetadataJSON("Member metadata")) {
         try UACManifestEditor.updateMemberFields(

@@ -53,10 +53,11 @@ independent media sources are not playback targets.
 
 | CocoaSpice playback family | Playable extensions or names | ScanSong metadata methodology and current boundary |
 | --- | --- | --- |
-| `libgme` | `.ay`, `.gbs`, `.hes`, `.kss`, `.nsf`, `.nsfe`, `.sap`, `.spc` | Direct format readers handle all eight: native header/chunk/playlist facts are used without starting libgme. |
+| `libgme` | `.ay`, `.gbs`, `.hes`, `.kss`, `.nsf`, `.nsfe`, `.spc` | Direct format readers cover all seven corresponding scanner routes; native header/chunk/playlist facts are used without starting libgme. |
+| `asap` | `.sap` | MetaManCore reads the bounded SAP header and ordered TIME facts; VGMBoy routes all SAP player types B/C/D/S through ASAP for playback. |
 | `libvgm` | `.vgm`, `.vgz`, `.gym`, `.s98`, `.dro` | `.vgm`/`.vgz` use MetaManCore's direct GD3/header-timing reader and `.s98` uses its direct header/device/tag/event reader. `.gym` remains one structure-known row without metadata and is not an extraction target; `.dro` has no ScanSong route. |
 | `psgplay` | `.sndh` | MetaManCore bounded header/tag/ICE! reader; PSGPlay remains the playback engine and is not linked for production scanning. |
-| `mdx` | `.mdx` | VGMBoy-built `vgmboy-mdx-inspect` still supplies decoder-derived enumeration and metadata; dependencies are materialized but not published as tracks. |
+| `mdx` | `.mdx` | MetaManCore reads the clear Shift-JIS title, PDX reference, and bounded MML timing for uncompressed bodies; the VGMBoy-built helper validates player/dependency acceptance only. LZX-compressed bodies retain tags but have no MetaMan timing. Dependencies are not published as tracks. |
 | `standard-audio` | `.aac`, `.aif`, `.aiff`, `.caf`, `.flac`, `.m4a`, `.mp3`, `.wav`, `.wave` | MetaManCore's file-URL reader uses AVFoundation for duration/common tags and directly retains FLAC Vorbis comments. `.ogg` is routed through this scanner handler too. `.aac`, `.caf`, and `.wave` do not currently have ScanSong routes. |
 | `ffmpeg-audio` | `.ape`, `.mp2`, `.tak` | `.ape` uses MetaManCore's direct header/tag reader. `.mp2` and `.tak` do not currently have ScanSong routes. |
 | `highly-complete` | `.gsf`, `.minigsf` | MetaManCore validates PSF v0x22 payloads, GBA segments, and dependency chains without mGBA. |
@@ -66,7 +67,7 @@ independent media sources are not playback targets.
 | `playpsf` | `.psf`, `.minipsf`, `.psf2`, `.minipsf2` | `MetaManCore` PSF-style `[TAG]` reader; libraries remain dependency data. |
 | `qsf` | `.qsf`, `.miniqsf` | MetaManCore's complete PSF v0x41/QSound reader validates payload blocks, root tags, and declared dependencies without the QSound core. |
 | `sidplayfp` | `.sid` | `MetaManCore` reads PSID/RSID header metadata; the playback decoder remains in VGMBoy. |
-| `openmpt` | `.669`, `.dmf`, `.far`, `.it`, `.mod`, `.mptm`, `.mtm`, `.okt`, `.ptm`, `.s3m`, `.stm`, `.ult`, `.xm` | ScanSong admits one known-structure row, but metadata remains optional/deferred; no playback decoder inspection runs. |
+| `openmpt` | `.669`, `.dmf`, `.far`, `.it`, `.mod`, `.mptm`, `.mtm`, `.okt`, `.ptm`, `.s3m`, `.stm`, `.ult`, `.xm` | Recognized 31-sample ProTracker-family `.mod` headers use MetaMan; all other registered module formats and unrecognized MOD dialects remain one known-structure row without metadata. No playback decoder inspection runs. |
 | `amiga-uade` | UADE replayer prefixes such as `mod.*`, `p4x.*`, `med.*`, and TFMX | VGMBoy-built `vgmboy-amiga-inspect` still supplies subsong enumeration and metadata; complete-set dependencies are materialized first. |
 
 `metadataPolicy: .direct` means the route does not need a playback-decoder
@@ -86,13 +87,18 @@ ScanSong projects those documents into the catalog. Neither MetaMan nor
 ScanSong expands, hashes, or inspects the TAR/audio payload during scanning;
 declared member sizes and BLAKE3 values are trusted rather than recomputed. A
 playable member is represented from its manifest record and does not need an
-inner-format inspector.
+inner-format inspector. If the manifest has explicit `subsong` entries, each
+unique member/decoder-index pair becomes a catalog row in playlist order; the
+entry's per-track metadata and decoder index are retained while all rows point
+to the same unchanged member. Ordinary file entries do not expand or duplicate
+member rows.
 
 The UAC game title and console select the catalog's browser grouping only.
-UAC member fields exclusively define the schema-23 track fields CocoaSpice
-consumes; missing, null, or invalid values remain blank/default, never falling
-back to contained-file tags. Track rows remain independent, so differing values
-are not promoted or overwritten by package-level consensus. Rich UAC member
+UAC member fields and explicit subsong projections define the schema-23 track
+fields CocoaSpice consumes; missing, null, or invalid values remain
+blank/default, never falling back to contained-file tags. Track rows remain
+independent, so differing values are not promoted or overwritten by
+package-level consensus. Rich UAC member
 metadata, hash records, playlists, and game-level metadata remain in the
 package manifest. During playback CocoaSpice may decode the selected payload
 member, but must not read its source-format tags for displayed metadata.
@@ -111,7 +117,7 @@ track fields and does not expose those additional manifest fields in CocoaSpice.
 | `sap-direct` | `.sap` | One row per `SONGS` header entry (default one) | `MetaManCore` SAP information-header reader | No emulator; retains the bounded raw header and ordered directives; native `TIME` facts map finite durations or loop-start intro times. |
 | `hes-direct` | `.hes` | One row per sibling-M3U entry, or 256 compatibility slots without one | `MetaManCore.readResult` HES header/M3U reader | No emulator; MetaMan receives only the same-basename sibling M3U, which remains support data and supplies the authored track map and timings. |
 | `sndh-direct` | `.sndh` | One row per declared subtune | `MetaManCore.readResult` with bounded ICE! expansion | PSGPlay remains playback-only; the previous metadata API is a test-only oracle. |
-| `openmpt` | `.669`, `.dmf`, `.far`, `.it`, `.mod`, `.mptm`, `.mtm`, `.okt`, `.ptm`, `.s3m`, `.stm`, `.ult`, `.xm` | One structurally-known row | Optional/deferred; metadata may be empty | No scanner-side module conversion or archive expansion. |
+| `openmpt` | `.669`, `.dmf`, `.far`, `.it`, `.mod`, `.mptm`, `.mtm`, `.okt`, `.ptm`, `.s3m`, `.stm`, `.ult`, `.xm` | One structurally-known row | MetaMan reads the bounded title/sample-name header for recognized 31-sample ProTracker-family MOD signatures; unrecognized MOD and the remaining formats have no current MetaMan projection | No scanner-side module conversion or archive expansion. |
 | `standard-audio` | `.aif`, `.aiff`, `.flac`, `.m4a`, `.mp3`, `.ogg`, `.wav` | One track | MetaManCore file-URL reader: AVFoundation duration/common tags; ordered FLAC Vorbis comments | Exact decoded duration is preferred; ScanSong only routes and projects the document. |
 | `ape-direct` | `.ape` | One validated single row | `MetaManCore` APE descriptor, seek-table, APEv2, and ID3v2 reader | Header-derived duration, ordered tags, and original tag blocks; no decoder startup. |
 | `adx-direct` | CRI/Monster ADX in `.adx` | One track | `MetaManCore` CRI/Monster header and loop-timing reader | Preserves native sample/loop bounds and vgmstream's default two-loop/10-second-fade play window; non-ADX signatures (including Ogg and RIFF aliases) use vgmstream. |
@@ -207,15 +213,15 @@ the former ScanSong reader.
 ### SAP: direct header, track, and timing facts
 
 `.sap` uses `sap-direct` and `SAPMetadataReader` in MetaManCore; ScanSong does
-not open libgme or start the Atari CPU and POKEY playback core. Starting after
-the five-byte `SAP\r\n` signature, the reader walks CR/LF directive lines to
-the first `FF FF` binary-data marker, validates the player type (B/C only),
-optional `SONGS` count, and bounded numeric fields, and retains the exact
-header and ordered directives—including unknown keys. `SONGS` defaults to one
-as it does in libgme's information-only reader. `NAME` and `AUTHOR` become game
-and author; the system is `Atari XL`. SAP `DATE` remains available as a source
-fact, matching the old scanner projection that did not map copyright into the
-catalog comment. Detailed parser offsets/layouts are in MetaMan's
+not invoke a playback core. Starting after the five-byte `SAP\r\n` signature,
+the reader walks CR/LF directive lines to the first `FF FF` binary-data marker,
+validates ASAP-supported player types B/C/D/S, up to 32 declared songs and
+TIME hints, and bounded numeric fields, and retains the exact header and
+ordered directives—including unknown keys. `SONGS` defaults to one. `NAME`
+and `AUTHOR` become game and author; the system is `Atari XL`. SAP `DATE`
+remains available as a source fact and is not mapped into the catalog comment.
+VGMBoy routes `.sap` playback through ASAP because the installed libgme 0.6.5
+does not play TYPE D or TYPE S. Detailed parser offsets/layouts are in MetaMan's
 [format layout map](../../../MetaMan/FORMAT-LAYOUTS.md).
 
 The reader retains one `TIME` hint per corresponding subsong. The [SAP format
@@ -227,13 +233,21 @@ ScanSong therefore maps plain time to `play_length_ms`, loop-start time to
 header-authored timing that the previous libgme info-only route did not expose;
 it does not infer loop length or a finite end for an indefinitely looping song.
 
-The earlier corpus parity comparison covered all 6,335 SAP sources under the
-local ASMA fixture tree: 5,577 were accepted and 758 rejected by both the
-former SAP reader and libgme. That run predates the MetaMan cutover. The current
-test compares MetaMan-backed ScanSong results with libgme when
-`SCANSONG_SAP_FIXTURE_DIR` is set; rerun it before claiming post-cutover corpus
-parity. No SAP rows exist in the inspected CocoaSpice catalog for live-row
-comparison.
+The local ASMA tests cover all 6,335 SAP sources. ScanSong produced metadata
+for all 6,335, and its projection matches libgme on the 5,577 files that
+libgme accepts. The full catalog projection discovered and scanned 6,336
+sources: all 6,335 SAP files produced 8,347 SAP track rows (8,347 tracks
+total), with zero source failures and one skipped archive member. The remaining
+758 SAP files are TYPE D/S; the separate
+VGMBoy fixture test confirms non-silent PCM for B, C, D, and S samples through
+ASAP, and verifies track selection plus final-track rendering for a 32-song SAP.
+
+The opt-in cross-format catalog fixture verifies persisted track indexes/counts
+for a SID archive member (2), GBS archive member (19), AY file (3), compressed
+SNDH (12), and NSFE source (14). This covers per-source row projection and two
+archive-member paths; it does not claim a full scan of the 31 MiB AY collection.
+These checks verify catalog projection and decoder PCM, not audio-device output
+or subjective musical quality.
 
 ### HES: complete header and M3U route
 
@@ -331,13 +345,32 @@ playback by selecting and rendering subtunes; a file that is valid SNDH but
 silent or hardware-specific is not silently converted into a false music
 claim.
 
+## MOD / OpenMPT admission
+
+`.mod` is recognized through the `openmpt` route, alongside other tracker
+modules. For recognized 31-sample ProTracker-family signatures, ScanSong calls
+MetaManCore, which validates the bounded order/pattern/sample extents and
+returns the module title, ordered named samples, header bytes, and layout
+facts. It does not start libopenmpt or enumerate/play patterns. MOD dialects
+whose header signatures are not recognized remain one structure-only row with
+no metadata; malformed recognized headers fail instead of silently falling
+back. Other OpenMPT formats remain structure-only pending their own complete
+MetaMan readers. PDX is support data for MDX, not a standalone track format.
+
 ## MDX dependencies
 
-`.mdx` is a one-track logical X68000 sequence. ScanSong invokes the
-VGMBoy-built `vgmboy-mdx-inspect` executable, so metadata and duration come
-from the same mdxmini implementation used by playback. MDX dependency names
-are decoded using the legacy Shift-JIS convention, with UTF-8 fallback for
-hand-authored files.
+`.mdx` is a one-track logical X68000 sequence. MetaManCore owns its clear
+Shift-JIS title, PDX-reference metadata, and bounded timing walk over
+uncompressed MML. It simulates sequencer time only; it does not render or
+synthesize audio. The current timing policy caps F1 loops at three traversals,
+uses the driver's five-tick fade, and refuses timing walks beyond 1,200
+seconds. ScanSong retains the VGMBoy-built `vgmboy-mdx-inspect` executable to
+fail closed when mdxmini cannot open the module with its required dependency,
+but never uses its reported duration. LZX-compressed bodies still receive
+header metadata and player validation, but MetaMan reports timing unavailable
+until it has a direct bounded LZX decoder. Dependency names are decoded using
+the legacy Shift-JIS convention, with UTF-8 fallback for hand-authored files.
+PDX remains dependency data, not a playable source row.
 
 PDX is native X68000 sample-bank data, not an archive and not an alternate MDX
 encoding. SMP and PCM companions, plus an explicitly referenced MDX sidecar,
@@ -938,11 +971,12 @@ bundled playback decoder.
 
 ### OpenMPT modules
 
-The registered tracker extensions use one structurally-known row and optional
-metadata. ScanSong does not render or convert a module during intake; an empty
-metadata object means the module was admitted as a known single source, not
-that a title was fabricated. Playback compatibility and module-specific
-duration remain the libopenmpt/VGMBoy boundary.
+The registered tracker extensions use one structurally-known row. Recognized
+31-sample ProTracker-family MOD headers obtain title/sample metadata from
+MetaManCore; other OpenMPT modules and unrecognized MOD dialects remain
+metadata-free. ScanSong does not render or convert modules during intake.
+Playback compatibility and module-specific duration remain the
+libopenmpt/VGMBoy boundary.
 
 ### Amiga modules through UADE
 
@@ -993,8 +1027,9 @@ header before reading the PSID/RSID fixed fields: title at `0x16`,
 author at `0x36`, and released text at `0x56`, preserving the raw header and
 technical identity/address/song-count facts. The source field called
 `released` is retained as copyright/release text, not misrepresented as a full
-date. ScanSong keeps its established one-row schema projection, with release
-text in the comment field.
+date. ScanSong projects each declared SID song as a catalog row, preserving its
+zero-based native track index and release text in the comment field. VGMBoy
+selects each row's one-based PSID/RSID song number through libsidplayfp.
 
 SID files do not carry a standard finite play duration. The reader therefore
 does not infer seconds from the v2 extension bytes: `0x76` begins flags and

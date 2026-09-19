@@ -52,7 +52,8 @@ byte counts, with optional frame checksums; its footer ends in
 `0x8F92EAB1`. The UAC metadata frame remains outside this payload, so payload
 frame offsets are relative to the first compressed TAR frame.
 
-The decoded manifest is capped at 16 MiB by the current reader; the encoded
+The decoded manifest is capped at 16 MiB by the current reader, and the
+current reader accepts at most 100,000 member records; the encoded
 skippable-frame body is bounded by that limit plus the small `ZJ01` prefix.
 Compressed readers must validate the decoded-size bound before allocation and
 require the decompressor to produce exactly the declared byte count; the
@@ -64,12 +65,51 @@ signature or proof of publisher authenticity.
 
 ## Manifest Contract
 
-The required top-level fields are `manifestVersion` (`1`), `packageID`,
+The required top-level fields are `manifestVersion` (`1` or `2`), `packageID`,
 `payload`, `game`, `variants`, `members`, `playlists`, `sources`,
 `transformations`, and `extensions`.
 
+The envelope header remains binary version 1.0. `manifestVersion` versions the
+JSON contract independently: new writers emit manifest version 2, while
+current readers retain support for version 1 packages. Older readers that only
+know manifest version 1 reject new version-2 packages; ship updated consumers
+before distributing newly packed files.
+
 - `game` contains the logical game ID, canonical title/system, canonical
-  release IDs, and extensible metadata.
+  release IDs, and extensible metadata. Common attachment pointers belong in
+  this metadata map and resolve to ordinary members. For example,
+  `game.metadata.cover_front` and `cover_back` may each be one reference object
+  or an array of references shaped as `{"memberPath":"scans/front.png","mediaType":"image/png"}` for a single-variant package.
+  Arrays retain multiple scans for one role. `game.metadata.cue_sheet` may
+  point to a source `.cue` member; `game.metadata.documents` may similarly
+  list notes, text files, Markdown, and other documentation. These open JSON
+  fields do not change member bytes. References should resolve to manifest
+  member paths, and image/document payloads remain independently hashed members.
+  When source records establish one clear collection and set, `game.metadata.set`
+  projects that provenance as `{"collection":"JoshW","name":"Nintendo SNES","url":"https://spc.joshw.info/"}`.
+  `collection` identifies the source collection, `name` identifies its relevant
+  system/set, and `url` points to its official distributor page. The complete
+  source records remain authoritative in `sources[]`; the projection is omitted
+  when sources conflict or no trustworthy URL is available. Project2612 uses
+  `url` for the current VGMRips system listing, `legacyURL` for the original
+  `project2612.org` address, and `archiveURL` for its Wayback snapshot. Project2612
+  is defunct; the VGMRips directory link is not a claim that every historic pack
+  was migrated one-to-one. The `enrich-sets` command adds this projection to
+  existing packages as a manifest-only rewrite and byte-copies the compressed
+  payload; it runs in dry-run mode unless `--apply` is supplied.
+  Redump packages may also cite derived-output and metadata-association records.
+  When a `redump-disc-archive` source is present, that record supplies the set
+  projection; the Archive.org download URL must identify the same item as
+  `setName`, and the projected URL is the item's `/details/<identifier>` page.
+  New writers add `game.metadata.containedContainerVersions`, a package-level
+  version inventory. Its `schemaVersion`, `formatsScanned`, `versions`, and
+  `mixedVersionFormats` fields record SPC/VGM version-count groups and identify
+  formats with more than one detected version. SPC version is read from header
+  byte `0x24`; the signature's textual version is retained separately because
+  source files may disagree between those two facts. Each SPC member exposes
+  `metadata.spcVersion`, `metadata.spcVersionByte`, and
+  `metadata.spcHeaderVersion` for direct access. VGM detection reads raw
+  `.vgm` or gzip-wrapped `.vgz` headers. These scans never edit source members.
 - Each `variant` groups a version, alternate, regional release, or other
   distinction and may carry its own canonical release IDs and metadata. A
   variant is not an automatic ranking or deletion decision.
@@ -79,12 +119,29 @@ The required top-level fields are `manifestVersion` (`1`), `packageID`,
   extensible metadata. Seekable payloads also require `tarDataOffset`, the
   offset of the member's first data byte in the decompressed TAR stream (not
   the TAR header offset).
+  New writers add `crc32-iso-hdlc` records to `hashes[]` for raw members and
+  playable payloads, alongside the existing BLAKE3 identities.
+  Hash-record digests are hexadecimal and may use either case for compatibility
+  with existing CRC32 writers; `blake3-256` values remain canonical lowercase.
+  For audio members, `metadata.loop` is the authoritative sample loop object
+  when present: `mode` (`forward`), `startSamples`, `endSamples` (exclusive),
+  `sampleRateHz`, `repeat` (`forever` or a nonnegative integer), and `source`.
+  Consumers must not fill a missing UAC loop by rereading enclosed member tags;
+  UAC metadata wins over FLAC/APE comments. The exact native tags remain in
+  the member bytes and may be retained as provenance, but they are not a
+  second competing playback instruction.
 - Each `playlist` is an ordered, UAC-native list of `targetMemberPath` pointers
   and optional target-member hashes. Entries retain raw source lines/context,
   format tags, title/artist, track index, and format-specific duration, loop,
-  fade, repeat, and stop values without assuming shared units. If an original
-  M3U/M3U8 exists, `originalMemberPath` points to its ordinary TAR member; its
-  original bytes remain unchanged for exact unpacking.
+  fade, repeat, and stop values without assuming shared units. An entry with
+  `entryKind: "subsong"` maps one logical decoder track inside a playable
+  member; its nonnegative decimal `trackIndex` is the decoder's source track
+  index. Multiple subsong entries can point at one unchanged NSF/NSFE/GBS
+  member, and `extraFields.metaManMetadata` retains the full per-track MetaMan
+  projection. Subsong entries expand as separate UAC metadata tracks; ordinary
+  `file` playlist entries do not. If an original M3U/M3U8 exists,
+  `originalMemberPath` points to its ordinary TAR member; its original bytes
+  remain unchanged for exact unpacking.
 - Each `source` records the source collection/set and original package identity
   (including its BLAKE3 where known). A source URL is provenance; local absolute
   file paths are not identity fields.
@@ -95,6 +152,14 @@ The required top-level fields are `manifestVersion` (`1`), `packageID`,
   `transcode`, `playlist-repair`, `duplicate-prune`, `metadata-harvest`, and
   `package`; new classes are allowed. Every input source must exist, and every
   output must resolve to a manifest member with the same raw BLAKE3.
+- A canonical derived CD/stream audio member may use Monkey's Audio (APE) at
+  the selected maximum/insane compression profile. FLAC remains a readable
+  compatibility input, but a FLAC-to-APE conversion is a PCM-preserving
+  transcode and must be recorded as a `transcode` transformation. A decoded
+  XA stream can be stored in APE without sample loss; APE cannot reconstruct
+  the original XA ADPCM sectors, interleave, headers, or cue layout. Retain
+  the source BIN/XA/CUE members or their immutable source package and hashes
+  whenever source-level reconstruction matters.
 - The UACMan wrapper CLI adds a `package` transformation for each linked source,
   mapping the selected source members and hashes to their byte-identical UAC
   members. Other transformation entries describe prior or explicit content
@@ -115,43 +180,89 @@ The required top-level fields are `manifestVersion` (`1`), `packageID`,
   the seek table.
 - `member.blake3` identifies exact stored member bytes. `streamBlake3` is a
   compatibility shortcut for a named playable-payload profile; it is not a
-  rendered-audio hash. In AudioMan's VGM collection profile, `.vgz` is hashed
-  after gzip decompression; other playable formats hash their complete native
-  member bytes, including headers/tags. No command-stream normalization or emulation
+  rendered-audio hash. The current `uac-playable-payload-v1` profile hashes
+  `.vgz` after gzip decompression; other playable formats hash their complete
+  native member bytes, including headers/tags. The older
+  `audioman-playable-payload-v1` profile remains valid as a historical hash
+  label on existing packages. No command-stream normalization or emulation
   render hash is generated. Additional hashes belong in `hashes[]` with
-  explicit scope, algorithm, and profile. A digest proves equality only for
+  explicit scope, algorithm, and profile. New packages include CRC32/ISO-HDLC
+  for fast lookups; BLAKE3 remains the content identity hash. A digest proves equality only for
   the exact byte scope/profile: it does not prove correct track identity, dump
   offset, timing, or completeness. Valid alternate captures may have different
   bytes; retain multiple known hashes keyed by identity/profile instead of
   assuming one universal “correct” digest.
+- Stream identity is format-profiled, not universal. A `raw-member-v1` profile
+  is authoritative when the stored member is itself the canonical source
+  stream, as with an extracted CD-XA file. A `decoded-pcm-v1` profile is a
+  separately computed hash of declared PCM parameters and decoded samples,
+  as with a lossless APE/FLAC transcode. A `rendered-playback-v1` profile is
+  an emulator or decoder output and must name the renderer, version, settings,
+  sample format, rate, channel layout, and render duration. Formats without a
+  reproducible stream projection may omit stream hashes entirely. Never emit
+  an empty stream hash, and never call a raw file hash a rendered-audio hash.
 - The structural envelope is fixed and versioned, with a small stable set of
-  typed cross-format fields; optional agreed common fields live in each
-  object's `metadata` map. Format-specific and user-defined fields remain
-  open-ended typed JSON in namespaced `extensions` maps at game, variant,
-  member, and source level; do not require a full tag-vocabulary brainstorm
-  before adding them. Promote a field into the universal core only when its
-  meaning and units are stable across formats. Unknown extension values must
-  survive read/write unchanged. MetaManCore owns native-tag parsing. The
-  UACMan creation-time bridge consumes its structured projection; the wrapper
-  does not implement or duplicate format parsers. UAC catalog scans trust the
-  stored manifest instead of re-reading member tags.
+  typed cross-format fields. UAC uses one shared metadata vocabulary across
+  packages, tools, and consumers: producers must reuse the canonical field
+  name, location, type, and meaning defined in this contract for a shared
+  concept, and must not emit synonymous aliases. For example, the canonical
+  system identity is `game.console`; do not also write the same value as
+  `game.metadata.system` or `platform`. The set projection is
+  `game.metadata.set`, while source-specific identifiers remain in their
+  documented `sources[]` fields. Common attachment keys include
+  `game.metadata.cover_front`, `cover_back`, `cue_sheet`, and `documents`.
+  Format-specific and genuinely user-defined fields remain open-ended typed
+  JSON in namespaced `extensions` maps at game, variant, member, and source
+  level. Do not use a custom extension as a second spelling for a shared
+  concept. Preserve unrecognized extension values unchanged. Promote a field
+  into this shared vocabulary only when its meaning, location, type, and units
+  are stable across formats; update this contract before producers emit it as
+  a common field. MetaManCore owns native-tag parsing. The UACMan creation-time
+  bridge consumes its structured projection; the wrapper does not implement
+  or duplicate format parsers. UAC catalog scans trust the stored manifest
+  instead of re-reading member tags. Native source tags and member bytes remain
+  unchanged; normalization applies only to the UAC manifest projection, while
+  MetaMan's retained raw/ordered metadata preserves source spelling and order.
 
-Member paths are relative POSIX paths. Variant members are isolated below
-`variants/<variantID>/`; game-wide files use `assets/` or `shared/`. Paths must
-not be absolute, contain traversal components, collide, or escape their
-variant root. TAR payloads contain only regular file members listed by the
-manifest; links, devices, and unlisted payload members are invalid.
+Member paths are relative POSIX paths. Manifest version 1 places every
+variant member below `variants/<variantID>/`. Version 2 uses the source-relative
+member path when the package declares one variant; when it declares multiple
+variants, members remain isolated below `variants/<variantID>/`. New writers
+emit the flat source-relative layout for a one-variant package. Readers accept
+both layouts, so existing version-1 packages need no rewrite. Game-wide files
+without a `variantID` use `assets/` or `shared/`. Paths must not be absolute,
+contain traversal components, or collide. TAR payloads contain only regular
+file members listed by the manifest; links, devices, and unlisted payload
+members are invalid. Roles are
+open strings: playable streams, playlist files, image scans, cue sheets, and
+documentation are all members, but only `playable`/`track` roles generate
+song rows in MetaMan and ScanSong. PNG, `.cue`, `.txt`, and `.md` source files
+are included as ordinary byte-exact members by the packer; they are not
+discarded as sidecars.
 
 ## Preservation and Compression
 
 The UAC layer must not retag, transcode, normalize, or rewrite member bytes.
 TAR member extraction reproduces every listed input file byte-for-byte.
-Original filenames and relative companion layout are preserved within the
-variant namespace, so M3U pointers and decoder dependencies remain together.
+Original filenames and relative companion layout are preserved, so M3U
+pointers and decoder dependencies remain together. Multi-variant packages use
+the variant namespace to prevent same-path collisions; single-variant packages
+do not add a synthetic `variants/original/` directory.
 The structured manifest playlist is the UAC playback list; the original M3U
 member is retained as byte-exact reversible evidence, not required for UAC-aware
-playback. PNGs, M3U/M3U8, documentation, and other files are ordinary typed
-members and may carry arbitrary metadata.
+playback. PNGs, CUE sheets, M3U/M3U8, documentation, and other files are
+ordinary typed members and may carry arbitrary metadata. Packaging a cue sheet
+preserves it and its audio-member references; current UAC players do not
+interpret an external CUE to split one APE or FLAC member into virtual tracks.
+Cue-aware playback requires an explicit player feature that resolves cue file
+references to UAC members and applies its indexes to decoder seeking.
+
+There is no format-wide total package-byte limit. Practical bounds are the
+reader's 16 MiB manifest and 100,000-member limits, the 64 MiB maximum
+decompressed Zstandard frame accepted by current readers, the seek-table's
+32-bit entry framing, filesystem/file-offset limits, and available storage.
+These are explicit reader and implementation bounds, not a fixed small-media
+assumption.
 
 V1 uses the existing TAR and Zstandard formats internally. The UACMan wrapper
 writer emits members in stable path order, normalizes TAR ownership/mode/time
@@ -206,9 +317,15 @@ libgme's in-memory open API; decompressed SPC bytes are not written to playback
 cache. Other formats whose decoders require filesystem paths use the existing
 selected-entry materialization route. The UACMan wrapper CLI accepts a JSON
 recipe and can invoke MetaManCore through UACManMetadataCLI. SPC uses its
-soundtrack-aware projection; other single-track MetaMan formats use the common
-member projection. Track-aware results are rejected instead of flattened until
-UAC defines their mapping. The wrapper does not contain native format parsers.
+soundtrack-aware projection; single-track formats use the common member
+projection, and track-aware formats use ordered subsong playlist entries. A
+track-aware result without unique nonnegative decoder indexes fails the
+harvest rather than being flattened. A successful generic MetaMan harvest
+defaults that member's role to `playable`; an explicit recipe role remains
+authoritative. The bridge accepts MetaManCore's advertised source formats,
+excluding UAC itself. Standard audio and APE metadata reads allow members up to
+1 GiB; the general source-member limit remains 64 MiB. The wrapper does not
+contain native format parsers.
 CLI unpack restores original members and writes `manifest.json` by default; it
 does not synthesize an M3U when no original playlist member was included.
 
@@ -218,9 +335,10 @@ does not synthesize an M3U when no original playlist member was included.
   seek-table validation, TAR-range-to-frame mapping, and byte-preserving
   payload copy operations. The TAR writer and Zstandard codec remain injected
   or owned by the package builder.
-- The UACMan wrapper owns package creation, inspection, extraction, and the
-  source/member mapping encoded in the manifest. AudioMan owns the collection
-  workflow and supplies its selected source records and recipe.
+- The UACMan project under VGMMan owns package creation, inspection,
+  extraction, the wrapper contract, and the source/member mapping encoded in
+  the manifest. AudioMan is one downstream operator: it chooses source sets
+  and recipes and invokes UACMan's CLI; it does not own or implement UAC.
 - CocoaSpice owns presentation and queue policy; it consumes manifest metadata
   and delegates archive materialization to FrontendCore.
 - MetaManCore owns UAC package/member metadata documents and consumes the

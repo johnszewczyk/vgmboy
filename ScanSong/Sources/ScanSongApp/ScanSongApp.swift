@@ -145,7 +145,7 @@ final class ScannerAppModel: ObservableObject {
         }
 
         do {
-            // CanonicalCatalogWriter creates the schema-23 file immediately;
+            // CanonicalCatalogWriter creates the schema-24 file immediately;
             // ScanSong becomes responsible for it only after that succeeds.
             _ = try CanonicalCatalogWriter(databaseURL: candidate)
             setCatalog(candidate)
@@ -384,7 +384,7 @@ final class ScannerAppModel: ObservableObject {
 
     private func validateCatalog() {
         guard FileManager.default.fileExists(atPath: databaseURL.path) else {
-            catalogStatus = "New schema-23 catalog will be created when scanning starts."
+            catalogStatus = "New schema-24 catalog will be created when scanning starts."
             roots = []
             rootTallies = [:]
             scanStatus = "Add one or more scan paths."

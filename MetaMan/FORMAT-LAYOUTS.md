@@ -12,6 +12,14 @@ positions. Some inputs use pointers, length-delimited blocks, repeated chunks,
 or event/frame streams. The reader follows those structures with bounds
 checks, preserves source bytes, and derives timing without producing audio.
 
+`MetaManCore` does not link VGMMan emulator/playback plugin libraries and
+never spawns a process. SwiftPM has one local dependency, the sibling
+`UACWrapperCore` package; the core also uses system zlib, and its standard-audio
+reader uses Apple's AVFoundation. A compressed UAC manifest is the host-codec
+boundary: the caller supplies a bounded decoder callback. The CLI supplies
+that callback by invoking external `zstd`. Coverage is the explicitly
+registered reader set, not every format routed by the broader VGMMan family.
+
 ## Reader layouts
 
 ### UAC manifests
@@ -22,8 +30,11 @@ bounded UACM skippable frame and, when present, calls the host's bounded
 `decompressContainerManifestFrame` callback for the independent compressed JSON
 frame. It does not decompress or hash the TAR/audio payload. The package-level
 `MetadataDocument` retains the exact decoded manifest bytes and a typed JSON
-value for the complete manifest; the ordered result also returns a member
-document for each playable member. See
+value for the complete manifest. The ordered result returns one document per
+playable member unless explicit `subsong` playlist entries map individual
+decoder indexes inside that member; those entries become separate ordered
+track documents with their per-track metadata. Ordinary file entries do not
+duplicate member documents. See
 [`uac-wrapper-format.md`](../UACMan/ai/subsystem-agent/uac-wrapper-format.md)
 for the complete binary and manifest contract.
 
@@ -56,6 +67,12 @@ title becomes `title`, and artist selection is `ARTIST`, `ALBUMARTIST`, then
 `COMPOSER`. Common AVFoundation metadata is the fallback. The scanner still
 projects only its existing schema-23 fields.
 
+When present, the shared loop vocabulary (`LOOP_START_SAMPLES`,
+`LOOP_END_SAMPLES` exclusive, or `LOOP_LENGTH_SAMPLES`, plus
+`LOOP_SAMPLE_RATE`/`XA_SAMPLE_RATE`, `LOOP_TYPE`, `LOOP_COUNT`, and
+`LOOP_SOURCE`) is exposed as the sample-accurate `MetadataDocument.loop`.
+`MetadataTiming.loopLengthMs` remains the additive schema-23 projection.
+
 ### NSF / NESM
 
 NSF has a fixed 128-byte header. Multi-byte addresses and speed fields are
@@ -79,7 +96,13 @@ retains the complete header; it does not read or execute the music program.
 GBS has a fixed 112-byte header. Addresses are little-endian; the three
 32-byte text fields are decoded through their first NUL and trimmed. Each
 header-declared track becomes a result entry with its native zero-based source
-index. No Game Boy CPU emulation is used to invent per-track titles or timing.
+index. When a directory harvest supplies sibling NEZplug extended-M3U files,
+MetaMan matches `filename::GBS,index,title,time,loop,fade,loopcount` rows to
+their referenced GBS member. It projects authored track titles, timing, and
+`# @TITLE` / `# @ARTIST` / other `# @KEY` comments onto the corresponding
+tracks, while retaining the M3U bytes as companion metadata. Decimal and
+`$hex` track indexes follow NEZplug's zero-based GBS convention. No Game Boy
+CPU emulation is used to invent per-track titles or timing.
 
 | Source position | Meaning |
 | --- | --- |
@@ -487,18 +510,19 @@ text/info blocks. See [AYMetadataReader.swift](Sources/MetaManCore/AYMetadataRea
 
 SAP has no fixed-position metadata record. The file begins `SAP\r\n`, then
 CR/LF-terminated ASCII directive names and values, and ends its information
-header at the first `FF FF` data marker. MetaMan caps this header at 1 MiB and
-retains its exact bytes. Directive order matters for repeated `TIME` lines:
-the first applies to source track 0, the next to track 1, and so on.
+header at the first `FF FF` data marker. MetaMan caps this header at 1 MiB,
+retains its exact bytes, and limits SAP's player-compatible song and TIME
+counts to 32. Directive order matters for repeated `TIME` lines: the first
+applies to source track 0, the next to track 1, and so on.
 
 | Directive | Interpretation |
 | --- | --- |
-| `SONGS n` | Track count; default is one. |
-| `TYPE B` / `TYPE C` | Accepted player type, retained as a source fact. |
+| `SONGS n` | Track count from 1 through 32; default is one. |
+| `TYPE B` / `TYPE C` / `TYPE D` / `TYPE S` | ASAP-supported player type, retained as a source fact. |
 | `INIT`, `PLAYER`, `MUSIC` | Four-hex-digit Atari addresses. |
 | `FASTPLAY n`, `STEREO` | Playback setup facts; no emulation is needed to read them. |
 | `NAME`, `AUTHOR`, `DATE` | Quoted game, author, and date/copyright text. |
-| `TIME mm:ss[.fraction] [LOOP]` | Ordered per-track hint. A `LOOP` value is the loop start; otherwise it is a finite length. Fractions of one, two, or three digits scale to milliseconds. |
+| `TIME mm:ss[.fraction] [LOOP]` | Up to 32 ordered per-track hints. A `LOOP` value is the loop start; otherwise it is a finite length. Fractions of one, two, or three digits scale to milliseconds. |
 | Other directives | Kept in ordered decoded tags and the raw header even if MetaMan has no normalized field for them. |
 
 See [SAPMetadataReader.swift](Sources/MetaManCore/SAPMetadataReader.swift).
@@ -568,6 +592,50 @@ count, then NUL-terminated UTF-16LE strings. The standard ordered sequence has
 11 values; extra values are retained. VGZ first inflates through a bounded
 gzip path. Timing uses the 44.1 kHz sample counts. See
 [VGMMetadataReader.swift](Sources/MetaManCore/VGMMetadataReader.swift).
+
+### ProTracker-family MOD
+
+MetaMan claims the common signed 31-sample MOD family when its four-byte
+signature is recognized. It reads title and sample-name strings, order-list
+length and entries, channel count, instrument volumes/sample byte lengths, and
+validates that the declared pattern and sample payloads fit within the file.
+It retains the full 1,084-byte header. The file-URL path reads only that
+header; file size is obtained from filesystem attributes. Pattern/sample audio
+is not decoded, and no title, author, or timing is invented. The old unsigned
+15-sample SoundTracker layout and unidentified MOD dialects are not claimed.
+
+| Source position | Meaning |
+| --- | --- |
+| `0x00..0x13` | 20-byte song title. |
+| `0x14..0x3B5` | Thirty-one 30-byte sample records. Each starts with a 22-byte sample name; bytes `+22..+23` contain sample length in big-endian words, `+24` finetune, `+25` volume, and `+26..+29` loop start/length. |
+| `0x3B6`, `0x3B7` | Order-list length and restart position. |
+| `0x3B8..0x437` | 128-byte pattern order table. The highest active pattern number determines the pattern data extent; each pattern has 64 rows, the signature-derived channel count, and four bytes per channel event. |
+| `0x438..0x43B` | Recognized four-byte MOD signature, including ProTracker and common channel-count variants. |
+
+The reader emits `TITLE` plus index-scoped `SAMPLE_nn_TITLE` tags, exposes
+channel/pattern/sample sizes as technical facts, and retains source header
+bytes. It rejects impossible volumes and payload extents. Unknown signatures
+remain unsupported so decoder support for other MOD dialects is not confused
+with MetaMan coverage. See
+[`MODMetadataReader.swift`](Sources/MetaManCore/MODMetadataReader.swift).
+
+### X68000 MDX / PDX reference
+
+The text header consists of a Shift-JIS title terminated by `0D 0A 1A`, then
+an optional NUL-terminated PDX basename, followed by the binary sequence data.
+The reader bounds the title and dependency fields to 1,024 bytes each, retains
+the exact header bytes, and exposes the PDX name as a source tag and technical
+fact. It does not follow the path or require the bank to exist; ScanSong owns
+safe companion resolution. For uncompressed bodies, MetaMan follows the
+relative voice/MML offsets and interprets bounded note/rest, tempo, repeat,
+sync, and end commands to derive sequence timing. It does not synthesize audio
+or require PDX sample data for that walk. An MDX loop without a finite end uses
+the current three-loop/five-tick-fade scanner policy; timing stops at a
+1,200-second bound. Reserved commands, malformed targets, and X68000 LZX
+0.32/0.42-compressed bodies leave duration unavailable with a diagnostic.
+ScanSong still invokes mdxmini to confirm player/dependency acceptance, but
+the helper returns no metadata or duration. See
+[`MDXMetadataReader.swift`](Sources/MetaManCore/MDXMetadataReader.swift).
 
 ### PSF / PSF2 / SSF / USF / 2SF tag family
 
@@ -747,7 +815,8 @@ item count, and flags are at footer `+8`, `+12`, `+16`, and `+20`. Items begin
 at `fileEnd - tagSize`; each has a 32-bit value length, 32-bit flags, NUL-ended
 key, then value. Text items are decoded, while exact APEv2/ID3 source blocks
 remain available. Duration is derived from frame/sample counts, not decoded
-audio. See [APEMetadataReader.swift](Sources/MetaManCore/APEMetadataReader.swift).
+audio. APEv2 items use the same shared loop vocabulary and are exposed through
+`MetadataDocument.loop`. See [APEMetadataReader.swift](Sources/MetaManCore/APEMetadataReader.swift).
 
 ### CRI / Monster ADX
 

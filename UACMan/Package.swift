@@ -30,7 +30,8 @@ let package = Package(
                 .product(name: "UACWrapperCore", package: "UACWrapper"),
                 .product(name: "MetaManCore", package: "MetaMan")
             ],
-            path: "Application/Sources/UACManApp"
+            path: "Application/Sources/UACManApp",
+            resources: [.process("Resources")]
         ),
         .executableTarget(
             name: "UACManMetadataCLI",

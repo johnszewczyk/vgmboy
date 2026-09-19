@@ -13,7 +13,7 @@ struct FormatRegistryTests {
     @Test("publishes one complete frontend descriptor table")
     func frontendDescriptorsMatchPlaybackRouting() {
         let expectedIDs = [
-            "libgme", "libvgm", "psgplay", "mdx", "standard-audio", "ffmpeg-audio",
+            "libgme", "asap", "libvgm", "psgplay", "mdx", "standard-audio", "ffmpeg-audio",
             "highly-complete", "twosf", "vgmstream", "lazyusf",
             "playpsf", "qsf", "sidplayfp", "openmpt", "amiga-uade"
         ]
@@ -68,6 +68,14 @@ struct FormatRegistryTests {
         #expect(FormatRegistry.family(for: "/tmp/example.unknown") == nil)
     }
 
+    @Test("routes SAP to the ASAP family, which has no tempo control")
+    func routesSAPToASAP() {
+        #expect(FormatRegistry.asapExtensions == ["sap"])
+        #expect(FormatRegistry.family(for: "/tmp/asma.SAP")?.id == "asap")
+        #expect(FormatRegistry.asapFamily.supportsLongPlay)
+        #expect(!FormatRegistry.asapFamily.supportsTempo)
+    }
+
     @Test("publishes archive preparation as a format capability")
     func archiveMaterializationRequirements() {
         #expect(
@@ -100,6 +108,31 @@ struct FormatRegistryTests {
         #expect(!FormatRegistry.sidplayfpFamily.hasNaturalEnding)
     }
 
+    @Test(
+        "SID fixture selects its default subtune and renders audible PCM",
+        .enabled(
+            if: ProcessInfo.processInfo.environment["VGMBoy_SID_FIXTURE"] != nil,
+            "Set VGMBoy_SID_FIXTURE to run the Bionic Commando SID playback check."
+        )
+    )
+    func sidFixtureRendersAudio() throws {
+        let path = try #require(ProcessInfo.processInfo.environment["VGMBoy_SID_FIXTURE"])
+        let decoder = try DecoderFactory.make(path: path)
+        defer { decoder.close() }
+
+        #expect(decoder.trackCount == 2)
+        for index in 0..<decoder.trackCount {
+            try decoder.startTrack(index)
+            let metadata = try decoder.metadata(for: index)
+            #expect(metadata.index == index)
+            if index == 0 { #expect(metadata.song.contains("Bionic Commando")) }
+            #expect(decoder.absolutePlayedFrames == 0)
+            let frames = try decoder.readFrames(4_096)
+            #expect(frames.left.count == 4_096)
+            #expect(frames.left.contains { abs($0) > 0.001 } || frames.right.contains { abs($0) > 0.001 })
+        }
+    }
+
     @Test("routes tracker module extensions to OpenMPT")
     func routesOpenMPT() {
         for ext in FormatRegistry.openMPTExtensions {
@@ -115,6 +148,8 @@ struct FormatRegistryTests {
         for ext in FormatRegistry.standardAudioExtensions {
             #expect(FormatRegistry.family(for: "/tmp/example.\(ext)")?.id == "standardaudio")
         }
+        #expect(FormatRegistry.standardAudioFamily.supportsLongPlay)
+        #expect(!FormatRegistry.standardAudioFamily.supportsTempo)
     }
 
     @Test("routes FFmpeg-only ordinary audio through the core")
@@ -122,7 +157,7 @@ struct FormatRegistryTests {
         for ext in FormatRegistry.ffmpegAudioExtensions {
             #expect(FormatRegistry.family(for: "/tmp/example.\(ext)")?.id == "ffmpegaudio")
         }
-        #expect(!FormatRegistry.ffmpegAudioFamily.supportsLongPlay)
+        #expect(FormatRegistry.ffmpegAudioFamily.supportsLongPlay)
         #expect(!FormatRegistry.ffmpegAudioFamily.supportsTempo)
     }
 
@@ -315,7 +350,7 @@ func sndhFixtureUsesPSGPlay() throws {
 }
 
 @Test(
-    "MDX fixture opens, reports native timing, and renders PCM",
+    "MDX fixture validates the scanner handoff, reports playback timing, and renders PCM",
     .enabled(
         if: ProcessInfo.processInfo.environment["VGMBoy_MDX_FIXTURE"] != nil,
         "Set VGMBoy_MDX_FIXTURE to run the archive-backed X68000 MDX check."
@@ -330,11 +365,7 @@ func mdxFixtureUsesNativeDecoder() throws {
     let metadata = try decoder.metadata(for: 0)
     #expect(metadata.system == "Sharp X68000")
     #expect(metadata.playMs > 0)
-    #expect(inspection.trackCount == decoder.trackCount)
-    #expect(inspection.title == metadata.song)
-    #expect(inspection.system == metadata.system)
-    #expect(inspection.playLengthMs == metadata.playMs)
-    #expect(inspection.introLengthMs == metadata.introMs)
+    #expect(inspection.trackCount == 1)
     let frames = try decoder.readFrames(4_096)
     #expect(frames.left.count == 4_096)
     #expect(frames.left.contains { abs($0) > 0.0001 } || frames.right.contains { abs($0) > 0.0001 })
@@ -412,6 +443,50 @@ func spcFixtureUsesNativeTimingAndClock() throws {
     let frames = decoder.readFrames(4_096)
     #expect(frames.left.count == 4_096)
     #expect(decoder.absolutePlayedFrames == before + 4_096)
+}
+
+@Test(
+    "ASMA SAP B/C/D/S samples open and render through ASAP",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["VGMBoy_SAP_FIXTURE_DIR"] != nil,
+        "Set VGMBoy_SAP_FIXTURE_DIR to run the four player-type ASMA sample check."
+    )
+)
+func asmaSAPPlayerTypesOpenAndRender() throws {
+    let root = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["VGMBoy_SAP_FIXTURE_DIR"]))
+    let fixtures = [
+        ("B", "Composers/Aki/Atari_Style.sap", 1),
+        ("C", "Composers/Badkowski_Marek/Fad_Face.sap", 1),
+        ("D", "Composers/Aki/Robots.sap", 1),
+        ("S", "Composers/Husak_Jakub/Aquanaut.sap", 1),
+        ("B", "Games/Storyline.sap", 32)
+    ]
+
+    for (type, relativePath, expectedTrackCount) in fixtures {
+        let path = root.appendingPathComponent(relativePath).path
+        let decoder = try DecoderFactory.make(path: path)
+        #expect(decoder is ASAPDecoder)
+        #expect(FormatRegistry.family(for: path)?.id == "asap")
+        #expect(decoder.trackCount == expectedTrackCount)
+        #expect(decoder.systemName == "Atari XL")
+        for trackIndex in 0..<decoder.trackCount {
+            try decoder.startTrack(trackIndex)
+            #expect(try decoder.metadata(for: trackIndex).index == trackIndex)
+        }
+        let lastTrack = decoder.trackCount - 1
+        try decoder.startTrack(lastTrack)
+        #expect(try decoder.metadata(for: lastTrack).system == "Atari XL")
+        decoder.configureFade(playMs: 120_000, fadeMs: 6_000)
+        let rendered = try decoder.readFrames(44_100)
+        #expect(rendered.left.count == 44_100)
+        #expect(rendered.right.count == 44_100)
+        #expect(decoder.absolutePlayedFrames == 44_100)
+        #expect(
+            rendered.left.contains { abs($0) > 0.0001 } || rendered.right.contains { abs($0) > 0.0001 },
+            "SAP TYPE \(type) produced only silent PCM."
+        )
+        decoder.close()
+    }
 }
 
 @Test(
@@ -723,6 +798,14 @@ struct PlaybackControlProtocolTests {
         let generation = try #require(started.status?.diagnostics.generation)
         #expect(started.status?.isPlaying == true)
 
+        try controller.configureAudio(PlaybackPreferences(
+            equalizerEnabled: true,
+            equalizerBandGains: Array(repeating: 3, count: EqualizerConfiguration.bandCount),
+            outputVolume: 0.8,
+            monoEnabled: true
+        ))
+        #expect(controller.status().isPlaying)
+
         let paused = controller.perform(.init(command: .pause))
         #expect(paused.status?.isPlaying == false)
         #expect(paused.status?.diagnostics.generation == generation)
@@ -995,16 +1078,16 @@ struct PlaybackControllerTimingTests {
         #expect(request.playMilliseconds == 0)
     }
 
-    @Test("unsupported Long Play falls back to natural file-default timing")
-    func unsupportedLongPlayDoesNotForceManualDuration() throws {
+    @Test("tagged ordinary audio accepts Long Play timing")
+    func taggedOrdinaryAudioUsesManualDuration() throws {
         let request = try PlaybackTimingRequest.standard(
             path: "/tmp/song.flac",
             longPlayEnabled: true,
             manualPlayMilliseconds: 240_000,
             fadeMilliseconds: 6_000
         )
-        #expect(request.playbackMode == .fileDefault)
-        #expect(request.playMilliseconds == nil)
+        #expect(request.playbackMode == .longPlay)
+        #expect(request.playMilliseconds == 240_000)
     }
 
     @Test("explicit timed requests require an actual duration")

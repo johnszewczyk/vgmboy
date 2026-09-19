@@ -58,6 +58,10 @@ const state = {
   selectedTrackId: null,
   selectedTrackIds: [],
   playlistSelectionAnchorId: null,
+  playlistTitle: "Playlist",
+  playlistTabs: [],
+  activePlaylistTabId: null,
+  playbackTabId: null,
   // The visible playlist is a browsing projection. Playback advances through
   // this separate queue so selecting another sidebar item cannot silently
   // replace the queue that is currently playing.
@@ -149,6 +153,8 @@ const state = {
   }
 };
 
+let settingsSaveChain = Promise.resolve();
+
 const audioEngine = {
   context: null,
   gain: null
@@ -156,8 +162,8 @@ const audioEngine = {
 
 const refs = {
   sidebarSearchInput: document.getElementById("sidebar-search-input"),
-  sidebarViewButtons: [],
   sidebarViewToggleButton: document.getElementById("sidebar-view-toggle-button"),
+  sidebarViewButtons: [],
   databaseCollapseAllButton: document.getElementById("database-collapse-all-button"),
   databaseExpandAllButton: document.getElementById("database-expand-all-button"),
   treeRoot: document.getElementById("tree-root"),
@@ -165,6 +171,8 @@ const refs = {
   workspace: document.querySelector(".workspace"),
   sidebarContextMenu: document.getElementById("sidebar-context-menu"),
   playlistScrollWrap: document.querySelector(".playlist-scroll-wrap"),
+  playlistTabsToolbar: document.getElementById("playlist-tabs-toolbar"),
+  playlistTabs: document.getElementById("playlist-tabs"),
   playlistHeaderWrap: document.querySelector(".playlist-header-wrap"),
   playlistBodyWrap: document.querySelector(".playlist-body-wrap"),
   playlistSelectionIndicator: document.getElementById("playlist-selection-indicator"),
@@ -200,9 +208,6 @@ const refs = {
   libraryDatabaseShowButton: document.getElementById("library-database-show-button"),
   libraryDatabaseDefaultButton: document.getElementById("library-database-default-button"),
   libraryDatabaseReloadButton: document.getElementById("library-database-reload-button"),
-  localBrowserEnabledCheckbox: document.getElementById("local-browser-enabled-checkbox"),
-  localBrowserPath: document.getElementById("local-browser-path"),
-  localBrowserBrowseButton: document.getElementById("local-browser-browse-button"),
   favoriteHistoricalSortCheckbox: document.getElementById("favorite-historical-sort-checkbox"),
   libraryCachePath: document.getElementById("library-cache-path"),
   libraryCacheBrowseButton: document.getElementById("library-cache-browse-button"),
@@ -292,13 +297,13 @@ async function loadSettings() {
       ? parsed.aacExportDirectory
       : (await window.spcBoyWK.defaultAACExportDirectory?.()) || "";
     state.uiItemSpacingRem = normalizeItemSpacing(parsed.uiItemSpacingRem);
-    state.rootPath = parsed.rootPath || null;
-    state.localBrowserEnabled = Boolean(parsed.localBrowserEnabled && state.rootPath);
-    state.selectedFolderPath = parsed.selectedFolderPath || null;
-    state.selectedBrowserPath = parsed.selectedBrowserPath || state.selectedFolderPath;
-    state.sidebarMode = ["paths", "consoles", "diskPath"].includes(parsed.sidebarMode)
-      ? parsed.sidebarMode
-      : "consoles";
+    // SPCBoyWK is a database-backed player. Older preference files may still
+    // contain local-browser state, but it must never reactivate that UI.
+    state.rootPath = null;
+    state.localBrowserEnabled = false;
+    state.selectedFolderPath = null;
+    state.selectedBrowserPath = null;
+    state.sidebarMode = parsed.sidebarMode === "paths" ? "paths" : "consoles";
     state.favoriteSortOrder = parsed.favoriteSortOrder === "alphabetical" ? "alphabetical" : "historical";
     state.selectedDatabaseGameKey = parsed.selectedDatabaseGameKey || null;
     state.collapsedConsoleNames = Array.isArray(parsed.collapsedConsoleNames)
@@ -368,11 +373,11 @@ function persistSettings() {
     libvgmPlaybackSpeed: state.libvgmPlaybackSpeed,
     libvgmPlaybackSpeedEnabled: state.libvgmPlaybackSpeedEnabled,
     uiItemSpacingRem: state.uiItemSpacingRem,
-    rootPath: state.rootPath,
-    localBrowserEnabled: state.localBrowserEnabled,
-    selectedFolderPath: state.selectedFolderPath,
-    selectedBrowserPath: state.selectedBrowserPath,
-    sidebarMode: state.sidebarMode,
+    rootPath: null,
+    localBrowserEnabled: false,
+    selectedFolderPath: null,
+    selectedBrowserPath: null,
+    sidebarMode: state.sidebarMode === "paths" ? "paths" : "consoles",
     favoriteSortOrder: state.favoriteSortOrder,
     selectedDatabaseGameKey: state.selectedDatabaseGameKey,
     collapsedConsoleNames: state.collapsedConsoleNames,
@@ -406,8 +411,11 @@ function persistSettings() {
     mainWindowAlwaysOnTop: state.mainWindowAlwaysOnTop,
     settingsWindowAlwaysOnTop: state.settingsWindowAlwaysOnTop
   };
-  window.spcBoyWK.frontendSettingsSave(settings)
+  settingsSaveChain = settingsSaveChain
+    .catch(() => {})
+    .then(() => window.spcBoyWK.frontendSettingsSave(settings))
     .catch((error) => console.error("[SPCBoy] native settings save failed", error));
+  return settingsSaveChain;
 }
 
 function formatTime(totalSeconds) {

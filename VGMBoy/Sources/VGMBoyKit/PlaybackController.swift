@@ -11,6 +11,7 @@ public final class PlaybackController: @unchecked Sendable {
         var trackIndex: Int
         var tempo: Double
         var sourceData: Data?
+        var loop: PlaybackLoopMetadata?
     }
 
     private let lock = NSLock()
@@ -37,6 +38,21 @@ public final class PlaybackController: @unchecked Sendable {
     public var controlSurface: PlaybackControlSurface { PlaybackControlSurface() }
 
     public func diagnostics() -> PlaybackDiagnostics { session.status().diagnostics }
+
+    public func status() -> PlaybackStatus { session.status() }
+
+    /// Applies all output preferences as one transport operation. The shared
+    /// transport calls this instead of emitting one status event per control.
+    public func configureAudio(_ preferences: PlaybackPreferences) throws {
+        try session.configureAudio(
+            volume: preferences.outputVolume,
+            equalizer: preferences.equalizer,
+            monoEnabled: preferences.monoEnabled
+        )
+        lock.lock()
+        equalizer = preferences.equalizer
+        lock.unlock()
+    }
 
     /// Render a finite AAC file without interrupting the controller's live
     /// session. Hosts should call this from their own background task.
@@ -195,8 +211,9 @@ public final class PlaybackController: @unchecked Sendable {
             throw PlaybackControlError.invalidPayload("Track index must be non-negative and the file format must be supported.")
         }
         let plan = makePlan(family: family)
-        _ = try session.load(path: path, sourceData: sourceData, trackIndex: trackIndex, plan: plan, tempo: tempo)
-        lock.lock(); loaded = LoadedTrack(path: path, trackIndex: trackIndex, tempo: tempo, sourceData: sourceData); lock.unlock()
+        let loop = payload.loop ?? (sourceData == nil ? PlaybackLoopTagReader.read(path: path) : PlaybackLoopTagReader.read(data: sourceData ?? Data(), extensionName: URL(fileURLWithPath: path).pathExtension))
+        _ = try session.load(path: path, sourceData: sourceData, trackIndex: trackIndex, plan: plan, tempo: tempo, loop: loop)
+        lock.lock(); loaded = LoadedTrack(path: path, trackIndex: trackIndex, tempo: tempo, sourceData: sourceData, loop: loop); lock.unlock()
     }
 
     private func configurePlaybackMode(_ payload: PlaybackControlPayload, reloadCurrent: Bool = true) throws {
@@ -221,7 +238,7 @@ public final class PlaybackController: @unchecked Sendable {
         guard reloadCurrent, let current else { return }
         let previousStatus = session.status()
         try load(
-            PlaybackControlPayload(path: current.path, trackIndex: current.trackIndex, tempo: current.tempo),
+            PlaybackControlPayload(path: current.path, trackIndex: current.trackIndex, tempo: current.tempo, loop: current.loop),
             sourceData: current.sourceData
         )
         if previousStatus.elapsedSeconds > 0 { try session.seek(to: previousStatus.elapsedSeconds) }

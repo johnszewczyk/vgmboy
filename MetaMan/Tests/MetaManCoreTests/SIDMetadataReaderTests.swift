@@ -60,6 +60,21 @@ import Testing
     #expect(document.timing?.playLengthMs == 0)
 }
 
+@Test func sidReadResultExpandsEveryDeclaredSubtuneInNativeOrder() throws {
+    var data = Data(repeating: 0, count: 0x7C)
+    data.replaceSubrange(0..<4, with: Data("PSID".utf8))
+    writeSIDUInt16(&data, at: 0x04, value: 2)
+    writeSIDUInt16(&data, at: 0x0E, value: 3)
+    writeSIDUInt16(&data, at: 0x10, value: 2)
+    writeSIDText(&data, at: 0x16, width: 32, value: "Multi SID")
+
+    let result = try MetaManCore.readResult(data: data, formatHint: "sid", displayName: "multi.sid")
+
+    #expect(result.tracks.map(\.sourceTrackIndex) == [0, 1, 2])
+    #expect(result.tracks.map(\.document.technicalFacts["songCount"]) == ["3", "3", "3"])
+    #expect(result.tracks.allSatisfy { $0.document.fields.title == "Multi SID" })
+}
+
 @Test func sidReaderRejectsInvalidAndTruncatedFiles() {
     #expect(throws: MetadataReadError.self) {
         try SIDMetadataReader.read(data: Data(repeating: 0, count: 0x80), displayName: "invalid.sid")

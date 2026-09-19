@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import datetime
+import errno
 import gzip
 import hashlib
 import io
@@ -23,6 +24,9 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import unicodedata
+from urllib.parse import urlsplit
+import zlib
 from pathlib import Path, PurePosixPath
 from typing import BinaryIO
 
@@ -46,10 +50,29 @@ ZSTD_SEEK_TABLE_MAGIC = 0x184D2A5E
 ZSTD_SEEK_TABLE_FOOTER_MAGIC = 0x8F92EAB1
 ZSTD_MAX_FRAME_SIZE = 64 * 1024 * 1024
 SEEKABLE_PROFILE = re.compile(r"^uac-zstd-seekable-level-(0|[1-9]|1[0-9]|2[0-2])-frame-([1-9][0-9]{0,9})-v1$")
+OFFICIAL_SET_URLS = {
+    ("JoshW", "Nintendo SNES"): "https://spc.joshw.info/",
+    ("JoshW", "Sega Genesis"): "https://smd.joshw.info/",
+    ("SNESMusicOrg", "Nintendo SNES"): "https://www.snesmusic.org/v2/",
+    ("SNESMusicOrg", "Nintendo Super Game Boy"): "https://www.snesmusic.org/v2/",
+    ("SNESMusicOrg", "Nintendo Super Game Boy (in joshw)"): "https://www.snesmusic.org/v2/",
+    ("ZopharsDomain", "Game Boy"): "https://www.zophar.net/music/gameboy-gbs",
+    ("GBS Penultimate", "Game Boy"): "https://snesmusic.org/hoot/gbs/",
+    ("GBS Penultimate", "."): "https://snesmusic.org/hoot/gbs/",
+    ("Project2612", "Sega Genesis"): "https://vgmrips.net/packs/system/sega/mega-drive",
+    ("Project2612", "Sega 32X"): "https://vgmrips.net/packs/system/sega/32x",
+    ("Project2612", "Sega CD"): "https://vgmrips.net/packs/system/sega/sega-cd",
+    ("Project2612", "Mixed"): "https://vgmrips.net/packs/systems",
+}
+ARCHIVED_SOURCE_URLS = {"Project2612": "https://project2612.org/list.php"}
+SOURCE_ARCHIVE_URLS = {
+    "Project2612": "https://web.archive.org/web/20240809092444/https://project2612.org/list.php",
+}
 PLAYABLE_EXTENSIONS = {
     ".spc", ".vgm", ".vgz", ".nsf", ".nsfe", ".gbs", ".hes", ".kss",
     ".sid", ".s98", ".mdx", ".usf", ".gsf", ".snsf", ".wsr", ".sap",
     ".ay", ".ym", ".xgm", ".psf", ".minipsf", ".2sf", ".minigsf",
+    ".aif", ".aiff", ".ape", ".flac", ".m4a", ".mp3", ".ogg", ".wav",
 }
 
 
@@ -62,11 +85,13 @@ class HashingReader:
         self.file = file
         self.hasher = blake3.blake3()
         self.byte_count = 0
+        self.crc32 = 0
 
     def read(self, size: int = -1) -> bytes:
         data = self.file.read(size)
         self.hasher.update(data)
         self.byte_count += len(data)
+        self.crc32 = zlib.crc32(data, self.crc32)
         return data
 
 
@@ -88,6 +113,50 @@ def safe_relative_path(value: str) -> bool:
 
 def safe_component(value: str) -> bool:
     return bool(value) and safe_relative_path(value) and "/" not in value
+
+
+def match_unicode_member_paths(
+    path_records: dict,
+    expected_paths: set[str],
+    context: str,
+    *,
+    allow_partial: bool = False,
+) -> dict[str, object]:
+    """Match filesystem paths to MetaMan paths despite canonical Unicode normalization."""
+    expected_by_key: dict[str, str] = {}
+    for expected in expected_paths:
+        key = unicodedata.normalize("NFC", expected)
+        previous = expected_by_key.get(key)
+        if previous is not None and previous != expected:
+            raise UACError(f"{context} input paths collide after Unicode normalization: {previous} and {expected}.")
+        expected_by_key[key] = expected
+
+    matched: dict[str, object] = {}
+    unexpected: list[str] = []
+    for reported_path, value in path_records.items():
+        if not isinstance(reported_path, str):
+            raise UACError(f"{context} returned a non-string member path.")
+        expected = expected_by_key.get(unicodedata.normalize("NFC", reported_path))
+        if expected is None:
+            unexpected.append(reported_path)
+            continue
+        if expected in matched:
+            raise UACError(f"{context} returned duplicate paths after Unicode normalization: {reported_path}.")
+        matched[expected] = value
+
+    missing = expected_paths - set(matched)
+    if unexpected or (missing and not allow_partial):
+        raise UACError(
+            f"{context} path coverage mismatch after Unicode normalization "
+            f"(missing={sorted(missing)[:5]}, unexpected={sorted(unexpected)[:5]})."
+        )
+    return matched
+
+
+def original_member_path(relative_path: str, member_path_map: dict[str, str] | None) -> str:
+    if not member_path_map:
+        return relative_path
+    return member_path_map.get(unicodedata.normalize("NFC", relative_path), relative_path)
 
 
 def require_string(record: dict, field: str, owner: str) -> str:
@@ -213,7 +282,130 @@ def normalize_recipe(recipe: dict) -> dict:
             entry.setdefault("extensions", {})
             if not isinstance(entry["extraFields"], dict) or not isinstance(entry["extensions"], dict):
                 raise UACError(f"Playlist entry extraFields/extensions must be JSON objects: {playlist_id}")
+            if not isinstance(entry["entryKind"], str) or not entry["entryKind"].strip():
+                raise UACError(f"Playlist entryKind must be a non-empty string: {playlist_id}")
+            if entry["entryKind"] == "subsong":
+                track_index = entry.get("trackIndex")
+                if (
+                    not isinstance(track_index, str)
+                    or not re.fullmatch(r"0|[1-9][0-9]*", track_index)
+                    or len(track_index) > 19
+                    or (len(track_index) == 19 and track_index > str(2**63 - 1))
+                ):
+                    raise UACError(
+                        f"Subsong playlist entries require a nonnegative decimal trackIndex: {playlist_id}"
+                    )
     return recipe
+
+
+def source_set_metadata(sources: object) -> dict | None:
+    """Return one conservative, collection-level set projection from source records."""
+    if not isinstance(sources, list) or not sources:
+        return None
+
+    # Redump packages can also cite the derived extraction and legacy metadata
+    # crosswalk. Those records document transformations/associations; the
+    # disc-archive record remains the authoritative collection source.
+    redump_sources = [
+        source for source in sources
+        if isinstance(source, dict) and source.get("id") == "redump-disc-archive"
+    ]
+    if redump_sources:
+        projections: set[tuple[str, str, str]] = set()
+        for source in redump_sources:
+            collection_title = source.get("collection")
+            set_name = source.get("setName")
+            source_url = source.get("sourceURL")
+            if not isinstance(collection_title, str) or not collection_title.startswith("Redump - "):
+                return None
+            if not isinstance(set_name, str) or not set_name.strip():
+                return None
+            if not isinstance(source_url, str):
+                return None
+            parsed = urlsplit(source_url)
+            path_parts = [part for part in parsed.path.split("/") if part]
+            if (
+                parsed.scheme != "https"
+                or parsed.netloc.lower() not in {"archive.org", "www.archive.org"}
+                or len(path_parts) < 3
+                or path_parts[0] != "download"
+                or path_parts[1] != set_name
+            ):
+                return None
+            set_title = collection_title.removeprefix("Redump - ").strip()
+            if not set_title:
+                return None
+            item_url = f"https://archive.org/details/{set_name}"
+            projections.add(("Redump", set_title, item_url))
+        if len(projections) != 1:
+            return None
+        collection, name, url = next(iter(projections))
+        return {"collection": collection, "name": name, "url": url}
+
+    projections: set[tuple[str, str, str, str | None, str | None]] = set()
+    for source in sources:
+        if not isinstance(source, dict):
+            return None
+        collection = source.get("collection")
+        set_name = source.get("setName")
+        if not isinstance(collection, str) or not collection.strip():
+            return None
+        if not isinstance(set_name, str) or not set_name.strip():
+            return None
+        url = OFFICIAL_SET_URLS.get((collection, set_name))
+        if url is None:
+            explicit_url = source.get("sourceURL")
+            if not isinstance(explicit_url, str):
+                return None
+            parsed = urlsplit(explicit_url)
+            if parsed.scheme not in ("http", "https") or not parsed.netloc:
+                return None
+            url = explicit_url
+        display_name = "GBS Penultimate" if collection == "GBS Penultimate" and set_name == "." else set_name
+        legacy_url = ARCHIVED_SOURCE_URLS.get(collection)
+        archive_url = SOURCE_ARCHIVE_URLS.get(collection)
+        projections.add((collection, display_name, url, legacy_url, archive_url))
+
+    if len(projections) != 1:
+        return None
+    collection, name, url, legacy_url, archive_url = next(iter(projections))
+    result = {"collection": collection, "name": name, "url": url}
+    if legacy_url is not None:
+        result["legacyURL"] = legacy_url
+    if archive_url is not None:
+        result["archiveURL"] = archive_url
+    return result
+
+
+def add_source_set_metadata(manifest: dict) -> bool:
+    """Add the source-derived game.metadata.set when it is unambiguous."""
+    game = manifest.get("game")
+    if not isinstance(game, dict):
+        return False
+    metadata = game.get("metadata")
+    if not isinstance(metadata, dict) or "set" in metadata:
+        return False
+    set_metadata = source_set_metadata(manifest.get("sources"))
+    if set_metadata is None:
+        return False
+    metadata["set"] = set_metadata
+    return True
+
+
+def refresh_project2612_set_metadata(manifest: dict) -> bool:
+    """Move prior Project2612 archive links to the current VGMRips system index."""
+    game = manifest.get("game")
+    metadata = game.get("metadata") if isinstance(game, dict) else None
+    existing = metadata.get("set") if isinstance(metadata, dict) else None
+    if not isinstance(existing, dict) or existing.get("collection") != "Project2612":
+        return False
+    if existing.get("url") != SOURCE_ARCHIVE_URLS["Project2612"]:
+        return False
+    updated = source_set_metadata(manifest.get("sources"))
+    if updated is None or updated.get("collection") != "Project2612":
+        return False
+    metadata["set"] = updated
+    return True
 
 
 def compression_profile(level: int, frame_size: int) -> str:
@@ -261,19 +453,169 @@ def infer_role(relative_path: str) -> str:
     return "asset"
 
 
-def stream_digest(path: Path, suffix: str, raw_digest: str) -> tuple[str, int]:
+def variant_member_path(relative_path: str, variant_id: str, variants: list[dict]) -> str:
+    """Use source-relative paths for one-variant packages and namespaces for sets of variants."""
+    if len(variants) == 1 and variants[0].get("id") == variant_id:
+        return relative_path
+    return f"variants/{variant_id}/{relative_path}"
+
+
+def stream_digest(
+    path: Path,
+    suffix: str,
+    raw_digest: str,
+    raw_crc32: int | None = None,
+) -> tuple[str, int, int]:
     if suffix.lower() != ".vgz":
-        return raw_digest, path.stat().st_size
+        if raw_crc32 is None:
+            raw_crc32 = file_crc32(path)
+        return raw_digest, path.stat().st_size, raw_crc32
     hasher = blake3.blake3()
     size = 0
+    playable_crc32 = 0
     try:
         with gzip.open(path, "rb") as source:
             for block in iter(lambda: source.read(1024 * 1024), b""):
                 hasher.update(block)
                 size += len(block)
+                playable_crc32 = zlib.crc32(block, playable_crc32)
     except (OSError, EOFError) as error:
         raise UACError(f"Cannot derive the playable payload hash for {path.name}: {error}") from error
-    return hasher.hexdigest(), size
+    return hasher.hexdigest(), size, playable_crc32
+
+
+def file_crc32(path: Path) -> int:
+    checksum = 0
+    with path.open("rb") as source:
+        for block in iter(lambda: source.read(1024 * 1024), b""):
+            checksum = zlib.crc32(block, checksum)
+    return checksum
+
+
+def vgm_version_text(value: int) -> str:
+    return f"{value >> 8}.{value & 0xFF:02X}"
+
+
+def spc_version_text(value: int) -> str:
+    return f"0.{value:02d}"
+
+
+def scan_contained_container_versions(root: Path) -> tuple[dict, dict[str, dict]]:
+    """Read SPC/VGM version facts without changing any source member."""
+    spc_versions: dict[int, dict] = {}
+    spc_members: dict[str, dict] = {}
+    versions: dict[int, int] = {}
+    for path in sorted(root.rglob("*"), key=lambda item: item.as_posix().casefold()):
+        if not path.is_file():
+            continue
+        suffix = path.suffix.lower()
+        if suffix == ".spc":
+            try:
+                with path.open("rb") as source:
+                    header = source.read(0x25)
+            except OSError as error:
+                raise UACError(f"Cannot read contained SPC header in {path.name}: {error}") from error
+            signature = header[:0x21]
+            match = re.fullmatch(rb"SNES-SPC700 Sound File Data v([0-9]+\.[0-9]{2})", signature)
+            if (
+                len(header) < 0x25
+                or not match
+                or header[0x21:0x23] != b"\x1A\x1A"
+                or header[0x23] not in (0x1A, 0x1B)
+            ):
+                raise UACError(f"Invalid or truncated SPC container: {path.name}")
+            header_version = match.group(1).decode("ascii")
+            version_byte = header[0x24]
+            version = spc_version_text(version_byte)
+            group = spc_versions.setdefault(version_byte, {"memberCount": 0, "headerVersions": {}})
+            group["memberCount"] += 1
+            group["headerVersions"][header_version] = group["headerVersions"].get(header_version, 0) + 1
+            relative = path.relative_to(root).as_posix()
+            spc_members[relative] = {
+                "spcVersion": version,
+                "spcVersionByte": version_byte,
+                "spcHeaderVersion": header_version,
+            }
+            continue
+        if suffix not in (".vgm", ".vgz"):
+            continue
+        try:
+            opener = gzip.open if suffix == ".vgz" else open
+            with opener(path, "rb") as source:
+                header = source.read(0x40)
+        except (OSError, EOFError) as error:
+            raise UACError(f"Cannot read contained VGM header in {path.name}: {error}") from error
+        if len(header) < 0x40 or header[:4] != b"Vgm ":
+            raise UACError(f"Invalid or truncated VGM container: {path.name}")
+        version = int.from_bytes(header[0x08:0x0C], "little")
+        if version < 0x100:
+            raise UACError(f"Invalid VGM container version in {path.name}: 0x{version:08X}")
+        versions[version] = versions.get(version, 0) + 1
+
+    spc_groups = [
+        {
+            "version": spc_version_text(version_byte),
+            "versionByte": version_byte,
+            "memberCount": group["memberCount"],
+            "headerVersions": [
+                {"version": header_version, "memberCount": count}
+                for header_version, count in sorted(group["headerVersions"].items())
+            ],
+        }
+        for version_byte, group in sorted(spc_versions.items())
+    ]
+    vgm_groups = [
+        {
+            "version": vgm_version_text(version),
+            "versionRaw": f"0x{version:08X}",
+            "memberCount": count,
+        }
+        for version, count in sorted(versions.items())
+    ]
+    mixed_formats = [
+        format_name
+        for format_name, groups in (("spc", spc_groups), ("vgm", vgm_groups))
+        if len(groups) > 1
+    ]
+    inventory = {
+        "schemaVersion": 1,
+        "formatsScanned": ["spc", "vgm"],
+        "mixedVersionFormats": mixed_formats,
+        "versions": {
+            "spc": spc_groups,
+            "vgm": vgm_groups,
+        },
+    }
+    return inventory, spc_members
+
+
+def contained_container_versions(root: Path) -> dict:
+    """Summarize versioned SPC/VGM containers without changing source members."""
+    inventory, _ = scan_contained_container_versions(root)
+    return inventory
+
+
+def apply_contained_container_versions(root: Path, recipe: dict) -> None:
+    detected, spc_members = scan_contained_container_versions(root)
+    game_metadata = recipe["game"].setdefault("metadata", {})
+    if not isinstance(game_metadata, dict):
+        raise UACError("Game metadata must be a JSON object.")
+    authored = game_metadata.get("containedContainerVersions")
+    if authored is not None and authored != detected:
+        raise UACError("Recipe containedContainerVersions disagrees with detected SPC/VGM headers.")
+    game_metadata["containedContainerVersions"] = detected
+
+    for path, fields in spc_members.items():
+        override = recipe["memberOverrides"].setdefault(path, {})
+        if not isinstance(override, dict):
+            raise UACError(f"Member override must be an object: {path}")
+        metadata = override.setdefault("metadata", {})
+        if not isinstance(metadata, dict):
+            raise UACError(f"Member metadata override must be an object: {path}")
+        for key, value in fields.items():
+            if key in metadata and metadata[key] not in (None, "", value):
+                raise UACError(f"Recipe {key} disagrees with detected SPC header: {path}")
+            metadata[key] = value
 
 
 def load_recipe(path: Path) -> dict:
@@ -304,7 +646,12 @@ def load_recipe(path: Path) -> dict:
     return normalize_recipe(recipe)
 
 
-def harvest_spc_metadata(root: Path, helper: Path, recipe: dict) -> tuple[int, int, list[str]]:
+def harvest_spc_metadata(
+    root: Path,
+    helper: Path,
+    recipe: dict,
+    member_path_map: dict[str, str] | None = None,
+) -> tuple[int, int, list[str]]:
     """Import MetaMan projections without changing the original SPC members."""
     if not helper.is_file() or not os.access(helper, os.X_OK):
         raise UACError(f"UACMan metadata helper is missing or not executable: {helper}")
@@ -344,13 +691,7 @@ def harvest_spc_metadata(root: Path, helper: Path, recipe: dict) -> tuple[int, i
 
     included, _ = discover_files(root, include_macos_sidecars=False)
     spc_paths = {relative for _, relative in included if Path(relative).suffix.lower() == ".spc"}
-    if set(members) != spc_paths:
-        missing = sorted(spc_paths - set(members))
-        unexpected = sorted(set(members) - spc_paths)
-        raise UACError(
-            "MetaMan SPC harvest did not cover exactly the packaged SPC members "
-            f"(missing={missing[:5]}, unexpected={unexpected[:5]})."
-        )
+    members = match_unicode_member_paths(members, spc_paths, "MetaMan SPC harvest")
     if any(not isinstance(fields, dict) for fields in members.values()):
         raise UACError("UACMan metadata helper returned a non-object member projection.")
 
@@ -380,8 +721,15 @@ def harvest_spc_metadata(root: Path, helper: Path, recipe: dict) -> tuple[int, i
     return len(members), diagnostic_count, [str(item) for item in conflicts]
 
 
-def harvest_format_metadata(root: Path, helper: Path, recipe: dict, format_extension: str) -> tuple[int, int]:
-    """Import single-track MetaMan projections without changing source members."""
+def harvest_format_metadata(
+    root: Path,
+    helper: Path,
+    recipe: dict,
+    format_extension: str,
+    variant_id: str = "original",
+    member_path_map: dict[str, str] | None = None,
+) -> tuple[int, int]:
+    """Import MetaMan projections and represent multi-track members as subsongs."""
     extension = format_extension.strip().lower().removeprefix(".")
     if not re.fullmatch(r"[a-z0-9]+", extension) or extension == "spc":
         raise UACError("Generic MetaMan harvesting requires a supported extension other than spc.")
@@ -413,8 +761,14 @@ def harvest_format_metadata(root: Path, helper: Path, recipe: dict, format_exten
 
     failures = response.get("failures")
     members = response.get("memberMetadata")
+    track_metadata = response.get("trackMetadata", {})
     diagnostics = response.get("diagnosticCount")
-    if not isinstance(failures, list) or not isinstance(members, dict) or not isinstance(diagnostics, int):
+    if (
+        not isinstance(failures, list)
+        or not isinstance(members, dict)
+        or not isinstance(track_metadata, dict)
+        or not isinstance(diagnostics, int)
+    ):
         raise UACError(f"UACMan metadata helper returned malformed .{extension} metadata.")
     if result.returncode or failures:
         rendered = "; ".join(str(item) for item in failures[:8])
@@ -424,26 +778,114 @@ def harvest_format_metadata(root: Path, helper: Path, recipe: dict, format_exten
             f"{rendered or detail or 'No partial metadata was imported.'}"
         )
 
-    if set(members) != expected_paths:
-        missing = sorted(expected_paths - set(members))
-        unexpected = sorted(set(members) - expected_paths)
-        raise UACError(
-            f"MetaMan .{extension} harvest did not cover exactly the packaged members "
-            f"(missing={missing[:5]}, unexpected={unexpected[:5]})."
-        )
+    members = match_unicode_member_paths(members, expected_paths, f"MetaMan .{extension} harvest")
+    track_metadata = match_unicode_member_paths(
+        track_metadata,
+        expected_paths,
+        f"MetaMan .{extension} track metadata",
+        allow_partial=True,
+    )
     if any(not isinstance(fields, dict) for fields in members.values()):
         raise UACError(f"UACMan metadata helper returned a non-object .{extension} projection.")
+
+    normalized_tracks: dict[str, list[dict]] = {}
+    for path, tracks in track_metadata.items():
+        if not isinstance(tracks, list) or not tracks:
+            raise UACError(f"UACMan metadata helper returned an empty or malformed track list: {path}")
+        normalized: list[dict] = []
+        indexes: list[int] = []
+        for ordinal, track in enumerate(tracks):
+            if not isinstance(track, dict) or not isinstance(track.get("metadata"), dict):
+                raise UACError(f"UACMan metadata helper returned a malformed track projection: {path}#{ordinal}")
+            source_index = track.get("sourceTrackIndex")
+            if source_index is not None and (
+                not isinstance(source_index, int) or isinstance(source_index, bool) or source_index < 0
+            ):
+                raise UACError(f"UACMan metadata helper returned an invalid source track index: {path}#{ordinal}")
+            if source_index is not None:
+                indexes.append(source_index)
+            normalized.append({"sourceTrackIndex": source_index, "metadata": track["metadata"]})
+        if len(normalized) > 1 and (len(indexes) != len(normalized) or len(set(indexes)) != len(indexes)):
+            raise UACError(
+                f"MetaMan .{extension} tracks do not have unique playable source indexes: {path}."
+            )
+        normalized_tracks[path] = normalized
 
     for path, fields in members.items():
         override = recipe["memberOverrides"].setdefault(path, {})
         if not isinstance(override, dict):
             raise UACError(f"Member override must be an object: {path}")
+        # An explicit MetaMan read establishes a native track projection even
+        # for formats outside the packer's built-in extension list. Respect an
+        # authored role override, but make successfully harvested media visible
+        # as a track in UAC readers by default.
+        override.setdefault("role", "playable")
         metadata = override.setdefault("metadata", {})
         if not isinstance(metadata, dict):
             raise UACError(f"Member metadata override must be an object: {path}")
         for key, value in fields.items():
             if key not in metadata or metadata[key] in (None, ""):
                 metadata[key] = value
+
+    playlist_id = None
+    # Track-aware formats need explicit playlist entries even when a stream
+    # exposes only one track. This keeps the subsong API consistent and lets
+    # callers attach per-track metadata uniformly.
+    if extension in {"nsf", "nsfe", "gbs"} or any(len(tracks) > 1 for tracks in normalized_tracks.values()):
+        if set(normalized_tracks) != expected_paths:
+            missing = sorted(expected_paths - set(normalized_tracks))
+            raise UACError(
+                f"MetaMan .{extension} track metadata is incomplete for subsong mapping "
+                f"(missing={missing[:5]})."
+            )
+        playlists = recipe.setdefault("playlists", [])
+        if not isinstance(playlists, list):
+            raise UACError("Recipe playlists must be an array before MetaMan subsongs can be added.")
+        existing_ids = {item.get("id") for item in playlists if isinstance(item, dict)}
+        base_id = f"metaman-{extension}-tracks"
+        playlist_id = base_id
+        suffix = 2
+        while playlist_id in existing_ids:
+            playlist_id = f"{base_id}-{suffix}"
+            suffix += 1
+        entries = []
+        for path in sorted(expected_paths):
+            tracks = normalized_tracks[path]
+            for ordinal, track in enumerate(tracks):
+                metadata = track["metadata"]
+                source_index = track["sourceTrackIndex"]
+                decoder_index = source_index if source_index is not None else 0
+                source_path = original_member_path(path, member_path_map)
+                target_path = variant_member_path(source_path, variant_id, recipe.get("variants", []))
+                if not safe_relative_path(target_path):
+                    raise UACError(f"Unsafe UAC subsong target path: {target_path}")
+                title = metadata.get("title")
+                artist = metadata.get("artist")
+                extra_fields = {
+                    "visibleTrackIndex": ordinal,
+                    "trackCount": len(tracks),
+                    "metaManMetadata": metadata,
+                }
+                if source_index is not None:
+                    extra_fields["sourceTrackIndex"] = source_index
+                entries.append({
+                    "targetMemberPath": target_path,
+                    "entryKind": "subsong",
+                    "formatTag": extension,
+                    "trackIndex": str(decoder_index),
+                    "title": title if isinstance(title, str) and title.strip() else None,
+                    "artist": artist if isinstance(artist, str) and artist.strip() else None,
+                    "extraFields": extra_fields,
+                    "extensions": {},
+                })
+        playlists.append({
+            "id": playlist_id,
+            "title": f"MetaMan {extension.upper()} tracks",
+            "variantID": variant_id,
+            "entries": entries,
+            "metadata": {"reader": "MetaManCore", "format": extension},
+            "extensions": {},
+        })
 
     imports = recipe.setdefault("extensions", {}).setdefault("metaManMetadataImport", {})
     if not isinstance(imports, dict):
@@ -456,6 +898,11 @@ def harvest_format_metadata(root: Path, helper: Path, recipe: dict, format_exten
         "memberCount": len(members),
         "diagnosticCount": diagnostics,
     })
+    if playlist_id is not None:
+        format_import["trackAwareMemberCount"] = sum(
+            len(tracks) > 1 for tracks in normalized_tracks.values()
+        )
+        format_import["playlistID"] = playlist_id
     return len(members), diagnostics
 
 
@@ -579,6 +1026,7 @@ def create_tar(
     recipe: dict,
     variant_id: str,
     include_macos_sidecars: bool,
+    member_path_map: dict[str, str] | None = None,
 ) -> tuple[list[dict], list[str]]:
     variants = {item.get("id") for item in recipe["variants"] if isinstance(item, dict)}
     if variant_id not in variants:
@@ -604,11 +1052,12 @@ def create_tar(
             if unknown:
                 raise UACError(f"Unknown override fields for {relative}: {', '.join(sorted(unknown))}")
 
-            member_path = f"variants/{variant_id}/{relative}"
+            archive_relative = original_member_path(relative, member_path_map)
+            member_path = variant_member_path(archive_relative, variant_id, recipe["variants"])
             if not safe_relative_path(member_path):
                 raise UACError(f"Unsafe UAC member path: {member_path}")
             suffix = source_path.suffix.lower()
-            role = override.get("role", infer_role(relative))
+            role = override.get("role", infer_role(archive_relative))
             format_name = override.get("format", suffix.removeprefix(".") or None)
             if not isinstance(role, str) or not role.strip():
                 raise UACError(f"Member role must be a non-empty string: {relative}")
@@ -638,25 +1087,45 @@ def create_tar(
                 digest_reader = HashingReader(source)
                 archive.addfile(info, digest_reader)
             raw_digest = digest_reader.hasher.hexdigest()
+            raw_crc32 = digest_reader.crc32 & 0xFFFFFFFF
             stream_hash = None
-            hash_records: list[dict] = []
+            hash_records: list[dict] = [{
+                "scope": "raw-member",
+                "algorithm": "crc32-iso-hdlc",
+                "digest": f"{raw_crc32:08X}",
+                "profile": "uac-raw-member-v1",
+                "byteSize": before.st_size,
+            }]
             if role == "playable":
-                stream_hash, stream_size = stream_digest(source_path, suffix, raw_digest)
+                stream_hash, stream_size, stream_crc32 = stream_digest(
+                    source_path, suffix, raw_digest, raw_crc32
+                )
                 hash_records.append({
                     "scope": "playable-payload",
                     "algorithm": "blake3-256",
                     "digest": stream_hash,
-                    "profile": "audioman-playable-payload-v1",
+                    "profile": "uac-playable-payload-v1",
+                    "byteSize": stream_size,
+                })
+                hash_records.append({
+                    "scope": "playable-payload",
+                    "algorithm": "crc32-iso-hdlc",
+                    "digest": f"{stream_crc32 & 0xFFFFFFFF:08X}",
+                    "profile": "uac-playable-payload-v1",
                     "byteSize": stream_size,
                 })
             after = source_path.stat()
-            if digest_reader.byte_count != before.st_size or (
-                before.st_size, before.st_mtime_ns, before.st_ino
-            ) != (after.st_size, after.st_mtime_ns, after.st_ino):
+            # SMB mounts can report a different nanosecond mtime on the second
+            # stat despite a stable file.  Size and inode remain mandatory;
+            # local files retain the stricter mtime guard.
+            remote_mount = str(root).startswith("/Volumes/")
+            changed_identity = (before.st_size, before.st_ino) != (after.st_size, after.st_ino)
+            changed_local_mtime = before.st_mtime_ns != after.st_mtime_ns and not remote_mount
+            if digest_reader.byte_count != before.st_size or changed_identity or changed_local_mtime:
                 raise UACError(f"Input changed while it was being packaged: {relative}")
             records.append({
                 "path": member_path,
-                "originalName": Path(relative).name,
+                "originalName": PurePosixPath(archive_relative).name,
                 "variantID": variant_id,
                 "sourceIDs": member_source_ids,
                 "role": role,
@@ -703,6 +1172,8 @@ def finalize_playlists(playlists: list, records: list[dict]) -> list[dict]:
             target = members.get(target_path)
             if target is None:
                 raise UACError(f"Playlist target is not packaged: {target_path}")
+            if entry.get("entryKind", "file") == "subsong" and target.get("role") not in ("playable", "track"):
+                raise UACError(f"Subsong playlist targets a non-playable member: {target_path}")
             target_digest = entry.get("targetMemberBlake3")
             if target_digest is not None and target_digest != target["blake3"]:
                 raise UACError(f"Playlist target hash disagrees with member bytes: {target_path}")
@@ -713,7 +1184,13 @@ def finalize_playlists(playlists: list, records: list[dict]) -> list[dict]:
     return result
 
 
-def finalize_transformations(transformations: list, records: list[dict], variant_id: str, sources: list[dict]) -> list[dict]:
+def finalize_transformations(
+    transformations: list,
+    records: list[dict],
+    variant_id: str,
+    sources: list[dict],
+    namespaces_variants: bool,
+) -> list[dict]:
     members = {record["path"]: record for record in records}
     result = [dict(item) for item in transformations]
     used_ids = {item["id"] for item in result}
@@ -738,9 +1215,12 @@ def finalize_transformations(transformations: list, records: list[dict], variant
         inputs = []
         outputs = []
         for member in linked:
-            if not member["path"].startswith(member_prefix):
-                raise UACError(f"Source-linked member is outside its variant: {member['path']}")
-            source_path = member["path"][len(member_prefix):]
+            if namespaces_variants:
+                if not member["path"].startswith(member_prefix):
+                    raise UACError(f"Source-linked member is outside its variant: {member['path']}")
+                source_path = member["path"][len(member_prefix):]
+            else:
+                source_path = member["path"]
             source_input = {
                 "sourceID": source_id,
                 "sourcePath": source_path,
@@ -776,7 +1256,7 @@ def manifest_bytes(recipe: dict, records: list[dict], payload: Path, level: int,
         raise UACError("packageID must be a non-empty string.")
 
     manifest = {
-        "manifestVersion": 1,
+        "manifestVersion": 2,
         "packageID": package_id,
         "payload": {
             "format": "tar+zstd-seekable",
@@ -789,7 +1269,13 @@ def manifest_bytes(recipe: dict, records: list[dict], payload: Path, level: int,
         "members": records,
         "playlists": finalize_playlists(recipe["playlists"], records),
         "sources": recipe["sources"],
-        "transformations": finalize_transformations(recipe["transformations"], records, records[0]["variantID"], recipe["sources"]),
+        "transformations": finalize_transformations(
+            recipe["transformations"],
+            records,
+            records[0]["variantID"],
+            recipe["sources"],
+            len(recipe["variants"]) > 1,
+        ),
         "extensions": recipe["extensions"],
     }
     try:
@@ -804,6 +1290,8 @@ def manifest_bytes(recipe: dict, records: list[dict], payload: Path, level: int,
 def pack(args: argparse.Namespace) -> tuple[int, int, list[str], list[tuple[str, int, int]]]:
     root = Path(args.input_dir).expanduser().absolute()
     recipe = args.recipe if isinstance(args.recipe, dict) else load_recipe(Path(args.recipe).expanduser())
+    add_source_set_metadata(recipe)
+    apply_contained_container_versions(root, recipe)
     output = Path(args.output).expanduser().absolute()
     if output.exists():
         raise UACError(f"Refusing to overwrite existing output: {output}")
@@ -820,6 +1308,7 @@ def pack(args: argparse.Namespace) -> tuple[int, int, list[str], list[tuple[str,
             root,
             Path(metadata_helper).expanduser().absolute(),
             recipe,
+            getattr(args, "member_path_map", None),
         )
     generic_harvests: list[tuple[str, int, int]] = []
     for extension, helper_path in getattr(args, "harvest_format_metadata", []) or []:
@@ -828,6 +1317,8 @@ def pack(args: argparse.Namespace) -> tuple[int, int, list[str], list[tuple[str,
             Path(helper_path).expanduser().absolute(),
             recipe,
             extension,
+            args.variant_id,
+            getattr(args, "member_path_map", None),
         )
         if count or diagnostics:
             generic_harvests.append((extension.lower().removeprefix("."), count, diagnostics))
@@ -836,7 +1327,14 @@ def pack(args: argparse.Namespace) -> tuple[int, int, list[str], list[tuple[str,
         work = Path(temporary)
         tar_path = work / "payload.tar"
         payload_path = work / "payload.tar.zst"
-        records, skipped = create_tar(root, tar_path, recipe, args.variant_id, args.include_macos_sidecars)
+        records, skipped = create_tar(
+            root,
+            tar_path,
+            recipe,
+            args.variant_id,
+            args.include_macos_sidecars,
+            getattr(args, "member_path_map", None),
+        )
         tar_size = tar_path.stat().st_size
         zstd_version = compress_seekable_tar(tar_path, payload_path, args.level, args.frame_size)
         if not payload_path.is_file():
@@ -875,7 +1373,15 @@ def pack(args: argparse.Namespace) -> tuple[int, int, list[str], list[tuple[str,
                 shutil.copyfileobj(payload, target, length=1024 * 1024)
                 target.flush()
                 os.fsync(target.fileno())
-            os.link(staging, output)
+            try:
+                os.link(staging, output)
+            except OSError as error:
+                # Some SMB shares do not implement hard links.  The staged
+                # file is already fsynced and lives beside the destination,
+                # so an atomic rename preserves the same no-overwrite rule.
+                if getattr(error, "errno", None) not in (errno.EOPNOTSUPP, errno.ENOTSUP, errno.EXDEV):
+                    raise
+                os.replace(staging, output)
         except FileExistsError as error:
             raise UACError(f"Refusing to overwrite output created concurrently: {output}") from error
         finally:
@@ -903,12 +1409,18 @@ def pack(args: argparse.Namespace) -> tuple[int, int, list[str], list[tuple[str,
     return harvested_spc, metadata_diagnostics, metadata_conflicts, generic_harvests
 
 
-def extract_zstd_tar(source_path: Path, destination: Path) -> tuple[int, int]:
+def extract_zstd_tar(
+    source_path: Path,
+    destination: Path,
+    member_path_map: dict[str, str] | None = None,
+) -> tuple[int, int]:
     """Safely extract regular files from one source .tar.zst into a new directory."""
     zstd = shutil.which("zstd")
     if not zstd:
         raise UACError("Source archive conversion requires the zstd command-line decoder.")
     destination.mkdir(parents=True, exist_ok=False)
+    if member_path_map is not None:
+        member_path_map.clear()
     seen_paths: set[str] = set()
     folded_paths: set[str] = set()
     file_count = 0
@@ -947,13 +1459,16 @@ def extract_zstd_tar(source_path: Path, destination: Path) -> tuple[int, int]:
                     continue
                 if not member.isfile() or getattr(member, "issparse", lambda: False)():
                     raise UACError(f"Unsupported non-regular source member in {source_path.name}: {member.name}")
-                folded = normalized.casefold()
+                unicode_key = unicodedata.normalize("NFC", normalized)
+                folded = unicode_key.casefold()
                 if normalized in seen_paths or folded in folded_paths:
                     raise UACError(f"Duplicate or case-colliding source member in {source_path.name}: {normalized}")
                 if member.size < 0:
                     raise UACError(f"Negative source member size in {source_path.name}: {normalized}")
                 seen_paths.add(normalized)
                 folded_paths.add(folded)
+                if member_path_map is not None:
+                    member_path_map[unicode_key] = normalized
                 target = destination.joinpath(*relative.parts)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 source = archive.extractfile(member)
@@ -1063,7 +1578,12 @@ def pack_source_archive_tree(args: argparse.Namespace) -> None:
             target.parent.mkdir(parents=True, exist_ok=True)
             with tempfile.TemporaryDirectory(prefix="uacman-source-set-") as temporary:
                 members_root = Path(temporary) / "members"
-                file_count, source_member_bytes = extract_zstd_tar(source_path, members_root)
+                member_path_map: dict[str, str] = {}
+                file_count, source_member_bytes = extract_zstd_tar(
+                    source_path,
+                    members_root,
+                    member_path_map,
+                )
                 total_source_bytes += source_member_bytes
                 source_id = "source-archive"
                 game_id = f"{source_slug}-{source_hash[:20]}"
@@ -1109,6 +1629,7 @@ def pack_source_archive_tree(args: argparse.Namespace) -> None:
                     include_macos_sidecars=False,
                     harvest_spc_metadata=str(helper),
                     harvest_format_metadata=[(extension, str(helper)) for extension in format_extensions],
+                    member_path_map=member_path_map,
                     quiet=True,
                 )
                 with contextlib.redirect_stdout(io.StringIO()):
@@ -1225,6 +1746,8 @@ def read_uac(path: Path, verify_payload: bool = True) -> tuple[dict, int, int, s
             manifest = json.loads(manifest_data.decode("utf-8"))
             if not isinstance(manifest, dict):
                 raise UACError("UAC manifest must be a JSON object.")
+            if manifest.get("manifestVersion") not in (1, 2):
+                raise UACError("Unsupported UAC manifest version.")
             payload_offset = 8 + metadata_size
             if size - payload_offset < 4:
                 raise UACError("UAC payload is truncated.")
@@ -1252,6 +1775,127 @@ def read_uac(path: Path, verify_payload: bool = True) -> tuple[dict, int, int, s
         len(manifest_data),
         len(stored_manifest),
     )
+
+
+def filesystem_identity(path: Path) -> tuple[int, int, int, int, int]:
+    info = path.stat()
+    return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
+
+
+def rewrite_uac_manifest(path: Path, manifest: dict, expected_original_manifest: dict) -> None:
+    """Atomically replace only a UAC manifest while byte-copying its payload."""
+    if path.is_symlink() or not path.is_file():
+        raise UACError(f"Refusing to rewrite a symlink or non-file: {path}")
+    identity_before_read = filesystem_identity(path)
+    original_manifest, payload_offset, payload_size, _, _, _ = read_uac(path, verify_payload=False)
+    if filesystem_identity(path) != identity_before_read:
+        raise UACError(f"UAC changed while its manifest was being read: {path}")
+    if original_manifest != expected_original_manifest:
+        raise UACError(f"UAC manifest changed after the collection scan: {path}")
+    if manifest.get("payload") != original_manifest.get("payload"):
+        raise UACError("Manifest-only updates may not alter payload metadata.")
+    try:
+        manifest_data = json.dumps(
+            manifest,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    except (TypeError, ValueError) as error:
+        raise UACError(f"Updated manifest is not valid JSON: {error}") from error
+    if not (0 < len(manifest_data) <= UAC_MAX_MANIFEST_SIZE):
+        raise UACError("Updated manifest exceeds the 16 MiB reader limit.")
+
+    zstd = shutil.which("zstd")
+    compressed_manifest = compress_manifest(zstd, manifest_data) if zstd else None
+    if compressed_manifest is None:
+        stored_manifest = manifest_data
+    else:
+        stored_manifest = UAC_MANIFEST_ZSTD_MAGIC + struct.pack("<I", len(manifest_data)) + compressed_manifest
+    metadata_frame = (
+        UAC_METADATA_MAGIC
+        + struct.pack("<HH", 1, 0)
+        + hashlib.sha256(manifest_data).digest()
+        + stored_manifest
+    )
+    if len(metadata_frame) > 0xFFFFFFFF:
+        raise UACError("Updated UAC metadata frame exceeds its 32-bit framing limit.")
+    header = struct.pack("<II", UAC_SKIPPABLE_MAGIC, len(metadata_frame)) + metadata_frame
+    expected_payload_hash = original_manifest.get("payload", {}).get("blake3")
+    hasher = blake3.blake3()
+    mode = stat.S_IMODE(path.stat().st_mode)
+    staging_fd, staging_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".uac-tmp", dir=path.parent)
+    staging = Path(staging_name)
+    try:
+        os.fchmod(staging_fd, mode)
+        with os.fdopen(staging_fd, "wb") as target, path.open("rb") as source:
+            if filesystem_identity(path) != identity_before_read:
+                raise UACError(f"UAC changed before its payload was copied: {path}")
+            source.seek(payload_offset)
+            target.write(header)
+            while True:
+                chunk = source.read(1024 * 1024)
+                if not chunk:
+                    break
+                target.write(chunk)
+                hasher.update(chunk)
+            if source.tell() - payload_offset != payload_size:
+                raise UACError(f"UAC payload length changed while copying: {path}")
+            if filesystem_identity(path) != identity_before_read:
+                raise UACError(f"UAC changed while its payload was copied: {path}")
+            if hasher.hexdigest() != expected_payload_hash:
+                raise UACError(f"Copied payload BLAKE3 does not match the source manifest: {path}")
+            target.flush()
+            os.fsync(target.fileno())
+
+        staged_manifest, staged_offset, staged_payload_size, _, _, _ = read_uac(staging, verify_payload=False)
+        if staged_manifest != manifest or staged_payload_size != payload_size:
+            raise UACError(f"Staged UAC did not validate as the requested metadata-only update: {path}")
+        if staged_offset + staged_payload_size != staging.stat().st_size:
+            raise UACError(f"Staged UAC has an invalid payload boundary: {path}")
+        if filesystem_identity(path) != identity_before_read:
+            raise UACError(f"UAC changed before the metadata update could be committed: {path}")
+        os.replace(staging, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        staging.unlink(missing_ok=True)
+
+
+def enrich_set_metadata(args: argparse.Namespace) -> None:
+    root = Path(args.root).expanduser().absolute()
+    if not root.is_dir():
+        raise UACError(f"UAC collection root is not a directory: {root}")
+    counts = {"scanned": 0, "updated": 0, "alreadyPresent": 0, "unmapped": 0, "errors": 0}
+    errors: list[dict[str, str]] = []
+    for path in sorted(root.rglob("*.uac")):
+        if path.is_symlink() or not path.is_file():
+            continue
+        counts["scanned"] += 1
+        try:
+            manifest, _, _, _, _, _ = read_uac(path, verify_payload=False)
+            original_manifest = json.loads(json.dumps(manifest, ensure_ascii=False))
+            game = manifest.get("game")
+            metadata = game.get("metadata", {}) if isinstance(game, dict) else {}
+            if isinstance(metadata, dict) and "set" in metadata:
+                if not refresh_project2612_set_metadata(manifest):
+                    counts["alreadyPresent"] += 1
+                    continue
+            elif not add_source_set_metadata(manifest):
+                counts["unmapped"] += 1
+                continue
+            if args.apply:
+                rewrite_uac_manifest(path, manifest, original_manifest)
+            counts["updated"] += 1
+        except (OSError, UACError, ValueError, TypeError, AttributeError) as error:
+            counts["errors"] += 1
+            if len(errors) < 100:
+                errors.append({"path": str(path), "error": str(error)})
+    print(json.dumps({"root": str(root), "mode": "apply" if args.apply else "dry-run", **counts, "errors": errors}, ensure_ascii=False, indent=2))
 
 
 def inspect(args: argparse.Namespace) -> None:
@@ -1301,11 +1945,21 @@ def verify_tar_members(manifest: dict, tar_path: Path) -> list[tarfile.TarInfo]:
             if source is None:
                 raise UACError(f"Cannot read TAR member: {member.name}")
             hasher = blake3.blake3()
+            checksum = 0
             with source:
                 for block in iter(lambda: source.read(1024 * 1024), b""):
                     hasher.update(block)
+                    checksum = zlib.crc32(block, checksum)
             if hasher.hexdigest() != record.get("blake3"):
                 raise UACError(f"Raw member BLAKE3 mismatch: {member.name}")
+            expected_crc = next((
+                item.get("digest") for item in record.get("hashes", [])
+                if isinstance(item, dict)
+                and item.get("scope") == "raw-member"
+                and item.get("algorithm") == "crc32-iso-hdlc"
+            ), None)
+            if expected_crc is not None and expected_crc != f"{checksum & 0xFFFFFFFF:08X}":
+                raise UACError(f"Raw member CRC32 mismatch: {member.name}")
         return members
 
 
@@ -1348,9 +2002,21 @@ def unpack(args: argparse.Namespace) -> None:
                     os.chmod(destination, 0o644)
                     stream_digest_value = record.get("streamBlake3")
                     if stream_digest_value and record.get("role") == "playable":
-                        actual, _ = stream_digest(destination, "." + str(record.get("format") or ""), record["blake3"])
+                        actual, _, stream_crc32 = stream_digest(
+                            destination,
+                            "." + str(record.get("format") or ""),
+                            record["blake3"],
+                        )
                         if actual != stream_digest_value:
                             raise UACError(f"Playable-payload BLAKE3 mismatch: {member.name}")
+                        expected_crc = next((
+                            item.get("digest") for item in record.get("hashes", [])
+                            if isinstance(item, dict)
+                            and item.get("scope") == "playable-payload"
+                            and item.get("algorithm") == "crc32-iso-hdlc"
+                        ), None)
+                        if expected_crc is not None and expected_crc != f"{stream_crc32 & 0xFFFFFFFF:08X}":
+                            raise UACError(f"Playable-payload CRC32 mismatch: {member.name}")
             if not args.omit_manifest:
                 sidecar = staging / "manifest.json"
                 sidecar.write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -1388,7 +2054,8 @@ def parser() -> argparse.ArgumentParser:
         nargs=2,
         metavar=("EXTENSION", "UACMAN_METADATA_CLI"),
         help=(
-            "Read a MetaMan-supported single-track format before writing the manifest; "
+            "Read a MetaMan-supported format before writing the manifest; "
+            "track-aware results become ordered subsong playlist entries; "
             "may be repeated for different extensions (SPC keeps its specialized option)."
         ),
     )
@@ -1407,7 +2074,7 @@ def parser() -> argparse.ArgumentParser:
         "--metadata-format",
         action="append",
         metavar="EXTENSION",
-        help="Also harvest this MetaMan-supported single-track format; may be repeated (SPC is included by default).",
+        help="Also harvest this MetaMan-supported format; track-aware results become subsong entries (SPC is included by default).",
     )
     source_tree_parser.add_argument("--level", type=int, default=3, help="Zstandard level 0-22 (default: 3).")
     source_tree_parser.add_argument("--frame-size", type=int, default=4194304, help="Maximum seek frame size in bytes (default: 4 MiB).")
@@ -1418,6 +2085,14 @@ def parser() -> argparse.ArgumentParser:
     inspect_parser.add_argument("container")
     inspect_parser.add_argument("--verify", action="store_true")
     inspect_parser.set_defaults(run=inspect)
+
+    enrich_sets_parser = commands.add_parser(
+        "enrich-sets",
+        help="Add source-backed game.metadata.set records or refresh the retired Project2612 links.",
+    )
+    enrich_sets_parser.add_argument("root", help="Collection directory to scan recursively for .uac files.")
+    enrich_sets_parser.add_argument("--apply", action="store_true", help="Apply updates; without this flag, report a dry run.")
+    enrich_sets_parser.set_defaults(run=enrich_set_metadata)
 
     unpack_parser = commands.add_parser("unpack", help="Verify and extract every listed member; metadata is emitted by default.")
     unpack_parser.add_argument("container")

@@ -315,7 +315,7 @@ struct OptionsView: View {
 
             tempoRow(
                 title: "libgme",
-                detail: "SPC, NSF/NSFE, GBS, HES, KSS, AY, and SAP",
+                detail: "SPC, NSF/NSFE, GBS, HES, KSS, and AY",
                 enabled: Binding(
                     get: { model.libgmeTempoEnabled },
                     set: { model.setLibGmeTempoEnabled($0) }
@@ -653,7 +653,7 @@ struct OptionsView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(status.hasPrefix("Database not selected") ? .red : .secondary)
                 } else {
-                    Text("CocoaSpice reads this schema-23 catalog. ScanSong owns scan paths, scanning, link checks, and cleanup.")
+                    Text("CocoaSpice reads this schema-24 catalog. ScanSong owns scan paths, scanning, link checks, and cleanup.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -667,8 +667,6 @@ struct OptionsView: View {
                 .controlSize(.regular)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .disabled(model.localBrowserEnabled)
-            .opacity(model.localBrowserEnabled ? 0.55 : 1)
 
             sectionCard(title: "Favorites") {
                 Toggle(isOn: Binding(
@@ -685,25 +683,6 @@ struct OptionsView: View {
                 .toggleStyle(.checkbox)
             }
 
-            sectionCard(title: "Local Files") {
-                Toggle(isOn: Binding(
-                    get: { model.localBrowserEnabled },
-                    set: { model.setLocalBrowserEnabled($0) }
-                )) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Use Local Files")
-                        Text("Browse one folder directly. The database library is disabled while this is on.")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .toggleStyle(.checkbox)
-
-                pathBar(
-                    path: model.localBrowserPath.isEmpty ? "No local folder selected" : model.localBrowserPath,
-                    browse: model.chooseLocalBrowserRoot
-                )
-            }
         }
         .onAppear {
             model.refreshArchiveCacheSummary()

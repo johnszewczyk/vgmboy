@@ -6,6 +6,15 @@ SOURCE_BUILD_ROOT="$ROOT_DIR/.build"
 DEPENDENCY_ROOT="$ROOT_DIR/.build/dependencies"
 STAMP_ROOT="$ROOT_DIR/.build/dependency-stamps"
 
+# CMake otherwise discovers the Command Line Tools SDK, which can be newer
+# than the Xcode toolchain used by SwiftPM and fail while linking its compiler
+# probe. Keep all vendored C/C++ dependencies on the same Xcode SDK as the
+# native app builds.
+if [[ -d /Applications/Xcode.app/Contents/Developer ]]; then
+    export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+    export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+fi
+
 [[ -f "$ROOT_DIR/Package.swift" ]] || {
     echo "Missing VGMBoy package: $ROOT_DIR" >&2
     exit 1

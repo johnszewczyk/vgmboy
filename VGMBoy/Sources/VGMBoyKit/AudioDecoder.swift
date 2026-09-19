@@ -47,6 +47,8 @@ enum DecoderFactory {
         switch family.id {
         case "libgme":
             return try GMEDecoder(path: path, sampleRate: sampleRate)
+        case "asap":
+            return try ASAPDecoder(path: path, sampleRate: sampleRate)
         case "sidplayfp":
             return try SIDDecoder(path: path, sampleRate: sampleRate)
         case "openmpt":
@@ -82,6 +84,10 @@ enum DecoderFactory {
 
     static func make(path: String, sourceData: Data? = nil, sampleRate: Int = 44_100) throws -> any AudioDecoder {
         if let sourceData {
+            if URL(fileURLWithPath: path).pathExtension.caseInsensitiveCompare("sap") == .orderedSame,
+               FormatRegistry.family(for: path)?.id == "asap" {
+                return try ASAPDecoder(data: sourceData, filename: URL(fileURLWithPath: path).lastPathComponent, sampleRate: sampleRate)
+            }
             guard URL(fileURLWithPath: path).pathExtension.lowercased() == "spc",
                   FormatRegistry.family(for: path)?.id == "libgme" else {
                 throw DecoderFactoryError.unsupportedFamily("in-memory \(URL(fileURLWithPath: path).pathExtension)")

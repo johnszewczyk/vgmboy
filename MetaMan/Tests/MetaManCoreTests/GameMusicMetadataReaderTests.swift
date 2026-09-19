@@ -78,6 +78,63 @@ func nsfeReaderPreservesOrderedTrackDocumentsAndSourceFacts() throws {
     }
 }
 
+@Test("GBS extended M3U companions add authored track titles and timing")
+func gbsReaderProjectsNEZPlugPlaylistMetadata() throws {
+    let m3u = """
+    # @TITLE Fixture Album
+    # @ARTIST Test Publisher
+    # @COMPOSER Test Composer
+    # @DATE 2000-01-02
+
+    fixture.gbs::GBS,0,Opening\\, theme,0:42,0:20,0:05,3
+    other.gbs::GBS,1,Unrelated,1:00,,10
+    """
+    let context = MetadataReadContext(companionFiles: [
+        MetadataCompanionFile(relativePath: "01 Opening.m3u", data: Data(m3u.utf8))
+    ])
+    let result = try MetaManCore.readResult(
+        data: makeGBS(),
+        formatHint: "gbs",
+        displayName: "fixture.gbs",
+        context: context
+    )
+
+    #expect(result.tracks.count == 2)
+    let first = result.tracks[0].document
+    #expect(first.fields.title == "Opening, theme")
+    #expect(first.fields.game == "Fixture Album")
+    #expect(first.fields.artist == "Test Publisher")
+    #expect(first.fields.date == "2000-01-02")
+    #expect(first.timing == MetadataTiming(introLengthMs: -1, loopLengthMs: 20_000, playLengthMs: 42_000, fadeLengthMs: 5_000))
+    #expect(first.technicalFacts["m3uLoopCount"] == "3")
+    #expect(first.technicalFacts["m3uSourcePath"] == "01 Opening.m3u")
+    #expect(first.rawMetadataBlocks?["companion-m3u"] == Data(m3u.utf8))
+    #expect(first.tags.contains(MetadataTag(name: "COMPOSER", value: "Test Composer")))
+    #expect(result.tracks[1].document.fields.title == nil)
+    #expect(result.tracks[1].document.fields.game == "Fixture Album")
+    #expect(result.tracks[1].document.fields.artist == "Test Publisher")
+}
+
+@Test("GBS file-URL reads discover sibling NEZPlug playlists")
+func gbsFileURLReadDiscoversSiblingPlaylists() throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("metaman-gbs-m3u-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let gbsURL = root.appendingPathComponent("fixture.gbs")
+    let source = makeGBS()
+    try source.write(to: gbsURL)
+    try "fixture.gbs::GBS,0,File URL Track,1:23,,5\n"
+        .write(to: root.appendingPathComponent("01 File URL Track.m3u"), atomically: true, encoding: .utf8)
+
+    let result = try MetaManCore.readResult(fileURL: gbsURL)
+    #expect(result.tracks[0].document.fields.title == "File URL Track")
+    #expect(result.tracks[0].document.timing?.playLengthMs == 83_000)
+    #expect(result.tracks[0].document.technicalFacts["m3uSourcePath"] == "01 File URL Track.m3u")
+    #expect(try Data(contentsOf: gbsURL) == source)
+}
+
 @Test("NSF, GBS, and NSFE reject malformed headers and chunk boundaries")
 func gameMusicReadersRejectMalformedSources() throws {
     #expect(throws: MetadataReadError.self) {

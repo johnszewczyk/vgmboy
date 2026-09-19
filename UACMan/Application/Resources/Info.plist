@@ -9,7 +9,7 @@
 	<key>CFBundleExecutable</key>
 	<string>UACManApp</string>
 	<key>CFBundleIdentifier</key>
-	<string>org.audioman.UACMan</string>
+	<string>org.vgmman.UACMan</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -22,15 +22,17 @@
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
-	<key>UTImportedTypeDeclarations</key>
+	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
+			<key>UTTypeIconFile</key>
+			<string>UACDocumentIcon.icns</string>
 			<key>UTTypeConformsTo</key>
 			<array><string>public.data</string></array>
 			<key>UTTypeDescription</key>
 			<string>Universal Audio Container</string>
 			<key>UTTypeIdentifier</key>
-			<string>org.audioman.uac</string>
+			<string>org.vgmman.uac</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
@@ -43,12 +45,14 @@
 		<dict>
 			<key>CFBundleTypeName</key>
 			<string>UAC Package</string>
+			<key>CFBundleTypeIconFile</key>
+			<string>UACDocumentIcon.icns</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
 			<string>Alternate</string>
 			<key>LSItemContentTypes</key>
-			<array><string>org.audioman.uac</string></array>
+			<array><string>org.vgmman.uac</string></array>
 		</dict>
 	</array>
 </dict>

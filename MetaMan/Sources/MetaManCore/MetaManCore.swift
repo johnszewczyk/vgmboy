@@ -22,7 +22,7 @@ public enum MetaManCore {
         MetadataFormatDescriptor(
             identifier: "gbs",
             fileExtensions: ["gbs"],
-            methodology: "Direct fixed-header reader for identity, timer/address facts, and declared tracks; no playback decoder or Game Boy emulation is started."
+            methodology: "Direct fixed-header reader plus bounded NEZplug M3U sidecar projection for track names/timing; no playback decoder or Game Boy emulation is started."
         ),
         MetadataFormatDescriptor(
             identifier: "nsfe",
@@ -53,6 +53,16 @@ public enum MetaManCore {
             identifier: "vgm",
             fileExtensions: ["vgm", "vgz"],
             methodology: "Direct VGM header and complete GD3 parser; gzip input is inflated with a 256 MiB output bound; no playback decoder."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "mdx",
+            fileExtensions: ["mdx"],
+            methodology: "Reads the clear Shift-JIS title/PDX reference and walks uncompressed X68000 MML commands for bounded timing without audio synthesis; LZX-compressed bodies have no MetaMan timing."
+        ),
+        MetadataFormatDescriptor(
+            identifier: "mod-protracker",
+            fileExtensions: ["mod"],
+            methodology: "Reads bounded 31-sample ProTracker-family MOD headers, title/sample names, pattern orders, channels, and payload bounds without opening libopenmpt; unidentified MOD dialects are not claimed."
         ),
         MetadataFormatDescriptor(
             identifier: "uac",
@@ -208,6 +218,12 @@ public enum MetaManCore {
         if fileURL.pathExtension.caseInsensitiveCompare("uac") == .orderedSame {
             throw MetadataReadError.trackAwareResultRequired("UAC")
         }
+        if fileURL.pathExtension.caseInsensitiveCompare("mdx") == .orderedSame {
+            return try MDXMetadataReader.read(fileURL: fileURL)
+        }
+        if fileURL.pathExtension.caseInsensitiveCompare("mod") == .orderedSame {
+            return try MODMetadataReader.read(fileURL: fileURL)
+        }
         if StandardAudioMetadataReader.supportedExtensions.contains(fileURL.pathExtension.lowercased()) {
             return try StandardAudioMetadataReader.read(fileURL: fileURL)
         }
@@ -274,6 +290,14 @@ public enum MetaManCore {
                 decompressManifestFrame: decompressContainerManifestFrame
             )
         }
+        if formatHint == "mdx" {
+            let document = try MDXMetadataReader.read(fileURL: fileURL)
+            return MetadataReadResult(tracks: [MetadataTrack(document: document)])
+        }
+        if formatHint == "mod" {
+            let document = try MODMetadataReader.read(fileURL: fileURL)
+            return MetadataReadResult(tracks: [MetadataTrack(document: document)])
+        }
         if StandardAudioMetadataReader.supportedExtensions.contains(formatHint) {
             let document = try StandardAudioMetadataReader.read(fileURL: fileURL)
             return MetadataReadResult(tracks: [MetadataTrack(document: document)])
@@ -322,7 +346,7 @@ public enum MetaManCore {
         }
         if formatHint != "svag" {
             let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
-            let resolvedContext = try contextIncludingHESPlaylist(for: fileURL, context: context)
+            let resolvedContext = try contextIncludingFormatPlaylist(for: fileURL, context: context)
             return try readResult(
                 data: data,
                 formatHint: formatHint,
@@ -346,6 +370,14 @@ public enum MetaManCore {
         let normalizedFormat = format?.isEmpty == false ? format : nil
         if normalizedFormat == "uac" {
             throw MetadataReadError.malformedFile("UAC is a file-URL container; use readResult(fileURL:) to read its bounded manifest.")
+        }
+        if normalizedFormat == "mdx" || (normalizedFormat == nil && MDXMetadataReader.matches(data)) {
+            let document = try MDXMetadataReader.read(data: data, displayName: displayName)
+            return MetadataReadResult(tracks: [MetadataTrack(document: document)])
+        }
+        if normalizedFormat == "mod" || (normalizedFormat == nil && MODMetadataReader.matches(data)) {
+            let document = try MODMetadataReader.read(data: data, displayName: displayName)
+            return MetadataReadResult(tracks: [MetadataTrack(document: document)])
         }
         if normalizedFormat == "genh" || (normalizedFormat == nil && GENHMetadataReader.matches(data)) {
             let document = try GENHMetadataReader.read(data: data, displayName: displayName)
@@ -385,7 +417,8 @@ public enum MetaManCore {
             return try GameMusicMetadataReader.readResult(
                 data: data,
                 formatHint: normalizedFormat,
-                displayName: displayName
+                displayName: displayName,
+                context: context
             )
         }
         if normalizedFormat == "ay" || (normalizedFormat == nil && AYMetadataReader.matches(data)) {
@@ -393,6 +426,9 @@ public enum MetaManCore {
         }
         if normalizedFormat == "sap" || (normalizedFormat == nil && SAPMetadataReader.matches(data)) {
             return try SAPMetadataReader.readResult(data: data, displayName: displayName)
+        }
+        if normalizedFormat == "sid" || (normalizedFormat == nil && SIDMetadataReader.matches(data)) {
+            return try SIDMetadataReader.readResult(data: data, displayName: displayName ?? "SID")
         }
         if normalizedFormat == "bika" || (normalizedFormat == nil && BinkAudioMetadataReader.matches(data)) {
             return try BinkAudioMetadataReader.readResult(data: data, displayName: displayName)
@@ -427,6 +463,7 @@ public enum MetaManCore {
         case "mib": MIBMetadataReader.supports(fileURL: fileURL)
         case "bika": BinkAudioMetadataReader.supports(fileURL: fileURL)
         case "adp": ADPMetadataReader.supports(fileURL: fileURL)
+        case "mod": MODMetadataReader.supports(fileURL: fileURL)
         case "ahx": AHXMetadataReader.supports(fileURL: fileURL)
         case "dvi": DVIMetadataReader.supports(fileURL: fileURL)
         case "dsp", "thp": NintendoDSPMetadataReader.supports(fileURL: fileURL)
@@ -450,6 +487,14 @@ public enum MetaManCore {
         let cleanedHint = formatHint?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let format = cleanedHint.map { $0.hasPrefix(".") ? String($0.dropFirst()) : $0 }
         let normalizedFormat = format?.isEmpty == false ? format : nil
+
+        if normalizedFormat == "mdx" || (normalizedFormat == nil && MDXMetadataReader.matches(data)) {
+            return try MDXMetadataReader.read(data: data, displayName: displayName)
+        }
+
+        if normalizedFormat == "mod" || (normalizedFormat == nil && MODMetadataReader.matches(data)) {
+            return try MODMetadataReader.read(data: data, displayName: displayName)
+        }
 
         if normalizedFormat == "agsc" || (normalizedFormat == nil && AGSCMetadataReader.matches(data)) {
             let result = try AGSCMetadataReader.readResult(data: data, displayName: displayName)
@@ -652,10 +697,13 @@ public enum MetaManCore {
         throw MetadataReadError.unsupportedFormat(normalizedFormat ?? "unknown content")
     }
 
-    private static func contextIncludingHESPlaylist(
+    private static func contextIncludingFormatPlaylist(
         for fileURL: URL,
         context: MetadataReadContext
     ) throws -> MetadataReadContext {
+        if fileURL.pathExtension.caseInsensitiveCompare("gbs") == .orderedSame {
+            return try contextIncludingGBSPlaylists(for: fileURL, context: context)
+        }
         guard fileURL.pathExtension.caseInsensitiveCompare("hes") == .orderedSame,
               !context.containsCompanion(beside: fileURL.lastPathComponent, fileExtension: "m3u") else {
             return context
@@ -683,5 +731,50 @@ public enum MetaManCore {
         return context.appending(
             MetadataCompanionFile(relativePath: playlistURL.lastPathComponent, data: data)
         )
+    }
+
+    private static func contextIncludingGBSPlaylists(
+        for fileURL: URL,
+        context: MetadataReadContext
+    ) throws -> MetadataReadContext {
+        guard !context.companionFiles.contains(where: {
+            URL(fileURLWithPath: $0.relativePath).pathExtension.caseInsensitiveCompare("m3u") == .orderedSame
+        }) else { return context }
+
+        let directoryURL = fileURL.deletingLastPathComponent()
+        let children = try FileManager.default.contentsOfDirectory(
+            at: directoryURL,
+            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey],
+            options: [.skipsHiddenFiles]
+        )
+        let gbsFiles = children.filter { $0.pathExtension.caseInsensitiveCompare("gbs") == .orderedSame }
+        // Per-game distributions commonly place one GBS file beside many
+        // one-track M3Us. Avoid scanning a whole set directory once per GBS.
+        guard gbsFiles.count == 1 else { return context }
+        let playlists = children.filter { $0.pathExtension.caseInsensitiveCompare("m3u") == .orderedSame }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        guard !playlists.isEmpty else { return context }
+        guard playlists.count <= 4_096 else {
+            throw MetadataReadError.malformedFile("GBS companion M3U directory has too many files: \(fileURL.lastPathComponent)")
+        }
+
+        var totalBytes: UInt64 = 0
+        var companions: [MetadataCompanionFile] = []
+        for playlistURL in playlists {
+            let values = try playlistURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+            guard values.isRegularFile == true, values.isSymbolicLink != true,
+                  let size = values.fileSize, size >= 0, size <= 4 * 1024 * 1024 else {
+                throw MetadataReadError.malformedFile("GBS companion M3U is not a bounded regular file: \(playlistURL.lastPathComponent)")
+            }
+            totalBytes += UInt64(size)
+            guard totalBytes <= 32 * 1024 * 1024 else {
+                throw MetadataReadError.malformedFile("GBS companion M3U set exceeds the 32 MiB limit: \(fileURL.lastPathComponent)")
+            }
+            companions.append(MetadataCompanionFile(
+                relativePath: playlistURL.lastPathComponent,
+                data: try Data(contentsOf: playlistURL, options: [.mappedIfSafe])
+            ))
+        }
+        return MetadataReadContext(companionFiles: companions)
     }
 }

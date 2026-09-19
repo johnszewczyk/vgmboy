@@ -17,8 +17,8 @@ executables.
 - ScanSong consumes the local sibling `MetaManCore` Swift package for APE, ADX,
   AUS, ATRAC3, Sony MSF/SSHD/XA, headerless PlayStation MIB, Nintendo DTK and
   TXTH-described IMA ADP, CRI AHX, Konami Saturn DVI, Konami/SNK SVAG and XMD,
-  Nintendo DSP/RS03/THP, Nintendo DS STRM, SID, SPC, SNDH, S98, VGM/VGZ,
-  UAC, PSF-family, GSF, and QSF metadata. MetaManCore owns bounded VGZ gzip
+  Nintendo DSP/RS03/THP, Nintendo DS STRM, SAP, SID, SPC, SNDH, S98, VGM/VGZ,
+  MOD, MDX, UAC, PSF-family, GSF, and QSF metadata. MetaManCore owns bounded VGZ gzip
   expansion and UAC manifest interpretation; ScanSong supplies the bounded
   Zstandard callback for compressed UAC manifests. MetaManCore has no VGMBoy,
   ScanSong, or playback-decoder dependency; test-only libvgm comparisons stay
@@ -35,8 +35,10 @@ executables.
   `vgmboy-mdx-inspect`,
   `vgmboy-amiga-inspect` product at the paths
   expected by the scanner adapters.
-- `build-app.sh` removes `.build` before a release build so stale scanner binaries cannot survive
-  a fresh packaging run.
+- `build-app.sh` recreates the app bundle before each packaging run so stale
+  scanner binaries or resources cannot survive. Normal builds retain SwiftPM's
+  derived objects for incremental compilation; set `SCANSONG_CLEAN_BUILD=1` to
+  remove `.build` and force a clean release build.
 - The VGMBoy scanner-plugin helper creates its destination before copying
   helpers, pins CMake to the active Xcode macOS SDK, and includes that SDK path
   in the build signature. This keeps CMake's compiler test on the same SDK as
@@ -114,8 +116,14 @@ executables.
 - SNDH metadata is read through MetaManCore, including its bounded ICE!
   expansion. The old `VGMBoySNDH` API is retained only by ScanSong tests as a
   reader oracle; PSGPlay remains in VGMBoy for playback.
-- MDX metadata is read through the VGMBoy-built `vgmboy-mdx-inspect` process;
-  ScanSong owns only route registration and catalog projection.
+- MDX title, PDX-reference metadata, and uncompressed MML timing are read by
+  MetaManCore from the source. ScanSong uses the VGMBoy-built
+  `vgmboy-mdx-inspect` process only to validate mdxmini acceptance and its
+  dependency path; the helper returns no metadata or timing. LZX-compressed
+  MDX bodies have no MetaMan timing yet.
+- Recognized 31-sample ProTracker-family MOD metadata is read by MetaManCore;
+  unrecognized MOD dialects and other OpenMPT formats remain metadata-free
+  structural rows until their complete readers are covered.
 - Amiga metadata is read through the VGMBoy-built `vgmboy-amiga-inspect` process;
   ScanSong owns only prefix admission, archive materialization, and catalog projection.
 - APE metadata is read by MetaManCore's direct header/tag reader; FFmpeg

@@ -64,5 +64,4 @@ knowledge.
 - [PlayerViewModel.swift](../../Sources/CocoaSpice/App/PlayerViewModel.swift)
 - [FrontendPreferencesCoordinator.swift](../../Sources/CocoaSpice/App/FrontendPreferencesCoordinator.swift)
 - [FavoritesCoordinator.swift](../../Sources/CocoaSpice/App/FavoritesCoordinator.swift)
-- [LocalBrowserCoordinator.swift](../../Sources/CocoaSpice/App/LocalBrowserCoordinator.swift)
 - [PlaylistQueueCoordinator.swift](../../Sources/CocoaSpice/App/PlaylistQueueCoordinator.swift)

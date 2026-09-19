@@ -42,9 +42,8 @@ and text colors with the contrast they want. Active toolbar and option controls
 use the same accent surface.
 
 `FrontendOptionsManifest` provides the common Database, Interface, and Windows
-organization through the bridge. `options-controller.js` applies that manifest,
-`playlist-controller.js` reduces selection, and `sidebar-controller.js` forwards
-browser-tree row gestures to the native shared reducer. `app-ui.js` remains the
+organization through the bridge. `options-controller.js` applies that manifest
+and `playlist-controller.js` reduces selection. `app-ui.js` remains the
 renderer and event wiring layer rather than the owner of those policies.
 Database Console → Game group disclosure and selection also pass through the
 shared `CatalogBrowserGroupState` reducer through its direct
@@ -206,12 +205,11 @@ round-trip or debounce. Native remains responsible for publishing and
 refreshing the authoritative game projection; WebKit does not scan paths or
 decode metadata to answer search input.
 
-Database Files are native-owned in the same way:
-`CatalogBrowserCore.CatalogFileTreeIndex.nodes()` supplies the complete nested
-folder/file projection through `databaseFileTree`. JavaScript maps those
-records into its existing DOM node shape and owns only renderer-local browser
-paths, disclosure, focus, scroll, and context-menu behavior. The former
-`buildCatalogFileTree` graph constructor must not return.
+SPCBoyWK is database-only with two catalog projections: Console View and a
+read-only Path View. The maintained sidebar does not expose a local folder
+browser or an Open Path flow. ScanSong remains responsible for scanning and
+publishing the catalog; SPCBoyWK reads it and sends playable identities to
+VGMBoy.
 
 The shared catalog order is the initial playlist order. WebKit does not sort a
 catalog projection merely because it measures columns or renders a header; a
@@ -348,5 +346,4 @@ raw filesystem scanning or a second catalog implementation.
 - `../../Sources/SPCBoyWK/Resources/app-ui.js`
 - `../../Sources/SPCBoyWK/Resources/options-controller.js`
 - `../../Sources/SPCBoyWK/Resources/playlist-controller.js`
-- `../../Sources/SPCBoyWK/Resources/sidebar-controller.js`
 - `../../../FrontendCore/Sources/PlaybackQueueCore/PlaybackQueueNavigation.swift`

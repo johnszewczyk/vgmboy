@@ -7,17 +7,18 @@ this page records what each input does at the VGMBoy and ScanSong boundaries.
 It describes the current implementation, not a claim that every file in a
 format family is playable.
 
-Last reviewed: **2026-09-15**
+Last reviewed: **2026-09-17**
 
 ## Decoder matrix
 
 | ID | Source/version | Playback bridge | ScanSong boundary | Formats and special data |
 | --- | --- | --- | --- | --- |
-| `libgme` | Game Music Emu 0.6.5 through Homebrew | `CGameMusicEmu` | ScanSong tests only as a parity oracle; no production scanner link | Playback supports AY, GBS, HES, KSS, NSF, NSFE, SAP, SPC |
+| `libgme` | Game Music Emu 0.6.5 through Homebrew | `CGameMusicEmu` | ScanSong tests only as a parity oracle; no production scanner link | Playback supports AY, GBS, HES, KSS, NSF, NSFE, SPC |
+| `asap` | ASAP 8.0.0 from vendored ZXTune revision `c93e81d081685ea2c7cd21fe0077e93d84b4d88d` | `VGMBoyCASAP` / `ASAPDecoder` | None; ScanSong uses MetaManCore for SAP fields | SAP TYPE B/C/D/S; long play, native speed only; GPL-2.0-or-later |
 | `MetaManCore` | Sibling decoder-independent metadata package | None | Shared direct metadata route | AY, SAP, NSF/GBS/NSFE, HES/M3U, SNDH/ICE!, GSF/miniGSF, SID, SPC, S98, VGM/VGZ, PSF-family tags, and supported stream headers |
 | `libvgm` | `867223e7c33d63de115d1ab955f784c44f19040a` | `CLibVGM` | Native libVGM route | GYM, S98, DRO |
 | `psgplay` | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | `CPSGPlay` | VGMBoy playback; legacy metadata API is test-only oracle | Atari ST SNDH playback; ScanSong production metadata is read by MetaManCore |
-| `mdxmini` | `003531a471c1955f4ed4357d0e2a6cba809c34a0` plus vendored LZX code | `CMDX` | `vgmboy-mdx-inspect` | X68000 MDX and PDX; sibling banks, legacy `\name`, inner LZX 0.32/0.42 |
+| `mdxmini` | `003531a471c1955f4ed4357d0e2a6cba809c34a0` plus vendored LZX code | `CMDX` | `vgmboy-mdx-inspect` (open/dependency validation only; metadata timing is MetaMan-owned) | X68000 MDX and PDX; sibling banks, legacy `\name`, inner LZX 0.32/0.42 |
 | `uade` | Homebrew UADE 3.05 | `CUADE` | `vgmboy-amiga-inspect` | Amiga EaglePlayer modules, TFMX, MED, and prefix-led replayers |
 | `vgmstream` | `807b4948cfc1de0cd90e377e9c56f74664c54a1c` plus compatibility patch | `CVGmstream` | Bundled `vgmstream-cli` | Console streamed audio, TXTP, HD/HBD/IECS-related routes |
 | `lazyusf2` | `421f00bcaa1988b8e1825e91780129f24fbd1aa0` | `CLazyUSF` | Native dependency-aware route | USF and miniUSF; `.usflib` companions |
@@ -40,14 +41,25 @@ boundary where required.
 
 ### Game Music Emu (`libgme`)
 
-AY, HES, KSS, SAP, SPC, NSF/GBS, and NSFE all have direct metadata routes in
+AY, HES, KSS, SPC, NSF/GBS, and NSFE all have direct metadata routes in
 ScanSong. AY's relative-pointer subtune table, HES header/M3U mapping, and
-SAP's directive-header data are read without starting a core. SPC ID666/xID6 tags and tagless info-only defaults are read
+SPC ID666/xID6 tags and tagless info-only defaults are read
 through MetaManCore; the production ScanSong library, CLI, and app do not link
 libgme. Tests retain it only as a reader-parity oracle. SPC playback remains
 owned by VGMBoy's libgme integration. NSF/GBS headers have no authored
 per-track names or finite timing, so their direct scanner route preserves the
 documented unknown/default timing policy.
+
+### ASAP (`asap`)
+
+SAP playback uses the vendored ASAP 8.0.0 C implementation from
+`vendor/zxtune/3rdparty/asap/asap.c`, behind the narrow `VGMBoyCASAP` bridge.
+ASAP handles SAP TYPE B/C/D/S; this is required for TYPE D and TYPE S, which
+the installed libgme 0.6.5 rejects. The shared registry marks SAP as native
+speed with Long Play enabled. ScanSong reads SAP fields through MetaManCore and
+does not link or call the playback decoder. A live fixture check opens and
+renders non-silent PCM from one ASMA sample of each type; audio-device output
+has not been qualified by that decoder test.
 
 NSFE scanner metadata is fully extracted from its chunk structure. The direct
 reader validates INFO/DATA/NEND, preserves AUTH/TLBL/TAUT/TIME/FADE/TEXT and

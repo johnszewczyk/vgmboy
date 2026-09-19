@@ -343,11 +343,90 @@ body.is-file-drag-over::after {
 
 .content {
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-height: 0;
   overflow: hidden;
   background: var(--bg-panel);
 }
+
+.playlist-tabs-toolbar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: calc(var(--top-toolbar-control-height) + var(--top-toolbar-inset));
+  min-width: 0;
+  overflow: hidden;
+  padding: var(--top-toolbar-inset) var(--top-toolbar-inset) 0;
+  background: var(--bg-sidebar);
+}
+
+.playlist-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--toolbar-gap);
+  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--top-toolbar-control-height);
+  overflow: hidden;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.playlist-tabs::-webkit-scrollbar { display: none; }
+
+.playlist-tab {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: var(--toolbar-gap);
+  min-width: 0;
+  height: var(--top-toolbar-control-height);
+  overflow: hidden;
+  border: 1px solid rgb(30 30 30);
+  border-radius: var(--control-radius);
+  background: var(--bg-chrome);
+}
+
+.playlist-tab-select {
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
+  height: calc(var(--top-toolbar-control-height) - 2px);
+  overflow: hidden;
+  padding: 0 0.5rem;
+  border: 0;
+  border-radius: var(--control-radius);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.playlist-tab-select:hover { color: var(--text); }
+.playlist-tab-select.is-active { color: var(--accent); }
+.playlist-tab-select:active { background: transparent; color: var(--accent); }
+
+.playlist-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 var(--top-toolbar-control-height);
+  width: var(--top-toolbar-control-height);
+  height: calc(var(--top-toolbar-control-height) - 2px);
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.playlist-tab-close:hover { background: var(--bg-hover); color: var(--text); }
 
 .controls-strip {
   display: flex;
@@ -701,7 +780,7 @@ body.is-file-drag-over::after {
   background: var(--bg-panel);
 }
 
-.playlist-row.is-current td {
+.playlist-row.is-current:not(.is-selected) td {
   color: var(--accent);
 }
 
@@ -747,7 +826,8 @@ body.is-file-drag-over::after {
   pointer-events: none;
   opacity: 0;
   transform: translate3d(0, 0, 0);
-  transition: transform var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1), width var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1), height var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1), opacity var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1);
+  will-change: transform;
+  transition: transform var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1);
 }
 
 /* A sidebar preview has no playlist selection. Do not leave the old capsule
@@ -829,8 +909,8 @@ body.is-file-drag-over::after {
   min-width: 8rem;
   height: var(--control-height);
   padding: 0 var(--control-padding-x);
-  border-radius: 0;
-  background: transparent;
+  border-radius: var(--control-radius);
+  background: var(--button-bg);
 }
 
 .progress-slider-rail {
@@ -1241,12 +1321,12 @@ body.is-file-drag-over::after {
 /* Active and latched controls use the accent as their state surface. Keeping
    the rule centralized prevents individual controls from reverting to an
    accent-colored label on a dark background. */
-button:not(.tree-node):not(.database-game-row):not(.database-console-row):is(:active, [aria-pressed="true"]) {
+button:not(.favorite-toggle):not(.tree-node):not(.database-game-row):not(.database-console-row):is(:active, [aria-pressed="true"]) {
   background: var(--accent);
   color: var(--accent-ink);
 }
 
-button:not(.tree-node):not(.database-game-row):not(.database-console-row):is(:active, [aria-pressed="true"]) .ui-icon {
+button:not(.favorite-toggle):not(.tree-node):not(.database-game-row):not(.database-console-row):is(:active, [aria-pressed="true"]) .ui-icon {
   color: inherit;
 }
 
@@ -1258,10 +1338,7 @@ button:is(.tree-node, .database-game-row, .database-console-row).is-selected {
   box-shadow: none;
 }
 
-.favorite-toggle.is-favorite {
-  background: var(--accent);
-  color: var(--accent-ink);
-}
+.favorite-toggle.is-favorite { background: transparent; color: var(--accent); }
 
 .options-library-toolbar .tool-button,
 .library-root-actions .tool-button { min-width: 0; background: rgb(50 50 50); }

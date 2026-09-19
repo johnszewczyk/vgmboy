@@ -39,7 +39,7 @@ import zlib
     #expect(registry.route(pathExtension: "s98")?.metadataPolicy == .direct)
     #expect(registry.route(pathExtension: "flac")?.metadataPolicy == .direct)
     #expect(registry.route(pathExtension: "txtp")?.structurePolicy == .dependencyEnumerate)
-    #expect(registry.route(pathExtension: "sid")?.structurePolicy == .knownSingle)
+    #expect(registry.route(pathExtension: "sid")?.structurePolicy == .enumerate)
     #expect(registry.route(pathExtension: "sid")?.metadataPolicy == .direct)
     #expect(registry.route(pathExtension: "sap")?.pluginID == "sap-direct")
     #expect(registry.route(pathExtension: "sap")?.metadataPolicy == .direct)
@@ -120,6 +120,44 @@ import zlib
     #expect(ScannerFormatPolicy.defaultIgnoredExtensions.contains("sgc"))
     #expect(ScannerFormatPolicy.defaultIgnoredExtensions.contains("minincsf"))
     #expect(ScannerFormatPolicy.defaultIgnoredExtensions.contains("mus"))
+}
+
+@Test("OpenMPT route projects recognized MOD metadata from MetaMan and keeps unknown MOD dialects structural")
+func openMPTMODUsesMetaManWhenItsHeaderIsSupported() async throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("scansong-mod-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    func fixture(signature: String) -> Data {
+        var data = Data(repeating: 0, count: 1_084 + 1_024 + 2)
+        for (index, byte) in Data("Opening Theme".utf8).enumerated() { data[index] = byte }
+        for (index, byte) in Data("Piano".utf8).enumerated() { data[20 + index] = byte }
+        data[42] = 0
+        data[43] = 1
+        data[45] = 64
+        data[950] = 1
+        data[952] = 0
+        for (index, byte) in Data(signature.utf8).enumerated() { data[1_080 + index] = byte }
+        return data
+    }
+
+    for (signature, expectedTitle) in [("M.K.", Optional("Opening Theme")), ("XXXX", nil)] {
+        let url = directory.appendingPathComponent("\(signature).mod")
+        try fixture(signature: signature).write(to: url)
+        let route = try #require(BuiltInScannerPlugins.registry.route(forPath: url.path))
+        let handler = try #require(BuiltInFormatInspectors.registry.handler(for: route))
+        let inspection = try await handler.inspect(fileURL: url, route: route)
+
+        #expect(route.pluginID == "openmpt")
+        #expect(inspection.tracks.count == 1)
+        #expect(inspection.tracks[0].metadata?.song == expectedTitle)
+        if signature == "M.K." {
+            #expect(inspection.tracks[0].metadata?.system == "Commodore Amiga")
+        } else {
+            #expect(inspection.tracks[0].metadata == nil)
+        }
+    }
 }
 
 @Test("KSS direct route preserves libgme info-only headers and slot enumeration")
@@ -705,7 +743,7 @@ func ayFixtureDirectoryMatchesLibGMEInfoOnly() async throws {
 }
 
 @Test(
-    "SAP direct route matches libgme info-only metadata across the fixture corpus",
+    "SAP direct route covers ASMA player types and preserves libgme parity where available",
     .enabled(
         if: ProcessInfo.processInfo.environment["SCANSONG_SAP_FIXTURE_DIR"] != nil,
         "Set SCANSONG_SAP_FIXTURE_DIR to run the corpus-backed SAP parity check."
@@ -723,6 +761,7 @@ func sapFixtureDirectoryMatchesLibGMEInfoOnly() async throws {
     var mismatches: [String] = []
     var matchingFiles = 0
     var fullyAcceptedFiles = 0
+    var asapOnlyPlayerFiles = 0
     var libGMEAcceptedFiles = 0
     var directAcceptedFiles = 0
     var directTimings: [UInt64] = []
@@ -807,6 +846,13 @@ func sapFixtureDirectoryMatchesLibGMEInfoOnly() async throws {
                     }
                 }
             }
+        } else if reference == nil, let candidate {
+            let metaResult = try MetaManCore.readResult(fileURL: fileURL)
+            let playerType = metaResult.tracks.first?.document.technicalFacts["playerType"]
+            if ["D", "S"].contains(playerType ?? ""), metaResult.tracks.count == candidate.count {
+                fileMatches = true
+                asapOnlyPlayerFiles += 1
+            }
         } else if reference == nil, candidate == nil {
             fileMatches = true
         }
@@ -820,13 +866,72 @@ func sapFixtureDirectoryMatchesLibGMEInfoOnly() async throws {
     }
     #expect(mismatches.isEmpty, "\(mismatches.joined(separator: "; "))")
     #expect(matchingFiles == files.count)
-    #expect(libGMEAcceptedFiles == directAcceptedFiles)
     #expect(fullyAcceptedFiles == libGMEAcceptedFiles)
+    #expect(directAcceptedFiles >= libGMEAcceptedFiles)
+    #expect(asapOnlyPlayerFiles == directAcceptedFiles - fullyAcceptedFiles)
     print(
-        "SAP parity: \(matchingFiles)/\(files.count) file outcomes; "
-            + "\(fullyAcceptedFiles) accepted, \(files.count - fullyAcceptedFiles) rejected by both; "
+        "SAP coverage: \(matchingFiles)/\(files.count) file outcomes; "
+            + "direct \(directAcceptedFiles), libgme parity \(fullyAcceptedFiles), "
+            + "ASAP-only TYPE D/S \(asapOnlyPlayerFiles); "
             + "median direct \(medianMilliseconds(directTimings)) ms, "
             + "libgme \(medianMilliseconds(libGMETimings)) ms"
+    )
+}
+
+@Test(
+    "ASMA SAP sources publish complete track rows in a ScanSong catalog",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["SCANSONG_SAP_FIXTURE_DIR"] != nil,
+        "Set SCANSONG_SAP_FIXTURE_DIR to run the corpus-backed catalog projection check."
+    )
+)
+func catalogScannerPublishesASMASAPRows() async throws {
+    let path = try #require(ProcessInfo.processInfo.environment["SCANSONG_SAP_FIXTURE_DIR"])
+    let root = URL(fileURLWithPath: path, isDirectory: true)
+    let enumerator = try #require(FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil))
+    let files = enumerator.compactMap { $0 as? URL }
+        .filter { $0.pathExtension.lowercased() == "sap" }
+    #expect(!files.isEmpty)
+    let expectedSAPTrackCount = try files.reduce(into: 0) { total, fileURL in
+        total += try MetaManCore.readResult(fileURL: fileURL).tracks.count
+    }
+
+    let scratch = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ScanSong-asma-sap-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: scratch) }
+    let databaseURL = scratch.appendingPathComponent("Catalog.sqlite")
+    let result = try await CatalogScanner(
+        databaseURL: databaseURL,
+        inspectionPermits: 4,
+        archivePipelineLimit: 2
+    ).scan(rootURL: root, mode: .newScan)
+
+    let sapFailures = result.failures.filter { $0.route?.pluginID == "sap-direct" }
+    #expect(sapFailures.isEmpty, "\(sapFailures.count) SAP source failures")
+    #expect(result.scannedSourceCount >= files.count)
+
+    var database: OpaquePointer?
+    #expect(sqlite3_open_v2(databaseURL.path, &database, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
+    let connection = try #require(database)
+    let sourceRows = try querySingleRow(
+        database: connection,
+        sql: "SELECT COUNT(*), SUM(CASE WHEN state='successful' THEN 1 ELSE 0 END) FROM scan_items WHERE format_extension='sap' AND archive_entry='';"
+    )
+    let sapTrackRows = try querySingleRow(
+        database: connection,
+        sql: "SELECT COUNT(*) FROM tracks WHERE extension='sap' AND COALESCE(archive_entry, '')='';"
+    )
+    sqlite3_close(database)
+
+    #expect(sourceRows == [String(files.count), String(files.count)])
+    let sapTrackCount = try #require(Int(sapTrackRows[0] ?? ""))
+    #expect(sapTrackCount == expectedSAPTrackCount)
+    print(
+        "ASMA catalog: \(result.discoveredSourceCount) discovered, "
+            + "\(result.scannedSourceCount) scanned, \(result.trackCount) total tracks; "
+            + "\(files.count) SAP sources succeeded with \(sapTrackCount) SAP track rows; "
+            + "\(result.failures.count) total source failures and \(result.skipped.count) skipped entries."
     )
 }
 
@@ -1642,7 +1747,7 @@ func cocoaSpiceAPELiveRowsMatchDirectExtraction() async throws {
 }
 
 @Test(
-    "MDX fixture publishes one native-duration track",
+    "MDX fixture projects MetaMan sequence timing for one logical track",
     .enabled(
         if: ProcessInfo.processInfo.environment["SCANSONG_MDX_FIXTURE"] != nil
             && ProcessInfo.processInfo.environment["SCANSONG_MDX_INSPECT"] != nil,
@@ -1652,13 +1757,14 @@ func cocoaSpiceAPELiveRowsMatchDirectExtraction() async throws {
 func mdxFixtureInspectsThroughVGMBoy() async throws {
     let path = try #require(ProcessInfo.processInfo.environment["SCANSONG_MDX_FIXTURE"])
     let fileURL = URL(fileURLWithPath: path)
+    let document = try MetaManCore.read(fileURL: fileURL)
     let route = try #require(BuiltInScannerPlugins.registry.route(pathExtension: fileURL.pathExtension))
     let handler = try #require(BuiltInFormatInspectors.registry.handler(for: route))
     let inspection = try await handler.inspect(fileURL: fileURL, route: route)
     #expect(inspection.tracks.count == 1)
     #expect(inspection.tracks.first?.trackIndex == 0)
     #expect(inspection.tracks.first?.trackCount == 1)
-    #expect((inspection.tracks.first?.metadata?.playLengthMs ?? 0) > 0)
+    #expect(inspection.tracks.first?.metadata?.playLengthMs == (document.timing?.playLengthMs ?? 0))
     #expect(inspection.tracks.first?.metadata?.system == "Sharp X68000")
 }
 
@@ -1673,11 +1779,14 @@ func mdxFixtureInspectsThroughVGMBoy() async throws {
 func mdxLZXFixtureInspectsThroughVGMBoy() async throws {
     let path = try #require(ProcessInfo.processInfo.environment["SCANSONG_MDX_LZX_FIXTURE"])
     let fileURL = URL(fileURLWithPath: path)
+    let document = try MetaManCore.read(fileURL: fileURL)
     let route = try #require(BuiltInScannerPlugins.registry.route(pathExtension: fileURL.pathExtension))
     let handler = try #require(BuiltInFormatInspectors.registry.handler(for: route))
     let inspection = try await handler.inspect(fileURL: fileURL, route: route)
     #expect(inspection.tracks.count == 1)
-    #expect((inspection.tracks.first?.metadata?.playLengthMs ?? 0) > 0)
+    #expect(document.timing == nil)
+    #expect(document.technicalFacts["mdx.sequenceTiming"] == "unavailable")
+    #expect(inspection.tracks.first?.metadata?.playLengthMs == 0)
     #expect(inspection.tracks.first?.metadata?.system == "Sharp X68000")
 }
 
@@ -1706,10 +1815,11 @@ func mdxArchiveFixtureMaterializesDependency() async throws {
 
     let member = try #require(extracted.members.first)
     #expect(extracted.members.count == 1)
+    let document = try MetaManCore.read(fileURL: member.fileURL)
     let handler = try #require(BuiltInFormatInspectors.registry.handler(for: member.route))
     let inspection = try await handler.inspect(fileURL: member.fileURL, route: member.route)
     #expect(inspection.tracks.count == 1)
-    #expect((inspection.tracks.first?.metadata?.playLengthMs ?? 0) > 0)
+    #expect(inspection.tracks.first?.metadata?.playLengthMs == (document.timing?.playLengthMs ?? 0))
     #expect(inspection.tracks.first?.metadata?.system == "Sharp X68000")
 }
 
@@ -1723,6 +1833,7 @@ func mdxArchiveFixtureMaterializesDependency() async throws {
     mdx.append(0x1A)
     mdx.append(contentsOf: Data("missing.pdx".utf8))
     mdx.append(0)
+    mdx.append(contentsOf: [0x00, 0x04, 0x00, 0x00])
     let fileURL = root.appendingPathComponent("missing.MDX")
     try mdx.write(to: fileURL)
 
@@ -1738,19 +1849,25 @@ func mdxArchiveFixtureMaterializesDependency() async throws {
     }
 }
 
-@Test func mdxDependencyReaderInfersPDXOnlyForExtensionlessReferences() {
+@Test func mdxDependencyReaderInfersPDXOnlyForExtensionlessReferences() throws {
     func mdxData(for dependency: String) -> Data {
         var data = Data("[TITLE] Dependency test\r\n".utf8)
         data.append(contentsOf: [0x1A])
         data.append(contentsOf: Data(dependency.utf8))
         data.append(0)
+        data.append(contentsOf: [0x00, 0x04, 0x00, 0x00])
         return data
     }
 
-    #expect(MDXDependencyReader.dependencyName(in: mdxData(for: "nos")) == "nos.pdx")
-    #expect(MDXDependencyReader.dependencyName(in: mdxData(for: "nos.smp")) == "nos.smp")
-    #expect(MDXDependencyReader.dependencyName(in: mdxData(for: "thrice.pcm")) == "thrice.pcm")
-    #expect(MDXDependencyReader.dependencyName(in: mdxData(for: "konami.mdx")) == "konami.mdx")
+    func resolvedDependency(_ name: String) throws -> String? {
+        let document = try MetaManCore.read(data: mdxData(for: name), formatHint: "mdx")
+        return MDXDependencyReader.dependencyName(in: document)
+    }
+
+    #expect(try resolvedDependency("nos") == "nos.pdx")
+    #expect(try resolvedDependency("nos.smp") == "nos.smp")
+    #expect(try resolvedDependency("thrice.pcm") == "thrice.pcm")
+    #expect(try resolvedDependency("konami.mdx") == "konami.mdx")
 }
 
 @Test(
@@ -2149,7 +2266,7 @@ func gameCubeFixturesInspectThroughVGMStream() async throws {
     header[0x04] = 0; header[0x05] = 2            // version 2
     header[0x06] = 0; header[0x07] = 0x7C          // data offset
     header[0x08] = 0x08; header[0x09] = 0x00       // load address
-    header[0x0E] = 0; header[0x0F] = 1             // number of songs
+    header[0x0E] = 0; header[0x0F] = 3             // number of songs
     header[0x10] = 0; header[0x11] = 1             // start song
     let name = Data("Willow".utf8); header.replaceSubrange(0x16..<(0x16 + name.count), with: name)
     let author = Data("Tester".utf8); header.replaceSubrange(0x36..<(0x36 + author.count), with: author)
@@ -2163,13 +2280,100 @@ func gameCubeFixturesInspectThroughVGMStream() async throws {
     let handler = try #require(BuiltInFormatInspectors.registry.handler(for: route))
     let inspection = try await handler.inspect(fileURL: fileURL, route: route)
     let metadata = try #require(inspection.tracks.first?.metadata)
-    #expect(inspection.tracks.count == 1)
+    #expect(inspection.tracks.map(\.trackIndex) == [0, 1, 2])
+    #expect(inspection.tracks.allSatisfy { $0.trackCount == 3 })
     #expect(metadata.system == "Commodore 64")
     #expect(metadata.song == "Willow")
     #expect(metadata.game == "Willow")
     #expect(metadata.author == "Tester")
     #expect(metadata.comment == "1987")
     #expect(metadata.playLengthMs == 0)
+}
+
+@Test(
+    "known multitrack SID, GBS, AY, SNDH, and NSFE sources publish complete catalog rows",
+    .enabled(
+        if: ProcessInfo.processInfo.environment["SCANSONG_MULTITRACK_FIXTURE_DIR"] != nil,
+        "Set SCANSONG_MULTITRACK_FIXTURE_DIR to run the local multitrack archive check."
+    )
+)
+func catalogScannerExpandsKnownMultitrackFixtures() async throws {
+    let fixturePath = try #require(ProcessInfo.processInfo.environment["SCANSONG_MULTITRACK_FIXTURE_DIR"])
+    let fixtureRoot = URL(fileURLWithPath: fixturePath, isDirectory: true)
+    let expectedNames: Set<String> = [
+        "Bionic Commando USA Version.tar.zst",
+        "Mario's Picross (1995)(Nintendo).tar.zst",
+        "Dies irae.ay",
+        "Bobo.sndh.zst",
+        "Over Horizon.nsfe"
+    ]
+    let expectedTrackCountsByExtension = ["sid": 2, "gbs": 19, "ay": 3, "sndh": 12, "nsfe": 14]
+    let fixtureURLs = try FileManager.default.contentsOfDirectory(
+        at: fixtureRoot,
+        includingPropertiesForKeys: nil
+    )
+    let fixtureNames = Set(fixtureURLs.map(\.lastPathComponent))
+    #expect(expectedNames.isSubset(of: fixtureNames))
+
+    let scratch = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ScanSong-multitrack-(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: scratch) }
+    let mediaRoot = scratch.appendingPathComponent("Media", isDirectory: true)
+    try FileManager.default.createDirectory(at: mediaRoot, withIntermediateDirectories: true)
+    for source in fixtureURLs where expectedNames.contains(source.lastPathComponent) {
+        try FileManager.default.copyItem(at: source, to: mediaRoot.appendingPathComponent(source.lastPathComponent))
+    }
+
+    let databaseURL = scratch.appendingPathComponent("Catalog.sqlite")
+    let result = try await CatalogScanner(
+        databaseURL: databaseURL,
+        inspectionPermits: 4,
+        archivePipelineLimit: 2
+    ).scan(rootURL: mediaRoot, mode: .newScan)
+    #expect(result.discoveredSourceCount == expectedNames.count)
+    #expect(result.failures.isEmpty)
+    #expect(result.trackCount > expectedNames.count)
+
+    var database: OpaquePointer?
+    #expect(sqlite3_open_v2(databaseURL.path, &database, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
+    let connection = try #require(database)
+    let groups = try queryRows(
+        database: connection,
+        sql: """
+            SELECT extension, archive_entry, COUNT(*), MIN(track_index), MAX(track_index),
+                   MIN(track_count), MAX(track_count)
+            FROM tracks
+            GROUP BY extension, path, COALESCE(archive_entry, '')
+            ORDER BY extension, path, archive_entry;
+            """
+    )
+    let catalogTrackCount = try querySingleRow(database: connection, sql: "SELECT COUNT(*) FROM tracks;")
+    sqlite3_close(database)
+
+    let persistedTrackCount = try #require(Int(catalogTrackCount[0]))
+    #expect(persistedTrackCount == result.trackCount)
+    #expect(Set(groups.map { $0[0] }).isSuperset(of: ["sid", "gbs", "ay", "sndh", "nsfe"]))
+    #expect(groups.contains { (Int($0[5]) ?? 0) > 1 })
+    for (extensionName, expectedTrackCount) in expectedTrackCountsByExtension {
+        let matchingGroups = groups.filter { $0[0] == extensionName }
+        #expect(matchingGroups.count == 1)
+        #expect(Int(matchingGroups.first?[5] ?? "") == expectedTrackCount)
+    }
+    print(
+        "Multitrack fixture catalog: \(result.discoveredSourceCount) sources, \(result.trackCount) tracks; "
+            + groups.map { "\($0[0]) \($0[2])/\($0[5])" }.joined(separator: ", ")
+    )
+    for group in groups {
+        let rowCount = Int(group[2]) ?? 0
+        let firstIndex = Int(group[3]) ?? -1
+        let lastIndex = Int(group[4]) ?? -1
+        let minimumTrackCount = Int(group[5]) ?? 0
+        let maximumTrackCount = Int(group[6]) ?? 0
+        #expect(rowCount == minimumTrackCount)
+        #expect(firstIndex == 0)
+        #expect(lastIndex == minimumTrackCount - 1)
+        #expect(minimumTrackCount == maximumTrackCount)
+    }
 }
 
 @Test func psfReaderHarvestsTagsAndTimingWithoutAPlaybackDecoder() async throws {
@@ -2517,6 +2721,35 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
                     "title": .string("Manifest Edited Title")
                 ]
             )
+        ],
+        playlists: [
+            UACPlaylist(
+                id: "nsf-like-subsongs",
+                title: "Manifest tracks",
+                variantID: "original",
+                entries: [
+                    UACPlaylistEntry(
+                        targetMemberPath: memberPath,
+                        entryKind: "subsong",
+                        formatTag: "spc",
+                        trackIndex: "0",
+                        title: "Manifest Subsong Zero",
+                        extraFields: ["metaManMetadata": .object([
+                            "title": .string("Manifest Subsong Zero")
+                        ])]
+                    ),
+                    UACPlaylistEntry(
+                        targetMemberPath: memberPath,
+                        entryKind: "subsong",
+                        formatTag: "spc",
+                        trackIndex: "1",
+                        title: "Manifest Subsong One",
+                        extraFields: ["metaManMetadata": .object([
+                            "title": .string("Manifest Subsong One")
+                        ])]
+                    )
+                ]
+            )
         ]
     )
     let packageURL = directory.appendingPathComponent("Game.uac")
@@ -2549,7 +2782,7 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
         handlers: ScanPluginHandlerRegistry(handlers: [])
     )
         .scan(rootURL: root.deletingLastPathComponent(), mode: .newScan)
-    #expect(result.trackCount == 1)
+    #expect(result.trackCount == 2)
     #expect(result.failures.isEmpty)
 
     var database: OpaquePointer?
@@ -2558,8 +2791,9 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
         database: try #require(database),
         sql: """
         SELECT t.archive_entry, t.browser_game, t.browser_system,
-               m.game, m.title, m.author
+               m.game, m.title, m.author, t.track_index, t.track_count
           FROM tracks t JOIN track_metadata m ON m.track_id=t.id
+         ORDER BY t.track_index
          LIMIT 1;
         """
     )
@@ -2569,8 +2803,10 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
         "Canonical Package Title",
         "Nintendo SNES",
         "UAC Track Game",
-        "Manifest Edited Title",
-        ""
+        "Manifest Subsong Zero",
+        "",
+        "0",
+        "2"
     ])
 }
 
@@ -2738,7 +2974,7 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
     }
 }
 
-@Test func catalogScannerCreatesAndPublishesAHostReadableSchema23Catalog() async throws {
+@Test func catalogScannerCreatesAndPublishesAHostReadableSchema24Catalog() async throws {
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("ScanSong-writer-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: directory) }
@@ -2756,7 +2992,7 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
     #expect(result.failures.isEmpty)
 
     let summary = try CanonicalCatalog.inspect(databaseURL: databaseURL)
-    #expect(summary.schemaVersion == 23)
+    #expect(summary.schemaVersion == 24)
     #expect(summary.rootCount == 1)
     #expect(summary.trackCount == 1)
 
@@ -4197,7 +4433,7 @@ private func createCanonicalCatalog(at url: URL) throws {
     }
     defer { sqlite3_close(database) }
     let statements = [
-        "PRAGMA user_version = 23;",
+        "PRAGMA user_version = 24;",
         "CREATE TABLE library_roots (id INTEGER PRIMARY KEY, is_attached INTEGER NOT NULL);",
         "CREATE TABLE tracks (id INTEGER PRIMARY KEY);",
         "CREATE TABLE track_metadata (track_id INTEGER PRIMARY KEY);",
@@ -4237,6 +4473,25 @@ private func querySingleRow(database: OpaquePointer, sql: String) throws -> [Str
     return (0..<sqlite3_column_count(statement)).map { index in
         sqlite3_column_text(statement, index).map { String(cString: $0) } ?? ""
     }
+}
+
+private func queryRows(database: OpaquePointer, sql: String) throws -> [[String]] {
+    var statement: OpaquePointer?
+    guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
+        throw NSError(
+            domain: "ScanSongTests",
+            code: 5,
+            userInfo: [NSLocalizedDescriptionKey: String(cString: sqlite3_errmsg(database))]
+        )
+    }
+    defer { sqlite3_finalize(statement) }
+    var rows: [[String]] = []
+    while sqlite3_step(statement) == SQLITE_ROW {
+        rows.append((0..<sqlite3_column_count(statement)).map { index in
+            sqlite3_column_text(statement, index).map { String(cString: $0) } ?? ""
+        })
+    }
+    return rows
 }
 
 @Test func sharedSchedulerReleasesItsPermitAfterPluginFailure() async throws {

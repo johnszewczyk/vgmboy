@@ -17,7 +17,8 @@ Preserve component ownership, provenance, and release boundaries. Compilation
 alone does not prove packaged, visible, or audible behavior; use the family
 verification script and state any live-fixture gaps explicitly.
 
-`SPCBoy/` is archived Electron source, retained for recovery only. The active
-player apps are CocoaSpice, SPCBoyWK, and ViewBoy. Keep all three as separate
+`SPCBoy/` is archived Electron source, retained for recovery only. It is never
+the active target for a SPCBoy task; LaunchPad points to `SPCBoyWK/`. The active
+player apps are CocoaSpice, SPCBoyWK, and ViewBoy. Keep them as separate
 presentation clients over the shared catalog, frontend, and playback packages;
 do not merge one skin into another.

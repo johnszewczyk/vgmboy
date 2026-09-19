@@ -49,6 +49,9 @@
         <div id="sidebar-resize-handle" class="sidebar-resize-handle" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" aria-valuemin="12" aria-valuemax="50" aria-valuenow="20" tabindex="0"></div>
 
         <section class="content">
+          <div id="playlist-tabs-toolbar" class="playlist-tabs-toolbar is-hidden" aria-label="Playlist tabs">
+            <div id="playlist-tabs" class="playlist-tabs" role="tablist" aria-label="Playlists"></div>
+          </div>
           <div class="playlist-wrap">
             <div class="playlist-scroll-wrap">
               <div class="playlist-header-wrap">
@@ -57,7 +60,7 @@
                 </table>
               </div>
               <div class="playlist-body-wrap">
-                <div id="playlist-selection-indicator" class="list-selection-indicator" aria-hidden="true"></div>
+                <div id="playlist-selection-indicator" class="list-selection-indicator is-hidden" aria-hidden="true"></div>
                 <table class="playlist-table playlist-body-table">
                   <tbody id="playlist-body"></tbody>
                 </table>
@@ -67,7 +70,7 @@
 
           <div class="content-bottombar">
             <div class="bottom-primary toolbar toolbar-fill">
-              <div id="progress-slider-shell" class="ui-control toolbar-control progress-slider-shell">
+              <div id="progress-slider-shell" class="tool-button ui-control toolbar-control progress-slider-shell">
                 <div class="progress-slider-rail">
                   <div class="progress-slider-fill"></div>
                   <div class="progress-slider-thumb"></div>
@@ -188,11 +191,6 @@
                 <div class="options-subpanel-title">Favorites</div>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="favorite-historical-sort-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Sort by Date Added</span><small>Sort favorites playlist by date added.</small></span></span></label>
               </div>
-              <div class="options-subpanel options-local-files-panel">
-                <div class="options-subpanel-title">Local Files</div>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="local-browser-enabled-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Use Local Files</span><small>Browse one folder directly. The database library is disabled while this is on.</small></span></span></label>
-                <div class="database-stats-panel options-path-control"><input id="local-browser-path" class="options-input options-path-readout" type="text" readonly placeholder="No local folder selected" aria-label="Local files folder" /><button id="local-browser-browse-button" class="tool-button glyph-button" type="button" aria-label="Choose local files folder" title="Choose local files folder"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
-              </div>
             </div>
 
             <div id="options-routing-section" class="options-page options-routing-page is-hidden">
@@ -257,7 +255,7 @@
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Play Speed</div>
                 <div class="options-help-text">Fractions and decimals are accepted and snap to 1/32 increments.</div>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="libgme-playback-speed-enabled-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>libgme</span><small>SPC, NSF/NSFE, GBS, HES, KSS, AY, and SAP.</small></span></span><span class="options-inline-trailing"><input id="libgme-playback-speed-input" class="options-input options-duration-input" type="text" inputmode="decimal" value="1" aria-label="libgme playback speed" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="libgme-playback-speed-enabled-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>libgme</span><small>SPC, NSF/NSFE, GBS, HES, KSS, and AY.</small></span></span><span class="options-inline-trailing"><input id="libgme-playback-speed-input" class="options-input options-duration-input" type="text" inputmode="decimal" value="1" aria-label="libgme playback speed" /></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="libvgm-playback-speed-enabled-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>libvgm</span><small>GYM, S98, VGM, and VGZ.</small></span></span><span class="options-inline-trailing"><input id="libvgm-playback-speed-input" class="options-input options-duration-input" type="text" inputmode="decimal" value="1" aria-label="libvgm playback speed" /></span></label>
               </div>
             </div>
@@ -300,7 +298,6 @@
 
     <script src="./playback-speed.js"></script>
     <script src="./app-core.js"></script>
-    <script src="./sidebar-controller.js"></script>
     <script src="./playlist-controller.js"></script>
     <script src="./options-controller.js"></script>
     <script src="./playback-backends.js"></script>

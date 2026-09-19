@@ -4,6 +4,7 @@ import ArchiveCacheCore
 import ArchiveMaterializationCore
 import Foundation
 import UACWrapperCore
+import VGMBoyKit
 
 enum ZipArchiveSupport {
     static var cacheDirectoryURL: URL { cacheRootURL() }
@@ -266,6 +267,65 @@ enum ZipArchiveSupport {
                 entryPath: entryPath,
                 requirement: requirement
             )
+        }
+    }
+
+    /// Returns the sample loop declared for a UAC member. UAC metadata lives
+    /// at the package/member layer, so a materialized XA (or other raw member)
+    /// cannot expose it through the ordinary file-tag reader. Keep this lookup
+    /// here beside archive materialization and let VGMBoy own the actual loop
+    /// jumps.
+    static func loopMetadata(for track: TrackItem) throws -> PlaybackLoopMetadata? {
+        guard case let .zipEntry(archiveURL, entryPath) = track.source,
+              archiveURL.pathExtension.lowercased() == "uac" else {
+            return nil
+        }
+        let container = try UACContainerReader.read(
+            from: archiveURL,
+            decompressManifestFrame: UACManifestFrameCodec.decoder
+        )
+        guard let member = container.manifest.members.first(where: { $0.path == entryPath }),
+              case let .object(loop) = member.metadata["loop"],
+              let start = integer(loop["startSamples"]),
+              let end = integer(loop["endSamples"]),
+              end > start,
+              let sampleRate = integer(loop["sampleRateHz"]),
+              sampleRate > 0 else {
+            return nil
+        }
+        let mode = string(loop["mode"]) ?? "forward"
+        let repeatValue = string(loop["repeat"])
+        let repeatCount: Int? = if let repeatValue,
+                                    !["0", "forever", "infinite", "unbounded", "inf"].contains(repeatValue.lowercased()) {
+            Int(repeatValue).map { max(0, $0) }
+        } else {
+            nil
+        }
+        return PlaybackLoopMetadata(
+            startSample: start,
+            endSample: end,
+            sampleRateHz: Int(sampleRate),
+            mode: mode,
+            repeatCount: repeatCount,
+            source: string(loop["source"]) ?? "uac-member-metadata"
+        )
+    }
+
+    private static func integer(_ value: UACJSONValue?) -> Int64? {
+        switch value {
+        case .integer(let value): return value
+        case .string(let value): return Int64(value)
+        case .number(let value): return Int64(value)
+        default: return nil
+        }
+    }
+
+    private static func string(_ value: UACJSONValue?) -> String? {
+        switch value {
+        case .string(let value): return value
+        case .integer(let value): return String(value)
+        case .number(let value): return String(value)
+        default: return nil
         }
     }
 

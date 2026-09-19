@@ -8,17 +8,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var optionsWindow: NSWindow?
     private weak var webView: WKWebView?
     private weak var optionsWebView: WKWebView?
-    private var localBrowserEnabled = false
+    private weak var closePlaylistMenuItem: NSMenuItem?
+    private var playlistTabShortcutMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSWindow.allowsAutomaticWindowTabbing = false
         if let iconURL = Bundle.main.url(forResource: "app-icon", withExtension: "png"),
            let icon = NSImage(contentsOf: iconURL) {
             NSApp.applicationIconImage = icon
         }
         let nativeBridge = WKNativeBridge()
         nativeBridge.onOpenOptionsWindow = { [weak self] in self?.showOptionsWindow() }
-        nativeBridge.onChooseRootFolder = { [weak self] in self?.choosePath(allowFiles: false) }
-        nativeBridge.onChoosePath = { [weak self] in self?.choosePath(allowFiles: true) }
+        nativeBridge.onCloseMainWindow = { [weak self] in self?.window?.performClose(nil) }
         nativeBridge.onChooseAACExportDirectory = { [weak self] in self?.chooseDirectory(title: "Choose AAC Export Folder") }
         nativeBridge.onAppearanceSettingsChanged = { [weak self] settings in
             self?.broadcastAppearanceSettings(settings)
@@ -43,12 +44,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             defer: false
         )
         window.title = "SPCBoy"
+        window.tabbingMode = .disallowed
         window.contentView = webView
+        window.delegate = self
         if !window.setFrameAutosaveName("SPCBoyWK.Main") {
             window.center()
         }
         window.makeKeyAndOrderFront(nil)
         self.window = window
+        playlistTabShortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self,
+                  NSApp.keyWindow === self.window,
+                  event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+                  let character = event.charactersIgnoringModifiers,
+                  let digit = character.first?.wholeNumberValue,
+                  (1...9).contains(digit) else {
+                return event
+            }
+            self.dispatchCustom("selectPlaylistTab:\(digit)")
+            return nil
+        }
         applyWindowLevels()
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -68,26 +83,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                       pending.push(command);
                       return;
                     }
+                    const playlistTabPrefix = "selectPlaylistTab:";
+                    if (command.startsWith(playlistTabPrefix)) {
+                      const index = Number(command.slice(playlistTabPrefix.length)) - 1;
+                      app.ui?.activatePlaylistTabAtIndex?.(index);
+                      return;
+                    }
                     switch (command) {
                       case "previous": app.playback?.playAdjacent(-1); break;
                       case "playPause": app.playback?.togglePlayback?.(); break;
                       case "next": app.playback?.playAdjacent(1); break;
-                      case "openPath":
-                        window.spcBoyWK?.choosePath?.().then((snapshot) => {
-                          if (snapshot) app.ui?.applyLibrarySnapshot?.(snapshot);
-                        });
-                        break;
+                      case "newPlaylistTab": app.ui?.createPlaylistTab?.({ duplicateActive: true }); break;
+                      case "closePlaylistTab": app.ui?.closePlaylistTab?.(); break;
                       case "sidebarPaths": app.ui?.setSidebarMode?.("paths"); break;
                       case "sidebarConsoles": app.ui?.setSidebarMode?.("consoles"); break;
-                      case "sidebarDiskPath":
-                        if (app.state?.localBrowserEnabled && app.state?.rootPath) {
-                          app.ui?.setSidebarMode?.("diskPath");
-                        } else {
-                          window.spcBoyWK?.choosePath?.().then((snapshot) => {
-                            if (snapshot) app.ui?.applyLibrarySnapshot?.(snapshot);
-                          });
-                        }
-                        break;
                       case "favoritesPlaylist": app.ui?.showFavoritesPlaylist?.(); break;
                       case "settings": window.spcBoyWK?.openOptionsWindow?.(); break;
                       default: break;
@@ -114,8 +123,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
         let bridge = WKNativeBridge(isOptionsWindow: true)
         bridge.onCloseOptionsWindow = { [weak self] in self?.closeOptionsWindow() }
-        bridge.onChooseRootFolder = { [weak self] in self?.choosePath(allowFiles: false) }
-        bridge.onChoosePath = { [weak self] in self?.choosePath(allowFiles: true) }
         bridge.onChooseAACExportDirectory = { [weak self] in self?.chooseDirectory(title: "Choose AAC Export Folder") }
         bridge.onAppearanceSettingsChanged = { [weak self] settings in
             self?.broadcastAppearanceSettings(settings)
@@ -132,6 +139,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             defer: false
         )
         optionsWindow.title = "SPCBoy Settings"
+        optionsWindow.tabbingMode = .disallowed
         optionsWindow.contentView = optionsWebView
         if !optionsWindow.setFrameAutosaveName("SPCBoyWK.Options") {
             optionsWindow.center()
@@ -178,7 +186,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     private func receiveFrontendSettings(_ settings: SPCBoyPreferencesSnapshot) {
-        localBrowserEnabled = settings.localBrowserEnabled ?? false
         if let value = settings.mainWindowAlwaysOnTop {
             window?.level = value ? .floating : .normal
         }
@@ -198,17 +205,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         window?.level = snapshot.mainWindowAlwaysOnTop == true ? .floating : .normal
         optionsWindow?.level = snapshot.settingsWindowAlwaysOnTop == true ? .floating : .normal
-    }
-
-    private func choosePath(allowFiles: Bool) -> String? {
-        let panel = NSOpenPanel()
-        panel.title = allowFiles ? "Open Local Path" : "Choose Local Files Folder"
-        panel.prompt = "Open"
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = allowFiles
-        panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK else { return nil }
-        return panel.url?.standardizedFileURL.path
     }
 
     private func chooseDirectory(title: String) -> String? {
@@ -239,17 +235,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
         let fileMenuItem = NSMenuItem()
         let fileMenu = NSMenu(title: "File")
-        fileMenu.addItem(menuItem("Open Path…", command: .openPath, action: #selector(openPath(_:))))
+        let newPlaylistItem = NSMenuItem(title: "Duplicate Playlist in New Tab", action: #selector(newPlaylistTab(_:)), keyEquivalent: "t")
+        newPlaylistItem.keyEquivalentModifierMask = [.command]
+        newPlaylistItem.target = self
+        fileMenu.addItem(newPlaylistItem)
         fileMenuItem.submenu = fileMenu
         mainMenu.addItem(fileMenuItem)
 
         let viewMenuItem = NSMenuItem()
         let viewMenu = NSMenu(title: "View")
-        viewMenu.addItem(menuItem(FrontendSidebarView.consoles.title, command: .sidebarConsoles, action: #selector(sidebarConsoles(_:))))
-        viewMenu.addItem(menuItem(FrontendSidebarView.paths.title, command: .sidebarPaths, action: #selector(sidebarPaths(_:))))
-        viewMenu.addItem(menuItem("Favorites Playlist", command: .favoritesPlaylist, action: #selector(favoritesPlaylist(_:))))
+        viewMenu.addItem(menuItem("Console View", command: .sidebarConsoles, action: #selector(sidebarConsoles(_:))))
+        viewMenu.addItem(menuItem("Path View", command: .sidebarPaths, action: #selector(sidebarPaths(_:))))
         viewMenu.addItem(.separator())
-        viewMenu.addItem(menuItem("Local Files", command: .sidebarDiskPath, action: #selector(sidebarDiskPath(_:))))
+        viewMenu.addItem(menuItem("Favorites Playlist", command: .favoritesPlaylist, action: #selector(favoritesPlaylist(_:))))
         viewMenuItem.submenu = viewMenu
         mainMenu.addItem(viewMenuItem)
 
@@ -264,7 +262,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let windowMenuItem = NSMenuItem()
         let windowMenu = NSMenu(title: "Window")
         windowMenu.addItem(menuItem("Minimize", command: .minimizeWindow, action: #selector(minimizeWindow(_:))))
-        windowMenu.addItem(menuItem("Close Window", command: .closeWindow, action: #selector(closeWindow(_:))))
+        let closeItem = menuItem("Close Playlist Tab", command: .closeWindow, action: #selector(closeWindow(_:)))
+        closePlaylistMenuItem = closeItem
+        windowMenu.addItem(closeItem)
+        windowMenu.addItem(.separator())
+        for index in 1...9 {
+            let tabItem = NSMenuItem(title: "Playlist \(index)", action: #selector(selectPlaylistTab(_:)), keyEquivalent: String(index))
+            tabItem.keyEquivalentModifierMask = [.command]
+            tabItem.target = self
+            tabItem.tag = index
+            windowMenu.addItem(tabItem)
+        }
         windowMenuItem.submenu = windowMenu
         mainMenu.addItem(windowMenuItem)
         NSApp.windowsMenu = windowMenu
@@ -311,24 +319,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     @objc private func quit(_ sender: Any?) { NSApp.terminate(sender) }
-    @objc private func closeWindow(_ sender: Any?) { (NSApp.keyWindow ?? window)?.performClose(sender) }
+    @objc private func closeWindow(_ sender: Any?) {
+        let target = NSApp.keyWindow ?? window
+        guard let target else { return }
+        if target === window {
+            dispatchClosePlaylistTab()
+        } else {
+            target.performClose(sender)
+        }
+    }
     @objc private func minimizeWindow(_ sender: Any?) { (NSApp.keyWindow ?? window)?.performMiniaturize(sender) }
-    @objc private func openPath(_ sender: Any?) { dispatch(.openPath) }
+    @objc private func favoritesPlaylist(_ sender: Any?) { dispatch(.favoritesPlaylist) }
     @objc private func sidebarPaths(_ sender: Any?) { dispatch(.sidebarPaths) }
     @objc private func sidebarConsoles(_ sender: Any?) { dispatch(.sidebarConsoles) }
-    @objc private func sidebarDiskPath(_ sender: Any?) { dispatch(.sidebarDiskPath) }
-    @objc private func favoritesPlaylist(_ sender: Any?) { dispatch(.favoritesPlaylist) }
     @objc private func settings(_ sender: Any?) {
         showOptionsWindow()
     }
     @objc private func previous(_ sender: Any?) { dispatch(.previous) }
     @objc private func playPause(_ sender: Any?) { dispatch(.playPause) }
     @objc private func next(_ sender: Any?) { dispatch(.next) }
+    @objc private func newPlaylistTab(_ sender: Any?) { dispatchCustom("newPlaylistTab") }
+    @objc private func selectPlaylistTab(_ sender: NSMenuItem) {
+        dispatchCustom("selectPlaylistTab:\(sender.tag)")
+    }
+
+    private func dispatchClosePlaylistTab() {
+        dispatchCustom("closePlaylistTab")
+    }
+
+    private func dispatchCustom(_ command: String) {
+        let encoded = try! JSONEncoder().encode(command)
+        webView?.evaluateJavaScript("window.SPCBoyWK?.dispatch(\(String(decoding: encoded, as: UTF8.self)));", completionHandler: nil)
+    }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        guard menuItem.action == #selector(sidebarConsoles(_:))
-                || menuItem.action == #selector(sidebarPaths(_:)) else { return true }
-        return !localBrowserEnabled
+        if menuItem.action == #selector(closeWindow(_:)) {
+            menuItem.title = NSApp.keyWindow === window ? "Close Playlist Tab" : "Close Window"
+            return true
+        }
+        return true
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -337,6 +366,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 }
 
 extension AppDelegate: NSWindowDelegate {
+    func windowDidBecomeKey(_ notification: Notification) {
+        NSApp.mainMenu?.update()
+    }
+
     func windowWillClose(_ notification: Notification) {
         guard let closingWindow = notification.object as? NSWindow, closingWindow === optionsWindow else { return }
         optionsWebView?.configuration.userContentController.removeAllUserScripts()

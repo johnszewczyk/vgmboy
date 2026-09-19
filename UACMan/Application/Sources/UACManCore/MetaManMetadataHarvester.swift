@@ -4,26 +4,48 @@ import UACWrapperCore
 
 public struct MetaManMetadataHarvestOutcome: Sendable {
     public let memberMetadata: [String: [String: UACJSONValue]]
+    public let trackMetadata: [String: [MetaManMetadataTrackProjection]]
     public let failures: [String]
     public let diagnosticCount: Int
 
     public init(
         memberMetadata: [String: [String: UACJSONValue]],
+        trackMetadata: [String: [MetaManMetadataTrackProjection]] = [:],
         failures: [String],
         diagnosticCount: Int
     ) {
         self.memberMetadata = memberMetadata
+        self.trackMetadata = trackMetadata
         self.failures = failures
         self.diagnosticCount = diagnosticCount
     }
 }
 
+public struct MetaManMetadataTrackProjection: Encodable, Sendable {
+    /// The native decoder/subsong index. UAC stores this as a decimal string
+    /// in playlist entries because the manifest keeps playlist fields open.
+    public let sourceTrackIndex: Int?
+    public let metadata: [String: UACJSONValue]
+
+    public init(sourceTrackIndex: Int?, metadata: [String: UACJSONValue]) {
+        self.sourceTrackIndex = sourceTrackIndex
+        self.metadata = metadata
+    }
+}
+
 public enum MetaManMetadataHarvester {
     private static let maximumMemberSize: UInt64 = 64 * 1024 * 1024
+    private static let maximumCompanionPlaylistSize: UInt64 = 4 * 1024 * 1024
+    // Audio tracks can exceed the general cap. These readers use file APIs or
+    // memory mapping instead of copying the encoded audio into a working buffer.
+    private static let maximumAudioMemberSize: UInt64 = 1024 * 1024 * 1024
+    private static let largeAudioExtensions: Set<String> = [
+        "aif", "aiff", "ape", "flac", "m4a", "mp3", "ogg", "wav"
+    ]
 
     /// Harvests a directory of native source files for one format extension.
-    /// UAC packages are read through the wrapper API, not this single-source
-    /// directory harvester; multi-track results are never flattened.
+    /// UAC packages are read through the wrapper API, not this native-source
+    /// directory harvester. Track-aware results remain separate projections.
     public static func harvest(
         directoryURL: URL,
         formatExtension: String
@@ -51,8 +73,12 @@ public enum MetaManMetadataHarvester {
         }
 
         var files: [(url: URL, path: String)] = []
+        var gbsPlaylistsByDirectory: [String: [URL]] = [:]
         for case let url as URL in enumerator {
-            guard url.pathExtension.lowercased() == ext else { continue }
+            let fileExtension = url.pathExtension.lowercased()
+            let isTarget = fileExtension == ext
+            let isGBSPlaylist = ext == "gbs" && fileExtension == "m3u"
+            guard isTarget || isGBSPlaylist else { continue }
             let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
             guard values.isSymbolicLink != true, values.isRegularFile == true else {
                 throw MetaManMetadataHarvesterError.notRegularFile(url.path)
@@ -61,33 +87,83 @@ public enum MetaManMetadataHarvester {
             guard !path.isEmpty, !path.hasPrefix("../"), !path.contains("\\") else {
                 throw MetaManMetadataHarvesterError.unsafeRelativePath(path)
             }
-            files.append((url, path))
+            if isTarget {
+                files.append((url, path))
+            } else {
+                gbsPlaylistsByDirectory[url.deletingLastPathComponent().standardizedFileURL.path, default: []]
+                    .append(url)
+            }
         }
         files.sort { $0.path < $1.path }
 
         var memberMetadata: [String: [String: UACJSONValue]] = [:]
+        var trackMetadata: [String: [MetaManMetadataTrackProjection]] = [:]
         var failures: [String] = []
         var diagnosticCount = 0
         for file in files {
             do {
                 let attributes = try FileManager.default.attributesOfItem(atPath: file.url.path)
+                let maximumSize = largeAudioExtensions.contains(ext)
+                    ? maximumAudioMemberSize
+                    : maximumMemberSize
                 guard let size = attributes[.size] as? NSNumber,
-                      size.uint64Value <= maximumMemberSize else {
+                      size.uint64Value <= maximumSize else {
                     throw MetaManMetadataHarvesterError.memberTooLarge(file.path)
                 }
-                let result = try MetaManCore.readResult(fileURL: file.url)
-                guard result.tracks.count == 1, let track = result.tracks.first else {
-                    throw MetaManMetadataHarvesterError.trackAwareResultRequired(file.path, result.tracks.count)
+                let context: MetadataReadContext
+                if ext == "gbs" {
+                    let directory = file.url.deletingLastPathComponent().standardizedFileURL.path
+                    let playlistURLs = gbsPlaylistsByDirectory[directory] ?? []
+                    let companions = try playlistURLs.sorted { $0.lastPathComponent < $1.lastPathComponent }.map { playlistURL in
+                        let playlistAttributes = try FileManager.default.attributesOfItem(atPath: playlistURL.path)
+                        guard let playlistSize = playlistAttributes[.size] as? NSNumber,
+                              playlistSize.uint64Value <= maximumCompanionPlaylistSize else {
+                            throw MetaManMetadataHarvesterError.companionPlaylistTooLarge(playlistURL.lastPathComponent)
+                        }
+                        return MetadataCompanionFile(
+                            relativePath: playlistURL.lastPathComponent,
+                            data: try Data(contentsOf: playlistURL, options: [.mappedIfSafe])
+                        )
+                    }
+                    context = MetadataReadContext(companionFiles: companions)
+                } else {
+                    context = MetadataReadContext()
                 }
-                diagnosticCount += track.document.diagnostics.count
-                memberMetadata[file.path] = MetaManMetadataProjector.memberFields(from: track.document)
+                let result = try MetaManCore.readResult(fileURL: file.url, context: context)
+                guard !result.tracks.isEmpty else {
+                    throw MetaManMetadataHarvesterError.noTracks(file.path)
+                }
+                diagnosticCount += result.tracks.reduce(0) { $0 + $1.document.diagnostics.count }
+                trackMetadata[file.path] = result.tracks.map { track in
+                    MetaManMetadataTrackProjection(
+                        sourceTrackIndex: track.sourceTrackIndex,
+                        metadata: MetaManMetadataProjector.memberFields(from: track.document)
+                    )
+                }
+                if result.tracks.count == 1, let track = result.tracks.first {
+                    memberMetadata[file.path] = MetaManMetadataProjector.memberFields(from: track.document)
+                } else {
+                    let indexes = result.tracks.compactMap(\.sourceTrackIndex)
+                    guard indexes.count == result.tracks.count,
+                          indexes.allSatisfy({ $0 >= 0 }),
+                          Set(indexes).count == indexes.count else {
+                        throw MetaManMetadataHarvesterError.unrepresentableTrackMap(file.path)
+                    }
+                    memberMetadata[file.path] = MetaManMetadataProjector.sharedMemberFields(
+                        from: result.tracks.map(\.document),
+                        sourceTrackIndices: indexes
+                    )
+                }
             } catch {
+                memberMetadata.removeValue(forKey: file.path)
+                trackMetadata.removeValue(forKey: file.path)
                 failures.append("\(file.path): \(error.localizedDescription)")
             }
         }
 
         return MetaManMetadataHarvestOutcome(
             memberMetadata: memberMetadata,
+            trackMetadata: trackMetadata,
             failures: failures,
             diagnosticCount: diagnosticCount
         )
@@ -102,7 +178,9 @@ private enum MetaManMetadataHarvesterError: Error, LocalizedError {
     case notRegularFile(String)
     case unsafeRelativePath(String)
     case memberTooLarge(String)
-    case trackAwareResultRequired(String, Int)
+    case companionPlaylistTooLarge(String)
+    case noTracks(String)
+    case unrepresentableTrackMap(String)
 
     var errorDescription: String? {
         switch self {
@@ -112,9 +190,11 @@ private enum MetaManMetadataHarvesterError: Error, LocalizedError {
         case .cannotEnumerate(let path): "Cannot enumerate metadata input: \(path)"
         case .notRegularFile(let path): "Metadata input is not a regular file: \(path)"
         case .unsafeRelativePath(let path): "Metadata input has an unsafe member path: \(path)"
-        case .memberTooLarge(let path): "Member is larger than the 64 MiB metadata-reader safety limit: \(path)"
-        case .trackAwareResultRequired(let path, let count):
-            "\(path) has \(count) logical tracks; UAC format harvesting does not flatten track-aware MetaMan results."
+        case .memberTooLarge(let path): "Member exceeds the metadata-reader safety limit for its format: \(path)"
+        case .companionPlaylistTooLarge(let path): "GBS companion playlist exceeds the 4 MiB metadata limit: \(path)"
+        case .noTracks(let path): "MetaMan returned no logical tracks for \(path)."
+        case .unrepresentableTrackMap(let path):
+            "\(path) has track indexes that UAC cannot map to unique playable subsong entries."
         }
     }
 }

@@ -19,7 +19,7 @@ unit; the monorepo is the only source tree for maintained family code.
 | AppKit/SwiftUI presentation | CocoaSpice |
 | Native WebKit presentation | SPCBoyWK |
 | Phosphor WebKit presentation | ViewBoy |
-| Electron SPCBoy | Archived source and recovery only |
+| Electron SPCBoy | Recovery source and archive only; never a LaunchPad target |
 
 ## Format decisions
 

@@ -12,8 +12,17 @@ and ViewBoy.
 - `ScanSongKit` owns source discovery, safe archive handling, reader routing,
   resumable scan state, schema-23 projection, and catalog publication.
 - `MetaManCore` owns decoder-independent format metadata interpretation.
-  ScanSong adapts MetaMan's ordered documents; it does not duplicate those
-  parsers or launch playback cores to read metadata.
+  ScanSong adapts MetaMan's ordered documents and does not duplicate those
+  parsers. SAP headers and per-song TIME hints come from MetaMan; ScanSong
+  projects those bounded song documents to catalog rows. MOD and MDX title/module
+  fields come from MetaMan; ScanSong's
+  VGMBoy helper remains responsible for MDX playback/dependency validation,
+  and returns no metadata or timing. Uncompressed MDX sequence timing comes from
+  MetaMan; LZX-compressed bodies currently have no MetaMan duration.
+  Recognized 31-sample ProTracker-family MOD headers
+  use MetaMan; other OpenMPT-family modules remain structure-only until
+  MetaMan has complete bounded readers for them. See the per-format matrix
+  before describing ScanSong as a MetaMan-only reader.
 - VGMBoy owns decoder products and scanner inspection executables. ScanSong
   packages the registered scanner helpers into its app bundle.
 - `scansong` owns the versioned JSONL command-line boundary. `ScanSongApp`
@@ -24,11 +33,12 @@ and ViewBoy.
 
 ## Important Contracts
 
-- For UAC, MetaMan reads the package manifest and playable-member documents.
-  ScanSong may decode the bounded compressed JSON manifest frame, but never
-  opens, hashes, extracts, or decompresses the TAR/audio payload during a
-  catalog scan. Manifest fields are authoritative; missing values remain
-  blank/default rather than being filled from enclosed native metadata.
+- For UAC, MetaMan reads the package manifest and playable-member or explicitly
+  mapped subsong documents. ScanSong may decode the bounded compressed JSON
+  manifest frame, but never opens, hashes, extracts, or decompresses the
+  TAR/audio payload during a catalog scan. Manifest fields are authoritative;
+  missing values remain blank/default rather than being filled from enclosed
+  native metadata.
 - A scan checkpoint represents a complete loose source or physical archive.
   Partial archive results are not resumable or published. Failed refreshes
   retain last-known-good playable rows and remain eligible for retry.

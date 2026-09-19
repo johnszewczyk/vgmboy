@@ -4,6 +4,7 @@ import Foundation
 public enum SIDMetadataReader {
     private static let v1HeaderSize = 0x76
     private static let extendedHeaderSize = 0x7C
+    private static let maximumSongCount = 256
     private static let magicValues = ["PSID", "RSID"]
 
     public static func matches(_ data: Data) -> Bool {
@@ -80,6 +81,17 @@ public enum SIDMetadataReader {
             timing: MetadataTiming(introLengthMs: 0, loopLengthMs: 0, playLengthMs: 0, fadeLengthMs: 0),
             technicalFacts: facts
         )
+    }
+
+    /// Reads every playable SID subtune in native order. libsidplayfp exposes
+    /// at most 256 songs, so the structural projection observes that same cap.
+    public static func readResult(data: Data, displayName: String = "SID") throws -> MetadataReadResult {
+        let document = try read(data: data, displayName: displayName)
+        let declaredCount = Int(document.technicalFacts["songCount"] ?? "1") ?? 1
+        let trackCount = min(max(1, declaredCount), maximumSongCount)
+        return MetadataReadResult(tracks: (0..<trackCount).map { index in
+            MetadataTrack(sourceTrackIndex: index, document: document)
+        })
     }
 
     private static func bigEndianUInt16(_ data: Data, at offset: Int) -> UInt16? {

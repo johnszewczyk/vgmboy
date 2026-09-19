@@ -1,7 +1,7 @@
 import Foundation
 
 /// Semantic commands shared by native and WebKit frontend hosts. The host
-/// translates these into AppKit menus, Electron accelerators, or web events.
+/// translates these into native menu shortcuts or WebKit events.
 public enum FrontendCommand: String, CaseIterable, Codable, Equatable, Sendable {
     case quit
     case closeWindow

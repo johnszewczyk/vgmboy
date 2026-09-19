@@ -22,17 +22,28 @@ enum GameMusicMetadataReader {
     static func readResult(
         data: Data,
         formatHint: String?,
-        displayName: String?
+        displayName: String?,
+        context: MetadataReadContext = MetadataReadContext()
     ) throws -> MetadataReadResult {
         let hint = formatHint.map(normalize)
         let name = displayName ?? hint?.uppercased() ?? "game-music source"
         switch hint {
         case "nsf": return try readFixedHeader(data, kind: .nsf, displayName: name)
-        case "gbs": return try readFixedHeader(data, kind: .gbs, displayName: name)
+        case "gbs": return try GBSM3UMetadataReader.enrich(
+            readFixedHeader(data, kind: .gbs, displayName: name),
+            context: context,
+            displayName: name
+        )
         case "nsfe": return try readNSFE(data, displayName: name)
         case nil:
             if data.starts(with: nsfSignature) { return try readFixedHeader(data, kind: .nsf, displayName: name) }
-            if data.starts(with: Data("GBS".utf8)) { return try readFixedHeader(data, kind: .gbs, displayName: name) }
+            if data.starts(with: Data("GBS".utf8)) {
+                return try GBSM3UMetadataReader.enrich(
+                    readFixedHeader(data, kind: .gbs, displayName: name),
+                    context: context,
+                    displayName: name
+                )
+            }
             if data.starts(with: Data("NSFE".utf8)) { return try readNSFE(data, displayName: name) }
             throw MetadataReadError.unsupportedFormat("unknown game-music content")
         default:

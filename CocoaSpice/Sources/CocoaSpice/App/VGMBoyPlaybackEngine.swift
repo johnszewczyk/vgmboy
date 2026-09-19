@@ -160,7 +160,8 @@ final class PlaybackEngine: @unchecked Sendable {
                 playbackMode: plan.isLongPlay ? .longPlay : .fileDefault,
                 playMilliseconds: plan.isLongPlay ? plan.preFadeSeconds * 1_000 : nil,
                 fadeMilliseconds: plan.fadeSeconds * 1_000,
-                unknownDurationMilliseconds: plan.unknownDurationSeconds * 1_000
+                unknownDurationMilliseconds: plan.unknownDurationSeconds * 1_000,
+                loop: playableTrack.loop
             ),
             requestID: requestID
         )
@@ -170,17 +171,19 @@ final class PlaybackEngine: @unchecked Sendable {
     }
 
     private func transportTrack(for track: TrackItem) throws -> PlaybackTransportTrack {
+        let loop = try ZipArchiveSupport.loopMetadata(for: track)
         if let data = try ZipArchiveSupport.seekableUACSPCData(for: track),
            let entryPath = track.archiveEntryPath {
             return PlaybackTransportTrack(
                 id: track.id,
                 path: entryPath,
                 trackIndex: track.trackIndex,
-                sourceData: data
+                sourceData: data,
+                loop: loop
             )
         }
         let url = try ZipArchiveSupport.materializePlayableFile(for: track)
-        return PlaybackTransportTrack(id: track.id, path: url.path, trackIndex: track.trackIndex)
+        return PlaybackTransportTrack(id: track.id, path: url.path, trackIndex: track.trackIndex, loop: loop)
     }
 
     func isCurrentGeneration(_ generation: Int) async -> Bool {

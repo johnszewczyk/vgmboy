@@ -22,6 +22,9 @@
 - `VGMBoyKit.FormatRegistry.playbackDescriptors` is the complete frontend capability projection.
   CocoaSpice's `PlaybackFormatRegistry` is only an archive-admission adapter and must not rebuild
   extension unions, backend IDs, Long Play, tempo, or natural-ending flags.
+- SAP's descriptor routes to the ASAP decoder family, which supports Long Play and
+  does not support tempo. CocoaSpice's libgme Play Speed description lists only
+  the formats that use libgme.
 - `VGMBoyKit.PlaybackPreferences` owns timing, fade, EQ, volume, mono, and native-tempo
   normalization. `AppSessionPersistence` retains CocoaSpice's UserDefaults keys and legacy-shape
   compatibility while passing values through that shared semantic model.
