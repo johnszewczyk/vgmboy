@@ -145,7 +145,8 @@ struct PlaylistTableView: NSViewRepresentable {
             }
 
             var sortColumn: CatalogPlaylistSortColumn? {
-                CatalogPlaylistSortColumn(frontendColumn: rawValue)
+                guard self != .index else { return nil }
+                return CatalogPlaylistSortColumn(frontendColumn: rawValue)
             }
         }
 
@@ -212,6 +213,7 @@ struct PlaylistTableView: NSViewRepresentable {
             selectionHighlightView?.animationDuration = Double(model.effectiveSelectionAnimationMilliseconds) / 1_000
 
             applyVisibility(to: tableView)
+            updateAutomaticContentVisibility(in: tableView)
             refreshSortIndicators()
             let playlistContentRevision = model.playlistContentRevision
             let selectedTrackIDs = model.selectedTrackIDs
@@ -664,9 +666,13 @@ struct PlaylistTableView: NSViewRepresentable {
                     continue
                 }
 
-                let sortDirection = model.playlistSortColumn == column.sortColumn
-                    ? model.playlistSortDirection
-                    : nil
+                let sortDirection: CatalogPlaylistSortDirection?
+                if let sortColumn = column.sortColumn,
+                   model.playlistSortColumn == sortColumn {
+                    sortDirection = model.playlistSortDirection
+                } else {
+                    sortDirection = nil
+                }
                 if headerCell.sortDirection != sortDirection {
                     headerCell.sortDirection = sortDirection
                     changed = true

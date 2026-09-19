@@ -145,7 +145,6 @@
     renderIssues();
     renderMembers();
     renderInspector();
-    if (mainView === "schema" || mainView === "technical") scheduleSchemaColumnSizing();
     $("#members-view").classList.toggle("hidden", mainView !== "members");
     $("#metadata-view").classList.toggle("hidden", mainView === "members");
     $$(".main-view-tabs button").forEach(button => button.classList.toggle("active", button.dataset.view === mainView));
@@ -289,8 +288,8 @@
 
   function renderTechnicalPage() {
     const entries = technicalEntries();
-    const rows = entries.map(entry => `<tr data-technical-row data-tech-scope="${esc(entry.scope)}" data-tech-track="${esc(entry.track)}" data-tech-key="${esc(entry.key)}"><td><input class="tag-table-field" data-tech-scope value="${esc(entry.scope)}"></td><td><input class="tag-table-field" data-tech-track value="${esc(entry.track)}"></td><td><input class="tag-table-field" data-tech-key value="${esc(entry.key)}"></td><td class="tag-value-cell"><input class="tag-table-field" data-tech-value value="${esc(typeof entry.value === "object" ? displayMetadataValue(entry.value).replace(/<[^>]+>/g, "") : entry.value)}"></td><td class="tag-submit-cell"><button class="icon-button" data-action="commitTechnicalRow" title="Submit changed fields" aria-label="Submit changed fields">✓</button></td><td class="tag-delete-cell"><button class="icon-button danger" data-action="deleteTechnicalRow" title="Delete technical field" aria-label="Delete technical field">×</button></td></tr>`).join("");
-    return `<section class="data-page technical-page"><div class="data-page-heading"><div><h2>Technical Fields</h2></div><span class="data-page-count">${entries.length} fields</span></div><div class="data-table-scroll"><table class="data-table schema-table technical-table"><colgroup><col class="technical-scope-column"><col class="technical-track-column"><col class="technical-key-column"><col class="technical-value-column"><col class="technical-submit-column"><col class="technical-delete-column"></colgroup><thead><tr><th>Scope</th><th>Track</th><th>Key</th><th>Value</th><th class="action-heading" colspan="2">Actions</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="tree-empty">No technical fields</td></tr>'}</tbody></table></div></section>`;
+    const rows = entries.map(entry => `<div class="field-grid-row" role="row" data-technical-row data-tech-scope="${esc(entry.scope)}" data-tech-track="${esc(entry.track)}" data-tech-key="${esc(entry.key)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tech-scope value="${esc(entry.scope)}"></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tech-track value="${esc(entry.track)}"></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tech-key value="${esc(entry.key)}"></div><div class="field-grid-cell tag-value-cell" role="cell"><input class="tag-table-field" data-tech-value value="${esc(typeof entry.value === "object" ? displayMetadataValue(entry.value).replace(/<[^>]+>/g, "") : entry.value)}"></div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitTechnicalRow" title="Submit changed fields" aria-label="Submit changed fields">✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteTechnicalRow" title="Delete technical field" aria-label="Delete technical field">×</button></div></div>`).join("");
+    return `<section class="data-page technical-page"><div class="data-page-heading"><div><h2>Technical Fields</h2></div><span class="data-page-count">${entries.length} fields</span></div><div class="data-table-scroll"><div class="field-grid technical-field-grid" role="table" aria-label="Technical fields"><div class="field-grid-header" role="row"><div class="field-grid-heading" role="columnheader">Scope</div><div class="field-grid-heading" role="columnheader">Track</div><div class="field-grid-heading" role="columnheader">Key</div><div class="field-grid-heading" role="columnheader">Value</div><div class="field-grid-heading action-heading" role="columnheader" aria-label="Actions">Actions</div></div>${rows || '<div class="field-grid-empty" role="row"><span role="cell">No technical fields</span></div>'}</div></div></section>`;
   }
 
   function metadataTagCatalog() {
@@ -328,10 +327,10 @@
         : `<span class="muted tag-value-disabled">Multiple Values</span>`;
       const valueInput = entry.signatures.size === 1 && typeof entry.sample !== "object" ? `<input data-tag-value aria-label="Tag value for ${esc(entry.key)}" value="${esc(entry.sample)}">` : `<input data-tag-value aria-label="Tag value for ${esc(entry.key)}" value="Multiple Values" disabled>`;
       const tagType = entry.signatures.size === 1 ? (Array.isArray(entry.sample) ? "list" : typeof entry.sample) : "various";
-      return `<tr data-tag-row data-tag-from="${esc(entry.key)}"><td class="tag-number-cell"><input class="tag-table-field" value="${catalog.indexOf(entry) + 1}" aria-label="Tag number" disabled></td><td class="tag-type-cell"><input class="tag-table-field" value="${esc(tagType)}" aria-label="Tag type for ${esc(entry.key)}" disabled></td><td class="tag-name-cell"><input class="tag-table-field" data-tag-to value="${esc(entry.key)}" aria-label="Tag name for ${esc(entry.key)}"></td><td class="tag-value-cell"><span class="tag-inline-editor">${valueInput}</span></td><td class="tag-uses-cell"><input class="tag-table-field" value="${entry.count}" aria-label="Uses for ${esc(entry.key)}" disabled></td><td class="tag-submit-cell"><button class="icon-button" data-action="commitTagRow" title="Submit changed fields" aria-label="Submit changed fields">✓</button></td><td class="tag-delete-cell"><button class="icon-button danger" data-action="deleteTag" title="Delete ${esc(entry.key)}" aria-label="Delete ${esc(entry.key)}">×</button></td></tr>`;
+      return `<div class="field-grid-row" role="row" data-tag-row data-tag-from="${esc(entry.key)}"><div class="field-grid-cell tag-number-cell" role="cell"><input class="tag-table-field" value="${catalog.indexOf(entry) + 1}" aria-label="Tag number" disabled></div><div class="field-grid-cell tag-type-cell" role="cell"><input class="tag-table-field" value="${esc(tagType)}" aria-label="Tag type for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-name-cell" role="cell"><input class="tag-table-field" data-tag-to value="${esc(entry.key)}" aria-label="Tag name for ${esc(entry.key)}"></div><div class="field-grid-cell tag-value-cell" role="cell"><span class="tag-inline-editor">${valueInput}</span></div><div class="field-grid-cell tag-uses-cell" role="cell"><input class="tag-table-field" value="${entry.count}" aria-label="Uses for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitTagRow" title="Submit changed fields" aria-label="Submit changed fields">✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteTag" title="Delete ${esc(entry.key)}" aria-label="Delete ${esc(entry.key)}">×</button></div></div>`;
     }).join("");
-    const table = (title, rows, scope) => `<section class="tag-scope-table"><div class="section-title"><span>${title}</span><form class="tag-create-form" data-tag-create data-tag-scope="${scope}"><input data-new-tag-key placeholder="Meta Tag Name" aria-label="New tag name"><input data-new-tag-value placeholder="New Key Value" aria-label="New tag value"><button class="icon-button add-tag-submit" type="submit" title="Add tag" aria-label="Add tag">✓</button></form></div><div class="data-table-scroll"><table class="data-table schema-table"><colgroup><col class="tag-number-column"><col class="tag-type-column"><col class="tag-name-column"><col class="tag-value-column"><col class="tag-uses-column"><col class="tag-submit-column"><col class="tag-delete-column"></colgroup><thead><tr><th>#</th><th>Tag Type</th><th>Tag Name</th><th>Tag Value</th><th>Uses</th><th></th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="7" class="tree-empty">No metadata tags</td></tr>'}</tbody></table></div></section>`;
-    return `<section class="data-page schema-page">${table("Package Tags", rowsFor("Package"), "package")}${table("Track Tags", rowsFor("Track"), "tracks")}</section>`;
+    const grid = (title, rows, scope) => `<section class="tag-scope-table"><div class="section-title"><span>${title}</span><form class="tag-create-form" data-tag-create data-tag-scope="${scope}"><input data-new-tag-key placeholder="Meta Tag Name" aria-label="New tag name"><input data-new-tag-value placeholder="New tag value" aria-label="New tag value"><button class="icon-button add-tag-submit" type="submit" title="Add tag" aria-label="Add tag">✓</button></form></div><div class="data-table-scroll"><div class="field-grid meta-field-grid" role="table" aria-label="${title}"><div class="field-grid-header" role="row"><div class="field-grid-heading" role="columnheader">#</div><div class="field-grid-heading" role="columnheader">Tag Type</div><div class="field-grid-heading" role="columnheader">Tag Name</div><div class="field-grid-heading" role="columnheader">Tag Value</div><div class="field-grid-heading" role="columnheader">Uses</div><div class="field-grid-heading" role="columnheader" aria-label="Submit"></div><div class="field-grid-heading" role="columnheader" aria-label="Delete"></div></div>${rows || '<div class="field-grid-empty" role="row"><span role="cell">No metadata tags</span></div>'}</div></div></section>`;
+    return `<section class="data-page schema-page">${grid("Package Tags", rowsFor("Package"), "package")}${grid("Track Tags", rowsFor("Track"), "tracks")}</section>`;
   }
 
   function renderTrackGrid(tracks) {
@@ -374,24 +373,6 @@
       table.style.width = `${Math.max(980, total)}px`;
       table.style.tableLayout = "fixed";
       $$("col[data-column-key]", table).forEach((column, index) => { column.style.width = `${widths[index]}px`; });
-    });
-  }
-
-  function scheduleSchemaColumnSizing() {
-    requestAnimationFrame(() => {
-      $$(".schema-table").forEach(table => {
-        const rows = $$('thead tr:first-child, tbody tr', table);
-        const columns = Math.max(...rows.map(row => row.children.length), 0);
-        if (!columns) return;
-        const canvas = document.createElement("canvas"), context = canvas.getContext("2d");
-        if (!context) return;
-        context.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
-        const widths = Array.from({ length:columns }, (_, index) => Math.max(30, ...rows.map(row => context.measureText(row.children[index]?.textContent?.trim() || row.children[index]?.querySelector("input")?.value || "").width + 18)));
-        table.style.width = "100%";
-        table.style.minWidth = "0";
-        const colgroup = table.querySelector("colgroup");
-        if (colgroup) [...colgroup.children].forEach((column, index) => { if (index === 0 || index === 1 || index === 4 || index === 5 || index === 6) column.style.width = `${widths[index]}px`; else column.style.width = "auto"; });
-      });
     });
   }
 

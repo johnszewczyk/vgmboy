@@ -77,7 +77,7 @@ final class PlayerViewModel {
     )
     private static let playlistColumnSchema = FrontendPlaylistColumnSchema(columns: [
         .init(id: "favorite", isReorderable: false, isSortable: false),
-        .init(id: "index"),
+        .init(id: "index", isSortable: false),
         .init(id: "trackNumber"),
         .init(id: "file"),
         .init(id: "title"),
@@ -1259,7 +1259,7 @@ final class PlayerViewModel {
     }
 
     var allowsManualPlaylistReordering: Bool {
-        playlistSortColumn == nil || playlistSortColumn == .index
+        playlistSortColumn == nil
     }
 
     var canCutSelectedTracks: Bool {
@@ -3357,7 +3357,7 @@ final class PlayerViewModel {
     }
 
     func indexText(for track: TrackItem) -> String {
-        guard let index = playlistManualOrder[track.id] else { return "—" }
+        guard let index = playlist.firstIndex(of: track) else { return "—" }
         return String(index + 1)
     }
 
