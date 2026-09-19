@@ -1565,7 +1565,36 @@ function allColumns() {
 }
 
 function orderedColumns() {
-  return allColumns().filter((column) => state.columnVisibility[column.id]);
+  return allColumns().filter((column) => state.columnVisibility[column.id]
+    && !state.automaticallyHiddenColumns.has(column.id));
+}
+
+function hasMeaningfulColumnContent(value) {
+  const normalized = String(value ?? "").trim();
+  return normalized.length > 0 && normalized !== "—" && normalized !== "-";
+}
+
+function columnHasContent(column) {
+  if (column.id === "favorite" || column.id === "index") return true;
+  const sharedHint = state.catalogPlaylistColumnContentHints?.[column.id];
+  if (sharedHint !== undefined) return hasMeaningfulColumnContent(sharedHint);
+  const sample = state.playlist.length > 1200
+    ? [...state.playlist.slice(0, 600), ...state.playlist.slice(-600)]
+    : state.playlist;
+  return sample.some((track, rowIndex) => hasMeaningfulColumnContent(playlistColumnValue(track, column, rowIndex)));
+}
+
+function updateAutomaticColumnVisibility() {
+  if (!state.playlist.length) {
+    state.automaticallyHiddenColumns = new Set();
+    return;
+  }
+  const next = new Set();
+  for (const column of allColumns()) {
+    if (!state.columnVisibility[column.id] || column.id === "favorite" || column.id === "index") continue;
+    if (!columnHasContent(column)) next.add(column.id);
+  }
+  state.automaticallyHiddenColumns = next;
 }
 
 function playlistDisplayPath(track) {
@@ -1687,6 +1716,7 @@ function showColumnMenu(event) {
     checkbox.type = "checkbox";
     checkbox.checked = state.columnVisibility[column.id];
     checkbox.addEventListener("change", () => {
+      state.automaticallyHiddenColumns.delete(column.id);
       state.columnVisibility[column.id] = checkbox.checked;
       if (!Object.values(state.columnVisibility).some(Boolean)) {
         state.columnVisibility[column.id] = true;
@@ -1864,6 +1894,7 @@ function autoSizeColumn(columnId) {
 }
 
 function renderPlaylistHeader() {
+  updateAutomaticColumnVisibility();
   refs.playlistHeaderRow.innerHTML = "";
 
   for (const column of orderedColumns()) {
@@ -2169,6 +2200,7 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
 
 function renderPlaylist({ sort = true, persistTab = true } = {}) {
   if (persistTab && findActivePlaylistTab()) persistPlaylistTabs();
+  updateAutomaticColumnVisibility();
   playlistRenderGeneration += 1;
   const generation = playlistRenderGeneration;
   if (!state.selectedTrackIds.length && state.selectedTrackId) {
@@ -2244,7 +2276,11 @@ function scheduleMetadataRefresh(trackId) {
     const trackIds = [...metadataRefreshTrackIds];
     metadataRefreshTrackIds.clear();
     const mustReorder = playlistSortDependsOnMetadata();
-    if (mustReorder || trackIds.some((id) => !refreshPlaylistRow(id))) {
+    const previousAutomaticallyHidden = [...state.automaticallyHiddenColumns].join("\u0001");
+    updateAutomaticColumnVisibility();
+    const automaticVisibilityChanged = previousAutomaticallyHidden
+      !== [...state.automaticallyHiddenColumns].join("\u0001");
+    if (mustReorder || automaticVisibilityChanged || trackIds.some((id) => !refreshPlaylistRow(id))) {
       renderPlaylist();
     } else if (columnResizePointerId === null && state.columnAutoSize && trackIds.length) {
       autoSizedPlaylistSignature = playlistAutoSizeSignature();

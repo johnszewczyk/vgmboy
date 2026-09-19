@@ -109,6 +109,7 @@ const state = {
   columnOrder: [...DEFAULT_COLUMN_ORDER],
   columnWidths: { ...DEFAULT_COLUMN_WIDTHS },
   columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY },
+  automaticallyHiddenColumns: new Set(),
   playlistColumnSizing: { horizontalPaddingPerSide: 8 },
   columnAutoSize: true,
   // Catalog order is authoritative until a user explicitly asks to sort a
@@ -337,10 +338,13 @@ async function loadSettings() {
     state.playlistColumnSizing = normalizePlaylistColumnSizing(parsed.playlistColumnSizing);
     state.columnAutoSize = parsed.columnAutoSize !== false;
     const savedSortColumn = typeof parsed.sortColumn === "string" ? parsed.sortColumn : null;
+    const savedSortIsValid = savedSortColumn !== null
+      && COLUMN_DEFS.some((column) => column.id === savedSortColumn && column.sortable !== false);
     // The old renderer always persisted a sort column, even when the user had
     // not chosen one. Absence of the opt-in flag marks that legacy state as
     // inactive so fresh catalog order reaches the list unchanged.
-    state.playlistSortEnabled = parsed.playlistSortEnabled === true && savedSortColumn !== null;
+    const legacySortEnabled = parsed.playlistSortEnabled === true && savedSortColumn !== null;
+    state.playlistSortEnabled = legacySortEnabled && savedSortIsValid;
     state.sortColumn = state.playlistSortEnabled ? savedSortColumn : null;
     state.sortDirection = parsed.sortDirection === "descending" ? "descending" : "ascending";
     state.autoResizeAnimationMilliseconds = normalizeAnimationMilliseconds(parsed.autoResizeAnimationMilliseconds);

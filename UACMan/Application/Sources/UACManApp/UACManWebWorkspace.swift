@@ -84,25 +84,11 @@ struct UACManWebWorkspace: NSViewRepresentable {
                 if let path = payload["path"] as? String { model.selectCollectionPackage(path) }
             case "selectMember":
                 if let path = payload["path"] as? String { model.selectMember(path) }
-            case "selectMembers":
-                model.setSelectedMembers(Set(payload["paths"] as? [String] ?? []))
-            case "toggleMember":
-                guard let path = payload["path"] as? String else { return }
-                model.setMemberSelected(path, isSelected: payload["selected"] as? Bool ?? false)
             case "save": model.save()
             case "revert": model.revert()
             case "harvest": model.harvestSPCMetadata()
             case "replaceHarvest": model.harvestSPCMetadata(replaceExisting: true)
             case "cancelHarvest": model.cancelSPCMetadataHarvest()
-            case "batchEdit":
-                guard let operationValue = payload["operation"] as? String,
-                      let operation = UACBatchFieldOperation(rawValue: operationValue) else { return }
-                model.applyBatchFieldEdit(
-                    key: payload["key"] as? String ?? "",
-                    operation: operation,
-                    value: payload["value"] as? String ?? "",
-                    searchText: payload["searchText"] as? String ?? ""
-                )
             case "renameMetadataKey":
                 model.renameMetadataKey(
                     from: payload["from"] as? String ?? "",
@@ -121,9 +107,9 @@ struct UACManWebWorkspace: NSViewRepresentable {
             case "commitMetadataRow":
                 model.commitMetadataRow(key: payload["key"] as? String ?? "", newKey: payload["newKey"] as? String ?? "", value: payload["value"] as? String)
             case "commitTechnicalRow":
-                model.commitTechnicalRow(scope: payload["scope"] as? String ?? "", track: payload["track"] as? String ?? "", key: payload["key"] as? String ?? "", newKey: payload["newKey"] as? String ?? "", value: payload["value"] as? String ?? "")
+                model.commitTechnicalRow(scope: payload["scope"] as? String ?? "", key: payload["key"] as? String ?? "", newKey: payload["newKey"] as? String ?? "", value: payload["value"] as? String ?? "")
             case "deleteTechnicalRow":
-                model.deleteTechnicalRow(scope: payload["scope"] as? String ?? "", track: payload["track"] as? String ?? "", key: payload["key"] as? String ?? "")
+                model.deleteTechnicalRow(scope: payload["scope"] as? String ?? "", key: payload["key"] as? String ?? "")
             case "setPackageTitle":
                 model.packageTitle = payload["value"] as? String ?? ""
                 model.markEdited()

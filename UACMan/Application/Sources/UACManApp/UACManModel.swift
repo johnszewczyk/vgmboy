@@ -161,7 +161,6 @@ final class UACManModel {
     var memberMetadataJSON = "{}"
     var memberExtensionsJSON = "{}"
     var selectedMemberPath: String?
-    var selectedMemberPaths: Set<String> = []
     var members: [UACMemberRow] = []
     var collectionRootURL: URL?
     var collectionEntries: [UACCollectionEntry] = []
@@ -249,7 +248,6 @@ final class UACManModel {
                 ] as [String: Any]
             } ?? [],
             "selectedMemberPath": selectedMemberPath ?? NSNull(),
-            "selectedMemberPaths": Array(selectedMemberPaths).sorted(),
             "variantCount": loadedContainer?.manifest.variants.count ?? 0,
             "members": members.map(Self.webMemberSnapshot),
             "collectionRoot": collectionRootURL?.path ?? "",
@@ -447,7 +445,6 @@ final class UACManModel {
                 UACMemberRow(member: member, variantLabel: member.variantID.flatMap { variantLabels[$0] })
             }
             selectedMemberPath = members.first?.path
-            selectedMemberPaths = []
             if let first = members.first {
                 try loadMemberEditor(path: first.path, from: container.manifest)
             } else {
@@ -497,51 +494,6 @@ final class UACManModel {
             return
         }
         members[index] = members[index].updatingMetadata(metadata)
-    }
-
-    func setSelectedMembers(_ paths: Set<String>) {
-        selectedMemberPaths = paths.intersection(Set(members.map(\.path)))
-    }
-
-    func setMemberSelected(_ path: String, isSelected: Bool) {
-        if isSelected {
-            selectedMemberPaths.insert(path)
-        } else {
-            selectedMemberPaths.remove(path)
-        }
-    }
-
-    func applyBatchFieldEdit(
-        key: String,
-        operation: UACBatchFieldOperation,
-        value: String,
-        searchText: String
-    ) {
-        guard !selectedMemberPaths.isEmpty else {
-            errorMessage = "Select one or more package members before applying a batch edit."
-            return
-        }
-        do {
-            try flushEditorBuffers()
-            draftManifestJSON = try UACManifestEditor.applyBatchMetadataEdit(
-                in: draftManifestJSON,
-                memberPaths: selectedMemberPaths,
-                key: key,
-                operation: operation,
-                value: value,
-                searchText: searchText
-            )
-            let updatedManifest = try UACManifestEditor.decode(draftManifestJSON)
-            refreshMemberSummaries(from: updatedManifest)
-            if let selectedMemberPath {
-                try loadMemberEditor(path: selectedMemberPath, from: updatedManifest)
-            }
-            hasUnsavedChanges = draftManifestJSON != originalManifestJSON
-            errorMessage = nil
-            statusMessage = "Applied \(operation.title.lowercased()) to \(selectedMemberPaths.count) selected member(s). Revert is available until saved."
-        } catch {
-            errorMessage = String(describing: error)
-        }
     }
 
     func renameMetadataKey(from oldKey: String, to newKey: String) {
@@ -701,29 +653,58 @@ final class UACManModel {
         } catch { errorMessage = String(describing: error) }
     }
 
-    func commitTechnicalRow(scope: String, track: String, key: String, newKey: String, value: String) {
+    func commitTechnicalRow(scope: String, key: String, newKey: String, value: String) {
         guard !key.isEmpty, !newKey.isEmpty else { errorMessage = "Technical field names cannot be empty."; return }
-        guard scope.contains("Tags") else { errorMessage = "Computed identity fields cannot be edited."; return }
+        guard scope.hasPrefix("Package") else { errorMessage = "Only package technical fields can be edited."; return }
         do {
-            try flushEditorBuffers(); guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any] else { throw UACManifestEditorError.invalidManifestJSON }
-            var changed = false
-            func update(_ fields: inout [String: Any]) { guard fields[key] != nil else { return }; fields.removeValue(forKey: key); fields[newKey] = value; changed = true }
-            if scope.hasPrefix("Package"), var game = root["game"] as? [String: Any], var fields = game["metadata"] as? [String: Any] { update(&fields); game["metadata"] = fields; root["game"] = game }
-            if scope.hasPrefix("Track"), var members = root["members"] as? [[String: Any]] { for index in members.indices { guard let number = members[index]["metadata"] as? [String: Any], number[key] != nil else { continue }; var fields = number; update(&fields); members[index]["metadata"] = fields }; root["members"] = members }
-            guard changed else { throw UACManifestEditorError.invalidMetadataJSON("Technical field cannot be edited: \(key)") }
-            draftManifestJSON = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .prettyPrinted]); let manifest = try UACManifestEditor.decode(draftManifestJSON); gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata); refreshMemberSummaries(from: manifest); hasUnsavedChanges = draftManifestJSON != originalManifestJSON; statusMessage = "Updated technical field. Save to commit the package change."; errorMessage = nil
+            try flushEditorBuffers()
+            guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any] else { throw UACManifestEditorError.invalidManifestJSON }
+            guard var game = root["game"] as? [String: Any] else { throw UACManifestEditorError.invalidManifestJSON }
+            let bucket = scope.contains("Extension") ? "extensions" : "metadata"
+            let oldStorageKey = key.hasPrefix("extension.") ? String(key.dropFirst("extension.".count)) : key
+            let newStorageKey = newKey.hasPrefix("extension.") ? String(newKey.dropFirst("extension.".count)) : newKey
+            guard var fields = game[bucket] as? [String: Any], fields[oldStorageKey] != nil else {
+                throw UACManifestEditorError.invalidMetadataJSON("Technical field cannot be edited: \(key)")
+            }
+            if oldStorageKey != newStorageKey, fields[newStorageKey] != nil {
+                throw UACManifestEditorError.invalidMetadataJSON("The destination tag already exists: \(newKey)")
+            }
+            fields.removeValue(forKey: oldStorageKey)
+            fields[newStorageKey] = value
+            game[bucket] = fields
+            root["game"] = game
+            draftManifestJSON = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .prettyPrinted])
+            let manifest = try UACManifestEditor.decode(draftManifestJSON)
+            gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata)
+            gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
+            refreshMemberSummaries(from: manifest)
+            hasUnsavedChanges = draftManifestJSON != originalManifestJSON
+            statusMessage = "Updated package technical field. Save to commit the package change."
+            errorMessage = nil
         } catch { errorMessage = String(describing: error) }
     }
 
-    func deleteTechnicalRow(scope: String, track: String, key: String) {
-        guard scope.contains("Tags") else { errorMessage = "Computed identity fields cannot be deleted."; return }
+    func deleteTechnicalRow(scope: String, key: String) {
+        guard scope.hasPrefix("Package") else { errorMessage = "Only package technical fields can be deleted."; return }
         do {
-            try flushEditorBuffers(); guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any] else { throw UACManifestEditorError.invalidManifestJSON }
-            var changed = false
-            if scope.hasPrefix("Package"), var game = root["game"] as? [String: Any], var fields = game["metadata"] as? [String: Any] { changed = fields.removeValue(forKey: key) != nil; game["metadata"] = fields; root["game"] = game }
-            if scope.hasPrefix("Track"), var members = root["members"] as? [[String: Any]] { for index in members.indices { if var fields = members[index]["metadata"] as? [String: Any], fields.removeValue(forKey: key) != nil { members[index]["metadata"] = fields; changed = true } }; root["members"] = members }
-            guard changed else { throw UACManifestEditorError.invalidMetadataJSON("Technical field cannot be deleted: \(key)") }
-            draftManifestJSON = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .prettyPrinted]); let manifest = try UACManifestEditor.decode(draftManifestJSON); gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata); refreshMemberSummaries(from: manifest); hasUnsavedChanges = draftManifestJSON != originalManifestJSON; statusMessage = "Deleted technical field. Save to commit the package change."; errorMessage = nil
+            try flushEditorBuffers()
+            guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any] else { throw UACManifestEditorError.invalidManifestJSON }
+            guard var game = root["game"] as? [String: Any] else { throw UACManifestEditorError.invalidManifestJSON }
+            let bucket = scope.contains("Extension") ? "extensions" : "metadata"
+            let storageKey = key.hasPrefix("extension.") ? String(key.dropFirst("extension.".count)) : key
+            guard var fields = game[bucket] as? [String: Any], fields.removeValue(forKey: storageKey) != nil else {
+                throw UACManifestEditorError.invalidMetadataJSON("Technical field cannot be deleted: \(key)")
+            }
+            game[bucket] = fields
+            root["game"] = game
+            draftManifestJSON = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .prettyPrinted])
+            let manifest = try UACManifestEditor.decode(draftManifestJSON)
+            gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata)
+            gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
+            refreshMemberSummaries(from: manifest)
+            hasUnsavedChanges = draftManifestJSON != originalManifestJSON
+            statusMessage = "Deleted package technical field. Save to commit the package change."
+            errorMessage = nil
         } catch { errorMessage = String(describing: error) }
     }
 

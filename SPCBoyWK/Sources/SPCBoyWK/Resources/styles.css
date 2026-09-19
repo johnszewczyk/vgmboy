@@ -107,6 +107,8 @@ body.is-file-drag-over::after {
 }
 
 .app-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   height: 100vh;
 }
 
@@ -143,7 +145,7 @@ body.is-file-drag-over::after {
   display: grid;
   grid-template-columns: calc(var(--sidebar-width-percent) * 1%) 0.2rem minmax(0, 1fr);
   min-height: 0;
-  height: 100vh;
+  height: 100%;
   background: var(--bg-chrome);
 }
 
@@ -343,10 +345,33 @@ body.is-file-drag-over::after {
 
 .content {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
   background: var(--bg-panel);
+}
+
+.transport-toolbar {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--toolbar-gap);
+  width: 100%;
+  height: var(--top-toolbar-height);
+  min-width: 0;
+  padding: var(--top-toolbar-inset);
+  overflow: hidden;
+  background: var(--bg-sidebar);
+}
+
+.transport-toolbar .transport {
+  margin-left: 0;
+}
+
+.transport-toolbar .timing-readout {
+  justify-content: flex-start;
+  min-width: 0;
+  width: 100%;
 }
 
 .playlist-tabs-toolbar {
@@ -482,30 +507,6 @@ body.is-file-drag-over::after {
   overflow-x: visible;
   overflow-y: auto;
   scrollbar-gutter: stable;
-}
-
-.content-bottombar {
-  display: block;
-  padding: 0.5rem;
-  background: var(--bg-sidebar);
-  border-top: 0;
-}
-
-.bottom-primary {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-  min-height: var(--control-height);
-}
-
-.bottom-controls {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  min-width: max-content;
 }
 
 .native-diagnostics {
@@ -851,7 +852,8 @@ body.is-file-drag-over::after {
 
 .transport {
   display: flex;
-  gap: 0.5rem;
+  flex: 0 0 auto;
+  gap: var(--toolbar-gap);
   margin-left: auto;
   align-items: center;
   padding: 0;
@@ -965,7 +967,7 @@ body.is-file-drag-over::after {
   font-variant-numeric: tabular-nums;
 }
 
-.content-bottombar .tool-button {
+.transport-toolbar .tool-button {
   height: var(--control-height);
   min-height: var(--control-height);
   padding: 0 0.5rem;
@@ -975,8 +977,8 @@ body.is-file-drag-over::after {
   font-weight: 700;
 }
 
-.content-bottombar .tool-button.is-selected,
-.content-bottombar .tool-button[aria-pressed="true"] {
+.transport-toolbar .tool-button.is-selected,
+.transport-toolbar .tool-button[aria-pressed="true"] {
   background: var(--accent);
   color: var(--accent-ink);
 }
@@ -1648,10 +1650,6 @@ body.scan-log-window .scan-log-panel {
 }
 
 @media (max-width: 900px) {
-  .bottom-primary {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-  }
-
   .native-diagnostics {
     width: 100%;
   }

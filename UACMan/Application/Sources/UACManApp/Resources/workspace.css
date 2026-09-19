@@ -135,3 +135,10 @@ button { cursor:pointer; }
 .main-view-tabs .member-search { width:min(300px,30vw); height:25px; margin:0 0 0 auto; flex:0 1 300px; }
 .statusbar #member-summary,.statusbar #table-selection-summary { color:var(--muted); font-size:10px; line-height:1; white-space:nowrap; }
 .statusbar #table-selection-summary { color:var(--accent); }
+
+/* Tracks rows open the per-track inspector; selection is intentionally not a
+   separate interaction now that package-wide edits live in Meta Tags. */
+.track-grid tbody tr { cursor:pointer; }
+.track-grid .track-number-heading,.track-grid .track-number-cell { left:0; }
+.technical-field-grid { --field-grid-columns:15% minmax(0,1fr) minmax(0,1fr) 28px 28px; }
+.track-tags-editor .technical-field { display:table-row!important; }

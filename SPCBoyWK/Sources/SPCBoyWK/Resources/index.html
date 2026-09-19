@@ -29,6 +29,30 @@
       <symbol id="icon-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z" /></symbol>
     </svg>
     <div class="app-shell">
+      <div class="transport-toolbar toolbar" aria-label="Playback controls">
+        <div id="progress-slider-shell" class="tool-button ui-control toolbar-control progress-slider-shell">
+          <div class="progress-slider-rail">
+            <div class="progress-slider-fill"></div>
+            <div class="progress-slider-thumb"></div>
+          </div>
+          <input id="progress-slider" type="range" min="0" max="1" step="0.1" value="0" aria-label="Playback position" />
+        </div>
+        <div class="transport toolbar-fixed">
+          <button id="previous-button" class="tool-button glyph-button ui-control" title="Previous" aria-label="Previous"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-back"></use></svg></button>
+          <button id="play-button" class="tool-button glyph-button ui-control is-primary" title="Play / Pause" aria-label="Play / Pause"><svg class="ui-icon" aria-hidden="true"><use href="#icon-play"></use></svg></button>
+          <button id="next-button" class="tool-button glyph-button ui-control" title="Next" aria-label="Next"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-forward"></use></svg></button>
+          <button id="equalizer-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Enable Equalizer" aria-label="Enable Equalizer" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg></button>
+          <button id="long-play-button" class="tool-button glyph-button ui-control" type="button" title="Toggle Long Play" aria-label="Toggle Long Play"><svg class="ui-icon" aria-hidden="true"><use href="#icon-infinity"></use></svg></button>
+          <button id="repeat-button" class="tool-button glyph-button ui-control" type="button" title="Repeat off" aria-label="Repeat off"><svg class="ui-icon" aria-hidden="true"><use href="#icon-repeat-2"></use></svg></button>
+        </div>
+        <div class="ui-control toolbar-control timing-readout">
+          <span id="elapsed-label" class="time-label">0:00</span>
+          <span class="time-separator">/</span>
+          <span id="song-length-label" class="time-label">0:00</span>
+          <span class="time-separator">/</span>
+          <span id="playlist-total-label" class="time-label">0:00</span>
+        </div>
+      </div>
       <main class="workspace">
         <aside class="sidebar">
           <div class="sidebar-search-wrap toolbar">
@@ -68,32 +92,6 @@
             </div>
           </div>
 
-          <div class="content-bottombar">
-            <div class="bottom-primary toolbar toolbar-fill">
-              <div id="progress-slider-shell" class="tool-button ui-control toolbar-control progress-slider-shell">
-                <div class="progress-slider-rail">
-                  <div class="progress-slider-fill"></div>
-                  <div class="progress-slider-thumb"></div>
-                </div>
-                <input id="progress-slider" type="range" min="0" max="1" step="0.1" value="0" />
-              </div>
-              <div class="ui-control toolbar-control timing-readout">
-                <span id="elapsed-label" class="time-label">0:00</span>
-                <span class="time-separator">/</span>
-                <span id="song-length-label" class="time-label">0:00</span>
-                <span class="time-separator">/</span>
-                <span id="playlist-total-label" class="time-label">0:00</span>
-              </div>
-              <div class="transport toolbar-fixed">
-                <button id="previous-button" class="tool-button glyph-button ui-control" title="Previous" aria-label="Previous"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-back"></use></svg></button>
-                <button id="play-button" class="tool-button glyph-button ui-control is-primary" title="Play / Pause" aria-label="Play / Pause"><svg class="ui-icon" aria-hidden="true"><use href="#icon-play"></use></svg></button>
-                <button id="next-button" class="tool-button glyph-button ui-control" title="Next" aria-label="Next"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-forward"></use></svg></button>
-                <button id="equalizer-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Enable Equalizer" aria-label="Enable Equalizer" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg></button>
-                <button id="long-play-button" class="tool-button glyph-button ui-control" type="button" title="Toggle Long Play" aria-label="Toggle Long Play"><svg class="ui-icon" aria-hidden="true"><use href="#icon-infinity"></use></svg></button>
-                <button id="repeat-button" class="tool-button glyph-button ui-control" type="button" title="Repeat off" aria-label="Repeat off"><svg class="ui-icon" aria-hidden="true"><use href="#icon-repeat-2"></use></svg></button>
-              </div>
-            </div>
-          </div>
         </section>
       </main>
     </div>

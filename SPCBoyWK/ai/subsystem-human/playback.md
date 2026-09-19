@@ -1,5 +1,9 @@
 # Playback and transport
 
+The main window places transport controls in a toolbar above the sidebar search
+and playlist tabs. The progress slider occupies the left side, transport buttons
+keep their fixed sizes, and the clock fills the remaining space.
+
 SPCBoy WK obtains transport state, elapsed position, decoder statistics, and reached-end state
 from the in-process VGMBoy bridge. The native transport pushes bounded status updates while a
 track is playing, and the frontend renders those updates; it does not poll the decoder. Natural

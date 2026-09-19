@@ -22,6 +22,9 @@ support directory.
 - Keep the tab toolbar's top inset aligned with the sidebar toolbar and use one
   inset between the tabs and playlist headers, so headers align with the first
   sidebar row when tabs are visible.
+- Keep automatic empty-column visibility presentation-local. Persist only the
+  user's manual visibility choices and column order; the `index` column remains
+  a non-sortable row-position projection.
 
 ## Files
 

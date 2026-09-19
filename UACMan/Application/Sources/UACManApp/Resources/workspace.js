@@ -61,7 +61,7 @@
   const hasMeaningfulTagValue = value => !isEmptyTagValue(value);
   const metadataColumns = () => {
     const keys = new Set();
-    playableMembers().forEach(member => Object.entries(memberFields(member)).forEach(([key, value]) => { if (hasMeaningfulTagValue(value) && !isTechnicalKey(key)) keys.add(key); }));
+    playableMembers().forEach(member => Object.keys(memberFields(member)).forEach(key => keys.add(key)));
     return [...keys].sort((a, b) => {
       const ai = preferredMetadataColumns.indexOf(a), bi = preferredMetadataColumns.indexOf(b);
       if (ai >= 0 || bi >= 0) return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
@@ -92,7 +92,6 @@
   let inspectorTab = "set";
   let mainView = "members";
   let lastDocumentName = "";
-  let selectionAnchorPath = null;
 
   function visibleMembers() {
     if (!state) return [];
@@ -190,16 +189,8 @@
       ? (noRows ? `<div class="empty-state"><div class="empty-icon">▤</div><h3>${state.members.length ? "No tracks match this filter" : "This package has no audio tracks"}</h3><p>${state.members.length ? "Change the search text to show audio tracks." : "The package contains no playable members."}</p></div>` : renderTrackGrid(members))
       : `<div class="empty-state"><div class="empty-icon">▤</div><h3>Open a package to get started</h3><p>Browse a collection or open a UAC package. Audio streams appear here as rows with their tags as columns.</p><button class="button primary" data-action="openUAC">Open a UAC file</button></div>`;
     $("#member-summary").textContent = state.documentName ? `${members.length} shown · ${playableMembers().length} audio tracks` : "No package open";
-    $("#table-selection-summary").textContent = state.selectedMemberPaths.length ? `${state.selectedMemberPaths.length} selected` : "";
     $$(".track-grid th[data-sort]").forEach(th => { const marker = $("span", th); marker.textContent = sort.key === th.dataset.sort ? (sort.direction > 0 ? " ↑" : " ↓") : ""; });
     scheduleTrackColumnSizing();
-    const selectAll = $("[data-select-all]");
-    if (selectAll) {
-      const visiblePaths = members.map(member => member.path);
-      const selectedVisible = visiblePaths.filter(path => state.selectedMemberPaths.includes(path)).length;
-      selectAll.checked = visiblePaths.length > 0 && selectedVisible === visiblePaths.length;
-      selectAll.indeterminate = selectedVisible > 0 && selectedVisible < visiblePaths.length;
-    }
   }
 
   function fieldKind(value) {
@@ -218,9 +209,11 @@
     return `<input class="field-value" data-field-value data-focus-id="${esc(id)}" value="${esc(encoded)}">`;
   }
 
-  function renderPropertyEditor(title, scope, raw) {
+  function renderPropertyEditor(title, scope, raw, options = {}) {
+    const includeTechnical = options.includeTechnical === true;
+    const includeEmpty = options.includeEmpty === true;
     const value = parseObject(raw);
-    const fields = value ? Object.entries(value).filter(([key, field]) => !isTechnicalKey(key) && !isEmptyTagValue(field)).map(([key, field]) => {
+    const fields = value ? Object.entries(value).filter(([key, field]) => (includeTechnical || !isTechnicalKey(key)) && (includeEmpty || !isEmptyTagValue(field))).map(([key, field]) => {
       const kind = fieldKind(field);
       const editorID = `${scope}-${key}`;
       return `<tr class="field-row ${isTechnicalKey(key) ? "technical-field" : ""}" data-kind="${kind}"><td><input class="field-key" data-field-key data-focus-id="${esc(editorID)}" value="${esc(key)}" aria-label="Metadata field name"></td><td>${fieldValueMarkup(field, `${editorID}-value`, kind)}</td><td class="field-type-cell"><select class="field-type" data-field-type aria-label="Value type"><option value="string" ${kind === "string" ? "selected" : ""}>text</option><option value="number" ${kind === "number" ? "selected" : ""}>number</option><option value="boolean" ${kind === "boolean" ? "selected" : ""}>boolean</option><option value="json" ${kind === "json" ? "selected" : ""}>json</option></select></td><td class="field-action-cell"><button class="remove-field" data-action="removeField" title="Remove field" aria-label="Remove ${esc(key)}">×</button></td></tr>`;
@@ -246,7 +239,7 @@
 
   function trackColumns() {
     const keys = new Set();
-    playableMembers().forEach(member => Object.entries(memberFields(member)).forEach(([key, value]) => { if (hasMeaningfulTagValue(value) && !isTechnicalKey(key)) keys.add(key); }));
+    playableMembers().forEach(member => Object.keys(memberFields(member)).forEach(key => keys.add(key)));
     return [...keys].sort((a, b) => {
       const ai = preferredMetadataColumns.indexOf(a), bi = preferredMetadataColumns.indexOf(b);
       if (ai >= 0 || bi >= 0) return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
@@ -268,28 +261,20 @@
 
   function technicalEntries() {
     const entries = [];
-    const add = (scope, track, key, value) => {
-      if (isTechnicalKey(key) && hasMeaningfulTagValue(value)) entries.push({ scope, track, key, value });
+    const add = (scope, key, value) => {
+      if (isTechnicalKey(key) && hasMeaningfulTagValue(value)) entries.push({ scope, key, value });
     };
     const game = parseObject(state.gameMetadataJSON) || {};
     const gameExtensions = parseObject(state.gameExtensionsJSON) || {};
-    Object.entries(game).forEach(([key, value]) => add("Package Tags", "Package", key, value));
-    Object.entries(gameExtensions).forEach(([key, value]) => add("Package Extensions", "Package", `extension.${key}`, value));
-    state.members.forEach((member, index) => {
-      const track = String(trackNumberFor(member, index)).padStart(2, "0");
-      Object.entries(member.metadata || {}).forEach(([key, value]) => add("Track Tags", track, key, value));
-      Object.entries(member.extensions || {}).forEach(([key, value]) => add("Track Extensions", track, `extension.${key}`, value));
-      add("Identity", track, "fileBLAKE3", member.rawHash);
-      if (typeof member.streamHash === "string" && member.streamHash) add("Identity", track, "streamBLAKE3", member.streamHash);
-      (member.hashes || []).forEach(hash => add("Identity", track, `${hash.scope}.${hash.profile}`, hash.digest));
-    });
+    Object.entries(game).forEach(([key, value]) => add("Package Tags", key, value));
+    Object.entries(gameExtensions).forEach(([key, value]) => add("Package Extensions", `extension.${key}`, value));
     return entries;
   }
 
   function renderTechnicalPage() {
     const entries = technicalEntries();
-    const rows = entries.map(entry => `<div class="field-grid-row" role="row" data-technical-row data-tech-scope="${esc(entry.scope)}" data-tech-track="${esc(entry.track)}" data-tech-key="${esc(entry.key)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tech-scope value="${esc(entry.scope)}"></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tech-track value="${esc(entry.track)}"></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tech-key value="${esc(entry.key)}"></div><div class="field-grid-cell tag-value-cell" role="cell"><input class="tag-table-field" data-tech-value value="${esc(typeof entry.value === "object" ? displayMetadataValue(entry.value).replace(/<[^>]+>/g, "") : entry.value)}"></div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitTechnicalRow" title="Submit changed fields" aria-label="Submit changed fields">✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteTechnicalRow" title="Delete technical field" aria-label="Delete technical field">×</button></div></div>`).join("");
-    return `<section class="data-page technical-page"><div class="data-page-heading"><div><h2>Technical Fields</h2></div><span class="data-page-count">${entries.length} fields</span></div><div class="data-table-scroll"><div class="field-grid technical-field-grid" role="table" aria-label="Technical fields"><div class="field-grid-row field-grid-header" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader">Scope</div><div class="field-grid-cell field-grid-heading" role="columnheader">Track</div><div class="field-grid-cell field-grid-heading" role="columnheader">Key</div><div class="field-grid-cell field-grid-heading" role="columnheader">Value</div><div class="field-grid-cell field-grid-heading action-heading" role="columnheader" aria-label="Actions">Actions</div></div>${rows || '<div class="field-grid-empty" role="row"><span role="cell">No technical fields</span></div>'}</div></div></section>`;
+    const rows = entries.map(entry => `<div class="field-grid-row" role="row" data-technical-row data-tech-scope="${esc(entry.scope)}" data-tech-key="${esc(entry.key)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tech-scope value="${esc(entry.scope)}"></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tech-key value="${esc(entry.key)}"></div><div class="field-grid-cell tag-value-cell" role="cell"><input class="tag-table-field" data-tech-value value="${esc(typeof entry.value === "object" ? displayMetadataValue(entry.value).replace(/<[^>]+>/g, "") : entry.value)}"></div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitTechnicalRow" title="Submit changed fields" aria-label="Submit changed fields">✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteTechnicalRow" title="Delete technical field" aria-label="Delete technical field">×</button></div></div>`).join("");
+    return `<section class="data-page technical-page"><div class="data-page-heading"><div><h2>Package Technical Fields</h2><p>Package-level technical tags and attachments.</p></div><span class="data-page-count">${entries.length} fields</span></div><div class="data-table-scroll"><div class="field-grid technical-field-grid" role="table" aria-label="Package technical fields"><div class="field-grid-row field-grid-header" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader">Scope</div><div class="field-grid-cell field-grid-heading" role="columnheader">Key</div><div class="field-grid-cell field-grid-heading" role="columnheader">Value</div><div class="field-grid-cell field-grid-heading action-heading" role="columnheader" aria-label="Actions">Actions</div></div>${rows || '<div class="field-grid-empty" role="row"><span role="cell">No package technical fields</span></div>'}</div></div>${renderAttachments()}</section>`;
   }
 
   function metadataTagCatalog() {
@@ -346,9 +331,9 @@
         return `<td><input class="track-cell" data-track-cell data-track-path="${esc(member.path)}" data-track-key="${esc(fieldKey)}" data-track-scope="${extension ? "memberExtensions" : "memberMetadata"}" value="${esc(value ?? "")}" aria-label="${esc(member.title || member.name)} ${esc(key)}"></td>`;
       }).join("");
       const trackNumber = trackNumberFor(member, index);
-      return `<tr tabindex="0" data-track-row="${esc(member.path)}" class="${member.path === state.selectedMemberPath ? "active" : ""}"><td class="select-cell"><input type="checkbox" data-select-member="${esc(member.path)}" ${state.selectedMemberPaths.includes(member.path) ? "checked" : ""} aria-label="Select ${esc(member.name)}"></td><td class="track-number-cell" title="${esc(member.path)}"><span class="track-number">${esc(String(trackNumber).padStart(2, "0"))}</span></td>${cells}</tr>`;
+      return `<tr tabindex="0" data-track-row="${esc(member.path)}" class="${member.path === state.selectedMemberPath ? "active" : ""}" title="Open exhaustive tags for ${esc(member.title || member.name)}"><td class="track-number-cell"><span class="track-number">${esc(String(trackNumber).padStart(2, "0"))}</span></td>${cells}</tr>`;
     }).join("");
-    return `<div class="track-grid-wrap"><div class="track-grid-scroll"><table class="track-grid"><colgroup><col data-column-key="select" style="width:28px"><col data-column-key="track" style="width:64px">${columns.map(key => `<col data-column-key="${esc(key)}" style="width:100px">`).join("")}</colgroup><thead><tr><th class="select-heading"><input type="checkbox" data-select-all aria-label="Select all visible tracks"></th><th class="track-number-heading" data-sort="track">Track <span></span></th>${columns.map(key => `<th data-sort="${esc(key)}" title="Sort by ${esc(displayMetadataKey(key))}">${esc(displayMetadataKey(key))} <span></span></th>`).join("")}</tr></thead><tbody>${rows || '<tr><td class="tree-empty" colspan="3">No playable tracks</td></tr>'}</tbody></table></div></div>`;
+    return `<div class="track-grid-wrap"><div class="track-grid-scroll"><table class="track-grid"><colgroup><col data-column-key="track" style="width:64px">${columns.map(key => `<col data-column-key="${esc(key)}" style="width:100px">`).join("")}</colgroup><thead><tr><th class="track-number-heading" data-sort="track">Track <span></span></th>${columns.map(key => `<th data-sort="${esc(key)}" title="Sort by ${esc(displayMetadataKey(key))}">${esc(displayMetadataKey(key))} <span></span></th>`).join("")}</tr></thead><tbody>${rows || `<tr><td class="tree-empty" colspan="${columns.length + 1}">No playable tracks</td></tr>`}</tbody></table></div></div>`;
   }
 
   function scheduleTrackColumnSizing() {
@@ -362,7 +347,7 @@
       if (!context) return;
       context.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
       const widthFor = values => Math.max(42, Math.ceil(Math.max(...values.map(value => context.measureText(String(value ?? "")).width), 0) + 16));
-      const widths = [28, widthFor(["Track", ...tracks.map((member, index) => String(trackNumberFor(member, index)).padStart(2, "0"))])];
+      const widths = [widthFor(["Track", ...tracks.map((member, index) => String(trackNumberFor(member, index)).padStart(2, "0"))])];
       columns.forEach(key => widths.push(widthFor([key, ...tracks.map(member => {
         const value = memberFields(member)[key];
         if (value === null || value === undefined || value === "") return "—";
@@ -424,7 +409,7 @@
       html += renderAttachments();
     } else if (mainView === "track") {
       if (member) {
-        html += `<section class="track-tags-editor">${renderPropertyEditor("Track Tags", "memberMetadata", state.memberMetadataJSON)}${renderPropertyEditor("Track Extensions", "memberExtensions", state.memberExtensionsJSON)}</section>`;
+        html += `<section class="track-tags-editor">${renderPropertyEditor("Track Tags", "memberMetadata", state.memberMetadataJSON, { includeTechnical:true, includeEmpty:true })}${renderPropertyEditor("Track Extensions", "memberExtensions", state.memberExtensionsJSON, { includeTechnical:true, includeEmpty:true })}</section>`;
       } else html += `<section class="inspector-section"><div class="empty-tab"><strong>Select a track</strong><span>Choose a row in Tracks to edit its tags.</span></div></section>`;
     } else if (mainView === "technical") html += renderTechnicalPage();
     else if (mainView === "schema") html += renderMetaTagsPage();
@@ -538,13 +523,7 @@
     }
     if (trackRow && !event.target.closest("input")) {
       const path = trackRow.dataset.trackRow;
-      if (event.shiftKey && selectionAnchorPath) {
-        const visible = visibleMembers().map(member => member.path), anchor = visible.indexOf(selectionAnchorPath), index = visible.indexOf(path), paths = new Set(state.selectedMemberPaths);
-        if (anchor >= 0 && index >= 0) visible.slice(Math.min(anchor, index), Math.max(anchor, index) + 1).forEach(item => paths.add(item));
-        bridge("selectMembers", { paths:[...paths] });
-      } else if (event.metaKey || event.ctrlKey) {
-        const paths = new Set(state.selectedMemberPaths); paths.has(path) ? paths.delete(path) : paths.add(path); bridge("selectMembers", { paths:[...paths] }); selectionAnchorPath = path;
-      } else { mainView = "track"; bridge("selectMember", { path }); render(state); }
+      mainView = "track"; bridge("selectMember", { path }); render(state);
     }
     if (!action) return;
     if (action === "addField") addField(event.target.closest("[data-scope]").dataset.scope);
@@ -571,11 +550,11 @@
     }
     else if (action === "commitTechnicalRow") {
       const row = event.target.closest("[data-technical-row]");
-      if (row) bridge("commitTechnicalRow", { scope:$('[data-tech-scope]', row)?.value || "", track:$('[data-tech-track]', row)?.value || "", key:row.dataset.techKey || "", newKey:$('[data-tech-key]', row)?.value || "", value:$('[data-tech-value]', row)?.value || "" });
+      if (row) bridge("commitTechnicalRow", { scope:$('[data-tech-scope]', row)?.value || "", key:row.dataset.techKey || "", newKey:$('[data-tech-key]', row)?.value || "", value:$('[data-tech-value]', row)?.value || "" });
     }
     else if (action === "deleteTechnicalRow") {
       const row = event.target.closest("[data-technical-row]");
-      if (row && window.confirm(`Delete ${row.dataset.techKey || "this technical field"}?`)) bridge("deleteTechnicalRow", { scope:row.dataset.techScope || "", track:row.dataset.techTrack || "", key:row.dataset.techKey || "" });
+      if (row && window.confirm(`Delete ${row.dataset.techKey || "this technical field"}?`)) bridge("deleteTechnicalRow", { scope:row.dataset.techScope || "", key:row.dataset.techKey || "" });
     }
     else if (action === "removeField") {
       const row = event.target.closest(".field-row");
@@ -602,14 +581,7 @@
 
   document.addEventListener("change", event => {
     const target = event.target;
-    if (target.matches("[data-select-all]")) {
-      const visiblePaths = visibleMembers().map(member => member.path);
-      const allVisible = visiblePaths.length > 0 && visiblePaths.every(path => state.selectedMemberPaths.includes(path));
-      const paths = new Set(state.selectedMemberPaths);
-      visiblePaths.forEach(path => allVisible ? paths.delete(path) : paths.add(path));
-      bridge("selectMembers", { paths:[...paths] });
-    } else if (target.matches("[data-select-member]")) bridge("toggleMember", { path:target.dataset.selectMember, selected:target.checked });
-    else if (target.matches("[data-track-cell]")) commitTrackCell(target);
+    if (target.matches("[data-track-cell]")) commitTrackCell(target);
     else if (target.matches("[data-tree-value], [data-tree-key]")) commitTreeEditor(target.closest("[data-tree-editor]"));
     else if (target.matches("[data-basic='packageTitle']")) bridge("setPackageTitle", { value:target.value });
     else if (target.matches("[data-basic='consoleName']")) bridge("setConsole", { value:target.value });
@@ -634,7 +606,6 @@
   document.addEventListener("keydown", event => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") { event.preventDefault(); $("#collection-filter").focus(); }
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { const field = $("#member-filter"); if (field) { event.preventDefault(); field.focus(); } }
-    if (mainView === "members" && event.key === " " && document.activeElement?.closest("tr[data-track-row]")) { event.preventDefault(); const path = document.activeElement.closest("tr[data-track-row]").dataset.trackRow, paths = new Set(state.selectedMemberPaths); paths.has(path) ? paths.delete(path) : paths.add(path); bridge("selectMembers", { paths:[...paths] }); selectionAnchorPath = path; }
   });
 
   window.UACMan = { render };
