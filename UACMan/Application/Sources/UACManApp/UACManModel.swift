@@ -663,8 +663,11 @@ final class UACManModel {
             let bucket = scope.contains("Extension") ? "extensions" : "metadata"
             let oldStorageKey = key.hasPrefix("extension.") ? String(key.dropFirst("extension.".count)) : key
             let newStorageKey = newKey.hasPrefix("extension.") ? String(newKey.dropFirst("extension.".count)) : newKey
-            guard var fields = game[bucket] as? [String: Any], fields[oldStorageKey] != nil else {
+            guard var fields = game[bucket] as? [String: Any], let currentValue = fields[oldStorageKey] else {
                 throw UACManifestEditorError.invalidMetadataJSON("Technical field cannot be edited: \(key)")
+            }
+            if currentValue is [Any] || currentValue is [String: Any] {
+                throw UACManifestEditorError.invalidMetadataJSON("Technical field contains structured values and is read-only: \(key)")
             }
             if oldStorageKey != newStorageKey, fields[newStorageKey] != nil {
                 throw UACManifestEditorError.invalidMetadataJSON("The destination tag already exists: \(newKey)")

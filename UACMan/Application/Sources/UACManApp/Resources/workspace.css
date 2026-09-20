@@ -140,5 +140,15 @@ button { cursor:pointer; }
    separate interaction now that package-wide edits live in Meta Tags. */
 .track-grid tbody tr { cursor:pointer; }
 .track-grid .track-number-heading,.track-grid .track-number-cell { left:0; }
-.technical-field-grid { --field-grid-columns:15% minmax(0,1fr) minmax(0,1fr) 28px 28px; }
+.technical-field-grid { --field-grid-columns:15% minmax(0,1fr) 100px minmax(0,1fr) 28px 28px; }
 .track-tags-editor .technical-field { display:table-row!important; }
+.structured-technical-row .tag-table-field:disabled { cursor:not-allowed; }
+.tracks-beta-grid { width:max-content; min-width:100%; }
+.tracks-beta-row { min-height:35px; cursor:pointer; }
+.tracks-beta-row:hover,.tracks-beta-row.active { background:var(--selected); }
+.tracks-beta-grid .field-grid-cell { padding:0 5px; }
+.tracks-beta-grid .track-cell { min-width:0; }
+.track-beta-number { justify-content:flex-end; color:var(--accent); }
+.track-beta-name { display:flex; flex-direction:column; align-items:flex-start; justify-content:center; min-width:0; }
+.track-beta-name span { width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); }
+.track-beta-name small { color:var(--muted); font-size:9px; }

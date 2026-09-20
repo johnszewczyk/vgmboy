@@ -51,6 +51,7 @@
       .replace(/[_-]+/g, " ")
       .replace(/\b\w/g, character => character.toUpperCase());
   };
+  const displayTrackKey = key => String(key).startsWith("extension.") ? `Extension: ${displayMetadataKey(String(key).slice("extension.".length))}` : displayMetadataKey(key);
   const technicalKeyPattern = /^(?:extension\.)?(?:contained|source|native|technical|diagnostic|hash|blake3|md5|sha1|loop|fade|intro|disc|xa|pcm|raw|tracktotal|disctotal|schema|versions|formats|dumper|cue|memberpath|sector|lba)/i;
   const isTechnicalKey = key => technicalKeyPattern.test(String(key)) || /^(?:SOURCE_|NATIVE_|XA_|LOOP_|PCM_)/i.test(String(key));
   const memberFields = member => ({
@@ -127,7 +128,7 @@
 
     $("#document-name").textContent = state.documentName || "No package open";
     $("#document-path").textContent = state.documentPath || "Choose a collection or open one UAC file";
-    $("#member-filter-wrap").classList.toggle("hidden", mainView !== "members");
+    $("#member-filter-wrap").classList.toggle("hidden", !["members", "trackBeta"].includes(mainView));
     const singleDocumentMode = Boolean(state.documentName) && !state.collectionRoot;
     $("#workspace").classList.toggle("library-collapsed", singleDocumentMode);
     $("#library-panel").classList.toggle("single-document-hidden", singleDocumentMode);
@@ -273,8 +274,16 @@
 
   function renderTechnicalPage() {
     const entries = technicalEntries();
-    const rows = entries.map(entry => `<div class="field-grid-row" role="row" data-technical-row data-tech-scope="${esc(entry.scope)}" data-tech-key="${esc(entry.key)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tech-scope value="${esc(entry.scope)}"></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tech-key value="${esc(entry.key)}"></div><div class="field-grid-cell tag-value-cell" role="cell"><input class="tag-table-field" data-tech-value value="${esc(typeof entry.value === "object" ? displayMetadataValue(entry.value).replace(/<[^>]+>/g, "") : entry.value)}"></div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitTechnicalRow" title="Submit changed fields" aria-label="Submit changed fields">✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteTechnicalRow" title="Delete technical field" aria-label="Delete technical field">×</button></div></div>`).join("");
-    return `<section class="data-page technical-page"><div class="data-page-heading"><div><h2>Package Technical Fields</h2><p>Package-level technical tags and attachments.</p></div><span class="data-page-count">${entries.length} fields</span></div><div class="data-table-scroll"><div class="field-grid technical-field-grid" role="table" aria-label="Package technical fields"><div class="field-grid-row field-grid-header" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader">Scope</div><div class="field-grid-cell field-grid-heading" role="columnheader">Key</div><div class="field-grid-cell field-grid-heading" role="columnheader">Value</div><div class="field-grid-cell field-grid-heading action-heading" role="columnheader" aria-label="Actions">Actions</div></div>${rows || '<div class="field-grid-empty" role="row"><span role="cell">No package technical fields</span></div>'}</div></div>${renderAttachments()}</section>`;
+    const rows = entries.map(entry => {
+      const structured = entry.value && typeof entry.value === "object";
+      const type = structured ? "Multiple Values" : fieldKind(entry.value);
+      const disabled = structured ? " disabled" : "";
+      const valueMarkup = structured
+        ? `<span class="muted tag-value-disabled">Multiple Values</span>`
+        : `<input class="tag-table-field" data-tech-value value="${esc(entry.value)}">`;
+      return `<div class="field-grid-row ${structured ? "structured-technical-row" : ""}" role="row" data-technical-row data-tech-scope="${esc(entry.scope)}" data-tech-key="${esc(entry.key)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tech-scope value="${esc(entry.scope)}"${disabled}></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tech-key value="${esc(entry.key)}"${disabled}></div><div class="field-grid-cell tag-type-cell" role="cell"><span class="${structured ? "muted" : ""}">${type}</span></div><div class="field-grid-cell tag-value-cell" role="cell">${valueMarkup}</div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitTechnicalRow" title="${structured ? "Structured values are read-only" : "Submit changed fields"}" aria-label="${structured ? "Structured values are read-only" : "Submit changed fields"}"${disabled}>✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteTechnicalRow" title="Delete technical field" aria-label="Delete technical field">×</button></div></div>`;
+    }).join("");
+    return `<section class="data-page technical-page"><div class="data-page-heading"><div><h2>Package Tags</h2><p>Package-level technical tags and attachments. Structured values are read-only here.</p></div><span class="data-page-count">${entries.length} fields</span></div><div class="data-table-scroll"><div class="field-grid technical-field-grid" role="table" aria-label="Package tags"><div class="field-grid-row field-grid-header" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader">Scope</div><div class="field-grid-cell field-grid-heading" role="columnheader">Key</div><div class="field-grid-cell field-grid-heading" role="columnheader">Type</div><div class="field-grid-cell field-grid-heading" role="columnheader">Value</div><div class="field-grid-cell field-grid-heading action-heading" role="columnheader" aria-label="Actions">Actions</div></div>${rows || '<div class="field-grid-empty" role="row"><span role="cell">No package tags</span></div>'}</div></div>${renderAttachments()}</section>`;
   }
 
   function metadataTagCatalog() {
@@ -333,7 +342,28 @@
       const trackNumber = trackNumberFor(member, index);
       return `<tr tabindex="0" data-track-row="${esc(member.path)}" class="${member.path === state.selectedMemberPath ? "active" : ""}" title="Open exhaustive tags for ${esc(member.title || member.name)}"><td class="track-number-cell"><span class="track-number">${esc(String(trackNumber).padStart(2, "0"))}</span></td>${cells}</tr>`;
     }).join("");
-    return `<div class="track-grid-wrap"><div class="track-grid-scroll"><table class="track-grid"><colgroup><col data-column-key="track" style="width:64px">${columns.map(key => `<col data-column-key="${esc(key)}" style="width:100px">`).join("")}</colgroup><thead><tr><th class="track-number-heading" data-sort="track">Track <span></span></th>${columns.map(key => `<th data-sort="${esc(key)}" title="Sort by ${esc(displayMetadataKey(key))}">${esc(displayMetadataKey(key))} <span></span></th>`).join("")}</tr></thead><tbody>${rows || `<tr><td class="tree-empty" colspan="${columns.length + 1}">No playable tracks</td></tr>`}</tbody></table></div></div>`;
+    return `<div class="track-grid-wrap"><div class="track-grid-scroll"><table class="track-grid"><colgroup><col data-column-key="track" style="width:64px">${columns.map(key => `<col data-column-key="${esc(key)}" style="width:100px">`).join("")}</colgroup><thead><tr><th class="track-number-heading" data-sort="track">Track <span></span></th>${columns.map(key => `<th data-sort="${esc(key)}" title="Sort by ${esc(displayTrackKey(key))}">${esc(displayTrackKey(key))} <span></span></th>`).join("")}</tr></thead><tbody>${rows || `<tr><td class="tree-empty" colspan="${columns.length + 1}">No playable tracks</td></tr>`}</tbody></table></div></div>`;
+  }
+
+  function renderTracksBetaPage() {
+    const tracks = visibleMembers();
+    const columns = trackColumns();
+    const gridColumns = `52px minmax(190px, 1fr) ${columns.map(() => "minmax(105px, 1fr)").join(" ")}`;
+    const rows = tracks.map((member, index) => {
+      const fields = memberFields(member);
+      const cells = columns.map(key => {
+        const value = fields[key];
+        if (!Object.prototype.hasOwnProperty.call(fields, key) || isEmptyTagValue(value)) return `<div class="field-grid-cell"><span class="muted">—</span></div>`;
+        if (value && typeof value === "object") return `<div class="field-grid-cell">${structuredPopup(value)}</div>`;
+        const extension = key.startsWith("extension.");
+        const fieldKey = extension ? key.slice("extension.".length) : key;
+        return `<div class="field-grid-cell"><input class="track-cell" data-track-cell data-track-path="${esc(member.path)}" data-track-key="${esc(fieldKey)}" data-track-scope="${extension ? "memberExtensions" : "memberMetadata"}" value="${esc(value ?? "")}" aria-label="${esc(member.title || member.name)} ${esc(displayTrackKey(key))}"></div>`;
+      }).join("");
+      const trackNumber = trackNumberFor(member, index);
+      const title = member.title || member.name || member.path;
+      return `<div class="field-grid-row tracks-beta-row ${member.path === state.selectedMemberPath ? "active" : ""}" role="row" tabindex="0" data-track-row="${esc(member.path)}" title="Open exhaustive tags for ${esc(title)}"><div class="field-grid-cell track-beta-number" role="cell">${esc(String(trackNumber).padStart(2, "0"))}</div><div class="field-grid-cell track-beta-name" role="cell"><span>${esc(title)}</span><small>${esc(member.format || member.role || "track")}</small></div>${cells}</div>`;
+    }).join("");
+    return `<section class="data-page tracks-beta-page"><div class="data-page-heading"><div><h2>Tracks Beta</h2><p>Experimental array-style view of every track tag. Click a row for the exhaustive track inspector.</p></div><span class="data-page-count">${tracks.length} tracks · ${columns.length} tag columns</span></div><div class="data-table-scroll"><div class="field-grid tracks-beta-grid" role="table" aria-label="Tracks Beta" style="--field-grid-columns:${gridColumns}"><div class="field-grid-row field-grid-header" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader">#</div><div class="field-grid-cell field-grid-heading" role="columnheader">Track</div>${columns.map(key => `<div class="field-grid-cell field-grid-heading" role="columnheader" title="${esc(displayTrackKey(key))}">${esc(displayTrackKey(key))}</div>`).join("")}</div>${rows || '<div class="field-grid-empty" role="row"><span role="cell">No playable tracks</span></div>'}</div></div></section>`;
   }
 
   function scheduleTrackColumnSizing() {
@@ -348,7 +378,7 @@
       context.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
       const widthFor = values => Math.max(42, Math.ceil(Math.max(...values.map(value => context.measureText(String(value ?? "")).width), 0) + 16));
       const widths = [widthFor(["Track", ...tracks.map((member, index) => String(trackNumberFor(member, index)).padStart(2, "0"))])];
-      columns.forEach(key => widths.push(widthFor([key, ...tracks.map(member => {
+      columns.forEach(key => widths.push(widthFor([displayTrackKey(key), ...tracks.map(member => {
         const value = memberFields(member)[key];
         if (value === null || value === undefined || value === "") return "—";
         if (typeof value === "object") return Array.isArray(value) ? `List · ${value.length}` : `Object · ${Object.keys(value).length}`;
@@ -400,18 +430,14 @@
       return;
     }
     const title = member?.title || member?.name || "Package metadata";
-    const pageTitle = ["package", "technical", "schema", "tree"].includes(mainView) ? state.packageTitle || state.packageID : title;
-    let html = `<div class="inspector-head"><div class="inspector-title-row"><div><span class="eyebrow">${mainView === "package" ? "PACKAGE TAGS" : mainView === "track" ? "TRACK TAGS" : mainView === "technical" ? "TECHNICAL" : mainView === "schema" ? "META TAGS" : "METADATA TREE"}</span><h2>${esc(pageTitle)}</h2></div></div>${mainView === "track" && member ? `<div class="inspector-sub">${esc(member.role)} · ${esc(member.format || "unknown format")} · ${bytes(member.bytes)}<br><span title="Stored UAC path: ${esc(member.path)}">${esc(memberLocation(member))}</span></div>` : `<div class="inspector-sub">${esc(state.packageID)}</div>`}</div>`;
-    if (mainView === "package") {
-      html += `<section class="inspector-section identity-strip"><div class="identity-fields"><label>Title<input data-basic="packageTitle" data-focus-id="package-title" value="${esc(state.packageTitle)}"></label><label>System<input data-basic="consoleName" data-focus-id="console-name" value="${esc(state.consoleName)}"></label></div></section>`;
-      html += renderPropertyEditor("Package Tags And Attachments", "gameMetadata", state.gameMetadataJSON);
-      html += renderPropertyEditor("Package Extensions", "gameExtensions", state.gameExtensionsJSON);
-      html += renderAttachments();
-    } else if (mainView === "track") {
+    const pageTitle = ["trackBeta", "technical", "schema", "tree"].includes(mainView) ? state.packageTitle || state.packageID : title;
+    let html = `<div class="inspector-head"><div class="inspector-title-row"><div><span class="eyebrow">${mainView === "trackBeta" ? "TRACKS BETA" : mainView === "track" ? "TRACK TAGS" : mainView === "technical" ? "PACKAGE TAGS" : mainView === "schema" ? "META TAGS" : "METADATA TREE"}</span><h2>${esc(pageTitle)}</h2></div></div>${mainView === "track" && member ? `<div class="inspector-sub">${esc(member.role)} · ${esc(member.format || "unknown format")} · ${bytes(member.bytes)}<br><span title="Stored UAC path: ${esc(member.path)}">${esc(memberLocation(member))}</span></div>` : `<div class="inspector-sub">${esc(state.packageID)}</div>`}</div>`;
+    if (mainView === "track") {
       if (member) {
         html += `<section class="track-tags-editor">${renderPropertyEditor("Track Tags", "memberMetadata", state.memberMetadataJSON, { includeTechnical:true, includeEmpty:true })}${renderPropertyEditor("Track Extensions", "memberExtensions", state.memberExtensionsJSON, { includeTechnical:true, includeEmpty:true })}</section>`;
       } else html += `<section class="inspector-section"><div class="empty-tab"><strong>Select a track</strong><span>Choose a row in Tracks to edit its tags.</span></div></section>`;
-    } else if (mainView === "technical") html += renderTechnicalPage();
+    } else if (mainView === "trackBeta") html += renderTracksBetaPage();
+    else if (mainView === "technical") html += renderTechnicalPage();
     else if (mainView === "schema") html += renderMetaTagsPage();
     else if (mainView === "tree") html += renderTree();
     $("#inspector-content").innerHTML = html;
@@ -512,7 +538,7 @@
     const action = event.target.closest("[data-action]")?.dataset.action;
     const packageItem = event.target.closest("[data-package]");
     const memberRow = event.target.closest("tr[data-member]");
-    const trackRow = event.target.closest("tr[data-track-row]");
+    const trackRow = event.target.closest("[data-track-row]");
     const treeMember = event.target.closest("[data-tree-member]");
     if (packageItem) { bridge("selectPackage", { path:packageItem.dataset.package }); return; }
     if (treeMember) { mainView = "tree"; bridge("selectMember", { path:treeMember.dataset.treeMember }); render(state); return; }
@@ -593,7 +619,7 @@
 
   document.addEventListener("input", event => {
     if (event.target.id === "collection-filter") renderCollections();
-    else if (event.target.id === "member-filter") renderMembers();
+    else if (event.target.id === "member-filter") mainView === "trackBeta" ? render(state) : renderMembers();
   });
   document.addEventListener("click", event => {
     const header = event.target.closest("th[data-sort]");
