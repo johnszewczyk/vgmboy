@@ -71,6 +71,8 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
     var playlistHeaderBold: Bool?
     var sidebarWidthPercent: Double?
     var accentColor: String?
+    var uiChromeColor: String?
+    var solidSelectionBar: Bool?
     var aacExportDirectory: String?
     var routingPreferences: [String: String]?
     var archiveCacheEnabled: Bool?

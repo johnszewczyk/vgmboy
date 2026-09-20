@@ -3,6 +3,8 @@
 The sidebar places transport controls in a toolbar above its search controls. The
 transport buttons keep their fixed sizes and the clock fills the remaining
 sidebar width. The progress slider remains in the playlist's bottom toolbar.
+Transport, search, tabs, table headers, and the position bar share one toolbar
+height token derived from the interface font size.
 
 SPCBoy WK obtains transport state, elapsed position, decoder statistics, and reached-end state
 from the in-process VGMBoy bridge. The native transport pushes bounded status updates while a

@@ -87,6 +87,8 @@ const state = {
   playlistHeaderBold: false,
   sidebarWidthPercent: 20,
   accentColor: "lightskyblue",
+  uiChromeColor: "rgb(30 30 30)",
+  solidSelectionBar: false,
   routingPreferences: {},
   archiveCacheEnabled: true,
   archiveCacheLimitBytes: DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES,
@@ -231,6 +233,8 @@ const refs = {
   settingsWindowAlwaysOnTopCheckbox: document.getElementById("settings-window-always-on-top-checkbox"),
   sidebarWidthInput: document.getElementById("sidebar-width-input"),
   accentColorInput: document.getElementById("accent-color-input"),
+  uiChromeColorInput: document.getElementById("ui-chrome-color-input"),
+  solidSelectionBarCheckbox: document.getElementById("solid-selection-bar-checkbox"),
   uiItemSpacingInput: document.getElementById("ui-item-spacing-input"),
   spcForceLengthCheckbox: document.getElementById("spc-force-length-checkbox"),
   queuedSkipsCheckbox: document.getElementById("queued-skips-checkbox"),
@@ -325,6 +329,8 @@ async function loadSettings() {
     state.playlistHeaderBold = Boolean(parsed.playlistHeaderBold);
     state.sidebarWidthPercent = normalizeSidebarWidth(parsed.sidebarWidthPercent);
     state.accentColor = normalizeAccentColor(parsed.accentColor);
+    state.uiChromeColor = normalizeUIColor(parsed.uiChromeColor, "rgb(30 30 30)");
+    state.solidSelectionBar = Boolean(parsed.solidSelectionBar);
     state.routingPreferences = parsed.routingPreferences && typeof parsed.routingPreferences === "object" ? { ...parsed.routingPreferences } : {};
     state.archiveCacheEnabled = parsed.archiveCacheEnabled !== false;
     state.archiveCacheLimitBytes = normalizeArchiveCacheLimit(parsed.archiveCacheLimitBytes);
@@ -397,6 +403,8 @@ function persistSettings() {
     playlistHeaderBold: state.playlistHeaderBold,
     sidebarWidthPercent: state.sidebarWidthPercent,
     accentColor: state.accentColor,
+    uiChromeColor: state.uiChromeColor,
+    solidSelectionBar: state.solidSelectionBar,
     routingPreferences: state.routingPreferences,
     archiveCacheEnabled: state.archiveCacheEnabled,
     archiveCacheLimitBytes: state.archiveCacheLimitBytes,
@@ -515,24 +523,23 @@ function normalizeFontSize(value) {
     : 10;
 }
 
-function normalizeFontColor(value) {
+function normalizeUIColor(value, fallback) {
   const text = String(value || "").trim();
-  if (!text) return "#a9a9a9";
+  if (!text) return fallback;
   if (typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("color", text)) {
     return text;
   }
   return /^#[0-9a-f]{3,4}$/i.test(text) || /^#[0-9a-f]{6,8}$/i.test(text)
     ? text.toLowerCase()
-    : "#a9a9a9";
+    : fallback;
+}
+
+function normalizeFontColor(value) {
+  return normalizeUIColor(value, "#a9a9a9");
 }
 
 function normalizeAccentColor(value) {
-  const text = String(value || "").trim();
-  if (!text) return "lightskyblue";
-  if (typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("color", text)) return text;
-  return /^#[0-9a-f]{3,4}$/i.test(text) || /^#[0-9a-f]{6,8}$/i.test(text)
-    ? text.toLowerCase()
-    : "lightskyblue";
+  return normalizeUIColor(value, "lightskyblue");
 }
 
 function normalizeSidebarWidth(value) {
@@ -621,6 +628,7 @@ window.SPCBoyApp = {
   normalizeFontSize,
   normalizeFontColor,
   normalizeAccentColor,
+  normalizeUIColor,
   EQUALIZER_BAND_FREQUENCIES,
   normalizeEqualizerGain,
   normalizeAppVolume,

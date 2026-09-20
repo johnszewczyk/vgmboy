@@ -4,7 +4,8 @@
 - Interface > Animations exposes checkbox-enabled Auto-Resize and Selection Bar timings; both default on at 200 ms and accept 0–1000 ms. Disabling one uses an effective 0 ms duration while retaining the configured value.
 - Playlist Options exposes Column Auto-size, enabled by default, with the description “Automatically resize columns for content width on selection.”
 - Interface Style combines font size, font color, and monospace controls for the database sidebar and playlist; the single setting is applied to both surfaces.
-- The Selection Bar uses the chosen accent color without changing sidebar or playlist text color. Choose accent and text colors that provide the desired contrast.
+- Interface exposes the UI Chrome Color through the same CSS color text field used by Accent Color and Font Color.
+- The Selection Bar uses the chosen accent color without changing sidebar or playlist text color. It is outlined by default; Solid Selection Bar fills the capsule with the accent color for light surfaces and dark text.
 - Windows has independent Always on Top switches for Main Window and Options Window; both default off. Main keeps the main window on top of other apps; Options keeps the options window on top of the main window.
 - Archive Cache uses the shared 2 GB default and 2, 4, 8, or 16 GB choices.
 - AAC Export exposes a destination folder and a playlist context-menu action. New installs default to Downloads, matching CocoaSpice. SPCBoy supplies the selected path, timing plan, and destination; VGMBoyKit performs the offline conversion, including archive-member materialization through the native bridge. Only one export runs at a time. Folder chooser controls use the shared folder glyph.

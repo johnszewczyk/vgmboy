@@ -829,8 +829,14 @@ test("SPCBoyWK keeps compact playlist tabs in the WebKit toolbar and persists th
   assert.match(appDelegateSource, /NSWindow\.allowsAutomaticWindowTabbing = false/);
   assert.match(appDelegateSource, /keyEquivalent: "t"/);
   assert.match(appDelegateSource, /dispatchClosePlaylistTab\(\)/);
-  assert.match(stylesSource, /\.playlist-tabs-toolbar[\s\S]*height: calc\(var\(--top-toolbar-control-height\) \+ var\(--top-toolbar-inset\)\)/);
-  assert.match(stylesSource, /\.playlist-tabs-toolbar[\s\S]*padding: var\(--top-toolbar-inset\) var\(--top-toolbar-inset\) 0;/);
+  assert.match(stylesSource, /--control-height: calc\(\(var\(--ui-font-size-pt\) \* 1pt\) \+ 0\.85rem\)/);
+  assert.match(stylesSource, /--top-toolbar-control-height: var\(--control-height\)/);
+  assert.match(stylesSource, /\.transport-toolbar[\s\S]*height: var\(--top-toolbar-height\)/);
+  assert.match(stylesSource, /\.sidebar-search-wrap[\s\S]*height: var\(--top-toolbar-height\)/);
+  assert.match(stylesSource, /\.playlist-table thead tr,[\s\S]*height: var\(--top-toolbar-height\)/);
+  assert.match(stylesSource, /\.playlist-bottom-toolbar[\s\S]*height: var\(--top-toolbar-height\)/);
+  assert.match(stylesSource, /\.playlist-tabs-toolbar[\s\S]*height: var\(--top-toolbar-height\)/);
+  assert.match(stylesSource, /\.playlist-tabs-toolbar[\s\S]*padding: var\(--top-toolbar-inset\);/);
   assert.match(stylesSource, /\.playlist-tab\s*\{[^}]*height: var\(--top-toolbar-control-height\)/);
   assert.match(stylesSource, /\.playlist-tab-select\.is-active \{ color: var\(--accent\); \}/);
   assert.doesNotMatch(stylesSource, /\.playlist-tab-select\.is-active \{[^}]*background:/);
@@ -973,6 +979,8 @@ test("SPCBoyWK sends one typed audio-output snapshot to the shared transport", (
 
 test("SPCBoyWK lets native controls own Enter activation", () => {
   assert.match(appSource, /if \(event\.key === "Enter" && !state\.optionsOpen\) \{[\s\S]*?target\.matches\("button, select, option, a, input, \[role=button\], \[role=tab\]"\)[\s\S]*?if \(nativeControlTarget\) return;/);
+  assert.match(appSource, /const playlistTarget = refs\.playlistScrollWrap\?\.contains\(event\.target\)[\s\S]*?if \(playlistTarget\) \{[\s\S]*?app\.ui\.playSelectedTrack\(\);/);
+  assert.match(uiSource, /function isPlaylistSelectionTarget\(focusTarget = document\.activeElement\)/);
   assert.match(uiSource, /if \(event\.target !== row && event\.target\?\.closest\?\.\("button, input, select, a, \[contenteditable=true\]"\)\) return;/);
   assert.match(uiSource, /selectPlaylistTrack\(track\.id, \{ focus: true \}\)/);
 });

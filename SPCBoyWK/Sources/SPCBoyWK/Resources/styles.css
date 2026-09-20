@@ -11,6 +11,7 @@
   --dim: dimgray;
   --accent: lightskyblue;
   --accent-ink: rgb(20 20 20);
+  --selection-bar-background: transparent;
   --line: rgb(40 40 40);
   --ui-font-size-pt: 10;
   --sidebar-width-percent: 20;
@@ -30,15 +31,16 @@
   --control-background: var(--bg-chrome);
   --button-bg: var(--control-background);
   --control-radius: 5px;
-  --control-height: 1.85rem;
+  /* One toolbar geometry for transport, search, tabs, headers, and the
+     playlist position bar. The control grows with the interface font size. */
+  --control-height: calc((var(--ui-font-size-pt) * 1pt) + 0.85rem);
   --control-padding-x: 0.65rem;
-  /* Header-only spacing tokens. The actual toolbars use their intrinsic
-     contents and the established control height below. */
+  /* Shared toolbar spacing. Every toolbar uses the same inset and gap below. */
   --toolbar-padding: 0.2rem;
   --toolbar-gap: 0.25rem;
   --frame-inset: 0.5rem;
   --top-toolbar-inset: 0.5rem;
-  --top-toolbar-control-height: 1.65rem;
+  --top-toolbar-control-height: var(--control-height);
   --top-toolbar-height: calc(var(--top-toolbar-control-height) + (2 * var(--top-toolbar-inset)));
   --column-resize-duration: 200ms;
   --selection-animation-duration: 200ms;
@@ -188,7 +190,7 @@ body.is-file-drag-over::after {
 .sidebar-search-wrap {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: var(--toolbar-gap);
   height: var(--top-toolbar-height);
   min-width: 0;
   overflow: hidden;
@@ -206,7 +208,7 @@ body.is-file-drag-over::after {
   font: inherit;
 }
 
-.sidebar-search-actions, .sidebar-view-actions, .sidebar-fold-actions { display: flex; flex: 0 0 auto; gap: 0.25rem; }
+.sidebar-search-actions, .sidebar-view-actions, .sidebar-fold-actions { display: flex; flex: 0 0 auto; gap: var(--toolbar-gap); }
 .sidebar-mode-button { display: inline-flex; align-items: center; justify-content: center; width: var(--top-toolbar-control-height); height: var(--top-toolbar-control-height); padding: 0; border: 1px solid rgb(30 30 30); border-radius: 5px; background: var(--bg-chrome); color: var(--muted); cursor: pointer; line-height: 1; }
 .sidebar-mode-button:hover { background: var(--bg-subpanel); }
 .icon-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
@@ -393,10 +395,10 @@ body.is-file-drag-over::after {
   display: flex;
   align-items: center;
   width: 100%;
-  height: calc(var(--top-toolbar-control-height) + var(--top-toolbar-inset));
+  height: var(--top-toolbar-height);
   min-width: 0;
   overflow: hidden;
-  padding: var(--top-toolbar-inset) var(--top-toolbar-inset) 0;
+  padding: var(--top-toolbar-inset);
   background: var(--bg-sidebar);
 }
 
@@ -495,7 +497,7 @@ body.is-file-drag-over::after {
 .playlist-scroll-wrap {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  row-gap: 0.2rem;
+  row-gap: var(--toolbar-gap);
   width: 100%;
   height: 100%;
   min-width: 0;
@@ -827,6 +829,7 @@ body.is-file-drag-over::after {
 }
 
 .favorite-toggle .ui-icon { width: 0.9rem; height: 0.9rem; }
+.favorite-toggle .ui-icon { transform: translateY(1px); }
 .favorite-toggle .ui-icon { fill: none; }
 .favorite-toggle.is-favorite .ui-icon { fill: currentColor; }
 
@@ -838,7 +841,8 @@ body.is-file-drag-over::after {
   width: 0;
   height: 0;
   border-radius: 999px;
-  background: var(--accent);
+  border: 1px solid var(--accent);
+  background: var(--selection-bar-background);
   pointer-events: none;
   opacity: 0;
   transform: translate3d(0, 0, 0);

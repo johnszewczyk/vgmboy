@@ -262,6 +262,16 @@ refs.accentColorInput.addEventListener("blur", (event) => {
   app.ui.setAccentColor(event.target.value);
 });
 
+refs.uiChromeColorInput.addEventListener("change", (event) => {
+  app.ui.setUIChromeColor(event.target.value);
+});
+refs.uiChromeColorInput.addEventListener("blur", (event) => {
+  app.ui.setUIChromeColor(event.target.value);
+});
+refs.solidSelectionBarCheckbox.addEventListener("change", (event) => {
+  app.ui.setSolidSelectionBar(event.target.checked);
+});
+
 if (window.spcBoyWK?.onAppearanceSettingsChanged) {
   window.spcBoyWK.onAppearanceSettingsChanged((settings) => {
     app.ui.applyAppearanceSettings(settings);
@@ -586,8 +596,20 @@ window.addEventListener("keydown", (event) => {
     );
     if (nativeControlTarget) return;
     event.preventDefault();
+    // WebKit can deliver Enter from the table body after a virtualized row
+    // has been recycled. Keep that activation in the playlist domain so it
+    // cannot fall through to the sidebar's database loader, which otherwise
+    // starts the first track of the selected game.
+    const playlistTarget = refs.playlistScrollWrap?.contains(event.target)
+      || refs.playlistBodyWrap?.contains(event.target)
+      || refs.playlistBody?.contains(event.target)
+      || app.ui.isPlaylistSelectionTarget(event.target);
     app.ui.activateFocusedItem(event.target).then((handled) => {
       if (handled) return;
+      if (playlistTarget) {
+        app.ui.playSelectedTrack();
+        return;
+      }
       if (state.sidebarView.contentMode === "database") {
         app.ui.activateDatabaseSelection();
         return;

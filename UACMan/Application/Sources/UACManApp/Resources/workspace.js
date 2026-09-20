@@ -147,6 +147,8 @@
     renderInspector();
     $("#members-view").classList.toggle("hidden", mainView !== "members");
     $("#metadata-view").classList.toggle("hidden", mainView === "members");
+    $("#metadata-view").classList.toggle("tracks-beta-active", mainView === "trackBeta");
+    if (mainView === "trackBeta") scheduleTrackColumnSizing(".tracks-beta-native-grid");
     $$(".main-view-tabs button").forEach(button => button.classList.toggle("active", button.dataset.view === mainView));
 
     $("#status-message").textContent = state.isHarvestingMetadata ? state.harvestProgressMessage || "Reading metadata…" : state.statusMessage || "Ready";
@@ -327,7 +329,7 @@
     return `<section class="data-page schema-page">${grid("Package Tags", rowsFor("Package"), "package")}${grid("Track Tags", rowsFor("Track"), "tracks")}</section>`;
   }
 
-  function renderTrackGrid(tracks) {
+  function renderTrackGrid(tracks, variantClass = "") {
     const columns = trackColumns();
     const rows = tracks.map((member, index) => {
       const fields = memberFields(member);
@@ -342,32 +344,18 @@
       const trackNumber = trackNumberFor(member, index);
       return `<tr tabindex="0" data-track-row="${esc(member.path)}" class="${member.path === state.selectedMemberPath ? "active" : ""}" title="Open exhaustive tags for ${esc(member.title || member.name)}"><td class="track-number-cell"><span class="track-number">${esc(String(trackNumber).padStart(2, "0"))}</span></td>${cells}</tr>`;
     }).join("");
-    return `<div class="track-grid-wrap"><div class="track-grid-scroll"><table class="track-grid"><colgroup><col data-column-key="track" style="width:64px">${columns.map(key => `<col data-column-key="${esc(key)}" style="width:100px">`).join("")}</colgroup><thead><tr><th class="track-number-heading" data-sort="track">Track <span></span></th>${columns.map(key => `<th data-sort="${esc(key)}" title="Sort by ${esc(displayTrackKey(key))}">${esc(displayTrackKey(key))} <span></span></th>`).join("")}</tr></thead><tbody>${rows || `<tr><td class="tree-empty" colspan="${columns.length + 1}">No playable tracks</td></tr>`}</tbody></table></div></div>`;
+    const tableClass = ["track-grid", variantClass].filter(Boolean).join(" ");
+    return `<div class="track-grid-wrap"><div class="track-grid-scroll"><table class="${tableClass}" aria-label="${variantClass ? "Tracks Beta" : "Tracks"}"><colgroup><col data-column-key="track" style="width:64px">${columns.map(key => `<col data-column-key="${esc(key)}" style="width:100px">`).join("")}</colgroup><thead><tr><th class="track-number-heading" data-sort="track">Track <span></span></th>${columns.map(key => `<th data-sort="${esc(key)}" title="Sort by ${esc(displayTrackKey(key))}">${esc(displayTrackKey(key))} <span></span></th>`).join("")}</tr></thead><tbody>${rows || `<tr><td class="tree-empty" colspan="${columns.length + 1}">No playable tracks</td></tr>`}</tbody></table></div></div>`;
   }
 
   function renderTracksBetaPage() {
     const tracks = visibleMembers();
     const columns = trackColumns();
-    const gridColumns = `52px minmax(190px, 1fr) ${columns.map(() => "minmax(105px, 1fr)").join(" ")}`;
-    const rows = tracks.map((member, index) => {
-      const fields = memberFields(member);
-      const cells = columns.map(key => {
-        const value = fields[key];
-        if (!Object.prototype.hasOwnProperty.call(fields, key) || isEmptyTagValue(value)) return `<div class="field-grid-cell"><span class="muted">—</span></div>`;
-        if (value && typeof value === "object") return `<div class="field-grid-cell">${structuredPopup(value)}</div>`;
-        const extension = key.startsWith("extension.");
-        const fieldKey = extension ? key.slice("extension.".length) : key;
-        return `<div class="field-grid-cell"><input class="track-cell" data-track-cell data-track-path="${esc(member.path)}" data-track-key="${esc(fieldKey)}" data-track-scope="${extension ? "memberExtensions" : "memberMetadata"}" value="${esc(value ?? "")}" aria-label="${esc(member.title || member.name)} ${esc(displayTrackKey(key))}"></div>`;
-      }).join("");
-      const trackNumber = trackNumberFor(member, index);
-      const title = member.title || member.name || member.path;
-      return `<div class="field-grid-row tracks-beta-row ${member.path === state.selectedMemberPath ? "active" : ""}" role="row" tabindex="0" data-track-row="${esc(member.path)}" title="Open exhaustive tags for ${esc(title)}"><div class="field-grid-cell track-beta-number" role="cell">${esc(String(trackNumber).padStart(2, "0"))}</div><div class="field-grid-cell track-beta-name" role="cell"><span>${esc(title)}</span><small>${esc(member.format || member.role || "track")}</small></div>${cells}</div>`;
-    }).join("");
-    return `<section class="data-page tracks-beta-page"><div class="data-page-heading"><div><h2>Tracks Beta</h2><p>Experimental array-style view of every track tag. Click a row for the exhaustive track inspector.</p></div><span class="data-page-count">${tracks.length} tracks · ${columns.length} tag columns</span></div><div class="data-table-scroll"><div class="field-grid tracks-beta-grid" role="table" aria-label="Tracks Beta" style="--field-grid-columns:${gridColumns}"><div class="field-grid-row field-grid-header" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader">#</div><div class="field-grid-cell field-grid-heading" role="columnheader">Track</div>${columns.map(key => `<div class="field-grid-cell field-grid-heading" role="columnheader" title="${esc(displayTrackKey(key))}">${esc(displayTrackKey(key))}</div>`).join("")}</div>${rows || '<div class="field-grid-empty" role="row"><span role="cell">No playable tracks</span></div>'}</div></div></section>`;
+    return `<section class="data-page tracks-beta-page"><div class="data-page-heading"><div><h2>Tracks Beta</h2><p>Wide array-style view of every track tag. Click a row for the exhaustive track inspector.</p></div><span class="data-page-count">${tracks.length} tracks · ${columns.length} tag columns</span></div>${renderTrackGrid(tracks, "tracks-beta-native-grid")}</section>`;
   }
 
-  function scheduleTrackColumnSizing() {
-    const table = $(".track-grid");
+  function scheduleTrackColumnSizing(selector = ".members-view .track-grid") {
+    const table = $(selector);
     if (!table) return;
     const tracks = visibleMembers();
     const columns = trackColumns();

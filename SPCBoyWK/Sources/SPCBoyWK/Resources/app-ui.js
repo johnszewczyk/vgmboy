@@ -86,6 +86,7 @@ function restorePlaylistTabView(tab) {
   state.selectedTrackId = tab.selectedTrackId || null;
   state.selectedTrackIds = Array.isArray(tab.selectedTrackIds) ? [...tab.selectedTrackIds] : [];
   state.playlistSelectionAnchorId = tab.playlistSelectionAnchorId || null;
+  lastPlaylistSelectionID = state.selectedTrackId;
   state.catalogPlaylistColumnContentHints = tab.catalogPlaylistColumnContentHints || null;
   state.catalogPlaylistSortSessionId = tab.catalogPlaylistSortSessionId || null;
   // Column widths are shared UI state, but the content that determines an
@@ -323,6 +324,7 @@ const playlistRowsByTrackId = new Map();
 let selectedPlaylistRow = null;
 let currentPlaylistRow = null;
 let selectionIndicatorFrame = 0;
+let lastPlaylistSelectionID = null;
 
 function playlistUsesVirtualRows() {
   return state.playlist.length > PLAYLIST_VIRTUALIZATION_THRESHOLD;
@@ -477,6 +479,7 @@ function clearPlaylistSelection() {
   state.selectedTrackIds = [];
   state.playlistSelectionAnchorId = null;
   selectedPlaylistRow = null;
+  lastPlaylistSelectionID = null;
   scheduleSelectionIndicators();
 }
 
@@ -675,6 +678,7 @@ async function handleBrowserGesture(node, gesture, wasSelected = false) {
 }
 
 function selectBrowserNode(node, { focus = false, previewLeaf = true } = {}) {
+  lastPlaylistSelectionID = null;
   if (state.selectedBrowserPath !== node.path) {
     browserSelectionGeneration += 1;
   }
@@ -732,6 +736,7 @@ function appendPlaylistTracks(additions, selectedBrowserPath = state.selectedBro
   state.catalogPlaylistColumnContentHints = null;
   state.catalogPlaylistSortSessionId = null;
   state.selectedTrackId = uniqueAdditions[0].id;
+  lastPlaylistSelectionID = state.selectedTrackId;
   persistSettings();
   renderTree();
   syncTreeSelection();
@@ -879,6 +884,7 @@ function visibleDatabaseSidebarRows() {
 
 function selectDatabaseSidebarRow(button, { focus = true, preview = false } = {}) {
   if (!button) return false;
+  lastPlaylistSelectionID = null;
   window.clearTimeout(databaseGameClickTimer);
   databaseGameClickTimer = 0;
 
@@ -1470,7 +1476,10 @@ async function activateDatabaseSelection() {
 
 async function activateFocusedItem(focusTarget = document.activeElement) {
   const focused = focusTarget?.closest?.(".playlist-row, .tree-node, .database-game-row, .database-console-row") || document.activeElement;
-  const playlistRow = focused?.closest?.(".playlist-row");
+  const playlistRow = focused?.closest?.(".playlist-row")
+    || (refs.playlistBody.contains(focusTarget) && state.selectedTrackId
+      ? refs.playlistBody.querySelector(`[data-track-id="${CSS.escape(state.selectedTrackId)}"]`)
+      : null);
   if (playlistRow?.dataset.trackId) {
     // Enter on a playlist row activates that row. Never substitute the
     // previously selected or playing track when DOM focus has moved.
@@ -2055,6 +2064,7 @@ function selectPlaylistTrack(trackId, { focus = false, extend = false, range = f
   state.selectedTrackIds = selection.selectedIds;
   state.selectedTrackId = selection.primaryId;
   state.playlistSelectionAnchorId = selection.anchorId;
+  lastPlaylistSelectionID = selection.primaryId;
   if (previousIds.size !== selection.selectedIds.length || selection.selectedIds.some((id) => !previousIds.has(id))) persistSettings();
   persistPlaylistTabs();
 
@@ -2305,6 +2315,8 @@ function applyUISettings() {
   rootStyle.setProperty("--playlist-header-font-weight", state.playlistHeaderBold ? "700" : "400");
   rootStyle.setProperty("--sidebar-width-percent", String(state.sidebarWidthPercent));
   rootStyle.setProperty("--accent", state.accentColor);
+  rootStyle.setProperty("--bg-chrome", state.uiChromeColor);
+  rootStyle.setProperty("--selection-bar-background", state.solidSelectionBar ? state.accentColor : "transparent");
   rootStyle.setProperty("--item-spacing-rem", String(state.uiItemSpacingRem));
   rootStyle.setProperty("--column-resize-duration", `${state.autoResizeAnimationEnabled ? state.autoResizeAnimationMilliseconds : 0}ms`);
   rootStyle.setProperty("--selection-animation-duration", `${state.selectionAnimationEnabled ? state.selectionAnimationMilliseconds : 0}ms`);
@@ -2323,7 +2335,9 @@ function appearanceSettings() {
     playlistMonospace: state.playlistMonospace,
     applicationMonospace: state.applicationMonospace,
     playlistHeaderBold: state.playlistHeaderBold,
-    accentColor: state.accentColor
+    accentColor: state.accentColor,
+    uiChromeColor: state.uiChromeColor,
+    solidSelectionBar: state.solidSelectionBar
   };
 }
 
@@ -2408,6 +2422,8 @@ function renderAll() {
   if (document.activeElement !== refs.sidebarTextColorInput) refs.sidebarTextColorInput.value = state.sidebarTextColor;
   refs.sidebarPathCountsCheckbox.checked = state.sidebarPathCounts;
   if (document.activeElement !== refs.accentColorInput) refs.accentColorInput.value = state.accentColor;
+  if (document.activeElement !== refs.uiChromeColorInput) refs.uiChromeColorInput.value = state.uiChromeColor;
+  refs.solidSelectionBarCheckbox.checked = state.solidSelectionBar;
   refs.applicationMonospaceCheckbox.checked = state.applicationMonospace;
   if (refs.aacExportDirectoryPath) refs.aacExportDirectoryPath.value = state.aacExportDirectory || "";
   if (refs.aacExportStatus) refs.aacExportStatus.textContent = state.aacExportStatus || "";
@@ -2508,6 +2524,7 @@ function selectAllPlaylistTracks() {
   if (!state.playlist.length) return;
   state.selectedTrackIds = state.playlist.map((track) => track.id);
   state.selectedTrackId = state.playlist[0].id;
+  lastPlaylistSelectionID = state.selectedTrackId;
   state.playlistSelectionAnchorId = state.selectedTrackId;
   persistSettings();
   refreshPlaylistPlaybackState();
@@ -2525,6 +2542,16 @@ function playSelectedTrack() {
   playVisibleTrack(active.id, 0).catch((error) => {
     console.error(error);
   });
+}
+
+function isPlaylistSelectionTarget(focusTarget = document.activeElement) {
+  if (refs.treeRoot?.contains(focusTarget)) return false;
+  if (refs.playlistScrollWrap?.contains(focusTarget)
+      || refs.playlistBodyWrap?.contains(focusTarget)
+      || refs.playlistBody?.contains(focusTarget)) return true;
+  return Boolean(lastPlaylistSelectionID
+    && state.selectedTrackId === lastPlaylistSelectionID
+    && state.playlist.some((track) => track.id === lastPlaylistSelectionID));
 }
 
 function setPlayTime(nextSeconds) {
@@ -2874,12 +2901,28 @@ function applyAppearanceSettings(settings) {
   if (settings.sidebarPathCounts !== undefined) state.sidebarPathCounts = Boolean(settings.sidebarPathCounts);
   if (settings.playlistHeaderBold !== undefined) state.playlistHeaderBold = Boolean(settings.playlistHeaderBold);
   if (settings.accentColor !== undefined) state.accentColor = uiApp.normalizeAccentColor(settings.accentColor);
+  if (settings.uiChromeColor !== undefined) state.uiChromeColor = uiApp.normalizeUIColor(settings.uiChromeColor, "rgb(30 30 30)");
+  if (settings.solidSelectionBar !== undefined) state.solidSelectionBar = Boolean(settings.solidSelectionBar);
   persistSettings();
   renderAll();
 }
 
 function setAccentColor(color) {
   state.accentColor = uiApp.normalizeAccentColor(color);
+  persistSettings();
+  broadcastAppearanceSettings();
+  renderAll();
+}
+
+function setUIChromeColor(color) {
+  state.uiChromeColor = uiApp.normalizeUIColor(color, "rgb(30 30 30)");
+  persistSettings();
+  broadcastAppearanceSettings();
+  renderAll();
+}
+
+function setSolidSelectionBar(enabled) {
+  state.solidSelectionBar = Boolean(enabled);
   persistSettings();
   broadcastAppearanceSettings();
   renderAll();
@@ -3055,6 +3098,7 @@ uiApp.ui = {
   moveDatabaseSidebarSelection,
   jumpFocusedListToEdge,
   playSelectedTrack,
+  isPlaylistSelectionTarget,
   setPlayTime,
   setSpcForceManualTime,
   cycleRepeatMode,
@@ -3078,6 +3122,8 @@ uiApp.ui = {
   setFontSize,
   setSidebarWidth,
   setAccentColor,
+  setUIChromeColor,
+  setSolidSelectionBar,
   commitFontSizeInput,
   commitSidebarFontSizeInput,
   setSidebarTextColor,
