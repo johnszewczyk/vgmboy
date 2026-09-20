@@ -643,6 +643,11 @@ test("SPCBoyWK selection capsule leaves playlist text colors unchanged", () => {
   assert.doesNotMatch(stylesSource, /\.list-selection-indicator\s*\{[^}]*transition:[^}]*opacity/);
   assert.doesNotMatch(stylesSource, /\.list-selection-indicator\s*\{[^}]*transition:[^}]*,\s*(?:width|height)\s+var\(--selection-animation-duration\)/);
   assert.match(stylesSource, /\.list-selection-indicator\.is-hidden\s*\{\s*transition: none;/);
+  assert.match(uiSource, /const height = targetBounds\.height \+ 1;[\s\S]*?indicator\.style\.height = `\$\{height\}px`;/);
+  assert.match(stylesSource, /--toolbar-stack-overlap: var\(--top-toolbar-inset\)/);
+  assert.match(stylesSource, /\.sidebar > \.sidebar-search-wrap\s*\{\s*margin-top: calc\(-1 \* var\(--toolbar-stack-overlap\)\);/);
+  assert.match(stylesSource, /\.playlist-tabs-toolbar:not\(\.is-hidden\) \+ \.playlist-wrap\s*\{\s*margin-top: calc\(-1 \* var\(--toolbar-stack-overlap\)\);/);
+  assert.match(stylesSource, /\.playlist-wrap \+ \.playlist-bottom-toolbar\s*\{\s*margin-top: calc\(-1 \* var\(--toolbar-stack-overlap\)\);/);
   assert.match(stylesSource, /\.playlist-row\.is-current:not\(\.is-selected\) td\s*\{\s*color: var\(--accent\);\s*\}/);
   assert.doesNotMatch(stylesSource, /\.playlist-row\.is-selected[^{}]*\{[^}]*\bcolor\s*:/);
   assert.match(stylesSource, /button:is\(\.tree-node, \.database-game-row, \.database-console-row\)\.is-selected\s*\{[^}]*background: transparent;[^}]*box-shadow: none;/);

@@ -414,6 +414,9 @@ function positionSelectionIndicator(container, indicator, target) {
   if (!targetBounds.width || !targetBounds.height) return false;
   const left = targetBounds.left - containerBounds.left + container.scrollLeft;
   const top = targetBounds.top - containerBounds.top + container.scrollTop;
+  // Let the capsule fall one CSS pixel below the row baseline so it sits
+  // between rows instead of visually stopping high against the text.
+  const height = targetBounds.height + 1;
   const transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
   if (indicator.classList.contains("is-hidden")) {
     // First appearance after an explicit clear/source change should land at
@@ -421,7 +424,7 @@ function positionSelectionIndicator(container, indicator, target) {
     const previousTransition = indicator.style.transition;
     indicator.style.transition = "none";
     indicator.style.width = `${targetBounds.width}px`;
-    indicator.style.height = `${targetBounds.height}px`;
+    indicator.style.height = `${height}px`;
     indicator.style.transform = transform;
     indicator.style.opacity = "1";
     indicator.classList.remove("is-hidden");
@@ -430,7 +433,7 @@ function positionSelectionIndicator(container, indicator, target) {
     return true;
   }
   indicator.style.width = `${targetBounds.width}px`;
-  indicator.style.height = `${targetBounds.height}px`;
+  indicator.style.height = `${height}px`;
   indicator.style.transform = transform;
   return true;
 }

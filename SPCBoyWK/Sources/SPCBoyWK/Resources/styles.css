@@ -40,6 +40,7 @@
   --toolbar-gap: 0.25rem;
   --frame-inset: 0.5rem;
   --top-toolbar-inset: 0.5rem;
+  --toolbar-stack-overlap: var(--top-toolbar-inset);
   --top-toolbar-control-height: var(--control-height);
   --top-toolbar-height: calc(var(--top-toolbar-control-height) + (2 * var(--top-toolbar-inset)));
   --column-resize-duration: 200ms;
@@ -195,6 +196,12 @@ body.is-file-drag-over::after {
   min-width: 0;
   overflow: hidden;
   padding: var(--top-toolbar-inset);
+}
+
+/* Adjacent toolbar controls share one chrome gap. Their internal top and
+   bottom insets would otherwise add together at the stack boundary. */
+.sidebar > .sidebar-search-wrap {
+  margin-top: calc(-1 * var(--toolbar-stack-overlap));
 }
 
 .sidebar-search-input {
@@ -492,6 +499,14 @@ body.is-file-drag-over::after {
   -webkit-user-select: none;
   padding: 0 var(--top-toolbar-inset) var(--top-toolbar-inset);
   background: var(--bg-sidebar);
+}
+
+.playlist-tabs-toolbar:not(.is-hidden) + .playlist-wrap {
+  margin-top: calc(-1 * var(--toolbar-stack-overlap));
+}
+
+.playlist-wrap + .playlist-bottom-toolbar {
+  margin-top: calc(-1 * var(--toolbar-stack-overlap));
 }
 
 .playlist-scroll-wrap {

@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none';">
   <title>UACMan</title>
-  <link rel="stylesheet" href="workspace.css?v=20260919-tracks-beta">
-  <script src="workspace.js?v=20260919-tracks-beta" defer></script>
+  <link rel="stylesheet" href="workspace.css?v=20260919-fields-v2">
+  <script src="workspace.js?v=20260919-fields-v2" defer></script>
 </head>
 <body>
   <header class="appbar">
@@ -35,7 +35,7 @@
     </aside>
 
     <section class="members-panel panel">
-      <nav class="main-view-tabs" aria-label="Package workspace"><div class="tab-buttons"><button data-action="mainView" data-view="members" id="members-view-button" class="active">Tracks</button><button data-action="mainView" data-view="trackBeta" id="tracks-beta-view-button">Tracks Beta</button><button data-action="mainView" data-view="technical" id="technical-view-button">Package Tags</button><button data-action="mainView" data-view="schema" id="schema-view-button">Meta Tags</button><button data-action="mainView" data-view="tree" id="tree-view-button">Tree</button></div><label class="search member-search" id="member-filter-wrap"><span>⌕</span><input id="member-filter" placeholder="Search title, artist, album, filename, path…" autocomplete="off"><kbd>⌘ K</kbd></label></nav>
+      <nav class="main-view-tabs" aria-label="Package workspace"><div class="tab-buttons"><button data-action="mainView" data-view="members" id="members-view-button" class="active">Tracks</button><button data-action="mainView" data-view="trackBeta" id="tracks-beta-view-button">Tracks Beta</button><button data-action="mainView" data-view="files" id="files-view-button">Files</button><button data-action="mainView" data-view="technical" id="technical-view-button">Package Tags</button><button data-action="mainView" data-view="schema" id="schema-view-button">Meta Tags</button><button data-action="mainView" data-view="tree" id="tree-view-button">Tree</button></div><label class="search member-search" id="member-filter-wrap"><span>⌕</span><input id="member-filter" placeholder="Search title, artist, album, filename, path…" autocomplete="off"><kbd>⌘ K</kbd></label></nav>
       <div class="members-view" id="members-view">
         <div class="table-scroll" id="table-scroll"><table class="member-table"><thead><tr id="member-headings"><th class="check-col"></th><th data-sort="role">Role <span></span></th><th data-sort="format">Format <span></span></th><th data-sort="name">File <span></span></th></tr></thead><tbody id="member-rows"></tbody></table>
           <div class="empty-state" id="empty-state"><div class="empty-icon">▤</div><h3>Open a package to get started</h3><p>Browse a collection or open a UAC package. The member table includes streams, artwork, cue sheets, and documents.</p><button class="button primary" data-action="openUAC">Open a UAC file</button></div>

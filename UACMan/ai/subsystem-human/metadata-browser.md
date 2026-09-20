@@ -20,36 +20,27 @@ list. Finder displays UACMan's document icon for `.uac` files. Hidden files and
 symbolic links are skipped. Choose **Open UAC** to open a single package
 without scanning its parent folder.
 
-Selecting a package opens every member in the center grid, including playable
-streams, artwork, cue sheets, and documentation. The checkbox column selects
-members independently of the active row. The member filter above the table searches all visible metadata values, role,
-format, filename, and path. The Tracks page builds dense scalar tag columns from
-playable members; attachments and structured metadata stay out of the audio rows
-and are shown in their scoped pages.
-Selecting a package uses six explicit pages. **Tracks** is the primary view: it
-filters to playable audio members and presents scalar tags as editable fixed-width
-columns, one compact row per track. Its heading line carries the shown/audio count
-and the right-aligned filter; clicking any column header sorts the visible rows.
-The first column is checkbox-only, with an all/none checkbox in its header. The
-Track column is the display track number;
-the source filename remains available as a tooltip and in the scoped track page.
-Track columns size themselves from the longest loaded header or value and ease
-to the new width over 200 ms. In **Meta Tags**, Example shows the shared value
-when all uses agree and `Varies · N values` otherwise; structured values remain
-compact `Object · N` or `List · N` entries.
-Attachments never appear as fake audio rows. **Package tags** contains set-level
-fields and a separate attachment list. **Track Tags** contains only the selected
-track's fields. **Technical** is a dedicated table for hashes, source facts, and
-diagnostics. **Meta Tags** inventories top-level names and renames them throughout
-the package draft, including Package or All Tracks creation and deletion. **Tree** is a plain folding dictionary for
-the set and tracks, with scalar `key : value` rows editable in place and the same
-compact Key/Value/Type table treatment as Tracks. Technical fields stay on the
-Technical page; structured objects and lists
-are represented by counts until a scoped editor is chosen. Raw JSON is available
-only through the collapsed advanced editor. This keeps a set-level image or
-document attached to the set rather than repeating it on every track. Hovering
-the path reveals its exact stored UAC member path. UACMan lists assets and their
-metadata; it does not yet preview image bytes inside the compressed payload.
+Selecting a package opens its playable tracks in the primary **Tracks** view.
+The member filter searches visible metadata values, role, format, filename, and
+path. Track rows are clickable and open an exhaustive per-track inspector; batch
+tag edits live in **Meta Tags**, so Tracks does not carry a separate checkbox
+selection model. The Tracks table includes both the display track number and the
+literal source filename as its first two columns. Scalar values are editable;
+structured values are shown as compact read-only summaries.
+
+The workspace has six explicit pages. **Tracks Beta** is the wide experimental
+array-style field grid: every header and value is a boxed field, and its horizontal
+scroll is intentional. **Files** lists every stored package member, including
+playable streams, artwork, cue sheets, and documentation, and opens a member's
+inspector when selected. **Package Tags** contains package-level metadata and all
+attachments using the same field-grid cells; structured package values are
+read-only. **Meta Tags** inventories package and track tag names, supports scalar
+value edits and package-wide rename/delete operations, and shows multiple values
+as disabled fields. **Tree** presents the set and tracks vertically with boxed
+Key/Value/Type fields; scalar values can be edited in place. Technical and
+structured values remain represented by their package-scoped field views. UACMan
+lists assets and their metadata; it does not preview image bytes inside the
+compressed payload.
 When a single UAC is opened directly, the library rail collapses automatically;
 it returns when a collection is opened. The last existing UAC or collection path
 is restored on launch when no command-line document was supplied.

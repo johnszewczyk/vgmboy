@@ -104,9 +104,9 @@ button { cursor:pointer; }
 .field-grid .icon-button { width:23px; height:23px; padding:0; border:1px solid var(--line); border-radius:3px; background:transparent; color:var(--muted); cursor:pointer; }
 .field-grid .icon-button:hover { color:var(--text); border-color:var(--accent); }
 .field-grid .icon-button.danger,.field-grid .danger { color:var(--danger, #e06c75); }
-.technical-field-grid { --field-grid-columns:15% 7% minmax(0,1fr) minmax(0,1fr) 28px 28px; min-width:760px; }
+.technical-field-grid { --field-grid-columns:15% 7% minmax(0,1fr) minmax(0,1fr) 58px 58px; min-width:760px; }
 .technical-field-grid .action-heading { grid-column:span 2; justify-content:center; }
-.meta-field-grid { --field-grid-columns:max-content max-content minmax(0,1fr) minmax(0,1fr) max-content 28px 28px; }
+.meta-field-grid { --field-grid-columns:max-content max-content minmax(0,1fr) minmax(0,1fr) max-content 58px 58px; }
 .tag-scope-table { margin-top:10px; }
 .tag-values-popover { position:relative; display:inline-block; }
 .tag-values-popover summary { cursor:pointer; list-style:none; color:var(--muted); }
@@ -140,20 +140,52 @@ button { cursor:pointer; }
    separate interaction now that package-wide edits live in Meta Tags. */
 .track-grid tbody tr { cursor:pointer; }
 .track-grid .track-number-heading,.track-grid .track-number-cell { left:0; }
-.technical-field-grid { --field-grid-columns:15% minmax(0,1fr) 100px minmax(0,1fr) 28px 28px; }
+.technical-field-grid { --field-grid-columns:15% minmax(0,1fr) 100px minmax(0,1fr) 58px 58px; }
 .track-tags-editor .technical-field { display:table-row!important; }
 .structured-technical-row .tag-table-field:disabled { cursor:not-allowed; }
 .metadata-view.tracks-beta-active .inspector-content { width:100%; max-width:none; margin:0; }
 .tracks-beta-page { width:100%; min-width:0; }
-.tracks-beta-page .track-grid-wrap { flex:1 1 auto; min-height:0; width:100%; padding:0 0 18px; }
-.tracks-beta-page .track-grid-scroll { width:100%; height:100%; min-height:0; overflow:auto; }
-.tracks-beta-page .tracks-beta-native-grid { width:max-content; min-width:100%; table-layout:fixed; }
-.tracks-beta-page .tracks-beta-native-grid th,
-.tracks-beta-page .tracks-beta-native-grid td { height:23px; padding:0 5px; border-bottom:0; vertical-align:middle; }
-.tracks-beta-page .tracks-beta-native-grid th { background:var(--panel); color:var(--text); text-align:center; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.tracks-beta-page .tracks-beta-native-grid td { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.tracks-beta-page .tracks-beta-native-grid tbody tr:hover .track-number-cell,
-.tracks-beta-page .tracks-beta-native-grid tbody tr.active .track-number-cell { background:var(--selected); }
-.tracks-beta-page .tracks-beta-native-grid .track-cell { min-width:0; color:var(--accent); }
-.tracks-beta-page .tracks-beta-native-grid .structured-value,
-.tracks-beta-page .tracks-beta-native-grid .track-structured-popover summary { color:var(--muted); background:transparent; border-color:var(--line); }
+
+.field-grid-heading-input { text-align:center; font-weight:700; color:var(--text)!important; background:var(--panel-2)!important; border-color:var(--line)!important; cursor:default; }
+.technical-field-grid .field-grid-header .field-grid-cell,
+.meta-field-grid .field-grid-header .field-grid-cell { justify-content:center; }
+.track-grid .track-filename-cell { color:var(--muted); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:9px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tracks-beta-page .track-array-scroll { flex:1 1 auto; min-width:0; min-height:0; width:100%; overflow:auto; }
+.tracks-beta-page .track-array-grid { --track-array-columns:64px 220px 120px; width:max-content; min-width:max-content; padding:0; }
+.tracks-beta-page .track-array-grid .field-grid-header,
+.tracks-beta-page .track-array-grid .track-array-row { grid-template-columns:var(--track-array-columns); width:max-content; min-width:100%; }
+.tracks-beta-page .track-array-grid .field-grid-header { position:sticky; top:0; z-index:2; background:var(--panel-2); }
+.tracks-beta-page .track-array-grid .field-grid-cell { min-width:0; padding:2px; }
+.tracks-beta-page .track-array-grid .track-array-row { cursor:pointer; }
+.tracks-beta-page .track-array-grid .track-array-row:hover,
+.tracks-beta-page .track-array-grid .track-array-row.active { background:var(--selected); }
+.tracks-beta-page .track-array-grid .track-array-row .field-grid-cell { border-bottom:0; }
+.tracks-beta-page .track-array-grid .track-array-value { min-width:0; color:var(--muted); }
+.tracks-beta-page .track-array-grid .track-array-value.track-cell { color:var(--accent); }
+.tracks-beta-page .track-array-grid .track-array-value:disabled { opacity:1; color:var(--muted); }
+.tree-field-grid { --tree-field-columns:minmax(170px,28%) minmax(260px,1fr) 90px; min-width:680px; width:100%; padding:0; }
+.tree-field-grid .field-grid-header,
+.tree-field-grid .tree-entry { grid-template-columns:var(--tree-field-columns); width:100%; }
+.tree-field-grid .tree-entry { min-height:27px; }
+.tree-field-grid .tree-entry .field-grid-cell { min-width:0; padding:2px; }
+.tree-field-grid .tree-type-field { color:var(--muted)!important; }
+.tree-field-grid .tree-value-field:disabled { opacity:1; color:var(--muted); }
+.tree-field-grid .tree-entry:hover { background:var(--hover); }
+.files-page .file-table-scroll { flex:1 1 auto; min-height:0; }
+.file-field-grid { --file-field-columns:110px 100px 220px minmax(320px,1fr) 90px; min-width:900px; width:100%; padding:0; }
+.file-field-grid .field-grid-header,
+.file-field-grid .file-row { grid-template-columns:var(--file-field-columns); width:100%; }
+.file-field-grid .file-row { cursor:pointer; }
+.file-field-grid .file-row:hover { background:var(--hover); }
+.file-field-grid .file-row .field-grid-cell { padding:2px; }
+.file-field-grid .file-path-field { color:var(--muted)!important; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:9px; }
+.file-field-grid .file-name-field { color:var(--accent)!important; }
+.attachment-table-scroll { min-height:0; }
+.attachment-field-grid { --attachment-field-columns:110px 100px 220px minmax(320px,1fr) 90px; min-width:900px; width:100%; padding:0; }
+.attachment-field-grid .field-grid-header,
+.attachment-field-grid .attachment-row { grid-template-columns:var(--attachment-field-columns); width:100%; }
+.attachment-field-grid .attachment-row { cursor:pointer; }
+.attachment-field-grid .attachment-row:hover { background:var(--hover); }
+.attachment-field-grid .attachment-row .field-grid-cell { padding:2px; }
+.attachment-field-grid .file-path-field { color:var(--muted)!important; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:9px; }
+.attachment-field-grid .file-name-field { color:var(--accent)!important; }
