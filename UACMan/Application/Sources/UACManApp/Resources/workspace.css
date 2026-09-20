@@ -182,7 +182,7 @@ button { cursor:pointer; }
 .main-view-tabs button.active { border-color:transparent; }
 .main-view-tabs button.active::after { transform:scaleX(1); }
 
-.field-grid { padding:1px var(--field-grid-gap); }
+.field-grid { padding:2px var(--field-grid-gap); }
 .field-grid-header,.field-grid-row { width:auto; min-width:0; }
 .field-grid-cell { padding:0; }
 .field-grid .row-removing { pointer-events:none; }
@@ -196,7 +196,7 @@ button { cursor:pointer; }
 
 .tree-field-grid,
 .file-field-grid,
-.attachment-field-grid { padding:0 var(--field-grid-gap); }
+.attachment-field-grid { padding:2px var(--field-grid-gap); }
 .tree-field-grid .field-grid-header,
 .tree-field-grid .tree-entry,
 .file-field-grid .field-grid-header,
@@ -210,16 +210,36 @@ button { cursor:pointer; }
 .file-field-grid .file-row { grid-template-columns:var(--file-field-columns); column-gap:var(--field-grid-gap); }
 .attachment-field-grid .attachment-row { grid-template-columns:var(--attachment-field-columns); column-gap:var(--field-grid-gap); gap:0 var(--field-grid-gap); align-items:center; padding:0; border-bottom:0; }
 
+.canonical-fold { min-width:0; }
+.canonical-fold-toggle { display:flex; align-items:center; gap:8px; width:100%; min-width:0; padding:7px 0; border:0; background:transparent; color:var(--muted); font:inherit; text-align:left; cursor:pointer; transition:color var(--ui-motion),background-color var(--ui-motion); }
+.canonical-fold-toggle > span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.canonical-fold-toggle:hover { color:var(--text); background:var(--hover); }
+.canonical-fold-meta { margin-left:auto; color:var(--muted); font-size:10px; white-space:nowrap; }
+.canonical-fold-icon { flex:none; color:var(--accent); font-size:14px; line-height:1; }
+.canonical-fold-panel { display:grid; grid-template-rows:0fr; opacity:0; transition:grid-template-rows var(--ui-motion),opacity var(--ui-motion); }
+.canonical-fold-panel.open { grid-template-rows:1fr; opacity:1; }
+.canonical-fold-inner { min-height:0; overflow:hidden; }
 .tag-multiple-values { width:100%; min-width:0; }
-.tag-multiple-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; height:23px; padding:2px 5px; border:1px dashed var(--line); border-radius:0; background:var(--panel-2); color:var(--muted); font:inherit; text-align:left; }
-.tag-multiple-toggle:hover { border-color:var(--accent); color:var(--text); }
-.tag-multiple-toggle-icon { color:var(--accent); font-size:14px; line-height:1; }
-.tag-multiple-values-panel { display:grid; grid-template-rows:0fr; opacity:0; transition:grid-template-rows var(--ui-motion),opacity var(--ui-motion); }
-.tag-multiple-values-panel.open { grid-template-rows:1fr; opacity:1; }
-.tag-multiple-values-inner { min-height:0; overflow:hidden; border:1px solid var(--line); border-top:0; background:var(--panel); }
+.tag-multiple-values > .canonical-fold-toggle { height:23px; padding:2px 5px; border:1px dashed var(--line); background:var(--panel-2); }
+.tag-multiple-values > .canonical-fold-inner { border:1px solid var(--line); border-top:0; background:var(--panel); }
 .tag-multiple-value-row { display:grid; grid-template-columns:24px minmax(0,1fr); gap:6px; padding:3px 5px; border-top:1px solid color-mix(in srgb,var(--line) 72%,transparent); color:var(--muted); white-space:pre-wrap; overflow-wrap:anywhere; }
 .tag-multiple-value-row:first-child { border-top:0; }
 .tag-multiple-value-row > span:first-child { color:var(--soft); text-align:right; }
+
+/* Every Tree level uses the same animated disclosure as Multiple Values. */
+.tree-page > .tree-branch > .canonical-fold-toggle { padding:11px 0; border-top:1px solid var(--line); }
+.tree-page > .tree-branch > .canonical-fold-inner { padding:0 0 12px; }
+.tree-track > .canonical-fold-toggle { padding:9px 12px; background:color-mix(in srgb,var(--accent) 5%,var(--panel-2)); }
+.tree-track > .canonical-fold-inner { padding:0 0 10px 14px; }
+.tree-dictionary-heading { padding:0; }
+.tree-dictionary-toggle { padding:7px 0; }
+
+/* The same motion token drives page changes, navigation, tabs, and controls. */
+@keyframes page-enter { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+.page-enter { animation:page-enter var(--ui-motion) both; }
+.appbar,.main-view-tabs,.panel-heading,.inspector-head { transition:background-color var(--ui-motion),border-color var(--ui-motion),box-shadow var(--ui-motion); }
+.main-view-tabs button,.button,.icon-button,.search,.collection-item { transition:color var(--ui-motion),background-color var(--ui-motion),border-color var(--ui-motion),box-shadow var(--ui-motion),transform var(--ui-motion); }
+.main-view-tabs button:active,.button:active,.icon-button:active { transform:translateY(1px); }
 
 /* Keep the package workspace usable as its width changes. The search field
    yields space to the tab strip without changing the shared table geometry. */

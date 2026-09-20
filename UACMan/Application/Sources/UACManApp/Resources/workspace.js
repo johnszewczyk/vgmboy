@@ -78,12 +78,18 @@
     }
     return esc(String(value));
   };
+  const canonicalFoldMarkup = (label, body, options = {}) => {
+    const open = options.open === true;
+    const memberPath = options.memberPath ? ` data-tree-member="${esc(options.memberPath)}"` : "";
+    const meta = options.meta ? `<span class="canonical-fold-meta">${esc(options.meta)}</span>` : "";
+    return `<div class="canonical-fold ${esc(options.className || "")}"><button class="canonical-fold-toggle" type="button" data-action="toggleCanonicalFold" aria-expanded="${open}"${memberPath}><span>${esc(label)}</span>${meta}<span class="canonical-fold-icon">${open ? "−" : "＋"}</span></button><div class="canonical-fold-panel${open ? " open" : ""}"><div class="canonical-fold-inner">${body}</div></div></div>`;
+  };
   const multipleValuesMarkup = (value, suppliedEntries = null) => {
     const entries = suppliedEntries || (Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value || {}));
     const body = entries.length
       ? entries.map(([key, item]) => `<div class="tag-multiple-value-row"><span>${esc(key)}</span><span>${esc(typeof item === "object" ? JSON.stringify(item) : String(item ?? "—"))}</span></div>`).join("")
       : '<div class="tag-multiple-value-row"><span>—</span><span>Empty</span></div>';
-    return `<div class="tag-multiple-values"><button class="tag-multiple-toggle" type="button" data-action="toggleMultipleValues" aria-expanded="false"><span>Multiple Values</span><span class="tag-multiple-toggle-icon">＋</span></button><div class="tag-multiple-values-panel"><div class="tag-multiple-values-inner">${body}</div></div></div>`;
+    return canonicalFoldMarkup("Multiple Values", body, { className:"tag-multiple-values" });
   };
   const metadataSortValue = (member, key) => {
     const value = memberFields(member)[key];
@@ -93,6 +99,7 @@
   let sort = { key:"track", direction:1 };
   let inspectorTab = "set";
   let mainView = "members";
+  let lastRenderedView = "";
   let lastDocumentName = "";
   const uiMotionDuration = 200;
 
@@ -136,6 +143,8 @@
       inspectorTab = "set";
       mainView = "members";
     }
+    const viewChanged = mainView !== lastRenderedView;
+    lastRenderedView = mainView;
     const active = document.activeElement;
     const focusId = active?.dataset?.focusId;
     const selection = active && "selectionStart" in active ? [active.selectionStart, active.selectionEnd] : null;
@@ -162,6 +171,14 @@
     $("#members-view").classList.toggle("hidden", mainView !== "members");
     $("#metadata-view").classList.toggle("hidden", mainView === "members");
     $$(".main-view-tabs button").forEach(button => button.classList.toggle("active", button.dataset.view === mainView));
+    if (viewChanged) {
+      const visiblePage = mainView === "members" ? $("#members-view") : $("#metadata-view");
+      visiblePage?.classList.remove("page-enter");
+      if (visiblePage) {
+        void visiblePage.offsetWidth;
+        visiblePage.classList.add("page-enter");
+      }
+    }
 
     $("#status-message").textContent = state.isHarvestingMetadata ? state.harvestProgressMessage || "Reading metadata…" : state.statusMessage || "Ready";
     $("#encoding-info").textContent = state.manifestEncodingDescription || "";
@@ -233,17 +250,6 @@
       return `<tr class="field-row ${isTechnicalKey(key) ? "technical-field" : ""}" data-kind="${kind}"><td><input class="field-key" data-field-key data-focus-id="${esc(editorID)}" value="${esc(key)}" aria-label="Metadata field name"></td><td>${fieldValueMarkup(field, `${editorID}-value`, kind)}</td><td class="field-type-cell"><select class="field-type" data-field-type aria-label="Value type"><option value="string" ${kind === "string" ? "selected" : ""}>text</option><option value="number" ${kind === "number" ? "selected" : ""}>number</option><option value="boolean" ${kind === "boolean" ? "selected" : ""}>boolean</option><option value="json" ${kind === "json" ? "selected" : ""}>json</option></select></td><td class="field-action-cell"><button class="remove-field" data-action="removeField" title="Remove field" aria-label="Remove ${esc(key)}">×</button></td></tr>`;
     }).join("") : `<tr><td colspan="4" class="json-invalid">Metadata must be a JSON object. Use the JSON editor only if recovery is needed.</td></tr>`;
     return `<section class="inspector-section metadata-section" data-scope-section="${scope}"><div class="section-title">${esc(title)}<span class="section-actions"><button class="add-field" data-action="addField" data-scope="${scope}">＋ Add field</button></span></div><table class="kv-table"><thead><tr><th>Key</th><th>Value</th><th class="type-heading">Type</th><th class="action-heading"></th></tr></thead><tbody class="field-list" data-editor="${scope}">${fields}</tbody></table><div class="field-error" data-error-for="${scope}"></div><details class="raw-editor"><summary>Open JSON editor</summary><textarea data-raw-editor="${scope}" data-focus-id="raw-${scope}">${esc(raw || "{}")}</textarea></details></section>`;
-  }
-
-  function treeValue(key, value, depth = 0) {
-    const label = esc(key);
-    if (value !== null && typeof value === "object") {
-      const entries = Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value);
-      const kind = Array.isArray(value) ? `list · ${entries.length}` : `object · ${entries.length}`;
-      const children = entries.length ? entries.map(([childKey, childValue]) => treeValue(childKey, childValue, depth + 1)).join("") : '<div class="tree-empty">Empty</div>';
-      return `<details class="tree-node" ${depth < 1 ? "open" : ""}><summary><span class="tree-key">${label}</span><span class="tree-kind">${kind}</span></summary><div class="tree-children">${children}</div></details>`;
-    }
-    return `<div class="tree-leaf"><span class="tree-key">${label}</span><span class="tree-value">${displayMetadataValue(value)}</span></div>`;
   }
 
   function playableMembers() {
@@ -419,7 +425,7 @@
     }).join("");
     const empty = "<div class=\"field-grid-empty\" role=\"row\"><span role=\"cell\">No fields</span></div>";
     const header = `<div class="field-grid-row field-grid-header" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Key" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Value" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Type" disabled></div></div>`;
-    return `<section class="tree-dictionary" data-tree-editor data-tree-scope="${scope}" data-tree-member="${esc(memberPath || "")}" data-tree-id="${esc(rootID)}"><div class="tree-dictionary-heading"><strong>${esc(title)}</strong><span><button class="add-field" data-action="addTreeField">＋ Add field</button></span></div><div class="field-grid tree-field-grid" role="table" aria-label="${esc(title)}">${header}${rows || empty}</div></section>`;
+    return `<section class="tree-dictionary canonical-fold" data-tree-editor data-tree-scope="${scope}" data-tree-member="${esc(memberPath || "")}" data-tree-id="${esc(rootID)}"><div class="tree-dictionary-heading"><button class="canonical-fold-toggle tree-dictionary-toggle" type="button" data-action="toggleCanonicalFold" aria-expanded="true"><span>${esc(title)}</span><span class="canonical-fold-icon">−</span></button><button class="add-field" data-action="addTreeField">＋ Add field</button></div><div class="canonical-fold-panel open"><div class="canonical-fold-inner"><div class="field-grid tree-field-grid" role="table" aria-label="${esc(title)}">${header}${rows || empty}</div></div></div></section>`;
   }
 
   function renderTree() {
@@ -429,9 +435,11 @@
       const selected = member.path === state.selectedMemberPath;
       const metadata = member.metadata || {};
       const extensions = member.extensions || {};
-      return `<details class="tree-track" ${selected ? "open" : ""}><summary data-tree-member="${esc(member.path)}"><span class="tree-track-title">${esc(member.title || member.name)}</span><span class="tree-kind">${esc(member.format || member.role)}</span></summary><div class="tree-track-body">${treeEditor("memberMetadata", metadata, member.path, "Track Tags")}${Object.keys(extensions).length ? treeEditor("memberExtensions", extensions, member.path, "Track Extensions") : ""}</div></details>`;
+      const body = `${treeEditor("memberMetadata", metadata, member.path, "Track Tags")}${Object.keys(extensions).length ? treeEditor("memberExtensions", extensions, member.path, "Track Extensions") : ""}`;
+      return canonicalFoldMarkup(member.title || member.name, body, { className:"tree-track", open:selected, meta:member.format || member.role, memberPath:member.path });
     }).join("");
-    return `<section class="tree-page"><p class="tab-note">A plain key : value view. Scalar fields can be edited here; package-level fields are collected on the Package Tags page.</p><details class="tree-branch" open><summary><strong>Set</strong><span>${esc(state.packageTitle || state.packageID)}</span></summary><div class="tree-branch-body">${treeEditor("gameMetadata", game, "", "Set Tags")}${Object.keys(gameExtensions).length ? treeEditor("gameExtensions", gameExtensions, "", "Set Extensions") : ""}</div></details><details class="tree-branch" open><summary><strong>Tracks</strong><span>${playableMembers().length} audio tracks</span></summary><div class="tree-track-list">${tracks || '<div class="tree-empty">No playable tracks</div>'}</div></details></section>`;
+    const setBody = `${treeEditor("gameMetadata", game, "", "Set Tags")}${Object.keys(gameExtensions).length ? treeEditor("gameExtensions", gameExtensions, "", "Set Extensions") : ""}`;
+    return `<section class="tree-page"><p class="tab-note">A plain key : value view. Scalar fields can be edited here; package-level fields are collected on the Package Tags page.</p>${canonicalFoldMarkup("Set", setBody, { className:"tree-branch", open:true, meta:state.packageTitle || state.packageID })}${canonicalFoldMarkup("Tracks", tracks || '<div class="tree-empty">No playable tracks</div>', { className:"tree-branch", open:true, meta:`${playableMembers().length} audio tracks` })}</section>`;
   }
 
   function renderInspector() {
@@ -555,7 +563,7 @@
     const trackRow = event.target.closest("[data-track-row]");
     const treeMember = event.target.closest("[data-tree-member]");
     if (packageItem) { bridge("selectPackage", { path:packageItem.dataset.package }); return; }
-    if (treeMember) { mainView = "tree"; bridge("selectMember", { path:treeMember.dataset.treeMember }); render(state); return; }
+    if (treeMember && !event.target.closest("[data-tree-editor]") && action !== "toggleCanonicalFold") { mainView = "tree"; bridge("selectMember", { path:treeMember.dataset.treeMember }); render(state); return; }
     if (memberRow && !event.target.closest("input[type=checkbox]")) {
       mainView = "track";
       bridge("selectMember", { path:memberRow.dataset.member });
@@ -580,13 +588,16 @@
       const key = row?.dataset.tagFrom || "";
       if (key) animateRowRemoval(row, () => bridge("deleteMetadataKey", { key }));
     }
-    else if (action === "toggleMultipleValues") {
-      const toggle = event.target.closest("[data-action=toggleMultipleValues]");
-      const panel = toggle?.closest(".tag-multiple-values")?.querySelector(".tag-multiple-values-panel");
+    else if (action === "toggleCanonicalFold") {
+      const toggle = event.target.closest("[data-action=toggleCanonicalFold]");
+      const fold = toggle?.closest(".canonical-fold");
+      const panel = fold?.querySelector(".canonical-fold-panel");
       if (toggle && panel) {
         const open = panel.classList.toggle("open");
         toggle.setAttribute("aria-expanded", String(open));
-        $(".tag-multiple-toggle-icon", toggle).textContent = open ? "−" : "＋";
+        $(".canonical-fold-icon", toggle).textContent = open ? "−" : "＋";
+        const memberPath = toggle.dataset.treeMember || "";
+        if (memberPath && state.selectedMemberPath !== memberPath) bridge("selectMember", { path:memberPath });
       }
     }
     else if (action === "updateTagValue") {

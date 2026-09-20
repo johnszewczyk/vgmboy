@@ -38,8 +38,10 @@ using the same field-grid cells; structured package values are read-only.
 **Meta Tags** inventories package and track tag names, supports scalar value edits
 and package-wide rename/delete operations, and expands multiple values inline for
 inspection. **Tree** presents the set and tracks vertically with the same
-canonical boxed Key/Value/Type field-grid; scalar values can be edited in place.
-Multiple Values disclosures are reused anywhere structured fields appear. UACMan
+canonical boxed Key/Value/Type field-grid; its Set, Tracks, track, and dictionary
+levels all use the shared animated disclosure, and scalar values can be edited in
+place. Multiple Values disclosures are reused anywhere structured fields appear.
+UACMan
 lists assets and their metadata; it does not preview image bytes inside the
 compressed payload.
 When a single UAC is opened directly, the library rail collapses automatically;
