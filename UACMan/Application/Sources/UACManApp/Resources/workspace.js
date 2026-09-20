@@ -122,6 +122,18 @@
     const editor = multipleValuesEditorBodyMarkup(value, context);
     return `<div class="canonical-subtable-panel">${editor.body}</div>`;
   };
+  const multipleValuesPopupParts = (value, context = {}, options = {}) => {
+    const popupID = context.popupID || "multiple-values";
+    const isEditor = options.editable === true;
+    const entries = options.entries || (Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value || {}));
+    const editor = isEditor ? multipleValuesEditorBodyMarkup(value, context) : null;
+    const body = editor
+      ? `<div class="editable-multiple-values">${editor.body}</div>`
+      : `<div class="multiple-values-popup-table" role="table">${entries.length ? entries.map(([key, item]) => `<div class="tag-multiple-value-row" role="row"><span role="cell">${esc(key)}</span><span role="cell">${esc(typeof item === "object" ? JSON.stringify(item) : String(item ?? "—"))}</span></div>`).join("") : '<div class="tag-multiple-value-row" role="row"><span role="cell">—</span><span role="cell">Empty</span></div>'}</div>`;
+    const trigger = `<button class="canonical-fold-toggle canonical-fold-trigger multiple-values-popup-trigger" type="button" data-action="toggleMultipleValuesPopup" data-popup-id="${esc(popupID)}" aria-controls="multiple-values-popup-${esc(popupID)}" aria-expanded="false"><span>Multiple Values</span><span class="canonical-fold-icon">＋</span></button>`;
+    const popup = `<div class="multiple-values-popup-backdrop" id="multiple-values-popup-${esc(popupID)}" data-multiple-values-popup="${esc(popupID)}" hidden><div class="multiple-values-popup-card" role="dialog" aria-modal="true" aria-label="Multiple Values"><div class="multiple-values-popup-heading"><strong>Multiple Values</strong><button class="icon-button multiple-values-popup-close" data-action="closeMultipleValuesPopup" data-popup-id="${esc(popupID)}" type="button" title="Close" aria-label="Close">×</button></div><div class="multiple-values-popup-content">${body}</div></div></div>`;
+    return { trigger, popup };
+  };
   const metadataSortValue = (member, key) => {
     const value = memberFields(member)[key];
     return value && typeof value === "object" ? JSON.stringify(value) : (value ?? "");
@@ -344,7 +356,9 @@
 
   function renderTagScopePage(title, scope, includeAttachments = false) {
     const catalog = metadataTagCatalog();
-    const rowsFor = scope => catalog.filter(entry => [...entry.scopes].some(value => value.startsWith(scope))).map((entry, index) => {
+    const rowsFor = scope => {
+      const popups = [];
+      const rows = catalog.filter(entry => [...entry.scopes].some(value => value.startsWith(scope))).map((entry, index) => {
       const scoped = [...entry.scoped.entries()].filter(([name]) => name.startsWith(scope)).map(([, value]) => value);
       const count = scoped.reduce((total, value) => total + value.count, 0);
       const signatures = new Set(scoped.flatMap(value => [...value.signatures]));
@@ -352,20 +366,32 @@
       const sample = scoped[0]?.sample;
       const multipleValues = signatures.size > 1 || typeof sample === "object";
       const editableMultipleValues = signatures.size === 1 && sample !== null && typeof sample === "object";
-      const valueInput = editableMultipleValues
-        ? multipleValuesEditorMarkup(sample, { target:"metadata", scope:scope === "Package" ? "package" : "tracks", key:entry.key })
-        : multipleValues
-        ? multipleValuesMarkup(null, [...values.values()].map((value, valueIndex) => [String(valueIndex + 1), value]))
-        : `<input data-tag-value aria-label="Tag value for ${esc(entry.key)}" value="${esc(sample)}">`;
+      let popupID = "";
+      let valueInput;
+      if (editableMultipleValues || multipleValues) {
+        popupID = `tag-${scope.toLowerCase()}-${index}`;
+        const popup = multipleValuesPopupParts(
+          editableMultipleValues ? sample : null,
+          { target:"metadata", scope:scope === "Package" ? "package" : "tracks", key:entry.key, popupID },
+          { editable:editableMultipleValues, entries:[...values.values()].map((value, valueIndex) => [String(valueIndex + 1), value]) }
+        );
+        valueInput = popup.trigger;
+        popups.push(popup.popup);
+      } else {
+        valueInput = `<input data-tag-value aria-label="Tag value for ${esc(entry.key)}" value="${esc(sample)}">`;
+      }
       const tagType = multipleValues ? "Multiple Values" : signatures.size === 1 ? (Array.isArray(sample) ? "list" : typeof sample) : "various";
       const readOnlyMultipleValues = multipleValues && !editableMultipleValues;
       const submitTitle = readOnlyMultipleValues ? "Multiple Values contain different values" : "Submit changed fields";
-      return `<div class="field-grid-row" role="row" data-tag-row data-tag-scope="${esc(scope)}" data-tag-from="${esc(entry.key)}"><div class="field-grid-cell tag-number-cell" role="cell"><input class="tag-table-field" value="${index + 1}" aria-label="Tag number" disabled></div><div class="field-grid-cell tag-type-cell" role="cell"><input class="tag-table-field" value="${esc(tagType)}" aria-label="Tag type for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-name-cell" role="cell"><input class="tag-table-field" data-tag-to value="${esc(entry.key)}" aria-label="Tag name for ${esc(entry.key)}"></div><div class="field-grid-cell tag-value-cell" role="cell"><span class="tag-inline-editor">${valueInput}</span></div><div class="field-grid-cell tag-uses-cell" role="cell"><input class="tag-table-field" value="${count}" aria-label="Uses for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitTagRow" title="${submitTitle}" aria-label="${submitTitle}"${readOnlyMultipleValues ? " disabled" : ""}>✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteTag" title="Delete ${esc(entry.key)}" aria-label="Delete ${esc(entry.key)}">×</button></div></div>`;
-    }).join("");
+      const popupAttribute = popupID ? ` data-multiple-popup-id="${esc(popupID)}"` : "";
+      return `<div class="field-grid-row" role="row" data-tag-row data-tag-scope="${esc(scope)}" data-tag-from="${esc(entry.key)}"${popupAttribute}><div class="field-grid-cell tag-number-cell" role="cell"><input class="tag-table-field" value="${index + 1}" aria-label="Tag number" disabled></div><div class="field-grid-cell tag-type-cell" role="cell"><input class="tag-table-field" value="${esc(tagType)}" aria-label="Tag type for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-name-cell" role="cell"><input class="tag-table-field" data-tag-to value="${esc(entry.key)}" aria-label="Tag name for ${esc(entry.key)}"></div><div class="field-grid-cell tag-value-cell" role="cell"><span class="tag-inline-editor">${valueInput}</span></div><div class="field-grid-cell tag-uses-cell" role="cell"><input class="tag-table-field" value="${count}" aria-label="Uses for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitTagRow" title="${submitTitle}" aria-label="${submitTitle}"${readOnlyMultipleValues ? " disabled" : ""}>✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteTag" title="Delete ${esc(entry.key)}" aria-label="Delete ${esc(entry.key)}">×</button></div></div>`;
+      }).join("");
+      return { rows, popups:popups.join("") };
+    };
     const header = `<div class="field-grid-row field-grid-header" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="#" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Tag Type" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Tag Name" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Tag Value" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Uses" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="✓" aria-label="Submit" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="×" aria-label="Delete" disabled></div></div>`;
-    const grid = (title, rows, scope) => `<section class="tag-scope-table"><div class="section-title"><span>${title}</span><form class="tag-create-form" data-tag-create data-tag-scope="${scope}"><input data-new-tag-key placeholder="Tag Name" aria-label="New tag name"><input data-new-tag-value placeholder="New tag value" aria-label="New tag value"><button class="icon-button add-tag-submit" type="submit" title="Add tag" aria-label="Add tag">✓</button></form></div><div class="data-table-scroll"><div class="field-grid meta-field-grid" role="table" aria-label="${title}">${header}${rows || '<div class="field-grid-empty" role="row"><span role="cell">No tags</span></div>'}</div></div></section>`;
-    const entries = rowsFor(scope);
-    return `<section class="data-page schema-page"><div class="data-page-heading"><div><h2>${esc(title)}</h2><p>${scope === "Package" ? "Package-level fields and attachments. Add or edit scalar values here; open an unambiguous structured value to edit its child fields." : "Track-level tag vocabulary across playable members. Add a field to every track or edit a shared scalar or unambiguous structured value."}</p></div><span class="data-page-count">${entries ? entries.split("data-tag-row").length - 1 : 0} fields</span></div>${grid(title, entries, scope === "Package" ? "package" : "tracks")}${includeAttachments ? renderAttachments() : ""}</section>`;
+    const grid = (title, rows, popups, scope) => `<section class="tag-scope-table"><div class="section-title"><span>${title}</span><form class="tag-create-form" data-tag-create data-tag-scope="${scope}"><input data-new-tag-key placeholder="Tag Name" aria-label="New tag name"><input data-new-tag-value placeholder="New tag value" aria-label="New tag value"><button class="icon-button add-tag-submit" type="submit" title="Add tag" aria-label="Add tag">✓</button></form></div><div class="data-table-scroll"><div class="field-grid meta-field-grid" role="table" aria-label="${title}">${header}${rows || '<div class="field-grid-empty" role="row"><span role="cell">No tags</span>'}</div></div>${popups}</section>`;
+    const table = rowsFor(scope);
+    return `<section class="data-page schema-page"><div class="data-page-heading"><div><h2>${esc(title)}</h2><p>${scope === "Package" ? "Package-level fields and attachments. Add or edit scalar values here; open an unambiguous structured value to edit its child fields." : "Track-level tag vocabulary across playable members. Add a field to every track or edit a shared scalar or unambiguous structured value."}</p></div><span class="data-page-count">${table.rows ? table.rows.split("data-tag-row").length - 1 : 0} fields</span></div>${grid(title, table.rows, table.popups, scope === "Package" ? "package" : "tracks")}${includeAttachments ? renderAttachments() : ""}</section>`;
   }
 
   function renderPackTagsPage() { return renderTagScopePage("Pack Tags", "Package", true); }
@@ -443,19 +469,24 @@
 
   function renderTrackTagTable(member) {
     const entries = fileTagEntries(member);
+    const popups = [];
     const header = ["Scope", "Tag Name", "Tag Value", "Actions"].map(label => `<div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${label}" disabled></div>`).join("");
     const rows = entries.map((entry, index) => {
       const structured = entry.value && typeof entry.value === "object";
-      const foldID = `file-tag-${index}`;
-      const context = { target:"member", path:member.path, scope:entry.scope, key:entry.key, showCount:false };
-      const valueMarkup = structured ? multipleValuesTriggerMarkup(foldID) : memberTagValueMarkup(member, entry);
-      const row = `<div class="field-grid-row track-browser-row" role="row" data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-scope" value="${entry.scope === "memberExtensions" ? "extension" : "metadata"}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name"></div><div class="field-grid-cell track-browser-value-cell" role="cell">${valueMarkup}</div><div class="field-grid-cell track-browser-actions" role="cell"><button class="icon-button" data-action="commitFileTag" title="Submit changed tag" aria-label="Submit changed tag">✓</button><button class="icon-button danger" data-action="deleteFileTag" title="Delete tag" aria-label="Delete tag">×</button></div></div>`;
-      const subrow = structured ? `<div class="field-grid-row field-grid-subrow" role="row" data-canonical-subrow="${esc(foldID)}"><div class="field-grid-cell canonical-subtable-cell" role="cell">${multipleValuesSubtableMarkup(entry.value, context)}</div></div>` : "";
-      return row + subrow;
+      let popupID = "";
+      let valueMarkup = memberTagValueMarkup(member, entry);
+      if (structured) {
+        popupID = `file-tag-${index}`;
+        const popup = multipleValuesPopupParts(entry.value, { target:"member", path:member.path, scope:entry.scope, key:entry.key, popupID }, { editable:true });
+        valueMarkup = popup.trigger;
+        popups.push(popup.popup);
+      }
+      const popupAttribute = popupID ? ` data-multiple-popup-id="${esc(popupID)}"` : "";
+      return `<div class="field-grid-row track-browser-row" role="row" data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"${popupAttribute}><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-scope" value="${entry.scope === "memberExtensions" ? "extension" : "metadata"}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name"></div><div class="field-grid-cell track-browser-value-cell" role="cell">${valueMarkup}</div><div class="field-grid-cell track-browser-actions" role="cell"><button class="icon-button" data-action="commitFileTag" title="Submit changed tag" aria-label="Submit changed tag">✓</button><button class="icon-button danger" data-action="deleteFileTag" title="Delete tag" aria-label="Delete tag">×</button></div></div>`;
     }).join("");
     const empty = '<div class="field-grid-empty" role="row"><span role="cell">No tags on this file</span></div>';
     const form = `<form class="file-tag-create-form track-browser-create-form" data-file-tag-create data-file-tag-path="${esc(member.path)}"><select data-file-tag-scope aria-label="Tag namespace"><option value="memberMetadata">metadata</option><option value="memberExtensions">extension</option></select><input data-file-tag-key placeholder="Tag name" aria-label="New file tag name"><input data-file-tag-value placeholder="Value" aria-label="New file tag value"><button class="icon-button" type="submit" title="Add tag" aria-label="Add tag">✓</button></form>`;
-    return `<div class="track-browser-table-wrap"><div class="field-grid track-browser-field-grid" role="table" aria-label="Tags for ${esc(member.name)}"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div>${form}</div>`;
+    return `<div class="track-browser-table-wrap"><div class="field-grid track-browser-field-grid" role="table" aria-label="Tags for ${esc(member.name)}"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div>${form}${popups.join("")}</div>`;
   }
 
   function renderTrackPage() {
@@ -641,7 +672,41 @@
     }
   }
 
+  function multipleValuesEditorForRow(row) {
+    const inlineEditor = $("[data-multiple-editor]", row);
+    if (inlineEditor) return inlineEditor;
+    const popupID = row?.dataset.multiplePopupId;
+    return popupID ? document.querySelector(`[data-multiple-values-popup="${CSS.escape(popupID)}"] [data-multiple-editor]`) : null;
+  }
+
+  function closeMultipleValuesPopup(popup) {
+    if (!popup) return;
+    popup.hidden = true;
+    const popupID = popup.dataset.multipleValuesPopup || "";
+    $$(`[data-action="toggleMultipleValuesPopup"][data-popup-id="${CSS.escape(popupID)}"]`).forEach(toggle => {
+      toggle.setAttribute("aria-expanded", "false");
+      $(".canonical-fold-icon", toggle).textContent = "＋";
+    });
+  }
+
+  function toggleMultipleValuesPopup(popupID, toggle) {
+    const popup = document.querySelector(`[data-multiple-values-popup="${CSS.escape(popupID)}"]`);
+    if (!popup) return;
+    const opening = popup.hidden;
+    $$(`[data-multiple-values-popup]`).forEach(closeMultipleValuesPopup);
+    if (!opening) return;
+    popup.hidden = false;
+    toggle?.setAttribute("aria-expanded", "true");
+    $(".canonical-fold-icon", toggle).textContent = "−";
+    $(".multiple-values-popup-close", popup)?.focus({ preventScroll:true });
+  }
+
   document.addEventListener("click", event => {
+    const popupBackdrop = event.target.closest("[data-multiple-values-popup]");
+    if (popupBackdrop && event.target === popupBackdrop) {
+      closeMultipleValuesPopup(popupBackdrop);
+      return;
+    }
     const action = event.target.closest("[data-action]")?.dataset.action;
     const packageItem = event.target.closest("[data-package]");
     const memberRow = event.target.closest("tr[data-member]");
@@ -673,6 +738,8 @@
     else if (action === "addMultipleValue") addMultipleValue(event.target.closest("[data-multiple-editor]"));
     else if (action === "removeMultipleValue") removeMultipleValue(event.target.closest("[data-multiple-entry]"));
     else if (action === "commitMultipleValues") commitMultipleValues(event.target.closest("[data-multiple-editor]"));
+    else if (action === "toggleMultipleValuesPopup") toggleMultipleValuesPopup(event.target.closest("[data-action=toggleMultipleValuesPopup]")?.dataset.popupId || "", event.target.closest("[data-action=toggleMultipleValuesPopup]"));
+    else if (action === "closeMultipleValuesPopup") closeMultipleValuesPopup(event.target.closest("[data-multiple-values-popup]"));
     else if (action === "toggleCanonicalFold") {
       const toggle = event.target.closest("[data-action=toggleCanonicalFold]");
       const fold = toggle?.closest(".canonical-fold");
@@ -691,10 +758,10 @@
       const row = event.target.closest("[data-tag-row]");
       if (row) bridge("updateMetadataValue", { key:row.dataset.tagFrom || "", value:$('[data-tag-value]', row)?.value || "" });
     }
-   else if (action === "commitTagRow") {
+    else if (action === "commitTagRow") {
      const row = event.target.closest("[data-tag-row]");
       if (row) {
-        const editor = $("[data-multiple-editor]", row);
+        const editor = multipleValuesEditorForRow(row);
         if (editor) { commitMultipleValues(editor); return; }
         const from = row.dataset.tagFrom || "";
         let to = $('[data-tag-to]', row)?.value || "";
@@ -705,7 +772,7 @@
     else if (action === "commitFileTag") {
       const row = event.target.closest("[data-file-tag-row]");
       if (row) {
-        const editor = $("[data-multiple-editor]", row);
+        const editor = multipleValuesEditorForRow(row);
         if (editor) { commitMultipleValues(editor); return; }
         bridge("commitMemberTag", { path:row.dataset.fileTagPath || "", scope:row.dataset.fileTagScope || "", key:row.dataset.fileTagFrom || "", newKey:$('[data-file-tag-key]', row)?.value || "", value:$('[data-file-tag-value]', row)?.value || "" });
       }
@@ -781,6 +848,10 @@
     }
   });
   document.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+      const popup = $("[data-multiple-values-popup]:not([hidden])");
+      if (popup) { closeMultipleValuesPopup(popup); return; }
+    }
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") { event.preventDefault(); $("#collection-filter").focus(); }
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { const field = $("#member-filter"); if (field) { event.preventDefault(); field.focus(); } }
   });

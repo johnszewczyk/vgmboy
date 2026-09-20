@@ -23,7 +23,8 @@ without scanning its parent folder.
 Selecting a package opens its playable tracks in the primary **Tracks** view.
 The member filter searches visible metadata values, role, format, filename, and
 path. Tracks stays an inline field grid: scalar cells edit in place and structured
-cells open the editable canonical Multiple Values disclosure. Batch tag edits live in
+cells open a full-width editable Multiple Values child table beneath the source
+row. Batch tag edits live in
 the **Track** browser, so Tracks does not carry a separate checkbox
 selection model. The Tracks table includes both the display track number and the
 literal source filename as its first two columns. Scalar values are editable;
@@ -39,11 +40,11 @@ artwork, cue sheets, and documentation. Its filename field edits the
 manifest's displayed/original filename while the stored TAR path remains
 immutable. Each row's **Tags** column is a numeric count. The **Track** page
 provides a file selector and an exhaustive canonical table for editing that
-file's metadata/extensions; structured values use the same editable Multiple
-Values child editor. **Pack Tags** contains
+file's metadata/extensions; structured values open the same editable Multiple
+Values popup without changing the table row geometry. **Pack Tags** contains
 package-level metadata and all attachments using the same field-grid cells, with
-the same add interface as the tag workspace. Multiple Values disclosures are
-reused anywhere structured fields appear.
+the same add interface as the tag workspace. Standard-table Multiple Values
+popups are reused anywhere structured fields appear outside the giga Tracks grid.
 UACMan
 lists assets and their metadata. The Files page can preview recognized text
 members directly from the seekable payload, including JSON, Markdown, CUE, and
@@ -64,10 +65,12 @@ simple set summary should not be nested needlessly.
 ## Editing and import
 
 Per-field edits use typed rows: **Add column** creates a text, number, boolean,
-or JSON field, and removing a row removes that manifest field. A collapsed
+or JSON field, and removing a row removes that manifest field. A centered
+Multiple Values popup
 **Open JSON editor** escape hatch remains available for advanced or nested
-edits. Canonical Multiple Values disclosures provide the same child key/value
-editing for structured cells; an aggregate row is read-only when it combines
+edits. Canonical Multiple Values popups provide the same child key/value editing
+for standard structured cells; the wide Tracks grid uses a child row instead.
+An aggregate row is read-only when it combines
 different source values. Save reopens and
 verifies the wrapper, then preserves the compressed payload byte-for-byte.
 Files cannot be physically removed or have their stored TAR paths renamed in

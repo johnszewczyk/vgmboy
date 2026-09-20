@@ -20,9 +20,10 @@ tag editor for a selected file. Files also offers a read-only text preview for
 bundled JSON, Markdown, CUE, and other recognized text members without extracting
 or rewriting the payload. Every table uses the shared field-grid structure with
 fixed page-level column contracts so wide tables retain their intended shape.
-Structured values remain closed until their
-Multiple Values child table is opened; the source row stays in place while the
-child table expands below it. Metadata keys are case-sensitive arbitrary JSON
+Standard-table structured values remain closed until a centered Multiple Values
+popup is opened, so the source row and table geometry stay fixed. The giga Tracks
+table keeps its specialized full-width child row beneath the source row.
+Metadata keys are case-sensitive arbitrary JSON
 keys; camelCase is the shared naming convention, not a validation restriction.
 When a single UAC is opened directly, the library rail collapses to give the
 track table the full width; it returns automatically when a collection is open.
