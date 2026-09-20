@@ -22,13 +22,14 @@ without scanning its parent folder.
 
 Selecting a package opens its playable tracks in the primary **Tracks** view.
 The member filter searches visible metadata values, role, format, filename, and
-path. Track rows are clickable and open an exhaustive per-track inspector; batch
-tag edits live in **Track Tags**, so Tracks does not carry a separate checkbox
+path. Tracks stays an inline field grid: scalar cells edit in place and structured
+cells open the canonical Multiple Values disclosure. Batch tag edits live in
+**Track Tags**, so Tracks does not carry a separate checkbox
 selection model. The Tracks table includes both the display track number and the
 literal source filename as its first two columns. Scalar values are editable;
 structured values are shown through a compact read-only Multiple Values disclosure.
 
-The workspace has five explicit pages. **Tracks** is the wide canonical
+The workspace has four explicit pages. **Tracks** is the wide canonical
 array-style field grid: every header and value is a boxed field, and its
 horizontal scroll belongs to the workspace surface rather than a nested table
 window. **Files** lists every stored package member, including playable streams,
@@ -40,10 +41,7 @@ package-level metadata and all attachments using the same field-grid cells, with
 the same add interface as the tag workspace. **Track Tags** inventories
 track-level tag names, supports scalar value edits and track-scoped
 rename/delete operations, and expands multiple values inline for inspection.
-**Tree** presents the set and tracks vertically with the same
-canonical boxed Key/Value/Type field-grid; its Set, Tracks, track, and dictionary
-levels all use the shared animated disclosure, and scalar values can be edited in
-place. Multiple Values disclosures are reused anywhere structured fields appear.
+Multiple Values disclosures are reused anywhere structured fields appear.
 UACMan
 lists assets and their metadata; it does not preview image bytes inside the
 compressed payload.

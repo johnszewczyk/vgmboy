@@ -80,9 +80,8 @@
   };
   const canonicalFoldMarkup = (label, body, options = {}) => {
     const open = options.open === true;
-    const memberPath = options.memberPath ? ` data-tree-member="${esc(options.memberPath)}"` : "";
     const meta = options.meta ? `<span class="canonical-fold-meta">${esc(options.meta)}</span>` : "";
-    return `<div class="canonical-fold ${esc(options.className || "")}"><button class="canonical-fold-toggle" type="button" data-action="toggleCanonicalFold" aria-expanded="${open}"${memberPath}><span>${esc(label)}</span>${meta}<span class="canonical-fold-icon">${open ? "−" : "＋"}</span></button><div class="canonical-fold-panel${open ? " open" : ""}"><div class="canonical-fold-inner">${body}</div></div></div>`;
+    return `<div class="canonical-fold ${esc(options.className || "")}"><button class="canonical-fold-toggle" type="button" data-action="toggleCanonicalFold" aria-expanded="${open}"><span>${esc(label)}</span>${meta}<span class="canonical-fold-icon">${open ? "−" : "＋"}</span></button><div class="canonical-fold-panel${open ? " open" : ""}"><div class="canonical-fold-inner">${body}</div></div></div>`;
   };
   const multipleValuesMarkup = (value, suppliedEntries = null) => {
     const entries = suppliedEntries || (Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value || {}));
@@ -358,7 +357,7 @@
         const source = extension ? member.extensions : member.metadata;
         return `<div class="field-grid-cell" role="cell">${scalar(source?.[fieldKey], fieldKey, extension ? "memberExtensions" : "memberMetadata", true)}</div>`;
       }).join("");
-      return `<div class="field-grid-row track-array-row" role="row" tabindex="0" data-track-row="${esc(member.path)}" title="Open exhaustive tags for ${esc(rowLabel)}"><div class="field-grid-cell" role="cell">${scalar(trackNumber, "track", "memberMetadata", false)}</div><div class="field-grid-cell" role="cell">${scalar(filename, "filename", "memberMetadata", false)}</div>${metadataCells}</div>`;
+      return `<div class="field-grid-row track-array-row" role="row"><div class="field-grid-cell" role="cell">${scalar(trackNumber, "track", "memberMetadata", false)}</div><div class="field-grid-cell" role="cell">${scalar(filename, "filename", "memberMetadata", false)}</div>${metadataCells}</div>`;
     }).join("");
     const empty = `<div class="field-grid-empty" role="row"><span role="cell">No playable tracks</span></div>`;
     return `<div class="field-grid tracks-field-grid" data-field-grid="tracks" role="table" aria-label="Tracks"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div>`;
@@ -421,36 +420,6 @@
     return `<section class="inspector-section attachments-section"><div class="section-title"><span>Attachments</span><span class="section-help">${assets.length} package files</span></div><div class="data-table-scroll attachment-table-scroll"><div class="field-grid attachment-field-grid" role="table" aria-label="Package attachments"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows}</div></div></section>`;
   }
 
-  function treeEditor(scope, fields, memberPath, title) {
-    const rootID = `${scope}-${memberPath || "set"}`;
-    const rows = Object.entries(fields).filter(([key, value]) => !isTechnicalKey(key) && !isEmptyTagValue(value)).map(([key, value]) => {
-      const kind = fieldKind(value);
-      const structured = value && typeof value === "object";
-      const valueMarkup = structured
-        ? multipleValuesMarkup(value)
-        : `<input class="tag-table-field tree-value-field" data-tree-value value="${esc(value ?? "")}" aria-label="${esc(key)} value">`;
-      const type = kind === "json" ? (structured ? "Multiple Values" : "json") : kind;
-      return `<div class="field-grid-row tree-entry ${isTechnicalKey(key) ? "technical-entry" : ""}" data-tree-kind="${kind}" data-tree-raw="${structured ? esc(JSON.stringify(value)) : ""}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tree-key value="${esc(key)}" aria-label="Metadata key"></div><div class="field-grid-cell" role="cell">${valueMarkup}</div><div class="field-grid-cell" role="cell"><input class="tag-table-field tree-type-field" value="${esc(type)}" aria-label="Value type" disabled></div></div>`;
-    }).join("");
-    const empty = "<div class=\"field-grid-empty\" role=\"row\"><span role=\"cell\">No fields</span></div>";
-    const header = `<div class="field-grid-row field-grid-header" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Key" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Value" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Type" disabled></div></div>`;
-    return `<section class="tree-dictionary canonical-fold" data-tree-editor data-tree-scope="${scope}" data-tree-member="${esc(memberPath || "")}" data-tree-id="${esc(rootID)}"><div class="tree-dictionary-heading"><button class="canonical-fold-toggle tree-dictionary-toggle" type="button" data-action="toggleCanonicalFold" aria-expanded="true"><span>${esc(title)}</span><span class="canonical-fold-icon">−</span></button><button class="add-field" data-action="addTreeField">＋ Add field</button></div><div class="canonical-fold-panel open"><div class="canonical-fold-inner"><div class="field-grid tree-field-grid" role="table" aria-label="${esc(title)}">${header}${rows || empty}</div></div></div></section>`;
-  }
-
-  function renderTree() {
-    const game = parseObject(state.gameMetadataJSON) || {};
-    const gameExtensions = parseObject(state.gameExtensionsJSON) || {};
-    const tracks = playableMembers().map(member => {
-      const selected = member.path === state.selectedMemberPath;
-      const metadata = member.metadata || {};
-      const extensions = member.extensions || {};
-      const body = `${treeEditor("memberMetadata", metadata, member.path, "Track Tags")}${Object.keys(extensions).length ? treeEditor("memberExtensions", extensions, member.path, "Track Extensions") : ""}`;
-      return canonicalFoldMarkup(member.title || member.name, body, { className:"tree-track", open:selected, meta:member.format || member.role, memberPath:member.path });
-    }).join("");
-    const setBody = `${treeEditor("gameMetadata", game, "", "Set Tags")}${Object.keys(gameExtensions).length ? treeEditor("gameExtensions", gameExtensions, "", "Set Extensions") : ""}`;
-    return `<section class="tree-page"><p class="tab-note">A plain key : value view. Scalar fields can be edited here; package-level fields are collected on the Pack Tags page.</p>${canonicalFoldMarkup("Set", setBody, { className:"tree-branch", open:true, meta:state.packageTitle || state.packageID })}${canonicalFoldMarkup("Tracks", tracks || '<div class="tree-empty">No playable tracks</div>', { className:"tree-branch", open:true, meta:`${playableMembers().length} audio tracks` })}</section>`;
-  }
-
   function renderInspector() {
     const hasPackage = Boolean(state.documentName);
     const member = state.members.find(item => item.path === state.selectedMemberPath);
@@ -459,8 +428,8 @@
       return;
     }
     const title = member?.title || member?.name || "Package metadata";
-    const pageTitle = ["files", "packTags", "trackTags", "tree"].includes(mainView) ? state.packageTitle || state.packageID : title;
-    const eyebrow = mainView === "files" ? "FILES" : mainView === "track" || mainView === "trackTags" ? "TRACK TAGS" : mainView === "packTags" ? "PACK TAGS" : "METADATA TREE";
+    const pageTitle = ["files", "packTags", "trackTags"].includes(mainView) ? state.packageTitle || state.packageID : title;
+    const eyebrow = mainView === "files" ? "FILES" : mainView === "track" || mainView === "trackTags" ? "TRACK TAGS" : mainView === "packTags" ? "PACK TAGS" : "PACKAGE";
     let html = `<div class="inspector-head"><div class="inspector-title-row"><div><span class="eyebrow">${eyebrow}</span><h2>${esc(pageTitle)}</h2></div></div>${mainView === "track" && member ? `<div class="inspector-sub">${esc(member.role)} · ${esc(member.format || "unknown format")} · ${bytes(member.bytes)}<br><span title="Stored UAC path: ${esc(member.path)}">${esc(memberLocation(member))}</span></div>` : `<div class="inspector-sub">${esc(state.packageID)}</div>`}</div>`;
     if (mainView === "track") {
       if (member) {
@@ -469,7 +438,6 @@
     } else if (mainView === "files") html += renderFilesPage();
     else if (mainView === "packTags") html += renderPackTagsPage();
     else if (mainView === "trackTags") html += renderTrackTagsPage();
-    else if (mainView === "tree") html += renderTree();
     $("#inspector-content").innerHTML = html;
   }
 
@@ -524,34 +492,6 @@
     return JSON.parse(raw);
   }
 
-  function commitTreeEditor(root) {
-    const object = {};
-    for (const row of $$(".tree-entry", root)) {
-      const key = $("[data-tree-key]", row)?.value.trim();
-      if (!key) continue;
-      if (Object.prototype.hasOwnProperty.call(object, key)) return;
-      try {
-        const valueInput = $("[data-tree-value]", row);
-        object[key] = valueInput ? coerceValue(valueInput.value, row.dataset.treeKind) : JSON.parse(row.dataset.treeRaw || "null");
-      } catch { return; }
-    }
-    const scope = root.dataset.treeScope;
-    if (root.dataset.treeMember) bridge("selectMember", { path:root.dataset.treeMember });
-    bridge(scopeToAction(scope), { value:JSON.stringify(object, null, 2) });
-  }
-
-  function addTreeField(root) {
-    const list = $(".tree-field-grid", root);
-    if (!list) return;
-    $(".field-grid-empty", list)?.remove();
-    const row = document.createElement("div");
-    row.className = "tree-entry";
-    row.dataset.treeKind = "string";
-    row.innerHTML = `<div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tree-key placeholder="Field name" aria-label="Metadata key"></div><div class="field-grid-cell" role="cell"><input class="tag-table-field tree-value-field" data-tree-value placeholder="Value" aria-label="Metadata value"></div><div class="field-grid-cell" role="cell"><input class="tag-table-field tree-type-field" value="string" aria-label="Value type" disabled></div>`;
-    list.append(row);
-    $("[data-tree-key]", row).focus();
-  }
-
   function commitTrackCell(target) {
     const member = state.members.find(item => item.path === target.dataset.trackPath);
     if (!member) return;
@@ -570,9 +510,7 @@
     const packageItem = event.target.closest("[data-package]");
     const memberRow = event.target.closest("tr[data-member]");
     const trackRow = event.target.closest("[data-track-row]");
-    const treeMember = event.target.closest("[data-tree-member]");
     if (packageItem) { bridge("selectPackage", { path:packageItem.dataset.package }); return; }
-    if (treeMember && !event.target.closest("[data-tree-editor]") && action !== "toggleCanonicalFold") { mainView = "tree"; bridge("selectMember", { path:treeMember.dataset.treeMember }); render(state); return; }
     if (memberRow && !event.target.closest("input[type=checkbox]")) {
       mainView = "track";
       bridge("selectMember", { path:memberRow.dataset.member });
@@ -584,7 +522,6 @@
     }
     if (!action) return;
     if (action === "addField") addField(event.target.closest("[data-scope]").dataset.scope);
-    else if (action === "addTreeField") addTreeField(event.target.closest("[data-tree-editor]"));
     else if (action === "renameTag") {
       const row = event.target.closest("[data-tag-row]");
       const from = row?.dataset.tagFrom || "";
@@ -605,8 +542,6 @@
         const open = panel.classList.toggle("open");
         toggle.setAttribute("aria-expanded", String(open));
         $(".canonical-fold-icon", toggle).textContent = open ? "−" : "＋";
-        const memberPath = toggle.dataset.treeMember || "";
-        if (memberPath && state.selectedMemberPath !== memberPath) bridge("selectMember", { path:memberPath });
       }
     }
     else if (action === "updateTagValue") {
@@ -675,7 +610,6 @@
     const target = event.target;
     if (target.matches("[data-track-cell]")) commitTrackCell(target);
     else if (target.matches("[data-file-name]")) bridge("renameMember", { path:target.dataset.filePath || "", name:target.value });
-    else if (target.matches("[data-tree-value], [data-tree-key]")) commitTreeEditor(target.closest("[data-tree-editor]"));
     else if (target.matches("[data-basic='packageTitle']")) bridge("setPackageTitle", { value:target.value });
     else if (target.matches("[data-basic='consoleName']")) bridge("setConsole", { value:target.value });
     else if (target.matches("[data-raw-editor]")) {
