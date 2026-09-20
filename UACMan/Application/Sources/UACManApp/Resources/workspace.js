@@ -201,7 +201,6 @@
     renderIssues();
     renderMembers();
     renderInspector();
-    scheduleCanonicalGridSizing();
     $("#members-view").classList.toggle("hidden", mainView !== "members");
     $("#metadata-view").classList.toggle("hidden", mainView === "members");
     $$(".main-view-tabs button").forEach(button => button.classList.toggle("active", button.dataset.view === mainView));
@@ -255,7 +254,7 @@
       ? (noRows ? `<div class="empty-state"><div class="empty-icon">▤</div><h3>${state.members.length ? "No tracks match this filter" : "This package has no audio tracks"}</h3><p>${state.members.length ? "Change the search text to show audio tracks." : "The package contains no playable members."}</p></div>` : renderTrackArrayGrid(members))
       : `<div class="empty-state"><div class="empty-icon">▤</div><h3>Open a package to get started</h3><p>Browse a collection or open a UAC package. Audio streams appear here as rows with their tags as columns.</p><button class="button primary" data-action="openUAC">Open a UAC file</button></div>`;
     $("#member-summary").textContent = state.documentName ? `${members.length} shown · ${playableMembers().length} audio tracks` : "No package open";
-    scheduleCanonicalGridSizing();
+    scheduleTrackArraySizing();
   }
 
   function fieldKind(value) {
@@ -410,36 +409,19 @@
     return `<div class="field-grid tracks-field-grid" data-field-grid="tracks" role="table" aria-label="Tracks"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div>`;
   }
 
-  function scheduleCanonicalGridSizing() {
+  function scheduleTrackArraySizing() {
+    const grid = $(".tracks-field-grid");
+    if (!grid) return;
+    const tracks = visibleMembers();
+    const columns = trackColumns();
     requestAnimationFrame(() => {
       const canvas = document.createElement("canvas");
       const context = canvas.getContext("2d");
       if (!context) return;
-      $$(".field-grid").forEach(grid => {
-        const rows = [...grid.querySelectorAll(".field-grid-header, .field-grid-row:not(.field-grid-subrow)")];
-        const columnCount = rows[0]?.children.length || 0;
-        if (!columnCount) return;
-        const widths = Array.from({ length:columnCount }, () => 0);
-        const measure = (text, element) => {
-          const value = String(text ?? "").trim();
-          if (!value) return 0;
-          const style = getComputedStyle(element || grid);
-          context.font = style.font || `${style.fontSize} ${style.fontFamily}`;
-          return context.measureText(value).width;
-        };
-        rows.forEach((row, rowIndex) => [...row.children].forEach((cell, index) => {
-          if (index >= widths.length) return;
-          const controls = [...cell.querySelectorAll("input, textarea, select, button")]
-            .filter(element => !element.closest(".canonical-fold-panel, .canonical-subtable-panel"));
-          const values = controls.length
-            ? controls.map(element => element.matches("select") ? element.selectedOptions[0]?.textContent : ("value" in element ? element.value : element.textContent))
-            : [cell.textContent];
-          const textWidth = Math.max(...values.map(value => measure(value, controls[0] || cell)), 0);
-          const minimum = rowIndex === 0 ? textWidth + 32 : textWidth + 10;
-          widths[index] = Math.max(widths[index], Math.ceil(minimum), cell.querySelector(".icon-button") ? 28 : 0);
-        }));
-        grid.style.setProperty("--field-grid-columns", widths.map(width => `${width}px`).join(" "));
-      });
+      context.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
+      const widthFor = values => Math.max(58, Math.ceil(Math.max(...values.map(value => context.measureText(String(value ?? "")).width), 0) + 18));
+      const widths = [widthFor(["Track", ...tracks.map((member, index) => String(trackNumberFor(member, index)).padStart(2, "0"))]), widthFor(["Filename", ...tracks.map(member => member.name || member.path.split("/").pop() || member.path)]), ...columns.map(key => widthFor([displayTrackKey(key), ...tracks.map(member => { const value = memberFields(member)[key]; if (value === null || value === undefined || value === "") return "—"; if (typeof value === "object") return "Multiple Values"; return String(value); })]))];
+      grid.style.setProperty("--field-grid-columns", widths.map(width => `${width}px`).join(" "));
     });
   }
 

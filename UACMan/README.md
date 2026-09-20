@@ -18,18 +18,16 @@ field grid for playable members, **Files** lists every stored member, **Pack Tag
 edits package-level fields and attachments, and **Track** provides an exhaustive
 tag editor for a selected file. Files also offers a read-only text preview for
 bundled JSON, Markdown, CUE, and other recognized text members without extracting
-or rewriting the payload. Every table uses the same measured field-grid builder:
-each column starts at the longest visible cell value, while headers reserve 1rem
-of horizontal padding on each side. Structured values remain closed until their
+or rewriting the payload. Every table uses the shared field-grid structure with
+fixed page-level column contracts so wide tables retain their intended shape.
+Structured values remain closed until their
 Multiple Values child table is opened; the source row stays in place while the
 child table expands below it. Metadata keys are case-sensitive arbitrary JSON
 keys; camelCase is the shared naming convention, not a validation restriction.
 When a single UAC is opened directly, the library rail collapses to give the
 track table the full width; it returns automatically when a collection is open.
 UACMan restores the last existing UAC path (or collection path) on launch when there is no
-command-line document argument.
-Track columns measure their longest loaded value and ease to the new widths over
-200 ms. The Meta Tags example is the shared value when every use agrees, or
+command-line document argument. The Meta Tags example is the shared value when every use agrees, or
 `Varies · N values` when it does not; structured values remain compact
 `Object · N` or `List · N` entries. The app does not write native SPC bytes or
 play audio.
