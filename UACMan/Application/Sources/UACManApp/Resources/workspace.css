@@ -156,7 +156,7 @@ button { cursor:pointer; }
 .tree-field-grid .tree-type-field { color:var(--muted)!important; }
 .tree-field-grid .tree-value-field:disabled { opacity:1; color:var(--muted); }
 .tree-field-grid .tree-entry:hover { background:var(--hover); }
-.file-field-grid { --file-field-columns:110px 100px 220px minmax(320px,1fr) 90px; min-width:900px; width:100%; padding:0; }
+.file-field-grid { --file-field-columns:105px 90px 220px minmax(300px,1fr) minmax(250px,330px) 90px; min-width:1120px; width:100%; padding:0; }
 .file-field-grid .field-grid-header,
 .file-field-grid .file-row { grid-template-columns:var(--file-field-columns); width:100%; }
 .file-field-grid .file-row { cursor:pointer; }
@@ -164,6 +164,23 @@ button { cursor:pointer; }
 .file-field-grid .file-row .field-grid-cell { padding:2px; }
 .file-field-grid .file-path-field { color:var(--muted)!important; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:9px; }
 .file-field-grid .file-name-field { color:var(--accent)!important; }
+.file-field-grid .file-tags-cell { align-items:stretch; min-height:27px; }
+.file-tags-fold { width:100%; }
+.file-tags-fold > .canonical-fold-toggle { min-height:23px; height:23px; padding:2px 5px; border:1px dashed var(--line); background:var(--panel-2); }
+.file-tags-fold > .canonical-fold-inner { border:1px solid var(--line); border-top:0; background:var(--panel); }
+.file-tag-editor { width:100%; min-width:0; padding:4px; font-size:9px; }
+.file-tag-editor-header,.file-tag-entry { display:grid; grid-template-columns:minmax(90px,.7fr) minmax(110px,1.3fr) 52px; gap:4px; align-items:center; }
+.file-tag-editor-header { padding:0 2px 3px; color:var(--muted); font-weight:700; text-align:center; }
+.file-tag-entry { padding:2px 0; border-top:1px solid color-mix(in srgb,var(--line) 72%,transparent); }
+.file-tag-entry .tag-table-field { height:22px; }
+.file-tag-value-cell { min-width:0; }
+.file-tag-action-cell { display:flex; justify-content:center; gap:2px; }
+.file-tag-action-cell .icon-button { width:22px; height:22px; font-size:12px; }
+.file-tag-empty { padding:5px 2px; color:var(--soft); }
+.file-tag-create-form { display:grid; grid-template-columns:80px minmax(70px,1fr) minmax(70px,1fr) 23px; gap:4px; padding-top:4px; }
+.file-tag-create-form select,.file-tag-create-form input { min-width:0; height:22px; padding:2px 4px; border:1px solid var(--line); border-radius:0; background:var(--panel-2); color:var(--accent); font:inherit; }
+.file-tag-create-form .icon-button { width:23px; height:22px; border:1px solid var(--line); border-radius:3px; }
+.file-edit-note { margin:0; color:var(--soft); font-size:10px; line-height:1.45; }
 .attachment-table-scroll { min-height:0; }
 .attachment-field-grid { --attachment-field-columns:110px 100px 220px minmax(320px,1fr) 90px; min-width:900px; width:100%; padding:0; }
 .attachment-field-grid .field-grid-header,

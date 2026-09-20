@@ -23,7 +23,7 @@ without scanning its parent folder.
 Selecting a package opens its playable tracks in the primary **Tracks** view.
 The member filter searches visible metadata values, role, format, filename, and
 path. Track rows are clickable and open an exhaustive per-track inspector; batch
-tag edits live in **Meta Tags**, so Tracks does not carry a separate checkbox
+tag edits live in **Track Tags**, so Tracks does not carry a separate checkbox
 selection model. The Tracks table includes both the display track number and the
 literal source filename as its first two columns. Scalar values are editable;
 structured values are shown through a compact read-only Multiple Values disclosure.
@@ -32,12 +32,15 @@ The workspace has five explicit pages. **Tracks** is the wide canonical
 array-style field grid: every header and value is a boxed field, and its
 horizontal scroll belongs to the workspace surface rather than a nested table
 window. **Files** lists every stored package member, including playable streams,
-artwork, cue sheets, and documentation, and opens a member's inspector when
-selected. **Package Tags** contains package-level metadata and all attachments
-using the same field-grid cells; structured package values are read-only.
-**Meta Tags** inventories package and track tag names, supports scalar value edits
-and package-wide rename/delete operations, and expands multiple values inline for
-inspection. **Tree** presents the set and tracks vertically with the same
+artwork, cue sheets, and documentation. Its filename field edits the
+manifest's displayed/original filename while the stored TAR path remains
+immutable. Each row's **Tags** disclosure counts and edits that member's scalar
+metadata/extensions; structured values remain read-only. **Pack Tags** contains
+package-level metadata and all attachments using the same field-grid cells, with
+the same add interface as the tag workspace. **Track Tags** inventories
+track-level tag names, supports scalar value edits and track-scoped
+rename/delete operations, and expands multiple values inline for inspection.
+**Tree** presents the set and tracks vertically with the same
 canonical boxed Key/Value/Type field-grid; its Set, Tracks, track, and dictionary
 levels all use the shared animated disclosure, and scalar values can be edited in
 place. Multiple Values disclosures are reused anywhere structured fields appear.
@@ -61,6 +64,9 @@ or JSON field, and removing a row removes that manifest field. A collapsed
 **Open JSON editor** escape hatch remains available for advanced or nested
 edits. Save reopens and
 verifies the wrapper, then preserves the compressed payload byte-for-byte.
+Files cannot be physically removed or have their stored TAR paths renamed in
+this payload-preserving editor; those operations require a separate repack
+workflow.
 Revert discards unsaved manifest changes.
 Saving refuses to overwrite a package that changed on disk after it was opened.
 

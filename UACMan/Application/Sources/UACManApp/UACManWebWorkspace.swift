@@ -101,11 +101,19 @@ struct UACManWebWorkspace: NSViewRepresentable {
                     value: payload["value"] as? String ?? ""
                 )
             case "deleteMetadataKey":
-                model.deleteMetadataKey(key: payload["key"] as? String ?? "")
+                model.deleteMetadataKey(key: payload["key"] as? String ?? "", scope: payload["scope"] as? String ?? "")
             case "updateMetadataValue":
-                model.updateMetadataValue(key: payload["key"] as? String ?? "", value: payload["value"] as? String ?? "")
+                model.updateMetadataValue(key: payload["key"] as? String ?? "", scope: payload["scope"] as? String ?? "", value: payload["value"] as? String ?? "")
             case "commitMetadataRow":
-                model.commitMetadataRow(key: payload["key"] as? String ?? "", newKey: payload["newKey"] as? String ?? "", value: payload["value"] as? String)
+                model.commitMetadataRow(key: payload["key"] as? String ?? "", newKey: payload["newKey"] as? String ?? "", scope: payload["scope"] as? String ?? "", value: payload["value"] as? String)
+            case "renameMember":
+                model.renameMember(path: payload["path"] as? String ?? "", name: payload["name"] as? String ?? "")
+            case "addMemberTag":
+                model.addMemberTag(path: payload["path"] as? String ?? "", scope: payload["scope"] as? String ?? "memberMetadata", key: payload["key"] as? String ?? "", value: payload["value"] as? String ?? "")
+            case "commitMemberTag":
+                model.commitMemberTag(path: payload["path"] as? String ?? "", scope: payload["scope"] as? String ?? "memberMetadata", key: payload["key"] as? String ?? "", newKey: payload["newKey"] as? String ?? "", value: payload["value"] as? String ?? "")
+            case "deleteMemberTag":
+                model.deleteMemberTag(path: payload["path"] as? String ?? "", scope: payload["scope"] as? String ?? "memberMetadata", key: payload["key"] as? String ?? "")
             case "commitTechnicalRow":
                 model.commitTechnicalRow(scope: payload["scope"] as? String ?? "", key: payload["key"] as? String ?? "", newKey: payload["newKey"] as? String ?? "", value: payload["value"] as? String ?? "")
             case "deleteTechnicalRow":

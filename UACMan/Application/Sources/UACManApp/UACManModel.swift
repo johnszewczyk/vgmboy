@@ -85,6 +85,23 @@ struct UACMemberRow: Identifiable {
         )
     }
 
+    func updatingName(_ name: String) -> UACMemberRow {
+        UACMemberRow(
+            path: path,
+            name: name,
+            variantID: variantID,
+            variantLabel: variantLabel,
+            role: role,
+            format: format,
+            bytes: bytes,
+            rawHash: rawHash,
+            streamHash: streamHash,
+            hashes: hashes,
+            metadata: metadata,
+            extensions: extensions
+        )
+    }
+
     private init(
         path: String,
         name: String,
@@ -589,17 +606,18 @@ final class UACManModel {
         } catch { errorMessage = String(describing: error) }
     }
 
-    func deleteMetadataKey(key rawKey: String) {
+    func deleteMetadataKey(key rawKey: String, scope: String = "") {
         let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty else { return }
         do {
             try flushEditorBuffers()
             guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any] else { throw UACManifestEditorError.invalidManifestJSON }
             let parts = metadataNamespace(for: key)
+            let targets = metadataScopeTargets(scope)
             var removed = 0
             func remove(_ fields: inout [String: Any]) { if fields.removeValue(forKey: parts.storageKey) != nil { removed += 1 } }
-            if var game = root["game"] as? [String: Any], var fields = game[parts.bucket] as? [String: Any] { remove(&fields); game[parts.bucket] = fields; root["game"] = game }
-            if var members = root["members"] as? [[String: Any]] { for index in members.indices { if var fields = members[index][parts.bucket] as? [String: Any] { remove(&fields); members[index][parts.bucket] = fields } }; root["members"] = members }
+            if targets.game, var game = root["game"] as? [String: Any], var fields = game[parts.bucket] as? [String: Any] { remove(&fields); game[parts.bucket] = fields; root["game"] = game }
+            if targets.members, var members = root["members"] as? [[String: Any]] { for index in members.indices { if var fields = members[index][parts.bucket] as? [String: Any] { remove(&fields); members[index][parts.bucket] = fields } }; root["members"] = members }
             guard removed > 0 else { throw UACManifestEditorError.invalidMetadataJSON("Tag not found in this package: \(key)") }
             draftManifestJSON = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .prettyPrinted])
             let manifest = try UACManifestEditor.decode(draftManifestJSON)
@@ -613,17 +631,18 @@ final class UACManModel {
         } catch { errorMessage = String(describing: error) }
     }
 
-    func updateMetadataValue(key rawKey: String, value rawValue: String) {
+    func updateMetadataValue(key rawKey: String, scope: String = "", value rawValue: String) {
         let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty else { return }
         do {
             try flushEditorBuffers()
             guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any] else { throw UACManifestEditorError.invalidManifestJSON }
             let parts = metadataNamespace(for: key)
+            let targets = metadataScopeTargets(scope)
             var changed = 0
             func update(_ fields: inout [String: Any]) { if fields[parts.storageKey] != nil { fields[parts.storageKey] = rawValue; changed += 1 } }
-            if var game = root["game"] as? [String: Any], var fields = game[parts.bucket] as? [String: Any] { update(&fields); game[parts.bucket] = fields; root["game"] = game }
-            if var members = root["members"] as? [[String: Any]] { for index in members.indices { if var fields = members[index][parts.bucket] as? [String: Any] { update(&fields); members[index][parts.bucket] = fields } }; root["members"] = members }
+            if targets.game, var game = root["game"] as? [String: Any], var fields = game[parts.bucket] as? [String: Any] { update(&fields); game[parts.bucket] = fields; root["game"] = game }
+            if targets.members, var members = root["members"] as? [[String: Any]] { for index in members.indices { if var fields = members[index][parts.bucket] as? [String: Any] { update(&fields); members[index][parts.bucket] = fields } }; root["members"] = members }
             guard changed > 0 else { throw UACManifestEditorError.invalidMetadataJSON("Tag not found in this package: \(key)") }
             draftManifestJSON = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .prettyPrinted])
             let manifest = try UACManifestEditor.decode(draftManifestJSON)
@@ -635,18 +654,19 @@ final class UACManModel {
         } catch { errorMessage = String(describing: error) }
     }
 
-    func commitMetadataRow(key rawKey: String, newKey rawNewKey: String, value: String?) {
+    func commitMetadataRow(key rawKey: String, newKey rawNewKey: String, scope: String = "", value: String?) {
         let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines), newKey = rawNewKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty, !newKey.isEmpty else { errorMessage = "Tag name cannot be empty."; return }
         do {
             try flushEditorBuffers(); guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any] else { throw UACManifestEditorError.invalidManifestJSON }
             let oldParts = metadataNamespace(for: key)
             let newParts = metadataNamespace(for: newKey)
+            let targets = metadataScopeTargets(scope)
             guard oldParts.bucket == newParts.bucket else {
                 throw UACManifestEditorError.invalidMetadataJSON("Metadata and extension namespaces cannot be mixed in one edit.")
             }
             var changed = 0
-            if var game = root["game"] as? [String: Any], var fields = game[oldParts.bucket] as? [String: Any], let old = fields[oldParts.storageKey] {
+            if targets.game, var game = root["game"] as? [String: Any], var fields = game[oldParts.bucket] as? [String: Any], let old = fields[oldParts.storageKey] {
                 if oldParts.storageKey != newParts.storageKey, fields[newParts.storageKey] != nil {
                     throw UACManifestEditorError.invalidMetadataJSON("The destination tag already exists: \(newKey)")
                 }
@@ -656,7 +676,7 @@ final class UACManModel {
                 root["game"] = game
                 changed += 1
             }
-            if var members = root["members"] as? [[String: Any]] {
+            if targets.members, var members = root["members"] as? [[String: Any]] {
                 for index in members.indices where members[index][oldParts.bucket] is [String: Any] {
                     var fields = members[index][oldParts.bucket] as! [String: Any]
                     guard let old = fields[oldParts.storageKey] else { continue }
@@ -678,6 +698,117 @@ final class UACManModel {
             if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
             hasUnsavedChanges = draftManifestJSON != originalManifestJSON; statusMessage = "Updated \(key) in \(changed) location(s). Save to commit the package change."; errorMessage = nil
         } catch { errorMessage = String(describing: error) }
+    }
+
+    func renameMember(path rawPath: String, name rawName: String) {
+        let path = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !path.isEmpty, !name.isEmpty, !name.contains("/"), !name.contains("\\"), name != ".", name != ".." else {
+            errorMessage = "Enter a simple filename without path separators."
+            return
+        }
+        do {
+            try flushEditorBuffers()
+            guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any], var members = root["members"] as? [[String: Any]], let index = members.firstIndex(where: { ($0["path"] as? String) == path }) else {
+                throw UACManifestEditorError.memberRecordMissing(path)
+            }
+            members[index]["originalName"] = name
+            root["members"] = members
+            try acceptDraftManifest(root)
+            if let rowIndex = self.members.firstIndex(where: { $0.path == path }) {
+                self.members[rowIndex] = self.members[rowIndex].updatingName(name)
+            }
+            statusMessage = "Renamed the displayed filename. Save to commit the package change."
+            errorMessage = nil
+        } catch { errorMessage = String(describing: error) }
+    }
+
+    func addMemberTag(path rawPath: String, scope: String, key rawKey: String, value rawValue: String) {
+        let path = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !path.isEmpty, !key.isEmpty else { errorMessage = "Enter a tag name."; return }
+        do {
+            try flushEditorBuffers()
+            let bucket = try memberMetadataBucket(scope)
+            let storageKey = bucket == "extensions" && key.hasPrefix("extension.") ? String(key.dropFirst("extension.".count)) : key
+            guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any], var members = root["members"] as? [[String: Any]], let index = members.firstIndex(where: { ($0["path"] as? String) == path }) else {
+                throw UACManifestEditorError.memberRecordMissing(path)
+            }
+            var fields = members[index][bucket] as? [String: Any] ?? [:]
+            guard fields[storageKey] == nil else { throw UACManifestEditorError.invalidMetadataJSON("The tag already exists: \(key)") }
+            fields[storageKey] = rawValue
+            members[index][bucket] = fields
+            root["members"] = members
+            try acceptDraftManifest(root)
+            statusMessage = "Added \(key) to the selected file. Save to commit the package change."
+            errorMessage = nil
+        } catch { errorMessage = String(describing: error) }
+    }
+
+    func commitMemberTag(path rawPath: String, scope: String, key rawKey: String, newKey rawNewKey: String, value: String) {
+        let path = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let newKey = rawNewKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !path.isEmpty, !key.isEmpty, !newKey.isEmpty else { errorMessage = "Tag name cannot be empty."; return }
+        do {
+            try flushEditorBuffers()
+            let bucket = try memberMetadataBucket(scope)
+            let oldStorageKey = bucket == "extensions" && key.hasPrefix("extension.") ? String(key.dropFirst("extension.".count)) : key
+            let newStorageKey = bucket == "extensions" && newKey.hasPrefix("extension.") ? String(newKey.dropFirst("extension.".count)) : newKey
+            guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any], var members = root["members"] as? [[String: Any]], let index = members.firstIndex(where: { ($0["path"] as? String) == path }) else {
+                throw UACManifestEditorError.memberRecordMissing(path)
+            }
+            var fields = members[index][bucket] as? [String: Any] ?? [:]
+            guard let currentValue = fields[oldStorageKey] else { throw UACManifestEditorError.invalidMetadataJSON("Tag not found in the selected file: \(key)") }
+            guard !(currentValue is [Any] || currentValue is [String: Any]) else { throw UACManifestEditorError.invalidMetadataJSON("Structured tags are read-only in the Files editor: \(key)") }
+            if oldStorageKey != newStorageKey, fields[newStorageKey] != nil { throw UACManifestEditorError.invalidMetadataJSON("The destination tag already exists: \(newKey)") }
+            fields.removeValue(forKey: oldStorageKey)
+            fields[newStorageKey] = value
+            members[index][bucket] = fields
+            root["members"] = members
+            try acceptDraftManifest(root)
+            statusMessage = "Updated \(key) on the selected file. Save to commit the package change."
+            errorMessage = nil
+        } catch { errorMessage = String(describing: error) }
+    }
+
+    func deleteMemberTag(path rawPath: String, scope: String, key rawKey: String) {
+        let path = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !path.isEmpty, !key.isEmpty else { return }
+        do {
+            try flushEditorBuffers()
+            let bucket = try memberMetadataBucket(scope)
+            let storageKey = bucket == "extensions" && key.hasPrefix("extension.") ? String(key.dropFirst("extension.".count)) : key
+            guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any], var members = root["members"] as? [[String: Any]], let index = members.firstIndex(where: { ($0["path"] as? String) == path }) else {
+                throw UACManifestEditorError.memberRecordMissing(path)
+            }
+            var fields = members[index][bucket] as? [String: Any] ?? [:]
+            guard fields.removeValue(forKey: storageKey) != nil else { throw UACManifestEditorError.invalidMetadataJSON("Tag not found in the selected file: \(key)") }
+            members[index][bucket] = fields
+            root["members"] = members
+            try acceptDraftManifest(root)
+            statusMessage = "Deleted \(key) from the selected file. Save to commit the package change."
+            errorMessage = nil
+        } catch { errorMessage = String(describing: error) }
+    }
+
+    private func memberMetadataBucket(_ scope: String) throws -> String {
+        switch scope {
+        case "memberMetadata": return "metadata"
+        case "memberExtensions": return "extensions"
+        default: throw UACManifestEditorError.invalidMetadataJSON("Unknown member tag namespace: \(scope)")
+        }
+    }
+
+    private func acceptDraftManifest(_ root: [String: Any]) throws {
+        draftManifestJSON = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .prettyPrinted])
+        let manifest = try UACManifestEditor.decode(draftManifestJSON)
+        gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata)
+        gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
+        refreshMemberSummaries(from: manifest)
+        if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
+        hasUnsavedChanges = draftManifestJSON != originalManifestJSON
     }
 
     func commitTechnicalRow(scope: String, key: String, newKey: String, value: String) {
@@ -892,6 +1023,14 @@ final class UACManModel {
         key.hasPrefix("extension.")
             ? ("extensions", String(key.dropFirst("extension.".count)))
             : ("metadata", key)
+    }
+
+    private func metadataScopeTargets(_ scope: String) -> (game: Bool, members: Bool) {
+        switch scope.lowercased() {
+        case "package", "packagetags", "package tags": return (true, false)
+        case "tracks", "track", "tracktags", "track tags": return (false, true)
+        default: return (true, true)
+        }
     }
 
     private func flushEditorBuffers() throws {
