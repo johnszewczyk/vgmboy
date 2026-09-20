@@ -74,16 +74,16 @@
     if (value === null || value === undefined || value === "") return '<span class="muted">—</span>';
     if (typeof value === "object") {
       const count = Array.isArray(value) ? value.length : Object.keys(value).length;
-      const kind = Array.isArray(value) ? "List" : "Object";
-      return `<span class="structured-value" title="${kind} value; open the editor to inspect it">${kind} · ${count}</span>`;
+      return `<span class="structured-value" title="Multiple Values; open the disclosure to inspect them">Multiple Values · ${count}</span>`;
     }
     return esc(String(value));
   };
-  const structuredPopup = value => {
-    const entries = Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value || {});
-    const kind = Array.isArray(value) ? "List" : "Object";
-    const body = entries.length ? entries.map(([key, item]) => `<div><strong>${esc(key)}</strong><span>${displayMetadataValue(item)}</span></div>`).join("") : '<div class="muted">Empty</div>';
-    return `<details class="tag-values-popover track-structured-popover"><summary>${kind} · ${entries.length}</summary><div class="tag-values-list">${body}</div></details>`;
+  const multipleValuesMarkup = (value, suppliedEntries = null) => {
+    const entries = suppliedEntries || (Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value || {}));
+    const body = entries.length
+      ? entries.map(([key, item]) => `<div class="tag-multiple-value-row"><span>${esc(key)}</span><span>${esc(typeof item === "object" ? JSON.stringify(item) : String(item ?? "—"))}</span></div>`).join("")
+      : '<div class="tag-multiple-value-row"><span>—</span><span>Empty</span></div>';
+    return `<div class="tag-multiple-values"><button class="tag-multiple-toggle" type="button" data-action="toggleMultipleValues" aria-expanded="false"><span>Multiple Values</span><span class="tag-multiple-toggle-icon">＋</span></button><div class="tag-multiple-values-panel"><div class="tag-multiple-values-inner">${body}</div></div></div>`;
   };
   const metadataSortValue = (member, key) => {
     const value = memberFields(member)[key];
@@ -142,7 +142,7 @@
 
     $("#document-name").textContent = state.documentName || "No package open";
     $("#document-path").textContent = state.documentPath || "Choose a collection or open one UAC file";
-    $("#member-filter-wrap").classList.toggle("hidden", !["members", "trackBeta", "files"].includes(mainView));
+    $("#member-filter-wrap").classList.toggle("hidden", !["members", "files"].includes(mainView));
     const singleDocumentMode = Boolean(state.documentName) && !state.collectionRoot;
     $("#workspace").classList.toggle("library-collapsed", singleDocumentMode);
     $("#library-panel").classList.toggle("single-document-hidden", singleDocumentMode);
@@ -161,8 +161,6 @@
     renderInspector();
     $("#members-view").classList.toggle("hidden", mainView !== "members");
     $("#metadata-view").classList.toggle("hidden", mainView === "members");
-    $("#metadata-view").classList.toggle("tracks-beta-active", mainView === "trackBeta");
-    if (mainView === "trackBeta") scheduleTrackArraySizing();
     $$(".main-view-tabs button").forEach(button => button.classList.toggle("active", button.dataset.view === mainView));
 
     $("#status-message").textContent = state.isHarvestingMetadata ? state.harvestProgressMessage || "Reading metadata…" : state.statusMessage || "Ready";
@@ -203,11 +201,10 @@
     const open = Boolean(state.documentName);
     const noRows = members.length === 0;
     $("#table-scroll").innerHTML = open
-      ? (noRows ? `<div class="empty-state"><div class="empty-icon">▤</div><h3>${state.members.length ? "No tracks match this filter" : "This package has no audio tracks"}</h3><p>${state.members.length ? "Change the search text to show audio tracks." : "The package contains no playable members."}</p></div>` : renderTrackGrid(members))
+      ? (noRows ? `<div class="empty-state"><div class="empty-icon">▤</div><h3>${state.members.length ? "No tracks match this filter" : "This package has no audio tracks"}</h3><p>${state.members.length ? "Change the search text to show audio tracks." : "The package contains no playable members."}</p></div>` : renderTrackArrayGrid(members))
       : `<div class="empty-state"><div class="empty-icon">▤</div><h3>Open a package to get started</h3><p>Browse a collection or open a UAC package. Audio streams appear here as rows with their tags as columns.</p><button class="button primary" data-action="openUAC">Open a UAC file</button></div>`;
     $("#member-summary").textContent = state.documentName ? `${members.length} shown · ${playableMembers().length} audio tracks` : "No package open";
-    $$(".track-grid th[data-sort]").forEach(th => { const marker = $("span", th); marker.textContent = sort.key === th.dataset.sort ? (sort.direction > 0 ? " ↑" : " ↓") : ""; });
-    scheduleTrackColumnSizing();
+    scheduleTrackArraySizing();
   }
 
   function fieldKind(value) {
@@ -220,8 +217,8 @@
   function fieldValueMarkup(value, id, kind) {
     const encoded = kind === "string" ? value : JSON.stringify(value, null, 2);
     if (value && typeof value === "object") {
-      const label = Array.isArray(value) ? `List · ${value.length} items` : `Object · ${Object.keys(value).length} fields`;
-      return `<details class="nested-field"><summary>${esc(label)} <span>Open</span></summary><textarea class="field-structured" data-field-value data-focus-id="${esc(id)}">${esc(encoded)}</textarea></details>`;
+      const count = Array.isArray(value) ? value.length : Object.keys(value).length;
+      return `<details class="nested-field"><summary>Multiple Values · ${count} <span>Open</span></summary><textarea class="field-structured" data-field-value data-focus-id="${esc(id)}">${esc(encoded)}</textarea></details>`;
     }
     return `<input class="field-value" data-field-value data-focus-id="${esc(id)}" value="${esc(encoded)}">`;
   }
@@ -294,8 +291,8 @@
       const structured = entry.value && typeof entry.value === "object";
       const type = structured ? "Multiple Values" : fieldKind(entry.value);
       const disabled = structured ? " disabled" : "";
-      const value = structured ? "Multiple Values" : String(entry.value);
-      return `<div class="field-grid-row ${structured ? "structured-technical-row" : ""}" role="row" data-technical-row data-tech-scope="${esc(entry.scope)}" data-tech-key="${esc(entry.key)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tech-scope value="${esc(entry.scope)}"${disabled}></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tech-key value="${esc(entry.key)}"${disabled}></div><div class="field-grid-cell tag-type-cell" role="cell"><input class="tag-table-field" value="${esc(type)}" aria-label="Type for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-value-cell" role="cell"><input class="tag-table-field" data-tech-value value="${esc(value)}"${disabled}></div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitTechnicalRow" title="${structured ? "Structured values are read-only" : "Submit changed fields"}" aria-label="${structured ? "Structured values are read-only" : "Submit changed fields"}"${disabled}>✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteTechnicalRow" title="Delete package field" aria-label="Delete package field">×</button></div></div>`;
+      const valueMarkup = structured ? multipleValuesMarkup(entry.value) : `<input class="tag-table-field" data-tech-value value="${esc(String(entry.value))}">`;
+      return `<div class="field-grid-row ${structured ? "structured-technical-row" : ""}" role="row" data-technical-row data-tech-scope="${esc(entry.scope)}" data-tech-key="${esc(entry.key)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tech-scope value="${esc(entry.scope)}"${disabled}></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tech-key value="${esc(entry.key)}"${disabled}></div><div class="field-grid-cell tag-type-cell" role="cell"><input class="tag-table-field" value="${esc(type)}" aria-label="Type for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-value-cell" role="cell">${valueMarkup}</div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitTechnicalRow" title="${structured ? "Structured values are read-only" : "Submit changed fields"}" aria-label="${structured ? "Structured values are read-only" : "Submit changed fields"}"${disabled}>✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteTechnicalRow" title="Delete package field" aria-label="Delete package field">×</button></div></div>`;
     }).join("");
     const empty = "<div class=\"field-grid-empty\" role=\"row\"><span role=\"cell\">No package tags</span></div>";
     const header = `<div class="field-grid-row field-grid-header" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Scope" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Key" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Type" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Value" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="✓" aria-label="Submit" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="×" aria-label="Delete" disabled></div></div>`;
@@ -331,33 +328,14 @@
     const rowsFor = scope => catalog.filter(entry => [...entry.scopes].some(value => value.startsWith(scope))).map(entry => {
       const multipleValues = entry.signatures.size > 1 || typeof entry.sample === "object";
       const valueInput = multipleValues
-        ? `<div class="tag-multiple-values"><button class="tag-multiple-toggle" type="button" data-action="toggleMultipleValues" aria-expanded="false"><span>Multiple Values</span><span class="tag-multiple-toggle-icon">＋</span></button><div class="tag-multiple-values-panel"><div class="tag-multiple-values-inner">${[...entry.values.values()].map((value, index) => `<div class="tag-multiple-value-row"><span>${index + 1}</span><span>${esc(typeof value === "object" ? JSON.stringify(value) : String(value))}</span></div>`).join("")}</div></div></div>`
+        ? multipleValuesMarkup(null, [...entry.values.values()].map((value, index) => [String(index + 1), value]))
         : `<input data-tag-value aria-label="Tag value for ${esc(entry.key)}" value="${esc(entry.sample)}">`;
-      const tagType = entry.signatures.size === 1 ? (Array.isArray(entry.sample) ? "list" : typeof entry.sample) : "various";
+      const tagType = multipleValues ? "Multiple Values" : entry.signatures.size === 1 ? (Array.isArray(entry.sample) ? "list" : typeof entry.sample) : "various";
       return `<div class="field-grid-row" role="row" data-tag-row data-tag-from="${esc(entry.key)}"><div class="field-grid-cell tag-number-cell" role="cell"><input class="tag-table-field" value="${catalog.indexOf(entry) + 1}" aria-label="Tag number" disabled></div><div class="field-grid-cell tag-type-cell" role="cell"><input class="tag-table-field" value="${esc(tagType)}" aria-label="Tag type for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-name-cell" role="cell"><input class="tag-table-field" data-tag-to value="${esc(entry.key)}" aria-label="Tag name for ${esc(entry.key)}"></div><div class="field-grid-cell tag-value-cell" role="cell"><span class="tag-inline-editor">${valueInput}</span></div><div class="field-grid-cell tag-uses-cell" role="cell"><input class="tag-table-field" value="${entry.count}" aria-label="Uses for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitTagRow" title="${multipleValues ? "Multiple Values are read-only" : "Submit changed fields"}" aria-label="${multipleValues ? "Multiple Values are read-only" : "Submit changed fields"}"${multipleValues ? " disabled" : ""}>✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteTag" title="Delete ${esc(entry.key)}" aria-label="Delete ${esc(entry.key)}">×</button></div></div>`;
     }).join("");
     const header = `<div class="field-grid-row field-grid-header" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="#" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Tag Type" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Tag Name" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Tag Value" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Uses" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="✓" aria-label="Submit" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="×" aria-label="Delete" disabled></div></div>`;
     const grid = (title, rows, scope) => `<section class="tag-scope-table"><div class="section-title"><span>${title}</span><form class="tag-create-form" data-tag-create data-tag-scope="${scope}"><input data-new-tag-key placeholder="Meta Tag Name" aria-label="New tag name"><input data-new-tag-value placeholder="New tag value" aria-label="New tag value"><button class="icon-button add-tag-submit" type="submit" title="Add tag" aria-label="Add tag">✓</button></form></div><div class="data-table-scroll"><div class="field-grid meta-field-grid" role="table" aria-label="${title}">${header}${rows || '<div class="field-grid-empty" role="row"><span role="cell">No metadata tags</span></div>'}</div></div></section>`;
     return `<section class="data-page schema-page">${grid("Package Tags", rowsFor("Package"), "package")}${grid("Track Tags", rowsFor("Track"), "tracks")}</section>`;
-  }
-
-  function renderTrackGrid(tracks) {
-    const columns = trackColumns();
-    const rows = tracks.map((member, index) => {
-      const fields = memberFields(member);
-      const cells = columns.map(key => {
-        const value = fields[key];
-        if (!Object.prototype.hasOwnProperty.call(fields, key) || isEmptyTagValue(value)) return `<td><span class="muted">—</span></td>`;
-        if (value && typeof value === "object") return `<td>${structuredPopup(value)}</td>`;
-        const extension = key.startsWith("extension.");
-        const fieldKey = extension ? key.slice("extension.".length) : key;
-        return `<td><input class="track-cell" data-track-cell data-track-path="${esc(member.path)}" data-track-key="${esc(fieldKey)}" data-track-scope="${extension ? "memberExtensions" : "memberMetadata"}" value="${esc(value ?? "")}" aria-label="${esc(member.title || member.name)} ${esc(key)}"></td>`;
-      }).join("");
-      const trackNumber = trackNumberFor(member, index);
-      const filename = member.name || member.path.split("/").pop() || member.path;
-      return `<tr tabindex="0" data-track-row="${esc(member.path)}" class="${member.path === state.selectedMemberPath ? "active" : ""}" title="Open exhaustive tags for ${esc(member.title || member.name)}"><td class="track-number-cell"><span class="track-number">${esc(String(trackNumber).padStart(2, "0"))}</span></td><td class="track-filename-cell" title="${esc(member.path)}">${esc(filename)}</td>${cells}</tr>`;
-    }).join("");
-    return `<div class="track-grid-wrap"><div class="track-grid-scroll"><table class="track-grid" aria-label="Tracks"><colgroup><col data-column-key="track" style="width:64px"><col data-column-key="filename" style="width:220px">${columns.map(key => `<col data-column-key="${esc(key)}" style="width:100px">`).join("")}</colgroup><thead><tr><th class="track-number-heading" data-sort="track">Track <span></span></th><th data-sort="filename">Filename <span></span></th>${columns.map(key => `<th data-sort="${esc(key)}" title="Sort by ${esc(displayTrackKey(key))}">${esc(displayTrackKey(key))} <span></span></th>`).join("")}</tr></thead><tbody>${rows || `<tr><td class="tree-empty" colspan="${columns.length + 2}">No playable tracks</td></tr>`}</tbody></table></div></div>`;
   }
 
   function renderTrackArrayGrid(tracks) {
@@ -374,10 +352,10 @@
       const scalar = (value, key, scope, editable) => {
         const present = value !== undefined && value !== null && value !== "";
         const structured = present && typeof value === "object";
-        const display = !present ? "—" : structured ? (Array.isArray(value) ? `List · ${value.length}` : `Object · ${Object.keys(value).length}`) : String(value);
+        const display = !present ? "—" : structured ? "Multiple Values" : String(value);
         const disabled = !editable || !present || structured ? " disabled" : "";
         const attributes = editable && present && !structured ? ` data-track-cell data-track-path="${esc(member.path)}" data-track-key="${esc(key)}" data-track-scope="${esc(scope)}"` : "";
-        return `<input class="tag-table-field track-array-value${editable && present && !structured ? " track-cell" : ""}" value="${esc(display)}" aria-label="${esc(rowLabel)} ${esc(key)}"${attributes}${disabled}>`;
+        return structured ? multipleValuesMarkup(value) : `<input class="tag-table-field track-array-value${editable && present ? " track-cell" : ""}" value="${esc(display)}" aria-label="${esc(rowLabel)} ${esc(key)}"${attributes}${disabled}>`;
       };
       const metadataCells = columns.map(key => {
         const extension = key.startsWith("extension.");
@@ -388,37 +366,7 @@
       return `<div class="field-grid-row track-array-row" role="row" tabindex="0" data-track-row="${esc(member.path)}" title="Open exhaustive tags for ${esc(rowLabel)}"><div class="field-grid-cell" role="cell">${scalar(trackNumber, "track", "memberMetadata", false)}</div><div class="field-grid-cell" role="cell">${scalar(filename, "filename", "memberMetadata", false)}</div>${metadataCells}</div>`;
     }).join("");
     const empty = `<div class="field-grid-empty" role="row"><span role="cell">No playable tracks</span></div>`;
-    return `<div class="field-grid tracks-field-grid" role="table" aria-label="Tracks Beta"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div>`;
-  }
-
-  function renderTracksBetaPage() {
-    const tracks = visibleMembers();
-    return `<section class="tracks-beta-page">${renderTrackArrayGrid(tracks)}</section>`;
-  }
-
-  function scheduleTrackColumnSizing(selector = ".members-view .track-grid") {
-    const table = $(selector);
-    if (!table) return;
-    const tracks = visibleMembers();
-    const columns = trackColumns();
-    requestAnimationFrame(() => {
-      const canvas = document.createElement("canvas");
-      const context = canvas.getContext("2d");
-      if (!context) return;
-      context.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
-      const widthFor = values => Math.max(42, Math.ceil(Math.max(...values.map(value => context.measureText(String(value ?? "")).width), 0) + 16));
-      const widths = [widthFor(["Track", ...tracks.map((member, index) => String(trackNumberFor(member, index)).padStart(2, "0"))]), widthFor(["Filename", ...tracks.map(member => member.name || member.path.split("/").pop() || member.path)])];
-      columns.forEach(key => widths.push(widthFor([displayTrackKey(key), ...tracks.map(member => {
-        const value = memberFields(member)[key];
-        if (value === null || value === undefined || value === "") return "—";
-        if (typeof value === "object") return Array.isArray(value) ? `List · ${value.length}` : `Object · ${Object.keys(value).length}`;
-        return String(value);
-      })])));
-      const total = widths.reduce((sum, width) => sum + width, 0);
-      table.style.width = `${Math.max(980, total)}px`;
-      table.style.tableLayout = "fixed";
-      $$("col[data-column-key]", table).forEach((column, index) => { column.style.width = `${widths[index]}px`; });
-    });
+    return `<div class="field-grid tracks-field-grid" data-field-grid="tracks" role="table" aria-label="Tracks"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div>`;
   }
 
   function scheduleTrackArraySizing() {
@@ -432,7 +380,7 @@
       if (!context) return;
       context.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
       const widthFor = values => Math.max(58, Math.ceil(Math.max(...values.map(value => context.measureText(String(value ?? "")).width), 0) + 18));
-      const widths = [widthFor(["Track", ...tracks.map((member, index) => String(trackNumberFor(member, index)).padStart(2, "0"))]), widthFor(["Filename", ...tracks.map(member => member.name || member.path.split("/").pop() || member.path)]), ...columns.map(key => widthFor([displayTrackKey(key), ...tracks.map(member => { const value = memberFields(member)[key]; if (value === null || value === undefined || value === "") return "—"; if (typeof value === "object") return Array.isArray(value) ? `List · ${value.length}` : `Object · ${Object.keys(value).length}`; return String(value); })]))];
+      const widths = [widthFor(["Track", ...tracks.map((member, index) => String(trackNumberFor(member, index)).padStart(2, "0"))]), widthFor(["Filename", ...tracks.map(member => member.name || member.path.split("/").pop() || member.path)]), ...columns.map(key => widthFor([displayTrackKey(key), ...tracks.map(member => { const value = memberFields(member)[key]; if (value === null || value === undefined || value === "") return "—"; if (typeof value === "object") return "Multiple Values"; return String(value); })]))];
       grid.style.setProperty("--field-grid-columns", widths.map(width => `${width}px`).join(" "));
     });
   }
@@ -447,7 +395,7 @@
     const header = ["Role", "Format", "Filename", "Stored path", "Size"].map(label => `<div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`).join("");
     const rows = members.map(member => `<div class="field-grid-row file-row" role="row" tabindex="0" data-track-row="${esc(member.path)}" title="Open metadata for ${esc(member.name)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.role)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.format || "unknown")}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-name-field" value="${esc(member.name)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-path-field" value="${esc(member.path)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(bytes(member.bytes))}" disabled></div></div>`).join("");
     const empty = `<div class="field-grid-empty" role="row"><span role="cell">No package members match this filter</span></div>`;
-    return `<section class="data-page files-page"><div class="data-page-heading"><div><h2>Files</h2><p>Every stored package member, including playable tracks, artwork, cues, and documents. Select a row to inspect its metadata.</p></div><span class="data-page-count">${members.length} of ${state.members.length} members</span></div><div class="data-table-scroll file-table-scroll"><div class="field-grid file-field-grid" role="table" aria-label="Package files"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div></div></section>`;
+    return `<section class="data-page files-page"><div class="data-page-heading"><div><h2>Files</h2><p>Every stored package member, including playable tracks, artwork, cues, and documents. Select a row to inspect its metadata.</p></div><span class="data-page-count">${members.length} of ${state.members.length} members</span></div><div class="field-grid file-field-grid" role="table" aria-label="Package files"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div></section>`;
   }
 
   function renderAttachments() {
@@ -464,9 +412,9 @@
       const kind = fieldKind(value);
       const structured = value && typeof value === "object";
       const valueMarkup = structured
-        ? `<input class="tag-table-field tree-value-field" value="${Array.isArray(value) ? `List · ${value.length}` : `Object · ${Object.keys(value).length}`}" aria-label="${esc(key)} value" disabled>`
+        ? multipleValuesMarkup(value)
         : `<input class="tag-table-field tree-value-field" data-tree-value value="${esc(value ?? "")}" aria-label="${esc(key)} value">`;
-      const type = kind === "json" ? (structured ? "structured" : "json") : kind;
+      const type = kind === "json" ? (structured ? "Multiple Values" : "json") : kind;
       return `<div class="field-grid-row tree-entry ${isTechnicalKey(key) ? "technical-entry" : ""}" data-tree-kind="${kind}" data-tree-raw="${structured ? esc(JSON.stringify(value)) : ""}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" data-tree-key value="${esc(key)}" aria-label="Metadata key"></div><div class="field-grid-cell" role="cell">${valueMarkup}</div><div class="field-grid-cell" role="cell"><input class="tag-table-field tree-type-field" value="${esc(type)}" aria-label="Value type" disabled></div></div>`;
     }).join("");
     const empty = "<div class=\"field-grid-empty\" role=\"row\"><span role=\"cell\">No fields</span></div>";
@@ -494,15 +442,14 @@
       return;
     }
     const title = member?.title || member?.name || "Package metadata";
-    const pageTitle = ["trackBeta", "files", "technical", "schema", "tree"].includes(mainView) ? state.packageTitle || state.packageID : title;
-    const eyebrow = mainView === "trackBeta" ? "TRACKS BETA" : mainView === "files" ? "FILES" : mainView === "track" ? "TRACK TAGS" : mainView === "technical" ? "PACKAGE TAGS" : mainView === "schema" ? "META TAGS" : "METADATA TREE";
-    let html = mainView === "trackBeta" ? "" : `<div class="inspector-head"><div class="inspector-title-row"><div><span class="eyebrow">${eyebrow}</span><h2>${esc(pageTitle)}</h2></div></div>${mainView === "track" && member ? `<div class="inspector-sub">${esc(member.role)} · ${esc(member.format || "unknown format")} · ${bytes(member.bytes)}<br><span title="Stored UAC path: ${esc(member.path)}">${esc(memberLocation(member))}</span></div>` : `<div class="inspector-sub">${esc(state.packageID)}</div>`}</div>`;
+    const pageTitle = ["files", "technical", "schema", "tree"].includes(mainView) ? state.packageTitle || state.packageID : title;
+    const eyebrow = mainView === "files" ? "FILES" : mainView === "track" ? "TRACK TAGS" : mainView === "technical" ? "PACKAGE TAGS" : mainView === "schema" ? "META TAGS" : "METADATA TREE";
+    let html = `<div class="inspector-head"><div class="inspector-title-row"><div><span class="eyebrow">${eyebrow}</span><h2>${esc(pageTitle)}</h2></div></div>${mainView === "track" && member ? `<div class="inspector-sub">${esc(member.role)} · ${esc(member.format || "unknown format")} · ${bytes(member.bytes)}<br><span title="Stored UAC path: ${esc(member.path)}">${esc(memberLocation(member))}</span></div>` : `<div class="inspector-sub">${esc(state.packageID)}</div>`}</div>`;
     if (mainView === "track") {
       if (member) {
         html += `<section class="track-tags-editor">${renderPropertyEditor("Track Tags", "memberMetadata", state.memberMetadataJSON, { includeTechnical:true, includeEmpty:true })}${renderPropertyEditor("Track Extensions", "memberExtensions", state.memberExtensionsJSON, { includeTechnical:true, includeEmpty:true })}</section>`;
       } else html += `<section class="inspector-section"><div class="empty-tab"><strong>Select a track</strong><span>Choose a row in Tracks to edit its tags.</span></div></section>`;
-    } else if (mainView === "trackBeta") html += renderTracksBetaPage();
-    else if (mainView === "files") html += renderFilesPage();
+    } else if (mainView === "files") html += renderFilesPage();
     else if (mainView === "technical") html += renderTechnicalPage();
     else if (mainView === "schema") html += renderMetaTagsPage();
     else if (mainView === "tree") html += renderTree();
@@ -704,14 +651,14 @@
 
   document.addEventListener("input", event => {
     if (event.target.id === "collection-filter") renderCollections();
-    else if (event.target.id === "member-filter") ["trackBeta", "files"].includes(mainView) ? render(state) : renderMembers();
+    else if (event.target.id === "member-filter") mainView === "files" ? render(state) : renderMembers();
   });
   document.addEventListener("click", event => {
     const header = event.target.closest("[data-sort]");
     if (header) {
       const key = header.dataset.sort;
       if (sort.key === key) sort.direction *= -1; else sort = { key, direction:1 };
-      header.closest(".tracks-field-grid") ? render(state) : renderMembers();
+      renderMembers();
     }
   });
   document.addEventListener("keydown", event => {

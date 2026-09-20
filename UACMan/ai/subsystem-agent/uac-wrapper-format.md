@@ -108,8 +108,15 @@ before distributing newly packed files.
   byte `0x24`; the signature's textual version is retained separately because
   source files may disagree between those two facts. Each SPC member exposes
   `metadata.spcVersion`, `metadata.spcVersionByte`, and
-  `metadata.spcHeaderVersion` for direct access. VGM detection reads raw
-  `.vgm` or gzip-wrapped `.vgz` headers. These scans never edit source members.
+  `metadata.spcHeaderVersion` for direct access. Every SPC or VGM member also
+  carries the canonical required `metadata.sub-container-version` tag (for
+  example `0.30` for an SPC version byte or `1.71` for VGM). VGM detection
+  reads raw `.vgm` headers; VGZ members and gzip-wrapped files named `.vgm`
+  are rejected at the pack boundary and must be expanded before packaging.
+  When one package contains multiple versions of the same format,
+  `game.metadata.criticalFlags` contains a `mixed-sub-container-version`
+  record with severity `critical` and the detected versions. These scans and
+  flags never edit source members.
 - Each `variant` groups a version, alternate, regional release, or other
   distinction and may carry its own canonical release IDs and metadata. A
   variant is not an automatic ranking or deletion decision.

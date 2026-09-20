@@ -26,20 +26,20 @@ path. Track rows are clickable and open an exhaustive per-track inspector; batch
 tag edits live in **Meta Tags**, so Tracks does not carry a separate checkbox
 selection model. The Tracks table includes both the display track number and the
 literal source filename as its first two columns. Scalar values are editable;
-structured values are shown as compact read-only summaries.
+structured values are shown through a compact read-only Multiple Values disclosure.
 
-The workspace has six explicit pages. **Tracks Beta** is the wide experimental
-array-style field grid: every header and value is a boxed field, it reuses the
-canonical field-grid spacing, and its horizontal scroll belongs to the workspace
-surface rather than a nested table window. **Files** lists every stored package member, including
-playable streams, artwork, cue sheets, and documentation, and opens a member's
-inspector when selected. **Package Tags** contains package-level metadata and all
-attachments using the same field-grid cells; structured package values are
-read-only. **Meta Tags** inventories package and track tag names, supports scalar
-value edits and package-wide rename/delete operations, and expands multiple values
-inline for inspection. **Tree** presents the set and tracks vertically with the
-same canonical boxed Key/Value/Type field-grid; scalar values can be edited in place. Technical and
-structured values remain represented by their package-scoped field views. UACMan
+The workspace has five explicit pages. **Tracks** is the wide canonical
+array-style field grid: every header and value is a boxed field, and its
+horizontal scroll belongs to the workspace surface rather than a nested table
+window. **Files** lists every stored package member, including playable streams,
+artwork, cue sheets, and documentation, and opens a member's inspector when
+selected. **Package Tags** contains package-level metadata and all attachments
+using the same field-grid cells; structured package values are read-only.
+**Meta Tags** inventories package and track tag names, supports scalar value edits
+and package-wide rename/delete operations, and expands multiple values inline for
+inspection. **Tree** presents the set and tracks vertically with the same
+canonical boxed Key/Value/Type field-grid; scalar values can be edited in place.
+Multiple Values disclosures are reused anywhere structured fields appear. UACMan
 lists assets and their metadata; it does not preview image bytes inside the
 compressed payload.
 When a single UAC is opened directly, the library rail collapses automatically;

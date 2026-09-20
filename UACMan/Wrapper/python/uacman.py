@@ -484,6 +484,37 @@ def stream_digest(
     return hasher.hexdigest(), size, playable_crc32
 
 
+def reject_forbidden_vgm_members(root: Path) -> None:
+    """Reject compressed VGM inputs before they can enter a UAC payload.
+
+    VGZ is a distribution wrapper, not the canonical member format for the
+    VGMMan sets.  A few archives also carry gzip bytes under a `.vgm` name;
+    those are the same conversion error and must be expanded before packing.
+    Keeping this check at the pack boundary prevents a caller from bypassing
+    the source-tree conversion path with a direct `pack` invocation.
+    """
+    files, _ = discover_files(root, include_macos_sidecars=False)
+    for path, relative in files:
+        suffix = path.suffix.lower()
+        if suffix == ".vgz":
+            raise UACError(
+                f"VGZ members are forbidden in UAC packages: {relative}. "
+                "Decompress to a raw .vgm file first."
+            )
+        if suffix != ".vgm":
+            continue
+        try:
+            with path.open("rb") as source:
+                magic = source.read(2)
+        except OSError as error:
+            raise UACError(f"Cannot inspect VGM member {relative}: {error}") from error
+        if magic == b"\x1f\x8b":
+            raise UACError(
+                f"gzip-wrapped .vgm is not a raw VGM member: {relative}. "
+                "Decompress it before packaging."
+            )
+
+
 def file_crc32(path: Path) -> int:
     checksum = 0
     with path.open("rb") as source:
@@ -503,7 +534,7 @@ def spc_version_text(value: int) -> str:
 def scan_contained_container_versions(root: Path) -> tuple[dict, dict[str, dict]]:
     """Read SPC/VGM version facts without changing any source member."""
     spc_versions: dict[int, dict] = {}
-    spc_members: dict[str, dict] = {}
+    versioned_members: dict[str, dict] = {}
     versions: dict[int, int] = {}
     for path in sorted(root.rglob("*"), key=lambda item: item.as_posix().casefold()):
         if not path.is_file():
@@ -531,7 +562,8 @@ def scan_contained_container_versions(root: Path) -> tuple[dict, dict[str, dict]
             group["memberCount"] += 1
             group["headerVersions"][header_version] = group["headerVersions"].get(header_version, 0) + 1
             relative = path.relative_to(root).as_posix()
-            spc_members[relative] = {
+            versioned_members[relative] = {
+                "sub-container-version": version,
                 "spcVersion": version,
                 "spcVersionByte": version_byte,
                 "spcHeaderVersion": header_version,
@@ -551,6 +583,8 @@ def scan_contained_container_versions(root: Path) -> tuple[dict, dict[str, dict]
         if version < 0x100:
             raise UACError(f"Invalid VGM container version in {path.name}: 0x{version:08X}")
         versions[version] = versions.get(version, 0) + 1
+        relative = path.relative_to(root).as_posix()
+        versioned_members[relative] = {"sub-container-version": vgm_version_text(version)}
 
     spc_groups = [
         {
@@ -586,7 +620,7 @@ def scan_contained_container_versions(root: Path) -> tuple[dict, dict[str, dict]
             "vgm": vgm_groups,
         },
     }
-    return inventory, spc_members
+    return inventory, versioned_members
 
 
 def contained_container_versions(root: Path) -> dict:
@@ -596,7 +630,8 @@ def contained_container_versions(root: Path) -> dict:
 
 
 def apply_contained_container_versions(root: Path, recipe: dict) -> None:
-    detected, spc_members = scan_contained_container_versions(root)
+    reject_forbidden_vgm_members(root)
+    detected, versioned_members = scan_contained_container_versions(root)
     game_metadata = recipe["game"].setdefault("metadata", {})
     if not isinstance(game_metadata, dict):
         raise UACError("Game metadata must be a JSON object.")
@@ -605,7 +640,7 @@ def apply_contained_container_versions(root: Path, recipe: dict) -> None:
         raise UACError("Recipe containedContainerVersions disagrees with detected SPC/VGM headers.")
     game_metadata["containedContainerVersions"] = detected
 
-    for path, fields in spc_members.items():
+    for path, fields in versioned_members.items():
         override = recipe["memberOverrides"].setdefault(path, {})
         if not isinstance(override, dict):
             raise UACError(f"Member override must be an object: {path}")
@@ -616,6 +651,27 @@ def apply_contained_container_versions(root: Path, recipe: dict) -> None:
             if key in metadata and metadata[key] not in (None, "", value):
                 raise UACError(f"Recipe {key} disagrees with detected SPC header: {path}")
             metadata[key] = value
+
+    # A mixed version inventory is a provenance warning, not a reason to
+    # discard the package.  Keep it in the manifest so the dashboard can make
+    # the critical condition visible while preserving every source member.
+    critical_flags = [
+        item for item in game_metadata.get("criticalFlags", [])
+        if not (isinstance(item, dict) and item.get("code") == "mixed-sub-container-version")
+    ] if isinstance(game_metadata.get("criticalFlags", []), list) else []
+    for format_name in detected.get("mixedVersionFormats", []):
+        groups = detected.get("versions", {}).get(format_name, [])
+        critical_flags.append({
+            "code": "mixed-sub-container-version",
+            "severity": "critical",
+            "format": format_name,
+            "versions": [group.get("version") for group in groups],
+            "reason": "One title contains multiple sub-container versions; review source provenance before treating it as a clean single-source rip.",
+        })
+    if critical_flags:
+        game_metadata["criticalFlags"] = critical_flags
+    else:
+        game_metadata.pop("criticalFlags", None)
 
 
 def load_recipe(path: Path) -> dict:
@@ -1150,6 +1206,21 @@ def create_tar(
     return records, skipped
 
 
+def validate_required_sub_container_tags(records: list[dict]) -> None:
+    """Require the shared version tag on every versioned audio member."""
+    for record in records:
+        format_name = str(record.get("format") or "").lower()
+        if format_name not in {"vgm", "spc"}:
+            continue
+        metadata = record.get("metadata")
+        value = metadata.get("sub-container-version") if isinstance(metadata, dict) else None
+        if not isinstance(value, str) or not value.strip():
+            raise UACError(
+                "Versioned audio member is missing required metadata.sub-container-version: "
+                f"{record.get('path', '<unknown>')}"
+            )
+
+
 def finalize_playlists(playlists: list, records: list[dict]) -> list[dict]:
     members = {record["path"]: record for record in records}
     result: list[dict] = []
@@ -1335,6 +1406,7 @@ def pack(args: argparse.Namespace) -> tuple[int, int, list[str], list[tuple[str,
             args.include_macos_sidecars,
             getattr(args, "member_path_map", None),
         )
+        validate_required_sub_container_tags(records)
         tar_size = tar_path.stat().st_size
         zstd_version = compress_seekable_tar(tar_path, payload_path, args.level, args.frame_size)
         if not payload_path.is_file():

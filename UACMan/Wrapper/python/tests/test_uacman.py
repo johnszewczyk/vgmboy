@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import gzip
 import importlib.util
 import io
 import json
@@ -570,6 +571,18 @@ class UACManRoundTripTests(unittest.TestCase):
                 },
             )
             by_path = {member["path"]: member for member in manifest["members"]}
+            self.assertEqual(by_path["01-old.vgm"]["metadata"]["sub-container-version"], "1.70")
+            self.assertEqual(by_path["02-new.vgm"]["metadata"]["sub-container-version"], "1.71")
+            self.assertEqual(
+                manifest["game"]["metadata"]["criticalFlags"],
+                [{
+                    "code": "mixed-sub-container-version",
+                    "severity": "critical",
+                    "format": "vgm",
+                    "versions": ["1.70", "1.71"],
+                    "reason": "One title contains multiple sub-container versions; review source provenance before treating it as a clean single-source rip.",
+                }],
+            )
             for name, contents in members.items():
                 self.assertEqual((unpacked / name).read_bytes(), contents)
                 expected_crc = f"{zlib.crc32(contents) & 0xFFFFFFFF:08X}"
@@ -598,6 +611,29 @@ class UACManRoundTripTests(unittest.TestCase):
             })
             with self.assertRaisesRegex(uacman.UACError, "Invalid or truncated VGM"):
                 uacman.apply_contained_container_versions(source, recipe)
+
+    def test_pack_rejects_vgz_and_gzip_wrapped_vgm_members(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="uacman-vgz-reject-test-") as temporary:
+            root = Path(temporary)
+            recipe = uacman.normalize_recipe({
+                "game": {"id": "compressed", "title": "Compressed", "console": "Sega Genesis"},
+                "variants": [{"id": "original", "label": "Original", "kind": "release"}],
+                "sources": [], "transformations": [], "playlists": [],
+            })
+
+            vgz_source = root / "vgz-source"
+            vgz_source.mkdir()
+            with gzip.open(vgz_source / "track.vgz", "wb") as output:
+                output.write(minimal_vgm(0x171))
+            with self.assertRaisesRegex(uacman.UACError, "VGZ members are forbidden"):
+                uacman.apply_contained_container_versions(vgz_source, recipe)
+
+            wrapped_source = root / "wrapped-source"
+            wrapped_source.mkdir()
+            with gzip.open(wrapped_source / "track.vgm", "wb") as output:
+                output.write(minimal_vgm(0x171))
+            with self.assertRaisesRegex(uacman.UACError, "gzip-wrapped \.vgm"):
+                uacman.apply_contained_container_versions(wrapped_source, recipe)
 
     def test_package_records_spc_versions_and_per_member_metadata(self) -> None:
         with tempfile.TemporaryDirectory(prefix="uacman-spc-version-test-") as temporary:

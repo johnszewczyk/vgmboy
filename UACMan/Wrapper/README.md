@@ -42,8 +42,8 @@ their payloads do not need to be repacked just to remove the synthetic
 
 For creation-time SPC metadata, build `UACManMetadataCLI` from the project
 root and pass it with `--harvest-spc-metadata`. For another MetaMan-supported
-format, use `--harvest-format-metadata vgm <UACManMetadataCLI>` (or `vgz`,
-`mdx`; SID, NSF, NSFE, GBS, standard audio, and APE are also supported); the option can be
+format, use `--harvest-format-metadata vgm <UACManMetadataCLI>` (`mdx`, SID,
+NSF, NSFE, GBS, standard audio, and APE are also supported); the option can be
 repeated for additional extensions. FLAC Vorbis comments and APE/ID3 tags are
 retained as ordered native metadata while the original compressed audio remains intact.
 Track-aware NSF-family results become ordered UAC
@@ -70,10 +70,14 @@ every original Project2612 package was one-to-one migrated.
 
 New packages also write `game.metadata.containedContainerVersions`, which
 records SPC and VGM version/count groups at package level and lists formats
-with mixed versions. Each SPC member exposes `metadata.spcVersion` (from its
-version byte), `metadata.spcVersionByte`, and `metadata.spcHeaderVersion` (from
-the signature text). The byte and signature are reported separately because
-real SPCs can disagree between them; neither is silently normalized. This
+with mixed versions. Each SPC or VGM member receives the required canonical
+`metadata.sub-container-version` tag. Each SPC member exposes
+`metadata.spcVersion` (from its version byte), `metadata.spcVersionByte`, and
+`metadata.spcHeaderVersion` (from the signature text). The byte and signature
+are reported separately because real SPCs can disagree between them; neither
+is silently normalized. A mixed format adds a critical
+`game.metadata.criticalFlags` entry. VGZ members and gzip-wrapped files named
+`.vgm` are rejected; expand them to raw `.vgm` before packaging. This
 inspection does not change source bytes. Every member receives a CRC32/ISO-HDLC
 hash scoped to its exact raw bytes; playable members also receive a CRC32 for
 the playable-payload scope. Existing BLAKE3 hashes remain available for content
@@ -81,7 +85,7 @@ identity. AudioMan must convert VGZ to raw VGM and freshen VGM versions before
 packaging when that is the selected set policy.
 
 For bulk `.tar.zst` conversion, pass the same helper with `--metadata-cli` and
-add `--metadata-format vgm` (or `vgz`, `nsf`, `nsfe`, `gbs`, `flac`, or `ape`) to
+add `--metadata-format vgm` (or `nsf`, `nsfe`, `gbs`, `flac`, or `ape`) to
 `pack-source-tree`. Formats absent from an input package are skipped without
 starting a reader process. Other standard-audio extensions can be named the
 same way.

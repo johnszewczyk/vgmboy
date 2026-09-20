@@ -143,23 +143,11 @@ button { cursor:pointer; }
 .technical-field-grid { --field-grid-columns:15% minmax(0,1fr) 100px minmax(0,1fr) 28px 28px; }
 .track-tags-editor .technical-field { display:table-row!important; }
 .structured-technical-row .tag-table-field:disabled { cursor:not-allowed; }
-.metadata-view.tracks-beta-active .inspector-content { width:100%; max-width:none; margin:0; }
-.tracks-beta-page { width:100%; min-width:0; }
 
 .field-grid-heading-input { text-align:center; font-weight:700; color:var(--text)!important; background:var(--panel-2)!important; border-color:var(--line)!important; cursor:default; }
 .technical-field-grid .field-grid-header .field-grid-cell,
 .meta-field-grid .field-grid-header .field-grid-cell { justify-content:center; }
 .track-grid .track-filename-cell { color:var(--muted); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:9px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.tracks-beta-page .tracks-field-grid { --field-grid-columns:64px 220px 120px; width:max-content; min-width:max-content; padding:0; }
-.tracks-beta-page .tracks-field-grid .field-grid-header,
-.tracks-beta-page .tracks-field-grid .track-array-row { grid-template-columns:var(--field-grid-columns); width:max-content; min-width:100%; }
-.tracks-beta-page .tracks-field-grid .field-grid-header { position:sticky; top:0; z-index:2; background:var(--panel-2); }
-.tracks-beta-page .tracks-field-grid .field-grid-cell { min-width:0; padding:2px; }
-.tracks-beta-page .tracks-field-grid .track-array-row { cursor:pointer; }
-.tracks-beta-page .tracks-field-grid .track-array-row .field-grid-cell { border-bottom:0; }
-.tracks-beta-page .tracks-field-grid .track-array-value { min-width:0; color:var(--muted); }
-.tracks-beta-page .tracks-field-grid .track-array-value.track-cell { color:var(--accent); }
-.tracks-beta-page .tracks-field-grid .track-array-value:disabled { opacity:1; color:var(--muted); }
 .tree-field-grid { --tree-field-columns:minmax(170px,28%) minmax(260px,1fr) 90px; min-width:680px; width:100%; padding:0; }
 .tree-field-grid .field-grid-header,
 .tree-field-grid .tree-entry { grid-template-columns:var(--tree-field-columns); width:100%; }
@@ -168,7 +156,6 @@ button { cursor:pointer; }
 .tree-field-grid .tree-type-field { color:var(--muted)!important; }
 .tree-field-grid .tree-value-field:disabled { opacity:1; color:var(--muted); }
 .tree-field-grid .tree-entry:hover { background:var(--hover); }
-.files-page .file-table-scroll { flex:1 1 auto; min-height:0; }
 .file-field-grid { --file-field-columns:110px 100px 220px minmax(320px,1fr) 90px; min-width:900px; width:100%; padding:0; }
 .file-field-grid .field-grid-header,
 .file-field-grid .file-row { grid-template-columns:var(--file-field-columns); width:100%; }
@@ -195,23 +182,17 @@ button { cursor:pointer; }
 .main-view-tabs button.active { border-color:transparent; }
 .main-view-tabs button.active::after { transform:scaleX(1); }
 
-.field-grid { padding:0 var(--field-grid-gap); }
+.field-grid { padding:1px var(--field-grid-gap); }
 .field-grid-header,.field-grid-row { width:auto; min-width:0; }
 .field-grid-cell { padding:0; }
 .field-grid .row-removing { pointer-events:none; }
 @keyframes row-removal { from { opacity:1; transform:translateX(0); } to { opacity:0; transform:translateX(8px); } }
 .row-removing { animation:row-removal var(--ui-motion) forwards; }
 
-.metadata-view.tracks-beta-active { overflow:auto; }
-.metadata-view.tracks-beta-active .inspector-content { width:max-content; min-width:100%; max-width:none; height:auto; min-height:100%; margin:0; padding:0; overflow:visible; }
-.tracks-beta-page { display:block; width:max-content; min-width:100%; border:1px solid var(--line); border-radius:4px; }
-.tracks-beta-page .tracks-field-grid { --field-grid-columns:64px 220px 120px; width:max-content; min-width:max-content; padding:0 var(--field-grid-gap); }
-.tracks-beta-page .tracks-field-grid .field-grid-header,
-.tracks-beta-page .tracks-field-grid .track-array-row { width:auto; min-width:0; }
-.tracks-beta-page .tracks-field-grid .field-grid-cell { padding:0; }
-.tracks-beta-page .tracks-field-grid .track-array-row { cursor:pointer; }
-.tracks-beta-page .tracks-field-grid .track-array-row:hover,
-.tracks-beta-page .tracks-field-grid .track-array-row.active { background:transparent; }
+[data-field-grid="tracks"] { --field-grid-columns:64px 220px 120px; width:max-content; min-width:max-content; }
+[data-field-grid="tracks"] .track-array-row { cursor:pointer; }
+[data-field-grid="tracks"] .track-array-row:hover,
+[data-field-grid="tracks"] .track-array-row.active { background:transparent; }
 
 .tree-field-grid,
 .file-field-grid,
@@ -239,3 +220,13 @@ button { cursor:pointer; }
 .tag-multiple-value-row { display:grid; grid-template-columns:24px minmax(0,1fr); gap:6px; padding:3px 5px; border-top:1px solid color-mix(in srgb,var(--line) 72%,transparent); color:var(--muted); white-space:pre-wrap; overflow-wrap:anywhere; }
 .tag-multiple-value-row:first-child { border-top:0; }
 .tag-multiple-value-row > span:first-child { color:var(--soft); text-align:right; }
+
+/* Keep the package workspace usable as its width changes. The search field
+   yields space to the tab strip without changing the shared table geometry. */
+.main-view-tabs { min-width:0; gap:6px; }
+.main-view-tabs .tab-buttons { flex:1 1 auto; min-width:0; overflow:hidden; }
+.main-view-tabs .member-search { width:clamp(180px,26vw,300px); min-width:150px; flex:0 1 clamp(180px,26vw,300px); margin:0; }
+.field-grid .tag-multiple-values { min-width:0; }
+@media(max-width:820px) {
+  .main-view-tabs .member-search { width:30vw; min-width:120px; flex-basis:30vw; }
+}
