@@ -29,15 +29,16 @@ literal source filename as its first two columns. Scalar values are editable;
 structured values are shown as compact read-only summaries.
 
 The workspace has six explicit pages. **Tracks Beta** is the wide experimental
-array-style field grid: every header and value is a boxed field, and its horizontal
-scroll is intentional. **Files** lists every stored package member, including
+array-style field grid: every header and value is a boxed field, it reuses the
+canonical field-grid spacing, and its horizontal scroll belongs to the workspace
+surface rather than a nested table window. **Files** lists every stored package member, including
 playable streams, artwork, cue sheets, and documentation, and opens a member's
 inspector when selected. **Package Tags** contains package-level metadata and all
 attachments using the same field-grid cells; structured package values are
 read-only. **Meta Tags** inventories package and track tag names, supports scalar
-value edits and package-wide rename/delete operations, and shows multiple values
-as disabled fields. **Tree** presents the set and tracks vertically with boxed
-Key/Value/Type fields; scalar values can be edited in place. Technical and
+value edits and package-wide rename/delete operations, and expands multiple values
+inline for inspection. **Tree** presents the set and tracks vertically with the
+same canonical boxed Key/Value/Type field-grid; scalar values can be edited in place. Technical and
 structured values remain represented by their package-scoped field views. UACMan
 lists assets and their metadata; it does not preview image bytes inside the
 compressed payload.
