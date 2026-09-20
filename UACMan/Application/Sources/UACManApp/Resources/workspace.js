@@ -111,7 +111,7 @@
       `data-multiple-key="${esc(context.key || "")}"`
     ].join(" ");
     const body = `<div class="multiple-values-editor" ${data}><div class="multiple-values-rows">${rows || '<div class="file-tag-empty multiple-values-empty">No values</div>'}</div><div class="multiple-values-editor-actions"><button class="icon-button" data-action="addMultipleValue" type="button" title="Add value" aria-label="Add value">＋</button><button class="icon-button" data-action="commitMultipleValues" type="button" title="Submit changed values" aria-label="Submit changed values">✓</button></div><div class="multiple-values-editor-error" role="status"></div></div>`;
-    return canonicalFoldMarkup("Multiple Values", body, { className:"tag-multiple-values editable-multiple-values", meta:`${entries.length}` });
+    return canonicalFoldMarkup("Multiple Values", body, { className:"tag-multiple-values editable-multiple-values", meta:context.showCount === false ? "" : entries.length });
   };
   const metadataSortValue = (member, key) => {
     const value = memberFields(member)[key];
@@ -121,6 +121,7 @@
   let sort = { key:"track", direction:1 };
   let inspectorTab = "set";
   let mainView = "members";
+  let trackBrowserPath = "";
   let lastRenderedView = "";
   let lastDocumentName = "";
   const uiMotionDuration = 200;
@@ -164,6 +165,7 @@
       lastDocumentName = state.documentName || "";
       inspectorTab = "set";
       mainView = "members";
+      trackBrowserPath = "";
     }
     const viewChanged = mainView !== lastRenderedView;
     lastRenderedView = mainView;
@@ -358,7 +360,6 @@
   }
 
   function renderPackTagsPage() { return renderTagScopePage("Pack Tags", "Package", true); }
-  function renderTrackTagsPage() { return renderTagScopePage("Track Tags", "Track"); }
 
   function renderTrackArrayGrid(tracks) {
     const columns = trackColumns();
@@ -378,7 +379,7 @@
         const disabled = !editable || !present || structured ? " disabled" : "";
         const attributes = editable && present && !structured ? ` data-track-cell data-track-path="${esc(member.path)}" data-track-key="${esc(key)}" data-track-scope="${esc(scope)}"` : "";
         return structured
-          ? multipleValuesEditorMarkup(value, { target:"member", path:member.path, scope, key })
+          ? multipleValuesEditorMarkup(value, { target:"member", path:member.path, scope, key, showCount:false })
           : `<input class="tag-table-field track-array-value${editable && present ? " track-cell" : ""}" value="${esc(display)}" aria-label="${esc(rowLabel)} ${esc(key)}"${attributes}${disabled}>`;
       };
       const metadataCells = columns.map(key => {
@@ -421,25 +422,39 @@
     ].filter(entry => hasMeaningfulTagValue(entry.value)).sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric:true, sensitivity:"base" }));
   }
 
-  function renderFileTags(member) {
+  function memberTagValueMarkup(member, entry) {
+    return entry.value && typeof entry.value === "object"
+      ? multipleValuesEditorMarkup(entry.value, { target:"member", path:member.path, scope:entry.scope, key:entry.key, showCount:false })
+      : `<input class="tag-table-field file-tag-value" data-file-tag-value value="${esc(String(entry.value))}" aria-label="Value for ${esc(entry.key)}">`;
+  }
+
+  function renderTrackTagTable(member) {
     const entries = fileTagEntries(member);
-    const rows = entries.map(entry => {
-      const structured = entry.value && typeof entry.value === "object";
-      const value = structured
-        ? multipleValuesEditorMarkup(entry.value, { target:"member", path:member.path, scope:entry.scope, key:entry.key })
-        : `<input class="tag-table-field file-tag-value" data-file-tag-value value="${esc(String(entry.value))}" aria-label="Value for ${esc(entry.key)}">`;
-      return `<div class="file-tag-entry" data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"><div class="file-tag-key-cell"><input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name"></div><div class="file-tag-value-cell">${value}</div><div class="file-tag-action-cell"><button class="icon-button" data-action="commitFileTag" title="Submit changed tag" aria-label="Submit changed tag">✓</button><button class="icon-button danger" data-action="deleteFileTag" title="Delete tag" aria-label="Delete tag">×</button></div></div>`;
-    }).join("");
-    const body = `<div class="file-tag-editor"><div class="file-tag-editor-header"><span>Tag</span><span>Value</span><span>Actions</span></div>${rows || '<div class="file-tag-empty">No per-file tags</div>'}<form class="file-tag-create-form" data-file-tag-create data-file-tag-path="${esc(member.path)}"><select data-file-tag-scope aria-label="Tag namespace"><option value="memberMetadata">metadata</option><option value="memberExtensions">extension</option></select><input data-file-tag-key placeholder="Tag name" aria-label="New file tag name"><input data-file-tag-value placeholder="Value" aria-label="New file tag value"><button class="icon-button" type="submit" title="Add tag" aria-label="Add tag">✓</button></form></div>`;
-    return canonicalFoldMarkup("Tags", body, { className:"file-tags-fold", meta:`${entries.length}` });
+    const header = ["Scope", "Tag Name", "Tag Value", "Actions"].map(label => `<div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${label}" disabled></div>`).join("");
+    const rows = entries.map(entry => `<div class="field-grid-row track-browser-row" role="row" data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-scope" value="${entry.scope === "memberExtensions" ? "extension" : "metadata"}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name"></div><div class="field-grid-cell track-browser-value-cell" role="cell">${memberTagValueMarkup(member, entry)}</div><div class="field-grid-cell track-browser-actions" role="cell"><button class="icon-button" data-action="commitFileTag" title="Submit changed tag" aria-label="Submit changed tag">✓</button><button class="icon-button danger" data-action="deleteFileTag" title="Delete tag" aria-label="Delete tag">×</button></div></div>`).join("");
+    const empty = '<div class="field-grid-empty" role="row"><span role="cell">No tags on this file</span></div>';
+    const form = `<form class="file-tag-create-form track-browser-create-form" data-file-tag-create data-file-tag-path="${esc(member.path)}"><select data-file-tag-scope aria-label="Tag namespace"><option value="memberMetadata">metadata</option><option value="memberExtensions">extension</option></select><input data-file-tag-key placeholder="Tag name" aria-label="New file tag name"><input data-file-tag-value placeholder="Value" aria-label="New file tag value"><button class="icon-button" type="submit" title="Add tag" aria-label="Add tag">✓</button></form>`;
+    return `<div class="track-browser-table-wrap"><div class="field-grid track-browser-field-grid" role="table" aria-label="Tags for ${esc(member.name)}"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div>${form}</div>`;
+  }
+
+  function renderTrackPage() {
+    const candidates = state.members.filter(member => fileTagEntries(member).length > 0);
+    const selected = candidates.find(member => member.path === trackBrowserPath)
+      || candidates.find(member => member.path === state.selectedMemberPath)
+      || candidates[0];
+    trackBrowserPath = selected?.path || "";
+    const options = candidates.map(member => `<option value="${esc(member.path)}"${member.path === trackBrowserPath ? " selected" : ""}>${esc(member.name)} · ${fileTagEntries(member).length} tags</option>`).join("");
+    const selector = `<label class="track-browser-selector"><span>File</span><select data-track-browser-select aria-label="File with tags">${options || '<option value="">No files with tags</option>'}</select></label>`;
+    const body = selected ? renderTrackTagTable(selected) : '<div class="empty-tab"><strong>No tagged files</strong><span>Files with metadata or extensions will appear here.</span></div>';
+    return `<section class="data-page track-browser-page"><div class="data-page-heading"><div><h2>Track</h2><p>Select a package file to inspect and edit every metadata and extension tag it contains.</p></div>${selector}</div>${body}</section>`;
   }
 
   function renderFilesPage() {
     const members = visibleFileMembers();
-    const header = ["Role", "Format", "Filename", "Stored path", "Tags", "Size"].map(label => `<div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`).join("");
-    const rows = members.map(member => `<div class="field-grid-row file-row" role="row" tabindex="0" data-track-row="${esc(member.path)}" title="Open metadata for ${esc(member.name)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.role)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.format || "unknown")}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-name-field" data-file-name data-file-path="${esc(member.path)}" value="${esc(member.name)}" aria-label="Filename"></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-path-field" value="${esc(member.path)}" disabled></div><div class="field-grid-cell file-tags-cell" role="cell">${renderFileTags(member)}</div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(bytes(member.bytes))}" disabled></div></div>`).join("");
+    const header = ["Role", "Format", "Filename", "Stored path", "Tags Count", "Size"].map(label => `<div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`).join("");
+    const rows = members.map(member => `<div class="field-grid-row file-row" role="row" tabindex="0" data-track-row="${esc(member.path)}" title="Open metadata for ${esc(member.name)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.role)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.format || "unknown")}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-name-field" data-file-name data-file-path="${esc(member.path)}" value="${esc(member.name)}" aria-label="Filename"></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-path-field" value="${esc(member.path)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tags-count" value="${fileTagEntries(member).length}" aria-label="Tag count" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(bytes(member.bytes))}" disabled></div></div>`).join("");
     const empty = `<div class="field-grid-empty" role="row"><span role="cell">No package members match this filter</span></div>`;
-    return `<section class="data-page files-page"><div class="data-page-heading"><div><h2>Files</h2><p>Every stored package member, including playable tracks, artwork, cues, and documents. Rename the displayed filename or open Tags to edit per-file metadata.</p></div><span class="data-page-count">${members.length} of ${state.members.length} members</span></div><div class="field-grid file-field-grid" role="table" aria-label="Package files"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div><p class="file-edit-note">Stored paths and payload members stay immutable so metadata saves preserve the compressed UAC payload byte-for-byte.</p></section>`;
+    return `<section class="data-page files-page"><div class="data-page-heading"><div><h2>Files</h2><p>Every stored package member, including playable tracks, artwork, cues, and documents. Rename the displayed filename or choose Track to edit exhaustive per-file tags.</p></div><span class="data-page-count">${members.length} of ${state.members.length} members</span></div><div class="field-grid file-field-grid" role="table" aria-label="Package files"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div><p class="file-edit-note">Stored paths and payload members stay immutable so metadata saves preserve the compressed UAC payload byte-for-byte.</p></section>`;
   }
 
   function renderAttachments() {
@@ -458,16 +473,16 @@
       return;
     }
     const title = member?.title || member?.name || "Package metadata";
-    const pageTitle = ["files", "packTags", "trackTags"].includes(mainView) ? state.packageTitle || state.packageID : title;
-    const eyebrow = mainView === "files" ? "FILES" : mainView === "track" || mainView === "trackTags" ? "TRACK TAGS" : mainView === "packTags" ? "PACK TAGS" : "PACKAGE";
+    const pageTitle = ["files", "packTags", "trackBrowser"].includes(mainView) ? state.packageTitle || state.packageID : title;
+    const eyebrow = mainView === "files" ? "FILES" : mainView === "trackBrowser" || mainView === "track" ? "TRACK" : mainView === "packTags" ? "PACK TAGS" : "PACKAGE";
     let html = `<div class="inspector-head"><div class="inspector-title-row"><div><span class="eyebrow">${eyebrow}</span><h2>${esc(pageTitle)}</h2></div></div>${mainView === "track" && member ? `<div class="inspector-sub">${esc(member.role)} · ${esc(member.format || "unknown format")} · ${bytes(member.bytes)}<br><span title="Stored UAC path: ${esc(member.path)}">${esc(memberLocation(member))}</span></div>` : `<div class="inspector-sub">${esc(state.packageID)}</div>`}</div>`;
     if (mainView === "track") {
       if (member) {
-        html += `<section class="track-tags-editor">${renderPropertyEditor("Track Tags", "memberMetadata", state.memberMetadataJSON, { includeTechnical:true, includeEmpty:true })}${renderPropertyEditor("Track Extensions", "memberExtensions", state.memberExtensionsJSON, { includeTechnical:true, includeEmpty:true })}</section>`;
+        html += `<section class="track-tags-editor">${renderPropertyEditor("Track Metadata", "memberMetadata", state.memberMetadataJSON, { includeTechnical:true, includeEmpty:true })}${renderPropertyEditor("Track Extensions", "memberExtensions", state.memberExtensionsJSON, { includeTechnical:true, includeEmpty:true })}</section>`;
       } else html += `<section class="inspector-section"><div class="empty-tab"><strong>Select a track</strong><span>Choose a row in Tracks to edit its tags.</span></div></section>`;
     } else if (mainView === "files") html += renderFilesPage();
     else if (mainView === "packTags") html += renderPackTagsPage();
-    else if (mainView === "trackTags") html += renderTrackTagsPage();
+    else if (mainView === "trackBrowser") html += renderTrackPage();
     $("#inspector-content").innerHTML = html;
   }
 
@@ -715,6 +730,7 @@
   document.addEventListener("change", event => {
     const target = event.target;
     if (target.matches("[data-track-cell]")) commitTrackCell(target);
+    else if (target.matches("[data-track-browser-select]")) { trackBrowserPath = target.value; render(state); }
     else if (target.matches("[data-file-name]")) bridge("renameMember", { path:target.dataset.filePath || "", name:target.value });
     else if (target.matches("[data-basic='packageTitle']")) bridge("setPackageTitle", { value:target.value });
     else if (target.matches("[data-basic='consoleName']")) bridge("setConsole", { value:target.value });

@@ -24,7 +24,7 @@ Selecting a package opens its playable tracks in the primary **Tracks** view.
 The member filter searches visible metadata values, role, format, filename, and
 path. Tracks stays an inline field grid: scalar cells edit in place and structured
 cells open the editable canonical Multiple Values disclosure. Batch tag edits live in
-**Track Tags**, so Tracks does not carry a separate checkbox
+the **Track** browser, so Tracks does not carry a separate checkbox
 selection model. The Tracks table includes both the display track number and the
 literal source filename as its first two columns. Scalar values are editable;
 structured values expose child key/value controls and a submit action. Aggregate
@@ -37,14 +37,13 @@ horizontal scroll belongs to the workspace surface rather than a nested table
 window. **Files** lists every stored package member, including playable streams,
 artwork, cue sheets, and documentation. Its filename field edits the
 manifest's displayed/original filename while the stored TAR path remains
-immutable. Each row's **Tags** disclosure counts and edits that member's scalar
-metadata/extensions; structured values use the same editable Multiple Values
-child editor. **Pack Tags** contains
+immutable. Each row's **Tags** column is a numeric count. The **Track** page
+provides a file selector and an exhaustive canonical table for editing that
+file's metadata/extensions; structured values use the same editable Multiple
+Values child editor. **Pack Tags** contains
 package-level metadata and all attachments using the same field-grid cells, with
-the same add interface as the tag workspace. **Track Tags** inventories
-track-level tag names, supports scalar value edits and track-scoped
-rename/delete operations, and expands unambiguous multiple values inline for
-editing. Multiple Values disclosures are reused anywhere structured fields appear.
+the same add interface as the tag workspace. Multiple Values disclosures are
+reused anywhere structured fields appear.
 UACMan
 lists assets and their metadata; it does not preview image bytes inside the
 compressed payload.

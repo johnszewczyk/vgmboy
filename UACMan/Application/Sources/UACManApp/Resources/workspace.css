@@ -240,6 +240,34 @@ button { cursor:pointer; }
 .multiple-value-editor-row .multiple-value-remove { width:22px; height:22px; padding:0; }
 .multiple-values-editor-error { min-height:14px; padding:1px 2px 0; color:var(--danger,#e06c75); font-size:9px; }
 
+/* Keep the canonical table geometry stable when a structured cell opens. The
+   editor floats over the grid instead of changing the narrow value column or
+   pushing neighboring cells into a different row height. */
+.field-grid-header { background:transparent; }
+.canonical-fold-icon { margin-left:auto; }
+.canonical-fold-meta + .canonical-fold-icon { margin-left:0; }
+.tracks-field-grid .field-grid-cell:has(> .canonical-fold),
+.track-browser-field-grid .field-grid-cell:has(> .canonical-fold) { position:relative; align-items:flex-start; z-index:2; }
+.tracks-field-grid .canonical-fold,
+.track-browser-field-grid .canonical-fold { position:relative; width:100%; }
+.tracks-field-grid .canonical-fold-panel.open,
+.track-browser-field-grid .canonical-fold-panel.open { position:absolute; top:100%; left:0; z-index:20; width:min(560px,70vw); min-width:320px; }
+.tracks-field-grid .canonical-fold-inner,
+.track-browser-field-grid .canonical-fold-inner { max-height:320px; overflow:auto; }
+.file-field-grid { --file-field-columns:105px 90px 220px minmax(300px,1fr) 64px 90px; }
+.file-tags-count { text-align:center; color:var(--muted)!important; }
+.track-browser-page .data-page-heading { align-items:center; }
+.track-browser-selector { display:flex; align-items:center; gap:6px; flex:none; color:var(--muted); font-size:10px; }
+.track-browser-selector select { min-width:min(420px,40vw); height:27px; padding:2px 6px; border:1px solid var(--line); border-radius:3px; background:var(--panel-2); color:var(--accent); font:inherit; }
+.track-browser-table-wrap { display:flex; flex-direction:column; min-height:0; gap:8px; }
+.track-browser-field-grid { --track-browser-columns:110px 240px minmax(360px,1fr) 52px; min-width:760px; width:100%; }
+.track-browser-field-grid .field-grid-header,
+.track-browser-field-grid .track-browser-row { grid-template-columns:var(--track-browser-columns); width:auto; }
+.track-browser-field-grid .track-browser-row { min-height:27px; }
+.track-browser-value-cell { align-items:stretch!important; overflow:visible; }
+.track-browser-actions { justify-content:center; gap:2px; }
+.track-browser-create-form { align-self:flex-end; margin:0; }
+
 /* The same motion token drives page changes, navigation, tabs, and controls. */
 @keyframes page-enter { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
 .page-enter { animation:page-enter var(--ui-motion) both; }
