@@ -64,9 +64,11 @@
   32 MiB reader limits.
 - Keep `UTTypeIconFile` in the exported UAC type and `CFBundleTypeIconFile` in
   the `.uac` document type pointed at the same `UACDocumentIcon.icns` resource.
-  The PNG source and repeatable ICNS generator live in
-  `Application/DocumentIcon/`; `Application/launch.sh` copies the generated
-  ICNS directly into the app bundle's `Contents/Resources`.
+  `CFBundleIconFile` must point at that same resource for the UACMan
+  application icon. The PNG source of truth and repeatable ICNS generator
+  live in `Application/DocumentIcon/`; `Application/launch.sh` regenerates
+  the ICNS from the PNG before copying it into the app bundle's
+  `Contents/Resources`.
 
 ## Files
 

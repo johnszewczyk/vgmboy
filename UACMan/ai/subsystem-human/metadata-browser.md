@@ -23,11 +23,13 @@ without scanning its parent folder.
 Selecting a package opens its playable tracks in the primary **Tracks** view.
 The member filter searches visible metadata values, role, format, filename, and
 path. Tracks stays an inline field grid: scalar cells edit in place and structured
-cells open the canonical Multiple Values disclosure. Batch tag edits live in
+cells open the editable canonical Multiple Values disclosure. Batch tag edits live in
 **Track Tags**, so Tracks does not carry a separate checkbox
 selection model. The Tracks table includes both the display track number and the
 literal source filename as its first two columns. Scalar values are editable;
-structured values are shown through a compact read-only Multiple Values disclosure.
+structured values expose child key/value controls and a submit action. Aggregate
+rows with different structured values remain read-only until a single value is
+unambiguous.
 
 The workspace has four explicit pages. **Tracks** is the wide canonical
 array-style field grid: every header and value is a boxed field, and its
@@ -36,12 +38,13 @@ window. **Files** lists every stored package member, including playable streams,
 artwork, cue sheets, and documentation. Its filename field edits the
 manifest's displayed/original filename while the stored TAR path remains
 immutable. Each row's **Tags** disclosure counts and edits that member's scalar
-metadata/extensions; structured values remain read-only. **Pack Tags** contains
+metadata/extensions; structured values use the same editable Multiple Values
+child editor. **Pack Tags** contains
 package-level metadata and all attachments using the same field-grid cells, with
 the same add interface as the tag workspace. **Track Tags** inventories
 track-level tag names, supports scalar value edits and track-scoped
-rename/delete operations, and expands multiple values inline for inspection.
-Multiple Values disclosures are reused anywhere structured fields appear.
+rename/delete operations, and expands unambiguous multiple values inline for
+editing. Multiple Values disclosures are reused anywhere structured fields appear.
 UACMan
 lists assets and their metadata; it does not preview image bytes inside the
 compressed payload.
@@ -60,7 +63,9 @@ when provenance is incomplete or conflicting.
 Per-field edits use typed rows: **Add column** creates a text, number, boolean,
 or JSON field, and removing a row removes that manifest field. A collapsed
 **Open JSON editor** escape hatch remains available for advanced or nested
-edits. Save reopens and
+edits. Canonical Multiple Values disclosures provide the same child key/value
+editing for structured cells; an aggregate row is read-only when it combines
+different source values. Save reopens and
 verifies the wrapper, then preserves the compressed payload byte-for-byte.
 Files cannot be physically removed or have their stored TAR paths renamed in
 this payload-preserving editor; those operations require a separate repack

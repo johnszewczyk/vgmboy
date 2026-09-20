@@ -90,6 +90,29 @@
       : '<div class="tag-multiple-value-row"><span>—</span><span>Empty</span></div>';
     return canonicalFoldMarkup("Multiple Values", body, { className:"tag-multiple-values" });
   };
+  const multipleValuesEditorMarkup = (value, context = {}) => {
+    const isArray = Array.isArray(value);
+    const entries = isArray ? value.map((item, index) => [String(index), item]) : Object.entries(value || {});
+    const rowMarkup = ([key, item]) => {
+      const kind = fieldKind(item);
+      const raw = kind === "json" ? JSON.stringify(item, null, 2) : String(item ?? "");
+      const valueControl = kind === "json"
+        ? `<textarea class="multiple-value-editor" data-multiple-value aria-label="Value for ${esc(key)}">${esc(raw)}</textarea>`
+        : `<input class="multiple-value-editor" data-multiple-value value="${esc(raw)}" aria-label="Value for ${esc(key)}">`;
+      return `<div class="tag-multiple-value-row multiple-value-editor-row" data-multiple-entry data-multiple-kind="${kind}"><input class="multiple-value-key" data-multiple-key value="${esc(key)}" aria-label="Key for ${esc(key)}"${isArray ? " disabled" : ""}>${valueControl}<button class="icon-button danger multiple-value-remove" data-action="removeMultipleValue" type="button" title="Remove value" aria-label="Remove value">×</button></div>`;
+    };
+    const rows = entries.map(rowMarkup).join("");
+    const data = [
+      `data-multiple-editor`,
+      `data-multiple-target="${esc(context.target || "member")}"`,
+      `data-multiple-array="${isArray}"`,
+      `data-multiple-path="${esc(context.path || "")}"`,
+      `data-multiple-scope="${esc(context.scope || "")}"`,
+      `data-multiple-key="${esc(context.key || "")}"`
+    ].join(" ");
+    const body = `<div class="multiple-values-editor" ${data}><div class="multiple-values-rows">${rows || '<div class="file-tag-empty multiple-values-empty">No values</div>'}</div><div class="multiple-values-editor-actions"><button class="icon-button" data-action="addMultipleValue" type="button" title="Add value" aria-label="Add value">＋</button><button class="icon-button" data-action="commitMultipleValues" type="button" title="Submit changed values" aria-label="Submit changed values">✓</button></div><div class="multiple-values-editor-error" role="status"></div></div>`;
+    return canonicalFoldMarkup("Multiple Values", body, { className:"tag-multiple-values editable-multiple-values", meta:`${entries.length}` });
+  };
   const metadataSortValue = (member, key) => {
     const value = memberFields(member)[key];
     return value && typeof value === "object" ? JSON.stringify(value) : (value ?? "");
@@ -317,16 +340,21 @@
       const values = new Map(scoped.flatMap(value => [...value.values.entries()]));
       const sample = scoped[0]?.sample;
       const multipleValues = signatures.size > 1 || typeof sample === "object";
-      const valueInput = multipleValues
+      const editableMultipleValues = signatures.size === 1 && sample !== null && typeof sample === "object";
+      const valueInput = editableMultipleValues
+        ? multipleValuesEditorMarkup(sample, { target:"metadata", scope:scope === "Package" ? "package" : "tracks", key:entry.key })
+        : multipleValues
         ? multipleValuesMarkup(null, [...values.values()].map((value, valueIndex) => [String(valueIndex + 1), value]))
         : `<input data-tag-value aria-label="Tag value for ${esc(entry.key)}" value="${esc(sample)}">`;
       const tagType = multipleValues ? "Multiple Values" : signatures.size === 1 ? (Array.isArray(sample) ? "list" : typeof sample) : "various";
-      return `<div class="field-grid-row" role="row" data-tag-row data-tag-scope="${esc(scope)}" data-tag-from="${esc(entry.key)}"><div class="field-grid-cell tag-number-cell" role="cell"><input class="tag-table-field" value="${index + 1}" aria-label="Tag number" disabled></div><div class="field-grid-cell tag-type-cell" role="cell"><input class="tag-table-field" value="${esc(tagType)}" aria-label="Tag type for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-name-cell" role="cell"><input class="tag-table-field" data-tag-to value="${esc(entry.key)}" aria-label="Tag name for ${esc(entry.key)}"></div><div class="field-grid-cell tag-value-cell" role="cell"><span class="tag-inline-editor">${valueInput}</span></div><div class="field-grid-cell tag-uses-cell" role="cell"><input class="tag-table-field" value="${count}" aria-label="Uses for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitTagRow" title="${multipleValues ? "Multiple Values are read-only" : "Submit changed fields"}" aria-label="${multipleValues ? "Multiple Values are read-only" : "Submit changed fields"}"${multipleValues ? " disabled" : ""}>✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteTag" title="Delete ${esc(entry.key)}" aria-label="Delete ${esc(entry.key)}">×</button></div></div>`;
+      const readOnlyMultipleValues = multipleValues && !editableMultipleValues;
+      const submitTitle = readOnlyMultipleValues ? "Multiple Values contain different values" : "Submit changed fields";
+      return `<div class="field-grid-row" role="row" data-tag-row data-tag-scope="${esc(scope)}" data-tag-from="${esc(entry.key)}"><div class="field-grid-cell tag-number-cell" role="cell"><input class="tag-table-field" value="${index + 1}" aria-label="Tag number" disabled></div><div class="field-grid-cell tag-type-cell" role="cell"><input class="tag-table-field" value="${esc(tagType)}" aria-label="Tag type for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-name-cell" role="cell"><input class="tag-table-field" data-tag-to value="${esc(entry.key)}" aria-label="Tag name for ${esc(entry.key)}"></div><div class="field-grid-cell tag-value-cell" role="cell"><span class="tag-inline-editor">${valueInput}</span></div><div class="field-grid-cell tag-uses-cell" role="cell"><input class="tag-table-field" value="${count}" aria-label="Uses for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitTagRow" title="${submitTitle}" aria-label="${submitTitle}"${readOnlyMultipleValues ? " disabled" : ""}>✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteTag" title="Delete ${esc(entry.key)}" aria-label="Delete ${esc(entry.key)}">×</button></div></div>`;
     }).join("");
     const header = `<div class="field-grid-row field-grid-header" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="#" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Tag Type" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Tag Name" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Tag Value" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Uses" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="✓" aria-label="Submit" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="×" aria-label="Delete" disabled></div></div>`;
     const grid = (title, rows, scope) => `<section class="tag-scope-table"><div class="section-title"><span>${title}</span><form class="tag-create-form" data-tag-create data-tag-scope="${scope}"><input data-new-tag-key placeholder="Tag Name" aria-label="New tag name"><input data-new-tag-value placeholder="New tag value" aria-label="New tag value"><button class="icon-button add-tag-submit" type="submit" title="Add tag" aria-label="Add tag">✓</button></form></div><div class="data-table-scroll"><div class="field-grid meta-field-grid" role="table" aria-label="${title}">${header}${rows || '<div class="field-grid-empty" role="row"><span role="cell">No tags</span></div>'}</div></div></section>`;
     const entries = rowsFor(scope);
-    return `<section class="data-page schema-page"><div class="data-page-heading"><div><h2>${esc(title)}</h2><p>${scope === "Package" ? "Package-level fields and attachments. Add or edit scalar values here; structured values remain read-only." : "Track-level tag vocabulary across playable members. Add a field to every track or edit the shared scalar value."}</p></div><span class="data-page-count">${entries ? entries.split("data-tag-row").length - 1 : 0} fields</span></div>${grid(title, entries, scope === "Package" ? "package" : "tracks")}${includeAttachments ? renderAttachments() : ""}</section>`;
+    return `<section class="data-page schema-page"><div class="data-page-heading"><div><h2>${esc(title)}</h2><p>${scope === "Package" ? "Package-level fields and attachments. Add or edit scalar values here; open an unambiguous structured value to edit its child fields." : "Track-level tag vocabulary across playable members. Add a field to every track or edit a shared scalar or unambiguous structured value."}</p></div><span class="data-page-count">${entries ? entries.split("data-tag-row").length - 1 : 0} fields</span></div>${grid(title, entries, scope === "Package" ? "package" : "tracks")}${includeAttachments ? renderAttachments() : ""}</section>`;
   }
 
   function renderPackTagsPage() { return renderTagScopePage("Pack Tags", "Package", true); }
@@ -349,7 +377,9 @@
         const display = !present ? "—" : structured ? "Multiple Values" : String(value);
         const disabled = !editable || !present || structured ? " disabled" : "";
         const attributes = editable && present && !structured ? ` data-track-cell data-track-path="${esc(member.path)}" data-track-key="${esc(key)}" data-track-scope="${esc(scope)}"` : "";
-        return structured ? multipleValuesMarkup(value) : `<input class="tag-table-field track-array-value${editable && present ? " track-cell" : ""}" value="${esc(display)}" aria-label="${esc(rowLabel)} ${esc(key)}"${attributes}${disabled}>`;
+        return structured
+          ? multipleValuesEditorMarkup(value, { target:"member", path:member.path, scope, key })
+          : `<input class="tag-table-field track-array-value${editable && present ? " track-cell" : ""}" value="${esc(display)}" aria-label="${esc(rowLabel)} ${esc(key)}"${attributes}${disabled}>`;
       };
       const metadataCells = columns.map(key => {
         const extension = key.startsWith("extension.");
@@ -396,9 +426,9 @@
     const rows = entries.map(entry => {
       const structured = entry.value && typeof entry.value === "object";
       const value = structured
-        ? multipleValuesMarkup(entry.value)
+        ? multipleValuesEditorMarkup(entry.value, { target:"member", path:member.path, scope:entry.scope, key:entry.key })
         : `<input class="tag-table-field file-tag-value" data-file-tag-value value="${esc(String(entry.value))}" aria-label="Value for ${esc(entry.key)}">`;
-      return `<div class="file-tag-entry" data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"><div class="file-tag-key-cell"><input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name"></div><div class="file-tag-value-cell">${value}</div><div class="file-tag-action-cell"><button class="icon-button" data-action="commitFileTag" title="${structured ? "Structured values are read-only" : "Submit changed tag"}" aria-label="${structured ? "Structured values are read-only" : "Submit changed tag"}"${structured ? " disabled" : ""}>✓</button><button class="icon-button danger" data-action="deleteFileTag" title="Delete tag" aria-label="Delete tag">×</button></div></div>`;
+      return `<div class="file-tag-entry" data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"><div class="file-tag-key-cell"><input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name"></div><div class="file-tag-value-cell">${value}</div><div class="file-tag-action-cell"><button class="icon-button" data-action="commitFileTag" title="Submit changed tag" aria-label="Submit changed tag">✓</button><button class="icon-button danger" data-action="deleteFileTag" title="Delete tag" aria-label="Delete tag">×</button></div></div>`;
     }).join("");
     const body = `<div class="file-tag-editor"><div class="file-tag-editor-header"><span>Tag</span><span>Value</span><span>Actions</span></div>${rows || '<div class="file-tag-empty">No per-file tags</div>'}<form class="file-tag-create-form" data-file-tag-create data-file-tag-path="${esc(member.path)}"><select data-file-tag-scope aria-label="Tag namespace"><option value="memberMetadata">metadata</option><option value="memberExtensions">extension</option></select><input data-file-tag-key placeholder="Tag name" aria-label="New file tag name"><input data-file-tag-value placeholder="Value" aria-label="New file tag value"><button class="icon-button" type="submit" title="Add tag" aria-label="Add tag">✓</button></form></div>`;
     return canonicalFoldMarkup("Tags", body, { className:"file-tags-fold", meta:`${entries.length}` });
@@ -505,6 +535,73 @@
     bridge(scopeToAction(scope), { value:JSON.stringify(values, null, 2) });
   }
 
+  function addMultipleValue(editor) {
+    const rows = $(".multiple-values-rows", editor);
+    if (!rows) return;
+    const isArray = editor.dataset.multipleArray === "true";
+    $(".multiple-values-empty", rows)?.remove();
+    const row = document.createElement("div");
+    row.className = "tag-multiple-value-row multiple-value-editor-row";
+    row.dataset.multipleEntry = "";
+    row.dataset.multipleKind = "string";
+    row.innerHTML = `<input class="multiple-value-key" data-multiple-key value="" aria-label="New value key"${isArray ? " disabled" : ""}><input class="multiple-value-editor" data-multiple-value value="" aria-label="New value"><button class="icon-button danger multiple-value-remove" data-action="removeMultipleValue" type="button" title="Remove value" aria-label="Remove value">×</button>`;
+    rows.append(row);
+    $("[data-multiple-key]", row)?.focus();
+  }
+
+  function removeMultipleValue(row) {
+    const editor = row?.closest("[data-multiple-editor]");
+    if (!row || !editor) return;
+    row.remove();
+    const rows = $(".multiple-values-rows", editor);
+    if (rows && !$("[data-multiple-entry]", rows)) rows.innerHTML = '<div class="file-tag-empty multiple-values-empty">No values</div>';
+  }
+
+  function commitMultipleValues(editor) {
+    if (!editor) return;
+    const error = $(".multiple-values-editor-error", editor);
+    const isArray = editor.dataset.multipleArray === "true";
+    const result = isArray ? [] : {};
+    const seenKeys = new Set();
+    for (const row of $$("[data-multiple-entry]", editor)) {
+      const key = isArray ? String(result.length) : $("[data-multiple-key]", row)?.value.trim() || "";
+      if (!isArray && !key) {
+        if (error) error.textContent = "Keys cannot be empty.";
+        $("[data-multiple-key]", row)?.focus();
+        return;
+      }
+      if (!isArray && seenKeys.has(key)) {
+        if (error) error.textContent = "Keys must be unique.";
+        $("[data-multiple-key]", row)?.focus();
+        return;
+      }
+      seenKeys.add(key);
+      const raw = $("[data-multiple-value]", row)?.value ?? "";
+      try {
+        const value = coerceValue(raw, row.dataset.multipleKind || "string");
+        if (isArray) result.push(value); else result[key] = value;
+      } catch {
+        if (error) error.textContent = `Invalid JSON value for “${key || "value"}”.`;
+        $("[data-multiple-value]", row)?.focus();
+        return;
+      }
+    }
+    if (error) error.textContent = "";
+    const valueJSON = JSON.stringify(result);
+    const tagRow = editor.closest("[data-tag-row]");
+    const fileRow = editor.closest("[data-file-tag-row]");
+    if (editor.dataset.multipleTarget === "metadata") {
+      const key = editor.dataset.multipleKey || tagRow?.dataset.tagFrom || "";
+      let newKey = $("[data-tag-to]", tagRow)?.value.trim() || key;
+      if (key.startsWith("extension.") && !newKey.startsWith("extension.")) newKey = `extension.${newKey}`;
+      bridge("commitMetadataRow", { key, newKey, scope:editor.dataset.multipleScope || "", value:null, valueJSON });
+    } else {
+      const key = editor.dataset.multipleKey || fileRow?.dataset.fileTagFrom || "";
+      const newKey = $("[data-file-tag-key]", fileRow)?.value || key;
+      bridge("commitMemberTag", { path:editor.dataset.multiplePath || fileRow?.dataset.fileTagPath || "", scope:editor.dataset.multipleScope || fileRow?.dataset.fileTagScope || "memberMetadata", key, newKey, value:"", valueJSON });
+    }
+  }
+
   document.addEventListener("click", event => {
     const action = event.target.closest("[data-action]")?.dataset.action;
     const packageItem = event.target.closest("[data-package]");
@@ -534,6 +631,9 @@
       const key = row?.dataset.tagFrom || "";
       if (key) animateRowRemoval(row, () => bridge("deleteMetadataKey", { key, scope:row.dataset.tagScope || "" }));
     }
+    else if (action === "addMultipleValue") addMultipleValue(event.target.closest("[data-multiple-editor]"));
+    else if (action === "removeMultipleValue") removeMultipleValue(event.target.closest("[data-multiple-entry]"));
+    else if (action === "commitMultipleValues") commitMultipleValues(event.target.closest("[data-multiple-editor]"));
     else if (action === "toggleCanonicalFold") {
       const toggle = event.target.closest("[data-action=toggleCanonicalFold]");
       const fold = toggle?.closest(".canonical-fold");
@@ -551,6 +651,8 @@
    else if (action === "commitTagRow") {
      const row = event.target.closest("[data-tag-row]");
       if (row) {
+        const editor = $("[data-multiple-editor]", row);
+        if (editor) { commitMultipleValues(editor); return; }
         const from = row.dataset.tagFrom || "";
         let to = $('[data-tag-to]', row)?.value || "";
         if (from.startsWith("extension.") && !to.startsWith("extension.")) to = `extension.${to}`;
@@ -559,7 +661,11 @@
     }
     else if (action === "commitFileTag") {
       const row = event.target.closest("[data-file-tag-row]");
-      if (row) bridge("commitMemberTag", { path:row.dataset.fileTagPath || "", scope:row.dataset.fileTagScope || "", key:row.dataset.fileTagFrom || "", newKey:$('[data-file-tag-key]', row)?.value || "", value:$('[data-file-tag-value]', row)?.value || "" });
+      if (row) {
+        const editor = $("[data-multiple-editor]", row);
+        if (editor) { commitMultipleValues(editor); return; }
+        bridge("commitMemberTag", { path:row.dataset.fileTagPath || "", scope:row.dataset.fileTagScope || "", key:row.dataset.fileTagFrom || "", newKey:$('[data-file-tag-key]', row)?.value || "", value:$('[data-file-tag-value]', row)?.value || "" });
+      }
     }
     else if (action === "deleteFileTag") {
       const row = event.target.closest("[data-file-tag-row]");

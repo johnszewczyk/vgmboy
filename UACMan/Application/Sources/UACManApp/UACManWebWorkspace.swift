@@ -105,13 +105,13 @@ struct UACManWebWorkspace: NSViewRepresentable {
             case "updateMetadataValue":
                 model.updateMetadataValue(key: payload["key"] as? String ?? "", scope: payload["scope"] as? String ?? "", value: payload["value"] as? String ?? "")
             case "commitMetadataRow":
-                model.commitMetadataRow(key: payload["key"] as? String ?? "", newKey: payload["newKey"] as? String ?? "", scope: payload["scope"] as? String ?? "", value: payload["value"] as? String)
+                model.commitMetadataRow(key: payload["key"] as? String ?? "", newKey: payload["newKey"] as? String ?? "", scope: payload["scope"] as? String ?? "", value: payload["value"] as? String, structuredValueJSON: payload["valueJSON"] as? String)
             case "renameMember":
                 model.renameMember(path: payload["path"] as? String ?? "", name: payload["name"] as? String ?? "")
             case "addMemberTag":
                 model.addMemberTag(path: payload["path"] as? String ?? "", scope: payload["scope"] as? String ?? "memberMetadata", key: payload["key"] as? String ?? "", value: payload["value"] as? String ?? "")
             case "commitMemberTag":
-                model.commitMemberTag(path: payload["path"] as? String ?? "", scope: payload["scope"] as? String ?? "memberMetadata", key: payload["key"] as? String ?? "", newKey: payload["newKey"] as? String ?? "", value: payload["value"] as? String ?? "")
+                model.commitMemberTag(path: payload["path"] as? String ?? "", scope: payload["scope"] as? String ?? "memberMetadata", key: payload["key"] as? String ?? "", newKey: payload["newKey"] as? String ?? "", value: payload["value"] as? String ?? "", structuredValueJSON: payload["valueJSON"] as? String)
             case "deleteMemberTag":
                 model.deleteMemberTag(path: payload["path"] as? String ?? "", scope: payload["scope"] as? String ?? "memberMetadata", key: payload["key"] as? String ?? "")
             case "commitTechnicalRow":

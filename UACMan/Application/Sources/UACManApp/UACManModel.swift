@@ -654,10 +654,11 @@ final class UACManModel {
         } catch { errorMessage = String(describing: error) }
     }
 
-    func commitMetadataRow(key rawKey: String, newKey rawNewKey: String, scope: String = "", value: String?) {
+    func commitMetadataRow(key rawKey: String, newKey rawNewKey: String, scope: String = "", value: String?, structuredValueJSON: String? = nil) {
         let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines), newKey = rawNewKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty, !newKey.isEmpty else { errorMessage = "Tag name cannot be empty."; return }
         do {
+            let structuredValue = try decodedStructuredValue(from: structuredValueJSON)
             try flushEditorBuffers(); guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any] else { throw UACManifestEditorError.invalidManifestJSON }
             let oldParts = metadataNamespace(for: key)
             let newParts = metadataNamespace(for: newKey)
@@ -671,7 +672,9 @@ final class UACManModel {
                     throw UACManifestEditorError.invalidMetadataJSON("The destination tag already exists: \(newKey)")
                 }
                 fields.removeValue(forKey: oldParts.storageKey)
-                if let value { fields[newParts.storageKey] = value } else { fields[newParts.storageKey] = old }
+                if let structuredValue { fields[newParts.storageKey] = structuredValue }
+                else if let value { fields[newParts.storageKey] = value }
+                else { fields[newParts.storageKey] = old }
                 game[oldParts.bucket] = fields
                 root["game"] = game
                 changed += 1
@@ -684,7 +687,9 @@ final class UACManModel {
                         throw UACManifestEditorError.invalidMetadataJSON("The destination tag already exists: \(newKey)")
                     }
                     fields.removeValue(forKey: oldParts.storageKey)
-                    if let value { fields[newParts.storageKey] = value } else { fields[newParts.storageKey] = old }
+                    if let structuredValue { fields[newParts.storageKey] = structuredValue }
+                    else if let value { fields[newParts.storageKey] = value }
+                    else { fields[newParts.storageKey] = old }
                     changed += 1
                     members[index][oldParts.bucket] = fields
                 }
@@ -745,12 +750,13 @@ final class UACManModel {
         } catch { errorMessage = String(describing: error) }
     }
 
-    func commitMemberTag(path rawPath: String, scope: String, key rawKey: String, newKey rawNewKey: String, value: String) {
+    func commitMemberTag(path rawPath: String, scope: String, key rawKey: String, newKey rawNewKey: String, value: String, structuredValueJSON: String? = nil) {
         let path = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
         let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let newKey = rawNewKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !path.isEmpty, !key.isEmpty, !newKey.isEmpty else { errorMessage = "Tag name cannot be empty."; return }
         do {
+            let structuredValue = try decodedStructuredValue(from: structuredValueJSON)
             try flushEditorBuffers()
             let bucket = try memberMetadataBucket(scope)
             let oldStorageKey = bucket == "extensions" && key.hasPrefix("extension.") ? String(key.dropFirst("extension.".count)) : key
@@ -760,10 +766,10 @@ final class UACManModel {
             }
             var fields = members[index][bucket] as? [String: Any] ?? [:]
             guard let currentValue = fields[oldStorageKey] else { throw UACManifestEditorError.invalidMetadataJSON("Tag not found in the selected file: \(key)") }
-            guard !(currentValue is [Any] || currentValue is [String: Any]) else { throw UACManifestEditorError.invalidMetadataJSON("Structured tags are read-only in the Files editor: \(key)") }
+            guard !(currentValue is [Any] || currentValue is [String: Any]) || structuredValue != nil else { throw UACManifestEditorError.invalidMetadataJSON("Structured tags require a Multiple Values editor: \(key)") }
             if oldStorageKey != newStorageKey, fields[newStorageKey] != nil { throw UACManifestEditorError.invalidMetadataJSON("The destination tag already exists: \(newKey)") }
             fields.removeValue(forKey: oldStorageKey)
-            fields[newStorageKey] = value
+            fields[newStorageKey] = structuredValue ?? value
             members[index][bucket] = fields
             root["members"] = members
             try acceptDraftManifest(root)
@@ -798,6 +804,18 @@ final class UACManModel {
         case "memberMetadata": return "metadata"
         case "memberExtensions": return "extensions"
         default: throw UACManifestEditorError.invalidMetadataJSON("Unknown member tag namespace: \(scope)")
+        }
+    }
+
+    private func decodedStructuredValue(from raw: String?) throws -> Any? {
+        guard let raw else { return nil }
+        guard let data = raw.data(using: .utf8) else {
+            throw UACManifestEditorError.invalidMetadataJSON("The structured value is not valid UTF-8 JSON.")
+        }
+        do {
+            return try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
+        } catch {
+            throw UACManifestEditorError.invalidMetadataJSON("The structured value is not valid JSON.")
         }
     }
 

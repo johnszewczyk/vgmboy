@@ -18,6 +18,11 @@ mkdir -p "$BUILD_DIR" "$MODULE_CACHE"
 export CLANG_MODULE_CACHE_PATH="$MODULE_CACHE"
 export SWIFTPM_MODULECACHE_OVERRIDE="$MODULE_CACHE"
 
+# The PNG artwork is the source of truth for both the application and UAC
+# document icon. Regenerate the multi-resolution ICNS before packaging so a
+# build never silently uses stale icon artwork.
+python3 "$APPLICATION_DIR/DocumentIcon/build_icns.py"
+
 swift build \
   --package-path "$PROJECT_DIR" \
   --scratch-path "$SWIFTPM_DIR" \
