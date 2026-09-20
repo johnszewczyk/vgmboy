@@ -180,6 +180,11 @@ final class UACManModel {
     var gameExtensionsJSON = "{}"
     var memberMetadataJSON = "{}"
     var memberExtensionsJSON = "{}"
+    var filePreviewPath: String?
+    var filePreviewName = ""
+    var filePreviewContent = ""
+    var filePreviewTruncated = false
+    var filePreviewError: String?
     var selectedMemberPath: String?
     var members: [UACMemberRow] = []
     var collectionRootURL: URL?
@@ -217,6 +222,24 @@ final class UACManModel {
 
     var allMemberCount: Int { loadedContainer?.manifest.members.count ?? 0 }
 
+    private static let textPreviewExtensions: Set<String> = [
+        "cfg", "conf", "cue", "csv", "css", "h", "html", "ini", "js", "json",
+        "log", "m3u", "m3u8", "markdown", "md", "nfo", "plist", "rs", "sh", "swift",
+        "toml", "ts", "txt", "xml", "yaml", "yml"
+    ]
+
+    private static func isTextPreviewable(_ member: UACMemberRow) -> Bool {
+        let format = member.format?.lowercased() ?? ""
+        if format.hasPrefix("text/") || [
+            "application/json", "application/javascript", "application/xml",
+            "application/x-cue", "application/x-mpegurl", "text/x-cue"
+        ].contains(format) {
+            return true
+        }
+        let extensionName = URL(fileURLWithPath: member.name).pathExtension.lowercased()
+        return textPreviewExtensions.contains(extensionName)
+    }
+
     private static func webMemberSnapshot(_ member: UACMemberRow) -> [String: Any] {
         [
             "path": member.path,
@@ -244,7 +267,8 @@ final class UACManModel {
             "metadata": member.metadata.mapValues(Self.foundationValue),
             "extensions": member.extensions.mapValues(Self.foundationValue),
             "duration": member.durationText,
-            "playLengthMs": member.playLengthMs ?? NSNull()
+            "playLengthMs": member.playLengthMs ?? NSNull(),
+            "previewable": Self.isTextPreviewable(member)
         ]
     }
 
@@ -268,6 +292,11 @@ final class UACManModel {
                 ] as [String: Any]
             } ?? [],
             "selectedMemberPath": selectedMemberPath ?? NSNull(),
+            "filePreviewPath": filePreviewPath ?? NSNull(),
+            "filePreviewName": filePreviewName,
+            "filePreviewContent": filePreviewContent,
+            "filePreviewTruncated": filePreviewTruncated,
+            "filePreviewError": filePreviewError ?? NSNull(),
             "variantCount": loadedContainer?.manifest.variants.count ?? 0,
             "members": members.map(Self.webMemberSnapshot),
             "collectionRoot": collectionRootURL?.path ?? "",
@@ -439,6 +468,11 @@ final class UACManModel {
         harvestTask?.cancel()
         harvestTask = nil
         isHarvestingMetadata = false
+        filePreviewPath = nil
+        filePreviewName = ""
+        filePreviewContent = ""
+        filePreviewTruncated = false
+        filePreviewError = nil
         do {
             let standardizedURL = url.standardizedFileURL
             guard standardizedURL.pathExtension.lowercased() == "uac" else {
@@ -499,6 +533,53 @@ final class UACManModel {
         } catch {
             errorMessage = String(describing: error)
         }
+    }
+
+    func previewMember(path: String) {
+        guard let documentURL,
+              let member = members.first(where: { $0.path == path }) else { return }
+
+        filePreviewPath = path
+        filePreviewName = member.name
+        filePreviewContent = ""
+        filePreviewTruncated = false
+        filePreviewError = nil
+
+        guard Self.isTextPreviewable(member) else {
+            filePreviewError = "This member is not a supported text document."
+            return
+        }
+
+        do {
+            try codec.ensureAvailable()
+            let virtualFile = try UACSeekableMemberFile(
+                url: documentURL,
+                memberPath: path,
+                maximumCachedFrames: 4,
+                decompressManifestFrame: codec.decoder,
+                decompressFrame: codec.seekableFrameDecoder
+            )
+            let previewLimit = 4 * 1024 * 1024
+            let byteCount = min(virtualFile.size, UInt64(previewLimit) + 1)
+            let data = try virtualFile.read(at: 0, byteCount: Int(byteCount))
+            guard let text = String(data: data, encoding: .utf8)
+                    ?? String(data: data, encoding: .utf16) else {
+                filePreviewError = "This member is not valid UTF-8 or UTF-16 text."
+                return
+            }
+            filePreviewContent = text
+            filePreviewTruncated = virtualFile.size > UInt64(previewLimit)
+        } catch {
+            filePreviewError = "Could not read this bundled file: \(error)"
+        }
+    }
+
+    func closeFilePreview() {
+        filePreviewPath = nil
+        filePreviewName = ""
+        filePreviewContent = ""
+        filePreviewTruncated = false
+        filePreviewError = nil
     }
 
     func markEdited() {

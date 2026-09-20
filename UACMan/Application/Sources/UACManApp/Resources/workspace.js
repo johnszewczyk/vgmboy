@@ -90,7 +90,7 @@
       : '<div class="tag-multiple-value-row"><span>—</span><span>Empty</span></div>';
     return canonicalFoldMarkup("Multiple Values", body, { className:"tag-multiple-values" });
   };
-  const multipleValuesEditorMarkup = (value, context = {}) => {
+  const multipleValuesEditorBodyMarkup = (value, context = {}) => {
     const isArray = Array.isArray(value);
     const entries = isArray ? value.map((item, index) => [String(index), item]) : Object.entries(value || {});
     const rowMarkup = ([key, item]) => {
@@ -111,7 +111,16 @@
       `data-multiple-key="${esc(context.key || "")}"`
     ].join(" ");
     const body = `<div class="multiple-values-editor" ${data}><div class="multiple-values-rows">${rows || '<div class="file-tag-empty multiple-values-empty">No values</div>'}</div><div class="multiple-values-editor-actions"><button class="icon-button" data-action="addMultipleValue" type="button" title="Add value" aria-label="Add value">＋</button><button class="icon-button" data-action="commitMultipleValues" type="button" title="Submit changed values" aria-label="Submit changed values">✓</button></div><div class="multiple-values-editor-error" role="status"></div></div>`;
-    return canonicalFoldMarkup("Multiple Values", body, { className:"tag-multiple-values editable-multiple-values", meta:context.showCount === false ? "" : entries.length });
+    return { body, count:entries.length };
+  };
+  const multipleValuesEditorMarkup = (value, context = {}) => {
+    const editor = multipleValuesEditorBodyMarkup(value, context);
+    return canonicalFoldMarkup("Multiple Values", editor.body, { className:"tag-multiple-values editable-multiple-values", meta:context.showCount === false ? "" : editor.count });
+  };
+  const multipleValuesTriggerMarkup = foldID => `<button class="canonical-fold-toggle canonical-fold-trigger" type="button" data-action="toggleCanonicalFold" data-fold-id="${esc(foldID)}" aria-expanded="false"><span>Multiple Values</span><span class="canonical-fold-icon">＋</span></button>`;
+  const multipleValuesSubtableMarkup = (value, context = {}) => {
+    const editor = multipleValuesEditorBodyMarkup(value, context);
+    return `<div class="canonical-subtable-panel">${editor.body}</div>`;
   };
   const metadataSortValue = (member, key) => {
     const value = memberFields(member)[key];
@@ -192,6 +201,7 @@
     renderIssues();
     renderMembers();
     renderInspector();
+    scheduleCanonicalGridSizing();
     $("#members-view").classList.toggle("hidden", mainView !== "members");
     $("#metadata-view").classList.toggle("hidden", mainView === "members");
     $$(".main-view-tabs button").forEach(button => button.classList.toggle("active", button.dataset.view === mainView));
@@ -245,7 +255,7 @@
       ? (noRows ? `<div class="empty-state"><div class="empty-icon">▤</div><h3>${state.members.length ? "No tracks match this filter" : "This package has no audio tracks"}</h3><p>${state.members.length ? "Change the search text to show audio tracks." : "The package contains no playable members."}</p></div>` : renderTrackArrayGrid(members))
       : `<div class="empty-state"><div class="empty-icon">▤</div><h3>Open a package to get started</h3><p>Browse a collection or open a UAC package. Audio streams appear here as rows with their tags as columns.</p><button class="button primary" data-action="openUAC">Open a UAC file</button></div>`;
     $("#member-summary").textContent = state.documentName ? `${members.length} shown · ${playableMembers().length} audio tracks` : "No package open";
-    scheduleTrackArraySizing();
+    scheduleCanonicalGridSizing();
   }
 
   function fieldKind(value) {
@@ -372,15 +382,19 @@
       const trackNumber = trackNumberFor(member, index);
       const filename = member.name || member.path.split("/").pop() || member.path;
       const rowLabel = member.title || filename;
+      const structuredValues = [];
       const scalar = (value, key, scope, editable) => {
         const present = value !== undefined && value !== null && value !== "";
         const structured = present && typeof value === "object";
         const display = !present ? "—" : structured ? "Multiple Values" : String(value);
         const disabled = !editable || !present || structured ? " disabled" : "";
         const attributes = editable && present && !structured ? ` data-track-cell data-track-path="${esc(member.path)}" data-track-key="${esc(key)}" data-track-scope="${esc(scope)}"` : "";
-        return structured
-          ? multipleValuesEditorMarkup(value, { target:"member", path:member.path, scope, key, showCount:false })
-          : `<input class="tag-table-field track-array-value${editable && present ? " track-cell" : ""}" value="${esc(display)}" aria-label="${esc(rowLabel)} ${esc(key)}"${attributes}${disabled}>`;
+        if (structured) {
+          const foldID = `track-${index}-${structuredValues.length}`;
+          structuredValues.push({ foldID, value, context:{ target:"member", path:member.path, scope, key, showCount:false } });
+          return multipleValuesTriggerMarkup(foldID);
+        }
+        return `<input class="tag-table-field track-array-value${editable && present ? " track-cell" : ""}" value="${esc(display)}" aria-label="${esc(rowLabel)} ${esc(key)}"${attributes}${disabled}>`;
       };
       const metadataCells = columns.map(key => {
         const extension = key.startsWith("extension.");
@@ -388,25 +402,44 @@
         const source = extension ? member.extensions : member.metadata;
         return `<div class="field-grid-cell" role="cell">${scalar(source?.[fieldKey], fieldKey, extension ? "memberExtensions" : "memberMetadata", true)}</div>`;
       }).join("");
-      return `<div class="field-grid-row track-array-row" role="row"><div class="field-grid-cell" role="cell">${scalar(trackNumber, "track", "memberMetadata", false)}</div><div class="field-grid-cell" role="cell">${scalar(filename, "filename", "memberMetadata", false)}</div>${metadataCells}</div>`;
+      const row = `<div class="field-grid-row track-array-row" role="row"><div class="field-grid-cell" role="cell">${scalar(trackNumber, "track", "memberMetadata", false)}</div><div class="field-grid-cell" role="cell">${scalar(filename, "filename", "memberMetadata", false)}</div>${metadataCells}</div>`;
+      const subrows = structuredValues.map(({ foldID, value, context }) => `<div class="field-grid-row field-grid-subrow" role="row" data-canonical-subrow="${esc(foldID)}"><div class="field-grid-cell canonical-subtable-cell" role="cell">${multipleValuesSubtableMarkup(value, context)}</div></div>`).join("");
+      return row + subrows;
     }).join("");
     const empty = `<div class="field-grid-empty" role="row"><span role="cell">No playable tracks</span></div>`;
     return `<div class="field-grid tracks-field-grid" data-field-grid="tracks" role="table" aria-label="Tracks"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div>`;
   }
 
-  function scheduleTrackArraySizing() {
-    const grid = $(".tracks-field-grid");
-    if (!grid) return;
-    const tracks = visibleMembers();
-    const columns = trackColumns();
+  function scheduleCanonicalGridSizing() {
     requestAnimationFrame(() => {
       const canvas = document.createElement("canvas");
       const context = canvas.getContext("2d");
       if (!context) return;
-      context.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
-      const widthFor = values => Math.max(58, Math.ceil(Math.max(...values.map(value => context.measureText(String(value ?? "")).width), 0) + 18));
-      const widths = [widthFor(["Track", ...tracks.map((member, index) => String(trackNumberFor(member, index)).padStart(2, "0"))]), widthFor(["Filename", ...tracks.map(member => member.name || member.path.split("/").pop() || member.path)]), ...columns.map(key => widthFor([displayTrackKey(key), ...tracks.map(member => { const value = memberFields(member)[key]; if (value === null || value === undefined || value === "") return "—"; if (typeof value === "object") return "Multiple Values"; return String(value); })]))];
-      grid.style.setProperty("--field-grid-columns", widths.map(width => `${width}px`).join(" "));
+      $$(".field-grid").forEach(grid => {
+        const rows = [...grid.querySelectorAll(".field-grid-header, .field-grid-row:not(.field-grid-subrow)")];
+        const columnCount = rows[0]?.children.length || 0;
+        if (!columnCount) return;
+        const widths = Array.from({ length:columnCount }, () => 0);
+        const measure = (text, element) => {
+          const value = String(text ?? "").trim();
+          if (!value) return 0;
+          const style = getComputedStyle(element || grid);
+          context.font = style.font || `${style.fontSize} ${style.fontFamily}`;
+          return context.measureText(value).width;
+        };
+        rows.forEach((row, rowIndex) => [...row.children].forEach((cell, index) => {
+          if (index >= widths.length) return;
+          const controls = [...cell.querySelectorAll("input, textarea, select, button")]
+            .filter(element => !element.closest(".canonical-fold-panel, .canonical-subtable-panel"));
+          const values = controls.length
+            ? controls.map(element => element.matches("select") ? element.selectedOptions[0]?.textContent : ("value" in element ? element.value : element.textContent))
+            : [cell.textContent];
+          const textWidth = Math.max(...values.map(value => measure(value, controls[0] || cell)), 0);
+          const minimum = rowIndex === 0 ? textWidth + 32 : textWidth + 10;
+          widths[index] = Math.max(widths[index], Math.ceil(minimum), cell.querySelector(".icon-button") ? 28 : 0);
+        }));
+        grid.style.setProperty("--field-grid-columns", widths.map(width => `${width}px`).join(" "));
+      });
     });
   }
 
@@ -423,15 +456,21 @@
   }
 
   function memberTagValueMarkup(member, entry) {
-    return entry.value && typeof entry.value === "object"
-      ? multipleValuesEditorMarkup(entry.value, { target:"member", path:member.path, scope:entry.scope, key:entry.key, showCount:false })
-      : `<input class="tag-table-field file-tag-value" data-file-tag-value value="${esc(String(entry.value))}" aria-label="Value for ${esc(entry.key)}">`;
+    return `<input class="tag-table-field file-tag-value" data-file-tag-value value="${esc(String(entry.value))}" aria-label="Value for ${esc(entry.key)}">`;
   }
 
   function renderTrackTagTable(member) {
     const entries = fileTagEntries(member);
     const header = ["Scope", "Tag Name", "Tag Value", "Actions"].map(label => `<div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${label}" disabled></div>`).join("");
-    const rows = entries.map(entry => `<div class="field-grid-row track-browser-row" role="row" data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-scope" value="${entry.scope === "memberExtensions" ? "extension" : "metadata"}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name"></div><div class="field-grid-cell track-browser-value-cell" role="cell">${memberTagValueMarkup(member, entry)}</div><div class="field-grid-cell track-browser-actions" role="cell"><button class="icon-button" data-action="commitFileTag" title="Submit changed tag" aria-label="Submit changed tag">✓</button><button class="icon-button danger" data-action="deleteFileTag" title="Delete tag" aria-label="Delete tag">×</button></div></div>`).join("");
+    const rows = entries.map((entry, index) => {
+      const structured = entry.value && typeof entry.value === "object";
+      const foldID = `file-tag-${index}`;
+      const context = { target:"member", path:member.path, scope:entry.scope, key:entry.key, showCount:false };
+      const valueMarkup = structured ? multipleValuesTriggerMarkup(foldID) : memberTagValueMarkup(member, entry);
+      const row = `<div class="field-grid-row track-browser-row" role="row" data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-scope" value="${entry.scope === "memberExtensions" ? "extension" : "metadata"}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name"></div><div class="field-grid-cell track-browser-value-cell" role="cell">${valueMarkup}</div><div class="field-grid-cell track-browser-actions" role="cell"><button class="icon-button" data-action="commitFileTag" title="Submit changed tag" aria-label="Submit changed tag">✓</button><button class="icon-button danger" data-action="deleteFileTag" title="Delete tag" aria-label="Delete tag">×</button></div></div>`;
+      const subrow = structured ? `<div class="field-grid-row field-grid-subrow" role="row" data-canonical-subrow="${esc(foldID)}"><div class="field-grid-cell canonical-subtable-cell" role="cell">${multipleValuesSubtableMarkup(entry.value, context)}</div></div>` : "";
+      return row + subrow;
+    }).join("");
     const empty = '<div class="field-grid-empty" role="row"><span role="cell">No tags on this file</span></div>';
     const form = `<form class="file-tag-create-form track-browser-create-form" data-file-tag-create data-file-tag-path="${esc(member.path)}"><select data-file-tag-scope aria-label="Tag namespace"><option value="memberMetadata">metadata</option><option value="memberExtensions">extension</option></select><input data-file-tag-key placeholder="Tag name" aria-label="New file tag name"><input data-file-tag-value placeholder="Value" aria-label="New file tag value"><button class="icon-button" type="submit" title="Add tag" aria-label="Add tag">✓</button></form>`;
     return `<div class="track-browser-table-wrap"><div class="field-grid track-browser-field-grid" role="table" aria-label="Tags for ${esc(member.name)}"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div>${form}</div>`;
@@ -451,10 +490,13 @@
 
   function renderFilesPage() {
     const members = visibleFileMembers();
-    const header = ["Role", "Format", "Filename", "Stored path", "Tags Count", "Size"].map(label => `<div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`).join("");
-    const rows = members.map(member => `<div class="field-grid-row file-row" role="row" tabindex="0" data-track-row="${esc(member.path)}" title="Open metadata for ${esc(member.name)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.role)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.format || "unknown")}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-name-field" data-file-name data-file-path="${esc(member.path)}" value="${esc(member.name)}" aria-label="Filename"></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-path-field" value="${esc(member.path)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tags-count" value="${fileTagEntries(member).length}" aria-label="Tag count" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(bytes(member.bytes))}" disabled></div></div>`).join("");
+    const header = ["Role", "Format", "Filename", "Stored path", "Tags Count", "Size", "View"].map(label => `<div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`).join("");
+    const rows = members.map(member => `<div class="field-grid-row file-row" role="row" tabindex="0" data-track-row="${esc(member.path)}" title="Open metadata for ${esc(member.name)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.role)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.format || "unknown")}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-name-field" data-file-name data-file-path="${esc(member.path)}" value="${esc(member.name)}" aria-label="Filename"></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-path-field" value="${esc(member.path)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tags-count" value="${fileTagEntries(member).length}" aria-label="Tag count" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(bytes(member.bytes))}" disabled></div><div class="field-grid-cell file-preview-action" role="cell">${member.previewable ? `<button class="icon-button" data-action="previewMember" data-preview-path="${esc(member.path)}" title="View bundled text" aria-label="View bundled text">⌕</button>` : `<span class="file-preview-unavailable" title="Text preview unavailable">—</span>`}</div></div>`).join("");
     const empty = `<div class="field-grid-empty" role="row"><span role="cell">No package members match this filter</span></div>`;
-    return `<section class="data-page files-page"><div class="data-page-heading"><div><h2>Files</h2><p>Every stored package member, including playable tracks, artwork, cues, and documents. Rename the displayed filename or choose Track to edit exhaustive per-file tags.</p></div><span class="data-page-count">${members.length} of ${state.members.length} members</span></div><div class="field-grid file-field-grid" role="table" aria-label="Package files"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div><p class="file-edit-note">Stored paths and payload members stay immutable so metadata saves preserve the compressed UAC payload byte-for-byte.</p></section>`;
+    const preview = state.filePreviewPath
+      ? `<section class="file-preview" aria-label="Bundled file preview"><div class="file-preview-heading"><div><strong>${esc(state.filePreviewName || "Bundled file")}</strong><span>${esc(state.filePreviewPath)}</span></div><button class="icon-button" data-action="closeFilePreview" title="Close preview" aria-label="Close preview">×</button></div>${state.filePreviewError ? `<div class="file-preview-error">${esc(state.filePreviewError)}</div>` : `<pre class="file-preview-content">${esc(state.filePreviewContent)}</pre>${state.filePreviewTruncated ? '<div class="file-preview-note">Preview limited to the first 4 MiB. The bundled file remains unchanged.</div>' : ""}`}</section>`
+      : "";
+    return `<section class="data-page files-page"><div class="data-page-heading"><div><h2>Files</h2><p>Every stored package member, including playable tracks, artwork, cues, and documents. Rename the displayed filename, preview text files, or choose Track to edit exhaustive per-file tags.</p></div><span class="data-page-count">${members.length} of ${state.members.length} members</span></div><div class="field-grid file-field-grid" role="table" aria-label="Package files"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div><p class="file-edit-note">Stored paths and payload members stay immutable so metadata saves preserve the compressed UAC payload byte-for-byte.</p>${preview}</section>`;
   }
 
   function renderAttachments() {
@@ -653,12 +695,16 @@
       const toggle = event.target.closest("[data-action=toggleCanonicalFold]");
       const fold = toggle?.closest(".canonical-fold");
       const panel = fold?.querySelector(".canonical-fold-panel");
-      if (toggle && panel) {
-        const open = panel.classList.toggle("open");
+      const subrow = toggle?.dataset.foldId ? document.querySelector(`[data-canonical-subrow="${CSS.escape(toggle.dataset.foldId)}"]`) : null;
+      if (toggle && (panel || subrow)) {
+        const target = panel || subrow;
+        const open = target.classList.toggle("open");
         toggle.setAttribute("aria-expanded", String(open));
         $(".canonical-fold-icon", toggle).textContent = open ? "−" : "＋";
       }
     }
+    else if (action === "previewMember") bridge("previewMember", { path:event.target.closest("[data-preview-path]")?.dataset.previewPath || "" });
+    else if (action === "closeFilePreview") bridge("closeFilePreview");
     else if (action === "updateTagValue") {
       const row = event.target.closest("[data-tag-row]");
       if (row) bridge("updateMetadataValue", { key:row.dataset.tagFrom || "", value:$('[data-tag-value]', row)?.value || "" });

@@ -45,17 +45,21 @@ package-level metadata and all attachments using the same field-grid cells, with
 the same add interface as the tag workspace. Multiple Values disclosures are
 reused anywhere structured fields appear.
 UACMan
-lists assets and their metadata; it does not preview image bytes inside the
-compressed payload.
+lists assets and their metadata. The Files page can preview recognized text
+members directly from the seekable payload, including JSON, Markdown, CUE, and
+similar documents; it does not extract or edit them yet, and it does not preview
+binary image bytes.
 When a single UAC is opened directly, the library rail collapses automatically;
 it returns when a collection is opened. The last existing UAC or collection path
 is restored on launch when no command-line document was supplied.
 
-The shared game metadata can include a `set` object with `collection`, `name`,
-and `url` for the source set and its official distributor. The complete source
-records remain in the manifest's Sources section. UACMan only adds this summary
-when the source records resolve to one set and a known URL; it does not guess
-when provenance is incomplete or conflicting.
+The shared game metadata may use flat camelCase set fields such as `setName`,
+`setUrl`, and `setCollection` for a concise source-set summary. The complete
+source records remain in the manifest's Sources section. UACMan does not require
+camelCase or reject other key casing: metadata maps preserve arbitrary
+case-sensitive JSON keys, while camelCase remains the convention for shared
+fields. Nested values remain available when they carry real structure, but a
+simple set summary should not be nested needlessly.
 
 ## Editing and import
 

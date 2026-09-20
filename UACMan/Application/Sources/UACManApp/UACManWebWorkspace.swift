@@ -84,6 +84,9 @@ struct UACManWebWorkspace: NSViewRepresentable {
                 if let path = payload["path"] as? String { model.selectCollectionPackage(path) }
             case "selectMember":
                 if let path = payload["path"] as? String { model.selectMember(path) }
+            case "previewMember":
+                if let path = payload["path"] as? String { model.previewMember(path: path) }
+            case "closeFilePreview": model.closeFilePreview()
             case "save": model.save()
             case "revert": model.revert()
             case "harvest": model.harvestSPCMetadata()

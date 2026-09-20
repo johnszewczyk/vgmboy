@@ -13,26 +13,20 @@ The collection grid and metadata workspace are rendered by a bundled local
 WKWebView workspace. Swift remains responsible for file access, prompts,
 validation, and package writes; the app launcher embeds the SwiftPM web-resource
 bundle in the `.app` so the same UI loads from LaunchPad and command-line runs.
-The workspace is organized into six pages: **Tracks** is a dense fixed-width,
-spreadsheet-style audio-only table with tag columns. Its single heading line keeps
-the shown/audio count and right-aligned filter beside **Tracks**, and every column
-header sorts the visible rows. Its first column is checkbox-only, with an all/none
-checkbox in its header. **Package Tags** contains set-level fields and a separate
-attachment list; **Track Tags** edits the selected track; **Technical** is a
-dedicated table for hashes, source facts, and diagnostics; **Meta Tags** inventories
-the package's top-level tag names and can rename a tag everywhere it occurs in the
-package draft, including adding Package or All Tracks tags and deleting tags; and **Tree** is a plain folding `key : value` dictionary for the
-package and its tracks, using the same dense Key/Value/Type table style. Columns are built
-from scalar tags found in the package, so format-specific fields remain visible
-without mixing attachments or structural objects into the audio rows. Technical
-and diagnostic fields live on their own table page. Structured values are
-shown as compact counts and remain closed until their scoped editor is opened;
-raw JSON is an escape hatch, never the default view. “Add column” creates a
-metadata field, and package-level and per-member fields stay separate. Selecting
-a track keeps the audio table as the primary navigation surface. When a single
-UAC is opened directly, the library rail collapses to give the track table the
-full width; it returns automatically when a collection is open. UACMan restores
-the last existing UAC path (or collection path) on launch when there is no
+The workspace is organized into four pages: **Tracks** is the wide canonical
+field grid for playable members, **Files** lists every stored member, **Pack Tags**
+edits package-level fields and attachments, and **Track** provides an exhaustive
+tag editor for a selected file. Files also offers a read-only text preview for
+bundled JSON, Markdown, CUE, and other recognized text members without extracting
+or rewriting the payload. Every table uses the same measured field-grid builder:
+each column starts at the longest visible cell value, while headers reserve 1rem
+of horizontal padding on each side. Structured values remain closed until their
+Multiple Values child table is opened; the source row stays in place while the
+child table expands below it. Metadata keys are case-sensitive arbitrary JSON
+keys; camelCase is the shared naming convention, not a validation restriction.
+When a single UAC is opened directly, the library rail collapses to give the
+track table the full width; it returns automatically when a collection is open.
+UACMan restores the last existing UAC path (or collection path) on launch when there is no
 command-line document argument.
 Track columns measure their longest loaded value and ease to the new widths over
 200 ms. The Meta Tags example is the shared value when every use agrees, or
