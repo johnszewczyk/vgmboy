@@ -118,9 +118,12 @@
     return canonicalFoldMarkup("Multiple Values", editor.body, { className:"tag-multiple-values editable-multiple-values", meta:context.showCount === false ? "" : editor.count });
   };
   const multipleValuesTriggerMarkup = foldID => `<button class="canonical-fold-toggle canonical-fold-trigger" type="button" data-action="toggleCanonicalFold" data-fold-id="${esc(foldID)}" aria-expanded="false"><span>Multiple Values</span><span class="canonical-fold-icon">＋</span></button>`;
-  const multipleValuesSubtableMarkup = (value, context = {}) => {
+  const multipleValuesReadOnlyTableMarkup = entries => `<div class="multiple-values-popup-table canonical-subtable-table" role="table">${entries.length ? entries.map(([key, item]) => `<div class="tag-multiple-value-row" role="row"><span role="cell">${esc(key)}</span><span role="cell">${esc(typeof item === "object" ? JSON.stringify(item) : String(item ?? "—"))}</span></div>`).join("") : '<div class="tag-multiple-value-row" role="row"><span role="cell">—</span><span role="cell">Empty</span></div>'}</div>`;
+  const multipleValuesSubtableMarkup = (value, context = {}, options = {}) => {
+    const entries = options.entries || (Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value || {}));
+    if (options.editable === false) return `<div class="canonical-subtable-panel">${multipleValuesReadOnlyTableMarkup(entries)}</div>`;
     const editor = multipleValuesEditorBodyMarkup(value, context);
-    return `<div class="canonical-subtable-panel">${editor.body}</div>`;
+    return `<div class="canonical-subtable-panel"><div class="editable-multiple-values">${editor.body}</div></div>`;
   };
   const multipleValuesPopupParts = (value, context = {}, options = {}) => {
     const popupID = context.popupID || "multiple-values";
@@ -129,7 +132,7 @@
     const editor = isEditor ? multipleValuesEditorBodyMarkup(value, context) : null;
     const body = editor
       ? `<div class="editable-multiple-values">${editor.body}</div>`
-      : `<div class="multiple-values-popup-table" role="table">${entries.length ? entries.map(([key, item]) => `<div class="tag-multiple-value-row" role="row"><span role="cell">${esc(key)}</span><span role="cell">${esc(typeof item === "object" ? JSON.stringify(item) : String(item ?? "—"))}</span></div>`).join("") : '<div class="tag-multiple-value-row" role="row"><span role="cell">—</span><span role="cell">Empty</span></div>'}</div>`;
+      : multipleValuesReadOnlyTableMarkup(entries);
     const trigger = `<button class="canonical-fold-toggle canonical-fold-trigger multiple-values-popup-trigger" type="button" data-action="toggleMultipleValuesPopup" data-popup-id="${esc(popupID)}" aria-controls="multiple-values-popup-${esc(popupID)}" aria-expanded="false"><span>Multiple Values</span><span class="canonical-fold-icon">＋</span></button>`;
     const popup = `<div class="multiple-values-popup-backdrop" id="multiple-values-popup-${esc(popupID)}" data-multiple-values-popup="${esc(popupID)}" hidden><div class="multiple-values-popup-card" role="dialog" aria-modal="true" aria-label="Multiple Values"><div class="multiple-values-popup-heading"><strong>Multiple Values</strong><button class="icon-button multiple-values-popup-close" data-action="closeMultipleValuesPopup" data-popup-id="${esc(popupID)}" type="button" title="Close" aria-label="Close">×</button></div><div class="multiple-values-popup-content">${body}</div></div></div>`;
     return { trigger, popup };
@@ -357,7 +360,6 @@
   function renderTagScopePage(title, scope, includeAttachments = false) {
     const catalog = metadataTagCatalog();
     const rowsFor = scope => {
-      const popups = [];
       const rows = catalog.filter(entry => [...entry.scopes].some(value => value.startsWith(scope))).map((entry, index) => {
       const scoped = [...entry.scoped.entries()].filter(([name]) => name.startsWith(scope)).map(([, value]) => value);
       const count = scoped.reduce((total, value) => total + value.count, 0);
@@ -366,32 +368,32 @@
       const sample = scoped[0]?.sample;
       const multipleValues = signatures.size > 1 || typeof sample === "object";
       const editableMultipleValues = signatures.size === 1 && sample !== null && typeof sample === "object";
-      let popupID = "";
+      const foldID = `tag-${scope.toLowerCase()}-${index}`;
       let valueInput;
+      let subrow = "";
       if (editableMultipleValues || multipleValues) {
-        popupID = `tag-${scope.toLowerCase()}-${index}`;
-        const popup = multipleValuesPopupParts(
+        valueInput = multipleValuesTriggerMarkup(foldID);
+        const subtable = multipleValuesSubtableMarkup(
           editableMultipleValues ? sample : null,
-          { target:"metadata", scope:scope === "Package" ? "package" : "tracks", key:entry.key, popupID },
+          { target:"metadata", scope:scope === "Package" ? "package" : "tracks", key:entry.key },
           { editable:editableMultipleValues, entries:[...values.values()].map((value, valueIndex) => [String(valueIndex + 1), value]) }
         );
-        valueInput = popup.trigger;
-        popups.push(popup.popup);
+        subrow = `<div class="field-grid-row field-grid-subrow" role="row" data-canonical-subrow="${esc(foldID)}"><div class="field-grid-cell canonical-subtable-cell" role="cell">${subtable}</div></div>`;
       } else {
         valueInput = `<input data-tag-value aria-label="Tag value for ${esc(entry.key)}" value="${esc(sample)}">`;
       }
       const tagType = multipleValues ? "Multiple Values" : signatures.size === 1 ? (Array.isArray(sample) ? "list" : typeof sample) : "various";
       const readOnlyMultipleValues = multipleValues && !editableMultipleValues;
       const submitTitle = readOnlyMultipleValues ? "Multiple Values contain different values" : "Submit changed fields";
-      const popupAttribute = popupID ? ` data-multiple-popup-id="${esc(popupID)}"` : "";
-      return `<div class="field-grid-row" role="row" data-tag-row data-tag-scope="${esc(scope)}" data-tag-from="${esc(entry.key)}"${popupAttribute}><div class="field-grid-cell tag-number-cell" role="cell"><input class="tag-table-field" value="${index + 1}" aria-label="Tag number" disabled></div><div class="field-grid-cell tag-type-cell" role="cell"><input class="tag-table-field" value="${esc(tagType)}" aria-label="Tag type for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-name-cell" role="cell"><input class="tag-table-field" data-tag-to value="${esc(entry.key)}" aria-label="Tag name for ${esc(entry.key)}"></div><div class="field-grid-cell tag-value-cell" role="cell"><span class="tag-inline-editor">${valueInput}</span></div><div class="field-grid-cell tag-uses-cell" role="cell"><input class="tag-table-field" value="${count}" aria-label="Uses for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitTagRow" title="${submitTitle}" aria-label="${submitTitle}"${readOnlyMultipleValues ? " disabled" : ""}>✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteTag" title="Delete ${esc(entry.key)}" aria-label="Delete ${esc(entry.key)}">×</button></div></div>`;
+      const foldAttribute = multipleValues ? ` data-multiple-fold-id="${esc(foldID)}"` : "";
+      return `<div class="field-grid-row" role="row" data-tag-row data-tag-scope="${esc(scope)}" data-tag-from="${esc(entry.key)}"${foldAttribute}><div class="field-grid-cell tag-number-cell" role="cell"><input class="tag-table-field" value="${index + 1}" aria-label="Tag number" disabled></div><div class="field-grid-cell tag-type-cell" role="cell"><input class="tag-table-field" value="${esc(tagType)}" aria-label="Tag type for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-name-cell" role="cell"><input class="tag-table-field" data-tag-to value="${esc(entry.key)}" aria-label="Tag name for ${esc(entry.key)}"></div><div class="field-grid-cell tag-value-cell" role="cell"><span class="tag-inline-editor">${valueInput}</span></div><div class="field-grid-cell tag-uses-cell" role="cell"><input class="tag-table-field" value="${count}" aria-label="Uses for ${esc(entry.key)}" disabled></div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitTagRow" title="${submitTitle}" aria-label="${submitTitle}"${readOnlyMultipleValues ? " disabled" : ""}>✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteTag" title="Delete ${esc(entry.key)}" aria-label="Delete ${esc(entry.key)}">×</button></div></div>${subrow}`;
       }).join("");
-      return { rows, popups:popups.join("") };
+      return { rows };
     };
     const header = `<div class="field-grid-row field-grid-header" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="#" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Tag Type" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Tag Name" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Tag Value" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Uses" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="✓" aria-label="Submit" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="×" aria-label="Delete" disabled></div></div>`;
-    const grid = (title, rows, popups, scope) => `<section class="tag-scope-table"><div class="section-title"><span>${title}</span><form class="tag-create-form" data-tag-create data-tag-scope="${scope}"><input data-new-tag-key placeholder="Tag Name" aria-label="New tag name"><input data-new-tag-value placeholder="New tag value" aria-label="New tag value"><button class="icon-button add-tag-submit" type="submit" title="Add tag" aria-label="Add tag">✓</button></form></div><div class="data-table-scroll"><div class="field-grid meta-field-grid" role="table" aria-label="${title}">${header}${rows || '<div class="field-grid-empty" role="row"><span role="cell">No tags</span>'}</div></div>${popups}</section>`;
+    const grid = (title, rows, scope) => `<section class="tag-scope-table"><div class="section-title"><span>${title}</span><form class="tag-create-form" data-tag-create data-tag-scope="${scope}"><input data-new-tag-key placeholder="Tag Name" aria-label="New tag name"><input data-new-tag-value placeholder="New tag value" aria-label="New tag value"><button class="icon-button add-tag-submit" type="submit" title="Add tag" aria-label="Add tag">✓</button></form></div><div class="data-table-scroll"><div class="field-grid meta-field-grid" role="table" aria-label="${title}">${header}${rows || '<div class="field-grid-empty" role="row"><span role="cell">No tags</span>'}</div></div></section>`;
     const table = rowsFor(scope);
-    return `<section class="data-page schema-page"><div class="data-page-heading"><div><h2>${esc(title)}</h2><p>${scope === "Package" ? "Package-level fields and attachments. Add or edit scalar values here; open an unambiguous structured value to edit its child fields." : "Track-level tag vocabulary across playable members. Add a field to every track or edit a shared scalar or unambiguous structured value."}</p></div><span class="data-page-count">${table.rows ? table.rows.split("data-tag-row").length - 1 : 0} fields</span></div>${grid(title, table.rows, table.popups, scope === "Package" ? "package" : "tracks")}${includeAttachments ? renderAttachments() : ""}</section>`;
+    return `<section class="data-page schema-page"><div class="data-page-heading"><div><h2>${esc(title)}</h2><p>${scope === "Package" ? "Package-level fields and attachments. Add or edit scalar values here; open an unambiguous structured value to edit its child fields." : "Track-level tag vocabulary across playable members. Add a field to every track or edit a shared scalar or unambiguous structured value."}</p></div><span class="data-page-count">${table.rows ? table.rows.split("data-tag-row").length - 1 : 0} fields</span></div>${grid(title, table.rows, scope === "Package" ? "package" : "tracks")}${includeAttachments ? renderAttachments() : ""}</section>`;
   }
 
   function renderPackTagsPage() { return renderTagScopePage("Pack Tags", "Package", true); }
@@ -403,11 +405,11 @@
       const sortKey = index === 0 ? "track" : index === 1 ? "filename" : columns[index - 2];
       return `<div class="field-grid-cell field-grid-heading" role="columnheader" data-sort="${esc(sortKey)}"><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`;
     }).join("");
+    const popups = [];
     const rows = tracks.map((member, index) => {
       const trackNumber = trackNumberFor(member, index);
       const filename = member.name || member.path.split("/").pop() || member.path;
       const rowLabel = member.title || filename;
-      const structuredValues = [];
       const scalar = (value, key, scope, editable) => {
         const present = value !== undefined && value !== null && value !== "";
         const structured = present && typeof value === "object";
@@ -415,9 +417,10 @@
         const disabled = !editable || !present || structured ? " disabled" : "";
         const attributes = editable && present && !structured ? ` data-track-cell data-track-path="${esc(member.path)}" data-track-key="${esc(key)}" data-track-scope="${esc(scope)}"` : "";
         if (structured) {
-          const foldID = `track-${index}-${structuredValues.length}`;
-          structuredValues.push({ foldID, value, context:{ target:"member", path:member.path, scope, key, showCount:false } });
-          return multipleValuesTriggerMarkup(foldID);
+          const popupID = `track-${index}-${popups.length}`;
+          const popup = multipleValuesPopupParts(value, { target:"member", path:member.path, scope, key, popupID }, { editable:true });
+          popups.push(popup.popup);
+          return popup.trigger;
         }
         return `<input class="tag-table-field track-array-value${editable && present ? " track-cell" : ""}" value="${esc(display)}" aria-label="${esc(rowLabel)} ${esc(key)}"${attributes}${disabled}>`;
       };
@@ -428,11 +431,10 @@
         return `<div class="field-grid-cell" role="cell">${scalar(source?.[fieldKey], fieldKey, extension ? "memberExtensions" : "memberMetadata", true)}</div>`;
       }).join("");
       const row = `<div class="field-grid-row track-array-row" role="row"><div class="field-grid-cell" role="cell">${scalar(trackNumber, "track", "memberMetadata", false)}</div><div class="field-grid-cell" role="cell">${scalar(filename, "filename", "memberMetadata", false)}</div>${metadataCells}</div>`;
-      const subrows = structuredValues.map(({ foldID, value, context }) => `<div class="field-grid-row field-grid-subrow" role="row" data-canonical-subrow="${esc(foldID)}"><div class="field-grid-cell canonical-subtable-cell" role="cell">${multipleValuesSubtableMarkup(value, context)}</div></div>`).join("");
-      return row + subrows;
+      return row;
     }).join("");
     const empty = `<div class="field-grid-empty" role="row"><span role="cell">No playable tracks</span></div>`;
-    return `<div class="field-grid tracks-field-grid" data-field-grid="tracks" role="table" aria-label="Tracks"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div>`;
+    return `<div class="field-grid tracks-field-grid" data-field-grid="tracks" role="table" aria-label="Tracks"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div>${popups.join("")}`;
   }
 
   function scheduleTrackArraySizing() {
@@ -469,24 +471,22 @@
 
   function renderTrackTagTable(member) {
     const entries = fileTagEntries(member);
-    const popups = [];
     const header = ["Scope", "Tag Name", "Tag Value", "Actions"].map(label => `<div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${label}" disabled></div>`).join("");
     const rows = entries.map((entry, index) => {
       const structured = entry.value && typeof entry.value === "object";
-      let popupID = "";
+      const foldID = `file-tag-${index}`;
       let valueMarkup = memberTagValueMarkup(member, entry);
+      let subrow = "";
       if (structured) {
-        popupID = `file-tag-${index}`;
-        const popup = multipleValuesPopupParts(entry.value, { target:"member", path:member.path, scope:entry.scope, key:entry.key, popupID }, { editable:true });
-        valueMarkup = popup.trigger;
-        popups.push(popup.popup);
+        valueMarkup = multipleValuesTriggerMarkup(foldID);
+        subrow = `<div class="field-grid-row field-grid-subrow" role="row" data-canonical-subrow="${esc(foldID)}"><div class="field-grid-cell canonical-subtable-cell" role="cell">${multipleValuesSubtableMarkup(entry.value, { target:"member", path:member.path, scope:entry.scope, key:entry.key })}</div></div>`;
       }
-      const popupAttribute = popupID ? ` data-multiple-popup-id="${esc(popupID)}"` : "";
-      return `<div class="field-grid-row track-browser-row" role="row" data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"${popupAttribute}><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-scope" value="${entry.scope === "memberExtensions" ? "extension" : "metadata"}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name"></div><div class="field-grid-cell track-browser-value-cell" role="cell">${valueMarkup}</div><div class="field-grid-cell track-browser-actions" role="cell"><button class="icon-button" data-action="commitFileTag" title="Submit changed tag" aria-label="Submit changed tag">✓</button><button class="icon-button danger" data-action="deleteFileTag" title="Delete tag" aria-label="Delete tag">×</button></div></div>`;
+      const foldAttribute = structured ? ` data-multiple-fold-id="${esc(foldID)}"` : "";
+      return `<div class="field-grid-row track-browser-row" role="row" data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"${foldAttribute}><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-scope" value="${entry.scope === "memberExtensions" ? "extension" : "metadata"}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name"></div><div class="field-grid-cell track-browser-value-cell" role="cell">${valueMarkup}</div><div class="field-grid-cell track-browser-actions" role="cell"><button class="icon-button" data-action="commitFileTag" title="Submit changed tag" aria-label="Submit changed tag">✓</button><button class="icon-button danger" data-action="deleteFileTag" title="Delete tag" aria-label="Delete tag">×</button></div></div>${subrow}`;
     }).join("");
     const empty = '<div class="field-grid-empty" role="row"><span role="cell">No tags on this file</span></div>';
     const form = `<form class="file-tag-create-form track-browser-create-form" data-file-tag-create data-file-tag-path="${esc(member.path)}"><select data-file-tag-scope aria-label="Tag namespace"><option value="memberMetadata">metadata</option><option value="memberExtensions">extension</option></select><input data-file-tag-key placeholder="Tag name" aria-label="New file tag name"><input data-file-tag-value placeholder="Value" aria-label="New file tag value"><button class="icon-button" type="submit" title="Add tag" aria-label="Add tag">✓</button></form>`;
-    return `<div class="track-browser-table-wrap"><div class="field-grid track-browser-field-grid" role="table" aria-label="Tags for ${esc(member.name)}"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div>${form}${popups.join("")}</div>`;
+    return `<div class="track-browser-table-wrap"><div class="field-grid track-browser-field-grid" role="table" aria-label="Tags for ${esc(member.name)}"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div>${form}</div>`;
   }
 
   function renderTrackPage() {
@@ -675,6 +675,11 @@
   function multipleValuesEditorForRow(row) {
     const inlineEditor = $("[data-multiple-editor]", row);
     if (inlineEditor) return inlineEditor;
+    const foldID = row?.dataset.multipleFoldId;
+    if (foldID) {
+      const childEditor = document.querySelector(`[data-canonical-subrow="${CSS.escape(foldID)}"] [data-multiple-editor]`);
+      if (childEditor) return childEditor;
+    }
     const popupID = row?.dataset.multiplePopupId;
     return popupID ? document.querySelector(`[data-multiple-values-popup="${CSS.escape(popupID)}"] [data-multiple-editor]`) : null;
   }
