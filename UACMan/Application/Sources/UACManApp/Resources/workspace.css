@@ -280,13 +280,13 @@ button { cursor:pointer; }
 .track-browser-sidebar { min-width:0; min-height:calc(100vh - 155px); overflow:auto; padding:0; background:var(--panel-2); border-right:1px solid var(--line); }
 .track-browser-sidebar-field-grid { --field-grid-columns:4.5rem minmax(0,1fr) 56px; min-width:0; width:100%; padding:2px var(--field-grid-gap); background:var(--panel-2); }
 .track-browser-sidebar-field-grid .field-grid-header,
-.track-browser-sidebar-field-grid .track-browser-sidebar-row { grid-template-columns:var(--field-grid-columns); width:auto; }
-.track-browser-sidebar-row { cursor:pointer; }
-.track-browser-sidebar-row.selected { background:var(--selected); box-shadow:inset 2px 0 var(--accent); }
-.track-browser-sidebar-row .field-grid-cell { min-width:0; }
-.track-browser-sidebar-row .tag-table-field { border-color:transparent; background:transparent; }
-.track-browser-sidebar-row:hover .tag-table-field { background:var(--hover); }
-.track-browser-sidebar-row.selected .tag-table-field { background:transparent; }
+.track-browser-sidebar-field-grid .field-grid-row { grid-template-columns:var(--field-grid-columns); width:auto; }
+.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row] { cursor:pointer; }
+.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row].selected { background:var(--selected); box-shadow:inset 2px 0 var(--accent); }
+.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row] .field-grid-cell { min-width:0; }
+.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row] .tag-table-field { border-color:transparent; background:transparent; }
+.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row]:hover .tag-table-field { background:var(--hover); }
+.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row].selected .tag-table-field { background:transparent; }
 .track-browser-sidebar-number,.track-browser-sidebar-status { text-align:center; }
 .track-browser-sidebar-status { color:var(--muted)!important; }
 .track-browser-sidebar-status.dirty { color:var(--accent)!important; font-weight:700; }
