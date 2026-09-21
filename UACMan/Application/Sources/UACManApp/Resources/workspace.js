@@ -112,10 +112,10 @@
     const body = editable
       ? `<textarea class="tag-table-field nested-json-editor" data-multiple-value aria-label="JSON value for ${esc(key)}">${esc(raw)}</textarea>`
       : `<pre class="nested-json-preview">${esc(raw)}</pre>`;
-    return `<details class="nested-json-dropdown"><summary class="nested-json-trigger"><span>[Nested Values]</span><span class="canonical-fold-icon">＋</span></summary><div class="nested-json-panel">${body}</div></details>`;
+    return `<details class="nested-json-dropdown"><summary class="nested-json-trigger"><span>[Nested Tags]</span><span class="canonical-fold-icon">＋</span></summary><div class="nested-json-panel">${body}</div></details>`;
   };
   const multipleValuesCloseMarkup = context => context.foldID
-    ? `<button class="tag-table-field field-grid-heading-input multiple-values-header-action multiple-values-subtable-close" data-action="closeCanonicalSubtable" data-fold-id="${esc(context.foldID)}" type="button" title="Close values table" aria-label="Close values table">×</button>`
+    ? `<button class="tag-table-field field-grid-heading-input multiple-values-header-action multiple-values-subtable-close" data-action="closeCanonicalSubtable" data-fold-id="${esc(context.foldID)}" type="button" title="Close nested tags table" aria-label="Close nested tags table">×</button>`
     : `<button class="tag-table-field field-grid-heading-input multiple-values-header-action multiple-values-popup-close" data-action="closeMultipleValuesPopup" data-popup-id="${esc(context.popupID || "")}" type="button" title="Close" aria-label="Close">×</button>`;
   const multipleValuesTableTitleRowMarkup = context => {
     const title = context.title || context.key || "Values";
@@ -173,7 +173,7 @@
     const editor = multipleValuesEditorBodyMarkup(value, context);
     return canonicalFoldMarkup("Multiple Values", editor.body, { className:"tag-multiple-values editable-multiple-values", meta:context.showCount === false ? "" : editor.count });
   };
-  const multipleValuesTriggerMarkup = foldID => `<button class="canonical-fold-toggle canonical-fold-trigger" type="button" data-action="toggleCanonicalFold" data-fold-id="${esc(foldID)}" aria-expanded="false"><span>[Nested Values]</span><span class="canonical-fold-icon">＋</span></button>`;
+  const multipleValuesTriggerMarkup = foldID => `<button class="canonical-fold-toggle canonical-fold-trigger" type="button" data-action="toggleCanonicalFold" data-fold-id="${esc(foldID)}" aria-expanded="false"><span>[Nested Tags]</span><span class="canonical-fold-icon">＋</span></button>`;
   const multipleValuesReadOnlyTableMarkup = (entries, context = {}) => {
     const popupLayout = context.layout === "popup";
     const subtableLayout = context.layout === "subtable";
@@ -200,7 +200,7 @@
     const body = editable
       ? multipleValuesEditorBodyMarkup(value, { ...context, layout:"popup", popupID }).body
       : multipleValuesReadOnlyTableMarkup(entries, { ...context, layout:"popup" });
-    const trigger = `<button class="canonical-fold-toggle canonical-fold-trigger multiple-values-popup-trigger" type="button" data-action="toggleMultipleValuesPopup" data-popup-id="${esc(popupID)}" aria-controls="multiple-values-popup-${esc(popupID)}" aria-expanded="false"><span>[Nested Values]</span><span class="canonical-fold-icon">＋</span></button>`;
+    const trigger = `<button class="canonical-fold-toggle canonical-fold-trigger multiple-values-popup-trigger" type="button" data-action="toggleMultipleValuesPopup" data-popup-id="${esc(popupID)}" aria-controls="multiple-values-popup-${esc(popupID)}" aria-expanded="false"><span>[Nested Tags]</span><span class="canonical-fold-icon">＋</span></button>`;
     const popup = `<div class="multiple-values-popup-backdrop" id="multiple-values-popup-${esc(popupID)}" data-multiple-values-popup="${esc(popupID)}" data-multiple-target="${esc(context.target || "member")}" data-multiple-path="${esc(context.path || "")}" data-multiple-scope="${esc(context.scope || "")}" data-multiple-key="${esc(context.key || "")}" data-multiple-editable="${editable}" hidden><div class="multiple-values-popup-card" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="multiple-values-popup-content"><div class="field-grid canonical-popup-field-grid canonical-multiple-values-grid" role="table">${multipleValuesTableChromeMarkup({ ...context, popupID, title }, editable)}${body}</div></div></div></div>`;
     return { trigger, popup };
   };
@@ -501,7 +501,7 @@
       const scalar = (value, key, scope, editable) => {
         const present = value !== undefined && value !== null && value !== "";
         const structured = present && typeof value === "object";
-        const display = !present ? "—" : structured ? "[Nested Values]" : String(value);
+        const display = !present ? "—" : structured ? "[Nested Tags]" : String(value);
         const disabled = !editable || !present || structured ? " disabled" : "";
         const attributes = editable && present && !structured ? ` data-track-cell data-track-path="${esc(member.path)}" data-track-key="${esc(key)}" data-track-scope="${esc(scope)}"` : "";
         if (structured) {
@@ -541,7 +541,7 @@
       ...columns.map(key => widthFor([displayTrackKey(key), ...tracks.map(member => {
         const value = memberFields(member)[key];
         if (value === null || value === undefined || value === "") return "—";
-        if (typeof value === "object") return "[Nested Values]";
+        if (typeof value === "object") return "[Nested Tags]";
         return String(value);
       })]))
     ];

@@ -24,12 +24,12 @@ without scanning its parent folder.
 Selecting a package opens its playable tracks in the primary **Tracks** view.
 The member filter searches visible metadata values, role, format, filename, and
 path. Tracks stays an inline field grid: scalar cells edit in place and structured
-cells open a centered plain-text `[Nested Values]` popup so the wide table remains
+cells open a centered plain-text `[Nested Tags]` popup so the wide table remains
 easy to navigate. Batch tag edits live in
 the **Track Tags** browser, so Tracks does not carry a separate checkbox
 selection model. The Tracks table includes both the display track number and the
 literal source filename as its first two columns. Scalar values are editable;
-structured values show a stable `[Nested Values]` placeholder and open as plain
+structured values show a stable `[Nested Tags]` placeholder and open as plain
 text in a popup. Aggregate rows with different structured values remain
 read-only until a single value is unambiguous.
 
@@ -50,7 +50,7 @@ sidebar/content bar and no separate new-tag form. The left table is a compact,
 auto-height canonical table; its frame does not fill the page when it has only a
 few rows. **Pack Tags** contains package-level metadata and all attachments using
 the same field-grid cells and add interface as the tag workspace. Non-string
-values in Pack Tags and Track Tags use `[Nested Values]` to open an animated,
+values in Pack Tags and Track Tags use `[Nested Tags]` to open an animated,
 full-width inserted canonical subtable. Only the wide Tracks giga-table uses a
 dimmed popup for structured JSON, so its row geometry remains fixed.
 When a single UAC is opened directly, the library rail collapses automatically;
@@ -69,7 +69,7 @@ simple set summary should not be nested needlessly.
 
 Per-field edits use typed rows: **Add column** creates a text, number, boolean,
 or JSON field, and removing a row removes that manifest field. A centered
-`[Nested Values]` popup and its **Open JSON editor** escape hatch remain
+`[Nested Tags]` popup and its **Open JSON editor** escape hatch remain
 available for advanced or nested edits. The giga-table popup title row carries
 the tag name, header ✓ submits the full JSON value, and header × closes it.
 Small-table inserted subtables use the same title/action row inside the parent
