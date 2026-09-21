@@ -414,20 +414,19 @@ button { cursor:pointer; }
   .track-browser-detail-pane .track-browser-scroll { height:calc(100vh - 300px); }
 }
 
-/* Canonical table hierarchy: every surface shares the same rows and cells.
-   Variants only decide whether the table folds inline or opens a popup. */
-.canonical-table-surface { min-width:0; min-height:0; overflow:auto; border:1px solid var(--line); border-radius:4px; background:var(--panel); }
-.canonical-table { min-width:0; }
-.flat-table { background:var(--panel); }
-.foldable-table { background:var(--panel); }
-.giga-table { min-width:0; }
+/* Canonical table hierarchy: every surface shares one frame, one row/cell
+   geometry, and one inset. Variants only change how structured values open. */
+.canonical-table-surface,
+.giga-table-surface { box-sizing:border-box; min-width:0; min-height:0; overflow:auto; border:1px solid var(--line); border-radius:4px; background:var(--panel); }
+.canonical-table { min-width:0; padding:2px var(--field-grid-gap); }
+.flat-table,.foldable-table,.giga-table { background:var(--panel); }
 
 /* Track Tags sidebar: a compact canonical table, not a full-height list. */
 .track-browser-page { height:auto; min-height:0; align-items:start; overflow:visible; }
 .track-browser-pane { min-height:0; align-self:start; overflow:visible; }
 .track-browser-scroll { height:auto; max-height:calc(100vh - 132px); min-height:0; overflow:auto; }
 .track-browser-sidebar,.track-browser-detail { min-height:0; height:auto; }
-.track-browser-sidebar-field-grid { min-width:0; width:100%; padding:0 var(--field-grid-gap); background:var(--panel); }
+.track-browser-sidebar-field-grid { min-width:0; width:100%; padding:2px var(--field-grid-gap); background:var(--panel); }
 .track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row] { cursor:pointer; }
 .track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row] .tag-table-field { border-color:var(--line); background:var(--panel-2); }
 .track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row]:hover .tag-table-field { background:var(--hover); }
@@ -439,10 +438,32 @@ button { cursor:pointer; }
 .tracks-field-grid .multiple-values-popup-trigger,
 .file-field-grid .multiple-values-popup-trigger { width:100%; min-width:0; }
 
+/* Non-giga structured values use a full-width inserted canonical subtable. */
+.field-grid-subrow { display:grid; grid-template-columns:1fr; grid-template-rows:0fr; min-height:0; max-height:0; overflow:hidden; opacity:0; transition:grid-template-rows var(--ui-motion),max-height var(--ui-motion),opacity var(--ui-motion); }
+.field-grid-subrow.open { grid-template-rows:1fr; max-height:1200px; opacity:1; }
+.field-grid-subrow > .canonical-subtable-cell { grid-column:1 / -1; width:100%; min-height:0; overflow:hidden; padding:0; align-items:stretch; }
+.canonical-subtable-panel { width:100%; min-width:0; min-height:0; overflow:hidden; border:1px solid var(--line); border-radius:4px; background:var(--panel); }
+.canonical-subtable-field-grid { padding:2px var(--field-grid-gap); }
+
+/* Popup chrome is still canonical table chrome; only the giga surface dims the
+   page behind it. The title spans the table while actions remain two cells. */
+.multiple-values-popup-backdrop { background:#00000080; }
+.canonical-popup-field-grid > .multiple-values-title-row { grid-template-columns:minmax(0,1fr) 28px 28px; }
+.canonical-popup-field-grid > .multiple-values-title-row .field-grid-cell:first-child { min-width:0; }
+.canonical-popup-field-grid > .multiple-values-title-row .field-grid-heading-input { text-align:center; }
+
 /* Bundled text previews use the same unobtrusive table chrome as value
    popups, without creating a second scrolling surface in the Files page. */
-.file-preview-backdrop { position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; padding:12px; background:transparent; pointer-events:none; }
+.file-preview-backdrop { position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; padding:12px; background:#00000080; pointer-events:none; }
 .file-preview-backdrop .file-preview { width:min(860px,calc(100vw - 24px)); max-height:calc(100vh - 24px); pointer-events:auto; border:1px solid var(--line); border-radius:3px; box-shadow:1px 1px 1px #0008; }
+
+/* Search and package functions share one right-aligned app-header group. */
+.appbar-tools { display:flex; align-items:center; gap:6px; flex:none; min-width:0; }
+.appbar-tools .member-search { margin:0; }
+
+/* The status bar is a window-level footer, parallel to the app header, not
+   part of the members content pane. */
+.statusbar { flex:none; width:100%; min-height:30px; background:var(--panel); }
 
 /* Package actions are compact header-bar functions rather than large buttons. */
 .appbar .actions { gap:3px; }

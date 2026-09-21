@@ -5,20 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none';">
   <title>UACMan</title>
-  <link rel="stylesheet" href="workspace.css?v=20260921-table-hierarchy-v1">
-  <script src="workspace.js?v=20260921-table-hierarchy-v1" defer></script>
+  <link rel="stylesheet" href="workspace.css?v=20260921-table-surfaces-v2">
+  <script src="workspace.js?v=20260921-table-surfaces-v2" defer></script>
 </head>
 <body>
   <header class="appbar">
     <nav class="main-view-tabs app-nav" aria-label="Package workspace"><div class="tab-buttons"><button data-action="mainView" data-view="files" id="files-view-button">Files</button><button data-action="mainView" data-view="packTags" id="pack-tags-view-button">Pack Tags</button><button data-action="mainView" data-view="members" id="members-view-button" class="active">Tracks</button><button data-action="mainView" data-view="trackBrowser" id="track-view-button">Track Tags</button></div></nav>
-    <label class="search member-search hidden" id="member-filter-wrap"><span>⌕</span><input id="member-filter" placeholder="Search title, artist, album, filename, path…" autocomplete="off"><kbd>⌘ K</kbd></label>
     <div class="appbar-spacer"></div>
-    <div class="actions" aria-label="Package actions">
-      <button class="icon-button appbar-action" data-action="openCollection" title="Open Collection" aria-label="Open Collection">☰</button>
-      <button class="icon-button appbar-action" data-action="openUAC" title="Open UAC" aria-label="Open UAC">＋</button>
-      <div class="divider"></div>
-      <button class="icon-button appbar-action" data-action="revert" id="revert-button" title="Revert changes" aria-label="Revert changes" disabled>↶</button>
-      <button class="icon-button appbar-action primary" data-action="save" id="save-button" title="Save changes" aria-label="Save changes" disabled>✓</button>
+    <div class="appbar-tools">
+      <label class="search member-search hidden" id="member-filter-wrap"><span>⌕</span><input id="member-filter" placeholder="Search title, artist, album, filename, path…" autocomplete="off"><kbd>⌘ K</kbd></label>
+      <div class="actions" aria-label="Package actions">
+        <button class="icon-button appbar-action" data-action="openCollection" title="Open Collection" aria-label="Open Collection">☰</button>
+        <button class="icon-button appbar-action" data-action="openUAC" title="Open UAC" aria-label="Open UAC">＋</button>
+        <div class="divider"></div>
+        <button class="icon-button appbar-action" data-action="revert" id="revert-button" title="Revert changes" aria-label="Revert changes" disabled>↶</button>
+        <button class="icon-button appbar-action primary" data-action="save" id="save-button" title="Save changes" aria-label="Save changes" disabled>✓</button>
+      </div>
     </div>
   </header>
 
@@ -40,9 +42,10 @@
         <div class="table-scroll" id="table-scroll"></div>
       </div>
       <div class="metadata-view hidden" id="metadata-view"><div id="inspector-content" class="inspector-content"></div></div>
-      <footer class="statusbar"><div class="status-document"><strong id="document-name">No package open</strong><span id="document-path">Choose a collection or open one UAC file</span></div><span class="status-dot"></span><span id="status-message">Ready</span><span id="member-summary">No package open</span><span class="status-spacer"></span><span id="encoding-info"></span></footer>
     </section>
   </main>
+
+  <footer class="statusbar"><div class="status-document"><strong id="document-name">No package open</strong><span id="document-path">Choose a collection or open one UAC file</span></div><span class="status-dot"></span><span id="status-message">Ready</span><span id="member-summary">No package open</span><span class="status-spacer"></span><span id="encoding-info"></span></footer>
 
 </body>
 </html>
