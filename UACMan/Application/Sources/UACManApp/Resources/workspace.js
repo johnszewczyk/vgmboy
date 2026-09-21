@@ -129,15 +129,17 @@
     const submitMarkup = editable
       ? '<button class="tag-table-field field-grid-heading-input multiple-values-header-action" data-action="commitMultipleValues" type="button" title="Submit all changed values" aria-label="Submit all changed values">✓</button>'
       : '<input class="tag-table-field field-grid-heading-input" value="" aria-label="Submit" disabled>';
-    return `<div class="field-grid-row field-grid-header multiple-values-title-row" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Value" aria-label="Value" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader">${submitMarkup}</div><div class="field-grid-cell field-grid-heading" role="columnheader">${multipleValuesCloseMarkup(context)}</div></div>`;
+    return `<div class="field-grid-row field-grid-header multiple-values-title-row" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="#" aria-label="#" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Value" aria-label="Value" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader">${submitMarkup}</div><div class="field-grid-cell field-grid-heading" role="columnheader">${multipleValuesCloseMarkup(context)}</div></div>`;
   };
   const multipleValuesEditorBodyMarkup = (value, context = {}) => {
     const isArray = Array.isArray(value);
-    const canonicalLayout = context.layout === "canonical" || context.layout === "subtable";
+    const popupLayout = context.layout === "popup";
+    const canonicalLayout = ["canonical", "subtable", "popup"].includes(context.layout);
     const subtableLayout = context.layout === "subtable";
+    const tableLayout = subtableLayout || popupLayout;
     const gridClass = context.layout === "subtable" ? "inserted-table-grid" : "canonical-popup-field-grid";
     const entries = isArray ? value.map((item, index) => [String(index), item]) : Object.entries(value || {});
-    const rowMarkup = ([key, item]) => {
+    const rowMarkup = ([key, item], index) => {
       const kind = fieldKind(item);
       const raw = kind === "json" ? JSON.stringify(item, null, 2) : String(item ?? "");
       const valueControl = kind === "json"
@@ -145,10 +147,11 @@
         : `<input class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-editor" data-multiple-value value="${esc(raw)}" aria-label="Value for ${esc(key)}">`;
       const rowClass = canonicalLayout ? "field-grid-row multiple-value-editor-row" : "tag-multiple-value-row multiple-value-editor-row";
       const keyMarkup = `<input class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-key" data-multiple-key value="${esc(key)}" aria-label="Key for ${esc(key)}"${isArray ? " disabled" : ""}>`;
+      const numberMarkup = tableLayout ? `<div class="field-grid-cell"><input class="tag-table-field multiple-value-number" value="${index + 1}" aria-label="Value number ${index + 1}" disabled></div>` : "";
       const removeMarkup = `<button class="icon-button danger multiple-value-remove" data-action="removeMultipleValue" type="button" title="Remove value" aria-label="Remove value">×</button>`;
-      const submitMarkup = subtableLayout ? '<button class="icon-button multiple-value-submit" data-action="commitMultipleValueRow" type="button" title="Submit changed value" aria-label="Submit changed value">✓</button>' : "";
+      const submitMarkup = tableLayout ? '<button class="icon-button multiple-value-submit" data-action="commitMultipleValueRow" type="button" title="Submit changed value" aria-label="Submit changed value">✓</button>' : "";
       return canonicalLayout
-        ? `<div class="${rowClass}" data-multiple-entry data-multiple-kind="${kind}"><div class="field-grid-cell">${keyMarkup}</div><div class="field-grid-cell">${valueControl}</div>${subtableLayout ? `<div class="field-grid-cell field-grid-action-cell">${submitMarkup}</div>` : ""}<div class="field-grid-cell field-grid-action-cell">${removeMarkup}</div></div>`
+        ? `<div class="${rowClass}" data-multiple-entry data-multiple-kind="${kind}">${numberMarkup}<div class="field-grid-cell">${keyMarkup}</div><div class="field-grid-cell">${valueControl}</div>${tableLayout ? `<div class="field-grid-cell field-grid-action-cell">${submitMarkup}</div>` : ""}<div class="field-grid-cell field-grid-action-cell">${removeMarkup}</div></div>`
         : `<div class="${rowClass}" data-multiple-entry data-multiple-kind="${kind}">${keyMarkup}${valueControl}${removeMarkup}</div>`;
     };
     const rows = entries.map(rowMarkup).join("");
@@ -156,15 +159,17 @@
       `data-multiple-editor`,
       `data-multiple-target="${esc(context.target || "member")}"`,
       `data-multiple-array="${isArray}"`,
-      `data-multiple-layout="${subtableLayout ? "subtable" : canonicalLayout ? "canonical" : "compact"}"`,
+      `data-multiple-layout="${subtableLayout ? "subtable" : popupLayout ? "popup" : canonicalLayout ? "canonical" : "compact"}"`,
       `data-multiple-path="${esc(context.path || "")}"`,
       `data-multiple-scope="${esc(context.scope || "")}"`,
       `data-multiple-key="${esc(context.key || "")}"`
     ].join(" ");
     const rowsMarkup = canonicalLayout
-      ? `<div class="field-grid ${gridClass} canonical-multiple-values-grid" role="table">${subtableLayout ? multipleValuesSubtableTitleRowMarkup(context, true) : multipleValuesTitleRowMarkup(context, true)}<div class="multiple-values-rows">${rows || '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'}</div></div>`
+      ? popupLayout
+        ? `<div class="multiple-values-rows">${rows || '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'}</div>`
+        : `<div class="field-grid ${gridClass} canonical-multiple-values-grid" role="table">${subtableLayout ? multipleValuesSubtableTitleRowMarkup(context, true) : multipleValuesTitleRowMarkup(context, true)}<div class="multiple-values-rows">${rows || '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'}</div></div>`
       : `<div class="multiple-values-rows">${rows || '<div class="file-tag-empty multiple-values-empty">No values</div>'}</div>`;
-    const body = `<div class="multiple-values-editor${canonicalLayout ? " canonical-multiple-values-editor" : ""}" ${data}>${rowsMarkup}${canonicalLayout ? "" : '<div class="multiple-values-editor-actions"><button class="icon-button" data-action="addMultipleValue" type="button" title="Add value" aria-label="Add value">＋</button><button class="icon-button" data-action="commitMultipleValues" type="button" title="Submit changed values" aria-label="Submit changed values">✓</button>'}<div class="multiple-values-editor-error" role="status"></div></div>`;
+    const body = `<div class="multiple-values-editor${canonicalLayout ? " canonical-multiple-values-editor" : ""}${popupLayout ? " canonical-popup-editor" : ""}" ${data}>${rowsMarkup}${canonicalLayout ? "" : '<div class="multiple-values-editor-actions"><button class="icon-button" data-action="addMultipleValue" type="button" title="Add value" aria-label="Add value">＋</button><button class="icon-button" data-action="commitMultipleValues" type="button" title="Submit changed values" aria-label="Submit changed values">✓</button>'}<div class="multiple-values-editor-error" role="status"></div></div>`;
     return { body, count:entries.length };
   };
   const multipleValuesEditorMarkup = (value, context = {}) => {
@@ -173,11 +178,15 @@
   };
   const multipleValuesTriggerMarkup = foldID => `<button class="canonical-fold-toggle canonical-fold-trigger" type="button" data-action="toggleCanonicalFold" data-fold-id="${esc(foldID)}" aria-expanded="false"><span>[Nested Values]</span><span class="canonical-fold-icon">＋</span></button>`;
   const multipleValuesReadOnlyTableMarkup = (entries, context = {}) => {
-    const gridClass = context.layout === "subtable" ? "inserted-table-grid" : "canonical-popup-field-grid";
+    const popupLayout = context.layout === "popup";
+    const subtableLayout = context.layout === "subtable";
+    const tableLayout = popupLayout || subtableLayout;
+    const gridClass = subtableLayout ? "inserted-table-grid" : "canonical-popup-field-grid";
     const rows = entries.length
-      ? entries.map(([key, item]) => `<div class="field-grid-row multiple-value-readonly-row" role="row"><div class="field-grid-cell"><input class="tag-table-field" value="${esc(key)}" disabled></div><div class="field-grid-cell">${item && typeof item === "object" ? nestedJSONValueMarkup(item, key, false) : `<input class="tag-table-field" value="${esc(String(item ?? "—"))}" disabled>`}</div><div class="field-grid-cell"></div><div class="field-grid-cell"></div></div>`).join("")
+      ? entries.map(([key, item], index) => `<div class="field-grid-row multiple-value-readonly-row" role="row">${tableLayout ? `<div class="field-grid-cell"><input class="tag-table-field multiple-value-number" value="${index + 1}" aria-label="Value number ${index + 1}" disabled></div>` : ""}<div class="field-grid-cell"><input class="tag-table-field" value="${esc(key)}" disabled></div><div class="field-grid-cell">${item && typeof item === "object" ? nestedJSONValueMarkup(item, key, false) : `<input class="tag-table-field" value="${esc(String(item ?? "—"))}" disabled>`}</div><div class="field-grid-cell"></div><div class="field-grid-cell"></div></div>`).join("")
       : '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>';
-    const titleRow = context.layout === "subtable" ? multipleValuesSubtableTitleRowMarkup(context, false) : multipleValuesTitleRowMarkup(context, false);
+    if (popupLayout) return `<div class="multiple-values-rows">${rows}</div>`;
+    const titleRow = subtableLayout ? multipleValuesSubtableTitleRowMarkup(context, false) : multipleValuesTitleRowMarkup(context, false);
     return `<div class="field-grid ${gridClass} canonical-multiple-values-grid" role="table">${titleRow}<div class="multiple-values-rows">${rows}</div></div>`;
   };
   const multipleValuesSubtableMarkup = (value, context = {}, options = {}) => {
@@ -192,12 +201,9 @@
     const title = context.title || context.key || "Values";
     const editable = options.editable !== false;
     const entries = options.entries || (Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value || {}));
-    const text = value !== null && value !== undefined
-      ? JSON.stringify(value, null, 2)
-      : JSON.stringify(entries.map(([key, item]) => ({ key, value:item })), null, 2);
     const body = editable
-      ? `<div class="field-grid-row multiple-values-popup-json-row" role="row"><div class="field-grid-cell multiple-values-popup-text-wrap" role="cell"><textarea class="tag-table-field multiple-values-text" data-multiple-popup-text aria-label="JSON value">${esc(text || "")}</textarea><div class="multiple-values-popup-error" role="status"></div></div></div>`
-      : `<div class="field-grid-row multiple-values-popup-json-row" role="row"><div class="field-grid-cell multiple-values-popup-text-wrap" role="cell"><pre class="multiple-values-popup-preview">${esc(text || "")}</pre></div></div>`;
+      ? multipleValuesEditorBodyMarkup(value, { ...context, layout:"popup", popupID }).body
+      : multipleValuesReadOnlyTableMarkup(entries, { ...context, layout:"popup" });
     const trigger = `<button class="canonical-fold-toggle canonical-fold-trigger multiple-values-popup-trigger" type="button" data-action="toggleMultipleValuesPopup" data-popup-id="${esc(popupID)}" aria-controls="multiple-values-popup-${esc(popupID)}" aria-expanded="false"><span>[Nested Values]</span><span class="canonical-fold-icon">＋</span></button>`;
     const popup = `<div class="multiple-values-popup-backdrop" id="multiple-values-popup-${esc(popupID)}" data-multiple-values-popup="${esc(popupID)}" data-multiple-target="${esc(context.target || "member")}" data-multiple-path="${esc(context.path || "")}" data-multiple-scope="${esc(context.scope || "")}" data-multiple-key="${esc(context.key || "")}" data-multiple-editable="${editable}" hidden><div class="multiple-values-popup-card" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="multiple-values-popup-content"><div class="field-grid canonical-popup-field-grid canonical-multiple-values-grid" role="table">${multipleValuesTitleRowMarkup({ ...context, popupID, title }, editable)}${body}</div></div></div></div>`;
     return { trigger, popup };
@@ -721,8 +727,11 @@
     const rows = $(".multiple-values-rows", editor);
     if (!rows) return;
     const isArray = editor.dataset.multipleArray === "true";
-    const canonicalLayout = ["canonical", "subtable"].includes(editor.dataset.multipleLayout);
+    const popupLayout = editor.dataset.multipleLayout === "popup";
+    const canonicalLayout = ["canonical", "subtable", "popup"].includes(editor.dataset.multipleLayout);
     const subtableLayout = editor.dataset.multipleLayout === "subtable";
+    const tableLayout = subtableLayout || popupLayout;
+    const number = $$('[data-multiple-entry]', rows).length + 1;
     $(".multiple-values-empty", rows)?.remove();
     const row = document.createElement("div");
     row.className = canonicalLayout ? "field-grid-row multiple-value-editor-row" : "tag-multiple-value-row multiple-value-editor-row";
@@ -730,10 +739,11 @@
     row.dataset.multipleKind = "string";
     const keyMarkup = `<input class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-key" data-multiple-key value="" aria-label="New value key"${isArray ? " disabled" : ""}>`;
     const valueMarkup = `<input class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-editor" data-multiple-value value="" aria-label="New value">`;
-    const submitMarkup = subtableLayout ? '<button class="icon-button multiple-value-submit" data-action="commitMultipleValueRow" type="button" title="Submit changed value" aria-label="Submit changed value">✓</button>' : "";
+    const numberMarkup = tableLayout ? `<div class="field-grid-cell"><input class="tag-table-field multiple-value-number" value="${number}" aria-label="Value number ${number}" disabled></div>` : "";
+    const submitMarkup = tableLayout ? '<button class="icon-button multiple-value-submit" data-action="commitMultipleValueRow" type="button" title="Submit changed value" aria-label="Submit changed value">✓</button>' : "";
     const removeMarkup = `<button class="icon-button danger multiple-value-remove" data-action="removeMultipleValue" type="button" title="Remove value" aria-label="Remove value">×</button>`;
     row.innerHTML = canonicalLayout
-      ? `<div class="field-grid-cell">${keyMarkup}</div><div class="field-grid-cell">${valueMarkup}</div>${subtableLayout ? `<div class="field-grid-cell field-grid-action-cell">${submitMarkup}</div>` : ""}<div class="field-grid-cell field-grid-action-cell">${removeMarkup}</div>`
+      ? `${numberMarkup}<div class="field-grid-cell">${keyMarkup}</div><div class="field-grid-cell">${valueMarkup}</div>${tableLayout ? `<div class="field-grid-cell field-grid-action-cell">${submitMarkup}</div>` : ""}<div class="field-grid-cell field-grid-action-cell">${removeMarkup}</div>`
       : `${keyMarkup}${valueMarkup}${removeMarkup}`;
     rows.append(row);
     $("[data-multiple-key]", row)?.focus();
@@ -745,7 +755,7 @@
     row.remove();
     const rows = $(".multiple-values-rows", editor);
     if (rows && !$("[data-multiple-entry]", rows)) {
-      rows.innerHTML = editor.dataset.multipleLayout === "subtable"
+      rows.innerHTML = ["subtable", "popup"].includes(editor.dataset.multipleLayout)
         ? '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'
         : '<div class="file-tag-empty multiple-values-empty">No values</div>';
     }
@@ -786,7 +796,7 @@
 
   function commitMultipleValues(editor) {
     const collected = collectMultipleValues(editor);
-    if (!editor || !collected) return;
+    if (!editor || !collected) return false;
     const { valueJSON } = collected;
     const tagRow = editor.closest("[data-tag-row]");
     const fileRow = editor.closest("[data-file-tag-row]");
@@ -802,6 +812,7 @@
       markTrackDirty(path);
       bridge("commitMemberTag", { path, scope:editor.dataset.multipleScope || fileRow?.dataset.fileTagScope || "memberMetadata", key, newKey, value:"", valueJSON });
     }
+    return true;
   }
 
   function commitMultipleValueRow(row) {
@@ -820,6 +831,11 @@
   }
 
   function commitMultipleValuesPopup(popup) {
+    const editor = $("[data-multiple-editor]", popup);
+    if (editor) {
+      if (commitMultipleValues(editor)) closeMultipleValuesPopup(popup);
+      return;
+    }
     const textarea = $("[data-multiple-popup-text]", popup);
     const error = $(".multiple-values-popup-error", popup);
     if (!textarea) return;

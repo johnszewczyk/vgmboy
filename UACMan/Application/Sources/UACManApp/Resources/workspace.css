@@ -442,18 +442,18 @@ button { cursor:pointer; }
 .inserted-table-row.open { grid-template-rows:1fr; max-height:none; opacity:1; }
 .inserted-table-cell { grid-column:1 / -1; width:100%; min-width:0; min-height:0; overflow:visible; padding:0; align-items:stretch; }
 .inserted-table-panel { width:100%; min-width:0; min-height:0; overflow:visible; border:0; border-radius:0; background:transparent; }
-.inserted-table-grid { --field-grid-columns:minmax(110px,.7fr) minmax(180px,1.3fr) 28px 28px; width:100%; max-width:100%; min-width:0; padding:0; }
+.inserted-table-grid { --field-grid-columns:32px minmax(110px,.7fr) minmax(180px,1.3fr) 28px 28px; width:100%; max-width:100%; min-width:0; padding:0; }
 .inserted-table-grid .field-grid-row { grid-template-columns:var(--field-grid-columns); width:100%; min-width:0; }
 .inserted-table-grid .field-grid-cell { min-width:0; }
 .inserted-table-grid .field-grid-header .field-grid-cell { justify-content:center; }
+.multiple-value-number { text-align:center; }
 
 /* Popup JSON editing uses the same canonical rows and cells, but remains a
    fixed modal surface so editing it never reflows the source table. */
-.canonical-popup-field-grid .multiple-values-popup-json-row { min-height:0; align-items:stretch; }
-.canonical-popup-field-grid .multiple-values-popup-json-row .multiple-values-popup-text-wrap { grid-column:1 / -1; width:100%; min-width:0; min-height:0; padding:0; align-items:stretch; }
-.multiple-values-text { display:block; width:100%; min-height:260px; max-height:520px; margin:0; overflow:auto; resize:vertical; padding:2px 5px; color:var(--accent); background:var(--panel-2); border:1px solid var(--line); outline:0; font:inherit; white-space:pre-wrap; overflow-wrap:anywhere; }
-.multiple-values-text:focus { border-color:var(--accent); }
-.multiple-values-popup-preview { display:block; width:100%; max-height:520px; margin:0; overflow:auto; padding:2px 5px; color:var(--muted); font:inherit; white-space:pre-wrap; overflow-wrap:anywhere; }
+.canonical-popup-field-grid { --multiple-values-popup-columns:32px minmax(110px,.7fr) minmax(180px,1.3fr) 28px 28px; }
+.canonical-popup-field-grid > .canonical-popup-editor { width:100%; min-width:0; }
+.canonical-popup-field-grid .multiple-value-editor-row,
+.canonical-popup-field-grid .multiple-value-readonly-row { grid-template-columns:var(--multiple-values-popup-columns); width:100%; min-width:0; }
 .multiple-values-popup-error { min-height:0; padding:0; }
 
 /* Popup chrome is still canonical table chrome; only the giga surface dims the
