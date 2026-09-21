@@ -215,7 +215,7 @@
   let lastUnsavedChanges = false;
   let lastRenderedView = "";
   let lastDocumentName = "";
-  const uiMotionDuration = 200;
+  const uiMotionDuration = 250;
 
   function animateRowRemoval(row, completion) {
     if (!row) return;
@@ -578,7 +578,7 @@
       return `<div class="field-grid-row" role="row" data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"${foldAttribute}><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-scope" value="${entry.scope === "memberExtensions" ? "extension" : "metadata"}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name"></div><div class="field-grid-cell track-browser-value-cell" role="cell">${valueMarkup}</div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitFileTag" title="Submit changed tag" aria-label="Submit changed tag">✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteFileTag" title="Delete tag" aria-label="Delete tag">×</button></div></div>${subrow}`;
     }).join("");
     const empty = '<div class="field-grid-empty" role="row"><span role="cell">No tags on this file</span></div>';
-    return `<div class="track-browser-table-wrap"><div class="field-grid canonical-table foldable-table track-browser-field-grid" role="table" aria-label="Tags for ${esc(member.name)}">${header}${rows || empty}</div></div>`;
+    return `<div class="field-grid canonical-table flat-table track-browser-field-grid" role="table" aria-label="Tags for ${esc(member.name)}">${header}${rows || empty}</div>`;
   }
 
   function renderTrackPage() {
@@ -593,13 +593,13 @@
       const tagCount = fileTagEntries(member).length;
       const dirty = dirtyTrackPaths.has(member.path);
       const tagLabel = dirty ? `${tagCount} •` : String(tagCount);
-      return `<button type="button" role="button" class="field-grid-row${selectedClass}" aria-label="Select ${esc(member.name)}" aria-selected="${member.path === trackBrowserPath}" data-action="selectTrackBrowserMember" data-track-browser-path="${esc(member.path)}" data-track-browser-row><span class="field-grid-cell" role="cell"><span class="tag-table-field track-browser-sidebar-number">${index + 1}</span></span><span class="field-grid-cell" role="cell"><span class="tag-table-field file-name-field">${esc(member.name)}</span></span><span class="field-grid-cell" role="cell"><span class="tag-table-field track-browser-sidebar-status${dirty ? " dirty" : ""}">${esc(tagLabel)}</span></span></button>`;
+      return `<div class="field-grid-row${selectedClass}" role="row" tabindex="0" aria-label="Select ${esc(member.name)}" aria-selected="${member.path === trackBrowserPath}" data-action="selectTrackBrowserMember" data-track-browser-path="${esc(member.path)}" data-track-browser-row><div class="field-grid-cell" role="cell"><input class="tag-table-field track-browser-sidebar-number" value="${index + 1}" aria-label="Track number" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-name-field" value="${esc(member.name)}" aria-label="Filename" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field track-browser-sidebar-status${dirty ? " dirty" : ""}" value="${esc(tagLabel)}" aria-label="Tag count" disabled></div></div>`;
     }).join("");
     const sidebar = `<section class="track-browser-pane track-browser-sidebar-pane" aria-label="Tagged files"><div class="data-table-scroll canonical-table-surface track-browser-scroll"><div class="field-grid canonical-table flat-table track-browser-sidebar-field-grid" role="table" aria-label="Tagged tracks">${sidebarHeader}${sidebarRows || '<div class="field-grid-empty" role="row"><span role="cell">No files with tags</span></div>'}</div></div></section>`;
     const detailContent = selected
       ? renderTrackTagTable(selected)
       : '<div class="empty-tab"><strong>No tagged files</strong><span>Files with metadata or extensions will appear here.</span></div>';
-    const detail = `<section class="track-browser-pane track-browser-detail-pane" aria-label="Selected track tags"><div class="data-table-scroll canonical-table-surface track-browser-scroll"><div class="track-browser-detail">${detailContent}</div></div></section>`;
+    const detail = `<section class="track-browser-pane track-browser-detail-pane" aria-label="Selected track tags"><div class="data-table-scroll canonical-table-surface track-browser-scroll">${detailContent}</div></section>`;
     return `<section class="data-page track-browser-page">${sidebar}${detail}</section>`;
   }
 

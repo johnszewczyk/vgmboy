@@ -91,6 +91,9 @@ button { cursor:pointer; }
 .field-grid-empty { min-height:35px; display:flex; align-items:center; color:var(--soft); }
 .field-grid-empty span { width:100%; }
 .field-grid .tag-table-field { width:100%; min-width:0; height:23px; padding:2px 5px; border:1px solid var(--line); border-radius:0; background:var(--panel-2); color:var(--text); font:inherit; }
+.field-grid input.tag-table-field,
+.field-grid .tag-inline-editor input,
+.field-grid .canonical-fold-toggle { min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .field-grid .tag-table-field:focus { border-color:var(--accent); outline:0; }
 .field-grid .tag-table-field:not(:disabled),.field-grid .tag-inline-editor input:not(:disabled) { color:var(--accent); }
 .field-grid .tag-table-field:disabled,.field-grid .tag-inline-editor input:disabled { color:var(--muted); opacity:1; }
@@ -432,14 +435,14 @@ button { cursor:pointer; }
 
 /* Track Tags panes fill the workspace rectangle between the app header and
    the window-level status bar. Each pane owns its scrolling surface. */
-.track-browser-page { grid-template-columns:minmax(0,20%) minmax(0,1fr); height:100%; min-height:0; padding:0; align-items:stretch; overflow:hidden; }
+.track-browser-page { grid-template-columns:33rem minmax(0,1fr); height:100%; min-height:0; padding:0; align-items:stretch; overflow:hidden; }
 .track-browser-pane { min-height:0; align-self:stretch; overflow:hidden; }
 .track-browser-scroll { height:100%; max-height:none; min-height:0; overflow:auto; }
 .track-browser-sidebar,.track-browser-detail { min-height:0; height:100%; }
 .track-browser-sidebar-field-grid { min-width:0; width:100%; padding:2px var(--field-grid-gap); background:var(--panel); }
 .track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row] { cursor:pointer; }
-.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row] { appearance:none; width:auto; margin:0; padding:0; border:0; background:transparent; color:inherit; font:inherit; text-align:left; }
-.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row] .tag-table-field { display:block; border-color:var(--line); background:var(--panel-2); }
+.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row] { width:auto; margin:0; padding:0; }
+.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row] .tag-table-field { display:block; }
 .track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row] .tag-table-field { pointer-events:none; }
 .track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row]:hover .tag-table-field { background:var(--hover); }
 .track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row].selected .tag-table-field { background:var(--selected); }
@@ -451,11 +454,11 @@ button { cursor:pointer; }
 .file-field-grid .multiple-values-popup-trigger { width:100%; min-width:0; }
 
 /* Non-giga structured values use a full-width inserted canonical subtable. */
-.field-grid-subrow { display:grid; grid-template-columns:1fr; grid-template-rows:0fr; width:calc(100% + (2 * var(--field-grid-gap))); min-height:0; max-height:0; margin-left:calc(-1 * var(--field-grid-gap)); overflow:hidden; opacity:0; transition:grid-template-rows var(--ui-motion),max-height var(--ui-motion),opacity var(--ui-motion); }
+.field-grid-subrow { display:grid; grid-template-columns:1fr; grid-template-rows:0fr; width:100%; min-width:0; min-height:0; max-height:0; margin:0; overflow:hidden; opacity:0; transition:grid-template-rows var(--ui-motion),max-height var(--ui-motion),opacity var(--ui-motion); }
 .field-grid-subrow.open { grid-template-rows:1fr; max-height:1200px; opacity:1; }
-.field-grid-subrow > .canonical-subtable-cell { grid-column:1 / -1; width:100%; min-height:0; overflow:hidden; padding:0; align-items:stretch; }
+.field-grid-subrow > .canonical-subtable-cell { grid-column:1 / -1; width:100%; min-height:0; overflow:hidden; padding:0 0 var(--field-grid-gap); align-items:stretch; }
 .canonical-subtable-panel { width:100%; min-width:0; min-height:0; overflow:hidden; border:0; border-radius:0; background:transparent; }
-.canonical-subtable-field-grid { padding:0; }
+.canonical-subtable-field-grid { width:100%; max-width:100%; padding:0 var(--field-grid-gap); }
 
 /* Popup chrome is still canonical table chrome; only the giga surface dims the
    page behind it. The title spans the table while actions remain two cells. */
@@ -493,6 +496,29 @@ button { cursor:pointer; }
 .appbar .appbar-action { width:28px; min-width:28px; height:28px; padding:0; border:1px solid var(--line); border-radius:4px; background:transparent; color:var(--muted); font-size:13px; }
 .appbar .appbar-action:hover:not(:disabled) { color:var(--text); border-color:var(--accent); background:var(--hover); }
 .appbar .appbar-action.primary { color:#fff; border-color:var(--accent); background:var(--accent); }
+
+/* Final shared surface contract. Files keeps its giga-table width, while its
+   frame uses the same full-height inset as Tracks. Track Tags uses the exact
+   canonical row/cell geometry on both sides; only the sidebar width is fixed. */
+.files-page { gap:0; padding:0; }
+.file-table-surface { flex:1 1 auto; min-height:0; }
+.file-field-grid { width:max-content; min-width:1120px; padding:2px var(--field-grid-gap); }
+.file-field-grid .field-grid-header,
+.file-field-grid .file-row { width:100%; min-width:1120px; }
+.file-field-grid .file-row .field-grid-cell { padding:0; }
+.track-browser-page { grid-template-columns:33rem minmax(0,1fr); }
+.track-browser-sidebar-field-grid { --field-grid-columns:4.5rem minmax(0,1fr) 56px; width:100%; min-width:0; padding:2px var(--field-grid-gap); }
+.track-browser-sidebar-field-grid .field-grid-header,
+.track-browser-sidebar-field-grid .field-grid-row { grid-template-columns:var(--field-grid-columns); width:100%; min-width:0; }
+.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row] { cursor:pointer; }
+.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row] .tag-table-field { border-color:var(--line); background:var(--panel-2); }
+.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row]:hover .tag-table-field { background:var(--hover); }
+.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row].selected .tag-table-field { background:var(--selected); }
+.track-browser-detail { width:100%; min-width:0; margin:0; }
+
+@media(max-width:820px) {
+  .track-browser-page { grid-template-columns:1fr; }
+}
 
 @media(max-width:820px) {
   .track-browser-page { grid-template-columns:1fr; height:100%; min-height:0; overflow:hidden; }
