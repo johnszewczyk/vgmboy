@@ -563,3 +563,20 @@ button { cursor:pointer; }
 .multiple-values-popup-card { align-self:stretch; max-height:none; border:1px solid var(--line); border-radius:4px; background:var(--panel); box-shadow:none; }
 .multiple-values-popup-content { flex:1 1 auto; min-height:0; }
 .multiple-values-popup-content > .field-grid { min-height:100%; }
+
+/* Popup tables are centered and content-sized again. The title is a single
+   full-width row; the following canonical header carries the actions in its
+   final two cells. A stable scrollbar gutter keeps Track Tags columns from
+   moving when an inserted child table changes the pane height. */
+.multiple-values-popup-backdrop { align-items:center; }
+.multiple-values-popup-card { align-self:center; width:fit-content; max-width:calc(100vw - 24px); max-height:min(620px,calc(100vh - 24px)); }
+.multiple-values-popup-content { flex:0 1 auto; max-width:100%; overflow:auto; }
+.multiple-values-popup-content > .field-grid { width:max-content; max-width:100%; min-height:0; }
+.canonical-popup-field-grid > .multiple-values-popup-title-row { grid-template-columns:minmax(0,1fr)!important; width:100%; }
+.canonical-popup-field-grid > .multiple-values-popup-title-row .field-grid-cell { grid-column:1 / -1; }
+.canonical-popup-field-grid > .multiple-values-popup-header-row { grid-template-columns:var(--multiple-values-popup-columns)!important; width:100%; }
+.canonical-popup-field-grid > .multiple-values-popup-header-row .field-grid-action-cell { justify-content:flex-end; }
+.track-browser-scroll { scrollbar-gutter:stable; }
+.track-browser-field-grid { --track-tags-columns:var(--canonical-number-column) 110px minmax(160px,1fr) minmax(220px,1.5fr) 28px 28px; }
+.track-browser-field-grid > .field-grid-header,
+.track-browser-field-grid > .field-grid-row:not(.inserted-table-row) { grid-template-columns:var(--track-tags-columns)!important; }
