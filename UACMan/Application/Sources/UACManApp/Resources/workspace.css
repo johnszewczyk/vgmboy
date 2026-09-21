@@ -119,6 +119,12 @@ button { cursor:pointer; }
 .section-title { display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; }
 .section-title > span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .section-help { color:var(--muted); font-size:9px; white-space:nowrap; }
+.tag-create-form { display:grid; grid-template-columns:9rem 7rem minmax(110px,1fr) minmax(140px,1.2fr) 28px; column-gap:var(--field-grid-gap); align-items:center; width:100%; min-width:0; margin:0 0 8px; padding:2px var(--field-grid-gap); border:1px solid var(--line); border-radius:4px; background:var(--panel); font:10px/1.15 ui-monospace,SFMono-Regular,Menlo,monospace; }
+.tag-create-form > * { min-width:0; }
+.tag-create-form .tag-table-field { height:23px; color:var(--accent); }
+.tag-create-label { color:var(--muted); font-weight:650; }
+.tag-create-type { color:var(--muted); }
+.tag-create-submit { justify-self:center; width:23px; height:23px; border:1px solid var(--line); border-radius:3px; }
 .tag-create-row { min-height:27px; align-items:center; background:var(--panel); }
 .tag-create-row .field-grid-cell { min-width:0; }
 .tag-create-row .tag-table-field { height:23px; color:var(--accent); }
@@ -426,7 +432,7 @@ button { cursor:pointer; }
 
 /* Track Tags panes fill the workspace rectangle between the app header and
    the window-level status bar. Each pane owns its scrolling surface. */
-.track-browser-page { height:100%; min-height:0; padding:0; align-items:stretch; overflow:hidden; }
+.track-browser-page { grid-template-columns:minmax(0,20%) minmax(0,1fr); height:100%; min-height:0; padding:0; align-items:stretch; overflow:hidden; }
 .track-browser-pane { min-height:0; align-self:stretch; overflow:hidden; }
 .track-browser-scroll { height:100%; max-height:none; min-height:0; overflow:auto; }
 .track-browser-sidebar,.track-browser-detail { min-height:0; height:100%; }
@@ -445,7 +451,7 @@ button { cursor:pointer; }
 .file-field-grid .multiple-values-popup-trigger { width:100%; min-width:0; }
 
 /* Non-giga structured values use a full-width inserted canonical subtable. */
-.field-grid-subrow { display:grid; grid-template-columns:1fr; grid-template-rows:0fr; min-height:0; max-height:0; overflow:hidden; opacity:0; transition:grid-template-rows var(--ui-motion),max-height var(--ui-motion),opacity var(--ui-motion); }
+.field-grid-subrow { display:grid; grid-template-columns:1fr; grid-template-rows:0fr; width:calc(100% + (2 * var(--field-grid-gap))); min-height:0; max-height:0; margin-left:calc(-1 * var(--field-grid-gap)); overflow:hidden; opacity:0; transition:grid-template-rows var(--ui-motion),max-height var(--ui-motion),opacity var(--ui-motion); }
 .field-grid-subrow.open { grid-template-rows:1fr; max-height:1200px; opacity:1; }
 .field-grid-subrow > .canonical-subtable-cell { grid-column:1 / -1; width:100%; min-height:0; overflow:hidden; padding:0; align-items:stretch; }
 .canonical-subtable-panel { width:100%; min-width:0; min-height:0; overflow:hidden; border:0; border-radius:0; background:transparent; }
