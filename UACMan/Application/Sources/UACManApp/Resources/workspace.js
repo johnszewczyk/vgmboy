@@ -93,7 +93,10 @@
   const multipleValuesCloseMarkup = context => context.foldID
     ? `<button class="icon-button multiple-values-subtable-close" data-action="closeCanonicalSubtable" data-fold-id="${esc(context.foldID)}" type="button" title="Close values table" aria-label="Close values table">×</button>`
     : `<button class="icon-button multiple-values-popup-close" data-action="closeMultipleValuesPopup" data-popup-id="${esc(context.popupID || "")}" type="button" title="Close" aria-label="Close">×</button>`;
-  const multipleValuesTitleRowMarkup = (context, editable) => `<div class="field-grid-row multiple-values-title-row" role="row"><div class="field-grid-cell multiple-values-title-cell" role="cell"><strong>Multiple Values</strong></div><div class="field-grid-cell multiple-values-toolbar-cell" role="cell">${editable ? '<button class="icon-button" data-action="addMultipleValue" type="button" title="Add value" aria-label="Add value">＋</button><button class="icon-button" data-action="commitMultipleValues" type="button" title="Submit changed values" aria-label="Submit changed values">✓</button>' : ""}${multipleValuesCloseMarkup(context)}</div></div>`;
+  const multipleValuesTitleRowMarkup = (context, editable) => {
+    const title = context.title || context.key || "Values";
+    return `<div class="field-grid-row multiple-values-title-row" role="row"><div class="field-grid-cell multiple-values-title-cell" role="cell"><strong>${esc(title)}</strong></div><div class="field-grid-cell multiple-values-title-spacer" role="cell"></div><div class="field-grid-cell multiple-values-toolbar-cell" role="cell">${editable ? '<button class="icon-button" data-action="addMultipleValue" type="button" title="Add value" aria-label="Add value">＋</button><button class="icon-button" data-action="commitMultipleValues" type="button" title="Submit changed values" aria-label="Submit changed values">✓</button>' : ""}${multipleValuesCloseMarkup(context)}</div></div>`;
+  };
   const multipleValuesHeaderMarkup = editable => `<div class="field-grid-row field-grid-header" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Key" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Value" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${editable ? "×" : ""}" aria-label="${editable ? "Remove" : "Actions"}" disabled></div></div>`;
   const multipleValuesEditorBodyMarkup = (value, context = {}) => {
     const isArray = Array.isArray(value);
@@ -151,6 +154,7 @@
   };
   const multipleValuesPopupParts = (value, context = {}, options = {}) => {
     const popupID = context.popupID || "multiple-values";
+    const title = context.title || context.key || "Values";
     const isEditor = options.editable === true;
     const entries = options.entries || (Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value || {}));
     const editor = isEditor ? multipleValuesEditorBodyMarkup(value, { ...context, layout:"canonical" }) : null;
@@ -158,7 +162,7 @@
       ? `<div class="editable-multiple-values">${editor.body}</div>`
       : multipleValuesReadOnlyTableMarkup(entries, { ...context, layout:"canonical" });
     const trigger = `<button class="canonical-fold-toggle canonical-fold-trigger multiple-values-popup-trigger" type="button" data-action="toggleMultipleValuesPopup" data-popup-id="${esc(popupID)}" aria-controls="multiple-values-popup-${esc(popupID)}" aria-expanded="false"><span>Multiple Values</span><span class="canonical-fold-icon">＋</span></button>`;
-    const popup = `<div class="multiple-values-popup-backdrop" id="multiple-values-popup-${esc(popupID)}" data-multiple-values-popup="${esc(popupID)}" hidden><div class="multiple-values-popup-card" role="dialog" aria-modal="true" aria-label="Multiple Values"><div class="multiple-values-popup-content">${body}</div></div></div>`;
+    const popup = `<div class="multiple-values-popup-backdrop" id="multiple-values-popup-${esc(popupID)}" data-multiple-values-popup="${esc(popupID)}" hidden><div class="multiple-values-popup-card" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="multiple-values-popup-content">${body}</div></div></div>`;
     return { trigger, popup };
   };
   const metadataSortValue = (member, key) => {

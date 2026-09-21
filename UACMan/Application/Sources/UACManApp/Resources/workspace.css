@@ -316,15 +316,16 @@ button { cursor:pointer; }
 .field-grid-subrow { grid-template-columns:1fr; grid-template-rows:0fr; min-height:0; max-height:none; overflow:hidden; opacity:0; align-items:stretch; transition:grid-template-rows var(--ui-motion),opacity var(--ui-motion); }
 .field-grid-subrow.open { grid-template-rows:1fr; max-height:none; opacity:1; }
 .field-grid-subrow > .canonical-subtable-cell { min-height:0; overflow:hidden; }
-.canonical-subtable-panel { width:min(760px,100%); min-width:0; min-height:0; overflow:hidden; border:1px solid var(--line); background:var(--panel); }
+.canonical-subtable-panel { width:min(760px,100%); min-width:0; min-height:0; overflow:hidden; border:0; background:transparent; }
 .canonical-subtable-panel .multiple-values-editor { width:100%; padding:0; }
 .canonical-subtable-field-grid { --field-grid-columns:minmax(110px,.7fr) minmax(180px,1.3fr) 28px; min-width:520px; width:100%; padding:2px var(--field-grid-gap); }
 .canonical-subtable-field-grid .field-grid-row { grid-template-columns:var(--field-grid-columns); width:auto; }
 .canonical-multiple-values-grid .multiple-values-rows { display:flex; flex-direction:column; }
-.multiple-values-title-row { min-height:27px; align-items:center; background:var(--panel); }
-.multiple-values-title-cell { grid-column:1 / span 2; min-height:27px; padding:0 5px; color:var(--text); }
-.multiple-values-title-cell strong { font-size:9px; font-weight:650; letter-spacing:.04em; text-transform:uppercase; }
-.multiple-values-toolbar-cell { grid-column:3; justify-content:flex-end; gap:2px; padding:0 2px; }
+.multiple-values-title-row { min-height:27px; align-items:center; background:transparent; }
+.multiple-values-title-row .field-grid-cell { min-height:27px; }
+.multiple-values-title-cell { padding:0 5px; color:var(--text); }
+.multiple-values-title-cell strong { font-size:9px; font-weight:650; letter-spacing:.04em; }
+.multiple-values-toolbar-cell { justify-content:flex-end; gap:2px; padding:0 2px; }
 .multiple-values-toolbar-cell .icon-button { width:22px; height:22px; padding:0; }
 .multiple-values-toolbar-cell .multiple-values-popup-close,
 .multiple-values-toolbar-cell .multiple-values-subtable-close { color:var(--muted); }
@@ -337,6 +338,8 @@ button { cursor:pointer; }
 .canonical-multiple-values-grid .tag-table-field:disabled { color:var(--muted); }
 .canonical-multiple-values-grid textarea.tag-table-field { min-height:42px; resize:vertical; white-space:pre-wrap; }
 .canonical-multiple-values-editor .multiple-values-editor-error { padding:1px 4px 0; }
+.multiple-values-popup-card { border:0; border-radius:0; background:transparent; box-shadow:1px 1px 1px #0008; }
+.multiple-values-popup-content { background:transparent; }
 @media(max-width:820px) {
   .main-view-tabs .member-search { width:30vw; min-width:120px; flex-basis:30vw; }
 }
