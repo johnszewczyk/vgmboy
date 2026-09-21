@@ -33,17 +33,19 @@ text in a popup. Aggregate rows with different structured values remain
 read-only until a single value is unambiguous.
 
 The workspace has four explicit pages in this order: **Files**, **Pack Tags**,
-**Tracks**, and **Track Tags**. **Tracks** is the wide canonical
+**Tracks**, and **Track Tags**. Sub-pages keep their identity in the compact
+app header and do not add a second page heading. **Tracks** is the wide canonical
 array-style field grid: every header and value is a boxed field, and its
 horizontal scroll belongs to the workspace surface rather than a nested table
 window. **Files** lists every stored package member, including playable streams,
 artwork, cue sheets, and documentation. Its filename field edits the
 manifest's displayed/original filename while the stored TAR path remains
 immutable. Each row's **Tags** column is a numeric count. The **Track Tags** page
-provides a file selector sidebar and an exhaustive canonical table for editing
-that file's metadata/extensions; structured values slide down as full-width,
-left-aligned child tables inserted beneath the source row, without indenting the
-parent table. **Pack Tags** contains package-level metadata and all attachments
+provides a canonical table sidebar and an exhaustive canonical table for editing
+that file's metadata/extensions; the sidebar uses the same cells and geometry,
+has no extra inset padding, and has no separate new-tag form. Structured values
+slide down as full-width, left-aligned child tables inserted beneath the source
+row, without indenting the parent table. **Pack Tags** contains package-level metadata and all attachments
 using the same field-grid cells, with the same add interface as the tag
 workspace. Pack Tags and the selected-file Track Tags table use the inserted
 child-table treatment; the master Tracks grid uses the centered text popup
@@ -70,10 +72,14 @@ or JSON field, and removing a row removes that manifest field. A centered
 Multiple Values popup
 **Open JSON editor** escape hatch remains available for advanced or nested
 edits. Pack Tags and the selected-file Track Tags table use canonical child
-subtables inserted at the parent table's level, while the wide Tracks grid uses
-a plain centered text popup for structured values so nested JSON cannot change
-the giga-table's row geometry. Native macOS title-bar controls remain visible
-for the UACMan window.
+subtables inserted at the parent table's level. Each child table has the same
+key/value/✓/× action columns as its parent: the header ✓ submits all current
+rows, each row ✓ submits the edited structured value, and the header × closes
+the child table. The wide Tracks grid uses a plain centered editable JSON
+popup for structured values so nested JSON cannot change the giga-table's row
+geometry; malformed JSON is rejected without closing or submitting the popup.
+The table headers are ordinary rows rather than sticky overlays. Native macOS
+title-bar controls remain visible for the UACMan window.
 An aggregate row is read-only when it combines
 different source values. Save reopens and
 verifies the wrapper, then preserves the compressed payload byte-for-byte.

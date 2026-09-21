@@ -117,9 +117,17 @@
       : '<input class="tag-table-field field-grid-heading-input" value="" aria-label="Actions" disabled>';
     return `<div class="field-grid-row field-grid-header multiple-values-title-row" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader">${submitMarkup}</div><div class="field-grid-cell field-grid-heading" role="columnheader">${multipleValuesCloseMarkup(context)}</div></div>`;
   };
+  const multipleValuesSubtableTitleRowMarkup = (context, editable) => {
+    const title = context.title || context.key || "Values";
+    const submitMarkup = editable
+      ? '<button class="tag-table-field field-grid-heading-input multiple-values-header-action" data-action="commitMultipleValues" type="button" title="Submit all changed values" aria-label="Submit all changed values">✓</button>'
+      : '<input class="tag-table-field field-grid-heading-input" value="" aria-label="Submit" disabled>';
+    return `<div class="field-grid-row field-grid-header multiple-values-title-row" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Value" aria-label="Value" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader">${submitMarkup}</div><div class="field-grid-cell field-grid-heading" role="columnheader">${multipleValuesCloseMarkup(context)}</div></div>`;
+  };
   const multipleValuesEditorBodyMarkup = (value, context = {}) => {
     const isArray = Array.isArray(value);
     const canonicalLayout = context.layout === "canonical" || context.layout === "subtable";
+    const subtableLayout = context.layout === "subtable";
     const gridClass = context.layout === "subtable" ? "canonical-subtable-field-grid" : "canonical-popup-field-grid";
     const entries = isArray ? value.map((item, index) => [String(index), item]) : Object.entries(value || {});
     const rowMarkup = ([key, item]) => {
@@ -131,8 +139,9 @@
       const rowClass = canonicalLayout ? "field-grid-row multiple-value-editor-row" : "tag-multiple-value-row multiple-value-editor-row";
       const keyMarkup = `<input class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-key" data-multiple-key value="${esc(key)}" aria-label="Key for ${esc(key)}"${isArray ? " disabled" : ""}>`;
       const removeMarkup = `<button class="icon-button danger multiple-value-remove" data-action="removeMultipleValue" type="button" title="Remove value" aria-label="Remove value">×</button>`;
+      const submitMarkup = subtableLayout ? '<button class="icon-button multiple-value-submit" data-action="commitMultipleValueRow" type="button" title="Submit changed value" aria-label="Submit changed value">✓</button>' : "";
       return canonicalLayout
-        ? `<div class="${rowClass}" data-multiple-entry data-multiple-kind="${kind}"><div class="field-grid-cell">${keyMarkup}</div><div class="field-grid-cell">${valueControl}</div><div class="field-grid-cell field-grid-action-cell">${removeMarkup}</div></div>`
+        ? `<div class="${rowClass}" data-multiple-entry data-multiple-kind="${kind}"><div class="field-grid-cell">${keyMarkup}</div><div class="field-grid-cell">${valueControl}</div>${subtableLayout ? `<div class="field-grid-cell field-grid-action-cell">${submitMarkup}</div>` : ""}<div class="field-grid-cell field-grid-action-cell">${removeMarkup}</div></div>`
         : `<div class="${rowClass}" data-multiple-entry data-multiple-kind="${kind}">${keyMarkup}${valueControl}${removeMarkup}</div>`;
     };
     const rows = entries.map(rowMarkup).join("");
@@ -140,13 +149,13 @@
       `data-multiple-editor`,
       `data-multiple-target="${esc(context.target || "member")}"`,
       `data-multiple-array="${isArray}"`,
-      `data-multiple-layout="${canonicalLayout ? "canonical" : "compact"}"`,
+      `data-multiple-layout="${subtableLayout ? "subtable" : canonicalLayout ? "canonical" : "compact"}"`,
       `data-multiple-path="${esc(context.path || "")}"`,
       `data-multiple-scope="${esc(context.scope || "")}"`,
       `data-multiple-key="${esc(context.key || "")}"`
     ].join(" ");
     const rowsMarkup = canonicalLayout
-      ? `<div class="field-grid ${gridClass} canonical-multiple-values-grid" role="table">${multipleValuesTitleRowMarkup(context, true)}<div class="multiple-values-rows">${rows || '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'}</div></div>`
+      ? `<div class="field-grid ${gridClass} canonical-multiple-values-grid" role="table">${subtableLayout ? multipleValuesSubtableTitleRowMarkup(context, true) : multipleValuesTitleRowMarkup(context, true)}<div class="multiple-values-rows">${rows || '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'}</div></div>`
       : `<div class="multiple-values-rows">${rows || '<div class="file-tag-empty multiple-values-empty">No values</div>'}</div>`;
     const body = `<div class="multiple-values-editor${canonicalLayout ? " canonical-multiple-values-editor" : ""}" ${data}>${rowsMarkup}${canonicalLayout ? "" : '<div class="multiple-values-editor-actions"><button class="icon-button" data-action="addMultipleValue" type="button" title="Add value" aria-label="Add value">＋</button><button class="icon-button" data-action="commitMultipleValues" type="button" title="Submit changed values" aria-label="Submit changed values">✓</button>'}<div class="multiple-values-editor-error" role="status"></div></div>`;
     return { body, count:entries.length };
@@ -159,9 +168,10 @@
   const multipleValuesReadOnlyTableMarkup = (entries, context = {}) => {
     const gridClass = context.layout === "subtable" ? "canonical-subtable-field-grid" : "canonical-popup-field-grid";
     const rows = entries.length
-      ? entries.map(([key, item]) => `<div class="field-grid-row multiple-value-readonly-row" role="row"><div class="field-grid-cell"><input class="tag-table-field" value="${esc(key)}" disabled></div><div class="field-grid-cell"><input class="tag-table-field" value="${esc(typeof item === "object" ? JSON.stringify(item) : String(item ?? "—"))}" disabled></div><div class="field-grid-cell"></div></div>`).join("")
+      ? entries.map(([key, item]) => `<div class="field-grid-row multiple-value-readonly-row" role="row"><div class="field-grid-cell"><input class="tag-table-field" value="${esc(key)}" disabled></div><div class="field-grid-cell"><input class="tag-table-field" value="${esc(typeof item === "object" ? JSON.stringify(item) : String(item ?? "—"))}" disabled></div><div class="field-grid-cell"></div><div class="field-grid-cell"></div></div>`).join("")
       : '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>';
-    return `<div class="field-grid ${gridClass} canonical-multiple-values-grid" role="table">${multipleValuesTitleRowMarkup(context, false)}<div class="multiple-values-rows">${rows}</div></div>`;
+    const titleRow = context.layout === "subtable" ? multipleValuesSubtableTitleRowMarkup(context, false) : multipleValuesTitleRowMarkup(context, false);
+    return `<div class="field-grid ${gridClass} canonical-multiple-values-grid" role="table">${titleRow}<div class="multiple-values-rows">${rows}</div></div>`;
   };
   const multipleValuesSubtableMarkup = (value, context = {}, options = {}) => {
     const entries = options.entries || (Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value || {}));
@@ -177,9 +187,9 @@
     const text = value !== null && value !== undefined
       ? JSON.stringify(value, null, 2)
       : JSON.stringify(entries.map(([key, item]) => ({ key, value:item })), null, 2);
-    const body = `<div class="multiple-values-popup-text-wrap"><pre class="multiple-values-text" tabindex="0">${esc(text || "")}</pre></div>`;
+    const body = `<div class="multiple-values-popup-text-wrap"><textarea class="multiple-values-text" data-multiple-popup-text aria-label="JSON value">${esc(text || "")}</textarea><div class="multiple-values-popup-error" role="status"></div></div>`;
     const trigger = `<button class="canonical-fold-toggle canonical-fold-trigger multiple-values-popup-trigger" type="button" data-action="toggleMultipleValuesPopup" data-popup-id="${esc(popupID)}" aria-controls="multiple-values-popup-${esc(popupID)}" aria-expanded="false"><span>Multiple Values</span><span class="canonical-fold-icon">＋</span></button>`;
-    const popup = `<div class="multiple-values-popup-backdrop" id="multiple-values-popup-${esc(popupID)}" data-multiple-values-popup="${esc(popupID)}" hidden><div class="multiple-values-popup-card" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="multiple-values-popup-content"><div class="field-grid canonical-popup-field-grid canonical-multiple-values-grid" role="table">${multipleValuesTitleRowMarkup({ ...context, popupID, title }, false)}${body}</div></div></div></div>`;
+    const popup = `<div class="multiple-values-popup-backdrop" id="multiple-values-popup-${esc(popupID)}" data-multiple-values-popup="${esc(popupID)}" data-multiple-target="${esc(context.target || "member")}" data-multiple-path="${esc(context.path || "")}" data-multiple-scope="${esc(context.scope || "")}" data-multiple-key="${esc(context.key || "")}" hidden><div class="multiple-values-popup-card" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="multiple-values-popup-content"><div class="field-grid canonical-popup-field-grid canonical-multiple-values-grid" role="table">${multipleValuesTitleRowMarkup({ ...context, popupID, title }, true)}${body}</div></div></div></div>`;
     return { trigger, popup };
   };
   const metadataSortValue = (member, key) => {
@@ -450,7 +460,7 @@
     const header = `<div class="field-grid-row field-grid-header" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="#" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Tag Type" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Tag Name" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Tag Value" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Uses" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="✓" aria-label="Submit" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="×" aria-label="Delete" disabled></div></div>`;
     const grid = (title, rows, scope) => `<section class="tag-scope-table"><div class="section-title"><span>${title}</span><form class="tag-create-form" data-tag-create data-tag-scope="${scope}"><input data-new-tag-key placeholder="Tag Name" aria-label="New tag name"><input data-new-tag-value placeholder="New tag value" aria-label="New tag value"><button class="icon-button add-tag-submit" type="submit" title="Add tag" aria-label="Add tag">✓</button></form></div><div class="data-table-scroll"><div class="field-grid meta-field-grid" role="table" aria-label="${title}">${header}${rows || '<div class="field-grid-empty" role="row"><span role="cell">No tags</span>'}</div></div></section>`;
     const table = rowsFor(scope);
-    return `<section class="data-page schema-page"><div class="data-page-heading"><div><h2>${esc(title)}</h2><p>${scope === "Package" ? "Package-level fields and attachments. Scalar values stay in the canonical grid; structured values slide open as aligned child rows." : "Track-level tag vocabulary across playable members. Scalar values stay in the canonical grid; structured values slide open as aligned child rows."}</p></div><span class="data-page-count">${table.rows ? table.rows.split("data-tag-row").length - 1 : 0} fields</span></div>${grid(title, table.rows, scope === "Package" ? "package" : "tracks")}${includeAttachments ? renderAttachments() : ""}</section>`;
+    return `<section class="data-page schema-page">${grid(title, table.rows, scope === "Package" ? "package" : "tracks")}${includeAttachments ? renderAttachments() : ""}</section>`;
   }
 
   function renderPackTagsPage() { return renderTagScopePage("Pack Tags", "Package", true); }
@@ -553,8 +563,7 @@
       return `<div class="field-grid-row track-browser-row" role="row" data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"${foldAttribute}><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-scope" value="${entry.scope === "memberExtensions" ? "extension" : "metadata"}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name"></div><div class="field-grid-cell track-browser-value-cell" role="cell">${valueMarkup}</div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitFileTag" title="Submit changed tag" aria-label="Submit changed tag">✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteFileTag" title="Delete tag" aria-label="Delete tag">×</button></div></div>${subrow}`;
     }).join("");
     const empty = '<div class="field-grid-empty" role="row"><span role="cell">No tags on this file</span></div>';
-    const form = `<form class="file-tag-create-form track-browser-create-form" data-file-tag-create data-file-tag-path="${esc(member.path)}"><select data-file-tag-scope aria-label="Tag namespace"><option value="memberMetadata">metadata</option><option value="memberExtensions">extension</option></select><input data-file-tag-key placeholder="Tag name" aria-label="New file tag name"><input data-file-tag-value placeholder="Value" aria-label="New file tag value"><button class="icon-button" type="submit" title="Add tag" aria-label="Add tag">✓</button></form>`;
-    return `<div class="track-browser-table-wrap"><div class="field-grid canonical-field-grid track-browser-field-grid" role="table" aria-label="Tags for ${esc(member.name)}">${header}${rows || empty}</div>${form}</div>`;
+    return `<div class="track-browser-table-wrap"><div class="field-grid canonical-field-grid track-browser-field-grid" role="table" aria-label="Tags for ${esc(member.name)}">${header}${rows || empty}</div></div>`;
   }
 
   function renderTrackPage() {
@@ -586,7 +595,7 @@
     const preview = state.filePreviewPath
       ? `<section class="file-preview" aria-label="Bundled file preview"><div class="file-preview-heading"><div><strong>${esc(state.filePreviewName || "Bundled file")}</strong><span>${esc(state.filePreviewPath)}</span></div><button class="icon-button" data-action="closeFilePreview" title="Close preview" aria-label="Close preview">×</button></div>${state.filePreviewError ? `<div class="file-preview-error">${esc(state.filePreviewError)}</div>` : `<pre class="file-preview-content">${esc(state.filePreviewContent)}</pre>${state.filePreviewTruncated ? '<div class="file-preview-note">Preview limited to the first 4 MiB. The bundled file remains unchanged.</div>' : ""}`}</section>`
       : "";
-    return `<section class="data-page files-page"><div class="data-page-heading"><div><h2>Files</h2><p>Every stored package member, including playable tracks, artwork, cues, and documents. Rename the displayed filename, preview text files, or choose Track to edit exhaustive per-file tags.</p></div><span class="data-page-count">${members.length} of ${state.members.length} members</span></div><div class="field-grid file-field-grid" role="table" aria-label="Package files"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div><p class="file-edit-note">Stored paths and payload members stay immutable so metadata saves preserve the compressed UAC payload byte-for-byte.</p>${preview}</section>`;
+    return `<section class="data-page files-page"><div class="field-grid file-field-grid" role="table" aria-label="Package files"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div><p class="file-edit-note">Stored paths and payload members stay immutable so metadata saves preserve the compressed UAC payload byte-for-byte.</p>${preview}</section>`;
   }
 
   function renderAttachments() {
@@ -599,17 +608,13 @@
 
   function renderInspector() {
     const hasPackage = Boolean(state.documentName);
-    const member = state.members.find(item => item.path === state.selectedMemberPath);
     const inspector = $("#inspector-content");
     inspector.className = `inspector-content${mainView === "trackBrowser" ? " track-browser-inspector" : ""}`;
     if (!hasPackage) {
       inspector.innerHTML = `<div class="metadata-empty"><div class="empty-icon">⌁</div><h3>Open a package to edit metadata</h3><p>Choose a collection entry or open a UAC file.</p></div>`;
       return;
     }
-    const title = member?.title || member?.name || "Package metadata";
-    const pageTitle = ["files", "packTags", "trackBrowser"].includes(mainView) ? state.packageTitle || state.packageID : title;
-    const eyebrow = mainView === "files" ? "FILES" : mainView === "trackBrowser" ? "TRACK TAGS" : mainView === "packTags" ? "PACK TAGS" : "PACKAGE";
-    let html = `<div class="inspector-head"><div class="inspector-title-row"><div><span class="eyebrow">${eyebrow}</span><h2>${esc(pageTitle)}</h2></div></div><div class="inspector-sub">${esc(state.packageID)}</div></div>`;
+    let html = "";
     if (mainView === "files") html += renderFilesPage();
     else if (mainView === "packTags") html += renderPackTagsPage();
     else if (mainView === "trackBrowser") html += renderTrackPage();
@@ -693,7 +698,8 @@
     const rows = $(".multiple-values-rows", editor);
     if (!rows) return;
     const isArray = editor.dataset.multipleArray === "true";
-    const canonicalLayout = editor.dataset.multipleLayout === "canonical";
+    const canonicalLayout = ["canonical", "subtable"].includes(editor.dataset.multipleLayout);
+    const subtableLayout = editor.dataset.multipleLayout === "subtable";
     $(".multiple-values-empty", rows)?.remove();
     const row = document.createElement("div");
     row.className = canonicalLayout ? "field-grid-row multiple-value-editor-row" : "tag-multiple-value-row multiple-value-editor-row";
@@ -701,9 +707,10 @@
     row.dataset.multipleKind = "string";
     const keyMarkup = `<input class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-key" data-multiple-key value="" aria-label="New value key"${isArray ? " disabled" : ""}>`;
     const valueMarkup = `<input class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-editor" data-multiple-value value="" aria-label="New value">`;
+    const submitMarkup = subtableLayout ? '<button class="icon-button multiple-value-submit" data-action="commitMultipleValueRow" type="button" title="Submit changed value" aria-label="Submit changed value">✓</button>' : "";
     const removeMarkup = `<button class="icon-button danger multiple-value-remove" data-action="removeMultipleValue" type="button" title="Remove value" aria-label="Remove value">×</button>`;
     row.innerHTML = canonicalLayout
-      ? `<div class="field-grid-cell">${keyMarkup}</div><div class="field-grid-cell">${valueMarkup}</div><div class="field-grid-cell field-grid-action-cell">${removeMarkup}</div>`
+      ? `<div class="field-grid-cell">${keyMarkup}</div><div class="field-grid-cell">${valueMarkup}</div>${subtableLayout ? `<div class="field-grid-cell field-grid-action-cell">${submitMarkup}</div>` : ""}<div class="field-grid-cell field-grid-action-cell">${removeMarkup}</div>`
       : `${keyMarkup}${valueMarkup}${removeMarkup}`;
     rows.append(row);
     $("[data-multiple-key]", row)?.focus();
@@ -714,11 +721,15 @@
     if (!row || !editor) return;
     row.remove();
     const rows = $(".multiple-values-rows", editor);
-    if (rows && !$("[data-multiple-entry]", rows)) rows.innerHTML = '<div class="file-tag-empty multiple-values-empty">No values</div>';
+    if (rows && !$("[data-multiple-entry]", rows)) {
+      rows.innerHTML = editor.dataset.multipleLayout === "subtable"
+        ? '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'
+        : '<div class="file-tag-empty multiple-values-empty">No values</div>';
+    }
   }
 
-  function commitMultipleValues(editor) {
-    if (!editor) return;
+  function collectMultipleValues(editor) {
+    if (!editor) return null;
     const error = $(".multiple-values-editor-error", editor);
     const isArray = editor.dataset.multipleArray === "true";
     const result = isArray ? [] : {};
@@ -728,12 +739,12 @@
       if (!isArray && !key) {
         if (error) error.textContent = "Keys cannot be empty.";
         $("[data-multiple-key]", row)?.focus();
-        return;
+        return null;
       }
       if (!isArray && seenKeys.has(key)) {
         if (error) error.textContent = "Keys must be unique.";
         $("[data-multiple-key]", row)?.focus();
-        return;
+        return null;
       }
       seenKeys.add(key);
       const raw = $("[data-multiple-value]", row)?.value ?? "";
@@ -743,11 +754,17 @@
       } catch {
         if (error) error.textContent = `Invalid JSON value for “${key || "value"}”.`;
         $("[data-multiple-value]", row)?.focus();
-        return;
+        return null;
       }
     }
     if (error) error.textContent = "";
-    const valueJSON = JSON.stringify(result);
+    return { result, valueJSON:JSON.stringify(result) };
+  }
+
+  function commitMultipleValues(editor) {
+    const collected = collectMultipleValues(editor);
+    if (!editor || !collected) return;
+    const { valueJSON } = collected;
     const tagRow = editor.closest("[data-tag-row]");
     const fileRow = editor.closest("[data-file-tag-row]");
     if (editor.dataset.multipleTarget === "metadata") {
@@ -762,6 +779,45 @@
       markTrackDirty(path);
       bridge("commitMemberTag", { path, scope:editor.dataset.multipleScope || fileRow?.dataset.fileTagScope || "memberMetadata", key, newKey, value:"", valueJSON });
     }
+  }
+
+  function commitMultipleValueRow(row) {
+    const editor = row?.closest("[data-multiple-editor]");
+    if (!row || !editor) return;
+    const error = $(".multiple-values-editor-error", editor);
+    const key = editor.dataset.multipleArray === "true" ? "value" : $("[data-multiple-key]", row)?.value.trim() || "value";
+    try {
+      coerceValue($("[data-multiple-value]", row)?.value ?? "", row.dataset.multipleKind || "string");
+    } catch {
+      if (error) error.textContent = `Invalid JSON value for “${key}”.`;
+      $("[data-multiple-value]", row)?.focus();
+      return;
+    }
+    commitMultipleValues(editor);
+  }
+
+  function commitMultipleValuesPopup(popup) {
+    const textarea = $("[data-multiple-popup-text]", popup);
+    const error = $(".multiple-values-popup-error", popup);
+    if (!textarea) return;
+    let value;
+    try {
+      value = JSON.parse(textarea.value);
+    } catch {
+      if (error) error.textContent = "Invalid JSON. Correct the value before submitting.";
+      textarea.focus();
+      return;
+    }
+    if (error) error.textContent = "";
+    const key = popup.dataset.multipleKey || "";
+    if (popup.dataset.multipleTarget === "metadata") {
+      bridge("commitMetadataRow", { key, newKey:key, scope:popup.dataset.multipleScope || "", value:null, valueJSON:JSON.stringify(value) });
+    } else {
+      const path = popup.dataset.multiplePath || "";
+      markTrackDirty(path);
+      bridge("commitMemberTag", { path, scope:popup.dataset.multipleScope || "memberMetadata", key, newKey:key, value:"", valueJSON:JSON.stringify(value) });
+    }
+    closeMultipleValuesPopup(popup);
   }
 
   function multipleValuesEditorForRow(row) {
@@ -880,7 +936,12 @@
     }
     else if (action === "addMultipleValue") addMultipleValue(event.target.closest("[data-multiple-editor]"));
     else if (action === "removeMultipleValue") removeMultipleValue(event.target.closest("[data-multiple-entry]"));
-    else if (action === "commitMultipleValues") commitMultipleValues(event.target.closest("[data-multiple-editor]"));
+    else if (action === "commitMultipleValueRow") commitMultipleValueRow(event.target.closest("[data-multiple-entry]"));
+    else if (action === "commitMultipleValues") {
+      const popup = event.target.closest("[data-multiple-values-popup]");
+      if (popup) commitMultipleValuesPopup(popup);
+      else commitMultipleValues(event.target.closest("[data-multiple-editor]"));
+    }
     else if (action === "toggleMultipleValuesPopup") toggleMultipleValuesPopup(event.target.closest("[data-action=toggleMultipleValuesPopup]")?.dataset.popupId || "", event.target.closest("[data-action=toggleMultipleValuesPopup]"));
     else if (action === "closeMultipleValuesPopup") closeMultipleValuesPopup(event.target.closest("[data-multiple-values-popup]"));
     else if (action === "closeCanonicalSubtable") closeCanonicalSubtable(event.target.closest("[data-action=closeCanonicalSubtable]"));
@@ -967,11 +1028,6 @@
       bridge("addMetadataKey", { key:titleCaseTagName($('[data-new-tag-key]', form)?.value || ""), scope:form.dataset.tagScope || "package", value:$('[data-new-tag-value]', form)?.value || "" });
       return;
     }
-    const fileForm = event.target.closest("[data-file-tag-create]");
-    if (!fileForm) return;
-    event.preventDefault();
-    markTrackDirty(fileForm.dataset.fileTagPath || "");
-    bridge("addMemberTag", { path:fileForm.dataset.fileTagPath || "", scope:$('[data-file-tag-scope]', fileForm)?.value || "memberMetadata", key:titleCaseTagName($('[data-file-tag-key]', fileForm)?.value || ""), value:$('[data-file-tag-value]', fileForm)?.value || "" });
   });
 
   document.addEventListener("change", event => {
