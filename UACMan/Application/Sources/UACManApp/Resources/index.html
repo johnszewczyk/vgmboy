@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none';">
   <title>UACMan</title>
-  <link rel="stylesheet" href="workspace.css?v=20260920-viewer-grid-v1">
-  <script src="workspace.js?v=20260920-viewer-grid-v1" defer></script>
+  <link rel="stylesheet" href="workspace.css?v=20260921-header-panes-v1">
+  <script src="workspace.js?v=20260921-header-panes-v1" defer></script>
 </head>
 <body>
   <header class="appbar">
-    <div class="brand"><div class="brand-mark">U</div><strong>UACMan</strong></div>
-    <div class="document-heading"><strong id="document-name">No package open</strong><span id="document-path">Choose a collection or open one UAC file</span></div>
+    <nav class="main-view-tabs app-nav" aria-label="Package workspace"><div class="tab-buttons"><button data-action="mainView" data-view="files" id="files-view-button">Files</button><button data-action="mainView" data-view="packTags" id="pack-tags-view-button">Pack Tags</button><button data-action="mainView" data-view="members" id="members-view-button" class="active">Tracks</button><button data-action="mainView" data-view="trackBrowser" id="track-view-button">Track Tags</button></div></nav>
+    <label class="search member-search hidden" id="member-filter-wrap"><span>⌕</span><input id="member-filter" placeholder="Search title, artist, album, filename, path…" autocomplete="off"><kbd>⌘ K</kbd></label>
+    <div class="appbar-spacer"></div>
     <div class="actions">
       <button class="button secondary" data-action="openCollection"><span class="icon">☰</span> Collection</button>
       <button class="button secondary" data-action="openUAC"><span class="icon">＋</span> Open UAC</button>
@@ -35,12 +36,11 @@
     </aside>
 
     <section class="members-panel panel">
-      <nav class="main-view-tabs" aria-label="Package workspace"><div class="tab-buttons"><button data-action="mainView" data-view="files" id="files-view-button">Files</button><button data-action="mainView" data-view="packTags" id="pack-tags-view-button">Pack Tags</button><button data-action="mainView" data-view="members" id="members-view-button" class="active">Tracks</button><button data-action="mainView" data-view="trackBrowser" id="track-view-button">Track Tags</button></div><label class="search member-search" id="member-filter-wrap"><span>⌕</span><input id="member-filter" placeholder="Search title, artist, album, filename, path…" autocomplete="off"><kbd>⌘ K</kbd></label></nav>
       <div class="members-view" id="members-view">
         <div class="table-scroll" id="table-scroll"></div>
       </div>
       <div class="metadata-view hidden" id="metadata-view"><div id="inspector-content" class="inspector-content"></div></div>
-      <footer class="statusbar"><span class="status-dot"></span><span id="status-message">Ready</span><span id="member-summary">No package open</span><span class="status-spacer"></span><span id="encoding-info"></span></footer>
+      <footer class="statusbar"><div class="status-document"><strong id="document-name">No package open</strong><span id="document-path">Choose a collection or open one UAC file</span></div><span class="status-dot"></span><span id="status-message">Ready</span><span id="member-summary">No package open</span><span class="status-spacer"></span><span id="encoding-info"></span></footer>
     </section>
   </main>
 

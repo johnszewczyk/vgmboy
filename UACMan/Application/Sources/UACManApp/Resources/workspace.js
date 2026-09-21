@@ -107,6 +107,13 @@
       : '<div class="tag-multiple-value-row"><span>—</span><span>Empty</span></div>';
     return canonicalFoldMarkup("Multiple Values", body, { className:"tag-multiple-values" });
   };
+  const nestedJSONValueMarkup = (value, key, editable = true) => {
+    const raw = JSON.stringify(value, null, 2);
+    const body = editable
+      ? `<textarea class="tag-table-field nested-json-editor" data-multiple-value aria-label="JSON value for ${esc(key)}">${esc(raw)}</textarea>`
+      : `<pre class="nested-json-preview">${esc(raw)}</pre>`;
+    return `<details class="nested-json-dropdown"><summary class="nested-json-trigger"><span>Multiple Values</span><span class="canonical-fold-icon">＋</span></summary><div class="nested-json-panel">${body}</div></details>`;
+  };
   const multipleValuesCloseMarkup = context => context.foldID
     ? `<button class="tag-table-field field-grid-heading-input multiple-values-header-action multiple-values-subtable-close" data-action="closeCanonicalSubtable" data-fold-id="${esc(context.foldID)}" type="button" title="Close values table" aria-label="Close values table">×</button>`
     : `<button class="tag-table-field field-grid-heading-input multiple-values-header-action multiple-values-popup-close" data-action="closeMultipleValuesPopup" data-popup-id="${esc(context.popupID || "")}" type="button" title="Close" aria-label="Close">×</button>`;
@@ -134,7 +141,7 @@
       const kind = fieldKind(item);
       const raw = kind === "json" ? JSON.stringify(item, null, 2) : String(item ?? "");
       const valueControl = kind === "json"
-        ? `<textarea class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-editor" data-multiple-value aria-label="Value for ${esc(key)}">${esc(raw)}</textarea>`
+        ? (canonicalLayout ? nestedJSONValueMarkup(item, key) : `<textarea class="multiple-value-editor" data-multiple-value aria-label="Value for ${esc(key)}">${esc(raw)}</textarea>`)
         : `<input class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-editor" data-multiple-value value="${esc(raw)}" aria-label="Value for ${esc(key)}">`;
       const rowClass = canonicalLayout ? "field-grid-row multiple-value-editor-row" : "tag-multiple-value-row multiple-value-editor-row";
       const keyMarkup = `<input class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-key" data-multiple-key value="${esc(key)}" aria-label="Key for ${esc(key)}"${isArray ? " disabled" : ""}>`;
@@ -168,7 +175,7 @@
   const multipleValuesReadOnlyTableMarkup = (entries, context = {}) => {
     const gridClass = context.layout === "subtable" ? "canonical-subtable-field-grid" : "canonical-popup-field-grid";
     const rows = entries.length
-      ? entries.map(([key, item]) => `<div class="field-grid-row multiple-value-readonly-row" role="row"><div class="field-grid-cell"><input class="tag-table-field" value="${esc(key)}" disabled></div><div class="field-grid-cell"><input class="tag-table-field" value="${esc(typeof item === "object" ? JSON.stringify(item) : String(item ?? "—"))}" disabled></div><div class="field-grid-cell"></div><div class="field-grid-cell"></div></div>`).join("")
+      ? entries.map(([key, item]) => `<div class="field-grid-row multiple-value-readonly-row" role="row"><div class="field-grid-cell"><input class="tag-table-field" value="${esc(key)}" disabled></div><div class="field-grid-cell">${item && typeof item === "object" ? nestedJSONValueMarkup(item, key, false) : `<input class="tag-table-field" value="${esc(String(item ?? "—"))}" disabled>`}</div><div class="field-grid-cell"></div><div class="field-grid-cell"></div></div>`).join("")
       : '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>';
     const titleRow = context.layout === "subtable" ? multipleValuesSubtableTitleRowMarkup(context, false) : multipleValuesTitleRowMarkup(context, false);
     return `<div class="field-grid ${gridClass} canonical-multiple-values-grid" role="table">${titleRow}<div class="multiple-values-rows">${rows}</div></div>`;
@@ -477,8 +484,8 @@
       const columnAttribute = index > 1 ? ` data-track-column-key="${esc(sortKey)}"` : "";
       return `<div class="field-grid-cell field-grid-heading" role="columnheader" data-sort="${esc(sortKey)}"${columnAttribute}><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`;
     }).join("");
-    const popups = [];
     const rows = tracks.map((member, index) => {
+      const subtables = [];
       const trackNumber = trackNumberFor(member, index);
       const filename = member.name || member.path.split("/").pop() || member.path;
       const rowLabel = member.title || filename;
@@ -489,10 +496,9 @@
         const disabled = !editable || !present || structured ? " disabled" : "";
         const attributes = editable && present && !structured ? ` data-track-cell data-track-path="${esc(member.path)}" data-track-key="${esc(key)}" data-track-scope="${esc(scope)}"` : "";
         if (structured) {
-          const popupID = `track-${index}-${popups.length}`;
-          const popup = multipleValuesPopupParts(value, { target:"member", path:member.path, scope, key, popupID }, { editable:true });
-          popups.push(popup.popup);
-          return popup.trigger;
+          const foldID = `track-${index}-${key}`;
+          subtables.push(`<div class="field-grid-row field-grid-subrow" role="row" data-canonical-subrow="${esc(foldID)}"><div class="field-grid-cell canonical-subtable-cell" role="cell">${multipleValuesSubtableMarkup(value, { target:"member", path:member.path, scope, key, foldID }, { editable:true })}</div></div>`);
+          return multipleValuesTriggerMarkup(foldID);
         }
         return `<input class="tag-table-field track-array-value${editable && present ? " track-cell" : ""}" value="${esc(display)}" aria-label="${esc(rowLabel)} ${esc(key)}"${attributes}${disabled}>`;
       };
@@ -503,10 +509,10 @@
         return `<div class="field-grid-cell" role="cell" data-track-column-key="${esc(key)}">${scalar(source?.[fieldKey], fieldKey, extension ? "memberExtensions" : "memberMetadata", true)}</div>`;
       }).join("");
       const row = `<div class="field-grid-row track-array-row" role="row"${rowTemplateStyle}><div class="field-grid-cell" role="cell">${scalar(trackNumber, "track", "memberMetadata", false)}</div><div class="field-grid-cell" role="cell">${scalar(filename, "filename", "memberMetadata", false)}</div>${metadataCells}</div>`;
-      return row;
+      return row + subtables.join("");
     }).join("");
     const empty = `<div class="field-grid-empty" role="row"><span role="cell">No playable tracks</span></div>`;
-    return `<div class="field-grid tracks-field-grid" data-field-grid="tracks" role="table" aria-label="Tracks" style="--field-grid-columns:${columnTemplate}"><div class="field-grid-row field-grid-header" role="row"${rowTemplateStyle}>${header}</div>${rows || empty}</div>${popups.join("")}`;
+    return `<div class="field-grid tracks-field-grid" data-field-grid="tracks" role="table" aria-label="Tracks" style="--field-grid-columns:${columnTemplate}"><div class="field-grid-row field-grid-header" role="row"${rowTemplateStyle}>${header}</div>${rows || empty}</div>`;
   }
 
   function trackArrayColumnTemplate(tracks, columns) {
@@ -580,10 +586,11 @@
       const tagLabel = dirty ? `${tagCount} •` : String(tagCount);
       return `<div class="field-grid-row track-browser-sidebar-row${selectedClass}" role="row" tabindex="0" data-action="selectTrackBrowserMember" data-track-browser-path="${esc(member.path)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field track-browser-sidebar-number" value="${index + 1}" aria-label="Track row ${index + 1}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-name-field" value="${esc(member.name)}" aria-label="Filename" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field track-browser-sidebar-status${dirty ? " dirty" : ""}" value="${esc(tagLabel)}" aria-label="${dirty ? "Unsaved tag edits" : `${tagCount} tags`}" disabled></div></div>`;
     }).join("");
-    const sidebar = `<aside class="track-browser-sidebar" aria-label="Tagged files"><div class="field-grid canonical-field-grid track-browser-sidebar-field-grid" role="table" aria-label="Tagged tracks">${sidebarHeader}${sidebarRows || '<div class="field-grid-empty" role="row"><span role="cell">No files with tags</span></div>'}</div></aside>`;
-    const detail = selected
-      ? `<section class="track-browser-detail">${renderTrackTagTable(selected)}</section>`
-      : '<section class="track-browser-detail"><div class="empty-tab"><strong>No tagged files</strong><span>Files with metadata or extensions will appear here.</span></div></section>';
+    const sidebar = `<section class="track-browser-pane track-browser-sidebar-pane" aria-label="Tagged files"><div class="data-table-scroll track-browser-scroll"><div class="track-browser-sidebar"><div class="field-grid canonical-field-grid track-browser-sidebar-field-grid" role="table" aria-label="Tagged tracks">${sidebarHeader}${sidebarRows || '<div class="field-grid-empty" role="row"><span role="cell">No files with tags</span></div>'}</div></div></div></section>`;
+    const detailContent = selected
+      ? renderTrackTagTable(selected)
+      : '<div class="empty-tab"><strong>No tagged files</strong><span>Files with metadata or extensions will appear here.</span></div>';
+    const detail = `<section class="track-browser-pane track-browser-detail-pane" aria-label="Selected track tags"><div class="data-table-scroll track-browser-scroll"><div class="track-browser-detail">${detailContent}</div></div></section>`;
     return `<section class="data-page track-browser-page">${sidebar}${detail}</section>`;
   }
 

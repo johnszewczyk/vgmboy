@@ -3,8 +3,9 @@
 ## Browse collections
 
 The workspace has a collection rail, sortable member grid, and full-width
-metadata workspace. Its top action bar opens a collection or package and exposes
-Revert and Save; those actions stay available while the grid scrolls.
+metadata workspace. The compact app header owns page navigation, collection and
+package actions, and the Tracks/Files search field. The open package filename
+and path live in the left side of the universal status bar.
 
 Choose **Open Collection** and select a folder. UACMan recursively lists
 regular `.uac` files beneath it, ordered by the package title in each manifest.
@@ -33,23 +34,26 @@ text in a popup. Aggregate rows with different structured values remain
 read-only until a single value is unambiguous.
 
 The workspace has four explicit pages in this order: **Files**, **Pack Tags**,
-**Tracks**, and **Track Tags**. Sub-pages keep their identity in the compact
-app header and do not add a second page heading. **Tracks** is the wide canonical
+**Tracks**, and **Track Tags**. Pages have no secondary page heading. **Tracks** is the wide canonical
 array-style field grid: every header and value is a boxed field, and its
 horizontal scroll belongs to the workspace surface rather than a nested table
 window. **Files** lists every stored package member, including playable streams,
 artwork, cue sheets, and documentation. Its filename field edits the
 manifest's displayed/original filename while the stored TAR path remains
 immutable. Each row's **Tags** column is a numeric count. The **Track Tags** page
-provides a canonical table sidebar and an exhaustive canonical table for editing
-that file's metadata/extensions; the sidebar uses the same cells and geometry,
-has no extra inset padding, and has no separate new-tag form. Structured values
-slide down as full-width, left-aligned child tables inserted beneath the source
-row, without indenting the parent table. **Pack Tags** contains package-level metadata and all attachments
+provides two independent scroll panes, each containing the canonical field-grid
+table: a three-column tagged-file table on the left and an exhaustive metadata
+table on the right. They share the same cells and geometry, with no merged
+sidebar/content bar and no separate new-tag form. Structured values slide down
+as full-width, left-aligned child tables inserted beneath the source row, without
+indenting the parent table. **Pack Tags** contains package-level metadata and all attachments
 using the same field-grid cells, with the same add interface as the tag
 workspace. Pack Tags and the selected-file Track Tags table use the inserted
-child-table treatment; the master Tracks grid uses the centered text popup
-because of its width. UACMan lists assets and their metadata. The Files page can preview recognized text
+child-table treatment; nested JSON values remain compact Multiple Values
+disclosures until opened, so they do not inject textareas into ordinary rows.
+Structured cells in the master Tracks grid use the same canonical disclosure
+and child-table treatment; the explicit JSON editor remains available only when
+the value is opened for editing. UACMan lists assets and their metadata. The Files page can preview recognized text
 members directly from the seekable payload, including JSON, Markdown, CUE, and
 similar documents; it does not extract or edit them yet, and it does not preview
 binary image bytes.
