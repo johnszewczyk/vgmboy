@@ -100,7 +100,7 @@ button { cursor:pointer; }
 .field-grid .tag-inline-editor { display:flex; align-items:center; gap:3px; width:100%; min-width:0; }
 .field-grid .tag-inline-editor input { flex:1 1 auto; min-width:0; width:auto; height:23px; padding:2px 5px; border:1px solid var(--line); border-radius:0; background:var(--panel-2); color:var(--text); font:inherit; }
 .field-grid .tag-inline-editor input:focus { border-color:var(--accent); outline:0; }
-.field-grid .tag-submit-cell,.field-grid .tag-delete-cell { justify-content:center; }
+.field-grid .tag-submit-cell,.field-grid .tag-delete-cell,.field-grid .field-grid-action-cell { justify-content:center; }
 .field-grid .icon-button { width:23px; height:23px; padding:0; border:1px solid var(--line); border-radius:3px; background:transparent; color:var(--muted); cursor:pointer; }
 .field-grid .icon-button:hover { color:var(--text); border-color:var(--accent); }
 .field-grid .icon-button.danger,.field-grid .danger { color:var(--danger, #e06c75); }
@@ -248,19 +248,15 @@ button { cursor:pointer; }
 .multiple-values-editor-actions { display:flex; justify-content:flex-end; gap:3px; padding:3px 2px 1px; }
 .multiple-values-editor-actions .icon-button { width:22px; height:22px; padding:0; }
 .multiple-value-editor-row .multiple-value-remove { width:22px; height:22px; padding:0; }
-.multiple-values-editor-error { min-height:14px; padding:1px 2px 0; color:var(--danger,#e06c75); font-size:9px; }
+.multiple-values-editor-error { min-height:0; padding:0; color:var(--danger,#e06c75); font-size:9px; }
+.multiple-values-editor-error:empty,.multiple-values-popup-error:empty { display:none; }
 
 /* Keep the canonical table geometry stable when a structured cell opens. The
-   source row stays in place and the editor gets its own full-width subrow. */
+   source row stays in place and the editor gets its own full-width inserted row. */
 .field-grid-header { background:transparent; }
 .canonical-fold-icon { margin-left:auto; }
 .canonical-fold-meta + .canonical-fold-icon { margin-left:0; }
 .canonical-fold-trigger { height:23px; padding:2px 5px; border:1px dashed var(--line); background:var(--panel-2); }
-.field-grid-subrow { grid-template-columns:1fr; min-height:0; max-height:0; overflow:hidden; opacity:0; align-items:stretch; transition:max-height var(--ui-motion),opacity var(--ui-motion); }
-.field-grid-subrow.open { max-height:900px; opacity:1; }
-.canonical-subtable-cell { grid-column:1 / -1; min-height:0; padding:4px 0 6px; align-items:stretch; }
-.canonical-subtable-panel { width:min(760px,100%); min-width:0; border:1px solid var(--line); background:var(--panel); }
-.canonical-subtable-panel .multiple-values-editor { width:100%; padding:4px; }
 .multiple-values-popup-backdrop[hidden] { display:none!important; }
 .multiple-values-popup-backdrop { position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; padding:12px; background:transparent; pointer-events:none; }
 .multiple-values-popup-card { display:flex; flex-direction:column; width:min(720px,calc(100vw - 24px)); max-height:min(620px,calc(100vh - 24px)); overflow:hidden; border:1px solid var(--line); border-radius:3px; background:var(--panel); box-shadow:none; pointer-events:auto; }
@@ -272,7 +268,7 @@ button { cursor:pointer; }
 .multiple-values-popup-error { min-height:15px; padding:0 1rem 5px; color:var(--danger,#e06c75); font-size:10px; }
 .multiple-values-popup-content .multiple-values-editor { width:100%; padding:0; }
 .canonical-popup-field-grid { --field-grid-columns:minmax(150px,.7fr) minmax(260px,1.3fr) 28px; min-width:560px; width:100%; padding:2px var(--field-grid-gap); }
-.canonical-popup-field-grid .field-grid-row { grid-template-columns:var(--field-grid-columns); width:auto; }
+.canonical-popup-field-grid .field-grid-row { grid-template-columns:var(--field-grid-columns); width:100%; }
 .canonical-popup-field-grid .multiple-values-rows { display:flex; flex-direction:column; }
 .canonical-popup-field-grid .multiple-value-editor-row { min-height:27px; align-items:center; }
 .canonical-popup-field-grid .multiple-value-editor-row .field-grid-cell { min-height:27px; }
@@ -312,9 +308,6 @@ button { cursor:pointer; }
 .track-browser-value-cell { align-items:stretch!important; overflow:visible; }
 .track-browser-actions { justify-content:center; gap:2px; }
 
-.file-preview-action { justify-content:center; }
-.file-preview-action .icon-button { width:28px; }
-.file-preview-unavailable { color:var(--soft); }
 .file-preview { display:flex; flex-direction:column; min-height:0; border:1px solid var(--line); border-radius:4px; background:var(--panel); }
 .file-preview-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 8px; border-bottom:1px solid var(--line); background:var(--panel-2); }
 .file-preview-heading > div { display:flex; flex-direction:column; gap:2px; min-width:0; }
@@ -339,15 +332,6 @@ button { cursor:pointer; }
 .field-grid .tag-multiple-values { min-width:0; }
 .inspector-content { scrollbar-gutter:stable; }
 
-/* Structured values use the same table geometry as their parent. The inner
-   grid track, rather than a guessed max-height, owns the drawer animation. */
-.field-grid-subrow { display:none; grid-template-columns:1fr; width:100%; min-width:0; min-height:0; max-height:none; margin:0; padding:0; overflow:hidden; opacity:0; align-items:stretch; }
-.field-grid-subrow.open { display:grid; opacity:1; }
-.field-grid-subrow > .canonical-subtable-cell { grid-column:1 / -1; width:100%; min-width:0; min-height:0; margin:0; overflow:hidden; padding:0; align-items:stretch; }
-.canonical-subtable-panel { width:100%; min-width:0; min-height:0; margin:0; padding:0; overflow:hidden; border:0; background:transparent; }
-.canonical-subtable-panel .multiple-values-editor { width:100%; margin:0; padding:0; }
-.canonical-subtable-field-grid { --field-grid-columns:minmax(110px,.7fr) minmax(180px,1.3fr) 28px 28px; min-width:0; width:100%; margin:0; padding:0; }
-.canonical-subtable-field-grid .field-grid-row { grid-template-columns:var(--field-grid-columns); width:100%; min-width:0; }
 .canonical-multiple-values-grid .multiple-values-rows { display:flex; flex-direction:column; }
 .multiple-values-title-row { background:transparent; }
 .multiple-values-title-row .field-grid-heading-input { width:100%; }
@@ -454,11 +438,23 @@ button { cursor:pointer; }
 .file-field-grid .multiple-values-popup-trigger { width:100%; min-width:0; }
 
 /* Non-giga structured values use a full-width inserted canonical subtable. */
-.field-grid-subrow { display:grid; grid-template-columns:1fr; grid-template-rows:0fr; width:100%; min-width:0; min-height:0; max-height:0; margin:0; overflow:hidden; opacity:0; transition:grid-template-rows var(--ui-motion),opacity var(--ui-motion); }
-.field-grid-subrow.open { grid-template-rows:1fr; max-height:none; opacity:1; }
-.field-grid-subrow > .canonical-subtable-cell { grid-column:1 / -1; width:100%; min-width:0; min-height:0; overflow:visible; padding:0; align-items:stretch; }
-.canonical-subtable-panel { width:100%; min-width:0; min-height:0; overflow:visible; border:0; border-radius:0; background:transparent; }
-.canonical-subtable-field-grid { width:100%; max-width:100%; min-width:0; padding:0; }
+.inserted-table-row { display:grid; grid-template-columns:1fr; grid-template-rows:0fr; width:100%; min-width:0; min-height:0; max-height:0; margin:0; overflow:hidden; opacity:0; transition:grid-template-rows var(--ui-motion),opacity var(--ui-motion); }
+.inserted-table-row.open { grid-template-rows:1fr; max-height:none; opacity:1; }
+.inserted-table-cell { grid-column:1 / -1; width:100%; min-width:0; min-height:0; overflow:visible; padding:0; align-items:stretch; }
+.inserted-table-panel { width:100%; min-width:0; min-height:0; overflow:visible; border:0; border-radius:0; background:transparent; }
+.inserted-table-grid { --field-grid-columns:minmax(110px,.7fr) minmax(180px,1.3fr) 28px 28px; width:100%; max-width:100%; min-width:0; padding:0; }
+.inserted-table-grid .field-grid-row { grid-template-columns:var(--field-grid-columns); width:100%; min-width:0; }
+.inserted-table-grid .field-grid-cell { min-width:0; }
+.inserted-table-grid .field-grid-header .field-grid-cell { justify-content:center; }
+
+/* Popup JSON editing uses the same canonical rows and cells, but remains a
+   fixed modal surface so editing it never reflows the source table. */
+.canonical-popup-field-grid .multiple-values-popup-json-row { min-height:0; align-items:stretch; }
+.canonical-popup-field-grid .multiple-values-popup-json-row .multiple-values-popup-text-wrap { grid-column:1 / -1; width:100%; min-width:0; min-height:0; padding:0; align-items:stretch; }
+.multiple-values-text { display:block; width:100%; min-height:260px; max-height:520px; margin:0; overflow:auto; resize:vertical; padding:2px 5px; color:var(--accent); background:var(--panel-2); border:1px solid var(--line); outline:0; font:inherit; white-space:pre-wrap; overflow-wrap:anywhere; }
+.multiple-values-text:focus { border-color:var(--accent); }
+.multiple-values-popup-preview { display:block; width:100%; max-height:520px; margin:0; overflow:auto; padding:2px 5px; color:var(--muted); font:inherit; white-space:pre-wrap; overflow-wrap:anywhere; }
+.multiple-values-popup-error { min-height:0; padding:0; }
 
 /* Popup chrome is still canonical table chrome; only the giga surface dims the
    page behind it. The title spans the table while actions remain two cells. */
@@ -502,10 +498,11 @@ button { cursor:pointer; }
    canonical row/cell geometry on both sides; only the sidebar width is fixed. */
 .files-page { gap:0; padding:0; }
 .file-table-surface { flex:1 1 auto; min-height:0; }
-.file-field-grid { width:max-content; min-width:1120px; padding:2px var(--field-grid-gap); }
+.file-field-grid { width:100%; min-width:1120px; padding:2px var(--field-grid-gap); }
 .file-field-grid .field-grid-header,
 .file-field-grid .file-row { width:100%; min-width:1120px; }
 .file-field-grid .file-row .field-grid-cell { padding:0; }
+.file-field-grid .field-grid-action-placeholder { color:var(--soft); }
 .track-browser-page { grid-template-columns:33rem minmax(0,1fr); }
 .track-browser-sidebar-field-grid { --field-grid-columns:4.5rem minmax(0,1fr) 56px; width:100%; min-width:0; padding:2px var(--field-grid-gap); }
 .track-browser-sidebar-field-grid .field-grid-header,

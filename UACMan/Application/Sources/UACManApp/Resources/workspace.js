@@ -135,7 +135,7 @@
     const isArray = Array.isArray(value);
     const canonicalLayout = context.layout === "canonical" || context.layout === "subtable";
     const subtableLayout = context.layout === "subtable";
-    const gridClass = context.layout === "subtable" ? "canonical-subtable-field-grid" : "canonical-popup-field-grid";
+    const gridClass = context.layout === "subtable" ? "inserted-table-grid" : "canonical-popup-field-grid";
     const entries = isArray ? value.map((item, index) => [String(index), item]) : Object.entries(value || {});
     const rowMarkup = ([key, item]) => {
       const kind = fieldKind(item);
@@ -173,7 +173,7 @@
   };
   const multipleValuesTriggerMarkup = foldID => `<button class="canonical-fold-toggle canonical-fold-trigger" type="button" data-action="toggleCanonicalFold" data-fold-id="${esc(foldID)}" aria-expanded="false"><span>[Nested Values]</span><span class="canonical-fold-icon">＋</span></button>`;
   const multipleValuesReadOnlyTableMarkup = (entries, context = {}) => {
-    const gridClass = context.layout === "subtable" ? "canonical-subtable-field-grid" : "canonical-popup-field-grid";
+    const gridClass = context.layout === "subtable" ? "inserted-table-grid" : "canonical-popup-field-grid";
     const rows = entries.length
       ? entries.map(([key, item]) => `<div class="field-grid-row multiple-value-readonly-row" role="row"><div class="field-grid-cell"><input class="tag-table-field" value="${esc(key)}" disabled></div><div class="field-grid-cell">${item && typeof item === "object" ? nestedJSONValueMarkup(item, key, false) : `<input class="tag-table-field" value="${esc(String(item ?? "—"))}" disabled>`}</div><div class="field-grid-cell"></div><div class="field-grid-cell"></div></div>`).join("")
       : '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>';
@@ -183,9 +183,9 @@
   const multipleValuesSubtableMarkup = (value, context = {}, options = {}) => {
     const entries = options.entries || (Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value || {}));
     const subtableContext = { ...context, layout:"subtable" };
-    if (options.editable === false) return `<div class="canonical-subtable-panel">${multipleValuesReadOnlyTableMarkup(entries, subtableContext)}</div>`;
+    if (options.editable === false) return `<div class="inserted-table-panel">${multipleValuesReadOnlyTableMarkup(entries, subtableContext)}</div>`;
     const editor = multipleValuesEditorBodyMarkup(value, subtableContext);
-    return `<div class="canonical-subtable-panel"><div class="editable-multiple-values">${editor.body}</div></div>`;
+    return `<div class="inserted-table-panel"><div class="editable-multiple-values">${editor.body}</div></div>`;
   };
   const multipleValuesPopupParts = (value, context = {}, options = {}) => {
     const popupID = context.popupID || "multiple-values";
@@ -196,8 +196,8 @@
       ? JSON.stringify(value, null, 2)
       : JSON.stringify(entries.map(([key, item]) => ({ key, value:item })), null, 2);
     const body = editable
-      ? `<div class="multiple-values-popup-text-wrap"><textarea class="multiple-values-text" data-multiple-popup-text aria-label="JSON value">${esc(text || "")}</textarea><div class="multiple-values-popup-error" role="status"></div></div>`
-      : `<div class="multiple-values-popup-text-wrap"><pre class="multiple-values-popup-preview">${esc(text || "")}</pre></div>`;
+      ? `<div class="field-grid-row multiple-values-popup-json-row" role="row"><div class="field-grid-cell multiple-values-popup-text-wrap" role="cell"><textarea class="tag-table-field multiple-values-text" data-multiple-popup-text aria-label="JSON value">${esc(text || "")}</textarea><div class="multiple-values-popup-error" role="status"></div></div></div>`
+      : `<div class="field-grid-row multiple-values-popup-json-row" role="row"><div class="field-grid-cell multiple-values-popup-text-wrap" role="cell"><pre class="multiple-values-popup-preview">${esc(text || "")}</pre></div></div>`;
     const trigger = `<button class="canonical-fold-toggle canonical-fold-trigger multiple-values-popup-trigger" type="button" data-action="toggleMultipleValuesPopup" data-popup-id="${esc(popupID)}" aria-controls="multiple-values-popup-${esc(popupID)}" aria-expanded="false"><span>[Nested Values]</span><span class="canonical-fold-icon">＋</span></button>`;
     const popup = `<div class="multiple-values-popup-backdrop" id="multiple-values-popup-${esc(popupID)}" data-multiple-values-popup="${esc(popupID)}" data-multiple-target="${esc(context.target || "member")}" data-multiple-path="${esc(context.path || "")}" data-multiple-scope="${esc(context.scope || "")}" data-multiple-key="${esc(context.key || "")}" data-multiple-editable="${editable}" hidden><div class="multiple-values-popup-card" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="multiple-values-popup-content"><div class="field-grid canonical-popup-field-grid canonical-multiple-values-grid" role="table">${multipleValuesTitleRowMarkup({ ...context, popupID, title }, editable)}${body}</div></div></div></div>`;
     return { trigger, popup };
@@ -457,7 +457,7 @@
           { target:"metadata", scope:scope === "Package" ? "package" : "tracks", key:entry.key, foldID, title:entry.key },
           { editable:editableMultipleValues, entries:[...values.values()].map((value, valueIndex) => [String(valueIndex + 1), value]) }
         );
-        subrow = `<div class="field-grid-row field-grid-subrow" role="row" data-canonical-subrow="${esc(foldID)}"><div class="field-grid-cell canonical-subtable-cell" role="cell">${subtable}</div></div>`;
+        subrow = `<div class="field-grid-row inserted-table-row" role="row" data-canonical-subrow="${esc(foldID)}"><div class="field-grid-cell inserted-table-cell" role="cell">${subtable}</div></div>`;
       } else {
         valueInput = `<input data-tag-value aria-label="Tag value for ${esc(entry.key)}" value="${esc(sample)}">`;
       }
@@ -572,7 +572,7 @@
         const foldID = `file-tag-${index}`;
         valueMarkup = multipleValuesTriggerMarkup(foldID);
         const subtable = multipleValuesSubtableMarkup(entry.value, { target:"member", path:member.path, scope:entry.scope, key:entry.key, foldID, title:entry.key }, { editable:true });
-        subrow = `<div class="field-grid-row field-grid-subrow" role="row" data-canonical-subrow="${esc(foldID)}"><div class="field-grid-cell canonical-subtable-cell" role="cell">${subtable}</div></div>`;
+        subrow = `<div class="field-grid-row inserted-table-row" role="row" data-canonical-subrow="${esc(foldID)}"><div class="field-grid-cell inserted-table-cell" role="cell">${subtable}</div></div>`;
       }
       const foldAttribute = structured ? ` data-multiple-fold-id="file-tag-${index}"` : "";
       return `<div class="field-grid-row" role="row" data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"${foldAttribute}><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-scope" value="${entry.scope === "memberExtensions" ? "extension" : "metadata"}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name"></div><div class="field-grid-cell track-browser-value-cell" role="cell">${valueMarkup}</div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitFileTag" title="Submit changed tag" aria-label="Submit changed tag">✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteFileTag" title="Delete tag" aria-label="Delete tag">×</button></div></div>${subrow}`;
@@ -613,7 +613,7 @@
   function renderFilesPage() {
     const members = visibleFileMembers();
     const header = ["Role", "Format", "Filename", "Stored path", "Tags Count", "Size", "View"].map(label => `<div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`).join("");
-    const rows = members.map(member => `<div class="field-grid-row file-row" role="row" tabindex="0" data-track-row="${esc(member.path)}" title="Open metadata for ${esc(member.name)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.role)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.format || "unknown")}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-name-field" data-file-name data-file-path="${esc(member.path)}" value="${esc(member.name)}" aria-label="Filename"></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-path-field" value="${esc(member.path)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tags-count" value="${fileTagEntries(member).length}" aria-label="Tag count" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(bytes(member.bytes))}" disabled></div><div class="field-grid-cell file-preview-action" role="cell">${member.previewable ? `<button class="icon-button" data-action="previewMember" data-preview-path="${esc(member.path)}" title="View bundled text" aria-label="View bundled text">⌕</button>` : `<span class="file-preview-unavailable" title="Text preview unavailable">—</span>`}</div></div>`).join("");
+    const rows = members.map(member => `<div class="field-grid-row file-row" role="row" tabindex="0" data-track-row="${esc(member.path)}" title="Open metadata for ${esc(member.name)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.role)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.format || "unknown")}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-name-field" data-file-name data-file-path="${esc(member.path)}" value="${esc(member.name)}" aria-label="Filename"></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-path-field" value="${esc(member.path)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tags-count" value="${fileTagEntries(member).length}" aria-label="Tag count" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(bytes(member.bytes))}" disabled></div><div class="field-grid-cell field-grid-action-cell" role="cell">${member.previewable ? `<button class="icon-button" data-action="previewMember" data-preview-path="${esc(member.path)}" title="View bundled text" aria-label="View bundled text">⌕</button>` : `<span class="field-grid-action-placeholder" title="Text preview unavailable" aria-label="Text preview unavailable">—</span>`}</div></div>`).join("");
     const empty = `<div class="field-grid-empty" role="row"><span role="cell">No package members match this filter</span></div>`;
     const preview = state.filePreviewPath
       ? `<div class="file-preview-backdrop" role="presentation"><section class="file-preview" role="dialog" aria-modal="true" aria-label="Bundled file preview"><div class="file-preview-heading"><div><strong>${esc(state.filePreviewName || "Bundled file")}</strong><span>${esc(state.filePreviewPath)}</span></div><button class="icon-button" data-action="closeFilePreview" title="Close preview" aria-label="Close preview">×</button></div>${state.filePreviewError ? `<div class="file-preview-error">${esc(state.filePreviewError)}</div>` : `<pre class="file-preview-content">${esc(state.filePreviewContent)}</pre>${state.filePreviewTruncated ? '<div class="file-preview-note">Preview limited to the first 4 MiB. The bundled file remains unchanged.</div>' : ""}`}</section></div>`
