@@ -191,6 +191,8 @@
   let inspectorTab = "set";
   let mainView = "members";
   let trackBrowserPath = "";
+  let dirtyTrackPaths = new Set();
+  let lastUnsavedChanges = false;
   let lastRenderedView = "";
   let lastDocumentName = "";
   const uiMotionDuration = 200;
@@ -212,10 +214,7 @@
     return result.sort((a, b) => {
       let left;
       let right;
-      if (sort.key === "row") {
-        left = source.indexOf(a);
-        right = source.indexOf(b);
-      } else if (sort.key === "track") {
+      if (sort.key === "track") {
         left = trackNumberFor(a, source.indexOf(a));
         right = trackNumberFor(b, source.indexOf(b));
       } else if (sort.key === "filename") {
@@ -238,7 +237,11 @@
       inspectorTab = "set";
       mainView = "members";
       trackBrowserPath = "";
+      dirtyTrackPaths = new Set();
+      lastUnsavedChanges = Boolean(state.hasUnsavedChanges);
     }
+    if (lastUnsavedChanges && !state.hasUnsavedChanges) dirtyTrackPaths.clear();
+    lastUnsavedChanges = Boolean(state.hasUnsavedChanges);
     const viewChanged = mainView !== lastRenderedView;
     lastRenderedView = mainView;
     const active = document.activeElement;
@@ -365,7 +368,7 @@
 
   function trackNumberFor(member, index) {
     const fields = memberFields(member);
-    const candidates = ["trackNumber", "Track Number", "track", "Track", "trackIndex", "Track Index", "number", "Number", "index", "Index", "discTrack", "Disc Track"];
+    const candidates = ["trackNumber", "track", "trackIndex", "number", "index", "discTrack"];
     for (const key of candidates) {
       const value = fields[key];
       if (typeof value === "number" && Number.isFinite(value)) return Math.max(1, Math.trunc(value));
@@ -449,12 +452,11 @@
   function renderTrackArrayGrid(tracks) {
     const columns = trackColumns();
     const columnTemplate = trackArrayColumnTemplate(tracks, columns);
-    const headerCells = ["#", "Track #", "Filename", ...columns.map(displayTrackKey)];
+    const headerCells = ["Track", "Filename", ...columns.map(displayTrackKey)];
     const header = headerCells.map((label, index) => {
-      const sortKey = index === 0 ? "row" : index === 1 ? "track" : index === 2 ? "filename" : columns[index - 3];
-      const columnAttribute = index > 2 ? ` data-track-column-key="${esc(sortKey)}"` : "";
-      const indexClass = index === 0 ? " track-index-heading" : "";
-      return `<div class="field-grid-cell field-grid-heading${indexClass}" role="columnheader" data-sort="${esc(sortKey)}"${columnAttribute}><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`;
+      const sortKey = index === 0 ? "track" : index === 1 ? "filename" : columns[index - 2];
+      const columnAttribute = index > 1 ? ` data-track-column-key="${esc(sortKey)}"` : "";
+      return `<div class="field-grid-cell field-grid-heading" role="columnheader" data-sort="${esc(sortKey)}"${columnAttribute}><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`;
     }).join("");
     const popups = [];
     const rows = tracks.map((member, index) => {
@@ -481,7 +483,7 @@
         const source = extension ? member.extensions : member.metadata;
         return `<div class="field-grid-cell" role="cell" data-track-column-key="${esc(key)}">${scalar(source?.[fieldKey], fieldKey, extension ? "memberExtensions" : "memberMetadata", true)}</div>`;
       }).join("");
-      const row = `<div class="field-grid-row track-array-row" role="row"><div class="field-grid-cell track-index-cell" role="cell">${scalar(index + 1, "row", "memberMetadata", false)}</div><div class="field-grid-cell" role="cell">${scalar(trackNumber, "track", "memberMetadata", false)}</div><div class="field-grid-cell" role="cell">${scalar(filename, "filename", "memberMetadata", false)}</div>${metadataCells}</div>`;
+      const row = `<div class="field-grid-row track-array-row" role="row"><div class="field-grid-cell" role="cell">${scalar(trackNumber, "track", "memberMetadata", false)}</div><div class="field-grid-cell" role="cell">${scalar(filename, "filename", "memberMetadata", false)}</div>${metadataCells}</div>`;
       return row;
     }).join("");
     const empty = `<div class="field-grid-empty" role="row"><span role="cell">No playable tracks</span></div>`;
@@ -491,12 +493,11 @@
   function trackArrayColumnTemplate(tracks, columns) {
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
-    if (!context) return "calc(1ch + 4rem) 160px 220px " + columns.map(() => "160px").join(" ");
+    if (!context) return "64px 220px " + columns.map(() => "160px").join(" ");
     context.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
     const widthFor = values => Math.max(58, Math.ceil(Math.max(...values.map(value => context.measureText(String(value ?? "")).width), 0) + 18));
     const widths = [
-      "calc(1ch + 4rem)",
-      widthFor(["Track #", ...tracks.map((member, index) => String(trackNumberFor(member, index)).padStart(2, "0"))]),
+      widthFor(["Track", ...tracks.map((member, index) => String(trackNumberFor(member, index)).padStart(2, "0"))]),
       widthFor(["Filename", ...tracks.map(member => member.name || member.path.split("/").pop() || member.path)]),
       ...columns.map(key => widthFor([displayTrackKey(key), ...tracks.map(member => {
         const value = memberFields(member)[key];
@@ -550,16 +551,19 @@
       || candidates.find(member => member.path === state.selectedMemberPath)
       || candidates[0];
     trackBrowserPath = selected?.path || "";
-    const sidebarRows = candidates.map(member => {
+    const sidebarHeader = ["#", "Filename", "Tags"].map(label => `<div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`).join("");
+    const sidebarRows = candidates.map((member, index) => {
       const selectedClass = member.path === trackBrowserPath ? " selected" : "";
       const tagCount = fileTagEntries(member).length;
-      return `<button class="track-browser-sidebar-item${selectedClass}" type="button" data-action="selectTrackBrowserMember" data-track-browser-path="${esc(member.path)}"><span class="track-browser-sidebar-name">${esc(member.name)}</span><span class="track-browser-sidebar-meta">${tagCount} ${tagCount === 1 ? "tag" : "tags"} · ${esc(member.format || "unknown")}</span></button>`;
+      const dirty = dirtyTrackPaths.has(member.path);
+      const tagLabel = dirty ? `${tagCount} •` : String(tagCount);
+      return `<div class="field-grid-row track-browser-sidebar-row${selectedClass}" role="row" tabindex="0" data-action="selectTrackBrowserMember" data-track-browser-path="${esc(member.path)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field track-browser-sidebar-number" value="${index + 1}" aria-label="Track row ${index + 1}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-name-field" value="${esc(member.name)}" aria-label="Filename" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field track-browser-sidebar-status${dirty ? " dirty" : ""}" value="${esc(tagLabel)}" aria-label="${dirty ? "Unsaved tag edits" : `${tagCount} tags`}" disabled></div></div>`;
     }).join("");
-    const sidebar = `<aside class="track-browser-sidebar" aria-label="Tagged files"><div class="track-browser-sidebar-heading"><span class="eyebrow">TRACKS</span><span class="track-browser-sidebar-count">${candidates.length}</span></div><div class="track-browser-sidebar-list">${sidebarRows || '<div class="track-browser-sidebar-empty">No files with tags</div>'}</div></aside>`;
+    const sidebar = `<aside class="track-browser-sidebar" aria-label="Tagged files"><div class="field-grid track-browser-sidebar-field-grid" role="table" aria-label="Tagged tracks"><div class="field-grid-row field-grid-header" role="row">${sidebarHeader}</div>${sidebarRows || '<div class="field-grid-empty" role="row"><span role="cell">No files with tags</span></div>'}</div></aside>`;
     const detail = selected
       ? `<section class="track-browser-detail"><div class="track-browser-detail-heading"><div><span class="eyebrow">TRACK TAGS</span><h2>${esc(selected.name)}</h2><p title="Stored UAC path: ${esc(selected.path)}">${esc(memberLocation(selected))}</p></div><span class="track-browser-detail-count">${fileTagEntries(selected).length} tags</span></div>${renderTrackTagTable(selected)}</section>`
       : '<section class="track-browser-detail"><div class="empty-tab"><strong>No tagged files</strong><span>Files with metadata or extensions will appear here.</span></div></section>';
-    return `<section class="data-page track-browser-page"><div class="track-browser-layout">${sidebar}${detail}</div></section>`;
+    return `<section class="data-page track-browser-page">${sidebar}${detail}</section>`;
   }
 
   function renderFilesPage() {
@@ -584,8 +588,10 @@
   function renderInspector() {
     const hasPackage = Boolean(state.documentName);
     const member = state.members.find(item => item.path === state.selectedMemberPath);
+    const inspector = $("#inspector-content");
+    inspector.className = `inspector-content${mainView === "trackBrowser" ? " track-browser-inspector" : ""}`;
     if (!hasPackage) {
-      $("#inspector-content").innerHTML = `<div class="metadata-empty"><div class="empty-icon">⌁</div><h3>Open a package to edit metadata</h3><p>Choose a collection entry or open a UAC file.</p></div>`;
+      inspector.innerHTML = `<div class="metadata-empty"><div class="empty-icon">⌁</div><h3>Open a package to edit metadata</h3><p>Choose a collection entry or open a UAC file.</p></div>`;
       return;
     }
     const title = member?.title || member?.name || "Package metadata";
@@ -595,7 +601,7 @@
     if (mainView === "files") html += renderFilesPage();
     else if (mainView === "packTags") html += renderPackTagsPage();
     else if (mainView === "trackBrowser") html += renderTrackPage();
-    $("#inspector-content").innerHTML = html;
+    inspector.innerHTML = html;
   }
 
   function scopeToAction(scope) {
@@ -658,8 +664,17 @@
     const values = { ...(source || {}) };
     try { values[key] = coerceValue(target.value, fieldKind(values[key] ?? "")); }
     catch { return; }
+    dirtyTrackPaths.add(member.path);
     bridge("selectMember", { path:member.path });
     bridge(scopeToAction(scope), { value:JSON.stringify(values, null, 2) });
+  }
+
+  function markTrackDirty(path) {
+    if (path) dirtyTrackPaths.add(path);
+  }
+
+  function markAllTracksDirty() {
+    playableMembers().forEach(member => markTrackDirty(member.path));
   }
 
   function addMultipleValue(editor) {
@@ -730,8 +745,10 @@
       bridge("commitMetadataRow", { key, newKey, scope:editor.dataset.multipleScope || "", value:null, valueJSON });
     } else {
       const key = editor.dataset.multipleKey || fileRow?.dataset.fileTagFrom || "";
+      const path = editor.dataset.multiplePath || fileRow?.dataset.fileTagPath || "";
       const newKey = $("[data-file-tag-key]", fileRow)?.value || key;
-      bridge("commitMemberTag", { path:editor.dataset.multiplePath || fileRow?.dataset.fileTagPath || "", scope:editor.dataset.multipleScope || fileRow?.dataset.fileTagScope || "memberMetadata", key, newKey, value:"", valueJSON });
+      markTrackDirty(path);
+      bridge("commitMemberTag", { path, scope:editor.dataset.multipleScope || fileRow?.dataset.fileTagScope || "memberMetadata", key, newKey, value:"", valueJSON });
     }
   }
 
@@ -841,6 +858,7 @@
       const key = event.target.closest("[data-track-column-key]")?.dataset.trackColumnKey || "";
       closeTrackContextMenu();
       if (key && window.confirm(`Delete the entire “${displayTrackKey(key)}” tag column from all tracks?`)) {
+        markAllTracksDirty();
         bridge("deleteMetadataKey", { key, scope:"tracks" });
       }
     }
@@ -891,12 +909,16 @@
         const from = row.dataset.fileTagFrom || "";
         const rawTo = $('[data-file-tag-key]', row)?.value.trim() || "";
         const newKey = rawTo === from ? from : titleCaseTagName(rawTo);
+        markTrackDirty(row.dataset.fileTagPath || "");
         bridge("commitMemberTag", { path:row.dataset.fileTagPath || "", scope:row.dataset.fileTagScope || "", key:from, newKey, value:$('[data-file-tag-value]', row)?.value || "" });
       }
     }
     else if (action === "deleteFileTag") {
       const row = event.target.closest("[data-file-tag-row]");
-      if (row) animateRowRemoval(row, () => bridge("deleteMemberTag", { path:row.dataset.fileTagPath || "", scope:row.dataset.fileTagScope || "", key:row.dataset.fileTagFrom || "" }));
+      if (row) {
+        markTrackDirty(row.dataset.fileTagPath || "");
+        animateRowRemoval(row, () => bridge("deleteMemberTag", { path:row.dataset.fileTagPath || "", scope:row.dataset.fileTagScope || "", key:row.dataset.fileTagFrom || "" }));
+      }
     }
     else if (action === "commitTechnicalRow") {
       const row = event.target.closest("[data-technical-row]");
@@ -936,6 +958,7 @@
     const fileForm = event.target.closest("[data-file-tag-create]");
     if (!fileForm) return;
     event.preventDefault();
+    markTrackDirty(fileForm.dataset.fileTagPath || "");
     bridge("addMemberTag", { path:fileForm.dataset.fileTagPath || "", scope:$('[data-file-tag-scope]', fileForm)?.value || "memberMetadata", key:titleCaseTagName($('[data-file-tag-key]', fileForm)?.value || ""), value:$('[data-file-tag-value]', fileForm)?.value || "" });
   });
 
