@@ -91,13 +91,15 @@
     return canonicalFoldMarkup("Multiple Values", body, { className:"tag-multiple-values" });
   };
   const multipleValuesCloseMarkup = context => context.foldID
-    ? `<button class="icon-button multiple-values-subtable-close" data-action="closeCanonicalSubtable" data-fold-id="${esc(context.foldID)}" type="button" title="Close values table" aria-label="Close values table">×</button>`
-    : `<button class="icon-button multiple-values-popup-close" data-action="closeMultipleValuesPopup" data-popup-id="${esc(context.popupID || "")}" type="button" title="Close" aria-label="Close">×</button>`;
+    ? `<button class="tag-table-field field-grid-heading-input multiple-values-header-action multiple-values-subtable-close" data-action="closeCanonicalSubtable" data-fold-id="${esc(context.foldID)}" type="button" title="Close values table" aria-label="Close values table">×</button>`
+    : `<button class="tag-table-field field-grid-heading-input multiple-values-header-action multiple-values-popup-close" data-action="closeMultipleValuesPopup" data-popup-id="${esc(context.popupID || "")}" type="button" title="Close" aria-label="Close">×</button>`;
   const multipleValuesTitleRowMarkup = (context, editable) => {
     const title = context.title || context.key || "Values";
-    return `<div class="field-grid-row multiple-values-title-row" role="row"><div class="field-grid-cell multiple-values-title-cell" role="cell"><strong>${esc(title)}</strong></div><div class="field-grid-cell multiple-values-title-spacer" role="cell"></div><div class="field-grid-cell multiple-values-toolbar-cell" role="cell">${editable ? '<button class="icon-button" data-action="addMultipleValue" type="button" title="Add value" aria-label="Add value">＋</button><button class="icon-button" data-action="commitMultipleValues" type="button" title="Submit changed values" aria-label="Submit changed values">✓</button>' : ""}${multipleValuesCloseMarkup(context)}</div></div>`;
+    const submitMarkup = editable
+      ? '<button class="tag-table-field field-grid-heading-input multiple-values-header-action" data-action="commitMultipleValues" type="button" title="Submit changed values" aria-label="Submit changed values">✓</button>'
+      : '<input class="tag-table-field field-grid-heading-input" value="" aria-label="Actions" disabled>';
+    return `<div class="field-grid-row field-grid-header multiple-values-title-row" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader">${submitMarkup}</div><div class="field-grid-cell field-grid-heading" role="columnheader">${multipleValuesCloseMarkup(context)}</div></div>`;
   };
-  const multipleValuesHeaderMarkup = editable => `<div class="field-grid-row field-grid-header" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Key" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Value" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${editable ? "×" : ""}" aria-label="${editable ? "Remove" : "Actions"}" disabled></div></div>`;
   const multipleValuesEditorBodyMarkup = (value, context = {}) => {
     const isArray = Array.isArray(value);
     const canonicalLayout = context.layout === "canonical" || context.layout === "subtable";
@@ -126,9 +128,8 @@
       `data-multiple-scope="${esc(context.scope || "")}"`,
       `data-multiple-key="${esc(context.key || "")}"`
     ].join(" ");
-    const header = canonicalLayout ? multipleValuesHeaderMarkup(true) : "";
     const rowsMarkup = canonicalLayout
-      ? `<div class="field-grid ${gridClass} canonical-multiple-values-grid" role="table">${multipleValuesTitleRowMarkup(context, true)}${header}<div class="multiple-values-rows">${rows || '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'}</div></div>`
+      ? `<div class="field-grid ${gridClass} canonical-multiple-values-grid" role="table">${multipleValuesTitleRowMarkup(context, true)}<div class="multiple-values-rows">${rows || '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'}</div></div>`
       : `<div class="multiple-values-rows">${rows || '<div class="file-tag-empty multiple-values-empty">No values</div>'}</div>`;
     const body = `<div class="multiple-values-editor${canonicalLayout ? " canonical-multiple-values-editor" : ""}" ${data}>${rowsMarkup}${canonicalLayout ? "" : '<div class="multiple-values-editor-actions"><button class="icon-button" data-action="addMultipleValue" type="button" title="Add value" aria-label="Add value">＋</button><button class="icon-button" data-action="commitMultipleValues" type="button" title="Submit changed values" aria-label="Submit changed values">✓</button>'}<div class="multiple-values-editor-error" role="status"></div></div>`;
     return { body, count:entries.length };
@@ -143,7 +144,7 @@
     const rows = entries.length
       ? entries.map(([key, item]) => `<div class="field-grid-row multiple-value-readonly-row" role="row"><div class="field-grid-cell"><input class="tag-table-field" value="${esc(key)}" disabled></div><div class="field-grid-cell"><input class="tag-table-field" value="${esc(typeof item === "object" ? JSON.stringify(item) : String(item ?? "—"))}" disabled></div><div class="field-grid-cell"></div></div>`).join("")
       : '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>';
-    return `<div class="field-grid ${gridClass} canonical-multiple-values-grid" role="table">${multipleValuesTitleRowMarkup(context, false)}${multipleValuesHeaderMarkup(false)}<div class="multiple-values-rows">${rows}</div></div>`;
+    return `<div class="field-grid ${gridClass} canonical-multiple-values-grid" role="table">${multipleValuesTitleRowMarkup(context, false)}<div class="multiple-values-rows">${rows}</div></div>`;
   };
   const multipleValuesSubtableMarkup = (value, context = {}, options = {}) => {
     const entries = options.entries || (Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value || {}));
@@ -290,6 +291,7 @@
   }
 
   function renderMembers() {
+    closeTrackContextMenu();
     const members = visibleMembers();
     const open = Boolean(state.documentName);
     const noRows = members.length === 0;
@@ -297,7 +299,6 @@
       ? (noRows ? `<div class="empty-state"><div class="empty-icon">▤</div><h3>${state.members.length ? "No tracks match this filter" : "This package has no audio tracks"}</h3><p>${state.members.length ? "Change the search text to show audio tracks." : "The package contains no playable members."}</p></div>` : renderTrackArrayGrid(members))
       : `<div class="empty-state"><div class="empty-icon">▤</div><h3>Open a package to get started</h3><p>Browse a collection or open a UAC package. Audio streams appear here as rows with their tags as columns.</p><button class="button primary" data-action="openUAC">Open a UAC file</button></div>`;
     $("#member-summary").textContent = state.documentName ? `${members.length} shown · ${playableMembers().length} audio tracks` : "No package open";
-    scheduleTrackArraySizing();
   }
 
   function fieldKind(value) {
@@ -428,10 +429,12 @@
 
   function renderTrackArrayGrid(tracks) {
     const columns = trackColumns();
+    const columnTemplate = trackArrayColumnTemplate(tracks, columns);
     const headerCells = ["Track", "Filename", ...columns.map(displayTrackKey)];
     const header = headerCells.map((label, index) => {
       const sortKey = index === 0 ? "track" : index === 1 ? "filename" : columns[index - 2];
-      return `<div class="field-grid-cell field-grid-heading" role="columnheader" data-sort="${esc(sortKey)}"><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`;
+      const columnAttribute = index > 1 ? ` data-track-column-key="${esc(sortKey)}"` : "";
+      return `<div class="field-grid-cell field-grid-heading" role="columnheader" data-sort="${esc(sortKey)}"${columnAttribute}><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`;
     }).join("");
     const popups = [];
     const rows = tracks.map((member, index) => {
@@ -456,29 +459,32 @@
         const extension = key.startsWith("extension.");
         const fieldKey = extension ? key.slice("extension.".length) : key;
         const source = extension ? member.extensions : member.metadata;
-        return `<div class="field-grid-cell" role="cell">${scalar(source?.[fieldKey], fieldKey, extension ? "memberExtensions" : "memberMetadata", true)}</div>`;
+        return `<div class="field-grid-cell" role="cell" data-track-column-key="${esc(key)}">${scalar(source?.[fieldKey], fieldKey, extension ? "memberExtensions" : "memberMetadata", true)}</div>`;
       }).join("");
       const row = `<div class="field-grid-row track-array-row" role="row"><div class="field-grid-cell" role="cell">${scalar(trackNumber, "track", "memberMetadata", false)}</div><div class="field-grid-cell" role="cell">${scalar(filename, "filename", "memberMetadata", false)}</div>${metadataCells}</div>`;
       return row;
     }).join("");
     const empty = `<div class="field-grid-empty" role="row"><span role="cell">No playable tracks</span></div>`;
-    return `<div class="field-grid tracks-field-grid" data-field-grid="tracks" role="table" aria-label="Tracks"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div>${popups.join("")}`;
+    return `<div class="field-grid tracks-field-grid" data-field-grid="tracks" role="table" aria-label="Tracks" style="--field-grid-columns:${columnTemplate}"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div>${popups.join("")}`;
   }
 
-  function scheduleTrackArraySizing() {
-    const grid = $(".tracks-field-grid");
-    if (!grid) return;
-    const tracks = visibleMembers();
-    const columns = trackColumns();
-    requestAnimationFrame(() => {
-      const canvas = document.createElement("canvas");
-      const context = canvas.getContext("2d");
-      if (!context) return;
-      context.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
-      const widthFor = values => Math.max(58, Math.ceil(Math.max(...values.map(value => context.measureText(String(value ?? "")).width), 0) + 18));
-      const widths = [widthFor(["Track", ...tracks.map((member, index) => String(trackNumberFor(member, index)).padStart(2, "0"))]), widthFor(["Filename", ...tracks.map(member => member.name || member.path.split("/").pop() || member.path)]), ...columns.map(key => widthFor([displayTrackKey(key), ...tracks.map(member => { const value = memberFields(member)[key]; if (value === null || value === undefined || value === "") return "—"; if (typeof value === "object") return "Multiple Values"; return String(value); })]))];
-      grid.style.setProperty("--field-grid-columns", widths.map(width => `${width}px`).join(" "));
-    });
+  function trackArrayColumnTemplate(tracks, columns) {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) return "64px 220px " + columns.map(() => "160px").join(" ");
+    context.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
+    const widthFor = values => Math.max(58, Math.ceil(Math.max(...values.map(value => context.measureText(String(value ?? "")).width), 0) + 18));
+    const widths = [
+      widthFor(["Track", ...tracks.map((member, index) => String(trackNumberFor(member, index)).padStart(2, "0"))]),
+      widthFor(["Filename", ...tracks.map(member => member.name || member.path.split("/").pop() || member.path)]),
+      ...columns.map(key => widthFor([displayTrackKey(key), ...tracks.map(member => {
+        const value = memberFields(member)[key];
+        if (value === null || value === undefined || value === "") return "—";
+        if (typeof value === "object") return "Multiple Values";
+        return String(value);
+      })]))
+    ];
+    return widths.map(width => width + "px").join(" ");
   }
 
   function visibleFileMembers() {
@@ -738,6 +744,25 @@
     toggle?.focus({ preventScroll:true });
   }
 
+  let trackContextMenu = null;
+  function closeTrackContextMenu() {
+    trackContextMenu?.remove();
+    trackContextMenu = null;
+  }
+
+  function showTrackContextMenu(key, clientX, clientY) {
+    closeTrackContextMenu();
+    const menu = document.createElement("div");
+    menu.className = "track-context-menu";
+    menu.dataset.trackContextMenu = "";
+    menu.innerHTML = `<button type="button" data-action="deleteTrackColumn" data-track-column-key="${esc(key)}">Delete tag column</button>`;
+    document.body.append(menu);
+    const bounds = menu.getBoundingClientRect();
+    menu.style.left = Math.max(8, Math.min(clientX, window.innerWidth - bounds.width - 8)) + "px";
+    menu.style.top = Math.max(8, Math.min(clientY, window.innerHeight - bounds.height - 8)) + "px";
+    trackContextMenu = menu;
+  }
+
   function toggleMultipleValuesPopup(popupID, toggle) {
     const popup = document.querySelector(`[data-multiple-values-popup="${CSS.escape(popupID)}"]`);
     if (!popup) return;
@@ -751,6 +776,7 @@
   }
 
   document.addEventListener("click", event => {
+    if (!event.target.closest(".track-context-menu")) closeTrackContextMenu();
     const popupBackdrop = event.target.closest("[data-multiple-values-popup]");
     if (popupBackdrop && event.target === popupBackdrop) {
       closeMultipleValuesPopup(popupBackdrop);
@@ -783,6 +809,13 @@
       const row = event.target.closest("[data-tag-row]");
       const key = row?.dataset.tagFrom || "";
       if (key) animateRowRemoval(row, () => bridge("deleteMetadataKey", { key, scope:row.dataset.tagScope || "" }));
+    }
+    else if (action === "deleteTrackColumn") {
+      const key = event.target.closest("[data-track-column-key]")?.dataset.trackColumnKey || "";
+      closeTrackContextMenu();
+      if (key && window.confirm(`Delete the entire “${displayTrackKey(key)}” tag column from all tracks?`)) {
+        bridge("deleteMetadataKey", { key, scope:"tracks" });
+      }
     }
     else if (action === "addMultipleValue") addMultipleValue(event.target.closest("[data-multiple-editor]"));
     else if (action === "removeMultipleValue") removeMultipleValue(event.target.closest("[data-multiple-entry]"));
@@ -889,6 +922,15 @@
     if (event.target.id === "collection-filter") renderCollections();
     else if (event.target.id === "member-filter") mainView === "files" ? render(state) : renderMembers();
   });
+  document.addEventListener("contextmenu", event => {
+    const column = event.target.closest(".tracks-field-grid [data-track-column-key]");
+    if (!column) {
+      closeTrackContextMenu();
+      return;
+    }
+    event.preventDefault();
+    showTrackContextMenu(column.dataset.trackColumnKey || "", event.clientX, event.clientY);
+  });
   document.addEventListener("click", event => {
     const header = event.target.closest("[data-sort]");
     if (header) {
@@ -899,6 +941,7 @@
   });
   document.addEventListener("keydown", event => {
     if (event.key === "Escape") {
+      if (trackContextMenu) { closeTrackContextMenu(); return; }
       const popup = $("[data-multiple-values-popup]:not([hidden])");
       if (popup) { closeMultipleValuesPopup(popup); return; }
     }

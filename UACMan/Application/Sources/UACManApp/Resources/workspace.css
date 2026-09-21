@@ -321,14 +321,10 @@ button { cursor:pointer; }
 .canonical-subtable-field-grid { --field-grid-columns:minmax(110px,.7fr) minmax(180px,1.3fr) 28px; min-width:520px; width:100%; padding:2px var(--field-grid-gap); }
 .canonical-subtable-field-grid .field-grid-row { grid-template-columns:var(--field-grid-columns); width:auto; }
 .canonical-multiple-values-grid .multiple-values-rows { display:flex; flex-direction:column; }
-.multiple-values-title-row { min-height:27px; align-items:center; background:transparent; }
-.multiple-values-title-row .field-grid-cell { min-height:27px; }
-.multiple-values-title-cell { padding:0 5px; color:var(--text); }
-.multiple-values-title-cell strong { font-size:9px; font-weight:650; letter-spacing:.04em; }
-.multiple-values-toolbar-cell { justify-content:flex-end; gap:2px; padding:0 2px; }
-.multiple-values-toolbar-cell .icon-button { width:22px; height:22px; padding:0; }
-.multiple-values-toolbar-cell .multiple-values-popup-close,
-.multiple-values-toolbar-cell .multiple-values-subtable-close { color:var(--muted); }
+.multiple-values-title-row { background:transparent; }
+.multiple-values-title-row .field-grid-heading-input { width:100%; }
+.multiple-values-header-action { cursor:pointer; }
+.multiple-values-header-action:hover { border-color:var(--accent); background:var(--hover)!important; }
 .canonical-multiple-values-grid .field-grid-header .field-grid-cell { justify-content:center; }
 .canonical-multiple-values-grid .multiple-value-editor-row { min-height:27px; align-items:center; }
 .canonical-multiple-values-grid .multiple-value-editor-row .field-grid-cell { min-height:27px; }
@@ -340,6 +336,9 @@ button { cursor:pointer; }
 .canonical-multiple-values-editor .multiple-values-editor-error { padding:1px 4px 0; }
 .multiple-values-popup-card { border:0; border-radius:0; background:transparent; box-shadow:1px 1px 1px #0008; }
 .multiple-values-popup-content { background:transparent; }
+.track-context-menu { position:fixed; z-index:60; min-width:170px; padding:3px; border:1px solid var(--line); border-radius:3px; background:var(--panel); box-shadow:var(--shadow); }
+.track-context-menu button { display:block; width:100%; padding:6px 8px; border:0; border-radius:2px; background:transparent; color:var(--text); font:inherit; text-align:left; cursor:pointer; }
+.track-context-menu button:hover { background:var(--hover); }
 @media(max-width:820px) {
   .main-view-tabs .member-search { width:30vw; min-width:120px; flex-basis:30vw; }
 }
