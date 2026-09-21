@@ -305,7 +305,6 @@ button { cursor:pointer; }
 .track-browser-detail-heading p { max-width:70ch; margin:0; overflow:hidden; color:var(--muted); font:9px ui-monospace,SFMono-Regular,Menlo,monospace; text-overflow:ellipsis; white-space:nowrap; }
 .track-browser-table-wrap { display:flex; flex-direction:column; min-width:0; min-height:0; gap:1rem; overflow-x:auto; padding:0; }
 .track-browser-field-grid { --field-grid-columns:max-content minmax(160px,1fr) minmax(220px,1.5fr) 28px 28px; min-width:680px; width:100%; }
-.track-browser-value-cell { align-items:stretch!important; overflow:visible; }
 .track-browser-actions { justify-content:center; gap:2px; }
 
 .file-preview { display:flex; flex-direction:column; min-height:0; border:1px solid var(--line); border-radius:4px; background:var(--panel); }
@@ -333,8 +332,8 @@ button { cursor:pointer; }
 .inspector-content { scrollbar-gutter:stable; }
 
 .canonical-multiple-values-grid .multiple-values-rows { display:flex; flex-direction:column; }
-.multiple-values-title-row { background:transparent; }
-.multiple-values-title-row .field-grid-heading-input { width:100%; }
+.multiple-values-table-title-row { background:transparent; }
+.multiple-values-table-title-row .field-grid-heading-input { width:100%; }
 .multiple-values-header-action { cursor:pointer; }
 .multiple-values-header-action:hover { border-color:var(--accent); background:var(--hover)!important; }
 .canonical-multiple-values-grid .field-grid-header .field-grid-cell { justify-content:center; }
@@ -442,7 +441,7 @@ button { cursor:pointer; }
 .inserted-table-row.open { grid-template-rows:1fr; max-height:none; opacity:1; }
 .inserted-table-cell { grid-column:1 / -1; width:100%; min-width:0; min-height:0; overflow:visible; padding:0; align-items:stretch; }
 .inserted-table-panel { width:100%; min-width:0; min-height:0; overflow:visible; border:0; border-radius:0; background:transparent; }
-.inserted-table-grid { --field-grid-columns:32px minmax(110px,.7fr) minmax(180px,1.3fr) 28px 28px; width:100%; max-width:100%; min-width:0; padding:0; }
+.inserted-table-grid { --field-grid-columns:var(--canonical-number-column) minmax(110px,.7fr) minmax(180px,1.3fr) 28px 28px; width:100%; max-width:100%; min-width:0; padding:0; }
 .inserted-table-grid .field-grid-row { grid-template-columns:var(--field-grid-columns); width:100%; min-width:0; }
 .inserted-table-grid .field-grid-cell { min-width:0; }
 .inserted-table-grid .field-grid-header .field-grid-cell { justify-content:center; }
@@ -450,7 +449,7 @@ button { cursor:pointer; }
 
 /* Popup JSON editing uses the same canonical rows and cells, but remains a
    fixed modal surface so editing it never reflows the source table. */
-.canonical-popup-field-grid { --multiple-values-popup-columns:32px minmax(110px,.7fr) minmax(180px,1.3fr) 28px 28px; }
+.canonical-popup-field-grid { --multiple-values-popup-columns:var(--canonical-number-column) minmax(110px,.7fr) minmax(180px,1.3fr) 28px 28px; }
 .canonical-popup-field-grid > .canonical-popup-editor { width:100%; min-width:0; }
 .canonical-popup-field-grid .multiple-value-editor-row,
 .canonical-popup-field-grid .multiple-value-readonly-row { grid-template-columns:var(--multiple-values-popup-columns); width:100%; min-width:0; }
@@ -459,9 +458,6 @@ button { cursor:pointer; }
 /* Popup chrome is still canonical table chrome; only the giga surface dims the
    page behind it. The title spans the table while actions remain two cells. */
 .multiple-values-popup-backdrop { background:#00000080; }
-.canonical-popup-field-grid > .multiple-values-title-row { grid-template-columns:minmax(0,1fr) 28px 28px; }
-.canonical-popup-field-grid > .multiple-values-title-row .field-grid-cell:first-child { min-width:0; }
-.canonical-popup-field-grid > .multiple-values-title-row .field-grid-heading-input { text-align:center; }
 
 /* Bundled text previews use the same unobtrusive table chrome as value
    popups, without creating a second scrolling surface in the Files page. */
@@ -574,9 +570,27 @@ button { cursor:pointer; }
 .multiple-values-popup-content > .field-grid { width:max-content; max-width:100%; min-height:0; }
 .canonical-popup-field-grid > .multiple-values-popup-title-row { grid-template-columns:minmax(0,1fr)!important; width:100%; }
 .canonical-popup-field-grid > .multiple-values-popup-title-row .field-grid-cell { grid-column:1 / -1; }
-.canonical-popup-field-grid > .multiple-values-popup-header-row { grid-template-columns:var(--multiple-values-popup-columns)!important; width:100%; }
-.canonical-popup-field-grid > .multiple-values-popup-header-row .field-grid-action-cell { justify-content:flex-end; }
 .track-browser-scroll { scrollbar-gutter:stable; }
 .track-browser-field-grid { --track-tags-columns:var(--canonical-number-column) 110px minmax(160px,1fr) minmax(220px,1.5fr) 28px 28px; }
 .track-browser-field-grid > .field-grid-header,
 .track-browser-field-grid > .field-grid-row:not(.inserted-table-row) { grid-template-columns:var(--track-tags-columns)!important; }
+
+/* All tag tables share one row/cell contract. Pack Tags and the selected-file
+   Track Tags table only differ in their semantic columns; the number cell,
+   cell sizing, and value editor geometry are shared here. */
+.canonical-tag-grid { --canonical-tag-columns:var(--canonical-number-column) 9rem minmax(12rem,1fr) minmax(14rem,1.2fr) 4.5rem 28px 28px; }
+.track-browser-field-grid.canonical-tag-grid { --canonical-tag-columns:var(--canonical-number-column) 110px minmax(160px,1fr) minmax(220px,1.5fr) 28px 28px; }
+.canonical-tag-grid > .field-grid-header,
+.canonical-tag-grid > .field-grid-row:not(.inserted-table-row) { width:100%; min-width:0; box-sizing:border-box; grid-template-columns:var(--canonical-tag-columns)!important; }
+.canonical-tag-grid > .field-grid-row:not(.inserted-table-row) .field-grid-cell { box-sizing:border-box; }
+.canonical-tag-grid .tag-number-cell { text-align:center; }
+.canonical-tag-grid .tag-value-cell { align-items:center; overflow:visible; }
+.canonical-tag-grid .tag-value-cell .tag-inline-editor { width:100%; min-width:0; }
+
+/* Dropdown and popup tables use the same two-row chrome: a full-width tag
+   title, followed by the numbered Tag Name / Tag Value header with actions. */
+.canonical-multiple-values-grid > .multiple-values-table-title-row { grid-template-columns:minmax(0,1fr)!important; width:100%; }
+.canonical-multiple-values-grid > .multiple-values-table-title-row .field-grid-cell { grid-column:1 / -1; }
+.canonical-multiple-values-grid > .multiple-values-table-header-row { grid-template-columns:var(--field-grid-columns)!important; width:100%; }
+.canonical-popup-field-grid > .multiple-values-table-header-row { grid-template-columns:var(--multiple-values-popup-columns)!important; }
+.canonical-multiple-values-grid > .multiple-values-table-header-row .field-grid-action-cell { justify-content:flex-end!important; }
