@@ -491,10 +491,10 @@
     // The giga table has its own explicit track list. Keep it on every row so
     // WebKit cannot fall back to the generic three-column field-grid default.
     const rowTemplateStyle = ` style="grid-template-columns:${columnTemplate} !important"`;
-    const headerCells = ["Track", "Filename", ...columns.map(displayTrackKey)];
+    const headerCells = ["#", "Track #", "Filename", ...columns.map(displayTrackKey)];
     const header = headerCells.map((label, index) => {
-      const sortKey = index === 0 ? "track" : index === 1 ? "filename" : columns[index - 2];
-      const columnAttribute = index > 1 ? ` data-track-column-key="${esc(sortKey)}"` : "";
+      const sortKey = index === 0 ? "row" : index === 1 ? "track" : index === 2 ? "filename" : columns[index - 3];
+      const columnAttribute = index > 2 ? ` data-track-column-key="${esc(sortKey)}"` : "";
       return `<div class="field-grid-cell field-grid-heading" role="columnheader" data-sort="${esc(sortKey)}"${columnAttribute}><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`;
     }).join("");
     const popups = [];
@@ -522,7 +522,7 @@
         const source = extension ? member.extensions : member.metadata;
         return `<div class="field-grid-cell" role="cell" data-track-column-key="${esc(key)}">${scalar(source?.[fieldKey], fieldKey, extension ? "memberExtensions" : "memberMetadata", true)}</div>`;
       }).join("");
-      const row = `<div class="field-grid-row track-array-row" role="row"${rowTemplateStyle}><div class="field-grid-cell" role="cell">${scalar(trackNumber, "track", "memberMetadata", false)}</div><div class="field-grid-cell" role="cell">${scalar(filename, "filename", "memberMetadata", false)}</div>${metadataCells}</div>`;
+      const row = `<div class="field-grid-row track-array-row" role="row"${rowTemplateStyle}><div class="field-grid-cell" role="cell">${scalar(index + 1, "row", "memberMetadata", false)}</div><div class="field-grid-cell" role="cell">${scalar(trackNumber, "track", "memberMetadata", false)}</div><div class="field-grid-cell" role="cell">${scalar(filename, "filename", "memberMetadata", false)}</div>${metadataCells}</div>`;
       return row;
     }).join("");
     const empty = `<div class="field-grid-empty" role="row"><span role="cell">No playable tracks</span></div>`;
@@ -532,14 +532,15 @@
   function trackArrayColumnTemplate(tracks, columns) {
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
-    if (!context) return "64px 220px " + columns.map(() => "160px").join(" ");
+    if (!context) return "32px 64px 220px " + columns.map(() => "160px").join(" ");
     context.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
     const widthFor = values => {
       const measured = values.map(value => context.measureText(String(value ?? "")).width).filter(Number.isFinite);
       return Math.max(58, Math.ceil(Math.max(...measured, 0) + 18));
     };
     const widths = [
-      widthFor(["Track", ...tracks.map((member, index) => String(trackNumberFor(member, index)).padStart(2, "0"))]),
+      32,
+      widthFor(["Track #", ...tracks.map((member, index) => String(trackNumberFor(member, index)).padStart(2, "0"))]),
       widthFor(["Filename", ...tracks.map(member => member.name || member.path.split("/").pop() || member.path)]),
       ...columns.map(key => widthFor([displayTrackKey(key), ...tracks.map(member => {
         const value = memberFields(member)[key];
@@ -569,7 +570,7 @@
 
   function renderTrackTagTable(member) {
     const entries = fileTagEntries(member);
-    const header = canonicalHeaderMarkup(["Scope", "Tag Name", "Tag Value", "✓", "×"]);
+    const header = canonicalHeaderMarkup(["#", "Scope", "Tag Name", "Tag Value", "✓", "×"]);
     const rows = entries.map((entry, index) => {
       const structured = entry.value && typeof entry.value === "object";
       let valueMarkup = memberTagValueMarkup(member, entry);
@@ -581,7 +582,7 @@
         subrow = `<div class="field-grid-row inserted-table-row" role="row" data-canonical-subrow="${esc(foldID)}"><div class="field-grid-cell inserted-table-cell" role="cell">${subtable}</div></div>`;
       }
       const foldAttribute = structured ? ` data-multiple-fold-id="file-tag-${index}"` : "";
-      return `<div class="field-grid-row" role="row" data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"${foldAttribute}><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-scope" value="${entry.scope === "memberExtensions" ? "extension" : "metadata"}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name"></div><div class="field-grid-cell track-browser-value-cell" role="cell">${valueMarkup}</div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitFileTag" title="Submit changed tag" aria-label="Submit changed tag">✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteFileTag" title="Delete tag" aria-label="Delete tag">×</button></div></div>${subrow}`;
+      return `<div class="field-grid-row" role="row" data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"${foldAttribute}><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-number" value="${index + 1}" aria-label="Tag number" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-scope" value="${entry.scope === "memberExtensions" ? "extension" : "metadata"}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name"></div><div class="field-grid-cell track-browser-value-cell" role="cell">${valueMarkup}</div><div class="field-grid-cell tag-submit-cell" role="cell"><button class="icon-button" data-action="commitFileTag" title="Submit changed tag" aria-label="Submit changed tag">✓</button></div><div class="field-grid-cell tag-delete-cell" role="cell"><button class="icon-button danger" data-action="deleteFileTag" title="Delete tag" aria-label="Delete tag">×</button></div></div>${subrow}`;
     }).join("");
     const empty = '<div class="field-grid-empty" role="row"><span role="cell">No tags on this file</span></div>';
     return `<div class="field-grid canonical-table flat-table track-browser-field-grid" role="table" aria-label="Tags for ${esc(member.name)}">${header}${rows || empty}</div>`;
@@ -618,8 +619,8 @@
 
   function renderFilesPage() {
     const members = visibleFileMembers();
-    const header = ["Role", "Format", "Filename", "Stored path", "Tags Count", "Size", "View"].map(label => `<div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`).join("");
-    const rows = members.map(member => `<div class="field-grid-row file-row" role="row" tabindex="0" data-track-row="${esc(member.path)}" title="Open metadata for ${esc(member.name)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.role)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.format || "unknown")}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-name-field" data-file-name data-file-path="${esc(member.path)}" value="${esc(member.name)}" aria-label="Filename"></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-path-field" value="${esc(member.path)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tags-count" value="${fileTagEntries(member).length}" aria-label="Tag count" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(bytes(member.bytes))}" disabled></div><div class="field-grid-cell field-grid-action-cell" role="cell">${member.previewable ? `<button class="icon-button" data-action="previewMember" data-preview-path="${esc(member.path)}" title="View bundled text" aria-label="View bundled text">⌕</button>` : `<span class="field-grid-action-placeholder" title="Text preview unavailable" aria-label="Text preview unavailable">—</span>`}</div></div>`).join("");
+    const header = ["#", "Role", "Format", "Filename", "Stored path", "Tags Count", "Size", "View"].map(label => `<div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`).join("");
+    const rows = members.map((member, index) => `<div class="field-grid-row file-row" role="row" tabindex="0" data-track-row="${esc(member.path)}" title="Open metadata for ${esc(member.name)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field file-number" value="${index + 1}" aria-label="File number" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.role)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(member.format || "unknown")}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-name-field" data-file-name data-file-path="${esc(member.path)}" value="${esc(member.name)}" aria-label="Filename"></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-path-field" value="${esc(member.path)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-tags-count" value="${fileTagEntries(member).length}" aria-label="Tag count" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(bytes(member.bytes))}" disabled></div><div class="field-grid-cell field-grid-action-cell" role="cell">${member.previewable ? `<button class="icon-button" data-action="previewMember" data-preview-path="${esc(member.path)}" title="View bundled text" aria-label="View bundled text">⌕</button>` : `<span class="field-grid-action-placeholder" title="Text preview unavailable" aria-label="Text preview unavailable">—</span>`}</div></div>`).join("");
     const empty = `<div class="field-grid-empty" role="row"><span role="cell">No package members match this filter</span></div>`;
     const preview = state.filePreviewPath
       ? `<div class="file-preview-backdrop" role="presentation"><section class="file-preview" role="dialog" aria-modal="true" aria-label="Bundled file preview"><div class="file-preview-heading"><div><strong>${esc(state.filePreviewName || "Bundled file")}</strong><span>${esc(state.filePreviewPath)}</span></div><button class="icon-button" data-action="closeFilePreview" title="Close preview" aria-label="Close preview">×</button></div>${state.filePreviewError ? `<div class="file-preview-error">${esc(state.filePreviewError)}</div>` : `<pre class="file-preview-content">${esc(state.filePreviewContent)}</pre>${state.filePreviewTruncated ? '<div class="file-preview-note">Preview limited to the first 4 MiB. The bundled file remains unchanged.</div>' : ""}`}</section></div>`
@@ -630,8 +631,8 @@
   function renderAttachments() {
     const assets = state.members.filter(member => member.role !== "playable" && member.role !== "track");
     if (!assets.length) return "";
-    const header = ["Role", "Format", "Filename", "Stored path", "Size"].map(label => `<div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`).join("");
-    const rows = assets.map(asset => `<div class="field-grid-row attachment-row" role="row" tabindex="0" data-track-row="${esc(asset.path)}" title="Open metadata for ${esc(asset.name)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(asset.role)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(asset.format || "unknown")}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-name-field" value="${esc(asset.name)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-path-field" value="${esc(asset.path)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(bytes(asset.bytes))}" disabled></div></div>`).join("");
+    const header = ["#", "Role", "Format", "Filename", "Stored path", "Size"].map(label => `<div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="${esc(label)}" disabled></div>`).join("");
+    const rows = assets.map((asset, index) => `<div class="field-grid-row attachment-row" role="row" tabindex="0" data-track-row="${esc(asset.path)}" title="Open metadata for ${esc(asset.name)}"><div class="field-grid-cell" role="cell"><input class="tag-table-field file-number" value="${index + 1}" aria-label="Attachment number" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(asset.role)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(asset.format || "unknown")}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-name-field" value="${esc(asset.name)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-path-field" value="${esc(asset.path)}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field" value="${esc(bytes(asset.bytes))}" disabled></div></div>`).join("");
     return `<section class="inspector-section attachments-section"><div class="section-title"><span>Attachments</span><span class="section-help">${assets.length} package files</span></div><div class="data-table-scroll canonical-table-surface attachment-table-scroll"><div class="field-grid canonical-table flat-table attachment-field-grid" role="table" aria-label="Package attachments"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows}</div></div></section>`;
   }
 

@@ -522,3 +522,44 @@ button { cursor:pointer; }
   .track-browser-sidebar-pane .track-browser-scroll { height:220px; }
   .track-browser-detail-pane .track-browser-scroll { height:calc(100% - 230px); }
 }
+
+/* Numbered-table contract: every visible table starts with the same compact,
+   centered 32px row-number column. The remaining columns retain their page
+   semantics, but never get to change the number cell's geometry. */
+:root { --canonical-number-column:32px; }
+.meta-field-grid { --field-grid-columns:var(--canonical-number-column) 9rem minmax(12rem,1fr) minmax(14rem,1.2fr) 4.5rem 28px 28px; }
+.meta-field-grid > .field-grid-header,
+.meta-field-grid > .field-grid-row:not(.inserted-table-row) { width:100%; min-width:0; box-sizing:border-box; grid-template-columns:var(--field-grid-columns); }
+.meta-field-grid .tag-number-cell,
+.meta-field-grid .tag-create-number,
+.meta-field-grid .multiple-value-number { text-align:center; }
+
+.track-browser-field-grid { --field-grid-columns:var(--canonical-number-column) 110px minmax(160px,1fr) minmax(220px,1.5fr) 28px 28px; }
+.track-browser-field-grid > .field-grid-header,
+.track-browser-field-grid > .field-grid-row:not(.inserted-table-row) { width:100%; min-width:0; box-sizing:border-box; grid-template-columns:var(--field-grid-columns); }
+.track-browser-field-grid > .field-grid-row:not(.inserted-table-row) .field-grid-cell { box-sizing:border-box; }
+.track-browser-field-grid .file-tag-number { text-align:center; }
+
+.track-browser-sidebar-field-grid { --field-grid-columns:var(--canonical-number-column) minmax(0,1fr) 56px; }
+.track-browser-sidebar-field-grid .field-grid-header,
+.track-browser-sidebar-field-grid .field-grid-row:not(.inserted-table-row) { width:100%; min-width:0; box-sizing:border-box; grid-template-columns:var(--field-grid-columns); }
+
+.file-field-grid { --file-field-columns:var(--canonical-number-column) 105px 90px 220px minmax(300px,1fr) minmax(250px,330px) 90px 40px; }
+.file-field-grid .field-grid-header,
+.file-field-grid .file-row { width:100%; min-width:1120px; box-sizing:border-box; grid-template-columns:var(--file-field-columns); }
+.attachment-field-grid { --attachment-field-columns:var(--canonical-number-column) 110px 100px 220px minmax(320px,1fr) 90px; }
+.attachment-field-grid .field-grid-header,
+.attachment-field-grid .attachment-row { width:100%; min-width:900px; box-sizing:border-box; grid-template-columns:var(--attachment-field-columns); }
+.file-number,
+.tracks-field-grid > .track-array-row > .field-grid-cell:first-child .tag-table-field { text-align:center; }
+
+/* A child subtable is still part of its parent surface. Keep the parent
+   readable but gently de-emphasized while its inserted rows are open. */
+.canonical-table:has(> .inserted-table-row.open) > .field-grid-row:not(.inserted-table-row) { opacity:.94; transition:opacity var(--ui-motion); }
+
+/* Popups use the same canonical table frame and may occupy the full usable
+   window height, giving long JSON row tables their own complete scroll area. */
+.multiple-values-popup-backdrop { align-items:stretch; }
+.multiple-values-popup-card { align-self:stretch; max-height:none; border:1px solid var(--line); border-radius:4px; background:var(--panel); box-shadow:none; }
+.multiple-values-popup-content { flex:1 1 auto; min-height:0; }
+.multiple-values-popup-content > .field-grid { min-height:100%; }
