@@ -40,16 +40,21 @@ its horizontal scroll belongs to the workspace surface rather than a nested
 table window. **Files** lists every stored package member, including playable
 streams, artwork, cue sheets, and documentation. Its filename field edits the
 manifest's displayed/original filename while the stored TAR path remains
-immutable. Each row's **Tags** column is a numeric count, and recognized text
-members open in a compact canonical popup. All four page tables use the same
-rounded canonical frame and inset. The **Track Tags** page provides two
+immutable. Each row's **Tags Count** column is numeric. A fixed-width **View**
+column is blank for binary members and shows a magnifier for supported text
+attachments. The button opens a read-only viewer for recognized UTF-8 or UTF-16
+text (including JSON, Markdown, and cue sheets), limited to the first 4 MiB.
+Pack Tags' attachment table uses the same canonical View column and viewer.
+All page tables use the same rounded canonical frame and inset. The **Track Tags** page provides two
 independent scroll panes, each containing the canonical field-grid table: a
 three-column tagged-file table on the left and an exhaustive metadata table on
 the right. They share the same cells and geometry, with no merged
 sidebar/content bar and no separate new-tag form. The left table is a compact,
 auto-height canonical table; its frame does not fill the page when it has only a
-few rows. **Pack Tags** contains package-level metadata and all attachments using
-the same field-grid cells and add interface as the tag workspace. Non-string
+few rows. **Pack Tags** contains a three-row canonical **New Tag** table (title,
+column headers, and editable draft row), the package-level tag table, and the
+attachments table. Each table title is part of its own canonical grid rather
+than a separate decorative section heading. Non-string
 values in Pack Tags and Track Tags use `[Nested Tags]` to open an animated,
 full-width inserted canonical subtable. Only the wide Tracks giga-table uses a
 dimmed popup for structured JSON, so its row geometry remains fixed.
@@ -67,13 +72,11 @@ simple set summary should not be nested needlessly.
 
 ## Editing and import
 
-Per-field edits use typed rows: **Add column** creates a text, number, boolean,
-or JSON field, and removing a row removes that manifest field. A centered
-`[Nested Tags]` popup and its **Open JSON editor** escape hatch remain
-available for advanced or nested edits. The giga-table popup title row carries
-the tag name, header ✓ submits the full JSON value, and header × closes it.
-Small-table inserted subtables use the same title/action row inside the parent
-table. Malformed JSON is rejected without closing or submitting the popup or
+Pack Tags edits use canonical table rows; the **New Tag** draft adds a
+package-level string tag, and existing rows can be renamed, edited, submitted,
+or deleted. Structured values remain editable through the small-table inserted
+subtable or the giga-table popup, using canonical title and action rows.
+Malformed JSON is rejected without closing or submitting the popup or
 subtable.
 The table headers are ordinary rows rather than sticky overlays. Native macOS
 title-bar controls remain visible for the UACMan window.

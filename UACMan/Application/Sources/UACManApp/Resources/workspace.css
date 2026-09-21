@@ -107,7 +107,6 @@ button { cursor:pointer; }
 .technical-field-grid { --field-grid-columns:15% 7% minmax(0,1fr) minmax(0,1fr) 28px 28px; min-width:760px; }
 .technical-field-grid .action-heading { grid-column:span 2; justify-content:center; }
 .meta-field-grid { --field-grid-columns:4.75rem 9rem minmax(12rem,1fr) minmax(14rem,1.2fr) 4.5rem 28px 28px; min-width:760px; }
-.tag-scope-table { margin-top:10px; }
 .tag-values-popover { position:relative; display:inline-block; }
 .tag-values-popover summary { cursor:pointer; list-style:none; color:var(--muted); }
 .tag-values-popover summary::-webkit-details-marker { display:none; }
@@ -119,22 +118,10 @@ button { cursor:pointer; }
 .track-structured-popover .tag-values-list > div { display:flex; gap:8px; }
 .track-structured-popover .tag-values-list strong { color:var(--accent); font-weight:500; }
 .track-structured-popover .tag-values-list span { min-width:0; }
-.section-title { display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; }
-.section-title > span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.section-help { color:var(--muted); font-size:9px; white-space:nowrap; }
-.tag-create-form { display:grid; grid-template-columns:9rem 7rem minmax(110px,1fr) minmax(140px,1.2fr) 28px; column-gap:var(--field-grid-gap); align-items:center; width:100%; min-width:0; margin:0 0 8px; padding:2px var(--field-grid-gap); border:1px solid var(--line); border-radius:4px; background:var(--panel); font:10px/1.15 ui-monospace,SFMono-Regular,Menlo,monospace; }
-.tag-create-form > * { min-width:0; }
-.tag-create-form .tag-table-field { height:23px; color:var(--accent); }
-.tag-create-label { color:var(--muted); font-weight:650; }
-.tag-create-type { color:var(--muted); }
-.tag-create-submit { justify-self:center; width:23px; height:23px; border:1px solid var(--line); border-radius:3px; }
 .tag-create-row { min-height:27px; align-items:center; background:var(--panel); }
 .tag-create-row .field-grid-cell { min-width:0; }
 .tag-create-row .tag-table-field { height:23px; color:var(--accent); }
 .tag-create-number,.tag-create-row .tag-submit-cell,.tag-create-row .tag-delete-cell { justify-content:center; }
-.tag-create-marker { color:var(--accent); font-size:13px; line-height:1; }
-.tag-create-type,.tag-create-hint { color:var(--muted); }
-.tag-create-hint { text-align:center; }
 .track-grid .track-number-heading,.track-grid .track-number-cell { position:sticky; left:28px; z-index:1; width:64px; min-width:42px; max-width:120px; background:var(--panel); }
 .track-grid .track-number-heading { background:var(--panel-2); }
 .track-grid tbody tr:hover .track-number-cell,.track-grid tbody tr.active .track-number-cell { background:var(--selected); }
@@ -522,7 +509,7 @@ button { cursor:pointer; }
 /* Numbered-table contract: every visible table starts with the same compact,
    centered 32px row-number column. The remaining columns retain their page
    semantics, but never get to change the number cell's geometry. */
-:root { --canonical-number-column:32px; }
+:root { --canonical-number-column:32px; --canonical-action-column:28px; }
 .meta-field-grid { --field-grid-columns:var(--canonical-number-column) 9rem minmax(12rem,1fr) minmax(14rem,1.2fr) 4.5rem 28px 28px; }
 .meta-field-grid > .field-grid-header,
 .meta-field-grid > .field-grid-row:not(.inserted-table-row) { width:100%; min-width:0; box-sizing:border-box; grid-template-columns:var(--field-grid-columns); }
@@ -540,10 +527,10 @@ button { cursor:pointer; }
 .track-browser-sidebar-field-grid .field-grid-header,
 .track-browser-sidebar-field-grid .field-grid-row:not(.inserted-table-row) { width:100%; min-width:0; box-sizing:border-box; grid-template-columns:var(--field-grid-columns); }
 
-.file-field-grid { --file-field-columns:var(--canonical-number-column) 105px 90px 220px minmax(300px,1fr) minmax(250px,330px) 90px 40px; }
+.file-field-grid { --file-field-columns:var(--canonical-number-column) 105px 90px 220px minmax(300px,1fr) 90px 90px var(--canonical-action-column); }
 .file-field-grid .field-grid-header,
 .file-field-grid .file-row { width:100%; min-width:1120px; box-sizing:border-box; grid-template-columns:var(--file-field-columns); }
-.attachment-field-grid { --attachment-field-columns:var(--canonical-number-column) 110px 100px 220px minmax(320px,1fr) 90px; }
+.attachment-field-grid { --attachment-field-columns:var(--canonical-number-column) 110px 100px 220px minmax(320px,1fr) 90px var(--canonical-action-column); }
 .attachment-field-grid .field-grid-header,
 .attachment-field-grid .attachment-row { width:100%; min-width:900px; box-sizing:border-box; grid-template-columns:var(--attachment-field-columns); }
 .file-number,
@@ -582,10 +569,33 @@ button { cursor:pointer; }
 .track-browser-field-grid.canonical-tag-grid { --canonical-tag-columns:var(--canonical-number-column) 110px minmax(160px,1fr) minmax(220px,1.5fr) 28px 28px; }
 .canonical-tag-grid > .field-grid-header,
 .canonical-tag-grid > .field-grid-row:not(.inserted-table-row) { width:100%; min-width:0; box-sizing:border-box; grid-template-columns:var(--canonical-tag-columns)!important; }
+.canonical-tag-grid > .canonical-table-title-row { grid-template-columns:minmax(0,1fr)!important; }
+.canonical-tag-grid > .canonical-table-title-row .field-grid-cell { grid-column:1 / -1; }
 .canonical-tag-grid > .field-grid-row:not(.inserted-table-row) .field-grid-cell { box-sizing:border-box; }
 .canonical-tag-grid .tag-number-cell { text-align:center; }
 .canonical-tag-grid .tag-value-cell { align-items:center; overflow:visible; }
 .canonical-tag-grid .tag-value-cell .tag-inline-editor { width:100%; min-width:0; }
+
+/* Pack Tags' add form is a peer canonical table, not a custom form layout. */
+.tag-create-form { display:block; width:100%; min-width:0; margin:0 0 8px; padding:0; }
+.tag-create-grid { width:100%; min-width:0; }
+.tag-create-grid > .canonical-table-title-row { grid-template-columns:minmax(0,1fr)!important; width:100%; }
+.tag-create-grid > .canonical-table-title-row .field-grid-cell { grid-column:1 / -1; }
+.tag-create-grid .tag-create-row .field-grid-cell { box-sizing:border-box; }
+.tag-create-grid .tag-create-row .tag-submit-cell,
+.tag-create-grid .tag-create-row .tag-delete-cell { justify-content:center; }
+
+/* View is a regular canonical action column: blank for opaque members, with
+   the same fixed-width action cell when a text attachment can be previewed. */
+.file-field-grid .file-view-cell,
+.attachment-field-grid .file-view-cell { justify-content:center; }
+.file-field-grid .file-preview-action,
+.attachment-field-grid .file-preview-action { flex:none; }
+.attachment-field-grid { min-width:924px; }
+.attachment-field-grid .field-grid-header,
+.attachment-field-grid .attachment-row { min-width:924px; }
+.attachment-field-grid > .canonical-table-title-row { grid-template-columns:minmax(0,1fr)!important; width:100%; }
+.attachment-field-grid > .canonical-table-title-row .field-grid-cell { grid-column:1 / -1; }
 
 /* Dropdown and popup tables use the same two-row chrome: a full-width tag
    title, followed by the numbered Tag Name / Tag Value header with actions. */

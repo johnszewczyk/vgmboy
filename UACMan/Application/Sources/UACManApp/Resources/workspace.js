@@ -3,7 +3,6 @@
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const bridge = (action, values = {}) => window.webkit?.messageHandlers?.uacman?.postMessage({ action, ...values });
   const esc = value => String(value ?? "").replace(/[&<>"']/g, char => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[char]));
-  const textOrDash = value => value ? esc(value) : '<span class="muted">—</span>';
   const memberLocation = member => {
     const prefix = member.variantID ? `variants/${member.variantID}/` : "";
     const relativePath = Number(state?.variantCount) === 1 && prefix && member.path.startsWith(prefix)
@@ -86,6 +85,10 @@
     const heading = `<input class="tag-table-field field-grid-heading-input" value="${esc(label)}" aria-label="${esc(label)}" disabled>`;
     return canonicalCellMarkup(heading, { ...options, className:["field-grid-heading", options.className].filter(Boolean).join(" "), role:"columnheader" });
   };
+  const canonicalTitleRowMarkup = (title, className = "canonical-table-title-row") => {
+    const titleCell = canonicalCellMarkup(`<input class="tag-table-field field-grid-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled>`, { className:"field-grid-heading", role:"columnheader" });
+    return canonicalRowMarkup([titleCell], { className:["field-grid-header", className].filter(Boolean).join(" ") });
+  };
   const canonicalHeaderMarkup = (labels, options = {}) => canonicalRowMarkup(
     labels.map((label, index) => canonicalHeaderCellMarkup(label, options.cell?.(label, index) || {})),
     { className:"field-grid-header", attributes:options.attributes, style:options.style }
@@ -98,8 +101,6 @@
     const rows = options.rows || options.empty || "";
     return `<div class="${classes}" role="table"${ariaLabel}${attributes}${style}>${options.header || ""}${rows}</div>${options.trailing || ""}`;
   };
-  const technicalKeyPattern = /^(?:extension\.)?(?:contained|source|native|technical|diagnostic|hash|blake3|md5|sha1|loop|fade|intro|disc|xa|pcm|raw|tracktotal|disctotal|schema|versions|formats|dumper|cue|memberpath|sector|lba)/i;
-  const isTechnicalKey = key => technicalKeyPattern.test(String(key)) || /^(?:SOURCE_|NATIVE_|XA_|LOOP_|PCM_)/i.test(String(key));
   const memberFields = member => ({
     ...(member.metadata || {}),
     ...Object.fromEntries(Object.entries(member.extensions || {}).map(([key, value]) => [`extension.${key}`, value]))
@@ -115,26 +116,6 @@
       return a.localeCompare(b, undefined, { numeric:true, sensitivity:"base" });
     });
   };
-  const displayMetadataValue = value => {
-    if (value === null || value === undefined || value === "") return '<span class="muted">—</span>';
-    if (typeof value === "object") {
-      const count = Array.isArray(value) ? value.length : Object.keys(value).length;
-      return `<span class="structured-value" title="Multiple Values; open the disclosure to inspect them">Multiple Values · ${count}</span>`;
-    }
-    return esc(String(value));
-  };
-  const canonicalFoldMarkup = (label, body, options = {}) => {
-    const open = options.open === true;
-    const meta = options.meta ? `<span class="canonical-fold-meta">${esc(options.meta)}</span>` : "";
-    return `<div class="canonical-fold ${esc(options.className || "")}"><button class="canonical-fold-toggle" type="button" data-action="toggleCanonicalFold" aria-expanded="${open}"><span>${esc(label)}</span>${meta}<span class="canonical-fold-icon">${open ? "−" : "＋"}</span></button><div class="canonical-fold-panel${open ? " open" : ""}"><div class="canonical-fold-inner">${body}</div></div></div>`;
-  };
-  const multipleValuesMarkup = (value, suppliedEntries = null) => {
-    const entries = suppliedEntries || (Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value || {}));
-    const body = entries.length
-      ? entries.map(([key, item]) => `<div class="tag-multiple-value-row"><span>${esc(key)}</span><span>${esc(typeof item === "object" ? JSON.stringify(item) : String(item ?? "—"))}</span></div>`).join("")
-      : '<div class="tag-multiple-value-row"><span>—</span><span>Empty</span></div>';
-    return canonicalFoldMarkup("Multiple Values", body, { className:"tag-multiple-values" });
-  };
   const nestedJSONValueMarkup = (value, key, editable = true) => {
     const raw = JSON.stringify(value, null, 2);
     const body = editable
@@ -147,8 +128,7 @@
     : `<button class="tag-table-field field-grid-heading-input multiple-values-header-action multiple-values-popup-close" data-action="closeMultipleValuesPopup" data-popup-id="${esc(context.popupID || "")}" type="button" title="Close" aria-label="Close">×</button>`;
   const multipleValuesTableTitleRowMarkup = context => {
     const title = context.title || context.key || "Values";
-    const titleCell = canonicalCellMarkup(`<input class="tag-table-field field-grid-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled>`, { className:"field-grid-heading", role:"columnheader" });
-    return canonicalRowMarkup([titleCell], { className:"field-grid-header multiple-values-table-title-row" });
+    return canonicalTitleRowMarkup(title, "multiple-values-table-title-row");
   };
   const multipleValuesTableHeaderRowMarkup = (context, editable) => {
     const submitMarkup = editable
@@ -166,53 +146,43 @@
   const multipleValuesEditorBodyMarkup = (value, context = {}) => {
     const isArray = Array.isArray(value);
     const popupLayout = context.layout === "popup";
-    const canonicalLayout = ["canonical", "subtable", "popup"].includes(context.layout);
     const subtableLayout = context.layout === "subtable";
-    const tableLayout = subtableLayout || popupLayout;
     const gridClass = context.layout === "subtable" ? "inserted-table-grid" : "canonical-popup-field-grid";
     const entries = isArray ? value.map((item, index) => [String(index), item]) : Object.entries(value || {});
     const rowMarkup = ([key, item], index) => {
       const kind = fieldKind(item);
       const raw = kind === "json" ? JSON.stringify(item, null, 2) : String(item ?? "");
       const valueControl = kind === "json"
-        ? (canonicalLayout ? nestedJSONValueMarkup(item, key) : `<textarea class="multiple-value-editor" data-multiple-value aria-label="Value for ${esc(key)}">${esc(raw)}</textarea>`)
-        : `<input class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-editor" data-multiple-value value="${esc(raw)}" aria-label="Value for ${esc(key)}">`;
-      const rowClass = canonicalLayout ? "multiple-value-editor-row" : "tag-multiple-value-row multiple-value-editor-row";
-      const keyMarkup = `<input class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-key" data-multiple-key value="${esc(key)}" aria-label="Key for ${esc(key)}"${isArray ? " disabled" : ""}>`;
-      const numberMarkup = tableLayout ? canonicalCellMarkup(`<input class="tag-table-field multiple-value-number" value="${index + 1}" aria-label="Value number ${index + 1}" disabled>`) : "";
+        ? nestedJSONValueMarkup(item, key)
+        : `<input class="tag-table-field multiple-value-editor" data-multiple-value value="${esc(raw)}" aria-label="Value for ${esc(key)}">`;
+      const keyMarkup = `<input class="tag-table-field multiple-value-key" data-multiple-key value="${esc(key)}" aria-label="Key for ${esc(key)}"${isArray ? " disabled" : ""}>`;
+      const numberMarkup = canonicalCellMarkup(`<input class="tag-table-field multiple-value-number" value="${index + 1}" aria-label="Value number ${index + 1}" disabled>`);
       const removeMarkup = `<button class="icon-button danger multiple-value-remove" data-action="removeMultipleValue" type="button" title="Remove value" aria-label="Remove value">×</button>`;
-      const submitMarkup = tableLayout ? '<button class="icon-button multiple-value-submit" data-action="commitMultipleValueRow" type="button" title="Submit changed value" aria-label="Submit changed value">✓</button>' : "";
-      if (!canonicalLayout) return `<div class="${rowClass}" data-multiple-entry data-multiple-kind="${kind}">${keyMarkup}${valueControl}${removeMarkup}</div>`;
+      const submitMarkup = '<button class="icon-button multiple-value-submit" data-action="commitMultipleValueRow" type="button" title="Submit changed value" aria-label="Submit changed value">✓</button>';
       const cells = [
         numberMarkup,
         canonicalCellMarkup(keyMarkup),
         canonicalCellMarkup(valueControl),
-        ...(tableLayout ? [canonicalCellMarkup(submitMarkup, { className:"field-grid-action-cell" })] : []),
+        canonicalCellMarkup(submitMarkup, { className:"field-grid-action-cell" }),
         canonicalCellMarkup(removeMarkup, { className:"field-grid-action-cell" })
       ];
-      return canonicalRowMarkup(cells, { className:rowClass, attributes:`data-multiple-entry data-multiple-kind="${kind}"` });
+      return canonicalRowMarkup(cells, { className:"multiple-value-editor-row", attributes:`data-multiple-entry data-multiple-kind="${kind}"` });
     };
     const rows = entries.map(rowMarkup).join("");
     const data = [
       `data-multiple-editor`,
       `data-multiple-target="${esc(context.target || "member")}"`,
       `data-multiple-array="${isArray}"`,
-      `data-multiple-layout="${subtableLayout ? "subtable" : popupLayout ? "popup" : canonicalLayout ? "canonical" : "compact"}"`,
+      `data-multiple-layout="${subtableLayout ? "subtable" : "popup"}"`,
       `data-multiple-path="${esc(context.path || "")}"`,
       `data-multiple-scope="${esc(context.scope || "")}"`,
       `data-multiple-key="${esc(context.key || "")}"`
     ].join(" ");
-    const rowsMarkup = canonicalLayout
-      ? popupLayout
-        ? `<div class="multiple-values-rows">${rows || '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'}</div>`
-        : `<div class="field-grid ${gridClass} canonical-multiple-values-grid" role="table">${multipleValuesTableChromeMarkup(context, true)}<div class="multiple-values-rows">${rows || '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'}</div></div>`
-      : `<div class="multiple-values-rows">${rows || '<div class="file-tag-empty multiple-values-empty">No values</div>'}</div>`;
-    const body = `<div class="multiple-values-editor${canonicalLayout ? " canonical-multiple-values-editor" : ""}${popupLayout ? " canonical-popup-editor" : ""}" ${data}>${rowsMarkup}${canonicalLayout ? "" : '<div class="multiple-values-editor-actions"><button class="icon-button" data-action="addMultipleValue" type="button" title="Add value" aria-label="Add value">＋</button><button class="icon-button" data-action="commitMultipleValues" type="button" title="Submit changed values" aria-label="Submit changed values">✓</button>'}<div class="multiple-values-editor-error" role="status"></div></div>`;
+    const rowsMarkup = popupLayout
+      ? `<div class="multiple-values-rows">${rows || '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'}</div>`
+      : `<div class="field-grid ${gridClass} canonical-multiple-values-grid" role="table">${multipleValuesTableChromeMarkup(context, true)}<div class="multiple-values-rows">${rows || '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'}</div></div>`;
+    const body = `<div class="multiple-values-editor canonical-multiple-values-editor${popupLayout ? " canonical-popup-editor" : ""}" ${data}>${rowsMarkup}<div class="multiple-values-editor-error" role="status"></div></div>`;
     return { body, count:entries.length };
-  };
-  const multipleValuesEditorMarkup = (value, context = {}) => {
-    const editor = multipleValuesEditorBodyMarkup(value, context);
-    return canonicalFoldMarkup("Multiple Values", editor.body, { className:"tag-multiple-values editable-multiple-values", meta:context.showCount === false ? "" : editor.count });
   };
   const multipleValuesTriggerMarkup = foldID => `<button class="canonical-fold-toggle canonical-fold-trigger" type="button" data-action="toggleCanonicalFold" data-fold-id="${esc(foldID)}" aria-expanded="false"><span>[Nested Tags]</span><span class="canonical-fold-icon">＋</span></button>`;
   const multipleValuesReadOnlyTableMarkup = (entries, context = {}) => {
@@ -259,7 +229,6 @@
   };
   let state = null;
   let sort = { key:"track", direction:1 };
-  let inspectorTab = "set";
   let mainView = "members";
   let trackBrowserPath = "";
   let dirtyTrackPaths = new Set();
@@ -305,7 +274,6 @@
     state = stateValue;
     if (state.documentName !== lastDocumentName) {
       lastDocumentName = state.documentName || "";
-      inspectorTab = "set";
       mainView = "members";
       trackBrowserPath = "";
       dirtyTrackPaths = new Set();
@@ -409,27 +377,6 @@
     return "json";
   }
 
-  function fieldValueMarkup(value, id, kind) {
-    const encoded = kind === "string" ? value : JSON.stringify(value, null, 2);
-    if (value && typeof value === "object") {
-      const count = Array.isArray(value) ? value.length : Object.keys(value).length;
-      return `<details class="nested-field"><summary>Multiple Values · ${count} <span>Open</span></summary><textarea class="field-structured" data-field-value data-focus-id="${esc(id)}">${esc(encoded)}</textarea></details>`;
-    }
-    return `<input class="field-value" data-field-value data-focus-id="${esc(id)}" value="${esc(encoded)}">`;
-  }
-
-  function renderPropertyEditor(title, scope, raw, options = {}) {
-    const includeTechnical = options.includeTechnical === true;
-    const includeEmpty = options.includeEmpty === true;
-    const value = parseObject(raw);
-    const fields = value ? Object.entries(value).filter(([key, field]) => (includeTechnical || !isTechnicalKey(key)) && (includeEmpty || !isEmptyTagValue(field))).map(([key, field]) => {
-      const kind = fieldKind(field);
-      const editorID = `${scope}-${key}`;
-      return `<tr class="field-row ${isTechnicalKey(key) ? "technical-field" : ""}" data-kind="${kind}"><td><input class="field-key" data-field-key data-focus-id="${esc(editorID)}" value="${esc(key)}" aria-label="Metadata field name"></td><td>${fieldValueMarkup(field, `${editorID}-value`, kind)}</td><td class="field-type-cell"><select class="field-type" data-field-type aria-label="Value type"><option value="string" ${kind === "string" ? "selected" : ""}>text</option><option value="number" ${kind === "number" ? "selected" : ""}>number</option><option value="boolean" ${kind === "boolean" ? "selected" : ""}>boolean</option><option value="json" ${kind === "json" ? "selected" : ""}>json</option></select></td><td class="field-action-cell"><button class="remove-field" data-action="removeField" title="Remove field" aria-label="Remove ${esc(key)}">×</button></td></tr>`;
-    }).join("") : `<tr><td colspan="4" class="json-invalid">Metadata must be a JSON object. Use the JSON editor only if recovery is needed.</td></tr>`;
-    return `<section class="inspector-section metadata-section" data-scope-section="${scope}"><div class="section-title">${esc(title)}<span class="section-actions"><button class="add-field" data-action="addField" data-scope="${scope}">＋ Add field</button></span></div><table class="kv-table"><thead><tr><th>Key</th><th>Value</th><th class="type-heading">Type</th><th class="action-heading"></th></tr></thead><tbody class="field-list" data-editor="${scope}">${fields}</tbody></table><div class="field-error" data-error-for="${scope}"></div><details class="raw-editor"><summary>Open JSON editor</summary><textarea data-raw-editor="${scope}" data-focus-id="raw-${scope}">${esc(raw || "{}")}</textarea></details></section>`;
-  }
-
   function playableMembers() {
     const playable = state.members.filter(member => member.role === "playable" || member.role === "track");
     return playable.length ? playable : state.members;
@@ -531,10 +478,28 @@
       }).join("");
       return { rows };
     };
-    const header = canonicalHeaderMarkup(["#", "Tag Type", "Tag Name", "Tag Value", "Uses", "✓", "×"]);
-    const createForm = scope => `<form class="tag-create-form" data-tag-create data-tag-scope="${scope}" aria-label="New package tag"><span class="tag-create-label">New Tag</span><span class="tag-create-type">string</span><input class="tag-table-field" data-new-tag-key placeholder="Tag Name" aria-label="New tag name"><input class="tag-table-field" data-new-tag-value placeholder="Tag Value" aria-label="New tag value"><button class="icon-button tag-create-submit" type="submit" title="Add tag" aria-label="Add tag">✓</button></form>`;
+    const headers = ["#", "Tag Type", "Tag Name", "Tag Value", "Uses", "✓", "×"];
+    const header = `${canonicalTitleRowMarkup(title)}${canonicalHeaderMarkup(headers)}`;
+    const createForm = gridScope => {
+      const draft = canonicalRowMarkup([
+        canonicalCellMarkup('<input class="tag-table-field tag-create-number" value="＋" aria-label="New tag" disabled>', { className:"tag-create-number" }),
+        canonicalCellMarkup('<input class="tag-table-field" value="string" aria-label="Tag type" disabled>', { className:"tag-type-cell" }),
+        canonicalCellMarkup('<input class="tag-table-field" data-new-tag-key placeholder="Tag Name" aria-label="New tag name" required>', { className:"tag-name-cell" }),
+        canonicalCellMarkup('<input class="tag-table-field" data-new-tag-value placeholder="Tag Value" aria-label="New tag value">', { className:"tag-value-cell" }),
+        canonicalCellMarkup('<input class="tag-table-field" value="—" aria-label="Uses" disabled>', { className:"tag-uses-cell" }),
+        canonicalCellMarkup('<button class="icon-button" type="submit" title="Add tag" aria-label="Add tag">✓</button>', { className:"tag-submit-cell field-grid-action-cell" }),
+        canonicalCellMarkup('<button class="icon-button danger" type="reset" title="Clear new tag" aria-label="Clear new tag">×</button>', { className:"tag-delete-cell field-grid-action-cell" })
+      ], { className:"tag-create-row" });
+      const table = canonicalTableMarkup({
+        className:"flat-table meta-field-grid canonical-tag-grid tag-create-grid",
+        ariaLabel:"New package tag",
+        header:`${canonicalTitleRowMarkup("New Tag")}${canonicalHeaderMarkup(headers)}`,
+        rows:draft
+      });
+      return `<form class="tag-create-form canonical-table-surface" data-tag-create data-tag-scope="${gridScope}" aria-label="New package tag">${table}</form>`;
+    };
     const table = rowsFor(scope);
-    const canonicalGrid = (gridTitle, rows, popups, gridScope) => `<section class="tag-scope-table"><div class="section-title"><span>${gridTitle}</span><span class="section-help">Package-level metadata</span></div>${gridScope === "package" ? createForm(gridScope) : ""}<div class="data-table-scroll canonical-table-surface">${canonicalTableMarkup({ className:"flat-table meta-field-grid canonical-tag-grid", ariaLabel:gridTitle, header, rows, empty:'<div class="field-grid-empty" role="row"><span role="cell">No tags</span></div>' })}</div>${popups.join("")}</section>`;
+    const canonicalGrid = (gridTitle, rows, popups, gridScope) => `<section class="tag-scope-table">${gridScope === "package" ? createForm(gridScope) : ""}<div class="data-table-scroll canonical-table-surface">${canonicalTableMarkup({ className:"flat-table meta-field-grid canonical-tag-grid", ariaLabel:gridTitle, header, rows, empty:'<div class="field-grid-empty" role="row"><span role="cell">No tags</span></div>' })}</div>${popups.join("")}</section>`;
     return `<section class="data-page schema-page">${canonicalGrid(title, table.rows, [], scope === "Package" ? "package" : "tracks")}${includeAttachments ? renderAttachments() : ""}</section>`;
   }
 
@@ -703,7 +668,7 @@
       canonicalCellMarkup(`<input class="tag-table-field file-path-field" value="${esc(member.path)}" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field file-tags-count" value="${fileTagEntries(member).length}" aria-label="Tag count" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field" value="${esc(bytes(member.bytes))}" disabled>`),
-      canonicalCellMarkup(member.previewable ? `<button class="icon-button" data-action="previewMember" data-preview-path="${esc(member.path)}" title="View bundled text" aria-label="View bundled text">⌕</button>` : `<span class="field-grid-action-placeholder" title="Text preview unavailable" aria-label="Text preview unavailable">—</span>`, { className:"field-grid-action-cell" })
+      canonicalCellMarkup(member.previewable ? `<button class="icon-button file-preview-action" data-action="previewMember" data-preview-path="${esc(member.path)}" title="View bundled text" aria-label="View bundled text">⌕</button>` : "", { className:"field-grid-action-cell file-view-cell" })
     ], { className:"file-row", attributes:`tabindex="0" data-track-row="${esc(member.path)}" title="Open metadata for ${esc(member.name)}"` })).join("");
     const empty = `<div class="field-grid-empty" role="row"><span role="cell">No package members match this filter</span></div>`;
     const preview = state.filePreviewPath
@@ -716,17 +681,18 @@
   function renderAttachments() {
     const assets = state.members.filter(member => member.role !== "playable" && member.role !== "track");
     if (!assets.length) return "";
-    const header = canonicalHeaderMarkup(["#", "Role", "Format", "Filename", "Stored path", "Size"]);
+    const header = `${canonicalTitleRowMarkup("Attachments")}${canonicalHeaderMarkup(["#", "Role", "Format", "Filename", "Stored path", "Size", "View"])}`;
     const rows = assets.map((asset, index) => canonicalRowMarkup([
       canonicalCellMarkup(`<input class="tag-table-field file-number" value="${index + 1}" aria-label="Attachment number" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field" value="${esc(asset.role)}" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field" value="${esc(asset.format || "unknown")}" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field file-name-field" value="${esc(asset.name)}" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field file-path-field" value="${esc(asset.path)}" disabled>`),
-      canonicalCellMarkup(`<input class="tag-table-field" value="${esc(bytes(asset.bytes))}" disabled>`)
+      canonicalCellMarkup(`<input class="tag-table-field" value="${esc(bytes(asset.bytes))}" disabled>`),
+      canonicalCellMarkup(asset.previewable ? `<button class="icon-button file-preview-action" data-action="previewMember" data-preview-path="${esc(asset.path)}" title="View bundled text" aria-label="View bundled text">⌕</button>` : "", { className:"field-grid-action-cell file-view-cell" })
     ], { className:"attachment-row", attributes:`tabindex="0" data-track-row="${esc(asset.path)}" title="Open metadata for ${esc(asset.name)}"` })).join("");
     const table = canonicalTableMarkup({ className:"flat-table attachment-field-grid", ariaLabel:"Package attachments", header, rows });
-    return `<section class="inspector-section attachments-section"><div class="section-title"><span>Attachments</span><span class="section-help">${assets.length} package files</span></div><div class="data-table-scroll canonical-table-surface attachment-table-scroll">${table}</div></section>`;
+    return `<section class="attachments-section"><div class="data-table-scroll canonical-table-surface attachment-table-scroll">${table}</div></section>`;
   }
 
   function renderInspector() {
@@ -746,39 +712,6 @@
 
   function scopeToAction(scope) {
     return ({ gameMetadata:"setGameMetadata", gameExtensions:"setGameExtensions", memberMetadata:"setMemberMetadata", memberExtensions:"setMemberExtensions" })[scope];
-  }
-
-  function commitObjectEditor(scope) {
-    const list = $(`[data-editor="${CSS.escape(scope)}"]`);
-    if (!list) return;
-    const object = {};
-    for (const row of $$(".field-row", list)) {
-      const key = $("[data-field-key]", row).value.trim();
-      if (!key) continue;
-      if (Object.prototype.hasOwnProperty.call(object, key)) { $(`[data-error-for="${scope}"]`).textContent = "Field names must be unique."; return; }
-      const raw = $("[data-field-value]", row).value;
-      const kind = $("[data-field-type]", row)?.value || row.dataset.kind;
-      try {
-        if (kind === "string") object[key] = raw;
-        else if (kind === "number") { const number = Number(raw); if (!Number.isFinite(number)) throw new Error(); object[key] = number; }
-        else if (kind === "boolean") { if (!/^(true|false)$/i.test(raw.trim())) throw new Error(); object[key] = raw.trim().toLowerCase() === "true"; }
-        else object[key] = JSON.parse(raw);
-      }
-      catch { $(`[data-error-for="${scope}"]`).textContent = `Invalid JSON value in “${key}”.`; return; }
-    }
-    $(`[data-error-for="${scope}"]`).textContent = "";
-    bridge(scopeToAction(scope), { value:JSON.stringify(object, null, 2) });
-  }
-
-  function addField(scope) {
-    const list = $(`[data-editor="${CSS.escape(scope)}"]`);
-    if (!list) return;
-    const row = document.createElement("tr");
-    row.className = "field-row";
-    row.dataset.kind = "string";
-    row.innerHTML = `<td><input class="field-key" data-field-key data-focus-id="${esc(scope)}-new-${Date.now()}" placeholder="Field name"></td><td><input class="field-value" data-field-value placeholder="Value"></td><td class="field-type-cell"><select class="field-type" data-field-type aria-label="Value type"><option value="string" selected>text</option><option value="number">number</option><option value="boolean">boolean</option><option value="json">json</option></select></td><td class="field-action-cell"><button class="remove-field" data-action="removeField" title="Remove field">×</button></td>`;
-    list.append(row);
-    $("[data-field-key]", row).focus();
   }
 
   function coerceValue(raw, kind) {
@@ -815,32 +748,6 @@
 
   function markAllTracksDirty() {
     playableMembers().forEach(member => markTrackDirty(member.path));
-  }
-
-  function addMultipleValue(editor) {
-    const rows = $(".multiple-values-rows", editor);
-    if (!rows) return;
-    const isArray = editor.dataset.multipleArray === "true";
-    const popupLayout = editor.dataset.multipleLayout === "popup";
-    const canonicalLayout = ["canonical", "subtable", "popup"].includes(editor.dataset.multipleLayout);
-    const subtableLayout = editor.dataset.multipleLayout === "subtable";
-    const tableLayout = subtableLayout || popupLayout;
-    const number = $$('[data-multiple-entry]', rows).length + 1;
-    $(".multiple-values-empty", rows)?.remove();
-    const row = document.createElement("div");
-    row.className = canonicalLayout ? "field-grid-row multiple-value-editor-row" : "tag-multiple-value-row multiple-value-editor-row";
-    row.dataset.multipleEntry = "";
-    row.dataset.multipleKind = "string";
-    const keyMarkup = `<input class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-key" data-multiple-key value="" aria-label="New value key"${isArray ? " disabled" : ""}>`;
-    const valueMarkup = `<input class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-editor" data-multiple-value value="" aria-label="New value">`;
-    const numberMarkup = tableLayout ? `<div class="field-grid-cell"><input class="tag-table-field multiple-value-number" value="${number}" aria-label="Value number ${number}" disabled></div>` : "";
-    const submitMarkup = tableLayout ? '<button class="icon-button multiple-value-submit" data-action="commitMultipleValueRow" type="button" title="Submit changed value" aria-label="Submit changed value">✓</button>' : "";
-    const removeMarkup = `<button class="icon-button danger multiple-value-remove" data-action="removeMultipleValue" type="button" title="Remove value" aria-label="Remove value">×</button>`;
-    row.innerHTML = canonicalLayout
-      ? `${numberMarkup}<div class="field-grid-cell">${keyMarkup}</div><div class="field-grid-cell">${valueMarkup}</div>${tableLayout ? `<div class="field-grid-cell field-grid-action-cell">${submitMarkup}</div>` : ""}<div class="field-grid-cell field-grid-action-cell">${removeMarkup}</div>`
-      : `${keyMarkup}${valueMarkup}${removeMarkup}`;
-    rows.append(row);
-    $("[data-multiple-key]", row)?.focus();
   }
 
   function removeMultipleValue(row) {
@@ -1042,15 +949,7 @@
       render(state);
     }
     if (!action) return;
-    if (action === "addField") addField(event.target.closest("[data-scope]").dataset.scope);
-    else if (action === "renameTag") {
-      const row = event.target.closest("[data-tag-row]");
-      const from = row?.dataset.tagFrom || "";
-      const rawTo = $("[data-tag-to]", row)?.value.trim() || "";
-      const normalizedTo = rawTo === from ? from : titleCaseTagName(rawTo);
-      if (from && normalizedTo && from !== normalizedTo) bridge("renameMetadataKey", { from, to:normalizedTo });
-    }
-    else if (action === "deleteTag") {
+    if (action === "deleteTag") {
       const row = event.target.closest("[data-tag-row]");
       const key = row?.dataset.tagFrom || "";
       if (key) animateRowRemoval(row, () => bridge("deleteMetadataKey", { key, scope:row.dataset.tagScope || "" }));
@@ -1068,7 +967,6 @@
       const path = row?.dataset.trackBrowserPath || "";
       selectTrackBrowserMember(path);
     }
-    else if (action === "addMultipleValue") addMultipleValue(event.target.closest("[data-multiple-editor]"));
     else if (action === "removeMultipleValue") removeMultipleValue(event.target.closest("[data-multiple-entry]"));
     else if (action === "commitMultipleValueRow") commitMultipleValueRow(event.target.closest("[data-multiple-entry]"));
     else if (action === "commitMultipleValues") {
@@ -1131,23 +1029,7 @@
         animateRowRemoval(row, () => bridge("deleteMemberTag", { path:row.dataset.fileTagPath || "", scope:row.dataset.fileTagScope || "", key:row.dataset.fileTagFrom || "" }));
       }
     }
-    else if (action === "commitTechnicalRow") {
-      const row = event.target.closest("[data-technical-row]");
-      if (row) bridge("commitTechnicalRow", { scope:$('[data-tech-scope]', row)?.value || "", key:row.dataset.techKey || "", newKey:$('[data-tech-key]', row)?.value || "", value:$('[data-tech-value]', row)?.value || "" });
-    }
-    else if (action === "deleteTechnicalRow") {
-      const row = event.target.closest("[data-technical-row]");
-      if (row && window.confirm(`Delete ${row.dataset.techKey || "this technical field"}?`)) {
-        const scope = row.dataset.techScope || "";
-        const key = row.dataset.techKey || "";
-        animateRowRemoval(row, () => bridge("deleteTechnicalRow", { scope, key }));
-      }
-    }
-    else if (action === "removeField") {
-      const row = event.target.closest(".field-row");
-      const scope = row.closest("[data-editor]").dataset.editor;
-      animateRowRemoval(row, () => commitObjectEditor(scope));
-    } else if (action === "dismissError") bridge("dismissError");
+    else if (action === "dismissError") bridge("dismissError");
     else if (action === "mainView") {
       mainView = event.target.closest("[data-view]").dataset.view;
       render(state);
@@ -1183,12 +1065,6 @@
     const target = event.target;
     if (target.matches("[data-track-cell]")) commitTrackCell(target);
     else if (target.matches("[data-file-name]")) bridge("renameMember", { path:target.dataset.filePath || "", name:target.value });
-    else if (target.matches("[data-basic='packageTitle']")) bridge("setPackageTitle", { value:target.value });
-    else if (target.matches("[data-basic='consoleName']")) bridge("setConsole", { value:target.value });
-    else if (target.matches("[data-raw-editor]")) {
-      const scope = target.dataset.rawEditor;
-      bridge(scopeToAction(scope), { value:target.value });
-    } else if (target.closest("[data-editor]")) commitObjectEditor(target.closest("[data-editor]").dataset.editor);
   });
 
   document.addEventListener("input", event => {
