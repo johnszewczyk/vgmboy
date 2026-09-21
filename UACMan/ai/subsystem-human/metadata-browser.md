@@ -23,31 +23,31 @@ without scanning its parent folder.
 Selecting a package opens its playable tracks in the primary **Tracks** view.
 The member filter searches visible metadata values, role, format, filename, and
 path. Tracks stays an inline field grid: scalar cells edit in place and structured
-cells open a centered editable Multiple Values popup so the wide table remains
+cells open a centered plain-text Multiple Values popup so the wide table remains
 easy to navigate. Batch tag edits live in
-the **Track** browser, so Tracks does not carry a separate checkbox
+the **Track Tags** browser, so Tracks does not carry a separate checkbox
 selection model. The Tracks table includes both the display track number and the
 literal source filename as its first two columns. Scalar values are editable;
-structured values expose child key/value controls and a submit action. Aggregate
-rows with different structured values remain read-only until a single value is
-unambiguous.
+structured values show a stable Multiple Values placeholder and open as plain
+text in a popup. Aggregate rows with different structured values remain
+read-only until a single value is unambiguous.
 
-The workspace has four explicit pages. **Tracks** is the wide canonical
+The workspace has four explicit pages in this order: **Files**, **Pack Tags**,
+**Tracks**, and **Track Tags**. **Tracks** is the wide canonical
 array-style field grid: every header and value is a boxed field, and its
 horizontal scroll belongs to the workspace surface rather than a nested table
 window. **Files** lists every stored package member, including playable streams,
 artwork, cue sheets, and documentation. Its filename field edits the
 manifest's displayed/original filename while the stored TAR path remains
-immutable. Each row's **Tags** column is a numeric count. The **Track** page
-provides a file selector and an exhaustive canonical table for editing that
-file's metadata/extensions; structured values open the same editable Multiple
-Values popup without changing the table row geometry. **Pack Tags** contains
-package-level metadata and all attachments using the same field-grid cells, with
-the same add interface as the tag workspace. Pack Tags and the selected-file
-Track table use left-aligned full-width editable child subtables beneath the
-source row; the master Tracks grid uses the centered popup because of its width.
-UACMan
-lists assets and their metadata. The Files page can preview recognized text
+immutable. Each row's **Tags** column is a numeric count. The **Track Tags** page
+provides a file selector sidebar and an exhaustive canonical table for editing
+that file's metadata/extensions; structured values slide down as full-width,
+left-aligned child tables inserted beneath the source row, without indenting the
+parent table. **Pack Tags** contains package-level metadata and all attachments
+using the same field-grid cells, with the same add interface as the tag
+workspace. Pack Tags and the selected-file Track Tags table use the inserted
+child-table treatment; the master Tracks grid uses the centered text popup
+because of its width. UACMan lists assets and their metadata. The Files page can preview recognized text
 members directly from the seekable payload, including JSON, Markdown, CUE, and
 similar documents; it does not extract or edit them yet, and it does not preview
 binary image bytes.
@@ -69,8 +69,11 @@ Per-field edits use typed rows: **Add column** creates a text, number, boolean,
 or JSON field, and removing a row removes that manifest field. A centered
 Multiple Values popup
 **Open JSON editor** escape hatch remains available for advanced or nested
-edits. Pack Tags and the selected-file Track table use canonical child subtables,
-while the wide Tracks grid uses the same editor in a centered popup.
+edits. Pack Tags and the selected-file Track Tags table use canonical child
+subtables inserted at the parent table's level, while the wide Tracks grid uses
+a plain centered text popup for structured values so nested JSON cannot change
+the giga-table's row geometry. Native macOS title-bar controls remain visible
+for the UACMan window.
 An aggregate row is read-only when it combines
 different source values. Save reopens and
 verifies the wrapper, then preserves the compressed payload byte-for-byte.

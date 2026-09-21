@@ -10,6 +10,8 @@ struct UACManApp: App {
                 .onAppear { model.openCommandLineFileIfPresent() }
                 .onOpenURL { model.openDocument($0) }
         }
+        .windowStyle(.titleBar)
+        .windowToolbarStyle(.unifiedCompact)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("Open UAC…", action: model.openPanel)

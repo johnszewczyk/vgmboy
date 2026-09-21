@@ -6,6 +6,5 @@ struct ContentView: View {
     var body: some View {
         UACManWebWorkspace(model: model, snapshot: model.webSnapshot)
             .frame(minWidth: 920, minHeight: 600)
-            .toolbar(.hidden, for: .windowToolbar)
     }
 }

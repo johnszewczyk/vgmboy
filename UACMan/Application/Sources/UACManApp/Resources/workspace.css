@@ -259,6 +259,8 @@ button { cursor:pointer; }
 .multiple-values-popup-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; flex:none; min-height:27px; padding:0 4px; border-bottom:0; background:transparent; color:var(--muted); }
 .multiple-values-popup-heading strong { font-size:9px; font-weight:650; letter-spacing:.04em; text-transform:uppercase; }
 .multiple-values-popup-content { min-height:0; overflow:auto; padding:0; background:var(--panel); }
+.multiple-values-popup-text-wrap { grid-column:1 / -1; min-width:0; padding:0; }
+.multiple-values-text { max-height:520px; margin:0; overflow:auto; padding:1rem; color:var(--text); background:var(--panel); font:10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
 .multiple-values-popup-content .multiple-values-editor { width:100%; padding:0; }
 .canonical-popup-field-grid { --field-grid-columns:minmax(150px,.7fr) minmax(260px,1.3fr) 28px; min-width:560px; width:100%; padding:2px var(--field-grid-gap); }
 .canonical-popup-field-grid .field-grid-row { grid-template-columns:var(--field-grid-columns); width:auto; }
@@ -278,8 +280,8 @@ button { cursor:pointer; }
 .track-browser-inspector { max-width:none; padding-left:0; padding-right:0; }
 .track-browser-inspector > .inspector-head { padding-left:28px; padding-right:28px; }
 .track-browser-page { display:grid; grid-template-columns:minmax(190px,230px) minmax(0,1fr); min-height:calc(100vh - 155px); align-items:start; }
-.track-browser-sidebar { min-width:0; min-height:calc(100vh - 155px); overflow:auto; background:var(--panel-2); border-right:1px solid var(--line); }
-.track-browser-sidebar-field-grid { --field-grid-columns:calc(1ch + 4rem) minmax(0,1fr) 56px; min-width:0; width:100%; padding:2px 0; background:var(--panel-2); }
+.track-browser-sidebar { min-width:0; min-height:calc(100vh - 155px); overflow:auto; padding:1rem; background:var(--panel-2); border-right:1px solid var(--line); }
+.track-browser-sidebar-field-grid { --field-grid-columns:4.5rem minmax(0,1fr) 56px; min-width:0; width:100%; padding:2px var(--field-grid-gap); background:var(--panel-2); }
 .track-browser-sidebar-field-grid .field-grid-header,
 .track-browser-sidebar-field-grid .track-browser-sidebar-row { grid-template-columns:var(--field-grid-columns); width:auto; }
 .track-browser-sidebar-row { cursor:pointer; }
@@ -293,11 +295,11 @@ button { cursor:pointer; }
 .track-browser-sidebar-status.dirty { color:var(--accent)!important; font-weight:700; }
 .track-browser-detail { width:min(900px,100%); min-width:0; margin:0 auto; overflow:hidden; background:var(--panel); }
 .track-browser-detail-count { color:var(--muted); font:10px ui-monospace,SFMono-Regular,Menlo,monospace; }
-.track-browser-detail-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px 14px 10px; border-bottom:1px solid var(--line); }
+.track-browser-detail-heading { display:none; }
 .track-browser-detail-heading h2 { margin:4px 0 3px; font-size:14px; overflow-wrap:anywhere; }
 .track-browser-detail-heading p { max-width:70ch; margin:0; overflow:hidden; color:var(--muted); font:9px ui-monospace,SFMono-Regular,Menlo,monospace; text-overflow:ellipsis; white-space:nowrap; }
-.track-browser-table-wrap { display:flex; flex-direction:column; min-width:0; min-height:0; gap:8px; overflow-x:auto; padding:10px 14px 0; }
-.track-browser-field-grid { --field-grid-columns:minmax(100px,.65fr) minmax(160px,1fr) minmax(220px,1.5fr) 52px; min-width:680px; width:100%; }
+.track-browser-table-wrap { display:flex; flex-direction:column; min-width:0; min-height:0; gap:1rem; overflow-x:auto; padding:0; }
+.track-browser-field-grid { --field-grid-columns:max-content minmax(160px,1fr) minmax(220px,1.5fr) 28px 28px; min-width:680px; width:100%; }
 .track-browser-value-cell { align-items:stretch!important; overflow:visible; }
 .track-browser-actions { justify-content:center; gap:2px; }
 .track-browser-create-form { align-self:flex-start; margin:0; padding:0 2px; }
@@ -333,10 +335,10 @@ button { cursor:pointer; }
    grid track, rather than a guessed max-height, owns the drawer animation. */
 .field-grid-subrow { grid-template-columns:1fr; grid-template-rows:0fr; min-height:0; max-height:none; overflow:hidden; opacity:0; align-items:stretch; transition:grid-template-rows var(--ui-motion),opacity var(--ui-motion); }
 .field-grid-subrow.open { grid-template-rows:1fr; max-height:none; opacity:1; }
-.field-grid-subrow > .canonical-subtable-cell { min-height:0; overflow:hidden; }
-.canonical-subtable-panel { width:min(760px,100%); min-width:0; min-height:0; overflow:hidden; border:0; background:transparent; }
+.field-grid-subrow > .canonical-subtable-cell { grid-column:1 / -1; width:100%; min-height:0; overflow:hidden; padding:1rem 0 0; align-items:stretch; }
+.canonical-subtable-panel { width:100%; min-width:0; min-height:0; overflow:hidden; border:0; background:transparent; }
 .canonical-subtable-panel .multiple-values-editor { width:100%; padding:0; }
-.canonical-subtable-field-grid { --field-grid-columns:minmax(110px,.7fr) minmax(180px,1.3fr) 28px; min-width:520px; width:100%; padding:2px var(--field-grid-gap); }
+.canonical-subtable-field-grid { --field-grid-columns:minmax(110px,.7fr) minmax(180px,1.3fr) 28px; min-width:0; width:100%; padding:0; }
 .canonical-subtable-field-grid .field-grid-row { grid-template-columns:var(--field-grid-columns); width:auto; }
 .canonical-multiple-values-grid .multiple-values-rows { display:flex; flex-direction:column; }
 .multiple-values-title-row { background:transparent; }
