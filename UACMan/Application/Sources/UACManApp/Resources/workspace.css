@@ -454,11 +454,11 @@ button { cursor:pointer; }
 .file-field-grid .multiple-values-popup-trigger { width:100%; min-width:0; }
 
 /* Non-giga structured values use a full-width inserted canonical subtable. */
-.field-grid-subrow { display:grid; grid-template-columns:1fr; grid-template-rows:0fr; width:100%; min-width:0; min-height:0; max-height:0; margin:0; overflow:hidden; opacity:0; transition:grid-template-rows var(--ui-motion),max-height var(--ui-motion),opacity var(--ui-motion); }
-.field-grid-subrow.open { grid-template-rows:1fr; max-height:1200px; opacity:1; }
-.field-grid-subrow > .canonical-subtable-cell { grid-column:1 / -1; width:100%; min-height:0; overflow:hidden; padding:0 0 var(--field-grid-gap); align-items:stretch; }
-.canonical-subtable-panel { width:100%; min-width:0; min-height:0; overflow:hidden; border:0; border-radius:0; background:transparent; }
-.canonical-subtable-field-grid { width:100%; max-width:100%; padding:0 var(--field-grid-gap); }
+.field-grid-subrow { display:grid; grid-template-columns:1fr; grid-template-rows:0fr; width:100%; min-width:0; min-height:0; max-height:0; margin:0; overflow:hidden; opacity:0; transition:grid-template-rows var(--ui-motion),opacity var(--ui-motion); }
+.field-grid-subrow.open { grid-template-rows:1fr; max-height:none; opacity:1; }
+.field-grid-subrow > .canonical-subtable-cell { grid-column:1 / -1; width:100%; min-width:0; min-height:0; overflow:visible; padding:0; align-items:stretch; }
+.canonical-subtable-panel { width:100%; min-width:0; min-height:0; overflow:visible; border:0; border-radius:0; background:transparent; }
+.canonical-subtable-field-grid { width:100%; max-width:100%; min-width:0; padding:0; }
 
 /* Popup chrome is still canonical table chrome; only the giga surface dims the
    page behind it. The title spans the table while actions remain two cells. */
