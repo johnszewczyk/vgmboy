@@ -103,7 +103,7 @@ button { cursor:pointer; }
 .field-grid .icon-button.danger,.field-grid .danger { color:var(--danger, #e06c75); }
 .technical-field-grid { --field-grid-columns:15% 7% minmax(0,1fr) minmax(0,1fr) 28px 28px; min-width:760px; }
 .technical-field-grid .action-heading { grid-column:span 2; justify-content:center; }
-.meta-field-grid { --field-grid-columns:max-content max-content minmax(0,1fr) minmax(0,1fr) max-content 28px 28px; }
+.meta-field-grid { --field-grid-columns:4.75rem 9rem minmax(12rem,1fr) minmax(14rem,1.2fr) 4.5rem 28px 28px; min-width:760px; }
 .tag-scope-table { margin-top:10px; }
 .tag-values-popover { position:relative; display:inline-block; }
 .tag-values-popover summary { cursor:pointer; list-style:none; color:var(--muted); }
@@ -116,12 +116,16 @@ button { cursor:pointer; }
 .track-structured-popover .tag-values-list > div { display:flex; gap:8px; }
 .track-structured-popover .tag-values-list strong { color:var(--accent); font-weight:500; }
 .track-structured-popover .tag-values-list span { min-width:0; }
-.tag-create-form { display:flex; align-items:center; justify-content:flex-end; gap:4px; margin:0 0 8px; }
-.tag-create-form input, .tag-create-form select { height:25px; min-width:0; padding:3px 6px; border:1px solid var(--line); border-radius:3px; background:var(--panel); color:var(--text); font:inherit; }
-.tag-create-form input[data-new-tag-key] { width:150px; }
-.tag-create-form input[data-new-tag-value] { width:150px; }
-.tag-create-form select { width:105px; }
-.tag-create-form .add-tag-submit { width:25px; height:25px; }
+.section-title { display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; }
+.section-title > span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.section-help { color:var(--muted); font-size:9px; white-space:nowrap; }
+.tag-create-row { min-height:27px; align-items:center; background:var(--panel); }
+.tag-create-row .field-grid-cell { min-width:0; }
+.tag-create-row .tag-table-field { height:23px; color:var(--accent); }
+.tag-create-number,.tag-create-row .tag-submit-cell,.tag-create-row .tag-delete-cell { justify-content:center; }
+.tag-create-marker { color:var(--accent); font-size:13px; line-height:1; }
+.tag-create-type,.tag-create-hint { color:var(--muted); }
+.tag-create-hint { text-align:center; }
 .track-grid .track-number-heading,.track-grid .track-number-cell { position:sticky; left:28px; z-index:1; width:64px; min-width:42px; max-width:120px; background:var(--panel); }
 .track-grid .track-number-heading { background:var(--panel-2); }
 .track-grid tbody tr:hover .track-number-cell,.track-grid tbody tr.active .track-number-cell { background:var(--selected); }
@@ -166,7 +170,6 @@ button { cursor:pointer; }
 .file-tag-action-cell { display:flex; justify-content:center; gap:2px; }
 .file-tag-action-cell .icon-button { width:22px; height:22px; font-size:12px; }
 .file-tag-empty { padding:5px 2px; color:var(--soft); }
-.file-edit-note { margin:0; color:var(--soft); font-size:10px; line-height:1.45; }
 .attachment-table-scroll { min-height:0; }
 .attachment-field-grid { --attachment-field-columns:110px 100px 220px minmax(320px,1fr) 90px; min-width:900px; width:100%; padding:0; }
 .attachment-field-grid .field-grid-header,
@@ -329,13 +332,13 @@ button { cursor:pointer; }
 
 /* Structured values use the same table geometry as their parent. The inner
    grid track, rather than a guessed max-height, owns the drawer animation. */
-.field-grid-subrow { display:none; grid-template-columns:1fr; min-height:0; max-height:none; overflow:hidden; opacity:0; align-items:stretch; }
+.field-grid-subrow { display:none; grid-template-columns:1fr; width:100%; min-width:0; min-height:0; max-height:none; margin:0; padding:0; overflow:hidden; opacity:0; align-items:stretch; }
 .field-grid-subrow.open { display:grid; opacity:1; }
-.field-grid-subrow > .canonical-subtable-cell { grid-column:1 / -1; width:100%; min-height:0; overflow:hidden; padding:1rem 0 0; align-items:stretch; }
-.canonical-subtable-panel { width:100%; min-width:0; min-height:0; overflow:hidden; border:0; background:transparent; }
-.canonical-subtable-panel .multiple-values-editor { width:100%; padding:0; }
-.canonical-subtable-field-grid { --field-grid-columns:minmax(110px,.7fr) minmax(180px,1.3fr) 28px 28px; min-width:0; width:100%; padding:0; }
-.canonical-subtable-field-grid .field-grid-row { grid-template-columns:var(--field-grid-columns); width:auto; }
+.field-grid-subrow > .canonical-subtable-cell { grid-column:1 / -1; width:100%; min-width:0; min-height:0; margin:0; overflow:hidden; padding:0; align-items:stretch; }
+.canonical-subtable-panel { width:100%; min-width:0; min-height:0; margin:0; padding:0; overflow:hidden; border:0; background:transparent; }
+.canonical-subtable-panel .multiple-values-editor { width:100%; margin:0; padding:0; }
+.canonical-subtable-field-grid { --field-grid-columns:minmax(110px,.7fr) minmax(180px,1.3fr) 28px 28px; min-width:0; width:100%; margin:0; padding:0; }
+.canonical-subtable-field-grid .field-grid-row { grid-template-columns:var(--field-grid-columns); width:100%; min-width:0; }
 .canonical-multiple-values-grid .multiple-values-rows { display:flex; flex-direction:column; }
 .multiple-values-title-row { background:transparent; }
 .multiple-values-title-row .field-grid-heading-input { width:100%; }
@@ -423,7 +426,7 @@ button { cursor:pointer; }
 
 /* Track Tags panes fill the workspace rectangle between the app header and
    the window-level status bar. Each pane owns its scrolling surface. */
-.track-browser-page { height:100%; min-height:0; align-items:stretch; overflow:hidden; }
+.track-browser-page { height:100%; min-height:0; padding:0; align-items:stretch; overflow:hidden; }
 .track-browser-pane { min-height:0; align-self:stretch; overflow:hidden; }
 .track-browser-scroll { height:100%; max-height:none; min-height:0; overflow:auto; }
 .track-browser-sidebar,.track-browser-detail { min-height:0; height:100%; }
@@ -446,7 +449,7 @@ button { cursor:pointer; }
 .field-grid-subrow.open { grid-template-rows:1fr; max-height:1200px; opacity:1; }
 .field-grid-subrow > .canonical-subtable-cell { grid-column:1 / -1; width:100%; min-height:0; overflow:hidden; padding:0; align-items:stretch; }
 .canonical-subtable-panel { width:100%; min-width:0; min-height:0; overflow:hidden; border:0; border-radius:0; background:transparent; }
-.canonical-subtable-field-grid { padding:2px var(--field-grid-gap); }
+.canonical-subtable-field-grid { padding:0; }
 
 /* Popup chrome is still canonical table chrome; only the giga surface dims the
    page behind it. The title spans the table while actions remain two cells. */
