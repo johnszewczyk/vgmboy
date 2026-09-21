@@ -92,25 +92,36 @@
   };
   const multipleValuesEditorBodyMarkup = (value, context = {}) => {
     const isArray = Array.isArray(value);
+    const canonicalLayout = context.layout === "canonical";
     const entries = isArray ? value.map((item, index) => [String(index), item]) : Object.entries(value || {});
     const rowMarkup = ([key, item]) => {
       const kind = fieldKind(item);
       const raw = kind === "json" ? JSON.stringify(item, null, 2) : String(item ?? "");
       const valueControl = kind === "json"
-        ? `<textarea class="multiple-value-editor" data-multiple-value aria-label="Value for ${esc(key)}">${esc(raw)}</textarea>`
-        : `<input class="multiple-value-editor" data-multiple-value value="${esc(raw)}" aria-label="Value for ${esc(key)}">`;
-      return `<div class="tag-multiple-value-row multiple-value-editor-row" data-multiple-entry data-multiple-kind="${kind}"><input class="multiple-value-key" data-multiple-key value="${esc(key)}" aria-label="Key for ${esc(key)}"${isArray ? " disabled" : ""}>${valueControl}<button class="icon-button danger multiple-value-remove" data-action="removeMultipleValue" type="button" title="Remove value" aria-label="Remove value">×</button></div>`;
+        ? `<textarea class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-editor" data-multiple-value aria-label="Value for ${esc(key)}">${esc(raw)}</textarea>`
+        : `<input class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-editor" data-multiple-value value="${esc(raw)}" aria-label="Value for ${esc(key)}">`;
+      const rowClass = canonicalLayout ? "field-grid-row multiple-value-editor-row" : "tag-multiple-value-row multiple-value-editor-row";
+      const keyMarkup = `<input class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-key" data-multiple-key value="${esc(key)}" aria-label="Key for ${esc(key)}"${isArray ? " disabled" : ""}>`;
+      const removeMarkup = `<button class="icon-button danger multiple-value-remove" data-action="removeMultipleValue" type="button" title="Remove value" aria-label="Remove value">×</button>`;
+      return canonicalLayout
+        ? `<div class="${rowClass}" data-multiple-entry data-multiple-kind="${kind}"><div class="field-grid-cell">${keyMarkup}</div><div class="field-grid-cell">${valueControl}</div><div class="field-grid-cell field-grid-action-cell">${removeMarkup}</div></div>`
+        : `<div class="${rowClass}" data-multiple-entry data-multiple-kind="${kind}">${keyMarkup}${valueControl}${removeMarkup}</div>`;
     };
     const rows = entries.map(rowMarkup).join("");
     const data = [
       `data-multiple-editor`,
       `data-multiple-target="${esc(context.target || "member")}"`,
       `data-multiple-array="${isArray}"`,
+      `data-multiple-layout="${canonicalLayout ? "canonical" : "compact"}"`,
       `data-multiple-path="${esc(context.path || "")}"`,
       `data-multiple-scope="${esc(context.scope || "")}"`,
       `data-multiple-key="${esc(context.key || "")}"`
     ].join(" ");
-    const body = `<div class="multiple-values-editor" ${data}><div class="multiple-values-rows">${rows || '<div class="file-tag-empty multiple-values-empty">No values</div>'}</div><div class="multiple-values-editor-actions"><button class="icon-button" data-action="addMultipleValue" type="button" title="Add value" aria-label="Add value">＋</button><button class="icon-button" data-action="commitMultipleValues" type="button" title="Submit changed values" aria-label="Submit changed values">✓</button></div><div class="multiple-values-editor-error" role="status"></div></div>`;
+    const header = canonicalLayout ? `<div class="field-grid-row field-grid-header" role="row"><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Key" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="Value" disabled></div><div class="field-grid-cell field-grid-heading" role="columnheader"><input class="tag-table-field field-grid-heading-input" value="×" aria-label="Remove" disabled></div></div>` : "";
+    const rowsMarkup = canonicalLayout
+      ? `<div class="field-grid canonical-popup-field-grid" role="table">${header}<div class="multiple-values-rows">${rows || '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'}</div></div>`
+      : `<div class="multiple-values-rows">${rows || '<div class="file-tag-empty multiple-values-empty">No values</div>'}</div>`;
+    const body = `<div class="multiple-values-editor${canonicalLayout ? " canonical-popup-editor" : ""}" ${data}>${rowsMarkup}<div class="multiple-values-editor-actions"><button class="icon-button" data-action="addMultipleValue" type="button" title="Add value" aria-label="Add value">＋</button><button class="icon-button" data-action="commitMultipleValues" type="button" title="Submit changed values" aria-label="Submit changed values">✓</button></div><div class="multiple-values-editor-error" role="status"></div></div>`;
     return { body, count:entries.length };
   };
   const multipleValuesEditorMarkup = (value, context = {}) => {
@@ -129,7 +140,7 @@
     const popupID = context.popupID || "multiple-values";
     const isEditor = options.editable === true;
     const entries = options.entries || (Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value || {}));
-    const editor = isEditor ? multipleValuesEditorBodyMarkup(value, context) : null;
+    const editor = isEditor ? multipleValuesEditorBodyMarkup(value, { ...context, layout:"canonical" }) : null;
     const body = editor
       ? `<div class="editable-multiple-values">${editor.body}</div>`
       : multipleValuesReadOnlyTableMarkup(entries);
@@ -609,12 +620,18 @@
     const rows = $(".multiple-values-rows", editor);
     if (!rows) return;
     const isArray = editor.dataset.multipleArray === "true";
+    const canonicalLayout = editor.dataset.multipleLayout === "canonical";
     $(".multiple-values-empty", rows)?.remove();
     const row = document.createElement("div");
-    row.className = "tag-multiple-value-row multiple-value-editor-row";
+    row.className = canonicalLayout ? "field-grid-row multiple-value-editor-row" : "tag-multiple-value-row multiple-value-editor-row";
     row.dataset.multipleEntry = "";
     row.dataset.multipleKind = "string";
-    row.innerHTML = `<input class="multiple-value-key" data-multiple-key value="" aria-label="New value key"${isArray ? " disabled" : ""}><input class="multiple-value-editor" data-multiple-value value="" aria-label="New value"><button class="icon-button danger multiple-value-remove" data-action="removeMultipleValue" type="button" title="Remove value" aria-label="Remove value">×</button>`;
+    const keyMarkup = `<input class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-key" data-multiple-key value="" aria-label="New value key"${isArray ? " disabled" : ""}>`;
+    const valueMarkup = `<input class="${canonicalLayout ? "tag-table-field " : ""}multiple-value-editor" data-multiple-value value="" aria-label="New value">`;
+    const removeMarkup = `<button class="icon-button danger multiple-value-remove" data-action="removeMultipleValue" type="button" title="Remove value" aria-label="Remove value">×</button>`;
+    row.innerHTML = canonicalLayout
+      ? `<div class="field-grid-cell">${keyMarkup}</div><div class="field-grid-cell">${valueMarkup}</div><div class="field-grid-cell field-grid-action-cell">${removeMarkup}</div>`
+      : `${keyMarkup}${valueMarkup}${removeMarkup}`;
     rows.append(row);
     $("[data-multiple-key]", row)?.focus();
   }
