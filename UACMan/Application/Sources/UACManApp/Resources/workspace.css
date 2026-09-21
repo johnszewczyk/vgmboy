@@ -413,3 +413,39 @@ button { cursor:pointer; }
   .track-browser-sidebar-pane .track-browser-scroll { height:220px; }
   .track-browser-detail-pane .track-browser-scroll { height:calc(100vh - 300px); }
 }
+
+/* Canonical table hierarchy: every surface shares the same rows and cells.
+   Variants only decide whether the table folds inline or opens a popup. */
+.canonical-table-surface { min-width:0; min-height:0; overflow:auto; border:1px solid var(--line); border-radius:4px; background:var(--panel); }
+.canonical-table { min-width:0; }
+.flat-table { background:var(--panel); }
+.foldable-table { background:var(--panel); }
+.giga-table { min-width:0; }
+
+/* Track Tags sidebar: a compact canonical table, not a full-height list. */
+.track-browser-page { height:auto; min-height:0; align-items:start; overflow:visible; }
+.track-browser-pane { min-height:0; align-self:start; overflow:visible; }
+.track-browser-scroll { height:auto; max-height:calc(100vh - 132px); min-height:0; overflow:auto; }
+.track-browser-sidebar,.track-browser-detail { min-height:0; height:auto; }
+.track-browser-sidebar-field-grid { min-width:0; width:100%; padding:0 var(--field-grid-gap); background:var(--panel); }
+.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row] { cursor:pointer; }
+.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row] .tag-table-field { border-color:var(--line); background:var(--panel-2); }
+.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row]:hover .tag-table-field { background:var(--hover); }
+.track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row].selected .tag-table-field { background:var(--selected); }
+.track-browser-table-wrap { min-height:0; }
+
+/* Giga-table structured values never add rows to the grid; they open the
+   canonical popup so one expanded value cannot reflow sibling rows. */
+.tracks-field-grid .multiple-values-popup-trigger,
+.file-field-grid .multiple-values-popup-trigger { width:100%; min-width:0; }
+
+/* Bundled text previews use the same unobtrusive table chrome as value
+   popups, without creating a second scrolling surface in the Files page. */
+.file-preview-backdrop { position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; padding:12px; background:transparent; pointer-events:none; }
+.file-preview-backdrop .file-preview { width:min(860px,calc(100vw - 24px)); max-height:calc(100vh - 24px); pointer-events:auto; border:1px solid var(--line); border-radius:3px; box-shadow:1px 1px 1px #0008; }
+
+/* Package actions are compact header-bar functions rather than large buttons. */
+.appbar .actions { gap:3px; }
+.appbar .appbar-action { width:28px; min-width:28px; height:28px; padding:0; border:1px solid var(--line); border-radius:4px; background:transparent; color:var(--muted); font-size:13px; }
+.appbar .appbar-action:hover:not(:disabled) { color:var(--text); border-color:var(--accent); background:var(--hover); }
+.appbar .appbar-action.primary { color:#fff; border-color:var(--accent); background:var(--accent); }

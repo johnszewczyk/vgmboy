@@ -5,20 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none';">
   <title>UACMan</title>
-  <link rel="stylesheet" href="workspace.css?v=20260921-header-panes-v1">
-  <script src="workspace.js?v=20260921-header-panes-v1" defer></script>
+  <link rel="stylesheet" href="workspace.css?v=20260921-table-hierarchy-v1">
+  <script src="workspace.js?v=20260921-table-hierarchy-v1" defer></script>
 </head>
 <body>
   <header class="appbar">
     <nav class="main-view-tabs app-nav" aria-label="Package workspace"><div class="tab-buttons"><button data-action="mainView" data-view="files" id="files-view-button">Files</button><button data-action="mainView" data-view="packTags" id="pack-tags-view-button">Pack Tags</button><button data-action="mainView" data-view="members" id="members-view-button" class="active">Tracks</button><button data-action="mainView" data-view="trackBrowser" id="track-view-button">Track Tags</button></div></nav>
     <label class="search member-search hidden" id="member-filter-wrap"><span>⌕</span><input id="member-filter" placeholder="Search title, artist, album, filename, path…" autocomplete="off"><kbd>⌘ K</kbd></label>
     <div class="appbar-spacer"></div>
-    <div class="actions">
-      <button class="button secondary" data-action="openCollection"><span class="icon">☰</span> Collection</button>
-      <button class="button secondary" data-action="openUAC"><span class="icon">＋</span> Open UAC</button>
+    <div class="actions" aria-label="Package actions">
+      <button class="icon-button appbar-action" data-action="openCollection" title="Open Collection" aria-label="Open Collection">☰</button>
+      <button class="icon-button appbar-action" data-action="openUAC" title="Open UAC" aria-label="Open UAC">＋</button>
       <div class="divider"></div>
-      <button class="button secondary" data-action="revert" id="revert-button" disabled>Revert</button>
-      <button class="button primary" data-action="save" id="save-button" disabled>Save changes</button>
+      <button class="icon-button appbar-action" data-action="revert" id="revert-button" title="Revert changes" aria-label="Revert changes" disabled>↶</button>
+      <button class="icon-button appbar-action primary" data-action="save" id="save-button" title="Save changes" aria-label="Save changes" disabled>✓</button>
     </div>
   </header>
 
