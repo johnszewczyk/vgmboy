@@ -197,6 +197,8 @@ button { cursor:pointer; }
 .row-removing { animation:row-removal var(--ui-motion) forwards; }
 
 [data-field-grid="tracks"] { --field-grid-columns:64px 220px 120px; width:max-content; min-width:max-content; }
+[data-field-grid="tracks"] .field-grid-header,
+[data-field-grid="tracks"] .track-array-row { width:max-content; }
 [data-field-grid="tracks"] .track-array-row:hover,
 [data-field-grid="tracks"] .track-array-row.active { background:transparent; }
 

@@ -321,6 +321,12 @@
       ? (noRows ? `<div class="empty-state"><div class="empty-icon">▤</div><h3>${state.members.length ? "No tracks match this filter" : "This package has no audio tracks"}</h3><p>${state.members.length ? "Change the search text to show audio tracks." : "The package contains no playable members."}</p></div>` : renderTrackArrayGrid(members))
       : `<div class="empty-state"><div class="empty-icon">▤</div><h3>Open a package to get started</h3><p>Browse a collection or open a UAC package. Audio streams appear here as rows with their tags as columns.</p><button class="button primary" data-action="openUAC">Open a UAC file</button></div>`;
     $("#member-summary").textContent = state.documentName ? `${members.length} shown · ${playableMembers().length} audio tracks` : "No package open";
+    const gigaGrid = $(".tracks-field-grid");
+    if (gigaGrid) {
+      const template = trackArrayColumnTemplate(members, trackColumns());
+      gigaGrid.style.setProperty("--field-grid-columns", template);
+      $$(".field-grid-header, .track-array-row", gigaGrid).forEach(row => row.style.setProperty("grid-template-columns", template, "important"));
+    }
   }
 
   function fieldKind(value) {
@@ -452,6 +458,9 @@
   function renderTrackArrayGrid(tracks) {
     const columns = trackColumns();
     const columnTemplate = trackArrayColumnTemplate(tracks, columns);
+    // The giga table has its own explicit track list. Keep it on every row so
+    // WebKit cannot fall back to the generic three-column field-grid default.
+    const rowTemplateStyle = ` style="grid-template-columns:${columnTemplate} !important"`;
     const headerCells = ["Track", "Filename", ...columns.map(displayTrackKey)];
     const header = headerCells.map((label, index) => {
       const sortKey = index === 0 ? "track" : index === 1 ? "filename" : columns[index - 2];
@@ -483,11 +492,11 @@
         const source = extension ? member.extensions : member.metadata;
         return `<div class="field-grid-cell" role="cell" data-track-column-key="${esc(key)}">${scalar(source?.[fieldKey], fieldKey, extension ? "memberExtensions" : "memberMetadata", true)}</div>`;
       }).join("");
-      const row = `<div class="field-grid-row track-array-row" role="row"><div class="field-grid-cell" role="cell">${scalar(trackNumber, "track", "memberMetadata", false)}</div><div class="field-grid-cell" role="cell">${scalar(filename, "filename", "memberMetadata", false)}</div>${metadataCells}</div>`;
+      const row = `<div class="field-grid-row track-array-row" role="row"${rowTemplateStyle}><div class="field-grid-cell" role="cell">${scalar(trackNumber, "track", "memberMetadata", false)}</div><div class="field-grid-cell" role="cell">${scalar(filename, "filename", "memberMetadata", false)}</div>${metadataCells}</div>`;
       return row;
     }).join("");
     const empty = `<div class="field-grid-empty" role="row"><span role="cell">No playable tracks</span></div>`;
-    return `<div class="field-grid tracks-field-grid" data-field-grid="tracks" role="table" aria-label="Tracks" style="--field-grid-columns:${columnTemplate}"><div class="field-grid-row field-grid-header" role="row">${header}</div>${rows || empty}</div>${popups.join("")}`;
+    return `<div class="field-grid tracks-field-grid" data-field-grid="tracks" role="table" aria-label="Tracks" style="--field-grid-columns:${columnTemplate}"><div class="field-grid-row field-grid-header" role="row"${rowTemplateStyle}>${header}</div>${rows || empty}</div>${popups.join("")}`;
   }
 
   function trackArrayColumnTemplate(tracks, columns) {
@@ -495,7 +504,10 @@
     const context = canvas.getContext("2d");
     if (!context) return "64px 220px " + columns.map(() => "160px").join(" ");
     context.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
-    const widthFor = values => Math.max(58, Math.ceil(Math.max(...values.map(value => context.measureText(String(value ?? "")).width), 0) + 18));
+    const widthFor = values => {
+      const measured = values.map(value => context.measureText(String(value ?? "")).width).filter(Number.isFinite);
+      return Math.max(58, Math.ceil(Math.max(...measured, 0) + 18));
+    };
     const widths = [
       widthFor(["Track", ...tracks.map((member, index) => String(trackNumberFor(member, index)).padStart(2, "0"))]),
       widthFor(["Filename", ...tracks.map(member => member.name || member.path.split("/").pop() || member.path)]),
