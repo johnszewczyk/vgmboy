@@ -592,7 +592,7 @@
       const tagCount = fileTagEntries(member).length;
       const dirty = dirtyTrackPaths.has(member.path);
       const tagLabel = dirty ? `${tagCount} •` : String(tagCount);
-      return `<div class="field-grid-row${selectedClass}" role="row" tabindex="0" data-action="selectTrackBrowserMember" data-track-browser-path="${esc(member.path)}" data-track-browser-row><div class="field-grid-cell" role="cell"><input class="tag-table-field track-browser-sidebar-number" value="${index + 1}" aria-label="Track row ${index + 1}" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field file-name-field" value="${esc(member.name)}" aria-label="Filename" disabled></div><div class="field-grid-cell" role="cell"><input class="tag-table-field track-browser-sidebar-status${dirty ? " dirty" : ""}" value="${esc(tagLabel)}" aria-label="${dirty ? "Unsaved tag edits" : `${tagCount} tags`}" disabled></div></div>`;
+      return `<button type="button" role="button" class="field-grid-row${selectedClass}" aria-label="Select ${esc(member.name)}" aria-selected="${member.path === trackBrowserPath}" data-action="selectTrackBrowserMember" data-track-browser-path="${esc(member.path)}" data-track-browser-row><span class="field-grid-cell" role="cell"><span class="tag-table-field track-browser-sidebar-number">${index + 1}</span></span><span class="field-grid-cell" role="cell"><span class="tag-table-field file-name-field">${esc(member.name)}</span></span><span class="field-grid-cell" role="cell"><span class="tag-table-field track-browser-sidebar-status${dirty ? " dirty" : ""}">${esc(tagLabel)}</span></span></button>`;
     }).join("");
     const sidebar = `<section class="track-browser-pane track-browser-sidebar-pane" aria-label="Tagged files"><div class="data-table-scroll canonical-table-surface track-browser-scroll"><div class="field-grid canonical-table flat-table track-browser-sidebar-field-grid" role="table" aria-label="Tagged tracks">${sidebarHeader}${sidebarRows || '<div class="field-grid-empty" role="row"><span role="cell">No files with tags</span></div>'}</div></div></section>`;
     const detailContent = selected
@@ -600,6 +600,13 @@
       : '<div class="empty-tab"><strong>No tagged files</strong><span>Files with metadata or extensions will appear here.</span></div>';
     const detail = `<section class="track-browser-pane track-browser-detail-pane" aria-label="Selected track tags"><div class="data-table-scroll canonical-table-surface track-browser-scroll"><div class="track-browser-detail">${detailContent}</div></div></section>`;
     return `<section class="data-page track-browser-page">${sidebar}${detail}</section>`;
+  }
+
+  function selectTrackBrowserMember(path) {
+    if (!path || path === trackBrowserPath) return;
+    trackBrowserPath = path;
+    bridge("selectMember", { path });
+    render(state);
   }
 
   function renderFilesPage() {
@@ -946,8 +953,9 @@
       }
     }
     else if (action === "selectTrackBrowserMember") {
-      trackBrowserPath = event.target.closest("[data-track-browser-path]")?.dataset.trackBrowserPath || "";
-      render(state);
+      const row = event.target.closest("[data-track-browser-row]");
+      const path = row?.dataset.trackBrowserPath || "";
+      selectTrackBrowserMember(path);
     }
     else if (action === "addMultipleValue") addMultipleValue(event.target.closest("[data-multiple-editor]"));
     else if (action === "removeMultipleValue") removeMultipleValue(event.target.closest("[data-multiple-entry]"));
@@ -1047,6 +1055,17 @@
       bridge("addMetadataKey", { key:titleCaseTagName($('[data-new-tag-key]', form)?.value || ""), scope:form.dataset.tagScope || "package", value:$('[data-new-tag-value]', form)?.value || "" });
       return;
     }
+  });
+
+  document.addEventListener("focusin", event => {
+    const row = event.target.closest("[data-track-browser-row]");
+    if (row) selectTrackBrowserMember(row.dataset.trackBrowserPath || "");
+  });
+
+  document.addEventListener("pointerdown", event => {
+    if (event.button !== 0) return;
+    const row = event.target.closest("[data-track-browser-row]");
+    if (row) selectTrackBrowserMember(row.dataset.trackBrowserPath || "");
   });
 
   document.addEventListener("change", event => {
