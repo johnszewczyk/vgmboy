@@ -4,6 +4,7 @@
   --text: #202630; --muted: #78818e; --soft: #a1a8b1; --accent: #345fdb;
   --accent-soft: #edf2ff; --hover: #f1f5fc; --selected: #e8efff;
   --green: #228664; --red: #bd4848; --shadow: 0 8px 24px #18243a12;
+  --canonical-number-column:32px; --canonical-action-column:28px;
   font: 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 @media (prefers-color-scheme: dark) {
@@ -104,9 +105,11 @@ button { cursor:pointer; }
 .field-grid .icon-button { width:23px; height:23px; padding:0; border:1px solid var(--line); border-radius:3px; background:transparent; color:var(--muted); cursor:pointer; }
 .field-grid .icon-button:hover { color:var(--text); border-color:var(--accent); }
 .field-grid .icon-button.danger,.field-grid .danger { color:var(--danger, #e06c75); }
-.technical-field-grid { --field-grid-columns:15% 7% minmax(0,1fr) minmax(0,1fr) 28px 28px; min-width:760px; }
+.canonical-number-cell { justify-content:center; }
+.canonical-number-field { text-align:center; padding-right:0!important; padding-left:0!important; }
+.technical-field-grid { --field-grid-columns:var(--canonical-number-column) 7% minmax(0,1fr) minmax(0,1fr) 28px 28px; min-width:760px; }
 .technical-field-grid .action-heading { grid-column:span 2; justify-content:center; }
-.meta-field-grid { --field-grid-columns:4.75rem 9rem minmax(12rem,1fr) minmax(14rem,1.2fr) 4.5rem 28px 28px; min-width:760px; }
+.meta-field-grid { --field-grid-columns:var(--canonical-number-column) 9rem minmax(12rem,1fr) minmax(14rem,1.2fr) 4.5rem 28px 28px; min-width:760px; }
 .tag-values-popover { position:relative; display:inline-block; }
 .tag-values-popover summary { cursor:pointer; list-style:none; color:var(--muted); }
 .tag-values-popover summary::-webkit-details-marker { display:none; }
@@ -137,7 +140,7 @@ button { cursor:pointer; }
    separate interaction now that package-wide edits live in Meta Tags. */
 .track-grid tbody tr { cursor:pointer; }
 .track-grid .track-number-heading,.track-grid .track-number-cell { left:0; }
-.technical-field-grid { --field-grid-columns:15% minmax(0,1fr) 100px minmax(0,1fr) 28px 28px; }
+.technical-field-grid { --field-grid-columns:var(--canonical-number-column) minmax(0,1fr) 100px minmax(0,1fr) 28px 28px; }
 .track-tags-editor .technical-field { display:table-row!important; }
 .structured-technical-row .tag-table-field:disabled { cursor:not-allowed; }
 
@@ -145,7 +148,7 @@ button { cursor:pointer; }
 .technical-field-grid .field-grid-header .field-grid-cell,
 .meta-field-grid .field-grid-header .field-grid-cell { justify-content:center; }
 .track-grid .track-filename-cell { color:var(--muted); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:9px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.file-field-grid { --file-field-columns:105px 90px 220px minmax(300px,1fr) minmax(250px,330px) 90px; min-width:1120px; width:100%; padding:0; }
+.file-field-grid { --file-field-columns:var(--canonical-number-column) 105px 90px 220px minmax(300px,1fr) minmax(250px,330px) 90px; min-width:1120px; width:100%; padding:0; }
 .file-field-grid .field-grid-header,
 .file-field-grid .file-row { grid-template-columns:var(--file-field-columns); width:100%; }
 .file-field-grid .file-row { cursor:pointer; }
@@ -167,7 +170,7 @@ button { cursor:pointer; }
 .file-tag-action-cell .icon-button { width:22px; height:22px; font-size:12px; }
 .file-tag-empty { padding:5px 2px; color:var(--soft); }
 .attachment-table-scroll { min-height:0; }
-.attachment-field-grid { --attachment-field-columns:110px 100px 220px minmax(320px,1fr) 90px; min-width:900px; width:100%; padding:0; }
+.attachment-field-grid { --attachment-field-columns:var(--canonical-number-column) 100px 220px minmax(320px,1fr) 90px; min-width:900px; width:100%; padding:0; }
 .attachment-field-grid .field-grid-header,
 .attachment-field-grid .attachment-row { grid-template-columns:var(--attachment-field-columns); width:100%; }
 .attachment-field-grid .attachment-row { cursor:pointer; }
@@ -191,7 +194,7 @@ button { cursor:pointer; }
 @keyframes row-removal { from { opacity:1; transform:translateX(0); } to { opacity:0; transform:translateX(8px); } }
 .row-removing { animation:row-removal var(--ui-motion) forwards; }
 
-[data-field-grid="tracks"] { --field-grid-columns:64px 220px 120px; width:max-content; min-width:max-content; }
+[data-field-grid="tracks"] { --field-grid-columns:var(--canonical-number-column) 220px 120px; width:max-content; min-width:max-content; }
 [data-field-grid="tracks"] .field-grid-header,
 [data-field-grid="tracks"] .track-array-row { width:100%; min-width:max-content; flex:none; }
 [data-field-grid="tracks"] .track-array-row:hover,
@@ -266,14 +269,14 @@ button { cursor:pointer; }
 .multiple-values-popup-table { min-width:320px; border:1px solid var(--line); background:var(--panel); }
 .multiple-values-popup-table .tag-multiple-value-row { grid-template-columns:minmax(100px,.7fr) minmax(180px,1.3fr); gap:8px; padding:5px 7px; }
 .multiple-values-popup-table .tag-multiple-value-row > span:first-child { color:var(--accent); text-align:left; }
-.file-field-grid { --file-field-columns:105px 90px 220px minmax(300px,1fr) minmax(250px,330px) 90px 40px; min-width:1120px; width:100%; padding:0; }
+.file-field-grid { --file-field-columns:var(--canonical-number-column) 90px 220px minmax(300px,1fr) minmax(250px,330px) 90px 40px; min-width:1120px; width:100%; padding:0; }
 .file-tags-count { text-align:center; color:var(--muted)!important; }
 .track-browser-page { min-height:100%; }
 .track-browser-inspector { max-width:none; padding-left:0; padding-right:0; }
 .track-browser-inspector > .inspector-head { padding-left:28px; padding-right:28px; }
 .track-browser-page { display:grid; grid-template-columns:minmax(190px,230px) minmax(0,1fr); min-height:calc(100vh - 155px); align-items:start; }
 .track-browser-sidebar { min-width:0; min-height:calc(100vh - 155px); overflow:auto; padding:0; background:var(--panel-2); border-right:1px solid var(--line); }
-.track-browser-sidebar-field-grid { --field-grid-columns:4.5rem minmax(0,1fr) 56px; min-width:0; width:100%; padding:2px var(--field-grid-gap); background:var(--panel-2); }
+.track-browser-sidebar-field-grid { --field-grid-columns:var(--canonical-number-column) minmax(0,1fr) 56px; min-width:0; width:100%; padding:2px var(--field-grid-gap); background:var(--panel-2); }
 .track-browser-sidebar-field-grid .field-grid-header,
 .track-browser-sidebar-field-grid .field-grid-row { grid-template-columns:var(--field-grid-columns); width:auto; }
 .track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row] { cursor:pointer; }
@@ -291,7 +294,7 @@ button { cursor:pointer; }
 .track-browser-detail-heading h2 { margin:4px 0 3px; font-size:14px; overflow-wrap:anywhere; }
 .track-browser-detail-heading p { max-width:70ch; margin:0; overflow:hidden; color:var(--muted); font:9px ui-monospace,SFMono-Regular,Menlo,monospace; text-overflow:ellipsis; white-space:nowrap; }
 .track-browser-table-wrap { display:flex; flex-direction:column; min-width:0; min-height:0; gap:1rem; overflow-x:auto; padding:0; }
-.track-browser-field-grid { --field-grid-columns:max-content minmax(160px,1fr) minmax(220px,1.5fr) 28px 28px; min-width:680px; width:100%; }
+.track-browser-field-grid { --field-grid-columns:var(--canonical-number-column) minmax(160px,1fr) minmax(220px,1.5fr) 28px 28px; min-width:680px; width:100%; }
 .track-browser-actions { justify-content:center; gap:2px; }
 
 .file-preview { display:flex; flex-direction:column; min-height:0; border:1px solid var(--line); border-radius:4px; background:var(--panel); }
@@ -487,7 +490,7 @@ button { cursor:pointer; }
 .file-field-grid .file-row .field-grid-cell { padding:0; }
 .file-field-grid .field-grid-action-placeholder { color:var(--soft); }
 .track-browser-page { grid-template-columns:33rem minmax(0,1fr); }
-.track-browser-sidebar-field-grid { --field-grid-columns:4.5rem minmax(0,1fr) 56px; width:100%; min-width:0; padding:2px var(--field-grid-gap); }
+.track-browser-sidebar-field-grid { --field-grid-columns:var(--canonical-number-column) minmax(0,1fr) 56px; width:100%; min-width:0; padding:2px var(--field-grid-gap); }
 .track-browser-sidebar-field-grid .field-grid-header,
 .track-browser-sidebar-field-grid .field-grid-row { grid-template-columns:var(--field-grid-columns); width:100%; min-width:0; }
 .track-browser-sidebar-field-grid .field-grid-row[data-track-browser-row] { cursor:pointer; }
@@ -509,7 +512,6 @@ button { cursor:pointer; }
 /* Numbered-table contract: every visible table starts with the same compact,
    centered 32px row-number column. The remaining columns retain their page
    semantics, but never get to change the number cell's geometry. */
-:root { --canonical-number-column:32px; --canonical-action-column:28px; }
 .meta-field-grid { --field-grid-columns:var(--canonical-number-column) 9rem minmax(12rem,1fr) minmax(14rem,1.2fr) 4.5rem 28px 28px; }
 .meta-field-grid > .field-grid-header,
 .meta-field-grid > .field-grid-row:not(.inserted-table-row) { width:100%; min-width:0; box-sizing:border-box; grid-template-columns:var(--field-grid-columns); }
@@ -576,14 +578,22 @@ button { cursor:pointer; }
 .canonical-tag-grid .tag-value-cell { align-items:center; overflow:visible; }
 .canonical-tag-grid .tag-value-cell .tag-inline-editor { width:100%; min-width:0; }
 
-/* Pack Tags' add form is a peer canonical table, not a custom form layout. */
-.tag-create-form { display:block; width:100%; min-width:0; margin:0 0 8px; padding:0; }
-.tag-create-grid { width:100%; min-width:0; }
-.tag-create-grid > .canonical-table-title-row { grid-template-columns:minmax(0,1fr)!important; width:100%; }
-.tag-create-grid > .canonical-table-title-row .field-grid-cell { grid-column:1 / -1; }
-.tag-create-grid .tag-create-row .field-grid-cell { box-sizing:border-box; }
-.tag-create-grid .tag-create-row .tag-submit-cell,
-.tag-create-grid .tag-create-row .tag-delete-cell { justify-content:center; }
+.canonical-tag-grid .tag-create-row .field-grid-cell { box-sizing:border-box; }
+.canonical-tag-grid .tag-create-row .tag-submit-cell,
+.canonical-tag-grid .tag-create-row .tag-delete-cell { justify-content:center; }
+
+.new-tag-page { grid-template-columns:33rem minmax(0,1fr); }
+.new-tag-sidebar-field-grid { --field-grid-columns:var(--canonical-number-column) 36px minmax(0,1fr); }
+.new-tag-sidebar-field-grid .field-grid-header,
+.new-tag-sidebar-field-grid .new-tag-track-row { width:100%; min-width:0; box-sizing:border-box; grid-template-columns:var(--field-grid-columns); }
+.new-tag-checkbox-cell input[type="checkbox"] { width:13px; height:13px; margin:0; accent-color:var(--accent); }
+.new-tag-editor-field-grid { --field-grid-columns:var(--canonical-number-column) 10rem minmax(12rem,.8fr) minmax(14rem,1.2fr) 28px; width:100%; min-width:760px; }
+.new-tag-editor-field-grid > .field-grid-header,
+.new-tag-editor-field-grid > .field-grid-row { width:100%; min-width:0; box-sizing:border-box; grid-template-columns:var(--field-grid-columns); }
+.new-tag-editor-field-grid > .canonical-table-title-row { grid-template-columns:minmax(0,1fr)!important; }
+.new-tag-editor-field-grid > .canonical-table-title-row .field-grid-cell { grid-column:1 / -1; }
+.new-tag-form { width:100%; max-width:100%; }
+.new-tag-form [data-new-tag-submit] { justify-self:center; }
 
 /* View is a regular canonical action column: blank for opaque members, with
    the same fixed-width action cell when a text attachment can be previewed. */

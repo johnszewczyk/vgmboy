@@ -831,6 +831,56 @@ final class UACManModel {
         } catch { errorMessage = String(describing: error) }
     }
 
+    func addMemberTags(paths rawPaths: [String], key rawKey: String, value rawValue: String) {
+        let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        var seenPaths = Set<String>()
+        let paths = rawPaths
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && seenPaths.insert($0).inserted }
+        guard !key.isEmpty else { errorMessage = "Enter a tag name."; return }
+        guard !paths.isEmpty else { errorMessage = "Select at least one track."; return }
+        do {
+            try flushEditorBuffers()
+            guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any], var members = root["members"] as? [[String: Any]] else {
+                throw UACManifestEditorError.invalidManifestJSON
+            }
+            let indices = paths.compactMap { path in members.firstIndex(where: { ($0["path"] as? String) == path }) }
+            guard indices.count == paths.count else {
+                let foundPaths = Set(indices.compactMap { members[$0]["path"] as? String })
+                let missingPath = paths.first(where: { !foundPaths.contains($0) }) ?? "unknown"
+                throw UACManifestEditorError.memberRecordMissing(missingPath)
+            }
+            guard indices.allSatisfy({
+                let role = members[$0]["role"] as? String
+                return role == "playable" || role == "track"
+            }) else {
+                throw UACManifestEditorError.invalidMetadataJSON("New tags can only be applied to playable tracks.")
+            }
+            for index in indices {
+                let fields = members[index]["metadata"] as? [String: Any] ?? [:]
+                guard fields[key] == nil else {
+                    throw UACManifestEditorError.invalidMetadataJSON("The tag already exists on one or more selected tracks: \(key)")
+                }
+            }
+            for index in indices {
+                var fields = members[index]["metadata"] as? [String: Any] ?? [:]
+                fields[key] = value
+                members[index]["metadata"] = fields
+            }
+            root["members"] = members
+            draftManifestJSON = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .prettyPrinted])
+            let manifest = try UACManifestEditor.decode(draftManifestJSON)
+            gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata)
+            gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
+            refreshMemberSummaries(from: manifest)
+            if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
+            hasUnsavedChanges = draftManifestJSON != originalManifestJSON
+            statusMessage = "Added \(key) to \(indices.count) track(s). Save to commit the package change."
+            errorMessage = nil
+        } catch { errorMessage = String(describing: error) }
+    }
+
     func commitMemberTag(path rawPath: String, scope: String, key rawKey: String, newKey rawNewKey: String, value: String, structuredValueJSON: String? = nil) {
         let path = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
         let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)

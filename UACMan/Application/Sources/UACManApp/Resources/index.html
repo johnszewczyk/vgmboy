@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none';">
   <title>UACMan</title>
-  <link rel="stylesheet" href="workspace.css?v=20260921-pack-tags-v3">
-  <script src="workspace.js?v=20260921-pack-tags-v3" defer></script>
+  <link rel="stylesheet" href="workspace.css?v=20260922-new-tag-v1">
+  <script src="workspace.js?v=20260922-new-tag-v1" defer></script>
 </head>
 <body>
   <header class="appbar">
-    <nav class="main-view-tabs app-nav" aria-label="Package workspace"><div class="tab-buttons"><button data-action="mainView" data-view="files" id="files-view-button">Files</button><button data-action="mainView" data-view="packTags" id="pack-tags-view-button">Pack Tags</button><button data-action="mainView" data-view="members" id="members-view-button" class="active">Tracks</button><button data-action="mainView" data-view="trackBrowser" id="track-view-button">Track Tags</button></div></nav>
+    <nav class="main-view-tabs app-nav" aria-label="Package workspace"><div class="tab-buttons"><button data-action="mainView" data-view="files" id="files-view-button">Files</button><button data-action="mainView" data-view="packTags" id="pack-tags-view-button">Pack Tags</button><button data-action="mainView" data-view="members" id="members-view-button" class="active">Tracks</button><button data-action="mainView" data-view="trackBrowser" id="track-view-button">Track Tags</button><button data-action="mainView" data-view="newTag" id="new-tag-view-button">New Tag</button></div></nav>
     <div class="appbar-spacer"></div>
     <div class="appbar-tools">
-      <label class="search member-search hidden" id="member-filter-wrap"><span>⌕</span><input id="member-filter" placeholder="Search title, artist, album, filename, path…" autocomplete="off"><kbd>⌘ K</kbd></label>
+      <label class="search member-search hidden" id="member-filter-wrap"><span>⌕</span><input id="member-filter" data-focus-id="member-filter" placeholder="Search title, artist, album, filename, path…" autocomplete="off"><kbd>⌘ K</kbd></label>
       <div class="actions" aria-label="Package actions">
         <button class="icon-button appbar-action" data-action="openCollection" title="Open Collection" aria-label="Open Collection">☰</button>
         <button class="icon-button appbar-action" data-action="openUAC" title="Open UAC" aria-label="Open UAC">＋</button>

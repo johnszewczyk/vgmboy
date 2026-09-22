@@ -74,6 +74,10 @@
     const attributes = options.attributes ? ` ${options.attributes}` : "";
     return `<div class="${classes}" role="${role}"${attributes}>${content}</div>`;
   };
+  const canonicalNumberCellMarkup = (value, label, options = {}) => canonicalCellMarkup(
+    `<input class="tag-table-field canonical-number-field" value="${esc(value)}" aria-label="${esc(label)}" disabled>`,
+    { className:["canonical-number-cell", options.className].filter(Boolean).join(" "), attributes:options.attributes }
+  );
   const canonicalRowMarkup = (cells, options = {}) => {
     const classes = ["field-grid-row", options.className].filter(Boolean).join(" ");
     const role = options.role || "row";
@@ -156,7 +160,7 @@
         ? nestedJSONValueMarkup(item, key)
         : `<input class="tag-table-field multiple-value-editor" data-multiple-value value="${esc(raw)}" aria-label="Value for ${esc(key)}">`;
       const keyMarkup = `<input class="tag-table-field multiple-value-key" data-multiple-key value="${esc(key)}" aria-label="Key for ${esc(key)}"${isArray ? " disabled" : ""}>`;
-      const numberMarkup = canonicalCellMarkup(`<input class="tag-table-field multiple-value-number" value="${index + 1}" aria-label="Value number ${index + 1}" disabled>`);
+      const numberMarkup = canonicalNumberCellMarkup(index + 1, `Value number ${index + 1}`, { className:"multiple-value-number-cell" });
       const removeMarkup = `<button class="icon-button danger multiple-value-remove" data-action="removeMultipleValue" type="button" title="Remove value" aria-label="Remove value">×</button>`;
       const submitMarkup = '<button class="icon-button multiple-value-submit" data-action="commitMultipleValueRow" type="button" title="Submit changed value" aria-label="Submit changed value">✓</button>';
       const cells = [
@@ -193,7 +197,7 @@
     const rows = entries.length
       ? entries.map(([key, item], index) => {
         const cells = [
-          ...(tableLayout ? [canonicalCellMarkup(`<input class="tag-table-field multiple-value-number" value="${index + 1}" aria-label="Value number ${index + 1}" disabled>`)] : []),
+          ...(tableLayout ? [canonicalNumberCellMarkup(index + 1, `Value number ${index + 1}`, { className:"multiple-value-number-cell" })] : []),
           canonicalCellMarkup(`<input class="tag-table-field" value="${esc(key)}" disabled>`),
           canonicalCellMarkup(item && typeof item === "object" ? nestedJSONValueMarkup(item, key, false) : `<input class="tag-table-field" value="${esc(String(item ?? "—"))}" disabled>`),
           ...(tableLayout ? [canonicalCellMarkup(""), canonicalCellMarkup("")] : [])
@@ -231,10 +235,11 @@
   let sort = { key:"track", direction:1 };
   let mainView = "members";
   let trackBrowserPath = "";
+  let selectedTagTrackPaths = new Set();
   let dirtyTrackPaths = new Set();
   let lastUnsavedChanges = false;
   let lastRenderedView = "";
-  let lastDocumentName = "";
+  let lastDocumentPath = "";
   const uiMotionDuration = 250;
 
   function animateRowRemoval(row, completion) {
@@ -272,10 +277,11 @@
 
   function render(stateValue) {
     state = stateValue;
-    if (state.documentName !== lastDocumentName) {
-      lastDocumentName = state.documentName || "";
+    if (state.documentPath !== lastDocumentPath) {
+      lastDocumentPath = state.documentPath || "";
       mainView = "members";
       trackBrowserPath = "";
+      selectedTagTrackPaths = new Set();
       dirtyTrackPaths = new Set();
       lastUnsavedChanges = Boolean(state.hasUnsavedChanges);
     }
@@ -289,7 +295,7 @@
 
     $("#document-name").textContent = state.documentName || "No package open";
     $("#document-path").textContent = state.documentPath || "Choose a collection or open one UAC file";
-    $("#member-filter-wrap").classList.toggle("hidden", !["members", "files"].includes(mainView));
+    $("#member-filter-wrap").classList.toggle("hidden", !["members", "files", "newTag"].includes(mainView));
     const singleDocumentMode = Boolean(state.documentName) && !state.collectionRoot;
     $("#workspace").classList.toggle("library-collapsed", singleDocumentMode);
     $("#library-panel").classList.toggle("single-document-hidden", singleDocumentMode);
@@ -382,6 +388,10 @@
     return playable.length ? playable : state.members;
   }
 
+  function tagEligibleTracks() {
+    return state?.members.filter(member => member.role === "playable" || member.role === "track") || [];
+  }
+
   function trackColumns() {
     const keys = new Set();
     playableMembers().forEach(member => Object.keys(memberFields(member)).forEach(key => keys.add(key)));
@@ -466,7 +476,7 @@
       const submitTitle = readOnlyMultipleValues ? "Multiple Values contain different values" : "Submit changed fields";
       const foldAttribute = multipleValues ? ` data-multiple-fold-id="${esc(foldID)}"` : "";
       const cells = [
-        canonicalCellMarkup(`<input class="tag-table-field" value="${index + 1}" aria-label="Tag number" disabled>`, { className:"tag-number-cell" }),
+        canonicalNumberCellMarkup(index + 1, `Tag number ${index + 1}`, { className:"tag-number-cell" }),
         canonicalCellMarkup(`<input class="tag-table-field" value="${esc(tagType)}" aria-label="Tag type for ${esc(entry.key)}" disabled>`, { className:"tag-type-cell" }),
         canonicalCellMarkup(`<input class="tag-table-field" data-tag-to value="${esc(entry.key)}" aria-label="Tag name for ${esc(entry.key)}">`, { className:"tag-name-cell" }),
         canonicalCellMarkup(`<span class="tag-inline-editor">${valueInput}</span>`, { className:"tag-value-cell" }),
@@ -480,30 +490,61 @@
     };
     const headers = ["#", "Tag Type", "Tag Name", "Tag Value", "Uses", "✓", "×"];
     const header = `${canonicalTitleRowMarkup(title)}${canonicalHeaderMarkup(headers)}`;
-    const createForm = gridScope => {
-      const draft = canonicalRowMarkup([
-        canonicalCellMarkup('<input class="tag-table-field tag-create-number" value="＋" aria-label="New tag" disabled>', { className:"tag-create-number" }),
+    const packageTagDraftRow = () => canonicalRowMarkup([
+        canonicalNumberCellMarkup("＋", "Add package tag", { className:"tag-create-number" }),
         canonicalCellMarkup('<input class="tag-table-field" value="string" aria-label="Tag type" disabled>', { className:"tag-type-cell" }),
         canonicalCellMarkup('<input class="tag-table-field" data-new-tag-key placeholder="Tag Name" aria-label="New tag name" required>', { className:"tag-name-cell" }),
         canonicalCellMarkup('<input class="tag-table-field" data-new-tag-value placeholder="Tag Value" aria-label="New tag value">', { className:"tag-value-cell" }),
         canonicalCellMarkup('<input class="tag-table-field" value="—" aria-label="Uses" disabled>', { className:"tag-uses-cell" }),
-        canonicalCellMarkup('<button class="icon-button" type="submit" title="Add tag" aria-label="Add tag">✓</button>', { className:"tag-submit-cell field-grid-action-cell" }),
-        canonicalCellMarkup('<button class="icon-button danger" type="reset" title="Clear new tag" aria-label="Clear new tag">×</button>', { className:"tag-delete-cell field-grid-action-cell" })
-      ], { className:"tag-create-row" });
-      const table = canonicalTableMarkup({
-        className:"flat-table meta-field-grid canonical-tag-grid tag-create-grid",
-        ariaLabel:"New package tag",
-        header:`${canonicalTitleRowMarkup("New Tag")}${canonicalHeaderMarkup(headers)}`,
-        rows:draft
-      });
-      return `<form class="tag-create-form canonical-table-surface" data-tag-create data-tag-scope="${gridScope}" aria-label="New package tag">${table}</form>`;
-    };
+        canonicalCellMarkup('<button class="icon-button" data-action="createPackageTag" title="Add package tag" aria-label="Add package tag">✓</button>', { className:"tag-submit-cell field-grid-action-cell" }),
+        canonicalCellMarkup('<button class="icon-button danger" data-action="clearPackageTagDraft" title="Clear new tag" aria-label="Clear new tag">×</button>', { className:"tag-delete-cell field-grid-action-cell" })
+      ], { className:"tag-create-row", attributes:'data-new-tag-row data-tag-scope="package"' });
     const table = rowsFor(scope);
-    const canonicalGrid = (gridTitle, rows, popups, gridScope) => `<section class="tag-scope-table">${gridScope === "package" ? createForm(gridScope) : ""}<div class="data-table-scroll canonical-table-surface">${canonicalTableMarkup({ className:"flat-table meta-field-grid canonical-tag-grid", ariaLabel:gridTitle, header, rows, empty:'<div class="field-grid-empty" role="row"><span role="cell">No tags</span></div>' })}</div>${popups.join("")}</section>`;
-    return `<section class="data-page schema-page">${canonicalGrid(title, table.rows, [], scope === "Package" ? "package" : "tracks")}${includeAttachments ? renderAttachments() : ""}</section>`;
+    const rows = scope === "Package" ? `${table.rows}${packageTagDraftRow()}` : table.rows;
+    const grid = `<section class="tag-scope-table"><div class="data-table-scroll canonical-table-surface">${canonicalTableMarkup({ className:"flat-table meta-field-grid canonical-tag-grid", ariaLabel:title, header, rows, empty:table.rows ? "" : '<div class="field-grid-empty" role="row"><span role="cell">No tags</span></div>' })}</div></section>`;
+    return `<section class="data-page schema-page">${grid}${includeAttachments ? renderAttachments() : ""}</section>`;
   }
 
   function renderPackTagsPage() { return renderTagScopePage("Pack Tags", "Package", true); }
+
+  function renderNewTagPage() {
+    const tracks = tagEligibleTracks();
+    const query = $("#member-filter")?.value.trim().toLocaleLowerCase() || "";
+    const visibleTracks = tracks.filter(member => !query || [member.title, member.artist, member.album, member.name, member.path, member.role, member.format, ...Object.values(memberFields(member))].some(value => String(typeof value === "object" ? JSON.stringify(value) : (value || "")).toLocaleLowerCase().includes(query)));
+    const sidebarRows = visibleTracks.map(member => {
+      const number = tracks.indexOf(member) + 1;
+      const checked = selectedTagTrackPaths.has(member.path) ? " checked" : "";
+      const cells = [
+        canonicalNumberCellMarkup(number, `Track row ${number}`),
+        canonicalCellMarkup(`<input class="new-tag-track-checkbox" type="checkbox" data-new-tag-track value="${esc(member.path)}" aria-label="Select ${esc(member.name)}"${checked}>`, { className:"field-grid-action-cell new-tag-checkbox-cell" }),
+        canonicalCellMarkup(`<input class="tag-table-field file-name-field" value="${esc(member.name)}" aria-label="Track filename" title="${esc(member.path)}" disabled>`)
+      ];
+      return canonicalRowMarkup(cells, { className:"new-tag-track-row" });
+    }).join("");
+    const sidebar = canonicalTableMarkup({
+      className:"flat-table track-browser-sidebar-field-grid new-tag-sidebar-field-grid",
+      ariaLabel:"Select tracks for a new tag",
+      header:canonicalHeaderMarkup(["#", "✓", "Track"]),
+      rows:sidebarRows,
+      empty:'<div class="field-grid-empty" role="row"><span role="cell">No tracks match this filter</span></div>'
+    });
+    const draft = canonicalRowMarkup([
+      canonicalNumberCellMarkup("＋", "Create tag"),
+      canonicalCellMarkup('<select class="tag-table-field" data-new-tag-target aria-label="Apply to"><option value="allTracks">All Tracks</option><option value="selectedTracks">Selected Tracks</option><option value="package">Package</option></select>'),
+      canonicalCellMarkup('<input class="tag-table-field" data-new-tag-key placeholder="Tag Name" aria-label="New tag name" required>'),
+      canonicalCellMarkup('<input class="tag-table-field" data-new-tag-value placeholder="Tag Value" aria-label="New tag value">'),
+      canonicalCellMarkup('<button class="icon-button" type="submit" data-new-tag-submit title="Apply new tag" aria-label="Apply new tag">✓</button>', { className:"field-grid-action-cell" })
+    ], { className:"tag-create-row" });
+    const newTagTable = canonicalTableMarkup({
+      className:"flat-table new-tag-editor-field-grid",
+      ariaLabel:"Create a new tag",
+      header:`${canonicalTitleRowMarkup("New Tag")}${canonicalHeaderMarkup(["#", "Apply To", "Tag Name", "Tag Value", "✓"])}`,
+      rows:draft
+    });
+    const detail = `<section class="track-browser-pane new-tag-editor-pane" aria-label="New tag fields"><form class="data-table-scroll canonical-table-surface new-tag-form" data-new-tag-form>${newTagTable}</form></section>`;
+    const trackPane = `<section class="track-browser-pane track-browser-sidebar-pane new-tag-track-pane" aria-label="Track selection"><div class="data-table-scroll canonical-table-surface track-browser-scroll">${sidebar}</div></section>`;
+    return `<section class="data-page track-browser-page new-tag-page">${trackPane}${detail}</section>`;
+  }
 
   function renderTrackArrayGrid(tracks) {
     const columns = trackColumns();
@@ -537,7 +578,7 @@
         return `<input class="tag-table-field track-array-value${editable && present ? " track-cell" : ""}" value="${esc(display)}" aria-label="${esc(rowLabel)} ${esc(key)}"${attributes}${disabled}>`;
       };
       const cells = [
-        canonicalCellMarkup(scalar(index + 1, "row", "memberMetadata", false)),
+        canonicalNumberCellMarkup(index + 1, `Track row ${index + 1}`),
         canonicalCellMarkup(scalar(trackNumber, "track", "memberMetadata", false)),
         canonicalCellMarkup(scalar(filename, "filename", "memberMetadata", false)),
         ...columns.map(key => {
@@ -556,14 +597,15 @@
   function trackArrayColumnTemplate(tracks, columns) {
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
-    if (!context) return "32px 64px 220px " + columns.map(() => "160px").join(" ");
+    const numberColumn = getComputedStyle(document.documentElement).getPropertyValue("--canonical-number-column").trim() || "32px";
+    if (!context) return `${numberColumn} 64px 220px ` + columns.map(() => "160px").join(" ");
     context.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
     const widthFor = values => {
       const measured = values.map(value => context.measureText(String(value ?? "")).width).filter(Number.isFinite);
       return Math.max(58, Math.ceil(Math.max(...measured, 0) + 18));
     };
     const widths = [
-      32,
+      Number.parseFloat(numberColumn) || 32,
       widthFor(["Track #", ...tracks.map((member, index) => String(trackNumberFor(member, index)).padStart(2, "0"))]),
       widthFor(["Filename", ...tracks.map(member => member.name || member.path.split("/").pop() || member.path)]),
       ...columns.map(key => widthFor([displayTrackKey(key), ...tracks.map(member => {
@@ -609,7 +651,7 @@
       }
       const foldAttribute = structured ? ` data-multiple-fold-id="file-tag-${index}"` : "";
       const cells = [
-        canonicalCellMarkup(`<input class="tag-table-field file-tag-number" value="${index + 1}" aria-label="Tag number" disabled>`, { className:"tag-number-cell" }),
+        canonicalNumberCellMarkup(index + 1, `Tag number ${index + 1}`, { className:"tag-number-cell" }),
         canonicalCellMarkup(`<input class="tag-table-field file-tag-scope" value="${entry.scope === "memberExtensions" ? "extension" : "metadata"}" disabled>`, { className:"tag-type-cell" }),
         canonicalCellMarkup(`<input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name">`, { className:"tag-name-cell" }),
         canonicalCellMarkup(`<span class="tag-inline-editor">${valueMarkup}</span>`, { className:"tag-value-cell" }),
@@ -635,7 +677,7 @@
       const dirty = dirtyTrackPaths.has(member.path);
       const tagLabel = dirty ? `${tagCount} •` : String(tagCount);
       const cells = [
-        canonicalCellMarkup(`<input class="tag-table-field track-browser-sidebar-number" value="${index + 1}" aria-label="Track number" disabled>`),
+        canonicalNumberCellMarkup(index + 1, `Track row ${index + 1}`, { className:"track-browser-sidebar-number" }),
         canonicalCellMarkup(`<input class="tag-table-field file-name-field" value="${esc(member.name)}" aria-label="Filename" disabled>`),
         canonicalCellMarkup(`<input class="tag-table-field track-browser-sidebar-status${dirty ? " dirty" : ""}" value="${esc(tagLabel)}" aria-label="Tag count" disabled>`)
       ];
@@ -661,7 +703,7 @@
     const members = visibleFileMembers();
     const header = canonicalHeaderMarkup(["#", "Role", "Format", "Filename", "Stored path", "Tags Count", "Size", "View"]);
     const rows = members.map((member, index) => canonicalRowMarkup([
-      canonicalCellMarkup(`<input class="tag-table-field file-number" value="${index + 1}" aria-label="File number" disabled>`),
+      canonicalNumberCellMarkup(index + 1, `File number ${index + 1}`, { className:"file-number" }),
       canonicalCellMarkup(`<input class="tag-table-field" value="${esc(member.role)}" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field" value="${esc(member.format || "unknown")}" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field file-name-field" data-file-name data-file-path="${esc(member.path)}" value="${esc(member.name)}" aria-label="Filename">`),
@@ -683,7 +725,7 @@
     if (!assets.length) return "";
     const header = `${canonicalTitleRowMarkup("Attachments")}${canonicalHeaderMarkup(["#", "Role", "Format", "Filename", "Stored path", "Size", "View"])}`;
     const rows = assets.map((asset, index) => canonicalRowMarkup([
-      canonicalCellMarkup(`<input class="tag-table-field file-number" value="${index + 1}" aria-label="Attachment number" disabled>`),
+      canonicalNumberCellMarkup(index + 1, `Attachment number ${index + 1}`, { className:"file-number" }),
       canonicalCellMarkup(`<input class="tag-table-field" value="${esc(asset.role)}" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field" value="${esc(asset.format || "unknown")}" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field file-name-field" value="${esc(asset.name)}" disabled>`),
@@ -698,7 +740,7 @@
   function renderInspector() {
     const hasPackage = Boolean(state.documentName);
     const inspector = $("#inspector-content");
-    inspector.className = `inspector-content${mainView === "trackBrowser" ? " track-browser-inspector" : ""}`;
+    inspector.className = `inspector-content${["trackBrowser", "newTag"].includes(mainView) ? " track-browser-inspector" : ""}`;
     if (!hasPackage) {
       inspector.innerHTML = `<div class="metadata-empty"><div class="empty-icon">⌁</div><h3>Open a package to edit metadata</h3><p>Choose a collection entry or open a UAC file.</p></div>`;
       return;
@@ -707,7 +749,9 @@
     if (mainView === "files") html += renderFilesPage();
     else if (mainView === "packTags") html += renderPackTagsPage();
     else if (mainView === "trackBrowser") html += renderTrackPage();
+    else if (mainView === "newTag") html += renderNewTagPage();
     inspector.innerHTML = html;
+    if (mainView === "newTag") updateNewTagSubmitState();
   }
 
   function scopeToAction(scope) {
@@ -892,6 +936,40 @@
     toggle?.focus({ preventScroll:true });
   }
 
+  function updateNewTagSubmitState(form = $("[data-new-tag-form]")) {
+    if (!form) return;
+    const target = $("[data-new-tag-target]", form)?.value;
+    const hasTargets = target === "package" || (target === "selectedTracks" ? selectedTagTrackPaths.size > 0 : tagEligibleTracks().length > 0);
+    const submit = $("[data-new-tag-submit]", form);
+    if (submit) submit.disabled = !hasTargets;
+  }
+
+  function submitNewTag(form) {
+    if (!form) return;
+    const keyField = $("[data-new-tag-key]", form);
+    const key = titleCaseTagName(keyField?.value || "");
+    if (!key) { keyField?.focus(); return; }
+    const value = $("[data-new-tag-value]", form)?.value || "";
+    const target = $("[data-new-tag-target]", form)?.value || "allTracks";
+    if (target === "package") {
+      bridge("addMetadataKey", { key, scope:"package", value });
+      return;
+    }
+    const paths = target === "selectedTracks"
+      ? [...selectedTagTrackPaths]
+      : tagEligibleTracks().map(member => member.path);
+    if (!paths.length) return;
+    paths.forEach(markTrackDirty);
+    bridge("addMemberTags", { paths, key, value });
+  }
+
+  function createPackageTagFromDraft(row) {
+    const keyField = $("[data-new-tag-key]", row);
+    const key = titleCaseTagName(keyField?.value || "");
+    if (!key) { keyField?.focus(); return; }
+    bridge("addMetadataKey", { key, scope:"package", value:$('[data-new-tag-value]', row)?.value || "" });
+  }
+
   let trackContextMenu = null;
   function closeTrackContextMenu() {
     trackContextMenu?.remove();
@@ -1008,6 +1086,11 @@
         bridge("commitMetadataRow", { key:from, newKey:to, scope:row.dataset.tagScope || "", value:$('[data-tag-value]', row)?.disabled ? null : ($('[data-tag-value]', row)?.value || "") });
       }
     }
+    else if (action === "createPackageTag") createPackageTagFromDraft(event.target.closest("[data-new-tag-row]"));
+    else if (action === "clearPackageTagDraft") {
+      const row = event.target.closest("[data-new-tag-row]");
+      if (row) { $("[data-new-tag-key]", row).value = ""; $("[data-new-tag-value]", row).value = ""; }
+    }
     else if (action === "commitFileTag") {
       const row = event.target.closest("[data-file-tag-row]");
       if (row) {
@@ -1042,10 +1125,10 @@
   });
 
   document.addEventListener("submit", event => {
-    const form = event.target.closest("[data-tag-create]");
+    const form = event.target.closest("[data-new-tag-form]");
     if (form) {
       event.preventDefault();
-      bridge("addMetadataKey", { key:titleCaseTagName($('[data-new-tag-key]', form)?.value || ""), scope:form.dataset.tagScope || "package", value:$('[data-new-tag-value]', form)?.value || "" });
+      submitNewTag(form);
       return;
     }
   });
@@ -1063,13 +1146,18 @@
 
   document.addEventListener("change", event => {
     const target = event.target;
-    if (target.matches("[data-track-cell]")) commitTrackCell(target);
+    if (target.matches("[data-new-tag-track]")) {
+      if (target.checked) selectedTagTrackPaths.add(target.value); else selectedTagTrackPaths.delete(target.value);
+      updateNewTagSubmitState(target.closest(".new-tag-page")?.querySelector("[data-new-tag-form]"));
+    }
+    else if (target.matches("[data-new-tag-target]")) updateNewTagSubmitState(target.closest("[data-new-tag-form]"));
+    else if (target.matches("[data-track-cell]")) commitTrackCell(target);
     else if (target.matches("[data-file-name]")) bridge("renameMember", { path:target.dataset.filePath || "", name:target.value });
   });
 
   document.addEventListener("input", event => {
     if (event.target.id === "collection-filter") renderCollections();
-    else if (event.target.id === "member-filter") mainView === "files" ? render(state) : renderMembers();
+    else if (event.target.id === "member-filter") ["files", "newTag"].includes(mainView) ? render(state) : renderMembers();
   });
   document.addEventListener("contextmenu", event => {
     const column = event.target.closest(".tracks-field-grid [data-track-column-key]");

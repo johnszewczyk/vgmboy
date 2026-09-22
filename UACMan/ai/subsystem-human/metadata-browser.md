@@ -33,8 +33,8 @@ structured values show a stable `[Nested Tags]` placeholder and open as plain
 text in a popup. Aggregate rows with different structured values remain
 read-only until a single value is unambiguous.
 
-The workspace has four explicit pages in this order: **Files**, **Pack Tags**,
-**Tracks**, and **Track Tags**. Pages have no secondary page heading. **Tracks**
+The workspace has five explicit pages in this order: **Files**, **Pack Tags**,
+**Tracks**, **Track Tags**, and **New Tag**. Pages have no secondary page heading. **Tracks**
 is the wide canonical giga-table: every header and value is a boxed field, and
 its horizontal scroll belongs to the workspace surface rather than a nested
 table window. **Files** lists every stored package member, including playable
@@ -49,10 +49,14 @@ All page tables use the same rounded canonical frame and inset. The **Track Tags
 independent scroll panes, each containing the canonical field-grid table: a
 three-column tagged-file table on the left and an exhaustive metadata table on
 the right. They share the same cells and geometry, with no merged
-sidebar/content bar and no separate new-tag form. The left table is a compact,
-auto-height canonical table; its frame does not fill the page when it has only a
-few rows. **Pack Tags** contains a three-row canonical **New Tag** table (title,
-column headers, and editable draft row), the package-level tag table, and the
+sidebar/content bar. The left table is a compact, auto-height canonical table;
+its frame does not fill the page when it has only a few rows. **New Tag** pairs a
+scrollable canonical track list with checkboxes and a canonical draft table.
+The target selector applies the new string tag to **All Tracks**, **Selected
+Tracks**, or the **Package**. Search filters the track list without clearing
+checkbox selections. Batch track additions are applied atomically and refused
+if the tag already exists on any target track. **Pack Tags** contains the
+package-level tag table, a final inline draft row marked with **＋**, and the
 attachments table. Each table title is part of its own canonical grid rather
 than a separate decorative section heading. Non-string
 values in Pack Tags and Track Tags use `[Nested Tags]` to open an animated,
@@ -72,9 +76,11 @@ simple set summary should not be nested needlessly.
 
 ## Editing and import
 
-Pack Tags edits use canonical table rows; the **New Tag** draft adds a
+Pack Tags edits use canonical table rows; its final draft row adds a
 package-level string tag, and existing rows can be renamed, edited, submitted,
-or deleted. Structured values remain editable through the small-table inserted
+or deleted. The **New Tag** page adds one string tag to a chosen package or
+track scope; selected-track mode requires at least one checked track.
+Structured values remain editable through the small-table inserted
 subtable or the giga-table popup, using canonical title and action rows.
 Malformed JSON is rejected without closing or submitting the popup or
 subtable.

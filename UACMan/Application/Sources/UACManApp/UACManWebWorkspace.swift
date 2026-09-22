@@ -113,6 +113,8 @@ struct UACManWebWorkspace: NSViewRepresentable {
                 model.renameMember(path: payload["path"] as? String ?? "", name: payload["name"] as? String ?? "")
             case "addMemberTag":
                 model.addMemberTag(path: payload["path"] as? String ?? "", scope: payload["scope"] as? String ?? "memberMetadata", key: payload["key"] as? String ?? "", value: payload["value"] as? String ?? "")
+            case "addMemberTags":
+                model.addMemberTags(paths: payload["paths"] as? [String] ?? [], key: payload["key"] as? String ?? "", value: payload["value"] as? String ?? "")
             case "commitMemberTag":
                 model.commitMemberTag(path: payload["path"] as? String ?? "", scope: payload["scope"] as? String ?? "memberMetadata", key: payload["key"] as? String ?? "", newKey: payload["newKey"] as? String ?? "", value: payload["value"] as? String ?? "", structuredValueJSON: payload["valueJSON"] as? String)
             case "deleteMemberTag":
