@@ -73,6 +73,38 @@ import Testing
     #expect(container.manifest.members.first?.hashes.first?.digest == "DEADBEEF")
 }
 
+@Test func rejectsMalformedKnownHashDigests() throws {
+    for (algorithm, digest) in [
+        ("crc32-iso-hdlc", "ABC"),
+        ("sha1", String(repeating: "a", count: 39)),
+        ("sha1", String(repeating: "A", count: 40)),
+        ("md5", String(repeating: "b", count: 31)),
+    ] {
+        var manifest = try #require(
+            JSONSerialization.jsonObject(with: Data(validManifestJSON.utf8)) as? [String: Any]
+        )
+        var members = try #require(manifest["members"] as? [[String: Any]])
+        members[0]["hashes"] = [[
+            "scope": "raw-member",
+            "algorithm": algorithm,
+            "profile": "fixture-v1",
+            "digest": digest,
+            "byteSize": 4,
+        ]]
+        manifest["members"] = members
+        let manifestData = try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])
+        let fixture = try makeFixture(
+            payload: Data([0x28, 0xB5, 0x2F, 0xFD, 0x01]),
+            manifestData: manifestData
+        )
+        defer { try? FileManager.default.removeItem(at: fixture.url) }
+
+        #expect(throws: UACContainerError.self) {
+            try UACContainerReader.read(from: fixture.url)
+        }
+    }
+}
+
 @Test func versionTwoStillNamespacesMembersWhenMultipleVariantsExist() throws {
     var manifest = try #require(
         JSONSerialization.jsonObject(with: Data(validManifestJSON.utf8)) as? [String: Any]

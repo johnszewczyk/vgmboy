@@ -6,6 +6,10 @@
   original manifest document, performs selected-member batch edits across any
   member role, and
   projects MetaMan SPC results into game/member metadata.
+- Package-wide tag renames and selected-track tag additions are core edit
+  operations. They validate every destination before returning a new manifest,
+  preserve unknown JSON, and report the number of affected records. Keep these
+  mutations out of the WebView and app-model dictionary plumbing.
 - `UACCollectionScanner` recursively enumerates regular `.uac` files beneath a
   selected folder and asks `UACWrapperCore` for each manifest. It is a
   transient browser index only: do not persist it as a second catalog, follow
@@ -73,6 +77,7 @@
 ## Files
 
 - `Application/Sources/UACManCore/UACManifestEditor.swift`
+- `Application/Tests/UACManCoreTests/UACManifestEditorTests.swift`
 - `Application/Sources/UACManApp/UACManModel.swift`
 - `Application/Sources/UACManApp/UACManWebWorkspace.swift`
 - `Application/Sources/UACManApp/Resources/`
@@ -84,5 +89,7 @@
 - `Application/launch.sh`
 - `Application/Sources/UACManMetadataCLI/main.swift`
 - `Wrapper/Sources/UACWrapperCore/UACContainerReader.swift`
+- `Wrapper/Sources/UACWrapperCore/UACManifest.swift`
+- `Wrapper/Sources/UACWrapperCore/UACManifestValidator.swift`
 - `Wrapper/Sources/UACWrapperCore/UACSeekableFrameChecksum.swift`
 - `Wrapper/Sources/UACWrapperCore/UACContainerWriter.swift`

@@ -245,6 +245,20 @@ class UACManRoundTripTests(unittest.TestCase):
             manifest = json.loads((unpacked / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["manifestVersion"], 2)
             member = next(item for item in manifest["members"] if item["originalName"] == "track 01.spc")
+            playable_hashes = {
+                item["algorithm"]: item["digest"]
+                for item in member["hashes"]
+                if item["scope"] == "playable-payload"
+            }
+            self.assertEqual(
+                playable_hashes,
+                {
+                    "blake3-256": member["blake3"],
+                    "crc32-iso-hdlc": f"{zlib.crc32(track_bytes) & 0xFFFFFFFF:08X}",
+                    "sha1": hashlib.sha1(track_bytes).hexdigest(),
+                    "md5": hashlib.md5(track_bytes).hexdigest(),
+                },
+            )
             entry = manifest["playlists"][0]["entries"][0]
             package_step = manifest["transformations"][0]
             self.assertEqual(member["format"], "spc")
@@ -263,6 +277,27 @@ class UACManRoundTripTests(unittest.TestCase):
             member_by_path = {item["path"]: item for item in manifest["members"]}
             self.assertEqual(member_by_path["scans/front.png"]["role"], "artwork")
             self.assertEqual(member_by_path["audio/disc.cue"]["role"], "cue-sheet")
+
+            original_manifest, _, _, _, _, _ = uacman.read_uac(container, verify_payload=False)
+            tampered_manifest = json.loads(json.dumps(original_manifest))
+            tampered_member = next(item for item in tampered_manifest["members"] if item["path"] == "track 01.spc")
+            tampered_hash = next(
+                item for item in tampered_member["hashes"]
+                if item["scope"] == "playable-payload" and item["algorithm"] == "md5"
+            )
+            tampered_hash["digest"] = "0" * 32
+            tampered_container = root / "tampered.uac"
+            shutil.copy2(container, tampered_container)
+            uacman.rewrite_uac_manifest(tampered_container, tampered_manifest, original_manifest)
+            failed_output = root / "tampered-unpacked"
+            failed_unpack = subprocess.run(
+                [sys.executable, "-B", str(UACMAN), "unpack", str(tampered_container), str(failed_output)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(failed_unpack.returncode, 2)
+            self.assertIn("Playable-payload md5 mismatch", failed_unpack.stderr)
+            self.assertFalse(failed_output.exists())
             self.assertEqual(member_by_path["notes.md"]["role"], "documentation")
 
             legacy_manifest = json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -531,6 +566,22 @@ class UACManRoundTripTests(unittest.TestCase):
             self.assertEqual(manifest["members"][0]["path"], "variants/original/track.vgm")
             self.assertEqual((unpacked / "variants/original/track.vgm").read_bytes(), track_bytes)
 
+    def test_packages_without_spc_or_vgm_omit_container_version_metadata(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="uacman-unrelated-version-test-") as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            source.mkdir()
+            (source / "notes.txt").write_text("No SPC or VGM payloads", encoding="utf-8")
+            recipe = uacman.normalize_recipe({
+                "game": {"id": "other-format", "title": "Other Format", "console": "Sony PlayStation"},
+                "variants": [{"id": "original", "label": "Original", "kind": "release"}],
+                "sources": [], "transformations": [], "playlists": [],
+            })
+
+            uacman.apply_contained_container_versions(source, recipe)
+
+            self.assertNotIn("containedContainerVersions", recipe["game"].get("metadata", {}))
+
     def test_package_records_contained_vgm_versions_and_crc32_hashes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="uacman-vgm-version-test-") as temporary:
             root = Path(temporary)
@@ -559,10 +610,8 @@ class UACManRoundTripTests(unittest.TestCase):
                 manifest["game"]["metadata"]["containedContainerVersions"],
                 {
                     "schemaVersion": 1,
-                    "formatsScanned": ["spc", "vgm"],
-                    "mixedVersionFormats": ["vgm"],
+                    "formatsScanned": ["vgm"],
                     "versions": {
-                        "spc": [],
                         "vgm": [
                             {"version": "1.70", "versionRaw": "0x00000170", "memberCount": 1},
                             {"version": "1.71", "versionRaw": "0x00000171", "memberCount": 1},
@@ -571,18 +620,9 @@ class UACManRoundTripTests(unittest.TestCase):
                 },
             )
             by_path = {member["path"]: member for member in manifest["members"]}
-            self.assertEqual(by_path["01-old.vgm"]["metadata"]["sub-container-version"], "1.70")
-            self.assertEqual(by_path["02-new.vgm"]["metadata"]["sub-container-version"], "1.71")
-            self.assertEqual(
-                manifest["game"]["metadata"]["criticalFlags"],
-                [{
-                    "code": "mixed-sub-container-version",
-                    "severity": "critical",
-                    "format": "vgm",
-                    "versions": ["1.70", "1.71"],
-                    "reason": "One title contains multiple sub-container versions; review source provenance before treating it as a clean single-source rip.",
-                }],
-            )
+            self.assertNotIn("criticalFlags", manifest["game"]["metadata"])
+            self.assertNotIn("sub-container-version", by_path["01-old.vgm"]["metadata"])
+            self.assertNotIn("sub-container-version", by_path["02-new.vgm"]["metadata"])
             for name, contents in members.items():
                 self.assertEqual((unpacked / name).read_bytes(), contents)
                 expected_crc = f"{zlib.crc32(contents) & 0xFFFFFFFF:08X}"
@@ -591,6 +631,15 @@ class UACManRoundTripTests(unittest.TestCase):
                     if item["scope"] == "raw-member" and item["algorithm"] == "crc32-iso-hdlc"
                 )
                 self.assertEqual(raw_crc, expected_crc)
+                for algorithm, digest in (
+                    ("sha1", hashlib.sha1(contents).hexdigest()),
+                    ("md5", hashlib.md5(contents).hexdigest()),
+                ):
+                    recorded = next(
+                        item["digest"] for item in by_path[name]["hashes"]
+                        if item["scope"] == "raw-member" and item["algorithm"] == algorithm
+                    )
+                    self.assertEqual(recorded, digest)
                 if name.endswith(".vgm"):
                     playable_crc = next(
                         item["digest"] for item in by_path[name]["hashes"]
@@ -612,7 +661,7 @@ class UACManRoundTripTests(unittest.TestCase):
             with self.assertRaisesRegex(uacman.UACError, "Invalid or truncated VGM"):
                 uacman.apply_contained_container_versions(source, recipe)
 
-    def test_pack_rejects_vgz_and_gzip_wrapped_vgm_members(self) -> None:
+    def test_pack_rejects_vgz_but_accepts_gzip_wrapped_vgm_members(self) -> None:
         with tempfile.TemporaryDirectory(prefix="uacman-vgz-reject-test-") as temporary:
             root = Path(temporary)
             recipe = uacman.normalize_recipe({
@@ -632,8 +681,11 @@ class UACManRoundTripTests(unittest.TestCase):
             wrapped_source.mkdir()
             with gzip.open(wrapped_source / "track.vgm", "wb") as output:
                 output.write(minimal_vgm(0x171))
-            with self.assertRaisesRegex(uacman.UACError, "gzip-wrapped \.vgm"):
-                uacman.apply_contained_container_versions(wrapped_source, recipe)
+            uacman.apply_contained_container_versions(wrapped_source, recipe)
+            self.assertEqual(
+                recipe["game"]["metadata"]["containedContainerVersions"]["versions"]["vgm"][0]["version"],
+                "1.71",
+            )
 
     def test_package_records_spc_versions_and_per_member_metadata(self) -> None:
         with tempfile.TemporaryDirectory(prefix="uacman-spc-version-test-") as temporary:
@@ -660,8 +712,8 @@ class UACManRoundTripTests(unittest.TestCase):
             manifest = json.loads((unpacked / "manifest.json").read_text(encoding="utf-8"))
 
             inventory = manifest["game"]["metadata"]["containedContainerVersions"]
-            self.assertEqual(inventory["formatsScanned"], ["spc", "vgm"])
-            self.assertEqual(inventory["mixedVersionFormats"], ["spc"])
+            self.assertEqual(inventory["formatsScanned"], ["spc"])
+            self.assertNotIn("mixedVersionFormats", inventory)
             self.assertEqual(inventory["versions"]["spc"], [
                 {
                     "version": "0.10",
@@ -785,17 +837,17 @@ class SetMetadataTests(unittest.TestCase):
                 "collection": "JoshW", "setName": "Nintendo SNES",
             }]),
             {
-                "collection": "JoshW",
-                "name": "Nintendo SNES",
-                "url": "https://spc.joshw.info/",
+                "setCollection": "JoshW",
+                "setName": "Nintendo SNES",
+                "setUrl": "https://spc.joshw.info/",
             },
         )
         archived = uacman.source_set_metadata([{
             "collection": "Project2612", "setName": "Sega Genesis",
         }])
-        self.assertEqual(archived["url"], "https://vgmrips.net/packs/system/sega/mega-drive")
-        self.assertEqual(archived["legacyURL"], "https://project2612.org/list.php")
-        self.assertEqual(archived["archiveURL"], "https://web.archive.org/web/20240809092444/https://project2612.org/list.php")
+        self.assertEqual(archived["setUrl"], "https://vgmrips.net/packs/system/sega/mega-drive")
+        self.assertEqual(archived["setLegacyUrl"], "https://project2612.org/list.php")
+        self.assertEqual(archived["setArchiveUrl"], "https://web.archive.org/web/20240809092444/https://project2612.org/list.php")
         self.assertIsNone(uacman.source_set_metadata([
             {"collection": "JoshW", "setName": "Nintendo SNES"},
             {"collection": "ZopharsDomain", "setName": "Game Boy"},
@@ -825,14 +877,14 @@ class SetMetadataTests(unittest.TestCase):
             },
         ]
         expected = {
-            "collection": "Redump",
-            "name": "SNK - Neo Geo CD - (2019-10-16)",
-            "url": "https://archive.org/details/RedumpSnkNeoGeoCd16Oct2019",
+            "setCollection": "Redump",
+            "setName": "SNK - Neo Geo CD - (2019-10-16)",
+            "setUrl": "https://archive.org/details/RedumpSnkNeoGeoCd16Oct2019",
         }
         self.assertEqual(uacman.source_set_metadata(sources), expected)
         manifest = {"game": {"metadata": {}}, "sources": sources}
         self.assertTrue(uacman.add_source_set_metadata(manifest))
-        self.assertEqual(manifest["game"]["metadata"]["set"], expected)
+        self.assertEqual(manifest["game"]["metadata"], expected)
 
     def test_redump_projection_requires_download_item_to_match_set_identifier(self) -> None:
         source = {
@@ -853,7 +905,11 @@ class SetMetadataTests(unittest.TestCase):
             "sources": [{"collection": "Project2612", "setName": "Sega Genesis"}],
         }
         self.assertTrue(uacman.refresh_project2612_set_metadata(manifest))
-        self.assertEqual(manifest["game"]["metadata"]["set"]["url"], "https://vgmrips.net/packs/system/sega/mega-drive")
+        metadata = manifest["game"]["metadata"]
+        self.assertNotIn("set", metadata)
+        self.assertEqual(metadata["setCollection"], "Project2612")
+        self.assertEqual(metadata["setName"], "Sega Genesis")
+        self.assertEqual(metadata["setUrl"], "https://vgmrips.net/packs/system/sega/mega-drive")
         self.assertFalse(uacman.refresh_project2612_set_metadata(manifest))
 
     def test_manifest_rewrite_adds_set_metadata_without_changing_payload_bytes(self) -> None:
@@ -886,14 +942,17 @@ class SetMetadataTests(unittest.TestCase):
             manifest, old_offset, _, _, _, _ = uacman.read_uac(container)
             expected_payload = container.read_bytes()[old_offset:]
             old_manifest = json.loads(json.dumps(manifest))
-            del manifest["game"]["metadata"]["set"]
+            for key in ("setCollection", "setName", "setUrl", "setLegacyUrl", "setArchiveUrl"):
+                manifest["game"]["metadata"].pop(key, None)
             self.assertTrue(uacman.add_source_set_metadata(manifest))
-            self.assertEqual(manifest["game"]["metadata"]["set"]["url"], "https://example.invalid/test-set")
+            self.assertEqual(manifest["game"]["metadata"]["setCollection"], "Fixture")
+            self.assertEqual(manifest["game"]["metadata"]["setName"], "Test Set")
+            self.assertEqual(manifest["game"]["metadata"]["setUrl"], "https://example.invalid/test-set")
 
             uacman.rewrite_uac_manifest(container, manifest, old_manifest)
             rewritten, new_offset, _, _, _, _ = uacman.read_uac(container)
             self.assertEqual(container.read_bytes()[new_offset:], expected_payload)
-            self.assertEqual(rewritten["game"]["metadata"]["set"], manifest["game"]["metadata"]["set"])
+            self.assertEqual(rewritten["game"]["metadata"]["setName"], "Test Set")
 
 class MetaManMetadataImportTests(unittest.TestCase):
     def test_unicode_metadata_and_subsong_paths_resolve_to_source_spelling(self) -> None:

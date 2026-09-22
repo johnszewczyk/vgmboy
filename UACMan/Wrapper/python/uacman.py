@@ -84,12 +84,16 @@ class HashingReader:
     def __init__(self, file: BinaryIO):
         self.file = file
         self.hasher = blake3.blake3()
+        self.sha1 = hashlib.sha1()
+        self.md5 = hashlib.md5()
         self.byte_count = 0
         self.crc32 = 0
 
     def read(self, size: int = -1) -> bytes:
         data = self.file.read(size)
         self.hasher.update(data)
+        self.sha1.update(data)
+        self.md5.update(data)
         self.byte_count += len(data)
         self.crc32 = zlib.crc32(data, self.crc32)
         return data
@@ -340,7 +344,7 @@ def source_set_metadata(sources: object) -> dict | None:
         if len(projections) != 1:
             return None
         collection, name, url = next(iter(projections))
-        return {"collection": collection, "name": name, "url": url}
+        return {"setCollection": collection, "setName": name, "setUrl": url}
 
     projections: set[tuple[str, str, str, str | None, str | None]] = set()
     for source in sources:
@@ -369,26 +373,27 @@ def source_set_metadata(sources: object) -> dict | None:
     if len(projections) != 1:
         return None
     collection, name, url, legacy_url, archive_url = next(iter(projections))
-    result = {"collection": collection, "name": name, "url": url}
+    result = {"setCollection": collection, "setName": name, "setUrl": url}
     if legacy_url is not None:
-        result["legacyURL"] = legacy_url
+        result["setLegacyUrl"] = legacy_url
     if archive_url is not None:
-        result["archiveURL"] = archive_url
+        result["setArchiveUrl"] = archive_url
     return result
 
 
 def add_source_set_metadata(manifest: dict) -> bool:
-    """Add the source-derived game.metadata.set when it is unambiguous."""
+    """Add flat source-derived package set tags when they are unambiguous."""
     game = manifest.get("game")
     if not isinstance(game, dict):
         return False
     metadata = game.get("metadata")
-    if not isinstance(metadata, dict) or "set" in metadata:
+    set_fields = ("setCollection", "setName", "setUrl", "setLegacyUrl", "setArchiveUrl")
+    if not isinstance(metadata, dict) or "set" in metadata or any(key in metadata for key in set_fields):
         return False
     set_metadata = source_set_metadata(manifest.get("sources"))
     if set_metadata is None:
         return False
-    metadata["set"] = set_metadata
+    metadata.update(set_metadata)
     return True
 
 
@@ -396,15 +401,21 @@ def refresh_project2612_set_metadata(manifest: dict) -> bool:
     """Move prior Project2612 archive links to the current VGMRips system index."""
     game = manifest.get("game")
     metadata = game.get("metadata") if isinstance(game, dict) else None
-    existing = metadata.get("set") if isinstance(metadata, dict) else None
-    if not isinstance(existing, dict) or existing.get("collection") != "Project2612":
+    if not isinstance(metadata, dict):
         return False
-    if existing.get("url") != SOURCE_ARCHIVE_URLS["Project2612"]:
+
+    existing = metadata.get("set")
+    legacy_nested = isinstance(existing, dict)
+    collection = existing.get("collection") if legacy_nested else metadata.get("setCollection")
+    url = existing.get("url") if legacy_nested else metadata.get("setUrl")
+    if collection != "Project2612" or url != SOURCE_ARCHIVE_URLS["Project2612"]:
         return False
     updated = source_set_metadata(manifest.get("sources"))
-    if updated is None or updated.get("collection") != "Project2612":
+    if updated is None or updated.get("setCollection") != "Project2612":
         return False
-    metadata["set"] = updated
+    if legacy_nested:
+        metadata.pop("set", None)
+    metadata.update(updated)
     return True
 
 
@@ -465,33 +476,46 @@ def stream_digest(
     suffix: str,
     raw_digest: str,
     raw_crc32: int | None = None,
-) -> tuple[str, int, int]:
+    raw_sha1: str | None = None,
+    raw_md5: str | None = None,
+) -> tuple[str, int, int, str, str]:
     if suffix.lower() != ".vgz":
         if raw_crc32 is None:
             raw_crc32 = file_crc32(path)
-        return raw_digest, path.stat().st_size, raw_crc32
+        if raw_sha1 is None or raw_md5 is None:
+            sha1 = hashlib.sha1()
+            md5 = hashlib.md5()
+            with path.open("rb") as source:
+                for block in iter(lambda: source.read(1024 * 1024), b""):
+                    sha1.update(block)
+                    md5.update(block)
+            raw_sha1 = raw_sha1 or sha1.hexdigest()
+            raw_md5 = raw_md5 or md5.hexdigest()
+        return raw_digest, path.stat().st_size, raw_crc32, raw_sha1, raw_md5
     hasher = blake3.blake3()
+    sha1 = hashlib.sha1()
+    md5 = hashlib.md5()
     size = 0
     playable_crc32 = 0
     try:
         with gzip.open(path, "rb") as source:
             for block in iter(lambda: source.read(1024 * 1024), b""):
                 hasher.update(block)
+                sha1.update(block)
+                md5.update(block)
                 size += len(block)
                 playable_crc32 = zlib.crc32(block, playable_crc32)
     except (OSError, EOFError) as error:
         raise UACError(f"Cannot derive the playable payload hash for {path.name}: {error}") from error
-    return hasher.hexdigest(), size, playable_crc32
+    return hasher.hexdigest(), size, playable_crc32, sha1.hexdigest(), md5.hexdigest()
 
 
 def reject_forbidden_vgm_members(root: Path) -> None:
-    """Reject compressed VGM inputs before they can enter a UAC payload.
+    """Reject VGZ inputs before they can enter a UAC payload.
 
-    VGZ is a distribution wrapper, not the canonical member format for the
-    VGMMan sets.  A few archives also carry gzip bytes under a `.vgm` name;
-    those are the same conversion error and must be expanded before packing.
-    Keeping this check at the pack boundary prevents a caller from bypassing
-    the source-tree conversion path with a direct `pack` invocation.
+    VGZ is a distribution wrapper whose nested gzip stream prevents the
+    container's Zstandard layer from seeing raw VGM bytes. Format-specific
+    normalization remains outside this generic wrapper.
     """
     files, _ = discover_files(root, include_macos_sidecars=False)
     for path, relative in files:
@@ -500,18 +524,6 @@ def reject_forbidden_vgm_members(root: Path) -> None:
             raise UACError(
                 f"VGZ members are forbidden in UAC packages: {relative}. "
                 "Decompress to a raw .vgm file first."
-            )
-        if suffix != ".vgm":
-            continue
-        try:
-            with path.open("rb") as source:
-                magic = source.read(2)
-        except OSError as error:
-            raise UACError(f"Cannot inspect VGM member {relative}: {error}") from error
-        if magic == b"\x1f\x8b":
-            raise UACError(
-                f"gzip-wrapped .vgm is not a raw VGM member: {relative}. "
-                "Decompress it before packaging."
             )
 
 
@@ -563,7 +575,6 @@ def scan_contained_container_versions(root: Path) -> tuple[dict, dict[str, dict]
             group["headerVersions"][header_version] = group["headerVersions"].get(header_version, 0) + 1
             relative = path.relative_to(root).as_posix()
             versioned_members[relative] = {
-                "sub-container-version": version,
                 "spcVersion": version,
                 "spcVersionByte": version_byte,
                 "spcHeaderVersion": header_version,
@@ -572,7 +583,9 @@ def scan_contained_container_versions(root: Path) -> tuple[dict, dict[str, dict]
         if suffix not in (".vgm", ".vgz"):
             continue
         try:
-            opener = gzip.open if suffix == ".vgz" else open
+            with path.open("rb") as raw_source:
+                magic = raw_source.read(2)
+            opener = gzip.open if suffix == ".vgz" or magic == b"\x1f\x8b" else open
             with opener(path, "rb") as source:
                 header = source.read(0x40)
         except (OSError, EOFError) as error:
@@ -584,7 +597,6 @@ def scan_contained_container_versions(root: Path) -> tuple[dict, dict[str, dict]
             raise UACError(f"Invalid VGM container version in {path.name}: 0x{version:08X}")
         versions[version] = versions.get(version, 0) + 1
         relative = path.relative_to(root).as_posix()
-        versioned_members[relative] = {"sub-container-version": vgm_version_text(version)}
 
     spc_groups = [
         {
@@ -606,25 +618,27 @@ def scan_contained_container_versions(root: Path) -> tuple[dict, dict[str, dict]
         }
         for version, count in sorted(versions.items())
     ]
-    mixed_formats = [
+    formats_scanned = [
         format_name
         for format_name, groups in (("spc", spc_groups), ("vgm", vgm_groups))
-        if len(groups) > 1
+        if groups
     ]
-    inventory = {
-        "schemaVersion": 1,
-        "formatsScanned": ["spc", "vgm"],
-        "mixedVersionFormats": mixed_formats,
-        "versions": {
-            "spc": spc_groups,
-            "vgm": vgm_groups,
-        },
-    }
+    inventory = None
+    if formats_scanned:
+        inventory = {
+            "schemaVersion": 1,
+            "formatsScanned": formats_scanned,
+            "versions": {
+                format_name: groups
+                for format_name, groups in (("spc", spc_groups), ("vgm", vgm_groups))
+                if groups
+            },
+        }
     return inventory, versioned_members
 
 
-def contained_container_versions(root: Path) -> dict:
-    """Summarize versioned SPC/VGM containers without changing source members."""
+def contained_container_versions(root: Path) -> dict | None:
+    """Summarize present SPC/VGM versions without changing source members."""
     inventory, _ = scan_contained_container_versions(root)
     return inventory
 
@@ -636,9 +650,14 @@ def apply_contained_container_versions(root: Path, recipe: dict) -> None:
     if not isinstance(game_metadata, dict):
         raise UACError("Game metadata must be a JSON object.")
     authored = game_metadata.get("containedContainerVersions")
-    if authored is not None and authored != detected:
-        raise UACError("Recipe containedContainerVersions disagrees with detected SPC/VGM headers.")
-    game_metadata["containedContainerVersions"] = detected
+    if detected is None:
+        if authored is not None:
+            raise UACError("Recipe containedContainerVersions has no matching SPC/VGM members.")
+        game_metadata.pop("containedContainerVersions", None)
+    else:
+        if authored is not None and authored != detected:
+            raise UACError("Recipe containedContainerVersions disagrees with detected SPC/VGM headers.")
+        game_metadata["containedContainerVersions"] = detected
 
     for path, fields in versioned_members.items():
         override = recipe["memberOverrides"].setdefault(path, {})
@@ -651,28 +670,6 @@ def apply_contained_container_versions(root: Path, recipe: dict) -> None:
             if key in metadata and metadata[key] not in (None, "", value):
                 raise UACError(f"Recipe {key} disagrees with detected SPC header: {path}")
             metadata[key] = value
-
-    # A mixed version inventory is a provenance warning, not a reason to
-    # discard the package.  Keep it in the manifest so the dashboard can make
-    # the critical condition visible while preserving every source member.
-    critical_flags = [
-        item for item in game_metadata.get("criticalFlags", [])
-        if not (isinstance(item, dict) and item.get("code") == "mixed-sub-container-version")
-    ] if isinstance(game_metadata.get("criticalFlags", []), list) else []
-    for format_name in detected.get("mixedVersionFormats", []):
-        groups = detected.get("versions", {}).get(format_name, [])
-        critical_flags.append({
-            "code": "mixed-sub-container-version",
-            "severity": "critical",
-            "format": format_name,
-            "versions": [group.get("version") for group in groups],
-            "reason": "One title contains multiple sub-container versions; review source provenance before treating it as a clean single-source rip.",
-        })
-    if critical_flags:
-        game_metadata["criticalFlags"] = critical_flags
-    else:
-        game_metadata.pop("criticalFlags", None)
-
 
 def load_recipe(path: Path) -> dict:
     try:
@@ -1144,6 +1141,8 @@ def create_tar(
                 archive.addfile(info, digest_reader)
             raw_digest = digest_reader.hasher.hexdigest()
             raw_crc32 = digest_reader.crc32 & 0xFFFFFFFF
+            raw_sha1 = digest_reader.sha1.hexdigest()
+            raw_md5 = digest_reader.md5.hexdigest()
             stream_hash = None
             hash_records: list[dict] = [{
                 "scope": "raw-member",
@@ -1152,9 +1151,17 @@ def create_tar(
                 "profile": "uac-raw-member-v1",
                 "byteSize": before.st_size,
             }]
+            for algorithm, digest in (("sha1", raw_sha1), ("md5", raw_md5)):
+                hash_records.append({
+                    "scope": "raw-member",
+                    "algorithm": algorithm,
+                    "digest": digest,
+                    "profile": "uac-raw-member-v1",
+                    "byteSize": before.st_size,
+                })
             if role == "playable":
-                stream_hash, stream_size, stream_crc32 = stream_digest(
-                    source_path, suffix, raw_digest, raw_crc32
+                stream_hash, stream_size, stream_crc32, stream_sha1, stream_md5 = stream_digest(
+                    source_path, suffix, raw_digest, raw_crc32, raw_sha1, raw_md5
                 )
                 hash_records.append({
                     "scope": "playable-payload",
@@ -1170,6 +1177,14 @@ def create_tar(
                     "profile": "uac-playable-payload-v1",
                     "byteSize": stream_size,
                 })
+                for algorithm, digest in (("sha1", stream_sha1), ("md5", stream_md5)):
+                    hash_records.append({
+                        "scope": "playable-payload",
+                        "algorithm": algorithm,
+                        "digest": digest,
+                        "profile": "uac-playable-payload-v1",
+                        "byteSize": stream_size,
+                    })
             after = source_path.stat()
             # SMB mounts can report a different nanosecond mtime on the second
             # stat despite a stable file.  Size and inode remain mandatory;
@@ -1204,21 +1219,6 @@ def create_tar(
         record["tarDataOffset"] = offset[0]
 
     return records, skipped
-
-
-def validate_required_sub_container_tags(records: list[dict]) -> None:
-    """Require the shared version tag on every versioned audio member."""
-    for record in records:
-        format_name = str(record.get("format") or "").lower()
-        if format_name not in {"vgm", "spc"}:
-            continue
-        metadata = record.get("metadata")
-        value = metadata.get("sub-container-version") if isinstance(metadata, dict) else None
-        if not isinstance(value, str) or not value.strip():
-            raise UACError(
-                "Versioned audio member is missing required metadata.sub-container-version: "
-                f"{record.get('path', '<unknown>')}"
-            )
 
 
 def finalize_playlists(playlists: list, records: list[dict]) -> list[dict]:
@@ -1406,7 +1406,6 @@ def pack(args: argparse.Namespace) -> tuple[int, int, list[str], list[tuple[str,
             args.include_macos_sidecars,
             getattr(args, "member_path_map", None),
         )
-        validate_required_sub_container_tags(records)
         tar_size = tar_path.stat().st_size
         zstd_version = compress_seekable_tar(tar_path, payload_path, args.level, args.frame_size)
         if not payload_path.is_file():
@@ -1953,7 +1952,12 @@ def enrich_set_metadata(args: argparse.Namespace) -> None:
             original_manifest = json.loads(json.dumps(manifest, ensure_ascii=False))
             game = manifest.get("game")
             metadata = game.get("metadata", {}) if isinstance(game, dict) else {}
-            if isinstance(metadata, dict) and "set" in metadata:
+            if isinstance(metadata, dict) and (
+                "set" in metadata
+                or any(key in metadata for key in (
+                    "setCollection", "setName", "setUrl", "setLegacyUrl", "setArchiveUrl"
+                ))
+            ):
                 if not refresh_project2612_set_metadata(manifest):
                     counts["alreadyPresent"] += 1
                     continue
@@ -2017,21 +2021,31 @@ def verify_tar_members(manifest: dict, tar_path: Path) -> list[tarfile.TarInfo]:
             if source is None:
                 raise UACError(f"Cannot read TAR member: {member.name}")
             hasher = blake3.blake3()
+            sha1 = hashlib.sha1()
+            md5 = hashlib.md5()
             checksum = 0
             with source:
                 for block in iter(lambda: source.read(1024 * 1024), b""):
                     hasher.update(block)
+                    sha1.update(block)
+                    md5.update(block)
                     checksum = zlib.crc32(block, checksum)
             if hasher.hexdigest() != record.get("blake3"):
                 raise UACError(f"Raw member BLAKE3 mismatch: {member.name}")
-            expected_crc = next((
-                item.get("digest") for item in record.get("hashes", [])
-                if isinstance(item, dict)
-                and item.get("scope") == "raw-member"
-                and item.get("algorithm") == "crc32-iso-hdlc"
-            ), None)
-            if expected_crc is not None and expected_crc != f"{checksum & 0xFFFFFFFF:08X}":
-                raise UACError(f"Raw member CRC32 mismatch: {member.name}")
+            actual_hashes = {
+                "blake3-256": hasher.hexdigest(),
+                "crc32-iso-hdlc": f"{checksum & 0xFFFFFFFF:08X}",
+                "sha1": sha1.hexdigest(),
+                "md5": md5.hexdigest(),
+            }
+            for item in record.get("hashes", []):
+                if not isinstance(item, dict) or item.get("scope") != "raw-member":
+                    continue
+                algorithm = item.get("algorithm")
+                actual = actual_hashes.get(algorithm)
+                expected_digest = item.get("digest")
+                if actual is not None and isinstance(expected_digest, str) and actual.casefold() != expected_digest.casefold():
+                    raise UACError(f"Raw member {algorithm} mismatch: {member.name}")
         return members
 
 
@@ -2074,21 +2088,27 @@ def unpack(args: argparse.Namespace) -> None:
                     os.chmod(destination, 0o644)
                     stream_digest_value = record.get("streamBlake3")
                     if stream_digest_value and record.get("role") == "playable":
-                        actual, _, stream_crc32 = stream_digest(
+                        actual, _, stream_crc32, stream_sha1, stream_md5 = stream_digest(
                             destination,
                             "." + str(record.get("format") or ""),
                             record["blake3"],
                         )
                         if actual != stream_digest_value:
                             raise UACError(f"Playable-payload BLAKE3 mismatch: {member.name}")
-                        expected_crc = next((
-                            item.get("digest") for item in record.get("hashes", [])
-                            if isinstance(item, dict)
-                            and item.get("scope") == "playable-payload"
-                            and item.get("algorithm") == "crc32-iso-hdlc"
-                        ), None)
-                        if expected_crc is not None and expected_crc != f"{stream_crc32 & 0xFFFFFFFF:08X}":
-                            raise UACError(f"Playable-payload CRC32 mismatch: {member.name}")
+                        actual_hashes = {
+                            "blake3-256": actual,
+                            "crc32-iso-hdlc": f"{stream_crc32 & 0xFFFFFFFF:08X}",
+                            "sha1": stream_sha1,
+                            "md5": stream_md5,
+                        }
+                        for item in record.get("hashes", []):
+                            if not isinstance(item, dict) or item.get("scope") != "playable-payload":
+                                continue
+                            algorithm = item.get("algorithm")
+                            expected_digest = item.get("digest")
+                            actual_digest = actual_hashes.get(algorithm)
+                            if actual_digest is not None and isinstance(expected_digest, str) and actual_digest.casefold() != expected_digest.casefold():
+                                raise UACError(f"Playable-payload {algorithm} mismatch: {member.name}")
             if not args.omit_manifest:
                 sidecar = staging / "manifest.json"
                 sidecar.write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -2160,7 +2180,7 @@ def parser() -> argparse.ArgumentParser:
 
     enrich_sets_parser = commands.add_parser(
         "enrich-sets",
-        help="Add source-backed game.metadata.set records or refresh the retired Project2612 links.",
+        help="Add source-backed package set tags or refresh retired Project2612 links.",
     )
     enrich_sets_parser.add_argument("root", help="Collection directory to scan recursively for .uac files.")
     enrich_sets_parser.add_argument("--apply", action="store_true", help="Apply updates; without this flag, report a dry run.")

@@ -85,38 +85,40 @@ before distributing newly packed files.
   list notes, text files, Markdown, and other documentation. These open JSON
   fields do not change member bytes. References should resolve to manifest
   member paths, and image/document payloads remain independently hashed members.
-  When source records establish one clear collection and set, `game.metadata.set`
-  projects that provenance as `{"collection":"JoshW","name":"Nintendo SNES","url":"https://spc.joshw.info/"}`.
-  `collection` identifies the source collection, `name` identifies its relevant
-  system/set, and `url` points to its official distributor page. The complete
-  source records remain authoritative in `sources[]`; the projection is omitted
-  when sources conflict or no trustworthy URL is available. Project2612 uses
-  `url` for the current VGMRips system listing, `legacyURL` for the original
-  `project2612.org` address, and `archiveURL` for its Wayback snapshot. Project2612
-  is defunct; the VGMRips directory link is not a claim that every historic pack
-  was migrated one-to-one. The `enrich-sets` command adds this projection to
-  existing packages as a manifest-only rewrite and byte-copies the compressed
-  payload; it runs in dry-run mode unless `--apply` is supplied.
+  When source records establish one clear collection and set, the package may
+  expose distinct scalar tags `game.metadata.setCollection`,
+  `game.metadata.setName`, and `game.metadata.setUrl`. Optional legacy and archive
+  links use `setLegacyUrl` and `setArchiveUrl`. A set date is included only when
+  the source provides a trustworthy date. These are package-level tags, not
+  track tags; do not nest them under a `set` object or bundle them into an array.
+  The complete source records remain authoritative in `sources[]`; omit the
+  projection when sources conflict or no trustworthy URL is available.
+  Project2612 uses `setUrl` for the current VGMRips system listing,
+  `setLegacyUrl` for the original `project2612.org` address, and `setArchiveUrl`
+  for its Wayback snapshot. Project2612 is defunct; the VGMRips directory link is
+  not a claim that every historic pack was migrated one-to-one. The `enrich-sets`
+  command adds these tags to existing packages as a manifest-only rewrite and
+  byte-copies the compressed payload; it runs in dry-run mode unless `--apply`
+  is supplied.
   Redump packages may also cite derived-output and metadata-association records.
   When a `redump-disc-archive` source is present, that record supplies the set
   projection; the Archive.org download URL must identify the same item as
   `setName`, and the projected URL is the item's `/details/<identifier>` page.
-  New writers add `game.metadata.containedContainerVersions`, a package-level
-  version inventory. Its `schemaVersion`, `formatsScanned`, `versions`, and
-  `mixedVersionFormats` fields record SPC/VGM version-count groups and identify
-  formats with more than one detected version. SPC version is read from header
-  byte `0x24`; the signature's textual version is retained separately because
-  source files may disagree between those two facts. Each SPC member exposes
+  New writers add `game.metadata.containedContainerVersions` only when SPC or
+  VGM members are present. The inventory includes only those formats and their
+  version-count groups; it does not include a mixed-version flag. UACMan records
+  format facts but leaves mixed-version review to set-level consumers such as
+  AudioMan. SPC version is read from header byte `0x24`; the signature's textual
+  version is retained separately because source files may disagree between
+  those two facts. Each SPC member exposes
   `metadata.spcVersion`, `metadata.spcVersionByte`, and
-  `metadata.spcHeaderVersion` for direct access. Every SPC or VGM member also
-  carries the canonical required `metadata.sub-container-version` tag (for
-  example `0.30` for an SPC version byte or `1.71` for VGM). VGM detection
-  reads raw `.vgm` headers; VGZ members and gzip-wrapped files named `.vgm`
-  are rejected at the pack boundary and must be expanded before packaging.
-  When one package contains multiple versions of the same format,
-  `game.metadata.criticalFlags` contains a `mixed-sub-container-version`
-  record with severity `critical` and the detected versions. These scans and
-  flags never edit source members.
+  `metadata.spcHeaderVersion` for direct access. VGM detection reads `.vgm`
+  headers, including gzip-wrapped bytes when a caller supplies them under a
+  `.vgm` name. The generic pack boundary rejects `.vgz` members because the
+  nested gzip wrapper reduces the effectiveness of the outer Zstandard layer.
+  Set-specific consumers such as AudioMan may add required
+  `metadata.sub-container-version` tags and mixed-version critical flags; the
+  wrapper does not impose those project policies.
 - Each `variant` groups a version, alternate, regional release, or other
   distinction and may carry its own canonical release IDs and metadata. A
   variant is not an automatic ranking or deletion decision.
@@ -127,7 +129,13 @@ before distributing newly packed files.
   offset of the member's first data byte in the decompressed TAR stream (not
   the TAR header offset).
   New writers add `crc32-iso-hdlc` records to `hashes[]` for raw members and
-  playable payloads, alongside the existing BLAKE3 identities.
+  playable payloads. Playable-payload records also include `sha1` and `md5`,
+  alongside `blake3-256`, so a stream can expose the four common digest
+  algorithms without duplicating a separate metadata checksum tag. For an
+  ordinary untransformed member such as SPC, the playable-payload digests are
+  over the complete stored member bytes; a format with a distinct playable
+  projection hashes that declared profile instead. Verifiers check every
+  supported hash record whose scope/profile they can reproduce.
   Hash-record digests are hexadecimal and may use either case for compatibility
   with existing CRC32 writers; `blake3-256` values remain canonical lowercase.
   For audio members, `metadata.loop` is the authoritative sample loop object
@@ -192,13 +200,13 @@ before distributing newly packed files.
   native member bytes, including headers/tags. The older
   `audioman-playable-payload-v1` profile remains valid as a historical hash
   label on existing packages. No command-stream normalization or emulation
-  render hash is generated. Additional hashes belong in `hashes[]` with
-  explicit scope, algorithm, and profile. New packages include CRC32/ISO-HDLC
-  for fast lookups; BLAKE3 remains the content identity hash. A digest proves equality only for
-  the exact byte scope/profile: it does not prove correct track identity, dump
-  offset, timing, or completeness. Valid alternate captures may have different
-  bytes; retain multiple known hashes keyed by identity/profile instead of
-  assuming one universal “correct” digest.
+  render hash is generated. Hashes are grouped in `hashes[]` records with an
+  explicit scope, algorithm, and profile rather than exposed as four unrelated
+  tag names. CRC32 supports fast lookups; BLAKE3 remains the content identity
+  hash. A digest proves equality only for the exact byte scope/profile: it does
+  not prove correct track identity, dump offset, timing, or completeness. Valid
+  alternate captures may have different bytes; retain multiple known hashes
+  keyed by identity/profile instead of assuming one universal “correct” digest.
 - Stream identity is format-profiled, not universal. A `raw-member-v1` profile
   is authoritative when the stored member is itself the canonical source
   stream, as with an extracted CD-XA file. A `decoded-pcm-v1` profile is a
@@ -214,9 +222,10 @@ before distributing newly packed files.
   name, location, type, and meaning defined in this contract for a shared
   concept, and must not emit synonymous aliases. For example, the canonical
   system identity is `game.console`; do not also write the same value as
-  `game.metadata.system` or `platform`. The set projection is
-  `game.metadata.set`, while source-specific identifiers remain in their
-  documented `sources[]` fields. Common attachment keys include
+  `game.metadata.system` or `platform`. Package set tags use
+  `game.metadata.setCollection`, `setName`, `setUrl`,
+  `setLegacyUrl`, and `setArchiveUrl`, while source-specific identifiers remain
+  in their documented `sources[]` fields. Common attachment keys include
   `game.metadata.cover_front`, `cover_back`, `cue_sheet`, and `documents`.
   Format-specific and genuinely user-defined fields remain open-ended typed
   JSON in namespaced `extensions` maps at game, variant, member, and source
@@ -363,6 +372,8 @@ invalid `.uac` as TAR, ZIP, or standalone audio.
 ## Files
 
 - `Wrapper/Sources/UACWrapperCore/UACContainerReader.swift`
+- `Wrapper/Sources/UACWrapperCore/UACManifest.swift`
+- `Wrapper/Sources/UACWrapperCore/UACManifestValidator.swift`
 - `Wrapper/Sources/UACWrapperCore/UACContainerWriter.swift`
 - `Wrapper/Sources/UACWrapperCore/UACSeekableFormat.swift`
 - `Wrapper/Sources/UACWrapperCore/UACSeekableMemberFile.swift`

@@ -45,6 +45,16 @@ public enum UACBatchFieldOperation: String, CaseIterable, Identifiable, Sendable
     }
 }
 
+public struct UACManifestEditResult: Equatable, Sendable {
+    public let manifestJSON: Data
+    public let affectedCount: Int
+
+    public init(manifestJSON: Data, affectedCount: Int) {
+        self.manifestJSON = manifestJSON
+        self.affectedCount = affectedCount
+    }
+}
+
 /// Edits known metadata maps in the original JSON document so future or
 /// otherwise unmodeled keys survive a read/edit/write cycle.
 public enum UACManifestEditor {
@@ -103,6 +113,114 @@ public enum UACManifestEditor {
         members[index]["extensions"] = try metadataObject(extensionsJSON, field: "Member extensions")
         root["members"] = members
         return try validatedJSON(root)
+    }
+
+    /// Renames one metadata or extension key everywhere it is present while
+    /// preserving unknown manifest fields. Metadata and extension namespaces
+    /// cannot be crossed by one rename.
+    public static func renameMetadataKey(
+        in manifestJSON: Data,
+        from oldKey: String,
+        to newKey: String
+    ) throws -> UACManifestEditResult {
+        let oldParts = try metadataNamespace(oldKey)
+        let newParts = try metadataNamespace(newKey)
+        guard oldParts.bucket == newParts.bucket else {
+            throw UACManifestEditorError.invalidMetadataJSON(
+                "Metadata and extension namespaces cannot be mixed in one rename."
+            )
+        }
+
+        var root = try jsonObject(manifestJSON)
+        var affectedCount = 0
+        func rename(in fields: inout [String: Any]) throws {
+            guard fields[oldParts.key] != nil else { return }
+            guard oldParts.key == newParts.key || fields[newParts.key] == nil else {
+                throw UACManifestEditorError.invalidMetadataJSON(
+                    "The destination tag already exists: \(newKey)"
+                )
+            }
+            fields[newParts.key] = fields.removeValue(forKey: oldParts.key)
+            affectedCount += 1
+        }
+
+        if var game = root["game"] as? [String: Any],
+           var fields = game[oldParts.bucket] as? [String: Any] {
+            try rename(in: &fields)
+            game[oldParts.bucket] = fields
+            root["game"] = game
+        }
+        if var members = root["members"] as? [[String: Any]] {
+            for index in members.indices {
+                guard var fields = members[index][oldParts.bucket] as? [String: Any] else { continue }
+                try rename(in: &fields)
+                members[index][oldParts.bucket] = fields
+            }
+            root["members"] = members
+        }
+        guard affectedCount > 0 else {
+            throw UACManifestEditorError.invalidMetadataJSON("Tag not found in this package: \(oldKey)")
+        }
+        return UACManifestEditResult(
+            manifestJSON: try validatedJSON(root),
+            affectedCount: affectedCount
+        )
+    }
+
+    /// Adds one string metadata field to explicitly selected playable members.
+    /// All targets and conflicts are validated before any mutation is returned.
+    public static func addStringMetadataField(
+        in manifestJSON: Data,
+        memberPaths: Set<String>,
+        key: String,
+        value: String
+    ) throws -> UACManifestEditResult {
+        let fieldKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !fieldKey.isEmpty else { throw UACManifestEditorError.invalidFieldKey }
+        guard !memberPaths.isEmpty else { return UACManifestEditResult(manifestJSON: manifestJSON, affectedCount: 0) }
+
+        var root = try jsonObject(manifestJSON)
+        guard var members = root["members"] as? [[String: Any]] else {
+            throw UACManifestEditorError.invalidManifestJSON
+        }
+        var indicesByPath: [String: Int] = [:]
+        for index in members.indices {
+            guard let path = members[index]["path"] as? String,
+                  indicesByPath.updateValue(index, forKey: path) == nil else {
+                throw UACManifestEditorError.invalidManifestJSON
+            }
+        }
+        let missingPaths = memberPaths.filter { indicesByPath[$0] == nil }.sorted()
+        guard missingPaths.isEmpty else {
+            throw UACManifestEditorError.memberRecordMissing(missingPaths.joined(separator: ", "))
+        }
+        let indices = memberPaths.compactMap { indicesByPath[$0] }
+        guard indices.allSatisfy({
+            let role = members[$0]["role"] as? String
+            return role == "playable" || role == "track"
+        }) else {
+            throw UACManifestEditorError.invalidMetadataJSON(
+                "New tags can only be applied to playable tracks."
+            )
+        }
+        guard indices.allSatisfy({
+            let fields = members[$0]["metadata"] as? [String: Any] ?? [:]
+            return fields[fieldKey] == nil
+        }) else {
+            throw UACManifestEditorError.invalidMetadataJSON(
+                "The tag already exists on one or more selected tracks: \(fieldKey)"
+            )
+        }
+        for index in indices {
+            var fields = members[index]["metadata"] as? [String: Any] ?? [:]
+            fields[fieldKey] = value
+            members[index]["metadata"] = fields
+        }
+        root["members"] = members
+        return UACManifestEditResult(
+            manifestJSON: try validatedJSON(root),
+            affectedCount: indices.count
+        )
     }
 
     /// Applies one field operation to only the requested member paths. Other
@@ -189,6 +307,17 @@ public enum UACManifestEditor {
             }
             return true
         }
+    }
+
+    private static func metadataNamespace(_ rawKey: String) throws -> (bucket: String, key: String) {
+        let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { throw UACManifestEditorError.invalidFieldKey }
+        if key.hasPrefix("extension.") {
+            let storageKey = String(key.dropFirst("extension.".count))
+            guard !storageKey.isEmpty else { throw UACManifestEditorError.invalidFieldKey }
+            return ("extensions", storageKey)
+        }
+        return ("metadata", key)
     }
 
     private static func validatedJSON(_ object: [String: Any]) throws -> Data {

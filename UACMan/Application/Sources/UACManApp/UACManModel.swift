@@ -603,47 +603,19 @@ final class UACManModel {
         guard !oldKey.isEmpty, !newKey.isEmpty, oldKey != newKey else { return }
         do {
             try flushEditorBuffers()
-            guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any] else {
-                throw UACManifestEditorError.invalidManifestJSON
-            }
-            let oldParts = oldKey.hasPrefix("extension.") ? ("extensions", String(oldKey.dropFirst("extension.".count))) : ("metadata", oldKey)
-            let newParts = newKey.hasPrefix("extension.") ? ("extensions", String(newKey.dropFirst("extension.".count))) : ("metadata", newKey)
-            guard oldParts.0 == newParts.0 else {
-                throw UACManifestEditorError.invalidMetadataJSON("Metadata and extension namespaces cannot be mixed in one rename.")
-            }
-            var renamed = 0
-            func rename(in object: inout [String: Any]) throws {
-                guard object[oldParts.1] != nil else { return }
-                guard object[newParts.1] == nil else {
-                    throw UACManifestEditorError.invalidMetadataJSON("The destination tag already exists: \(newKey)")
-                }
-                object[newParts.1] = object.removeValue(forKey: oldParts.1)
-                renamed += 1
-            }
-            if var game = root["game"] as? [String: Any], var fields = game[oldParts.0] as? [String: Any] {
-                try rename(in: &fields)
-                game[oldParts.0] = fields
-                root["game"] = game
-            }
-            if var members = root["members"] as? [[String: Any]] {
-                for index in members.indices {
-                    guard var fields = members[index][oldParts.0] as? [String: Any] else { continue }
-                    try rename(in: &fields)
-                    members[index][oldParts.0] = fields
-                }
-                root["members"] = members
-            }
-            guard renamed > 0 else {
-                throw UACManifestEditorError.invalidMetadataJSON("Tag not found in this package: \(oldKey)")
-            }
-            draftManifestJSON = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .prettyPrinted])
+            let result = try UACManifestEditor.renameMetadataKey(
+                in: draftManifestJSON,
+                from: oldKey,
+                to: newKey
+            )
+            draftManifestJSON = result.manifestJSON
             let manifest = try UACManifestEditor.decode(draftManifestJSON)
             gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata)
             gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
             refreshMemberSummaries(from: manifest)
             if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
             hasUnsavedChanges = draftManifestJSON != originalManifestJSON
-            statusMessage = "Renamed \(oldKey) to \(newKey) in \(renamed) location(s). Save to commit the package change."
+            statusMessage = "Renamed \(oldKey) to \(newKey) in \(result.affectedCount) location(s). Save to commit the package change."
             errorMessage = nil
         } catch {
             errorMessage = String(describing: error)
@@ -761,8 +733,8 @@ final class UACManModel {
                 changed += 1
             }
             if targets.members, var members = root["members"] as? [[String: Any]] {
-                for index in members.indices where members[index][oldParts.bucket] is [String: Any] {
-                    var fields = members[index][oldParts.bucket] as! [String: Any]
+                for index in members.indices {
+                    guard var fields = members[index][oldParts.bucket] as? [String: Any] else { continue }
                     guard let old = fields[oldParts.storageKey] else { continue }
                     if oldParts.storageKey != newParts.storageKey, fields[newParts.storageKey] != nil {
                         throw UACManifestEditorError.invalidMetadataJSON("The destination tag already exists: \(newKey)")
@@ -842,41 +814,20 @@ final class UACManModel {
         guard !paths.isEmpty else { errorMessage = "Select at least one track."; return }
         do {
             try flushEditorBuffers()
-            guard var root = try JSONSerialization.jsonObject(with: draftManifestJSON) as? [String: Any], var members = root["members"] as? [[String: Any]] else {
-                throw UACManifestEditorError.invalidManifestJSON
-            }
-            let indices = paths.compactMap { path in members.firstIndex(where: { ($0["path"] as? String) == path }) }
-            guard indices.count == paths.count else {
-                let foundPaths = Set(indices.compactMap { members[$0]["path"] as? String })
-                let missingPath = paths.first(where: { !foundPaths.contains($0) }) ?? "unknown"
-                throw UACManifestEditorError.memberRecordMissing(missingPath)
-            }
-            guard indices.allSatisfy({
-                let role = members[$0]["role"] as? String
-                return role == "playable" || role == "track"
-            }) else {
-                throw UACManifestEditorError.invalidMetadataJSON("New tags can only be applied to playable tracks.")
-            }
-            for index in indices {
-                let fields = members[index]["metadata"] as? [String: Any] ?? [:]
-                guard fields[key] == nil else {
-                    throw UACManifestEditorError.invalidMetadataJSON("The tag already exists on one or more selected tracks: \(key)")
-                }
-            }
-            for index in indices {
-                var fields = members[index]["metadata"] as? [String: Any] ?? [:]
-                fields[key] = value
-                members[index]["metadata"] = fields
-            }
-            root["members"] = members
-            draftManifestJSON = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .prettyPrinted])
+            let result = try UACManifestEditor.addStringMetadataField(
+                in: draftManifestJSON,
+                memberPaths: Set(paths),
+                key: key,
+                value: value
+            )
+            draftManifestJSON = result.manifestJSON
             let manifest = try UACManifestEditor.decode(draftManifestJSON)
             gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata)
             gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
             refreshMemberSummaries(from: manifest)
             if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
             hasUnsavedChanges = draftManifestJSON != originalManifestJSON
-            statusMessage = "Added \(key) to \(indices.count) track(s). Save to commit the package change."
+            statusMessage = "Added \(key) to \(result.affectedCount) track(s). Save to commit the package change."
             errorMessage = nil
         } catch { errorMessage = String(describing: error) }
     }

@@ -119,6 +119,60 @@ import UACWrapperCore
     #expect(member.metadata["title"] == .string("Old title"))
 }
 
+@Test func packageWideRenamePreservesNamespacesAndUnknownFields() throws {
+    let seeded = try UACManifestEditor.updateGameFields(
+        in: Data(manifestJSON.utf8),
+        title: "Fixture Game",
+        console: "Nintendo SNES",
+        metadataJSON: "{\"title\":\"Package title\"}",
+        extensionsJSON: "{\"oldKey\":\"Package extension\"}"
+    )
+    let memberSeeded = try UACManifestEditor.updateMemberFields(
+        in: seeded,
+        memberPath: "variants/original/track.spc",
+        metadataJSON: "{\"title\":\"Track title\"}",
+        extensionsJSON: "{\"oldKey\":\"Track extension\"}"
+    )
+
+    let result = try UACManifestEditor.renameMetadataKey(
+        in: memberSeeded,
+        from: "extension.oldKey",
+        to: "extension.newKey"
+    )
+    let manifest = try UACManifestEditor.decode(result.manifestJSON)
+
+    #expect(result.affectedCount == 2)
+    #expect(manifest.game.extensions["oldKey"] == nil)
+    #expect(manifest.game.extensions["newKey"] == .string("Package extension"))
+    #expect(manifest.members.first?.extensions["newKey"] == .string("Track extension"))
+    #expect(String(decoding: result.manifestJSON, as: UTF8.self).contains("futureRootField"))
+    #expect(String(decoding: result.manifestJSON, as: UTF8.self).contains("futureMemberField"))
+}
+
+@Test func selectedTrackTagAdditionIsAtomic() throws {
+    let original = Data(manifestJSON.utf8)
+    let result = try UACManifestEditor.addStringMetadataField(
+        in: original,
+        memberPaths: ["variants/original/track.spc"],
+        key: "mood",
+        value: "Dreamy"
+    )
+    let manifest = try UACManifestEditor.decode(result.manifestJSON)
+
+    #expect(result.affectedCount == 1)
+    #expect(manifest.members.first?.metadata["mood"] == .string("Dreamy"))
+    #expect(throws: UACManifestEditorError.invalidMetadataJSON(
+        "The tag already exists on one or more selected tracks: mood"
+    )) {
+        try UACManifestEditor.addStringMetadataField(
+            in: result.manifestJSON,
+            memberPaths: ["variants/original/track.spc"],
+            key: "mood",
+            value: "Different"
+        )
+    }
+}
+
 private let manifestJSON = """
 {
   "manifestVersion": 1,

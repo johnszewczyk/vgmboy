@@ -91,7 +91,7 @@ Include the original CUE as a byte-exact ordinary member and point to it with
 `game.metadata.cue_sheet`. Include the native loop report, the certification
 list, the duration-candidate report, XA sector inventory, and source manifest as
 documentation members. Set-level metadata uses the shared
-shape `game.metadata.set = {collection, name, url}`. A playlist points to each
+shape `game.metadata.setCollection`, `setName`, and `setUrl`. A playlist points to each
 APE member and repeats the loop fields needed by a player UI; it does not copy
 the audio payload.
 

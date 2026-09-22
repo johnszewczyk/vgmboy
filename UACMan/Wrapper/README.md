@@ -9,6 +9,8 @@ streams. AudioMan is a downstream operator of this CLI, not an owner or runtime
 dependency of the wrapper.
 
 - Swift package target: `UACWrapperCore`.
+- `UACContainerReader` owns framing and payload ranges; `UACManifest` contains
+  the public JSON model; `UACManifestValidator` owns structural validation.
 - Collection packer and inspector: `python/uacman.py`.
 - Metadata harvest bridge: `../Application/Sources/UACManMetadataCLI/`, built
   from the UACMan application package using MetaManCore.
@@ -55,7 +57,8 @@ separate directory before promotion. A successfully harvested member defaults
 to UAC role `playable`; an explicit recipe role remains authoritative.
 
 When source records identify one unambiguous distributor and set, the packer
-projects it to `game.metadata.set` with `collection`, `name`, and `url`. For
+projects it to the flat package tags `game.metadata.setCollection`, `setName`,
+and `setUrl`. For
 Redump packages, the `redump-disc-archive` record is authoritative over derived
 output and metadata-only association records; its Archive.org download URL is
 projected to the matching item details page. Existing collections can be audited
@@ -70,18 +73,18 @@ every original Project2612 package was one-to-one migrated.
 
 New packages also write `game.metadata.containedContainerVersions`, which
 records SPC and VGM version/count groups at package level and lists formats
-with mixed versions. Each SPC or VGM member receives the required canonical
-`metadata.sub-container-version` tag. Each SPC member exposes
+with mixed versions. Each SPC member exposes
 `metadata.spcVersion` (from its version byte), `metadata.spcVersionByte`, and
 `metadata.spcHeaderVersion` (from the signature text). The byte and signature
 are reported separately because real SPCs can disagree between them; neither
-is silently normalized. A mixed format adds a critical
-`game.metadata.criticalFlags` entry. VGZ members and gzip-wrapped files named
-`.vgm` are rejected; expand them to raw `.vgm` before packaging. This
+is silently normalized. VGZ members are rejected by the generic packer because
+their nested gzip wrapper reduces outer Zstandard compression; other
+format-specific policy belongs to the caller. This
 inspection does not change source bytes. Every member receives a CRC32/ISO-HDLC
-hash scoped to its exact raw bytes; playable members also receive a CRC32 for
-the playable-payload scope. Existing BLAKE3 hashes remain available for content
-identity. AudioMan must convert VGZ to raw VGM and freshen VGM versions before
+hash scoped to its exact raw bytes. Playable members receive BLAKE3, CRC32,
+SHA-1, and MD5 records for the playable-payload scope; for SPC this is the
+complete stored file. Existing BLAKE3 member identity remains available.
+AudioMan must convert VGZ to raw VGM and freshen VGM versions before
 packaging when that is the selected set policy.
 
 For bulk `.tar.zst` conversion, pass the same helper with `--metadata-cli` and

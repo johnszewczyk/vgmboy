@@ -13,16 +13,18 @@ The collection grid and metadata workspace are rendered by a bundled local
 WKWebView workspace. Swift remains responsible for file access, prompts,
 validation, and package writes; the app launcher embeds the SwiftPM web-resource
 bundle in the `.app` so the same UI loads from LaunchPad and command-line runs.
-The workspace is organized into four pages: **Tracks** is the wide canonical
-field grid for playable members, **Files** lists every stored member, **Pack Tags**
-edits package-level fields and attachments, and **Track** provides an exhaustive
-tag editor for a selected file. Files also offers a read-only text preview for
+The workspace is organized into five pages: **Files** lists every stored
+member, **Pack Tags** edits package-level fields and attachments, **Tracks** is
+the wide canonical field grid for playable members, **Track Tags** provides an
+exhaustive tag editor for a selected file, and **New Tag** applies one string
+tag atomically to the package, all playable tracks, or an explicit track
+selection. Files also offers a read-only text preview for
 bundled JSON, Markdown, CUE, and other recognized text members without extracting
 or rewriting the payload. Every table uses the shared field-grid structure with
 fixed page-level column contracts so wide tables retain their intended shape.
 The wide master Tracks table opens structured values in a centered Nested Tags
 popup, so horizontal scrolling does not hide the editor. The smaller Pack Tags
-and selected-file Track tables keep the left-aligned full-width child subtable
+and selected-file Track Tags tables keep the left-aligned full-width child subtable
 beneath the source row, using the same canonical field-grid presentation.
 Metadata keys are case-sensitive arbitrary JSON
 keys; camelCase is the shared naming convention, not a validation restriction.
@@ -93,11 +95,18 @@ editor, and metadata bridge; `Wrapper/` is an independently consumable Swift
 package for the current reversible format and CLI; `Container/README.md`
 records the closed SPC successor decision. Native SPC conversion is not a
 supported package or development path.
+Within `UACWrapperCore`, container framing, manifest data models, and manifest
+validation are separate source units while the public reader/writer API stays
+stable. Application tag renames and selected-track additions go through
+`UACManCore` so unknown JSON fields and atomic edit behavior are covered by
+package tests rather than being implemented only in the UI model.
 The current `.uac` remains a wrapper around original format members. See
 [`ai/subsystem-agent/uac-editor.md`](ai/subsystem-agent/uac-editor.md),
 [`ai/subsystem-agent/uac-wrapper-format.md`](ai/subsystem-agent/uac-wrapper-format.md),
 [`ai/subsystem-agent/player-integration.md`](ai/subsystem-agent/player-integration.md),
-and the format-specific [`protocols/PSX-CDXA.protocol.md`](protocols/PSX-CDXA.protocol.md)
+and the format-specific
+[`protocols/SNES-SPC.protocol.md`](protocols/SNES-SPC.protocol.md) and
+[`protocols/PSX-CDXA.protocol.md`](protocols/PSX-CDXA.protocol.md)
 for editing, format, and consumer contracts.
 
 The Python pack/inspect/unpack CLI is `Wrapper/python/uacman.py`; its tests and

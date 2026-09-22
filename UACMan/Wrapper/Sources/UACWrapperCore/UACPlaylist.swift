@@ -91,7 +91,7 @@ public struct UACPlaylistEntry: Codable, Equatable, Sendable {
     }
 }
 
-/// An additional BLAKE3 observation with an explicit byte scope and method.
+/// An additional digest observation with an explicit byte scope and method.
 /// It supplements `UACMember.blake3` and the legacy `streamBlake3` shortcut.
 public struct UACHashRecord: Codable, Equatable, Sendable {
     public let scope: String

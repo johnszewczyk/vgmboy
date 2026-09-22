@@ -28,6 +28,12 @@ runtime dependency.
   `subsystem-agent/uac-wrapper-format.md`; keep genuinely custom or
   format-specific fields in typed, namespaced `extensions` instead of adding
   aliases for an existing shared concept.
+- AudioMan may impose set-specific requirements such as
+  `member.metadata.sub-container-version` and mixed-version review. UACMan
+  remains generic: it rejects `.vgz` members because the gzip wrapper harms
+  the outer Zstandard compression, while leaving other format policy to the
+  caller. Package-level `game.metadata.containedContainerVersions` is an
+  optional inspection projection, not a UACMan validation gate.
 - PNG scans, CUE sheets, notes, and other regular files are ordinary hashed
   members. Game metadata fields such as `cover_front`, `cover_back`, and
   `cue_sheet` reference those member paths; the current player boundary does
@@ -39,6 +45,8 @@ runtime dependency.
 - Manifest editing and save invariants: `subsystem-agent/uac-editor.md`.
 - Wrapper binary contract and reader/writer: `subsystem-agent/uac-wrapper-format.md`.
 - Player and scanner consumer boundaries: `subsystem-agent/player-integration.md`.
+- SNESMusic.org SPC metadata and four-hash profile: `../protocols/SNES-SPC.protocol.md`.
+- PlayStation CD-XA preservation profile: `../protocols/PSX-CDXA.protocol.md`.
 - Closed SPC research context: [Container/README.md](../Container/README.md).
 
 ## Local Rules
