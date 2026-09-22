@@ -40,11 +40,11 @@ its horizontal scroll belongs to the workspace surface rather than a nested
 table window. **Files** lists every stored package member, including playable
 streams, artwork, cue sheets, and documentation. Its filename field edits the
 manifest's displayed/original filename while the stored TAR path remains
-immutable. Each row's **Tags Count** column is numeric. A fixed-width **View**
+immutable. Each row's **Tags Count** column is numeric. A fixed-width **⌕**
 column is blank for binary members and shows a magnifier for supported text
 attachments. The button opens a read-only viewer for recognized UTF-8 or UTF-16
 text (including JSON, Markdown, and cue sheets), limited to the first 4 MiB.
-Pack Tags' attachment table uses the same canonical View column and viewer.
+Pack Tags' attachment table uses the same canonical **⌕** column and viewer.
 All page tables use the same rounded canonical frame and inset. The **Track Tags** page provides two
 independent scroll panes, each containing the canonical field-grid table: a
 three-column tagged-file table on the left and an exhaustive metadata table on

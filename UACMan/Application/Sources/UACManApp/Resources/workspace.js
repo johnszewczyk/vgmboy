@@ -701,7 +701,7 @@
 
   function renderFilesPage() {
     const members = visibleFileMembers();
-    const header = canonicalHeaderMarkup(["#", "Role", "Format", "Filename", "Stored path", "Tags Count", "Size", "View"]);
+    const header = canonicalHeaderMarkup(["#", "Role", "Format", "Filename", "Stored path", "Tags Count", "Size", "⌕"]);
     const rows = members.map((member, index) => canonicalRowMarkup([
       canonicalNumberCellMarkup(index + 1, `File number ${index + 1}`, { className:"file-number" }),
       canonicalCellMarkup(`<input class="tag-table-field" value="${esc(member.role)}" disabled>`),
@@ -723,7 +723,7 @@
   function renderAttachments() {
     const assets = state.members.filter(member => member.role !== "playable" && member.role !== "track");
     if (!assets.length) return "";
-    const header = `${canonicalTitleRowMarkup("Attachments")}${canonicalHeaderMarkup(["#", "Role", "Format", "Filename", "Stored path", "Size", "View"])}`;
+    const header = `${canonicalTitleRowMarkup("Attachments")}${canonicalHeaderMarkup(["#", "Role", "Format", "Filename", "Stored path", "Size", "⌕"])}`;
     const rows = assets.map((asset, index) => canonicalRowMarkup([
       canonicalNumberCellMarkup(index + 1, `Attachment number ${index + 1}`, { className:"file-number" }),
       canonicalCellMarkup(`<input class="tag-table-field" value="${esc(asset.role)}" disabled>`),
