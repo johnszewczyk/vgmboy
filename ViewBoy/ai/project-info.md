@@ -42,4 +42,6 @@ Engineering constraints:
   migration is separately scoped.
 - `launch.sh` performs a clean release build and opens the packaged app.
 
-Human-facing behavior is documented in the routed `ai/subsystem-human/` notes.
+## Human Docs
+
+Human-facing behavior is documented in the routed `subsystem-human/` notes.

@@ -7,7 +7,7 @@ for the active VGMMan player frontends: CocoaSpice, SPCBoyWK, and ViewBoy.
 
 ## Major Components
 
-- `CatalogReader`: schema-23 SQLite reader and canonical catalog records.
+- `CatalogReader`: schema-24 SQLite reader and canonical catalog records.
 - `CatalogSessionCore`: shared read-only sidebar bucket access and latest-task
   cancellation/stale-result ownership.
 - `CatalogBrowserCore`: UI-neutral browser state, grouping, search, identity,

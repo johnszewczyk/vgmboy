@@ -14,3 +14,7 @@
   use path or embedded metadata.
 - Output is ordered, versioned JSONL. Scanner failures return nonzero status;
   SIGINT/SIGTERM cancellation returns 130 after retaining checkpoints.
+- Progress diagnostics include phase, source count, and failures. During
+  checkpoint persistence the count is saved sources, not merely completed
+  inspections. Diagnostics are emitted on phase changes, phase completion, or
+  at most once per second while work continues.

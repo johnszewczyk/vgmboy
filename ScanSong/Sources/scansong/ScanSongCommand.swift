@@ -59,7 +59,11 @@ private final class ScanProgressReporter: @unchecked Sendable {
         lastEmissionAt = now
         lastPhase = update.phase
         let phaseDetail = update.detail.map { " — \($0)" } ?? ""
-        let detail = "\(update.phase.rawValue): \(update.processed)/\(update.discovered), \(update.failed) failed\(phaseDetail)"
+        let phaseCount = update.phase == .persistence
+            ? (update.phaseCompleted ?? update.processed)
+            : update.processed
+        let countLabel = update.phase == .persistence ? "saved" : "sources"
+        let detail = "\(update.phase.rawValue): \(phaseCount)/\(update.discovered) \(countLabel), \(update.failed) failed\(phaseDetail)"
         writer.emit { sequence in
             ScannerEvent(
                 kind: .diagnostic,

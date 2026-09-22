@@ -22,6 +22,32 @@ private enum PathAdditionOutcome: Sendable {
     case failure(String)
 }
 
+private enum CatalogSnapshot: Sendable {
+    case missing
+    case loaded(CanonicalCatalogSummary, [CatalogRoot], [Int64: CatalogScanTally])
+    case failure(String)
+
+    static func read(databaseURL: URL) -> Self {
+        guard FileManager.default.fileExists(atPath: databaseURL.path) else { return .missing }
+        do {
+            let summary = try CanonicalCatalog.inspect(databaseURL: databaseURL)
+            let reader = try CanonicalCatalogReader(databaseURL: databaseURL)
+            let roots = try reader.roots()
+            let tallies = try Dictionary(uniqueKeysWithValues: roots.map {
+                ($0.id, try reader.scanTally(rootID: $0.id))
+            })
+            return .loaded(summary, roots, tallies)
+        } catch {
+            return .failure(error.localizedDescription)
+        }
+    }
+}
+
+private enum CatalogChangeOutcome: Sendable {
+    case success(CatalogSnapshot)
+    case failure(String)
+}
+
 @MainActor
 final class ScannerAppModel: ObservableObject {
     private static let catalogPathKey = "ScanSong.catalogPath"
@@ -40,6 +66,7 @@ final class ScannerAppModel: ObservableObject {
     @Published private(set) var completedOperation: ScannerOperationTelemetry?
     @Published var isScanning = false
     @Published var isMaintaining = false
+    @Published var isCancelling = false
     @Published var deepScan = false
     @Published var showsResetPathsConfirmation = false
     @Published var showsResetCatalogConfirmation = false
@@ -51,11 +78,14 @@ final class ScannerAppModel: ObservableObject {
     private var worker: Task<ScanOutcome, Never>?
     private var pathTask: Task<PathAdditionOutcome, Never>?
     private var pathObserverTask: Task<Void, Never>?
+    private var pathChangeTask: Task<CatalogChangeOutcome, Never>?
+    private var pathChangeObserverTask: Task<Void, Never>?
     private var maintenanceTask: Task<Void, Never>?
     private var maintenanceWorker: Task<MaintenanceOutcome, Never>?
     private var activeRootID: Int64?
-    private var operationStartedAt: Date?
+    fileprivate var operationStartedAt: Date?
     private var logWindows: [Int64: ScannerScanLogWindow] = [:]
+    private var abbreviatedPaths: [Int64: String] = [:]
     private var closeWhenIdle: (() -> Void)?
 
     init() {
@@ -71,7 +101,24 @@ final class ScannerAppModel: ObservableObject {
         if storedExtensions.isEmpty {
             ignoredFileExtensions = ScannerFormatPolicy.defaultIgnoredExtensions
         }
-        validateCatalog()
+        isMaintaining = true
+        operationStartedAt = Date()
+        scanStatus = "Opening catalog…"
+        operationProgress = ScannerOperationProgress(
+            operation: .catalog,
+            phase: "opening",
+            processed: 0,
+            total: nil,
+            failures: 0,
+            detail: "Opening catalog…"
+        )
+        Task { [weak self] in
+            guard let self else { return }
+            await refreshCatalog()
+            isMaintaining = false
+            operationProgress = nil
+            completeRequestedCloseIfIdle()
+        }
     }
 
     deinit {
@@ -79,6 +126,8 @@ final class ScannerAppModel: ObservableObject {
         worker?.cancel()
         pathObserverTask?.cancel()
         pathTask?.cancel()
+        pathChangeObserverTask?.cancel()
+        pathChangeTask?.cancel()
         maintenanceTask?.cancel()
         maintenanceWorker?.cancel()
     }
@@ -144,15 +193,18 @@ final class ScannerAppModel: ObservableObject {
             return
         }
 
-        do {
-            // CanonicalCatalogWriter creates the schema-24 file immediately;
-            // ScanSong becomes responsible for it only after that succeeds.
-            _ = try CanonicalCatalogWriter(databaseURL: candidate)
-            setCatalog(candidate)
-            scanStatus = "Add one or more scan paths."
-        } catch {
-            record(error, stage: "database.create")
-        }
+        runCatalogChange("Creating database…", { databaseURL in
+            guard !FileManager.default.fileExists(atPath: databaseURL.path) else {
+                throw NSError(
+                    domain: "ScanSong.CatalogCreation",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "A database already exists at that path. Choose a new file name."]
+                )
+            }
+            // The writer creates the schema-24 file before it becomes selected.
+            _ = try CanonicalCatalogWriter(databaseURL: databaseURL)
+        }, targetURL: candidate, selectOnSuccess: true, kind: .catalog,
+           successText: "Add one or more scan paths.")
     }
 
     func useDefaultCatalog() {
@@ -162,22 +214,18 @@ final class ScannerAppModel: ObservableObject {
 
     func resetCatalog() {
         guard !isBusy, hasDatabaseFile else { return }
-        do {
-            let writer = try CanonicalCatalogWriter(databaseURL: databaseURL)
-            try writer.resetCatalog()
+        runCatalogChange("Resetting database…", { databaseURL in
+            try CanonicalCatalogWriter(databaseURL: databaseURL).resetCatalog()
             ScannerScanLogStore.discardAll(databaseURL: databaseURL)
-            logWindows.values.forEach { $0.close() }
-            logWindows.removeAll()
-            validateCatalog()
-            scanStatus = "Database reset. Add one or more scan paths."
-        } catch {
-            record(error, stage: "database.reset")
+        }, kind: .catalog, successText: "Database reset. Add one or more scan paths.") {
+            self.logWindows.values.forEach { $0.close() }
+            self.logWindows.removeAll()
         }
     }
 
     func deleteCatalogFile() {
         guard !isBusy, hasDatabaseFile else { return }
-        do {
+        runCatalogChange("Deleting database file…", { databaseURL in
             let fileManager = FileManager.default
             try fileManager.removeItem(at: databaseURL)
             for suffix in ["-wal", "-shm"] {
@@ -187,12 +235,9 @@ final class ScannerAppModel: ObservableObject {
                 }
             }
             ScannerScanLogStore.discardAll(databaseURL: databaseURL)
-            logWindows.values.forEach { $0.close() }
-            logWindows.removeAll()
-            validateCatalog()
-            scanStatus = "No database file selected. Use Default, Open, or Add New."
-        } catch {
-            record(error, stage: "database.delete")
+        }, kind: .catalog, successText: "No database file selected. Use Default, Open, or Add New.") {
+            self.logWindows.values.forEach { $0.close() }
+            self.logWindows.removeAll()
         }
     }
 
@@ -209,56 +254,40 @@ final class ScannerAppModel: ObservableObject {
 
     func removePath(_ id: Int64) {
         guard !isBusy else { return }
-        do {
-            let writer = try CanonicalCatalogWriter(databaseURL: databaseURL)
-            try writer.removeRoot(id: id)
-            logWindows[id]?.close()
-            logWindows[id] = nil
-            try refreshRoots()
-            scanStatus = roots.isEmpty ? "Add one or more scan paths." : readyText
-            validateCatalog()
-        } catch {
-            record(error, stage: "paths.remove")
+        runCatalogChange("Removing scan path…", { databaseURL in
+            try CanonicalCatalogWriter(databaseURL: databaseURL).removeRoot(id: id)
+        }) {
+            self.logWindows[id]?.close()
+            self.logWindows[id] = nil
         }
     }
 
     func resetPaths() {
         guard !isBusy else { return }
-        do {
+        let rootIDs = roots.map(\.id)
+        runCatalogChange("Removing all scan paths…", { databaseURL in
             let writer = try CanonicalCatalogWriter(databaseURL: databaseURL)
-            for root in roots { try writer.removeRoot(id: root.id) }
-            logWindows.values.forEach { $0.close() }
-            logWindows.removeAll()
-            try refreshRoots()
-            scanStatus = "Add one or more scan paths."
-            validateCatalog()
-        } catch {
-            record(error, stage: "paths.reset")
+            for id in rootIDs { try writer.removeRoot(id: id) }
+        }) {
+            self.logWindows.values.forEach { $0.close() }
+            self.logWindows.removeAll()
         }
     }
 
     func setPathEnabled(_ id: Int64, enabled: Bool) {
         guard !isBusy else { return }
-        do {
-            let writer = try CanonicalCatalogWriter(databaseURL: databaseURL)
-            try writer.setRootEnabled(id: id, enabled: enabled)
-            try refreshRoots()
-            scanStatus = readyText
-        } catch {
-            record(error, stage: "paths.enable")
+        runCatalogChange(enabled ? "Enabling scan path…" : "Disabling scan path…") { databaseURL in
+            try CanonicalCatalogWriter(databaseURL: databaseURL).setRootEnabled(id: id, enabled: enabled)
         }
     }
 
     func toggleAllPathsEnabled() {
         guard !isBusy, !roots.isEmpty else { return }
         let enable = roots.contains(where: { !$0.isEnabled })
-        do {
+        let rootIDs = roots.map(\.id)
+        runCatalogChange(enable ? "Enabling scan paths…" : "Disabling scan paths…") { databaseURL in
             let writer = try CanonicalCatalogWriter(databaseURL: databaseURL)
-            for root in roots { try writer.setRootEnabled(id: root.id, enabled: enable) }
-            try refreshRoots()
-            scanStatus = readyText
-        } catch {
-            record(error, stage: "paths.toggle-all")
+            for id in rootIDs { try writer.setRootEnabled(id: id, enabled: enable) }
         }
     }
 
@@ -304,7 +333,8 @@ final class ScannerAppModel: ObservableObject {
     }
 
     func cancelScan() {
-        guard isScanning else { return }
+        guard isScanning, !isCancelling else { return }
+        isCancelling = true
         scanStatus = "Cancelling and retaining completed checkpoints…"
         worker?.cancel()
     }
@@ -348,15 +378,23 @@ final class ScannerAppModel: ObservableObject {
     }
 
     func abbreviatedPath(for root: CatalogRoot) -> String {
+        abbreviatedPaths[root.id] ?? root.path
+    }
+
+    private func rebuildAbbreviatedPaths() {
         let paths = roots.map { URL(fileURLWithPath: $0.path).pathComponents }
-        guard let first = paths.first else { return root.path }
+        guard let first = paths.first else {
+            abbreviatedPaths = [:]
+            return
+        }
         let sharedCount = paths.dropFirst().reduce(first.count) { count, path in
             zip(first.prefix(count), path.prefix(count)).prefix { $0 == $1 }.count
         }
-        let components = URL(fileURLWithPath: root.path).pathComponents
-        let suffix = Array(components.dropFirst(min(sharedCount, components.count)))
-        let visible = suffix.isEmpty ? Array(components.suffix(2)) : suffix
-        return visible.joined(separator: "/")
+        abbreviatedPaths = Dictionary(uniqueKeysWithValues: zip(roots, paths).map { root, components in
+            let suffix = Array(components.dropFirst(min(sharedCount, components.count)))
+            let visible = suffix.isEmpty ? Array(components.suffix(2)) : suffix
+            return (root.id, visible.joined(separator: "/"))
+        })
     }
 
     private var emptyTally: CatalogScanTally {
@@ -379,28 +417,133 @@ final class ScannerAppModel: ObservableObject {
         UserDefaults.standard.set(databaseURL.path, forKey: Self.catalogPathKey)
         logWindows.values.forEach { $0.close() }
         logWindows.removeAll()
-        validateCatalog()
+        isMaintaining = true
+        operationStartedAt = Date()
+        currentPath = nil
+        currentFile = nil
+        scanStatus = "Opening catalog…"
+        operationProgress = ScannerOperationProgress(
+            operation: .catalog,
+            phase: "opening",
+            processed: 0,
+            total: nil,
+            failures: 0,
+            detail: "Opening catalog…"
+        )
+        Task { [weak self] in
+            guard let self else { return }
+            await refreshCatalog()
+            isMaintaining = false
+            operationProgress = nil
+            completeRequestedCloseIfIdle()
+        }
     }
 
-    private func validateCatalog() {
-        guard FileManager.default.fileExists(atPath: databaseURL.path) else {
+    private func refreshCatalog() async {
+        let selectedURL = databaseURL
+        let snapshot = await Task.detached(priority: .utility) {
+            CatalogSnapshot.read(databaseURL: selectedURL)
+        }.value
+        guard selectedURL == databaseURL else { return }
+        applyCatalogSnapshot(snapshot)
+    }
+
+    private func applyCatalogSnapshot(_ snapshot: CatalogSnapshot) {
+        switch snapshot {
+        case .missing:
             catalogStatus = "New schema-24 catalog will be created when scanning starts."
             roots = []
             rootTallies = [:]
-            scanStatus = "Add one or more scan paths."
-            return
-        }
-        do {
-            let summary = try CanonicalCatalog.inspect(databaseURL: databaseURL)
+            abbreviatedPaths = [:]
+            if scanStatus == "Opening catalog…" { scanStatus = "Add one or more scan paths." }
+        case .loaded(let summary, let loadedRoots, let tallies):
             catalogStatus = "Schema \(summary.schemaVersion) • \(summary.rootCount) paths • \(summary.trackCount) tracks"
-            try refreshRoots()
-            if !isBusy && scanStatus.hasPrefix("Add one or more") && !roots.isEmpty {
+            roots = loadedRoots
+            rootTallies = tallies
+            rebuildAbbreviatedPaths()
+            if scanStatus == "Opening catalog…" || scanStatus.hasPrefix("Add one or more") {
                 scanStatus = readyText
             }
-        } catch {
-            catalogStatus = "Cannot use catalog: \(error.localizedDescription)"
+        case .failure(let message):
+            catalogStatus = "Cannot use catalog: \(message)"
             roots = []
             rootTallies = [:]
+            abbreviatedPaths = [:]
+            scanStatus = "Catalog unavailable: \(message)"
+        }
+    }
+
+    private func runCatalogChange(
+        _ activity: String,
+        _ change: @escaping @Sendable (URL) throws -> Void,
+        targetURL: URL? = nil,
+        selectOnSuccess: Bool = false,
+        kind: ScannerOperationKind = .managePaths,
+        successText: String? = nil,
+        afterSuccess: (@MainActor () -> Void)? = nil
+    ) {
+        guard !isBusy else { return }
+        isMaintaining = true
+        operationStartedAt = Date()
+        completedOperation = nil
+        currentPath = nil
+        currentFile = nil
+        operationProgress = ScannerOperationProgress(
+            operation: kind,
+            phase: "updating",
+            processed: 0,
+            total: nil,
+            failures: 0,
+            detail: activity
+        )
+        scanStatus = activity
+        let selectedURL = targetURL ?? databaseURL
+        let worker = Task.detached(priority: .utility) {
+            do {
+                try change(selectedURL)
+                let snapshot = CatalogSnapshot.read(databaseURL: selectedURL)
+                if case .failure(let message) = snapshot { return CatalogChangeOutcome.failure(message) }
+                return CatalogChangeOutcome.success(snapshot)
+            } catch {
+                return CatalogChangeOutcome.failure(error.localizedDescription)
+            }
+        }
+        pathChangeTask = worker
+        pathChangeObserverTask = Task { [weak self] in
+            let outcome = await worker.value
+            guard let self else { return }
+            pathChangeTask = nil
+            pathChangeObserverTask = nil
+            switch outcome {
+            case .success(let snapshot):
+                if selectOnSuccess {
+                    databaseURL = selectedURL
+                    UserDefaults.standard.set(selectedURL.path, forKey: Self.catalogPathKey)
+                    logWindows.values.forEach { $0.close() }
+                    logWindows.removeAll()
+                }
+                applyCatalogSnapshot(snapshot)
+                afterSuccess?()
+                let result = successText ?? (roots.isEmpty ? "No scan paths configured" : readyText)
+                let completedAt = Date()
+                let telemetry = ScannerOperationTelemetry(
+                    operation: kind,
+                    startedAt: operationStartedAt ?? completedAt,
+                    completedAt: completedAt,
+                    processed: 0,
+                    total: nil,
+                    failures: 0,
+                    result: result
+                )
+                completedOperation = telemetry
+                scanStatus = telemetry.statusText
+            case .failure(let message):
+                await refreshCatalog()
+                recordMaintenanceFailure(message)
+            }
+            isMaintaining = false
+            operationProgress = nil
+            completeRequestedCloseIfIdle()
         }
     }
 
@@ -412,6 +555,9 @@ final class ScannerAppModel: ObservableObject {
 
         isMaintaining = true
         completedOperation = nil
+        operationStartedAt = Date()
+        currentPath = nil
+        currentFile = nil
         operationProgress = ScannerOperationProgress(
             operation: .addPath,
             phase: "adding",
@@ -438,19 +584,26 @@ final class ScannerAppModel: ObservableObject {
             guard let self else { return }
             pathTask = nil
             pathObserverTask = nil
-            isMaintaining = false
             switch outcome {
             case .success:
-                do {
-                    try refreshRoots()
-                    scanStatus = readyText
-                    validateCatalog()
-                } catch {
-                    record(error, stage: "paths.add.refresh")
-                }
+                await refreshCatalog()
+                let completedAt = Date()
+                let telemetry = ScannerOperationTelemetry(
+                    operation: .addPath,
+                    startedAt: operationStartedAt ?? completedAt,
+                    completedAt: completedAt,
+                    processed: canonical.count,
+                    total: canonical.count,
+                    failures: 0,
+                    result: readyText
+                )
+                completedOperation = telemetry
+                scanStatus = telemetry.statusText
             case .failure(let message):
+                await refreshCatalog()
                 recordMaintenanceFailure(message)
             }
+            isMaintaining = false
             operationProgress = nil
             completeRequestedCloseIfIdle()
         }
@@ -463,7 +616,15 @@ final class ScannerAppModel: ObservableObject {
         let mode: ScanMode = deepScan ? .newScan : .incremental
         let progressBuffer = LatestValueBuffer<CatalogScanProgress>()
         isScanning = true
-        operationProgress = nil
+        isCancelling = false
+        operationProgress = ScannerOperationProgress(
+            operation: .scan,
+            phase: "preparing",
+            processed: 0,
+            total: nil,
+            failures: 0,
+            detail: "Preparing catalog…"
+        )
         completedOperation = nil
         operationStartedAt = Date()
         activeRootID = requestedRoots.first?.id
@@ -495,18 +656,8 @@ final class ScannerAppModel: ObservableObject {
         scanTask = Task { [weak self] in
             guard let self else { return }
             await self.sampleProgress(from: progressBuffer, apply: self.applyVisibleProgress)
-            self.finish(await worker.value)
+            await self.finish(await worker.value)
         }
-    }
-
-    private func refreshRoots() throws {
-        let reader = try CanonicalCatalogReader(databaseURL: databaseURL)
-        roots = try reader.roots()
-        rootTallies = try Dictionary(
-            uniqueKeysWithValues: roots.map { root in
-                (root.id, try reader.scanTally(rootID: root.id))
-            }
-        )
     }
 
     private func runMaintenance(
@@ -518,6 +669,8 @@ final class ScannerAppModel: ObservableObject {
         isMaintaining = true
         operationStartedAt = Date()
         completedOperation = nil
+        currentPath = nil
+        currentFile = nil
         operationProgress = ScannerOperationProgress(
             operation: kind,
             phase: "preparing",
@@ -548,7 +701,6 @@ final class ScannerAppModel: ObservableObject {
             let outcome = await worker.value
             maintenanceWorker = nil
             maintenanceTask = nil
-            isMaintaining = false
             switch outcome {
             case .checked(let result):
                 let missingDescription = result.missingSourceCount == 0
@@ -570,7 +722,8 @@ final class ScannerAppModel: ObservableObject {
             case .failure(let message):
                 recordMaintenanceFailure(message)
             }
-            validateCatalog()
+            await refreshCatalog()
+            isMaintaining = false
             completeRequestedCloseIfIdle()
         }
     }
@@ -589,6 +742,9 @@ final class ScannerAppModel: ObservableObject {
         if let currentPath = update.currentPath {
             self.currentPath = (currentPath as NSString).deletingLastPathComponent
             self.currentFile = (currentPath as NSString).lastPathComponent
+        } else {
+            currentPath = nil
+            currentFile = nil
         }
     }
 
@@ -611,6 +767,8 @@ final class ScannerAppModel: ObservableObject {
         completedOperation = telemetry
         scanStatus = telemetry.statusText
         operationProgress = nil
+        currentPath = nil
+        currentFile = nil
     }
 
     private func sampleProgress<Value: Sendable>(
@@ -659,7 +817,7 @@ final class ScannerAppModel: ObservableObject {
         case .materialization: scanStatus = "Materializing archive members…"
         case .inspection: scanStatus = "Inspecting sources…"
         case .persistence:
-            scanStatus = "Saved \(update.processed) of \(update.discovered) • \(update.failed) failed"
+            scanStatus = "Saved \(update.phaseCompleted ?? update.processed) of \(update.discovered) • \(update.failed) failed"
         case .publication:
             currentPath = nil
             currentFile = nil
@@ -668,15 +826,26 @@ final class ScannerAppModel: ObservableObject {
         }
     }
 
-    private func finish(_ outcome: ScanOutcome) {
-        isScanning = false
+    private func finish(_ outcome: ScanOutcome) async {
         worker = nil
         scanTask = nil
         currentPath = nil
         currentFile = nil
+        operationProgress = ScannerOperationProgress(
+            operation: .scan,
+            phase: "cleanup",
+            processed: 0,
+            total: nil,
+            failures: 0,
+            detail: "Saving scan report and refreshing catalog…"
+        )
+        scanStatus = "Saving scan report and refreshing catalog…"
+        var logError: String?
         switch outcome {
         case .success(let results):
-            for result in results { writeLastScanLog(rootID: result.root.id, result: result, terminalMessage: nil) }
+            for result in results {
+                logError = await writeLastScanLog(rootID: result.root.id, result: result, terminalMessage: nil) ?? logError
+            }
             let completedAt = results.compactMap(\.root.lastScanCompletedAt).max() ?? Date()
             let startedAt = results.compactMap(\.root.lastScanStartedAt).min() ?? completedAt
             let totalDiscovered = results.reduce(0) { $0 + $1.discoveredSourceCount }
@@ -695,10 +864,10 @@ final class ScannerAppModel: ObservableObject {
             completedOperation = telemetry
             scanStatus = telemetry.statusText
         case .cancelled:
-            writeLastScanLog(rootID: activeRootID, result: nil, terminalMessage: "Cancelled. Completed checkpoints were retained.")
+            logError = await writeLastScanLog(rootID: activeRootID, result: nil, terminalMessage: "Cancelled. Completed checkpoints were retained.")
             scanStatus = "Cancelled. Completed source checkpoints were retained; Scan resumes them."
         case .failure(let message):
-            writeLastScanLog(rootID: activeRootID, result: nil, terminalMessage: "Stopped before publication — \(message)")
+            logError = await writeLastScanLog(rootID: activeRootID, result: nil, terminalMessage: "Stopped before publication — \(message)")
             if isCatalogContention(message) {
                 scanStatus = "Catalog busy. Existing records remain consistent; retry the scan shortly."
             } else {
@@ -707,7 +876,10 @@ final class ScannerAppModel: ObservableObject {
         }
         operationProgress = nil
         activeRootID = nil
-        validateCatalog()
+        await refreshCatalog()
+        if let logError { scanStatus += " • Scan log unavailable: \(logError)" }
+        isScanning = false
+        isCancelling = false
         completeRequestedCloseIfIdle()
     }
 
@@ -717,24 +889,28 @@ final class ScannerAppModel: ObservableObject {
         close()
     }
 
-    private func writeLastScanLog(rootID: Int64?, result: CatalogScanResult?, terminalMessage: String?) {
-        guard let rootID else { return }
-        do {
-            let reader = try CanonicalCatalogReader(databaseURL: databaseURL)
-            guard let root = try reader.roots().first(where: { $0.id == rootID }) else { return }
-            let tally = try reader.scanTally(rootID: rootID)
-            logWindows[rootID]?.close()
-            logWindows[rootID] = nil
-            ScannerScanLogStore.writeLastResult(
-                databaseURL: databaseURL,
-                root: root,
-                tally: tally,
-                result: result,
-                terminalMessage: terminalMessage
-            )
-        } catch {
-            scanStatus = "Scan completed, but its log could not be saved: \(error.localizedDescription)"
-        }
+    private func writeLastScanLog(rootID: Int64?, result: CatalogScanResult?, terminalMessage: String?) async -> String? {
+        guard let rootID else { return nil }
+        logWindows[rootID]?.close()
+        logWindows[rootID] = nil
+        let selectedURL = databaseURL
+        return await Task.detached(priority: .utility) {
+            do {
+                let reader = try CanonicalCatalogReader(databaseURL: selectedURL)
+                guard let root = try reader.roots().first(where: { $0.id == rootID }) else { return nil }
+                let tally = try reader.scanTally(rootID: rootID)
+                ScannerScanLogStore.writeLastResult(
+                    databaseURL: selectedURL,
+                    root: root,
+                    tally: tally,
+                    result: result,
+                    terminalMessage: terminalMessage
+                )
+                return nil
+            } catch {
+                return error.localizedDescription
+            }
+        }.value
     }
 
     private func record(_ error: Error, stage: String) {
@@ -783,8 +959,11 @@ struct ScannerWindow: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 catalogCard
+                    .opacity(model.isBusy ? 0.62 : 1)
                 scanPathsCard
+                    .opacity(model.isBusy ? 0.62 : 1)
                 scannerOptionsCard
+                    .opacity(model.isBusy ? 0.62 : 1)
                 scanStatusCard
             }
             .padding(20)
@@ -918,6 +1097,26 @@ struct ScannerWindow: View {
 
     private var scanStatusCard: some View {
         sectionCard(title: "Scan Status") {
+            if model.isBusy, let progress = model.operationProgress {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("\(progress.operation.rawValue) • \(progress.phaseLabel)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Spacer(minLength: 8)
+                    if let startedAt = model.operationStartedAt {
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            Text(ScannerOperationTelemetry.durationText(
+                                seconds: context.date.timeIntervalSince(startedAt)
+                            ))
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .accessibilityElement(children: .combine)
+            }
             if !model.isBusy, let completedOperation = model.completedOperation {
                 HStack(alignment: .center, spacing: 9) {
                     Image(systemName: "checkmark.circle.fill")
@@ -943,26 +1142,24 @@ struct ScannerWindow: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .accessibilityLabel("Scan progress")
+                .accessibilityLabel(model.progressFraction == nil ? "Processing" : "Source progress")
                 .transition(.move(edge: .top).combined(with: .opacity))
-                // A short ease-out gives the bar the requested simple
-                // exponential-style decay without animating the data area.
-                .animation(.easeOut(duration: 0.2), value: model.isBusy)
             }
             if model.isScanning {
                 Button(role: .cancel) { model.cancelScan() } label: {
-                    Text("Cancel Scan")
+                    Text(model.isCancelling ? "Cancelling…" : "Cancel Scan")
                         .frame(maxWidth: .infinity)
                 }
                     .frame(maxWidth: .infinity)
                     .keyboardShortcut(.cancelAction)
+                    .disabled(model.isCancelling)
             }
         }
     }
 
     private var scanReadout: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Current Scan")
+            Text(model.isBusy ? "Current Operation" : "Status")
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .foregroundStyle(.secondary)
             Text(model.scanStatus)
@@ -970,20 +1167,31 @@ struct ScannerWindow: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
-            VStack(alignment: .leading, spacing: 2) {
-                monoStatusField(
-                    title: " Items:",
-                    value: model.operationProgress.map { progress in
-                        if let total = progress.total { return "\(progress.processed) / \(total)" }
-                        return String(progress.processed)
-                    } ?? "0 / 0"
-                )
-                monoStatusField(
-                    title: " Fails:",
-                    value: model.operationProgress.map { String($0.failures) } ?? "0"
-                )
+            if let detail = model.operationProgress?.detail,
+               detail != model.scanStatus {
+                Text(detail)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
-            if model.isBusy {
+            if model.isBusy,
+               model.isScanning || model.operationProgress?.total != nil {
+                VStack(alignment: .leading, spacing: 2) {
+                    monoStatusField(
+                        title: model.isScanning ? " Sources:" : " Items:",
+                        value: model.operationProgress.map { progress in
+                            if let total = progress.total { return "\(progress.processed) / \(total)" }
+                            return String(progress.processed)
+                        } ?? "0"
+                    )
+                    monoStatusField(
+                        title: " Fails:",
+                        value: model.operationProgress.map { String($0.failures) } ?? "0"
+                    )
+                }
+            }
+            if model.isScanning, model.currentFile != nil {
                 Text("Current File")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundStyle(.secondary)

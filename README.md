@@ -11,7 +11,7 @@ recovery layout.
 | Project | Responsibility |
 | --- | --- |
 | [VGMBoy](VGMBoy/README.md) | Decoder routing, timing, playback, audio output, and scanner helpers. |
-| [ScanSong](ScanSong/README.md) | Source discovery, format inspection, and schema-23 catalog writing. |
+| [ScanSong](ScanSong/README.md) | Source discovery, format inspection, and schema-24 catalog writing. |
 | [MetaMan](MetaMan/README.md) | Decoder-independent metadata reading and typed source facts. |
 | [UACMan](UACMan/README.md) | UAC package metadata browser/editor and reversible wrapper tools. |
 | [CatalogReader](CatalogReader/README.md) | Read-only catalog access and shared browser projections. |
@@ -27,17 +27,22 @@ this family.
 
 ## Start here
 
-Read [`AGENTS.md`](AGENTS.md), then [`project-info.md`](project-info.md), then
-the owning component's `AGENTS.md` and routed `ai/project-info.md`. Keep
-user-visible behavior in `subsystem-human/` and engineering invariants in
-`subsystem-agent/`.
+In the `Code/` workspace, agent work starts with
+[DocMan](../DocMan/AGENTS.md) and its
+[onboarding and build method](../DocMan/docs-agent/agent-onboarding-and-builds.md).
+A standalone VGMMan checkout starts with [`AGENTS.md`](AGENTS.md),
+[`project-info.md`](project-info.md), and [verification.md](verification.md).
+Then follow
+the owning component's `AGENTS.md` → `ai/AGENTS.md` → `ai/project-info.md` route.
+The focused note is the final documentation read before source inspection.
 
 Family coordination and evidence:
 
 - [`WIP-PLAN.md`](WIP-PLAN.md) — current shared-core priorities and owners.
 - [`PARITY-WIP-REPORT.md`](PARITY-WIP-REPORT.md) — frontend parity evidence and
   open user-boundary checks.
-- [`verification.md`](verification.md) — package checks and evidence limits.
+- [`verification.md`](verification.md) — clean checkout procedure, package
+  checks, and evidence limits.
 - [`VGMBoy/Docs/plugin-catalog.md`](VGMBoy/Docs/plugin-catalog.md) — decoder,
   dependency, provenance, and scanner-product reference.
 - [`ScanSong/ai/subsystem-agent/format-accommodations.md`](ScanSong/ai/subsystem-agent/format-accommodations.md)

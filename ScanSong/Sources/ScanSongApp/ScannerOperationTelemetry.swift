@@ -46,6 +46,8 @@ enum ScannerOperationKind: String, Sendable {
     case checkLinks = "Check Links"
     case removeLinks = "Remove Links"
     case addPath = "Add Path"
+    case managePaths = "Update Paths"
+    case catalog = "Catalog"
 }
 
 struct ScannerOperationProgress: Sendable {
@@ -58,7 +60,30 @@ struct ScannerOperationProgress: Sendable {
 
     var fraction: Double? {
         guard let total, total > 0 else { return nil }
+        if operation == .scan,
+           !["planning", "inspection"].contains(phase) {
+            return nil
+        }
         return min(max(Double(processed) / Double(total), 0), 1)
+    }
+
+    var phaseLabel: String {
+        switch phase {
+        case "opening": return "Opening catalog"
+        case "adding": return "Adding paths"
+        case "updating": return "Updating paths"
+        case "preparing": return "Preparing"
+        case "discovery": return "Discovering sources"
+        case "planning": return "Planning"
+        case "archiveListing": return "Reading archive"
+        case "materialization": return "Preparing archive members"
+        case "inspection": return "Inspecting sources"
+        case "persistence": return "Saving checkpoints"
+        case "publication": return "Publishing catalog"
+        case "cleanup": return "Cleaning up"
+        case "maintenance": return "Checking catalog"
+        default: return operation.rawValue
+        }
     }
 }
 
@@ -71,14 +96,18 @@ struct ScannerOperationTelemetry: Sendable {
     let failures: Int
     let result: String
 
-    var durationText: String {
-        let seconds = max(0, Int(completedAt.timeIntervalSince(startedAt).rounded()))
+    static func durationText(seconds rawSeconds: TimeInterval) -> String {
+        let seconds = max(0, Int(rawSeconds.rounded()))
         let hours = seconds / 3_600
         let minutes = (seconds % 3_600) / 60
         let remainder = seconds % 60
         return hours > 0
             ? String(format: "%02d:%02d:%02d", hours, minutes, remainder)
             : String(format: "%02d:%02d", minutes, remainder)
+    }
+
+    var durationText: String {
+        Self.durationText(seconds: completedAt.timeIntervalSince(startedAt))
     }
 
     var completionTimeText: String {

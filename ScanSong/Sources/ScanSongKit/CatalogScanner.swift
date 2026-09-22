@@ -148,7 +148,7 @@ public final class CatalogScanner: @unchecked Sendable {
                 processed: visibleProcessed,
                 successful: max(0, visibleProcessed - failures.count),
                 failed: failures.count,
-                phaseCompleted: visibleProcessed,
+                phaseCompleted: phase == .persistence ? processed : visibleProcessed,
                 phaseTotal: discovered
             ))
         }
@@ -608,6 +608,7 @@ public final class CatalogScanner: @unchecked Sendable {
         let members = archive.members
         var inspections: [ScanInspection?] = Array(repeating: nil, count: members.count)
         var memberFailures: [String?] = Array(repeating: nil, count: members.count)
+        var completedMembers = 0
         try await withThrowingTaskGroup(of: (Int, ScanInspection?, String?).self) { group in
             for (index, member) in members.enumerated() {
                 try Task.checkCancellation()
@@ -634,6 +635,14 @@ public final class CatalogScanner: @unchecked Sendable {
             for try await (index, inspection, failure) in group {
                 inspections[index] = inspection
                 memberFailures[index] = failure
+                completedMembers += 1
+                progress(
+                    .inspection,
+                    "\(candidate.identity.path)#\(members[index].entryPath)",
+                    "Checked \(completedMembers) of \(members.count) archive members…",
+                    nil,
+                    nil
+                )
             }
         }
 

@@ -26,5 +26,8 @@ swift test --package-path . --disable-sandbox
 ```
 
 For engineering rules and task routing, read [AGENTS.md](AGENTS.md), then
-[`ai/project-info.md`](ai/project-info.md). ScanSong’s adapter boundary is
+[`ai/project-info.md`](ai/project-info.md). The
+[`reader-boundary.md`](ai/subsystem-agent/reader-boundary.md) note covers the
+shared API; [inspection.md](ai/subsystem-human/inspection.md) describes the
+CLI. ScanSong’s adapter boundary is
 documented in [`../ScanSong/ai/subsystem-agent/format-accommodations.md`](../ScanSong/ai/subsystem-agent/format-accommodations.md).

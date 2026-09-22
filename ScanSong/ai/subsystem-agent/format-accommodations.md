@@ -35,7 +35,7 @@ MetaManCore owns AY, SAP, NSF/GBS/NSFE, HES, SNDH, APE, ADX, ATRAC3, Sony MSF,
 Sony SSHD (`.ads`/`.ss2`), headerless PlayStation MIB, Bink audio containers, Nintendo DTK and
 TXTH-described IMA ADP, CRI AHX, Konami Saturn DVI, SVAG, SID, SPC, S98, VGM/VGZ,
 and supported PSF-family metadata parsers plus the neutral metadata document;
-ScanSong owns source routing and the schema-23 adapter. The package does not
+ScanSong owns source routing and the schema-24 adapter. The package does not
 link a playback decoder.
 
 ## Format coverage and eventual playback target
@@ -94,7 +94,7 @@ to the same unchanged member. Ordinary file entries do not expand or duplicate
 member rows.
 
 The UAC game title and console select the catalog's browser grouping only.
-UAC member fields and explicit subsong projections define the schema-23 track
+UAC member fields and explicit subsong projections define the schema-24 track
 fields CocoaSpice consumes; missing, null, or invalid values remain
 blank/default, never falling back to contained-file tags. Track rows remain
 independent, so differing values are not promoted or overwritten by
@@ -102,7 +102,7 @@ package-level consensus. Rich UAC member
 metadata, hash records, playlists, and game-level metadata remain in the
 package manifest. During playback CocoaSpice may decode the selected payload
 member, but must not read its source-format tags for displayed metadata.
-The current schema-23 player catalog projects only its established common
+The current schema-24 player catalog projects only its established common
 track fields and does not expose those additional manifest fields in CocoaSpice.
 
 ## Route summary
@@ -441,7 +441,7 @@ playback dependency builder.
 ### QSF / miniQSF
 
 `qsf-direct` and `qsf-mini-direct` route to MetaManCore's complete QSF reader
-and adapt its neutral document to schema 23. It verifies PSF v0x41 (root),
+and adapt its neutral document to schema 24. It verifies PSF v0x41 (root),
 compressed-payload CRCs and bounded zlib streams, validates each QSound data
 block against the legacy ROM bounds, and resolves `_lib` through `_lib9`
 declared sibling dependencies without starting the Z80/QSound playback core.
@@ -528,7 +528,7 @@ loop fields), and stale loop pointers after the `FD` end command are ignored
 instead of becoming fabricated full-song loops. A truncated final register
 write is ignored with a diagnostic while timing from complete preceding events
 is retained. The ScanSong schema adapter places full date text in the existing
-comment projection; catalog schema 23 has no dedicated date column. Unit tests
+comment projection; catalog schema 24 has no dedicated date column. Unit tests
 cover the library and the ScanSong projection.
 
 The read-only CocoaSpice comparison covers all 5,081 current S98 rows across
@@ -662,7 +662,7 @@ play window are preserved. All non-audio RIFF chunks are exposed as named raw
 blocks up to a 16 MiB aggregate limit; overflow is diagnosed and audio payload
 bytes are not copied. Nonmatching `.at3` aliases retain the vgmstream route.
 ScanSong now only performs content-based routing and adapts the neutral
-document to schema 23; VGMBoy still owns playback.
+document to schema 24; VGMBoy still owns playback.
 
 The read-only root-1 live-catalog comparison covers all 177 rows in the
 Castlevania: The Dracula X Chronicles and Silent Hill: Origins archives.
@@ -965,7 +965,7 @@ and sample rate for duration, then falls back to `AVURLAsset`. It retains
 AVFoundation common tags and directly parses FLAC Vorbis comments, preserving
 their order, duplicate/unknown keys, and source block. The convenience
 projection retains the former album/title/artist/comment precedence; ScanSong
-only adapts that document to schema 23. No game-music timing model is invented
+only adapts that document to schema 24. No game-music timing model is invented
 for ordinary audio. AVFoundation remains an OS framework dependency, not a
 bundled playback decoder.
 
@@ -1013,7 +1013,7 @@ parameters, seek-table extent, frame offsets, and payload bounds. It derives
 duration from the container's sample-block count and rate, retains ordered
 APEv2 text tags and leading ID3v2 common tags, and exposes both original tag
 blocks for unknown or binary values. An absent title falls back to the source
-stem. ScanSong only adapts the resulting `MetadataDocument` to schema 23; it
+stem. ScanSong only adapts the resulting `MetadataDocument` to schema 24; it
 never starts FFmpeg or an audio decoder. VGMBoy keeps its independent
 `CFFmpeg` bridge for APE playback; ScanSong no longer builds or bundles an
 FFmpeg inspection helper. The original APE bytes remain the catalog source;
@@ -1036,7 +1036,7 @@ does not infer seconds from the v2 extension bytes: `0x76` begins flags and
 other technical fields, not PAL/NTSC lengths. The former direct reader treated
 those bytes as durations and used overlapping title offsets for author and
 released text; MetaMan fixes both parsing errors. The raw header remains
-available through `MetadataDocument` even where schema 23 does not retain the
+available through `MetadataDocument` even where schema 24 does not retain the
 additional technical facts. See the [PSID/RSID format description](https://github.com/TheCodeTherapy/sid-player/blob/master/SIDspec.md).
 
 ## Deliberately not admitted

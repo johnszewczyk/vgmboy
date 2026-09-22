@@ -10,7 +10,7 @@ and reader behavior live in
 ## Ownership
 
 - `ScanSongKit` owns source discovery, safe file/archive handling, inspection
-  orchestration, checkpointing, schema-23 projection, and root publication.
+  orchestration, checkpointing, schema-24 projection, and root publication.
 - `CatalogScanner` coordinates discovery, reuse, inspection, and publication.
   `CanonicalCatalogSchema` owns the exact schema; `CanonicalCatalogWriter`
   owns every SQLite mutation and transaction boundary.
@@ -28,8 +28,10 @@ and reader behavior live in
 
 ## Catalog and Resume Invariants
 
-- ScanSong creates or accepts the exact supported schema 23; it does not
-  migrate an unrelated or older application database.
+- ScanSong creates schema 24, accepts it unchanged, and upgrades a schema-23
+  catalog by adding `tracks.track_number` before use. Other legacy or unrelated
+  databases are rejected. Player readers accept schema 24 only, so a catalog
+  needs the ScanSong upgrade before those apps open it.
 - Player connections use OS-level read-only SQLite handles and
   `PRAGMA query_only=ON`. Opening a player does not block a ScanSong writer.
 - The writer holds an OS advisory lease beside the selected catalog. The lease
@@ -104,10 +106,10 @@ and reader behavior live in
 - Standard output from `scansong` contains JSONL events only, with explicit
   contract name/version and increasing sequence numbers. Progress events are
   rate-limited to phase changes, completion, or one event per second.
-- The app retains the latest operation update and samples it every 250 ms on
-  the main actor. Progress presentation must not enqueue one UI task per file
-  or pace worker operations. Scan totals count loose sources and archives;
-  member inspections update detail only.
+- The app's asynchronous catalog actions and sampled progress presentation
+  are owned by [operation-presentation.md](operation-presentation.md). Scan
+  totals count loose sources and archives; member inspections update detail
+  only and do not advance the source counter.
 - Closing the native app during work asks the scanner to cancel cooperatively
   and waits for its checkpoint boundary. The development launcher's SIGTERM
   follows the same path rather than abruptly tearing down an active scan.
@@ -124,4 +126,3 @@ and reader behavior live in
 - `Sources/ScanSongKit/ArchiveMemberEnumerator.swift`
 - `Sources/ScanSongKit/StandaloneArchiveExtractor.swift`
 - `Sources/scansong/ScanSongCommand.swift`
-- `Sources/ScanSongApp/ScanSongApp.swift`

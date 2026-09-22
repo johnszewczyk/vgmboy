@@ -2,52 +2,40 @@
 
 ## Product
 
-MetaMan owns the direct, decoder-independent metadata readers for its
-explicitly registered game-music and audio formats. Apps link `MetaManCore`
-directly; the core does not launch subprocesses or depend on emulator or
-VGMMan playback plugins. Coverage is the registered list, not every format
-recognized by VGMBoy or ScanSong.
+MetaMan provides direct, decoder-independent metadata readers for its
+explicitly registered formats. Clients import `MetaManCore`; the `metaman`
+executable is a thin JSON inspection client.
 
-The Swift package has one local package dependency, `UACWrapperCore`; MetaManCore
-also uses system zlib, and its standard-audio reader uses Apple's AVFoundation.
-Compressed UAC manifests require a host-supplied bounded decompression
-callback; the `metaman` CLI currently implements it by running the external
-`zstd` tool.
+## Major Components
 
-## Ownership
-
-- `MetaManCore` parses format-native tags, source facts, timing, dependencies,
-  and ordered track documents where the registered source reader supports
-  them.
-- The command-line target is a thin inspection client.
-- ScanSong adapts reader results into its schema-23 catalog. It owns discovery
-  and catalog writes, not duplicate native parsers.
-- VGMBoy owns playback and decoder-based inspection only where no complete
-  direct metadata reader is available.
+- `MetaManCore` owns native source parsing and ordered metadata documents.
+- `MetaManZlib` supplies bounded gzip/zlib integration for applicable readers.
+- `UACWrapperCore` supplies UAC framing and manifest validation as MetaMan's
+  only local Swift-package dependency.
+- The `metaman` command exposes single-document and ordered-track inspection.
 
 ## Task Routing
 
-- Supported readers, layouts, bounds, and method:
-  [`FORMAT-LAYOUTS.md`](../FORMAT-LAYOUTS.md).
-- Public result/document contract and implementation:
-  `Sources/MetaManCore/`.
-- Reader fixtures and unit contracts:
-  `Tests/MetaManCoreTests/`.
-- Scanner adaptation and catalog projection:
-  [`../ScanSong/ai/subsystem-agent/format-accommodations.md`](../../ScanSong/ai/subsystem-agent/format-accommodations.md).
+- Public result contract, source preservation, dependencies, and failure
+  boundaries: [reader-boundary.md](subsystem-agent/reader-boundary.md).
+- Exact supported formats, layouts, and reader bounds:
+  [FORMAT-LAYOUTS.md](../FORMAT-LAYOUTS.md).
+- Command-line behavior: [inspection.md](subsystem-human/inspection.md).
+- ScanSong catalog projection and per-format routing:
+  [format-accommodations.md](../../ScanSong/ai/subsystem-agent/format-accommodations.md).
 
 ## Local Rules
 
-- A format is supported only when its reader covers its complete known
-  metadata structure and is bounded by declared input data.
-- Preserve order, duplicate tags, unknown fields, original source values, and
-  diagnostics when available; normalized common fields are additive.
-- Reading and writing are separate capabilities. Do not claim write support
-  without format-specific preservation and round-trip tests.
-- Decoder comparisons are test oracles, not production fallbacks. GYM is not
-  an extraction target.
+- A registered reader covers its known metadata structure from bounded source
+  data; no hidden decoder or playback fallback belongs in MetaManCore.
+- Preserve ordered duplicate tags, unknown fields, source bytes, and
+  diagnostics where the format permits. Normalized fields are additive.
+- Reading does not imply safe writing. Decoder comparisons belong in tests,
+  not production readers. GYM is not an extraction target.
+- A change to a field projected by ScanSong includes adapter and compatibility
+  checks there.
 
 ## Human Docs
 
-`README.md` is the package overview. The format map is maintained in
-[`FORMAT-LAYOUTS.md`](../FORMAT-LAYOUTS.md).
+- [Inspection](subsystem-human/inspection.md) describes the CLI.
+- [FORMAT-LAYOUTS.md](../FORMAT-LAYOUTS.md) is the format fact map.

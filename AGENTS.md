@@ -1,7 +1,12 @@
 # AGENTS
 
-Read this file, then `project-info.md`, then follow the owning component's
-`AGENTS.md` → `ai/AGENTS.md` → `ai/project-info.md` → focused-note route.
+In the `Code/` workspace, start with `../DocMan/AGENTS.md` →
+`../DocMan/project-info.md` and the narrow DocMan method routed by the task.
+In a standalone checkout, start here. Then read `project-info.md` and the
+owning component's `AGENTS.md` → `ai/AGENTS.md` → `ai/project-info.md` →
+focused-note route. A direct entry into a component still uses this family
+route before source inspection. `verification.md` contains the standalone
+clean checkout procedure and evidence levels.
 
 This directory is the single Git repository for the VGMMan application family.
 Component directories are package and release boundaries, not independent Git

@@ -52,6 +52,17 @@ STATE_DIR="$RESULT_ROOT/source-state"
 LOG_DIR="$RESULT_ROOT/logs"
 mkdir -p "$STATE_DIR" "$LOG_DIR"
 
+# A fresh checkout must not require a writable user cache. Keep SwiftPM and
+# Clang module products with this run's evidence unless the caller selected
+# another writable location explicitly.
+export CLANG_MODULE_CACHE_PATH="${CLANG_MODULE_CACHE_PATH:-$RESULT_ROOT/cache/clang-modules}"
+export SWIFTPM_MODULECACHE_OVERRIDE="${SWIFTPM_MODULECACHE_OVERRIDE:-$CLANG_MODULE_CACHE_PATH}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$RESULT_ROOT/cache/xdg}"
+export HOMEBREW_CACHE="${HOMEBREW_CACHE:-$RESULT_ROOT/cache/homebrew}"
+export HOMEBREW_NO_AUTO_UPDATE="${HOMEBREW_NO_AUTO_UPDATE:-1}"
+export HOMEBREW_NO_INSTALL_FROM_API="${HOMEBREW_NO_INSTALL_FROM_API:-1}"
+mkdir -p "$CLANG_MODULE_CACHE_PATH" "$SWIFTPM_MODULECACHE_OVERRIDE" "$XDG_CACHE_HOME" "$HOMEBREW_CACHE"
+
 MANIFEST="$RESULT_ROOT/repositories.tsv"
 TOOLS="$RESULT_ROOT/toolchain.tsv"
 CHECKS="$RESULT_ROOT/checks.tsv"
@@ -133,10 +144,20 @@ record_tool host_arch uname -m
 record_tool macos sw_vers -productVersion
 record_tool xcode xcodebuild -version
 record_tool swift swift --version
+record_tool macos_sdk xcrun --sdk macosx --show-sdk-path
+record_tool cmake cmake --version
+record_tool node node --version
+record_tool python python3 --version
+record_tool zstd zstd --version
+record_tool pkg_config pkg-config --version
+printf 'clang_module_cache\t%s\n' "$CLANG_MODULE_CACHE_PATH" >> "$TOOLS"
+printf 'swiftpm_module_cache\t%s\n' "$SWIFTPM_MODULECACHE_OVERRIDE" >> "$TOOLS"
+printf 'xdg_cache_home\t%s\n' "$XDG_CACHE_HOME" >> "$TOOLS"
+printf 'homebrew_cache\t%s\n' "$HOMEBREW_CACHE" >> "$TOOLS"
 if command -v brew >/dev/null 2>&1; then
   record_tool homebrew brew --version
   for formula in game-music-emu ffmpeg libogg libvorbis libopenmpt libsidplayfp uade; do
-    record_tool "brew_prefix_$formula" brew --prefix "$formula"
+    record_tool "brew_version_$formula" brew list --versions "$formula"
   done
 else
   printf 'homebrew\tNOT_FOUND\n' >> "$TOOLS"
@@ -175,7 +196,20 @@ run_check() {
   fi
 }
 
+check_renderer_js() {
+  local source
+  for source in Sources/*/Resources/*.js; do
+    node --check "$source" || return 1
+  done
+}
+
+run_renderer_tests() {
+  node --test Tests/*.test.js
+}
+
 if [[ "$MODE" == "verify" ]]; then
+  run_check documentation-links . node scripts/check-doc-links.js
+  run_check documentation-paradigm . node scripts/check-doc-paradigm.js
   run_check vgmboy-dependencies VGMBoy ./scripts/build-dependencies.sh
   run_check catalogreader-tests CatalogReader swift test --disable-sandbox
   run_check vgmboy-tests VGMBoy swift test --disable-sandbox --jobs 1
@@ -187,15 +221,11 @@ if [[ "$MODE" == "verify" ]]; then
   run_check scansong-tests ScanSong swift test --disable-sandbox --jobs 1
   run_check cocoaspice-tests CocoaSpice swift test --disable-sandbox --jobs 1
   run_check spcboywk-build SPCBoyWK swift build --disable-sandbox
-  run_check spcboywk-app-core-check SPCBoyWK node --check Sources/SPCBoyWK/Resources/app-core.js
-  run_check spcboywk-app-playback-check SPCBoyWK node --check Sources/SPCBoyWK/Resources/app-playback.js
-  run_check spcboywk-app-ui-check SPCBoyWK node --check Sources/SPCBoyWK/Resources/app-ui.js
-  run_check spcboywk-renderer-tests SPCBoyWK node --test Tests/SPCBoyWKTransport.test.js
+  run_check spcboywk-js-syntax SPCBoyWK check_renderer_js
+  run_check spcboywk-renderer-tests SPCBoyWK run_renderer_tests
   run_check viewboy-build ViewBoy ./build.sh
-  run_check viewboy-app-core-check ViewBoy node --check Sources/ViewBoy/Resources/app-core.js
-  run_check viewboy-app-playback-check ViewBoy node --check Sources/ViewBoy/Resources/app-playback.js
-  run_check viewboy-app-ui-check ViewBoy node --check Sources/ViewBoy/Resources/app-ui.js
-  run_check viewboy-renderer-tests ViewBoy node --test Tests/ViewBoyTransport.test.js
+  run_check viewboy-js-syntax ViewBoy check_renderer_js
+  run_check viewboy-renderer-tests ViewBoy run_renderer_tests
 fi
 
 {

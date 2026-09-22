@@ -2,14 +2,14 @@
 
 ## Scope
 
-- The ScanSong app manages a selected schema-23 catalog and its scan paths.
+- The ScanSong app manages a selected schema-24 catalog and its scan paths.
 
 ## Catalog
 
 - Database File always shows one selected catalog-file row, or `(None)` when
   that file no longer exists. Its controls open an existing catalog, while
   `Use Default` selects the standard catalog location and `Add New` creates a
-  fresh schema-23 SQLite catalog at a new path. Only one catalog is selected at
+  fresh schema-24 SQLite catalog at a new path. Only one catalog is selected at
   a time; Add New refuses to replace an existing file. Reset empties its
   contents with the circular x icon, and Delete permanently removes the file
   after confirmation.
@@ -41,30 +41,25 @@
   extension. Scan Status is the only in-window summary.
 - Scanner-owned extraction scratch prefixes are removed from diagnostic details;
   the archive/member path remains the stable identifier.
-- During Scan, Check Links, or Remove Links, Scan Status shows only sampled
-  aggregate progress and failure counts. Operation callbacks are retained as a
-  single latest value and sampled by the UI every 250 ms; no callback can pace
-  the worker. CLI JSONL diagnostics are separately rate-limited to
-  phase changes, phase completion, or at most one event per second; diagnostic
-  output must never become the scan's throughput limiter.
-- Scan item progress counts top-level sources: a loose file or an archive. An
-  archive member may update the current-file display, but never advances the
-  source/archive counter. Multi-root scans discover all roots once before
-  inspection so the displayed denominator remains stable. Completed-source
-  progress is monotonic even while archive-member detail callbacks are being
-  sampled. Standalone `.pdx.zst` sidecars are not source items; they are
-  prepared when their owning `.mdx.zst` is inspected. A completion summary's
-  scanned/reused values count sources. The completion line separates source
-  failures from member failure records, because one scanned archive can have
-  several failed members; those values are not expected to add up as one flat
-  source count.
-- Adding scan paths is an asynchronous catalog operation. The UI shows an
-  indeterminate Add Path state while the catalog is opened and refreshed, so
-  database work does not block the main window.
-- While active, Scan Status presents a bold `Current Scan` heading followed by
-  indented monospaced `Items:` and `Fails:` counters. These aggregate readouts
-  disappear when the operation finishes; completion is a compact green checkmark
-  row with operation duration and finish time.
+- During a scan or catalog operation, the relevant controls dim and Scan Status
+  shows the current phase, a live elapsed clock, and an activity indicator.
+  Scan and link checks show source/item and failure counts when available.
+  Scan cancellation remains available while the worker is stopping.
+- The linear bar shows a source fraction only while planning or inspecting
+  with a known source total. Saving checkpoints reports a separate saved
+  count; discovery, archive work, publication, and cleanup show ongoing
+  indeterminate activity instead of a
+  percentage that would appear stuck at the end. Current File and a concise
+  operation detail report what is being handled; completed archive members
+  update the detail while the archive remains one source item.
+- Multi-root scans discover their total before inspection, so the source
+  denominator stays stable. Standalone `.pdx.zst` sidecars are prepared with
+  their owning `.mdx.zst`, not counted as separate source items. A completion
+  summary distinguishes source counts from member failures.
+- Adding, enabling, disabling, or removing paths and creating, opening,
+  resetting, or deleting a catalog show an in-progress state while database
+  work runs. Mutating actions finish with a checkmark row showing duration,
+  finish time, and result. The window remains responsive during that work.
 - Closing the app while a scan or link-maintenance operation is active presents
   a warning. A scan can be cancelled and closes only after completed checkpoints
   are retained; maintenance closes only after its current database operation.

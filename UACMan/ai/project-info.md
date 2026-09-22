@@ -12,7 +12,7 @@ UACMan is the UI for working with UAC manifests. AudioMan is a downstream
 operator that invokes UACMan tools for its data workflow, not an owner or
 runtime dependency.
 
-## Components
+## Major Components
 
 - `Application/` contains the filesystem collection browser, WKWebView
   workspace, native file/open/save model, manifest editing, collection
@@ -23,21 +23,6 @@ runtime dependency.
   SPC conversion, playback, or ingestion package is supported.
 - `MetaManCore` owns native-format metadata reading. UACMan consumes its
   structured results and never rewrites native source-format tags.
-- UAC metadata uses one shared vocabulary across all sets and consumers. Use
-  the canonical field names and meanings in
-  `subsystem-agent/uac-wrapper-format.md`; keep genuinely custom or
-  format-specific fields in typed, namespaced `extensions` instead of adding
-  aliases for an existing shared concept.
-- AudioMan may impose set-specific requirements such as
-  `member.metadata.sub-container-version` and mixed-version review. UACMan
-  remains generic: it rejects `.vgz` members because the gzip wrapper harms
-  the outer Zstandard compression, while leaving other format policy to the
-  caller. Package-level `game.metadata.containedContainerVersions` is an
-  optional inspection projection, not a UACMan validation gate.
-- PNG scans, CUE sheets, notes, and other regular files are ordinary hashed
-  members. Game metadata fields such as `cover_front`, `cover_back`, and
-  `cue_sheet` reference those member paths; the current player boundary does
-  not interpret external CUE indexes as virtual FLAC tracks.
 
 ## Task Routing
 

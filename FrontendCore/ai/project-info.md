@@ -24,7 +24,7 @@ CocoaSpice, SPCBoyWK, and ViewBoy frontends.
 ## Local Rules
 
 - ScanSong is the only catalog writer and scanner owner.
-- CatalogReader owns read-only schema-23 access and catalog projections.
+- CatalogReader owns read-only schema-24 access and catalog projections.
 - VGMBoy owns format admission, decoding, timing, output gain, and the audio
   device.
 - Frontends own presentation, app-specific persistence keys, and user-facing

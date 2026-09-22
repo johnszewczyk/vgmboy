@@ -22,11 +22,21 @@ swift run scansong probe --recursive --strict /path/to/folder
 ```
 
 `launch.sh` builds a fresh release app before opening it. The app can select an
-existing schema-23 catalog or create a new one, attach scan roots, scan or resume
+existing schema-24 catalog or create a new one, attach scan roots, scan or resume
 roots, inspect per-path logs, and check or clean links. **Clean Links** removes
 inactive catalog records only after confirmation; it never deletes source
 files. A normal scan reuses completed matching work; Deep Scan forces
 reinspection.
+
+The native window keeps catalog and path work off its UI actor. Scan Status
+shows the current phase and elapsed time; its source meter is determinate only
+when the scan has a meaningful total. Archive, publication, and cleanup phases
+keep an activity indicator and current detail visible. UI progress sampling
+does not pace the worker.
+
+The writer upgrades a schema-23 catalog to 24 by adding the optional
+`tracks.track_number` column. Player readers require schema 24; other legacy
+and unrelated databases are rejected.
 
 The `scansong` CLI writes versioned JSONL events to stdout; errors and required
 unsupported adapters return a nonzero status. `probe` is dry-run and `scan`
@@ -35,13 +45,15 @@ writes only the catalog path supplied to it.
 ## Ownership and routes
 
 MetaMan owns direct format metadata readers. ScanSong adapts their ordered
-results into schema 23, owns scanner-specific archive/source handling, and
+results into schema 24, owns scanner-specific archive/source handling, and
 bundles VGMBoy-built inspection helpers only where required. It does not invoke
 player apps or link the playback kit.
 
 Read [AGENTS.md](AGENTS.md), then [`ai/project-info.md`](ai/project-info.md).
 The focused inspection, archive, and failure contracts are in
 [`ai/subsystem-agent/format-accommodations.md`](ai/subsystem-agent/format-accommodations.md);
+the native operation boundary is in
+[`ai/subsystem-agent/operation-presentation.md`](ai/subsystem-agent/operation-presentation.md);
 user-visible app behavior is in `ai/subsystem-human/`. The authoritative
 plugin/dependency matrix is
 [`../VGMBoy/Docs/plugin-catalog.md`](../VGMBoy/Docs/plugin-catalog.md), and the

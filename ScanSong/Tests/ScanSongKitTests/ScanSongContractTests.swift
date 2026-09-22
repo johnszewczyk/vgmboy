@@ -2881,6 +2881,29 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
     #expect(zip(updates, updates.dropFirst()).allSatisfy { $0.0.processed <= $0.1.processed })
 }
 
+@Test func checkpointProgressDoesNotClaimInspectionIsPersistence() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ScanSong-checkpoint-progress-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    try makeSPCFile(id666Flag: 0x1A).write(to: root.appendingPathComponent("First.spc"))
+    try makeSPCFile(id666Flag: 0x1A).write(to: root.appendingPathComponent("Second.spc"))
+
+    let progress = ProgressCapture()
+    let databaseURL = root.appendingPathComponent("Library.sqlite")
+    _ = try await CatalogScanner(databaseURL: databaseURL).scan(
+        rootURL: root,
+        mode: .newScan,
+        progress: progress.append
+    )
+
+    let persistence = progress.values().filter { $0.phase == .persistence }
+    #expect(persistence.contains {
+        $0.processed == 2 && $0.phaseCompleted == 1 && $0.phaseTotal == 2
+    })
+    #expect(persistence.last?.phaseCompleted == 2)
+}
+
 @Test func dryRunReportsTypedRoutesWithoutWritingADataStore() throws {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("ScanSong-probe-\(UUID().uuidString)", isDirectory: true)
