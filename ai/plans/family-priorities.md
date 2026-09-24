@@ -11,7 +11,7 @@ unit; the monorepo is the only source tree for maintained family code.
 | Concern | Owner |
 | --- | --- |
 | Decoder-independent format metadata | MetaMan |
-| Source discovery, inspection routing, and schema-23 catalog writes | ScanSong |
+| Source discovery, inspection routing, and schema-24 catalog writes | ScanSong |
 | UAC manifest, seek table, and reversible wrapper | UACMan |
 | Read-only catalog access and browser projections | CatalogReader |
 | Shared archive/cache, preferences, queue, and transport policy | FrontendCore |
@@ -24,7 +24,7 @@ unit; the monorepo is the only source tree for maintained family code.
 ## Format decisions
 
 - MetaMan reads native metadata from existing source formats. ScanSong adapts
-  those results to schema 23; UACMan can read and edit its own manifest without
+  those results to schema 24; UACMan can read and edit its own manifest without
   rewriting native source files.
 - UAC remains a reversible wrapper around original source members with separate
   rich metadata and seekable Zstandard payloads. It does not claim to improve
@@ -39,10 +39,10 @@ unit; the monorepo is the only source tree for maintained family code.
 
 1. Keep `scripts/verify-family.sh` aligned with all maintained packages,
    renderer checks, and family apps. Run it before a family release and record
-   current results in `verification.md`.
+   current results in `../verification/family.md`.
 2. Verify packaged launch and playback interactions separately from package
    tests. Current cross-app evidence and limits live in
-   `PARITY-WIP-REPORT.md`.
+   `../reports/frontend-parity.md`.
 3. Run audio-output/AAC integration checks on a host with a working CoreAudio
    device and encoder. Host-only failures must remain identified as environment
    gaps until that boundary is exercised successfully.

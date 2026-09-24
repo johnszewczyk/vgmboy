@@ -33,11 +33,14 @@ For a component task, follow its `AGENTS.md` → `ai/AGENTS.md` →
 `ai/project-info.md` → focused-note route. See `README.md` for the family
 index.
 
-- Shared ownership and remaining cross-app gates: [WIP-PLAN.md](WIP-PLAN.md).
+- Shared ownership and remaining cross-app gates:
+  [ai/plans/family-priorities.md](ai/plans/family-priorities.md).
 - Frontend parity and open user-boundary checks:
-  [PARITY-WIP-REPORT.md](PARITY-WIP-REPORT.md).
+  [ai/reports/frontend-parity.md](ai/reports/frontend-parity.md).
 - Clean checkout, build, and evidence procedure:
-  [verification.md](verification.md).
+  [ai/verification/family.md](ai/verification/family.md).
+- Git ownership and recovery boundaries:
+  [ai/subsystem-agent/repository-recovery.md](ai/subsystem-agent/repository-recovery.md).
 - Workspace-wide agent intake and build method, when DocMan is a sibling:
   [DocMan](../DocMan/AGENTS.md) and
   [agent-onboarding-and-builds.md](../DocMan/docs-agent/agent-onboarding-and-builds.md).
@@ -58,11 +61,11 @@ index.
   excluded from Git. `LocalRecovery/README.md` inventories retained local
   recovery assets.
 - Compilation is package evidence, not proof of packaged UI or audible output.
-  Use `verification.md` for current checks and evidence limits.
+  Use `ai/verification/family.md` for current checks and evidence limits.
 
 ## Human Docs
 
 User-facing behavior lives under each app’s `ai/subsystem-human/`.
-`README.md` indexes the family; `MONOREPO-MIGRATION.md` records its repository
-and recovery layout. Shared decoder and dependency references live in
-`VGMBoy/Docs/`.
+`README.md` indexes the family; family plans, reports, verification, and
+repository constraints are routed to their owner-specific files under `ai/`.
+Shared decoder and dependency references live in `VGMBoy/Docs/`.

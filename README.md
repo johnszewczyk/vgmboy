@@ -2,9 +2,9 @@
 
 VGMMan is the canonical Git repository for the game-music application family.
 Each child keeps its own package, app, tests, and release boundary; family
-source and history live in this repository. See
-[`MONOREPO-MIGRATION.md`](MONOREPO-MIGRATION.md) for the repository and
-recovery layout.
+source and history live in this repository. See the routed
+[repository recovery note](ai/subsystem-agent/repository-recovery.md) for Git
+ownership and preservation rules.
 
 ## Projects
 
@@ -31,17 +31,18 @@ In the `Code/` workspace, agent work starts with
 [DocMan](../DocMan/AGENTS.md) and its
 [onboarding and build method](../DocMan/docs-agent/agent-onboarding-and-builds.md).
 A standalone VGMMan checkout starts with [`AGENTS.md`](AGENTS.md),
-[`project-info.md`](project-info.md), and [verification.md](verification.md).
+[`project-info.md`](project-info.md), and
+[`ai/verification/family.md`](ai/verification/family.md).
 Then follow
 the owning component's `AGENTS.md` → `ai/AGENTS.md` → `ai/project-info.md` route.
 The focused note is the final documentation read before source inspection.
 
-Family coordination and evidence:
+Family plans and evidence:
 
-- [`WIP-PLAN.md`](WIP-PLAN.md) — current shared-core priorities and owners.
-- [`PARITY-WIP-REPORT.md`](PARITY-WIP-REPORT.md) — frontend parity evidence and
+- [`ai/plans/family-priorities.md`](ai/plans/family-priorities.md) — current shared-core priorities and owners.
+- [`ai/reports/frontend-parity.md`](ai/reports/frontend-parity.md) — frontend parity evidence and
   open user-boundary checks.
-- [`verification.md`](verification.md) — clean checkout procedure, package
+- [`ai/verification/family.md`](ai/verification/family.md) — clean checkout procedure, package
   checks, and evidence limits.
 - [`VGMBoy/Docs/plugin-catalog.md`](VGMBoy/Docs/plugin-catalog.md) — decoder,
   dependency, provenance, and scanner-product reference.
