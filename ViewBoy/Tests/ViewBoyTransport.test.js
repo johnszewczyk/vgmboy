@@ -55,8 +55,11 @@ test("ViewBoy uses one settable 200 ms timing for width and selection transition
   assert.match(uiSource, /void refs\.playlistHeaderTable\.offsetWidth/);
   assert.match(uiSource, /if \(initialColumnWidths\) window\.requestAnimationFrame\(\(\) => syncPlaylistColumnWidths\(\)\)/);
   assert.match(indexSource, /viewboy-gameboy\.css/);
-  assert.match(gameboySource, /radial-gradient\(circle, rgb\(54 65 33 \/ 12%\)/);
-  assert.match(gameboySource, /background-size: 4px 4px, 100% 100%/);
+  assert.match(gameboySource, /repeating-linear-gradient\(0deg, rgb\(54 65 33 \/ 7%\) 0 3px, transparent 3px 4px\)/);
+  assert.match(gameboySource, /repeating-linear-gradient\(90deg, rgb\(54 65 33 \/ 7%\) 0 3px, transparent 3px 4px\)/);
+  assert.match(gameboySource, /background-size: 4px 4px, 4px 4px, 100% 100%/);
+  assert.match(gameboySource, /--vb-type-base: 0\.9rem/);
+  assert.match(stylesSource, /font-size: calc\(var\(--playlist-font-size-pt\) \* 0\.9pt\)/);
   assert.match(gameboySource, /grid-template-columns: repeat\(7, minmax\(0, 1fr\)\)/);
   assert.match(uiSource, /state\.selectionAnimationMilliseconds = milliseconds/);
 });

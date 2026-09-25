@@ -14,7 +14,6 @@ let databaseEmptyState = null;
 let databaseConsoleGroups = [];
 let collapsedDatabaseConsoles = new Set();
 let databaseRowRenderGeneration = 0;
-let browserClickTimer = 0;
 let browserSelectionRequest = null;
 let databaseGameLoadRequest = null;
 let databaseGameSearchRecords = [];
@@ -534,10 +533,6 @@ async function previewBrowserLeaf(node) {
   }
 }
 
-async function handleBrowserPrimaryClick(node, wasSelected) {
-  await handleBrowserGesture(node, "primaryClick", wasSelected);
-}
-
 async function handleBrowserGesture(node, gesture, wasSelected = false) {
   const intent = await window.SPCBoySidebarController.resolveIntent(node, gesture, wasSelected);
   if (intent === "preview") await previewBrowserLeaf(node);
@@ -640,29 +635,20 @@ function renderTreeNode(node, container) {
   button.classList.toggle("tree-file", node.kind === "file");
   button.setAttribute("aria-expanded", node.kind === "folder" ? String(expanded) : "false");
   button.innerHTML = `
-    <span class="tree-disclosure">${node.kind === "folder" ? (expanded ? "▾" : "▸") : "·"}</span><span class="tree-label">${escapeHtml(node.name)}</span>
+    <span class="tree-disclosure">${node.kind === "folder" ? (expanded ? "▾" : "▸") : ""}</span><span class="tree-label">${escapeHtml(node.name)}</span>
   `;
   button.addEventListener("click", (event) => {
-    window.clearTimeout(browserClickTimer);
-    const wasSelected = state.selectedBrowserPath === node.path;
-    const disclosureClick = event.target.closest?.(".tree-disclosure");
     selectBrowserNode(node, { focus: true, previewLeaf: false });
     if (event.detail > 1) return;
     if (node.kind === "file") {
       void previewBrowserLeaf(node);
       return;
     }
-    if (disclosureClick && node.kind === "folder") {
-      void toggleBrowserNode(node);
-      return;
-    }
-    if (!wasSelected) return;
-    browserClickTimer = window.setTimeout(() => void handleBrowserPrimaryClick(node, wasSelected), 220);
+    void handleBrowserGesture(node, "disclosureClick", true);
   });
   button.addEventListener("dblclick", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    window.clearTimeout(browserClickTimer);
     if (event.target.closest?.(".tree-disclosure")) return;
     void handleBrowserGesture(node, "activate", true);
   });
@@ -863,7 +849,7 @@ function makeDatabaseGameButton(game) {
   button.className = "database-game-row";
   button.dataset.databaseGameKey = databaseGameKey(game);
   button.dataset.searchText = `${game.name} ${game.rootName || ""}`.toLowerCase();
-  button.innerHTML = `<span class="database-disclosure">·</span><span class="database-game-name">${escapeHtml(game.displayName || game.name)}</span>${state.sidebarPathCounts ? `<span class="database-game-meta">${game.trackCount}</span>` : ""}`;
+  button.innerHTML = `<span class="database-game-name">${escapeHtml(game.displayName || game.name)}</span>${state.sidebarPathCounts ? `<span class="database-game-meta">${game.trackCount}</span>` : ""}`;
   button.addEventListener("click", (event) => {
     if (event.detail > 1) return;
     state.selectedDatabaseGameKey = databaseGameKey(game);

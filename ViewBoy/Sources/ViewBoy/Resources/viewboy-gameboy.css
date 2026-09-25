@@ -24,7 +24,7 @@
   --sidebar-font-family: var(--viewboy-font-family);
   --playlist-font-family: var(--viewboy-font-family);
   --vb-type-small: 0.72rem;
-  --vb-type-base: 0.82rem;
+  --vb-type-base: 0.9rem;
   --vb-type-medium: 0.95rem;
   --vb-type-display: 1.14rem;
 }
@@ -72,9 +72,10 @@ html .deck-screen {
   border-color: #89906f;
   background-color: #c8d47b;
   background-image:
-    radial-gradient(circle, rgb(67 80 38 / 13%) 0.55px, transparent 0.8px),
+    repeating-linear-gradient(0deg, rgb(67 80 38 / 8%) 0 3px, transparent 3px 4px),
+    repeating-linear-gradient(90deg, rgb(67 80 38 / 8%) 0 3px, transparent 3px 4px),
     linear-gradient(112deg, #d7e28e, #c7d277 54%, #bac766);
-  background-size: 4px 4px, 100% 100%;
+  background-size: 4px 4px, 4px 4px, 100% 100%;
   color: #354027;
   box-shadow: inset 0 2px 7px rgb(61 68 35 / 25%), inset 0 0 0 1px rgb(255 255 255 / 28%),
     0 1px rgb(255 255 255 / 75%);
@@ -203,6 +204,10 @@ html .playlist-body-wrap { scrollbar-color: #aaa99c #e2e1da; }
 html .tree-node,
 html .database-game-row,
 html .database-console-row { color: #333; }
+
+html .tree-node,
+html .database-game-row,
+html .database-console-row { font-size: 0.9rem; }
 
 html .database-game-row:hover,
 html .database-console-row:hover,
@@ -564,29 +569,24 @@ html .playlist-tab { transition-duration: var(--selection-animation-duration); }
 }
 
 
-/* One quiet, aligned pixel field ties the working display surfaces together. */
+/* Square LCD cells stay on display-like working surfaces. */
 html .workspace {
   background-color: #c8c7c0;
-  background-image:
-    radial-gradient(circle, rgb(55 60 42 / 6%) 0.45px, transparent 0.72px),
-    linear-gradient(145deg, #d0cfc8, #c2c1ba 78%);
-  background-size: 4px 4px, 100% 100%;
+  background-image: linear-gradient(145deg, #d0cfc8, #c2c1ba 78%);
 }
 
 html .sidebar {
   background-color: #c8c7c0;
-  background-image:
-    radial-gradient(circle, rgb(55 60 42 / 7%) 0.45px, transparent 0.72px),
-    linear-gradient(145deg, #cecdc6, #c3c2bb 82%);
-  background-size: 4px 4px, 100% 100%;
+  background-image: linear-gradient(145deg, #cecdc6, #c3c2bb 82%);
 }
 
 html .content {
   background-color: #d2d1c9;
   background-image:
-    radial-gradient(circle, rgb(57 63 41 / 6%) 0.45px, transparent 0.72px),
+    repeating-linear-gradient(0deg, rgb(57 63 41 / 5%) 0 3px, transparent 3px 4px),
+    repeating-linear-gradient(90deg, rgb(57 63 41 / 5%) 0 3px, transparent 3px 4px),
     linear-gradient(145deg, #dad9d2, #cecdc6 78%);
-  background-size: 4px 4px, 100% 100%;
+  background-size: 4px 4px, 4px 4px, 100% 100%;
 }
 
 html .tree-root {
@@ -623,10 +623,11 @@ html .playlist-wrap {
 html .playlist-body-wrap {
   background-color: #cbd67d;
   background-image:
-    radial-gradient(circle, rgb(54 65 33 / 12%) 0.48px, transparent 0.76px),
+    repeating-linear-gradient(0deg, rgb(54 65 33 / 7%) 0 3px, transparent 3px 4px),
+    repeating-linear-gradient(90deg, rgb(54 65 33 / 7%) 0 3px, transparent 3px 4px),
     linear-gradient(115deg, #d3dd83, #cbd67d 48%, #c5d073);
-  background-size: 4px 4px, 100% 100%;
-  background-attachment: local, local;
+  background-size: 4px 4px, 4px 4px, 100% 100%;
+  background-attachment: local, local, local;
   --selection-indicator-color: var(--playlist-text-color, #333);
 }
 
@@ -649,9 +650,7 @@ html .options-windows-page,
 html .options-routing-page,
 html .options-page-playback {
   background-image:
-    radial-gradient(circle, rgb(55 60 42 / 5%) 0.42px, transparent 0.7px),
     linear-gradient(145deg, rgb(255 255 255 / 16%), transparent 78%);
-  background-size: 4px 4px, 100% 100%;
 }
 
 html .list-selection-indicator {

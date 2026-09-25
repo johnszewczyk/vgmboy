@@ -6,12 +6,15 @@ source details sit beside elapsed, track, and playlist times inside the LCD.
 Playback keys stay in their own adjacent bank, with a short segmented seek rail
 below. The compact layout leaves more room for the text-first library and
 playlist. Game Boy Core is the only presentation: a sampled DMG-gray shell,
-muted maroon controls, and a pea-green LCD field with #333 text. Fine 4 px dots
-carry the pixel grid across the display, library, and playlist; the gray
-sidebar keeps its calm membrane finish with only a faint dot field. Small
-raised seams and inset edges give the panels hardware character without large
-textures or heavy effects. The bundled Doto face remains consistent across the
-app.
+muted maroon controls, and a pea-green LCD field with #333 text. The LCD,
+content area, and playlist use a subtle 4 px square-cell grid with one-pixel
+gaps, matching the tiny square cells visible in original DMG LCD macro photos.
+The sidebar stays smooth gray plastic without a tiled texture. Folder rows
+expand with one click anywhere on the row; nested folders and game rows indent
+without bullet markers. Small raised seams and inset edges give the panels
+hardware character without large textures or heavy effects. The bundled Doto
+face remains consistent across the app at a compact 0.9 rem base, with
+Interface Scale applied globally.
 
 The bundled Doto face covers controls, lists, headings, and readouts. One
 Interface Scale setting resizes text throughout the player, library, playlist,
