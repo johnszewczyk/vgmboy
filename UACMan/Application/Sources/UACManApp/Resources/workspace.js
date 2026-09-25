@@ -123,7 +123,7 @@
         ? ""
         : canonicalTitleRowMarkup(options.title, options.titleClassName || "", options.titleAction || "");
       const table = `<div class="${classes}" role="table"${ariaLabel}${attributes}${columnSchema}${style}>${title}${options.header || ""}${rows}</div>`;
-      return `${options.nestedSurface ? `<div class="canonical-table-surface canonical-table-nested-surface">${table}</div>` : table}${options.trailing || ""}`;
+      return `${table}${options.trailing || ""}`;
     }
 
     static applyColumnSchemas(root = document) {
@@ -152,11 +152,8 @@
       const renderedContent = content instanceof CanonicalTable ? content.render() : String(content || "");
       const open = this.isFoldOpen(foldID);
       const classes = ["inserted-table-row", open ? "open" : ""].filter(Boolean).join(" ");
-      const surface = renderedContent.trim()
-        ? `<div class="canonical-table-surface canonical-table-nested-surface">${renderedContent}</div>`
-        : "";
       return canonicalRowMarkup([
-        canonicalCellMarkup(`<div class="inserted-table-panel"><div class="canonical-unfold-content">${surface}</div>${nestedRows}</div>`, { className:"inserted-table-cell" })
+        canonicalCellMarkup(`<div class="inserted-table-panel"><div class="canonical-unfold-content">${renderedContent}</div>${nestedRows}</div>`, { className:"inserted-table-cell" })
       ], { className:classes, attributes:`data-canonical-subrow="${esc(foldID)}"` });
     }
 
