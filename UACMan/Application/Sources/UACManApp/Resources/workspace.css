@@ -482,11 +482,15 @@ button { cursor:pointer; }
 }
 
 /* CanonicalTable owns the one schema string for a table and applies it to all
-   of that table's header/data rows. Nested tables run the same renderer, so
-   page modifiers can change cell behavior without changing the grid contract. */
+   of that table's header/data rows. Its direct children stretch to one shared
+   width, including inserted unfolds at every nesting depth. */
+.canonical-table { display:flex; flex-direction:column; align-items:stretch; box-sizing:border-box; }
+.canonical-table > .field-grid-header,
+.canonical-table > .field-grid-row { width:100%; max-width:100%; min-width:0; box-sizing:border-box; flex:0 0 auto; align-self:stretch; }
 .canonical-table > .field-grid-header:not(.canonical-table-title-row),
 .canonical-table > .field-grid-row:not(.inserted-table-row) { width:100%; min-width:0; box-sizing:border-box; grid-template-columns:var(--field-grid-columns); }
-.canonical-table > .canonical-table-title-row { width:100%; grid-template-columns:minmax(0,1fr)!important; }
+.canonical-table > .canonical-table-title-row { width:100%; max-width:100%; box-sizing:border-box; grid-template-columns:minmax(0,1fr)!important; }
+.canonical-table > .inserted-table-row { display:grid; width:100%; max-width:100%; min-width:0; box-sizing:border-box; }
 .canonical-table > .canonical-table-title-row > .canonical-table-title-cell { grid-column:1 / -1; }
 .canonical-table-title-content { display:flex; align-items:center; gap:4px; width:100%; min-width:0; }
 .canonical-table-title-content > input { flex:1 1 auto; min-width:0; }

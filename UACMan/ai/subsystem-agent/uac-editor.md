@@ -46,9 +46,10 @@
   `CanonicalTableColumns` in `workspace.js` records the live schemas, and
   `applyColumnSchemas` writes each schema onto only its own rows. CSS table
   modifiers may style cell content, but must not define column tracks. Geometry
-  rules target each table's direct title/header/data rows so an ancestor cannot
-  resize a nested table. This keeps every depth on the same grid contract while
-  allowing each table's explicit schema to set its widths.
+  rules target each table's direct title/header/data/unfold rows and make them
+  full-width, border-box flex children so an ancestor cannot shrink or inset a
+  nested table. This keeps every depth on the same grid contract while allowing
+  each table's explicit schema to set its column widths.
 - Render nested value editors and popups through `CanonicalTable` too. Unfolded
   child tables render directly inside the full-width unfold content, without a
   separate surface wrapper, border, or horizontal inset. Give each unfold a
