@@ -85,10 +85,14 @@ count, and a **Tag Fields** expander. Each pack row opens another animated
 canonical table with **#**, **Track**, **Tag Name**, **Tag Value**, **✓**, and
 **×** columns. Track filenames occupy their own cells; package-level fields
 show **Package** in the Track column. Both nested tables use the shared title
-row and close control. The parent table's **×** action removes every occurrence
-of that tag name from playable tracks in packages matching the current filename
-filter. It asks for confirmation, reports progress, and rewrites each affected
-package manifest once; package-level fields are not targets.
+row and close control. Any nested row can unfold another canonical table,
+without a fixed nesting depth. Multiple unfolds on one row nest in their
+declared order; opening a deeper level opens its ancestors, and closing a table
+closes its unfolded descendants. The parent table's **×** action removes every
+occurrence of that tag name from playable tracks in packages matching the
+current filename filter. It asks for confirmation, reports progress, and
+rewrites each affected package manifest once; package-level fields are not
+targets.
 
 The ✓ action updates one manifest field; the nested × removes that one field
 after confirmation. Both preserve the archive's compressed members. Progress

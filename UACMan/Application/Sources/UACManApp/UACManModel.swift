@@ -598,6 +598,7 @@ final class UACManModel {
 
     func loadTagAnalyzerMatches(tagName: String) {
         guard tagAnalyzerHasResult,
+              !isDeletingTagAnalyzerTrackFields,
               let tag = tagAnalyzerTags.first(where: { $0.name == tagName }) else { return }
         tagAnalyzerSelectedMatchesTagName = tag.name
         tagAnalyzerSelectedMatches = tag.matches

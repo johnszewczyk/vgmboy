@@ -97,13 +97,135 @@
     labels.map((label, index) => canonicalHeaderCellMarkup(label, options.cell?.(label, index) || {})),
     { className:"field-grid-header", attributes:options.attributes, style:options.style }
   );
-  const canonicalTableMarkup = (options = {}) => {
-    const classes = ["field-grid", "canonical-table", options.className].filter(Boolean).join(" ");
+  class CanonicalTable {
+    static openFoldIDs = new Set();
+
+    constructor(options = {}) {
+      this.options = options;
+    }
+
+    render() {
+      const options = this.options;
+      const classes = ["field-grid", "canonical-table", options.className].filter(Boolean).join(" ");
+      const attributes = options.attributes ? ` ${options.attributes}` : "";
+      const ariaLabel = options.ariaLabel ? ` aria-label="${esc(options.ariaLabel)}"` : "";
+      const style = options.style ? ` style="${esc(options.style)}"` : "";
+      const rows = options.rows || options.empty || "";
+      return `<div class="${classes}" role="table"${ariaLabel}${attributes}${style}>${options.header || ""}${rows}</div>${options.trailing || ""}`;
+    }
+
+    static isFoldOpen(foldID) {
+      return Boolean(foldID && this.openFoldIDs.has(foldID));
+    }
+
+    static unfoldedRowMarkup(foldID, content = "", nestedRows = "") {
+      const renderedContent = content instanceof CanonicalTable ? content.render() : String(content || "");
+      const classes = this.isFoldOpen(foldID) ? "inserted-table-row open" : "inserted-table-row";
+      return canonicalRowMarkup([
+        canonicalCellMarkup(`<div class="inserted-table-panel"><div class="canonical-unfold-content">${renderedContent}</div>${nestedRows}</div>`, { className:"inserted-table-cell" })
+      ], { className:classes, attributes:`data-canonical-subrow="${esc(foldID)}"` });
+    }
+
+    static rowWithUnfolds(rowMarkup, unfolds = []) {
+      let nestedRows = "";
+      for (let index = unfolds.length - 1; index >= 0; index -= 1) {
+        const unfold = unfolds[index];
+        nestedRows = this.unfoldedRowMarkup(unfold.foldID, unfold.content, nestedRows);
+      }
+      return rowMarkup + nestedRows;
+    }
+
+    static subrow(foldID) {
+      return foldID
+        ? document.querySelector(`[data-canonical-subrow="${CSS.escape(foldID)}"]`)
+        : null;
+    }
+
+    static fillUnfold(foldID, content) {
+      const contentHost = this.subrow(foldID)?.querySelector(":scope > .inserted-table-cell > .inserted-table-panel > .canonical-unfold-content");
+      if (!contentHost) return false;
+      contentHost.innerHTML = content instanceof CanonicalTable ? content.render() : String(content || "");
+      return true;
+    }
+
+    static toggleFor(foldID) {
+      return foldID
+        ? [...document.querySelectorAll("[data-fold-id]")].find(toggle => toggle.dataset.foldId === foldID)
+        : null;
+    }
+
+    static setFoldOpen(toggle, open) {
+      const foldID = toggle?.dataset.foldId || "";
+      if (!foldID) return false;
+      const subrow = this.subrow(foldID);
+      if (open && subrow) {
+        let ancestorRow = subrow.parentElement?.closest("[data-canonical-subrow]");
+        while (ancestorRow) {
+          const ancestorToggle = this.toggleFor(ancestorRow.dataset.canonicalSubrow || "");
+          if (ancestorToggle) this.setFoldOpen(ancestorToggle, true);
+          ancestorRow = ancestorRow.parentElement?.closest("[data-canonical-subrow]");
+        }
+      }
+      if (open) this.openFoldIDs.add(foldID);
+      else {
+        this.openFoldIDs.delete(foldID);
+        this.closeDescendants(foldID);
+      }
+      if (subrow) subrow.classList.toggle("open", open);
+      toggle.setAttribute("aria-expanded", String(open));
+      const icon = $(".canonical-fold-icon", toggle);
+      if (icon) icon.textContent = open ? "−" : "＋";
+      return true;
+    }
+
+    static closeDescendants(foldID) {
+      const prefix = foldID + "/";
+      for (const openID of [...this.openFoldIDs]) {
+        if (openID.startsWith(prefix)) this.openFoldIDs.delete(openID);
+      }
+      const parentRow = this.subrow(foldID);
+      parentRow?.querySelectorAll("[data-canonical-subrow]").forEach(childRow => {
+        const childFoldID = childRow.dataset.canonicalSubrow || "";
+        this.openFoldIDs.delete(childFoldID);
+        childRow.classList.remove("open");
+        const toggle = this.toggleFor(childFoldID);
+        if (!toggle) return;
+        toggle.setAttribute("aria-expanded", "false");
+        const icon = $(".canonical-fold-icon", toggle);
+        if (icon) icon.textContent = "＋";
+      });
+    }
+
+    static renameFoldBranch(oldID, newID) {
+      if (!oldID || !newID || oldID === newID) return;
+      const replacements = [...this.openFoldIDs]
+        .filter(openID => openID === oldID || openID.startsWith(oldID + "/"))
+        .map(openID => [openID, newID + openID.slice(oldID.length)]);
+      replacements.forEach(([oldFoldID]) => this.openFoldIDs.delete(oldFoldID));
+      replacements.forEach(([, newFoldID]) => this.openFoldIDs.add(newFoldID));
+    }
+
+    static clearFoldPrefix(prefix) {
+      for (const openID of [...this.openFoldIDs]) {
+        if (openID.startsWith(prefix)) this.openFoldIDs.delete(openID);
+      }
+      document.querySelectorAll("[data-fold-id]").forEach(toggle => {
+        const foldID = toggle.dataset.foldId || "";
+        if (!foldID.startsWith(prefix)) return;
+        this.openFoldIDs.delete(foldID);
+        this.subrow(foldID)?.classList.remove("open");
+        toggle.setAttribute("aria-expanded", "false");
+        const icon = $(".canonical-fold-icon", toggle);
+        if (icon) icon.textContent = "＋";
+      });
+    }
+  }
+
+  const canonicalTableMarkup = options => new CanonicalTable(options).render();
+  const canonicalFoldToggleMarkup = (foldID, label, options = {}) => {
+    const expanded = CanonicalTable.isFoldOpen(foldID);
     const attributes = options.attributes ? ` ${options.attributes}` : "";
-    const ariaLabel = options.ariaLabel ? ` aria-label="${esc(options.ariaLabel)}"` : "";
-    const style = options.style ? ` style="${esc(options.style)}"` : "";
-    const rows = options.rows || options.empty || "";
-    return `<div class="${classes}" role="table"${ariaLabel}${attributes}${style}>${options.header || ""}${rows}</div>${options.trailing || ""}`;
+    return `<button class="canonical-fold-toggle canonical-fold-trigger ${options.className || ""}" type="button" data-action="toggleCanonicalFold" data-fold-id="${esc(foldID)}" data-focus-id="${esc(foldID)}" aria-expanded="${expanded}"${attributes} aria-label="${esc(label)}"><span>${options.label || "[Nested Tags]"}</span><span class="canonical-fold-icon">${expanded ? "−" : "＋"}</span></button>`;
   };
   const memberFields = member => ({
     ...(member.metadata || {}),
@@ -193,7 +315,7 @@
     const body = `<div class="multiple-values-editor canonical-multiple-values-editor${popupLayout ? " canonical-popup-editor" : ""}" ${data}>${rowsMarkup}<div class="multiple-values-editor-error" role="status"></div></div>`;
     return { body, count:entries.length };
   };
-  const multipleValuesTriggerMarkup = foldID => `<button class="canonical-fold-toggle canonical-fold-trigger" type="button" data-action="toggleCanonicalFold" data-fold-id="${esc(foldID)}" aria-expanded="false"><span>[Nested Tags]</span><span class="canonical-fold-icon">＋</span></button>`;
+  const multipleValuesTriggerMarkup = foldID => canonicalFoldToggleMarkup(foldID, "Show nested tag values");
   const multipleValuesReadOnlyTableMarkup = (entries, context = {}) => {
     const popupLayout = context.layout === "popup";
     const subtableLayout = context.layout === "subtable";
@@ -216,9 +338,9 @@
   const multipleValuesSubtableMarkup = (value, context = {}, options = {}) => {
     const entries = options.entries || (Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value || {}));
     const subtableContext = { ...context, layout:"subtable" };
-    if (options.editable === false) return `<div class="inserted-table-panel">${multipleValuesReadOnlyTableMarkup(entries, subtableContext)}</div>`;
+    if (options.editable === false) return multipleValuesReadOnlyTableMarkup(entries, subtableContext);
     const editor = multipleValuesEditorBodyMarkup(value, subtableContext);
-    return `<div class="inserted-table-panel"><div class="editable-multiple-values">${editor.body}</div></div>`;
+    return `<div class="editable-multiple-values">${editor.body}</div>`;
   };
   const multipleValuesPopupParts = (value, context = {}, options = {}) => {
     const popupID = context.popupID || "multiple-values";
@@ -245,8 +367,8 @@
   let lastUnsavedChanges = false;
   let lastRenderedView = "";
   let lastDocumentPath = "";
-  let expandedTagAnalyzerName = "";
-  let expandedTagAnalyzerPackPath = "";
+  let tagAnalyzerMatchesByName = new Map();
+  let tagAnalyzerMatchesRootPath = "";
   const uiMotionDuration = 250;
 
   function animateRowRemoval(row, completion) {
@@ -284,6 +406,7 @@
 
   function render(stateValue) {
     state = stateValue;
+    retainTagAnalyzerMatches(state);
     if (state.documentPath !== lastDocumentPath) {
       lastDocumentPath = state.documentPath || "";
       if (mainView !== "tagAnalyzer") mainView = "members";
@@ -346,6 +469,19 @@
         replacement.focus({ preventScroll:true });
         if (selection && replacement.setSelectionRange) replacement.setSelectionRange(...selection);
       }
+    }
+  }
+
+  function retainTagAnalyzerMatches(snapshot) {
+    const rootPath = snapshot.tagAnalyzerRootPath || "";
+    if (tagAnalyzerMatchesRootPath !== rootPath || !snapshot.tagAnalyzerHasResult) {
+      tagAnalyzerMatchesByName.clear();
+      tagAnalyzerMatchesRootPath = rootPath;
+      if (!snapshot.tagAnalyzerHasResult) CanonicalTable.clearFoldPrefix("tag-analyzer/");
+    }
+    const tagName = snapshot.tagAnalyzerSelectedMatchesTagName || "";
+    if (snapshot.tagAnalyzerHasResult && tagName && !snapshot.isDeletingTagAnalyzerTrackFields) {
+      tagAnalyzerMatchesByName.set(tagName, snapshot.tagAnalyzerSelectedMatches || []);
     }
   }
 
@@ -465,9 +601,9 @@
       const sample = scoped[0]?.sample;
       const multipleValues = signatures.size > 1 || typeof sample === "object";
       const editableMultipleValues = signatures.size === 1 && sample !== null && typeof sample === "object";
-      const foldID = `tag-${scope.toLowerCase()}-${index}`;
+      const foldID = `tag/${scope.toLowerCase()}/${encodeURIComponent(entry.key)}`;
       let valueInput;
-      let subrow = "";
+      let unfoldedContent = "";
       if (editableMultipleValues || multipleValues) {
         valueInput = multipleValuesTriggerMarkup(foldID);
         const subtable = multipleValuesSubtableMarkup(
@@ -475,9 +611,7 @@
           { target:"metadata", scope:scope === "Package" ? "package" : "tracks", key:entry.key, foldID, title:entry.key },
           { editable:editableMultipleValues, entries:[...values.values()].map((value, valueIndex) => [String(valueIndex + 1), value]) }
         );
-        subrow = canonicalRowMarkup([
-          canonicalCellMarkup(subtable, { className:"inserted-table-cell" })
-        ], { className:"inserted-table-row", attributes:`data-canonical-subrow="${esc(foldID)}"` });
+        unfoldedContent = subtable;
       } else {
         valueInput = `<input data-tag-value aria-label="Tag value for ${esc(entry.key)}" value="${esc(sample)}">`;
       }
@@ -494,7 +628,8 @@
         canonicalCellMarkup(`<button class="icon-button" data-action="commitTagRow" title="${submitTitle}" aria-label="${submitTitle}"${readOnlyMultipleValues ? " disabled" : ""}>✓</button>`, { className:"tag-submit-cell" }),
         canonicalCellMarkup(`<button class="icon-button danger" data-action="deleteTag" title="Delete ${esc(entry.key)}" aria-label="Delete ${esc(entry.key)}">×</button>`, { className:"tag-delete-cell" })
       ];
-      return canonicalRowMarkup(cells, { attributes:`data-tag-row data-tag-scope="${esc(scope)}" data-tag-from="${esc(entry.key)}"${foldAttribute}` }) + subrow;
+      const row = canonicalRowMarkup(cells, { attributes:`data-tag-row data-tag-scope="${esc(scope)}" data-tag-from="${esc(entry.key)}"${foldAttribute}` });
+      return CanonicalTable.rowWithUnfolds(row, multipleValues ? [{ foldID, content:unfoldedContent }] : []);
       }).join("");
       return { rows };
     };
@@ -650,16 +785,15 @@
     const rows = entries.map((entry, index) => {
       const structured = entry.value && typeof entry.value === "object";
       let valueMarkup = memberTagValueMarkup(member, entry);
-      let subrow = "";
+      let unfoldedContent = "";
       if (structured) {
-        const foldID = `file-tag-${index}`;
+        const foldID = `file-tag/${encodeURIComponent(member.path)}/${index}`;
         valueMarkup = multipleValuesTriggerMarkup(foldID);
         const subtable = multipleValuesSubtableMarkup(entry.value, { target:"member", path:member.path, scope:entry.scope, key:entry.key, foldID, title:entry.key }, { editable:true });
-        subrow = canonicalRowMarkup([
-          canonicalCellMarkup(subtable, { className:"inserted-table-cell" })
-        ], { className:"inserted-table-row", attributes:`data-canonical-subrow="${esc(foldID)}"` });
+        unfoldedContent = subtable;
       }
-      const foldAttribute = structured ? ` data-multiple-fold-id="file-tag-${index}"` : "";
+      const foldID = `file-tag/${encodeURIComponent(member.path)}/${index}`;
+      const foldAttribute = structured ? ` data-multiple-fold-id="${esc(foldID)}"` : "";
       const cells = [
         canonicalNumberCellMarkup(index + 1, `Tag number ${index + 1}`, { className:"tag-number-cell" }),
         canonicalCellMarkup(`<input class="tag-table-field file-tag-scope" value="${entry.scope === "memberExtensions" ? "extension" : "metadata"}" disabled>`, { className:"tag-type-cell" }),
@@ -668,7 +802,8 @@
         canonicalCellMarkup(`<button class="icon-button" data-action="commitFileTag" title="Submit changed tag" aria-label="Submit changed tag">✓</button>`, { className:"tag-submit-cell" }),
         canonicalCellMarkup(`<button class="icon-button danger" data-action="deleteFileTag" title="Delete tag" aria-label="Delete tag">×</button>`, { className:"tag-delete-cell" })
       ];
-      return canonicalRowMarkup(cells, { attributes:`data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"${foldAttribute}` }) + subrow;
+      const row = canonicalRowMarkup(cells, { attributes:`data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"${foldAttribute}` });
+      return CanonicalTable.rowWithUnfolds(row, structured ? [{ foldID, content:unfoldedContent }] : []);
     }).join("");
     const empty = '<div class="field-grid-empty" role="row"><span role="cell">No tags on this file</span></div>';
     return canonicalTableMarkup({ className:"flat-table track-browser-field-grid canonical-tag-grid", ariaLabel:`Tags for ${member.name}`, header, rows, empty });
@@ -710,8 +845,16 @@
   }
 
 
-  function tagAnalyzerSubtableTitleMarkup(title, foldID, closeAttributes = "") {
-    return multipleValuesTableTitleRowMarkup({ title, foldID, titleClose:true, closeAttributes });
+  function tagAnalyzerFoldID(tagName) {
+    return `tag-analyzer/${encodeURIComponent(tagName)}`;
+  }
+
+  function tagAnalyzerPackFoldID(parentFoldID, archiveRelativePath) {
+    return `${parentFoldID}/pack/${encodeURIComponent(archiveRelativePath)}`;
+  }
+
+  function tagAnalyzerSubtableTitleMarkup(title, foldID) {
+    return multipleValuesTableTitleRowMarkup({ title, foldID, titleClose:true });
   }
 
   function tagAnalyzerFieldRowMarkup(tagName, match, index) {
@@ -736,17 +879,16 @@
   }
 
   function tagAnalyzerFieldsSubtableMarkup(tagName, matches, foldID, archiveRelativePath) {
-    const header = tagAnalyzerSubtableTitleMarkup(tagName + " · " + matches.length + " tag field(s)", foldID, 'data-close-pack-path="' + esc(archiveRelativePath) + '"') +
+    const header = tagAnalyzerSubtableTitleMarkup(tagName + " · " + matches.length + " tag field(s)", foldID) +
       canonicalHeaderMarkup(["#", "Track", "Tag Name", "Tag Value", "✓", "×"]);
     const rows = matches.map((match, index) => tagAnalyzerFieldRowMarkup(tagName, match, index)).join("") ||
       '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No matching tag fields</span></div>';
-    const table = canonicalTableMarkup({
+    return canonicalTableMarkup({
       className:"inserted-table-grid canonical-multiple-values-grid tag-analyzer-field-grid",
       ariaLabel:"Tag values in " + archiveRelativePath,
       header,
       rows
     });
-    return '<div class="inserted-table-panel">' + table + '</div>';
   }
 
   function groupTagAnalyzerMatchesByPack(matches) {
@@ -761,103 +903,61 @@
     );
   }
 
-  function tagAnalyzerPackSubtableMarkup(tagName, matches, tagIndex) {
+  function tagAnalyzerPackSubtableMarkup(tagName, matches, foldID) {
     const packs = groupTagAnalyzerMatchesByPack(matches);
-    const foldID = "tag-analyzer-matches-" + tagIndex;
     const title = tagName + " · " + packs.length + " matched pack(s)";
-    const header = tagAnalyzerSubtableTitleMarkup(title, foldID, 'data-close-tag-name="' + esc(tagName) + '"') +
+    const header = tagAnalyzerSubtableTitleMarkup(title, foldID) +
       canonicalHeaderMarkup(["#", "Filename", "Tracks", "Tag Fields"]);
     const rows = packs.map((pack, index) => {
       const first = pack.matches[0] || {};
-      const packFoldID = "tag-analyzer-pack-" + tagIndex + "-" + index;
-      const isExpanded = expandedTagAnalyzerName === tagName && expandedTagAnalyzerPackPath === pack.archiveRelativePath;
+      const packFoldID = tagAnalyzerPackFoldID(foldID, pack.archiveRelativePath);
+      const isExpanded = CanonicalTable.isFoldOpen(packFoldID);
       const packageName = pack.archiveRelativePath.split("/").pop() || first.archiveTitle || pack.archiveRelativePath;
-      const packToggle = '<button class="canonical-fold-toggle canonical-fold-trigger tag-analyzer-pack-trigger" type="button" data-action="toggleCanonicalFold" data-fold-id="' + esc(packFoldID) + '" data-tag-analyzer-name="' + esc(tagName) + '" data-tag-analyzer-pack-path="' + esc(pack.archiveRelativePath) + '" aria-expanded="' + isExpanded + '" aria-label="Show ' + pack.matches.length + ' tag fields in ' + esc(packageName) + '"><span>' + pack.matches.length + '</span><span class="canonical-fold-icon">' + (isExpanded ? "−" : "＋") + '</span></button>';
+      const packToggle = canonicalFoldToggleMarkup(packFoldID, `Show ${pack.matches.length} tag fields in ${packageName}`, {
+        className:"tag-analyzer-pack-trigger",
+        label:`<span>${pack.matches.length}</span>`,
+        attributes:`data-unfold-render="tagAnalyzer" data-tag-name="${esc(tagName)}" data-archive-relative-path="${esc(pack.archiveRelativePath)}"${state?.isDeletingTagAnalyzerTrackFields ? " disabled" : ""}`
+      });
       const packRow = canonicalRowMarkup([
         canonicalNumberCellMarkup(index + 1, "Matched pack number " + (index + 1), { className:"tag-number-cell" }),
         canonicalCellMarkup('<input class="tag-table-field" value="' + esc(packageName) + '" title="' + esc(pack.archiveRelativePath) + '" aria-label="Filename" disabled>'),
         canonicalCellMarkup('<input class="tag-table-field" value="' + (Number(first.archiveTrackCount) || 0) + '" aria-label="Track count" disabled>'),
         canonicalCellMarkup(packToggle, { className:"tag-uses-cell" })
       ]);
-      const nestedRow = canonicalRowMarkup([
-        canonicalCellMarkup('<div class="inserted-table-panel"></div>', { className:"inserted-table-cell" })
-      ], { className:"inserted-table-row", attributes:'data-canonical-subrow="' + esc(packFoldID) + '"' });
-      return packRow + nestedRow;
+      const fieldTable = isExpanded
+        ? tagAnalyzerFieldsSubtableMarkup(tagName, pack.matches, packFoldID, pack.archiveRelativePath)
+        : "";
+      return CanonicalTable.rowWithUnfolds(packRow, [{ foldID:packFoldID, content:fieldTable }]);
     }).join("") ||
       '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No matched packs</span></div>';
-    const table = canonicalTableMarkup({
+    return canonicalTableMarkup({
       className:"inserted-table-grid canonical-multiple-values-grid tag-analyzer-pack-grid",
       ariaLabel:"Matched packs for " + tagName,
       header,
       rows
     });
-    return '<div class="inserted-table-panel">' + table + '</div>';
   }
 
-  function setCanonicalFoldOpen(toggle, open) {
-    if (!toggle) return;
-    const fold = toggle.closest(".canonical-fold");
-    const panel = fold?.querySelector(".canonical-fold-panel");
-    const subrow = toggle.dataset.foldId
-      ? document.querySelector('[data-canonical-subrow="' + CSS.escape(toggle.dataset.foldId) + '"]')
-      : null;
-    const target = panel || subrow;
-    if (!target) return;
-    target.classList.toggle("open", open);
-    toggle.setAttribute("aria-expanded", String(open));
-    const icon = $(".canonical-fold-icon", toggle);
-    if (icon) icon.textContent = open ? "−" : "＋";
-  }
-
-  function closeExpandedTagAnalyzerPack() {
-    if (!expandedTagAnalyzerPackPath) return;
-    const archiveRelativePath = expandedTagAnalyzerPackPath;
-    const toggle = [...document.querySelectorAll(".tag-analyzer-pack-grid [data-action='toggleCanonicalFold']")]
-      .find(candidate => candidate.dataset.tagAnalyzerPackPath === archiveRelativePath);
-    setCanonicalFoldOpen(toggle, false);
-    expandedTagAnalyzerPackPath = "";
-    const subrow = toggle?.dataset.foldId
-      ? document.querySelector('[data-canonical-subrow="' + CSS.escape(toggle.dataset.foldId) + '"]')
-      : null;
-    window.setTimeout(() => {
-      if (!subrow || expandedTagAnalyzerPackPath === archiveRelativePath || subrow.classList.contains("open")) return;
-      const cell = $(".inserted-table-cell", subrow);
-      if (cell) cell.innerHTML = '<div class="inserted-table-panel"></div>';
-    }, uiMotionDuration + 25);
-  }
-
-  function populateTagAnalyzerPack(toggle) {
+  function renderTagAnalyzerUnfold(toggle) {
     const foldID = toggle?.dataset.foldId || "";
-    const subrow = foldID
-      ? document.querySelector('[data-canonical-subrow="' + CSS.escape(foldID) + '"]')
-      : null;
-    const cell = subrow && $(".inserted-table-cell", subrow);
-    if (!cell || $(".tag-analyzer-field-grid", cell)) return Boolean(cell);
-    const tagName = toggle.dataset.tagAnalyzerName || "";
-    const archiveRelativePath = toggle.dataset.tagAnalyzerPackPath || "";
-    const matches = (state?.tagAnalyzerSelectedMatches || []).filter(match => match.archiveRelativePath === archiveRelativePath);
-    cell.innerHTML = tagAnalyzerFieldsSubtableMarkup(tagName, matches, foldID, archiveRelativePath);
-    return true;
-  }
-
-  function restoreTagAnalyzerFolds() {
-    const tagName = expandedTagAnalyzerName;
-    if (!tagName || state?.tagAnalyzerSelectedMatchesTagName !== tagName) return;
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (expandedTagAnalyzerName !== tagName || state?.tagAnalyzerSelectedMatchesTagName !== tagName) return;
-      const outerToggle = [...document.querySelectorAll('[data-action="toggleTagAnalyzerPacks"]')]
-        .find(toggle => toggle.dataset.tagName === tagName);
-      setCanonicalFoldOpen(outerToggle, true);
-      if (!expandedTagAnalyzerPackPath) return;
-      const packToggle = [...document.querySelectorAll(".tag-analyzer-pack-grid [data-action='toggleCanonicalFold']")]
-        .find(toggle => toggle.dataset.tagAnalyzerPackPath === expandedTagAnalyzerPackPath);
-      if (!populateTagAnalyzerPack(packToggle)) return;
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        if (expandedTagAnalyzerName === tagName && packToggle?.dataset.tagAnalyzerPackPath === expandedTagAnalyzerPackPath) {
-          setCanonicalFoldOpen(packToggle, true);
-        }
-      }));
-    }));
+    const tagName = toggle?.dataset.tagName || "";
+    if (!foldID || !tagName) return false;
+    const query = $("#member-filter")?.value.trim().toLocaleLowerCase() || "";
+    const matches = tagAnalyzerMatchesByName.get(tagName) || [];
+    if (toggle.dataset.unfoldLoad === "tagAnalyzerMatches") {
+      const visibleMatches = matches.filter(match => tagAnalyzerFilenameMatches(match.archiveRelativePath, query));
+      return CanonicalTable.fillUnfold(foldID, tagAnalyzerPackSubtableMarkup(tagName, visibleMatches, foldID));
+    }
+    const archiveRelativePath = toggle.dataset.archiveRelativePath || "";
+    if (!archiveRelativePath) return false;
+    const packMatches = matches.filter(match =>
+      match.archiveRelativePath === archiveRelativePath
+        && tagAnalyzerFilenameMatches(match.archiveRelativePath, query)
+    );
+    return CanonicalTable.fillUnfold(
+      foldID,
+      tagAnalyzerFieldsSubtableMarkup(tagName, packMatches, foldID, archiveRelativePath)
+    );
   }
 
   function tagAnalyzerFilenameMatches(relativePath, query) {
@@ -906,16 +1006,18 @@
       : deleting
         ? state.tagAnalyzerStatusMessage || "Deleting matching track fields…"
       : state.tagAnalyzerStatusMessage || "Browse for a folder to inventory its UAC tag names.";
-    const selectedMatchesTagName = state.tagAnalyzerSelectedMatchesTagName || "";
-    const selectedMatches = (state.tagAnalyzerSelectedMatches || []).filter(match =>
-      tagAnalyzerFilenameMatches(match.archiveRelativePath, query)
-    );
-    const rows = visibleTags.map(({ tag, matchedPackCount, trackCount, trackArchives }, index) => {
-      const hasSelectedMatches = selectedMatchesTagName === tag.name;
-      const tagIsExpanded = expandedTagAnalyzerName === tag.name && hasSelectedMatches;
-      const foldID = "tag-analyzer-matches-" + index;
-      const matches = hasSelectedMatches ? selectedMatches : [];
-      const toggle = '<button class="canonical-fold-toggle canonical-fold-trigger tag-analyzer-match-trigger" type="button" data-action="toggleTagAnalyzerPacks" data-tag-name="' + esc(tag.name) + '" data-fold-id="' + esc(foldID) + '" aria-expanded="' + tagIsExpanded + '" aria-label="Show ' + matchedPackCount + ' matched packs for ' + esc(tag.name) + '"><span>' + matchedPackCount + '</span><span class="canonical-fold-icon">' + (tagIsExpanded ? "−" : "＋") + '</span></button>';
+    const rows = visibleTags.map(({ tag, matchedPackCount, trackCount, trackArchives }) => {
+      const foldID = tagAnalyzerFoldID(tag.name);
+      const tagIsExpanded = CanonicalTable.isFoldOpen(foldID);
+      const hasCachedMatches = tagAnalyzerMatchesByName.has(tag.name);
+      const matches = (tagAnalyzerMatchesByName.get(tag.name) || []).filter(match =>
+        tagAnalyzerFilenameMatches(match.archiveRelativePath, query)
+      );
+      const toggle = canonicalFoldToggleMarkup(foldID, `Show ${matchedPackCount} matched packs for ${tag.name}`, {
+        className:"tag-analyzer-match-trigger",
+        label:`<span>${matchedPackCount}</span>`,
+        attributes:`data-unfold-load="tagAnalyzerMatches" data-unfold-render="tagAnalyzer" data-tag-name="${esc(tag.name)}"${deleting ? " disabled" : ""}`
+      });
       const cells = [
         canonicalNumberCellMarkup(index + 1, "Tag number " + (index + 1), { className:"tag-number-cell" }),
         canonicalCellMarkup('<input class="tag-table-field" value="' + esc(tag.name) + '" title="' + esc(tag.name) + '" aria-label="Tag name ' + esc(tag.name) + '" disabled>', { className:"tag-name-cell" }),
@@ -924,12 +1026,10 @@
         canonicalCellMarkup('<button class="icon-button danger tag-analyzer-delete-button" data-action="deleteTagAnalyzerTrackFields" data-tag-name="' + esc(tag.name) + '" data-track-field-count="' + trackCount + '" data-package-count="' + trackArchives.length + '" data-archive-paths="' + esc(JSON.stringify(trackArchives.map(archive => archive.relativePath))) + '" title="Delete ' + trackCount + ' track field(s) from ' + trackArchives.length + ' matching package(s)" aria-label="Delete ' + trackCount + ' track field(s) named ' + esc(tag.name) + ' from ' + trackArchives.length + ' matching package(s)"' + (trackCount < 1 || busy ? " disabled" : "") + '>×</button>', { className:"field-grid-action-cell tag-analyzer-delete-cell" })
       ];
       const parentRow = canonicalRowMarkup(cells);
-      if (!hasSelectedMatches) return parentRow;
-      const subtable = tagAnalyzerPackSubtableMarkup(tag.name, matches, index);
-      const subrow = canonicalRowMarkup([
-        canonicalCellMarkup(subtable, { className:"inserted-table-cell" })
-      ], { className:"inserted-table-row", attributes:'data-canonical-subrow="' + esc(foldID) + '"' });
-      return parentRow + subrow;
+      const subtable = tagIsExpanded && hasCachedMatches
+        ? tagAnalyzerPackSubtableMarkup(tag.name, matches, foldID)
+        : "";
+      return CanonicalTable.rowWithUnfolds(parentRow, [{ foldID, content:subtable }]);
     }).join("");
     const emptyMessage = state.tagAnalyzerHasResult
       ? query
@@ -1006,7 +1106,6 @@
     inspector.className = `inspector-content${["trackBrowser", "newTag"].includes(mainView) ? " track-browser-inspector" : ""}`;
     if (mainView === "tagAnalyzer") {
       inspector.innerHTML = renderTagAnalyzerPage();
-      restoreTagAnalyzerFolds();
       return;
     }
     if (!hasPackage) {
@@ -1197,21 +1296,9 @@
   function closeCanonicalSubtable(button) {
     if (!button) return;
     const foldID = button.dataset.foldId || "";
-    const subrow = foldID
-      ? document.querySelector('[data-canonical-subrow="' + CSS.escape(foldID) + '"]')
-      : button.closest("[data-canonical-subrow]");
-    const toggle = foldID
-      ? [...document.querySelectorAll("[data-fold-id]")].find(candidate => candidate.dataset.foldId === foldID)
-      : null;
-    setCanonicalFoldOpen(toggle, false);
-    const tagName = button.dataset.closeTagName || "";
-    const packPath = button.dataset.closePackPath || "";
-    if (tagName && expandedTagAnalyzerName === tagName) {
-      closeExpandedTagAnalyzerPack();
-      expandedTagAnalyzerName = "";
-    }
-    if (packPath && expandedTagAnalyzerPackPath === packPath) expandedTagAnalyzerPackPath = "";
-    subrow?.classList.remove("open");
+    const toggle = CanonicalTable.toggleFor(foldID);
+    if (toggle) CanonicalTable.setFoldOpen(toggle, false);
+    else button.closest("[data-canonical-subrow]")?.classList.remove("open");
     toggle?.focus({ preventScroll:true });
   }
 
@@ -1280,45 +1367,6 @@
     $(".multiple-values-popup-close", popup)?.focus({ preventScroll:true });
   }
 
-  function toggleTagAnalyzerPacks(tagName, toggle) {
-    if (!tagName) return;
-    if (expandedTagAnalyzerName === tagName) {
-      closeExpandedTagAnalyzerPack();
-      expandedTagAnalyzerName = "";
-      setCanonicalFoldOpen(toggle, false);
-      return;
-    }
-    const previousToggle = [...document.querySelectorAll('[data-action="toggleTagAnalyzerPacks"]')]
-      .find(candidate => candidate.dataset.tagName === expandedTagAnalyzerName);
-    closeExpandedTagAnalyzerPack();
-    setCanonicalFoldOpen(previousToggle, false);
-    expandedTagAnalyzerName = tagName;
-    expandedTagAnalyzerPackPath = "";
-    if (state?.tagAnalyzerSelectedMatchesTagName === tagName) setCanonicalFoldOpen(toggle, true);
-    else bridge("loadTagAnalyzerMatches", { tagName });
-  }
-
-  function toggleTagAnalyzerPack(tagName, packPath, toggle) {
-    if (!tagName || !packPath || tagName !== expandedTagAnalyzerName) return;
-    const opening = expandedTagAnalyzerPackPath !== packPath;
-    if (!opening) {
-      closeExpandedTagAnalyzerPack();
-      return;
-    }
-    if (expandedTagAnalyzerPackPath) closeExpandedTagAnalyzerPack();
-    expandedTagAnalyzerPackPath = packPath;
-    const subrow = document.querySelector('[data-canonical-subrow="' + CSS.escape(toggle.dataset.foldId || "") + '"]');
-    const hasTable = subrow && $(".tag-analyzer-field-grid", subrow);
-    if (!populateTagAnalyzerPack(toggle)) return;
-    if (hasTable) {
-      setCanonicalFoldOpen(toggle, true);
-      return;
-    }
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (expandedTagAnalyzerName === tagName && expandedTagAnalyzerPackPath === packPath) setCanonicalFoldOpen(toggle, true);
-    }));
-  }
-
   function tagAnalyzerMatchPayload(row) {
     return {
       tagName:row?.dataset.tagName || "",
@@ -1352,7 +1400,15 @@
       }
     }
     if (error) error.textContent = "";
-    if (expandedTagAnalyzerName === row.dataset.tagName) expandedTagAnalyzerName = name;
+    const oldName = row.dataset.tagName || "";
+    if (oldName !== name) {
+      CanonicalTable.renameFoldBranch(tagAnalyzerFoldID(oldName), tagAnalyzerFoldID(name));
+      const cachedMatches = tagAnalyzerMatchesByName.get(oldName);
+      if (cachedMatches) {
+        tagAnalyzerMatchesByName.delete(oldName);
+        tagAnalyzerMatchesByName.set(name, cachedMatches);
+      }
+    }
     bridge("commitTagAnalyzerMatch", {
       ...tagAnalyzerMatchPayload(row),
       newName:name,
@@ -1382,6 +1438,10 @@
     const scope = packageCount === 1 ? "1 package" : packageCount + " packages";
     const message = 'Delete all ' + trackFieldCount + ' "' + tagName + '" track fields from ' + scope + ' matched by the current filename filter? This edits their UAC manifests.';
     if (!window.confirm(message)) return;
+    const foldID = tagAnalyzerFoldID(tagName);
+    const toggle = CanonicalTable.toggleFor(foldID);
+    if (toggle) CanonicalTable.setFoldOpen(toggle, false);
+    tagAnalyzerMatchesByName.delete(tagName);
     bridge("deleteTagAnalyzerTrackFields", { tagName, archiveRelativePaths });
   }
 
@@ -1437,10 +1497,6 @@
       else commitMultipleValues(event.target.closest("[data-multiple-editor]"));
     }
     else if (action === "toggleMultipleValuesPopup") toggleMultipleValuesPopup(event.target.closest("[data-action=toggleMultipleValuesPopup]")?.dataset.popupId || "", event.target.closest("[data-action=toggleMultipleValuesPopup]"));
-    else if (action === "toggleTagAnalyzerPacks") {
-      const toggle = event.target.closest("[data-action=toggleTagAnalyzerPacks]");
-      toggleTagAnalyzerPacks(toggle?.dataset.tagName || "", toggle);
-    }
     else if (action === "commitTagAnalyzerMatch") commitTagAnalyzerMatch(event.target.closest("[data-tag-analyzer-match]"));
     else if (action === "deleteTagAnalyzerMatch") deleteTagAnalyzerMatch(event.target.closest("[data-tag-analyzer-match]"));
     else if (action === "deleteTagAnalyzerTrackFields") deleteTagAnalyzerTrackFields(event.target.closest("[data-action=deleteTagAnalyzerTrackFields]"));
@@ -1448,14 +1504,19 @@
     else if (action === "closeCanonicalSubtable") closeCanonicalSubtable(event.target.closest("[data-action=closeCanonicalSubtable]"));
     else if (action === "toggleCanonicalFold") {
       const toggle = event.target.closest("[data-action=toggleCanonicalFold]");
-      const packPath = toggle?.dataset.tagAnalyzerPackPath || "";
-      if (toggle && packPath) {
-        toggleTagAnalyzerPack(toggle.dataset.tagAnalyzerName || "", packPath, toggle);
-        return;
-      }
       const foldID = toggle?.dataset.foldId || "";
-      const subrow = foldID ? document.querySelector('[data-canonical-subrow="' + CSS.escape(foldID) + '"]') : null;
-      if (toggle && subrow) setCanonicalFoldOpen(toggle, !subrow.classList.contains("open"));
+      const subrow = CanonicalTable.subrow(foldID);
+      if (toggle && subrow) {
+        const opening = !subrow.classList.contains("open");
+        CanonicalTable.setFoldOpen(toggle, opening);
+        if (!opening) return;
+        const tagName = toggle.dataset.tagName || "";
+        if (toggle.dataset.unfoldLoad === "tagAnalyzerMatches" && tagName && !tagAnalyzerMatchesByName.has(tagName)) {
+          bridge("loadTagAnalyzerMatches", { tagName });
+        } else if (toggle.dataset.unfoldRender === "tagAnalyzer") {
+          renderTagAnalyzerUnfold(toggle);
+        }
+      }
     }
     else if (action === "previewMember") bridge("previewMember", { path:event.target.closest("[data-preview-path]")?.dataset.previewPath || "" });
     else if (action === "closeFilePreview") bridge("closeFilePreview");
@@ -1505,7 +1566,7 @@
     else if (action === "dismissError") bridge("dismissError");
     else if (action === "mainView") {
       mainView = event.target.closest("[data-view]").dataset.view;
-      if (mainView !== "tagAnalyzer") { expandedTagAnalyzerName = ""; expandedTagAnalyzerPackPath = ""; }
+      if (mainView !== "tagAnalyzer") CanonicalTable.clearFoldPrefix("tag-analyzer/");
       render(state);
     }
     else if (action === "closeInspector") { mainView = "members"; render(state); }
@@ -1513,7 +1574,10 @@
     else if (action === "cancelCollectionScan") bridge("cancelCollectionScan");
     else if (action === "cancelHarvest") bridge("cancelHarvest");
     else if (["chooseTagAnalyzerFolder", "cancelTagAnalysis"].includes(action)) {
-      if (action !== "cancelTagAnalysis") { expandedTagAnalyzerName = ""; expandedTagAnalyzerPackPath = ""; }
+      if (action !== "cancelTagAnalysis") {
+        CanonicalTable.clearFoldPrefix("tag-analyzer/");
+        tagAnalyzerMatchesByName.clear();
+      }
       bridge(action);
     }
     else if (action === "openUAC" || action === "openCollection" || action === "save" || action === "revert" || action === "harvest") bridge(action);
