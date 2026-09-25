@@ -393,7 +393,8 @@ button { cursor:pointer; }
 .canonical-table > .inserted-table-row { grid-template-columns:minmax(0,1fr)!important; }
 .inserted-table-cell { grid-column:1 / -1; width:100%; min-width:0; min-height:0; overflow:visible; padding:0; align-items:stretch; }
 .inserted-table-panel { width:100%; min-width:0; min-height:0; overflow:visible; border:0; border-radius:0; background:transparent; }
-.canonical-table-surface.canonical-table-nested-surface { width:100%; min-width:0; min-height:0; overflow:visible; padding:0; }
+.canonical-table-surface.canonical-table-nested-surface { width:100%; min-width:0; min-height:0; overflow:visible; padding:0; border:0; border-radius:0; background:transparent; }
+.canonical-table-nested-surface > .canonical-table { padding-left:0; padding-right:0; }
 .multiple-value-number { text-align:center; }
 
 

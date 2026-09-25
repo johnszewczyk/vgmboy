@@ -50,12 +50,13 @@
   resize a nested table. This keeps every depth on the same grid contract while
   allowing each table's explicit schema to set its widths.
 - Render nested value editors and popups through `CanonicalTable` too. Unfolded
-  child tables use the shared canonical surface frame and title row. Give each
-  unfold a hierarchical ID and render child rows through `rowWithUnfolds`; a
-  child can contain further unfold rows at any depth. Keep multiple unfolds on
-  one row in declared hierarchical order, open ancestors when a deeper fold is
-  activated, and clear descendant fold state when a parent closes. Inserted
-  unfold rows span one full-width grid track.
+  child tables use the shared title row without an additional surface border or
+  horizontal inset; the parent unfold row already provides their full-width
+  frame. Give each unfold a hierarchical ID and render child rows through
+  `rowWithUnfolds`; a child can contain further unfold rows at any depth. Keep
+  multiple unfolds on one row in declared hierarchical order, open ancestors
+  when a deeper fold is activated, and clear descendant fold state when a
+  parent closes. Inserted unfold rows span one full-width grid track.
 - `CanonicalTable.setFoldOpen`, `fillUnfold`, and `playPendingFoldAnimations`
   own unfold motion. Use the same measured-height Web Animations path for
   immediate and asynchronously loaded child tables; do not add per-table CSS
