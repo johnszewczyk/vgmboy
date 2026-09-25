@@ -54,6 +54,9 @@
   and cell primitives inside its unfold row, without another surface class,
   border, or horizontal inset. Keep each table's schema local to its root so
   nested rows inherit only their own table's column tracks.
+- Canonical title rows share the compact 27 px baseline used by table headers
+  and content rows. Let tall controls such as JSON textareas grow their own
+  row; do not increase every row in a nested value table to accommodate them.
 - Render nested value editors and popups through `CanonicalTable` too. Unfolded
   child tables render directly inside the full-width unfold content, without a
   separate surface wrapper, border, or horizontal inset. Give each unfold a

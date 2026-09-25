@@ -72,7 +72,7 @@ button { cursor:pointer; }
 .canonical-table { --canonical-table-gap:4px; display:flex; flex-direction:column; align-items:stretch; gap:0; box-sizing:border-box; width:100%; min-width:680px; padding:2px var(--canonical-table-gap); background:var(--panel); font:10px/1.15 ui-monospace,SFMono-Regular,Menlo,monospace; font-variant-numeric:tabular-nums; }
 .canonical-table-row { display:grid; grid-template-columns:var(--canonical-table-columns,minmax(0,1fr)); column-gap:var(--canonical-table-gap); width:100%; max-width:100%; min-width:0; box-sizing:border-box; flex:0 0 auto; align-self:stretch; }
 .canonical-table-title-row,.canonical-table-unfold-row { grid-template-columns:minmax(0,1fr); }
-.canonical-table-title-row { min-height:35px; align-items:center; }
+.canonical-table-title-row { min-height:27px; align-items:center; }
 .canonical-table-header-row { min-height:27px; color:var(--muted); font-weight:650; white-space:nowrap; }
 .canonical-table-content-row { min-height:27px; align-items:center; }
 .canonical-table-content-row:hover { background:var(--hover); }
@@ -396,8 +396,8 @@ button { cursor:pointer; }
 .tag-analyzer-packs-table { width:100%; max-width:100%; min-width:0; }
 .tag-analyzer-pack-trigger { display:flex; align-items:center; justify-content:center; gap:5px; width:100%; }
 .tag-analyzer-fields-table { width:100%; min-width:0; }
-.tag-analyzer-fields-table .tag-analyzer-match-row { min-height:38px; }
-.tag-analyzer-match-row > .canonical-table-cell { min-height:38px; }
+.tag-analyzer-fields-table .tag-analyzer-match-row { min-height:27px; }
+.tag-analyzer-match-row > .canonical-table-cell { min-height:27px; }
 .tag-analyzer-match-row .tag-analyzer-match-track-cell,
 .tag-analyzer-match-row .tag-analyzer-match-name-cell,
 .tag-analyzer-match-row .tag-analyzer-match-value-cell { min-width:0; }
@@ -406,6 +406,7 @@ button { cursor:pointer; }
 .tag-analyzer-match-value { width:100%; min-width:0; }
 .tag-analyzer-match-value-cell textarea { min-height:52px; resize:vertical; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
 .tag-analyzer-match-error { color:var(--danger,#e06c75); font-size:9px; }
+.tag-analyzer-match-error:empty { display:none; }
 .multiple-values-popup-table > .canonical-popup-editor { width:100%; min-width:0; }
 .multiple-values-popup-table .multiple-value-editor-row,
 .multiple-values-popup-table .multiple-value-readonly-row { width:100%; min-width:0; }
