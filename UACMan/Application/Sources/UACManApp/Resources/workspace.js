@@ -94,24 +94,14 @@
     const heading = `<input class="tag-table-field canonical-table-heading-input" value="${esc(label)}" aria-label="${esc(label)}" disabled>`;
     return canonicalCellMarkup(heading, { ...options, role:"columnheader" });
   };
-  const canonicalActionBoxMarkup = (label, options = {}) => {
-    const tag = options.action ? "button" : "span";
-    const className = ["tag-table-field", "canonical-table-heading-input", "canonical-action-box", options.danger ? "danger" : ""].filter(Boolean).join(" ");
-    const type = options.action ? ' type="button" data-action="' + esc(options.action) + '"' : "";
+  const canonicalDeleteButtonMarkup = (action, options = {}) => {
+    const className = ["icon-button", "danger", options.className].filter(Boolean).join(" ");
     const dataAttributes = Object.entries(options.data || {}).map(([name, value]) => ` data-${name}="${esc(value)}"`).join("");
-    const title = options.title ? ' title="' + esc(options.title) + '"' : "";
-    const ariaLabel = options.ariaLabel ? ' aria-label="' + esc(options.ariaLabel) + '"' : "";
+    const title = options.title ? ` title="${esc(options.title)}"` : "";
+    const ariaLabel = options.ariaLabel ? ` aria-label="${esc(options.ariaLabel)}"` : "";
     const disabled = options.disabled ? " disabled" : "";
-    return `<${tag} class="${className}"${type}${dataAttributes}${title}${ariaLabel}${disabled}>${esc(label)}</${tag}>`;
+    return `<button class="${className}" type="button" data-action="${esc(action)}"${dataAttributes}${title}${ariaLabel}${disabled}>×</button>`;
   };
-  const canonicalActionHeaderCellMarkup = (label, options = {}) => canonicalCellMarkup(
-    canonicalActionBoxMarkup(label, options),
-    {
-      className:["canonical-table-heading-cell", "canonical-table-action-cell", options.cellClassName || ""].filter(Boolean).join(" "),
-      attributes:options.cellAttributes,
-      role:"columnheader"
-    }
-  );
   const canonicalTitleRowMarkup = (title, className = "", actionMarkup = "") => {
     const heading = `<input class="tag-table-field canonical-table-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled>`;
     const content = actionMarkup
@@ -121,12 +111,7 @@
     return canonicalRowMarkup([titleCell], { kind:"title", className });
   };
   const canonicalHeaderMarkup = (labels, options = {}) => canonicalRowMarkup(
-    labels.map((label, index) => {
-      const actionCell = options.actionCell?.(label, index);
-      return actionCell
-        ? canonicalActionHeaderCellMarkup(label, actionCell)
-        : canonicalHeaderCellMarkup(label, options.cell?.(label, index) || {});
-    }),
+    labels.map((label, index) => canonicalHeaderCellMarkup(label, options.cell?.(label, index) || {})),
     { kind:"header", className:options.className, attributes:options.attributes, style:options.style }
   );
   const canonicalEmptyRowMarkup = (message, className = "") => canonicalRowMarkup(
@@ -498,7 +483,11 @@
         : `<input class="tag-table-field multiple-value-editor" data-multiple-value value="${esc(raw)}" aria-label="Value for ${esc(key)}">`;
       const keyMarkup = `<input class="tag-table-field multiple-value-key" data-multiple-key value="${esc(key)}" aria-label="Key for ${esc(key)}"${isArray ? " disabled" : ""}>`;
       const numberMarkup = canonicalNumberCellMarkup(index + 1, `Value number ${index + 1}`, { className:"multiple-value-number-cell" });
-      const removeMarkup = `<button class="icon-button danger multiple-value-remove" data-action="removeMultipleValue" type="button" title="Remove value" aria-label="Remove value">×</button>`;
+      const removeMarkup = canonicalDeleteButtonMarkup("removeMultipleValue", {
+        className:"multiple-value-remove",
+        title:"Remove value",
+        ariaLabel:"Remove value"
+      });
       const submitMarkup = '<button class="icon-button multiple-value-submit" data-action="commitMultipleValueRow" type="button" title="Submit changed value" aria-label="Submit changed value">✓</button>';
       const cells = [
         numberMarkup,
@@ -856,7 +845,10 @@
         canonicalCellMarkup(`<span class="tag-inline-editor">${valueInput}</span>`, { className:"tag-value-cell" }),
         canonicalCellMarkup(`<input class="tag-table-field" value="${count}" aria-label="Uses for ${esc(entry.key)}" disabled>`, { className:"tag-uses-cell" }),
         canonicalCellMarkup(`<button class="icon-button" data-action="commitTagRow" title="${submitTitle}" aria-label="${submitTitle}"${readOnlyMultipleValues ? " disabled" : ""}>✓</button>`, { className:"tag-submit-cell" }),
-        canonicalCellMarkup(`<button class="icon-button danger" data-action="deleteTag" title="Delete ${esc(entry.key)}" aria-label="Delete ${esc(entry.key)}">×</button>`, { className:"tag-delete-cell" })
+        canonicalCellMarkup(canonicalDeleteButtonMarkup("deleteTag", {
+          title:`Delete ${entry.key}`,
+          ariaLabel:`Delete ${entry.key}`
+        }), { className:"tag-delete-cell" })
       ];
       const row = canonicalRowMarkup(cells, { attributes:`data-tag-row data-tag-scope="${esc(scope)}" data-tag-from="${esc(entry.key)}"${foldAttribute}` });
       return CanonicalTable.rowWithUnfolds(row, multipleValues ? [{ foldID, content:unfoldedContent }] : []);
@@ -872,7 +864,10 @@
         canonicalCellMarkup('<input class="tag-table-field" data-new-tag-value placeholder="Tag Value" aria-label="New tag value">', { className:"tag-value-cell" }),
         canonicalCellMarkup('<input class="tag-table-field" value="—" aria-label="Uses" disabled>', { className:"tag-uses-cell" }),
         canonicalCellMarkup('<button class="icon-button" data-action="createPackageTag" title="Add package tag" aria-label="Add package tag">✓</button>', { className:"tag-submit-cell canonical-table-action-cell" }),
-        canonicalCellMarkup('<button class="icon-button danger" data-action="clearPackageTagDraft" title="Clear new tag" aria-label="Clear new tag">×</button>', { className:"tag-delete-cell canonical-table-action-cell" })
+        canonicalCellMarkup(canonicalDeleteButtonMarkup("clearPackageTagDraft", {
+          title:"Clear new tag",
+          ariaLabel:"Clear new tag"
+        }), { className:"tag-delete-cell canonical-table-action-cell" })
       ], { className:"tag-create-row", attributes:'data-new-tag-row data-tag-scope="package"' });
     const table = rowsFor(scope);
     const rows = scope === "Package" ? `${table.rows}${packageTagDraftRow()}` : table.rows;
@@ -1031,7 +1026,10 @@
         canonicalCellMarkup(`<input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name">`, { className:"tag-name-cell" }),
         canonicalCellMarkup(`<span class="tag-inline-editor">${valueMarkup}</span>`, { className:"tag-value-cell" }),
         canonicalCellMarkup(`<button class="icon-button" data-action="commitFileTag" title="Submit changed tag" aria-label="Submit changed tag">✓</button>`, { className:"tag-submit-cell" }),
-        canonicalCellMarkup(`<button class="icon-button danger" data-action="deleteFileTag" title="Delete tag" aria-label="Delete tag">×</button>`, { className:"tag-delete-cell" })
+        canonicalCellMarkup(canonicalDeleteButtonMarkup("deleteFileTag", {
+          title:"Delete tag",
+          ariaLabel:"Delete tag"
+        }), { className:"tag-delete-cell" })
       ];
       const row = canonicalRowMarkup(cells, { attributes:`data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"${foldAttribute}` });
       return CanonicalTable.rowWithUnfolds(row, structured ? [{ foldID, content:unfoldedContent }] : []);
@@ -1144,11 +1142,9 @@
       canonicalNumberCellMarkup(index + 1, `Value number ${index + 1}`, { className:"multiple-value-number-cell" }),
       canonicalCellMarkup(keyControl, { className:"tag-analyzer-json-key-cell" }),
       canonicalCellMarkup(valueControl, { className:"tag-analyzer-json-value-cell" }),
-      canonicalCellMarkup(canonicalActionBoxMarkup("×", {
-        action:"removeTagAnalyzerJSONEntry",
+      canonicalCellMarkup(canonicalDeleteButtonMarkup("removeTagAnalyzerJSONEntry", {
         title:`Remove ${childTitle}`,
-        ariaLabel:`Remove ${childTitle}`,
-        danger:true
+        ariaLabel:`Remove ${childTitle}`
       }), { className:"canonical-table-action-cell" })
     ], { className:"tag-analyzer-json-entry-row", attributes:`data-json-entry data-json-entry-index="${index}" data-json-entry-id="${entryID}" data-json-entry-kind="${structured ? "node" : "scalar"}" data-json-entry-stringified="${nestedValue?.encodedString === true}"${structured ? ` data-json-entry-fold-id="${esc(childFoldID)}"` : ""}` });
     if (!structured) return row;
@@ -1176,8 +1172,7 @@
       titleAction:tagAnalyzerJSONTitleActions(foldID),
       ariaLabel:`Nested values for ${title}`,
       header:canonicalHeaderMarkup(["#", isArray ? "Index" : "Key", "Value", "×"], {
-        className:"multiple-values-table-header-row",
-        actionCell:(label, index) => index === 3 ? { danger:true, ariaLabel:"Delete value column" } : null
+        className:"multiple-values-table-header-row"
       }),
       rows,
       attributes:`data-json-node data-json-node-kind="${isArray ? "array" : "object"}" data-json-node-fold-id="${esc(foldID)}" data-json-node-title="${esc(title)}" data-json-next-entry-id="${entries.length}"`
@@ -1213,11 +1208,9 @@
       canonicalCellMarkup(nameControl, { className:"tag-analyzer-match-name-cell" }),
       canonicalCellMarkup(valueControl + '<small class="tag-analyzer-match-error" data-tag-analyzer-error></small>', { className:"tag-analyzer-match-value-cell" }),
       canonicalCellMarkup('<button class="icon-button" data-action="commitTagAnalyzerMatch" title="Save this tag field" aria-label="Save this tag field"' + disabled + '>✓</button>', { className:"canonical-table-action-cell" }),
-      canonicalCellMarkup(canonicalActionBoxMarkup("×", {
-        action:"deleteTagAnalyzerMatch",
+      canonicalCellMarkup(canonicalDeleteButtonMarkup("deleteTagAnalyzerMatch", {
         title:"Delete this tag field",
         ariaLabel:"Delete this tag field",
-        danger:true,
         disabled:state?.isDeletingTagAnalyzerTrackFields
       }), { className:"canonical-table-action-cell" })
     ], { className:"multiple-value-editor-row tag-analyzer-match-row", attributes:rowAttributes });
@@ -1229,11 +1222,7 @@
   }
 
   function tagAnalyzerFieldsSubtableMarkup(tagName, matches, foldID, archiveRelativePath) {
-    const header = canonicalHeaderMarkup(["#", "Track", "Tag Name", "Tag Value", "✓", "×"], {
-      actionCell:(label, index) => index === 5
-        ? { danger:true, title:"Delete this tag field", ariaLabel:"Delete this tag field" }
-        : null
-    });
+    const header = canonicalHeaderMarkup(["#", "Track", "Tag Name", "Tag Value", "✓", "×"]);
     const rows = matches.map((match, index) => tagAnalyzerFieldRowMarkup(tagName, match, index, foldID)).join("") ||
       canonicalEmptyRowMarkup("No matching tag fields", "multiple-values-empty");
     return new CanonicalTable({
@@ -1399,8 +1388,7 @@
         canonicalCellMarkup('<input class="tag-table-field" value="' + esc(tag.name) + '" title="' + esc(tag.name) + '" aria-label="Tag name ' + esc(tag.name) + '" disabled>', { className:"tag-name-cell" }),
         canonicalCellMarkup(toggle, { className:"tag-uses-cell" }),
         canonicalCellMarkup('<input class="tag-table-field" value="' + trackCount + '" aria-label="Tracks with ' + esc(tag.name) + '" disabled>', { className:"tag-uses-cell" }),
-        canonicalCellMarkup(canonicalActionBoxMarkup("×", {
-          action:"deleteTagAnalyzerTrackFields",
+        canonicalCellMarkup(canonicalDeleteButtonMarkup("deleteTagAnalyzerTrackFields", {
           data:{
             "tag-name":tag.name,
             "track-field-count":trackCount,
@@ -1409,9 +1397,8 @@
           },
           title:`Delete ${trackCount} track field(s) from ${trackArchives.length} matching package(s)`,
           ariaLabel:`Delete ${trackCount} track field(s) named ${tag.name} from ${trackArchives.length} matching package(s)`,
-          danger:true,
           disabled:trackCount < 1 || busy
-        }), { className:"canonical-table-action-cell tag-analyzer-delete-cell" })
+        }), { className:"canonical-table-action-cell" })
       ];
       const parentRow = canonicalRowMarkup(cells);
       const subtable = tagIsExpanded && hasCachedMatches
@@ -1434,14 +1421,7 @@
       columns:CanonicalTableColumns.tagAnalyzer,
       title:"Tag Names" + (state.tagAnalyzerHasResult ? " · " + visibleTags.length : ""),
       ariaLabel:"Tag names, matched packs, and tracks",
-      header:canonicalHeaderMarkup(["#", "Tag Name", "Matched Packs", "Tracks", "×"], {
-        actionCell:(label, index) => index === 4 ? {
-          danger:true,
-          title:"Delete matching track fields",
-          ariaLabel:"Delete matching track fields",
-          cellClassName:"tag-analyzer-delete-header"
-        } : null
-      }),
+      header:canonicalHeaderMarkup(["#", "Tag Name", "Matched Packs", "Tracks", "×"]),
       rows,
       empty:canonicalEmptyRowMarkup(esc(emptyMessage), "tag-analyzer-empty")
     });

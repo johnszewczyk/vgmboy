@@ -56,6 +56,11 @@
   nested rows inherit only their own table's column tracks. Tag Analyzer's
   parent, pack, occurrence, and recursive JSON tables all use this class; their
   differences belong in their schema and cell content.
+- Generate visible row deletion controls with `canonicalDeleteButtonMarkup`.
+  It must emit the same fixed-size `.icon-button.danger` used on Track Tags;
+  do not put a full-width `.tag-table-field` box in a narrow action column.
+  Table-title close buttons keep that button geometry but use the accent color.
+  A header's `×` is a plain canonical heading cell, not a second delete button.
 - Canonical title rows share the compact 27 px baseline used by table headers
   and content rows. Let tall controls such as JSON textareas grow their own
   row; do not increase every row in a nested value table to accommodate them.

@@ -95,6 +95,7 @@ button { cursor:pointer; }
 .canonical-table .icon-button { width:23px; height:23px; padding:0; border:1px solid var(--line); border-radius:3px; background:transparent; color:var(--muted); cursor:pointer; }
 .canonical-table .icon-button:hover { color:var(--text); border-color:var(--accent); }
 .canonical-table .icon-button.danger,.canonical-table .danger { color:var(--danger, #e06c75); }
+.canonical-table .icon-button:disabled { opacity:.42; cursor:default; }
 .canonical-number-cell { justify-content:center; }
 .canonical-number-field { text-align:center; padding-right:0!important; padding-left:0!important; }
 .tag-values-popover { position:relative; display:inline-block; }
@@ -124,11 +125,6 @@ button { cursor:pointer; }
 .structured-technical-row .tag-table-field:disabled { cursor:not-allowed; }
 
 .canonical-table-heading-input { text-align:center; font-weight:700; color:var(--text)!important; background:var(--panel-2)!important; border-color:var(--line)!important; cursor:default; }
-.canonical-table .canonical-action-box { display:flex; align-items:center; justify-content:center; padding:0; line-height:1; }
-.canonical-table .canonical-action-box.danger { color:var(--danger,#e06c75)!important; }
-.canonical-table button.canonical-action-box:not(:disabled) { cursor:pointer; }
-.canonical-table button.canonical-action-box:disabled { opacity:.42; cursor:default; }
-.canonical-table button.canonical-action-box.danger:hover:not(:disabled) { border-color:var(--danger,#e06c75)!important; background:var(--hover)!important; }
 .files-table { min-width:1120px; width:100%; }
 .files-table .file-row { cursor:pointer; }
 .files-table .file-row:hover { background:var(--hover); }
@@ -209,7 +205,6 @@ button { cursor:pointer; }
 .editable-multiple-values .multiple-value-editor:focus { border-color:var(--accent); outline:0; }
 .multiple-values-editor-actions { display:flex; justify-content:flex-end; gap:3px; padding:3px 2px 1px; }
 .multiple-values-editor-actions .icon-button { width:22px; height:22px; padding:0; }
-.multiple-value-editor-row .multiple-value-remove { width:22px; height:22px; padding:0; }
 .multiple-values-editor-error { min-height:0; padding:0; color:var(--danger,#e06c75); font-size:9px; }
 .multiple-values-editor-error:empty,.multiple-values-popup-error:empty { display:none; }
 
@@ -499,6 +494,7 @@ button { cursor:pointer; }
 .canonical-table-title-content > input { flex:1 1 auto; min-width:0; }
 .canonical-table-title-action { display:flex; flex:none; align-items:center; }
 .canonical-table-title-close { width:23px!important; height:23px!important; min-width:23px!important; padding:0!important; }
+.canonical-table .icon-button.canonical-table-title-close { color:var(--accent); font-size:15px; }
 .canonical-table .tag-number-cell,
 .canonical-table .tag-create-number,
 .canonical-table .multiple-value-number { text-align:center; }
@@ -536,8 +532,6 @@ button { cursor:pointer; }
 .canonical-tag-table .tag-create-row .canonical-table-cell { box-sizing:border-box; }
 .canonical-tag-table .tag-create-row .tag-submit-cell,
 .canonical-tag-table .tag-create-row .tag-delete-cell { justify-content:center; }
-
-.tag-analyzer-delete-header,.tag-analyzer-delete-cell { justify-content:center; }
 
 .new-tag-page { grid-template-columns:33rem minmax(0,1fr); }
 .new-tag-checkbox-cell input[type="checkbox"] { width:13px; height:13px; margin:0; accent-color:var(--accent); }
