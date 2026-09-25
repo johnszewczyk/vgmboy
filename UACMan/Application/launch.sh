@@ -18,10 +18,10 @@ mkdir -p "$BUILD_DIR" "$MODULE_CACHE"
 export CLANG_MODULE_CACHE_PATH="$MODULE_CACHE"
 export SWIFTPM_MODULECACHE_OVERRIDE="$MODULE_CACHE"
 
-# The PNG artwork is the source of truth for both the application and UAC
-# document icon. Regenerate the multi-resolution ICNS before packaging so a
-# build never silently uses stale icon artwork.
-python3 "$APPLICATION_DIR/DocumentIcon/build_icns.py"
+# The PNG artwork is the application icon source of truth. UAC files use the
+# system's generic document icon. Regenerate the multi-resolution ICNS before
+# packaging so a build never silently uses stale app artwork.
+python3 "$APPLICATION_DIR/AppIcon/build_app_icns.py"
 
 swift build \
   --package-path "$PROJECT_DIR" \
@@ -37,7 +37,7 @@ mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp "$SWIFTPM_DIR/release/UACManApp" "$APP_DIR/Contents/MacOS/UACManApp"
 cp "$APPLICATION_DIR/Resources/Info.plist" "$APP_DIR/Contents/Info.plist"
 cp "$APPLICATION_DIR/Resources/PkgInfo" "$APP_DIR/Contents/PkgInfo"
-cp "$APPLICATION_DIR/DocumentIcon/UACDocumentIcon.icns" "$APP_DIR/Contents/Resources/UACDocumentIcon.icns"
+cp "$APPLICATION_DIR/AppIcon/UACManAppIcon.icns" "$APP_DIR/Contents/Resources/UACManAppIcon.icns"
 RESOURCE_BUNDLE="$SWIFTPM_DIR/release/UACMan_UACManApp.bundle"
 [[ -d "$RESOURCE_BUNDLE" ]] || { echo "Missing WKWebView workspace resources: $RESOURCE_BUNDLE" >&2; exit 1; }
 ditto "$RESOURCE_BUNDLE" "$APP_DIR/Contents/Resources/UACMan_UACManApp.bundle"

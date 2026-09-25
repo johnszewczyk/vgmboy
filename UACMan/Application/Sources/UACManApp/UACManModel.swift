@@ -170,6 +170,7 @@ final class UACManModel {
     private enum PreferenceKey {
         static let lastDocumentPath = "UACMan.lastDocumentPath"
         static let lastCollectionPath = "UACMan.lastCollectionPath"
+        static let lastTagAnalyzerPath = "UACMan.lastTagAnalyzerPath"
     }
 
     var documentURL: URL?
@@ -193,6 +194,24 @@ final class UACManModel {
     var selectedCollectionPackagePath: String?
     var isScanningCollection = false
     var collectionStatusMessage = "Choose a folder to browse its UAC packages."
+    var tagAnalyzerRootURL: URL?
+    var tagAnalyzerTags: [UACTagNameUsage] = []
+    var tagAnalyzerSelectedMatchesTagName: String?
+    var tagAnalyzerSelectedMatches: [UACTagFieldMatch] = []
+    var tagAnalyzerIssues: [UACCollectionIssue] = []
+    var tagAnalyzerProgress = UACTagAnalysisProgress(
+        phase: .discovering,
+        directoriesVisited: 0,
+        packagesFound: 0,
+        packagesProcessed: 0,
+        totalPackages: 0,
+        currentRelativePath: "",
+        uniqueTagCount: 0
+    )
+    var tagAnalyzerStatusMessage = "Choose a folder path to inventory its UAC tag names."
+    var isAnalyzingTagNames = false
+    var isCancellingTagAnalysis = false
+    var tagAnalyzerHasResult = false
     var hasUnsavedChanges = false
     var isHarvestingMetadata = false
     var harvestProgressMessage = ""
@@ -208,6 +227,9 @@ final class UACManModel {
     @ObservationIgnored private var harvestTask: Task<Void, Never>?
     @ObservationIgnored private var collectionScanTask: Task<Void, Never>?
     @ObservationIgnored private var collectionScanID: UUID?
+    @ObservationIgnored private var tagAnalysisTask: Task<Void, Never>?
+    @ObservationIgnored private var tagAnalysisID: UUID?
+    @ObservationIgnored private var lastTagAnalysisProgressUpdate = 0.0
 
     var selectedMember: UACMember? {
         guard let selectedMemberPath else { return nil }
@@ -315,6 +337,55 @@ final class UACManModel {
             "collectionIssues": collectionIssues.map { ["relativePath": $0.relativePath, "message": $0.message] },
             "selectedCollectionPackagePath": selectedCollectionPackagePath ?? NSNull(),
             "isScanningCollection": isScanningCollection,
+            "tagAnalyzerRootPath": tagAnalyzerRootURL?.path ?? "",
+            "tagAnalyzerTags": tagAnalyzerTags.map { tag in
+                let archiveMatches = Dictionary(grouping: tag.matches, by: \.archiveRelativePath)
+                    .map { archivePath, matches -> (String, Int) in
+                        (archivePath, matches.filter(\.isTrack).count)
+                    }
+                    .sorted { $0.0.localizedStandardCompare($1.0) == .orderedAscending }
+                    .map { ["relativePath": $0.0, "trackCount": $0.1] as [String: Any] }
+                return [
+                    "name": tag.name,
+                    "matchedPackCount": tag.matchedPackCount,
+                    "trackCount": tag.trackCount,
+                    "archiveMatches": archiveMatches
+                ] as [String: Any]
+            },
+            "tagAnalyzerSelectedMatchesTagName": tagAnalyzerSelectedMatchesTagName ?? "",
+            "tagAnalyzerSelectedMatches": tagAnalyzerSelectedMatches.map { match in
+                [
+                    "archiveRelativePath": match.archiveRelativePath,
+                    "archiveAlbum": match.archiveAlbum,
+                    "archiveTitle": match.archiveTitle,
+                    "archiveConsole": match.archiveConsole,
+                    "archiveTrackCount": match.archiveTrackCount,
+                    "memberRelativePath": match.memberRelativePath ?? "",
+                    "scope": match.scope,
+                    "storageScope": match.storageScope,
+                    "storageKey": match.storageKey,
+                    "isTrack": match.isTrack,
+                    "value": match.value,
+                    "valueJSON": match.valueJSON,
+                    "valueIsJSON": match.valueIsJSON
+                ] as [String: Any]
+            },
+            "tagAnalyzerIssues": tagAnalyzerIssues.map { issue in
+                ["relativePath": issue.relativePath, "message": issue.message]
+            },
+            "tagAnalyzerProgress": [
+                "phase": tagAnalyzerProgress.phase.rawValue,
+                "directoriesVisited": tagAnalyzerProgress.directoriesVisited,
+                "packagesFound": tagAnalyzerProgress.packagesFound,
+                "packagesProcessed": tagAnalyzerProgress.packagesProcessed,
+                "totalPackages": tagAnalyzerProgress.totalPackages,
+                "currentRelativePath": tagAnalyzerProgress.currentRelativePath,
+                "uniqueTagCount": tagAnalyzerProgress.uniqueTagCount
+            ] as [String: Any],
+            "tagAnalyzerStatusMessage": tagAnalyzerStatusMessage,
+            "isAnalyzingTagNames": isAnalyzingTagNames,
+            "isCancellingTagAnalysis": isCancellingTagAnalysis,
+            "tagAnalyzerHasResult": tagAnalyzerHasResult,
             "allMemberCount": allMemberCount,
             "manifestEncodingDescription": manifestEncodingDescription,
             "hasUnsavedChanges": hasUnsavedChanges,
@@ -355,13 +426,17 @@ final class UACManModel {
     func openCommandLineFileIfPresent() {
         guard !handledCommandLineFile else { return }
         handledCommandLineFile = true
+        let defaults = UserDefaults.standard
+        if let path = defaults.string(forKey: PreferenceKey.lastTagAnalyzerPath), !path.isEmpty {
+            tagAnalyzerRootURL = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+            tagAnalyzerStatusMessage = "Restored the previous folder path. Choose & Analyze to scan it again."
+        }
         if let argument = ProcessInfo.processInfo.arguments.dropFirst().first,
            !argument.hasPrefix("-") {
             openDocument(URL(fileURLWithPath: argument))
             return
         }
 
-        let defaults = UserDefaults.standard
         if let path = defaults.string(forKey: PreferenceKey.lastDocumentPath),
            FileManager.default.fileExists(atPath: path) {
             openDocument(URL(fileURLWithPath: path))
@@ -428,6 +503,401 @@ final class UACManModel {
 
     func cancelCurrentCollectionScan() {
         collectionScanTask?.cancel()
+    }
+
+    func chooseTagAnalyzerFolderPanel() {
+        guard !isAnalyzingTagNames else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsOtherFileTypes = false
+        panel.prompt = "Choose Folder"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let root = url.standardizedFileURL
+        tagAnalyzerRootURL = root
+        UserDefaults.standard.set(root.path, forKey: PreferenceKey.lastTagAnalyzerPath)
+        startTagAnalysis()
+    }
+
+    func startTagAnalysis() {
+        guard !isAnalyzingTagNames else { return }
+        guard let root = tagAnalyzerRootURL else {
+            errorMessage = "Choose a folder path before analyzing tag names."
+            return
+        }
+
+        let scanID = UUID()
+        tagAnalysisID = scanID
+        isAnalyzingTagNames = true
+        isCancellingTagAnalysis = false
+        tagAnalyzerHasResult = false
+        tagAnalyzerTags = []
+        tagAnalyzerSelectedMatchesTagName = nil
+        tagAnalyzerSelectedMatches = []
+        tagAnalyzerIssues = []
+        tagAnalyzerProgress = UACTagAnalysisProgress(
+            phase: .discovering,
+            directoriesVisited: 0,
+            packagesFound: 0,
+            packagesProcessed: 0,
+            totalPackages: 0,
+            currentRelativePath: "",
+            uniqueTagCount: 0
+        )
+        tagAnalyzerStatusMessage = "Finding UAC packages…"
+        statusMessage = "Analyzing UAC tag names…"
+        errorMessage = nil
+        lastTagAnalysisProgressUpdate = 0
+
+        let manifestDecoder = codec.decoder
+        let progressRelay = UACTagAnalysisProgressRelay(model: self, scanID: scanID)
+        tagAnalysisTask = Task.detached(priority: .userInitiated) { [weak self, progressRelay] in
+            do {
+                let result = try UACTagAnalyzer.analyze(
+                    root: root,
+                    manifestReader: { packageURL in
+                        try UACContainerReader.read(
+                            from: packageURL,
+                            decompressManifestFrame: manifestDecoder
+                        ).manifest
+                    },
+                    progress: { progress in
+                        Task { @MainActor in
+                            progressRelay.report(progress)
+                        }
+                    }
+                )
+                await self?.finishTagAnalysis(result, scanID: scanID, root: root)
+            } catch is CancellationError {
+                await self?.cancelTagAnalysis(scanID: scanID)
+            } catch {
+                await self?.failTagAnalysis(error, scanID: scanID, root: root)
+            }
+        }
+    }
+
+    func cancelTagAnalysis() {
+        guard isAnalyzingTagNames, !isCancellingTagAnalysis else { return }
+        isCancellingTagAnalysis = true
+        tagAnalyzerStatusMessage = "Cancelling after the current manifest read…"
+        tagAnalysisTask?.cancel()
+    }
+
+    func loadTagAnalyzerMatches(tagName: String) {
+        guard tagAnalyzerHasResult,
+              let tag = tagAnalyzerTags.first(where: { $0.name == tagName }) else { return }
+        tagAnalyzerSelectedMatchesTagName = tag.name
+        tagAnalyzerSelectedMatches = tag.matches
+    }
+
+    func commitTagAnalyzerMatch(
+        tagName: String,
+        archiveRelativePath: String,
+        memberRelativePath: String,
+        storageScope: String,
+        storageKey: String,
+        expectedValueJSON: String,
+        newName: String,
+        value: String,
+        valueIsJSON: Bool
+    ) {
+        let replacement: UACJSONValue
+        if valueIsJSON {
+            guard let data = value.data(using: .utf8),
+                  let decoded = try? JSONDecoder().decode(UACJSONValue.self, from: data) else {
+                errorMessage = "Enter a valid JSON value before submitting this field."
+                return
+            }
+            replacement = decoded
+        } else {
+            replacement = .string(value)
+        }
+        rewriteTagAnalyzerMatch(
+            tagName: tagName,
+            archiveRelativePath: archiveRelativePath,
+            memberRelativePath: memberRelativePath,
+            storageScope: storageScope,
+            storageKey: storageKey,
+            expectedValueJSON: expectedValueJSON,
+            newName: newName,
+            replacement: replacement
+        )
+    }
+
+    func deleteTagAnalyzerMatch(
+        tagName: String,
+        archiveRelativePath: String,
+        memberRelativePath: String,
+        storageScope: String,
+        storageKey: String,
+        expectedValueJSON: String
+    ) {
+        rewriteTagAnalyzerMatch(
+            tagName: tagName,
+            archiveRelativePath: archiveRelativePath,
+            memberRelativePath: memberRelativePath,
+            storageScope: storageScope,
+            storageKey: storageKey,
+            expectedValueJSON: expectedValueJSON,
+            newName: tagName,
+            replacement: nil
+        )
+    }
+
+    private func rewriteTagAnalyzerMatch(
+        tagName: String,
+        archiveRelativePath: String,
+        memberRelativePath: String,
+        storageScope: String,
+        storageKey: String,
+        expectedValueJSON: String,
+        newName: String,
+        replacement: UACJSONValue?
+    ) {
+        guard tagAnalyzerHasResult,
+              let tag = tagAnalyzerTags.first(where: { $0.name == tagName }),
+              let match = tag.matches.first(where: {
+                  $0.archiveRelativePath == archiveRelativePath
+                      && ($0.memberRelativePath ?? "") == memberRelativePath
+                      && $0.storageScope == storageScope
+                      && $0.storageKey == storageKey
+                      && $0.valueJSON == expectedValueJSON
+              }),
+              let root = tagAnalyzerRootURL?.standardizedFileURL else {
+            errorMessage = "The selected tag match is no longer available. Run the analyzer again."
+            return
+        }
+
+        let archiveURL = root.appendingPathComponent(archiveRelativePath).standardizedFileURL
+        guard archiveURL.path.hasPrefix(root.path + "/"), archiveURL.path == match.archiveURL.standardizedFileURL.path else {
+            errorMessage = "The matched archive is outside the selected folder or has moved. Run the analyzer again."
+            return
+        }
+
+        let normalizedName: String
+        let trimmedName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if storageScope.hasSuffix("Extensions"), !trimmedName.hasPrefix("extension.") {
+            normalizedName = "extension." + trimmedName
+        } else {
+            normalizedName = trimmedName
+        }
+        do {
+            try UACTagAnalyzerEditor.rewrite(
+                match: match,
+                expectedValueJSON: expectedValueJSON,
+                newName: normalizedName,
+                newValue: replacement,
+                compressManifestFrame: codec.encoder,
+                decompressManifestFrame: codec.decoder
+            )
+            updateTagAnalyzerResults(
+                tagName: tagName,
+                match: match,
+                newName: normalizedName,
+                replacement: replacement
+            )
+            errorMessage = nil
+            let action = replacement == nil ? "Removed" : "Updated"
+            tagAnalyzerStatusMessage = "\(action) \(normalizedName) in \(archiveRelativePath)."
+            statusMessage = tagAnalyzerStatusMessage
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func updateTagAnalyzerResults(
+        tagName: String,
+        match: UACTagFieldMatch,
+        newName: String,
+        replacement: UACJSONValue?
+    ) {
+        let destinationName = replacement == nil ? nil : newName
+        let newStorageKey = destinationName.map { name in
+            match.storageScope.hasSuffix("Extensions") ? String(name.dropFirst("extension.".count)) : name
+        }
+        let updatedMatch = replacement.map { value in
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+            let valueJSON = (try? encoder.encode(value)).flatMap { String(data: $0, encoding: .utf8) } ?? "null"
+            return UACTagFieldMatch(
+                archiveRelativePath: match.archiveRelativePath,
+                archiveURL: match.archiveURL,
+                archiveAlbum: match.archiveAlbum,
+                archiveTitle: match.archiveTitle,
+                archiveConsole: match.archiveConsole,
+                archiveTrackCount: match.archiveTrackCount,
+                memberRelativePath: match.memberRelativePath,
+                scope: match.scope,
+                storageScope: match.storageScope,
+                storageKey: newStorageKey ?? match.storageKey,
+                isTrack: match.isTrack,
+                value: analyzerValueDisplay(value, valueJSON: valueJSON),
+                valueJSON: valueJSON,
+                valueIsJSON: analyzerValueIsJSON(value)
+            )
+        }
+
+        func removingOccurrence(from usage: UACTagNameUsage) -> UACTagNameUsage {
+            let remaining = usage.matches.filter { !$0.isSameTagAnalyzerMatch(as: match) }
+            let stillInArchive = remaining.contains { $0.archiveRelativePath == match.archiveRelativePath }
+            return UACTagNameUsage(
+                name: usage.name,
+                matchedPackCount: max(0, usage.matchedPackCount - (stillInArchive ? 0 : 1)),
+                trackCount: max(0, usage.trackCount - (match.isTrack ? 1 : 0)),
+                matches: remaining
+            )
+        }
+
+        if destinationName == tagName, let updatedMatch,
+           let index = tagAnalyzerTags.firstIndex(where: { $0.name == tagName }) {
+            let usage = tagAnalyzerTags[index]
+            let remaining = usage.matches.filter { !$0.isSameTagAnalyzerMatch(as: match) } + [updatedMatch]
+            tagAnalyzerTags[index] = UACTagNameUsage(
+                name: usage.name,
+                matchedPackCount: usage.matchedPackCount,
+                trackCount: usage.trackCount,
+                matches: remaining.sorted(by: Self.tagAnalyzerMatchOrder)
+            )
+        } else {
+            if let index = tagAnalyzerTags.firstIndex(where: { $0.name == tagName }) {
+                let oldUsage = removingOccurrence(from: tagAnalyzerTags[index])
+                if oldUsage.matches.isEmpty { tagAnalyzerTags.remove(at: index) }
+                else { tagAnalyzerTags[index] = oldUsage }
+            }
+            if let destinationName, let updatedMatch {
+                if let index = tagAnalyzerTags.firstIndex(where: { $0.name == destinationName }) {
+                    let usage = tagAnalyzerTags[index]
+                    let alreadyInArchive = usage.matches.contains { $0.archiveRelativePath == match.archiveRelativePath }
+                    tagAnalyzerTags[index] = UACTagNameUsage(
+                        name: usage.name,
+                        matchedPackCount: usage.matchedPackCount + (alreadyInArchive ? 0 : 1),
+                        trackCount: usage.trackCount + (match.isTrack ? 1 : 0),
+                        matches: (usage.matches + [updatedMatch]).sorted(by: Self.tagAnalyzerMatchOrder)
+                    )
+                } else {
+                    tagAnalyzerTags.append(UACTagNameUsage(
+                        name: destinationName,
+                        matchedPackCount: 1,
+                        trackCount: match.isTrack ? 1 : 0,
+                        matches: [updatedMatch]
+                    ))
+                }
+            }
+        }
+        tagAnalyzerTags.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+
+        if let selectedName = tagAnalyzerSelectedMatchesTagName,
+           let selectedUsage = tagAnalyzerTags.first(where: { $0.name == selectedName }) {
+            tagAnalyzerSelectedMatches = selectedUsage.matches
+        } else if let destinationName,
+                  let selectedUsage = tagAnalyzerTags.first(where: { $0.name == destinationName }) {
+            tagAnalyzerSelectedMatchesTagName = destinationName
+            tagAnalyzerSelectedMatches = selectedUsage.matches
+        } else {
+            tagAnalyzerSelectedMatchesTagName = nil
+            tagAnalyzerSelectedMatches = []
+        }
+    }
+
+    private static func tagAnalyzerMatchOrder(_ lhs: UACTagFieldMatch, _ rhs: UACTagFieldMatch) -> Bool {
+        let archiveOrder = lhs.archiveRelativePath.localizedStandardCompare(rhs.archiveRelativePath)
+        if archiveOrder != .orderedSame { return archiveOrder == .orderedAscending }
+        let sourceOrder = (lhs.memberRelativePath ?? "").localizedStandardCompare(rhs.memberRelativePath ?? "")
+        if sourceOrder != .orderedSame { return sourceOrder == .orderedAscending }
+        return lhs.scope.localizedStandardCompare(rhs.scope) == .orderedAscending
+    }
+
+    private func analyzerValueDisplay(_ value: UACJSONValue, valueJSON: String) -> String {
+        return switch value {
+        case .null: "null"
+        case .bool(let value): value ? "true" : "false"
+        case .integer(let value): String(value)
+        case .number(let value): String(value)
+        case .string(let value): value
+        case .array, .object: valueJSON
+        }
+    }
+
+    private func analyzerValueIsJSON(_ value: UACJSONValue) -> Bool {
+        return switch value {
+        case .string: false
+        case .null, .bool, .integer, .number, .array, .object: true
+        }
+    }
+
+    fileprivate func receiveTagAnalysisProgress(_ progress: UACTagAnalysisProgress, scanID: UUID) {
+        guard tagAnalysisID == scanID, isAnalyzingTagNames else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        let phaseChanged = progress.phase != tagAnalyzerProgress.phase
+        let finalRead = progress.phase == .reading && progress.packagesProcessed >= progress.totalPackages
+        guard phaseChanged || finalRead || now - lastTagAnalysisProgressUpdate >= 0.12 else { return }
+
+        tagAnalyzerProgress = progress
+        lastTagAnalysisProgressUpdate = now
+        switch progress.phase {
+        case .discovering:
+            tagAnalyzerStatusMessage = "Finding packages · \(progress.directoriesVisited) folder(s) checked · \(progress.packagesFound) UAC package(s) found"
+        case .reading:
+            tagAnalyzerStatusMessage = "Reading package \(progress.packagesProcessed) of \(progress.totalPackages) · \(progress.uniqueTagCount) tag name(s) found"
+        }
+        statusMessage = tagAnalyzerStatusMessage
+    }
+
+    private func finishTagAnalysis(_ result: UACTagAnalysisResult, scanID: UUID, root: URL) {
+        guard tagAnalysisID == scanID, tagAnalyzerRootURL == root else { return }
+        tagAnalysisTask = nil
+        tagAnalysisID = nil
+        isAnalyzingTagNames = false
+        isCancellingTagAnalysis = false
+        tagAnalyzerTags = result.tags
+        tagAnalyzerIssues = result.issues
+        tagAnalyzerHasResult = true
+        tagAnalyzerProgress = UACTagAnalysisProgress(
+            phase: .reading,
+            directoriesVisited: tagAnalyzerProgress.directoriesVisited,
+            packagesFound: result.packageCount,
+            packagesProcessed: result.packageCount,
+            totalPackages: result.packageCount,
+            currentRelativePath: "",
+            uniqueTagCount: result.tags.count
+        )
+
+        if result.packageCount == 0 && result.issues.isEmpty {
+            tagAnalyzerStatusMessage = "No .uac packages found in this folder."
+        } else if result.issues.isEmpty {
+            tagAnalyzerStatusMessage = "Analyzed \(result.packagesRead) package(s) · \(result.tags.count) unique tag name(s)."
+        } else {
+            tagAnalyzerStatusMessage = "Read \(result.packagesRead) of \(result.packageCount) package(s) · \(result.tags.count) tag name(s) · \(result.issues.count) issue(s); the list may be incomplete."
+        }
+        statusMessage = tagAnalyzerStatusMessage
+    }
+
+    private func cancelTagAnalysis(scanID: UUID) {
+        guard tagAnalysisID == scanID else { return }
+        tagAnalysisTask = nil
+        tagAnalysisID = nil
+        isAnalyzingTagNames = false
+        isCancellingTagAnalysis = false
+        tagAnalyzerTags = []
+        tagAnalyzerIssues = []
+        tagAnalyzerHasResult = false
+        tagAnalyzerStatusMessage = "Tag analysis cancelled. Run it again to produce a complete list."
+        statusMessage = tagAnalyzerStatusMessage
+    }
+
+    private func failTagAnalysis(_ error: Error, scanID: UUID, root: URL) {
+        guard tagAnalysisID == scanID, tagAnalyzerRootURL == root else { return }
+        tagAnalysisTask = nil
+        tagAnalysisID = nil
+        isAnalyzingTagNames = false
+        isCancellingTagAnalysis = false
+        tagAnalyzerTags = []
+        tagAnalyzerIssues = []
+        tagAnalyzerHasResult = false
+        tagAnalyzerStatusMessage = "Could not analyze tag names in this folder."
+        statusMessage = tagAnalyzerStatusMessage
+        errorMessage = error.localizedDescription
     }
 
     func selectCollectionPackage(_ relativePath: String) {
@@ -1260,6 +1730,21 @@ final class UACManModel {
 }
 
 @MainActor
+private final class UACTagAnalysisProgressRelay {
+    weak var model: UACManModel?
+    let scanID: UUID
+
+    init(model: UACManModel, scanID: UUID) {
+        self.model = model
+        self.scanID = scanID
+    }
+
+    func report(_ progress: UACTagAnalysisProgress) {
+        model?.receiveTagAnalysisProgress(progress, scanID: scanID)
+    }
+}
+
+@MainActor
 private final class SPCMetadataProgressRelay {
     weak var model: UACManModel?
 
@@ -1308,5 +1793,14 @@ private enum UACManError: Error, LocalizedError {
         case .atomicReplaceFailed(let message):
             return "Could not atomically replace the UAC: \(message)"
         }
+    }
+}
+
+private extension UACTagFieldMatch {
+    func isSameTagAnalyzerMatch(as other: UACTagFieldMatch) -> Bool {
+        archiveRelativePath == other.archiveRelativePath
+            && memberRelativePath == other.memberRelativePath
+            && storageScope == other.storageScope
+            && storageKey == other.storageKey
     }
 }

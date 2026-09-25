@@ -15,7 +15,7 @@
 	<key>CFBundleName</key>
 	<string>UACMan</string>
 	<key>CFBundleIconFile</key>
-	<string>UACDocumentIcon.icns</string>
+	<string>UACManAppIcon.icns</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -27,8 +27,6 @@
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
-			<key>UTTypeIconFile</key>
-			<string>UACDocumentIcon.icns</string>
 			<key>UTTypeConformsTo</key>
 			<array><string>public.data</string></array>
 			<key>UTTypeDescription</key>
@@ -47,8 +45,6 @@
 		<dict>
 			<key>CFBundleTypeName</key>
 			<string>UAC Package</string>
-			<key>CFBundleTypeIconFile</key>
-			<string>UACDocumentIcon.icns</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>

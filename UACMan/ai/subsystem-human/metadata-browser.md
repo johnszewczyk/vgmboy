@@ -33,8 +33,8 @@ structured values show a stable `[Nested Tags]` placeholder and open as plain
 text in a popup. Aggregate rows with different structured values remain
 read-only until a single value is unambiguous.
 
-The workspace has five explicit pages in this order: **Files**, **Pack Tags**,
-**Tracks**, **Track Tags**, and **New Tag**. Pages have no secondary page heading. **Tracks**
+The workspace has six explicit pages in this order: **Files**, **Pack Tags**,
+**Tracks**, **Track Tags**, **New Tag**, and **Tag Analyzer**. **Tracks**
 is the wide canonical giga-table: every header and value is a boxed field, and
 its horizontal scroll belongs to the workspace surface rather than a nested
 table window. **Files** lists every stored package member, including playable
@@ -65,6 +65,33 @@ dimmed popup for structured JSON, so its row geometry remains fixed.
 When a single UAC is opened directly, the library rail collapses automatically;
 it returns when a collection is opened. The last existing UAC or collection path
 is restored on launch when no command-line document was supplied.
+
+**Tag Analyzer** (Beta) is a separate workspace page that works with or without
+an open package. **Choose & Analyze…** selects a folder and immediately scans
+its regular `.uac` packages recursively. The selected folder path is restored
+when UACMan launches again. The app-bar search filters package filenames in the
+current analyzer results; matching tag names and their pack/track counts update
+with the filter.
+
+The analyzer lists exact tag field names from package metadata, package
+extensions, every member's metadata, and member extensions; extension names are
+shown with the `extension.` namespace. Its canonical numbered table shows the
+number of matching packs and playable tracks for each field. A pack counts once
+per field even when that field appears in multiple places in its manifest.
+Matches are by exact field name, not by value, so one field such as **Source
+RSN** can match multiple packages with different values. Opening a matched-pack
+count expands an animated canonical table with each package filename, track
+count, and a **Tag Fields** expander. Each pack row opens another animated
+canonical table with **#**, **Track**, **Tag Name**, **Tag Value**, **✓**, and
+**×** columns. Track filenames occupy their own cells; package-level fields
+show **Package** in the Track column. Both nested tables use the shared title
+row and close control.
+
+The ✓ action updates one manifest field; × removes that one field after
+confirmation. Both preserve the archive's compressed members. Progress reports
+folder discovery and package reads, and **Cancel** stops the scan. Cancelling
+clears the incomplete list. Unreadable folders or packages are reported, and
+their presence marks the result as potentially incomplete.
 
 The shared game metadata may use flat camelCase set fields such as `setName`,
 `setUrl`, and `setCollection` for a concise source-set summary. The complete
@@ -123,7 +150,7 @@ not own the application or wrapper. UACMan does not provide playback.
 - `Application/Sources/UACManCore/SPCMetadataHarvester.swift`
 - `Application/Sources/UACManCore/SPCMetadataProjection.swift`
 - `Application/Resources/Info.plist`
-- `Application/DocumentIcon/UACDocumentIcon.png`
-- `Application/DocumentIcon/build_icns.py`
-- `Application/DocumentIcon/UACDocumentIcon.icns`
+- `Application/AppIcon/UACManAppIcon.png`
+- `Application/AppIcon/build_app_icns.py`
+- `Application/AppIcon/UACManAppIcon.icns`
 - `Application/launch.sh`

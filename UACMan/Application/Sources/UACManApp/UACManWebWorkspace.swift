@@ -80,6 +80,31 @@ struct UACManWebWorkspace: NSViewRepresentable {
                     model.openCollection(URL(fileURLWithPath: path))
                 }
             case "cancelCollectionScan": model.cancelCurrentCollectionScan()
+            case "chooseTagAnalyzerFolder": model.chooseTagAnalyzerFolderPanel()
+            case "cancelTagAnalysis": model.cancelTagAnalysis()
+            case "loadTagAnalyzerMatches":
+                model.loadTagAnalyzerMatches(tagName: payload["tagName"] as? String ?? "")
+            case "commitTagAnalyzerMatch":
+                model.commitTagAnalyzerMatch(
+                    tagName: payload["tagName"] as? String ?? "",
+                    archiveRelativePath: payload["archiveRelativePath"] as? String ?? "",
+                    memberRelativePath: payload["memberRelativePath"] as? String ?? "",
+                    storageScope: payload["storageScope"] as? String ?? "",
+                    storageKey: payload["storageKey"] as? String ?? "",
+                    expectedValueJSON: payload["expectedValueJSON"] as? String ?? "",
+                    newName: payload["newName"] as? String ?? "",
+                    value: payload["value"] as? String ?? "",
+                    valueIsJSON: payload["valueIsJSON"] as? Bool ?? false
+                )
+            case "deleteTagAnalyzerMatch":
+                model.deleteTagAnalyzerMatch(
+                    tagName: payload["tagName"] as? String ?? "",
+                    archiveRelativePath: payload["archiveRelativePath"] as? String ?? "",
+                    memberRelativePath: payload["memberRelativePath"] as? String ?? "",
+                    storageScope: payload["storageScope"] as? String ?? "",
+                    storageKey: payload["storageKey"] as? String ?? "",
+                    expectedValueJSON: payload["expectedValueJSON"] as? String ?? ""
+                )
             case "selectPackage":
                 if let path = payload["path"] as? String { model.selectCollectionPackage(path) }
             case "selectMember":

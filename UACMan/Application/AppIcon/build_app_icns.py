@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build UACMan's multi-resolution macOS document icon from its PNG artwork."""
+"""Build UACMan's multi-resolution app icon from its PNG artwork."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from pathlib import Path
 
 
 ASSET_DIR = Path(__file__).resolve().parent
-SOURCE = ASSET_DIR / "UACDocumentIcon.png"
-OUTPUT = ASSET_DIR / "UACDocumentIcon.icns"
+SOURCE = ASSET_DIR / "UACManAppIcon.png"
+OUTPUT = ASSET_DIR / "UACManAppIcon.icns"
 ICON_REPRESENTATIONS = (
     ("icp4", 16),
     ("icp5", 32),

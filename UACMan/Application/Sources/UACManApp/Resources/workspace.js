@@ -89,9 +89,9 @@
     const heading = `<input class="tag-table-field field-grid-heading-input" value="${esc(label)}" aria-label="${esc(label)}" disabled>`;
     return canonicalCellMarkup(heading, { ...options, className:["field-grid-heading", options.className].filter(Boolean).join(" "), role:"columnheader" });
   };
-  const canonicalTitleRowMarkup = (title, className = "canonical-table-title-row") => {
+  const canonicalTitleRowMarkup = (title, className = "") => {
     const titleCell = canonicalCellMarkup(`<input class="tag-table-field field-grid-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled>`, { className:"field-grid-heading", role:"columnheader" });
-    return canonicalRowMarkup([titleCell], { className:["field-grid-header", className].filter(Boolean).join(" ") });
+    return canonicalRowMarkup([titleCell], { className:["field-grid-header", "canonical-table-title-row", className].filter(Boolean).join(" ") });
   };
   const canonicalHeaderMarkup = (labels, options = {}) => canonicalRowMarkup(
     labels.map((label, index) => canonicalHeaderCellMarkup(label, options.cell?.(label, index) || {})),
@@ -128,11 +128,16 @@
     return `<details class="nested-json-dropdown"><summary class="nested-json-trigger"><span>[Nested Tags]</span><span class="canonical-fold-icon">＋</span></summary><div class="nested-json-panel">${body}</div></details>`;
   };
   const multipleValuesCloseMarkup = context => context.foldID
-    ? `<button class="tag-table-field field-grid-heading-input multiple-values-header-action multiple-values-subtable-close" data-action="closeCanonicalSubtable" data-fold-id="${esc(context.foldID)}" type="button" title="Close nested tags table" aria-label="Close nested tags table">×</button>`
+    ? `<button class="tag-table-field field-grid-heading-input multiple-values-header-action multiple-values-subtable-close" data-action="closeCanonicalSubtable" data-fold-id="${esc(context.foldID)}" ${context.closeAttributes || ""} type="button" title="Close nested tags table" aria-label="Close nested tags table">×</button>`
     : `<button class="tag-table-field field-grid-heading-input multiple-values-header-action multiple-values-popup-close" data-action="closeMultipleValuesPopup" data-popup-id="${esc(context.popupID || "")}" type="button" title="Close" aria-label="Close">×</button>`;
   const multipleValuesTableTitleRowMarkup = context => {
     const title = context.title || context.key || "Values";
-    return canonicalTitleRowMarkup(title, "multiple-values-table-title-row");
+    if (!context.titleClose) return canonicalTitleRowMarkup(title, "multiple-values-table-title-row");
+    const heading = `<input class="tag-table-field field-grid-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled>`;
+    const titleControl = `<div class="multiple-values-table-title-control">${heading}${multipleValuesCloseMarkup(context)}</div>`;
+    return canonicalRowMarkup([
+      canonicalCellMarkup(titleControl, { className:"field-grid-heading", role:"columnheader" })
+    ], { className:"field-grid-header canonical-table-title-row multiple-values-table-title-row" });
   };
   const multipleValuesTableHeaderRowMarkup = (context, editable) => {
     const submitMarkup = editable
@@ -240,6 +245,8 @@
   let lastUnsavedChanges = false;
   let lastRenderedView = "";
   let lastDocumentPath = "";
+  let expandedTagAnalyzerName = "";
+  let expandedTagAnalyzerPackPath = "";
   const uiMotionDuration = 250;
 
   function animateRowRemoval(row, completion) {
@@ -279,7 +286,7 @@
     state = stateValue;
     if (state.documentPath !== lastDocumentPath) {
       lastDocumentPath = state.documentPath || "";
-      mainView = "members";
+      if (mainView !== "tagAnalyzer") mainView = "members";
       trackBrowserPath = "";
       selectedTagTrackPaths = new Set();
       dirtyTrackPaths = new Set();
@@ -295,7 +302,10 @@
 
     $("#document-name").textContent = state.documentName || "No package open";
     $("#document-path").textContent = state.documentPath || "Choose a collection or open one UAC file";
-    $("#member-filter-wrap").classList.toggle("hidden", !["members", "files", "newTag"].includes(mainView));
+    $("#member-filter-wrap").classList.toggle("hidden", !["members", "files", "newTag", "tagAnalyzer"].includes(mainView));
+    $("#member-filter").placeholder = mainView === "tagAnalyzer"
+      ? "Filter package filenames…"
+      : "Search title, artist, album, filename, path…";
     const singleDocumentMode = Boolean(state.documentName) && !state.collectionRoot;
     $("#workspace").classList.toggle("library-collapsed", singleDocumentMode);
     $("#library-panel").classList.toggle("single-document-hidden", singleDocumentMode);
@@ -699,6 +709,241 @@
     render(state);
   }
 
+
+  function tagAnalyzerSubtableTitleMarkup(title, foldID, closeAttributes = "") {
+    return multipleValuesTableTitleRowMarkup({ title, foldID, titleClose:true, closeAttributes });
+  }
+
+  function tagAnalyzerFieldRowMarkup(tagName, match, index) {
+    const memberPath = match.memberRelativePath || "";
+    const trackName = memberPath ? memberPath.split("/").pop() : "Package";
+    const value = match.valueIsJSON ? match.valueJSON : match.value;
+    const valueControl = match.valueIsJSON
+      ? '<textarea class="tag-table-field tag-analyzer-match-value" data-tag-analyzer-value rows="3" aria-label="Tag value for ' + esc(tagName) + '">' + esc(value) + '</textarea>'
+      : '<input class="tag-table-field tag-analyzer-match-value" data-tag-analyzer-value value="' + esc(value) + '" aria-label="Tag value for ' + esc(tagName) + '">';
+    const trackControl = '<input class="tag-table-field tag-analyzer-match-track" value="' + esc(trackName) + '" title="' + esc(memberPath || "Package-level tag field") + '" aria-label="Track" disabled>';
+    const nameControl = '<input class="tag-table-field" data-tag-analyzer-name value="' + esc(tagName) + '" aria-label="Tag name ' + esc(tagName) + '">';
+    const rowAttributes = 'data-tag-analyzer-match data-tag-name="' + esc(tagName) + '" data-archive-relative-path="' + esc(match.archiveRelativePath) + '" data-member-relative-path="' + esc(match.memberRelativePath || "") + '" data-storage-scope="' + esc(match.storageScope) + '" data-storage-key="' + esc(match.storageKey) + '" data-expected-value-json="' + esc(match.valueJSON) + '" data-value-is-json="' + match.valueIsJSON + '"';
+    return canonicalRowMarkup([
+      canonicalNumberCellMarkup(index + 1, "Tag field number " + (index + 1), { className:"multiple-value-number-cell" }),
+      canonicalCellMarkup(trackControl, { className:"tag-analyzer-match-track-cell" }),
+      canonicalCellMarkup(nameControl, { className:"tag-analyzer-match-name-cell" }),
+      canonicalCellMarkup(valueControl + '<small class="tag-analyzer-match-error" data-tag-analyzer-error></small>', { className:"tag-analyzer-match-value-cell" }),
+      canonicalCellMarkup('<button class="icon-button" data-action="commitTagAnalyzerMatch" title="Save this tag field" aria-label="Save this tag field">✓</button>', { className:"field-grid-action-cell" }),
+      canonicalCellMarkup('<button class="icon-button danger" data-action="deleteTagAnalyzerMatch" title="Delete this tag field" aria-label="Delete this tag field">×</button>', { className:"field-grid-action-cell" })
+    ], { className:"multiple-value-editor-row tag-analyzer-match-row", attributes:rowAttributes });
+  }
+
+  function tagAnalyzerFieldsSubtableMarkup(tagName, matches, foldID, archiveRelativePath) {
+    const header = tagAnalyzerSubtableTitleMarkup(tagName + " · " + matches.length + " tag field(s)", foldID, 'data-close-pack-path="' + esc(archiveRelativePath) + '"') +
+      canonicalHeaderMarkup(["#", "Track", "Tag Name", "Tag Value", "✓", "×"]);
+    const rows = matches.map((match, index) => tagAnalyzerFieldRowMarkup(tagName, match, index)).join("") ||
+      '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No matching tag fields</span></div>';
+    const table = canonicalTableMarkup({
+      className:"inserted-table-grid canonical-multiple-values-grid tag-analyzer-field-grid",
+      ariaLabel:"Tag values in " + archiveRelativePath,
+      header,
+      rows
+    });
+    return '<div class="inserted-table-panel">' + table + '</div>';
+  }
+
+  function groupTagAnalyzerMatchesByPack(matches) {
+    const groups = new Map();
+    matches.forEach(match => {
+      const path = match.archiveRelativePath || "";
+      if (!groups.has(path)) groups.set(path, { archiveRelativePath:path, matches:[] });
+      groups.get(path).matches.push(match);
+    });
+    return [...groups.values()].sort((left, right) =>
+      left.archiveRelativePath.localeCompare(right.archiveRelativePath, undefined, { numeric:true, sensitivity:"base" })
+    );
+  }
+
+  function tagAnalyzerPackSubtableMarkup(tagName, matches, tagIndex) {
+    const packs = groupTagAnalyzerMatchesByPack(matches);
+    const foldID = "tag-analyzer-matches-" + tagIndex;
+    const title = tagName + " · " + packs.length + " matched pack(s)";
+    const header = tagAnalyzerSubtableTitleMarkup(title, foldID, 'data-close-tag-name="' + esc(tagName) + '"') +
+      canonicalHeaderMarkup(["#", "Filename", "Tracks", "Tag Fields"]);
+    const rows = packs.map((pack, index) => {
+      const first = pack.matches[0] || {};
+      const packFoldID = "tag-analyzer-pack-" + tagIndex + "-" + index;
+      const isExpanded = expandedTagAnalyzerName === tagName && expandedTagAnalyzerPackPath === pack.archiveRelativePath;
+      const packageName = pack.archiveRelativePath.split("/").pop() || first.archiveTitle || pack.archiveRelativePath;
+      const packToggle = '<button class="canonical-fold-toggle canonical-fold-trigger tag-analyzer-pack-trigger" type="button" data-action="toggleCanonicalFold" data-fold-id="' + esc(packFoldID) + '" data-tag-analyzer-name="' + esc(tagName) + '" data-tag-analyzer-pack-path="' + esc(pack.archiveRelativePath) + '" aria-expanded="' + isExpanded + '" aria-label="Show ' + pack.matches.length + ' tag fields in ' + esc(packageName) + '"><span>' + pack.matches.length + '</span><span class="canonical-fold-icon">' + (isExpanded ? "−" : "＋") + '</span></button>';
+      const packRow = canonicalRowMarkup([
+        canonicalNumberCellMarkup(index + 1, "Matched pack number " + (index + 1), { className:"tag-number-cell" }),
+        canonicalCellMarkup('<input class="tag-table-field" value="' + esc(packageName) + '" title="' + esc(pack.archiveRelativePath) + '" aria-label="Filename" disabled>'),
+        canonicalCellMarkup('<input class="tag-table-field" value="' + (Number(first.archiveTrackCount) || 0) + '" aria-label="Track count" disabled>'),
+        canonicalCellMarkup(packToggle, { className:"tag-uses-cell" })
+      ]);
+      const nestedRow = canonicalRowMarkup([
+        canonicalCellMarkup('<div class="inserted-table-panel"></div>', { className:"inserted-table-cell" })
+      ], { className:"inserted-table-row", attributes:'data-canonical-subrow="' + esc(packFoldID) + '"' });
+      return packRow + nestedRow;
+    }).join("") ||
+      '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No matched packs</span></div>';
+    const table = canonicalTableMarkup({
+      className:"inserted-table-grid canonical-multiple-values-grid tag-analyzer-pack-grid",
+      ariaLabel:"Matched packs for " + tagName,
+      header,
+      rows
+    });
+    return '<div class="inserted-table-panel">' + table + '</div>';
+  }
+
+  function setCanonicalFoldOpen(toggle, open) {
+    if (!toggle) return;
+    const fold = toggle.closest(".canonical-fold");
+    const panel = fold?.querySelector(".canonical-fold-panel");
+    const subrow = toggle.dataset.foldId
+      ? document.querySelector('[data-canonical-subrow="' + CSS.escape(toggle.dataset.foldId) + '"]')
+      : null;
+    const target = panel || subrow;
+    if (!target) return;
+    target.classList.toggle("open", open);
+    toggle.setAttribute("aria-expanded", String(open));
+    const icon = $(".canonical-fold-icon", toggle);
+    if (icon) icon.textContent = open ? "−" : "＋";
+  }
+
+  function closeExpandedTagAnalyzerPack() {
+    if (!expandedTagAnalyzerPackPath) return;
+    const archiveRelativePath = expandedTagAnalyzerPackPath;
+    const toggle = [...document.querySelectorAll(".tag-analyzer-pack-grid [data-action='toggleCanonicalFold']")]
+      .find(candidate => candidate.dataset.tagAnalyzerPackPath === archiveRelativePath);
+    setCanonicalFoldOpen(toggle, false);
+    expandedTagAnalyzerPackPath = "";
+    const subrow = toggle?.dataset.foldId
+      ? document.querySelector('[data-canonical-subrow="' + CSS.escape(toggle.dataset.foldId) + '"]')
+      : null;
+    window.setTimeout(() => {
+      if (!subrow || expandedTagAnalyzerPackPath === archiveRelativePath || subrow.classList.contains("open")) return;
+      const cell = $(".inserted-table-cell", subrow);
+      if (cell) cell.innerHTML = '<div class="inserted-table-panel"></div>';
+    }, uiMotionDuration + 25);
+  }
+
+  function populateTagAnalyzerPack(toggle) {
+    const foldID = toggle?.dataset.foldId || "";
+    const subrow = foldID
+      ? document.querySelector('[data-canonical-subrow="' + CSS.escape(foldID) + '"]')
+      : null;
+    const cell = subrow && $(".inserted-table-cell", subrow);
+    if (!cell || $(".tag-analyzer-field-grid", cell)) return Boolean(cell);
+    const tagName = toggle.dataset.tagAnalyzerName || "";
+    const archiveRelativePath = toggle.dataset.tagAnalyzerPackPath || "";
+    const matches = (state?.tagAnalyzerSelectedMatches || []).filter(match => match.archiveRelativePath === archiveRelativePath);
+    cell.innerHTML = tagAnalyzerFieldsSubtableMarkup(tagName, matches, foldID, archiveRelativePath);
+    return true;
+  }
+
+  function restoreTagAnalyzerFolds() {
+    const tagName = expandedTagAnalyzerName;
+    if (!tagName || state?.tagAnalyzerSelectedMatchesTagName !== tagName) return;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (expandedTagAnalyzerName !== tagName || state?.tagAnalyzerSelectedMatchesTagName !== tagName) return;
+      const outerToggle = [...document.querySelectorAll('[data-action="toggleTagAnalyzerPacks"]')]
+        .find(toggle => toggle.dataset.tagName === tagName);
+      setCanonicalFoldOpen(outerToggle, true);
+      if (!expandedTagAnalyzerPackPath) return;
+      const packToggle = [...document.querySelectorAll(".tag-analyzer-pack-grid [data-action='toggleCanonicalFold']")]
+        .find(toggle => toggle.dataset.tagAnalyzerPackPath === expandedTagAnalyzerPackPath);
+      if (!populateTagAnalyzerPack(packToggle)) return;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (expandedTagAnalyzerName === tagName && packToggle?.dataset.tagAnalyzerPackPath === expandedTagAnalyzerPackPath) {
+          setCanonicalFoldOpen(packToggle, true);
+        }
+      }));
+    }));
+  }
+
+  function tagAnalyzerFilenameMatches(relativePath, query) {
+    if (!query) return true;
+    const filename = String(relativePath || "").split("/").pop() || "";
+    return filename.toLocaleLowerCase().includes(query);
+  }
+
+  function renderTagAnalyzerPage() {
+    const tags = state.tagAnalyzerTags || [];
+    const query = $("#member-filter")?.value.trim().toLocaleLowerCase() || "";
+    const visibleTags = tags.map(tag => {
+      if (!query) return { tag, matchedPackCount:Number(tag.matchedPackCount) || 0, trackCount:Number(tag.trackCount) || 0 };
+      const archives = (tag.archiveMatches || []).filter(archive => tagAnalyzerFilenameMatches(archive.relativePath, query));
+      return {
+        tag,
+        matchedPackCount:archives.length,
+        trackCount:archives.reduce((total, archive) => total + (Number(archive.trackCount) || 0), 0)
+      };
+    }).filter(item => !query || item.matchedPackCount > 0);
+    const issues = state.tagAnalyzerIssues || [];
+    const progress = state.tagAnalyzerProgress || {};
+    const running = Boolean(state.isAnalyzingTagNames);
+    const phase = progress.phase || "discovering";
+    const total = Number(progress.totalPackages) || 0;
+    const processed = Number(progress.packagesProcessed) || 0;
+    const progressControl = running && phase === "reading" && total > 0
+      ? '<progress class="tag-analyzer-progress-meter" max="' + total + '" value="' + Math.min(processed, total) + '" aria-label="Packages read"></progress>'
+      : running
+        ? '<progress class="tag-analyzer-progress-meter" aria-label="Finding UAC packages"></progress>'
+        : "";
+    const status = state.isCancellingTagAnalysis
+      ? "Cancelling after the current manifest read…"
+      : state.tagAnalyzerStatusMessage || "Choose a folder path to inventory its UAC tag names.";
+    const selectedMatchesTagName = state.tagAnalyzerSelectedMatchesTagName || "";
+    const selectedMatches = (state.tagAnalyzerSelectedMatches || []).filter(match =>
+      tagAnalyzerFilenameMatches(match.archiveRelativePath, query)
+    );
+    const rows = visibleTags.map(({ tag, matchedPackCount, trackCount }, index) => {
+      const hasSelectedMatches = selectedMatchesTagName === tag.name;
+      const tagIsExpanded = expandedTagAnalyzerName === tag.name && hasSelectedMatches;
+      const foldID = "tag-analyzer-matches-" + index;
+      const matches = hasSelectedMatches ? selectedMatches : [];
+      const toggle = '<button class="canonical-fold-toggle canonical-fold-trigger tag-analyzer-match-trigger" type="button" data-action="toggleTagAnalyzerPacks" data-tag-name="' + esc(tag.name) + '" data-fold-id="' + esc(foldID) + '" aria-expanded="' + tagIsExpanded + '" aria-label="Show ' + matchedPackCount + ' matched packs for ' + esc(tag.name) + '"><span>' + matchedPackCount + '</span><span class="canonical-fold-icon">' + (tagIsExpanded ? "−" : "＋") + '</span></button>';
+      const cells = [
+        canonicalNumberCellMarkup(index + 1, "Tag number " + (index + 1), { className:"tag-number-cell" }),
+        canonicalCellMarkup('<input class="tag-table-field" value="' + esc(tag.name) + '" title="' + esc(tag.name) + '" aria-label="Tag name ' + esc(tag.name) + '" disabled>', { className:"tag-name-cell" }),
+        canonicalCellMarkup(toggle, { className:"tag-uses-cell" }),
+        canonicalCellMarkup('<input class="tag-table-field" value="' + trackCount + '" aria-label="Tracks with ' + esc(tag.name) + '" disabled>', { className:"tag-uses-cell" })
+      ];
+      const parentRow = canonicalRowMarkup(cells);
+      if (!hasSelectedMatches) return parentRow;
+      const subtable = tagAnalyzerPackSubtableMarkup(tag.name, matches, index);
+      const subrow = canonicalRowMarkup([
+        canonicalCellMarkup(subtable, { className:"inserted-table-cell" })
+      ], { className:"inserted-table-row", attributes:'data-canonical-subrow="' + esc(foldID) + '"' });
+      return parentRow + subrow;
+    }).join("");
+    const emptyMessage = state.tagAnalyzerHasResult
+      ? query
+        ? 'No tag fields match package filenames containing "' + esc(query) + '".'
+        : "No tag fields were found in the readable UAC manifests."
+      : "Choose & Analyze a folder to list its UAC tag names.";
+    const issuesDisclosure = issues.length
+      ? '<details class="tag-analyzer-issues"><summary>' + issues.length + ' unreadable folder or package item(s) · results may be incomplete</summary><div class="tag-analyzer-issue-list">' + issues.map(issue => '<div class="issue"><strong>' + esc(issue.relativePath || "Selected folder") + '</strong>' + esc(issue.message) + '</div>').join("") + '</div></details>'
+      : "";
+    const table = canonicalTableMarkup({
+      className:"flat-table meta-field-grid tag-analyzer-table",
+      ariaLabel:"Tag names, matched packs, and tracks",
+      header:canonicalTitleRowMarkup("Tag Names" + (state.tagAnalyzerHasResult ? " · " + visibleTags.length : "")) + canonicalHeaderMarkup(["#", "Tag Name", "Matched Packs", "Tracks"]),
+      rows,
+      empty:'<div class="field-grid-empty tag-analyzer-empty" role="row"><span role="cell">' + esc(emptyMessage) + '</span></div>'
+    });
+
+    return '<section class="data-page tag-analyzer-page" aria-label="Tag Analyzer">' +
+      '<div class="data-page-heading"><div><div class="tag-analyzer-heading-line"><h2>Tag Analyzer</h2><span class="beta-badge">Beta</span></div><p>List exact tag field names in a folder. Matched-pack counts identify packages with that field; values may differ. Expand a pack to inspect its field entries.</p></div><span class="data-page-count">' + (state.tagAnalyzerHasResult ? (query ? visibleTags.length + ' / ' + tags.length + ' matching name(s)' : tags.length + ' unique name(s)') : "Manifest fields") + '</span></div>' +
+      '<div class="tag-analyzer-controls">' +
+        '<label class="tag-analyzer-path-control">Folder Path<input class="tag-table-field" value="' + esc(state.tagAnalyzerRootPath || "") + '" placeholder="Choose a folder path" aria-label="Tag analysis folder path" readonly></label>' +
+        '<button class="button primary" data-action="chooseTagAnalyzerFolder"' + (running ? " disabled" : "") + '>Choose &amp; Analyze…</button>' +
+        '<button class="button secondary tag-analyzer-cancel" data-action="cancelTagAnalysis"' + (!running || state.isCancellingTagAnalysis ? " disabled" : "") + '>Cancel</button>' +
+      '</div>' +
+      '<div class="tag-analyzer-progress" role="status" aria-live="polite">' + progressControl + '<span>' + esc(status) + '</span>' + (running && progress.currentRelativePath ? '<code title="' + esc(progress.currentRelativePath) + '">' + esc(progress.currentRelativePath) + '</code>' : "") + '</div>' +
+      issuesDisclosure +
+      '<div class="tag-analyzer-results"><div class="data-table-scroll canonical-table-surface">' + table + '</div></div>' +
+    '</section>';
+  }
+
   function renderFilesPage() {
     const members = visibleFileMembers();
     const header = canonicalHeaderMarkup(["#", "Role", "Format", "Filename", "Stored path", "Tags Count", "Size", "⌕"]);
@@ -741,6 +986,11 @@
     const hasPackage = Boolean(state.documentName);
     const inspector = $("#inspector-content");
     inspector.className = `inspector-content${["trackBrowser", "newTag"].includes(mainView) ? " track-browser-inspector" : ""}`;
+    if (mainView === "tagAnalyzer") {
+      inspector.innerHTML = renderTagAnalyzerPage();
+      restoreTagAnalyzerFolds();
+      return;
+    }
     if (!hasPackage) {
       inspector.innerHTML = `<div class="metadata-empty"><div class="empty-icon">⌁</div><h3>Open a package to edit metadata</h3><p>Choose a collection entry or open a UAC file.</p></div>`;
       return;
@@ -920,19 +1170,30 @@
     if (!popup) return;
     popup.hidden = true;
     const popupID = popup.dataset.multipleValuesPopup || "";
-    $$(`[data-action="toggleMultipleValuesPopup"][data-popup-id="${CSS.escape(popupID)}"]`).forEach(toggle => {
+    $$('[data-action="toggleMultipleValuesPopup"][data-popup-id="' + CSS.escape(popupID) + '"]').forEach(toggle => {
       toggle.setAttribute("aria-expanded", "false");
       $(".canonical-fold-icon", toggle).textContent = "＋";
     });
   }
 
   function closeCanonicalSubtable(button) {
-    const foldID = button?.dataset.foldId || "";
-    const subrow = foldID ? document.querySelector(`[data-canonical-subrow="${CSS.escape(foldID)}"]`) : button?.closest("[data-canonical-subrow]");
-    const toggle = foldID ? document.querySelector(`[data-action="toggleCanonicalFold"][data-fold-id="${CSS.escape(foldID)}"]`) : null;
+    if (!button) return;
+    const foldID = button.dataset.foldId || "";
+    const subrow = foldID
+      ? document.querySelector('[data-canonical-subrow="' + CSS.escape(foldID) + '"]')
+      : button.closest("[data-canonical-subrow]");
+    const toggle = foldID
+      ? [...document.querySelectorAll("[data-fold-id]")].find(candidate => candidate.dataset.foldId === foldID)
+      : null;
+    setCanonicalFoldOpen(toggle, false);
+    const tagName = button.dataset.closeTagName || "";
+    const packPath = button.dataset.closePackPath || "";
+    if (tagName && expandedTagAnalyzerName === tagName) {
+      closeExpandedTagAnalyzerPack();
+      expandedTagAnalyzerName = "";
+    }
+    if (packPath && expandedTagAnalyzerPackPath === packPath) expandedTagAnalyzerPackPath = "";
     subrow?.classList.remove("open");
-    toggle?.setAttribute("aria-expanded", "false");
-    if (toggle) $(".canonical-fold-icon", toggle).textContent = "＋";
     toggle?.focus({ preventScroll:true });
   }
 
@@ -990,15 +1251,104 @@
   }
 
   function toggleMultipleValuesPopup(popupID, toggle) {
-    const popup = document.querySelector(`[data-multiple-values-popup="${CSS.escape(popupID)}"]`);
+    const popup = document.querySelector('[data-multiple-values-popup="' + CSS.escape(popupID) + '"]');
     if (!popup) return;
     const opening = popup.hidden;
-    $$(`[data-multiple-values-popup]`).forEach(closeMultipleValuesPopup);
+    $$("[data-multiple-values-popup]").forEach(closeMultipleValuesPopup);
     if (!opening) return;
     popup.hidden = false;
     toggle?.setAttribute("aria-expanded", "true");
     $(".canonical-fold-icon", toggle).textContent = "−";
     $(".multiple-values-popup-close", popup)?.focus({ preventScroll:true });
+  }
+
+  function toggleTagAnalyzerPacks(tagName, toggle) {
+    if (!tagName) return;
+    if (expandedTagAnalyzerName === tagName) {
+      closeExpandedTagAnalyzerPack();
+      expandedTagAnalyzerName = "";
+      setCanonicalFoldOpen(toggle, false);
+      return;
+    }
+    const previousToggle = [...document.querySelectorAll('[data-action="toggleTagAnalyzerPacks"]')]
+      .find(candidate => candidate.dataset.tagName === expandedTagAnalyzerName);
+    closeExpandedTagAnalyzerPack();
+    setCanonicalFoldOpen(previousToggle, false);
+    expandedTagAnalyzerName = tagName;
+    expandedTagAnalyzerPackPath = "";
+    if (state?.tagAnalyzerSelectedMatchesTagName === tagName) setCanonicalFoldOpen(toggle, true);
+    else bridge("loadTagAnalyzerMatches", { tagName });
+  }
+
+  function toggleTagAnalyzerPack(tagName, packPath, toggle) {
+    if (!tagName || !packPath || tagName !== expandedTagAnalyzerName) return;
+    const opening = expandedTagAnalyzerPackPath !== packPath;
+    if (!opening) {
+      closeExpandedTagAnalyzerPack();
+      return;
+    }
+    if (expandedTagAnalyzerPackPath) closeExpandedTagAnalyzerPack();
+    expandedTagAnalyzerPackPath = packPath;
+    const subrow = document.querySelector('[data-canonical-subrow="' + CSS.escape(toggle.dataset.foldId || "") + '"]');
+    const hasTable = subrow && $(".tag-analyzer-field-grid", subrow);
+    if (!populateTagAnalyzerPack(toggle)) return;
+    if (hasTable) {
+      setCanonicalFoldOpen(toggle, true);
+      return;
+    }
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (expandedTagAnalyzerName === tagName && expandedTagAnalyzerPackPath === packPath) setCanonicalFoldOpen(toggle, true);
+    }));
+  }
+
+  function tagAnalyzerMatchPayload(row) {
+    return {
+      tagName:row?.dataset.tagName || "",
+      archiveRelativePath:row?.dataset.archiveRelativePath || "",
+      memberRelativePath:row?.dataset.memberRelativePath || "",
+      storageScope:row?.dataset.storageScope || "",
+      storageKey:row?.dataset.storageKey || "",
+      expectedValueJSON:row?.dataset.expectedValueJson || ""
+    };
+  }
+
+  function commitTagAnalyzerMatch(row) {
+    if (!row) return;
+    const nameField = $("[data-tag-analyzer-name]", row);
+    const valueField = $("[data-tag-analyzer-value]", row);
+    const name = nameField?.value.trim() || "";
+    const value = valueField?.value ?? "";
+    const error = $("[data-tag-analyzer-error]", row);
+    const valueIsJSON = row.dataset.valueIsJson === "true";
+    if (!name) {
+      if (error) error.textContent = "Tag name cannot be empty.";
+      nameField?.focus();
+      return;
+    }
+    if (valueIsJSON) {
+      try { JSON.parse(value); }
+      catch {
+        if (error) error.textContent = "Enter a valid JSON value.";
+        valueField?.focus();
+        return;
+      }
+    }
+    if (error) error.textContent = "";
+    if (expandedTagAnalyzerName === row.dataset.tagName) expandedTagAnalyzerName = name;
+    bridge("commitTagAnalyzerMatch", {
+      ...tagAnalyzerMatchPayload(row),
+      newName:name,
+      value,
+      valueIsJSON
+    });
+  }
+
+  function deleteTagAnalyzerMatch(row) {
+    if (!row) return;
+    const source = [row.dataset.archiveRelativePath, row.dataset.memberRelativePath].filter(Boolean).join(" · ");
+    const name = row.dataset.tagName || "this tag";
+    if (!window.confirm('Delete only "' + name + '" from ' + source + '?')) return;
+    bridge("deleteTagAnalyzerMatch", tagAnalyzerMatchPayload(row));
   }
 
   document.addEventListener("click", event => {
@@ -1053,19 +1403,24 @@
       else commitMultipleValues(event.target.closest("[data-multiple-editor]"));
     }
     else if (action === "toggleMultipleValuesPopup") toggleMultipleValuesPopup(event.target.closest("[data-action=toggleMultipleValuesPopup]")?.dataset.popupId || "", event.target.closest("[data-action=toggleMultipleValuesPopup]"));
+    else if (action === "toggleTagAnalyzerPacks") {
+      const toggle = event.target.closest("[data-action=toggleTagAnalyzerPacks]");
+      toggleTagAnalyzerPacks(toggle?.dataset.tagName || "", toggle);
+    }
+    else if (action === "commitTagAnalyzerMatch") commitTagAnalyzerMatch(event.target.closest("[data-tag-analyzer-match]"));
+    else if (action === "deleteTagAnalyzerMatch") deleteTagAnalyzerMatch(event.target.closest("[data-tag-analyzer-match]"));
     else if (action === "closeMultipleValuesPopup") closeMultipleValuesPopup(event.target.closest("[data-multiple-values-popup]"));
     else if (action === "closeCanonicalSubtable") closeCanonicalSubtable(event.target.closest("[data-action=closeCanonicalSubtable]"));
     else if (action === "toggleCanonicalFold") {
       const toggle = event.target.closest("[data-action=toggleCanonicalFold]");
-      const fold = toggle?.closest(".canonical-fold");
-      const panel = fold?.querySelector(".canonical-fold-panel");
-      const subrow = toggle?.dataset.foldId ? document.querySelector(`[data-canonical-subrow="${CSS.escape(toggle.dataset.foldId)}"]`) : null;
-      if (toggle && (panel || subrow)) {
-        const target = panel || subrow;
-        const open = target.classList.toggle("open");
-        toggle.setAttribute("aria-expanded", String(open));
-        $(".canonical-fold-icon", toggle).textContent = open ? "−" : "＋";
+      const packPath = toggle?.dataset.tagAnalyzerPackPath || "";
+      if (toggle && packPath) {
+        toggleTagAnalyzerPack(toggle.dataset.tagAnalyzerName || "", packPath, toggle);
+        return;
       }
+      const foldID = toggle?.dataset.foldId || "";
+      const subrow = foldID ? document.querySelector('[data-canonical-subrow="' + CSS.escape(foldID) + '"]') : null;
+      if (toggle && subrow) setCanonicalFoldOpen(toggle, !subrow.classList.contains("open"));
     }
     else if (action === "previewMember") bridge("previewMember", { path:event.target.closest("[data-preview-path]")?.dataset.previewPath || "" });
     else if (action === "closeFilePreview") bridge("closeFilePreview");
@@ -1115,12 +1470,17 @@
     else if (action === "dismissError") bridge("dismissError");
     else if (action === "mainView") {
       mainView = event.target.closest("[data-view]").dataset.view;
+      if (mainView !== "tagAnalyzer") { expandedTagAnalyzerName = ""; expandedTagAnalyzerPackPath = ""; }
       render(state);
     }
     else if (action === "closeInspector") { mainView = "members"; render(state); }
     else if (action === "rescanCollection") bridge("rescanCollection");
     else if (action === "cancelCollectionScan") bridge("cancelCollectionScan");
     else if (action === "cancelHarvest") bridge("cancelHarvest");
+    else if (["chooseTagAnalyzerFolder", "cancelTagAnalysis"].includes(action)) {
+      if (action !== "cancelTagAnalysis") { expandedTagAnalyzerName = ""; expandedTagAnalyzerPackPath = ""; }
+      bridge(action);
+    }
     else if (action === "openUAC" || action === "openCollection" || action === "save" || action === "revert" || action === "harvest") bridge(action);
   });
 
@@ -1157,7 +1517,7 @@
 
   document.addEventListener("input", event => {
     if (event.target.id === "collection-filter") renderCollections();
-    else if (event.target.id === "member-filter") ["files", "newTag"].includes(mainView) ? render(state) : renderMembers();
+    else if (event.target.id === "member-filter") ["files", "newTag", "tagAnalyzer"].includes(mainView) ? render(state) : renderMembers();
   });
   document.addEventListener("contextmenu", event => {
     const column = event.target.closest(".tracks-field-grid [data-track-column-key]");

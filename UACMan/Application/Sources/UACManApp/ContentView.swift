@@ -5,6 +5,6 @@ struct ContentView: View {
 
     var body: some View {
         UACManWebWorkspace(model: model, snapshot: model.webSnapshot)
-            .frame(minWidth: 920, minHeight: 600)
+            .frame(minWidth: 640, minHeight: 480)
     }
 }

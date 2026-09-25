@@ -14,6 +14,12 @@
   selected folder and asks `UACWrapperCore` for each manifest. It is a
   transient browser index only: do not persist it as a second catalog, follow
   symlinks, or decompress/extract payloads for collection summaries.
+- `UACTagAnalyzer` reuses collection path discovery, then reads each candidate
+  package manifest once. It inventories keys in `game.metadata`,
+  `game.extensions`, and every member's `metadata` and `extensions`; extension
+  keys use the `extension.` namespace shown by the editor. It returns field
+  names and per-scope occurrence counts, never metadata values. Unreadable
+  paths/packages remain issues so the UI can label an incomplete result.
 - `Application/Sources/UACManMetadataCLI` exposes the same
   `SPCMetadataHarvester` and
   `SPCMetadataProjector` for raw-directory creation-time import. It depends on
@@ -40,6 +46,11 @@
   app atomically replaces the original. The writer refuses an existing
   destination.
 - Keep unknown top-level, member, and extension JSON values through edits.
+- Tag analysis scans manifests only and never changes packages. The matched
+  field popup may explicitly update or remove one field; rewrite only the
+  manifest and preserve all compressed payload bytes. Keep cancellation checks
+  between directory entries and package reads; a cancelled run must not present
+  its partial field set as exhaustive.
 - The package inspector lists and edits metadata for every manifest member.
   Only playable/track roles represent song rows in MetaMan and ScanSong;
   artwork, cue sheets, and documents remain inspectable package assets.
@@ -66,17 +77,17 @@
   native model's existing confirmation and validation paths.
 - Bound decoded manifest output by the declared size and the shared 16 MiB /
   32 MiB reader limits.
-- Keep `UTTypeIconFile` in the exported UAC type and `CFBundleTypeIconFile` in
-  the `.uac` document type pointed at the same `UACDocumentIcon.icns` resource.
-  `CFBundleIconFile` must point at that same resource for the UACMan
-  application icon. The PNG source of truth and repeatable ICNS generator
-  live in `Application/DocumentIcon/`; `Application/launch.sh` regenerates
-  the ICNS from the PNG before copying it into the app bundle's
-  `Contents/Resources`.
+- Keep the new branded image on the UACMan application only via
+  `CFBundleIconFile` and `UACManAppIcon.icns`. Leave the exported UAC type and
+  `.uac` document type without custom icon keys so Launch Services supplies the
+  system document icon. The PNG source and repeatable ICNS generator live in
+  `Application/AppIcon/`; `Application/launch.sh` regenerates the app ICNS from
+  the PNG before copying it into the app bundle's `Contents/Resources`.
 
 ## Files
 
 - `Application/Sources/UACManCore/UACManifestEditor.swift`
+- `Application/Sources/UACManCore/UACTagAnalyzer.swift`
 - `Application/Tests/UACManCoreTests/UACManifestEditorTests.swift`
 - `Application/Sources/UACManApp/UACManModel.swift`
 - `Application/Sources/UACManApp/UACManWebWorkspace.swift`
@@ -85,7 +96,7 @@
 - `Application/Sources/UACManCore/SPCMetadataHarvester.swift`
 - `Application/Sources/UACManCore/SPCMetadataProjection.swift`
 - `Application/Resources/Info.plist`
-- `Application/DocumentIcon/`
+- `Application/AppIcon/`
 - `Application/launch.sh`
 - `Application/Sources/UACManMetadataCLI/main.swift`
 - `Wrapper/Sources/UACWrapperCore/UACContainerReader.swift`

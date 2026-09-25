@@ -322,8 +322,10 @@ button { cursor:pointer; }
 .inspector-content { scrollbar-gutter:stable; }
 
 .canonical-multiple-values-grid .multiple-values-rows { display:flex; flex-direction:column; }
-.multiple-values-table-title-row { background:transparent; }
 .multiple-values-table-title-row .field-grid-heading-input { width:100%; }
+.multiple-values-table-title-control { display:flex; align-items:center; gap:0; width:100%; min-width:0; }
+.multiple-values-table-title-control > input { flex:1 1 auto; min-width:0; }
+.multiple-values-table-title-control > button { flex:0 0 28px; width:28px; }
 .multiple-values-header-action { cursor:pointer; }
 .multiple-values-header-action:hover { border-color:var(--accent); background:var(--hover)!important; }
 .canonical-multiple-values-grid .field-grid-header .field-grid-cell { justify-content:center; }
@@ -440,6 +442,23 @@ button { cursor:pointer; }
 /* Popup JSON editing uses the same canonical rows and cells, but remains a
    fixed modal surface so editing it never reflows the source table. */
 .canonical-popup-field-grid { --multiple-values-popup-columns:var(--canonical-number-column) minmax(110px,.7fr) minmax(180px,1.3fr) 28px 28px; }
+.tag-analyzer-pack-grid { --tag-analyzer-pack-columns:var(--canonical-number-column) minmax(0,1fr) 58px 82px; --field-grid-columns:var(--tag-analyzer-pack-columns); }
+.tag-analyzer-pack-grid > .field-grid-header:not(.canonical-table-title-row),
+.tag-analyzer-pack-grid > .field-grid-row:not(.inserted-table-row) { width:100%; min-width:0; box-sizing:border-box; grid-template-columns:var(--tag-analyzer-pack-columns)!important; }
+.tag-analyzer-pack-trigger { display:flex; align-items:center; justify-content:center; gap:5px; width:100%; }
+.tag-analyzer-field-grid { --tag-analyzer-field-columns:var(--canonical-number-column) minmax(100px,.9fr) minmax(110px,1fr) minmax(180px,1.5fr) var(--canonical-action-column) var(--canonical-action-column); --field-grid-columns:var(--tag-analyzer-field-columns); width:100%; min-width:0; }
+.tag-analyzer-field-grid > .field-grid-header:not(.canonical-table-title-row),
+.tag-analyzer-field-grid > .field-grid-row:not(.inserted-table-row) { width:100%; min-width:0; box-sizing:border-box; grid-template-columns:var(--tag-analyzer-field-columns)!important; }
+.tag-analyzer-field-grid .tag-analyzer-match-row { min-height:38px; }
+.tag-analyzer-match-row > .field-grid-cell { min-height:38px; }
+.tag-analyzer-match-row .tag-analyzer-match-track-cell,
+.tag-analyzer-match-row .tag-analyzer-match-name-cell,
+.tag-analyzer-match-row .tag-analyzer-match-value-cell { min-width:0; }
+.tag-analyzer-match-track { min-width:0; text-overflow:ellipsis; }
+.tag-analyzer-match-value-cell { display:flex; flex-direction:column; align-items:stretch; gap:3px; }
+.tag-analyzer-match-value { width:100%; min-width:0; }
+.tag-analyzer-match-value-cell textarea { min-height:52px; resize:vertical; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+.tag-analyzer-match-error { color:var(--danger,#e06c75); font-size:9px; }
 .canonical-popup-field-grid > .canonical-popup-editor { width:100%; min-width:0; }
 .canonical-popup-field-grid .multiple-value-editor-row,
 .canonical-popup-field-grid .multiple-value-readonly-row { grid-template-columns:var(--multiple-values-popup-columns); width:100%; min-width:0; }
@@ -564,9 +583,8 @@ button { cursor:pointer; }
 .track-browser-field-grid > .field-grid-header,
 .track-browser-field-grid > .field-grid-row:not(.inserted-table-row) { grid-template-columns:var(--track-tags-columns)!important; }
 
-/* All tag tables share one row/cell contract. Pack Tags and the selected-file
-   Track Tags table only differ in their semantic columns; the number cell,
-   cell sizing, and value editor geometry are shared here. */
+/* All tag tables share one row/cell contract. Pack Tags, selected-file Track
+   Tags, and Tag Analyzer supply their semantic columns through this grid. */
 .canonical-tag-grid { --canonical-tag-columns:var(--canonical-number-column) 9rem minmax(12rem,1fr) minmax(14rem,1.2fr) 4.5rem 28px 28px; }
 .track-browser-field-grid.canonical-tag-grid { --canonical-tag-columns:var(--canonical-number-column) 110px minmax(160px,1fr) minmax(220px,1.5fr) 28px 28px; }
 .canonical-tag-grid > .field-grid-header,
@@ -581,6 +599,12 @@ button { cursor:pointer; }
 .canonical-tag-grid .tag-create-row .field-grid-cell { box-sizing:border-box; }
 .canonical-tag-grid .tag-create-row .tag-submit-cell,
 .canonical-tag-grid .tag-create-row .tag-delete-cell { justify-content:center; }
+
+.tag-analyzer-table { --tag-analyzer-columns:var(--canonical-number-column) minmax(0,4fr) minmax(0,1fr) minmax(0,1fr); }
+.tag-analyzer-table > .field-grid-header:not(.canonical-table-title-row),
+.tag-analyzer-table > .field-grid-row:not(.inserted-table-row) { width:100%; min-width:0; box-sizing:border-box; grid-template-columns:var(--tag-analyzer-columns)!important; }
+.tag-analyzer-table > .canonical-table-title-row { grid-template-columns:minmax(0,1fr)!important; }
+.tag-analyzer-table > .canonical-table-title-row .field-grid-cell { grid-column:1 / -1; }
 
 .new-tag-page { grid-template-columns:33rem minmax(0,1fr); }
 .new-tag-sidebar-field-grid { --field-grid-columns:var(--canonical-number-column) 36px minmax(0,1fr); }
@@ -614,3 +638,25 @@ button { cursor:pointer; }
 .canonical-multiple-values-grid > .multiple-values-table-header-row { grid-template-columns:var(--field-grid-columns)!important; width:100%; }
 .canonical-popup-field-grid > .multiple-values-table-header-row { grid-template-columns:var(--multiple-values-popup-columns)!important; }
 .canonical-multiple-values-grid > .multiple-values-table-header-row .field-grid-action-cell { justify-content:flex-end!important; }
+
+.beta-badge { display:inline-flex; align-items:center; padding:2px 5px; border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line)); border-radius:4px; color:var(--accent); font-size:8px; font-weight:750; letter-spacing:.08em; line-height:1; text-transform:uppercase; }
+.main-view-tabs .beta-badge { margin-left:4px; vertical-align:1px; }
+.tag-analyzer-heading-line { display:flex; align-items:center; gap:8px; }
+.tag-analyzer-page { padding:0 12px 12px; }
+.tag-analyzer-controls { display:flex; align-items:end; gap:8px; padding:9px 0 2px; }
+.tag-analyzer-path-control { display:flex; flex:1 1 auto; flex-direction:column; gap:4px; min-width:120px; color:var(--muted); font-size:10px; }
+.tag-analyzer-path-control input { width:100%; height:32px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:var(--panel-2); color:var(--text)!important; font:10px ui-monospace,SFMono-Regular,Menlo,monospace; }
+.tag-analyzer-progress { display:flex; align-items:center; gap:9px; min-height:29px; color:var(--muted); font-size:10px; }
+.tag-analyzer-progress-meter { width:150px; height:8px; accent-color:var(--accent); }
+.tag-analyzer-progress code { min-width:0; overflow:hidden; color:var(--soft); text-overflow:ellipsis; white-space:nowrap; font-size:9px; }
+.tag-analyzer-issues { max-height:180px; overflow:auto; padding:6px 9px; border:1px solid color-mix(in srgb,var(--red) 30%,var(--line)); border-radius:5px; color:var(--muted); font-size:10px; }
+.tag-analyzer-issues summary { cursor:pointer; }
+.tag-analyzer-issue-list { padding-top:5px; }
+.tag-analyzer-results { flex:1 1 auto; min-height:120px; }
+.tag-analyzer-results > .data-table-scroll { height:100%; }
+.tag-analyzer-empty { padding:0 8px; }
+@media(max-width:900px) {
+  .tag-analyzer-controls { flex-wrap:wrap; }
+  .tag-analyzer-path-control { flex-basis:100%; }
+  .tag-analyzer-progress { flex-wrap:wrap; }
+}
