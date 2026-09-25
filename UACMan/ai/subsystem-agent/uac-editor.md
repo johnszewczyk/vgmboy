@@ -53,18 +53,26 @@
   top-level table. A nested table uses the same `.canonical-table` root and row
   and cell primitives inside its unfold row, without another surface class,
   border, or horizontal inset. Keep each table's schema local to its root so
-  nested rows inherit only their own table's column tracks.
+  nested rows inherit only their own table's column tracks. Tag Analyzer's
+  parent, pack, occurrence, and recursive JSON tables all use this class; their
+  differences belong in their schema and cell content.
 - Canonical title rows share the compact 27 px baseline used by table headers
   and content rows. Let tall controls such as JSON textareas grow their own
   row; do not increase every row in a nested value table to accommodate them.
 - Render nested value editors and popups through `CanonicalTable` too. Unfolded
-  child tables render directly inside the full-width unfold content, without a
-  separate surface wrapper, border, or horizontal inset. Give each unfold a
+  child tables render inside the full-width unfold content, optionally wrapped
+  by semantic annotations such as inline errors, without a separate surface,
+  border, or horizontal inset. Give each unfold a
   hierarchical ID and render child rows through `rowWithUnfolds`; a child can
   contain further unfold rows at any depth. Keep multiple unfolds on one row
   in declared hierarchical order, open ancestors when a deeper fold is
   activated, and clear descendant fold state when a parent closes. Inserted
   unfold rows span one full-width grid track.
+- Keep the nested-table width and zero-inset rule on every `.canonical-table`
+  descendant of `.canonical-unfold-content`, not only its direct child.
+  Recursive editors may add semantic wrappers (for example, inline error
+  messages) around a table; wrappers must not restore the root table's minimum
+  width or padding at deeper levels.
 - Structured JSON values opened from Tag Analyzer field rows use the
   `tagAnalyzerJSONValues` schema recursively. Arrays and objects remain
   canonical tables at every depth; scalar values and object keys edit in their

@@ -121,8 +121,13 @@
     return canonicalRowMarkup([titleCell], { kind:"title", className });
   };
   const canonicalHeaderMarkup = (labels, options = {}) => canonicalRowMarkup(
-    labels.map((label, index) => canonicalHeaderCellMarkup(label, options.cell?.(label, index) || {})),
-    { kind:"header", attributes:options.attributes, style:options.style }
+    labels.map((label, index) => {
+      const actionCell = options.actionCell?.(label, index);
+      return actionCell
+        ? canonicalActionHeaderCellMarkup(label, actionCell)
+        : canonicalHeaderCellMarkup(label, options.cell?.(label, index) || {});
+    }),
+    { kind:"header", className:options.className, attributes:options.attributes, style:options.style }
   );
   const canonicalEmptyRowMarkup = (message, className = "") => canonicalRowMarkup(
     [canonicalCellMarkup(`<span>${message}</span>`, { className:"canonical-table-empty-cell" })],
@@ -1170,12 +1175,10 @@
       title:tableTitle,
       titleAction:tagAnalyzerJSONTitleActions(foldID),
       ariaLabel:`Nested values for ${title}`,
-      header:canonicalRowMarkup([
-        canonicalHeaderCellMarkup("#"),
-        canonicalHeaderCellMarkup(isArray ? "Index" : "Key"),
-        canonicalHeaderCellMarkup("Value"),
-        canonicalActionHeaderCellMarkup("×", { danger:true, ariaLabel:"Delete value column" })
-      ], { kind:"header", className:"multiple-values-table-header-row" }),
+      header:canonicalHeaderMarkup(["#", isArray ? "Index" : "Key", "Value", "×"], {
+        className:"multiple-values-table-header-row",
+        actionCell:(label, index) => index === 3 ? { danger:true, ariaLabel:"Delete value column" } : null
+      }),
       rows,
       attributes:`data-json-node data-json-node-kind="${isArray ? "array" : "object"}" data-json-node-fold-id="${esc(foldID)}" data-json-node-title="${esc(title)}" data-json-next-entry-id="${entries.length}"`
     });
@@ -1226,14 +1229,11 @@
   }
 
   function tagAnalyzerFieldsSubtableMarkup(tagName, matches, foldID, archiveRelativePath) {
-    const header = canonicalRowMarkup([
-      canonicalHeaderCellMarkup("#"),
-      canonicalHeaderCellMarkup("Track"),
-      canonicalHeaderCellMarkup("Tag Name"),
-      canonicalHeaderCellMarkup("Tag Value"),
-      canonicalHeaderCellMarkup("✓"),
-      canonicalActionHeaderCellMarkup("×", { danger:true, title:"Delete this tag field", ariaLabel:"Delete this tag field" })
-    ], { kind:"header" });
+    const header = canonicalHeaderMarkup(["#", "Track", "Tag Name", "Tag Value", "✓", "×"], {
+      actionCell:(label, index) => index === 5
+        ? { danger:true, title:"Delete this tag field", ariaLabel:"Delete this tag field" }
+        : null
+    });
     const rows = matches.map((match, index) => tagAnalyzerFieldRowMarkup(tagName, match, index, foldID)).join("") ||
       canonicalEmptyRowMarkup("No matching tag fields", "multiple-values-empty");
     return new CanonicalTable({
@@ -1434,18 +1434,14 @@
       columns:CanonicalTableColumns.tagAnalyzer,
       title:"Tag Names" + (state.tagAnalyzerHasResult ? " · " + visibleTags.length : ""),
       ariaLabel:"Tag names, matched packs, and tracks",
-      header:canonicalRowMarkup([
-        canonicalHeaderCellMarkup("#"),
-        canonicalHeaderCellMarkup("Tag Name"),
-        canonicalHeaderCellMarkup("Matched Packs"),
-        canonicalHeaderCellMarkup("Tracks"),
-        canonicalActionHeaderCellMarkup("×", {
+      header:canonicalHeaderMarkup(["#", "Tag Name", "Matched Packs", "Tracks", "×"], {
+        actionCell:(label, index) => index === 4 ? {
           danger:true,
           title:"Delete matching track fields",
           ariaLabel:"Delete matching track fields",
           cellClassName:"tag-analyzer-delete-header"
-        })
-      ], { kind:"header" }),
+        } : null
+      }),
       rows,
       empty:canonicalEmptyRowMarkup(esc(emptyMessage), "tag-analyzer-empty")
     });
