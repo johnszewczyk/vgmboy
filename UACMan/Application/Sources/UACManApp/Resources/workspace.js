@@ -94,6 +94,24 @@
     const heading = `<input class="tag-table-field canonical-table-heading-input" value="${esc(label)}" aria-label="${esc(label)}" disabled>`;
     return canonicalCellMarkup(heading, { ...options, role:"columnheader" });
   };
+  const canonicalActionBoxMarkup = (label, options = {}) => {
+    const tag = options.action ? "button" : "span";
+    const className = ["tag-table-field", "canonical-table-heading-input", "canonical-action-box", options.danger ? "danger" : ""].filter(Boolean).join(" ");
+    const type = options.action ? ' type="button" data-action="' + esc(options.action) + '"' : "";
+    const dataAttributes = Object.entries(options.data || {}).map(([name, value]) => ` data-${name}="${esc(value)}"`).join("");
+    const title = options.title ? ' title="' + esc(options.title) + '"' : "";
+    const ariaLabel = options.ariaLabel ? ' aria-label="' + esc(options.ariaLabel) + '"' : "";
+    const disabled = options.disabled ? " disabled" : "";
+    return `<${tag} class="${className}"${type}${dataAttributes}${title}${ariaLabel}${disabled}>${esc(label)}</${tag}>`;
+  };
+  const canonicalActionHeaderCellMarkup = (label, options = {}) => canonicalCellMarkup(
+    canonicalActionBoxMarkup(label, options),
+    {
+      className:["canonical-table-heading-cell", "canonical-table-action-cell", options.cellClassName || ""].filter(Boolean).join(" "),
+      attributes:options.cellAttributes,
+      role:"columnheader"
+    }
+  );
   const canonicalTitleRowMarkup = (title, className = "", actionMarkup = "") => {
     const heading = `<input class="tag-table-field canonical-table-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled>`;
     const content = actionMarkup
@@ -1109,7 +1127,12 @@
       canonicalNumberCellMarkup(index + 1, `Value number ${index + 1}`, { className:"multiple-value-number-cell" }),
       canonicalCellMarkup(keyControl, { className:"tag-analyzer-json-key-cell" }),
       canonicalCellMarkup(valueControl, { className:"tag-analyzer-json-value-cell" }),
-      canonicalCellMarkup(`<button class="icon-button danger" data-action="removeTagAnalyzerJSONEntry" type="button" title="Remove ${esc(childTitle)}" aria-label="Remove ${esc(childTitle)}">×</button>`, { className:"canonical-table-action-cell" })
+      canonicalCellMarkup(canonicalActionBoxMarkup("×", {
+        action:"removeTagAnalyzerJSONEntry",
+        title:`Remove ${childTitle}`,
+        ariaLabel:`Remove ${childTitle}`,
+        danger:true
+      }), { className:"canonical-table-action-cell" })
     ], { className:"tag-analyzer-json-entry-row", attributes:`data-json-entry data-json-entry-index="${index}" data-json-entry-id="${entryID}" data-json-entry-kind="${structured ? "node" : "scalar"}"${structured ? ` data-json-entry-fold-id="${esc(childFoldID)}"` : ""}` });
     if (!structured) return row;
     const childTable = CanonicalTable.isFoldOpen(childFoldID)
@@ -1135,7 +1158,12 @@
       title:tableTitle,
       titleAction:tagAnalyzerJSONTitleActions(foldID),
       ariaLabel:`Nested values for ${title}`,
-      header:canonicalHeaderMarkup(["#", isArray ? "Index" : "Key", "Value", "×"]),
+      header:canonicalRowMarkup([
+        canonicalHeaderCellMarkup("#"),
+        canonicalHeaderCellMarkup(isArray ? "Index" : "Key"),
+        canonicalHeaderCellMarkup("Value"),
+        canonicalActionHeaderCellMarkup("×", { danger:true, ariaLabel:"Delete value column" })
+      ], { kind:"header", className:"multiple-values-table-header-row" }),
       rows,
       attributes:`data-json-node data-json-node-kind="${isArray ? "array" : "object"}" data-json-node-fold-id="${esc(foldID)}" data-json-node-title="${esc(title)}" data-json-next-entry-id="${entries.length}"`
     });
@@ -1167,7 +1195,13 @@
       canonicalCellMarkup(nameControl, { className:"tag-analyzer-match-name-cell" }),
       canonicalCellMarkup(valueControl + '<small class="tag-analyzer-match-error" data-tag-analyzer-error></small>', { className:"tag-analyzer-match-value-cell" }),
       canonicalCellMarkup('<button class="icon-button" data-action="commitTagAnalyzerMatch" title="Save this tag field" aria-label="Save this tag field"' + disabled + '>✓</button>', { className:"canonical-table-action-cell" }),
-      canonicalCellMarkup('<button class="icon-button danger" data-action="deleteTagAnalyzerMatch" title="Delete this tag field" aria-label="Delete this tag field"' + disabled + '>×</button>', { className:"canonical-table-action-cell" })
+      canonicalCellMarkup(canonicalActionBoxMarkup("×", {
+        action:"deleteTagAnalyzerMatch",
+        title:"Delete this tag field",
+        ariaLabel:"Delete this tag field",
+        danger:true,
+        disabled:state?.isDeletingTagAnalyzerTrackFields
+      }), { className:"canonical-table-action-cell" })
     ], { className:"multiple-value-editor-row tag-analyzer-match-row", attributes:rowAttributes });
     if (!structuredValue) return row;
     const nestedTable = CanonicalTable.isFoldOpen(valueFoldID)
@@ -1177,7 +1211,14 @@
   }
 
   function tagAnalyzerFieldsSubtableMarkup(tagName, matches, foldID, archiveRelativePath) {
-    const header = canonicalHeaderMarkup(["#", "Track", "Tag Name", "Tag Value", "✓", "×"]);
+    const header = canonicalRowMarkup([
+      canonicalHeaderCellMarkup("#"),
+      canonicalHeaderCellMarkup("Track"),
+      canonicalHeaderCellMarkup("Tag Name"),
+      canonicalHeaderCellMarkup("Tag Value"),
+      canonicalHeaderCellMarkup("✓"),
+      canonicalActionHeaderCellMarkup("×", { danger:true, title:"Delete this tag field", ariaLabel:"Delete this tag field" })
+    ], { kind:"header" });
     const rows = matches.map((match, index) => tagAnalyzerFieldRowMarkup(tagName, match, index, foldID)).join("") ||
       canonicalEmptyRowMarkup("No matching tag fields", "multiple-values-empty");
     return new CanonicalTable({
@@ -1343,7 +1384,19 @@
         canonicalCellMarkup('<input class="tag-table-field" value="' + esc(tag.name) + '" title="' + esc(tag.name) + '" aria-label="Tag name ' + esc(tag.name) + '" disabled>', { className:"tag-name-cell" }),
         canonicalCellMarkup(toggle, { className:"tag-uses-cell" }),
         canonicalCellMarkup('<input class="tag-table-field" value="' + trackCount + '" aria-label="Tracks with ' + esc(tag.name) + '" disabled>', { className:"tag-uses-cell" }),
-        canonicalCellMarkup('<button class="icon-button danger tag-analyzer-delete-button" data-action="deleteTagAnalyzerTrackFields" data-tag-name="' + esc(tag.name) + '" data-track-field-count="' + trackCount + '" data-package-count="' + trackArchives.length + '" data-archive-paths="' + esc(JSON.stringify(trackArchives.map(archive => archive.relativePath))) + '" title="Delete ' + trackCount + ' track field(s) from ' + trackArchives.length + ' matching package(s)" aria-label="Delete ' + trackCount + ' track field(s) named ' + esc(tag.name) + ' from ' + trackArchives.length + ' matching package(s)"' + (trackCount < 1 || busy ? " disabled" : "") + '>×</button>', { className:"canonical-table-action-cell tag-analyzer-delete-cell" })
+        canonicalCellMarkup(canonicalActionBoxMarkup("×", {
+          action:"deleteTagAnalyzerTrackFields",
+          data:{
+            "tag-name":tag.name,
+            "track-field-count":trackCount,
+            "package-count":trackArchives.length,
+            "archive-paths":JSON.stringify(trackArchives.map(archive => archive.relativePath))
+          },
+          title:`Delete ${trackCount} track field(s) from ${trackArchives.length} matching package(s)`,
+          ariaLabel:`Delete ${trackCount} track field(s) named ${tag.name} from ${trackArchives.length} matching package(s)`,
+          danger:true,
+          disabled:trackCount < 1 || busy
+        }), { className:"canonical-table-action-cell tag-analyzer-delete-cell" })
       ];
       const parentRow = canonicalRowMarkup(cells);
       const subtable = tagIsExpanded && hasCachedMatches
@@ -1366,9 +1419,18 @@
       columns:CanonicalTableColumns.tagAnalyzer,
       title:"Tag Names" + (state.tagAnalyzerHasResult ? " · " + visibleTags.length : ""),
       ariaLabel:"Tag names, matched packs, and tracks",
-      header:canonicalHeaderMarkup(["#", "Tag Name", "Matched Packs", "Tracks", "×"], {
-        cell:label => label === "×" ? { className:"tag-analyzer-delete-header", attributes:'title="Delete matching track fields"' } : {}
-      }),
+      header:canonicalRowMarkup([
+        canonicalHeaderCellMarkup("#"),
+        canonicalHeaderCellMarkup("Tag Name"),
+        canonicalHeaderCellMarkup("Matched Packs"),
+        canonicalHeaderCellMarkup("Tracks"),
+        canonicalActionHeaderCellMarkup("×", {
+          danger:true,
+          title:"Delete matching track fields",
+          ariaLabel:"Delete matching track fields",
+          cellClassName:"tag-analyzer-delete-header"
+        })
+      ], { kind:"header" }),
       rows,
       empty:canonicalEmptyRowMarkup(esc(emptyMessage), "tag-analyzer-empty")
     });
