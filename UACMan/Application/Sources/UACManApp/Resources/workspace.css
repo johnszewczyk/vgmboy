@@ -600,11 +600,13 @@ button { cursor:pointer; }
 .canonical-tag-grid .tag-create-row .tag-submit-cell,
 .canonical-tag-grid .tag-create-row .tag-delete-cell { justify-content:center; }
 
-.tag-analyzer-table { --tag-analyzer-columns:var(--canonical-number-column) minmax(0,4fr) minmax(0,1fr) minmax(0,1fr); }
+.tag-analyzer-table { --tag-analyzer-columns:var(--canonical-number-column) minmax(0,4fr) minmax(0,1fr) minmax(0,1fr) var(--canonical-action-column); }
 .tag-analyzer-table > .field-grid-header:not(.canonical-table-title-row),
 .tag-analyzer-table > .field-grid-row:not(.inserted-table-row) { width:100%; min-width:0; box-sizing:border-box; grid-template-columns:var(--tag-analyzer-columns)!important; }
 .tag-analyzer-table > .canonical-table-title-row { grid-template-columns:minmax(0,1fr)!important; }
 .tag-analyzer-table > .canonical-table-title-row .field-grid-cell { grid-column:1 / -1; }
+.tag-analyzer-delete-header,.tag-analyzer-delete-cell { justify-content:center; }
+.tag-analyzer-delete-button { width:100%; min-width:24px; }
 
 .new-tag-page { grid-template-columns:33rem minmax(0,1fr); }
 .new-tag-sidebar-field-grid { --field-grid-columns:var(--canonical-number-column) 36px minmax(0,1fr); }

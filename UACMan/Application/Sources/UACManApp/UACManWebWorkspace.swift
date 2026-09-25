@@ -105,6 +105,11 @@ struct UACManWebWorkspace: NSViewRepresentable {
                     storageKey: payload["storageKey"] as? String ?? "",
                     expectedValueJSON: payload["expectedValueJSON"] as? String ?? ""
                 )
+            case "deleteTagAnalyzerTrackFields":
+                model.deleteTagAnalyzerTrackFields(
+                    tagName: payload["tagName"] as? String ?? "",
+                    archiveRelativePaths: payload["archiveRelativePaths"] as? [String] ?? []
+                )
             case "selectPackage":
                 if let path = payload["path"] as? String { model.selectCollectionPackage(path) }
             case "selectMember":

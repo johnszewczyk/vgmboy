@@ -724,13 +724,14 @@
     const trackControl = '<input class="tag-table-field tag-analyzer-match-track" value="' + esc(trackName) + '" title="' + esc(memberPath || "Package-level tag field") + '" aria-label="Track" disabled>';
     const nameControl = '<input class="tag-table-field" data-tag-analyzer-name value="' + esc(tagName) + '" aria-label="Tag name ' + esc(tagName) + '">';
     const rowAttributes = 'data-tag-analyzer-match data-tag-name="' + esc(tagName) + '" data-archive-relative-path="' + esc(match.archiveRelativePath) + '" data-member-relative-path="' + esc(match.memberRelativePath || "") + '" data-storage-scope="' + esc(match.storageScope) + '" data-storage-key="' + esc(match.storageKey) + '" data-expected-value-json="' + esc(match.valueJSON) + '" data-value-is-json="' + match.valueIsJSON + '"';
+    const disabled = state?.isDeletingTagAnalyzerTrackFields ? " disabled" : "";
     return canonicalRowMarkup([
       canonicalNumberCellMarkup(index + 1, "Tag field number " + (index + 1), { className:"multiple-value-number-cell" }),
       canonicalCellMarkup(trackControl, { className:"tag-analyzer-match-track-cell" }),
       canonicalCellMarkup(nameControl, { className:"tag-analyzer-match-name-cell" }),
       canonicalCellMarkup(valueControl + '<small class="tag-analyzer-match-error" data-tag-analyzer-error></small>', { className:"tag-analyzer-match-value-cell" }),
-      canonicalCellMarkup('<button class="icon-button" data-action="commitTagAnalyzerMatch" title="Save this tag field" aria-label="Save this tag field">✓</button>', { className:"field-grid-action-cell" }),
-      canonicalCellMarkup('<button class="icon-button danger" data-action="deleteTagAnalyzerMatch" title="Delete this tag field" aria-label="Delete this tag field">×</button>', { className:"field-grid-action-cell" })
+      canonicalCellMarkup('<button class="icon-button" data-action="commitTagAnalyzerMatch" title="Save this tag field" aria-label="Save this tag field"' + disabled + '>✓</button>', { className:"field-grid-action-cell" }),
+      canonicalCellMarkup('<button class="icon-button danger" data-action="deleteTagAnalyzerMatch" title="Delete this tag field" aria-label="Delete this tag field"' + disabled + '>×</button>', { className:"field-grid-action-cell" })
     ], { className:"multiple-value-editor-row tag-analyzer-match-row", attributes:rowAttributes });
   }
 
@@ -868,13 +869,17 @@
   function renderTagAnalyzerPage() {
     const tags = state.tagAnalyzerTags || [];
     const query = $("#member-filter")?.value.trim().toLocaleLowerCase() || "";
+    const deleting = Boolean(state.isDeletingTagAnalyzerTrackFields);
+    const busy = Boolean(state.isAnalyzingTagNames) || deleting;
     const visibleTags = tags.map(tag => {
-      if (!query) return { tag, matchedPackCount:Number(tag.matchedPackCount) || 0, trackCount:Number(tag.trackCount) || 0 };
       const archives = (tag.archiveMatches || []).filter(archive => tagAnalyzerFilenameMatches(archive.relativePath, query));
       return {
         tag,
-        matchedPackCount:archives.length,
-        trackCount:archives.reduce((total, archive) => total + (Number(archive.trackCount) || 0), 0)
+        matchedPackCount:query ? archives.length : Number(tag.matchedPackCount) || 0,
+        trackCount:query
+          ? archives.reduce((total, archive) => total + (Number(archive.trackCount) || 0), 0)
+          : Number(tag.trackCount) || 0,
+        trackArchives:archives.filter(archive => Number(archive.trackCount) > 0)
       };
     }).filter(item => !query || item.matchedPackCount > 0);
     const issues = state.tagAnalyzerIssues || [];
@@ -883,19 +888,29 @@
     const phase = progress.phase || "discovering";
     const total = Number(progress.totalPackages) || 0;
     const processed = Number(progress.packagesProcessed) || 0;
-    const progressControl = running && phase === "reading" && total > 0
+    const deletionProgress = state.tagAnalyzerDeletionProgress || {};
+    const deletionTotal = Number(deletionProgress.totalPackages) || 0;
+    const deletionCompleted = Number(deletionProgress.packagesCompleted) || 0;
+    const progressControl = deleting && deletionTotal > 0
+      ? '<progress class="tag-analyzer-progress-meter" max="' + deletionTotal + '" value="' + Math.min(deletionCompleted, deletionTotal) + '" aria-label="Packages updated"></progress>'
+      : running && phase === "reading" && total > 0
       ? '<progress class="tag-analyzer-progress-meter" max="' + total + '" value="' + Math.min(processed, total) + '" aria-label="Packages read"></progress>'
       : running
         ? '<progress class="tag-analyzer-progress-meter" aria-label="Finding UAC packages"></progress>'
         : "";
+    const currentPath = deleting
+      ? deletionProgress.currentRelativePath || ""
+      : progress.currentRelativePath || "";
     const status = state.isCancellingTagAnalysis
       ? "Cancelling after the current manifest read…"
-      : state.tagAnalyzerStatusMessage || "Choose a folder path to inventory its UAC tag names.";
+      : deleting
+        ? state.tagAnalyzerStatusMessage || "Deleting matching track fields…"
+      : state.tagAnalyzerStatusMessage || "Browse for a folder to inventory its UAC tag names.";
     const selectedMatchesTagName = state.tagAnalyzerSelectedMatchesTagName || "";
     const selectedMatches = (state.tagAnalyzerSelectedMatches || []).filter(match =>
       tagAnalyzerFilenameMatches(match.archiveRelativePath, query)
     );
-    const rows = visibleTags.map(({ tag, matchedPackCount, trackCount }, index) => {
+    const rows = visibleTags.map(({ tag, matchedPackCount, trackCount, trackArchives }, index) => {
       const hasSelectedMatches = selectedMatchesTagName === tag.name;
       const tagIsExpanded = expandedTagAnalyzerName === tag.name && hasSelectedMatches;
       const foldID = "tag-analyzer-matches-" + index;
@@ -905,7 +920,8 @@
         canonicalNumberCellMarkup(index + 1, "Tag number " + (index + 1), { className:"tag-number-cell" }),
         canonicalCellMarkup('<input class="tag-table-field" value="' + esc(tag.name) + '" title="' + esc(tag.name) + '" aria-label="Tag name ' + esc(tag.name) + '" disabled>', { className:"tag-name-cell" }),
         canonicalCellMarkup(toggle, { className:"tag-uses-cell" }),
-        canonicalCellMarkup('<input class="tag-table-field" value="' + trackCount + '" aria-label="Tracks with ' + esc(tag.name) + '" disabled>', { className:"tag-uses-cell" })
+        canonicalCellMarkup('<input class="tag-table-field" value="' + trackCount + '" aria-label="Tracks with ' + esc(tag.name) + '" disabled>', { className:"tag-uses-cell" }),
+        canonicalCellMarkup('<button class="icon-button danger tag-analyzer-delete-button" data-action="deleteTagAnalyzerTrackFields" data-tag-name="' + esc(tag.name) + '" data-track-field-count="' + trackCount + '" data-package-count="' + trackArchives.length + '" data-archive-paths="' + esc(JSON.stringify(trackArchives.map(archive => archive.relativePath))) + '" title="Delete ' + trackCount + ' track field(s) from ' + trackArchives.length + ' matching package(s)" aria-label="Delete ' + trackCount + ' track field(s) named ' + esc(tag.name) + ' from ' + trackArchives.length + ' matching package(s)"' + (trackCount < 1 || busy ? " disabled" : "") + '>×</button>', { className:"field-grid-action-cell tag-analyzer-delete-cell" })
       ];
       const parentRow = canonicalRowMarkup(cells);
       if (!hasSelectedMatches) return parentRow;
@@ -919,14 +935,16 @@
       ? query
         ? 'No tag fields match package filenames containing "' + esc(query) + '".'
         : "No tag fields were found in the readable UAC manifests."
-      : "Choose & Analyze a folder to list its UAC tag names.";
+      : "Browse for a folder to list its UAC tag names.";
     const issuesDisclosure = issues.length
       ? '<details class="tag-analyzer-issues"><summary>' + issues.length + ' unreadable folder or package item(s) · results may be incomplete</summary><div class="tag-analyzer-issue-list">' + issues.map(issue => '<div class="issue"><strong>' + esc(issue.relativePath || "Selected folder") + '</strong>' + esc(issue.message) + '</div>').join("") + '</div></details>'
       : "";
     const table = canonicalTableMarkup({
       className:"flat-table meta-field-grid tag-analyzer-table",
       ariaLabel:"Tag names, matched packs, and tracks",
-      header:canonicalTitleRowMarkup("Tag Names" + (state.tagAnalyzerHasResult ? " · " + visibleTags.length : "")) + canonicalHeaderMarkup(["#", "Tag Name", "Matched Packs", "Tracks"]),
+      header:canonicalTitleRowMarkup("Tag Names" + (state.tagAnalyzerHasResult ? " · " + visibleTags.length : "")) + canonicalHeaderMarkup(["#", "Tag Name", "Matched Packs", "Tracks", "×"], {
+        cell:label => label === "×" ? { className:"tag-analyzer-delete-header", attributes:'title="Delete matching track fields"' } : {}
+      }),
       rows,
       empty:'<div class="field-grid-empty tag-analyzer-empty" role="row"><span role="cell">' + esc(emptyMessage) + '</span></div>'
     });
@@ -935,10 +953,10 @@
       '<div class="data-page-heading"><div><div class="tag-analyzer-heading-line"><h2>Tag Analyzer</h2><span class="beta-badge">Beta</span></div><p>List exact tag field names in a folder. Matched-pack counts identify packages with that field; values may differ. Expand a pack to inspect its field entries.</p></div><span class="data-page-count">' + (state.tagAnalyzerHasResult ? (query ? visibleTags.length + ' / ' + tags.length + ' matching name(s)' : tags.length + ' unique name(s)') : "Manifest fields") + '</span></div>' +
       '<div class="tag-analyzer-controls">' +
         '<label class="tag-analyzer-path-control">Folder Path<input class="tag-table-field" value="' + esc(state.tagAnalyzerRootPath || "") + '" placeholder="Choose a folder path" aria-label="Tag analysis folder path" readonly></label>' +
-        '<button class="button primary" data-action="chooseTagAnalyzerFolder"' + (running ? " disabled" : "") + '>Choose &amp; Analyze…</button>' +
+        '<button class="button primary" data-action="chooseTagAnalyzerFolder"' + (busy ? " disabled" : "") + '>Browse</button>' +
         '<button class="button secondary tag-analyzer-cancel" data-action="cancelTagAnalysis"' + (!running || state.isCancellingTagAnalysis ? " disabled" : "") + '>Cancel</button>' +
       '</div>' +
-      '<div class="tag-analyzer-progress" role="status" aria-live="polite">' + progressControl + '<span>' + esc(status) + '</span>' + (running && progress.currentRelativePath ? '<code title="' + esc(progress.currentRelativePath) + '">' + esc(progress.currentRelativePath) + '</code>' : "") + '</div>' +
+      '<div class="tag-analyzer-progress" role="status" aria-live="polite">' + progressControl + '<span>' + esc(status) + '</span>' + ((running || deleting) && currentPath ? '<code title="' + esc(currentPath) + '">' + esc(currentPath) + '</code>' : "") + '</div>' +
       issuesDisclosure +
       '<div class="tag-analyzer-results"><div class="data-table-scroll canonical-table-surface">' + table + '</div></div>' +
     '</section>';
@@ -1313,7 +1331,7 @@
   }
 
   function commitTagAnalyzerMatch(row) {
-    if (!row) return;
+    if (!row || state?.isDeletingTagAnalyzerTrackFields) return;
     const nameField = $("[data-tag-analyzer-name]", row);
     const valueField = $("[data-tag-analyzer-value]", row);
     const name = nameField?.value.trim() || "";
@@ -1344,11 +1362,27 @@
   }
 
   function deleteTagAnalyzerMatch(row) {
-    if (!row) return;
+    if (!row || state?.isDeletingTagAnalyzerTrackFields) return;
     const source = [row.dataset.archiveRelativePath, row.dataset.memberRelativePath].filter(Boolean).join(" · ");
     const name = row.dataset.tagName || "this tag";
     if (!window.confirm('Delete only "' + name + '" from ' + source + '?')) return;
     bridge("deleteTagAnalyzerMatch", tagAnalyzerMatchPayload(row));
+  }
+
+  function deleteTagAnalyzerTrackFields(button) {
+    if (!button || state?.isDeletingTagAnalyzerTrackFields) return;
+    const tagName = button.dataset.tagName || "";
+    const trackFieldCount = Number(button.dataset.trackFieldCount) || 0;
+    const packageCount = Number(button.dataset.packageCount) || 0;
+    let archiveRelativePaths = [];
+    try {
+      archiveRelativePaths = JSON.parse(button.dataset.archivePaths || "[]");
+    } catch { return; }
+    if (!tagName || trackFieldCount < 1 || !packageCount || !Array.isArray(archiveRelativePaths)) return;
+    const scope = packageCount === 1 ? "1 package" : packageCount + " packages";
+    const message = 'Delete all ' + trackFieldCount + ' "' + tagName + '" track fields from ' + scope + ' matched by the current filename filter? This edits their UAC manifests.';
+    if (!window.confirm(message)) return;
+    bridge("deleteTagAnalyzerTrackFields", { tagName, archiveRelativePaths });
   }
 
   document.addEventListener("click", event => {
@@ -1409,6 +1443,7 @@
     }
     else if (action === "commitTagAnalyzerMatch") commitTagAnalyzerMatch(event.target.closest("[data-tag-analyzer-match]"));
     else if (action === "deleteTagAnalyzerMatch") deleteTagAnalyzerMatch(event.target.closest("[data-tag-analyzer-match]"));
+    else if (action === "deleteTagAnalyzerTrackFields") deleteTagAnalyzerTrackFields(event.target.closest("[data-action=deleteTagAnalyzerTrackFields]"));
     else if (action === "closeMultipleValuesPopup") closeMultipleValuesPopup(event.target.closest("[data-multiple-values-popup]"));
     else if (action === "closeCanonicalSubtable") closeCanonicalSubtable(event.target.closest("[data-action=closeCanonicalSubtable]"));
     else if (action === "toggleCanonicalFold") {

@@ -120,6 +120,80 @@ public enum UACTagAnalyzerEditor {
         }
     }
 
+    /// Removes the requested track fields in one package with a single
+    /// manifest rewrite while preserving the compressed payload byte-for-byte.
+    public static func removeTrackFields(
+        matches: [UACTagFieldMatch],
+        compressManifestFrame: @escaping UACManifestFrameEncoder,
+        decompressManifestFrame: @escaping UACManifestFrameDecoder
+    ) throws {
+        guard let first = matches.first else { return }
+        let archiveURL = first.archiveURL.standardizedFileURL
+        guard matches.allSatisfy({
+            $0.isTrack
+                && $0.archiveRelativePath == first.archiveRelativePath
+                && $0.archiveURL.standardizedFileURL == archiveURL
+                && $0.memberRelativePath != nil
+                && ["memberMetadata", "memberExtensions"].contains($0.storageScope)
+        }) else {
+            throw UACTagAnalyzerEditorError.unsupportedScope("bulk deletion requires track fields from one package")
+        }
+
+        let original = try UACContainerReader.read(
+            from: archiveURL,
+            decompressManifestFrame: decompressManifestFrame
+        )
+        let sourceStamp = try SourceStamp(url: archiveURL, manifestSHA256: original.manifestSHA256)
+        guard var manifest = try JSONSerialization.jsonObject(with: original.manifestJSON) as? [String: Any],
+              var members = manifest["members"] as? [[String: Any]] else {
+            throw UACTagAnalyzerEditorError.invalidManifest
+        }
+
+        var memberIndices: [String: Int] = [:]
+        for (index, member) in members.enumerated() {
+            if let path = member["path"] as? String { memberIndices[path] = index }
+        }
+        for match in matches {
+            guard let memberPath = match.memberRelativePath,
+                  let index = memberIndices[memberPath] else {
+                throw UACTagAnalyzerEditorError.missingMemberPath
+            }
+            var member = members[index]
+            let fieldsKey = match.storageScope == "memberExtensions" ? "extensions" : "metadata"
+            try removeField(in: &member, fieldsKey: fieldsKey, match: match)
+            members[index] = member
+        }
+        manifest["members"] = members
+
+        let manifestData = try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys, .withoutEscapingSlashes])
+        let temporaryURL = archiveURL.deletingLastPathComponent()
+            .appendingPathComponent(".\(archiveURL.lastPathComponent).uacman-\(UUID().uuidString).tmp")
+        defer { try? FileManager.default.removeItem(at: temporaryURL) }
+
+        let rewritten = try UACContainerWriter.rewriteManifest(
+            manifestJSON: manifestData,
+            in: archiveURL,
+            to: temporaryURL,
+            compressManifestFrame: compressManifestFrame,
+            decompressManifestFrame: decompressManifestFrame
+        )
+        guard rewritten.manifestJSON == manifestData else {
+            throw UACTagAnalyzerEditorError.rewriteFailed("the staged manifest did not match the requested edit")
+        }
+        let current = try UACContainerReader.read(from: archiveURL, decompressManifestFrame: decompressManifestFrame)
+        guard try SourceStamp(url: archiveURL, manifestSHA256: current.manifestSHA256) == sourceStamp else {
+            throw UACTagAnalyzerEditorError.archiveChanged(first.archiveRelativePath)
+        }
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: archiveURL.path)
+        if let permissions = attributes[.posixPermissions] as? NSNumber {
+            try FileManager.default.setAttributes([.posixPermissions: permissions], ofItemAtPath: temporaryURL.path)
+        }
+        guard Darwin.rename(temporaryURL.path, archiveURL.path) == 0 else {
+            throw UACTagAnalyzerEditorError.rewriteFailed(String(cString: strerror(errno)))
+        }
+    }
+
     private static func editField(
         in parent: inout [String: Any],
         fieldsKey: String,
@@ -160,6 +234,26 @@ public enum UACTagAnalyzerEditor {
             let encodedValue = try JSONEncoder().encode(newValue)
             fields[newStorageKey] = try JSONSerialization.jsonObject(with: encodedValue, options: [.fragmentsAllowed])
         }
+        parent[fieldsKey] = fields
+    }
+
+    private static func removeField(
+        in parent: inout [String: Any],
+        fieldsKey: String,
+        match: UACTagFieldMatch
+    ) throws {
+        guard var fields = parent[fieldsKey] as? [String: Any],
+              let currentRawValue = fields[match.storageKey],
+              let expectedData = match.valueJSON.data(using: .utf8) else {
+            throw UACTagAnalyzerEditorError.invalidManifest
+        }
+        let currentData = try JSONSerialization.data(withJSONObject: currentRawValue, options: [.fragmentsAllowed, .sortedKeys])
+        let currentValue = try JSONDecoder().decode(UACJSONValue.self, from: currentData)
+        let expectedValue = try JSONDecoder().decode(UACJSONValue.self, from: expectedData)
+        guard currentValue == expectedValue else {
+            throw UACTagAnalyzerEditorError.fieldChanged(match.storageKey)
+        }
+        fields.removeValue(forKey: match.storageKey)
         parent[fieldsKey] = fields
     }
 

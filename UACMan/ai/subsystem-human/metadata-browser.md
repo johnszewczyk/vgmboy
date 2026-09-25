@@ -67,7 +67,7 @@ it returns when a collection is opened. The last existing UAC or collection path
 is restored on launch when no command-line document was supplied.
 
 **Tag Analyzer** (Beta) is a separate workspace page that works with or without
-an open package. **Choose & Analyze…** selects a folder and immediately scans
+an open package. **Browse** selects a folder and immediately scans
 its regular `.uac` packages recursively. The selected folder path is restored
 when UACMan launches again. The app-bar search filters package filenames in the
 current analyzer results; matching tag names and their pack/track counts update
@@ -85,11 +85,14 @@ count, and a **Tag Fields** expander. Each pack row opens another animated
 canonical table with **#**, **Track**, **Tag Name**, **Tag Value**, **✓**, and
 **×** columns. Track filenames occupy their own cells; package-level fields
 show **Package** in the Track column. Both nested tables use the shared title
-row and close control.
+row and close control. The parent table's **×** action removes every occurrence
+of that tag name from playable tracks in packages matching the current filename
+filter. It asks for confirmation, reports progress, and rewrites each affected
+package manifest once; package-level fields are not targets.
 
-The ✓ action updates one manifest field; × removes that one field after
-confirmation. Both preserve the archive's compressed members. Progress reports
-folder discovery and package reads, and **Cancel** stops the scan. Cancelling
+The ✓ action updates one manifest field; the nested × removes that one field
+after confirmation. Both preserve the archive's compressed members. Progress
+reports folder discovery and package reads, and **Cancel** stops the scan. Cancelling
 clears the incomplete list. Unreadable folders or packages are reported, and
 their presence marks the result as potentially incomplete.
 

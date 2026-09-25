@@ -51,6 +51,11 @@
   manifest and preserve all compressed payload bytes. Keep cancellation checks
   between directory entries and package reads; a cancelled run must not present
   its partial field set as exhaustive.
+- Parent-level Tag Analyzer deletion targets playable-track occurrences of the
+  exact field name in packages matched by the current filename filter. Group
+  matches by archive and rewrite each manifest once, after verifying every
+  stored value still matches the analysis snapshot. Report successful and
+  failed packages so a partial collection update is visible.
 - The package inspector lists and edits metadata for every manifest member.
   Only playable/track roles represent song rows in MetaMan and ScanSong;
   artwork, cue sheets, and documents remain inspectable package assets.

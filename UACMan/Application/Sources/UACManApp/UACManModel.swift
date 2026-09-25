@@ -208,9 +208,13 @@ final class UACManModel {
         currentRelativePath: "",
         uniqueTagCount: 0
     )
-    var tagAnalyzerStatusMessage = "Choose a folder path to inventory its UAC tag names."
+    var tagAnalyzerStatusMessage = "Browse for a folder to inventory its UAC tag names."
     var isAnalyzingTagNames = false
     var isCancellingTagAnalysis = false
+    var isDeletingTagAnalyzerTrackFields = false
+    var tagAnalyzerDeletionCompletedPackages = 0
+    var tagAnalyzerDeletionTotalPackages = 0
+    var tagAnalyzerDeletionCurrentPath = ""
     var tagAnalyzerHasResult = false
     var hasUnsavedChanges = false
     var isHarvestingMetadata = false
@@ -229,6 +233,8 @@ final class UACManModel {
     @ObservationIgnored private var collectionScanID: UUID?
     @ObservationIgnored private var tagAnalysisTask: Task<Void, Never>?
     @ObservationIgnored private var tagAnalysisID: UUID?
+    @ObservationIgnored private var tagAnalyzerDeletionTask: Task<Void, Never>?
+    @ObservationIgnored private var tagAnalyzerDeletionID: UUID?
     @ObservationIgnored private var lastTagAnalysisProgressUpdate = 0.0
 
     var selectedMember: UACMember? {
@@ -385,6 +391,12 @@ final class UACManModel {
             "tagAnalyzerStatusMessage": tagAnalyzerStatusMessage,
             "isAnalyzingTagNames": isAnalyzingTagNames,
             "isCancellingTagAnalysis": isCancellingTagAnalysis,
+            "isDeletingTagAnalyzerTrackFields": isDeletingTagAnalyzerTrackFields,
+            "tagAnalyzerDeletionProgress": [
+                "packagesCompleted": tagAnalyzerDeletionCompletedPackages,
+                "totalPackages": tagAnalyzerDeletionTotalPackages,
+                "currentRelativePath": tagAnalyzerDeletionCurrentPath
+            ] as [String: Any],
             "tagAnalyzerHasResult": tagAnalyzerHasResult,
             "allMemberCount": allMemberCount,
             "manifestEncodingDescription": manifestEncodingDescription,
@@ -429,7 +441,7 @@ final class UACManModel {
         let defaults = UserDefaults.standard
         if let path = defaults.string(forKey: PreferenceKey.lastTagAnalyzerPath), !path.isEmpty {
             tagAnalyzerRootURL = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
-            tagAnalyzerStatusMessage = "Restored the previous folder path. Choose & Analyze to scan it again."
+            tagAnalyzerStatusMessage = "Restored the previous folder path. Browse to scan it again."
         }
         if let argument = ProcessInfo.processInfo.arguments.dropFirst().first,
            !argument.hasPrefix("-") {
@@ -506,7 +518,7 @@ final class UACManModel {
     }
 
     func chooseTagAnalyzerFolderPanel() {
-        guard !isAnalyzingTagNames else { return }
+        guard !isAnalyzingTagNames, !isDeletingTagAnalyzerTrackFields else { return }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -521,9 +533,9 @@ final class UACManModel {
     }
 
     func startTagAnalysis() {
-        guard !isAnalyzingTagNames else { return }
+        guard !isAnalyzingTagNames, !isDeletingTagAnalyzerTrackFields else { return }
         guard let root = tagAnalyzerRootURL else {
-            errorMessage = "Choose a folder path before analyzing tag names."
+            errorMessage = "Browse for a folder before analyzing tag names."
             return
         }
 
@@ -602,6 +614,7 @@ final class UACManModel {
         value: String,
         valueIsJSON: Bool
     ) {
+        guard !isDeletingTagAnalyzerTrackFields else { return }
         let replacement: UACJSONValue
         if valueIsJSON {
             guard let data = value.data(using: .utf8),
@@ -633,6 +646,7 @@ final class UACManModel {
         storageKey: String,
         expectedValueJSON: String
     ) {
+        guard !isDeletingTagAnalyzerTrackFields else { return }
         rewriteTagAnalyzerMatch(
             tagName: tagName,
             archiveRelativePath: archiveRelativePath,
@@ -643,6 +657,143 @@ final class UACManModel {
             newName: tagName,
             replacement: nil
         )
+    }
+
+    func deleteTagAnalyzerTrackFields(tagName: String, archiveRelativePaths: [String]) {
+        guard tagAnalyzerHasResult,
+              !isAnalyzingTagNames,
+              !isDeletingTagAnalyzerTrackFields,
+              let tag = tagAnalyzerTags.first(where: { $0.name == tagName }),
+              let root = tagAnalyzerRootURL?.standardizedFileURL else { return }
+
+        let targetPaths = Set(archiveRelativePaths)
+        let matches = tag.matches.filter { $0.isTrack && targetPaths.contains($0.archiveRelativePath) }
+        guard !matches.isEmpty else { return }
+
+        let packages = Dictionary(grouping: matches, by: \.archiveRelativePath)
+            .map { UACTagAnalyzerTrackDeletionPackage(relativePath: $0.key, matches: $0.value) }
+            .sorted { $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending }
+        let deletionID = UUID()
+        tagAnalyzerDeletionID = deletionID
+        isDeletingTagAnalyzerTrackFields = true
+        tagAnalyzerDeletionCompletedPackages = 0
+        tagAnalyzerDeletionTotalPackages = packages.count
+        tagAnalyzerDeletionCurrentPath = packages.first?.relativePath ?? ""
+        tagAnalyzerStatusMessage = "Deleting \(matches.count) track field(s) named \(tagName) across \(packages.count) package(s)…"
+        statusMessage = tagAnalyzerStatusMessage
+        errorMessage = nil
+
+        let manifestEncoder = codec.encoder
+        let manifestDecoder = codec.decoder
+        tagAnalyzerDeletionTask = Task.detached(priority: .userInitiated) { [weak self, packages] in
+            var outcomes: [UACTagAnalyzerTrackDeletionOutcome] = []
+            for (index, package) in packages.enumerated() {
+                do {
+                    let archiveURL = root.appendingPathComponent(package.relativePath).standardizedFileURL
+                    guard archiveURL.path.hasPrefix(root.path + "/"),
+                          package.matches.allSatisfy({ $0.archiveURL.standardizedFileURL == archiveURL }) else {
+                        throw UACTagAnalyzerEditorError.archiveChanged(package.relativePath)
+                    }
+                    try UACTagAnalyzerEditor.removeTrackFields(
+                        matches: package.matches,
+                        compressManifestFrame: manifestEncoder,
+                        decompressManifestFrame: manifestDecoder
+                    )
+                    outcomes.append(UACTagAnalyzerTrackDeletionOutcome(
+                        relativePath: package.relativePath,
+                        deletedFieldCount: package.matches.count,
+                        errorMessage: nil
+                    ))
+                } catch {
+                    outcomes.append(UACTagAnalyzerTrackDeletionOutcome(
+                        relativePath: package.relativePath,
+                        deletedFieldCount: 0,
+                        errorMessage: error.localizedDescription
+                    ))
+                }
+                await self?.reportTagAnalyzerTrackDeletionProgress(
+                    deletionID: deletionID,
+                    packagesCompleted: index + 1,
+                    totalPackages: packages.count,
+                    currentRelativePath: package.relativePath
+                )
+            }
+            await self?.finishTagAnalyzerTrackDeletion(
+                tagName: tagName,
+                deletionID: deletionID,
+                outcomes: outcomes
+            )
+        }
+    }
+
+    private func reportTagAnalyzerTrackDeletionProgress(
+        deletionID: UUID,
+        packagesCompleted: Int,
+        totalPackages: Int,
+        currentRelativePath: String
+    ) {
+        guard tagAnalyzerDeletionID == deletionID else { return }
+        tagAnalyzerDeletionCompletedPackages = packagesCompleted
+        tagAnalyzerDeletionTotalPackages = totalPackages
+        tagAnalyzerDeletionCurrentPath = currentRelativePath
+        tagAnalyzerStatusMessage = "Deleting track fields · \(packagesCompleted) of \(totalPackages) package(s) processed"
+        statusMessage = tagAnalyzerStatusMessage
+    }
+
+    private func finishTagAnalyzerTrackDeletion(
+        tagName: String,
+        deletionID: UUID,
+        outcomes: [UACTagAnalyzerTrackDeletionOutcome]
+    ) {
+        guard tagAnalyzerDeletionID == deletionID else { return }
+        tagAnalyzerDeletionTask = nil
+        tagAnalyzerDeletionID = nil
+        isDeletingTagAnalyzerTrackFields = false
+        tagAnalyzerDeletionCurrentPath = ""
+
+        let completedArchives = Set(outcomes.filter { $0.errorMessage == nil }.map(\.relativePath))
+        removeTagAnalyzerTrackMatches(tagName: tagName, archivePaths: completedArchives)
+        let deletedFieldCount = outcomes.reduce(0) { $0 + $1.deletedFieldCount }
+        let completedPackageCount = completedArchives.count
+        let failures = outcomes.filter { $0.errorMessage != nil }
+        if failures.isEmpty {
+            tagAnalyzerStatusMessage = "Deleted \(deletedFieldCount) track field(s) named \(tagName) from \(completedPackageCount) package(s)."
+            errorMessage = nil
+        } else {
+            tagAnalyzerStatusMessage = "Deleted \(deletedFieldCount) track field(s) named \(tagName) from \(completedPackageCount) package(s); \(failures.count) package(s) could not be updated."
+            errorMessage = failures.compactMap { outcome in
+                outcome.errorMessage.map { "\(outcome.relativePath): \($0)" }
+            }.joined(separator: "\n")
+        }
+        statusMessage = tagAnalyzerStatusMessage
+    }
+
+    private func removeTagAnalyzerTrackMatches(tagName: String, archivePaths: Set<String>) {
+        guard let index = tagAnalyzerTags.firstIndex(where: { $0.name == tagName }) else { return }
+        let usage = tagAnalyzerTags[index]
+        let removedMatches = usage.matches.filter { $0.isTrack && archivePaths.contains($0.archiveRelativePath) }
+        guard !removedMatches.isEmpty else { return }
+        let remainingMatches = usage.matches.filter { !($0.isTrack && archivePaths.contains($0.archiveRelativePath)) }
+        let removedPackCount = Set(removedMatches.map(\.archiveRelativePath)).reduce(into: 0) { count, path in
+            if !remainingMatches.contains(where: { $0.archiveRelativePath == path }) { count += 1 }
+        }
+        if remainingMatches.isEmpty {
+            tagAnalyzerTags.remove(at: index)
+        } else {
+            tagAnalyzerTags[index] = UACTagNameUsage(
+                name: usage.name,
+                matchedPackCount: max(0, usage.matchedPackCount - removedPackCount),
+                trackCount: max(0, usage.trackCount - removedMatches.count),
+                matches: remainingMatches
+            )
+        }
+        if let selectedName = tagAnalyzerSelectedMatchesTagName,
+           let selectedUsage = tagAnalyzerTags.first(where: { $0.name == selectedName }) {
+            tagAnalyzerSelectedMatches = selectedUsage.matches
+        } else if tagAnalyzerSelectedMatchesTagName != nil {
+            tagAnalyzerSelectedMatchesTagName = nil
+            tagAnalyzerSelectedMatches = []
+        }
     }
 
     private func rewriteTagAnalyzerMatch(
@@ -656,6 +807,7 @@ final class UACManModel {
         replacement: UACJSONValue?
     ) {
         guard tagAnalyzerHasResult,
+              !isDeletingTagAnalyzerTrackFields,
               let tag = tagAnalyzerTags.first(where: { $0.name == tagName }),
               let match = tag.matches.first(where: {
                   $0.archiveRelativePath == archiveRelativePath
@@ -1727,6 +1879,17 @@ final class UACManModel {
         alert.addButton(withTitle: "Cancel")
         return alert.runModal() == .alertFirstButtonReturn
     }
+}
+
+private struct UACTagAnalyzerTrackDeletionPackage: Sendable {
+    let relativePath: String
+    let matches: [UACTagFieldMatch]
+}
+
+private struct UACTagAnalyzerTrackDeletionOutcome: Sendable {
+    let relativePath: String
+    let deletedFieldCount: Int
+    let errorMessage: String?
 }
 
 @MainActor
