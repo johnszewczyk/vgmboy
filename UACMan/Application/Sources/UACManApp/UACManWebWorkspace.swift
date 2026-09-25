@@ -17,6 +17,7 @@ struct UACManWebWorkspace: NSViewRepresentable {
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
+        webView.uiDelegate = context.coordinator
         context.coordinator.webView = webView
         let resourceBundleURL = Bundle.main.resourceURL?.appendingPathComponent("UACMan_UACManApp.bundle")
         let resourceBundle = resourceBundleURL.flatMap { Bundle(url: $0) }
@@ -34,7 +35,7 @@ struct UACManWebWorkspace: NSViewRepresentable {
     }
 
     @MainActor
-    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
         let model: UACManModel
         weak var webView: WKWebView?
         var snapshot: [String: Any] = [:]
@@ -55,6 +56,20 @@ struct UACManWebWorkspace: NSViewRepresentable {
             decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
         ) {
             decisionHandler(navigationAction.request.url?.isFileURL == true ? .allow : .cancel)
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            runJavaScriptConfirmPanelWithMessage message: String,
+            initiatedByFrame frame: WKFrameInfo,
+            completionHandler: @escaping @MainActor @Sendable (Bool) -> Void
+        ) {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = message
+            alert.addButton(withTitle: "Delete")
+            alert.addButton(withTitle: "Cancel")
+            completionHandler(alert.runModal() == .alertFirstButtonReturn)
         }
 
         func renderIfReady() {
@@ -81,6 +96,7 @@ struct UACManWebWorkspace: NSViewRepresentable {
                 }
             case "cancelCollectionScan": model.cancelCurrentCollectionScan()
             case "chooseTagAnalyzerFolder": model.chooseTagAnalyzerFolderPanel()
+            case "startTagAnalysis": model.startTagAnalysis()
             case "cancelTagAnalysis": model.cancelTagAnalysis()
             case "loadTagAnalyzerMatches":
                 model.loadTagAnalyzerMatches(tagName: payload["tagName"] as? String ?? "")

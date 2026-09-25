@@ -441,7 +441,7 @@ final class UACManModel {
         let defaults = UserDefaults.standard
         if let path = defaults.string(forKey: PreferenceKey.lastTagAnalyzerPath), !path.isEmpty {
             tagAnalyzerRootURL = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
-            tagAnalyzerStatusMessage = "Restored the previous folder path. Browse to scan it again."
+            tagAnalyzerStatusMessage = "Restored the previous folder path. Choose Analyze to scan it."
         }
         if let argument = ProcessInfo.processInfo.arguments.dropFirst().first,
            !argument.hasPrefix("-") {
@@ -524,12 +524,29 @@ final class UACManModel {
         panel.canChooseFiles = false
         panel.allowsOtherFileTypes = false
         panel.prompt = "Choose Folder"
+        panel.directoryURL = tagAnalyzerRootURL
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
         let root = url.standardizedFileURL
         tagAnalyzerRootURL = root
         UserDefaults.standard.set(root.path, forKey: PreferenceKey.lastTagAnalyzerPath)
-        startTagAnalysis()
+        tagAnalyzerHasResult = false
+        tagAnalyzerTags = []
+        tagAnalyzerSelectedMatchesTagName = nil
+        tagAnalyzerSelectedMatches = []
+        tagAnalyzerIssues = []
+        tagAnalyzerProgress = UACTagAnalysisProgress(
+            phase: .discovering,
+            directoriesVisited: 0,
+            packagesFound: 0,
+            packagesProcessed: 0,
+            totalPackages: 0,
+            currentRelativePath: "",
+            uniqueTagCount: 0
+        )
+        tagAnalyzerStatusMessage = "Folder selected. Choose Analyze to inventory its UAC tag names."
+        statusMessage = "Folder selected for tag analysis."
+        errorMessage = nil
     }
 
     func startTagAnalysis() {

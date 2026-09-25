@@ -1005,8 +1005,10 @@
       ? "Cancelling after the current manifest read…"
       : deleting
         ? state.tagAnalyzerStatusMessage || "Deleting matching track fields…"
-      : state.tagAnalyzerStatusMessage || "Browse for a folder to inventory its UAC tag names.";
-    const rows = visibleTags.map(({ tag, matchedPackCount, trackCount, trackArchives }) => {
+      : state.tagAnalyzerStatusMessage || (state.tagAnalyzerRootPath
+        ? "Choose Analyze to inventory this folder’s UAC tag names."
+        : "Browse for a folder to inventory its UAC tag names.");
+    const rows = visibleTags.map(({ tag, matchedPackCount, trackCount, trackArchives }, index) => {
       const foldID = tagAnalyzerFoldID(tag.name);
       const tagIsExpanded = CanonicalTable.isFoldOpen(foldID);
       const hasCachedMatches = tagAnalyzerMatchesByName.has(tag.name);
@@ -1035,7 +1037,9 @@
       ? query
         ? 'No tag fields match package filenames containing "' + esc(query) + '".'
         : "No tag fields were found in the readable UAC manifests."
-      : "Browse for a folder to list its UAC tag names.";
+      : state.tagAnalyzerRootPath
+        ? "Choose Analyze to list this folder’s UAC tag names."
+        : "Browse for a folder to list its UAC tag names.";
     const issuesDisclosure = issues.length
       ? '<details class="tag-analyzer-issues"><summary>' + issues.length + ' unreadable folder or package item(s) · results may be incomplete</summary><div class="tag-analyzer-issue-list">' + issues.map(issue => '<div class="issue"><strong>' + esc(issue.relativePath || "Selected folder") + '</strong>' + esc(issue.message) + '</div>').join("") + '</div></details>'
       : "";
@@ -1053,8 +1057,9 @@
       '<div class="data-page-heading"><div><div class="tag-analyzer-heading-line"><h2>Tag Analyzer</h2><span class="beta-badge">Beta</span></div><p>List exact tag field names in a folder. Matched-pack counts identify packages with that field; values may differ. Expand a pack to inspect its field entries.</p></div><span class="data-page-count">' + (state.tagAnalyzerHasResult ? (query ? visibleTags.length + ' / ' + tags.length + ' matching name(s)' : tags.length + ' unique name(s)') : "Manifest fields") + '</span></div>' +
       '<div class="tag-analyzer-controls">' +
         '<label class="tag-analyzer-path-control">Folder Path<input class="tag-table-field" value="' + esc(state.tagAnalyzerRootPath || "") + '" placeholder="Choose a folder path" aria-label="Tag analysis folder path" readonly></label>' +
-        '<button class="button primary" data-action="chooseTagAnalyzerFolder"' + (busy ? " disabled" : "") + '>Browse</button>' +
-        '<button class="button secondary tag-analyzer-cancel" data-action="cancelTagAnalysis"' + (!running || state.isCancellingTagAnalysis ? " disabled" : "") + '>Cancel</button>' +
+        '<button class="button secondary" data-action="chooseTagAnalyzerFolder" title="Browse for a folder"' + (busy ? " disabled" : "") + '>Browse</button>' +
+        '<button class="icon-button primary tag-analyzer-analyze-button" data-action="startTagAnalysis" title="Analyze folder" aria-label="Analyze folder"' + (busy || !state.tagAnalyzerRootPath ? " disabled" : "") + '><span class="tag-analyzer-analyze-icon" aria-hidden="true">⌕</span></button>' +
+        '<button class="button secondary tag-analyzer-cancel" data-action="cancelTagAnalysis" title="Cancel tag analysis" aria-label="Cancel tag analysis"' + (!running || state.isCancellingTagAnalysis ? " disabled" : "") + '>×</button>' +
       '</div>' +
       '<div class="tag-analyzer-progress" role="status" aria-live="polite">' + progressControl + '<span>' + esc(status) + '</span>' + ((running || deleting) && currentPath ? '<code title="' + esc(currentPath) + '">' + esc(currentPath) + '</code>' : "") + '</div>' +
       issuesDisclosure +
@@ -1573,7 +1578,7 @@
     else if (action === "rescanCollection") bridge("rescanCollection");
     else if (action === "cancelCollectionScan") bridge("cancelCollectionScan");
     else if (action === "cancelHarvest") bridge("cancelHarvest");
-    else if (["chooseTagAnalyzerFolder", "cancelTagAnalysis"].includes(action)) {
+    else if (["chooseTagAnalyzerFolder", "startTagAnalysis", "cancelTagAnalysis"].includes(action)) {
       if (action !== "cancelTagAnalysis") {
         CanonicalTable.clearFoldPrefix("tag-analyzer/");
         tagAnalyzerMatchesByName.clear();
