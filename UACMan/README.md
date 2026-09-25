@@ -20,15 +20,17 @@ exhaustive tag editor for a selected file, **New Tag** applies one string tag
 atomically to the package, all playable tracks, or an explicit track selection,
 and **Tag Analyzer** (Beta) inventories tag field names across UAC packages
 beneath a selected folder path. Its canonical tag table numbers each field and
-shows the matched pack count and playable-track count. Browse selects and scans
-a folder; the analyzer reports scan progress and supports cancellation. Opening a matched-pack count expands a
+shows the matched pack count and playable-track count. Browse selects and saves
+a folder path; the magnifier button starts the scan, with visible progress and
+cancellation. Opening a matched-pack count expands a
 canonical pack table. Each pack row expands to a second nested canonical table
 with the field source and value; its ✓ and × controls update or remove one
 manifest field while preserving the compressed package members. The parent
 table's **×** action removes a selected field from all playable tracks in
 packages matching the filename filter. Structured JSON values in Tag Analyzer
-unfold recursively into canonical tables for arrays and objects; the field's
-✓ saves edits across the full nested value. Files also
+unfold recursively into canonical tables for arrays and objects, including
+strings containing serialized arrays or objects; saving preserves those values
+as strings. The field's ✓ saves edits across the full nested value. Files also
 offers a read-only text preview for bundled JSON, Markdown, CUE, and other
 recognized text members without extracting
 or rewriting the payload. Every table uses the shared field-grid structure with

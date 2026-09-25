@@ -17,7 +17,7 @@ remain visible in an error disclosure with the path and reader error.
 This is a live filesystem view, not a saved database or media-library manager.
 UACMan reads the bounded UAC manifest and validates wrapper/seek-table
 structure; it does not decompress or extract TAR/audio payloads to populate the
-list. Finder displays UACMan's document icon for `.uac` files. Hidden files and
+list. Finder displays macOS's generic document icon for `.uac` files. Hidden files and
 symbolic links are skipped. Choose **Open UAC** to open a single package
 without scanning its parent folder.
 
@@ -67,9 +67,9 @@ it returns when a collection is opened. The last existing UAC or collection path
 is restored on launch when no command-line document was supplied.
 
 **Tag Analyzer** (Beta) is a separate workspace page that works with or without
-an open package. **Browse** selects a folder and immediately scans
-its regular `.uac` packages recursively. The selected folder path is restored
-when UACMan launches again. The app-bar search filters package filenames in the
+an open package. **Browse** selects and saves a folder path. The magnifier
+button starts scanning its regular `.uac` packages recursively. The selected
+folder path is restored when UACMan launches again. The app-bar search filters package filenames in the
 current analyzer results; matching tag names and their pack/track counts update
 with the filter.
 
@@ -95,15 +95,17 @@ rewrites each affected package manifest once; package-level fields are not
 targets.
 
 When a field value is a JSON array or object, its **Tag Value** cell opens the
-same nested canonical table pattern. Each level can contain scalars, arrays,
-and objects, with no designed nesting-depth limit. Use **＋** to add a string,
+same nested canonical table pattern. A string containing a JSON array or
+object opens the same way and remains a string when saved. Each level can
+contain scalars, arrays, and objects, with no designed nesting-depth limit.
+Use **＋** to add a string,
 **123** to add a JSON scalar, **{}** to add an object, **[]** to add an array,
 and **×** to remove an entry.
 These edits stay in the field editor until its **✓** saves the whole value.
 
 The ✓ action updates one manifest field; the nested × removes that one field
 after confirmation. Both preserve the archive's compressed members. Progress
-reports folder discovery and package reads, and **Cancel** stops the scan. Cancelling
+reports folder discovery and package reads, and **×** stops the scan. Cancelling
 clears the incomplete list. Unreadable folders or packages are reported, and
 their presence marks the result as potentially incomplete.
 

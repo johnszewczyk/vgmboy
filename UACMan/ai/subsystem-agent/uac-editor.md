@@ -68,8 +68,12 @@
 - Structured JSON values opened from Tag Analyzer field rows use the
   `tagAnalyzerJSONValues` schema recursively. Arrays and objects remain
   canonical tables at every depth; scalar values and object keys edit in their
-  own cells, while add/remove actions change only the local draft. The field
-  row's ✓ serializes the complete nested tree back to the manifest field.
+  own cells, while add/remove actions change only the local draft. A string
+  whose contents parse as an array or object also opens as a recursive table;
+  saving serializes that tree back into a string so the manifest value keeps
+  its original JSON type. Ordinary strings and JSON scalar strings stay inline.
+  The field row's ✓ serializes the complete nested tree back to the manifest
+  field.
 - `CanonicalTable.setFoldOpen`, `fillUnfold`, and `playPendingFoldAnimations`
   own unfold motion. Use the same measured-height Web Animations path for
   immediate and asynchronously loaded child tables; do not add per-table CSS

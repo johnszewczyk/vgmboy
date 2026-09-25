@@ -1081,6 +1081,17 @@
 
   const isStructuredTagAnalyzerValue = value => Array.isArray(value) || (value !== null && typeof value === "object");
 
+  function tagAnalyzerStructuredValue(value) {
+    if (isStructuredTagAnalyzerValue(value)) return { value, encodedString:false };
+    if (typeof value !== "string") return null;
+    try {
+      const parsed = JSON.parse(value);
+      return isStructuredTagAnalyzerValue(parsed) ? { value:parsed, encodedString:true } : null;
+    } catch {
+      return null;
+    }
+  }
+
   function tagAnalyzerJSONSummary(value) {
     const count = Array.isArray(value) ? value.length : Object.keys(value || {}).length;
     const label = Array.isArray(value) ? "item" : "field";
@@ -1115,13 +1126,14 @@
   function tagAnalyzerJSONEntryRowMarkup(value, key, index, entryID, parentFoldID, isArray) {
     const keyText = String(key);
     const childTitle = isArray ? `Item ${index + 1}` : keyText;
-    const structured = isStructuredTagAnalyzerValue(value);
+    const nestedValue = tagAnalyzerStructuredValue(value);
+    const structured = Boolean(nestedValue);
     const childFoldID = structured ? tagAnalyzerJSONEntryFoldID(parentFoldID, entryID) : "";
     const keyControl = isArray
       ? `<input class="tag-table-field tag-analyzer-json-key" value="${index}" aria-label="Index ${index}" disabled>`
       : `<input class="tag-table-field tag-analyzer-json-key" data-tag-analyzer-json-key value="${esc(keyText)}" aria-label="Key ${esc(keyText)}">`;
     const valueControl = structured
-      ? tagAnalyzerJSONFoldToggleMarkup(value, childFoldID, childTitle)
+      ? tagAnalyzerJSONFoldToggleMarkup(nestedValue.value, childFoldID, childTitle)
       : tagAnalyzerJSONScalarMarkup(value, childTitle);
     const row = canonicalRowMarkup([
       canonicalNumberCellMarkup(index + 1, `Value number ${index + 1}`, { className:"multiple-value-number-cell" }),
@@ -1133,10 +1145,10 @@
         ariaLabel:`Remove ${childTitle}`,
         danger:true
       }), { className:"canonical-table-action-cell" })
-    ], { className:"tag-analyzer-json-entry-row", attributes:`data-json-entry data-json-entry-index="${index}" data-json-entry-id="${entryID}" data-json-entry-kind="${structured ? "node" : "scalar"}"${structured ? ` data-json-entry-fold-id="${esc(childFoldID)}"` : ""}` });
+    ], { className:"tag-analyzer-json-entry-row", attributes:`data-json-entry data-json-entry-index="${index}" data-json-entry-id="${entryID}" data-json-entry-kind="${structured ? "node" : "scalar"}" data-json-entry-stringified="${nestedValue?.encodedString === true}"${structured ? ` data-json-entry-fold-id="${esc(childFoldID)}"` : ""}` });
     if (!structured) return row;
     const childTable = CanonicalTable.isFoldOpen(childFoldID)
-      ? tagAnalyzerJSONNodeMarkup(value, childTitle, childFoldID)
+      ? tagAnalyzerJSONNodeMarkup(nestedValue.value, childTitle, childFoldID)
       : "";
     return CanonicalTable.rowWithUnfolds(row, [{ foldID:childFoldID, content:childTable }]);
   }
@@ -1177,8 +1189,11 @@
     let parsedValue = null;
     if (match.valueIsJSON) {
       try { parsedValue = JSON.parse(value); } catch { parsedValue = null; }
+    } else {
+      parsedValue = tagAnalyzerStructuredValue(value)?.value ?? null;
     }
-    const structuredValue = match.valueIsJSON && isStructuredTagAnalyzerValue(parsedValue);
+    const structuredValue = isStructuredTagAnalyzerValue(parsedValue);
+    const valueIsJSONString = !match.valueIsJSON && structuredValue;
     const valueFoldID = structuredValue ? tagAnalyzerJSONValueFoldID(parentFoldID, match) : "";
     const valueControl = structuredValue
       ? tagAnalyzerJSONFoldToggleMarkup(parsedValue, valueFoldID, tagName)
@@ -1187,7 +1202,7 @@
       : '<input class="tag-table-field tag-analyzer-match-value" data-tag-analyzer-value value="' + esc(value) + '" aria-label="Tag value for ' + esc(tagName) + '">';
     const trackControl = '<input class="tag-table-field tag-analyzer-match-track" value="' + esc(trackName) + '" title="' + esc(memberPath || "Package-level tag field") + '" aria-label="Track" disabled>';
     const nameControl = '<input class="tag-table-field" data-tag-analyzer-name value="' + esc(tagName) + '" aria-label="Tag name ' + esc(tagName) + '">';
-    const rowAttributes = 'data-tag-analyzer-match data-tag-name="' + esc(tagName) + '" data-archive-relative-path="' + esc(match.archiveRelativePath) + '" data-member-relative-path="' + esc(match.memberRelativePath || "") + '" data-storage-scope="' + esc(match.storageScope) + '" data-storage-key="' + esc(match.storageKey) + '" data-expected-value-json="' + esc(match.valueJSON) + '" data-value-is-json="' + match.valueIsJSON + '" data-json-value-fold-id="' + esc(valueFoldID) + '"';
+    const rowAttributes = 'data-tag-analyzer-match data-tag-name="' + esc(tagName) + '" data-archive-relative-path="' + esc(match.archiveRelativePath) + '" data-member-relative-path="' + esc(match.memberRelativePath || "") + '" data-storage-scope="' + esc(match.storageScope) + '" data-storage-key="' + esc(match.storageKey) + '" data-expected-value-json="' + esc(match.valueJSON) + '" data-value-is-json="' + match.valueIsJSON + '" data-value-is-json-string="' + valueIsJSONString + '" data-json-value-fold-id="' + esc(valueFoldID) + '"';
     const disabled = state?.isDeletingTagAnalyzerTrackFields ? " disabled" : "";
     const row = canonicalRowMarkup([
       canonicalNumberCellMarkup(index + 1, "Tag field number " + (index + 1), { className:"multiple-value-number-cell" }),
@@ -1786,10 +1801,13 @@
         if (childTable) {
           const child = tagAnalyzerJSONNodeFromTable(childTable);
           if (child.error) return child;
-          value = child.value;
+          value = row.dataset.jsonEntryStringified === "true" ? JSON.stringify(child.value) : child.value;
         } else {
           const toggle = row.querySelector('[data-unfold-render="tagAnalyzerJSON"]');
-          try { value = JSON.parse(toggle?.dataset.jsonValue || "null"); }
+          try {
+            value = JSON.parse(toggle?.dataset.jsonValue || "null");
+            if (row.dataset.jsonEntryStringified === "true") value = JSON.stringify(value);
+          }
           catch { return { error:'The nested value for "' + key + '" is not valid JSON.', focus:toggle }; }
         }
       } else {
@@ -1843,11 +1861,13 @@
       const keyField = $("[data-tag-analyzer-json-key]", row);
       const key = isArray ? String(index) : (keyField?.value ?? "");
       const childValue = isArray ? value[index] : value[key];
+      const nestedValue = tagAnalyzerStructuredValue(childValue);
+      if (!nestedValue) return;
       const title = isArray ? "Item " + (index + 1) : (key || "Value");
-      updateTagAnalyzerJSONToggle(row.querySelector('[data-unfold-render="tagAnalyzerJSON"]'), childValue, title);
+      updateTagAnalyzerJSONToggle(row.querySelector('[data-unfold-render="tagAnalyzerJSON"]'), nestedValue.value, title);
       const childFoldID = row.dataset.jsonEntryFoldId || "";
       const childTable = CanonicalTable.subrow(childFoldID)?.querySelector(".canonical-table[data-json-node]");
-      if (childTable) updateTagAnalyzerJSONTableHeading(childTable, title, childValue);
+      if (childTable) updateTagAnalyzerJSONTableHeading(childTable, title, nestedValue.value);
     });
   }
 
@@ -1993,20 +2013,26 @@
     let value = valueField?.value ?? "";
     const error = $("[data-tag-analyzer-error]", row);
     const valueIsJSON = row.dataset.valueIsJson === "true";
+    const valueIsJSONString = row.dataset.valueIsJsonString === "true";
     if (!name) {
       if (error) error.textContent = "Tag name cannot be empty.";
       nameField?.focus();
       return;
     }
-    if (valueIsJSON) {
+    if (valueIsJSON || valueIsJSONString) {
       if (row.dataset.jsonValueFoldId) {
         const collected = tagAnalyzerJSONValueForMatch(row);
         if (!collected.ok) return;
         value = collected.value;
       }
-      try { JSON.parse(value); }
+      try {
+        const parsed = JSON.parse(value);
+        if (valueIsJSONString && !isStructuredTagAnalyzerValue(parsed)) throw new Error("Expected an object or array.");
+      }
       catch {
-        if (error) error.textContent = "Enter a valid JSON value.";
+        if (error) error.textContent = valueIsJSONString
+          ? "Enter a valid JSON object or array."
+          : "Enter a valid JSON value.";
         valueField?.focus();
         return;
       }
