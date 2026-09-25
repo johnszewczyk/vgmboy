@@ -24,6 +24,14 @@ const stylesSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/ViewBoy/Resources/styles.css"),
   "utf8"
 );
+const nightglassSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/ViewBoy/Resources/viewboy-nightglass.css"),
+  "utf8"
+);
+const lightmodeSource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/ViewBoy/Resources/viewboy-lightmode.css"),
+  "utf8"
+);
 const nativeBridgeSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/ViewBoy/WKNativeBridge.swift"),
   "utf8"
@@ -40,6 +48,33 @@ const appDelegateSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/ViewBoy/main.swift"),
   "utf8"
 );
+
+test("ViewBoy uses one settable 200 ms timing for width and selection transitions", () => {
+  assert.match(appCoreSource, /DEFAULT_ANIMATION_DURATION_MILLISECONDS\s*=\s*200/);
+  assert.match(indexSource, /id="animation-duration-input"[^>]*value="200"/);
+  assert.doesNotMatch(indexSource, /auto-resize-animation-input|selection-animation-input/);
+  assert.match(stylesSource, /--column-resize-duration:\s*200ms/);
+  assert.match(stylesSource, /\.playlist-table th\s*\{[^}]*transition:\s*width var\(--column-resize-duration\)/);
+  assert.match(stylesSource, /\.playlist-body-table \.playlist-width-source > td\s*\{[^}]*transition:\s*width var\(--column-resize-duration\)/);
+  assert.match(uiSource, /void refs\.playlistHeaderTable\.offsetWidth/);
+  assert.match(uiSource, /if \(initialColumnWidths\) window\.requestAnimationFrame\(\(\) => syncPlaylistColumnWidths\(\)\)/);
+  assert.match(nightglassSource, /url\("viewboy-deck-machining\.svg"\)/);
+  assert.match(nightglassSource, /url\("viewboy-glass-catchlight\.svg"\)/);
+  assert.match(uiSource, /state\.selectionAnimationMilliseconds = milliseconds/);
+});
+
+test("LightMode is a persisted Game Boy LCD theme and retains the bundled typeface", () => {
+  assert.match(indexSource, /viewboy-lightmode\.css/);
+  assert.match(indexSource, /id="ui-theme-select"[\s\S]*?value="lightmode"/);
+  assert.match(appCoreSource, /uiTheme: DEFAULT_UI_THEME/);
+  assert.match(appCoreSource, /uiTheme: state\.uiTheme/);
+  assert.match(lightmodeSource, /--accent:\s*#812d46/);
+  assert.match(lightmodeSource, /background:\s*#cbd67d/);
+  assert.doesNotMatch(lightmodeSource, /font-family:/);
+  assert.match(uiSource, /document\.documentElement\.dataset\.uiTheme = state\.uiTheme/);
+  assert.match(uiSource, /uiTheme: state\.uiTheme/);
+  assert.match(fs.readFileSync(path.resolve(__dirname, "../Sources/ViewBoy/SPCBoyPreferencesSnapshot.swift"), "utf8"), /var uiTheme: String\?/);
+});
 
 function element() {
   return {
@@ -528,8 +563,10 @@ test("ViewBoy ignores delayed native status events", () => {
   assert.equal(state.nativePlayback.statusSequence, 20);
 });
 
-test("ViewBoy uses one accent selection capsule for sidebar and playlist", () => {
-  assert.match(stylesSource, /\.list-selection-indicator[\s\S]*?background: var\(--accent\)/);
+test("ViewBoy uses a one-pixel font-color locator for sidebar and playlist", () => {
+  assert.match(stylesSource, /\.list-selection-indicator[\s\S]*?height: 1px/);
+  assert.match(stylesSource, /\.list-selection-indicator[\s\S]*?background: var\(--selection-indicator-color, var\(--accent\)\)/);
+  assert.match(lightmodeSource, /\.list-selection-indicator[\s\S]*?height: 1px[\s\S]*?background: #333[\s\S]*?box-shadow: none/);
   assert.match(stylesSource, /button:is\(\.tree-node, \.database-game-row, \.database-console-row\)\.is-selected[\s\S]*?background: transparent/);
   assert.match(stylesSource, /\.tree-node[\s\S]*?transition: color var\(--selection-animation-duration\)/);
   assert.match(stylesSource, /\.playlist-table td[\s\S]*?transition: width[\s\S]*?color var\(--selection-animation-duration\)/);

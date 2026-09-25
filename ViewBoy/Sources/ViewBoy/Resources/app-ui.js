@@ -269,7 +269,7 @@ function positionSelectionIndicator(container, indicator, target) {
     return;
   }
   const left = visibleLeft;
-  const top = visibleBottom - 2;
+  const top = visibleBottom - 1;
   indicator.style.width = `${visibleRight - visibleLeft}px`;
   indicator.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
   indicator.style.opacity = "1";
@@ -1651,6 +1651,7 @@ function autoSizeColumns() {
 function autoSizeColumn(columnId) {
   if (!state.playlist.length || !state.columnVisibility[columnId]) return;
   const columns = orderedColumns();
+  const startingWidths = Object.fromEntries(columns.map((column) => [column.id, state.columnWidths[column.id]]));
   const tableWidth = refs.playlistHeaderRow.closest("table").getBoundingClientRect().width;
   const nextWidth = Math.max(4, Math.min(80, (columnContentWidth(columnId) / tableWidth) * 100));
   const previousWidth = state.columnWidths[columnId];
@@ -1668,11 +1669,15 @@ function autoSizeColumn(columnId) {
   }
   if (!Number.isFinite(previousWidth)) state.columnWidths[columnId] = nextWidth;
   persistSettings();
-  renderPlaylistHeader();
-  syncPlaylistColumnWidths();
+  if (primePlaylistColumnResize(startingWidths)) {
+    window.requestAnimationFrame(() => syncPlaylistColumnWidths());
+  } else {
+    renderPlaylistHeader();
+    syncPlaylistColumnWidths();
+  }
 }
 
-function renderPlaylistHeader() {
+function renderPlaylistHeader(widths = state.columnWidths) {
   refs.playlistHeaderRow.innerHTML = "";
 
   for (const column of orderedColumns()) {
@@ -1680,7 +1685,7 @@ function renderPlaylistHeader() {
     th.dataset.columnId = column.id;
     th.draggable = true;
     th.className = column.className || "";
-    th.style.width = `${state.columnWidths[column.id]}%`;
+    th.style.width = `${widths[column.id]}%`;
     th.title = column.sortable === false ? "Line number" : `Sort by ${column.label}`;
 
     const label = document.createElement("span");
@@ -1772,11 +1777,11 @@ function renderPlaylistHeader() {
   }
 }
 
-function renderPlaylistCell(track, column, rowIndex) {
+function renderPlaylistCell(track, column, rowIndex, widths = state.columnWidths) {
   const td = document.createElement("td");
   td.className = column.className || "";
   td.dataset.columnId = column.id;
-  td.style.width = `${state.columnWidths[column.id]}%`;
+  td.style.width = `${widths[column.id]}%`;
   if (column.id === "favorite") {
     const button = document.createElement("button");
     button.type = "button";
@@ -1892,31 +1897,51 @@ function playlistSortDependsOnMetadata() {
   return ["title", "game", "artist", "system", "lengthLabel"].includes(state.sortColumn);
 }
 
-function syncPlaylistColumnWidths() {
+function syncPlaylistColumnWidths(widths = state.columnWidths) {
+  const firstBodyRow = refs.playlistBody.querySelector(".playlist-row");
+  for (const row of playlistRowsByTrackId.values()) {
+    row.classList.toggle("playlist-width-source", row === firstBodyRow);
+  }
   for (const column of orderedColumns()) {
     const header = refs.playlistHeaderRow.querySelector(`[data-column-id="${CSS.escape(column.id)}"]`);
-    if (header) header.style.width = `${state.columnWidths[column.id]}%`;
+    if (header) header.style.width = `${widths[column.id]}%`;
   }
   for (const row of playlistRowsByTrackId.values()) {
     for (const column of orderedColumns()) {
       const cell = row.querySelector(`[data-column-id="${CSS.escape(column.id)}"]`);
-      if (cell) cell.style.width = `${state.columnWidths[column.id]}%`;
+      if (cell) cell.style.width = `${widths[column.id]}%`;
     }
   }
 }
 
-function makePlaylistRow(track, rowIndex) {
+function primePlaylistColumnResize(startingWidths) {
+  if (!state.autoResizeAnimationEnabled || state.autoResizeAnimationMilliseconds <= 0) return false;
+  const changed = orderedColumns().some((column) =>
+    Math.abs(state.columnWidths[column.id] - startingWidths[column.id]) > 0.01
+  );
+  if (!changed) return false;
+
+  renderPlaylistHeader(startingWidths);
+  syncPlaylistColumnWidths(startingWidths);
+  // Resolve the old widths before the next animation frame installs the new
+  // widths. WebKit can then run its native transition at display rate.
+  void refs.playlistHeaderTable.offsetWidth;
+  return true;
+}
+
+function makePlaylistRow(track, rowIndex, widths = state.columnWidths) {
   const row = document.createElement("tr");
+  const isWidthSource = playlistRowsByTrackId.size === 0;
   row.dataset.trackId = track.id;
   row.tabIndex = 0;
   row.setAttribute("aria-label", `${track.title || track.filename || "Track"}`);
-  row.className = `playlist-row${selectedPlaylistTrackIDs.has(track.id) ? " is-selected" : ""}${state.currentTrackId === track.id ? " is-current" : ""}`;
+  row.className = `playlist-row${isWidthSource ? " playlist-width-source" : ""}${selectedPlaylistTrackIDs.has(track.id) ? " is-selected" : ""}${state.currentTrackId === track.id ? " is-current" : ""}`;
   playlistRowsByTrackId.set(track.id, row);
   if (state.selectedTrackId === track.id) selectedPlaylistRow = row;
   if (state.currentTrackId === track.id) currentPlaylistRow = row;
 
   for (const column of orderedColumns()) {
-    row.appendChild(renderPlaylistCell(track, column, rowIndex));
+    row.appendChild(renderPlaylistCell(track, column, rowIndex, widths));
   }
 
   row.addEventListener("click", (event) => {
@@ -1953,7 +1978,7 @@ function makePlaylistRow(track, rowIndex) {
   return row;
 }
 
-function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = state.playlist.length, spacers = null, animateSelection = true) {
+function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = state.playlist.length, spacers = null, animateSelection = true, initialColumnWidths = null) {
   let rowIndex = startIndex;
   const appendBatch = () => {
     if (generation !== playlistRenderGeneration) return;
@@ -1963,7 +1988,7 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
     }
     const startedAt = performance.now();
     while (rowIndex < endIndex && performance.now() - startedAt < 8) {
-      fragment.appendChild(makePlaylistRow(state.playlist[rowIndex], rowIndex));
+      fragment.appendChild(makePlaylistRow(state.playlist[rowIndex], rowIndex, initialColumnWidths || state.columnWidths));
       rowIndex += 1;
     }
     refs.playlistBody.appendChild(fragment);
@@ -1972,6 +1997,7 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
     } else {
       if (spacers?.bottom > 0) refs.playlistBody.appendChild(makePlaylistVirtualSpacer(spacers.bottom, "bottom"));
       playlistRowsRendering = false;
+      if (initialColumnWidths) window.requestAnimationFrame(() => syncPlaylistColumnWidths());
       scheduleSelectionIndicators(animateSelection, SELECTION_PLAYLIST);
       schedulePlaylistRowMeasurement();
       if (playlistViewportRenderPending) {
@@ -2024,6 +2050,7 @@ function renderPlaylist({ sort = true, persist = true, refreshIndex = true, anim
   const shouldAutoSize = !virtualized && columnResizePointerId === null
     && state.columnAutoSize
     && playlistSignature !== autoSizedPlaylistSignature;
+  let initialColumnWidths = null;
 
   if (state.playlist.length === 0) {
     const row = document.createElement("tr");
@@ -2036,12 +2063,16 @@ function renderPlaylist({ sort = true, persist = true, refreshIndex = true, anim
 
   if (shouldAutoSize) {
     autoSizedPlaylistSignature = playlistSignature;
+    const startingWidths = Object.fromEntries(orderedColumns().map((column) => [column.id, state.columnWidths[column.id]]));
     autoSizeColumns();
-    renderPlaylistHeader();
-    syncPlaylistColumnWidths();
+    if (primePlaylistColumnResize(startingWidths)) initialColumnWidths = startingWidths;
+    else {
+      renderPlaylistHeader();
+      syncPlaylistColumnWidths();
+    }
   }
   if (!virtualized) {
-    appendPlaylistRowsInBatches(generation);
+    appendPlaylistRowsInBatches(generation, 0, state.playlist.length, null, animateSelection, initialColumnWidths);
     return;
   }
 
@@ -2085,6 +2116,7 @@ function scheduleMetadataRefresh(trackId) {
 
 function applyUISettings() {
   const rootStyle = document.documentElement.style;
+  document.documentElement.dataset.uiTheme = state.uiTheme;
   rootStyle.setProperty("--ui-font-size-pt", String(state.uiFontSizePt));
   rootStyle.setProperty("--app-font-family", "var(--viewboy-font-family)");
   rootStyle.setProperty("--sidebar-font-size-pt", String(state.sidebarFontSizePt));
@@ -2115,7 +2147,8 @@ function appearanceSettings() {
     playlistMonospace: state.playlistMonospace,
     applicationMonospace: state.applicationMonospace,
     playlistHeaderBold: state.playlistHeaderBold,
-    accentColor: state.accentColor
+    accentColor: state.accentColor,
+    uiTheme: state.uiTheme
   };
 }
 
@@ -2201,6 +2234,7 @@ function renderAll() {
   if (document.activeElement !== refs.sidebarTextColorInput) refs.sidebarTextColorInput.value = state.sidebarTextColor;
   refs.sidebarPathCountsCheckbox.checked = state.sidebarPathCounts;
   if (document.activeElement !== refs.accentColorInput) refs.accentColorInput.value = state.accentColor;
+  if (refs.uiThemeSelect) refs.uiThemeSelect.value = state.uiTheme;
   if (refs.aacExportDirectoryPath) refs.aacExportDirectoryPath.value = state.aacExportDirectory || "";
   if (refs.aacExportStatus) refs.aacExportStatus.textContent = state.aacExportStatus || "";
   if (refs.aacExportCancelButton) refs.aacExportCancelButton.disabled = !state.aacExportInProgress;
@@ -2208,11 +2242,8 @@ function renderAll() {
   if (document.activeElement !== refs.spcUnknownDurationInput) refs.spcUnknownDurationInput.value = uiApp.formatTime(state.unknownDurationSeconds);
   refs.columnAutoSizeCheckbox.checked = state.columnAutoSize;
   refs.autoResizeAnimationEnabledCheckbox.checked = state.autoResizeAnimationEnabled;
-  refs.autoResizeAnimationInput.value = String(state.autoResizeAnimationMilliseconds);
-  refs.autoResizeAnimationInput.disabled = !state.autoResizeAnimationEnabled;
+  refs.animationDurationInput.value = String(state.autoResizeAnimationMilliseconds);
   refs.selectionAnimationEnabledCheckbox.checked = state.selectionAnimationEnabled;
-  refs.selectionAnimationInput.value = String(state.selectionAnimationMilliseconds);
-  refs.selectionAnimationInput.disabled = !state.selectionAnimationEnabled;
   refs.mainWindowAlwaysOnTopCheckbox.checked = state.mainWindowAlwaysOnTop;
   refs.settingsWindowAlwaysOnTopCheckbox.checked = state.settingsWindowAlwaysOnTop;
   refs.archiveCacheEnabledCheckbox.checked = state.archiveCacheEnabled;
@@ -2254,8 +2285,18 @@ function renderAll() {
   refs.equalizerToolbarButton.setAttribute("aria-pressed", state.equalizerEnabled ? "true" : "false");
   refs.equalizerToolbarButton.title = state.equalizerEnabled ? "Disable Equalizer" : "Enable Equalizer";
   refs.equalizerToolbarButton.setAttribute("aria-label", refs.equalizerToolbarButton.title);
+  refs.monoToolbarButton.classList.toggle("is-selected", state.monoEnabled);
+  refs.monoToolbarButton.setAttribute("aria-pressed", state.monoEnabled ? "true" : "false");
+  refs.monoToolbarButton.title = state.monoEnabled ? "Disable Mono" : "Enable Mono";
+  refs.monoToolbarButton.setAttribute("aria-label", refs.monoToolbarButton.title);
   refs.appVolumeInput.value = String(state.appVolume);
   refs.appVolumeValue.textContent = `${Math.round(state.appVolume * 100)}%`;
+  const muted = state.appVolume <= 0.001;
+  refs.muteToolbarButton.classList.toggle("is-selected", muted);
+  refs.muteToolbarButton.setAttribute("aria-pressed", muted ? "true" : "false");
+  refs.muteToolbarButton.title = muted ? "Restore Volume" : "Mute";
+  refs.muteToolbarButton.setAttribute("aria-label", refs.muteToolbarButton.title);
+  refs.muteToolbarIcon.setAttribute("href", muted ? "#icon-volume-off" : "#icon-volume");
   refs.monoEnabledCheckbox.checked = state.monoEnabled;
   refs.equalizerBandInputs.forEach((input, index) => {
     input.value = String(state.equalizerBandGains[index] || 0);
@@ -2631,8 +2672,10 @@ function setColumnAutoSize(enabled) {
   renderPlaylist();
 }
 
-function setAnimationTiming(key, value) {
-  window.SPCBoyOptionsController.setAnimation(state, uiApp.normalizeAnimationMilliseconds, key, value);
+function setAnimationTiming(value) {
+  const milliseconds = uiApp.normalizeAnimationMilliseconds(value);
+  state.autoResizeAnimationMilliseconds = milliseconds;
+  state.selectionAnimationMilliseconds = milliseconds;
   persistSettings();
   renderAll();
 }
@@ -2675,12 +2718,50 @@ function applyAppearanceSettings(settings) {
   if (settings.sidebarPathCounts !== undefined) state.sidebarPathCounts = Boolean(settings.sidebarPathCounts);
   if (settings.playlistHeaderBold !== undefined) state.playlistHeaderBold = Boolean(settings.playlistHeaderBold);
   if (settings.accentColor !== undefined) state.accentColor = uiApp.normalizeAccentColor(settings.accentColor);
+  if (settings.uiTheme !== undefined) {
+    const nextTheme = uiApp.normalizeUITheme(settings.uiTheme);
+    if (nextTheme !== state.uiTheme) applyThemeDefaults(nextTheme);
+    state.uiTheme = nextTheme;
+  }
   persistSettings();
   renderAll();
 }
 
 function setAccentColor(color) {
   state.accentColor = uiApp.normalizeAccentColor(color);
+  persistSettings();
+  broadcastAppearanceSettings();
+  renderAll();
+}
+
+function applyThemeDefaults(theme) {
+  const palettes = {
+    nightglass: { accent: "#b6d9ca", sidebar: "#cbd6d1", playlist: "#d4ddd9" },
+    lightmode: { accent: "#812d46", sidebar: "#333", playlist: "#333" }
+  };
+  const allDefaultAccents = Object.values(palettes).map((palette) => palette.accent);
+  const allDefaultTextColors = ["#d7e1dc", "lightgray", "#d3d3d3", "#36342e", "#303a21", ...Object.values(palettes).flatMap((palette) => [palette.sidebar, palette.playlist])];
+  const palette = palettes[theme];
+  let changed = false;
+  if (allDefaultAccents.includes(state.accentColor.toLowerCase())) {
+    state.accentColor = palette.accent;
+    changed = true;
+  }
+  if (allDefaultTextColors.includes(state.sidebarTextColor.toLowerCase())) {
+    state.sidebarTextColor = palette.sidebar;
+    changed = true;
+  }
+  if (allDefaultTextColors.includes(state.playlistTextColor.toLowerCase())) {
+    state.playlistTextColor = palette.playlist;
+    changed = true;
+  }
+  return changed;
+}
+
+function setUITheme(theme) {
+  const nextTheme = uiApp.normalizeUITheme(theme);
+  if (nextTheme !== state.uiTheme) applyThemeDefaults(nextTheme);
+  state.uiTheme = nextTheme;
   persistSettings();
   broadcastAppearanceSettings();
   renderAll();
@@ -2719,6 +2800,7 @@ async function bootstrap() {
   // after catalog/cache requests produces a distracting default-style flash.
   window.SPCBoyOptionsController.applyManifest(await window.spcBoyWK.frontendOptionsManifest());
   await loadSettings();
+  if (applyThemeDefaults(state.uiTheme)) persistSettings();
   await syncSidebarView();
   if (!window.spcBoyWK?.isOptionsWindow) await refreshFavorites();
   if (window.spcBoyWK?.isOptionsWindow) {
@@ -2887,6 +2969,7 @@ uiApp.ui = {
   setColumnAutoSize,
   setAnimationTiming,
   setAnimationEnabled,
+  setUITheme,
   setWindowAlwaysOnTop,
   applyAppearanceSettings,
   applyRoutingPreferences,

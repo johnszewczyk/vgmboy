@@ -1,9 +1,9 @@
 # Options
 
 - ViewBoy-owned pages use the shared organization: Database, Interface, and Windows, while VGMBoy pages provide Audio, Diagnostics, Playback, and Routing in the same WebKit settings window.
-- Interface > Animations exposes checkbox-enabled Auto-Resize and Selection Bar timings; both default on at 200 ms and accept 0–1000 ms. Disabling one uses an effective 0 ms duration while retaining the configured value.
+- Interface > Animations exposes one shared 200 ms duration for playlist column resizing and selection movement, configurable from 0–1000 ms. Auto-Resize and Selection Bar can be disabled independently; disabling an effect uses 0 ms while retaining the shared configured value.
 - Playlist Options exposes Column Auto-size, enabled by default, with the description “Automatically resize columns for content width on selection.” Columns without meaningful values in the active playlist hide automatically and return when content appears; manual visibility choices remain saved. The `#` column displays row position and does not sort.
-- Interface Style provides one 8–18 pt Interface Scale and one bundled Doto typeface for the player, library, playlist, and Settings. Font color remains adjustable for the library and playlist text.
+- Interface provides Nightglass and LightMode themes. LightMode uses molded gray surfaces, maroon accents, and a pea-green LCD playlist while retaining Doto. Interface Style provides one 8–18 pt Interface Scale and one bundled Doto typeface for the player, library, playlist, and Settings. Font color remains adjustable for library and playlist text.
 - Windows has independent Always on Top switches for Main Window and Options Window; both default off. Main keeps the main window on top of other apps; Options keeps the options window on top of the main window.
 - Archive Cache uses the shared 2 GB default and 2, 4, 8, or 16 GB choices.
 - AAC Export exposes a destination folder and a playlist context-menu action. New installs default to Downloads, matching CocoaSpice. ViewBoy supplies the selected path, timing plan, and destination; VGMBoyKit performs the offline conversion, including archive-member materialization through the native bridge. Only one export runs at a time. Folder chooser controls use the shared folder glyph.
@@ -18,7 +18,7 @@ remains independent while Settings is open.
 ## Components
 
 Settings groups app-owned controls above VGMBoy playback controls in a dedicated navigation rail.
-The rail separates ViewBoy and VGMBoy pages; one persistent pale LCD underline glides between active pages. The same scale-aware font system covers Settings and the main window.
+The rail separates ViewBoy and VGMBoy pages; one persistent theme-colored underline glides between active pages. The same scale-aware font system covers Settings and the main window.
 Settings content uses two-column charcoal panels when the window is wide and collapses to one column on
 narrow windows. App controls cover Interface, Windows, database location, and browser behavior.
 VGMBoy controls cover playback, routing, tempo, fade, volume, mono, equalizer, and archive-cache behavior.

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="150" viewBox="0 0 1440 150" preserveAspectRatio="none" fill="none">
+  <g stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke">
+    <path d="M10.5 19.5V9.5h43M1386.5 9.5h43v10M10.5 130.5v10h43M1386.5 140.5h43v-10" stroke="#e6f2ec" stroke-opacity=".24"/>
+    <path d="M9.5 22v104M1430.5 22v104M61 9.5h125M1254 9.5h125M61 140.5h125m1008 0h125" stroke="#d7e6de" stroke-opacity=".075"/>
+    <path d="M65 13.5h108m1094 0h108M65 136.5h108m1094 0h108" stroke="#050708" stroke-opacity=".48"/>
+    <path d="M88 24v4m9-4v2m9-2v4m9-4v2m9-2v4m9-4v2m9-2v4m9-4v2m9-2v4m9-4v2m9-2v4m9-4v2m1008-2v4m9-4v2m9-2v4m9-4v2m9-2v4m9-4v2m9-2v4m9-4v2m9-2v4m9-4v2m9-2v4m9-4v2" stroke="#e1ede6" stroke-opacity=".16"/>
+    <path d="M88 126v-4m9 4v-2m9 2v-4m9 4v-2m9 2v-4m9 4v-2m9 2v-4m9 4v-2m9 2v-4m9 4v-2m9 2v-4m9 4v-2m1008 2v-4m9 4v-2m9 2v-4m9 4v-2m9 2v-4m9 4v-2m9 2v-4m9 4v-2m9 2v-4m9 4v-2m9 2v-4m9 4v-2" stroke="#030506" stroke-opacity=".56"/>
+    <path d="M18 39h22m-22 5h12m-12 5h17m1395-10h-22m22 5h-12m12 5h-17M18 100h12m-12 5h17m-17 5h12m1395-17h-12m12 5h-17m17 5h-12" stroke="#d9e6df" stroke-opacity=".13"/>
+    <path d="M22 17h8m-4-4v8m1384-4h8m-4-4v8M22 133h8m-4-4v8m1384-4h8m-4-4v8" stroke="#dce9e2" stroke-opacity=".12"/>
+    <path d="M200 9.5v4m8-4v2m8-2v4m8-4v2m1000-2v4m8-4v2m8-2v4m8-4v2" stroke="#e1ede6" stroke-opacity=".09"/>
+  </g>
+</svg>

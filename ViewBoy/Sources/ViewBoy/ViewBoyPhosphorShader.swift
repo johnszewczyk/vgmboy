@@ -195,11 +195,11 @@ private final class ViewBoyPhosphorRenderer: NSObject, MTKViewDelegate {
             float deck = 1.0 - smoothstep(0.15, 0.22, uv.y);
             float scan = 1.0 - step(1.0, fmod(floor(in.position.y), 4.0));
             float edge = pow(max(abs(uv.x - 0.5) * 2.0, abs(uv.y - 0.5) * 2.0), 5.0);
-            float vignette = min(edge * 0.075, 0.075);
+            float vignette = min(edge * 0.075, 0.075) * deck;
             float sweep = exp(-pow((uv.x - u.pulseProgress) / 0.09, 2.0))
                         * deck * u.pulseStrength;
             float lcdSheen = deck * (0.012 + u.isPlaying * 0.008);
-            float darkAlpha = scan * (0.014 + deck * 0.026) + vignette;
+            float darkAlpha = deck * (scan * 0.026) + vignette;
             float lightAlpha = lcdSheen + sweep * 0.18;
             float alpha = min(darkAlpha + lightAlpha, 0.24);
             float3 darkInk = float3(0.025, 0.045, 0.038);

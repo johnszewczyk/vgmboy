@@ -1,6 +1,7 @@
 (() => {
 const app = window.SPCBoyApp;
 const { state, refs } = app;
+let volumeBeforeMute = state.appVolume > 0 ? state.appVolume : 1;
 
 let resizingSidebar = false;
 let resizePointerId = null;
@@ -81,8 +82,21 @@ refs.nextButton.addEventListener("click", () => {
   app.playback.playAdjacent(1);
 });
 
+refs.stopButton.addEventListener("click", () => {
+  app.playback.stopPlaybackState().catch((error) => console.error(error));
+});
+
 refs.equalizerToolbarButton.addEventListener("click", () => {
   app.ui.setEqualizerEnabled(!state.equalizerEnabled);
+});
+
+refs.monoToolbarButton.addEventListener("click", () => {
+  app.ui.setMonoEnabled(!state.monoEnabled);
+});
+
+refs.muteToolbarButton.addEventListener("click", () => {
+  if (state.appVolume > 0.001) volumeBeforeMute = state.appVolume;
+  app.ui.setAppVolume(state.appVolume > 0.001 ? 0 : volumeBeforeMute);
 });
 
 refs.progressSlider.addEventListener("input", (event) => {
@@ -217,14 +231,11 @@ refs.columnAutoSizeCheckbox.addEventListener("change", (event) => {
   app.ui.setColumnAutoSize(event.target.checked);
 });
 
-refs.autoResizeAnimationInput.addEventListener("change", (event) => {
-  app.ui.setAnimationTiming("autoResizeAnimationMilliseconds", event.target.value);
+refs.animationDurationInput.addEventListener("change", (event) => {
+  app.ui.setAnimationTiming(event.target.value);
 });
 refs.autoResizeAnimationEnabledCheckbox.addEventListener("change", (event) => {
   app.ui.setAnimationEnabled("autoResizeAnimationEnabled", event.target.checked);
-});
-refs.selectionAnimationInput.addEventListener("change", (event) => {
-  app.ui.setAnimationTiming("selectionAnimationMilliseconds", event.target.value);
 });
 refs.selectionAnimationEnabledCheckbox.addEventListener("change", (event) => {
   app.ui.setAnimationEnabled("selectionAnimationEnabled", event.target.checked);
@@ -253,6 +264,9 @@ refs.accentColorInput.addEventListener("change", (event) => {
 });
 refs.accentColorInput.addEventListener("blur", (event) => {
   app.ui.setAccentColor(event.target.value);
+});
+refs.uiThemeSelect.addEventListener("change", (event) => {
+  app.ui.setUITheme(event.target.value);
 });
 
 if (window.spcBoyWK?.onAppearanceSettingsChanged) {
@@ -286,14 +300,16 @@ if (window.spcBoyWK?.onFrontendSettingsChanged) {
     state.rootPath = settings.rootPath || state.rootPath;
     state.localBrowserEnabled = Boolean(settings.localBrowserEnabled && state.rootPath);
     state.favoriteSortOrder = settings.favoriteSortOrder === "alphabetical" ? "alphabetical" : "historical";
-    if (settings.autoResizeAnimationMilliseconds !== undefined) {
-      state.autoResizeAnimationMilliseconds = app.normalizeAnimationMilliseconds(settings.autoResizeAnimationMilliseconds);
+    if (settings.autoResizeAnimationMilliseconds !== undefined || settings.selectionAnimationMilliseconds !== undefined) {
+      const animationDuration = app.normalizeAnimationMilliseconds(
+        settings.selectionAnimationMilliseconds ?? settings.autoResizeAnimationMilliseconds
+      );
+      state.autoResizeAnimationMilliseconds = animationDuration;
+      state.selectionAnimationMilliseconds = animationDuration;
     }
     if (settings.autoResizeAnimationEnabled !== undefined) state.autoResizeAnimationEnabled = settings.autoResizeAnimationEnabled !== false;
-    if (settings.selectionAnimationMilliseconds !== undefined) {
-      state.selectionAnimationMilliseconds = app.normalizeAnimationMilliseconds(settings.selectionAnimationMilliseconds);
-    }
     if (settings.selectionAnimationEnabled !== undefined) state.selectionAnimationEnabled = settings.selectionAnimationEnabled !== false;
+    if (settings.uiTheme !== undefined) state.uiTheme = app.normalizeUITheme(settings.uiTheme);
     if (settings.mainWindowAlwaysOnTop !== undefined) state.mainWindowAlwaysOnTop = Boolean(settings.mainWindowAlwaysOnTop);
     if (settings.settingsWindowAlwaysOnTop !== undefined) state.settingsWindowAlwaysOnTop = Boolean(settings.settingsWindowAlwaysOnTop);
     if (!window.spcBoyWK.isOptionsWindow && state.localBrowserEnabled && (!wasEnabled || previousRootPath !== state.rootPath || state.sidebarMode !== "diskPath")) {

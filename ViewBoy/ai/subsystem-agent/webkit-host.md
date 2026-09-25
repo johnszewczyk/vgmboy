@@ -34,7 +34,8 @@ to the main WebView, which asks VGMBoyKit to reconfigure the loaded session
 without losing position or paused state.
 
 The shared `FrontendPreferencesCore` contract owns the validated animation
-timing range and 200 ms defaults. DOM geometry and CSS remain WebKit-owned so
+timing range and 200 ms default. ViewBoy exposes one shared configurable
+duration for auto-resize and selection movement, with independent effect toggles. DOM geometry and CSS remain WebKit-owned so
 ViewBoy can replace the presentation skin without moving layout policy into
 native code; native Swift owns persistence and window levels.
 
@@ -48,10 +49,11 @@ selected row without animation. The bundled Doto face and
 one root Interface Scale apply across both the main and Settings windows, with
 shared relative sizes for captions, controls, and display text.
 
-`index.html` layers `viewboy-nightglass.css` after `styles.css`. The latter
-provides shared structure; Nightglass owns ViewBoy's black smoked-glass palette,
-pale phosphor text, and selection treatment. Keep presentation colors out of
-the inherited transport bridge.
+`index.html` layers `viewboy-nightglass.css` and `viewboy-lightmode.css` after
+`styles.css`. The shared sheet owns structure; Nightglass defines the default
+black smoked-glass palette, while LightMode overrides it through the root
+`data-ui-theme` attribute. Keep presentation colors out of the inherited
+transport bridge.
 
 ## Selection and Search
 

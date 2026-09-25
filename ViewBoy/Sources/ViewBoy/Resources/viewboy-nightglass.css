@@ -17,6 +17,7 @@
   --button-bg: #181c1e;
   --sidebar-text-color: #cbd6d1;
   --playlist-text-color: #d4ddd9;
+  --selection-indicator-color: var(--text);
   --viewboy-font-family: "ViewBoy Doto", ui-monospace, SFMono-Regular, Menlo, monospace;
   --ui-font-family: var(--viewboy-font-family);
   --mono-font-family: var(--viewboy-font-family);
@@ -171,14 +172,14 @@ body { font-size: var(--vb-type-base); }
   top: 0;
   left: 0;
   width: 0;
-  height: 2px;
+  height: 1px;
   border: 0;
-  border-radius: 1px;
+  border-radius: 0;
   opacity: 0;
   pointer-events: none;
   transform: translate3d(0, 0, 0);
-  background: linear-gradient(90deg, rgb(177 220 198 / 42%), #c7ead8 42%, rgb(153 201 176 / 76%) 82%, rgb(177 220 198 / 25%));
-  box-shadow: 0 0 5px rgb(171 223 198 / 34%), 0 1px 5px rgb(0 0 0 / 65%);
+  background: var(--selection-indicator-color);
+  box-shadow: none;
   transition: transform var(--selection-animation-duration) cubic-bezier(0.18, 0.72, 0.18, 1);
   will-change: transform;
 }
@@ -362,12 +363,10 @@ body.options-window input[type="checkbox"] { accent-color: #a9cbb8; }
 body.options-window :focus-visible { outline-color: #b8d9c8; }
 
 /* Static polymer grain and beveled glass keep the finish crisp while lists scroll. */
-:root { --selection-animation-duration: 145ms; }
-
 .player-deck {
-  background-image: url("viewboy-polymer-grain.svg"), linear-gradient(125deg, #24292a, #15191a 48%, #0b0e0f);
-  background-size: 96px 96px, 100% 100%;
-  background-repeat: repeat, no-repeat;
+  background-image: url("viewboy-deck-machining.svg"), url("viewboy-polymer-grain.svg"), linear-gradient(125deg, #24292a, #15191a 48%, #0b0e0f);
+  background-size: 100% 100%, 96px 96px, 100% 100%;
+  background-repeat: no-repeat, repeat, no-repeat;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
@@ -384,7 +383,7 @@ body.options-window .options-page .options-subpanel {
   backdrop-filter: none;
 }
 
-.sidebar { background-image: url("viewboy-polymer-grain.svg"), linear-gradient(155deg, #14191a, #0b0e10 82%); }
+.sidebar { background-image: linear-gradient(155deg, #14191a, #0b0e10 82%); background-repeat: no-repeat; }
 .content { background-image: url("viewboy-polymer-grain.svg"), linear-gradient(150deg, #111617, #0a0d0e 82%); }
 .panel-heading { background-image: url("viewboy-polymer-grain.svg"), linear-gradient(110deg, #232829, #15191a 72%, #101314); }
 .sidebar-search-wrap, .playlist-tabs-toolbar { background-image: url("viewboy-polymer-grain.svg"), linear-gradient(100deg, #1b2021, #101415); }
@@ -405,9 +404,10 @@ body.options-window .options-page .options-subpanel { background-image: url("vie
   border-color: #3b4742;
   background-color: #080c0b;
   background-image:
+    url("viewboy-glass-catchlight.svg"),
     radial-gradient(circle, rgb(179 218 201 / 8%) 0.55px, transparent 0.8px),
     linear-gradient(112deg, #0d1412, #080c0b 55%, #101513);
-  background-size: 4px 4px, 100% 100%;
+  background-size: 100% 100%, 4px 4px, 100% 100%;
   box-shadow: inset 0 2px 8px rgb(0 0 0 / 94%), inset 0 0 0 1px rgb(211 232 223 / 4%),
     inset 0 1px rgb(221 240 230 / 9%), 0 1px rgb(235 249 243 / 8%);
 }
@@ -460,7 +460,7 @@ body.options-window .options-page .options-subpanel { background-image: url("vie
 .deck-control-bank .transport-toolbar { width: 100%; }
 .deck-control-bank .transport-toolbar .transport { width: 100%; justify-content: center; }
 .list-selection-indicator {
-  transition: transform var(--selection-animation-duration) cubic-bezier(0.18, 0.82, 0.28, 1), opacity 70ms linear;
+  transition: transform var(--selection-animation-duration) cubic-bezier(0.18, 0.82, 0.28, 1), opacity 0ms linear;
 }
 .playlist-wrap { background-image: url("viewboy-polymer-grain.svg"), linear-gradient(#151a1b, #0b0e0f 13rem); background-size: 96px 96px, 100% 100%; background-repeat: repeat, no-repeat; }
 

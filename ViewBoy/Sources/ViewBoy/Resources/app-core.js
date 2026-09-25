@@ -1,5 +1,7 @@
 const DEFAULT_PLAY_FADE_SECONDS = 6;
 const DEFAULT_LONG_PLAY_SECONDS = 180;
+const DEFAULT_ANIMATION_DURATION_MILLISECONDS = 200;
+const DEFAULT_UI_THEME = "nightglass";
 const DEFAULT_ACCENT_COLOR = "#b6d9ca";
 const SAMPLE_RATE = 44_100;
 const DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES = 2 * 1024 * 1024 * 1024;
@@ -83,6 +85,7 @@ const state = {
   playlistHeaderBold: false,
   sidebarWidthPercent: 20,
   accentColor: DEFAULT_ACCENT_COLOR,
+  uiTheme: DEFAULT_UI_THEME,
   routingPreferences: {},
   archiveCacheEnabled: true,
   archiveCacheLimitBytes: DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES,
@@ -108,8 +111,8 @@ const state = {
   columnAutoSize: true,
   sortColumn: "filename",
   sortDirection: "ascending",
-  autoResizeAnimationMilliseconds: 200,
-  selectionAnimationMilliseconds: 200,
+  autoResizeAnimationMilliseconds: DEFAULT_ANIMATION_DURATION_MILLISECONDS,
+  selectionAnimationMilliseconds: DEFAULT_ANIMATION_DURATION_MILLISECONDS,
   autoResizeAnimationEnabled: true,
   selectionAnimationEnabled: true,
   mainWindowAlwaysOnTop: false,
@@ -217,13 +220,13 @@ const refs = {
   playlistHeaderBoldCheckbox: document.getElementById("playlist-header-bold-checkbox"),
   columnAutoSizeCheckbox: document.getElementById("column-auto-size-checkbox"),
   autoResizeAnimationEnabledCheckbox: document.getElementById("auto-resize-animation-enabled-checkbox"),
-  autoResizeAnimationInput: document.getElementById("auto-resize-animation-input"),
+  animationDurationInput: document.getElementById("animation-duration-input"),
   selectionAnimationEnabledCheckbox: document.getElementById("selection-animation-enabled-checkbox"),
-  selectionAnimationInput: document.getElementById("selection-animation-input"),
   mainWindowAlwaysOnTopCheckbox: document.getElementById("main-window-always-on-top-checkbox"),
   settingsWindowAlwaysOnTopCheckbox: document.getElementById("settings-window-always-on-top-checkbox"),
   sidebarWidthInput: document.getElementById("sidebar-width-input"),
   accentColorInput: document.getElementById("accent-color-input"),
+  uiThemeSelect: document.getElementById("ui-theme-select"),
   uiItemSpacingInput: document.getElementById("ui-item-spacing-input"),
   spcForceLengthCheckbox: document.getElementById("spc-force-length-checkbox"),
   queuedSkipsCheckbox: document.getElementById("queued-skips-checkbox"),
@@ -251,7 +254,11 @@ const refs = {
   deckMeta: document.getElementById("deck-meta"),
   queueCount: document.getElementById("queue-count"),
   nextButton: document.getElementById("next-button"),
+  stopButton: document.getElementById("stop-button"),
   equalizerToolbarButton: document.getElementById("equalizer-toolbar-button"),
+  monoToolbarButton: document.getElementById("mono-toolbar-button"),
+  muteToolbarButton: document.getElementById("mute-toolbar-button"),
+  muteToolbarIcon: document.getElementById("mute-toolbar-icon"),
   nativeDiagnostics: document.getElementById("native-diagnostics"),
   nativeTransportLabel: document.getElementById("native-transport-label"),
   nativeTrackLabel: document.getElementById("native-track-label"),
@@ -312,12 +319,17 @@ async function loadSettings() {
       ? parsed.collapsedConsoleNames.filter((name) => typeof name === "string")
       : [];
     state.lastSelectedTrackId = parsed.lastSelectedTrackId || null;
+    const storedUITheme = normalizeUITheme(parsed.uiTheme);
     const storedFontSize = parsed.uiFontSizePt ?? parsed.sidebarFontSizePt ?? parsed.playlistFontSizePt;
     const interfaceFontSize = Number(storedFontSize) === 10 ? 11 : normalizeFontSize(storedFontSize);
     const storedFontColor = parsed.sidebarTextColor ?? parsed.playlistTextColor;
-    const interfaceFontColor = ["#062d4a", "#b7e4f2", "#e2f8fb"].includes(String(storedFontColor || "").trim().toLowerCase())
-      ? "#d7e1dc"
-      : normalizeFontColor(storedFontColor);
+    const storedFontColorKey = String(storedFontColor || "").trim().toLowerCase();
+    const legacyLightModeFontColors = ["#36342e", "#303a21"];
+    const interfaceFontColor = storedUITheme === "lightmode" && legacyLightModeFontColors.includes(storedFontColorKey)
+      ? "#333"
+      : ["#062d4a", "#b7e4f2", "#e2f8fb"].includes(storedFontColorKey)
+        ? "#d7e1dc"
+        : normalizeFontColor(storedFontColor);
     const interfaceMonospace = Boolean(parsed.applicationMonospace ?? parsed.sidebarMonospace ?? parsed.playlistMonospace);
     state.uiFontSizePt = interfaceFontSize;
     state.sidebarFontSizePt = interfaceFontSize;
@@ -333,6 +345,7 @@ async function loadSettings() {
     state.accentColor = ["#072f57", "#59c9f1", "#65d9ef", "#d77a3d"].includes(String(parsed.accentColor || "").trim().toLowerCase())
       ? DEFAULT_ACCENT_COLOR
       : normalizeAccentColor(parsed.accentColor);
+    state.uiTheme = storedUITheme;
     state.routingPreferences = parsed.routingPreferences && typeof parsed.routingPreferences === "object" ? { ...parsed.routingPreferences } : {};
     state.archiveCacheEnabled = parsed.archiveCacheEnabled !== false;
     state.archiveCacheLimitBytes = normalizeArchiveCacheLimit(parsed.archiveCacheLimitBytes);
@@ -342,8 +355,11 @@ async function loadSettings() {
     state.columnAutoSize = parsed.columnAutoSize !== false;
     state.sortColumn = normalizeSortColumn(parsed.sortColumn);
     state.sortDirection = normalizeSortDirection(parsed.sortDirection);
-    state.autoResizeAnimationMilliseconds = normalizeAnimationMilliseconds(parsed.autoResizeAnimationMilliseconds);
-    state.selectionAnimationMilliseconds = normalizeAnimationMilliseconds(parsed.selectionAnimationMilliseconds);
+    const animationDuration = normalizeAnimationMilliseconds(
+      parsed.selectionAnimationMilliseconds ?? parsed.autoResizeAnimationMilliseconds
+    );
+    state.autoResizeAnimationMilliseconds = animationDuration;
+    state.selectionAnimationMilliseconds = animationDuration;
     state.autoResizeAnimationEnabled = parsed.autoResizeAnimationEnabled !== false;
     state.selectionAnimationEnabled = parsed.selectionAnimationEnabled !== false;
     state.mainWindowAlwaysOnTop = Boolean(parsed.mainWindowAlwaysOnTop);
@@ -393,6 +409,7 @@ function persistSettings() {
     playlistHeaderBold: state.playlistHeaderBold,
     sidebarWidthPercent: state.sidebarWidthPercent,
     accentColor: state.accentColor,
+    uiTheme: state.uiTheme,
     routingPreferences: state.routingPreferences,
     archiveCacheEnabled: state.archiveCacheEnabled,
     archiveCacheLimitBytes: state.archiveCacheLimitBytes,
@@ -445,7 +462,13 @@ function normalizeFadeTime(value) {
 
 function normalizeAnimationMilliseconds(value) {
   const numeric = Number(value);
-  return Number.isFinite(numeric) ? Math.max(0, Math.min(1000, Math.round(numeric))) : 200;
+  return Number.isFinite(numeric) ? Math.max(0, Math.min(1000, Math.round(numeric))) : DEFAULT_ANIMATION_DURATION_MILLISECONDS;
+}
+
+function normalizeUITheme(value) {
+  return ["nightglass", "lightmode"].includes(String(value || "").trim().toLowerCase())
+    ? String(value).trim().toLowerCase()
+    : DEFAULT_UI_THEME;
 }
 
 function normalizeEqualizerGain(value) {
@@ -612,6 +635,7 @@ function targetPlaybackSeconds() {
 window.SPCBoyApp = {
   DEFAULT_PLAY_FADE_SECONDS,
   DEFAULT_LONG_PLAY_SECONDS,
+  DEFAULT_ANIMATION_DURATION_MILLISECONDS,
   SAMPLE_RATE,
   COLUMN_DEFS,
   DEFAULT_COLUMN_ORDER,
@@ -635,6 +659,7 @@ window.SPCBoyApp = {
   normalizeFontSize,
   normalizeFontColor,
   normalizeAccentColor,
+  normalizeUITheme,
   EQUALIZER_BAND_FREQUENCIES,
   normalizeEqualizerGain,
   normalizeAppVolume,

@@ -6,6 +6,7 @@
     <title>ViewBoy</title>
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./viewboy-nightglass.css" />
+    <link rel="stylesheet" href="./viewboy-lightmode.css" />
   </head>
   <body>
     <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -27,6 +28,10 @@
       <symbol id="icon-skip-forward" viewBox="0 0 24 24"><path d="M21 4v16" /><path d="M6.029 4.285A2 2 0 0 0 3 6v12a2 2 0 0 0 3.029 1.715l9.997-5.998a2 2 0 0 0 .003-3.432z" /></symbol>
       <symbol id="icon-infinity" viewBox="0 0 24 24"><path d="M6 16c5 0 7-8 12-8a4 4 0 0 1 0 8c-5 0-7-8-12-8a4 4 0 1 0 0 8" /></symbol>
       <symbol id="icon-repeat-2" viewBox="0 0 24 24"><path d="m2 9 3-3 3 3" /><path d="M13 18H7a2 2 0 0 1-2-2V6" /><path d="m22 15-3 3-3-3" /><path d="M11 6h6a2 2 0 0 1 2 2v10" /></symbol>
+      <symbol id="icon-stop" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1.5" /></symbol>
+      <symbol id="icon-mono" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="2.2" /></symbol>
+      <symbol id="icon-volume" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z" /><path d="M15 9a4 4 0 0 1 0 6" /><path d="M18 6a8 8 0 0 1 0 12" /></symbol>
+      <symbol id="icon-volume-off" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z" /><path d="m16 9 5 6" /><path d="m21 9-5 6" /></symbol>
       <symbol id="icon-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z" /></symbol>
     </svg>
     <div class="app-shell">
@@ -48,10 +53,12 @@
                 <button id="previous-button" class="tool-button glyph-button ui-control" title="Previous" aria-label="Previous"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-back"></use></svg></button>
                 <button id="play-button" class="tool-button glyph-button ui-control is-primary" title="Play / Pause" aria-label="Play / Pause"><svg class="ui-icon" aria-hidden="true"><use href="#icon-play"></use></svg></button>
                 <button id="next-button" class="tool-button glyph-button ui-control" title="Next" aria-label="Next"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-forward"></use></svg></button>
-                <span class="deck-control-divider" aria-hidden="true"></span>
+                <button id="stop-button" class="tool-button glyph-button ui-control" type="button" title="Stop" aria-label="Stop"><svg class="ui-icon" aria-hidden="true"><use href="#icon-stop"></use></svg></button>
                 <button id="equalizer-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Enable Equalizer" aria-label="Enable Equalizer" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg></button>
                 <button id="long-play-button" class="tool-button glyph-button ui-control" type="button" title="Toggle Long Play" aria-label="Toggle Long Play"><svg class="ui-icon" aria-hidden="true"><use href="#icon-infinity"></use></svg></button>
                 <button id="repeat-button" class="tool-button glyph-button ui-control" type="button" title="Repeat off" aria-label="Repeat off"><svg class="ui-icon" aria-hidden="true"><use href="#icon-repeat-2"></use></svg></button>
+                <button id="mono-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Enable Mono" aria-label="Enable Mono" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-mono"></use></svg></button>
+                <button id="mute-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Mute" aria-label="Mute" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use id="mute-toolbar-icon" href="#icon-volume"></use></svg></button>
               </div>
             </div>
           </div>
@@ -131,6 +138,7 @@
               <div class="options-page-title">ViewBoy / Interface</div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Application</div>
+                <label class="options-field"><span>Theme</span><span class="options-inline-trailing"><select id="ui-theme-select" class="options-input" aria-label="ViewBoy theme"><option value="nightglass">Nightglass</option><option value="lightmode">LightMode</option></select></span></label>
                 <label class="options-field"><span>Accent Color</span><span class="options-inline-trailing"><input id="accent-color-input" class="options-input options-color-text-input" type="text" value="#b6d9ca" placeholder="#b6d9ca, rgb(...), oklch(...)" aria-label="Accent color CSS value" /></span></label>
               </div>
               <div class="options-subpanel">
@@ -153,8 +161,9 @@
               </div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Animations</div>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="auto-resize-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Auto-Resize</span><small>Duration for automatic playlist column resizing (ms).</small></span></span><span class="options-inline-trailing"><input id="auto-resize-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Auto-resize animation milliseconds" /></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="selection-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Selection Bar</span><small>Duration for library, playlist, and Settings selection movement (ms).</small></span></span><span class="options-inline-trailing"><input id="selection-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Selection bar animation milliseconds" /></span></label>
+                <label class="options-field"><span>Shared Duration (ms)<small>One timing for selection glides and playlist column resizing.</small></span><span class="options-inline-trailing"><input id="animation-duration-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Shared animation duration milliseconds" /></span></label>
+                <label class="options-field options-inline-field"><span>Auto-Resize</span><input id="auto-resize-animation-enabled-checkbox" type="checkbox" checked /></label>
+                <label class="options-field options-inline-field"><span>Selection Bar</span><input id="selection-animation-enabled-checkbox" type="checkbox" checked /></label>
               </div>
             </div>
 
