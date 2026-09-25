@@ -115,14 +115,33 @@
       const classes = ["field-grid", "canonical-table", options.className].filter(Boolean).join(" ");
       const attributes = options.attributes ? ` ${options.attributes}` : "";
       const ariaLabel = options.ariaLabel ? ` aria-label="${esc(options.ariaLabel)}"` : "";
-      const styleProperties = [options.columns ? `--field-grid-columns:${options.columns}` : "", options.style || ""].filter(Boolean).join(";");
+      const columnSchema = options.columns ? ` data-canonical-columns="${esc(options.columns)}"` : "";
+      const styleProperties = options.style || "";
       const style = styleProperties ? ` style="${esc(styleProperties)}"` : "";
       const rows = options.rows || options.empty || "";
       const title = options.title === undefined || options.title === null || options.title === ""
         ? ""
         : canonicalTitleRowMarkup(options.title, options.titleClassName || "", options.titleAction || "");
-      const table = `<div class="${classes}" role="table"${ariaLabel}${attributes}${style}>${title}${options.header || ""}${rows}</div>`;
+      const table = `<div class="${classes}" role="table"${ariaLabel}${attributes}${columnSchema}${style}>${title}${options.header || ""}${rows}</div>`;
       return `${options.nestedSurface ? `<div class="canonical-table-surface canonical-table-nested-surface">${table}</div>` : table}${options.trailing || ""}`;
+    }
+
+    static applyColumnSchemas(root = document) {
+      const tables = [];
+      if (root instanceof Element && root.matches(".canonical-table[data-canonical-columns]")) tables.push(root);
+      tables.push(...root.querySelectorAll(".canonical-table[data-canonical-columns]"));
+      tables.forEach(table => {
+        const columns = table.dataset.canonicalColumns || "";
+        if (!columns) return;
+        table.style.setProperty("--field-grid-columns", columns);
+        table.querySelectorAll(".field-grid-header, .field-grid-row").forEach(row => {
+          if (row.closest(".canonical-table") !== table) return;
+          const rowColumns = row.classList.contains("canonical-table-title-row") || row.classList.contains("inserted-table-row")
+            ? "minmax(0,1fr)"
+            : columns;
+          row.style.setProperty("grid-template-columns", rowColumns, "important");
+        });
+      });
     }
 
     static isFoldOpen(foldID) {
@@ -166,6 +185,7 @@
         subrow.style.overflow = "hidden";
       }
       contentHost.innerHTML = content instanceof CanonicalTable ? content.render() : String(content || "");
+      this.applyColumnSchemas(subrow);
       if (this.isFoldOpen(foldID) && !hadContent) this.animateSubrow(subrow, true);
       return true;
     }
@@ -611,6 +631,7 @@
     renderIssues();
     renderMembers();
     renderInspector();
+    CanonicalTable.applyColumnSchemas();
     CanonicalTable.playPendingFoldAnimations();
     $("#members-view").classList.toggle("hidden", mainView !== "members");
     $("#metadata-view").classList.toggle("hidden", mainView === "members");
@@ -685,6 +706,8 @@
     if (gigaGrid) {
       const template = trackArrayColumnTemplate(members, trackColumns());
       gigaGrid.style.setProperty("--field-grid-columns", template);
+      gigaGrid.dataset.canonicalColumns = template;
+      CanonicalTable.applyColumnSchemas(gigaGrid);
     }
   }
 

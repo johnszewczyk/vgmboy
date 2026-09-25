@@ -43,7 +43,8 @@
 - `CanonicalTable` is the only field-grid renderer and nested-fold owner. Every
   table supplies its title and one explicit column schema; `CanonicalTable`
   emits the title row, numbered header/data grid, and shared row/cell markup.
-  `CanonicalTableColumns` in `workspace.js` records the live schemas. CSS table
+  `CanonicalTableColumns` in `workspace.js` records the live schemas, and
+  `applyColumnSchemas` writes each schema onto only its own rows. CSS table
   modifiers may style cell content, but must not define column tracks. Geometry
   rules target each table's direct title/header/data rows so an ancestor cannot
   resize a nested table. This keeps every depth on the same grid contract while
