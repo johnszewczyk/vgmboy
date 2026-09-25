@@ -49,11 +49,10 @@ selected row without animation. The bundled Doto face and
 one root Interface Scale apply across both the main and Settings windows, with
 shared relative sizes for captions, controls, and display text.
 
-`index.html` layers `viewboy-nightglass.css` and `viewboy-lightmode.css` after
-`styles.css`. The shared sheet owns structure; Nightglass defines the default
-black smoked-glass palette, while LightMode overrides it through the root
-`data-ui-theme` attribute. Keep presentation colors out of the inherited
-transport bridge.
+`index.html` loads one `viewboy-gameboy.css` presentation sheet after
+`styles.css`. Game Boy Core is the only skin: a gray membrane shell, maroon
+hardware accents, and low-contrast 4 px LCD dots carried across the display
+surfaces. Keep presentation colors out of the inherited transport bridge.
 
 ## Selection and Search
 

@@ -265,9 +265,6 @@ refs.accentColorInput.addEventListener("change", (event) => {
 refs.accentColorInput.addEventListener("blur", (event) => {
   app.ui.setAccentColor(event.target.value);
 });
-refs.uiThemeSelect.addEventListener("change", (event) => {
-  app.ui.setUITheme(event.target.value);
-});
 
 if (window.spcBoyWK?.onAppearanceSettingsChanged) {
   window.spcBoyWK.onAppearanceSettingsChanged((settings) => {
@@ -309,7 +306,6 @@ if (window.spcBoyWK?.onFrontendSettingsChanged) {
     }
     if (settings.autoResizeAnimationEnabled !== undefined) state.autoResizeAnimationEnabled = settings.autoResizeAnimationEnabled !== false;
     if (settings.selectionAnimationEnabled !== undefined) state.selectionAnimationEnabled = settings.selectionAnimationEnabled !== false;
-    if (settings.uiTheme !== undefined) state.uiTheme = app.normalizeUITheme(settings.uiTheme);
     if (settings.mainWindowAlwaysOnTop !== undefined) state.mainWindowAlwaysOnTop = Boolean(settings.mainWindowAlwaysOnTop);
     if (settings.settingsWindowAlwaysOnTop !== undefined) state.settingsWindowAlwaysOnTop = Boolean(settings.settingsWindowAlwaysOnTop);
     if (!window.spcBoyWK.isOptionsWindow && state.localBrowserEnabled && (!wasEnabled || previousRootPath !== state.rootPath || state.sidebarMode !== "diskPath")) {
@@ -351,8 +347,8 @@ refs.optionsCloseButton.addEventListener("click", () => {
   app.ui.setOptionsOpen(false);
 });
 
-refs.optionsThemeTab.addEventListener("click", () => {
-  state.optionsSection = "theme";
+refs.optionsInterfaceTab.addEventListener("click", () => {
+  state.optionsSection = "interface";
   app.ui.renderAll();
 });
 

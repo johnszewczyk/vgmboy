@@ -293,8 +293,7 @@ function syncSelectionIndicators() {
   if (scopes & SELECTION_OPTIONS) {
     const optionsTarget = {
       database: refs.optionsDatabaseTab,
-      interface: refs.optionsThemeTab,
-      theme: refs.optionsThemeTab,
+      interface: refs.optionsInterfaceTab,
       windows: refs.optionsWindowsTab,
       audio: refs.optionsAudioTab,
       diagnostics: refs.optionsDiagnosticsTab,
@@ -2116,7 +2115,6 @@ function scheduleMetadataRefresh(trackId) {
 
 function applyUISettings() {
   const rootStyle = document.documentElement.style;
-  document.documentElement.dataset.uiTheme = state.uiTheme;
   rootStyle.setProperty("--ui-font-size-pt", String(state.uiFontSizePt));
   rootStyle.setProperty("--app-font-family", "var(--viewboy-font-family)");
   rootStyle.setProperty("--sidebar-font-size-pt", String(state.sidebarFontSizePt));
@@ -2147,8 +2145,7 @@ function appearanceSettings() {
     playlistMonospace: state.playlistMonospace,
     applicationMonospace: state.applicationMonospace,
     playlistHeaderBold: state.playlistHeaderBold,
-    accentColor: state.accentColor,
-    uiTheme: state.uiTheme
+    accentColor: state.accentColor
   };
 }
 
@@ -2212,16 +2209,16 @@ function renderAll() {
   const playbackSelected = state.optionsSection === "playback";
   const diagnosticsSelected = state.optionsSection === "diagnostics";
   const audioSelected = state.optionsSection === "audio";
-  const themeSelected = state.optionsSection === "theme";
+  const interfaceSelected = state.optionsSection === "interface";
   const windowsSelected = state.optionsSection === "windows";
   refs.optionsDatabaseTab.classList.toggle("is-selected", databaseSelected);
   refs.optionsRoutingTab.classList.toggle("is-selected", routingSelected);
   refs.optionsPlaybackTab.classList.toggle("is-selected", playbackSelected);
   refs.optionsDiagnosticsTab.classList.toggle("is-selected", diagnosticsSelected);
   refs.optionsAudioTab.classList.toggle("is-selected", audioSelected);
-  refs.optionsThemeTab.classList.toggle("is-selected", themeSelected);
+  refs.optionsInterfaceTab.classList.toggle("is-selected", interfaceSelected);
   refs.optionsWindowsTab.classList.toggle("is-selected", windowsSelected);
-  refs.optionsThemeSection.classList.toggle("is-hidden", !themeSelected);
+  refs.optionsInterfaceSection.classList.toggle("is-hidden", !interfaceSelected);
   refs.optionsWindowsSection.classList.toggle("is-hidden", !windowsSelected);
   refs.optionsDatabaseSection.classList.toggle("is-hidden", !databaseSelected);
   refs.optionsRoutingSection.classList.toggle("is-hidden", !routingSelected);
@@ -2234,7 +2231,6 @@ function renderAll() {
   if (document.activeElement !== refs.sidebarTextColorInput) refs.sidebarTextColorInput.value = state.sidebarTextColor;
   refs.sidebarPathCountsCheckbox.checked = state.sidebarPathCounts;
   if (document.activeElement !== refs.accentColorInput) refs.accentColorInput.value = state.accentColor;
-  if (refs.uiThemeSelect) refs.uiThemeSelect.value = state.uiTheme;
   if (refs.aacExportDirectoryPath) refs.aacExportDirectoryPath.value = state.aacExportDirectory || "";
   if (refs.aacExportStatus) refs.aacExportStatus.textContent = state.aacExportStatus || "";
   if (refs.aacExportCancelButton) refs.aacExportCancelButton.disabled = !state.aacExportInProgress;
@@ -2718,50 +2714,12 @@ function applyAppearanceSettings(settings) {
   if (settings.sidebarPathCounts !== undefined) state.sidebarPathCounts = Boolean(settings.sidebarPathCounts);
   if (settings.playlistHeaderBold !== undefined) state.playlistHeaderBold = Boolean(settings.playlistHeaderBold);
   if (settings.accentColor !== undefined) state.accentColor = uiApp.normalizeAccentColor(settings.accentColor);
-  if (settings.uiTheme !== undefined) {
-    const nextTheme = uiApp.normalizeUITheme(settings.uiTheme);
-    if (nextTheme !== state.uiTheme) applyThemeDefaults(nextTheme);
-    state.uiTheme = nextTheme;
-  }
   persistSettings();
   renderAll();
 }
 
 function setAccentColor(color) {
   state.accentColor = uiApp.normalizeAccentColor(color);
-  persistSettings();
-  broadcastAppearanceSettings();
-  renderAll();
-}
-
-function applyThemeDefaults(theme) {
-  const palettes = {
-    nightglass: { accent: "#b6d9ca", sidebar: "#cbd6d1", playlist: "#d4ddd9" },
-    lightmode: { accent: "#812d46", sidebar: "#333", playlist: "#333" }
-  };
-  const allDefaultAccents = Object.values(palettes).map((palette) => palette.accent);
-  const allDefaultTextColors = ["#d7e1dc", "lightgray", "#d3d3d3", "#36342e", "#303a21", ...Object.values(palettes).flatMap((palette) => [palette.sidebar, palette.playlist])];
-  const palette = palettes[theme];
-  let changed = false;
-  if (allDefaultAccents.includes(state.accentColor.toLowerCase())) {
-    state.accentColor = palette.accent;
-    changed = true;
-  }
-  if (allDefaultTextColors.includes(state.sidebarTextColor.toLowerCase())) {
-    state.sidebarTextColor = palette.sidebar;
-    changed = true;
-  }
-  if (allDefaultTextColors.includes(state.playlistTextColor.toLowerCase())) {
-    state.playlistTextColor = palette.playlist;
-    changed = true;
-  }
-  return changed;
-}
-
-function setUITheme(theme) {
-  const nextTheme = uiApp.normalizeUITheme(theme);
-  if (nextTheme !== state.uiTheme) applyThemeDefaults(nextTheme);
-  state.uiTheme = nextTheme;
   persistSettings();
   broadcastAppearanceSettings();
   renderAll();
@@ -2800,7 +2758,6 @@ async function bootstrap() {
   // after catalog/cache requests produces a distracting default-style flash.
   window.SPCBoyOptionsController.applyManifest(await window.spcBoyWK.frontendOptionsManifest());
   await loadSettings();
-  if (applyThemeDefaults(state.uiTheme)) persistSettings();
   await syncSidebarView();
   if (!window.spcBoyWK?.isOptionsWindow) await refreshFavorites();
   if (window.spcBoyWK?.isOptionsWindow) {
@@ -2969,7 +2926,6 @@ uiApp.ui = {
   setColumnAutoSize,
   setAnimationTiming,
   setAnimationEnabled,
-  setUITheme,
   setWindowAlwaysOnTop,
   applyAppearanceSettings,
   applyRoutingPreferences,

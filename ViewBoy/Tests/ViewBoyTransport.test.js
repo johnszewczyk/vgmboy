@@ -24,12 +24,8 @@ const stylesSource = fs.readFileSync(
   path.resolve(__dirname, "../Sources/ViewBoy/Resources/styles.css"),
   "utf8"
 );
-const nightglassSource = fs.readFileSync(
-  path.resolve(__dirname, "../Sources/ViewBoy/Resources/viewboy-nightglass.css"),
-  "utf8"
-);
-const lightmodeSource = fs.readFileSync(
-  path.resolve(__dirname, "../Sources/ViewBoy/Resources/viewboy-lightmode.css"),
+const gameboySource = fs.readFileSync(
+  path.resolve(__dirname, "../Sources/ViewBoy/Resources/viewboy-gameboy.css"),
   "utf8"
 );
 const nativeBridgeSource = fs.readFileSync(
@@ -58,22 +54,28 @@ test("ViewBoy uses one settable 200 ms timing for width and selection transition
   assert.match(stylesSource, /\.playlist-body-table \.playlist-width-source > td\s*\{[^}]*transition:\s*width var\(--column-resize-duration\)/);
   assert.match(uiSource, /void refs\.playlistHeaderTable\.offsetWidth/);
   assert.match(uiSource, /if \(initialColumnWidths\) window\.requestAnimationFrame\(\(\) => syncPlaylistColumnWidths\(\)\)/);
-  assert.match(nightglassSource, /url\("viewboy-deck-machining\.svg"\)/);
-  assert.match(nightglassSource, /url\("viewboy-glass-catchlight\.svg"\)/);
+  assert.match(indexSource, /viewboy-gameboy\.css/);
+  assert.match(gameboySource, /radial-gradient\(circle, rgb\(54 65 33 \/ 12%\)/);
+  assert.match(gameboySource, /background-size: 4px 4px, 100% 100%/);
+  assert.match(gameboySource, /grid-template-columns: repeat\(7, minmax\(0, 1fr\)\)/);
   assert.match(uiSource, /state\.selectionAnimationMilliseconds = milliseconds/);
 });
 
-test("LightMode is a persisted Game Boy LCD theme and retains the bundled typeface", () => {
-  assert.match(indexSource, /viewboy-lightmode\.css/);
-  assert.match(indexSource, /id="ui-theme-select"[\s\S]*?value="lightmode"/);
-  assert.match(appCoreSource, /uiTheme: DEFAULT_UI_THEME/);
-  assert.match(appCoreSource, /uiTheme: state\.uiTheme/);
-  assert.match(lightmodeSource, /--accent:\s*#812d46/);
-  assert.match(lightmodeSource, /background:\s*#cbd67d/);
-  assert.doesNotMatch(lightmodeSource, /font-family:/);
-  assert.match(uiSource, /document\.documentElement\.dataset\.uiTheme = state\.uiTheme/);
-  assert.match(uiSource, /uiTheme: state\.uiTheme/);
-  assert.match(fs.readFileSync(path.resolve(__dirname, "../Sources/ViewBoy/SPCBoyPreferencesSnapshot.swift"), "utf8"), /var uiTheme: String\?/);
+test("Game Boy Core is the sole presentation and retains the bundled typeface", () => {
+  assert.match(indexSource, /viewboy-gameboy\.css/);
+  assert.doesNotMatch(indexSource, /ui-theme-select|Nightglass|LightMode/);
+  assert.doesNotMatch(indexSource, /#b6d9ca|#d7e1dc/);
+  assert.match(indexSource, /value="#812d46"/);
+  assert.match(indexSource, /value="#333"/);
+  assert.match(gameboySource, /--accent:\s*#812d46/);
+  assert.match(gameboySource, /background-color:\s*#cbd67d/);
+  assert.match(gameboySource, /--viewboy-font-family:\s*"ViewBoy Doto"/);
+  assert.match(gameboySource, /--playlist-font-family:\s*var\(--viewboy-font-family\)/);
+  assert.match(stylesSource, /@font-face[\s\S]*?Doto/);
+  assert.doesNotMatch(appCoreSource, /#072f57|#59c9f1|#65d9ef|#d77a3d|#d7e1dc/);
+  assert.match(appCoreSource, /function normalizeFontColor\(value\)[\s\S]*?if \(!text\) return "#333";[\s\S]*?: "#333";/);
+  assert.doesNotMatch(appCoreSource + uiSource, /uiTheme|normalizeUITheme|setUITheme/);
+  assert.doesNotMatch(fs.readFileSync(path.resolve(__dirname, "../Sources/ViewBoy/SPCBoyPreferencesSnapshot.swift"), "utf8"), /uiTheme/);
 });
 
 function element() {
@@ -566,7 +568,7 @@ test("ViewBoy ignores delayed native status events", () => {
 test("ViewBoy uses a one-pixel font-color locator for sidebar and playlist", () => {
   assert.match(stylesSource, /\.list-selection-indicator[\s\S]*?height: 1px/);
   assert.match(stylesSource, /\.list-selection-indicator[\s\S]*?background: var\(--selection-indicator-color, var\(--accent\)\)/);
-  assert.match(lightmodeSource, /\.list-selection-indicator[\s\S]*?height: 1px[\s\S]*?background: #333[\s\S]*?box-shadow: none/);
+  assert.match(gameboySource, /html \.list-selection-indicator[\s\S]*?height: 1px[\s\S]*?background: var\(--selection-indicator-color, #333\)[\s\S]*?box-shadow: none/);
   assert.match(stylesSource, /button:is\(\.tree-node, \.database-game-row, \.database-console-row\)\.is-selected[\s\S]*?background: transparent/);
   assert.match(stylesSource, /\.tree-node[\s\S]*?transition: color var\(--selection-animation-duration\)/);
   assert.match(stylesSource, /\.playlist-table td[\s\S]*?transition: width[\s\S]*?color var\(--selection-animation-duration\)/);

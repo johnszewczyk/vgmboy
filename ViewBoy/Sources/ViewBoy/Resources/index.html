@@ -5,8 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ViewBoy</title>
     <link rel="stylesheet" href="./styles.css" />
-    <link rel="stylesheet" href="./viewboy-nightglass.css" />
-    <link rel="stylesheet" href="./viewboy-lightmode.css" />
+    <link rel="stylesheet" href="./viewboy-gameboy.css" />
   </head>
   <body>
     <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -121,7 +120,7 @@
             <div class="options-nav-group" aria-labelledby="options-native-heading">
                 <div id="options-native-heading" class="options-nav-group-title">ViewBoy</div>
               <button id="options-database-tab" data-app-option-section="database" class="options-nav-item is-selected" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-database"></use></svg><span>Database</span></button>
-              <button id="options-theme-tab" data-app-option-section="interface" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"></use></svg><span>Interface</span></button>
+              <button id="options-interface-tab" data-app-option-section="interface" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"></use></svg><span>Interface</span></button>
               <button id="options-windows-tab" data-app-option-section="windows" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sidebar-views"></use></svg><span>Windows</span></button>
             </div>
             <div class="options-nav-group" aria-labelledby="options-extension-heading">
@@ -134,18 +133,17 @@
           </nav>
 
           <div class="options-content">
-            <div id="options-theme-section" class="options-page options-theme-page is-hidden">
-              <div class="options-page-title">ViewBoy / Interface</div>
+            <div id="options-interface-section" class="options-page options-interface-page is-hidden">
+              <div class="options-page-title">ViewBoy / Game Boy Core</div>
               <div class="options-subpanel">
-                <div class="options-subpanel-title">Application</div>
-                <label class="options-field"><span>Theme</span><span class="options-inline-trailing"><select id="ui-theme-select" class="options-input" aria-label="ViewBoy theme"><option value="nightglass">Nightglass</option><option value="lightmode">LightMode</option></select></span></label>
-                <label class="options-field"><span>Accent Color</span><span class="options-inline-trailing"><input id="accent-color-input" class="options-input options-color-text-input" type="text" value="#b6d9ca" placeholder="#b6d9ca, rgb(...), oklch(...)" aria-label="Accent color CSS value" /></span></label>
+                <div class="options-subpanel-title">Shell</div>
+                <label class="options-field"><span>Accent Color</span><span class="options-inline-trailing"><input id="accent-color-input" class="options-input options-color-text-input" type="text" value="#812d46" placeholder="#812d46, rgb(...), oklch(...)" aria-label="Accent color CSS value" /></span></label>
               </div>
               <div class="options-subpanel">
-                <div class="options-subpanel-title">Interface Style</div>
+                <div class="options-subpanel-title">Display</div>
                 <div class="options-help-text">One type scale applies across the player, library, playlist, and Settings.</div>
                 <label class="options-field options-font-size-field"><span>Interface Scale</span><span class="font-scale-control"><input id="sidebar-font-size-input" class="ui-font-scale" type="range" min="8" max="18" step="1" value="11" aria-label="ViewBoy interface font size in points" /><output id="ui-font-size-readout">11 PT</output></span></label>
-                <label class="options-field"><span>Font Color</span><span class="options-inline-trailing"><input id="sidebar-text-color-input" class="options-input options-color-text-input" type="text" value="#d7e1dc" placeholder="#d7e1dc, rgb(...), red" aria-label="Sidebar font color CSS value" /></span></label>
+                <label class="options-field"><span>Font Color</span><span class="options-inline-trailing"><input id="sidebar-text-color-input" class="options-input options-color-text-input" type="text" value="#333" placeholder="#333, rgb(...), red" aria-label="Sidebar font color CSS value" /></span></label>
                 <div class="font-family-readout"><span>TYPEFACE / GLOBAL</span><strong>VIEWBOY DOTO</strong><small>ONE PIXEL FACE · ALL SURFACES</small></div>
               </div>
               <div class="options-subpanel">

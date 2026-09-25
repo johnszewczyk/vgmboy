@@ -1083,7 +1083,7 @@ body.is-file-drag-over::after {
   background: transparent;
 }
 
-.options-theme-page {
+.options-interface-page {
   gap: 1rem;
   padding: 0;
   background: transparent;
@@ -2014,7 +2014,7 @@ html, body {
 .options-nav-item { gap: 0.35rem; padding: 0.36rem; border: 1px solid transparent; border-radius: 0; background: transparent; color: #b4d3df; font-weight: 500; }
 .options-nav-item.is-selected { border-color: #7ac8d4; background: #367c98; color: #f1ffff; }
 .options-content { border: 1px solid #39576d; border-radius: 0; background: #0a1928; }
-.options-page, .options-page-playback, .options-theme-page, .options-database-page, .options-diagnostics-page, .options-page-audio, .options-windows-page, .options-routing-page { gap: 0.42rem; padding: 0.55rem; border-radius: 0; background: #0a1928; }
+.options-page, .options-page-playback, .options-interface-page, .options-database-page, .options-diagnostics-page, .options-page-audio, .options-windows-page, .options-routing-page { gap: 0.42rem; padding: 0.55rem; border-radius: 0; background: #0a1928; }
 .options-page-title { color: #c9f3ed; font: 500 0.87rem/1.2 var(--mono-font-family); letter-spacing: 0.08em; }
 .options-subpanel { gap: 0.48rem; padding: 0.6rem; border: 1px solid #3d5e70; border-radius: 0; background: #12293b; }
 .options-subpanel-title { color: #a7e0df; font-weight: 500; letter-spacing: 0.06em; }
