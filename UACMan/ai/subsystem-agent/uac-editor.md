@@ -45,7 +45,9 @@
   `rowWithUnfolds`; a child can contain further unfold rows at any depth. Keep
   multiple unfolds on one row in declared hierarchical order, open ancestors
   when a deeper fold is activated, and clear descendant fold state when a
-  parent closes.
+  parent closes. Inserted unfold rows span one full-width grid track. Table
+  column rules must target direct headers and data rows while excluding
+  `.inserted-table-row`, or nested levels inherit the data columns and drift.
 - Rewrites use the original payload offset and length and copy those compressed
   bytes directly. Never materialize the TAR/audio members to edit metadata.
 - A rewrite writes to a new sibling file and is reopened/validated before the

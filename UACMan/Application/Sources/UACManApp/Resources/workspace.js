@@ -99,6 +99,7 @@
   );
   class CanonicalTable {
     static openFoldIDs = new Set();
+    static pendingFoldAnimations = new Set();
 
     constructor(options = {}) {
       this.options = options;
@@ -120,7 +121,10 @@
 
     static unfoldedRowMarkup(foldID, content = "", nestedRows = "") {
       const renderedContent = content instanceof CanonicalTable ? content.render() : String(content || "");
-      const classes = this.isFoldOpen(foldID) ? "inserted-table-row open" : "inserted-table-row";
+      const open = this.isFoldOpen(foldID);
+      const animateOpening = open && renderedContent.trim() && this.pendingFoldAnimations.has(foldID);
+      if (animateOpening) this.pendingFoldAnimations.delete(foldID);
+      const classes = ["inserted-table-row", open ? "open" : "", animateOpening ? "canonical-fold-opening" : ""].filter(Boolean).join(" ");
       return canonicalRowMarkup([
         canonicalCellMarkup(`<div class="inserted-table-panel"><div class="canonical-unfold-content">${renderedContent}</div>${nestedRows}</div>`, { className:"inserted-table-cell" })
       ], { className:classes, attributes:`data-canonical-subrow="${esc(foldID)}"` });
@@ -144,7 +148,11 @@
     static fillUnfold(foldID, content) {
       const contentHost = this.subrow(foldID)?.querySelector(":scope > .inserted-table-cell > .inserted-table-panel > .canonical-unfold-content");
       if (!contentHost) return false;
+      this.pendingFoldAnimations.delete(foldID);
       contentHost.innerHTML = content instanceof CanonicalTable ? content.render() : String(content || "");
+      contentHost.classList.remove("canonical-unfold-content-enter");
+      void contentHost.offsetWidth;
+      contentHost.classList.add("canonical-unfold-content-enter");
       return true;
     }
 
@@ -162,16 +170,23 @@
         let ancestorRow = subrow.parentElement?.closest("[data-canonical-subrow]");
         while (ancestorRow) {
           const ancestorToggle = this.toggleFor(ancestorRow.dataset.canonicalSubrow || "");
-          if (ancestorToggle) this.setFoldOpen(ancestorToggle, true);
+          if (ancestorToggle && !this.isFoldOpen(ancestorRow.dataset.canonicalSubrow || "")) this.setFoldOpen(ancestorToggle, true);
           ancestorRow = ancestorRow.parentElement?.closest("[data-canonical-subrow]");
         }
       }
-      if (open) this.openFoldIDs.add(foldID);
+      if (open) {
+        if (!this.openFoldIDs.has(foldID)) this.pendingFoldAnimations.add(foldID);
+        this.openFoldIDs.add(foldID);
+      }
       else {
         this.openFoldIDs.delete(foldID);
+        this.pendingFoldAnimations.delete(foldID);
         this.closeDescendants(foldID);
       }
-      if (subrow) subrow.classList.toggle("open", open);
+      if (subrow) {
+        if (!open) subrow.classList.remove("canonical-fold-opening");
+        subrow.classList.toggle("open", open);
+      }
       toggle.setAttribute("aria-expanded", String(open));
       const icon = $(".canonical-fold-icon", toggle);
       if (icon) icon.textContent = open ? "−" : "＋";
@@ -183,11 +198,14 @@
       for (const openID of [...this.openFoldIDs]) {
         if (openID.startsWith(prefix)) this.openFoldIDs.delete(openID);
       }
+      for (const pendingID of [...this.pendingFoldAnimations]) {
+        if (pendingID.startsWith(prefix)) this.pendingFoldAnimations.delete(pendingID);
+      }
       const parentRow = this.subrow(foldID);
       parentRow?.querySelectorAll("[data-canonical-subrow]").forEach(childRow => {
         const childFoldID = childRow.dataset.canonicalSubrow || "";
         this.openFoldIDs.delete(childFoldID);
-        childRow.classList.remove("open");
+        childRow.classList.remove("open", "canonical-fold-opening");
         const toggle = this.toggleFor(childFoldID);
         if (!toggle) return;
         toggle.setAttribute("aria-expanded", "false");
@@ -203,17 +221,26 @@
         .map(openID => [openID, newID + openID.slice(oldID.length)]);
       replacements.forEach(([oldFoldID]) => this.openFoldIDs.delete(oldFoldID));
       replacements.forEach(([, newFoldID]) => this.openFoldIDs.add(newFoldID));
+      const pendingReplacements = [...this.pendingFoldAnimations]
+        .filter(foldID => foldID === oldID || foldID.startsWith(oldID + "/"))
+        .map(foldID => [foldID, newID + foldID.slice(oldID.length)]);
+      pendingReplacements.forEach(([oldFoldID]) => this.pendingFoldAnimations.delete(oldFoldID));
+      pendingReplacements.forEach(([, newFoldID]) => this.pendingFoldAnimations.add(newFoldID));
     }
 
     static clearFoldPrefix(prefix) {
       for (const openID of [...this.openFoldIDs]) {
         if (openID.startsWith(prefix)) this.openFoldIDs.delete(openID);
       }
+      for (const pendingID of [...this.pendingFoldAnimations]) {
+        if (pendingID.startsWith(prefix)) this.pendingFoldAnimations.delete(pendingID);
+      }
       document.querySelectorAll("[data-fold-id]").forEach(toggle => {
         const foldID = toggle.dataset.foldId || "";
         if (!foldID.startsWith(prefix)) return;
         this.openFoldIDs.delete(foldID);
-        this.subrow(foldID)?.classList.remove("open");
+        this.subrow(foldID)?.classList.remove("open", "canonical-fold-opening");
+        this.subrow(foldID)?.querySelectorAll(".canonical-unfold-content-enter").forEach(content => content.classList.remove("canonical-unfold-content-enter"));
         toggle.setAttribute("aria-expanded", "false");
         const icon = $(".canonical-fold-icon", toggle);
         if (icon) icon.textContent = "＋";
@@ -883,7 +910,7 @@
       canonicalHeaderMarkup(["#", "Track", "Tag Name", "Tag Value", "✓", "×"]);
     const rows = matches.map((match, index) => tagAnalyzerFieldRowMarkup(tagName, match, index)).join("") ||
       '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No matching tag fields</span></div>';
-    return canonicalTableMarkup({
+    return new CanonicalTable({
       className:"inserted-table-grid canonical-multiple-values-grid tag-analyzer-field-grid",
       ariaLabel:"Tag values in " + archiveRelativePath,
       header,
@@ -930,7 +957,7 @@
       return CanonicalTable.rowWithUnfolds(packRow, [{ foldID:packFoldID, content:fieldTable }]);
     }).join("") ||
       '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No matched packs</span></div>';
-    return canonicalTableMarkup({
+    return new CanonicalTable({
       className:"inserted-table-grid canonical-multiple-values-grid tag-analyzer-pack-grid",
       ariaLabel:"Matched packs for " + tagName,
       header,
@@ -1449,6 +1476,11 @@
     tagAnalyzerMatchesByName.delete(tagName);
     bridge("deleteTagAnalyzerTrackFields", { tagName, archiveRelativePaths });
   }
+
+  document.addEventListener("animationend", event => {
+    if (event.animationName === "canonical-fold-open") event.target.classList?.remove("canonical-fold-opening");
+    if (event.animationName === "canonical-fold-content-enter") event.target.classList?.remove("canonical-unfold-content-enter");
+  });
 
   document.addEventListener("click", event => {
     if (!event.target.closest(".track-context-menu")) closeTrackContextMenu();

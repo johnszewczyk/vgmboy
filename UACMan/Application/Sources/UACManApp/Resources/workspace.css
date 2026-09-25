@@ -429,15 +429,25 @@ button { cursor:pointer; }
 .file-field-grid .multiple-values-popup-trigger { width:100%; min-width:0; }
 
 /* Non-giga structured values use a full-width inserted canonical subtable. */
-.inserted-table-row { display:grid; grid-template-columns:1fr; grid-template-rows:0fr; width:100%; min-width:0; min-height:0; max-height:0; margin:0; overflow:hidden; opacity:0; transition:grid-template-rows var(--ui-motion),opacity var(--ui-motion); }
+.inserted-table-row { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:0fr; width:100%; min-width:0; min-height:0; max-height:0; margin:0; overflow:hidden; opacity:0; transition:grid-template-rows var(--ui-motion),opacity var(--ui-motion); }
 .inserted-table-row.open { grid-template-rows:1fr; max-height:none; opacity:1; }
+.canonical-table > .inserted-table-row { grid-template-columns:minmax(0,1fr)!important; }
 .inserted-table-cell { grid-column:1 / -1; width:100%; min-width:0; min-height:0; overflow:visible; padding:0; align-items:stretch; }
 .inserted-table-panel { width:100%; min-width:0; min-height:0; overflow:visible; border:0; border-radius:0; background:transparent; }
 .inserted-table-grid { --field-grid-columns:var(--canonical-number-column) minmax(110px,.7fr) minmax(180px,1.3fr) 28px 28px; width:100%; max-width:100%; min-width:0; padding:0; }
-.inserted-table-grid .field-grid-row { grid-template-columns:var(--field-grid-columns); width:100%; min-width:0; }
-.inserted-table-grid .field-grid-cell { min-width:0; }
-.inserted-table-grid .field-grid-header .field-grid-cell { justify-content:center; }
+.inserted-table-grid > .field-grid-header,
+.inserted-table-grid > .field-grid-row:not(.inserted-table-row) { grid-template-columns:var(--field-grid-columns); width:100%; min-width:0; }
+.inserted-table-grid > .field-grid-row:not(.inserted-table-row) .field-grid-cell { min-width:0; }
+.inserted-table-grid > .field-grid-header .field-grid-cell { justify-content:center; }
 .multiple-value-number { text-align:center; }
+
+@keyframes canonical-fold-open { from { grid-template-rows:0fr; opacity:0; } to { grid-template-rows:1fr; opacity:1; } }
+@keyframes canonical-fold-content-enter { from { opacity:0; transform:translateY(-3px); } to { opacity:1; transform:translateY(0); } }
+.inserted-table-row.canonical-fold-opening { animation:canonical-fold-open var(--ui-motion) both; }
+.canonical-unfold-content-enter { animation:canonical-fold-content-enter var(--ui-motion) both; }
+@media(prefers-reduced-motion:reduce) {
+  .inserted-table-row.canonical-fold-opening,.canonical-unfold-content-enter { animation-duration:1ms; }
+}
 
 /* Popup JSON editing uses the same canonical rows and cells, but remains a
    fixed modal surface so editing it never reflows the source table. */
