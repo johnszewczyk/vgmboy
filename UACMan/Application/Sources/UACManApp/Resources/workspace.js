@@ -89,8 +89,12 @@
     const heading = `<input class="tag-table-field field-grid-heading-input" value="${esc(label)}" aria-label="${esc(label)}" disabled>`;
     return canonicalCellMarkup(heading, { ...options, className:["field-grid-heading", options.className].filter(Boolean).join(" "), role:"columnheader" });
   };
-  const canonicalTitleRowMarkup = (title, className = "") => {
-    const titleCell = canonicalCellMarkup(`<input class="tag-table-field field-grid-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled>`, { className:"field-grid-heading", role:"columnheader" });
+  const canonicalTitleRowMarkup = (title, className = "", actionMarkup = "") => {
+    const heading = `<input class="tag-table-field field-grid-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled>`;
+    const content = actionMarkup
+      ? `<div class="canonical-table-title-content">${heading}<span class="canonical-table-title-action">${actionMarkup}</span></div>`
+      : heading;
+    const titleCell = canonicalCellMarkup(content, { className:"field-grid-heading canonical-table-title-cell", role:"columnheader" });
     return canonicalRowMarkup([titleCell], { className:["field-grid-header", "canonical-table-title-row", className].filter(Boolean).join(" ") });
   };
   const canonicalHeaderMarkup = (labels, options = {}) => canonicalRowMarkup(
@@ -100,6 +104,7 @@
   class CanonicalTable {
     static openFoldIDs = new Set();
     static pendingFoldAnimations = new Set();
+    static foldAnimations = new Map();
 
     constructor(options = {}) {
       this.options = options;
@@ -110,9 +115,14 @@
       const classes = ["field-grid", "canonical-table", options.className].filter(Boolean).join(" ");
       const attributes = options.attributes ? ` ${options.attributes}` : "";
       const ariaLabel = options.ariaLabel ? ` aria-label="${esc(options.ariaLabel)}"` : "";
-      const style = options.style ? ` style="${esc(options.style)}"` : "";
+      const styleProperties = [options.columns ? `--field-grid-columns:${options.columns}` : "", options.style || ""].filter(Boolean).join(";");
+      const style = styleProperties ? ` style="${esc(styleProperties)}"` : "";
       const rows = options.rows || options.empty || "";
-      return `<div class="${classes}" role="table"${ariaLabel}${attributes}${style}>${options.header || ""}${rows}</div>${options.trailing || ""}`;
+      const title = options.title === undefined || options.title === null || options.title === ""
+        ? ""
+        : canonicalTitleRowMarkup(options.title, options.titleClassName || "", options.titleAction || "");
+      const table = `<div class="${classes}" role="table"${ariaLabel}${attributes}${style}>${title}${options.header || ""}${rows}</div>`;
+      return `${options.nestedSurface ? `<div class="canonical-table-surface canonical-table-nested-surface">${table}</div>` : table}${options.trailing || ""}`;
     }
 
     static isFoldOpen(foldID) {
@@ -122,11 +132,12 @@
     static unfoldedRowMarkup(foldID, content = "", nestedRows = "") {
       const renderedContent = content instanceof CanonicalTable ? content.render() : String(content || "");
       const open = this.isFoldOpen(foldID);
-      const animateOpening = open && renderedContent.trim() && this.pendingFoldAnimations.has(foldID);
-      if (animateOpening) this.pendingFoldAnimations.delete(foldID);
-      const classes = ["inserted-table-row", open ? "open" : "", animateOpening ? "canonical-fold-opening" : ""].filter(Boolean).join(" ");
+      const classes = ["inserted-table-row", open ? "open" : ""].filter(Boolean).join(" ");
+      const surface = renderedContent.trim()
+        ? `<div class="canonical-table-surface canonical-table-nested-surface">${renderedContent}</div>`
+        : "";
       return canonicalRowMarkup([
-        canonicalCellMarkup(`<div class="inserted-table-panel"><div class="canonical-unfold-content">${renderedContent}</div>${nestedRows}</div>`, { className:"inserted-table-cell" })
+        canonicalCellMarkup(`<div class="inserted-table-panel"><div class="canonical-unfold-content">${surface}</div>${nestedRows}</div>`, { className:"inserted-table-cell" })
       ], { className:classes, attributes:`data-canonical-subrow="${esc(foldID)}"` });
     }
 
@@ -146,14 +157,112 @@
     }
 
     static fillUnfold(foldID, content) {
-      const contentHost = this.subrow(foldID)?.querySelector(":scope > .inserted-table-cell > .inserted-table-panel > .canonical-unfold-content");
+      const subrow = this.subrow(foldID);
+      const contentHost = subrow?.querySelector(":scope > .inserted-table-cell > .inserted-table-panel > .canonical-unfold-content");
       if (!contentHost) return false;
-      this.pendingFoldAnimations.delete(foldID);
+      const hadContent = Boolean(contentHost.firstElementChild || contentHost.textContent.trim());
+      if (this.isFoldOpen(foldID) && !hadContent) {
+        subrow.style.height = "0px";
+        subrow.style.overflow = "hidden";
+      }
       contentHost.innerHTML = content instanceof CanonicalTable ? content.render() : String(content || "");
-      contentHost.classList.remove("canonical-unfold-content-enter");
-      void contentHost.offsetWidth;
-      contentHost.classList.add("canonical-unfold-content-enter");
+      if (this.isFoldOpen(foldID) && !hadContent) this.animateSubrow(subrow, true);
       return true;
+    }
+
+    static animateSubrow(subrow, open) {
+      if (!subrow) return;
+      const currentHeight = Math.ceil(subrow.getBoundingClientRect().height);
+      const foldID = subrow.dataset.canonicalSubrow || "";
+      const previous = this.foldAnimations.get(subrow);
+      if (previous) previous.cancel();
+      this.foldAnimations.delete(subrow);
+      if (open) this.pendingFoldAnimations.delete(foldID);
+      const panel = subrow.querySelector(":scope > .inserted-table-cell > .inserted-table-panel");
+      if (!panel) return;
+      const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || false;
+      const duration = reduceMotion ? 1 : 250;
+      subrow.style.overflow = "hidden";
+      if (open) {
+        subrow.classList.add("open");
+        const startHeight = previous ? currentHeight : 0;
+        subrow.style.height = `${startHeight}px`;
+        void subrow.offsetHeight;
+        const targetHeight = Math.ceil(panel.scrollHeight);
+        if (!targetHeight) {
+          subrow.style.removeProperty("height");
+          subrow.style.removeProperty("overflow");
+          return;
+        }
+        const keyframes = [
+          { height:`${startHeight}px`, opacity:startHeight > 0 ? 1 : 0 },
+          { height:`${targetHeight}px`, opacity:1 }
+        ];
+        if (typeof subrow.animate !== "function") {
+          subrow.style.transition = `height ${duration}ms cubic-bezier(.22,1,.36,1), opacity ${duration}ms cubic-bezier(.22,1,.36,1)`;
+          requestAnimationFrame(() => { subrow.style.height = `${targetHeight}px`; subrow.style.opacity = "1"; });
+          window.setTimeout(() => {
+            subrow.style.removeProperty("height");
+            subrow.style.removeProperty("overflow");
+            subrow.style.removeProperty("transition");
+            subrow.style.removeProperty("opacity");
+          }, duration);
+          return;
+        }
+        const animation = subrow.animate(keyframes, { duration, easing:"cubic-bezier(.22,1,.36,1)" });
+        this.foldAnimations.set(subrow, animation);
+        animation.onfinish = () => {
+          if (this.foldAnimations.get(subrow) !== animation) return;
+          this.foldAnimations.delete(subrow);
+          subrow.style.removeProperty("height");
+          subrow.style.removeProperty("overflow");
+        };
+      } else {
+        if (!currentHeight) {
+          subrow.classList.remove("open");
+          subrow.style.removeProperty("height");
+          subrow.style.removeProperty("overflow");
+          return;
+        }
+        const keyframes = [{ height:`${currentHeight}px`, opacity:1 }, { height:"0px", opacity:0 }];
+        if (typeof subrow.animate !== "function") {
+          subrow.style.height = `${currentHeight}px`;
+          void subrow.offsetHeight;
+          subrow.style.transition = `height ${duration}ms cubic-bezier(.22,1,.36,1), opacity ${duration}ms cubic-bezier(.22,1,.36,1)`;
+          requestAnimationFrame(() => { subrow.style.height = "0px"; subrow.style.opacity = "0"; });
+          window.setTimeout(() => {
+            subrow.classList.remove("open");
+            subrow.style.removeProperty("height");
+            subrow.style.removeProperty("overflow");
+            subrow.style.removeProperty("transition");
+            subrow.style.removeProperty("opacity");
+          }, duration);
+          return;
+        }
+        subrow.style.height = `${currentHeight}px`;
+        const animation = subrow.animate(keyframes, { duration, easing:"cubic-bezier(.22,1,.36,1)" });
+        this.foldAnimations.set(subrow, animation);
+        animation.onfinish = () => {
+          if (this.foldAnimations.get(subrow) !== animation) return;
+          this.foldAnimations.delete(subrow);
+          subrow.classList.remove("open");
+          subrow.style.removeProperty("height");
+          subrow.style.removeProperty("overflow");
+        };
+      }
+    }
+
+    static playPendingFoldAnimations() {
+      for (const foldID of [...this.pendingFoldAnimations]) {
+        if (!this.isFoldOpen(foldID)) {
+          this.pendingFoldAnimations.delete(foldID);
+          continue;
+        }
+        const subrow = this.subrow(foldID);
+        const contentHost = subrow?.querySelector(":scope > .inserted-table-cell > .inserted-table-panel > .canonical-unfold-content");
+        if (!contentHost || !(contentHost.firstElementChild || contentHost.textContent.trim())) continue;
+        this.animateSubrow(subrow, true);
+      }
     }
 
     static toggleFor(foldID) {
@@ -184,8 +293,13 @@
         this.closeDescendants(foldID);
       }
       if (subrow) {
-        if (!open) subrow.classList.remove("canonical-fold-opening");
-        subrow.classList.toggle("open", open);
+        const contentHost = subrow.querySelector(":scope > .inserted-table-cell > .inserted-table-panel > .canonical-unfold-content");
+        const hasContent = Boolean(contentHost?.firstElementChild || contentHost?.textContent.trim());
+        if (open && !hasContent) {
+          subrow.classList.add("open");
+          subrow.style.height = "0px";
+          subrow.style.overflow = "hidden";
+        } else this.animateSubrow(subrow, open);
       }
       toggle.setAttribute("aria-expanded", String(open));
       const icon = $(".canonical-fold-icon", toggle);
@@ -198,14 +312,16 @@
       for (const openID of [...this.openFoldIDs]) {
         if (openID.startsWith(prefix)) this.openFoldIDs.delete(openID);
       }
-      for (const pendingID of [...this.pendingFoldAnimations]) {
-        if (pendingID.startsWith(prefix)) this.pendingFoldAnimations.delete(pendingID);
-      }
       const parentRow = this.subrow(foldID);
       parentRow?.querySelectorAll("[data-canonical-subrow]").forEach(childRow => {
         const childFoldID = childRow.dataset.canonicalSubrow || "";
         this.openFoldIDs.delete(childFoldID);
-        childRow.classList.remove("open", "canonical-fold-opening");
+        this.pendingFoldAnimations.delete(childFoldID);
+        this.foldAnimations.get(childRow)?.cancel();
+        this.foldAnimations.delete(childRow);
+        childRow.classList.remove("open");
+        childRow.style.removeProperty("height");
+        childRow.style.removeProperty("overflow");
         const toggle = this.toggleFor(childFoldID);
         if (!toggle) return;
         toggle.setAttribute("aria-expanded", "false");
@@ -232,15 +348,19 @@
       for (const openID of [...this.openFoldIDs]) {
         if (openID.startsWith(prefix)) this.openFoldIDs.delete(openID);
       }
-      for (const pendingID of [...this.pendingFoldAnimations]) {
-        if (pendingID.startsWith(prefix)) this.pendingFoldAnimations.delete(pendingID);
+      for (const foldID of [...this.pendingFoldAnimations]) {
+        if (foldID.startsWith(prefix)) this.pendingFoldAnimations.delete(foldID);
       }
       document.querySelectorAll("[data-fold-id]").forEach(toggle => {
         const foldID = toggle.dataset.foldId || "";
         if (!foldID.startsWith(prefix)) return;
         this.openFoldIDs.delete(foldID);
-        this.subrow(foldID)?.classList.remove("open", "canonical-fold-opening");
-        this.subrow(foldID)?.querySelectorAll(".canonical-unfold-content-enter").forEach(content => content.classList.remove("canonical-unfold-content-enter"));
+        const subrow = this.subrow(foldID);
+        this.foldAnimations.get(subrow)?.cancel();
+        this.foldAnimations.delete(subrow);
+        subrow?.classList.remove("open");
+        subrow?.style.removeProperty("height");
+        subrow?.style.removeProperty("overflow");
         toggle.setAttribute("aria-expanded", "false");
         const icon = $(".canonical-fold-icon", toggle);
         if (icon) icon.textContent = "＋";
@@ -249,6 +369,19 @@
   }
 
   const canonicalTableMarkup = options => new CanonicalTable(options).render();
+  const CanonicalTableColumns = Object.freeze({
+    metadataTags:"var(--canonical-number-column) 9rem minmax(12rem,1fr) minmax(14rem,1.2fr) 4.5rem var(--canonical-action-column) var(--canonical-action-column)",
+    trackTags:"var(--canonical-number-column) 110px minmax(160px,1fr) minmax(220px,1.5fr) var(--canonical-action-column) var(--canonical-action-column)",
+    trackBrowser:"var(--canonical-number-column) minmax(0,1fr) 56px",
+    newTagSidebar:"var(--canonical-number-column) 36px minmax(0,1fr)",
+    newTagEditor:"var(--canonical-number-column) 10rem minmax(12rem,.8fr) minmax(14rem,1.2fr) var(--canonical-action-column)",
+    tagAnalyzer:"var(--canonical-number-column) minmax(0,4fr) minmax(0,1fr) minmax(0,1fr) var(--canonical-action-column)",
+    tagAnalyzerPacks:"var(--canonical-number-column) minmax(0,1fr) 58px 82px",
+    tagAnalyzerFields:"var(--canonical-number-column) minmax(100px,.9fr) minmax(110px,1fr) minmax(180px,1.5fr) var(--canonical-action-column) var(--canonical-action-column)",
+    files:"var(--canonical-number-column) 105px 90px 220px minmax(300px,1fr) 90px 90px var(--canonical-action-column)",
+    attachments:"var(--canonical-number-column) 110px 100px 220px minmax(320px,1fr) 90px var(--canonical-action-column)",
+    multipleValues:"var(--canonical-number-column) minmax(110px,.7fr) minmax(180px,1.3fr) var(--canonical-action-column) var(--canonical-action-column)"
+  });
   const canonicalFoldToggleMarkup = (foldID, label, options = {}) => {
     const expanded = CanonicalTable.isFoldOpen(foldID);
     const attributes = options.attributes ? ` ${options.attributes}` : "";
@@ -277,17 +410,8 @@
     return `<details class="nested-json-dropdown"><summary class="nested-json-trigger"><span>[Nested Tags]</span><span class="canonical-fold-icon">＋</span></summary><div class="nested-json-panel">${body}</div></details>`;
   };
   const multipleValuesCloseMarkup = context => context.foldID
-    ? `<button class="tag-table-field field-grid-heading-input multiple-values-header-action multiple-values-subtable-close" data-action="closeCanonicalSubtable" data-fold-id="${esc(context.foldID)}" ${context.closeAttributes || ""} type="button" title="Close nested tags table" aria-label="Close nested tags table">×</button>`
-    : `<button class="tag-table-field field-grid-heading-input multiple-values-header-action multiple-values-popup-close" data-action="closeMultipleValuesPopup" data-popup-id="${esc(context.popupID || "")}" type="button" title="Close" aria-label="Close">×</button>`;
-  const multipleValuesTableTitleRowMarkup = context => {
-    const title = context.title || context.key || "Values";
-    if (!context.titleClose) return canonicalTitleRowMarkup(title, "multiple-values-table-title-row");
-    const heading = `<input class="tag-table-field field-grid-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled>`;
-    const titleControl = `<div class="multiple-values-table-title-control">${heading}${multipleValuesCloseMarkup(context)}</div>`;
-    return canonicalRowMarkup([
-      canonicalCellMarkup(titleControl, { className:"field-grid-heading", role:"columnheader" })
-    ], { className:"field-grid-header canonical-table-title-row multiple-values-table-title-row" });
-  };
+    ? `<button class="icon-button canonical-table-title-close multiple-values-subtable-close" data-action="closeCanonicalSubtable" data-fold-id="${esc(context.foldID)}" ${context.closeAttributes || ""} type="button" title="Close nested tags table" aria-label="Close nested tags table">×</button>`
+    : `<button class="icon-button canonical-table-title-close multiple-values-popup-close" data-action="closeMultipleValuesPopup" data-popup-id="${esc(context.popupID || "")}" type="button" title="Close" aria-label="Close">×</button>`;
   const multipleValuesTableHeaderRowMarkup = (context, editable) => {
     const submitMarkup = editable
       ? '<button class="tag-table-field field-grid-heading-input multiple-values-header-action" data-action="commitMultipleValues" type="button" title="Submit all changed values" aria-label="Submit all changed values">✓</button>'
@@ -300,12 +424,12 @@
       canonicalCellMarkup(multipleValuesCloseMarkup(context), { className:"field-grid-heading field-grid-action-cell", role:"columnheader" })
     ], { className:"field-grid-header multiple-values-table-header-row" });
   };
-  const multipleValuesTableChromeMarkup = (context, editable) => `${multipleValuesTableTitleRowMarkup(context)}${multipleValuesTableHeaderRowMarkup(context, editable)}`;
+  const multipleValuesTableChromeMarkup = (context, editable) => multipleValuesTableHeaderRowMarkup(context, editable);
   const multipleValuesEditorBodyMarkup = (value, context = {}) => {
     const isArray = Array.isArray(value);
     const popupLayout = context.layout === "popup";
     const subtableLayout = context.layout === "subtable";
-    const gridClass = context.layout === "subtable" ? "inserted-table-grid" : "canonical-popup-field-grid";
+    const gridClass = popupLayout ? "canonical-popup-field-grid" : "canonical-multiple-values-grid";
     const entries = isArray ? value.map((item, index) => [String(index), item]) : Object.entries(value || {});
     const rowMarkup = ([key, item], index) => {
       const kind = fieldKind(item);
@@ -336,9 +460,16 @@
       `data-multiple-scope="${esc(context.scope || "")}"`,
       `data-multiple-key="${esc(context.key || "")}"`
     ].join(" ");
-    const rowsMarkup = popupLayout
-      ? `<div class="multiple-values-rows">${rows || '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'}</div>`
-      : `<div class="field-grid ${gridClass} canonical-multiple-values-grid" role="table">${multipleValuesTableChromeMarkup(context, true)}<div class="multiple-values-rows">${rows || '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'}</div></div>`;
+    const table = canonicalTableMarkup({
+      className:gridClass,
+      columns:CanonicalTableColumns.multipleValues,
+      title:context.title || context.key || "Values",
+      titleAction:context.layout === "popup" || context.layout === "subtable" ? multipleValuesCloseMarkup(context) : "",
+      ariaLabel:context.title || context.key || "Tag values",
+      header:multipleValuesTableChromeMarkup(context, true),
+      rows:`<div class="multiple-values-rows">${rows || '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'}</div>`
+    });
+    const rowsMarkup = table;
     const body = `<div class="multiple-values-editor canonical-multiple-values-editor${popupLayout ? " canonical-popup-editor" : ""}" ${data}>${rowsMarkup}<div class="multiple-values-editor-error" role="status"></div></div>`;
     return { body, count:entries.length };
   };
@@ -347,7 +478,7 @@
     const popupLayout = context.layout === "popup";
     const subtableLayout = context.layout === "subtable";
     const tableLayout = popupLayout || subtableLayout;
-    const gridClass = subtableLayout ? "inserted-table-grid" : "canonical-popup-field-grid";
+    const gridClass = popupLayout ? "canonical-popup-field-grid" : "canonical-multiple-values-grid";
     const rows = entries.length
       ? entries.map(([key, item], index) => {
         const cells = [
@@ -359,8 +490,15 @@
         return canonicalRowMarkup(cells, { className:"multiple-value-readonly-row" });
       }).join("")
       : '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>';
-    if (popupLayout) return `<div class="multiple-values-rows">${rows}</div>`;
-    return `<div class="field-grid ${gridClass} canonical-multiple-values-grid" role="table">${multipleValuesTableChromeMarkup(context, false)}<div class="multiple-values-rows">${rows}</div></div>`;
+    return canonicalTableMarkup({
+      className:gridClass,
+      columns:CanonicalTableColumns.multipleValues,
+      title:context.title || context.key || "Values",
+      titleAction:context.layout === "popup" || context.layout === "subtable" ? multipleValuesCloseMarkup(context) : "",
+      ariaLabel:context.title || context.key || "Tag values",
+      header:multipleValuesTableChromeMarkup(context, false),
+      rows:`<div class="multiple-values-rows">${rows}</div>`
+    });
   };
   const multipleValuesSubtableMarkup = (value, context = {}, options = {}) => {
     const entries = options.entries || (Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value || {}));
@@ -374,11 +512,12 @@
     const title = context.title || context.key || "Values";
     const editable = options.editable !== false;
     const entries = options.entries || (Array.isArray(value) ? value.map((item, index) => [String(index + 1), item]) : Object.entries(value || {}));
+    const popupContext = { ...context, layout:"popup", popupID, title };
     const body = editable
-      ? multipleValuesEditorBodyMarkup(value, { ...context, layout:"popup", popupID }).body
-      : multipleValuesReadOnlyTableMarkup(entries, { ...context, layout:"popup" });
+      ? multipleValuesEditorBodyMarkup(value, popupContext).body
+      : multipleValuesReadOnlyTableMarkup(entries, popupContext);
     const trigger = `<button class="canonical-fold-toggle canonical-fold-trigger multiple-values-popup-trigger" type="button" data-action="toggleMultipleValuesPopup" data-popup-id="${esc(popupID)}" aria-controls="multiple-values-popup-${esc(popupID)}" aria-expanded="false"><span>[Nested Tags]</span><span class="canonical-fold-icon">＋</span></button>`;
-    const popup = `<div class="multiple-values-popup-backdrop" id="multiple-values-popup-${esc(popupID)}" data-multiple-values-popup="${esc(popupID)}" data-multiple-target="${esc(context.target || "member")}" data-multiple-path="${esc(context.path || "")}" data-multiple-scope="${esc(context.scope || "")}" data-multiple-key="${esc(context.key || "")}" data-multiple-editable="${editable}" hidden><div class="multiple-values-popup-card" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="multiple-values-popup-content"><div class="field-grid canonical-popup-field-grid canonical-multiple-values-grid" role="table">${multipleValuesTableChromeMarkup({ ...context, popupID, title }, editable)}${body}</div></div></div></div>`;
+    const popup = `<div class="multiple-values-popup-backdrop" id="multiple-values-popup-${esc(popupID)}" data-multiple-values-popup="${esc(popupID)}" data-multiple-target="${esc(context.target || "member")}" data-multiple-path="${esc(context.path || "")}" data-multiple-scope="${esc(context.scope || "")}" data-multiple-key="${esc(context.key || "")}" data-multiple-editable="${editable}" hidden><div class="multiple-values-popup-card" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="multiple-values-popup-content">${body}</div></div></div>`;
     return { trigger, popup };
   };
   const metadataSortValue = (member, key) => {
@@ -472,6 +611,7 @@
     renderIssues();
     renderMembers();
     renderInspector();
+    CanonicalTable.playPendingFoldAnimations();
     $("#members-view").classList.toggle("hidden", mainView !== "members");
     $("#metadata-view").classList.toggle("hidden", mainView === "members");
     $$(".main-view-tabs button").forEach(button => button.classList.toggle("active", button.dataset.view === mainView));
@@ -545,7 +685,6 @@
     if (gigaGrid) {
       const template = trackArrayColumnTemplate(members, trackColumns());
       gigaGrid.style.setProperty("--field-grid-columns", template);
-      $$(".field-grid-header, .track-array-row", gigaGrid).forEach(row => row.style.setProperty("grid-template-columns", template, "important"));
     }
   }
 
@@ -661,7 +800,7 @@
       return { rows };
     };
     const headers = ["#", "Tag Type", "Tag Name", "Tag Value", "Uses", "✓", "×"];
-    const header = `${canonicalTitleRowMarkup(title)}${canonicalHeaderMarkup(headers)}`;
+    const header = canonicalHeaderMarkup(headers);
     const packageTagDraftRow = () => canonicalRowMarkup([
         canonicalNumberCellMarkup("＋", "Add package tag", { className:"tag-create-number" }),
         canonicalCellMarkup('<input class="tag-table-field" value="string" aria-label="Tag type" disabled>', { className:"tag-type-cell" }),
@@ -673,7 +812,7 @@
       ], { className:"tag-create-row", attributes:'data-new-tag-row data-tag-scope="package"' });
     const table = rowsFor(scope);
     const rows = scope === "Package" ? `${table.rows}${packageTagDraftRow()}` : table.rows;
-    const grid = `<section class="tag-scope-table"><div class="data-table-scroll canonical-table-surface">${canonicalTableMarkup({ className:"flat-table meta-field-grid canonical-tag-grid", ariaLabel:title, header, rows, empty:table.rows ? "" : '<div class="field-grid-empty" role="row"><span role="cell">No tags</span></div>' })}</div></section>`;
+    const grid = `<section class="tag-scope-table"><div class="data-table-scroll canonical-table-surface">${canonicalTableMarkup({ className:"flat-table meta-field-grid canonical-tag-grid", columns:CanonicalTableColumns.metadataTags, title, ariaLabel:title, header, rows, empty:table.rows ? "" : '<div class="field-grid-empty" role="row"><span role="cell">No tags</span></div>' })}</div></section>`;
     return `<section class="data-page schema-page">${grid}${includeAttachments ? renderAttachments() : ""}</section>`;
   }
 
@@ -695,6 +834,8 @@
     }).join("");
     const sidebar = canonicalTableMarkup({
       className:"flat-table track-browser-sidebar-field-grid new-tag-sidebar-field-grid",
+      columns:CanonicalTableColumns.newTagSidebar,
+      title:"Tracks",
       ariaLabel:"Select tracks for a new tag",
       header:canonicalHeaderMarkup(["#", "✓", "Track"]),
       rows:sidebarRows,
@@ -709,8 +850,10 @@
     ], { className:"tag-create-row" });
     const newTagTable = canonicalTableMarkup({
       className:"flat-table new-tag-editor-field-grid",
+      columns:CanonicalTableColumns.newTagEditor,
+      title:"New Tag",
       ariaLabel:"Create a new tag",
-      header:`${canonicalTitleRowMarkup("New Tag")}${canonicalHeaderMarkup(["#", "Apply To", "Tag Name", "Tag Value", "✓"])}`,
+      header:canonicalHeaderMarkup(["#", "Apply To", "Tag Name", "Tag Value", "✓"]),
       rows:draft
     });
     const detail = `<section class="track-browser-pane new-tag-editor-pane" aria-label="New tag fields"><form class="data-table-scroll canonical-table-surface new-tag-form" data-new-tag-form>${newTagTable}</form></section>`;
@@ -721,11 +864,8 @@
   function renderTrackArrayGrid(tracks) {
     const columns = trackColumns();
     const columnTemplate = trackArrayColumnTemplate(tracks, columns);
-    // The giga table has its own explicit track list. Keep it on every row so
-    // WebKit cannot fall back to the generic three-column field-grid default.
-    const rowTemplateStyle = `grid-template-columns:${columnTemplate} !important`;
     const headerCells = ["#", "Track #", "Filename", ...columns.map(displayTrackKey)];
-    const header = canonicalHeaderMarkup(headerCells, { style:rowTemplateStyle, cell:(label, index) => {
+    const header = canonicalHeaderMarkup(headerCells, { cell:(label, index) => {
       const sortKey = index === 0 ? "row" : index === 1 ? "track" : index === 2 ? "filename" : columns[index - 3];
       const columnAttribute = index > 2 ? ` data-track-column-key="${esc(sortKey)}"` : "";
       return { attributes:`data-sort="${esc(sortKey)}"${columnAttribute}` };
@@ -760,10 +900,10 @@
           return canonicalCellMarkup(scalar(source?.[fieldKey], fieldKey, extension ? "memberExtensions" : "memberMetadata", true), { attributes:`data-track-column-key="${esc(key)}"` });
         })
       ];
-      return canonicalRowMarkup(cells, { className:"track-array-row", style:rowTemplateStyle });
+      return canonicalRowMarkup(cells, { className:"track-array-row" });
     }).join("");
     const empty = `<div class="field-grid-empty" role="row"><span role="cell">No playable tracks</span></div>`;
-    return canonicalTableMarkup({ className:"giga-table tracks-field-grid", ariaLabel:"Tracks", attributes:'data-field-grid="tracks"', style:`--field-grid-columns:${columnTemplate}`, header, rows, empty, trailing:popups.join("") });
+    return canonicalTableMarkup({ className:"giga-table tracks-field-grid", columns:columnTemplate, title:"Tracks", ariaLabel:"Tracks", attributes:'data-field-grid="tracks"', header, rows, empty, trailing:popups.join("") });
   }
 
   function trackArrayColumnTemplate(tracks, columns) {
@@ -833,7 +973,7 @@
       return CanonicalTable.rowWithUnfolds(row, structured ? [{ foldID, content:unfoldedContent }] : []);
     }).join("");
     const empty = '<div class="field-grid-empty" role="row"><span role="cell">No tags on this file</span></div>';
-    return canonicalTableMarkup({ className:"flat-table track-browser-field-grid canonical-tag-grid", ariaLabel:`Tags for ${member.name}`, header, rows, empty });
+    return canonicalTableMarkup({ className:"flat-table track-browser-field-grid canonical-tag-grid", columns:CanonicalTableColumns.trackTags, title:`Tags · ${member.name}`, ariaLabel:`Tags for ${member.name}`, header, rows, empty });
   }
 
   function renderTrackPage() {
@@ -855,7 +995,7 @@
       ];
       return canonicalRowMarkup(cells, { className:selectedClass.trim(), attributes:`tabindex="0" aria-label="Select ${esc(member.name)}" aria-selected="${member.path === trackBrowserPath}" data-action="selectTrackBrowserMember" data-track-browser-path="${esc(member.path)}" data-track-browser-row` });
     }).join("");
-    const sidebarTable = canonicalTableMarkup({ className:"flat-table track-browser-sidebar-field-grid", ariaLabel:"Tagged tracks", header:sidebarHeader, rows:sidebarRows, empty:'<div class="field-grid-empty" role="row"><span role="cell">No files with tags</span></div>' });
+    const sidebarTable = canonicalTableMarkup({ className:"flat-table track-browser-sidebar-field-grid", columns:CanonicalTableColumns.trackBrowser, title:"Tagged Tracks", ariaLabel:"Tagged tracks", header:sidebarHeader, rows:sidebarRows, empty:'<div class="field-grid-empty" role="row"><span role="cell">No files with tags</span></div>' });
     const sidebar = `<section class="track-browser-pane track-browser-sidebar-pane" aria-label="Tagged files"><div class="data-table-scroll canonical-table-surface track-browser-scroll">${sidebarTable}</div></section>`;
     const detailContent = selected
       ? renderTrackTagTable(selected)
@@ -880,10 +1020,6 @@
     return `${parentFoldID}/pack/${encodeURIComponent(archiveRelativePath)}`;
   }
 
-  function tagAnalyzerSubtableTitleMarkup(title, foldID) {
-    return multipleValuesTableTitleRowMarkup({ title, foldID, titleClose:true });
-  }
-
   function tagAnalyzerFieldRowMarkup(tagName, match, index) {
     const memberPath = match.memberRelativePath || "";
     const trackName = memberPath ? memberPath.split("/").pop() : "Package";
@@ -906,12 +1042,14 @@
   }
 
   function tagAnalyzerFieldsSubtableMarkup(tagName, matches, foldID, archiveRelativePath) {
-    const header = tagAnalyzerSubtableTitleMarkup(tagName + " · " + matches.length + " tag field(s)", foldID) +
-      canonicalHeaderMarkup(["#", "Track", "Tag Name", "Tag Value", "✓", "×"]);
+    const header = canonicalHeaderMarkup(["#", "Track", "Tag Name", "Tag Value", "✓", "×"]);
     const rows = matches.map((match, index) => tagAnalyzerFieldRowMarkup(tagName, match, index)).join("") ||
       '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No matching tag fields</span></div>';
     return new CanonicalTable({
-      className:"inserted-table-grid canonical-multiple-values-grid tag-analyzer-field-grid",
+      className:"canonical-multiple-values-grid tag-analyzer-field-grid",
+      columns:CanonicalTableColumns.tagAnalyzerFields,
+      title:tagName + " · " + matches.length + " tag field(s)",
+      titleAction:multipleValuesCloseMarkup({ foldID }),
       ariaLabel:"Tag values in " + archiveRelativePath,
       header,
       rows
@@ -933,8 +1071,7 @@
   function tagAnalyzerPackSubtableMarkup(tagName, matches, foldID) {
     const packs = groupTagAnalyzerMatchesByPack(matches);
     const title = tagName + " · " + packs.length + " matched pack(s)";
-    const header = tagAnalyzerSubtableTitleMarkup(title, foldID) +
-      canonicalHeaderMarkup(["#", "Filename", "Tracks", "Tag Fields"]);
+    const header = canonicalHeaderMarkup(["#", "Filename", "Tracks", "Tag Fields"]);
     const rows = packs.map((pack, index) => {
       const first = pack.matches[0] || {};
       const packFoldID = tagAnalyzerPackFoldID(foldID, pack.archiveRelativePath);
@@ -958,7 +1095,10 @@
     }).join("") ||
       '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No matched packs</span></div>';
     return new CanonicalTable({
-      className:"inserted-table-grid canonical-multiple-values-grid tag-analyzer-pack-grid",
+      className:"canonical-multiple-values-grid tag-analyzer-pack-grid",
+      columns:CanonicalTableColumns.tagAnalyzerPacks,
+      title,
+      titleAction:multipleValuesCloseMarkup({ foldID }),
       ariaLabel:"Matched packs for " + tagName,
       header,
       rows
@@ -1072,8 +1212,10 @@
       : "";
     const table = canonicalTableMarkup({
       className:"flat-table meta-field-grid tag-analyzer-table",
+      columns:CanonicalTableColumns.tagAnalyzer,
+      title:"Tag Names" + (state.tagAnalyzerHasResult ? " · " + visibleTags.length : ""),
       ariaLabel:"Tag names, matched packs, and tracks",
-      header:canonicalTitleRowMarkup("Tag Names" + (state.tagAnalyzerHasResult ? " · " + visibleTags.length : "")) + canonicalHeaderMarkup(["#", "Tag Name", "Matched Packs", "Tracks", "×"], {
+      header:canonicalHeaderMarkup(["#", "Tag Name", "Matched Packs", "Tracks", "×"], {
         cell:label => label === "×" ? { className:"tag-analyzer-delete-header", attributes:'title="Delete matching track fields"' } : {}
       }),
       rows,
@@ -1111,14 +1253,14 @@
     const preview = state.filePreviewPath
       ? `<div class="file-preview-backdrop" role="presentation"><section class="file-preview" role="dialog" aria-modal="true" aria-label="Bundled file preview"><div class="file-preview-heading"><div><strong>${esc(state.filePreviewName || "Bundled file")}</strong><span>${esc(state.filePreviewPath)}</span></div><button class="icon-button" data-action="closeFilePreview" title="Close preview" aria-label="Close preview">×</button></div>${state.filePreviewError ? `<div class="file-preview-error">${esc(state.filePreviewError)}</div>` : `<pre class="file-preview-content">${esc(state.filePreviewContent)}</pre>${state.filePreviewTruncated ? '<div class="file-preview-note">Preview limited to the first 4 MiB. The bundled file remains unchanged.</div>' : ""}`}</section></div>`
       : "";
-    const table = canonicalTableMarkup({ className:"giga-table file-field-grid", ariaLabel:"Package files", header, rows, empty });
+    const table = canonicalTableMarkup({ className:"giga-table file-field-grid", columns:CanonicalTableColumns.files, title:"Package Files", ariaLabel:"Package files", header, rows, empty });
     return `<section class="data-page files-page"><div class="data-table-scroll canonical-table-surface giga-table-surface file-table-surface">${table}</div>${preview}</section>`;
   }
 
   function renderAttachments() {
     const assets = state.members.filter(member => member.role !== "playable" && member.role !== "track");
     if (!assets.length) return "";
-    const header = `${canonicalTitleRowMarkup("Attachments")}${canonicalHeaderMarkup(["#", "Role", "Format", "Filename", "Stored path", "Size", "⌕"])}`;
+    const header = canonicalHeaderMarkup(["#", "Role", "Format", "Filename", "Stored path", "Size", "⌕"]);
     const rows = assets.map((asset, index) => canonicalRowMarkup([
       canonicalNumberCellMarkup(index + 1, `Attachment number ${index + 1}`, { className:"file-number" }),
       canonicalCellMarkup(`<input class="tag-table-field" value="${esc(asset.role)}" disabled>`),
@@ -1128,7 +1270,7 @@
       canonicalCellMarkup(`<input class="tag-table-field" value="${esc(bytes(asset.bytes))}" disabled>`),
       canonicalCellMarkup(asset.previewable ? `<button class="icon-button file-preview-action" data-action="previewMember" data-preview-path="${esc(asset.path)}" title="View bundled text" aria-label="View bundled text">⌕</button>` : "", { className:"field-grid-action-cell file-view-cell" })
     ], { className:"attachment-row", attributes:`tabindex="0" data-track-row="${esc(asset.path)}" title="Open metadata for ${esc(asset.name)}"` })).join("");
-    const table = canonicalTableMarkup({ className:"flat-table attachment-field-grid", ariaLabel:"Package attachments", header, rows });
+    const table = canonicalTableMarkup({ className:"flat-table attachment-field-grid", columns:CanonicalTableColumns.attachments, title:"Attachments", ariaLabel:"Package attachments", header, rows });
     return `<section class="attachments-section"><div class="data-table-scroll canonical-table-surface attachment-table-scroll">${table}</div></section>`;
   }
 
@@ -1476,11 +1618,6 @@
     tagAnalyzerMatchesByName.delete(tagName);
     bridge("deleteTagAnalyzerTrackFields", { tagName, archiveRelativePaths });
   }
-
-  document.addEventListener("animationend", event => {
-    if (event.animationName === "canonical-fold-open") event.target.classList?.remove("canonical-fold-opening");
-    if (event.animationName === "canonical-fold-content-enter") event.target.classList?.remove("canonical-unfold-content-enter");
-  });
 
   document.addEventListener("click", event => {
     if (!event.target.closest(".track-context-menu")) closeTrackContextMenu();
