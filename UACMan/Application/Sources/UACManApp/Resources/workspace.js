@@ -69,7 +69,11 @@
   };
   const displayTrackKey = key => String(key).startsWith("extension.") ? `Extension: ${displayMetadataKey(String(key).slice("extension.".length))}` : displayMetadataKey(key);
   const canonicalCellMarkup = (content, options = {}) => {
-    const classes = ["field-grid-cell", options.className].filter(Boolean).join(" ");
+    const classes = [
+      "canonical-table-cell",
+      options.role === "columnheader" ? "canonical-table-heading-cell" : "",
+      options.className
+    ].filter(Boolean).join(" ");
     const role = options.role || "cell";
     const attributes = options.attributes ? ` ${options.attributes}` : "";
     return `<div class="${classes}" role="${role}"${attributes}>${content}</div>`;
@@ -79,28 +83,35 @@
     { className:["canonical-number-cell", options.className].filter(Boolean).join(" "), attributes:options.attributes }
   );
   const canonicalRowMarkup = (cells, options = {}) => {
-    const classes = ["field-grid-row", options.className].filter(Boolean).join(" ");
+    const kind = options.kind || "content";
+    const classes = ["canonical-table-row", `canonical-table-${kind}-row`, options.className].filter(Boolean).join(" ");
     const role = options.role || "row";
     const attributes = options.attributes ? ` ${options.attributes}` : "";
     const style = options.style ? ` style="${esc(options.style)}"` : "";
     return `<div class="${classes}" role="${role}"${attributes}${style}>${cells.join("")}</div>`;
   };
   const canonicalHeaderCellMarkup = (label, options = {}) => {
-    const heading = `<input class="tag-table-field field-grid-heading-input" value="${esc(label)}" aria-label="${esc(label)}" disabled>`;
-    return canonicalCellMarkup(heading, { ...options, className:["field-grid-heading", options.className].filter(Boolean).join(" "), role:"columnheader" });
+    const heading = `<input class="tag-table-field canonical-table-heading-input" value="${esc(label)}" aria-label="${esc(label)}" disabled>`;
+    return canonicalCellMarkup(heading, { ...options, role:"columnheader" });
   };
   const canonicalTitleRowMarkup = (title, className = "", actionMarkup = "") => {
-    const heading = `<input class="tag-table-field field-grid-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled>`;
+    const heading = `<input class="tag-table-field canonical-table-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled>`;
     const content = actionMarkup
       ? `<div class="canonical-table-title-content">${heading}<span class="canonical-table-title-action">${actionMarkup}</span></div>`
       : heading;
-    const titleCell = canonicalCellMarkup(content, { className:"field-grid-heading canonical-table-title-cell", role:"columnheader" });
-    return canonicalRowMarkup([titleCell], { className:["field-grid-header", "canonical-table-title-row", className].filter(Boolean).join(" ") });
+    const titleCell = canonicalCellMarkup(content, { className:"canonical-table-title-cell", role:"columnheader" });
+    return canonicalRowMarkup([titleCell], { kind:"title", className });
   };
   const canonicalHeaderMarkup = (labels, options = {}) => canonicalRowMarkup(
     labels.map((label, index) => canonicalHeaderCellMarkup(label, options.cell?.(label, index) || {})),
-    { className:"field-grid-header", attributes:options.attributes, style:options.style }
+    { kind:"header", attributes:options.attributes, style:options.style }
   );
+  const canonicalEmptyRowMarkup = (message, className = "") => canonicalRowMarkup(
+    [canonicalCellMarkup(`<span>${message}</span>`, { className:"canonical-table-empty-cell" })],
+    { kind:"empty", className }
+  );
+  const canonicalTableSurfaceClassName = (...classes) =>
+    ["canonical-table-surface", ...classes].filter(Boolean).join(" ");
   class CanonicalTable {
     static openFoldIDs = new Set();
     static pendingFoldAnimations = new Set();
@@ -112,11 +123,14 @@
 
     render() {
       const options = this.options;
-      const classes = ["field-grid", "canonical-table", options.className].filter(Boolean).join(" ");
+      const classes = ["canonical-table", options.className].filter(Boolean).join(" ");
       const attributes = options.attributes ? ` ${options.attributes}` : "";
       const ariaLabel = options.ariaLabel ? ` aria-label="${esc(options.ariaLabel)}"` : "";
       const columnSchema = options.columns ? ` data-canonical-columns="${esc(options.columns)}"` : "";
-      const styleProperties = options.style || "";
+      const styleProperties = [
+        options.columns ? `--canonical-table-columns:${options.columns}` : "",
+        options.style || ""
+      ].filter(Boolean).join(";");
       const style = styleProperties ? ` style="${esc(styleProperties)}"` : "";
       const rows = options.rows || options.empty || "";
       const title = options.title === undefined || options.title === null || options.title === ""
@@ -133,14 +147,7 @@
       tables.forEach(table => {
         const columns = table.dataset.canonicalColumns || "";
         if (!columns) return;
-        table.style.setProperty("--field-grid-columns", columns);
-        table.querySelectorAll(".field-grid-header, .field-grid-row").forEach(row => {
-          if (row.closest(".canonical-table") !== table) return;
-          const rowColumns = row.classList.contains("canonical-table-title-row") || row.classList.contains("inserted-table-row")
-            ? "minmax(0,1fr)"
-            : columns;
-          row.style.setProperty("grid-template-columns", rowColumns, "important");
-        });
+        table.style.setProperty("--canonical-table-columns", columns);
       });
     }
 
@@ -154,7 +161,7 @@
       const classes = ["inserted-table-row", open ? "open" : ""].filter(Boolean).join(" ");
       return canonicalRowMarkup([
         canonicalCellMarkup(`<div class="inserted-table-panel"><div class="canonical-unfold-content">${renderedContent}</div>${nestedRows}</div>`, { className:"inserted-table-cell" })
-      ], { className:classes, attributes:`data-canonical-subrow="${esc(foldID)}"` });
+      ], { kind:"unfold", className:classes, attributes:`data-canonical-subrow="${esc(foldID)}"` });
     }
 
     static rowWithUnfolds(rowMarkup, unfolds = []) {
@@ -194,7 +201,6 @@
       const previous = this.foldAnimations.get(subrow);
       if (previous) previous.cancel();
       this.foldAnimations.delete(subrow);
-      if (open) this.pendingFoldAnimations.delete(foldID);
       const panel = subrow.querySelector(":scope > .inserted-table-cell > .inserted-table-panel");
       if (!panel) return;
       const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || false;
@@ -223,6 +229,9 @@
             subrow.style.removeProperty("overflow");
             subrow.style.removeProperty("transition");
             subrow.style.removeProperty("opacity");
+            if (subrow.isConnected && this.subrow(foldID) === subrow && this.isFoldOpen(foldID)) {
+              this.pendingFoldAnimations.delete(foldID);
+            }
           }, duration);
           return;
         }
@@ -233,6 +242,9 @@
           this.foldAnimations.delete(subrow);
           subrow.style.removeProperty("height");
           subrow.style.removeProperty("overflow");
+          if (subrow.isConnected && this.subrow(foldID) === subrow && this.isFoldOpen(foldID)) {
+            this.pendingFoldAnimations.delete(foldID);
+          }
         };
       } else {
         if (!currentHeight) {
@@ -270,6 +282,11 @@
     }
 
     static playPendingFoldAnimations() {
+      for (const [subrow, animation] of this.foldAnimations) {
+        if (subrow.isConnected) continue;
+        animation.cancel();
+        this.foldAnimations.delete(subrow);
+      }
       for (const foldID of [...this.pendingFoldAnimations]) {
         if (!this.isFoldOpen(foldID)) {
           this.pendingFoldAnimations.delete(foldID);
@@ -278,6 +295,7 @@
         const subrow = this.subrow(foldID);
         const contentHost = subrow?.querySelector(":scope > .inserted-table-cell > .inserted-table-panel > .canonical-unfold-content");
         if (!contentHost || !(contentHost.firstElementChild || contentHost.textContent.trim())) continue;
+        if (this.foldAnimations.has(subrow)) continue;
         this.animateSubrow(subrow, true);
       }
     }
@@ -431,22 +449,22 @@
     : `<button class="icon-button canonical-table-title-close multiple-values-popup-close" data-action="closeMultipleValuesPopup" data-popup-id="${esc(context.popupID || "")}" type="button" title="Close" aria-label="Close">×</button>`;
   const multipleValuesTableHeaderRowMarkup = (context, editable) => {
     const submitMarkup = editable
-      ? '<button class="tag-table-field field-grid-heading-input multiple-values-header-action" data-action="commitMultipleValues" type="button" title="Submit all changed values" aria-label="Submit all changed values">✓</button>'
-      : '<input class="tag-table-field field-grid-heading-input" value="" aria-label="Submit" disabled>';
+      ? '<button class="tag-table-field canonical-table-heading-input multiple-values-header-action" data-action="commitMultipleValues" type="button" title="Submit all changed values" aria-label="Submit all changed values">✓</button>'
+      : '<input class="tag-table-field canonical-table-heading-input" value="" aria-label="Submit" disabled>';
     return canonicalRowMarkup([
       canonicalHeaderCellMarkup("#"),
       canonicalHeaderCellMarkup("Tag Name"),
       canonicalHeaderCellMarkup("Tag Value"),
-      canonicalCellMarkup(submitMarkup, { className:"field-grid-heading field-grid-action-cell", role:"columnheader" }),
-      canonicalCellMarkup(multipleValuesCloseMarkup(context), { className:"field-grid-heading field-grid-action-cell", role:"columnheader" })
-    ], { className:"field-grid-header multiple-values-table-header-row" });
+      canonicalCellMarkup(submitMarkup, { className:"canonical-table-action-cell", role:"columnheader" }),
+      canonicalCellMarkup(multipleValuesCloseMarkup(context), { className:"canonical-table-action-cell", role:"columnheader" })
+    ], { kind:"header", className:"multiple-values-table-header-row" });
   };
   const multipleValuesTableChromeMarkup = (context, editable) => multipleValuesTableHeaderRowMarkup(context, editable);
   const multipleValuesEditorBodyMarkup = (value, context = {}) => {
     const isArray = Array.isArray(value);
     const popupLayout = context.layout === "popup";
     const subtableLayout = context.layout === "subtable";
-    const gridClass = popupLayout ? "canonical-popup-field-grid" : "canonical-multiple-values-grid";
+    const gridClass = popupLayout ? "multiple-values-popup-table" : "multiple-values-table";
     const entries = isArray ? value.map((item, index) => [String(index), item]) : Object.entries(value || {});
     const rowMarkup = ([key, item], index) => {
       const kind = fieldKind(item);
@@ -462,8 +480,8 @@
         numberMarkup,
         canonicalCellMarkup(keyMarkup),
         canonicalCellMarkup(valueControl),
-        canonicalCellMarkup(submitMarkup, { className:"field-grid-action-cell" }),
-        canonicalCellMarkup(removeMarkup, { className:"field-grid-action-cell" })
+        canonicalCellMarkup(submitMarkup, { className:"canonical-table-action-cell" }),
+        canonicalCellMarkup(removeMarkup, { className:"canonical-table-action-cell" })
       ];
       return canonicalRowMarkup(cells, { className:"multiple-value-editor-row", attributes:`data-multiple-entry data-multiple-kind="${kind}"` });
     };
@@ -484,9 +502,11 @@
       titleAction:context.layout === "popup" || context.layout === "subtable" ? multipleValuesCloseMarkup(context) : "",
       ariaLabel:context.title || context.key || "Tag values",
       header:multipleValuesTableChromeMarkup(context, true),
-      rows:`<div class="multiple-values-rows">${rows || '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'}</div>`
+      rows:`<div class="multiple-values-rows">${rows || canonicalEmptyRowMarkup("No values", "multiple-values-empty")}</div>`
     });
-    const rowsMarkup = table;
+    const rowsMarkup = popupLayout
+      ? `<div class="${canonicalTableSurfaceClassName("multiple-values-popup-surface")}">${table}</div>`
+      : table;
     const body = `<div class="multiple-values-editor canonical-multiple-values-editor${popupLayout ? " canonical-popup-editor" : ""}" ${data}>${rowsMarkup}<div class="multiple-values-editor-error" role="status"></div></div>`;
     return { body, count:entries.length };
   };
@@ -495,7 +515,7 @@
     const popupLayout = context.layout === "popup";
     const subtableLayout = context.layout === "subtable";
     const tableLayout = popupLayout || subtableLayout;
-    const gridClass = popupLayout ? "canonical-popup-field-grid" : "canonical-multiple-values-grid";
+    const gridClass = popupLayout ? "multiple-values-popup-table" : "multiple-values-table";
     const rows = entries.length
       ? entries.map(([key, item], index) => {
         const cells = [
@@ -506,7 +526,7 @@
         ];
         return canonicalRowMarkup(cells, { className:"multiple-value-readonly-row" });
       }).join("")
-      : '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>';
+      : canonicalEmptyRowMarkup("No values", "multiple-values-empty");
     return canonicalTableMarkup({
       className:gridClass,
       columns:CanonicalTableColumns.multipleValues,
@@ -694,17 +714,17 @@
     const open = Boolean(state.documentName);
     const noRows = members.length === 0;
     const tableScroll = $("#table-scroll");
-    tableScroll.className = "table-scroll canonical-table-surface giga-table-surface";
+    tableScroll.className = canonicalTableSurfaceClassName("table-scroll");
     tableScroll.innerHTML = open
       ? (noRows ? `<div class="empty-state"><div class="empty-icon">▤</div><h3>${state.members.length ? "No tracks match this filter" : "This package has no audio tracks"}</h3><p>${state.members.length ? "Change the search text to show audio tracks." : "The package contains no playable members."}</p></div>` : renderTrackArrayGrid(members))
       : `<div class="empty-state"><div class="empty-icon">▤</div><h3>Open a package to get started</h3><p>Browse a collection or open a UAC package. Audio streams appear here as rows with their tags as columns.</p><button class="button primary" data-action="openUAC">Open a UAC file</button></div>`;
     $("#member-summary").textContent = state.documentName ? `${members.length} shown · ${playableMembers().length} audio tracks` : "No package open";
-    const gigaGrid = $(".tracks-field-grid");
-    if (gigaGrid) {
+    const tracksTable = $(".tracks-table");
+    if (tracksTable) {
       const template = trackArrayColumnTemplate(members, trackColumns());
-      gigaGrid.style.setProperty("--field-grid-columns", template);
-      gigaGrid.dataset.canonicalColumns = template;
-      CanonicalTable.applyColumnSchemas(gigaGrid);
+      tracksTable.style.setProperty("--canonical-table-columns", template);
+      tracksTable.dataset.canonicalColumns = template;
+      CanonicalTable.applyColumnSchemas(tracksTable);
     }
   }
 
@@ -827,12 +847,12 @@
         canonicalCellMarkup('<input class="tag-table-field" data-new-tag-key placeholder="Tag Name" aria-label="New tag name" required>', { className:"tag-name-cell" }),
         canonicalCellMarkup('<input class="tag-table-field" data-new-tag-value placeholder="Tag Value" aria-label="New tag value">', { className:"tag-value-cell" }),
         canonicalCellMarkup('<input class="tag-table-field" value="—" aria-label="Uses" disabled>', { className:"tag-uses-cell" }),
-        canonicalCellMarkup('<button class="icon-button" data-action="createPackageTag" title="Add package tag" aria-label="Add package tag">✓</button>', { className:"tag-submit-cell field-grid-action-cell" }),
-        canonicalCellMarkup('<button class="icon-button danger" data-action="clearPackageTagDraft" title="Clear new tag" aria-label="Clear new tag">×</button>', { className:"tag-delete-cell field-grid-action-cell" })
+        canonicalCellMarkup('<button class="icon-button" data-action="createPackageTag" title="Add package tag" aria-label="Add package tag">✓</button>', { className:"tag-submit-cell canonical-table-action-cell" }),
+        canonicalCellMarkup('<button class="icon-button danger" data-action="clearPackageTagDraft" title="Clear new tag" aria-label="Clear new tag">×</button>', { className:"tag-delete-cell canonical-table-action-cell" })
       ], { className:"tag-create-row", attributes:'data-new-tag-row data-tag-scope="package"' });
     const table = rowsFor(scope);
     const rows = scope === "Package" ? `${table.rows}${packageTagDraftRow()}` : table.rows;
-    const grid = `<section class="tag-scope-table"><div class="data-table-scroll canonical-table-surface">${canonicalTableMarkup({ className:"flat-table meta-field-grid canonical-tag-grid", columns:CanonicalTableColumns.metadataTags, title, ariaLabel:title, header, rows, empty:table.rows ? "" : '<div class="field-grid-empty" role="row"><span role="cell">No tags</span></div>' })}</div></section>`;
+    const grid = `<section class="tag-scope-table"><div class="${canonicalTableSurfaceClassName("data-table-scroll")}">${canonicalTableMarkup({ className:"metadata-tags-table canonical-tag-table", columns:CanonicalTableColumns.metadataTags, title, ariaLabel:title, header, rows, empty:table.rows ? "" : canonicalEmptyRowMarkup("No tags") })}</div></section>`;
     return `<section class="data-page schema-page">${grid}${includeAttachments ? renderAttachments() : ""}</section>`;
   }
 
@@ -847,37 +867,37 @@
       const checked = selectedTagTrackPaths.has(member.path) ? " checked" : "";
       const cells = [
         canonicalNumberCellMarkup(number, `Track row ${number}`),
-        canonicalCellMarkup(`<input class="new-tag-track-checkbox" type="checkbox" data-new-tag-track value="${esc(member.path)}" aria-label="Select ${esc(member.name)}"${checked}>`, { className:"field-grid-action-cell new-tag-checkbox-cell" }),
+        canonicalCellMarkup(`<input class="new-tag-track-checkbox" type="checkbox" data-new-tag-track value="${esc(member.path)}" aria-label="Select ${esc(member.name)}"${checked}>`, { className:"canonical-table-action-cell new-tag-checkbox-cell" }),
         canonicalCellMarkup(`<input class="tag-table-field file-name-field" value="${esc(member.name)}" aria-label="Track filename" title="${esc(member.path)}" disabled>`)
       ];
       return canonicalRowMarkup(cells, { className:"new-tag-track-row" });
     }).join("");
     const sidebar = canonicalTableMarkup({
-      className:"flat-table track-browser-sidebar-field-grid new-tag-sidebar-field-grid",
+      className:"track-browser-sidebar-table new-tag-sidebar-table",
       columns:CanonicalTableColumns.newTagSidebar,
       title:"Tracks",
       ariaLabel:"Select tracks for a new tag",
       header:canonicalHeaderMarkup(["#", "✓", "Track"]),
       rows:sidebarRows,
-      empty:'<div class="field-grid-empty" role="row"><span role="cell">No tracks match this filter</span></div>'
+      empty:canonicalEmptyRowMarkup("No tracks match this filter")
     });
     const draft = canonicalRowMarkup([
       canonicalNumberCellMarkup("＋", "Create tag"),
       canonicalCellMarkup('<select class="tag-table-field" data-new-tag-target aria-label="Apply to"><option value="allTracks">All Tracks</option><option value="selectedTracks">Selected Tracks</option><option value="package">Package</option></select>'),
       canonicalCellMarkup('<input class="tag-table-field" data-new-tag-key placeholder="Tag Name" aria-label="New tag name" required>'),
       canonicalCellMarkup('<input class="tag-table-field" data-new-tag-value placeholder="Tag Value" aria-label="New tag value">'),
-      canonicalCellMarkup('<button class="icon-button" type="submit" data-new-tag-submit title="Apply new tag" aria-label="Apply new tag">✓</button>', { className:"field-grid-action-cell" })
+      canonicalCellMarkup('<button class="icon-button" type="submit" data-new-tag-submit title="Apply new tag" aria-label="Apply new tag">✓</button>', { className:"canonical-table-action-cell" })
     ], { className:"tag-create-row" });
     const newTagTable = canonicalTableMarkup({
-      className:"flat-table new-tag-editor-field-grid",
+      className:"new-tag-editor-table",
       columns:CanonicalTableColumns.newTagEditor,
       title:"New Tag",
       ariaLabel:"Create a new tag",
       header:canonicalHeaderMarkup(["#", "Apply To", "Tag Name", "Tag Value", "✓"]),
       rows:draft
     });
-    const detail = `<section class="track-browser-pane new-tag-editor-pane" aria-label="New tag fields"><form class="data-table-scroll canonical-table-surface new-tag-form" data-new-tag-form>${newTagTable}</form></section>`;
-    const trackPane = `<section class="track-browser-pane track-browser-sidebar-pane new-tag-track-pane" aria-label="Track selection"><div class="data-table-scroll canonical-table-surface track-browser-scroll">${sidebar}</div></section>`;
+    const detail = `<section class="track-browser-pane new-tag-editor-pane" aria-label="New tag fields"><form class="${canonicalTableSurfaceClassName("data-table-scroll", "new-tag-form")}" data-new-tag-form>${newTagTable}</form></section>`;
+    const trackPane = `<section class="track-browser-pane track-browser-sidebar-pane new-tag-track-pane" aria-label="Track selection"><div class="${canonicalTableSurfaceClassName("data-table-scroll", "track-browser-scroll")}">${sidebar}</div></section>`;
     return `<section class="data-page track-browser-page new-tag-page">${trackPane}${detail}</section>`;
   }
 
@@ -922,8 +942,8 @@
       ];
       return canonicalRowMarkup(cells, { className:"track-array-row" });
     }).join("");
-    const empty = `<div class="field-grid-empty" role="row"><span role="cell">No playable tracks</span></div>`;
-    return canonicalTableMarkup({ className:"giga-table tracks-field-grid", columns:columnTemplate, title:"Tracks", ariaLabel:"Tracks", attributes:'data-field-grid="tracks"', header, rows, empty, trailing:popups.join("") });
+    const empty = canonicalEmptyRowMarkup("No playable tracks");
+    return canonicalTableMarkup({ className:"tracks-table", columns:columnTemplate, title:"Tracks", ariaLabel:"Tracks", header, rows, empty, trailing:popups.join("") });
   }
 
   function trackArrayColumnTemplate(tracks, columns) {
@@ -992,8 +1012,8 @@
       const row = canonicalRowMarkup(cells, { attributes:`data-file-tag-row data-file-tag-path="${esc(member.path)}" data-file-tag-scope="${esc(entry.scope)}" data-file-tag-from="${esc(entry.key)}"${foldAttribute}` });
       return CanonicalTable.rowWithUnfolds(row, structured ? [{ foldID, content:unfoldedContent }] : []);
     }).join("");
-    const empty = '<div class="field-grid-empty" role="row"><span role="cell">No tags on this file</span></div>';
-    return canonicalTableMarkup({ className:"flat-table track-browser-field-grid canonical-tag-grid", columns:CanonicalTableColumns.trackTags, title:`Tags · ${member.name}`, ariaLabel:`Tags for ${member.name}`, header, rows, empty });
+    const empty = canonicalEmptyRowMarkup("No tags on this file");
+    return canonicalTableMarkup({ className:"track-browser-table canonical-tag-table", columns:CanonicalTableColumns.trackTags, title:`Tags · ${member.name}`, ariaLabel:`Tags for ${member.name}`, header, rows, empty });
   }
 
   function renderTrackPage() {
@@ -1015,12 +1035,12 @@
       ];
       return canonicalRowMarkup(cells, { className:selectedClass.trim(), attributes:`tabindex="0" aria-label="Select ${esc(member.name)}" aria-selected="${member.path === trackBrowserPath}" data-action="selectTrackBrowserMember" data-track-browser-path="${esc(member.path)}" data-track-browser-row` });
     }).join("");
-    const sidebarTable = canonicalTableMarkup({ className:"flat-table track-browser-sidebar-field-grid", columns:CanonicalTableColumns.trackBrowser, title:"Tagged Tracks", ariaLabel:"Tagged tracks", header:sidebarHeader, rows:sidebarRows, empty:'<div class="field-grid-empty" role="row"><span role="cell">No files with tags</span></div>' });
-    const sidebar = `<section class="track-browser-pane track-browser-sidebar-pane" aria-label="Tagged files"><div class="data-table-scroll canonical-table-surface track-browser-scroll">${sidebarTable}</div></section>`;
+    const sidebarTable = canonicalTableMarkup({ className:"track-browser-sidebar-table", columns:CanonicalTableColumns.trackBrowser, title:"Tagged Tracks", ariaLabel:"Tagged tracks", header:sidebarHeader, rows:sidebarRows, empty:canonicalEmptyRowMarkup("No files with tags") });
+    const sidebar = `<section class="track-browser-pane track-browser-sidebar-pane" aria-label="Tagged files"><div class="${canonicalTableSurfaceClassName("data-table-scroll", "track-browser-scroll")}">${sidebarTable}</div></section>`;
     const detailContent = selected
       ? renderTrackTagTable(selected)
       : '<div class="empty-tab"><strong>No tagged files</strong><span>Files with metadata or extensions will appear here.</span></div>';
-    const detail = `<section class="track-browser-pane track-browser-detail-pane" aria-label="Selected track tags"><div class="data-table-scroll canonical-table-surface track-browser-scroll">${detailContent}</div></section>`;
+    const detail = `<section class="track-browser-pane track-browser-detail-pane" aria-label="Selected track tags"><div class="${canonicalTableSurfaceClassName("data-table-scroll", "track-browser-scroll")}">${detailContent}</div></section>`;
     return `<section class="data-page track-browser-page">${sidebar}${detail}</section>`;
   }
 
@@ -1056,17 +1076,17 @@
       canonicalCellMarkup(trackControl, { className:"tag-analyzer-match-track-cell" }),
       canonicalCellMarkup(nameControl, { className:"tag-analyzer-match-name-cell" }),
       canonicalCellMarkup(valueControl + '<small class="tag-analyzer-match-error" data-tag-analyzer-error></small>', { className:"tag-analyzer-match-value-cell" }),
-      canonicalCellMarkup('<button class="icon-button" data-action="commitTagAnalyzerMatch" title="Save this tag field" aria-label="Save this tag field"' + disabled + '>✓</button>', { className:"field-grid-action-cell" }),
-      canonicalCellMarkup('<button class="icon-button danger" data-action="deleteTagAnalyzerMatch" title="Delete this tag field" aria-label="Delete this tag field"' + disabled + '>×</button>', { className:"field-grid-action-cell" })
+      canonicalCellMarkup('<button class="icon-button" data-action="commitTagAnalyzerMatch" title="Save this tag field" aria-label="Save this tag field"' + disabled + '>✓</button>', { className:"canonical-table-action-cell" }),
+      canonicalCellMarkup('<button class="icon-button danger" data-action="deleteTagAnalyzerMatch" title="Delete this tag field" aria-label="Delete this tag field"' + disabled + '>×</button>', { className:"canonical-table-action-cell" })
     ], { className:"multiple-value-editor-row tag-analyzer-match-row", attributes:rowAttributes });
   }
 
   function tagAnalyzerFieldsSubtableMarkup(tagName, matches, foldID, archiveRelativePath) {
     const header = canonicalHeaderMarkup(["#", "Track", "Tag Name", "Tag Value", "✓", "×"]);
     const rows = matches.map((match, index) => tagAnalyzerFieldRowMarkup(tagName, match, index)).join("") ||
-      '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No matching tag fields</span></div>';
+      canonicalEmptyRowMarkup("No matching tag fields", "multiple-values-empty");
     return new CanonicalTable({
-      className:"canonical-multiple-values-grid tag-analyzer-field-grid",
+      className:"multiple-values-table tag-analyzer-fields-table",
       columns:CanonicalTableColumns.tagAnalyzerFields,
       title:tagName + " · " + matches.length + " tag field(s)",
       titleAction:multipleValuesCloseMarkup({ foldID }),
@@ -1113,9 +1133,9 @@
         : "";
       return CanonicalTable.rowWithUnfolds(packRow, [{ foldID:packFoldID, content:fieldTable }]);
     }).join("") ||
-      '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No matched packs</span></div>';
+      canonicalEmptyRowMarkup("No matched packs", "multiple-values-empty");
     return new CanonicalTable({
-      className:"canonical-multiple-values-grid tag-analyzer-pack-grid",
+      className:"multiple-values-table tag-analyzer-packs-table",
       columns:CanonicalTableColumns.tagAnalyzerPacks,
       title,
       titleAction:multipleValuesCloseMarkup({ foldID }),
@@ -1212,7 +1232,7 @@
         canonicalCellMarkup('<input class="tag-table-field" value="' + esc(tag.name) + '" title="' + esc(tag.name) + '" aria-label="Tag name ' + esc(tag.name) + '" disabled>', { className:"tag-name-cell" }),
         canonicalCellMarkup(toggle, { className:"tag-uses-cell" }),
         canonicalCellMarkup('<input class="tag-table-field" value="' + trackCount + '" aria-label="Tracks with ' + esc(tag.name) + '" disabled>', { className:"tag-uses-cell" }),
-        canonicalCellMarkup('<button class="icon-button danger tag-analyzer-delete-button" data-action="deleteTagAnalyzerTrackFields" data-tag-name="' + esc(tag.name) + '" data-track-field-count="' + trackCount + '" data-package-count="' + trackArchives.length + '" data-archive-paths="' + esc(JSON.stringify(trackArchives.map(archive => archive.relativePath))) + '" title="Delete ' + trackCount + ' track field(s) from ' + trackArchives.length + ' matching package(s)" aria-label="Delete ' + trackCount + ' track field(s) named ' + esc(tag.name) + ' from ' + trackArchives.length + ' matching package(s)"' + (trackCount < 1 || busy ? " disabled" : "") + '>×</button>', { className:"field-grid-action-cell tag-analyzer-delete-cell" })
+        canonicalCellMarkup('<button class="icon-button danger tag-analyzer-delete-button" data-action="deleteTagAnalyzerTrackFields" data-tag-name="' + esc(tag.name) + '" data-track-field-count="' + trackCount + '" data-package-count="' + trackArchives.length + '" data-archive-paths="' + esc(JSON.stringify(trackArchives.map(archive => archive.relativePath))) + '" title="Delete ' + trackCount + ' track field(s) from ' + trackArchives.length + ' matching package(s)" aria-label="Delete ' + trackCount + ' track field(s) named ' + esc(tag.name) + ' from ' + trackArchives.length + ' matching package(s)"' + (trackCount < 1 || busy ? " disabled" : "") + '>×</button>', { className:"canonical-table-action-cell tag-analyzer-delete-cell" })
       ];
       const parentRow = canonicalRowMarkup(cells);
       const subtable = tagIsExpanded && hasCachedMatches
@@ -1231,7 +1251,7 @@
       ? '<details class="tag-analyzer-issues"><summary>' + issues.length + ' unreadable folder or package item(s) · results may be incomplete</summary><div class="tag-analyzer-issue-list">' + issues.map(issue => '<div class="issue"><strong>' + esc(issue.relativePath || "Selected folder") + '</strong>' + esc(issue.message) + '</div>').join("") + '</div></details>'
       : "";
     const table = canonicalTableMarkup({
-      className:"flat-table meta-field-grid tag-analyzer-table",
+      className:"metadata-tags-table tag-analyzer-table",
       columns:CanonicalTableColumns.tagAnalyzer,
       title:"Tag Names" + (state.tagAnalyzerHasResult ? " · " + visibleTags.length : ""),
       ariaLabel:"Tag names, matched packs, and tracks",
@@ -1239,7 +1259,7 @@
         cell:label => label === "×" ? { className:"tag-analyzer-delete-header", attributes:'title="Delete matching track fields"' } : {}
       }),
       rows,
-      empty:'<div class="field-grid-empty tag-analyzer-empty" role="row"><span role="cell">' + esc(emptyMessage) + '</span></div>'
+      empty:canonicalEmptyRowMarkup(esc(emptyMessage), "tag-analyzer-empty")
     });
 
     return '<section class="data-page tag-analyzer-page" aria-label="Tag Analyzer">' +
@@ -1252,7 +1272,7 @@
       '</div>' +
       '<div class="tag-analyzer-progress" role="status" aria-live="polite">' + progressControl + '<span>' + esc(status) + '</span>' + ((running || deleting) && currentPath ? '<code title="' + esc(currentPath) + '">' + esc(currentPath) + '</code>' : "") + '</div>' +
       issuesDisclosure +
-      '<div class="tag-analyzer-results"><div class="data-table-scroll canonical-table-surface">' + table + '</div></div>' +
+      '<div class="tag-analyzer-results"><div class="' + canonicalTableSurfaceClassName("data-table-scroll") + '">' + table + '</div></div>' +
     '</section>';
   }
 
@@ -1267,14 +1287,14 @@
       canonicalCellMarkup(`<input class="tag-table-field file-path-field" value="${esc(member.path)}" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field file-tags-count" value="${fileTagEntries(member).length}" aria-label="Tag count" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field" value="${esc(bytes(member.bytes))}" disabled>`),
-      canonicalCellMarkup(member.previewable ? `<button class="icon-button file-preview-action" data-action="previewMember" data-preview-path="${esc(member.path)}" title="View bundled text" aria-label="View bundled text">⌕</button>` : "", { className:"field-grid-action-cell file-view-cell" })
+      canonicalCellMarkup(member.previewable ? `<button class="icon-button file-preview-action" data-action="previewMember" data-preview-path="${esc(member.path)}" title="View bundled text" aria-label="View bundled text">⌕</button>` : "", { className:"canonical-table-action-cell file-view-cell" })
     ], { className:"file-row", attributes:`tabindex="0" data-track-row="${esc(member.path)}" title="Open metadata for ${esc(member.name)}"` })).join("");
-    const empty = `<div class="field-grid-empty" role="row"><span role="cell">No package members match this filter</span></div>`;
+    const empty = canonicalEmptyRowMarkup("No package members match this filter");
     const preview = state.filePreviewPath
       ? `<div class="file-preview-backdrop" role="presentation"><section class="file-preview" role="dialog" aria-modal="true" aria-label="Bundled file preview"><div class="file-preview-heading"><div><strong>${esc(state.filePreviewName || "Bundled file")}</strong><span>${esc(state.filePreviewPath)}</span></div><button class="icon-button" data-action="closeFilePreview" title="Close preview" aria-label="Close preview">×</button></div>${state.filePreviewError ? `<div class="file-preview-error">${esc(state.filePreviewError)}</div>` : `<pre class="file-preview-content">${esc(state.filePreviewContent)}</pre>${state.filePreviewTruncated ? '<div class="file-preview-note">Preview limited to the first 4 MiB. The bundled file remains unchanged.</div>' : ""}`}</section></div>`
       : "";
-    const table = canonicalTableMarkup({ className:"giga-table file-field-grid", columns:CanonicalTableColumns.files, title:"Package Files", ariaLabel:"Package files", header, rows, empty });
-    return `<section class="data-page files-page"><div class="data-table-scroll canonical-table-surface giga-table-surface file-table-surface">${table}</div>${preview}</section>`;
+    const table = canonicalTableMarkup({ className:"files-table", columns:CanonicalTableColumns.files, title:"Package Files", ariaLabel:"Package files", header, rows, empty });
+    return `<section class="data-page files-page"><div class="${canonicalTableSurfaceClassName("data-table-scroll", "file-table-surface")}">${table}</div>${preview}</section>`;
   }
 
   function renderAttachments() {
@@ -1288,10 +1308,10 @@
       canonicalCellMarkup(`<input class="tag-table-field file-name-field" value="${esc(asset.name)}" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field file-path-field" value="${esc(asset.path)}" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field" value="${esc(bytes(asset.bytes))}" disabled>`),
-      canonicalCellMarkup(asset.previewable ? `<button class="icon-button file-preview-action" data-action="previewMember" data-preview-path="${esc(asset.path)}" title="View bundled text" aria-label="View bundled text">⌕</button>` : "", { className:"field-grid-action-cell file-view-cell" })
+      canonicalCellMarkup(asset.previewable ? `<button class="icon-button file-preview-action" data-action="previewMember" data-preview-path="${esc(asset.path)}" title="View bundled text" aria-label="View bundled text">⌕</button>` : "", { className:"canonical-table-action-cell file-view-cell" })
     ], { className:"attachment-row", attributes:`tabindex="0" data-track-row="${esc(asset.path)}" title="Open metadata for ${esc(asset.name)}"` })).join("");
-    const table = canonicalTableMarkup({ className:"flat-table attachment-field-grid", columns:CanonicalTableColumns.attachments, title:"Attachments", ariaLabel:"Package attachments", header, rows });
-    return `<section class="attachments-section"><div class="data-table-scroll canonical-table-surface attachment-table-scroll">${table}</div></section>`;
+    const table = canonicalTableMarkup({ className:"attachments-table", columns:CanonicalTableColumns.attachments, title:"Attachments", ariaLabel:"Package attachments", header, rows });
+    return `<section class="attachments-section"><div class="${canonicalTableSurfaceClassName("data-table-scroll", "attachment-table-scroll")}">${table}</div></section>`;
   }
 
   function renderInspector() {
@@ -1362,7 +1382,7 @@
     const rows = $(".multiple-values-rows", editor);
     if (rows && !$("[data-multiple-entry]", rows)) {
       rows.innerHTML = ["subtable", "popup"].includes(editor.dataset.multipleLayout)
-        ? '<div class="field-grid-empty multiple-values-empty" role="row"><span role="cell">No values</span></div>'
+        ? canonicalEmptyRowMarkup("No values", "multiple-values-empty")
         : '<div class="file-tag-empty multiple-values-empty">No values</div>';
     }
   }
@@ -1813,7 +1833,7 @@
     else if (event.target.id === "member-filter") ["files", "newTag", "tagAnalyzer"].includes(mainView) ? render(state) : renderMembers();
   });
   document.addEventListener("contextmenu", event => {
-    const column = event.target.closest(".tracks-field-grid [data-track-column-key]");
+    const column = event.target.closest(".tracks-table [data-track-column-key]");
     if (!column) {
       closeTrackContextMenu();
       return;
