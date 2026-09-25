@@ -65,6 +65,11 @@
   in declared hierarchical order, open ancestors when a deeper fold is
   activated, and clear descendant fold state when a parent closes. Inserted
   unfold rows span one full-width grid track.
+- Structured JSON values opened from Tag Analyzer field rows use the
+  `tagAnalyzerJSONValues` schema recursively. Arrays and objects remain
+  canonical tables at every depth; scalar values and object keys edit in their
+  own cells, while add/remove actions change only the local draft. The field
+  row's ✓ serializes the complete nested tree back to the manifest field.
 - `CanonicalTable.setFoldOpen`, `fillUnfold`, and `playPendingFoldAnimations`
   own unfold motion. Use the same measured-height Web Animations path for
   immediate and asynchronously loaded child tables; do not add per-table CSS
@@ -89,6 +94,7 @@
 | `tagAnalyzer` | Tag Analyzer | #, name, matched packs, tracks, delete |
 | `tagAnalyzerPacks` | Tag Analyzer matched packs | #, filename, tracks, tag fields |
 | `tagAnalyzerFields` | Tag Analyzer tag occurrences | #, track, name, value, save, delete |
+| `tagAnalyzerJSONValues` | Tag Analyzer structured field values | #, index/key, value, delete |
 | `files` | Files | #, role, format, filename, stored path, tag count, size, preview |
 | `attachments` | Pack Tags attachments | #, role, format, filename, stored path, size, preview |
 | `multipleValues` | Structured-value editor, subtable, and popup | #, name, value, submit, close/delete |

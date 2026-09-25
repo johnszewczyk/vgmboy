@@ -94,6 +94,13 @@ current filename filter. It asks for confirmation, reports progress, and
 rewrites each affected package manifest once; package-level fields are not
 targets.
 
+When a field value is a JSON array or object, its **Tag Value** cell opens the
+same nested canonical table pattern. Each level can contain scalars, arrays,
+and objects, with no designed nesting-depth limit. Use **＋** to add a string,
+**123** to add a JSON scalar, **{}** to add an object, **[]** to add an array,
+and **×** to remove an entry.
+These edits stay in the field editor until its **✓** saves the whole value.
+
 The ✓ action updates one manifest field; the nested × removes that one field
 after confirmation. Both preserve the archive's compressed members. Progress
 reports folder discovery and package reads, and **Cancel** stops the scan. Cancelling

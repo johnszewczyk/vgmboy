@@ -26,7 +26,9 @@ canonical pack table. Each pack row expands to a second nested canonical table
 with the field source and value; its ✓ and × controls update or remove one
 manifest field while preserving the compressed package members. The parent
 table's **×** action removes a selected field from all playable tracks in
-packages matching the filename filter. Files also
+packages matching the filename filter. Structured JSON values in Tag Analyzer
+unfold recursively into canonical tables for arrays and objects; the field's
+✓ saves edits across the full nested value. Files also
 offers a read-only text preview for bundled JSON, Markdown, CUE, and other
 recognized text members without extracting
 or rewriting the payload. Every table uses the shared field-grid structure with

@@ -413,6 +413,7 @@
     tagAnalyzer:"var(--canonical-number-column) minmax(0,4fr) minmax(0,1fr) minmax(0,1fr) var(--canonical-action-column)",
     tagAnalyzerPacks:"var(--canonical-number-column) minmax(0,1fr) 58px 82px",
     tagAnalyzerFields:"var(--canonical-number-column) minmax(100px,.9fr) minmax(110px,1fr) minmax(180px,1.5fr) var(--canonical-action-column) var(--canonical-action-column)",
+    tagAnalyzerJSONValues:"var(--canonical-number-column) minmax(100px,.7fr) minmax(180px,1.3fr) var(--canonical-action-column)",
     files:"var(--canonical-number-column) 105px 90px 220px minmax(300px,1fr) 90px 90px var(--canonical-action-column)",
     attachments:"var(--canonical-number-column) 110px 100px 220px minmax(320px,1fr) 90px var(--canonical-action-column)",
     multipleValues:"var(--canonical-number-column) minmax(110px,.7fr) minmax(180px,1.3fr) var(--canonical-action-column) var(--canonical-action-column)"
@@ -1060,18 +1061,107 @@
     return `${parentFoldID}/pack/${encodeURIComponent(archiveRelativePath)}`;
   }
 
-  function tagAnalyzerFieldRowMarkup(tagName, match, index) {
+  const isStructuredTagAnalyzerValue = value => Array.isArray(value) || (value !== null && typeof value === "object");
+
+  function tagAnalyzerJSONSummary(value) {
+    const count = Array.isArray(value) ? value.length : Object.keys(value || {}).length;
+    const label = Array.isArray(value) ? "item" : "field";
+    return `${Array.isArray(value) ? "Array" : "Object"} · ${count} ${label}${count === 1 ? "" : "s"}`;
+  }
+
+  function tagAnalyzerJSONValueFoldID(parentFoldID, match) {
+    const member = match.memberRelativePath || "package";
+    const scope = match.storageScope || match.scope || "metadata";
+    return `${parentFoldID}/field/${encodeURIComponent(member)}/${encodeURIComponent(scope)}`;
+  }
+
+  function tagAnalyzerJSONEntryFoldID(parentFoldID, entryID) {
+    return `${parentFoldID}/entry/${entryID}`;
+  }
+
+  function tagAnalyzerJSONFoldToggleMarkup(value, foldID, title) {
+    const summary = tagAnalyzerJSONSummary(value);
+    return canonicalFoldToggleMarkup(foldID, `Show nested ${title} values`, {
+      className:"tag-analyzer-json-trigger",
+      label:`<span class="canonical-fold-label">${esc(summary)}</span>`,
+      attributes:`data-unfold-render="tagAnalyzerJSON" data-json-value="${esc(JSON.stringify(value))}" data-json-title="${esc(title)}"`
+    });
+  }
+
+  function tagAnalyzerJSONScalarMarkup(value, title) {
+    const isString = typeof value === "string";
+    const raw = isString ? value : JSON.stringify(value);
+    return `<input class="tag-table-field tag-analyzer-json-scalar" data-tag-analyzer-json-scalar data-json-scalar-type="${isString ? "string" : "json"}" value="${esc(raw)}" aria-label="Value for ${esc(title)}">`;
+  }
+
+  function tagAnalyzerJSONEntryRowMarkup(value, key, index, entryID, parentFoldID, isArray) {
+    const keyText = String(key);
+    const childTitle = isArray ? `Item ${index + 1}` : keyText;
+    const structured = isStructuredTagAnalyzerValue(value);
+    const childFoldID = structured ? tagAnalyzerJSONEntryFoldID(parentFoldID, entryID) : "";
+    const keyControl = isArray
+      ? `<input class="tag-table-field tag-analyzer-json-key" value="${index}" aria-label="Index ${index}" disabled>`
+      : `<input class="tag-table-field tag-analyzer-json-key" data-tag-analyzer-json-key value="${esc(keyText)}" aria-label="Key ${esc(keyText)}">`;
+    const valueControl = structured
+      ? tagAnalyzerJSONFoldToggleMarkup(value, childFoldID, childTitle)
+      : tagAnalyzerJSONScalarMarkup(value, childTitle);
+    const row = canonicalRowMarkup([
+      canonicalNumberCellMarkup(index + 1, `Value number ${index + 1}`, { className:"multiple-value-number-cell" }),
+      canonicalCellMarkup(keyControl, { className:"tag-analyzer-json-key-cell" }),
+      canonicalCellMarkup(valueControl, { className:"tag-analyzer-json-value-cell" }),
+      canonicalCellMarkup(`<button class="icon-button danger" data-action="removeTagAnalyzerJSONEntry" type="button" title="Remove ${esc(childTitle)}" aria-label="Remove ${esc(childTitle)}">×</button>`, { className:"canonical-table-action-cell" })
+    ], { className:"tag-analyzer-json-entry-row", attributes:`data-json-entry data-json-entry-index="${index}" data-json-entry-id="${entryID}" data-json-entry-kind="${structured ? "node" : "scalar"}"${structured ? ` data-json-entry-fold-id="${esc(childFoldID)}"` : ""}` });
+    if (!structured) return row;
+    const childTable = CanonicalTable.isFoldOpen(childFoldID)
+      ? tagAnalyzerJSONNodeMarkup(value, childTitle, childFoldID)
+      : "";
+    return CanonicalTable.rowWithUnfolds(row, [{ foldID:childFoldID, content:childTable }]);
+  }
+
+  function tagAnalyzerJSONTitleActions(foldID) {
+    const addButton = (kind, label, title) => `<button class="icon-button tag-analyzer-json-add" data-action="addTagAnalyzerJSONEntry" data-json-entry-type="${kind}" type="button" title="${title}" aria-label="${title}">${label}</button>`;
+    return `<span class="tag-analyzer-json-title-actions">${addButton("scalar", "＋", "Add string value")}${addButton("json", "123", "Add JSON scalar")}${addButton("object", "{}", "Add object")}${addButton("array", "[]", "Add array")}${multipleValuesCloseMarkup({ foldID })}</span>`;
+  }
+
+  function tagAnalyzerJSONNodeMarkup(value, title, foldID) {
+    const isArray = Array.isArray(value);
+    const entries = isArray ? value.map((item, index) => [String(index), item]) : Object.entries(value || {});
+    const rows = entries.map(([key, item], index) => tagAnalyzerJSONEntryRowMarkup(item, key, index, index, foldID, isArray)).join("") ||
+      canonicalEmptyRowMarkup("No values", "tag-analyzer-json-empty");
+    const tableTitle = `${title} · ${tagAnalyzerJSONSummary(value).replace(/^(Array|Object) · /, "")}`;
+    const table = new CanonicalTable({
+      className:"multiple-values-table tag-analyzer-json-table",
+      columns:CanonicalTableColumns.tagAnalyzerJSONValues,
+      title:tableTitle,
+      titleAction:tagAnalyzerJSONTitleActions(foldID),
+      ariaLabel:`Nested values for ${title}`,
+      header:canonicalHeaderMarkup(["#", isArray ? "Index" : "Key", "Value", "×"]),
+      rows,
+      attributes:`data-json-node data-json-node-kind="${isArray ? "array" : "object"}" data-json-node-fold-id="${esc(foldID)}" data-json-node-title="${esc(title)}" data-json-next-entry-id="${entries.length}"`
+    });
+    return `<div class="tag-analyzer-json-node">${table}<small class="tag-analyzer-json-error" data-json-node-error></small></div>`;
+  }
+
+  function tagAnalyzerFieldRowMarkup(tagName, match, index, parentFoldID) {
     const memberPath = match.memberRelativePath || "";
     const trackName = memberPath ? memberPath.split("/").pop() : "Package";
     const value = match.valueIsJSON ? match.valueJSON : match.value;
-    const valueControl = match.valueIsJSON
+    let parsedValue = null;
+    if (match.valueIsJSON) {
+      try { parsedValue = JSON.parse(value); } catch { parsedValue = null; }
+    }
+    const structuredValue = match.valueIsJSON && isStructuredTagAnalyzerValue(parsedValue);
+    const valueFoldID = structuredValue ? tagAnalyzerJSONValueFoldID(parentFoldID, match) : "";
+    const valueControl = structuredValue
+      ? tagAnalyzerJSONFoldToggleMarkup(parsedValue, valueFoldID, tagName)
+      : match.valueIsJSON
       ? '<textarea class="tag-table-field tag-analyzer-match-value" data-tag-analyzer-value rows="3" aria-label="Tag value for ' + esc(tagName) + '">' + esc(value) + '</textarea>'
       : '<input class="tag-table-field tag-analyzer-match-value" data-tag-analyzer-value value="' + esc(value) + '" aria-label="Tag value for ' + esc(tagName) + '">';
     const trackControl = '<input class="tag-table-field tag-analyzer-match-track" value="' + esc(trackName) + '" title="' + esc(memberPath || "Package-level tag field") + '" aria-label="Track" disabled>';
     const nameControl = '<input class="tag-table-field" data-tag-analyzer-name value="' + esc(tagName) + '" aria-label="Tag name ' + esc(tagName) + '">';
-    const rowAttributes = 'data-tag-analyzer-match data-tag-name="' + esc(tagName) + '" data-archive-relative-path="' + esc(match.archiveRelativePath) + '" data-member-relative-path="' + esc(match.memberRelativePath || "") + '" data-storage-scope="' + esc(match.storageScope) + '" data-storage-key="' + esc(match.storageKey) + '" data-expected-value-json="' + esc(match.valueJSON) + '" data-value-is-json="' + match.valueIsJSON + '"';
+    const rowAttributes = 'data-tag-analyzer-match data-tag-name="' + esc(tagName) + '" data-archive-relative-path="' + esc(match.archiveRelativePath) + '" data-member-relative-path="' + esc(match.memberRelativePath || "") + '" data-storage-scope="' + esc(match.storageScope) + '" data-storage-key="' + esc(match.storageKey) + '" data-expected-value-json="' + esc(match.valueJSON) + '" data-value-is-json="' + match.valueIsJSON + '" data-json-value-fold-id="' + esc(valueFoldID) + '"';
     const disabled = state?.isDeletingTagAnalyzerTrackFields ? " disabled" : "";
-    return canonicalRowMarkup([
+    const row = canonicalRowMarkup([
       canonicalNumberCellMarkup(index + 1, "Tag field number " + (index + 1), { className:"multiple-value-number-cell" }),
       canonicalCellMarkup(trackControl, { className:"tag-analyzer-match-track-cell" }),
       canonicalCellMarkup(nameControl, { className:"tag-analyzer-match-name-cell" }),
@@ -1079,11 +1169,16 @@
       canonicalCellMarkup('<button class="icon-button" data-action="commitTagAnalyzerMatch" title="Save this tag field" aria-label="Save this tag field"' + disabled + '>✓</button>', { className:"canonical-table-action-cell" }),
       canonicalCellMarkup('<button class="icon-button danger" data-action="deleteTagAnalyzerMatch" title="Delete this tag field" aria-label="Delete this tag field"' + disabled + '>×</button>', { className:"canonical-table-action-cell" })
     ], { className:"multiple-value-editor-row tag-analyzer-match-row", attributes:rowAttributes });
+    if (!structuredValue) return row;
+    const nestedTable = CanonicalTable.isFoldOpen(valueFoldID)
+      ? tagAnalyzerJSONNodeMarkup(parsedValue, tagName, valueFoldID)
+      : "";
+    return CanonicalTable.rowWithUnfolds(row, [{ foldID:valueFoldID, content:nestedTable }]);
   }
 
   function tagAnalyzerFieldsSubtableMarkup(tagName, matches, foldID, archiveRelativePath) {
     const header = canonicalHeaderMarkup(["#", "Track", "Tag Name", "Tag Value", "✓", "×"]);
-    const rows = matches.map((match, index) => tagAnalyzerFieldRowMarkup(tagName, match, index)).join("") ||
+    const rows = matches.map((match, index) => tagAnalyzerFieldRowMarkup(tagName, match, index, foldID)).join("") ||
       canonicalEmptyRowMarkup("No matching tag fields", "multiple-values-empty");
     return new CanonicalTable({
       className:"multiple-values-table tag-analyzer-fields-table",
@@ -1164,6 +1259,22 @@
     return CanonicalTable.fillUnfold(
       foldID,
       tagAnalyzerFieldsSubtableMarkup(tagName, packMatches, foldID, archiveRelativePath)
+    );
+  }
+
+  function renderTagAnalyzerJSONUnfold(toggle) {
+    const foldID = toggle?.dataset.foldId || "";
+    const subrow = CanonicalTable.subrow(foldID);
+    const contentHost = subrow?.querySelector(":scope > .inserted-table-cell > .inserted-table-panel > .canonical-unfold-content");
+    if (!foldID || !contentHost) return false;
+    if (contentHost.querySelector(".canonical-table[data-json-node]")) return true;
+    let value;
+    try { value = JSON.parse(toggle.dataset.jsonValue || "null"); }
+    catch { return false; }
+    if (!isStructuredTagAnalyzerValue(value)) return false;
+    return CanonicalTable.fillUnfold(
+      foldID,
+      tagAnalyzerJSONNodeMarkup(value, toggle.dataset.jsonTitle || "Values", foldID)
     );
   }
 
@@ -1592,12 +1703,232 @@
     };
   }
 
+  function tagAnalyzerJSONNodeFromTable(table) {
+    const isArray = table?.dataset.jsonNodeKind === "array";
+    const result = isArray ? [] : Object.create(null);
+    const seenKeys = new Set();
+    const entries = table ? [...table.querySelectorAll(":scope > .canonical-table-content-row[data-json-entry]")] : [];
+    for (const row of entries) {
+      const index = Number(row.dataset.jsonEntryIndex) || 0;
+      const keyField = $("[data-tag-analyzer-json-key]", row);
+      const key = isArray ? String(index) : (keyField?.value ?? "");
+      if (!isArray && key.length === 0) return { error:"Object keys cannot be empty.", focus:keyField };
+      if (!isArray && seenKeys.has(key)) return { error:'Object key "' + key + '" is repeated.', focus:keyField };
+      seenKeys.add(key);
+
+      let value;
+      if (row.dataset.jsonEntryKind === "node") {
+        const foldID = row.dataset.jsonEntryFoldId || "";
+        const subrow = CanonicalTable.subrow(foldID);
+        const childTable = subrow?.querySelector(".canonical-table[data-json-node]");
+        if (childTable) {
+          const child = tagAnalyzerJSONNodeFromTable(childTable);
+          if (child.error) return child;
+          value = child.value;
+        } else {
+          const toggle = row.querySelector('[data-unfold-render="tagAnalyzerJSON"]');
+          try { value = JSON.parse(toggle?.dataset.jsonValue || "null"); }
+          catch { return { error:'The nested value for "' + key + '" is not valid JSON.', focus:toggle }; }
+        }
+      } else {
+        const field = $("[data-tag-analyzer-json-scalar]", row);
+        if (!field) return { error:'The value for "' + key + '" is missing.', focus:row };
+        if (field.dataset.jsonScalarType === "string") value = field.value;
+        else {
+          try { value = JSON.parse(field.value); }
+          catch { return { error:'Enter a valid JSON scalar for "' + key + '".', focus:field }; }
+          if (isStructuredTagAnalyzerValue(value)) return { error:'Use the nested table to edit structured value "' + key + '".', focus:field };
+        }
+      }
+      if (isArray) result.push(value);
+      else Object.defineProperty(result, key, { value, enumerable:true, configurable:true, writable:true });
+    }
+    return { value:result };
+  }
+
+  function showTagAnalyzerJSONNodeError(table, message, focusTarget) {
+    const error = table?.closest(".tag-analyzer-json-node")?.querySelector("[data-json-node-error]");
+    if (error) error.textContent = message || "";
+    if (message) focusTarget?.focus?.();
+  }
+
+  function updateTagAnalyzerJSONToggle(toggle, value, title) {
+    if (!toggle) return;
+    toggle.dataset.jsonValue = JSON.stringify(value);
+    toggle.dataset.jsonTitle = title;
+    toggle.setAttribute("aria-label", "Show nested " + title + " values");
+    const label = $(".canonical-fold-label", toggle);
+    if (label) label.textContent = tagAnalyzerJSONSummary(value);
+  }
+
+  function updateTagAnalyzerJSONTableHeading(table, title, value) {
+    table.dataset.jsonNodeTitle = title;
+    table.setAttribute("aria-label", "Nested values for " + title);
+    const heading = $(":scope > .canonical-table-title-row .canonical-table-title-cell input", table);
+    const countSummary = tagAnalyzerJSONSummary(value).replace(/^(Array|Object) · /, "");
+    const headingText = title + " · " + countSummary;
+    if (heading) {
+      heading.value = headingText;
+      heading.setAttribute("aria-label", headingText);
+    }
+  }
+
+  function syncTagAnalyzerJSONChildTitles(table, value) {
+    const isArray = table.dataset.jsonNodeKind === "array";
+    const entries = [...table.querySelectorAll(":scope > .canonical-table-content-row[data-json-entry]")];
+    entries.forEach((row, index) => {
+      if (row.dataset.jsonEntryKind !== "node") return;
+      const keyField = $("[data-tag-analyzer-json-key]", row);
+      const key = isArray ? String(index) : (keyField?.value ?? "");
+      const childValue = isArray ? value[index] : value[key];
+      const title = isArray ? "Item " + (index + 1) : (key || "Value");
+      updateTagAnalyzerJSONToggle(row.querySelector('[data-unfold-render="tagAnalyzerJSON"]'), childValue, title);
+      const childFoldID = row.dataset.jsonEntryFoldId || "";
+      const childTable = CanonicalTable.subrow(childFoldID)?.querySelector(".canonical-table[data-json-node]");
+      if (childTable) updateTagAnalyzerJSONTableHeading(childTable, title, childValue);
+    });
+  }
+
+  function refreshTagAnalyzerJSONTree(table) {
+    let currentTable = table;
+    while (currentTable) {
+      const parsed = tagAnalyzerJSONNodeFromTable(currentTable);
+      if (parsed.error) {
+        showTagAnalyzerJSONNodeError(currentTable, parsed.error, parsed.focus);
+        return false;
+      }
+      showTagAnalyzerJSONNodeError(currentTable, "");
+      currentTable.dataset.jsonNodeValue = JSON.stringify(parsed.value);
+      syncTagAnalyzerJSONChildTitles(currentTable, parsed.value);
+
+      const subrow = currentTable.closest("[data-canonical-subrow]");
+      const parentRow = subrow?.previousElementSibling;
+      if (parentRow?.matches("[data-json-entry]")) {
+        const isArray = parentRow.parentElement?.dataset.jsonNodeKind === "array";
+        const keyField = $("[data-tag-analyzer-json-key]", parentRow);
+        const entryIndex = Number(parentRow.dataset.jsonEntryIndex) || 0;
+        const title = isArray ? "Item " + (entryIndex + 1) : (keyField?.value || "Value");
+        updateTagAnalyzerJSONToggle(parentRow.querySelector('[data-unfold-render="tagAnalyzerJSON"]'), parsed.value, title);
+        updateTagAnalyzerJSONTableHeading(currentTable, title, parsed.value);
+        currentTable = parentRow.closest(".canonical-table[data-json-node]");
+        continue;
+      }
+      if (parentRow?.matches("[data-tag-analyzer-match]")) {
+        const name = $("[data-tag-analyzer-name]", parentRow)?.value.trim() || parentRow.dataset.tagName || "Tag value";
+        const foldID = parentRow.dataset.jsonValueFoldId || "";
+        updateTagAnalyzerJSONToggle(CanonicalTable.toggleFor(foldID), parsed.value, name);
+        updateTagAnalyzerJSONTableHeading(currentTable, name, parsed.value);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  function tagAnalyzerJSONValueForMatch(row) {
+    const foldID = row?.dataset.jsonValueFoldId || "";
+    const subrow = foldID ? CanonicalTable.subrow(foldID) : null;
+    const table = subrow?.querySelector(".canonical-table[data-json-node]");
+    if (table) {
+      const parsed = tagAnalyzerJSONNodeFromTable(table);
+      if (parsed.error) {
+        const error = $("[data-tag-analyzer-error]", row);
+        if (error) error.textContent = parsed.error;
+        parsed.focus?.focus?.();
+        return { ok:false };
+      }
+      return { ok:true, value:JSON.stringify(parsed.value) };
+    }
+    const toggle = CanonicalTable.toggleFor(foldID);
+    const valueJSON = toggle?.dataset.jsonValue || row?.dataset.expectedValueJson || "null";
+    try {
+      const parsed = JSON.parse(valueJSON);
+      if (!isStructuredTagAnalyzerValue(parsed)) return { ok:false };
+      return { ok:true, value:JSON.stringify(parsed) };
+    } catch {
+      const error = $("[data-tag-analyzer-error]", row);
+      if (error) error.textContent = "Enter a valid JSON value.";
+      return { ok:false };
+    }
+  }
+
+  function addTagAnalyzerJSONEntry(button) {
+    const table = button?.closest(".canonical-table[data-json-node]");
+    if (!table) return;
+    const isArray = table.dataset.jsonNodeKind === "array";
+    const parentFoldID = table.dataset.jsonNodeFoldId || "";
+    const entryType = button.dataset.jsonEntryType || "scalar";
+    const initialValue = entryType === "object" ? {} : entryType === "array" ? [] : entryType === "json" ? null : "";
+    const entries = [...table.querySelectorAll(":scope > .canonical-table-content-row[data-json-entry]")];
+    const index = entries.length;
+    let key = String(index);
+    if (!isArray) {
+      const keys = new Set(entries.map(row => $("[data-tag-analyzer-json-key]", row)?.value ?? ""));
+      key = "newField";
+      let suffix = 2;
+      while (keys.has(key)) key = "newField" + suffix++;
+    }
+    table.querySelector(":scope > .canonical-table-empty-row")?.remove();
+    const entryID = Number(table.dataset.jsonNextEntryId) || 0;
+    table.dataset.jsonNextEntryId = String(entryID + 1);
+    table.insertAdjacentHTML("beforeend", tagAnalyzerJSONEntryRowMarkup(initialValue, key, index, entryID, parentFoldID, isArray));
+    const row = table.querySelector(':scope > .canonical-table-content-row[data-json-entry-index="' + index + '"]');
+    refreshTagAnalyzerJSONTree(table);
+    if (isStructuredTagAnalyzerValue(initialValue)) {
+      const toggle = row?.querySelector('[data-unfold-render="tagAnalyzerJSON"]');
+      if (toggle) {
+        CanonicalTable.setFoldOpen(toggle, true);
+        renderTagAnalyzerJSONUnfold(toggle);
+      }
+    } else {
+      const focusTarget = isArray ? $("[data-tag-analyzer-json-scalar]", row) : $("[data-tag-analyzer-json-key]", row);
+      focusTarget?.focus();
+    }
+    if (!isArray && isStructuredTagAnalyzerValue(initialValue)) $("[data-tag-analyzer-json-key]", row)?.focus();
+  }
+
+  function removeTagAnalyzerJSONEntry(button) {
+    const row = button?.closest(".canonical-table-content-row[data-json-entry]");
+    const table = row?.closest(".canonical-table[data-json-node]");
+    if (!row || !table) return;
+    const foldID = row.dataset.jsonEntryFoldId || "";
+    if (foldID) {
+      CanonicalTable.openFoldIDs.delete(foldID);
+      CanonicalTable.pendingFoldAnimations.delete(foldID);
+      const childSubrow = CanonicalTable.subrow(foldID);
+      CanonicalTable.foldAnimations.get(childSubrow)?.cancel();
+      CanonicalTable.foldAnimations.delete(childSubrow);
+      CanonicalTable.clearFoldPrefix(foldID + "/");
+    }
+    if (row.nextElementSibling?.matches(".canonical-table-unfold-row")) row.nextElementSibling.remove();
+    row.remove();
+
+    const isArray = table.dataset.jsonNodeKind === "array";
+    const entries = [...table.querySelectorAll(":scope > .canonical-table-content-row[data-json-entry]")];
+    entries.forEach((entry, index) => {
+      entry.dataset.jsonEntryIndex = String(index);
+      const number = $(".canonical-number-field", entry);
+      if (number) {
+        number.value = String(index + 1);
+        number.setAttribute("aria-label", "Value number " + (index + 1));
+      }
+      if (isArray) {
+        const indexField = $(".tag-analyzer-json-key", entry);
+        if (indexField) {
+          indexField.value = String(index);
+          indexField.setAttribute("aria-label", "Index " + index);
+        }
+      }
+    });
+    if (!entries.length) table.insertAdjacentHTML("beforeend", canonicalEmptyRowMarkup("No values", "tag-analyzer-json-empty"));
+    refreshTagAnalyzerJSONTree(table);
+  }
+
   function commitTagAnalyzerMatch(row) {
     if (!row || state?.isDeletingTagAnalyzerTrackFields) return;
     const nameField = $("[data-tag-analyzer-name]", row);
     const valueField = $("[data-tag-analyzer-value]", row);
     const name = nameField?.value.trim() || "";
-    const value = valueField?.value ?? "";
+    let value = valueField?.value ?? "";
     const error = $("[data-tag-analyzer-error]", row);
     const valueIsJSON = row.dataset.valueIsJson === "true";
     if (!name) {
@@ -1606,6 +1937,11 @@
       return;
     }
     if (valueIsJSON) {
+      if (row.dataset.jsonValueFoldId) {
+        const collected = tagAnalyzerJSONValueForMatch(row);
+        if (!collected.ok) return;
+        value = collected.value;
+      }
       try { JSON.parse(value); }
       catch {
         if (error) error.textContent = "Enter a valid JSON value.";
@@ -1615,6 +1951,7 @@
     }
     if (error) error.textContent = "";
     const oldName = row.dataset.tagName || "";
+    if (row.dataset.jsonValueFoldId) CanonicalTable.clearFoldPrefix(row.dataset.jsonValueFoldId + "/");
     if (oldName !== name) {
       CanonicalTable.renameFoldBranch(tagAnalyzerFoldID(oldName), tagAnalyzerFoldID(name));
       const cachedMatches = tagAnalyzerMatchesByName.get(oldName);
@@ -1703,6 +2040,8 @@
       const path = row?.dataset.trackBrowserPath || "";
       selectTrackBrowserMember(path);
     }
+    else if (action === "addTagAnalyzerJSONEntry") addTagAnalyzerJSONEntry(event.target.closest("[data-action=addTagAnalyzerJSONEntry]"));
+    else if (action === "removeTagAnalyzerJSONEntry") removeTagAnalyzerJSONEntry(event.target.closest("[data-action=removeTagAnalyzerJSONEntry]"));
     else if (action === "removeMultipleValue") removeMultipleValue(event.target.closest("[data-multiple-entry]"));
     else if (action === "commitMultipleValueRow") commitMultipleValueRow(event.target.closest("[data-multiple-entry]"));
     else if (action === "commitMultipleValues") {
@@ -1729,6 +2068,8 @@
           bridge("loadTagAnalyzerMatches", { tagName });
         } else if (toggle.dataset.unfoldRender === "tagAnalyzer") {
           renderTagAnalyzerUnfold(toggle);
+        } else if (toggle.dataset.unfoldRender === "tagAnalyzerJSON") {
+          renderTagAnalyzerJSONUnfold(toggle);
         }
       }
     }
@@ -1831,6 +2172,9 @@
   document.addEventListener("input", event => {
     if (event.target.id === "collection-filter") renderCollections();
     else if (event.target.id === "member-filter") ["files", "newTag", "tagAnalyzer"].includes(mainView) ? render(state) : renderMembers();
+    else if (event.target.matches("[data-tag-analyzer-json-scalar], [data-tag-analyzer-json-key]")) {
+      refreshTagAnalyzerJSONTree(event.target.closest(".canonical-table[data-json-node]"));
+    }
   });
   document.addEventListener("contextmenu", event => {
     const column = event.target.closest(".tracks-table [data-track-column-key]");
