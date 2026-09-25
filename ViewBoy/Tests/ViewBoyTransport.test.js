@@ -44,7 +44,7 @@ const appDelegateSource = fs.readFileSync(
 function element() {
   return {
     className: "",
-    classList: { add() {}, remove() {} },
+    classList: { add() {}, remove() {}, toggle() {} },
     style: { setProperty() {} },
     textContent: "",
     value: "",
@@ -126,6 +126,12 @@ function makeHarness() {
     }
   };
   const refs = {
+    playerDeck: element(),
+    deckState: element(),
+    deckIndex: element(),
+    deckTitle: element(),
+    deckMeta: element(),
+    queueCount: element(),
     elapsedLabel: element(),
     songLengthLabel: element(),
     playlistTotalLabel: element(),
@@ -164,13 +170,15 @@ function makeHarness() {
   let clockNow = 1000;
   let animationFrameID = 0;
   const animationFrames = new Map();
+  const delayedTimers = new Map();
   const window = {
     setTimeout(callback, duration) {
       const id = ++timerID;
       if (duration <= 100) queueMicrotask(callback);
+      else delayedTimers.set(id, callback);
       return id;
     },
-    clearTimeout() {},
+    clearTimeout(id) { delayedTimers.delete(id); },
     performance: { now: () => clockNow },
     requestAnimationFrame(callback) {
       const id = ++animationFrameID;
@@ -251,6 +259,9 @@ function makeHarness() {
       const pending = [...animationFrames.entries()];
       animationFrames.clear();
       pending.forEach(([, callback]) => callback(clockNow));
+      const timers = [...delayedTimers.entries()];
+      delayedTimers.clear();
+      timers.forEach(([, callback]) => callback());
     }
   };
 }
@@ -278,6 +289,22 @@ test("ViewBoy ignores stale native generations", () => {
   assert.equal(state.nativePlayback.generation, 7);
   assert.equal(state.currentTrackId, "track-a");
   assert.equal(state.isPlaying, true);
+});
+
+test("ViewBoy deck identifies the cued track and active transport", () => {
+  const { app } = makeHarness();
+  app.state.selectedTrackId = "track-a";
+  app.state.currentTrackInfo = app.state.playlist[0];
+  app.playback.updatePlaybackReadout();
+  assert.equal(app.refs.deckState.textContent, "CUED");
+  assert.equal(app.refs.deckTitle.textContent, "Fixture");
+  assert.equal(app.refs.deckIndex.textContent, "01 / 01");
+  assert.equal(app.refs.queueCount.textContent, "001 TRACKS");
+
+  app.state.currentTrackId = "track-a";
+  app.state.isPlaying = true;
+  app.playback.updatePlaybackReadout();
+  assert.equal(app.refs.deckState.textContent, "PLAYING");
 });
 
 test("ViewBoy restores output when an adjacent fade is cancelled", async () => {
@@ -428,6 +455,7 @@ test("ViewBoy renders native status events without a polling loop", () => {
 });
 
 test("ViewBoy advances the visible clock between authoritative native events", () => {
+  assert.doesNotMatch(playbackSource, /requestAnimationFrame/);
   const { app, flushAnimationFrame } = makeHarness();
   const { state } = app;
   state.currentTrackId = "track-a";

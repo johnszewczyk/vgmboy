@@ -20,6 +20,9 @@ packages without forking catalog or playback behavior.
   `Package.swift` and `app-info.plist`.
 - Keep the renderer dispatcher named `window.SPCBoyWK` until a deliberate
   bridge migration updates both native and renderer clients together.
+- `PlaylistTabsStore` persists only ViewBoy playlist presentation in its own
+  application-support directory. Tab switches leave the shared playback
+  session and queue untouched.
 - The app must not write catalogs, add a private archive extractor, or create
   another decoder/playback implementation.
 
@@ -37,3 +40,5 @@ packages without forking catalog or playback behavior.
 - `build.sh`
 - `launch.sh`
 - `app-info.plist`
+- `Sources/ViewBoy/PlaylistTabsStore.swift`
+- `Sources/ViewBoy/Resources/viewboy-tabs.js`

@@ -10,13 +10,13 @@ let autoSizedPlaylistSignature = null;
 let playlistRenderGeneration = 0;
 let textMeasureContext = null;
 let renderedDatabaseGames = null;
-let databaseGameButtons = [];
 let databaseEmptyState = null;
 let databaseConsoleGroups = [];
 let collapsedDatabaseConsoles = new Set();
 let databaseRowRenderGeneration = 0;
 let browserClickTimer = 0;
-let databaseGameClickTimer = 0;
+let browserSelectionRequest = null;
+let databaseGameLoadRequest = null;
 let databaseGameSearchRecords = [];
 let columnResizePointerId = null;
 const PLAYLIST_VIRTUALIZATION_THRESHOLD = 200;
@@ -24,6 +24,9 @@ const PLAYLIST_VIRTUAL_OVERSCAN = 12;
 let playlistVirtualRowHeight = 28;
 let playlistViewportFrame = 0;
 let playlistRowMeasurementFrame = 0;
+let playlistVirtualWindowStart = null;
+let playlistVirtualWindowEnd = null;
+let playlistViewportRenderPending = false;
 
 function syncCollapsedConsolePersistence() {
   state.collapsedConsoleNames = [...collapsedDatabaseConsoles];
@@ -92,20 +95,43 @@ function playVisibleTrack(trackId, startSeconds = 0) {
 let browserSelectionGeneration = 0;
 let selectedBrowserButton = null;
 let selectedDatabaseGameButton = null;
+let selectedDatabaseConsoleButton = null;
 const playlistRowsByTrackId = new Map();
+const playlistTrackByID = new Map();
+const playlistIndexByID = new Map();
+let selectedPlaylistTrackIDs = new Set();
 let selectedPlaylistRow = null;
 let currentPlaylistRow = null;
 let selectionIndicatorFrame = 0;
+let selectionIndicatorSuppressionGeneration = 0;
+const SELECTION_SIDEBAR = 1;
+const SELECTION_PLAYLIST = 2;
+const SELECTION_OPTIONS = 4;
+const SELECTION_ALL = SELECTION_SIDEBAR | SELECTION_PLAYLIST | SELECTION_OPTIONS;
+let selectionIndicatorScopes = SELECTION_ALL;
+let sidebarContentRendering = false;
+let playlistRowsRendering = false;
+const databaseGameButtonsByKey = new Map();
+const databaseConsoleButtonsByName = new Map();
+let visibleDatabaseGameKeys = null;
+const browserButtonsByPath = new Map();
+const visibleBrowserNodeIndexByPath = new Map();
+let visibleBrowserNodeList = [];
 
 function playlistUsesVirtualRows() {
   return state.playlist.length > PLAYLIST_VIRTUALIZATION_THRESHOLD;
 }
 
 function schedulePlaylistViewportRender() {
-  if (!playlistUsesVirtualRows() || playlistViewportFrame) return;
+  if (!playlistUsesVirtualRows()) return;
+  if (playlistRowsRendering) {
+    playlistViewportRenderPending = true;
+    return;
+  }
+  if (playlistViewportFrame) return;
   playlistViewportFrame = window.requestAnimationFrame(() => {
     playlistViewportFrame = 0;
-    renderPlaylist({ sort: false });
+    reconcilePlaylistViewport();
   });
 }
 
@@ -117,13 +143,13 @@ function schedulePlaylistRowMeasurement() {
     const measuredHeight = Math.round(row?.getBoundingClientRect?.().height || 0);
     if (!measuredHeight || measuredHeight === playlistVirtualRowHeight) return;
     playlistVirtualRowHeight = measuredHeight;
-    renderPlaylist({ sort: false });
+    renderPlaylist({ sort: false, persist: false, refreshIndex: false, animateSelection: false });
   });
 }
 
-function makePlaylistVirtualSpacer(height) {
+function makePlaylistVirtualSpacer(height, edge) {
   const row = document.createElement("tr");
-  row.className = "playlist-virtual-spacer";
+  row.className = `playlist-virtual-spacer playlist-virtual-spacer-${edge}`;
   row.setAttribute("aria-hidden", "true");
   const cell = document.createElement("td");
   cell.colSpan = Math.max(1, orderedColumns().length);
@@ -132,7 +158,75 @@ function makePlaylistVirtualSpacer(height) {
   return row;
 }
 
+function playlistVirtualRange() {
+  const scrollTop = refs.playlistBodyWrap?.scrollTop || 0;
+  const viewportHeight = refs.playlistBodyWrap?.clientHeight || (playlistVirtualRowHeight * 24);
+  return {
+    start: Math.max(0, Math.floor(scrollTop / playlistVirtualRowHeight) - PLAYLIST_VIRTUAL_OVERSCAN),
+    end: Math.min(
+      state.playlist.length,
+      Math.ceil((scrollTop + viewportHeight) / playlistVirtualRowHeight) + PLAYLIST_VIRTUAL_OVERSCAN
+    )
+  };
+}
+
+function updatePlaylistVirtualSpacer(edge, height) {
+  const className = `playlist-virtual-spacer-${edge}`;
+  let row = refs.playlistBody.querySelector(`.${className}`);
+  if (height <= 0) {
+    row?.remove();
+    return null;
+  }
+  if (!row) row = makePlaylistVirtualSpacer(height, edge);
+  const cell = row.firstElementChild;
+  cell.colSpan = Math.max(1, orderedColumns().length);
+  cell.style.height = `${Math.max(0, Math.round(height))}px`;
+  return row;
+}
+
+function reconcilePlaylistViewport() {
+  if (!playlistUsesVirtualRows() || playlistRowsRendering) return;
+  const { start, end } = playlistVirtualRange();
+  if (start === playlistVirtualWindowStart && end === playlistVirtualWindowEnd) return;
+  playlistVirtualWindowStart = start;
+  playlistVirtualWindowEnd = end;
+
+  const topSpacer = updatePlaylistVirtualSpacer("top", start * playlistVirtualRowHeight);
+  const bottomSpacer = updatePlaylistVirtualSpacer("bottom", (state.playlist.length - end) * playlistVirtualRowHeight);
+  if (bottomSpacer && refs.playlistBody.lastChild !== bottomSpacer) {
+    refs.playlistBody.appendChild(bottomSpacer);
+  }
+  for (const [trackId, row] of playlistRowsByTrackId) {
+    const index = playlistIndexByID.get(trackId);
+    if (index === undefined || index < start || index >= end) {
+      row.remove();
+      playlistRowsByTrackId.delete(trackId);
+    }
+  }
+
+  let anchor = bottomSpacer;
+  for (let index = end - 1; index >= start; index -= 1) {
+    const track = state.playlist[index];
+    let row = playlistRowsByTrackId.get(track.id);
+    if (!row) row = makePlaylistRow(track, index);
+    if (row.nextSibling !== anchor) refs.playlistBody.insertBefore(row, anchor);
+    anchor = row;
+  }
+  if (topSpacer && refs.playlistBody.firstChild !== topSpacer) {
+    refs.playlistBody.insertBefore(topSpacer, refs.playlistBody.firstChild);
+  }
+  selectedPlaylistRow = state.selectedTrackId ? playlistRowsByTrackId.get(state.selectedTrackId) || null : null;
+  currentPlaylistRow = state.currentTrackId ? playlistRowsByTrackId.get(state.currentTrackId) || null : null;
+  scheduleSelectionIndicators(false, SELECTION_PLAYLIST);
+}
+
 refs.playlistBodyWrap?.addEventListener("scroll", schedulePlaylistViewportRender, { passive: true });
+refs.playlistBodyWrap?.addEventListener("scroll", () => {
+  if (!playlistUsesVirtualRows()) scheduleSelectionIndicators(false, SELECTION_PLAYLIST);
+}, { passive: true });
+refs.treeRoot?.addEventListener("scroll", () => scheduleSelectionIndicators(false, SELECTION_SIDEBAR), { passive: true });
+refs.optionsNav?.addEventListener("scroll", () => scheduleSelectionIndicators(false, SELECTION_OPTIONS), { passive: true });
+window.addEventListener("resize", () => scheduleSelectionIndicators(false), { passive: true });
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>'"]/g, (character) => ({
@@ -141,52 +235,88 @@ function escapeHtml(value) {
 }
 
 function ensureSidebarSelectionIndicator() {
-  let indicator = refs.treeRoot.querySelector(".list-selection-indicator");
-  if (indicator) return indicator;
-  indicator = document.createElement("div");
+  if (refs.sidebarSelectionIndicator?.isConnected) return refs.sidebarSelectionIndicator;
+  const indicator = document.createElement("div");
+  indicator.id = "sidebar-selection-indicator";
   indicator.className = "list-selection-indicator";
   indicator.setAttribute("aria-hidden", "true");
-  refs.treeRoot.prepend(indicator);
+  document.body.appendChild(indicator);
+  refs.sidebarSelectionIndicator = indicator;
   return indicator;
 }
 
 function resetSidebarContent() {
-  // Keep the single selection surface alive across sidebar renders. Recreating
-  // it on every click resets its transform, producing both flicker and stale
-  // looking bars instead of one continuous 100 ms movement.
+  sidebarContentRendering = true;
   databaseRowRenderGeneration += 1;
   const indicator = ensureSidebarSelectionIndicator();
-  refs.treeRoot.replaceChildren(indicator);
+  refs.treeRoot.replaceChildren();
   return indicator;
 }
 
 function positionSelectionIndicator(container, indicator, target) {
-  if (!container || !indicator || !target) {
+  if (!container || !indicator || !target?.isConnected || !container.contains(target)) {
     if (indicator) indicator.style.opacity = "0";
     return;
   }
   const containerBounds = container.getBoundingClientRect();
   const targetBounds = target.getBoundingClientRect();
-  if (!targetBounds.width || !targetBounds.height) {
+  const visibleLeft = Math.max(containerBounds.left, targetBounds.left);
+  const visibleRight = Math.min(containerBounds.right, targetBounds.right);
+  const visibleBottom = Math.min(containerBounds.bottom, targetBounds.bottom);
+  const visibleTop = Math.max(containerBounds.top, targetBounds.top);
+  if (!targetBounds.width || !targetBounds.height || visibleRight <= visibleLeft || visibleBottom <= visibleTop) {
     indicator.style.opacity = "0";
     return;
   }
-  const left = targetBounds.left - containerBounds.left + container.scrollLeft;
-  const top = targetBounds.top - containerBounds.top + container.scrollTop;
-  indicator.style.width = `${targetBounds.width}px`;
-  indicator.style.height = `${targetBounds.height}px`;
+  const left = visibleLeft;
+  const top = visibleBottom - 2;
+  indicator.style.width = `${visibleRight - visibleLeft}px`;
   indicator.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
   indicator.style.opacity = "1";
 }
 
 function syncSelectionIndicators() {
   selectionIndicatorFrame = 0;
-  const sidebarTarget = refs.treeRoot.querySelector(".tree-node.is-selected, .database-game-row.is-selected, .database-console-row.is-selected");
-  positionSelectionIndicator(refs.treeRoot, ensureSidebarSelectionIndicator(), sidebarTarget);
-  positionSelectionIndicator(refs.playlistBodyWrap, refs.playlistSelectionIndicator, selectedPlaylistRow);
+  const scopes = selectionIndicatorScopes || SELECTION_ALL;
+  selectionIndicatorScopes = 0;
+  if (scopes & SELECTION_SIDEBAR) {
+    const sidebarTarget = currentSidebarView().contentMode === "tree"
+      ? selectedBrowserButton
+      : selectedDatabaseGameButton || selectedDatabaseConsoleButton;
+    if (!sidebarContentRendering) {
+      positionSelectionIndicator(refs.treeRoot, ensureSidebarSelectionIndicator(), sidebarTarget);
+    }
+  }
+  if ((scopes & SELECTION_PLAYLIST) && !playlistRowsRendering) {
+    positionSelectionIndicator(refs.playlistBodyWrap, refs.playlistSelectionIndicator, selectedPlaylistRow);
+  }
+  if (scopes & SELECTION_OPTIONS) {
+    const optionsTarget = {
+      database: refs.optionsDatabaseTab,
+      interface: refs.optionsThemeTab,
+      theme: refs.optionsThemeTab,
+      windows: refs.optionsWindowsTab,
+      audio: refs.optionsAudioTab,
+      diagnostics: refs.optionsDiagnosticsTab,
+      playback: refs.optionsPlaybackTab,
+      routing: refs.optionsRoutingTab
+    }[state.optionsSection] || refs.optionsDatabaseTab;
+    positionSelectionIndicator(refs.optionsNav, refs.optionsSelectionIndicator, optionsTarget);
+  }
+  if (document.documentElement.classList.contains("selection-indicators-following-scroll")) {
+    const generation = selectionIndicatorSuppressionGeneration;
+    window.requestAnimationFrame(() => {
+      if (generation === selectionIndicatorSuppressionGeneration) {
+        document.documentElement.classList.remove("selection-indicators-following-scroll");
+      }
+    });
+  }
 }
 
-function scheduleSelectionIndicators() {
+function scheduleSelectionIndicators(animated = true, scopes = SELECTION_ALL) {
+  selectionIndicatorSuppressionGeneration += 1;
+  selectionIndicatorScopes |= scopes;
+  document.documentElement.classList.toggle("selection-indicators-following-scroll", !animated);
   if (selectionIndicatorFrame) return;
   selectionIndicatorFrame = window.requestAnimationFrame(syncSelectionIndicators);
 }
@@ -267,9 +397,7 @@ function isNodeExpanded(node) {
 }
 
 function scrollSelectedBrowserItemIntoView() {
-  if (!state.selectedBrowserPath) return;
-  const button = refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(state.selectedBrowserPath)}"]`);
-  button?.scrollIntoView({ block: "nearest" });
+  selectedBrowserButton?.scrollIntoView({ block: "nearest" });
 }
 
 async function loadBrowserChildren(node) {
@@ -302,6 +430,34 @@ async function loadBrowserSelection(node) {
     ? window.spcBoyWK.selectFolder(node.path)
     : window.spcBoyWK.selectFile(node.path);
   return selection.then((value) => value?.stale === true ? null : value);
+}
+
+function loadBrowserSelectionOnce(node) {
+  const now = performance.now();
+  const current = browserSelectionRequest;
+  if (current?.path === node.path && (current.pending || now < current.expiresAt)) {
+    return current.promise;
+  }
+  const request = { path: node.path, pending: true, expiresAt: Number.POSITIVE_INFINITY, promise: null };
+  request.promise = loadBrowserSelection(node).then((selection) => {
+    request.pending = false;
+    if (selection && selection.stale !== true) {
+      request.expiresAt = performance.now() + 350;
+      window.setTimeout(() => {
+        if (browserSelectionRequest === request && performance.now() >= request.expiresAt) {
+          browserSelectionRequest = null;
+        }
+      }, 360);
+    } else if (browserSelectionRequest === request) {
+      browserSelectionRequest = null;
+    }
+    return selection;
+  }, (error) => {
+    if (browserSelectionRequest === request) browserSelectionRequest = null;
+    throw error;
+  });
+  browserSelectionRequest = request;
+  return request.promise;
 }
 
 function hideSidebarContextMenu() {
@@ -355,7 +511,7 @@ async function activateBrowserNode(node, { playNow = true } = {}) {
       expandedFolders.add(node.path);
       await loadBrowserChildren(node);
     }
-    const selection = await loadBrowserSelection(node);
+    const selection = await loadBrowserSelectionOnce(node);
     if (!selection
         || generation !== browserSelectionGeneration
         || state.selectedBrowserPath !== node.path) return;
@@ -370,7 +526,7 @@ async function activateBrowserNode(node, { playNow = true } = {}) {
 async function previewBrowserLeaf(node) {
   const generation = ++browserSelectionGeneration;
   try {
-    const selection = await loadBrowserSelection(node);
+    const selection = await loadBrowserSelectionOnce(node);
     if (!selection) return;
     if (generation !== browserSelectionGeneration || state.selectedBrowserPath !== node.path) return;
     applyFolderSelection(selection);
@@ -379,8 +535,8 @@ async function previewBrowserLeaf(node) {
   }
 }
 
-async function handleBrowserPrimaryClick(node) {
-  await handleBrowserGesture(node, "primaryClick", state.selectedBrowserPath === node.path);
+async function handleBrowserPrimaryClick(node, wasSelected) {
+  await handleBrowserGesture(node, "primaryClick", wasSelected);
 }
 
 async function handleBrowserGesture(node, gesture, wasSelected = false) {
@@ -397,20 +553,18 @@ function selectBrowserNode(node, { focus = false, previewLeaf = true } = {}) {
   state.selectedBrowserPath = node.path;
   persistSettings();
   syncTreeSelection();
-  if (focus) refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(node.path)}"]`)?.focus();
+  if (focus) selectedBrowserButton?.focus();
   if (previewLeaf && node.kind === "file") void previewBrowserLeaf(node);
 }
 
 function visibleBrowserNodes() {
-  return [...refs.treeRoot.querySelectorAll(".tree-node")]
-    .map((button) => findBrowserNode(filteredTree(), button.dataset.browserPath))
-    .filter(Boolean);
+  return visibleBrowserNodeList;
 }
 
 function moveBrowserSelection(delta) {
   const nodes = visibleBrowserNodes();
   if (!nodes.length) return;
-  const currentIndex = nodes.findIndex((node) => node.path === state.selectedBrowserPath);
+  const currentIndex = visibleBrowserNodeIndexByPath.get(state.selectedBrowserPath) ?? -1;
   const nextIndex = currentIndex < 0
     ? (delta >= 0 ? 0 : nodes.length - 1)
     : Math.max(0, Math.min(nodes.length - 1, currentIndex + delta));
@@ -455,7 +609,7 @@ function appendPlaylistTracks(additions, selectedBrowserPath = state.selectedBro
 }
 
 async function queueBrowserNode(node) {
-  const selection = await loadBrowserSelection(node);
+  const selection = await loadBrowserSelectionOnce(node);
   if (!selection) return;
   appendPlaylistTracks(Array.isArray(selection.playlist) ? selection.playlist : [], node.path);
 }
@@ -470,7 +624,7 @@ async function toggleBrowserNode(node) {
   }
   renderTree();
   syncTreeSelection();
-  refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(node.path)}"]`)?.focus();
+  browserButtonsByPath.get(node.path)?.focus();
 }
 
 function renderTreeNode(node, container) {
@@ -481,6 +635,9 @@ function renderTreeNode(node, container) {
   button.dataset.browserPath = node.path;
   button.className = `tree-node${state.selectedBrowserPath === node.path ? " is-selected" : ""}`;
   if (state.selectedBrowserPath === node.path) selectedBrowserButton = button;
+  browserButtonsByPath.set(node.path, button);
+  visibleBrowserNodeIndexByPath.set(node.path, visibleBrowserNodeList.length);
+  visibleBrowserNodeList.push(node);
   button.classList.toggle("tree-file", node.kind === "file");
   button.setAttribute("aria-expanded", node.kind === "folder" ? String(expanded) : "false");
   button.innerHTML = `
@@ -488,14 +645,26 @@ function renderTreeNode(node, container) {
   `;
   button.addEventListener("click", (event) => {
     window.clearTimeout(browserClickTimer);
+    const wasSelected = state.selectedBrowserPath === node.path;
+    const disclosureClick = event.target.closest?.(".tree-disclosure");
     selectBrowserNode(node, { focus: true, previewLeaf: false });
     if (event.detail > 1) return;
-    browserClickTimer = window.setTimeout(() => void handleBrowserPrimaryClick(node), 220);
+    if (node.kind === "file") {
+      void previewBrowserLeaf(node);
+      return;
+    }
+    if (disclosureClick && node.kind === "folder") {
+      void toggleBrowserNode(node);
+      return;
+    }
+    if (!wasSelected) return;
+    browserClickTimer = window.setTimeout(() => void handleBrowserPrimaryClick(node, wasSelected), 220);
   });
   button.addEventListener("dblclick", (event) => {
     event.preventDefault();
     event.stopPropagation();
     window.clearTimeout(browserClickTimer);
+    if (event.target.closest?.(".tree-disclosure")) return;
     void handleBrowserGesture(node, "activate", true);
   });
   button.addEventListener("contextmenu", (event) => showSidebarContextMenu(node, event));
@@ -559,10 +728,17 @@ const sidebarNaturalCollator = new Intl.Collator(undefined, { numeric: true, sen
 
 function renderTree() {
   renderedDatabaseGames = null;
-  databaseGameButtons = [];
   databaseEmptyState = null;
   databaseConsoleGroups = [];
+  databaseGameButtonsByKey.clear();
+  databaseConsoleButtonsByName.clear();
+  visibleDatabaseGameKeys = null;
+  browserButtonsByPath.clear();
+  visibleBrowserNodeIndexByPath.clear();
+  visibleBrowserNodeList = [];
   selectedBrowserButton = null;
+  selectedDatabaseGameButton = null;
+  selectedDatabaseConsoleButton = null;
   resetSidebarContent();
   const visibleTree = filteredTree();
   if (visibleTree.length === 0) {
@@ -574,13 +750,15 @@ function renderTree() {
         ? "No subfolders match this view."
         : "Choose Open Path to browse a local folder.";
     refs.treeRoot.appendChild(empty);
-    scheduleSelectionIndicators();
+    sidebarContentRendering = false;
+    scheduleSelectionIndicators(true, SELECTION_SIDEBAR);
     return;
   }
 
   ensureExpandedToSelection(visibleTree);
   visibleTree.forEach((node) => renderTreeNode(node, refs.treeRoot));
-  scheduleSelectionIndicators();
+  sidebarContentRendering = false;
+  scheduleSelectionIndicators(true, SELECTION_SIDEBAR);
 }
 
 function databaseGameKey(game) {
@@ -592,6 +770,53 @@ function databaseConsoleName(game) {
 }
 
 let databaseGroupTransitionGeneration = 0;
+
+function syncDatabaseSelectionButtons() {
+  const nextGame = state.selectedDatabaseGameKey
+    ? databaseGameButtonsByKey.get(state.selectedDatabaseGameKey) || null
+    : null;
+  const nextConsole = !state.selectedDatabaseGameKey && state.selectedDatabaseConsoleName
+    ? databaseConsoleButtonsByName.get(state.selectedDatabaseConsoleName) || null
+    : null;
+  if (selectedDatabaseGameButton !== nextGame) {
+    selectedDatabaseGameButton?.classList.remove("is-selected");
+    nextGame?.classList.add("is-selected");
+    selectedDatabaseGameButton = nextGame;
+  }
+  if (selectedDatabaseConsoleButton !== nextConsole) {
+    selectedDatabaseConsoleButton?.classList.remove("is-selected");
+    nextConsole?.classList.add("is-selected");
+    selectedDatabaseConsoleButton = nextConsole;
+  }
+}
+
+function syncDatabaseGameVisibility(visibleGames) {
+  const nextKeys = Array.isArray(state.databaseSearchGames)
+    ? new Set(visibleGames.map(databaseGameKey))
+    : null;
+
+  if (nextKeys === null) {
+    if (visibleDatabaseGameKeys !== null) {
+      for (const button of databaseGameButtonsByKey.values()) button.classList.remove("is-hidden");
+    }
+    visibleDatabaseGameKeys = null;
+    return;
+  }
+
+  if (visibleDatabaseGameKeys === null) {
+    for (const [key, button] of databaseGameButtonsByKey) {
+      if (!nextKeys.has(key)) button.classList.add("is-hidden");
+    }
+  } else {
+    for (const key of visibleDatabaseGameKeys) {
+      if (!nextKeys.has(key)) databaseGameButtonsByKey.get(key)?.classList.add("is-hidden");
+    }
+    for (const key of nextKeys) {
+      if (!visibleDatabaseGameKeys.has(key)) databaseGameButtonsByKey.get(key)?.classList.remove("is-hidden");
+    }
+  }
+  visibleDatabaseGameKeys = nextKeys;
+}
 
 function databaseGroupStateSnapshot() {
   const knownGroupNames = databaseConsoleGroups.map(({ consoleName }) => consoleName);
@@ -619,6 +844,8 @@ async function applySharedDatabaseGroupAction(action, groupName = null, gameID =
   }
   state.selectedDatabaseConsoleName = next.selectedGroupName || null;
   state.selectedDatabaseGameKey = next.selectedGameID || null;
+  syncDatabaseSelectionButtons();
+  scheduleSelectionIndicators(true, SELECTION_SIDEBAR);
   syncCollapsedConsolePersistence();
   return true;
 }
@@ -639,38 +866,29 @@ function makeDatabaseGameButton(game) {
   button.dataset.searchText = `${game.name} ${game.rootName || ""}`.toLowerCase();
   button.innerHTML = `<span class="database-disclosure">·</span><span class="database-game-name">${escapeHtml(game.displayName || game.name)}</span>${state.sidebarPathCounts ? `<span class="database-game-meta">${game.trackCount}</span>` : ""}`;
   button.addEventListener("click", (event) => {
-    window.clearTimeout(databaseGameClickTimer);
     if (event.detail > 1) return;
     state.selectedDatabaseGameKey = databaseGameKey(game);
     state.selectedDatabaseConsoleName = databaseConsoleName(game);
     void applySharedDatabaseGroupAction("selectGame", state.selectedDatabaseConsoleName, state.selectedDatabaseGameKey)
       .catch((error) => reportDatabaseSidebarError("select the database game", error));
     persistSettings();
-    refs.treeRoot.querySelectorAll(".database-console-row.is-selected").forEach((row) => row.classList.remove("is-selected"));
-    selectedDatabaseGameButton?.classList.remove("is-selected");
-    selectedDatabaseGameButton = button;
-    selectedDatabaseGameButton.classList.add("is-selected");
-    scheduleSelectionIndicators();
+    syncDatabaseSelectionButtons();
+    scheduleSelectionIndicators(true, SELECTION_SIDEBAR);
     button.focus();
-    // Database game rows are final sidebar leaves. Read the indexed tracks
-    // immediately; this is a database preview, not a delayed filesystem scan.
-    databaseGameClickTimer = window.setTimeout(() => {
-      databaseGameClickTimer = 0;
-      loadDatabaseGame(game).catch((error) => reportDatabaseSidebarError("preview the selected game", error));
-    }, 220);
+    // Database game rows are final sidebar leaves. Preview the indexed tracks
+    // on the first click; a double-click reuses this request before activating it.
+    loadDatabaseGameOnce(game).catch((error) => reportDatabaseSidebarError("preview the selected game", error));
   });
   button.addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
     event.stopPropagation();
-    window.clearTimeout(databaseGameClickTimer);
-    databaseGameClickTimer = 0;
     state.selectedDatabaseGameKey = databaseGameKey(game);
     state.selectedDatabaseConsoleName = databaseConsoleName(game);
     void applySharedDatabaseGroupAction("selectGame", state.selectedDatabaseConsoleName, state.selectedDatabaseGameKey)
       .catch((error) => reportDatabaseSidebarError("select the database game", error));
     persistSettings();
-    loadDatabaseGame(game).then((loaded) => {
+    loadDatabaseGameOnce(game).then((loaded) => {
       const targetID = loaded ? databaseLoadedSelectionID() : null;
       if (targetID) return playVisibleTrack(targetID, 0);
       return undefined;
@@ -679,14 +897,12 @@ function makeDatabaseGameButton(game) {
   button.addEventListener("dblclick", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    window.clearTimeout(databaseGameClickTimer);
-    databaseGameClickTimer = 0;
     state.selectedDatabaseGameKey = databaseGameKey(game);
     state.selectedDatabaseConsoleName = databaseConsoleName(game);
     void applySharedDatabaseGroupAction("selectGame", state.selectedDatabaseConsoleName, state.selectedDatabaseGameKey)
       .catch((error) => reportDatabaseSidebarError("select the database game", error));
     persistSettings();
-    loadDatabaseGame(game).then((loaded) => {
+    loadDatabaseGameOnce(game).then((loaded) => {
       const targetID = loaded ? databaseLoadedSelectionID() : null;
       if (targetID) return playVisibleTrack(targetID, 0);
       return undefined;
@@ -720,24 +936,33 @@ function makeDatabaseGameButton(game) {
 
 function appendDatabaseGameRowsInBatches(groupedGames) {
   const generation = databaseRowRenderGeneration;
-  const pendingRows = databaseConsoleGroups.flatMap(({ games, consoleName }) =>
-    (groupedGames.get(consoleName) || []).map((game) => ({ games, game }))
-  );
-  let offset = 0;
+  let groupIndex = 0;
+  let rowIndex = 0;
 
   const appendBatch = () => {
     if (generation !== databaseRowRenderGeneration) return;
     const startedAt = performance.now();
-    while (offset < pendingRows.length && performance.now() - startedAt < 8) {
-      const { games, game } = pendingRows[offset++];
+    while (groupIndex < databaseConsoleGroups.length && performance.now() - startedAt < 8) {
+      const { games, consoleName } = databaseConsoleGroups[groupIndex];
+      const groupRows = groupedGames.get(consoleName) || [];
+      if (rowIndex >= groupRows.length) {
+        groupIndex += 1;
+        rowIndex = 0;
+        continue;
+      }
+      const game = groupRows[rowIndex++];
       const button = makeDatabaseGameButton(game);
+      const key = databaseGameKey(game);
+      if (visibleDatabaseGameKeys && !visibleDatabaseGameKeys.has(key)) button.classList.add("is-hidden");
       games.appendChild(button);
-      databaseGameButtons.push(button);
+      databaseGameButtonsByKey.set(key, button);
     }
-    if (offset < pendingRows.length) {
+    if (groupIndex < databaseConsoleGroups.length) {
       window.requestAnimationFrame(appendBatch);
     } else {
-      scheduleSelectionIndicators();
+      syncDatabaseSelectionButtons();
+      sidebarContentRendering = false;
+      scheduleSelectionIndicators(false, SELECTION_SIDEBAR);
     }
   };
 
@@ -747,27 +972,32 @@ function appendDatabaseGameRowsInBatches(groupedGames) {
 function renderDatabaseGames() {
   if (state.databaseSidebarLoading) {
     renderedDatabaseGames = null;
-    const indicator = resetSidebarContent();
+    resetSidebarContent();
     const loading = document.createElement("div");
     loading.className = "empty sidebar-empty sidebar-loading";
     loading.textContent = "Loading catalog…";
     refs.treeRoot.appendChild(loading);
-    positionSelectionIndicator(refs.treeRoot, indicator, null);
+    sidebarContentRendering = false;
+    scheduleSelectionIndicators(false, SELECTION_SIDEBAR);
     return;
   }
+  const allGames = state.databaseGames;
   const gamesForView = visibleDatabaseGames();
-  if (renderedDatabaseGames !== gamesForView) {
+  if (renderedDatabaseGames !== allGames) {
     resetSidebarContent();
     selectedDatabaseGameButton = null;
+    selectedDatabaseConsoleButton = null;
     databaseConsoleGroups = [];
+    databaseGameButtonsByKey.clear();
+    databaseConsoleButtonsByName.clear();
+    visibleDatabaseGameKeys = null;
     const groupedGames = new Map();
-    for (const game of gamesForView) {
+    for (const game of allGames) {
       const consoleName = databaseConsoleName(game);
       const games = groupedGames.get(consoleName) || [];
       games.push(game);
       groupedGames.set(consoleName, games);
     }
-    databaseGameButtons = [];
     [...groupedGames.keys()].sort((left, right) => sidebarNaturalCollator.compare(left, right)).forEach((consoleName) => {
       const group = document.createElement("div");
       group.className = "database-console-group";
@@ -804,24 +1034,24 @@ function renderDatabaseGames() {
       });
       group.append(heading, games);
       refs.treeRoot.appendChild(group);
-      databaseConsoleGroups.push({ group, games, consoleName });
+      databaseConsoleGroups.push({ group, games, consoleName, heading });
+      databaseConsoleButtonsByName.set(consoleName, heading);
     });
 
     databaseEmptyState = document.createElement("div");
     databaseEmptyState.className = "empty sidebar-empty";
     refs.treeRoot.appendChild(databaseEmptyState);
-    renderedDatabaseGames = gamesForView;
+    renderedDatabaseGames = allGames;
     appendDatabaseGameRowsInBatches(groupedGames);
   }
 
   const query = state.sidebarQuery.trim();
-  for (const button of databaseGameButtons) {
-    button.classList.remove("is-hidden");
-    button.classList.toggle("is-selected", state.selectedDatabaseGameKey === button.dataset.databaseGameKey);
-    if (state.selectedDatabaseGameKey === button.dataset.databaseGameKey) selectedDatabaseGameButton = button;
-  }
+  syncDatabaseGameVisibility(gamesForView);
+  syncDatabaseSelectionButtons();
+  const matchingConsoles = query ? new Set(gamesForView.map(databaseConsoleName)) : null;
 
   for (const { group, games, consoleName } of databaseConsoleGroups) {
+    group.classList.toggle("is-hidden", Boolean(matchingConsoles && !matchingConsoles.has(consoleName)));
     if (query) {
       games.classList.remove("is-hidden");
     } else {
@@ -835,7 +1065,7 @@ function renderDatabaseGames() {
   databaseEmptyState.textContent = state.databaseSidebarError || (state.databaseGames.length
     ? "No database games match this search."
     : "Use ScanSong to populate the selected database.");
-  scheduleSelectionIndicators();
+  scheduleSelectionIndicators(true, SELECTION_SIDEBAR);
 }
 
 async function setAllDatabaseConsolesCollapsed(collapsed) {
@@ -983,6 +1213,34 @@ async function loadDatabaseGame(game) {
   return loadDatabaseGamesIntoPlaylist([game]);
 }
 
+function loadDatabaseGameOnce(game) {
+  const key = databaseGameKey(game);
+  const current = databaseGameLoadRequest;
+  if (current?.key === key && (current.pending || performance.now() < current.expiresAt)) {
+    return current.promise;
+  }
+  const request = { key, pending: true, expiresAt: Number.POSITIVE_INFINITY, promise: null };
+  request.promise = loadDatabaseGame(game).then((loaded) => {
+    request.pending = false;
+    if (loaded) {
+      request.expiresAt = performance.now() + 350;
+      window.setTimeout(() => {
+        if (databaseGameLoadRequest === request && performance.now() >= request.expiresAt) {
+          databaseGameLoadRequest = null;
+        }
+      }, 360);
+    } else if (databaseGameLoadRequest === request) {
+      databaseGameLoadRequest = null;
+    }
+    return loaded;
+  }, (error) => {
+    if (databaseGameLoadRequest === request) databaseGameLoadRequest = null;
+    throw error;
+  });
+  databaseGameLoadRequest = request;
+  return request.promise;
+}
+
 async function toggleSelectedFavorites() {
   const focusedInSidebar = refs.treeRoot.contains(document.activeElement);
   if (!focusedInSidebar && state.selectedTrackIds.length) {
@@ -1114,12 +1372,10 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
   if (databaseGameButton?.dataset.databaseGameKey) {
     const game = visibleDatabaseGames().find((entry) => databaseGameKey(entry) === databaseGameButton.dataset.databaseGameKey);
     if (game) {
-      window.clearTimeout(databaseGameClickTimer);
-      databaseGameClickTimer = 0;
       state.selectedDatabaseGameKey = databaseGameButton.dataset.databaseGameKey;
       state.selectedDatabaseConsoleName = databaseConsoleName(game);
       persistSettings();
-      const loaded = await loadDatabaseGame(game);
+      const loaded = await loadDatabaseGameOnce(game);
       const targetID = loaded ? databaseLoadedSelectionID() : null;
       if (targetID) await playVisibleTrack(targetID, 0);
       return true;
@@ -1147,12 +1403,13 @@ function renderSidebar() {
     refs.sidebarViewToggleButton.querySelector("use")?.setAttribute("href", glyphs[view.storedMode] || glyphs.consoles);
   }
   if (state.databaseSidebarLoading) {
-    const indicator = resetSidebarContent();
+    resetSidebarContent();
     const loading = document.createElement("div");
     loading.className = "empty sidebar-empty sidebar-loading";
     loading.textContent = "Loading catalog…";
     refs.treeRoot.appendChild(loading);
-    positionSelectionIndicator(refs.treeRoot, indicator, null);
+    sidebarContentRendering = false;
+    scheduleSelectionIndicators(false, SELECTION_SIDEBAR);
     return;
   }
   if (view.contentMode === "database") renderDatabaseGames();
@@ -1174,13 +1431,11 @@ function syncAnimatedRanges() {
 function syncTreeSelection() {
   if (selectedBrowserButton?.dataset.browserPath !== state.selectedBrowserPath) {
     selectedBrowserButton?.classList.remove("is-selected");
-    selectedBrowserButton = state.selectedBrowserPath
-      ? refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(state.selectedBrowserPath)}"]`)
-      : null;
+    selectedBrowserButton = state.selectedBrowserPath ? browserButtonsByPath.get(state.selectedBrowserPath) || null : null;
     selectedBrowserButton?.classList.add("is-selected");
   }
   scrollSelectedBrowserItemIntoView();
-  scheduleSelectionIndicators();
+  scheduleSelectionIndicators(true, SELECTION_SIDEBAR);
 }
 
 function allColumns() {
@@ -1190,7 +1445,33 @@ function allColumns() {
 }
 
 function orderedColumns() {
-  return allColumns().filter((column) => state.columnVisibility[column.id]);
+  return allColumns().filter((column) => state.columnVisibility[column.id]
+    && !state.automaticallyHiddenColumns.has(column.id));
+}
+
+function updateAutomaticColumnVisibility() {
+  const hidden = new Set();
+  if (state.playlist.length) {
+    const sample = state.playlist.length > 1200
+      ? [...state.playlist.slice(0, 600), ...state.playlist.slice(-600)]
+      : state.playlist;
+    for (const column of allColumns()) {
+      if (!state.columnVisibility[column.id] || column.id === "favorite" || column.id === "index") continue;
+      const meaningful = sample.some((track, index) => {
+        const value = String(playlistColumnValue(track, column, index) ?? "").trim();
+        return value !== "" && value !== "—" && value !== "-";
+      });
+      if (!meaningful) hidden.add(column.id);
+    }
+    if (allColumns().every((column) => !state.columnVisibility[column.id] || hidden.has(column.id))) {
+      const fallback = allColumns().find((column) => state.columnVisibility[column.id]);
+      if (fallback) hidden.delete(fallback.id);
+    }
+  }
+  const changed = hidden.size !== state.automaticallyHiddenColumns.size
+    || [...hidden].some((id) => !state.automaticallyHiddenColumns.has(id));
+  state.automaticallyHiddenColumns = hidden;
+  return changed;
 }
 
 function playlistSortValue(track, column) {
@@ -1529,31 +1810,40 @@ function playlistAutoSizeSignature() {
 
 function updatePlaylistRowState(row, trackId) {
   if (!row) return;
-  row.classList.toggle("is-selected", state.selectedTrackIds.includes(trackId));
+  row.classList.toggle("is-selected", selectedPlaylistTrackIDs.has(trackId));
   row.classList.toggle("is-current", state.currentTrackId === trackId);
 }
 
 function selectPlaylistTrack(trackId, { focus = false, extend = false, range = false } = {}) {
-  const track = state.playlist.find((entry) => entry.id === trackId);
+  const track = playlistTrackByID.get(trackId) || state.playlist.find((entry) => entry.id === trackId);
   if (!track) return null;
 
   const previousIds = new Set(state.selectedTrackIds);
   const selection = window.SPCBoyPlaylistController.reduceSelection({
     playlist: state.playlist,
     selectedIds: state.selectedTrackIds,
-    anchorId: state.playlistSelectionAnchorId
+    selectedIDSet: selectedPlaylistTrackIDs,
+    anchorId: state.playlistSelectionAnchorId,
+    indexByID: playlistIndexByID
   }, trackId, { extend, range });
   if (!selection) return null;
   state.selectedTrackIds = selection.selectedIds;
+  selectedPlaylistTrackIDs = new Set(selection.selectedIds);
   state.selectedTrackId = selection.primaryId;
   state.lastSelectedTrackId = track.id;
   state.playlistSelectionAnchorId = selection.anchorId;
   if (previousIds.size !== selection.selectedIds.length || selection.selectedIds.some((id) => !previousIds.has(id))) persistSettings();
+  window.ViewBoyTabs?.scheduleSelectionSave?.();
 
-  for (const [id, row] of playlistRowsByTrackId) updatePlaylistRowState(row, id);
+  for (const id of previousIds) {
+    if (!selectedPlaylistTrackIDs.has(id)) playlistRowsByTrackId.get(id)?.classList.remove("is-selected");
+  }
+  for (const id of selectedPlaylistTrackIDs) {
+    if (!previousIds.has(id)) playlistRowsByTrackId.get(id)?.classList.add("is-selected");
+  }
   const nextRow = playlistRowsByTrackId.get(track.id) || null;
   selectedPlaylistRow = nextRow;
-  scheduleSelectionIndicators();
+  scheduleSelectionIndicators(true, SELECTION_PLAYLIST);
   if (focus) nextRow?.focus({ preventScroll: true });
   return track;
 }
@@ -1567,12 +1857,12 @@ function refreshPlaylistPlaybackState() {
   const nextCurrentRow = state.currentTrackId ? playlistRowsByTrackId.get(state.currentTrackId) || null : null;
   nextCurrentRow?.classList.add("is-current");
   currentPlaylistRow = nextCurrentRow;
-  scheduleSelectionIndicators();
+  scheduleSelectionIndicators(true, SELECTION_PLAYLIST);
 }
 
 function refreshPlaylistRow(trackId) {
-  const track = state.playlist.find((entry) => entry.id === trackId);
-  const rowIndex = state.playlist.findIndex((entry) => entry.id === trackId);
+  const track = playlistTrackByID.get(trackId);
+  const rowIndex = playlistIndexByID.get(trackId);
   const row = playlistRowsByTrackId.get(trackId);
   if (!track || !row) return false;
 
@@ -1615,93 +1905,118 @@ function syncPlaylistColumnWidths() {
   }
 }
 
-function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = state.playlist.length, spacers = null) {
+function makePlaylistRow(track, rowIndex) {
+  const row = document.createElement("tr");
+  row.dataset.trackId = track.id;
+  row.tabIndex = 0;
+  row.setAttribute("aria-label", `${track.title || track.filename || "Track"}`);
+  row.className = `playlist-row${selectedPlaylistTrackIDs.has(track.id) ? " is-selected" : ""}${state.currentTrackId === track.id ? " is-current" : ""}`;
+  playlistRowsByTrackId.set(track.id, row);
+  if (state.selectedTrackId === track.id) selectedPlaylistRow = row;
+  if (state.currentTrackId === track.id) currentPlaylistRow = row;
+
+  for (const column of orderedColumns()) {
+    row.appendChild(renderPlaylistCell(track, column, rowIndex));
+  }
+
+  row.addEventListener("click", (event) => {
+    selectPlaylistTrack(track.id, {
+      focus: true,
+      extend: event.metaKey || event.ctrlKey,
+      range: event.shiftKey
+    });
+    uiApp.playback.updateTimingSummary();
+  });
+
+  row.addEventListener("dblclick", () => {
+    playVisibleTrack(track.id, 0).catch((error) => {
+      console.error(error);
+    });
+  });
+
+  row.addEventListener("contextmenu", (event) => {
+    showContextMenu(event, [["Export AAC", async () => {
+      await uiApp.playback.exportTrackAsAAC(track);
+    }]]);
+  });
+
+  row.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    event.stopPropagation();
+    const selectedTrack = selectPlaylistTrack(track.id);
+    if (!selectedTrack) return;
+    playVisibleTrack(selectedTrack.id, 0).catch((error) => {
+      console.error(error);
+    });
+  });
+  return row;
+}
+
+function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = state.playlist.length, spacers = null, animateSelection = true) {
   let rowIndex = startIndex;
   const appendBatch = () => {
     if (generation !== playlistRenderGeneration) return;
     const fragment = document.createDocumentFragment();
     if (rowIndex === startIndex && spacers?.top > 0) {
-      fragment.appendChild(makePlaylistVirtualSpacer(spacers.top));
+      fragment.appendChild(makePlaylistVirtualSpacer(spacers.top, "top"));
     }
     const startedAt = performance.now();
     while (rowIndex < endIndex && performance.now() - startedAt < 8) {
-      const track = state.playlist[rowIndex];
-      const row = document.createElement("tr");
-      row.dataset.trackId = track.id;
-      row.tabIndex = 0;
-      row.setAttribute("aria-label", `${track.title || track.filename || "Track"}`);
-      row.className = `playlist-row${state.selectedTrackIds.includes(track.id) ? " is-selected" : ""}${state.currentTrackId === track.id ? " is-current" : ""}`;
-      playlistRowsByTrackId.set(track.id, row);
-      if (state.selectedTrackId === track.id) selectedPlaylistRow = row;
-      if (state.currentTrackId === track.id) currentPlaylistRow = row;
-
-      for (const column of orderedColumns()) {
-        row.appendChild(renderPlaylistCell(track, column, rowIndex));
-      }
-
-      row.addEventListener("click", (event) => {
-        const selectedTrack = selectPlaylistTrack(track.id, {
-          focus: true,
-          extend: event.metaKey || event.ctrlKey,
-          range: event.shiftKey
-        });
-        uiApp.playback.updateTimingSummary();
-      });
-
-      row.addEventListener("dblclick", () => {
-        playVisibleTrack(track.id, 0).catch((error) => {
-          console.error(error);
-        });
-      });
-
-      row.addEventListener("contextmenu", (event) => {
-        showContextMenu(event, [["Export AAC", async () => {
-          await uiApp.playback.exportTrackAsAAC(track);
-        }]]);
-      });
-
-      row.addEventListener("keydown", (event) => {
-        if (event.key !== "Enter") return;
-        event.preventDefault();
-        event.stopPropagation();
-        const selectedTrack = selectPlaylistTrack(track.id);
-        if (!selectedTrack) return;
-        playVisibleTrack(selectedTrack.id, 0).catch((error) => {
-          console.error(error);
-        });
-      });
-
-      fragment.appendChild(row);
+      fragment.appendChild(makePlaylistRow(state.playlist[rowIndex], rowIndex));
       rowIndex += 1;
     }
     refs.playlistBody.appendChild(fragment);
     if (rowIndex < endIndex) {
       window.requestAnimationFrame(appendBatch);
     } else {
-      if (spacers?.bottom > 0) refs.playlistBody.appendChild(makePlaylistVirtualSpacer(spacers.bottom));
-      scheduleSelectionIndicators();
+      if (spacers?.bottom > 0) refs.playlistBody.appendChild(makePlaylistVirtualSpacer(spacers.bottom, "bottom"));
+      playlistRowsRendering = false;
+      scheduleSelectionIndicators(animateSelection, SELECTION_PLAYLIST);
       schedulePlaylistRowMeasurement();
+      if (playlistViewportRenderPending) {
+        playlistViewportRenderPending = false;
+        schedulePlaylistViewportRender();
+      }
     }
   };
   window.requestAnimationFrame(appendBatch);
 }
 
-function renderPlaylist({ sort = true } = {}) {
+function renderPlaylist({ sort = true, persist = true, refreshIndex = true, animateSelection = true } = {}) {
+  if (persist) queueMicrotask(() => window.ViewBoyTabs?.scheduleSave?.());
+  if (refreshIndex && updateAutomaticColumnVisibility()) renderPlaylistHeader();
   playlistRenderGeneration += 1;
   const generation = playlistRenderGeneration;
-  if (!state.selectedTrackIds.length && state.selectedTrackId) {
-    state.selectedTrackIds = [state.selectedTrackId];
-  }
-  const playlistIDs = new Set(state.playlist.map((track) => track.id));
-  state.selectedTrackIds = state.selectedTrackIds.filter((id) => playlistIDs.has(id));
-  if (state.selectedTrackId && state.selectedTrackIds.length && !state.selectedTrackIds.includes(state.selectedTrackId)) {
-    state.selectedTrackId = state.selectedTrackIds.at(-1) || null;
+  playlistRowsRendering = true;
+  playlistViewportRenderPending = false;
+  playlistVirtualWindowStart = null;
+  playlistVirtualWindowEnd = null;
+  if (!animateSelection) document.documentElement.classList.add("selection-indicators-following-scroll");
+  if (refreshIndex) {
+    if (!state.selectedTrackIds.length && state.selectedTrackId) {
+      state.selectedTrackIds = [state.selectedTrackId];
+    }
+    const playlistIDs = new Set(state.playlist.map((track) => track.id));
+    state.selectedTrackIds = state.selectedTrackIds.filter((id) => playlistIDs.has(id));
+    if (state.selectedTrackId && state.selectedTrackIds.length && !state.selectedTrackIds.includes(state.selectedTrackId)) {
+      state.selectedTrackId = state.selectedTrackIds.at(-1) || null;
+    }
   }
   refs.playlistBody.innerHTML = "";
   playlistRowsByTrackId.clear();
   selectedPlaylistRow = null;
   currentPlaylistRow = null;
   if (sort) sortPlaylist();
+  if (refreshIndex) {
+    playlistTrackByID.clear();
+    playlistIndexByID.clear();
+    state.playlist.forEach((track, index) => {
+      playlistTrackByID.set(track.id, track);
+      playlistIndexByID.set(track.id, index);
+    });
+    selectedPlaylistTrackIDs = new Set(state.selectedTrackIds);
+  }
   const virtualized = playlistUsesVirtualRows();
   // Auto-sizing every cell defeats a catalog lookup. Large database playlists
   // retain the current widths; explicit column auto-size remains available.
@@ -1714,7 +2029,8 @@ function renderPlaylist({ sort = true } = {}) {
     const row = document.createElement("tr");
     row.innerHTML = `<td colspan="${Math.max(1, orderedColumns().length)}" class="empty-row"></td>`;
     refs.playlistBody.appendChild(row);
-    scheduleSelectionIndicators();
+    playlistRowsRendering = false;
+    scheduleSelectionIndicators(animateSelection, SELECTION_PLAYLIST);
     return;
   }
 
@@ -1729,13 +2045,9 @@ function renderPlaylist({ sort = true } = {}) {
     return;
   }
 
-  const scrollTop = refs.playlistBodyWrap?.scrollTop || 0;
-  const viewportHeight = refs.playlistBodyWrap?.clientHeight || (playlistVirtualRowHeight * 24);
-  const firstVisibleRow = Math.max(0, Math.floor(scrollTop / playlistVirtualRowHeight) - PLAYLIST_VIRTUAL_OVERSCAN);
-  const lastVisibleRow = Math.min(
-    state.playlist.length,
-    Math.ceil((scrollTop + viewportHeight) / playlistVirtualRowHeight) + PLAYLIST_VIRTUAL_OVERSCAN
-  );
+  const { start: firstVisibleRow, end: lastVisibleRow } = playlistVirtualRange();
+  playlistVirtualWindowStart = firstVisibleRow;
+  playlistVirtualWindowEnd = lastVisibleRow;
   appendPlaylistRowsInBatches(
     generation,
     firstVisibleRow,
@@ -1743,7 +2055,8 @@ function renderPlaylist({ sort = true } = {}) {
     {
       top: firstVisibleRow * playlistVirtualRowHeight,
       bottom: (state.playlist.length - lastVisibleRow) * playlistVirtualRowHeight
-    }
+    },
+    animateSelection
   );
 }
 
@@ -1773,19 +2086,20 @@ function scheduleMetadataRefresh(trackId) {
 function applyUISettings() {
   const rootStyle = document.documentElement.style;
   rootStyle.setProperty("--ui-font-size-pt", String(state.uiFontSizePt));
-  rootStyle.setProperty("--app-font-family", state.applicationMonospace ? "var(--mono-font-family)" : "var(--ui-font-family)");
+  rootStyle.setProperty("--app-font-family", "var(--viewboy-font-family)");
   rootStyle.setProperty("--sidebar-font-size-pt", String(state.sidebarFontSizePt));
   rootStyle.setProperty("--sidebar-text-color", state.sidebarTextColor);
-  rootStyle.setProperty("--sidebar-font-family", state.sidebarMonospace || state.applicationMonospace ? "var(--mono-font-family)" : "var(--ui-font-family)");
+  rootStyle.setProperty("--sidebar-font-family", "var(--viewboy-font-family)");
   rootStyle.setProperty("--playlist-font-size-pt", String(state.playlistFontSizePt));
   rootStyle.setProperty("--playlist-text-color", state.playlistTextColor);
-  rootStyle.setProperty("--playlist-font-family", state.playlistMonospace || state.applicationMonospace ? "var(--mono-font-family)" : "var(--ui-font-family)");
+  rootStyle.setProperty("--playlist-font-family", "var(--viewboy-font-family)");
   rootStyle.setProperty("--playlist-header-font-weight", state.playlistHeaderBold ? "700" : "400");
   rootStyle.setProperty("--sidebar-width-percent", String(state.sidebarWidthPercent));
   rootStyle.setProperty("--accent", state.accentColor);
   rootStyle.setProperty("--item-spacing-rem", String(state.uiItemSpacingRem));
   rootStyle.setProperty("--column-resize-duration", `${state.autoResizeAnimationEnabled ? state.autoResizeAnimationMilliseconds : 0}ms`);
   rootStyle.setProperty("--selection-animation-duration", `${state.selectionAnimationEnabled ? state.selectionAnimationMilliseconds : 0}ms`);
+  if (refs.uiFontSizeReadout) refs.uiFontSizeReadout.textContent = `${state.uiFontSizePt} PT`;
 }
 
 function appearanceSettings() {
@@ -1881,12 +2195,12 @@ function renderAll() {
   refs.optionsPlaybackSection.classList.toggle("is-hidden", !playbackSelected);
   refs.optionsDiagnosticsSection.classList.toggle("is-hidden", !diagnosticsSelected);
   refs.optionsAudioSection.classList.toggle("is-hidden", !audioSelected);
+  scheduleSelectionIndicators(true, SELECTION_OPTIONS);
   renderRoutingConflicts();
   if (document.activeElement !== refs.sidebarFontSizeInput) refs.sidebarFontSizeInput.value = String(state.uiFontSizePt);
   if (document.activeElement !== refs.sidebarTextColorInput) refs.sidebarTextColorInput.value = state.sidebarTextColor;
   refs.sidebarPathCountsCheckbox.checked = state.sidebarPathCounts;
   if (document.activeElement !== refs.accentColorInput) refs.accentColorInput.value = state.accentColor;
-  refs.applicationMonospaceCheckbox.checked = state.applicationMonospace;
   if (refs.aacExportDirectoryPath) refs.aacExportDirectoryPath.value = state.aacExportDirectory || "";
   if (refs.aacExportStatus) refs.aacExportStatus.textContent = state.aacExportStatus || "";
   if (refs.aacExportCancelButton) refs.aacExportCancelButton.disabled = !state.aacExportInProgress;
@@ -1931,7 +2245,7 @@ function renderAll() {
     refs.libraryCachePath.value = archiveCachePath;
     refs.libraryCachePath.title = archiveCachePath;
   }
-  refs.libraryDatabaseLocationStatus.textContent = state.databaseLocationStatus || "SPCBoy reads this schema-23 catalog. ScanSong owns scan paths, scanning, link checks, and cleanup.";
+  refs.libraryDatabaseLocationStatus.textContent = state.databaseLocationStatus || "ViewBoy reads this schema-24 catalog. ScanSong owns scan paths, scanning, link checks, and cleanup.";
   refs.libraryDatabaseReloadButton.disabled = Boolean(state.databaseLocation?.requiresRestart);
   refs.libraryClearCacheButton.disabled = false;
   refs.databaseCacheSummary.textContent = state.archiveCacheSummary ? formatArchiveCacheSummary(state.archiveCacheSummary) : "—";
@@ -1957,7 +2271,7 @@ function renderAll() {
 }
 
 function selectedTrackIndex() {
-  return state.playlist.findIndex((track) => track.id === state.selectedTrackId);
+  return playlistIndexByID.get(state.selectedTrackId) ?? -1;
 }
 
 function scrollSelectedTrackIntoView() {
@@ -1965,7 +2279,7 @@ function scrollSelectedTrackIntoView() {
     return;
   }
 
-  const row = refs.playlistBody.querySelector(`[data-track-id="${CSS.escape(state.selectedTrackId)}"]`);
+  const row = playlistRowsByTrackId.get(state.selectedTrackId);
   row?.scrollIntoView({ block: "nearest" });
 }
 
@@ -1988,7 +2302,7 @@ function moveSelection(delta, { range = false, extend = false } = {}) {
       0,
       nextIndex * playlistVirtualRowHeight - (refs.playlistBodyWrap.clientHeight / 2)
     );
-    renderPlaylist({ sort: false });
+    renderPlaylist({ sort: false, persist: false, refreshIndex: false });
     selectPlaylistTrack(state.selectedTrackId, { focus: true, range, extend });
   }
   scrollSelectedTrackIntoView();
@@ -2219,6 +2533,16 @@ function setFontSize(nextSize) {
   persistSettings();
   broadcastAppearanceSettings();
   renderAll();
+}
+
+function previewFontSizeInput(rawValue) {
+  const parsedValue = uiApp.parseNumericInput(rawValue);
+  if (parsedValue === null) return;
+  const size = uiApp.normalizeFontSize(parsedValue);
+  state.uiFontSizePt = size;
+  state.sidebarFontSizePt = size;
+  state.playlistFontSizePt = size;
+  applyUISettings();
 }
 
 function setSidebarWidth(nextWidth) {
@@ -2551,6 +2875,7 @@ uiApp.ui = {
   setAccentColor,
   commitFontSizeInput,
   commitSidebarFontSizeInput,
+  previewFontSizeInput,
   setSidebarTextColor,
   setSidebarMonospace,
   setSidebarPathCounts,

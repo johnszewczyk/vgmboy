@@ -2,6 +2,7 @@
   const DEFAULT = Object.freeze({ numerator: 1, denominator: 1 });
   const MAX_COMPONENT = 1_000_000;
   const MAX_DECIMAL_PLACES = 6;
+  const MAX_DISPLAY_FRACTION_DENOMINATOR = 32;
 
   function greatestCommonDivisor(left, right) {
     let a = Math.abs(Math.trunc(left));
@@ -44,6 +45,9 @@
 
   function format(value) {
     const { numerator, denominator } = normalize(value);
+    if (denominator > 1 && denominator <= MAX_DISPLAY_FRACTION_DENOMINATOR) {
+      return `${numerator}/${denominator}`;
+    }
     const scale = 10 ** MAX_DECIMAL_PLACES;
     if (scale % denominator !== 0) return `${numerator}/${denominator}`;
     const scaled = String(numerator * (scale / denominator)).padStart(MAX_DECIMAL_PLACES + 1, "0");

@@ -185,15 +185,11 @@ refs.uiItemSpacingInput.addEventListener("blur", (event) => {
   app.ui.setUiItemSpacing(event.target.value);
 });
 
-refs.sidebarFontSizeInput.addEventListener("change", (event) => {
-  app.ui.commitSidebarFontSizeInput(event.target.value);
-});
-
 refs.sidebarFontSizeInput.addEventListener("input", (event) => {
-  app.ui.commitSidebarFontSizeInput(event.target.value);
+  app.ui.previewFontSizeInput(event.target.value);
 });
 
-refs.sidebarFontSizeInput.addEventListener("blur", (event) => {
+refs.sidebarFontSizeInput.addEventListener("change", (event) => {
   app.ui.commitSidebarFontSizeInput(event.target.value);
 });
 
@@ -206,9 +202,6 @@ refs.sidebarTextColorInput.addEventListener("blur", (event) => {
 
 refs.sidebarPathCountsCheckbox.addEventListener("change", (event) => {
   app.ui.setSidebarPathCounts(event.target.checked);
-});
-refs.applicationMonospaceCheckbox.addEventListener("change", (event) => {
-  app.ui.setApplicationMonospace(event.target.checked);
 });
 refs.aacExportChooseButton.addEventListener("click", () => {
   app.playback.chooseAACExportDirectory().catch((error) => console.error("[SPCBoy] AAC export folder failed", error));

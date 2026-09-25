@@ -35,7 +35,9 @@ and persistence. This project owns only the typed native adapter and WebKit rend
 - Database game selection updates the playlist directly; it must not invoke a full sidebar redraw or deferred metadata pass when catalog rows already contain metadata.
 - Large catalog playlists are rendered through a fixed-height visible window;
   the database result remains fully selectable without creating one WebKit DOM
-  row per catalog track.
+  row per catalog track. Scrolling patches the existing row window and creates
+  or removes only rows crossing its boundary; selection updates the mounted
+  row classes and locator without rebuilding the playlist.
 - Native View-menu commands use the shared `FrontendCommandCore` command
   contract; the WebKit skin maps catalog commands to the same two view values.
   `Favorites Playlist` uses Command-Shift-D and changes only the queue snapshot,

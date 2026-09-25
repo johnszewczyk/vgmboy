@@ -2,8 +2,8 @@
 
 - ViewBoy-owned pages use the shared organization: Database, Interface, and Windows, while VGMBoy pages provide Audio, Diagnostics, Playback, and Routing in the same WebKit settings window.
 - Interface > Animations exposes checkbox-enabled Auto-Resize and Selection Bar timings; both default on at 200 ms and accept 0–1000 ms. Disabling one uses an effective 0 ms duration while retaining the configured value.
-- Playlist Options exposes Column Auto-size, enabled by default, with the description “Automatically resize columns for content width on selection.”
-- Interface Style combines font size, font color, and monospace controls for the database sidebar and playlist; the single setting is applied to both surfaces.
+- Playlist Options exposes Column Auto-size, enabled by default, with the description “Automatically resize columns for content width on selection.” Columns without meaningful values in the active playlist hide automatically and return when content appears; manual visibility choices remain saved. The `#` column displays row position and does not sort.
+- Interface Style provides one 8–18 pt Interface Scale and one bundled Doto typeface for the player, library, playlist, and Settings. Font color remains adjustable for the library and playlist text.
 - Windows has independent Always on Top switches for Main Window and Options Window; both default off. Main keeps the main window on top of other apps; Options keeps the options window on top of the main window.
 - Archive Cache uses the shared 2 GB default and 2, 4, 8, or 16 GB choices.
 - AAC Export exposes a destination folder and a playlist context-menu action. New installs default to Downloads, matching CocoaSpice. ViewBoy supplies the selected path, timing plan, and destination; VGMBoyKit performs the offline conversion, including archive-member materialization through the native bridge. Only one export runs at a time. Folder chooser controls use the shared folder glyph.
@@ -17,8 +17,10 @@ remains independent while Settings is open.
 
 ## Components
 
-Settings groups app-owned controls above VGMBoy playback controls in the same compact sidebar used
-by the current renderer skin. App controls cover Interface, Windows, database location, and browser behavior.
+Settings groups app-owned controls above VGMBoy playback controls in a dedicated navigation rail.
+The rail separates ViewBoy and VGMBoy pages; one persistent pale LCD underline glides between active pages. The same scale-aware font system covers Settings and the main window.
+Settings content uses two-column charcoal panels when the window is wide and collapses to one column on
+narrow windows. App controls cover Interface, Windows, database location, and browser behavior.
 VGMBoy controls cover playback, routing, tempo, fade, volume, mono, equalizer, and archive-cache behavior.
 Diagnostics is its own VGMBoy page and reports live transport, buffer, output, decode, and underrun values.
 Its page title is page-level content; Transport, Buffer, and Decoder are separate sibling panels.
@@ -53,7 +55,7 @@ replaces the playlist with a snapshot of shared Favorites without changing the
 sidebar. Command-D toggles the selected track or selected database game/group.
 Both playlist headers use a visible star for the favorite column. Command-click and Shift-click select
 multiple playlist rows. Favorites are shared with CocoaSpice through VGMMan's application-support data
-store and remain separate from the read-only schema-23 scan catalog.
+store and remain separate from the read-only schema-24 scan catalog.
 
 ## Files
 

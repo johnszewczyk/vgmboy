@@ -30,6 +30,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
     var onOpenOptionsWindow: (() -> Void)?
     var onCloseOptionsWindow: (() -> Void)?
+    var onCloseMainWindow: (() -> Void)?
     var onChooseRootFolder: (() -> String?)?
     var onChoosePath: (() -> String?)?
     var onChooseAACExportDirectory: (() -> String?)?
@@ -143,6 +144,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             isOptionsWindow: \(optionsWindowFlag),
             playbackBackends: \(Self.json(Self.playbackBackendManifest)),
             bootstrap: (...args) => request("bootstrap", args),
+            playlistTabsLoad: () => request("playlistTabsLoad"),
+            playlistTabsSave: (...args) => request("playlistTabsSave", args),
             refreshTree: (...args) => request("refreshTree", args),
             databaseLocation: (...args) => request("databaseLocation", args),
             databaseRoots: (...args) => request("databaseRoots", args),
@@ -179,6 +182,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             defaultAACExportDirectory: () => request("defaultAACExportDirectory"),
             openOptionsWindow: () => request("openOptionsWindow"),
             closeOptionsWindow: () => request("closeOptionsWindow"),
+            closeMainWindow: () => request("closeMainWindow"),
             openPath: (...args) => request("openPath", args),
             chooseRootFolder: (...args) => request("chooseRootFolder", args),
             choosePath: (...args) => request("choosePath", args),
@@ -229,8 +233,13 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
         print("[SPCBoy WK] request \(method)")
 
-        if method == "openOptionsWindow" || method == "closeOptionsWindow" {
-            let handler = method == "openOptionsWindow" ? onOpenOptionsWindow : onCloseOptionsWindow
+        if method == "openOptionsWindow" || method == "closeOptionsWindow" || method == "closeMainWindow" {
+            let handler: (() -> Void)?
+            switch method {
+            case "openOptionsWindow": handler = onOpenOptionsWindow
+            case "closeOptionsWindow": handler = onCloseOptionsWindow
+            default: handler = onCloseMainWindow
+            }
             Task { @MainActor in handler?() }
             Task {
                 await Self.reply(to: message.webView, id: id, success: true, valueJSON: "null")
@@ -463,6 +472,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         switch method {
         case "bootstrap":
             return emptySnapshot()
+        case "playlistTabsLoad":
+            return try PlaylistTabsStore.shared.load()
+        case "playlistTabsSave":
+            guard let payload = args.first as? [String: Any] else { throw BridgeError.invalidArguments }
+            return try PlaylistTabsStore.shared.save(payload)
         case "refreshTree":
             guard let rootPath = args.first as? String, !rootPath.isEmpty else { return emptySnapshot() }
             let selectedPath = args.dropFirst().first as? String

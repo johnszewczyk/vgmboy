@@ -19,10 +19,10 @@ let queuedSkipRequest = null;
 let queuedSkipTimer = 0;
 let playbackWindow = null;
 let playbackClockHandle = 0;
-let playbackClockUsesAnimationFrame = false;
 let nativeClockAnchor = null;
 const timingPlans = new Map();
 const TRANSPORT_DECLICK_MS = 10;
+const PLAYBACK_READOUT_INTERVAL_MS = 200;
 
 function playbackPlaylist() {
   return state.playingPlaylist?.length ? state.playingPlaylist : state.playlist;
@@ -58,11 +58,7 @@ function monotonicNow() {
 
 function cancelPlaybackClock() {
   if (!playbackClockHandle) return;
-  if (playbackClockUsesAnimationFrame && window.cancelAnimationFrame) {
-    window.cancelAnimationFrame(playbackClockHandle);
-  } else {
-    window.clearTimeout(playbackClockHandle);
-  }
+  window.clearTimeout(playbackClockHandle);
   playbackClockHandle = 0;
 }
 
@@ -88,13 +84,10 @@ function renderPlaybackClock(timestamp) {
 
 function schedulePlaybackClock() {
   if (playbackClockHandle || !state.isPlaying || !nativeClockAnchor) return;
-  if (typeof window.requestAnimationFrame === "function") {
-    playbackClockUsesAnimationFrame = true;
-    playbackClockHandle = window.requestAnimationFrame(renderPlaybackClock);
-  } else {
-    playbackClockUsesAnimationFrame = false;
-    playbackClockHandle = window.setTimeout(() => renderPlaybackClock(monotonicNow()), 50);
-  }
+  playbackClockHandle = window.setTimeout(
+    () => renderPlaybackClock(monotonicNow()),
+    PLAYBACK_READOUT_INTERVAL_MS
+  );
 }
 
 function anchorPlaybackClock(track, snapshot, elapsedSeconds) {
@@ -326,6 +319,7 @@ function updateTimingSummary() {
   refs.songLengthLabel.textContent = totalSeconds > 0 ? formatTime(totalSeconds) : "∞";
   const playlistTotalSeconds = state.playlist.reduce((sum, entry) => sum + currentOutputBasePlaybackSeconds(entry), 0);
   refs.playlistTotalLabel.textContent = formatTime(playlistTotalSeconds);
+  updateDeckReadout();
   refs.progressSlider.max = String(Math.max(totalSeconds, 1));
   if (!shouldPreserveFieldValue(refs.spcLengthInput)) {
     refs.spcLengthInput.value = formatTime(state.manualPlayTimeSeconds);
@@ -348,6 +342,20 @@ function updateTimingSummary() {
   if (!shouldPreserveFieldValue(refs.sidebarWidthInput)) {
     refs.sidebarWidthInput.value = String(state.sidebarWidthPercent);
   }
+}
+
+function updateDeckReadout() {
+  const track = activeTrackInfo();
+  const playlistLength = state.playlist.length;
+  const currentIndex = state.playlist.findIndex((entry) => entry.id === (state.currentTrackId || state.selectedTrackId));
+  refs.deckState.textContent = state.isPlaying ? "PLAYING" : state.currentTrackId ? "PAUSED" : track ? "CUED" : "STANDBY";
+  refs.deckIndex.textContent = `${String(Math.max(0, currentIndex + 1)).padStart(2, "0")} / ${String(playlistLength).padStart(2, "0")}`;
+  refs.deckTitle.textContent = track?.title || track?.displayName || track?.filename || "SELECT A TRACK";
+  refs.deckMeta.textContent = track
+    ? [track.game, track.artist, track.system].filter((value) => value && value !== "—").join("  /  ") || "UNKNOWN SOURCE"
+    : "LIBRARY READY · NO SIGNAL";
+  refs.queueCount.textContent = `${String(playlistLength).padStart(3, "0")} TRACKS`;
+  refs.playerDeck.classList.toggle("is-playing", state.isPlaying);
 }
 
 function bindMediaSessionHandlers() {
@@ -424,6 +432,7 @@ function updateElapsedReadout() {
 
 function updatePlaybackReadout() {
   updateElapsedReadout();
+  updateDeckReadout();
   const playlistTotalSeconds = state.playlist.reduce((sum, entry) => sum + currentOutputBasePlaybackSeconds(entry), 0);
   refs.playlistTotalLabel.textContent = formatTime(playlistTotalSeconds);
   refs.playButton.querySelector("use")?.setAttribute("href", state.isPlaying ? "#icon-pause" : "#icon-play");

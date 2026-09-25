@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ViewBoy</title>
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./viewboy-nightglass.css" />
   </head>
   <body>
     <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -29,8 +30,37 @@
       <symbol id="icon-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z" /></symbol>
     </svg>
     <div class="app-shell">
+      <header class="player-deck" aria-label="ViewBoy player">
+        <div class="deck-main">
+          <div class="deck-screen" aria-live="polite">
+            <div class="deck-screen-top"><span class="deck-brand-line"><strong class="deck-brand-name">VIEWBOY</strong><span class="deck-brand-divider" aria-hidden="true">/</span><span id="deck-state">STANDBY</span></span><span id="deck-index">00 / 00</span></div>
+            <div class="deck-display-body">
+              <div class="deck-display-track">
+                <div id="deck-title" class="deck-title">SELECT A TRACK</div>
+                <div id="deck-meta" class="deck-meta">LIBRARY READY · NO SIGNAL</div>
+              </div>
+              <div class="deck-time-row" aria-live="off"><span>TIME</span><div class="ui-control toolbar-control timing-readout" aria-label="Elapsed time, track length, and playlist length"><span id="elapsed-label" class="time-label">0:00</span><span class="time-separator">/</span><span id="song-length-label" class="time-label">0:00</span><span class="time-separator deck-time-divider">·</span><span id="playlist-total-label" class="time-label">0:00</span></div></div>
+            </div>
+          </div>
+          <div class="deck-control-bank">
+            <div class="transport-toolbar toolbar" aria-label="Playback controls">
+              <div class="transport toolbar-fixed">
+                <button id="previous-button" class="tool-button glyph-button ui-control" title="Previous" aria-label="Previous"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-back"></use></svg></button>
+                <button id="play-button" class="tool-button glyph-button ui-control is-primary" title="Play / Pause" aria-label="Play / Pause"><svg class="ui-icon" aria-hidden="true"><use href="#icon-play"></use></svg></button>
+                <button id="next-button" class="tool-button glyph-button ui-control" title="Next" aria-label="Next"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-forward"></use></svg></button>
+                <span class="deck-control-divider" aria-hidden="true"></span>
+                <button id="equalizer-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Enable Equalizer" aria-label="Enable Equalizer" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg></button>
+                <button id="long-play-button" class="tool-button glyph-button ui-control" type="button" title="Toggle Long Play" aria-label="Toggle Long Play"><svg class="ui-icon" aria-hidden="true"><use href="#icon-infinity"></use></svg></button>
+                <button id="repeat-button" class="tool-button glyph-button ui-control" type="button" title="Repeat off" aria-label="Repeat off"><svg class="ui-icon" aria-hidden="true"><use href="#icon-repeat-2"></use></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="deck-progress"><span>00</span><div id="progress-slider-shell" class="ui-control toolbar-control progress-slider-shell"><div class="progress-slider-rail"><div class="progress-slider-fill"></div><div class="progress-slider-thumb"></div></div><input id="progress-slider" type="range" min="0" max="1" step="0.1" value="0" aria-label="Playback position" /></div><span>END</span></div>
+      </header>
       <main class="workspace">
         <aside class="sidebar">
+          <div class="panel-heading"><span>01 / LIBRARY</span><span class="panel-heading-mark">BROWSE</span></div>
           <div class="sidebar-search-wrap toolbar">
               <input id="sidebar-search-input" class="sidebar-search-input" type="search" placeholder="Search" />
             <div class="sidebar-search-actions">
@@ -49,6 +79,10 @@
         <div id="sidebar-resize-handle" class="sidebar-resize-handle" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" aria-valuemin="12" aria-valuemax="50" aria-valuenow="20" tabindex="0"></div>
 
         <section class="content">
+          <div class="panel-heading playlist-heading"><span>02 / PLAYLIST</span><span id="queue-count" class="panel-heading-mark">000 TRACKS</span></div>
+          <div id="playlist-tabs-toolbar" class="playlist-tabs-toolbar is-hidden" aria-label="Playlist tabs">
+            <div id="playlist-tabs" class="playlist-tabs" role="tablist" aria-label="Playlists"></div>
+          </div>
           <div class="playlist-wrap">
             <div class="playlist-scroll-wrap">
               <div class="playlist-header-wrap">
@@ -57,7 +91,6 @@
                 </table>
               </div>
               <div class="playlist-body-wrap">
-                <div id="playlist-selection-indicator" class="list-selection-indicator" aria-hidden="true"></div>
                 <table class="playlist-table playlist-body-table">
                   <tbody id="playlist-body"></tbody>
                 </table>
@@ -65,32 +98,6 @@
             </div>
           </div>
 
-          <div class="content-bottombar">
-            <div class="bottom-primary toolbar toolbar-fill">
-              <div id="progress-slider-shell" class="ui-control toolbar-control progress-slider-shell">
-                <div class="progress-slider-rail">
-                  <div class="progress-slider-fill"></div>
-                  <div class="progress-slider-thumb"></div>
-                </div>
-                <input id="progress-slider" type="range" min="0" max="1" step="0.1" value="0" />
-              </div>
-              <div class="ui-control toolbar-control timing-readout">
-                <span id="elapsed-label" class="time-label">0:00</span>
-                <span class="time-separator">/</span>
-                <span id="song-length-label" class="time-label">0:00</span>
-                <span class="time-separator">/</span>
-                <span id="playlist-total-label" class="time-label">0:00</span>
-              </div>
-              <div class="transport toolbar-fixed">
-                <button id="previous-button" class="tool-button glyph-button ui-control" title="Previous" aria-label="Previous"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-back"></use></svg></button>
-                <button id="play-button" class="tool-button glyph-button ui-control is-primary" title="Play / Pause" aria-label="Play / Pause"><svg class="ui-icon" aria-hidden="true"><use href="#icon-play"></use></svg></button>
-                <button id="next-button" class="tool-button glyph-button ui-control" title="Next" aria-label="Next"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-forward"></use></svg></button>
-                <button id="equalizer-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Enable Equalizer" aria-label="Enable Equalizer" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg></button>
-                <button id="long-play-button" class="tool-button glyph-button ui-control" type="button" title="Toggle Long Play" aria-label="Toggle Long Play"><svg class="ui-icon" aria-hidden="true"><use href="#icon-infinity"></use></svg></button>
-                <button id="repeat-button" class="tool-button glyph-button ui-control" type="button" title="Repeat off" aria-label="Repeat off"><svg class="ui-icon" aria-hidden="true"><use href="#icon-repeat-2"></use></svg></button>
-              </div>
-            </div>
-          </div>
         </section>
       </main>
     </div>
@@ -124,14 +131,14 @@
               <div class="options-page-title">ViewBoy / Interface</div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Application</div>
-                <label class="options-field"><span>Accent Color</span><span class="options-inline-trailing"><input id="accent-color-input" class="options-input options-color-text-input" type="text" value="#072f57" placeholder="#072f57, rgb(...), oklch(...)" aria-label="Accent color CSS value" /></span></label>
+                <label class="options-field"><span>Accent Color</span><span class="options-inline-trailing"><input id="accent-color-input" class="options-input options-color-text-input" type="text" value="#b6d9ca" placeholder="#b6d9ca, rgb(...), oklch(...)" aria-label="Accent color CSS value" /></span></label>
               </div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Interface Style</div>
-                <div class="options-help-text">These controls apply consistently to the database sidebar and playlist.</div>
-                <label class="options-field"><span>Font Size</span><span class="options-inline-trailing"><input id="sidebar-font-size-input" class="options-input" type="text" inputmode="decimal" value="10" aria-label="Sidebar font size in points" /></span></label>
-                <label class="options-field"><span>Font Color</span><span class="options-inline-trailing"><input id="sidebar-text-color-input" class="options-input options-color-text-input" type="text" value="#062d4a" placeholder="#062d4a, rgb(...), red" aria-label="Sidebar font color CSS value" /></span></label>
-                <label class="options-field options-inline-field"><span>Monospace Font</span><input id="application-monospace-checkbox" type="checkbox" /></label>
+                <div class="options-help-text">One type scale applies across the player, library, playlist, and Settings.</div>
+                <label class="options-field options-font-size-field"><span>Interface Scale</span><span class="font-scale-control"><input id="sidebar-font-size-input" class="ui-font-scale" type="range" min="8" max="18" step="1" value="11" aria-label="ViewBoy interface font size in points" /><output id="ui-font-size-readout">11 PT</output></span></label>
+                <label class="options-field"><span>Font Color</span><span class="options-inline-trailing"><input id="sidebar-text-color-input" class="options-input options-color-text-input" type="text" value="#d7e1dc" placeholder="#d7e1dc, rgb(...), red" aria-label="Sidebar font color CSS value" /></span></label>
+                <div class="font-family-readout"><span>TYPEFACE / GLOBAL</span><strong>VIEWBOY DOTO</strong><small>ONE PIXEL FACE · ALL SURFACES</small></div>
               </div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Sidebar Options</div>
@@ -141,13 +148,13 @@
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Playlist Options</div>
                 <label class="options-field options-inline-field"><span>Bold Header Font</span><input id="playlist-header-bold-checkbox" type="checkbox" /></label>
-                <label class="options-field"><span>Item Spacing</span><span class="options-inline-trailing"><input id="ui-item-spacing-input" class="options-input" type="text" inputmode="decimal" value=".2" aria-label="Item spacing in rems" /></span></label>
+                <label class="options-field"><span>Item Spacing</span><span class="options-inline-trailing"><input id="ui-item-spacing-input" class="options-input" type="text" inputmode="decimal" value=".08" aria-label="Item spacing in rems" /></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="column-auto-size-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Column Auto-size</span><small>Automatically resize columns for content width on selection.</small></span></span></label>
               </div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Animations</div>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="auto-resize-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Auto-Resize</span><small>Duration for automatic playlist column resizing (ms).</small></span></span><span class="options-inline-trailing"><input id="auto-resize-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Auto-resize animation milliseconds" /></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="selection-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Selection Bar</span><small>Duration for playlist and sidebar selection movement (ms).</small></span></span><span class="options-inline-trailing"><input id="selection-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Selection bar animation milliseconds" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="selection-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Selection Bar</span><small>Duration for library, playlist, and Settings selection movement (ms).</small></span></span><span class="options-inline-trailing"><input id="selection-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Selection bar animation milliseconds" /></span></label>
               </div>
             </div>
 
@@ -177,7 +184,7 @@
               <div class="options-subpanel options-database-panel">
                 <div class="options-subpanel-title">Database</div>
                 <div class="database-stats-panel options-path-control"><input id="library-database-path" class="options-input options-path-readout" type="text" readonly placeholder="ScanSong catalog path" aria-label="Database path" /><button id="library-database-browse-button" class="tool-button glyph-button" type="button" aria-label="Browse for catalog" title="Browse for catalog"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
-                <p id="library-database-location-status">ViewBoy reads the shared schema-23 catalog read-only.</p>
+                <p id="library-database-location-status">ViewBoy reads the shared schema-24 catalog read-only.</p>
                 <div class="options-library-toolbar">
                   <button id="library-database-default-button" class="tool-button" type="button">Use Default</button>
                   <button id="library-database-reload-button" class="tool-button" type="button">Reload Library</button>
@@ -298,6 +305,10 @@
       </div>
     </div>
 
+    <div id="sidebar-selection-indicator" class="list-selection-indicator" aria-hidden="true"></div>
+    <div id="playlist-selection-indicator" class="list-selection-indicator" aria-hidden="true"></div>
+    <div id="options-selection-indicator" class="list-selection-indicator options-selection-indicator" aria-hidden="true"></div>
+
     <script src="./playback-speed.js"></script>
     <script src="./app-core.js"></script>
     <script src="./sidebar-controller.js"></script>
@@ -306,6 +317,7 @@
     <script src="./playback-backends.js"></script>
     <script src="./app-playback.js"></script>
     <script src="./app-ui.js"></script>
+    <script src="./viewboy-tabs.js"></script>
     <script src="./app-library.js"></script>
     <script src="./app.js"></script>
   </body>

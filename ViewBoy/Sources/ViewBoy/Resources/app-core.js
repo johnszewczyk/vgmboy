@@ -1,5 +1,6 @@
 const DEFAULT_PLAY_FADE_SECONDS = 6;
 const DEFAULT_LONG_PLAY_SECONDS = 180;
+const DEFAULT_ACCENT_COLOR = "#b6d9ca";
 const SAMPLE_RATE = 44_100;
 const DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES = 2 * 1024 * 1024 * 1024;
 const ARCHIVE_CACHE_LIMIT_CHOICES = Object.freeze([2, 4, 8, 16].map((gigabytes) => gigabytes * 1024 * 1024 * 1024));
@@ -55,6 +56,7 @@ const state = {
   selectedTrackId: null,
   selectedTrackIds: [],
   playlistSelectionAnchorId: null,
+  automaticallyHiddenColumns: new Set(),
   // The visible playlist is a browsing projection. Playback advances through
   // this separate queue so selecting another sidebar item cannot silently
   // replace the queue that is currently playing.
@@ -68,19 +70,19 @@ const state = {
   manualPlayTimeSeconds: DEFAULT_LONG_PLAY_SECONDS,
   unknownDurationSeconds: 150,
   spcFadeSeconds: DEFAULT_PLAY_FADE_SECONDS,
-  uiItemSpacingRem: 0.2,
-  uiFontSizePt: 10,
-  sidebarFontSizePt: 10,
-  sidebarTextColor: "#062d4a",
+  uiItemSpacingRem: 0.08,
+  uiFontSizePt: 11,
+  sidebarFontSizePt: 11,
+  sidebarTextColor: "#d7e1dc",
   sidebarMonospace: false,
   sidebarPathCounts: true,
-  playlistFontSizePt: 10,
-  playlistTextColor: "#062d4a",
+  playlistFontSizePt: 11,
+  playlistTextColor: "#d7e1dc",
   playlistMonospace: false,
   applicationMonospace: false,
   playlistHeaderBold: false,
   sidebarWidthPercent: 20,
-  accentColor: "#072f57",
+  accentColor: DEFAULT_ACCENT_COLOR,
   routingPreferences: {},
   archiveCacheEnabled: true,
   archiveCacheLimitBytes: DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES,
@@ -155,6 +157,7 @@ const refs = {
   databaseCollapseAllButton: document.getElementById("database-collapse-all-button"),
   databaseExpandAllButton: document.getElementById("database-expand-all-button"),
   treeRoot: document.getElementById("tree-root"),
+  sidebarSelectionIndicator: document.getElementById("sidebar-selection-indicator"),
   sidebarResizeHandle: document.getElementById("sidebar-resize-handle"),
   workspace: document.querySelector(".workspace"),
   sidebarContextMenu: document.getElementById("sidebar-context-menu"),
@@ -168,6 +171,8 @@ const refs = {
   playlistBody: document.getElementById("playlist-body"),
   optionsOverlay: document.getElementById("options-overlay"),
   optionsCloseButton: document.getElementById("options-close-button"),
+  optionsNav: document.querySelector(".options-nav"),
+  optionsSelectionIndicator: document.getElementById("options-selection-indicator"),
   optionsDatabaseTab: document.getElementById("options-database-tab"),
   optionsRoutingTab: document.getElementById("options-routing-tab"),
   optionsPlaybackTab: document.getElementById("options-playback-tab"),
@@ -202,9 +207,9 @@ const refs = {
   libraryCacheBrowseButton: document.getElementById("library-cache-browse-button"),
   libraryCacheDefaultButton: document.getElementById("library-cache-default-button"),
   sidebarFontSizeInput: document.getElementById("sidebar-font-size-input"),
+  uiFontSizeReadout: document.getElementById("ui-font-size-readout"),
   sidebarTextColorInput: document.getElementById("sidebar-text-color-input"),
   sidebarPathCountsCheckbox: document.getElementById("sidebar-path-counts-checkbox"),
-  applicationMonospaceCheckbox: document.getElementById("application-monospace-checkbox"),
   aacExportDirectoryPath: document.getElementById("aac-export-directory-path"),
   aacExportChooseButton: document.getElementById("aac-export-choose-button"),
   aacExportStatus: document.getElementById("aac-export-status"),
@@ -239,6 +244,12 @@ const refs = {
   monoEnabledCheckbox: document.getElementById("mono-enabled-checkbox"),
   previousButton: document.getElementById("previous-button"),
   playButton: document.getElementById("play-button"),
+  playerDeck: document.querySelector(".player-deck"),
+  deckState: document.getElementById("deck-state"),
+  deckIndex: document.getElementById("deck-index"),
+  deckTitle: document.getElementById("deck-title"),
+  deckMeta: document.getElementById("deck-meta"),
+  queueCount: document.getElementById("queue-count"),
   nextButton: document.getElementById("next-button"),
   equalizerToolbarButton: document.getElementById("equalizer-toolbar-button"),
   nativeDiagnostics: document.getElementById("native-diagnostics"),
@@ -285,7 +296,9 @@ async function loadSettings() {
     state.aacExportDirectory = typeof parsed.aacExportDirectory === "string" && parsed.aacExportDirectory
       ? parsed.aacExportDirectory
       : (await window.spcBoyWK.defaultAACExportDirectory?.()) || "";
-    state.uiItemSpacingRem = normalizeItemSpacing(parsed.uiItemSpacingRem);
+    state.uiItemSpacingRem = Number(parsed.uiItemSpacingRem) === 0.2
+      ? 0.08
+      : normalizeItemSpacing(parsed.uiItemSpacingRem);
     state.rootPath = parsed.rootPath || null;
     state.localBrowserEnabled = Boolean(parsed.localBrowserEnabled && state.rootPath);
     state.selectedFolderPath = parsed.selectedFolderPath || null;
@@ -299,8 +312,12 @@ async function loadSettings() {
       ? parsed.collapsedConsoleNames.filter((name) => typeof name === "string")
       : [];
     state.lastSelectedTrackId = parsed.lastSelectedTrackId || null;
-    const interfaceFontSize = normalizeFontSize(parsed.uiFontSizePt ?? parsed.sidebarFontSizePt ?? parsed.playlistFontSizePt);
-    const interfaceFontColor = normalizeFontColor(parsed.sidebarTextColor ?? parsed.playlistTextColor);
+    const storedFontSize = parsed.uiFontSizePt ?? parsed.sidebarFontSizePt ?? parsed.playlistFontSizePt;
+    const interfaceFontSize = Number(storedFontSize) === 10 ? 11 : normalizeFontSize(storedFontSize);
+    const storedFontColor = parsed.sidebarTextColor ?? parsed.playlistTextColor;
+    const interfaceFontColor = ["#062d4a", "#b7e4f2", "#e2f8fb"].includes(String(storedFontColor || "").trim().toLowerCase())
+      ? "#d7e1dc"
+      : normalizeFontColor(storedFontColor);
     const interfaceMonospace = Boolean(parsed.applicationMonospace ?? parsed.sidebarMonospace ?? parsed.playlistMonospace);
     state.uiFontSizePt = interfaceFontSize;
     state.sidebarFontSizePt = interfaceFontSize;
@@ -313,7 +330,9 @@ async function loadSettings() {
     state.applicationMonospace = interfaceMonospace;
     state.playlistHeaderBold = Boolean(parsed.playlistHeaderBold);
     state.sidebarWidthPercent = normalizeSidebarWidth(parsed.sidebarWidthPercent);
-    state.accentColor = normalizeAccentColor(parsed.accentColor);
+    state.accentColor = ["#072f57", "#59c9f1", "#65d9ef", "#d77a3d"].includes(String(parsed.accentColor || "").trim().toLowerCase())
+      ? DEFAULT_ACCENT_COLOR
+      : normalizeAccentColor(parsed.accentColor);
     state.routingPreferences = parsed.routingPreferences && typeof parsed.routingPreferences === "object" ? { ...parsed.routingPreferences } : {};
     state.archiveCacheEnabled = parsed.archiveCacheEnabled !== false;
     state.archiveCacheLimitBytes = normalizeArchiveCacheLimit(parsed.archiveCacheLimitBytes);
@@ -477,34 +496,34 @@ function normalizeItemSpacing(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric)
     ? Math.max(0, Math.min(2, Math.round(numeric * 100) / 100))
-    : 0.2;
+    : 0.08;
 }
 
 function normalizeFontSize(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric)
     ? Math.max(8, Math.min(18, Math.round(numeric)))
-    : 10;
+    : 11;
 }
 
 function normalizeFontColor(value) {
   const text = String(value || "").trim();
-  if (!text) return "#062d4a";
+  if (!text) return "#d7e1dc";
   if (typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("color", text)) {
     return text;
   }
   return /^#[0-9a-f]{3,4}$/i.test(text) || /^#[0-9a-f]{6,8}$/i.test(text)
     ? text.toLowerCase()
-    : "#062d4a";
+    : "#d7e1dc";
 }
 
 function normalizeAccentColor(value) {
   const text = String(value || "").trim();
-  if (!text) return "#072f57";
+  if (!text) return DEFAULT_ACCENT_COLOR;
   if (typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("color", text)) return text;
   return /^#[0-9a-f]{3,4}$/i.test(text) || /^#[0-9a-f]{6,8}$/i.test(text)
     ? text.toLowerCase()
-    : "#072f57";
+    : DEFAULT_ACCENT_COLOR;
 }
 
 function normalizeSidebarWidth(value) {

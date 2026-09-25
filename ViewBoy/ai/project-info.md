@@ -22,6 +22,7 @@ Human-facing behavior:
 - Display and phosphor treatment: `subsystem-human/display.md`.
 - Settings and preferences: `subsystem-human/options.md`.
 - Playback and transport: `subsystem-human/playback.md`.
+- Playlist tabs and shortcuts: `subsystem-human/playlist-tabs.md`.
 
 Engineering constraints:
 

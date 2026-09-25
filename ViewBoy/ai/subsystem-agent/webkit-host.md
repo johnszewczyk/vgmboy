@@ -12,6 +12,12 @@ Swift owns native capabilities, catalog/playback bridges, persistent settings,
 sidebar resolution, and favorite mutation. The web resources own DOM
 presentation, CSS animation, and user-interaction forwarding.
 
+The AppKit surface hosts a click-through Metal overlay above the WebKit view.
+It draws a static optical pass on layout changes and a short sweep when the
+native transport state or generation changes. The Metal view is paused between
+those events and the sweep respects macOS Reduced Motion. Text, hit testing,
+scrolling, and layout remain WebKit-owned.
+
 Frontend settings cross the bridge as a JSON projection of the typed Swift
 `SPCBoyPreferencesSnapshot` and are retained by native `UserDefaults`. Browser
 `localStorage` and the retired favorites migration payload are not part of the
@@ -33,11 +39,37 @@ ViewBoy can replace the presentation skin without moving layout policy into
 native code; native Swift owns persistence and window levels.
 
 The accent color is a persisted CSS color in the typed settings projection.
-`app-ui.js` applies it as the root `--accent` value, and both the sidebar and
-playlist use the same moving accent capsule. Selected-row backgrounds remain
-transparent so a second instantaneous paint cannot flash over the capsule;
-selected text transitions to the shared dark accent ink. Active toolbar and
-option controls use the same accent surface.
+`app-ui.js` applies it as the root `--accent` value. Sidebar, playlist, and
+Settings navigation use persistent body-level selection locators that move by
+transform; they stay outside scrolling and frequently replaced row containers.
+During virtual row replacement, the locator holds its last frame until the new
+selected row is attached, preventing a blank flash. Scrolling follows the
+selected row without animation. The bundled Doto face and
+one root Interface Scale apply across both the main and Settings windows, with
+shared relative sizes for captions, controls, and display text.
+
+`index.html` layers `viewboy-nightglass.css` after `styles.css`. The latter
+provides shared structure; Nightglass owns ViewBoy's black smoked-glass palette,
+pale phosphor text, and selection treatment. Keep presentation colors out of
+the inherited transport bridge.
+
+## Selection and Search
+
+The renderer retains selected sidebar and playlist row references for the shared
+selection indicator. Selection updates must not query the full sidebar tree;
+tree keyboard navigation uses the visible node list built during rendering.
+Playlist selection uses the ID and index maps rebuilt with each playlist
+render, then changes classes only on rows entering or leaving the selection.
+
+Database game search keeps the loaded game rows and group structure in place.
+It updates visibility for keys entering or leaving the current match set and
+hides groups without matches. Do not use each query result array identity as a
+reason to rebuild the complete sidebar.
+
+Playlist-tab scrolling persists the scroll offset without copying the active
+playlist on every scroll event. Full tab snapshots are reserved for playlist
+or tab changes; selection updates copy only their selection fields, and
+virtualized viewport redraws do not snapshot playlist data.
 
 `FrontendOptionsManifest` provides the common Database, Interface, and Windows
 organization through the bridge. `options-controller.js` applies that manifest,
@@ -99,7 +131,8 @@ model.
 Native playback status remains authoritative for elapsed position, pause, seek,
 tempo, and end state. While transport is playing, WebKit projects a small
 monotonic clock between native status anchors so the visible readout moves
-smoothly between the shared coordinator's status broadcasts. The projection is
+between the shared coordinator's status broadcasts. Its 200 ms timer avoids a
+display-rate redraw loop. The projection is
 cancelled on pause, stop, replacement, and natural end; it never polls the
 decoder or advances playback itself.
 
