@@ -18,8 +18,9 @@
   package manifest once. It inventories keys in `game.metadata`,
   `game.extensions`, and every member's `metadata` and `extensions`; extension
   keys use the `extension.` namespace shown by the editor. It returns field
-  names and per-scope occurrence counts, never metadata values. Unreadable
-  paths/packages remain issues so the UI can label an incomplete result.
+  names, counts, and matching values; the WebView snapshot sends the matching
+  values when a tag name is selected. Unreadable paths/packages remain issues
+  so the UI can label an incomplete result.
 - `Application/Sources/UACManMetadataCLI` exposes the same
   `SPCMetadataHarvester` and
   `SPCMetadataProjector` for raw-directory creation-time import. It depends on
@@ -55,7 +56,8 @@
   border, or horizontal inset. Keep each table's schema local to its root so
   nested rows inherit only their own table's column tracks. Tag Analyzer's
   parent, pack, occurrence, and recursive JSON tables all use this class; their
-  differences belong in their schema and cell content.
+  differences belong in their schema and cell content. Every analyzer fold uses
+  the same count-plus-chevron control, including array and object values.
 - Generate visible row deletion controls with `canonicalDeleteButtonMarkup`.
   It must emit the same fixed-size `.icon-button.danger` used on Track Tags;
   do not put a full-width `.tag-table-field` box in a narrow action column.
@@ -63,9 +65,10 @@
   chevron in the title cell. Keep it aligned at the title cell's right edge;
   the title cell and heading fold the child table, while JSON add actions remain
   independent. The parent row's fold control reopens the child table. Foldable
-  titles use the same bordered heading field as every canonical title and
-  header; only the nested heading background differs. Popup dismissal remains
-  a close `×` control.
+  titles use the same full-width bordered heading field as every canonical
+  title and header; actions overlay its right edge so the label remains
+  centered. Only the nested heading background differs. Popup dismissal
+  remains a close `×` control.
   A header's `×` is a plain canonical heading cell, not a second delete button.
 - Canonical title rows share the compact 27 px baseline used by table headers
   and content rows. Let tall controls such as JSON textareas grow their own

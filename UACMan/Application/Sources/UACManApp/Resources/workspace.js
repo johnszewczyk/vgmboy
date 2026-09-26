@@ -447,6 +447,11 @@
     const attributes = options.attributes ? ` ${options.attributes}` : "";
     return `<button class="canonical-fold-toggle canonical-fold-trigger ${options.className || ""}" type="button" data-action="toggleCanonicalFold" data-fold-id="${esc(foldID)}" data-focus-id="${esc(foldID)}" aria-expanded="${expanded}"${attributes} aria-label="${esc(label)}"><span>${options.label || "[Nested Tags]"}</span><span class="canonical-fold-icon">${expanded ? "−" : "＋"}</span></button>`;
   };
+  const canonicalCountFoldToggleMarkup = (foldID, count, label, attributes = "") =>
+    canonicalFoldToggleMarkup(foldID, label, {
+      label:`<span class="canonical-fold-count">${esc(count)}</span>`,
+      attributes
+    });
   const memberFields = member => ({
     ...(member.metadata || {}),
     ...Object.fromEntries(Object.entries(member.extensions || {}).map(([key, value]) => [`extension.${key}`, value]))
@@ -1115,9 +1120,13 @@
   }
 
   function tagAnalyzerJSONSummary(value) {
-    const count = Array.isArray(value) ? value.length : Object.keys(value || {}).length;
+    const count = tagAnalyzerJSONEntryCount(value);
     const label = Array.isArray(value) ? "item" : "field";
     return `${Array.isArray(value) ? "Array" : "Object"} · ${count} ${label}${count === 1 ? "" : "s"}`;
+  }
+
+  function tagAnalyzerJSONEntryCount(value) {
+    return Array.isArray(value) ? value.length : Object.keys(value || {}).length;
   }
 
   function tagAnalyzerJSONValueFoldID(parentFoldID, match) {
@@ -1131,12 +1140,11 @@
   }
 
   function tagAnalyzerJSONFoldToggleMarkup(value, foldID, title) {
-    const summary = tagAnalyzerJSONSummary(value);
-    return canonicalFoldToggleMarkup(foldID, `Show nested ${title} values`, {
-      className:"tag-analyzer-json-trigger",
-      label:`<span class="canonical-fold-label">${esc(summary)}</span>`,
-      attributes:`data-unfold-render="tagAnalyzerJSON" data-json-value="${esc(JSON.stringify(value))}" data-json-title="${esc(title)}"`
-    });
+    const count = tagAnalyzerJSONEntryCount(value);
+    return canonicalCountFoldToggleMarkup(
+      foldID, count, `Show ${count} nested values for ${title}`,
+      `data-unfold-render="tagAnalyzerJSON" data-json-value="${esc(JSON.stringify(value))}" data-json-title="${esc(title)}"`
+    );
   }
 
   function tagAnalyzerJSONScalarMarkup(value, title) {
@@ -1278,11 +1286,10 @@
       const packFoldID = tagAnalyzerPackFoldID(foldID, pack.archiveRelativePath);
       const isExpanded = CanonicalTable.isFoldOpen(packFoldID);
       const packageName = pack.archiveRelativePath.split("/").pop() || first.archiveTitle || pack.archiveRelativePath;
-      const packToggle = canonicalFoldToggleMarkup(packFoldID, `Show ${pack.matches.length} tag fields in ${packageName}`, {
-        className:"tag-analyzer-pack-trigger",
-        label:`<span>${pack.matches.length}</span>`,
-        attributes:`data-unfold-render="tagAnalyzer" data-tag-name="${esc(tagName)}" data-archive-relative-path="${esc(pack.archiveRelativePath)}"${state?.isDeletingTagAnalyzerTrackFields ? " disabled" : ""}`
-      });
+      const packToggle = canonicalCountFoldToggleMarkup(
+        packFoldID, pack.matches.length, `Show ${pack.matches.length} tag fields in ${packageName}`,
+        `data-unfold-render="tagAnalyzer" data-tag-name="${esc(tagName)}" data-archive-relative-path="${esc(pack.archiveRelativePath)}"${state?.isDeletingTagAnalyzerTrackFields ? " disabled" : ""}`
+      );
       const packRow = canonicalRowMarkup([
         canonicalNumberCellMarkup(index + 1, "Matched pack number " + (index + 1), { className:"tag-number-cell" }),
         canonicalCellMarkup('<input class="tag-table-field" value="' + esc(packageName) + '" title="' + esc(pack.archiveRelativePath) + '" aria-label="Filename" disabled>'),
@@ -1400,11 +1407,10 @@
       const matches = (tagAnalyzerMatchesByName.get(tag.name) || []).filter(match =>
         tagAnalyzerFilenameMatches(match.archiveRelativePath, query)
       );
-      const toggle = canonicalFoldToggleMarkup(foldID, `Show ${matchedPackCount} matched packs for ${tag.name}`, {
-        className:"tag-analyzer-match-trigger",
-        label:`<span>${matchedPackCount}</span>`,
-        attributes:`data-unfold-load="tagAnalyzerMatches" data-unfold-render="tagAnalyzer" data-tag-name="${esc(tag.name)}"${deleting ? " disabled" : ""}`
-      });
+      const toggle = canonicalCountFoldToggleMarkup(
+        foldID, matchedPackCount, `Show ${matchedPackCount} matched packs for ${tag.name}`,
+        `data-unfold-load="tagAnalyzerMatches" data-unfold-render="tagAnalyzer" data-tag-name="${esc(tag.name)}"${deleting ? " disabled" : ""}`
+      );
       const cells = [
         canonicalNumberCellMarkup(index + 1, "Tag number " + (index + 1), { className:"tag-number-cell" }),
         canonicalCellMarkup('<input class="tag-table-field" value="' + esc(tag.name) + '" title="' + esc(tag.name) + '" aria-label="Tag name ' + esc(tag.name) + '" disabled>', { className:"tag-name-cell" }),
@@ -1834,9 +1840,10 @@
     if (!toggle) return;
     toggle.dataset.jsonValue = JSON.stringify(value);
     toggle.dataset.jsonTitle = title;
-    toggle.setAttribute("aria-label", "Show nested " + title + " values");
-    const label = $(".canonical-fold-label", toggle);
-    if (label) label.textContent = tagAnalyzerJSONSummary(value);
+    const count = tagAnalyzerJSONEntryCount(value);
+    toggle.setAttribute("aria-label", "Show " + count + " nested values for " + title);
+    const label = $(".canonical-fold-count", toggle);
+    if (label) label.textContent = String(count);
   }
 
   function updateTagAnalyzerJSONTableHeading(table, title, value) {

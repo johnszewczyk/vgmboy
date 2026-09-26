@@ -99,6 +99,8 @@ When a field value is a JSON array or object, its **Tag Value** cell opens the
 same nested canonical table pattern. A string containing a JSON array or
 object opens the same way and remains a string when saved. Each level can
 contain scalars, arrays, and objects, with no designed nesting-depth limit.
+Structured values show their item or field count with the same plus/minus fold
+control used by the outer analyzer tables.
 Use **＋** to add a string,
 **123** to add a JSON scalar, **{}** to add an object, **[]** to add an array,
 and **×** to remove an entry.
