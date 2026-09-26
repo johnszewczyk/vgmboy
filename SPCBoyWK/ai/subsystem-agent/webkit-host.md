@@ -26,6 +26,13 @@ cross the shared VGMBoy boundary at both `nativePlaybackStart` and
 to the main WebView, which asks VGMBoyKit to reconfigure the loaded session
 without losing position or paused state.
 
+The stored Long Play duration is not playback-effective while Long Play is off.
+A duration-only snapshot change in that state must not reconfigure the loaded
+session. Finalized duration edits persist from either WebView; the Options
+WebView does not reconfigure playback for this field, and the main WebView
+applies the edit only when Long Play is enabled. Do not persist partial
+text-field values on every keystroke.
+
 The shared `FrontendPreferencesCore` contract owns the validated animation
 timing range, 200 ms defaults, and the eight-point-per-side playlist header
 minimum padding. DOM font measurement, geometry, and CSS remain WebKit-owned

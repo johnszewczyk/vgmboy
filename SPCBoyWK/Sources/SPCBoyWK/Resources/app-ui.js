@@ -2558,21 +2558,23 @@ function isPlaylistSelectionTarget(focusTarget = document.activeElement) {
 }
 
 function setPlayTime(nextSeconds) {
+  const previousSeconds = state.manualPlayTimeSeconds;
   state.manualPlayTimeSeconds = uiApp.normalizeLongPlayTime(nextSeconds);
   persistSettings();
   renderAll();
-  uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
-    console.error(error);
-  });
+  if (state.longPlayEnabled && !window.spcBoyWK?.isOptionsWindow && state.manualPlayTimeSeconds !== previousSeconds) {
+    uiApp.playback.refreshPlaybackForTimingChange().catch((error) => console.error(error));
+  }
 }
 
 function setSpcForceManualTime(nextEnabled) {
+  const previousEnabled = state.longPlayEnabled;
   state.longPlayEnabled = Boolean(nextEnabled);
   persistSettings();
   renderAll();
-  uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
-    console.error(error);
-  });
+  if (previousEnabled !== state.longPlayEnabled && !window.spcBoyWK?.isOptionsWindow) {
+    uiApp.playback.refreshPlaybackForTimingChange().catch((error) => console.error(error));
+  }
 }
 
 function cycleRepeatMode() {
@@ -2704,11 +2706,12 @@ function adjustAppVolume(delta) {
 
 function commitSpcLengthInput(rawValue) {
   const parsedSeconds = uiApp.parseDurationSeconds(rawValue);
+  const previousSeconds = state.manualPlayTimeSeconds;
   state.manualPlayTimeSeconds = uiApp.normalizeLongPlayTime(parsedSeconds ?? state.manualPlayTimeSeconds);
   persistSettings();
-  uiApp.playback.refreshPlaybackForTimingChange().catch((error) => {
-    console.error(error);
-  });
+  if (state.longPlayEnabled && !window.spcBoyWK?.isOptionsWindow && state.manualPlayTimeSeconds !== previousSeconds) {
+    uiApp.playback.refreshPlaybackForTimingChange().catch((error) => console.error(error));
+  }
 }
 
 function commitUnknownDurationInput(rawValue) {

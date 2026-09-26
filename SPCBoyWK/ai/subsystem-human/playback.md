@@ -71,10 +71,11 @@ including FLAC, keeps its decoder-reported natural duration even when Long Play
 is enabled; loop-capable formats retain the manual Long Play duration.
 
 The displayed track length and the native playback window use the same effective
-timing plan. Changing Long Play or its target updates both together. Long Play's
-duration accepts any non-negative whole-second value; `0` means unbounded Long
-Play, displayed as `∞`, until the decoder reports a real end. It is not rewritten
-to an arbitrary minimum or maximum.
+timing plan. Changing Long Play or its target updates both together. While Long
+Play is off, its configured duration is retained but editing it does not affect
+the current track. Long Play's duration accepts any non-negative whole-second
+value; `0` means unbounded Long Play, displayed as `∞`, until the decoder reports
+a real end. It is not rewritten to an arbitrary minimum or maximum.
 
 Timing and Play Speed changes reconfigure the already-loaded VGMBoy session
 through the native bridge, preserving the current position and paused/playing

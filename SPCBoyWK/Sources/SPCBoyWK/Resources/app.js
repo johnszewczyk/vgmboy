@@ -107,14 +107,6 @@ refs.spcLengthInput.addEventListener("change", (event) => {
   app.ui.commitSpcLengthInput(event.target.value);
 });
 
-refs.spcLengthInput.addEventListener("input", (event) => {
-  app.ui.commitSpcLengthInput(event.target.value);
-});
-
-refs.spcLengthInput.addEventListener("blur", (event) => {
-  app.ui.commitSpcLengthInput(event.target.value);
-});
-
 refs.spcUnknownDurationInput.addEventListener("change", (event) => {
   app.ui.commitUnknownDurationInput(event.target.value);
 });
@@ -293,9 +285,9 @@ if (window.spcBoyWK?.onFrontendSettingsChanged) {
     if (settings.longPlayEnabled !== undefined) state.longPlayEnabled = Boolean(settings.longPlayEnabled);
     if (settings.fadeEnabled !== undefined) state.fadeEnabled = Boolean(settings.fadeEnabled);
     if (settings.spcFadeSeconds !== undefined) state.spcFadeSeconds = app.normalizeFadeTime(settings.spcFadeSeconds);
-    const timingChanged = previousTiming.manualPlayTimeSeconds !== state.manualPlayTimeSeconds
+    const timingChanged = previousTiming.longPlayEnabled !== state.longPlayEnabled
+      || (state.longPlayEnabled && previousTiming.manualPlayTimeSeconds !== state.manualPlayTimeSeconds)
       || previousTiming.unknownDurationSeconds !== state.unknownDurationSeconds
-      || previousTiming.longPlayEnabled !== state.longPlayEnabled
       || previousTiming.fadeEnabled !== state.fadeEnabled
       || previousTiming.spcFadeSeconds !== state.spcFadeSeconds;
     state.rootPath = null;
