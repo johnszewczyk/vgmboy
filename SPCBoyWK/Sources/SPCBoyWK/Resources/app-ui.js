@@ -334,7 +334,7 @@ function schedulePlaylistViewportRender() {
   if (!playlistUsesVirtualRows() || playlistViewportFrame) return;
   playlistViewportFrame = window.requestAnimationFrame(() => {
     playlistViewportFrame = 0;
-    renderPlaylist({ sort: false, persistTab: false });
+    renderPlaylist({ sort: false, persistTab: false, preserveVirtualRows: true });
   });
 }
 
@@ -364,15 +364,75 @@ function schedulePlaylistRowMeasurement() {
   });
 }
 
-function makePlaylistVirtualSpacer(height) {
+function makePlaylistVirtualSpacer(height, side) {
   const row = document.createElement("tr");
   row.className = "playlist-virtual-spacer";
+  row.dataset.virtualSpacer = side;
   row.setAttribute("aria-hidden", "true");
   const cell = document.createElement("td");
   cell.colSpan = Math.max(1, orderedColumns().length);
   cell.style.height = `${Math.max(0, height)}px`;
   row.appendChild(cell);
   return row;
+}
+
+function updatePlaylistVirtualSpacer(spacer, height) {
+  if (!spacer) return;
+  const cell = spacer.firstElementChild;
+  if (cell) cell.style.height = `${Math.max(0, height)}px`;
+}
+
+function reconcilePlaylistVirtualRows(startIndex, endIndex) {
+  // Keep rows in the overlapping viewport mounted so an in-flight pointer click
+  // still lands on its original track while scrolling updates the virtual window.
+  const body = refs.playlistBody;
+  const wantedIDs = new Set(state.playlist.slice(startIndex, endIndex).map((track) => track.id));
+  for (const [trackId, row] of playlistRowsByTrackId) {
+    if (wantedIDs.has(trackId)) continue;
+    row.remove();
+    playlistRowsByTrackId.delete(trackId);
+  }
+
+  selectedPlaylistRow = null;
+  currentPlaylistRow = null;
+  let topSpacer = body.querySelector('.playlist-virtual-spacer[data-virtual-spacer="top"]');
+  let bottomSpacer = body.querySelector('.playlist-virtual-spacer[data-virtual-spacer="bottom"]');
+  if (startIndex > 0) {
+    if (!topSpacer) topSpacer = makePlaylistVirtualSpacer(0, "top");
+    if (body.firstElementChild !== topSpacer) body.insertBefore(topSpacer, body.firstElementChild);
+    updatePlaylistVirtualSpacer(topSpacer, startIndex * playlistVirtualRowHeight);
+  } else {
+    topSpacer?.remove();
+    topSpacer = null;
+  }
+  if (endIndex < state.playlist.length) {
+    if (!bottomSpacer) bottomSpacer = makePlaylistVirtualSpacer(0, "bottom");
+    if (!bottomSpacer.isConnected) body.appendChild(bottomSpacer);
+    updatePlaylistVirtualSpacer(bottomSpacer, (state.playlist.length - endIndex) * playlistVirtualRowHeight);
+  } else {
+    bottomSpacer?.remove();
+    bottomSpacer = null;
+  }
+
+  let cursor = topSpacer?.nextSibling || body.firstElementChild;
+  for (let index = startIndex; index < endIndex; index += 1) {
+    const track = state.playlist[index];
+    let row = playlistRowsByTrackId.get(track.id);
+    if (!row) {
+      row = createPlaylistRow(track, index);
+      playlistRowsByTrackId.set(track.id, row);
+    } else {
+      row.dataset.playlistIndex = String(index);
+      updatePlaylistRowState(row, track.id);
+    }
+    if (row !== cursor) body.insertBefore(row, cursor && cursor !== bottomSpacer ? cursor : bottomSpacer);
+    cursor = row.nextSibling;
+    if (state.selectedTrackId === track.id) selectedPlaylistRow = row;
+    if (state.activePlaylistTabId === state.playbackTabId && state.currentTrackId === track.id) currentPlaylistRow = row;
+  }
+  if (bottomSpacer && bottomSpacer !== body.lastElementChild) body.appendChild(bottomSpacer);
+  scheduleSelectionIndicators();
+  schedulePlaylistRowMeasurement();
 }
 
 refs.playlistBodyWrap?.addEventListener("scroll", schedulePlaylistViewportRender, { passive: true });
@@ -2152,66 +2212,73 @@ function syncPlaylistColumnWidths() {
   }
 }
 
+function createPlaylistRow(track, rowIndex) {
+  const row = document.createElement("tr");
+  row.dataset.trackId = track.id;
+  row.dataset.playlistIndex = String(rowIndex);
+  row.tabIndex = 0;
+  row.setAttribute("aria-label", `${track.title || track.filename || "Track"}`);
+  const isCurrent = state.activePlaylistTabId === state.playbackTabId && state.currentTrackId === track.id;
+  row.className = `playlist-row${state.selectedTrackIds.includes(track.id) ? " is-selected" : ""}${isCurrent ? " is-current" : ""}`;
+
+  for (const column of orderedColumns()) {
+    row.appendChild(renderPlaylistCell(track, column, rowIndex));
+  }
+
+  row.addEventListener("click", (event) => {
+    if (!row.isConnected || row.dataset.trackId !== track.id) return;
+    selectPlaylistTrack(track.id, {
+      focus: true,
+      extend: event.metaKey || event.ctrlKey,
+      range: event.shiftKey
+    });
+    uiApp.playback.updateTimingSummary();
+  });
+
+  row.addEventListener("dblclick", () => {
+    if (!row.isConnected || row.dataset.trackId !== track.id) return;
+    playVisibleTrack(track.id, 0).catch((error) => {
+      console.error(error);
+    });
+  });
+
+  row.addEventListener("contextmenu", (event) => {
+    showContextMenu(event, [["Export AAC", async () => {
+      await uiApp.playback.exportTrackAsAAC(track);
+    }]]);
+  });
+
+  row.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    if (!row.isConnected || row.dataset.trackId !== track.id) return;
+    if (event.target !== row && event.target?.closest?.("button, input, select, a, [contenteditable=true]")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const selectedTrack = selectPlaylistTrack(track.id, { focus: true });
+    if (!selectedTrack) return;
+    playVisibleTrack(selectedTrack.id, 0).catch((error) => {
+      console.error(error);
+    });
+  });
+
+  return row;
+}
+
 function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = state.playlist.length, spacers = null, { synchronous = false } = {}) {
   let rowIndex = startIndex;
   const appendBatch = () => {
     if (generation !== playlistRenderGeneration) return;
     const fragment = document.createDocumentFragment();
     if (rowIndex === startIndex && spacers?.top > 0) {
-      fragment.appendChild(makePlaylistVirtualSpacer(spacers.top));
+      fragment.appendChild(makePlaylistVirtualSpacer(spacers.top, "top"));
     }
     const startedAt = performance.now();
     while (rowIndex < endIndex && (synchronous || performance.now() - startedAt < 8)) {
       const track = state.playlist[rowIndex];
-      const row = document.createElement("tr");
-      row.dataset.trackId = track.id;
-      row.tabIndex = 0;
-      row.setAttribute("aria-label", `${track.title || track.filename || "Track"}`);
-      const isCurrent = state.activePlaylistTabId === state.playbackTabId && state.currentTrackId === track.id;
-      row.className = `playlist-row${state.selectedTrackIds.includes(track.id) ? " is-selected" : ""}${isCurrent ? " is-current" : ""}`;
+      const row = createPlaylistRow(track, rowIndex);
       playlistRowsByTrackId.set(track.id, row);
       if (state.selectedTrackId === track.id) selectedPlaylistRow = row;
-      if (isCurrent) currentPlaylistRow = row;
-
-      for (const column of orderedColumns()) {
-        row.appendChild(renderPlaylistCell(track, column, rowIndex));
-      }
-
-      row.addEventListener("click", (event) => {
-        if (!row.isConnected || row.dataset.trackId !== track.id) return;
-        const selectedTrack = selectPlaylistTrack(track.id, {
-          focus: true,
-          extend: event.metaKey || event.ctrlKey,
-          range: event.shiftKey
-        });
-        uiApp.playback.updateTimingSummary();
-      });
-
-      row.addEventListener("dblclick", () => {
-        if (!row.isConnected || row.dataset.trackId !== track.id) return;
-        playVisibleTrack(track.id, 0).catch((error) => {
-          console.error(error);
-        });
-      });
-
-      row.addEventListener("contextmenu", (event) => {
-        showContextMenu(event, [["Export AAC", async () => {
-          await uiApp.playback.exportTrackAsAAC(track);
-        }]]);
-      });
-
-      row.addEventListener("keydown", (event) => {
-        if (event.key !== "Enter") return;
-        if (!row.isConnected || row.dataset.trackId !== track.id) return;
-        if (event.target !== row && event.target?.closest?.("button, input, select, a, [contenteditable=true]")) return;
-        event.preventDefault();
-        event.stopPropagation();
-        const selectedTrack = selectPlaylistTrack(track.id, { focus: true });
-        if (!selectedTrack) return;
-        playVisibleTrack(selectedTrack.id, 0).catch((error) => {
-          console.error(error);
-        });
-      });
+      if (state.activePlaylistTabId === state.playbackTabId && state.currentTrackId === track.id) currentPlaylistRow = row;
 
       fragment.appendChild(row);
       rowIndex += 1;
@@ -2220,7 +2287,7 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
     if (rowIndex < endIndex) {
       window.requestAnimationFrame(appendBatch);
     } else {
-      if (spacers?.bottom > 0) refs.playlistBody.appendChild(makePlaylistVirtualSpacer(spacers.bottom));
+      if (spacers?.bottom > 0) refs.playlistBody.appendChild(makePlaylistVirtualSpacer(spacers.bottom, "bottom"));
       scheduleSelectionIndicators();
       schedulePlaylistRowMeasurement();
     }
@@ -2229,7 +2296,7 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
   else window.requestAnimationFrame(appendBatch);
 }
 
-function renderPlaylist({ sort = true, persistTab = true, virtualScrollTop = null } = {}) {
+function renderPlaylist({ sort = true, persistTab = true, virtualScrollTop = null, preserveVirtualRows = false } = {}) {
   if (persistTab && findActivePlaylistTab()) persistPlaylistTabs();
   updateAutomaticColumnVisibility();
   playlistRenderGeneration += 1;
@@ -2243,16 +2310,19 @@ function renderPlaylist({ sort = true, persistTab = true, virtualScrollTop = nul
     state.selectedTrackId = state.selectedTrackIds.at(-1) || null;
   }
   if (!state.selectedTrackId && state.selectedTrackIds.length) state.selectedTrackId = state.selectedTrackIds.at(-1) || null;
-  refs.playlistBody.innerHTML = "";
-  playlistRowsByTrackId.clear();
-  selectedPlaylistRow = null;
-  currentPlaylistRow = null;
+  const virtualized = playlistUsesVirtualRows();
+  const preserveWindow = preserveVirtualRows && virtualized;
+  if (!preserveWindow) {
+    refs.playlistBody.innerHTML = "";
+    playlistRowsByTrackId.clear();
+    selectedPlaylistRow = null;
+    currentPlaylistRow = null;
+  }
   if (sort && state.playlistSortEnabled && !isCatalogPlaylistProjection()) {
     void applyProjectionPlaylistSort()
       .then((didSort) => { if (didSort) renderPlaylist({ sort: false }); })
       .catch((error) => console.error(error));
   }
-  const virtualized = playlistUsesVirtualRows();
   // columnContentWidth uses catalog hints or a bounded sample, so virtualized
   // playlists can still fit their columns without mounting every row.
   const playlistSignature = playlistAutoSizeSignature();
@@ -2287,6 +2357,10 @@ function renderPlaylist({ sort = true, persistTab = true, virtualScrollTop = nul
     state.playlist.length,
     Math.ceil((scrollTop + viewportHeight) / playlistVirtualRowHeight) + PLAYLIST_VIRTUAL_OVERSCAN
   );
+  if (preserveWindow) {
+    reconcilePlaylistVirtualRows(firstVisibleRow, lastVisibleRow);
+    return;
+  }
   appendPlaylistRowsInBatches(
     generation,
     firstVisibleRow,
