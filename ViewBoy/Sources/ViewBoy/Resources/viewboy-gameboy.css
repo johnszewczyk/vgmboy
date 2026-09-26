@@ -695,3 +695,163 @@ html .list-selection-indicator {
 
   html body.options-window .options-nav-item::after { display: none; }
 }
+
+/* Physical console: molded shell, recessed charcoal glass frame, and inked labels. */
+html .app-shell {
+  gap: 0.48rem;
+  padding: 0.55rem;
+  background:
+    radial-gradient(ellipse 90% 75% at 18% -10%, rgb(255 255 255 / 65%), transparent 72%),
+    linear-gradient(145deg, #d7d6ce 0%, #c6c5bd 53%, #b9b8b0 100%);
+}
+
+html .player-deck {
+  position: relative;
+  overflow: hidden;
+  padding: 0.75rem 0.82rem 0.48rem;
+  border: 1px solid #96958e;
+  border-radius: 0.9rem 0.9rem 1.7rem 0.9rem;
+  background:
+    radial-gradient(ellipse 75% 90% at 17% -25%, rgb(255 255 255 / 70%), transparent 80%),
+    linear-gradient(135deg, #e2e1d9 0%, #d1d0c8 38%, #bdbcb4 100%);
+  box-shadow:
+    inset 0 2px 1px rgb(255 255 255 / 85%),
+    inset 0 -3px 4px rgb(92 88 80 / 18%),
+    inset 2px 0 2px rgb(255 255 255 / 32%),
+    0 2px 0 #aaa9a1, 0 8px 20px rgb(64 62 55 / 20%);
+}
+
+html .player-deck::before {
+  position: absolute;
+  inset: 0.35rem 0.42rem auto;
+  height: 1px;
+  width: auto;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 70%) 25%, rgb(112 109 99 / 10%) 85%, transparent);
+  content: "";
+  pointer-events: none;
+}
+
+html .deck-main {
+  grid-template-columns: minmax(0, 1fr) minmax(11.5rem, 25%);
+  gap: 0.95rem;
+  min-height: 7.6rem;
+}
+
+html .deck-screen-bezel {
+  min-width: 0;
+  padding: 0.62rem 0.75rem 0.78rem;
+  border: 1px solid #484b55;
+  border-radius: 0.55rem 0.55rem 1.7rem 0.55rem;
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 11%), transparent 37%),
+    linear-gradient(155deg, #676b78, #484c59 67%, #383d4a);
+  box-shadow:
+    inset 0 1px rgb(255 255 255 / 36%),
+    inset 0 -2px 3px rgb(12 15 23 / 27%),
+    0 1px 1px rgb(255 255 255 / 75%),
+    0 2px 5px rgb(69 66 61 / 25%);
+}
+
+html .deck-screen-bezel::after {
+  display: block;
+  width: fit-content;
+  margin: 0.31rem 0 0 0.18rem;
+  content: "DOT MATRIX WITH STEREO SOUND";
+  color: #a7a9b3;
+  font-size: 0.49rem;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-shadow: 0 -1px rgb(21 23 30 / 75%), 0 1px rgb(255 255 255 / 11%);
+}
+
+html .deck-screen {
+  height: calc(100% - 0.8rem);
+  min-height: 5.1rem;
+  padding: 0.5rem 0.78rem;
+  border: 1px solid #67724d;
+  border-radius: 0.12rem;
+  background-color: #c6d178;
+  background-image:
+    repeating-linear-gradient(0deg, rgb(49 62 34 / 8%) 0 3px, transparent 3px 4px),
+    repeating-linear-gradient(90deg, rgb(49 62 34 / 7%) 0 3px, transparent 3px 4px),
+    linear-gradient(155deg, #d8e292 0%, #c9d47d 49%, #b7c567 100%);
+  background-size: 4px 4px, 4px 4px, 100% 100%;
+  box-shadow:
+    0 0 0 0.2rem #2c303a,
+    inset 0 3px 7px rgb(35 48 27 / 29%),
+    inset 3px 0 4px rgb(48 58 36 / 12%),
+    inset 0 -1px rgb(255 255 232 / 55%),
+    0 1px rgb(174 179 183 / 34%);
+}
+
+html .deck-screen::after {
+  background:
+    linear-gradient(108deg, rgb(255 255 255 / 33%) 0%, rgb(255 255 255 / 7%) 28%, transparent 29% 74%, rgb(255 255 255 / 7%) 95%),
+    radial-gradient(ellipse at 50% -35%, rgb(255 255 255 / 19%), transparent 70%);
+}
+
+html .deck-brand-name { color: #273963; letter-spacing: 0.15em; }
+html .deck-title { color: #293429; font-size: clamp(1rem, 1.65vw, 1.35rem); }
+html .deck-screen-top, html .deck-meta, html .deck-time-row { color: #505c3e; }
+html .player-deck.is-playing #deck-state { color: #273963; text-shadow: 0 1px rgb(255 255 255 / 35%); }
+html .deck-time-row .timing-readout { border-color: #859064; background: rgb(154 173 84 / 24%); }
+
+html .deck-control-bank {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: center;
+  padding: 0.3rem 0.42rem 0.38rem;
+  border: 1px solid #a5a49d;
+  border-radius: 0.62rem;
+  background: linear-gradient(135deg, #d3d2ca, #bdbcb4 72%);
+  box-shadow: inset 0 1px rgb(255 255 255 / 75%), inset 0 -1px rgb(90 87 79 / 24%), 0 1px rgb(255 255 255 / 72%);
+}
+
+html .deck-power {
+  display: flex;
+  align-items: center;
+  justify-self: start;
+  gap: 0.42rem;
+  margin: 0 0 0.18rem 0.3rem;
+  color: #60617b;
+  font-size: 0.53rem;
+  letter-spacing: 0.15em;
+  text-shadow: 0 1px rgb(255 255 255 / 85%), 0 -1px rgb(69 67 63 / 28%);
+}
+
+html .deck-power-led {
+  display: block;
+  width: 0.52rem;
+  height: 0.52rem;
+  border: 1px solid #8c4546;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 26%, #ffb2a3, #cb3b3a 40%, #8d242d 78%);
+  box-shadow: 0 0 0 2px #aba9a1, inset 0 1px rgb(255 234 222 / 86%), 0 0 4px rgb(161 49 48 / 34%);
+}
+
+html .player-deck.is-playing .deck-power-led {
+  background: radial-gradient(circle at 34% 28%, #fff5dc, #ff7a59 31%, #e12d37 69%);
+  box-shadow: 0 0 0 2px #aba9a1, inset 0 1px #fff5e8, 0 0 9px rgb(246 57 53 / 85%);
+}
+
+html .transport-toolbar .transport { grid-template-columns: repeat(3, 1.9rem); grid-template-rows: repeat(3, 1.9rem); gap: 0.2rem; }
+html .transport-toolbar .tool-button, html .transport-toolbar #play-button { width: 1.9rem; min-width: 1.9rem; height: 1.9rem; }
+html .transport-toolbar #play-button { border-color: #512438; background: linear-gradient(140deg, #ad627a, #812d46 67%, #61273c); }
+html .transport-toolbar .tool-button:not(#play-button):not(.is-selected):not([aria-pressed="true"]) { background: linear-gradient(140deg, #8790ae, #636b8d 67%, #4a5273); border-color: #505775; }
+
+html .deck-progress { margin-top: 0.36rem; color: #5b5d75; }
+html .deck-progress .progress-slider-fill { background: linear-gradient(90deg, #566286, #303e70); box-shadow: none; }
+html .deck-progress .progress-slider-thumb { background: #e8e5dd; box-shadow: 0 0 0 1px #485275, 0 1px 3px rgb(43 41 36 / 35%); }
+
+html .panel-heading { color: #303e70; text-shadow: 0 1px rgb(255 255 255 / 75%); letter-spacing: 0.14em; }
+html .panel-heading-mark { color: #777b92; }
+html .playlist-row.is-current td:first-child { box-shadow: inset 2px 0 #4e5a87; }
+
+@media (max-width: 680px) {
+  html .deck-main { grid-template-columns: minmax(0, 1fr) minmax(7rem, 32%); gap: 0.52rem; }
+  html .deck-screen-bezel { padding-inline: 0.48rem; }
+  html .deck-control-bank { padding-inline: 0.2rem; }
+  html .transport-toolbar .transport { grid-template-columns: repeat(3, 1.6rem); grid-template-rows: repeat(3, 1.6rem); }
+  html .transport-toolbar .tool-button, html .transport-toolbar #play-button { width: 1.6rem; min-width: 1.6rem; height: 1.6rem; }
+  html .deck-screen-bezel::after { font-size: 0.42rem; }
+}

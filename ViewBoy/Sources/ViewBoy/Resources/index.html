@@ -36,17 +36,20 @@
     <div class="app-shell">
       <header class="player-deck" aria-label="ViewBoy player">
         <div class="deck-main">
-          <div class="deck-screen" aria-live="polite">
-            <div class="deck-screen-top"><span class="deck-brand-line"><strong class="deck-brand-name">VIEWBOY</strong><span class="deck-brand-divider" aria-hidden="true">/</span><span id="deck-state">STANDBY</span></span><span id="deck-index">00 / 00</span></div>
-            <div class="deck-display-body">
-              <div class="deck-display-track">
-                <div id="deck-title" class="deck-title">SELECT A TRACK</div>
-                <div id="deck-meta" class="deck-meta">LIBRARY READY · NO SIGNAL</div>
+          <div class="deck-screen-bezel">
+            <div class="deck-screen" aria-live="polite">
+              <div class="deck-screen-top"><span class="deck-brand-line"><strong class="deck-brand-name">VIEWBOY</strong><span class="deck-brand-divider" aria-hidden="true">/</span><span id="deck-state">STANDBY</span></span><span id="deck-index">00 / 00</span></div>
+              <div class="deck-display-body">
+                <div class="deck-display-track">
+                  <div id="deck-title" class="deck-title">SELECT A TRACK</div>
+                  <div id="deck-meta" class="deck-meta">LIBRARY READY · NO SIGNAL</div>
+                </div>
+                <div class="deck-time-row" aria-live="off"><span>TIME</span><div class="ui-control toolbar-control timing-readout" aria-label="Elapsed time, track length, and playlist length"><span id="elapsed-label" class="time-label">0:00</span><span class="time-separator">/</span><span id="song-length-label" class="time-label">0:00</span><span class="time-separator deck-time-divider">·</span><span id="playlist-total-label" class="time-label">0:00</span></div></div>
               </div>
-              <div class="deck-time-row" aria-live="off"><span>TIME</span><div class="ui-control toolbar-control timing-readout" aria-label="Elapsed time, track length, and playlist length"><span id="elapsed-label" class="time-label">0:00</span><span class="time-separator">/</span><span id="song-length-label" class="time-label">0:00</span><span class="time-separator deck-time-divider">·</span><span id="playlist-total-label" class="time-label">0:00</span></div></div>
             </div>
           </div>
           <div class="deck-control-bank">
+            <div class="deck-power" aria-hidden="true"><span class="deck-power-led"></span><span class="deck-power-label">POWER</span></div>
             <div class="transport-toolbar toolbar" aria-label="Playback controls">
               <div class="transport toolbar-fixed">
                 <button id="previous-button" class="tool-button glyph-button ui-control" title="Previous" aria-label="Previous"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-back"></use></svg></button>

@@ -29,6 +29,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     private weak var playbackEventWebView: WKWebView?
 
     var onOpenOptionsWindow: (() -> Void)?
+    var onMaterialGeometry: (([String: Any]) -> Void)?
     var onCloseOptionsWindow: (() -> Void)?
     var onCloseMainWindow: (() -> Void)?
     var onChooseRootFolder: (() -> String?)?
@@ -225,6 +226,12 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == "spcBoyWK",
+           let body = message.body as? [String: Any],
+           body["method"] as? String == "viewBoyMaterialGeometry" {
+            onMaterialGeometry?(body)
+            return
+        }
         guard message.name == "spcBoyWK",
               let body = message.body as? [String: Any],
               let id = body["id"] as? String,

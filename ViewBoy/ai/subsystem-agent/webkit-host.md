@@ -13,10 +13,12 @@ sidebar resolution, and favorite mutation. The web resources own DOM
 presentation, CSS animation, and user-interaction forwarding.
 
 The AppKit surface hosts a click-through Metal overlay above the WebKit view.
-It draws a static optical pass on layout changes and a short sweep when the
-native transport state or generation changes. The Metal view is paused between
-those events and the sweep respects macOS Reduced Motion. Text, hit testing,
-scrolling, and layout remain WebKit-owned.
+WebKit reports normalized bounds for the deck, matte bezel, LCD, and power lamp
+through the existing script message handler when those elements resize. The
+overlay uses those bounds for procedural material shading and draws a short
+LCD sweep when the native transport state or generation changes. The Metal
+view is paused between those events and the sweep respects macOS Reduced
+Motion. Text, hit testing, scrolling, and layout remain WebKit-owned.
 
 Frontend settings cross the bridge as a JSON projection of the typed Swift
 `SPCBoyPreferencesSnapshot` and are retained by native `UserDefaults`. Browser
@@ -50,10 +52,11 @@ one root Interface Scale apply across both the main and Settings windows, with
 shared relative sizes for captions, controls, and display text.
 
 `index.html` loads one `viewboy-gameboy.css` presentation sheet after
-`styles.css`. Game Boy Core is the only skin: a gray membrane shell, maroon
-hardware accents, and a subtle 4 px square-cell LCD grid with one-pixel gaps
-across the display and playlist surfaces. The sidebar uses smooth gray without
-a tiled grid. Keep presentation colors out of the inherited transport bridge.
+`styles.css`. Game Boy Core is the only skin: a gray molded shell, charcoal
+bezel, green LCD, blue-purple markings and keys, maroon Play key, and a subtle
+4 px square-cell LCD grid with one-pixel gaps across the display and playlist
+surfaces. The sidebar uses smooth gray without a tiled grid. Keep presentation
+colors out of the inherited transport bridge.
 
 ## Selection and Search
 

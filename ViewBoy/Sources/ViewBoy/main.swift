@@ -30,6 +30,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         nativeBridge.onPlaybackEvent = { [weak self] name, payload in
             self?.broadcastPlaybackEvent(name: name, payload: payload)
         }
+        nativeBridge.onMaterialGeometry = { [weak self] geometry in
+            (self?.window?.contentView as? ViewBoySurfaceView)?.updateMaterialGeometry(geometry)
+        }
         let webView = makeWebView(bridge: nativeBridge, includeCommandDispatcher: true)
         self.webView = webView
         nativeBridge.attachPlaybackEvents(to: webView)
@@ -72,6 +75,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let configuration = WKWebViewConfiguration()
         configuration.userContentController.add(bridge, name: "spcBoyWK")
         configuration.userContentController.addUserScript(bridge.userScript())
+        if includeCommandDispatcher {
+            configuration.userContentController.addUserScript(WKUserScript(
+                source: """
+                (() => {
+                  const selectors = {
+                    deck: '.player-deck', bezel: '.deck-screen-bezel',
+                    screen: '.deck-screen', led: '.deck-power-led'
+                  };
+                  let pending = false;
+                  const report = () => {
+                    pending = false;
+                    if (document.body.classList.contains('options-window')) return;
+                    const width = document.documentElement.clientWidth;
+                    const height = document.documentElement.clientHeight;
+                    if (!width || !height) return;
+                    const geometry = { method: 'viewBoyMaterialGeometry' };
+                    for (const [key, selector] of Object.entries(selectors)) {
+                      const element = document.querySelector(selector);
+                      if (!element) return;
+                      const r = element.getBoundingClientRect();
+                      geometry[key] = [r.x / width, r.y / height, r.width / width, r.height / height];
+                    }
+                    window.webkit.messageHandlers.spcBoyWK.postMessage(geometry);
+                  };
+                  const queue = () => {
+                    if (!pending) { pending = true; requestAnimationFrame(report); }
+                  };
+                  const start = () => {
+                    if (document.body.classList.contains('options-window')) return;
+                    const observer = new ResizeObserver(queue);
+                    for (const selector of Object.values(selectors)) {
+                      const element = document.querySelector(selector);
+                      if (element) observer.observe(element);
+                    }
+                    window.addEventListener('resize', queue, { passive: true });
+                    queue();
+                  };
+                  if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', start, { once: true });
+                  } else { start(); }
+                })();
+                """,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            ))
+        }
         if includeCommandDispatcher {
             configuration.userContentController.addUserScript(WKUserScript(
                 source: """

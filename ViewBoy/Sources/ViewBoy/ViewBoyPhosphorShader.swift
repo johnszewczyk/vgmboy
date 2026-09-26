@@ -35,6 +35,10 @@ final class ViewBoySurfaceView: NSView {
     func updatePlaybackVisual(transportState: String, generation: Int) {
         phosphorOverlay.updatePlaybackVisual(transportState: transportState, generation: generation)
     }
+
+    func updateMaterialGeometry(_ geometry: [String: Any]) {
+        phosphorOverlay.updateMaterialGeometry(geometry)
+    }
 }
 
 @MainActor
@@ -130,6 +134,11 @@ private final class ViewBoyPhosphorOverlayView: NSView {
         advancePulse()
     }
 
+    func updateMaterialGeometry(_ geometry: [String: Any]) {
+        renderer?.setGeometry(geometry)
+        metalView?.setNeedsDisplay(bounds)
+    }
+
     @objc private func advancePulse() {
         let fraction = min(1, (CACurrentMediaTime() - pulseStart) / pulseDuration)
         renderer?.setPulse(
@@ -151,6 +160,10 @@ private final class ViewBoyPhosphorRenderer: NSObject, MTKViewDelegate {
     private var pulseProgress: Float = 0
     private var pulseStrength: Float = 0
     private var isPlaying: Float = 0
+    private var deckRect = SIMD4<Float>(repeating: 0)
+    private var bezelRect = SIMD4<Float>(repeating: 0)
+    private var screenRect = SIMD4<Float>(repeating: 0)
+    private var ledRect = SIMD4<Float>(repeating: 0)
 
     private struct Uniforms {
         var viewport: SIMD2<Float>
@@ -158,6 +171,10 @@ private final class ViewBoyPhosphorRenderer: NSObject, MTKViewDelegate {
         var pulseStrength: Float
         var isPlaying: Float
         var padding: Float = 0
+        var deckRect: SIMD4<Float>
+        var bezelRect: SIMD4<Float>
+        var screenRect: SIMD4<Float>
+        var ledRect: SIMD4<Float>
     }
 
     init?(device: MTLDevice) {
@@ -177,7 +194,22 @@ private final class ViewBoyPhosphorRenderer: NSObject, MTKViewDelegate {
             float pulseStrength;
             float isPlaying;
             float padding;
+            float4 deckRect;
+            float4 bezelRect;
+            float4 screenRect;
+            float4 ledRect;
         };
+
+        float inRect(float2 p, float4 r) {
+            if (r.z <= 0.0 || r.w <= 0.0) return 0.0;
+            float2 a = smoothstep(r.xy, r.xy + float2(0.002), p);
+            float2 b = 1.0 - smoothstep(r.xy + r.zw - float2(0.002), r.xy + r.zw, p);
+            return a.x * a.y * b.x * b.y;
+        }
+
+        float grain(float2 p) {
+            return fract(sin(dot(floor(p), float2(12.9898, 78.233))) * 43758.5453);
+        }
 
         vertex VertexOut vertex_main(uint vertexID [[vertex_id]]) {
             const float2 corners[4] = {
@@ -192,20 +224,32 @@ private final class ViewBoyPhosphorRenderer: NSObject, MTKViewDelegate {
         fragment float4 fragment_main(VertexOut in [[stage_in]],
                                       constant Uniforms &u [[buffer(0)]]) {
             float2 uv = in.position.xy / max(u.viewport, float2(1.0));
-            float deck = 1.0 - smoothstep(0.15, 0.22, uv.y);
+            float deck = inRect(uv, u.deckRect);
+            float bezel = inRect(uv, u.bezelRect);
+            float lcd = inRect(uv, u.screenRect);
+            float shell = max(0.0, deck - bezel);
+            float matte = max(0.0, bezel - lcd);
+            float micro = grain(in.position.xy * 0.72);
+            float brushed = grain(float2(in.position.x * 0.18, in.position.y * 0.045));
+            float shellShade = shell * (0.013 + micro * 0.028 + brushed * 0.009);
+            float matteShade = matte * (0.033 + micro * 0.021);
             float scan = 1.0 - step(1.0, fmod(floor(in.position.y), 4.0));
-            float edge = pow(max(abs(uv.x - 0.5) * 2.0, abs(uv.y - 0.5) * 2.0), 5.0);
-            float vignette = min(edge * 0.075, 0.075) * deck;
-            float sweep = exp(-pow((uv.x - u.pulseProgress) / 0.09, 2.0))
-                        * deck * u.pulseStrength;
-            float lcdSheen = deck * (0.012 + u.isPlaying * 0.008);
-            float darkAlpha = deck * (scan * 0.026) + vignette;
-            float lightAlpha = lcdSheen + sweep * 0.18;
-            float alpha = min(darkAlpha + lightAlpha, 0.24);
-            float3 darkInk = float3(0.025, 0.045, 0.038);
-            float3 phosphor = float3(0.64, 0.86, 0.75);
-            float3 color = mix(darkInk, phosphor,
-                               lightAlpha / max(alpha, 0.001));
+            float lcdShade = lcd * (scan * 0.014 + micro * 0.01);
+            float2 glassUV = (uv - u.screenRect.xy) / max(u.screenRect.zw, float2(0.001));
+            float glassSheen = lcd * exp(-pow((glassUV.x - 0.22 - glassUV.y * 0.23) / 0.17, 2.0)) * 0.045;
+            float sweep = lcd * exp(-pow((glassUV.x - u.pulseProgress) / 0.09, 2.0))
+                        * u.pulseStrength * 0.20;
+            float2 ledCenter = u.ledRect.xy + u.ledRect.zw * 0.5;
+            float ledDistance = length((uv - ledCenter) * u.viewport);
+            float ledGlow = u.ledRect.z > 0.0
+                ? exp(-pow(ledDistance / 15.0, 2.0)) * (0.034 + u.isPlaying * 0.13) : 0.0;
+            float darkAlpha = shellShade + matteShade + lcdShade;
+            float lightAlpha = glassSheen + sweep + ledGlow;
+            float alpha = min(darkAlpha + lightAlpha, 0.27);
+            float3 darkInk = float3(0.11, 0.14, 0.16);
+            float3 lightInk = mix(float3(0.80, 0.86, 0.72), float3(0.98, 0.25, 0.27),
+                                  ledGlow / max(lightAlpha, 0.001));
+            float3 color = mix(darkInk, lightInk, lightAlpha / max(alpha, 0.001));
             return float4(color, alpha);
         }
         """
@@ -243,7 +287,11 @@ private final class ViewBoyPhosphorRenderer: NSObject, MTKViewDelegate {
             viewport: SIMD2(Float(view.drawableSize.width), Float(view.drawableSize.height)),
             pulseProgress: pulseProgress,
             pulseStrength: pulseStrength,
-            isPlaying: isPlaying
+            isPlaying: isPlaying,
+            deckRect: deckRect,
+            bezelRect: bezelRect,
+            screenRect: screenRect,
+            ledRect: ledRect
         )
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 0)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
@@ -261,5 +309,19 @@ private final class ViewBoyPhosphorRenderer: NSObject, MTKViewDelegate {
 
     func setPlaying(_ playing: Bool) {
         isPlaying = playing ? 1 : 0
+    }
+
+    func setGeometry(_ geometry: [String: Any]) {
+        func rect(_ key: String) -> SIMD4<Float> {
+            guard let values = geometry[key] as? [NSNumber], values.count == 4 else {
+                return SIMD4<Float>(repeating: 0)
+            }
+            return SIMD4(Float(values[0].doubleValue), Float(values[1].doubleValue),
+                         Float(values[2].doubleValue), Float(values[3].doubleValue))
+        }
+        deckRect = rect("deck")
+        bezelRect = rect("bezel")
+        screenRect = rect("screen")
+        ledRect = rect("led")
     }
 }
