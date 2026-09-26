@@ -128,7 +128,6 @@ button { cursor:pointer; }
 .files-table { min-width:1120px; width:100%; }
 .files-table .file-row { cursor:pointer; }
 .files-table .file-row:hover { background:var(--hover); }
-.files-table .file-row .canonical-table-cell { padding:2px; }
 .files-table .file-path-field { color:var(--muted)!important; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:9px; }
 .files-table .file-name-field { color:var(--accent)!important; }
 .files-table .file-tags-cell { align-items:stretch; min-height:27px; }
@@ -148,7 +147,6 @@ button { cursor:pointer; }
 .attachments-table { min-width:924px; width:100%; }
 .attachments-table .attachment-row { cursor:pointer; }
 .attachments-table .attachment-row:hover { background:var(--hover); }
-.attachments-table .attachment-row .canonical-table-cell { padding:2px; }
 .attachments-table .file-path-field { color:var(--muted)!important; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:9px; }
 .attachments-table .file-name-field { color:var(--accent)!important; }
 
@@ -169,14 +167,10 @@ button { cursor:pointer; }
 .tracks-table .track-array-row:hover,
 .tracks-table .track-array-row.active { background:transparent; }
 
-.files-table,
-.attachments-table { padding:2px var(--canonical-table-gap); }
 .files-table > .canonical-table-header-row,
 .files-table > .file-row,
 .attachments-table > .canonical-table-header-row,
 .attachments-table > .attachment-row { width:auto; min-width:0; }
-.files-table .file-row .canonical-table-cell,
-.attachments-table .attachment-row .canonical-table-cell { padding:0; }
 .attachments-table .attachment-row { align-items:center; padding:0; border-bottom:0; }
 
 .canonical-fold { min-width:0; }
@@ -529,14 +523,6 @@ button { cursor:pointer; }
 .new-tag-editor-table { width:100%; min-width:760px; }
 .new-tag-form { width:100%; max-width:100%; }
 .new-tag-form [data-new-tag-submit] { justify-self:center; }
-
-/* View is a regular canonical action column: blank for opaque members, with
-   the same fixed-width action cell when a text attachment can be previewed. */
-.files-table .file-view-cell,
-.attachments-table .file-view-cell { justify-content:center; }
-.files-table .file-preview-action,
-.attachments-table .file-preview-action { flex:none; }
-.attachments-table { min-width:924px; }
 
 .multiple-values-table .multiple-values-table-header-row .canonical-table-action-cell { justify-content:center; }
 
