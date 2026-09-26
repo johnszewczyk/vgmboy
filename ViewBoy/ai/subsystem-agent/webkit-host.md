@@ -51,8 +51,9 @@ shared relative sizes for captions, controls, and display text.
 
 `index.html` loads one `viewboy-gameboy.css` presentation sheet after
 `styles.css`. Game Boy Core is the only skin: a gray membrane shell, maroon
-hardware accents, and low-contrast 4 px LCD dots carried across the display
-surfaces. Keep presentation colors out of the inherited transport bridge.
+hardware accents, and a subtle 4 px square-cell LCD grid with one-pixel gaps
+across the display and playlist surfaces. The sidebar uses smooth gray without
+a tiled grid. Keep presentation colors out of the inherited transport bridge.
 
 ## Selection and Search
 
