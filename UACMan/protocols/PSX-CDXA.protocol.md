@@ -49,12 +49,26 @@ have no stream hash because they are not audio streams. This is a source-state
 rule, not a claim that every audio format has a meaningful rendered-stream
 hash.
 
-Useful source tags and researched fields are represented in the UAC member
-metadata. Generic loop fields are replaced with the disc-native values where a
-native mapping exists; streams without a native mapping carry an explicit
-no-loop provenance. `TXTP_*`, JoshW-specific, and other external-loop fields
-are excluded from the canonical package. External comparisons belong in
-research records, never in playable member metadata.
+Keep populated music tags on the playable member. Store Redump identity and
+disc-wide facts once in the package source record. Each playable member keeps
+its four playable-payload hashes in `hashes[]`; do not duplicate those digests
+as ad hoc `SOURCE_XA_*` tags.
+
+Generic loop fields are replaced with the disc-native values only where a
+verified native mapping exists. A member with no loop has no `loop` object,
+no `loopStatus`, and no `LOOP_TYPE=none`, `LOOP_PROVENANCE`, or equivalent
+negative tag. Absence of a loop field means no loop was identified. Keep a
+positive loop map in structured member metadata and the player playlist; do
+not flatten it into duplicate `LOOP_*` tags.
+
+For raw XA, MetaManCore's `nativeMetadata.technicalFacts` is the technical
+record. Retain measured XA header facts there, including the actual
+`bitsPerSample` value (4 for the SOTN members checked in the 2026-09-26
+report). Do not duplicate these as `XA_*` tags. Suppress the reader's generic
+`comment: Sony XA header` placeholder; it is not a source comment. The
+byte-identical XA member and `sourceXA` mapping retain the native stream and
+its disc-sector relationship. `TXTP_*`, JoshW-specific, and other
+external-loop fields remain in research records, not playable member metadata.
 
 Keep set-level provenance in `sources[]` or `game.metadata`; do not repeat it
 on every track. In particular, the source archive hash, BIN hash, CUE hash,
@@ -122,14 +136,19 @@ evidence to investigate; they do not change the native UAC tags.
 
 Before publishing a package:
 
-1. Verify the Redump source archive, BIN, and CUE hashes.
+1. Verify the Redump source archive, BIN, and CUE hashes. Keep source hashes at
+   package/source scope; keep each member's four playable-payload hashes with
+   that member.
 2. Confirm every staged APE passes `mac -V` and PCM BLAKE3 equality.
 3. Run `uacman inspect --verify` and a payload read/unpack check.
 4. Confirm the UAC has every intended native XA member, the Redbook APE, the
    CUE, and documentation members; no `.DS_Store`, BIN, TXTP, or unrelated
    source archives are admitted.
-5. Confirm native loop metadata is present at both member and playlist levels,
-   and that unresolved/no-loop streams remain documented.
+5. Confirm a verified native loop is present at member and playlist level.
+   Members without a verified loop have no negative loop field or tag; a loop
+   certification report may record their review status.
+6. Confirm XA technical facts come from MetaManCore and are not duplicated as
+   flattened `XA_*` tags; there is no synthetic XA-header comment.
 
 This protocol is the format-specific companion to the general UAC wrapper
 contract in `ai/subsystem-agent/uac-wrapper-format.md`.
