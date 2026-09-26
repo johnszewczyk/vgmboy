@@ -60,8 +60,10 @@ package-level tag table, a final inline draft row marked with **＋**, and the
 attachments table. Each table title is part of its own canonical grid rather
 than a separate decorative section heading. Non-string
 values in Pack Tags and Track Tags use `[Nested Tags]` to open an animated,
-full-width inserted canonical subtable. Only the wide Tracks giga-table uses a
-dimmed popup for structured JSON, so its row geometry remains fixed.
+full-width inserted canonical subtable. Arrays and objects inside those tables
+reuse the recursive canonical JSON table at every depth; JSON-encoded strings
+remain strings when saved. Only the wide Tracks giga-table uses a dimmed popup
+for structured JSON, so its row geometry remains fixed.
 When a single UAC is opened directly, the library rail collapses automatically;
 it returns when a collection is opened. The last existing UAC or collection path
 is restored on launch when no command-line document was supplied.

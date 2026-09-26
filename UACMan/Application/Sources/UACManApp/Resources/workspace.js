@@ -505,7 +505,11 @@
     const rowMarkup = ([key, item], index) => {
       const kind = fieldKind(item);
       const raw = kind === "json" ? JSON.stringify(item, null, 2) : String(item ?? "");
-      const valueControl = kind === "json"
+      const nestedValue = subtableLayout ? tagAnalyzerStructuredValue(item) : null;
+      const nestedFoldID = nestedValue && context.foldID ? `${context.foldID}/multiple/${index}` : "";
+      const valueControl = nestedFoldID
+        ? tagAnalyzerJSONFoldToggleMarkup(nestedValue.value, nestedFoldID, key)
+        : kind === "json"
         ? nestedJSONValueMarkup(item, key)
         : `<input class="tag-table-field multiple-value-editor" data-multiple-value value="${esc(raw)}" aria-label="Value for ${esc(key)}">`;
       const keyMarkup = `<input class="tag-table-field multiple-value-key" data-multiple-key value="${esc(key)}" aria-label="Key for ${esc(key)}"${isArray ? " disabled" : ""}>`;
@@ -523,13 +527,22 @@
         canonicalCellMarkup(submitMarkup, { className:"canonical-table-action-cell" }),
         canonicalCellMarkup(removeMarkup, { className:"canonical-table-action-cell" })
       ];
-      return canonicalRowMarkup(cells, { className:"multiple-value-editor-row", attributes:`data-multiple-entry data-multiple-kind="${kind}"` });
+      const row = canonicalRowMarkup(cells, {
+        className:"multiple-value-editor-row",
+        attributes:`data-multiple-entry data-multiple-kind="${kind}" data-multiple-json-stringified="${nestedValue?.encodedString === true}"${nestedFoldID ? ` data-multiple-json-fold-id="${esc(nestedFoldID)}"` : ""}`
+      });
+      if (!nestedFoldID) return row;
+      const childTable = CanonicalTable.isFoldOpen(nestedFoldID)
+        ? tagAnalyzerJSONNodeMarkup(nestedValue.value, key, nestedFoldID)
+        : "";
+      return CanonicalTable.rowWithUnfolds(row, [{ foldID:nestedFoldID, content:childTable }]);
     };
     const rows = entries.map(rowMarkup).join("");
     const data = [
       `data-multiple-editor`,
       `data-multiple-target="${esc(context.target || "member")}"`,
       `data-multiple-array="${isArray}"`,
+      `data-multiple-json-stringified="${context.jsonStringified === true}"`,
       `data-multiple-layout="${subtableLayout ? "subtable" : "popup"}"`,
       `data-multiple-path="${esc(context.path || "")}"`,
       `data-multiple-scope="${esc(context.scope || "")}"`,
@@ -1038,13 +1051,14 @@
     const entries = fileTagEntries(member);
     const header = canonicalHeaderMarkup(["#", "Scope", "Tag Name", "Tag Value", "✓", "×"]);
     const rows = entries.map((entry, index) => {
-      const structured = entry.value && typeof entry.value === "object";
+      const structuredValue = tagAnalyzerStructuredValue(entry.value);
+      const structured = Boolean(structuredValue);
       let valueMarkup = memberTagValueMarkup(member, entry);
       let unfoldedContent = "";
       if (structured) {
         const foldID = `file-tag/${encodeURIComponent(member.path)}/${index}`;
         valueMarkup = multipleValuesTriggerMarkup(foldID);
-        const subtable = multipleValuesSubtableMarkup(entry.value, { target:"member", path:member.path, scope:entry.scope, key:entry.key, foldID, title:entry.key }, { editable:true });
+        const subtable = multipleValuesSubtableMarkup(structuredValue.value, { target:"member", path:member.path, scope:entry.scope, key:entry.key, foldID, title:entry.key, jsonStringified:structuredValue.encodedString }, { editable:true });
         unfoldedContent = subtable;
       }
       const foldID = `file-tag/${encodeURIComponent(member.path)}/${index}`;
@@ -1573,6 +1587,16 @@
   function removeMultipleValue(row) {
     const editor = row?.closest("[data-multiple-editor]");
     if (!row || !editor) return;
+    const foldID = row.dataset.multipleJsonFoldId || "";
+    if (foldID) {
+      CanonicalTable.openFoldIDs.delete(foldID);
+      CanonicalTable.pendingFoldAnimations.delete(foldID);
+      const childSubrow = CanonicalTable.subrow(foldID);
+      CanonicalTable.foldAnimations.get(childSubrow)?.cancel();
+      CanonicalTable.foldAnimations.delete(childSubrow);
+      CanonicalTable.clearFoldPrefix(foldID + "/");
+    }
+    if (row.nextElementSibling?.matches(".canonical-table-unfold-row")) row.nextElementSibling.remove();
     row.remove();
     const rows = $(".multiple-values-rows", editor);
     if (rows && !$("[data-multiple-entry]", rows)) {
@@ -1601,18 +1625,40 @@
         return null;
       }
       seenKeys.add(key);
-      const raw = $("[data-multiple-value]", row)?.value ?? "";
       try {
-        const value = coerceValue(raw, row.dataset.multipleKind || "string");
-        if (isArray) result.push(value); else result[key] = value;
+        const nestedFoldID = row.dataset.multipleJsonFoldId || "";
+        let value;
+        if (nestedFoldID) {
+          const subrow = CanonicalTable.subrow(nestedFoldID);
+          const childTable = subrow?.querySelector(".canonical-table[data-json-node]");
+          if (childTable) {
+            const parsed = tagAnalyzerJSONNodeFromTable(childTable);
+            if (parsed.error) {
+              if (error) error.textContent = parsed.error;
+              parsed.focus?.focus?.();
+              return null;
+            }
+            value = parsed.value;
+          } else {
+            const toggle = row.querySelector('[data-unfold-render="tagAnalyzerJSON"]');
+            value = JSON.parse(toggle?.dataset.jsonValue || "null");
+          }
+          if (row.dataset.multipleJsonStringified === "true") value = JSON.stringify(value);
+        } else {
+          const raw = $("[data-multiple-value]", row)?.value ?? "";
+          value = coerceValue(raw, row.dataset.multipleKind || "string");
+        }
+        if (isArray) result.push(value);
+        else Object.defineProperty(result, key, { value, enumerable:true, configurable:true, writable:true });
       } catch {
         if (error) error.textContent = `Invalid JSON value for “${key || "value"}”.`;
-        $("[data-multiple-value]", row)?.focus();
+        row.querySelector('[data-multiple-value], [data-unfold-render="tagAnalyzerJSON"]')?.focus();
         return null;
       }
     }
     if (error) error.textContent = "";
-    return { result, valueJSON:JSON.stringify(result) };
+    const value = editor.dataset.multipleJsonStringified === "true" ? JSON.stringify(result) : result;
+    return { result:value, valueJSON:JSON.stringify(value) };
   }
 
   function commitMultipleValues(editor) {
@@ -1639,15 +1685,6 @@
   function commitMultipleValueRow(row) {
     const editor = row?.closest("[data-multiple-editor]");
     if (!row || !editor) return;
-    const error = $(".multiple-values-editor-error", editor);
-    const key = editor.dataset.multipleArray === "true" ? "value" : $("[data-multiple-key]", row)?.value.trim() || "value";
-    try {
-      coerceValue($("[data-multiple-value]", row)?.value ?? "", row.dataset.multipleKind || "string");
-    } catch {
-      if (error) error.textContent = `Invalid JSON value for “${key}”.`;
-      $("[data-multiple-value]", row)?.focus();
-      return;
-    }
     commitMultipleValues(editor);
   }
 
@@ -1903,6 +1940,14 @@
         updateTagAnalyzerJSONTableHeading(currentTable, title, parsed.value);
         currentTable = parentRow.closest(".canonical-table[data-json-node]");
         continue;
+      }
+      if (parentRow?.matches("[data-multiple-entry][data-multiple-json-fold-id]")) {
+        const title = $("[data-multiple-key]", parentRow)?.value.trim() || "Value";
+        updateTagAnalyzerJSONToggle(parentRow.querySelector('[data-unfold-render="tagAnalyzerJSON"]'), parsed.value, title);
+        updateTagAnalyzerJSONTableHeading(currentTable, title, parsed.value);
+        const editorError = parentRow.closest("[data-multiple-editor]")?.querySelector(".multiple-values-editor-error");
+        if (editorError) editorError.textContent = "";
+        return true;
       }
       if (parentRow?.matches("[data-tag-analyzer-match]")) {
         const name = $("[data-tag-analyzer-name]", parentRow)?.value.trim() || parentRow.dataset.tagName || "Tag value";
@@ -2271,6 +2316,21 @@
     else if (event.target.id === "member-filter") ["files", "newTag", "tagAnalyzer"].includes(mainView) ? render(state) : renderMembers();
     else if (event.target.matches("[data-tag-analyzer-json-scalar], [data-tag-analyzer-json-key]")) {
       refreshTagAnalyzerJSONTree(event.target.closest(".canonical-table[data-json-node]"));
+    }
+    else if (event.target.matches("[data-multiple-key]")) {
+      const row = event.target.closest("[data-multiple-entry][data-multiple-json-fold-id]");
+      const foldID = row?.dataset.multipleJsonFoldId || "";
+      const valueToggle = row?.querySelector('[data-unfold-render="tagAnalyzerJSON"]');
+      if (foldID && valueToggle) {
+        let value = null;
+        try { value = JSON.parse(valueToggle.dataset.jsonValue || "null"); } catch {}
+        if (isStructuredTagAnalyzerValue(value)) {
+          const title = event.target.value.trim() || "Value";
+          updateTagAnalyzerJSONToggle(valueToggle, value, title);
+          const table = CanonicalTable.subrow(foldID)?.querySelector(".canonical-table[data-json-node]");
+          if (table) updateTagAnalyzerJSONTableHeading(table, title, value);
+        }
+      }
     }
   });
   document.addEventListener("contextmenu", event => {
