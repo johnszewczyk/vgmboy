@@ -100,4 +100,7 @@ were `Castlevania - Symphony of the Night (US).uac`,
 The approved duplicate and rejected-trial cleanup freed 304,558,486 bytes
 (about 290.4 MiB), plus the two redundant SOTN snapshots. The old SOTN package
 was replaced by the new export package; its source archive, BINs, CUE, and
-other study evidence remain intact.
+other study evidence remain intact. Including the replaced old Darkstalkers
+package and the old SOTN working package, the removed/replaced files totaled
+1,345,483,889 bytes (about 1.25 GiB by file size). Actual disk-space recovery
+depends on filesystem allocation.
