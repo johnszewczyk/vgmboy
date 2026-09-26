@@ -107,6 +107,7 @@
     return `<button class="${className}" type="button" data-action="${esc(action)}"${dataAttributes}${title}${ariaLabel}${disabled}>×</button>`;
   };
   const canonicalTitleRowMarkup = (title, className = "", actionMarkup = "", foldID = "") => {
+    if (foldID && actionMarkup) throw new TypeError("Foldable table titles must not contain separate actions");
     const heading = canonicalHeadingFieldMarkup(title, foldID);
     const content = actionMarkup
       ? `<div class="canonical-table-title-content">${heading}<span class="canonical-table-title-action">${actionMarkup}</span></div>`
@@ -476,8 +477,6 @@
   };
   const multipleValuesCloseMarkup = context =>
     `<button class="icon-button canonical-table-title-close multiple-values-popup-close" data-action="closeMultipleValuesPopup" data-popup-id="${esc(context.popupID || "")}" type="button" title="Close" aria-label="Close">×</button>`;
-  const canonicalSubtableFoldMarkup = (foldID, attributes = "") =>
-    `<button class="icon-button canonical-table-title-fold" data-action="closeCanonicalSubtable" data-fold-id="${esc(foldID)}" ${attributes} type="button" title="Fold table" aria-label="Fold table">⌃</button>`;
   const multipleValuesTableHeaderRowMarkup = (context, editable) => {
     const submitMarkup = editable
       ? '<button class="tag-table-field canonical-table-heading-input multiple-values-header-action" data-action="commitMultipleValues" type="button" title="Submit all changed values" aria-label="Submit all changed values">✓</button>'
@@ -535,7 +534,7 @@
       columns:CanonicalTableColumns.multipleValues,
       title:context.title || context.key || "Values",
       titleFoldID:subtableLayout ? context.foldID : "",
-      titleAction:context.layout === "popup" ? multipleValuesCloseMarkup(context) : context.layout === "subtable" ? canonicalSubtableFoldMarkup(context.foldID, context.closeAttributes || "") : "",
+      titleAction:context.layout === "popup" ? multipleValuesCloseMarkup(context) : "",
       ariaLabel:context.title || context.key || "Tag values",
       header:multipleValuesTableChromeMarkup(context, true),
       rows:`<div class="multiple-values-rows">${rows || canonicalEmptyRowMarkup("No values", "multiple-values-empty")}</div>`
@@ -568,7 +567,7 @@
       columns:CanonicalTableColumns.multipleValues,
       title:context.title || context.key || "Values",
       titleFoldID:subtableLayout ? context.foldID : "",
-      titleAction:context.layout === "popup" ? multipleValuesCloseMarkup(context) : context.layout === "subtable" ? canonicalSubtableFoldMarkup(context.foldID, context.closeAttributes || "") : "",
+      titleAction:context.layout === "popup" ? multipleValuesCloseMarkup(context) : "",
       ariaLabel:context.title || context.key || "Tag values",
       header:multipleValuesTableChromeMarkup(context, false),
       rows:`<div class="multiple-values-rows">${rows}</div>`
@@ -1181,9 +1180,10 @@
     return CanonicalTable.rowWithUnfolds(row, [{ foldID:childFoldID, content:childTable }]);
   }
 
-  function tagAnalyzerJSONTitleActions(foldID) {
+  function tagAnalyzerJSONAddRowMarkup() {
     const addButton = (kind, label, title) => `<button class="icon-button tag-analyzer-json-add" data-action="addTagAnalyzerJSONEntry" data-json-entry-type="${kind}" type="button" title="${title}" aria-label="${title}">${label}</button>`;
-    return `<span class="tag-analyzer-json-title-actions">${addButton("scalar", "＋", "Add string value")}${addButton("json", "123", "Add JSON scalar")}${addButton("object", "{}", "Add object")}${addButton("array", "[]", "Add array")}${canonicalSubtableFoldMarkup(foldID)}</span>`;
+    const actions = `<span class="tag-analyzer-json-add-actions">${addButton("scalar", "＋", "Add string value")}${addButton("json", "123", "Add JSON scalar")}${addButton("object", "{}", "Add object")}${addButton("array", "[]", "Add array")}</span>`;
+    return canonicalRowMarkup([canonicalCellMarkup(actions, { className:"canonical-table-full-cell tag-analyzer-json-add-cell" })], { className:"tag-analyzer-json-add-row" });
   }
 
   function tagAnalyzerJSONNodeMarkup(value, title, foldID) {
@@ -1197,12 +1197,11 @@
       columns:CanonicalTableColumns.tagAnalyzerJSONValues,
       title:tableTitle,
       titleFoldID:foldID,
-      titleAction:tagAnalyzerJSONTitleActions(foldID),
       ariaLabel:`Nested values for ${title}`,
       header:canonicalHeaderMarkup(["#", isArray ? "Index" : "Key", "Value", "×"], {
         className:"multiple-values-table-header-row"
       }),
-      rows,
+      rows:tagAnalyzerJSONAddRowMarkup() + rows,
       attributes:`data-json-node data-json-node-kind="${isArray ? "array" : "object"}" data-json-node-fold-id="${esc(foldID)}" data-json-node-title="${esc(title)}" data-json-next-entry-id="${entries.length}"`
     });
     return `<div class="tag-analyzer-json-node">${table.render()}<small class="tag-analyzer-json-error" data-json-node-error></small></div>`;
@@ -1258,7 +1257,6 @@
       columns:CanonicalTableColumns.tagAnalyzerFields,
       title:tagName + " · " + matches.length + " tag field(s)",
       titleFoldID:foldID,
-      titleAction:canonicalSubtableFoldMarkup(foldID),
       ariaLabel:"Tag values in " + archiveRelativePath,
       header,
       rows
@@ -1307,7 +1305,6 @@
       columns:CanonicalTableColumns.tagAnalyzerPacks,
       title,
       titleFoldID:foldID,
-      titleAction:canonicalSubtableFoldMarkup(foldID),
       ariaLabel:"Matched packs for " + tagName,
       header,
       rows

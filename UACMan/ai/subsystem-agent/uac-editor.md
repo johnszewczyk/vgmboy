@@ -61,14 +61,11 @@
 - Generate visible row deletion controls with `canonicalDeleteButtonMarkup`.
   It must emit the same fixed-size `.icon-button.danger` used on Track Tags;
   do not put a full-width `.tag-table-field` box in a narrow action column.
-  Expanded child-table title bars use the shared, borderless accent-color fold
-  chevron in the title cell. Keep it aligned at the title cell's right edge;
-  the title cell and heading fold the child table, while JSON add actions remain
-  independent. The parent row's fold control reopens the child table. Foldable
-  titles use the same full-width bordered heading field as every canonical
-  title and header; actions overlay its right edge so the label remains
-  centered. Only the nested heading background differs. Popup dismissal
-  remains a close `×` control.
+  Expanded child-table titles are bare, full-width canonical heading fields:
+  the whole field folds the table, with an accent background and no separate
+  chevron or action overlay. The parent row's fold control reopens the table.
+  Recursive JSON add actions occupy a separate canonical content row. Popup
+  dismissal remains a close `×` control.
   A header's `×` is a plain canonical heading cell, not a second delete button.
 - Canonical title rows share the compact 27 px baseline used by table headers
   and content rows. Let tall controls such as JSON textareas grow their own
