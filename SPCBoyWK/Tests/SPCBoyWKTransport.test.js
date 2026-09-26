@@ -252,7 +252,10 @@ function makeHarness() {
       },
       nativePlaybackReconfigure: async (request) => {
         reconfigureRequests.push(request);
-        return snapshot(8);
+        return {
+          ...snapshot(8),
+          tempo: Number(request?.tempo?.numerator) / Number(request?.tempo?.denominator)
+        };
       },
       nativePlaybackSetTempo: async (request) => ({
         ...snapshot(7),
@@ -420,7 +423,7 @@ test("SPCBoyWK drops a stale tempo reply after replacement", async () => {
   );
   await app.playback.playTrack("track-a");
   app.state.playlist.push({ ...app.state.playlist[0], id: "track-b", path: "/tmp/replacement.flac" });
-  const pending = deferFirstBridgeReply(window.spcBoyWK, "nativePlaybackSetTempo");
+  const pending = deferFirstBridgeReply(window.spcBoyWK, "nativePlaybackReconfigure");
 
   const oldTempo = app.playback.refreshPlaybackForSpeedChange("libgme");
   await pending.entered;
@@ -443,7 +446,7 @@ test("SPCBoyWK keeps only the newest tempo reply for the current track", async (
     { id: "libgme", playbackSpeedMode: "native-tempo", playbackSpeedExtensions: [".spc"] }
   );
   await app.playback.playTrack("track-a");
-  const pending = deferFirstBridgeReply(window.spcBoyWK, "nativePlaybackSetTempo");
+  const pending = deferFirstBridgeReply(window.spcBoyWK, "nativePlaybackReconfigure");
 
   const oldTempo = app.playback.refreshPlaybackForSpeedChange("libgme");
   await pending.entered;
@@ -990,9 +993,11 @@ test("SPCBoyWK lets native controls own Enter activation", () => {
   assert.match(uiSource, /selectPlaylistTrack\(track\.id, \{ focus: true \}\)/);
 });
 
-test("SPCBoyWK uses native in-place tempo and AAC cancellation events", () => {
-  assert.match(playbackSource, /const tempo = playbackSpeedForTrack\(track\);[\s\S]*nativePlaybackSetTempo\(\{ tempo \}\)/);
-  assert.doesNotMatch(playbackSource, /async function refreshPlaybackForSpeedChange[\s\S]*refreshPlaybackForTimingChange\(\)/);
+test("SPCBoyWK reconfigures timing for speed changes and supports AAC cancellation events", () => {
+  assert.match(playbackSource, /nativePlaybackReconfigure\(\{[\s\S]*?tempo: playbackSpeedForTrack\(track\)/);
+  const speedRefreshCase = playbackSource.match(/async function refreshPlaybackForSpeedChange\(backendId\)[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(speedRefreshCase, /await refreshPlaybackForTimingChange\(\)/);
+  assert.doesNotMatch(speedRefreshCase, /nativePlaybackSetTempo/);
   assert.match(playbackSource, /function handleAACExportEvent\(event\)/);
   assert.match(playbackSource, /nativeCancelAACExport/);
   assert.match(nativeBridgeSource, /onNativeAACExport/);

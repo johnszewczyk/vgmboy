@@ -76,10 +76,11 @@ duration accepts any non-negative whole-second value; `0` means unbounded Long
 Play, displayed as `∞`, until the decoder reports a real end. It is not rewritten
 to an arbitrary minimum or maximum.
 
-Timing changes reconfigure the already-loaded VGMBoy session through the native
-bridge, preserving the current position and paused/playing state. The separate
-Options WebView relays the shared playback preference snapshot to the main
-WebView before this reconfiguration occurs.
+Timing and Play Speed changes reconfigure the already-loaded VGMBoy session
+through the native bridge, preserving the current position and paused/playing
+state. Play Speed refreshes the timing window together with the decoder tempo.
+The separate Options WebView relays the shared playback preference snapshot to
+the main WebView before this reconfiguration occurs.
 
 Tracks without decoder-provided timing, including SID music, use the persisted
 unknown-duration fallback of 2:30 plus the configured fade unless Long Play is

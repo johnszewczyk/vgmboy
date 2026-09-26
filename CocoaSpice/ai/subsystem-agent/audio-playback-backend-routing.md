@@ -90,7 +90,7 @@
   must express pause, replacement, seek, and completion only through the typed core controls; it
   must not stop/recreate a separate device path around those transitions.
 - The CocoaSpice equalizer UI maps directly to VGMBoy's ten 31 Hz–16 kHz bands, constrained to -12...+12 dB.
-- The libgme and libvgm Play Speed controls persist frontend preferences but submit only the shared `PlaybackTempo` value through VGMBoy's typed `set_tempo` command. Non-tempo decoder families always receive the default multiplier.
+- The libgme and libvgm Play Speed controls persist frontend preferences and reconfigure a loaded track with both its tempo-scaled timing plan and shared `PlaybackTempo`. A tempo-only `set_tempo` command does not update the active frame cap. Non-tempo decoder families always receive the default multiplier.
 - `FormatRegistry.family(for:)` resolves a source path, not a bare extension. CocoaSpice adapts a playable extension as `source.<extension>` through one `playbackFamily(forPathExtension:)` helper for both initial tempo selection and the live `set_tempo` eligibility check.
 - CocoaSpice persists its chosen App Volume and Mono preferences, then reapplies them to a newly created bundled core. VGMBoy owns the actual attenuation and real-time channel downmix.
 - `build.sh` packages VGMBoy's dynamic decoder requirements under `Contents/Frameworks`; SID uses the bundled `libsidplayfp.7.dylib` via `@executable_path`, never a runtime Homebrew path or a user-chosen core executable.

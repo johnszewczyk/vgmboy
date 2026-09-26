@@ -33,6 +33,7 @@
 ## Timing
 
 - Long Play: one shared setting for loop-capable game-music decoders, available in Playback Options and from the infinity button beside the main transport controls. Finite audio such as WAV, AIFF, FLAC, MP3, and M4A retains its native duration even when Long Play is on.
+- Changing Play Speed for an active libgme or libvgm track updates its tempo-scaled timing window at the current position and preserves its paused or playing state.
 - Timing: supports manual duration and fade behavior.
 - Tracks without decoder-provided timing, including SID music, use the configurable unknown-length default in the Long Play options area plus the configured end fade unless Long Play is enabled.
 - End Fade: the shared six-second end fade is enabled by default and can be disabled in Playback Options.

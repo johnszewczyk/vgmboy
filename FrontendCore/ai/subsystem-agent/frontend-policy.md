@@ -45,7 +45,10 @@ contracts shared by CocoaSpice and SPCBoyWK.
   and `PlaybackTransportTempoRequest` are the corresponding typed timing
   bridge contracts. They own policy-preview scaling, playback-mode payload
   construction, and normalized tempo; a frontend passes user intent and never
-  rebuilds those VGMBoy values from untyped bridge dictionaries.
+  rebuilds those VGMBoy values from untyped bridge dictionaries. A direct tempo
+  request changes the decoder multiplier without recomputing the active timing
+  cap. Frontends that scale a track's playback window by tempo must refresh the
+  timing preview and reconfigure with both the new plan and tempo.
 - `PlaybackTransportAudioConfigurationRequest` is the complete output snapshot
   for volume, EQ, and mono. `PlaybackTransportCoordinator.configureAudio(_:)`
   normalizes and serializes all three control commands; presentation adapters

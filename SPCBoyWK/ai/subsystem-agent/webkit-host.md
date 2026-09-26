@@ -146,6 +146,9 @@ the shared `PlaybackTimingPreviewRequest`, `PlaybackTransportReconfigurationRequ
 `PlaybackTransportTempoRequest` codecs. The contracts retain the established WebKit JSON keys but
 own preview scaling, control-payload construction, and tempo normalization; the WK bridge must not
 parse individual timing fields, calculate a multiplier, or build a `PlaybackControlPayload` itself.
+Live Play Speed edits must refresh the timing preview and use `nativePlaybackReconfigure` with the
+new plan and tempo. `nativePlaybackSetTempo` alone changes the decoder multiplier but leaves the
+currently loaded timing cap unchanged.
 
 `nativePlaybackAudioConfig` receives one object decoded as
 `PlaybackTransportAudioConfigurationRequest` rather than positional arguments. The shared transport

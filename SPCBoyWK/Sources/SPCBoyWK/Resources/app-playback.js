@@ -1182,25 +1182,7 @@ async function refreshPlaybackForSpeedChange(backendId) {
   const track = currentTrack();
   const activeBackend = playbackBackends.forPath(track?.archiveEntry || track?.path)?.id;
   if (activeBackend !== backendId || !track || state.currentTrackId !== track.id) return;
-  const requestGeneration = ++playbackSettingsGeneration;
-  const generation = playbackGeneration;
-  const trackID = track.id;
-  const tempo = playbackSpeedForTrack(track);
-  let snapshot;
-  try {
-    snapshot = await window.spcBoyWK.nativePlaybackSetTempo({ tempo });
-  } catch (error) {
-    if (!matchesCurrentPlaybackSettings(requestGeneration, generation, trackID)) return;
-    throw error;
-  }
-  if (!matchesCurrentPlaybackSettings(requestGeneration, generation, trackID)
-      || playbackBackends.forPath(track.archiveEntry || track.path)?.id !== backendId
-      || !samePlaybackSpeed(tempo, playbackSpeedForTrack(track))) {
-    return;
-  }
-  applyNativePlaybackSnapshot(track, snapshot, generation);
-  state.totalSeconds = effectiveTotalSeconds(track);
-  updatePlaybackReadout();
+  await refreshPlaybackForTimingChange();
 }
 
 playbackApp.playback = {

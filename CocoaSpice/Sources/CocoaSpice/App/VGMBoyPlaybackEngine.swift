@@ -85,10 +85,6 @@ final class PlaybackEngine: @unchecked Sendable {
         try await transport.reconfigureCurrentTrack(plan: plan, tempo: tempo)
     }
 
-    func setTempo(_ tempo: PlaybackTempo) async throws {
-        try await transport.setTempo(tempo)
-    }
-
     func setPlaying(_ shouldPlay: Bool) async -> Bool {
         await transport.setPlaying(shouldPlay)
     }

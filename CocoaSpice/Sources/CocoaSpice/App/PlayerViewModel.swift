@@ -1450,24 +1450,28 @@ final class PlayerViewModel {
 
     func setLibGmeTempo(_ tempo: PlaybackTempo) {
         libgmeTempo = tempo
+        refreshPlaylistTotalDurationReadout()
         savePreferencesNow()
         applyPlaybackTempoIfNeeded(for: "libgme")
     }
 
     func setLibGmeTempoEnabled(_ enabled: Bool) {
         libgmeTempoEnabled = enabled
+        refreshPlaylistTotalDurationReadout()
         savePreferencesNow()
         applyPlaybackTempoIfNeeded(for: "libgme")
     }
 
     func setLibVgmTempo(_ tempo: PlaybackTempo) {
         libvgmTempo = tempo
+        refreshPlaylistTotalDurationReadout()
         savePreferencesNow()
         applyPlaybackTempoIfNeeded(for: "libvgm")
     }
 
     func setLibVgmTempoEnabled(_ enabled: Bool) {
         libvgmTempoEnabled = enabled
+        refreshPlaylistTotalDurationReadout()
         savePreferencesNow()
         applyPlaybackTempoIfNeeded(for: "libvgm")
     }
@@ -2163,11 +2167,14 @@ final class PlayerViewModel {
         }
     }
 
-    func applyPlaybackTiming() {
+    func applyPlaybackTiming(
+        updatingStatus: String = "Updating Long Play…",
+        completedStatus: String = "Long Play updated"
+    ) {
         guard let currentTrack, !isLoading else { return }
         let plan = playbackPlan(for: currentMetadata, trackPathExtension: currentTrack.playablePathExtension)
         isLoading = true
-        statusText = "Updating Long Play…"
+        statusText = updatingStatus
         let playback = self.playback
         Task { @MainActor [weak self] in
             guard let self else { return }
@@ -2177,7 +2184,7 @@ final class PlayerViewModel {
                 self.playbackElapsedSeconds = snapshot.elapsedSeconds
                 self.seekPreviewSeconds = snapshot.elapsedSeconds
                 self.isPlaying = snapshot.isPlaying
-                self.statusText = "Long Play updated"
+                self.statusText = completedStatus
             } catch {
                 self.statusText = error.localizedDescription
             }
@@ -2187,27 +2194,18 @@ final class PlayerViewModel {
     }
 
     private func applyPlaybackTempoIfNeeded(for backendID: String) {
-        guard let currentTrack,
-              playbackFamily(forPathExtension: currentTrack.playablePathExtension)?.id == backendID,
+        guard let track = currentTrack,
+              playbackFamily(forPathExtension: track.playablePathExtension)?.id == backendID,
               !isLoading else { return }
-        let tempo = playbackTempo(for: currentTrack)
-        isLoading = true
-        statusText = "Updating tempo…"
+        let trackID = track.id
         let playback = self.playback
         Task { @MainActor [weak self] in
-            guard let self else { return }
-            do {
-                try await playback.setTempo(tempo)
-                let snapshot = await playback.statusSnapshot()
-                self.playbackElapsedSeconds = snapshot.elapsedSeconds
-                self.seekPreviewSeconds = snapshot.elapsedSeconds
-                self.isPlaying = snapshot.isPlaying
-                self.statusText = "Tempo updated"
-            } catch {
-                self.statusText = error.localizedDescription
-            }
-            self.isLoading = false
-            self.updateRemoteTransportState()
+            let loadedTrackID = await playback.currentTrackID()
+            guard let self,
+                  !self.isLoading,
+                  self.currentTrack?.id == trackID,
+                  loadedTrackID == trackID else { return }
+            self.applyPlaybackTiming(updatingStatus: "Updating tempo…", completedStatus: "Tempo updated")
         }
     }
 
