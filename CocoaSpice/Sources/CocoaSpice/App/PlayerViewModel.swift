@@ -2188,7 +2188,7 @@ final class PlayerViewModel {
 
     private func applyPlaybackTempoIfNeeded(for backendID: String) {
         guard let currentTrack,
-              FormatRegistry.family(for: currentTrack.playablePathExtension)?.id == backendID,
+              playbackFamily(forPathExtension: currentTrack.playablePathExtension)?.id == backendID,
               !isLoading else { return }
         let tempo = playbackTempo(for: currentTrack)
         isLoading = true
@@ -2396,7 +2396,7 @@ final class PlayerViewModel {
 
     private func playbackTempo(forPathExtension pathExtension: String?) -> PlaybackTempo {
         guard let pathExtension,
-              let family = FormatRegistry.family(for: "source.\(pathExtension)"),
+              let family = playbackFamily(forPathExtension: pathExtension),
               family.supportsTempo else {
             return .defaultValue
         }
@@ -2405,6 +2405,10 @@ final class PlayerViewModel {
         case "libvgm": return libvgmTempoEnabled ? libvgmTempo : .defaultValue
         default: return .defaultValue
         }
+    }
+
+    private func playbackFamily(forPathExtension pathExtension: String) -> DecoderFamily? {
+        FormatRegistry.family(for: "source.\(pathExtension)")
     }
 
     var effectivePreFadeSeconds: Int {
