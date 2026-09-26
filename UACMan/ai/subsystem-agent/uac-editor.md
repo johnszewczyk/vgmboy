@@ -53,8 +53,8 @@
 - `.canonical-table-surface` owns the outer border, radius, and scrolling for a
   top-level table. A nested table uses the same `.canonical-table` root and row
   and cell primitives inside its unfold row, without another surface class,
-  border, or separate padding rule. Each depth keeps the canonical table's
-  normal cell inset. Keep each table's schema local to its root so
+  border, or accumulated horizontal inset. Nested tables retain zero padding
+  so their rows align to the parent's content edge. Keep each table's schema local to its root so
   nested rows inherit only their own table's column tracks. Tag Analyzer's
   parent, pack, occurrence, and recursive JSON tables all use this class; their
   differences belong in their schema and cell content. Every analyzer fold uses
@@ -62,7 +62,7 @@
 - Generate visible row deletion controls with `canonicalDeleteButtonMarkup`.
   It must emit the same fixed-size `.icon-button.danger` used on Track Tags;
   do not put a full-width `.tag-table-field` box in a narrow action column.
-  Expanded child-table titles are bare, full-width canonical heading fields:
+  Expanded child-table titles are bare, full-width canonical heading inputs:
   the whole field folds the table, with only its background changed to accent
   and no separate chevron or action overlay. The parent row's fold control reopens the table.
   Recursive JSON add actions occupy a separate canonical content row. Popup
@@ -82,12 +82,14 @@
   unfold rows span one full-width grid track. Unfold content accepts rendered
   markup or a `CanonicalTable`; do not coerce arbitrary objects into visible
   text.
-- Keep the nested-table width rule on every `.canonical-table`
-  descendant of `.canonical-unfold-content`, not only its direct child, while
-  retaining the same table padding at every depth.
+- Keep the nested-table width and zero-padding rule on every `.canonical-table`
+  descendant of `.canonical-unfold-content`, not only its direct child.
   Recursive editors may add semantic wrappers (for example, inline error
   messages) around a table; wrappers must not restore the root table's minimum
-  width at deeper levels.
+  width or table padding at deeper levels.
+- Tag Analyzer occurrence value cells may stack a field and an error message.
+  Center that stack vertically in its canonical cell so scalar values line up
+  with the name, track, and action fields in every row.
 - Structured JSON values opened from Tag Analyzer field rows use the
   `tagAnalyzerJSONValues` schema recursively. Arrays and objects remain
   canonical tables at every depth; scalar values and object keys edit in their

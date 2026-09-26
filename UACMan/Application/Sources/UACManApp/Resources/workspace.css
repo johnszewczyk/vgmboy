@@ -387,17 +387,16 @@ button { cursor:pointer; }
 .inserted-table-cell { grid-column:1 / -1; width:100%; min-width:0; min-height:0; overflow:visible; padding:0; align-items:stretch; }
 .inserted-table-panel { width:100%; min-width:0; min-height:0; overflow:visible; border:0; border-radius:0; background:transparent; }
 .canonical-unfold-content { width:100%; max-width:100%; min-width:0; }
-/* A nested canonical table may sit in an annotation/error wrapper (Tag
-   Analyzer's recursive JSON editor does). Normalize width at every depth;
-   each table keeps the same canonical cell inset as the root. */
-.canonical-unfold-content .canonical-table { width:100%; max-width:100%; min-width:0; }
+/* Nested tables can sit in an annotation/error wrapper. Their rows align to
+   the parent content edge at every depth, without accumulating table insets. */
+.canonical-unfold-content .canonical-table { width:100%; max-width:100%; min-width:0; padding:0; }
 .multiple-value-number { text-align:center; }
 
 
 /* Tag Analyzer keeps only content-specific treatments; CanonicalTable owns
    row height, cell width, and nested table geometry at every depth. */
 .tag-analyzer-match-track { min-width:0; text-overflow:ellipsis; }
-.tag-analyzer-match-value-cell { display:flex; flex-direction:column; align-items:stretch; gap:3px; }
+.tag-analyzer-match-value-cell { display:flex; flex-direction:column; align-items:stretch; justify-content:center; gap:3px; }
 .tag-analyzer-match-value-cell textarea { min-height:52px; resize:vertical; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
 .tag-analyzer-match-error { color:var(--danger,#e06c75); font-size:9px; }
 .tag-analyzer-match-error:empty { display:none; }

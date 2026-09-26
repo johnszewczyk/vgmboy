@@ -91,7 +91,7 @@
     return `<div class="${classes}" role="${role}"${attributes}${style}>${cells.join("")}</div>`;
   };
   const canonicalHeadingFieldMarkup = (label, foldID = "") => foldID
-    ? `<button class="tag-table-field canonical-table-heading-input canonical-table-title-toggle" data-action="closeCanonicalSubtable" data-fold-id="${esc(foldID)}" type="button" title="Fold ${esc(label)}" aria-label="Fold ${esc(label)}">${esc(label)}</button>`
+    ? `<input class="tag-table-field canonical-table-heading-input canonical-table-title-toggle" data-action="closeCanonicalSubtable" data-fold-id="${esc(foldID)}" type="button" value="${esc(label)}" title="Fold ${esc(label)}" aria-label="Fold ${esc(label)}">`
     : `<input class="tag-table-field canonical-table-heading-input" value="${esc(label)}" aria-label="${esc(label)}" disabled>`;
   const canonicalHeaderCellMarkup = (label, options = {}) => {
     const heading = canonicalHeadingFieldMarkup(label);
