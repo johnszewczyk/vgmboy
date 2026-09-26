@@ -855,3 +855,253 @@ html .playlist-row.is-current td:first-child { box-shadow: inset 2px 0 #4e5a87; 
   html .transport-toolbar .tool-button, html .transport-toolbar #play-button { width: 1.6rem; min-width: 1.6rem; height: 1.6rem; }
   html .deck-screen-bezel::after { font-size: 0.42rem; }
 }
+
+/* Lit glyphs occupy the same square cells as the LCD, at integer pixel sizes. */
+html .deck-screen {
+  --lcd-cell-pitch: 2px;
+  background-size: var(--lcd-cell-pitch) var(--lcd-cell-pitch),
+    var(--lcd-cell-pitch) var(--lcd-cell-pitch), 100% 100%;
+}
+
+html .deck-main { min-height: 9rem; }
+html .deck-screen { min-height: 6.5rem; }
+html .deck-screen { justify-content: space-between; }
+html .deck-display-body { display: grid; grid-template-rows: auto auto; row-gap: 0.25rem; }
+html .deck-display-track { display: grid; row-gap: 0.16rem; min-width: 0; }
+
+html .lcd-pixels-active {
+  position: relative;
+  display: inline-block;
+  min-height: calc(7 * var(--lcd-cell-pitch));
+  vertical-align: middle;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none !important;
+}
+
+html .deck-title.lcd-pixels-active,
+html .deck-meta.lcd-pixels-active { display: block; width: 100%; }
+
+html .lcd-pixel-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+html .deck-brand-name { --lcd-pixel-ink: #293b70; }
+html #deck-state, html #deck-index, html .deck-brand-divider { --lcd-pixel-ink: #3d4d34; }
+html .deck-title { --lcd-pixel-ink: #28362b; }
+html .deck-meta, html .deck-time-row { --lcd-pixel-ink: #34472f; }
+html .player-deck.is-playing #deck-state { --lcd-pixel-ink: #2b426b; }
+
+/* Three recessed displays share one fine LCD material. Their controls live
+   within the glass instead of repeating the old raised panel treatment. */
+html .workspace {
+  --lcd-cell-pitch: 2px;
+  grid-template-columns: calc(var(--sidebar-width-percent) * 1%) 0.45rem minmax(0, 1fr);
+  gap: 0;
+  background: transparent;
+}
+
+html .sidebar,
+html .content {
+  min-height: 0;
+  border: 0.4rem solid #4d5260;
+  border-radius: 0.78rem 0.78rem 1.25rem 0.78rem;
+  background-color: #c8d37e;
+  background-image:
+    linear-gradient(155deg, rgb(255 255 218 / 24%), transparent 48%, rgb(76 91 48 / 12%)),
+    repeating-linear-gradient(0deg, rgb(45 62 33 / 5%) 0 1px, transparent 1px 2px),
+    repeating-linear-gradient(90deg, rgb(45 62 33 / 5%) 0 1px, transparent 1px 2px);
+  background-size: 100% 100%, 2px 2px, 2px 2px;
+  box-shadow:
+    inset 0 0 0 1px #77825a,
+    inset 0 4px 12px rgb(43 55 29 / 22%),
+    0 1px 0 rgb(255 255 255 / 83%),
+    0 3px 8px rgb(75 70 60 / 21%);
+}
+
+html .sidebar {
+  background-color: #c9d47f;
+  background-image: none;
+}
+
+html .content { background-image: none; }
+
+html .sidebar-resize-handle,
+html .sidebar-resize-handle::before {
+  width: 0.45rem;
+  min-width: 0.45rem;
+  background: linear-gradient(90deg, #c7c6be, #aead9f 45%, #d6d5cd);
+}
+
+html .sidebar-resize-handle::before {
+  width: 1px;
+  min-width: 1px;
+  left: 50%;
+  box-shadow: 1px 0 rgb(255 255 255 / 72%);
+}
+
+html .panel-heading,
+html .sidebar-search-wrap,
+html .playlist-tabs-toolbar,
+html .playlist-header-wrap {
+  border-color: rgb(50 68 36 / 24%);
+  background:
+    linear-gradient(180deg, rgb(49 65 39 / 14%), transparent 74%),
+    #c3d078;
+  box-shadow: inset 0 1px rgb(255 255 215 / 39%), inset 0 -1px rgb(57 69 43 / 14%);
+}
+
+html .panel-heading {
+  color: #25365b;
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-shadow: 0 1px rgb(243 250 190 / 75%), 0 0 1px rgb(39 54 87 / 28%);
+}
+
+html .panel-heading-mark { color: #354936; }
+
+html .sidebar-search-wrap { gap: 0.3rem; }
+
+html .sidebar-search-input {
+  border: 0;
+  border-bottom: 1px solid #77864c;
+  border-radius: 0;
+  background: rgb(177 195 100 / 28%);
+  color: #2e3c2f;
+  box-shadow: inset 0 2px 3px rgb(47 61 31 / 12%);
+}
+
+html .sidebar-search-input::placeholder { color: #5a674c; }
+
+html .sidebar-mode-button {
+  border-color: #687450;
+  border-radius: 0.24rem;
+  background: linear-gradient(#d9e19d, #aebd69);
+  color: #34435d;
+  box-shadow: inset 0 1px rgb(255 255 220 / 65%), 0 1px rgb(60 74 43 / 20%);
+}
+
+html .sidebar-mode-button:hover,
+html .sidebar-mode-button:focus-visible {
+  background: linear-gradient(#e5ebaa, #bdca79);
+  color: #243760;
+}
+
+html .tree-root,
+html .playlist-body-wrap {
+  background-color: #cad680;
+  background-image:
+    repeating-linear-gradient(0deg, rgb(47 63 33 / 6%) 0 1px, transparent 1px 2px),
+    repeating-linear-gradient(90deg, rgb(47 63 33 / 6%) 0 1px, transparent 1px 2px),
+    linear-gradient(155deg, #d5df8d, #c6d174 70%, #bfcb6d);
+  background-size: 2px 2px, 2px 2px, 100% 100%;
+  scrollbar-color: #7d8b58 #d2dd89;
+}
+
+html .tree-root {
+  padding: 0.28rem 0.18rem 0.5rem;
+  box-shadow: inset 0 4px 8px rgb(47 62 34 / 12%);
+}
+
+html .tree-node,
+html .database-game-row,
+html .database-console-row,
+html .playlist-table td {
+  color: #233429;
+  -webkit-font-smoothing: none;
+  -webkit-text-stroke: 0.18px currentColor;
+  text-shadow: 0 1px rgb(240 249 184 / 48%), 0 0 1px rgb(36 53 41 / 23%);
+}
+
+html .tree-node,
+html .database-game-row,
+html .database-console-row {
+  border-radius: 0;
+  font-size: 0.95rem;
+  line-height: 1.18;
+}
+
+html .tree-node:hover,
+html .database-game-row:hover,
+html .database-console-row:hover,
+html .playlist-row:hover:not(.is-selected) {
+  background: rgb(48 65 41 / 12%);
+  color: #202f27;
+}
+
+html .tree-node.is-selected,
+html .database-game-row.is-selected,
+html .database-console-row.is-selected,
+html .playlist-row.is-selected {
+  background: rgb(42 58 71 / 13%);
+}
+
+html .playlist-tabs-toolbar {
+  padding: 0.18rem 0.34rem 0;
+}
+
+html .playlist-tab,
+html .playlist-tab.is-active {
+  border-color: #778354;
+  background: linear-gradient(#d0dc87, #b8c671);
+  box-shadow: inset 0 1px rgb(255 255 206 / 60%);
+}
+
+html .playlist-tab.is-active {
+  border-color: #596c4b;
+  background: linear-gradient(#dce69b, #c5d37c);
+  box-shadow: inset 0 2px #394a78, inset 0 1px rgb(255 255 220 / 70%);
+}
+
+html .playlist-tab-select,
+html .playlist-tab-close,
+html .playlist-tab.is-active .playlist-tab-select { color: #344431; }
+
+html .playlist-wrap {
+  min-height: 0;
+  border: 0;
+  background: #c8d47f;
+  box-shadow: inset 0 3px 9px rgb(49 64 32 / 15%);
+}
+
+html .playlist-scroll-wrap { row-gap: 0; }
+
+html .playlist-header-wrap { border-bottom: 1px solid #7d8b55; }
+
+html .playlist-header-table,
+html .playlist-table thead,
+html .playlist-table thead tr,
+html .playlist-table th {
+  background: transparent;
+}
+
+html .playlist-header-label {
+  border: 0;
+  border-bottom: 1px solid rgb(57 73 48 / 40%);
+  border-radius: 0;
+  background: transparent;
+  color: #2e4438;
+  box-shadow: none;
+  text-shadow: 0 1px rgb(243 249 194 / 70%), 0 0 1px rgb(36 53 41 / 20%);
+}
+
+html .playlist-table th { color: #3b4d39; }
+html .playlist-table td { border-bottom-color: rgb(55 72 40 / 13%); }
+html .playlist-row:nth-child(even):not(.is-selected) { background: rgb(241 248 182 / 11%); }
+html .playlist-row.is-current td { color: #22345c; }
+html .playlist-row.is-current td:first-child { box-shadow: inset 2px 0 #354777; }
+
+html .deck-title { font-size: 1.2rem; }
+html .deck-time-row .timing-readout {
+  min-height: calc(7 * var(--lcd-cell-pitch));
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}

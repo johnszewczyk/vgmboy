@@ -53,10 +53,17 @@ shared relative sizes for captions, controls, and display text.
 
 `index.html` loads one `viewboy-gameboy.css` presentation sheet after
 `styles.css`. Game Boy Core is the only skin: a gray molded shell, charcoal
-bezel, green LCD, blue-purple markings and keys, maroon Play key, and a subtle
-4 px square-cell LCD grid with one-pixel gaps across the display and playlist
-surfaces. The sidebar uses smooth gray without a tiled grid. Keep presentation
-colors out of the inherited transport bridge.
+bezel, three green LCD surfaces, blue-purple markings and keys, and maroon Play
+key. The library and playlist each have a 2 px square-cell surface, while the
+player draws 5×7 glyphs directly. Their controls and headings remain within the
+LCDs. Keep presentation colors out of the inherited transport bridge.
+
+`lcd-pixels.js` owns only the visible canvas glyph layer inside the LCD. It
+observes the existing readout nodes so playback code continues writing text
+normally. Original DOM text remains available to accessibility; unsupported
+Unicode leaves the canvas path and displays the original font. Cell pitch
+follows Interface Scale and screen geometry, with no native playback bridge
+requests or continuous rendering loop.
 
 ## Selection and Search
 

@@ -8,22 +8,28 @@ below. The compact layout leaves more room for the text-first library and
 playlist. Game Boy Core is the only presentation: a molded DMG-gray shell,
 charcoal screen bezel, pea-green LCD, blue-purple markings and keys, muted
 maroon Play key, and a red power lamp. Engraved labels and inset seams give the
-deck its console character. The LCD, content area, and playlist use a subtle
-4 px square-cell grid with one-pixel gaps, matching the tiny square cells
-visible in original DMG LCD macro photos.
-The sidebar stays smooth gray plastic without a tiled texture. Folder rows
+deck its console character. The player, library, and playlist each sit in a
+recessed LCD screen. The library and playlist use a fine 2 px square-cell
+texture; their controls, tabs, and column headings remain inside the lit glass.
+The player renders its own 5×7 glyph cells over a quiet LCD surface.
+Folder rows
 expand with one click anywhere on the row; nested folders and game rows indent
-without bullet markers. Small raised seams and inset edges give the panels
-hardware character without large textures or heavy effects. The bundled Doto
-face remains consistent across the app at a compact 0.9 rem base, with
-Interface Scale applied globally.
+without bullet markers. The bundled Doto face remains consistent across the
+library and playlist at a compact 0.9 rem base, with Interface Scale applied
+globally.
 
-The bundled Doto face covers controls, lists, headings, and readouts. One
+The bundled Doto face covers controls, lists, headings, and fallback readouts. One
 Interface Scale setting resizes text throughout the player, library, playlist,
 and Settings. High-contrast dark text stays readable on the pale shell and LCD.
-Fixed highlights and inset readouts give the screen a hardware appearance;
-scrolling rows stay simple. Reduced-motion settings remove control and
-selection transitions.
+The player LCD draws supported Latin letters, digits, and common punctuation
+as discrete 5×7 square-cell glyphs. Its cells grow with Interface Scale and
+the title is sized around 1.2 rem. A soft pixel shadow strengthens the glyphs,
+and the time readout sits directly on the glass without its former box. Long
+titles truncate within the screen. Titles with characters outside that
+alphabet remain in the bundled Doto face, preserving their original spelling.
+The library and playlist use the bundled dotted face with a restrained stroke
+and shadow, keeping long and multilingual catalog text in selectable DOM rows.
+Reduced-motion settings remove control and selection transitions.
 
 The interface remains in WebKit and CSS. A transparent, click-through Metal
 overlay aligns fine plastic grain to the deck, matte shading to the screen
@@ -47,5 +53,6 @@ stops the locator transition.
 
 - `Sources/ViewBoy/Resources/styles.css`
 - `Sources/ViewBoy/Resources/viewboy-gameboy.css`
+- `Sources/ViewBoy/Resources/lcd-pixels.js`
 - `Sources/ViewBoy/Resources/Fonts/`
 - `Sources/ViewBoy/ViewBoyPhosphorShader.swift`
