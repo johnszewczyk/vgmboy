@@ -28,6 +28,11 @@ final paths with `verifiedPayload=true`. The field-removal ledger is
   measured header reports 4-bit, stereo, 37,800 Hz audio. The candidate keeps
   the complete structured MetaMan technical facts and does not promote
   duplicate `XA_*` tags or MetaMan's synthetic `comment: Sony XA header`.
+- All 16 measured fields are present for all 38 members:
+  `audioSectorCount`, `bitsPerSample`, `channels`, `codingInfo`, `container`,
+  `form`, `sampleCountPerSector`, `sampleRateHz`, `sectorHeaderBytes`,
+  `sectorPayloadBytes`, `sectorSizeBytes`, `submode`, `visibleTrackIndex`,
+  `xaChannelNumber`, `xaConfiguration`, and `xaFileNumber`.
 - The 26 positive, source-backed loop maps remain. Members without a verified
   loop have no loop field or negative loop tag.
 - Each of the 39 playable members has BLAKE3-256, CRC32, SHA-1, and MD5 stream
