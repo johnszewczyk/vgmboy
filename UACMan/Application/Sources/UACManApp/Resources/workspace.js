@@ -90,8 +90,11 @@
     const style = options.style ? ` style="${esc(options.style)}"` : "";
     return `<div class="${classes}" role="${role}"${attributes}${style}>${cells.join("")}</div>`;
   };
+  const canonicalHeadingFieldMarkup = (label, foldID = "") => foldID
+    ? `<button class="tag-table-field canonical-table-heading-input canonical-table-title-toggle" data-action="closeCanonicalSubtable" data-fold-id="${esc(foldID)}" type="button" title="Fold ${esc(label)}" aria-label="Fold ${esc(label)}">${esc(label)}</button>`
+    : `<input class="tag-table-field canonical-table-heading-input" value="${esc(label)}" aria-label="${esc(label)}" disabled>`;
   const canonicalHeaderCellMarkup = (label, options = {}) => {
-    const heading = `<input class="tag-table-field canonical-table-heading-input" value="${esc(label)}" aria-label="${esc(label)}" disabled>`;
+    const heading = canonicalHeadingFieldMarkup(label);
     const className = [label === "×" ? "canonical-table-delete-heading" : "", options.className].filter(Boolean).join(" ");
     return canonicalCellMarkup(heading, { ...options, className, role:"columnheader" });
   };
@@ -104,9 +107,7 @@
     return `<button class="${className}" type="button" data-action="${esc(action)}"${dataAttributes}${title}${ariaLabel}${disabled}>×</button>`;
   };
   const canonicalTitleRowMarkup = (title, className = "", actionMarkup = "", foldID = "") => {
-    const heading = foldID
-      ? `<button class="canonical-table-title-toggle" data-action="closeCanonicalSubtable" data-fold-id="${esc(foldID)}" type="button" title="Fold ${esc(title)}" aria-label="Fold ${esc(title)}">${esc(title)}</button>`
-      : `<input class="tag-table-field canonical-table-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled>`;
+    const heading = canonicalHeadingFieldMarkup(title, foldID);
     const content = actionMarkup
       ? `<div class="canonical-table-title-content">${heading}<span class="canonical-table-title-action">${actionMarkup}</span></div>`
       : heading;
@@ -136,6 +137,13 @@
       this.options = options;
     }
 
+    static contentMarkup(content) {
+      if (content instanceof CanonicalTable) return content.render();
+      if (content === null || content === undefined) return "";
+      if (typeof content === "string") return content;
+      throw new TypeError("CanonicalTable content must be table markup or a CanonicalTable");
+    }
+
     render() {
       const options = this.options;
       const classes = ["canonical-table", options.className].filter(Boolean).join(" ");
@@ -147,7 +155,7 @@
         options.style || ""
       ].filter(Boolean).join(";");
       const style = styleProperties ? ` style="${esc(styleProperties)}"` : "";
-      const rows = options.rows || options.empty || "";
+      const rows = this.constructor.contentMarkup(options.rows || options.empty || "");
       const title = options.title === undefined || options.title === null || options.title === ""
         ? ""
         : canonicalTitleRowMarkup(options.title, options.titleClassName || "", options.titleAction || "", options.titleFoldID || "");
@@ -171,7 +179,7 @@
     }
 
     static unfoldedRowMarkup(foldID, content = "", nestedRows = "") {
-      const renderedContent = content instanceof CanonicalTable ? content.render() : String(content || "");
+      const renderedContent = this.contentMarkup(content);
       const open = this.isFoldOpen(foldID);
       const classes = ["inserted-table-row", open ? "open" : ""].filter(Boolean).join(" ");
       return canonicalRowMarkup([
@@ -198,12 +206,13 @@
       const subrow = this.subrow(foldID);
       const contentHost = subrow?.querySelector(":scope > .inserted-table-cell > .inserted-table-panel > .canonical-unfold-content");
       if (!contentHost) return false;
+      const renderedContent = this.contentMarkup(content);
       const hadContent = Boolean(contentHost.firstElementChild || contentHost.textContent.trim());
       if (this.isFoldOpen(foldID) && !hadContent) {
         subrow.style.height = "0px";
         subrow.style.overflow = "hidden";
       }
-      contentHost.innerHTML = content instanceof CanonicalTable ? content.render() : String(content || "");
+      contentHost.innerHTML = renderedContent;
       this.applyColumnSchemas(subrow);
       if (this.isFoldOpen(foldID) && !hadContent) this.animateSubrow(subrow, true);
       return true;

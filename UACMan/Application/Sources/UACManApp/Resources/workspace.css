@@ -394,28 +394,17 @@ button { cursor:pointer; }
 .multiple-value-number { text-align:center; }
 
 
-/* Popup JSON editing uses the same canonical rows and cells, but remains a
-   fixed modal surface so editing it never reflows the source table. */
-.tag-analyzer-packs-table { width:100%; max-width:100%; min-width:0; }
+/* Tag Analyzer keeps only content-specific treatments; CanonicalTable owns
+   row height, cell width, and nested table geometry at every depth. */
 .tag-analyzer-pack-trigger { display:flex; align-items:center; justify-content:center; gap:5px; width:100%; }
-.tag-analyzer-fields-table { width:100%; min-width:0; }
-.tag-analyzer-fields-table .tag-analyzer-match-row { min-height:27px; }
-.tag-analyzer-match-row > .canonical-table-cell { min-height:27px; }
-.tag-analyzer-match-row .tag-analyzer-match-track-cell,
-.tag-analyzer-match-row .tag-analyzer-match-name-cell,
-.tag-analyzer-match-row .tag-analyzer-match-value-cell { min-width:0; }
 .tag-analyzer-match-track { min-width:0; text-overflow:ellipsis; }
 .tag-analyzer-match-value-cell { display:flex; flex-direction:column; align-items:stretch; gap:3px; }
-.tag-analyzer-match-value { width:100%; min-width:0; }
 .tag-analyzer-match-value-cell textarea { min-height:52px; resize:vertical; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
 .tag-analyzer-match-error { color:var(--danger,#e06c75); font-size:9px; }
 .tag-analyzer-match-error:empty { display:none; }
-.tag-analyzer-json-node,.tag-analyzer-json-table { width:100%; min-width:0; }
+.tag-analyzer-json-node { width:100%; min-width:0; }
 .tag-analyzer-json-title-actions { display:flex; align-items:center; gap:3px; }
 .tag-analyzer-json-title-actions .icon-button { width:21px; height:21px; font-size:9px; }
-.tag-analyzer-json-entry-row .canonical-table-cell { min-height:27px; }
-.tag-analyzer-json-entry-row .canonical-table-action-cell { justify-content:center; }
-.tag-analyzer-json-key,.tag-analyzer-json-scalar { width:100%; min-width:0; }
 .tag-analyzer-json-trigger { height:23px; padding:2px 5px; border:1px dashed var(--line); background:var(--panel-2); }
 .tag-analyzer-json-trigger:hover { border-color:var(--accent); }
 .tag-analyzer-json-trigger .canonical-fold-label { flex:1 1 auto; min-width:0; }
@@ -493,17 +482,16 @@ button { cursor:pointer; }
 .canonical-table-title-content { display:flex; align-items:center; gap:4px; width:100%; min-width:0; }
 .canonical-table-title-content > input,
 .canonical-table-title-content > .canonical-table-title-toggle { flex:1 1 auto; min-width:0; }
-.canonical-table-title-toggle { height:27px; overflow:hidden; padding:0 5px; border:0; border-radius:0; background:transparent; color:var(--text); font:inherit; font-weight:700; text-align:center; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
-.canonical-table-title-toggle:focus-visible { outline:1px solid var(--accent); outline-offset:-2px; }
+.canonical-table-title-toggle { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
+.canonical-table .canonical-table-title-toggle:focus-visible { outline:1px solid var(--accent); outline-offset:-2px; }
 .canonical-table-title-action { display:flex; flex:none; align-items:center; }
 .canonical-table-title-close { width:23px!important; height:23px!important; min-width:23px!important; padding:0!important; }
 .canonical-table .icon-button.canonical-table-title-close { color:var(--accent); font-size:15px; }
 .canonical-table .icon-button.canonical-table-title-fold { width:23px; height:23px; min-width:23px; padding:0; border:0; border-radius:3px; background:transparent; color:var(--accent); font-size:15px; line-height:1; }
 .canonical-table .icon-button.canonical-table-title-fold:hover { border:0; background:transparent; color:var(--accent); }
-.canonical-unfold-content .canonical-table-title-cell { background:color-mix(in srgb,var(--panel-2) 78%,var(--panel)); }
 .canonical-unfold-content .canonical-table-title-cell[data-action="closeCanonicalSubtable"] { cursor:pointer; }
-.canonical-unfold-content .canonical-table-title-cell[data-action="closeCanonicalSubtable"]:hover { background:var(--hover); }
-.canonical-unfold-content .canonical-table-title-cell > .canonical-table-title-content > .canonical-table-heading-input { background:transparent!important; border-color:transparent!important; }
+.canonical-unfold-content .canonical-table-title-cell .canonical-table-heading-input { background:color-mix(in srgb,var(--panel-2) 65%,var(--panel))!important; }
+.canonical-unfold-content .canonical-table-title-cell[data-action="closeCanonicalSubtable"]:hover .canonical-table-heading-input { background:var(--hover)!important; }
 .canonical-table .canonical-table-delete-heading .canonical-table-heading-input { color:var(--danger,#e06c75)!important; }
 .canonical-table .tag-number-cell,
 .canonical-table .tag-create-number,

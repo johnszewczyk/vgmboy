@@ -62,9 +62,10 @@
   Expanded child-table title bars use the shared, borderless accent-color fold
   chevron in the title cell. Keep it aligned at the title cell's right edge;
   the title cell and heading fold the child table, while JSON add actions remain
-  independent. The parent row's fold control reopens the child table. Nested
-  title cells use a lighter child-table surface. Popup dismissal remains a
-  close `×` control.
+  independent. The parent row's fold control reopens the child table. Foldable
+  titles use the same bordered heading field as every canonical title and
+  header; only the nested heading background differs. Popup dismissal remains
+  a close `×` control.
   A header's `×` is a plain canonical heading cell, not a second delete button.
 - Canonical title rows share the compact 27 px baseline used by table headers
   and content rows. Let tall controls such as JSON textareas grow their own
@@ -77,7 +78,9 @@
   contain further unfold rows at any depth. Keep multiple unfolds on one row
   in declared hierarchical order, open ancestors when a deeper fold is
   activated, and clear descendant fold state when a parent closes. Inserted
-  unfold rows span one full-width grid track.
+  unfold rows span one full-width grid track. Unfold content accepts rendered
+  markup or a `CanonicalTable`; do not coerce arbitrary objects into visible
+  text.
 - Keep the nested-table width and zero-inset rule on every `.canonical-table`
   descendant of `.canonical-unfold-content`, not only its direct child.
   Recursive editors may add semantic wrappers (for example, inline error
