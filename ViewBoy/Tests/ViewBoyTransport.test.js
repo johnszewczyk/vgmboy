@@ -46,10 +46,10 @@ const appDelegateSource = fs.readFileSync(
 );
 
 test("ViewBoy keeps settable column timing and a shared 2 px LCD cell", () => {
-  assert.match(appCoreSource, /DEFAULT_ANIMATION_DURATION_MILLISECONDS\s*=\s*200/);
-  assert.match(indexSource, /id="animation-duration-input"[^>]*value="200"/);
+  assert.match(appCoreSource, /DEFAULT_ANIMATION_DURATION_MILLISECONDS\s*=\s*250/);
+  assert.match(indexSource, /id="animation-duration-input"[^>]*value="250"/);
   assert.doesNotMatch(indexSource, /auto-resize-animation-input|selection-animation-input/);
-  assert.match(stylesSource, /--column-resize-duration:\s*200ms/);
+  assert.match(stylesSource, /--column-resize-duration:\s*250ms/);
   assert.match(stylesSource, /\.playlist-table th\s*\{[^}]*transition:\s*width var\(--column-resize-duration\)/);
   assert.match(stylesSource, /\.playlist-body-table \.playlist-width-source > td\s*\{[^}]*transition:\s*width var\(--column-resize-duration\)/);
   assert.match(uiSource, /void refs\.playlistHeaderTable\.offsetWidth/);

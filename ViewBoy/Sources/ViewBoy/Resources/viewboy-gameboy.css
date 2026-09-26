@@ -1185,151 +1185,137 @@ html .playlist-row.is-selected > td * {
 html .playlist-row.is-current { background: transparent; }
 html .playlist-row.is-current td:first-child { box-shadow: none; }
 
-/* Three tactile transport keys, a working power rocker, and a quiet membrane
-   strip for the playback modes. */
-html .deck-control-bank {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  justify-items: stretch;
-  gap: 0.15rem;
-  padding: 0.28rem 0.42rem 0.36rem;
-  background: linear-gradient(150deg, #d8d7d0, #bdbcb4 75%);
+
+/* Four discrete LCD tones: unlit cell, soft cell, mid cell, and active ink. */
+:root {
+  --lcd-tone-0: #d2dd91;
+  --lcd-tone-1: #a9bc73;
+  --lcd-tone-2: #627c55;
+  --lcd-tone-3: #263e38;
 }
 
-html .deck-main { grid-template-columns: minmax(0, 1fr) 12.7rem; }
-
-html .deck-power {
-  display: flex;
-  align-items: center;
-  justify-self: stretch;
-  gap: 0.3rem;
-  width: 100%;
-  margin: 0;
+html .deck-screen,
+html .tree-root,
+html .playlist-body-wrap {
+  background-color: var(--lcd-tone-0);
+  background-image:
+    repeating-linear-gradient(0deg, rgb(38 62 56 / 5%) 0 1px, transparent 1px 2px),
+    repeating-linear-gradient(90deg, rgb(38 62 56 / 5%) 0 1px, transparent 1px 2px),
+    linear-gradient(150deg, #dce6a0, var(--lcd-tone-0) 57%, #bfce7d);
+  background-size: 2px 2px, 2px 2px, 100% 100%;
 }
 
-html .deck-power-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.28rem;
-  padding: 0.08rem 0.14rem;
-  border: 0;
-  border-radius: 0.2rem;
-  background: transparent;
-  color: #585e77;
-  cursor: pointer;
-}
+html .deck-screen { background-size: var(--lcd-cell-pitch) var(--lcd-cell-pitch), var(--lcd-cell-pitch) var(--lcd-cell-pitch), 100% 100%; }
+html .deck-screen-top,
+html .deck-meta,
+html .deck-time-row,
+html .deck-screen-top #deck-index { color: var(--lcd-tone-2); }
+html .deck-title,
+html .deck-brand-name,
+html .deck-time-row .timing-readout,
+html .player-deck.is-playing #deck-state { color: var(--lcd-tone-3); }
+html .deck-screen .lcd-pixels-active { --lcd-pixel-ink: var(--lcd-tone-3); }
+html .deck-screen .deck-meta.lcd-pixels-active,
+html .deck-screen #deck-index.lcd-pixels-active { --lcd-pixel-ink: var(--lcd-tone-2); }
+html .deck-time-row .timing-readout { border: 0; background: transparent; box-shadow: none; }
+html .deck-display-body { grid-template-columns: minmax(0, 1fr) 10.5rem; grid-template-rows: minmax(0, 1fr) auto; column-gap: 0.5rem; }
+html .deck-display-track { align-content: center; }
+html .deck-time-row { grid-column: 1 / -1; }
+html .deck-spectrum { display: grid; align-content: center; justify-items: center; min-width: 0; border-left: 1px solid var(--lcd-tone-1); }
+html .deck-spectrum canvas { display: block; width: 10.5rem; height: 3.625rem; image-rendering: pixelated; }
+html .deck-spectrum-caption { color: var(--lcd-tone-2); font-size: 0.46rem; line-height: 1; letter-spacing: 0.1em; }
 
-html .deck-power-switch:hover,
-html .deck-power-switch:focus-visible,
-html .deck-power-switch[aria-pressed="true"] {
-  background: rgb(255 255 255 / 19%);
-  color: #344268;
-}
-
-html .deck-power-switch:focus-visible { outline: 1px solid #394a77; }
-
-html .deck-power-slot {
-  position: relative;
-  display: block;
-  width: 1.65rem;
-  height: 0.62rem;
-  border: 1px solid #77776f;
-  border-radius: 0.18rem;
-  background: linear-gradient(#8f8e87, #aaa99f);
-  box-shadow: inset 0 1px 2px rgb(46 45 41 / 45%), 0 1px rgb(255 255 255 / 68%);
-}
-
-html .deck-power-thumb {
-  position: absolute;
-  top: -0.1rem;
-  left: -0.05rem;
-  width: 0.74rem;
-  height: 0.72rem;
-  border: 1px solid #73736f;
-  border-radius: 0.15rem;
-  background: linear-gradient(135deg, #e1e0d9, #b4b3ac 75%);
-  box-shadow: inset 0 1px rgb(255 255 255 / 86%), 0 1px 2px rgb(48 47 43 / 42%);
-  transition: transform 140ms ease;
-}
-
-html .deck-power-switch[aria-pressed="true"] .deck-power-thumb { transform: translateX(0.9rem); }
-html .deck-power-label, html .deck-power-state { font-size: 0.49rem; letter-spacing: 0.12em; }
-html .deck-power-state { color: #6a695f; text-shadow: 0 1px rgb(255 255 255 / 75%); }
-html .deck-power-led {
-  width: 0.4rem;
-  height: 0.4rem;
-  margin-left: auto;
-  background: radial-gradient(circle at 35% 30%, #b66b64, #702d32 72%);
-  box-shadow: 0 0 0 2px #aaa9a1, inset 0 1px rgb(255 219 205 / 29%);
-}
-
-html .transport-toolbar .transport {
-  grid-template-columns: repeat(3, 2.08rem);
-  grid-template-rows: 2.08rem;
-  gap: 0.3rem;
-  margin-inline: auto;
-}
-
+/* The hardware key matrix sits outside the LCD and keeps its nine actions. */
+html .deck-main { grid-template-columns: minmax(0, 1fr) minmax(11.5rem, 25%); }
+html .deck-control-bank { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); justify-items: center; gap: 0.12rem; padding: 0.3rem 0.42rem 0.38rem; }
+html .deck-power { display: flex; align-items: center; justify-self: start; gap: 0.4rem; width: auto; margin: 0 0 0.12rem 0.3rem; }
+html .deck-power-led { width: 0.52rem; height: 0.52rem; margin-left: 0; }
+html .transport-toolbar .transport { grid-template-columns: repeat(3, 1.9rem); grid-template-rows: repeat(3, 1.9rem); gap: 0.2rem; }
 html .transport-toolbar .tool-button,
-html .transport-toolbar #play-button {
-  width: 2.08rem;
-  min-width: 2.08rem;
-  height: 2.08rem;
-}
+html .transport-toolbar #play-button { width: 1.9rem; min-width: 1.9rem; height: 1.9rem; }
 
-html .deck-mode-strip {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.12rem;
-  width: 100%;
-}
+/* Selections, tabs, and controls within an LCD use only the display palette. */
+html .tree-node.is-selected,
+html .database-game-row.is-selected,
+html .database-console-row.is-selected,
+html .playlist-row.is-selected { background: transparent; color: var(--lcd-tone-3); }
+html .list-selection-indicator { background: rgb(98 124 85 / 24%); border-color: var(--lcd-tone-2); }
+html .playlist-tab,
+html .playlist-tab.is-active { border-color: var(--lcd-tone-2); background: var(--lcd-tone-1); color: var(--lcd-tone-3); box-shadow: inset 0 1px var(--lcd-tone-0); }
+html .playlist-tab.is-active { background: var(--lcd-tone-0); box-shadow: inset 0 2px var(--lcd-tone-3); }
+html .playlist-tab-select,
+html .playlist-tab-close,
+html .playlist-tab.is-active .playlist-tab-select { color: var(--lcd-tone-3); }
+html .sidebar-mode-button,
+html .sidebar-mode-button:is(:active,[aria-pressed="true"],.is-selected) { border-color: var(--lcd-tone-2); background: var(--lcd-tone-1); color: var(--lcd-tone-3); }
+html .sidebar-mode-button:hover { background: var(--lcd-tone-0); }
+html .tree-node,
+html .database-game-row,
+html .database-console-row,
+html .playlist-table td { color: var(--lcd-tone-3); }
+html .tree-group,
+html .database-console-games { overflow: hidden; }
 
-html .deck-mode-key,
-html .deck-mode-key[aria-pressed="true"],
-html .deck-mode-key.is-selected {
-  min-width: 0;
-  min-height: 1.15rem;
-  padding: 0.08rem 0.02rem;
-  border: 1px solid #8c8b83;
-  border-radius: 0.18rem;
-  background: linear-gradient(#c9c8bf, #b8b7ae);
-  color: #3b4461;
-  box-shadow: inset 0 1px rgb(255 255 255 / 69%), 0 1px 1px rgb(60 58 52 / 20%);
-  font-size: 0.51rem;
-  line-height: 1;
-  letter-spacing: 0;
-  cursor: pointer;
-}
-
-html .deck-mode-key::before {
-  display: block;
-  width: 0.25rem;
-  height: 0.12rem;
-  margin: 0 auto 0.09rem;
-  background: #73776a;
-  box-shadow: inset 0 1px rgb(53 59 49 / 35%);
-  content: "";
-}
-
-html .deck-mode-key[aria-pressed="true"]::before,
-html .deck-mode-key.is-selected::before {
-  background: #3f5e8d;
-  box-shadow: 0 0 3px rgb(58 96 162 / 55%);
-}
-
-html .deck-mode-key:hover,
-html .deck-mode-key:focus-visible { background: linear-gradient(#e1e0d6, #c7c6bb); }
-html .deck-mode-key:focus-visible { outline: 1px solid #394a77; }
-html .deck-mode-key .ui-icon { display: none; }
+/* Options is a white shell enclosing two independent LCD screens. */
+html body.options-window,
+html body.options-window .options-panel { background: linear-gradient(140deg, #e3e2db, #c9c8c0 73%, #bab9b1); color: #31342c; }
+html body.options-window .options-panel { gap: 0.5rem; padding: 0.68rem; border: 1px solid #a4a39b; border-radius: 0.7rem; box-shadow: inset 0 1px #fff, 0 6px 20px rgb(51 50 43 / 24%); }
+html body.options-window .options-header { color: #3c4a70; text-shadow: 0 1px #fff; letter-spacing: 0.12em; }
+html body.options-window .options-body { gap: 0.7rem; }
+html body.options-window .options-nav,
+html body.options-window .options-content { border: 0.34rem solid #e5e4dc; outline: 1px solid #9f9e96; border-radius: 0.55rem; background-color: var(--lcd-tone-0); background-image: repeating-linear-gradient(0deg, rgb(38 62 56 / 5%) 0 1px, transparent 1px 2px), repeating-linear-gradient(90deg, rgb(38 62 56 / 5%) 0 1px, transparent 1px 2px), linear-gradient(145deg, #dfe8a0, #c9d582 70%); background-size: 2px 2px, 2px 2px, 100% 100%; box-shadow: inset 0 3px 7px rgb(38 62 56 / 22%), 0 3px 8px rgb(67 65 57 / 15%); }
+html body.options-window .options-nav { padding: 0.3rem; }
+html body.options-window .options-nav-group { border-bottom: 1px solid var(--lcd-tone-2); }
+html body.options-window .options-nav-group-title { color: var(--lcd-tone-2); }
+html body.options-window .options-nav-item,
+html body.options-window .options-nav-item .ui-icon { color: var(--lcd-tone-3); }
+html body.options-window .options-nav-item:hover { color: var(--lcd-tone-3); background: rgb(98 124 85 / 18%); }
+html body.options-window .options-nav-item.is-selected { border-color: var(--lcd-tone-2); background: var(--lcd-tone-1); color: var(--lcd-tone-3); box-shadow: inset 2px 0 var(--lcd-tone-3); }
+html body.options-window .options-nav-item.is-selected .ui-icon { color: var(--lcd-tone-3); }
+html body.options-window .options-nav-item::after { display: none; }
+html body.options-window .options-content { padding: 0.25rem; }
+html body.options-window .options-page-title { position: static; margin: -0.22rem -0.22rem 0.08rem; border-color: var(--lcd-tone-2); background: var(--lcd-tone-1); color: var(--lcd-tone-3); text-shadow: 0 1px var(--lcd-tone-0); }
+html body.options-window .options-page .options-subpanel { border: 1px solid var(--lcd-tone-2); border-radius: 0.15rem; background: rgb(210 221 145 / 68%); box-shadow: inset 0 1px var(--lcd-tone-0); }
+html body.options-window .options-page .options-subpanel-title { border-color: var(--lcd-tone-2); color: var(--lcd-tone-3); }
+html body.options-window .options-page .options-help-text,
+html body.options-window .options-page p,
+html body.options-window .options-page .options-checkbox-copy small { color: var(--lcd-tone-2); }
+html body.options-window .options-page .options-field { border-color: rgb(98 124 85 / 24%); color: var(--lcd-tone-3); }
+html body.options-window .options-page .options-input { border-color: var(--lcd-tone-2); background: var(--lcd-tone-0); color: var(--lcd-tone-3); box-shadow: inset 0 1px 2px rgb(38 62 56 / 18%); }
+html body.options-window .options-page .options-path-control,
+html body.options-window .database-stats-panel { border-color: var(--lcd-tone-2); background: rgb(169 188 115 / 25%); }
+html body.options-window .options-page .options-subpanel .tool-button,
+html body.options-window .options-page .options-library-toolbar > .tool-button { border-color: var(--lcd-tone-2); background: var(--lcd-tone-1); color: var(--lcd-tone-3); }
+html body.options-window input[type="checkbox"] { accent-color: var(--lcd-tone-3); }
+html body.options-window :focus-visible { outline-color: var(--lcd-tone-3); }
 
 @media (max-width: 680px) {
   html .deck-main { grid-template-columns: minmax(0, 1fr) minmax(7rem, 32%); }
-  html .transport-toolbar .transport { grid-template-columns: repeat(3, 1.75rem); grid-template-rows: 1.75rem; gap: 0.15rem; }
-  html .transport-toolbar .tool-button, html .transport-toolbar #play-button { width: 1.75rem; min-width: 1.75rem; height: 1.75rem; }
-  html .deck-mode-key { font-size: 0.43rem; }
+  html .transport-toolbar .transport { grid-template-columns: repeat(3, 1.6rem); grid-template-rows: repeat(3, 1.6rem); }
+  html .transport-toolbar .tool-button,
+  html .transport-toolbar #play-button { width: 1.6rem; min-width: 1.6rem; height: 1.6rem; }
+  html .deck-display-body { grid-template-columns: minmax(0, 1fr) 7rem; }
+  html .deck-spectrum canvas { width: 7rem; }
 }
-
 @media (max-width: 580px) {
   html .deck-main { grid-template-columns: minmax(0, 1fr); }
-  html .deck-control-bank { min-height: 5.8rem; }
+  html .deck-control-bank { min-height: 6.5rem; }
 }
+
+html .deck-time-row { gap: 0.5rem; }
+html .deck-time-row .timing-readout { gap: 0.24rem; }
+html body.options-window .options-nav-item { font-size: 0.74rem; -webkit-text-stroke: 0.12px currentColor; }
+html body.options-window .options-nav-group-title { color: var(--lcd-tone-3); }
+html body.options-window .options-page .options-help-text,
+html body.options-window .options-page p,
+html body.options-window .options-page .options-checkbox-copy small { color: var(--lcd-tone-3); font-size: 0.73rem; line-height: 1.42; -webkit-text-stroke: 0.18px currentColor; text-shadow: 0 1px rgb(250 255 212 / 45%); }
+html body.options-window .options-page .options-field { font-size: 0.74rem; -webkit-text-stroke: 0.12px currentColor; }
+html body.options-window .options-page .options-subpanel-title { font-size: 0.67rem; -webkit-text-stroke: 0.16px currentColor; }
+
+html body.options-window .font-scale-control output { color: var(--lcd-tone-3); }
+html body.options-window .ui-font-scale::-webkit-slider-runnable-track { background: linear-gradient(90deg, var(--lcd-tone-1), var(--lcd-tone-2), var(--lcd-tone-3)); }
+html body.options-window .ui-font-scale::-webkit-slider-thumb { border-color: var(--lcd-tone-3); background: var(--lcd-tone-0); box-shadow: 0 1px 2px rgb(38 62 56 / 35%); }
+html body.options-window .font-family-readout { border-color: var(--lcd-tone-2); background: var(--lcd-tone-1); box-shadow: inset 0 1px var(--lcd-tone-0); }
+html body.options-window .font-family-readout > span,
+html body.options-window .font-family-readout small,
+html body.options-window .font-family-readout strong { color: var(--lcd-tone-3); text-shadow: none; }

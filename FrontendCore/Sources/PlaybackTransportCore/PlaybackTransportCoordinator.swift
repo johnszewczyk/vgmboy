@@ -579,6 +579,10 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         queue.sync { status(controller.perform(.init(command: .status)).status) }
     }
 
+    public func spectrum() -> (left: [Float], right: [Float]) {
+        controller.spectrum()
+    }
+
     public func diagnostics() -> PlaybackTransportDiagnostics {
         queue.sync {
             let status = controller.perform(.init(command: .status)).status

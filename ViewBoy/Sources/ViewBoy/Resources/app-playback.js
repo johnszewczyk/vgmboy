@@ -436,9 +436,6 @@ function updatePlaybackReadout() {
   const playlistTotalSeconds = state.playlist.reduce((sum, entry) => sum + currentOutputBasePlaybackSeconds(entry), 0);
   refs.playlistTotalLabel.textContent = formatTime(playlistTotalSeconds);
   refs.playButton.querySelector("use")?.setAttribute("href", state.isPlaying ? "#icon-pause" : "#icon-play");
-  refs.stopButton?.setAttribute("aria-pressed", state.isPlaying ? "true" : "false");
-  refs.stopButton?.setAttribute("aria-label", state.isPlaying ? "Power off and stop" : "Power on and play");
-  if (refs.stopButton) refs.stopButton.title = state.isPlaying ? "Power off and stop" : "Power on and play";
   syncMediaSessionState();
 }
 

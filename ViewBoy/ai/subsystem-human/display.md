@@ -30,7 +30,8 @@ alphabet remain in the bundled Doto face, preserving their original spelling.
 The library and playlist use the bundled dotted face with a restrained stroke
 and shadow, keeping long and multilingual catalog text in selectable DOM rows.
 The two lower screens have pale molded frames around their dark glass bezels;
-each LCD cell has a faint recessed edge and highlight.
+each LCD cell has a faint recessed edge and highlight. Four fixed green-gray
+tones distinguish unlit cells, soft cells, mid tones, and active ink.
 Reduced-motion settings remove control and selection transitions.
 
 The interface remains in WebKit and CSS. A transparent, click-through Metal
@@ -39,10 +40,11 @@ bezel, and scanlines and glass sheen to the LCD. It adds a glow around the
 power lamp during playback. A short pale phosphor sweep crosses the LCD when
 transport state or track generation changes. The sweep is disabled with
 Reduced Motion. The overlay does not change layout or controls and stays
-paused between state changes. Previous, Play/Pause, and Next are the three
-round transport keys. A power rocker starts or stops playback, with a red LED
-that lights during playback. Equalizer, Long Play, Repeat, Mono, and Mute use
-small membrane switches below the transport keys.
+paused between state changes. Nine round keys handle Previous, Play/Pause,
+Next, Stop, Equalizer, Long Play, Repeat, Mono, and Mute. The red power LED
+sits on plastic outside the LCD. A ten-band stereo spectrum occupies the
+right side of the top display. It reads post-EQ PCM at 10 Hz and draws
+mirrored bars with falling peak caps. It rests when playback stops.
 
 Library and playlist selections use one persistent shaded row bar that slides
 to the selected item with a 250 ms ease transition. It snaps to the clipped
@@ -50,12 +52,15 @@ visible row while scrolling and stays mounted while virtualized rows are
 patched. Settings retains its compact locator. Large-playlist scrolling retains existing
 row nodes and creates or removes only rows entering or leaving the visible
 window. Rows keep a restrained LCD tint and readable text. Reduced Motion
-stops the bar transition.
+stops the bar transition. Sidebar folder and console-group expansion uses
+the same ease timing; the default shared duration is 250 ms. Options has a
+white bezel and two LCD screens for navigation and settings.
 
 ## Files
 
 - `Sources/ViewBoy/Resources/styles.css`
 - `Sources/ViewBoy/Resources/viewboy-gameboy.css`
 - `Sources/ViewBoy/Resources/lcd-pixels.js`
+- `Sources/ViewBoy/Resources/lcd-spectrum.js`
 - `Sources/ViewBoy/Resources/Fonts/`
 - `Sources/ViewBoy/ViewBoyPhosphorShader.swift`

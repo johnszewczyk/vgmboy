@@ -101,6 +101,17 @@ final class AudioOutput: @unchecked Sendable {
         )
     }
 
+    func spectrum() -> (left: [Float], right: [Float]) {
+        var left = [Float](repeating: 0, count: 10)
+        var right = [Float](repeating: 0, count: 10)
+        left.withUnsafeMutableBufferPointer { leftBuffer in
+            right.withUnsafeMutableBufferPointer { rightBuffer in
+                _ = vgmboy_audio_unit_spectrum(handle, leftBuffer.baseAddress, rightBuffer.baseAddress, 10)
+            }
+        }
+        return (left, right)
+    }
+
     func setEqualizer(_ configuration: EqualizerConfiguration) {
         let gains = configuration.gainsDecibels
         gains.withUnsafeBufferPointer { buffer in

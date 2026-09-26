@@ -83,10 +83,7 @@ refs.nextButton.addEventListener("click", () => {
 });
 
 refs.stopButton.addEventListener("click", () => {
-  const action = state.isPlaying
-    ? app.playback.stopPlaybackState()
-    : app.playback.togglePlayback();
-  action.catch((error) => console.error(error));
+  app.playback.stopPlaybackState().catch((error) => console.error(error));
 });
 
 refs.equalizerToolbarButton.addEventListener("click", () => {

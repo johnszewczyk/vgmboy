@@ -10,6 +10,7 @@
 
 #define VGMBOY_BAND_COUNT 10
 #define VGMBOY_BYTES_PER_FRAME 4
+#define VGMBOY_SPECTRUM_FRAMES 2048
 
 typedef struct { float b0, b1, b2, a1, a2, x1[2], x2[2], y1[2], y2[2]; } Biquad;
 
@@ -28,6 +29,8 @@ struct VGMBoyAudioUnit {
   float volume;
   int mono, equalizer_enabled;
   Biquad equalizer[VGMBOY_BAND_COUNT];
+  int16_t spectrum_pcm[VGMBOY_SPECTRUM_FRAMES * 2];
+  size_t spectrum_write, spectrum_count;
 };
 
 static const float band_frequencies[VGMBOY_BAND_COUNT] = {31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000};
@@ -118,6 +121,33 @@ void vgmboy_audio_unit_set_transport_gain(VGMBoyAudioUnit* output, float gain) {
 void vgmboy_audio_unit_set_transport_active(VGMBoyAudioUnit* output, int active) { if (output) atomic_store_explicit(&output->transport_active, active != 0, memory_order_release); }
 void vgmboy_audio_unit_ramp_transport_gain(VGMBoyAudioUnit* output, float gain, uint32_t frames) { if (output) { atomic_store(&output->transport_target, clampf(gain, 0, 1)); atomic_store(&output->transport_ramp_frames, frames); } }
 void vgmboy_audio_unit_set_equalizer(VGMBoyAudioUnit* output, int enabled, const float* gains, size_t count) { if (!output) return; pthread_mutex_lock(&output->producer_lock); output->equalizer_enabled = enabled != 0; for (size_t i = 0; i < VGMBOY_BAND_COUNT; i += 1) { configure_biquad(&output->equalizer[i], band_frequencies[i], gains && i < count ? clampf(gains[i], -12, 12) : 0, output->format.mSampleRate); memset(output->equalizer[i].x1, 0, sizeof(output->equalizer[i].x1)); memset(output->equalizer[i].x2, 0, sizeof(output->equalizer[i].x2)); memset(output->equalizer[i].y1, 0, sizeof(output->equalizer[i].y1)); memset(output->equalizer[i].y2, 0, sizeof(output->equalizer[i].y2)); } pthread_mutex_unlock(&output->producer_lock); }
-size_t vgmboy_audio_unit_enqueue_pcm(VGMBoyAudioUnit* output, int16_t* samples, size_t frames) { if (!output || !samples) return 0; pthread_mutex_lock(&output->producer_lock); for (size_t frame = 0; frame < frames; frame += 1) { float left = samples[frame * 2] / 32768.0f, right = samples[frame * 2 + 1] / 32768.0f; if (output->equalizer_enabled) for (size_t band = 0; band < VGMBOY_BAND_COUNT; band += 1) { left = process_sample(&output->equalizer[band], left, 0); right = process_sample(&output->equalizer[band], right, 1); } if (output->mono) { const float mix = (left + right) * 0.5f; left = mix; right = mix; } samples[frame * 2] = (int16_t)lrintf(clampf(left * output->volume, -1, 1) * 32767); samples[frame * 2 + 1] = (int16_t)lrintf(clampf(right * output->volume, -1, 1) * 32767); } pthread_mutex_unlock(&output->producer_lock); const size_t written = ring_write(output, samples, frames * VGMBOY_BYTES_PER_FRAME) / VGMBOY_BYTES_PER_FRAME; atomic_fetch_add_explicit(&output->frames_written, written, memory_order_relaxed); return written; }
+size_t vgmboy_audio_unit_enqueue_pcm(VGMBoyAudioUnit* output, int16_t* samples, size_t frames) { if (!output || !samples) return 0; pthread_mutex_lock(&output->producer_lock); for (size_t frame = 0; frame < frames; frame += 1) { float left = samples[frame * 2] / 32768.0f, right = samples[frame * 2 + 1] / 32768.0f; if (output->equalizer_enabled) for (size_t band = 0; band < VGMBOY_BAND_COUNT; band += 1) { left = process_sample(&output->equalizer[band], left, 0); right = process_sample(&output->equalizer[band], right, 1); } if (output->mono) { const float mix = (left + right) * 0.5f; left = mix; right = mix; } samples[frame * 2] = (int16_t)lrintf(clampf(left * output->volume, -1, 1) * 32767); samples[frame * 2 + 1] = (int16_t)lrintf(clampf(right * output->volume, -1, 1) * 32767); output->spectrum_pcm[output->spectrum_write * 2] = samples[frame * 2]; output->spectrum_pcm[output->spectrum_write * 2 + 1] = samples[frame * 2 + 1]; output->spectrum_write = (output->spectrum_write + 1) % VGMBOY_SPECTRUM_FRAMES; if (output->spectrum_count < VGMBOY_SPECTRUM_FRAMES) output->spectrum_count += 1; } pthread_mutex_unlock(&output->producer_lock); const size_t written = ring_write(output, samples, frames * VGMBOY_BYTES_PER_FRAME) / VGMBOY_BYTES_PER_FRAME; atomic_fetch_add_explicit(&output->frames_written, written, memory_order_relaxed); return written; }
+
+int vgmboy_audio_unit_spectrum(VGMBoyAudioUnit* output, float* left, float* right, size_t band_count) {
+  if (!output || !left || !right || band_count < VGMBOY_BAND_COUNT) return 1;
+  int16_t pcm[VGMBOY_SPECTRUM_FRAMES * 2];
+  pthread_mutex_lock(&output->producer_lock);
+  const size_t count = output->spectrum_count, start = (output->spectrum_write + VGMBOY_SPECTRUM_FRAMES - count) % VGMBOY_SPECTRUM_FRAMES;
+  for (size_t frame = 0; frame < count; frame += 1) { const size_t source = ((start + frame) % VGMBOY_SPECTRUM_FRAMES) * 2; pcm[frame * 2] = output->spectrum_pcm[source]; pcm[frame * 2 + 1] = output->spectrum_pcm[source + 1]; }
+  pthread_mutex_unlock(&output->producer_lock);
+  float window[VGMBOY_SPECTRUM_FRAMES];
+  if (count == VGMBOY_SPECTRUM_FRAMES) for (size_t frame = 0; frame < count; frame += 1) window[frame] = 0.5f - 0.5f * cosf((float)(2.0 * M_PI * frame / (count - 1)));
+  for (size_t band = 0; band < VGMBOY_BAND_COUNT; band += 1) {
+    left[band] = right[band] = 0;
+    if (count < VGMBOY_SPECTRUM_FRAMES) continue;
+    const float omega = (float)(2.0 * M_PI * band_frequencies[band] / output->format.mSampleRate);
+    const float coefficient = 2.0f * cosf(omega);
+    float q1[2] = {0, 0}, q2[2] = {0, 0};
+    for (size_t frame = 0; frame < count; frame += 1) {
+      for (size_t channel = 0; channel < 2; channel += 1) {
+        const float q = window[frame] * (pcm[frame * 2 + channel] / 32768.0f) + coefficient * q1[channel] - q2[channel];
+        q2[channel] = q1[channel]; q1[channel] = q;
+      }
+    }
+    left[band] = clampf(2.0f * sqrtf(fmaxf(0, q1[0] * q1[0] + q2[0] * q2[0] - coefficient * q1[0] * q2[0])) / count, 0, 1);
+    right[band] = clampf(2.0f * sqrtf(fmaxf(0, q1[1] * q1[1] + q2[1] * q2[1] - coefficient * q1[1] * q2[1])) / count, 0, 1);
+  }
+  return 0;
+}
 size_t vgmboy_audio_unit_render_offline(VGMBoyAudioUnit* output, int16_t* samples, size_t frames) { if (!output || !samples || !frames || frames > UINT32_MAX) return 0; render_frames(output, samples, (uint32_t)frames); return frames; }
 int vgmboy_audio_unit_snapshot(const VGMBoyAudioUnit* output, VGMBoyAudioUnitSnapshot* snapshot) { if (!output || !snapshot) return 1; snapshot->is_running = atomic_load(&output->running); snapshot->callback_count = atomic_load(&output->callback_count); snapshot->underrun_count = atomic_load(&output->underrun_count); snapshot->frames_requested = atomic_load(&output->frames_requested); snapshot->frames_supplied = atomic_load(&output->frames_supplied); snapshot->frames_written = atomic_load(&output->frames_written); snapshot->buffered_frames = (uint32_t)(readable(output) / VGMBOY_BYTES_PER_FRAME); snapshot->ring_buffer_frames = (uint32_t)(output->capacity_bytes / VGMBOY_BYTES_PER_FRAME); snapshot->sample_rate = output->format.mSampleRate; return 0; }

@@ -286,6 +286,11 @@ remain intentionally local.
 
 ## Failure Boundaries
 
+The ViewBoy bridge exposes `nativePlaybackSpectrum` as a read-only ten-band
+stereo snapshot. VGMBoy owns the post-EQ PCM tap and frequency measurements;
+the frontend owns only the 10 Hz LCD drawing and peak-cap motion. The audio
+render callback does no spectrum work.
+
 Missing packaged resources are fatal. The host must not silently fall back to
 raw filesystem scanning or a second catalog implementation.
 

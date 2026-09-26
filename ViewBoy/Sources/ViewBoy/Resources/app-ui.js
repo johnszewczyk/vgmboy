@@ -613,14 +613,35 @@ async function queueBrowserNode(node) {
 async function toggleBrowserNode(node) {
   if (node.kind !== "folder") return;
   if (node.path === state.rootPath) return;
-  if (expandedFolders.has(node.path)) expandedFolders.delete(node.path);
-  else {
+  const wasExpanded = expandedFolders.has(node.path);
+  if (wasExpanded) {
+    const group = browserButtonsByPath.get(node.path)?.parentElement?.querySelector(":scope > .tree-group");
+    await animateSidebarGroup(group, false);
+    expandedFolders.delete(node.path);
+  } else {
     expandedFolders.add(node.path);
     await loadBrowserChildren(node);
   }
   renderTree();
   syncTreeSelection();
   browserButtonsByPath.get(node.path)?.focus();
+  if (!wasExpanded) {
+    const group = browserButtonsByPath.get(node.path)?.parentElement?.querySelector(":scope > .tree-group");
+    void animateSidebarGroup(group, true);
+  }
+}
+
+async function animateSidebarGroup(group, opening) {
+  if (!group || !group.animate || !state.selectionAnimationEnabled || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const height = group.scrollHeight;
+  if (!height) return;
+  const animation = group.animate(
+    [{ height: `${opening ? 0 : height}px`, opacity: opening ? 0 : 1 },
+      { height: `${opening ? height : 0}px`, opacity: opening ? 1 : 0 }],
+    { duration: state.selectionAnimationMilliseconds, easing: "ease", fill: "both" }
+  );
+  try { await animation.finished; } catch { /* The tree was rebuilt during the animation. */ }
+  animation.cancel();
 }
 
 function renderTreeNode(node, container) {
@@ -1000,8 +1021,11 @@ function renderDatabaseGames() {
       games.classList.toggle("is-hidden", !expanded);
       heading.addEventListener("click", async () => {
         try {
+          const wasExpanded = !collapsedDatabaseConsoles.has(consoleName);
           await applySharedDatabaseGroupAction("toggle", consoleName);
+          if (wasExpanded) await animateSidebarGroup(games, false);
           renderDatabaseGames();
+          if (!wasExpanded) void animateSidebarGroup(games, true);
         } catch (error) {
           reportDatabaseSidebarError("toggle the database console", error);
         }

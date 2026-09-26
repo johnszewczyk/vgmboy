@@ -74,6 +74,9 @@ final class WKPlaybackBridge: @unchecked Sendable {
 
     private func handleSerialized(method: String, args: [Any], requestID: Int? = nil) throws -> Any {
         switch method {
+        case "nativePlaybackSpectrum":
+            let spectrum = transport.spectrum()
+            return ["left": spectrum.left, "right": spectrum.right]
         case "nativePlaybackInit", "nativePlaybackState":
             return statusResponse()
         case "nativePlaybackAudioConfig":
