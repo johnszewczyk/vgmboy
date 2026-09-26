@@ -57,16 +57,23 @@
   so their rows align to the parent's content edge. Keep each table's schema local to its root so
   nested rows inherit only their own table's column tracks. Tag Analyzer's
   parent, pack, occurrence, and recursive JSON tables all use this class; their
-  differences belong in their schema and cell content. Every analyzer fold uses
-  the same count-plus-chevron control, including array and object values.
+  differences belong in their schema and cell content. Tag-name and matched-pack
+  folds use the count-plus-chevron control. Structured-value folds show
+  `[Nested Tags]` with the standard fold icon; child counts belong in the
+  expanded title, not in the parent value cell.
 - Generate visible row deletion controls with `canonicalDeleteButtonMarkup`.
   It must emit the same fixed-size `.icon-button.danger` used on Track Tags;
   do not put a full-width `.tag-table-field` box in a narrow action column.
   Expanded child-table titles are bare, full-width canonical heading inputs:
-  the whole field folds the table, with only its background changed to accent
-  and no separate chevron or action overlay. The parent row's fold control reopens the table.
-  Recursive JSON add actions occupy a separate canonical content row. Popup
-  dismissal remains a close `×` control.
+  they keep the standard heading-cell appearance and the whole cell folds the
+  table, with no separate chevron or action overlay. The parent row's fold
+  control reopens the table.
+  Recursive JSON add actions live in the final header action cell and open a
+  menu with named value types; the trigger uses the same compact canonical
+  action-button styling. Recursive unfolded JSON titles show their full path,
+  with each field or array item joined by a backslash separator and the item
+  count after it; do not reset the title path at deeper levels. Do not add a
+  separate action row. Popup dismissal remains a close `×` control.
   A header's `×` is a plain canonical heading cell, not a second delete button.
 - Canonical title rows share the compact 27 px baseline used by table headers
   and content rows. Let tall controls such as JSON textareas grow their own

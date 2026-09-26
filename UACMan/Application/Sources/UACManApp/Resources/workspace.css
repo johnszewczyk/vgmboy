@@ -395,9 +395,12 @@ button { cursor:pointer; }
 .tag-analyzer-match-error { color:var(--danger,#e06c75); font-size:9px; }
 .tag-analyzer-match-error:empty { display:none; }
 .tag-analyzer-json-node { width:100%; min-width:0; }
-.tag-analyzer-json-add-cell { justify-content:flex-end; }
-.tag-analyzer-json-add-actions { display:flex; align-items:center; gap:3px; }
-.tag-analyzer-json-add-actions .icon-button { width:21px; height:21px; font-size:9px; }
+.tag-analyzer-json-add-menu { position:relative; }
+.tag-analyzer-json-add-menu > summary { box-sizing:border-box; display:flex; align-items:center; justify-content:center; padding:0; font:inherit; cursor:pointer; list-style:none; }
+.tag-analyzer-json-add-menu > summary::-webkit-details-marker { display:none; }
+.tag-analyzer-json-add-options { position:absolute; z-index:20; top:calc(100% + 3px); right:0; display:grid; min-width:132px; padding:3px; border:1px solid var(--line); border-radius:5px; background:var(--panel); box-shadow:0 5px 14px #0005; }
+.tag-analyzer-json-add-option { min-height:25px; padding:4px 7px; border:0; border-radius:3px; background:transparent; color:var(--text); font:inherit; text-align:left; white-space:nowrap; cursor:pointer; }
+.tag-analyzer-json-add-option:hover { background:var(--hover); }
 .tag-analyzer-json-error { display:block; padding:1px 4px 0; color:var(--danger,#e06c75); font-size:9px; }
 .tag-analyzer-json-error:empty { display:none; }
 .multiple-values-popup-table > .canonical-popup-editor { width:100%; min-width:0; }

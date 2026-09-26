@@ -507,8 +507,10 @@
       const raw = kind === "json" ? JSON.stringify(item, null, 2) : String(item ?? "");
       const nestedValue = subtableLayout ? tagAnalyzerStructuredValue(item) : null;
       const nestedFoldID = nestedValue && context.foldID ? `${context.foldID}/multiple/${index}` : "";
+      const nestedTitle = isArray ? `Item ${index + 1}` : String(key);
+      const nestedTitlePath = [context.title || context.key || "Values", nestedTitle];
       const valueControl = nestedFoldID
-        ? tagAnalyzerJSONFoldToggleMarkup(nestedValue.value, nestedFoldID, key)
+        ? tagAnalyzerJSONFoldToggleMarkup(nestedValue.value, nestedFoldID, nestedTitle, nestedTitlePath)
         : kind === "json"
         ? nestedJSONValueMarkup(item, key)
         : `<input class="tag-table-field multiple-value-editor" data-multiple-value value="${esc(raw)}" aria-label="Value for ${esc(key)}">`;
@@ -533,7 +535,7 @@
       });
       if (!nestedFoldID) return row;
       const childTable = CanonicalTable.isFoldOpen(nestedFoldID)
-        ? tagAnalyzerJSONNodeMarkup(nestedValue.value, key, nestedFoldID)
+        ? tagAnalyzerJSONNodeMarkup(nestedValue.value, nestedTitle, nestedFoldID, nestedTitlePath)
         : "";
       return CanonicalTable.rowWithUnfolds(row, [{ foldID:nestedFoldID, content:childTable }]);
     };
@@ -1158,11 +1160,14 @@
     return `${parentFoldID}/entry/${entryID}`;
   }
 
-  function tagAnalyzerJSONFoldToggleMarkup(value, foldID, title) {
+  function tagAnalyzerJSONFoldToggleMarkup(value, foldID, title, titlePath = [title]) {
     const count = tagAnalyzerJSONEntryCount(value);
-    return canonicalCountFoldToggleMarkup(
-      foldID, count, `Show ${count} nested values for ${title}`,
-      `data-unfold-render="tagAnalyzerJSON" data-json-value="${esc(JSON.stringify(value))}" data-json-title="${esc(title)}"`
+    return canonicalFoldToggleMarkup(
+      foldID, `Show ${count} nested values for ${title}`,
+      {
+        label:"[Nested Tags]",
+        attributes:`data-unfold-render="tagAnalyzerJSON" data-json-value="${esc(JSON.stringify(value))}" data-json-title="${esc(title)}" data-json-title-path="${esc(JSON.stringify(titlePath))}"`
+      }
     );
   }
 
@@ -1172,17 +1177,18 @@
     return `<input class="tag-table-field tag-analyzer-json-scalar" data-tag-analyzer-json-scalar data-json-scalar-type="${isString ? "string" : "json"}" value="${esc(raw)}" aria-label="Value for ${esc(title)}">`;
   }
 
-  function tagAnalyzerJSONEntryRowMarkup(value, key, index, entryID, parentFoldID, isArray) {
+  function tagAnalyzerJSONEntryRowMarkup(value, key, index, entryID, parentFoldID, isArray, parentTitlePath = []) {
     const keyText = String(key);
     const childTitle = isArray ? `Item ${index + 1}` : keyText;
     const nestedValue = tagAnalyzerStructuredValue(value);
     const structured = Boolean(nestedValue);
     const childFoldID = structured ? tagAnalyzerJSONEntryFoldID(parentFoldID, entryID) : "";
+    const childTitlePath = [...parentTitlePath, childTitle];
     const keyControl = isArray
       ? `<input class="tag-table-field tag-analyzer-json-key" value="${index}" aria-label="Index ${index}" disabled>`
       : `<input class="tag-table-field tag-analyzer-json-key" data-tag-analyzer-json-key value="${esc(keyText)}" aria-label="Key ${esc(keyText)}">`;
     const valueControl = structured
-      ? tagAnalyzerJSONFoldToggleMarkup(nestedValue.value, childFoldID, childTitle)
+      ? tagAnalyzerJSONFoldToggleMarkup(nestedValue.value, childFoldID, childTitle, childTitlePath)
       : tagAnalyzerJSONScalarMarkup(value, childTitle);
     const row = canonicalRowMarkup([
       canonicalNumberCellMarkup(index + 1, `Value number ${index + 1}`, { className:"multiple-value-number-cell" }),
@@ -1195,34 +1201,37 @@
     ], { className:"tag-analyzer-json-entry-row", attributes:`data-json-entry data-json-entry-index="${index}" data-json-entry-id="${entryID}" data-json-entry-kind="${structured ? "node" : "scalar"}" data-json-entry-stringified="${nestedValue?.encodedString === true}"${structured ? ` data-json-entry-fold-id="${esc(childFoldID)}"` : ""}` });
     if (!structured) return row;
     const childTable = CanonicalTable.isFoldOpen(childFoldID)
-      ? tagAnalyzerJSONNodeMarkup(nestedValue.value, childTitle, childFoldID)
+      ? tagAnalyzerJSONNodeMarkup(nestedValue.value, childTitle, childFoldID, childTitlePath)
       : "";
     return CanonicalTable.rowWithUnfolds(row, [{ foldID:childFoldID, content:childTable }]);
   }
 
-  function tagAnalyzerJSONAddRowMarkup() {
-    const addButton = (kind, label, title) => `<button class="icon-button tag-analyzer-json-add" data-action="addTagAnalyzerJSONEntry" data-json-entry-type="${kind}" type="button" title="${title}" aria-label="${title}">${label}</button>`;
-    const actions = `<span class="tag-analyzer-json-add-actions">${addButton("scalar", "＋", "Add string value")}${addButton("json", "123", "Add JSON scalar")}${addButton("object", "{}", "Add object")}${addButton("array", "[]", "Add array")}</span>`;
-    return canonicalRowMarkup([canonicalCellMarkup(actions, { className:"canonical-table-full-cell tag-analyzer-json-add-cell" })], { className:"tag-analyzer-json-add-row" });
+  function tagAnalyzerJSONAddMenuMarkup() {
+    const option = (kind, label) => `<button class="tag-analyzer-json-add-option" data-action="addTagAnalyzerJSONEntry" data-json-entry-type="${kind}" type="button" role="menuitem">${label}</button>`;
+    return `<details class="tag-analyzer-json-add-menu"><summary class="icon-button tag-analyzer-json-add" title="Add nested value" aria-label="Add nested value">＋</summary><div class="tag-analyzer-json-add-options" role="menu">${option("scalar", "String value")}${option("json", "JSON scalar")}${option("object", "Object")}${option("array", "Array")}</div></details>`;
   }
 
-  function tagAnalyzerJSONNodeMarkup(value, title, foldID) {
+  function tagAnalyzerJSONNodeMarkup(value, title, foldID, titlePath = [title]) {
     const isArray = Array.isArray(value);
     const entries = isArray ? value.map((item, index) => [String(index), item]) : Object.entries(value || {});
-    const rows = entries.map(([key, item], index) => tagAnalyzerJSONEntryRowMarkup(item, key, index, index, foldID, isArray)).join("") ||
+    const rows = entries.map(([key, item], index) => tagAnalyzerJSONEntryRowMarkup(item, key, index, index, foldID, isArray, titlePath)).join("") ||
       canonicalEmptyRowMarkup("No values", "tag-analyzer-json-empty");
-    const tableTitle = `${title} · ${tagAnalyzerJSONSummary(value).replace(/^(Array|Object) · /, "")}`;
+    const pathTitle = titlePath.join(" \\ ");
+    const tableTitle = `${pathTitle} · ${tagAnalyzerJSONSummary(value).replace(/^(Array|Object) · /, "")}`;
     const table = new CanonicalTable({
       className:"multiple-values-table tag-analyzer-json-table",
       columns:CanonicalTableColumns.tagAnalyzerJSONValues,
       title:tableTitle,
       titleFoldID:foldID,
-      ariaLabel:`Nested values for ${title}`,
-      header:canonicalHeaderMarkup(["#", isArray ? "Index" : "Key", "Value", "×"], {
-        className:"multiple-values-table-header-row"
-      }),
-      rows:tagAnalyzerJSONAddRowMarkup() + rows,
-      attributes:`data-json-node data-json-node-kind="${isArray ? "array" : "object"}" data-json-node-fold-id="${esc(foldID)}" data-json-node-title="${esc(title)}" data-json-next-entry-id="${entries.length}"`
+      ariaLabel:`Nested values for ${pathTitle}`,
+      header:canonicalRowMarkup([
+        canonicalHeaderCellMarkup("#"),
+        canonicalHeaderCellMarkup(isArray ? "Index" : "Key"),
+        canonicalHeaderCellMarkup("Value"),
+        canonicalCellMarkup(tagAnalyzerJSONAddMenuMarkup(), { className:"canonical-table-action-cell", role:"columnheader" })
+      ], { kind:"header", className:"multiple-values-table-header-row" }),
+      rows,
+      attributes:`data-json-node data-json-node-kind="${isArray ? "array" : "object"}" data-json-node-fold-id="${esc(foldID)}" data-json-node-title="${esc(title)}" data-json-title-path="${esc(JSON.stringify(titlePath))}" data-json-next-entry-id="${entries.length}"`
     });
     return `<div class="tag-analyzer-json-node">${table.render()}<small class="tag-analyzer-json-error" data-json-node-error></small></div>`;
   }
@@ -1363,9 +1372,14 @@
     try { value = JSON.parse(toggle.dataset.jsonValue || "null"); }
     catch { return false; }
     if (!isStructuredTagAnalyzerValue(value)) return false;
+    let titlePath = [toggle.dataset.jsonTitle || "Values"];
+    try {
+      const parsedTitlePath = JSON.parse(toggle.dataset.jsonTitlePath || "null");
+      if (Array.isArray(parsedTitlePath) && parsedTitlePath.length) titlePath = parsedTitlePath.map(String);
+    } catch {}
     return CanonicalTable.fillUnfold(
       foldID,
-      tagAnalyzerJSONNodeMarkup(value, toggle.dataset.jsonTitle || "Values", foldID)
+      tagAnalyzerJSONNodeMarkup(value, toggle.dataset.jsonTitle || "Values", foldID, titlePath)
     );
   }
 
@@ -1992,6 +2006,7 @@
     const parentFoldID = table.dataset.jsonNodeFoldId || "";
     const entryType = button.dataset.jsonEntryType || "scalar";
     const initialValue = entryType === "object" ? {} : entryType === "array" ? [] : entryType === "json" ? null : "";
+    button.closest(".tag-analyzer-json-add-menu")?.removeAttribute("open");
     const entries = [...table.querySelectorAll(":scope > .canonical-table-content-row[data-json-entry]")];
     const index = entries.length;
     let key = String(index);
@@ -2004,7 +2019,12 @@
     table.querySelector(":scope > .canonical-table-empty-row")?.remove();
     const entryID = Number(table.dataset.jsonNextEntryId) || 0;
     table.dataset.jsonNextEntryId = String(entryID + 1);
-    table.insertAdjacentHTML("beforeend", tagAnalyzerJSONEntryRowMarkup(initialValue, key, index, entryID, parentFoldID, isArray));
+    let titlePath = [table.dataset.jsonNodeTitle || "Values"];
+    try {
+      const parsedTitlePath = JSON.parse(table.dataset.jsonTitlePath || "null");
+      if (Array.isArray(parsedTitlePath) && parsedTitlePath.length) titlePath = parsedTitlePath.map(String);
+    } catch {}
+    table.insertAdjacentHTML("beforeend", tagAnalyzerJSONEntryRowMarkup(initialValue, key, index, entryID, parentFoldID, isArray, titlePath));
     const row = table.querySelector(':scope > .canonical-table-content-row[data-json-entry-index="' + index + '"]');
     refreshTagAnalyzerJSONTree(table);
     if (isStructuredTagAnalyzerValue(initialValue)) {
