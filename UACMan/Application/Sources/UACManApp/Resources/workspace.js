@@ -1455,9 +1455,7 @@
       ? query
         ? 'No tag fields match package filenames containing "' + esc(query) + '".'
         : "No tag fields were found in the readable UAC manifests."
-      : state.tagAnalyzerRootPath
-        ? "Choose Analyze to list this folder’s UAC tag names."
-        : "Browse for a folder to list its UAC tag names.";
+      : "";
     const issuesDisclosure = issues.length
       ? '<details class="tag-analyzer-issues"><summary>' + issues.length + ' unreadable folder or package item(s) · results may be incomplete</summary><div class="tag-analyzer-issue-list">' + issues.map(issue => '<div class="issue"><strong>' + esc(issue.relativePath || "Selected folder") + '</strong>' + esc(issue.message) + '</div>').join("") + '</div></details>'
       : "";
@@ -1468,7 +1466,7 @@
       ariaLabel:"Tag names, matched packs, and tracks",
       header:canonicalHeaderMarkup(["#", "Tag Name", "Matched Packs", "Tracks", "×"]),
       rows,
-      empty:canonicalEmptyRowMarkup(esc(emptyMessage), "tag-analyzer-empty")
+      empty:emptyMessage ? canonicalEmptyRowMarkup(esc(emptyMessage), "tag-analyzer-empty") : ""
     });
 
     return '<section class="data-page tag-analyzer-page" aria-label="Tag Analyzer">' +
@@ -1481,7 +1479,7 @@
       '</div>' +
       '<div class="tag-analyzer-progress" role="status" aria-live="polite">' + progressControl + '<span>' + esc(status) + '</span>' + ((running || deleting) && currentPath ? '<code title="' + esc(currentPath) + '">' + esc(currentPath) + '</code>' : "") + '</div>' +
       issuesDisclosure +
-      '<div class="tag-analyzer-results"><div class="' + canonicalTableSurfaceClassName("data-table-scroll") + '">' + table + '</div></div>' +
+      '<section class="tag-scope-table"><div class="' + canonicalTableSurfaceClassName("data-table-scroll") + '">' + table + '</div></section>' +
     '</section>';
   }
 
