@@ -495,6 +495,11 @@ button { cursor:pointer; }
 .canonical-table-title-action { display:flex; flex:none; align-items:center; }
 .canonical-table-title-close { width:23px!important; height:23px!important; min-width:23px!important; padding:0!important; }
 .canonical-table .icon-button.canonical-table-title-close { color:var(--accent); font-size:15px; }
+.canonical-table .icon-button.canonical-table-title-fold { width:23px; height:23px; min-width:23px; padding:0; border:0; border-radius:3px; background:transparent; color:var(--accent); font-size:15px; line-height:1; }
+.canonical-table .icon-button.canonical-table-title-fold:hover { border:0; background:transparent; color:var(--accent); }
+.canonical-unfold-content .canonical-table-title-cell { background:var(--bg); }
+.canonical-unfold-content .canonical-table-title-cell > .canonical-table-title-content > .canonical-table-heading-input { background:transparent!important; border-color:transparent!important; }
+.canonical-table .canonical-table-delete-heading .canonical-table-heading-input { color:var(--danger,#e06c75)!important; }
 .canonical-table .tag-number-cell,
 .canonical-table .tag-create-number,
 .canonical-table .multiple-value-number { text-align:center; }

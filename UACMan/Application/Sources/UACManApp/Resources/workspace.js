@@ -92,7 +92,8 @@
   };
   const canonicalHeaderCellMarkup = (label, options = {}) => {
     const heading = `<input class="tag-table-field canonical-table-heading-input" value="${esc(label)}" aria-label="${esc(label)}" disabled>`;
-    return canonicalCellMarkup(heading, { ...options, role:"columnheader" });
+    const className = [label === "×" ? "canonical-table-delete-heading" : "", options.className].filter(Boolean).join(" ");
+    return canonicalCellMarkup(heading, { ...options, className, role:"columnheader" });
   };
   const canonicalDeleteButtonMarkup = (action, options = {}) => {
     const className = ["icon-button", "danger", options.className].filter(Boolean).join(" ");
@@ -453,9 +454,10 @@
       : `<pre class="nested-json-preview">${esc(raw)}</pre>`;
     return `<details class="nested-json-dropdown"><summary class="nested-json-trigger"><span>[Nested Tags]</span><span class="canonical-fold-icon">＋</span></summary><div class="nested-json-panel">${body}</div></details>`;
   };
-  const multipleValuesCloseMarkup = context => context.foldID
-    ? `<button class="icon-button canonical-table-title-close multiple-values-subtable-close" data-action="closeCanonicalSubtable" data-fold-id="${esc(context.foldID)}" ${context.closeAttributes || ""} type="button" title="Close nested tags table" aria-label="Close nested tags table">×</button>`
-    : `<button class="icon-button canonical-table-title-close multiple-values-popup-close" data-action="closeMultipleValuesPopup" data-popup-id="${esc(context.popupID || "")}" type="button" title="Close" aria-label="Close">×</button>`;
+  const multipleValuesCloseMarkup = context =>
+    `<button class="icon-button canonical-table-title-close multiple-values-popup-close" data-action="closeMultipleValuesPopup" data-popup-id="${esc(context.popupID || "")}" type="button" title="Close" aria-label="Close">×</button>`;
+  const canonicalSubtableFoldMarkup = (foldID, attributes = "") =>
+    `<button class="icon-button canonical-table-title-fold" data-action="closeCanonicalSubtable" data-fold-id="${esc(foldID)}" ${attributes} type="button" title="Fold table" aria-label="Fold table">⌃</button>`;
   const multipleValuesTableHeaderRowMarkup = (context, editable) => {
     const submitMarkup = editable
       ? '<button class="tag-table-field canonical-table-heading-input multiple-values-header-action" data-action="commitMultipleValues" type="button" title="Submit all changed values" aria-label="Submit all changed values">✓</button>'
@@ -465,7 +467,7 @@
       canonicalHeaderCellMarkup("Tag Name"),
       canonicalHeaderCellMarkup("Tag Value"),
       canonicalCellMarkup(submitMarkup, { className:"canonical-table-action-cell", role:"columnheader" }),
-      canonicalCellMarkup(multipleValuesCloseMarkup(context), { className:"canonical-table-action-cell", role:"columnheader" })
+      canonicalHeaderCellMarkup("×", { className:"canonical-table-delete-heading" })
     ], { kind:"header", className:"multiple-values-table-header-row" });
   };
   const multipleValuesTableChromeMarkup = (context, editable) => multipleValuesTableHeaderRowMarkup(context, editable);
@@ -512,7 +514,7 @@
       className:gridClass,
       columns:CanonicalTableColumns.multipleValues,
       title:context.title || context.key || "Values",
-      titleAction:context.layout === "popup" || context.layout === "subtable" ? multipleValuesCloseMarkup(context) : "",
+      titleAction:context.layout === "popup" ? multipleValuesCloseMarkup(context) : context.layout === "subtable" ? canonicalSubtableFoldMarkup(context.foldID, context.closeAttributes || "") : "",
       ariaLabel:context.title || context.key || "Tag values",
       header:multipleValuesTableChromeMarkup(context, true),
       rows:`<div class="multiple-values-rows">${rows || canonicalEmptyRowMarkup("No values", "multiple-values-empty")}</div>`
@@ -544,7 +546,7 @@
       className:gridClass,
       columns:CanonicalTableColumns.multipleValues,
       title:context.title || context.key || "Values",
-      titleAction:context.layout === "popup" || context.layout === "subtable" ? multipleValuesCloseMarkup(context) : "",
+      titleAction:context.layout === "popup" ? multipleValuesCloseMarkup(context) : context.layout === "subtable" ? canonicalSubtableFoldMarkup(context.foldID, context.closeAttributes || "") : "",
       ariaLabel:context.title || context.key || "Tag values",
       header:multipleValuesTableChromeMarkup(context, false),
       rows:`<div class="multiple-values-rows">${rows}</div>`
@@ -1156,7 +1158,7 @@
 
   function tagAnalyzerJSONTitleActions(foldID) {
     const addButton = (kind, label, title) => `<button class="icon-button tag-analyzer-json-add" data-action="addTagAnalyzerJSONEntry" data-json-entry-type="${kind}" type="button" title="${title}" aria-label="${title}">${label}</button>`;
-    return `<span class="tag-analyzer-json-title-actions">${addButton("scalar", "＋", "Add string value")}${addButton("json", "123", "Add JSON scalar")}${addButton("object", "{}", "Add object")}${addButton("array", "[]", "Add array")}${multipleValuesCloseMarkup({ foldID })}</span>`;
+    return `<span class="tag-analyzer-json-title-actions">${addButton("scalar", "＋", "Add string value")}${addButton("json", "123", "Add JSON scalar")}${addButton("object", "{}", "Add object")}${addButton("array", "[]", "Add array")}${canonicalSubtableFoldMarkup(foldID)}</span>`;
   }
 
   function tagAnalyzerJSONNodeMarkup(value, title, foldID) {
@@ -1229,7 +1231,7 @@
       className:"multiple-values-table tag-analyzer-fields-table",
       columns:CanonicalTableColumns.tagAnalyzerFields,
       title:tagName + " · " + matches.length + " tag field(s)",
-      titleAction:multipleValuesCloseMarkup({ foldID }),
+      titleAction:canonicalSubtableFoldMarkup(foldID),
       ariaLabel:"Tag values in " + archiveRelativePath,
       header,
       rows
@@ -1278,7 +1280,7 @@
       className:"multiple-values-table tag-analyzer-packs-table",
       columns:CanonicalTableColumns.tagAnalyzerPacks,
       title,
-      titleAction:multipleValuesCloseMarkup({ foldID }),
+      titleAction:canonicalSubtableFoldMarkup(foldID),
       ariaLabel:"Matched packs for " + tagName,
       header,
       rows
