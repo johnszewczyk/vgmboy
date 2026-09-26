@@ -106,6 +106,12 @@
     const disabled = options.disabled ? " disabled" : "";
     return `<button class="${className}" type="button" data-action="${esc(action)}"${dataAttributes}${title}${ariaLabel}${disabled}>×</button>`;
   };
+  const canonicalPreviewCellMarkup = member => canonicalCellMarkup(
+    member.previewable
+      ? `<button class="icon-button" type="button" data-action="previewMember" data-preview-path="${esc(member.path)}" title="View bundled text" aria-label="View bundled text">⌕</button>`
+      : "",
+    { className:"canonical-table-action-cell" }
+  );
   const canonicalTitleRowMarkup = (title, className = "", actionMarkup = "", foldID = "") => {
     if (foldID && actionMarkup) throw new TypeError("Foldable table titles must not contain separate actions");
     const heading = canonicalHeadingFieldMarkup(title, foldID);
@@ -1476,7 +1482,7 @@
       canonicalCellMarkup(`<input class="tag-table-field file-path-field" value="${esc(member.path)}" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field file-tags-count" value="${fileTagEntries(member).length}" aria-label="Tag count" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field" value="${esc(bytes(member.bytes))}" disabled>`),
-      canonicalCellMarkup(member.previewable ? `<button class="icon-button file-preview-action" data-action="previewMember" data-preview-path="${esc(member.path)}" title="View bundled text" aria-label="View bundled text">⌕</button>` : "", { className:"canonical-table-action-cell file-view-cell" })
+      canonicalPreviewCellMarkup(member)
     ], { className:"file-row", attributes:`tabindex="0" data-track-row="${esc(member.path)}" title="Open metadata for ${esc(member.name)}"` })).join("");
     const empty = canonicalEmptyRowMarkup("No package members match this filter");
     const preview = state.filePreviewPath
@@ -1497,7 +1503,7 @@
       canonicalCellMarkup(`<input class="tag-table-field file-name-field" value="${esc(asset.name)}" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field file-path-field" value="${esc(asset.path)}" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field" value="${esc(bytes(asset.bytes))}" disabled>`),
-      canonicalCellMarkup(asset.previewable ? `<button class="icon-button file-preview-action" data-action="previewMember" data-preview-path="${esc(asset.path)}" title="View bundled text" aria-label="View bundled text">⌕</button>` : "", { className:"canonical-table-action-cell file-view-cell" })
+      canonicalPreviewCellMarkup(asset)
     ], { className:"attachment-row", attributes:`tabindex="0" data-track-row="${esc(asset.path)}" title="Open metadata for ${esc(asset.name)}"` })).join("");
     const table = canonicalTableMarkup({ className:"attachments-table", columns:CanonicalTableColumns.attachments, title:"Attachments", ariaLabel:"Package attachments", header, rows });
     return `<section class="attachments-section"><div class="${canonicalTableSurfaceClassName("data-table-scroll", "attachment-table-scroll")}">${table}</div></section>`;
