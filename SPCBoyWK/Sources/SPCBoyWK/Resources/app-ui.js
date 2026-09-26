@@ -343,10 +343,24 @@ function schedulePlaylistRowMeasurement() {
   playlistRowMeasurementFrame = window.requestAnimationFrame(() => {
     playlistRowMeasurementFrame = 0;
     const row = refs.playlistBody.querySelector(".playlist-row");
-    const measuredHeight = Math.round(row?.getBoundingClientRect?.().height || 0);
-    if (!measuredHeight || measuredHeight === playlistVirtualRowHeight) return;
+    const measuredHeight = row?.getBoundingClientRect?.().height || 0;
+    const previousHeight = playlistVirtualRowHeight;
+    if (!measuredHeight || Math.abs(measuredHeight - previousHeight) < 0.01) return;
+
+    const scrollTop = Math.max(0, Number(refs.playlistBodyWrap?.scrollTop) || 0);
+    const viewportHeight = Math.max(0, Number(refs.playlistBodyWrap?.clientHeight) || 0);
+    const oldMaxScrollTop = Math.max(0, (refs.playlistBodyWrap?.scrollHeight || 0) - viewportHeight);
+    const wasAtBottom = oldMaxScrollTop - scrollTop <= Math.max(previousHeight, 1);
+    const adjustedScrollTop = wasAtBottom
+      ? Math.max(0, state.playlist.length * measuredHeight - viewportHeight)
+      : scrollTop * (measuredHeight / previousHeight);
+
     playlistVirtualRowHeight = measuredHeight;
-    renderPlaylist({ sort: false });
+    renderPlaylist({ sort: false, persistTab: false, virtualScrollTop: adjustedScrollTop });
+    if (refs.playlistBodyWrap) refs.playlistBodyWrap.scrollTop = adjustedScrollTop;
+    const tab = findActivePlaylistTab();
+    if (tab) tab.scrollTop = Math.max(0, Number(refs.playlistBodyWrap?.scrollTop) || 0);
+    persistPlaylistTabs();
   });
 }
 
@@ -356,7 +370,7 @@ function makePlaylistVirtualSpacer(height) {
   row.setAttribute("aria-hidden", "true");
   const cell = document.createElement("td");
   cell.colSpan = Math.max(1, orderedColumns().length);
-  cell.style.height = `${Math.max(0, Math.round(height))}px`;
+  cell.style.height = `${Math.max(0, height)}px`;
   row.appendChild(cell);
   return row;
 }
@@ -2138,7 +2152,7 @@ function syncPlaylistColumnWidths() {
   }
 }
 
-function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = state.playlist.length, spacers = null) {
+function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = state.playlist.length, spacers = null, { synchronous = false } = {}) {
   let rowIndex = startIndex;
   const appendBatch = () => {
     if (generation !== playlistRenderGeneration) return;
@@ -2147,7 +2161,7 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
       fragment.appendChild(makePlaylistVirtualSpacer(spacers.top));
     }
     const startedAt = performance.now();
-    while (rowIndex < endIndex && performance.now() - startedAt < 8) {
+    while (rowIndex < endIndex && (synchronous || performance.now() - startedAt < 8)) {
       const track = state.playlist[rowIndex];
       const row = document.createElement("tr");
       row.dataset.trackId = track.id;
@@ -2164,6 +2178,7 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
       }
 
       row.addEventListener("click", (event) => {
+        if (!row.isConnected || row.dataset.trackId !== track.id) return;
         const selectedTrack = selectPlaylistTrack(track.id, {
           focus: true,
           extend: event.metaKey || event.ctrlKey,
@@ -2173,6 +2188,7 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
       });
 
       row.addEventListener("dblclick", () => {
+        if (!row.isConnected || row.dataset.trackId !== track.id) return;
         playVisibleTrack(track.id, 0).catch((error) => {
           console.error(error);
         });
@@ -2186,6 +2202,7 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
 
       row.addEventListener("keydown", (event) => {
         if (event.key !== "Enter") return;
+        if (!row.isConnected || row.dataset.trackId !== track.id) return;
         if (event.target !== row && event.target?.closest?.("button, input, select, a, [contenteditable=true]")) return;
         event.preventDefault();
         event.stopPropagation();
@@ -2208,10 +2225,11 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
       schedulePlaylistRowMeasurement();
     }
   };
-  window.requestAnimationFrame(appendBatch);
+  if (synchronous) appendBatch();
+  else window.requestAnimationFrame(appendBatch);
 }
 
-function renderPlaylist({ sort = true, persistTab = true } = {}) {
+function renderPlaylist({ sort = true, persistTab = true, virtualScrollTop = null } = {}) {
   if (persistTab && findActivePlaylistTab()) persistPlaylistTabs();
   updateAutomaticColumnVisibility();
   playlistRenderGeneration += 1;
@@ -2260,7 +2278,9 @@ function renderPlaylist({ sort = true, persistTab = true } = {}) {
     return;
   }
 
-  const scrollTop = refs.playlistBodyWrap?.scrollTop || 0;
+  const scrollTop = virtualScrollTop === null
+    ? (refs.playlistBodyWrap?.scrollTop || 0)
+    : Math.max(0, Number(virtualScrollTop) || 0);
   const viewportHeight = refs.playlistBodyWrap?.clientHeight || (playlistVirtualRowHeight * 24);
   const firstVisibleRow = Math.max(0, Math.floor(scrollTop / playlistVirtualRowHeight) - PLAYLIST_VIRTUAL_OVERSCAN);
   const lastVisibleRow = Math.min(
@@ -2274,7 +2294,8 @@ function renderPlaylist({ sort = true, persistTab = true } = {}) {
     {
       top: firstVisibleRow * playlistVirtualRowHeight,
       bottom: (state.playlist.length - lastVisibleRow) * playlistVirtualRowHeight
-    }
+    },
+    { synchronous: true }
   );
 }
 
