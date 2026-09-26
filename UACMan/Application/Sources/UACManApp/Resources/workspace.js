@@ -103,12 +103,18 @@
     const disabled = options.disabled ? " disabled" : "";
     return `<button class="${className}" type="button" data-action="${esc(action)}"${dataAttributes}${title}${ariaLabel}${disabled}>×</button>`;
   };
-  const canonicalTitleRowMarkup = (title, className = "", actionMarkup = "") => {
-    const heading = `<input class="tag-table-field canonical-table-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled>`;
+  const canonicalTitleRowMarkup = (title, className = "", actionMarkup = "", foldID = "") => {
+    const heading = foldID
+      ? `<button class="canonical-table-title-toggle" data-action="closeCanonicalSubtable" data-fold-id="${esc(foldID)}" type="button" title="Fold ${esc(title)}" aria-label="Fold ${esc(title)}">${esc(title)}</button>`
+      : `<input class="tag-table-field canonical-table-heading-input" value="${esc(title)}" aria-label="${esc(title)}" disabled>`;
     const content = actionMarkup
       ? `<div class="canonical-table-title-content">${heading}<span class="canonical-table-title-action">${actionMarkup}</span></div>`
       : heading;
-    const titleCell = canonicalCellMarkup(content, { className:"canonical-table-title-cell", role:"columnheader" });
+    const titleCell = canonicalCellMarkup(content, {
+      className:"canonical-table-title-cell",
+      role:"columnheader",
+      attributes:foldID ? `data-action="closeCanonicalSubtable" data-fold-id="${esc(foldID)}"` : ""
+    });
     return canonicalRowMarkup([titleCell], { kind:"title", className });
   };
   const canonicalHeaderMarkup = (labels, options = {}) => canonicalRowMarkup(
@@ -144,7 +150,7 @@
       const rows = options.rows || options.empty || "";
       const title = options.title === undefined || options.title === null || options.title === ""
         ? ""
-        : canonicalTitleRowMarkup(options.title, options.titleClassName || "", options.titleAction || "");
+        : canonicalTitleRowMarkup(options.title, options.titleClassName || "", options.titleAction || "", options.titleFoldID || "");
       const table = `<div class="${classes}" role="table"${ariaLabel}${attributes}${columnSchema}${style}>${title}${options.header || ""}${rows}</div>`;
       return `${table}${options.trailing || ""}`;
     }
@@ -514,6 +520,7 @@
       className:gridClass,
       columns:CanonicalTableColumns.multipleValues,
       title:context.title || context.key || "Values",
+      titleFoldID:subtableLayout ? context.foldID : "",
       titleAction:context.layout === "popup" ? multipleValuesCloseMarkup(context) : context.layout === "subtable" ? canonicalSubtableFoldMarkup(context.foldID, context.closeAttributes || "") : "",
       ariaLabel:context.title || context.key || "Tag values",
       header:multipleValuesTableChromeMarkup(context, true),
@@ -546,6 +553,7 @@
       className:gridClass,
       columns:CanonicalTableColumns.multipleValues,
       title:context.title || context.key || "Values",
+      titleFoldID:subtableLayout ? context.foldID : "",
       titleAction:context.layout === "popup" ? multipleValuesCloseMarkup(context) : context.layout === "subtable" ? canonicalSubtableFoldMarkup(context.foldID, context.closeAttributes || "") : "",
       ariaLabel:context.title || context.key || "Tag values",
       header:multipleValuesTableChromeMarkup(context, false),
@@ -1171,6 +1179,7 @@
       className:"multiple-values-table tag-analyzer-json-table",
       columns:CanonicalTableColumns.tagAnalyzerJSONValues,
       title:tableTitle,
+      titleFoldID:foldID,
       titleAction:tagAnalyzerJSONTitleActions(foldID),
       ariaLabel:`Nested values for ${title}`,
       header:canonicalHeaderMarkup(["#", isArray ? "Index" : "Key", "Value", "×"], {
@@ -1179,7 +1188,7 @@
       rows,
       attributes:`data-json-node data-json-node-kind="${isArray ? "array" : "object"}" data-json-node-fold-id="${esc(foldID)}" data-json-node-title="${esc(title)}" data-json-next-entry-id="${entries.length}"`
     });
-    return `<div class="tag-analyzer-json-node">${table}<small class="tag-analyzer-json-error" data-json-node-error></small></div>`;
+    return `<div class="tag-analyzer-json-node">${table.render()}<small class="tag-analyzer-json-error" data-json-node-error></small></div>`;
   }
 
   function tagAnalyzerFieldRowMarkup(tagName, match, index, parentFoldID) {
@@ -1231,6 +1240,7 @@
       className:"multiple-values-table tag-analyzer-fields-table",
       columns:CanonicalTableColumns.tagAnalyzerFields,
       title:tagName + " · " + matches.length + " tag field(s)",
+      titleFoldID:foldID,
       titleAction:canonicalSubtableFoldMarkup(foldID),
       ariaLabel:"Tag values in " + archiveRelativePath,
       header,
@@ -1280,6 +1290,7 @@
       className:"multiple-values-table tag-analyzer-packs-table",
       columns:CanonicalTableColumns.tagAnalyzerPacks,
       title,
+      titleFoldID:foldID,
       titleAction:canonicalSubtableFoldMarkup(foldID),
       ariaLabel:"Matched packs for " + tagName,
       header,
@@ -1822,12 +1833,13 @@
   function updateTagAnalyzerJSONTableHeading(table, title, value) {
     table.dataset.jsonNodeTitle = title;
     table.setAttribute("aria-label", "Nested values for " + title);
-    const heading = $(":scope > .canonical-table-title-row .canonical-table-title-cell input", table);
+    const heading = $(":scope > .canonical-table-title-row .canonical-table-title-toggle", table);
     const countSummary = tagAnalyzerJSONSummary(value).replace(/^(Array|Object) · /, "");
     const headingText = title + " · " + countSummary;
     if (heading) {
-      heading.value = headingText;
-      heading.setAttribute("aria-label", headingText);
+      heading.textContent = headingText;
+      heading.title = "Fold " + headingText;
+      heading.setAttribute("aria-label", "Fold " + headingText);
     }
   }
 

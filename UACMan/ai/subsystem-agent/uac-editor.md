@@ -61,8 +61,10 @@
   do not put a full-width `.tag-table-field` box in a narrow action column.
   Expanded child-table title bars use the shared, borderless accent-color fold
   chevron in the title cell. Keep it aligned at the title cell's right edge;
-  the parent row's fold control reopens the child table. Nested title cells use
-  the child-table gray surface. Popup dismissal remains a close `×` control.
+  the title cell and heading fold the child table, while JSON add actions remain
+  independent. The parent row's fold control reopens the child table. Nested
+  title cells use a lighter child-table surface. Popup dismissal remains a
+  close `×` control.
   A header's `×` is a plain canonical heading cell, not a second delete button.
 - Canonical title rows share the compact 27 px baseline used by table headers
   and content rows. Let tall controls such as JSON textareas grow their own
