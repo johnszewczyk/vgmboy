@@ -1510,6 +1510,11 @@ body.options-window .options-header { display: none; }
   text-align: right;
 }
 
+.options-color-text-input {
+  width: 24ch;
+  max-width: 24ch;
+}
+
 .options-number-input {
   width: 8rem;
   min-width: 0;
