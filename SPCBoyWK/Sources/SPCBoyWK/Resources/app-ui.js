@@ -24,7 +24,6 @@ const PLAYLIST_VIRTUALIZATION_THRESHOLD = 200;
 const PLAYLIST_VIRTUAL_OVERSCAN = 12;
 let playlistVirtualRowHeight = 28;
 let playlistViewportFrame = 0;
-let playlistRowMeasurementFrame = 0;
 let catalogPlaylistSortGeneration = 0;
 let projectionPlaylistSortGeneration = 0;
 let playlistTabsSaveTimer = 0;
@@ -338,30 +337,36 @@ function schedulePlaylistViewportRender() {
   });
 }
 
-function schedulePlaylistRowMeasurement() {
-  if (!playlistUsesVirtualRows() || playlistRowMeasurementFrame) return;
-  playlistRowMeasurementFrame = window.requestAnimationFrame(() => {
-    playlistRowMeasurementFrame = 0;
-    const row = refs.playlistBody.querySelector(".playlist-row");
-    const measuredHeight = row?.getBoundingClientRect?.().height || 0;
-    const previousHeight = playlistVirtualRowHeight;
-    if (!measuredHeight || Math.abs(measuredHeight - previousHeight) < 0.01) return;
+// Measure directly after synchronous row insertion so calibration cannot move
+// a scrolled viewport in a later frame, during the next pointer interaction.
+function measurePlaylistRowHeight() {
+  if (!playlistUsesVirtualRows()) return;
+  const row = refs.playlistBody.querySelector(".playlist-row");
+  const measuredHeight = row?.getBoundingClientRect?.().height || 0;
+  const previousHeight = playlistVirtualRowHeight;
+  if (!measuredHeight || Math.abs(measuredHeight - previousHeight) < 0.01) return;
 
-    const scrollTop = Math.max(0, Number(refs.playlistBodyWrap?.scrollTop) || 0);
-    const viewportHeight = Math.max(0, Number(refs.playlistBodyWrap?.clientHeight) || 0);
-    const oldMaxScrollTop = Math.max(0, (refs.playlistBodyWrap?.scrollHeight || 0) - viewportHeight);
-    const wasAtBottom = oldMaxScrollTop - scrollTop <= Math.max(previousHeight, 1);
-    const adjustedScrollTop = wasAtBottom
-      ? Math.max(0, state.playlist.length * measuredHeight - viewportHeight)
-      : scrollTop * (measuredHeight / previousHeight);
+  const scrollTop = Math.max(0, Number(refs.playlistBodyWrap?.scrollTop) || 0);
+  const viewportHeight = Math.max(0, Number(refs.playlistBodyWrap?.clientHeight) || 0);
+  const oldMaxScrollTop = Math.max(0, (refs.playlistBodyWrap?.scrollHeight || 0) - viewportHeight);
+  const wasAtBottom = oldMaxScrollTop - scrollTop <= Math.max(previousHeight, 1);
+  const anchorIndex = Math.floor(scrollTop / previousHeight);
+  const offsetWithinAnchorRow = scrollTop - (anchorIndex * previousHeight);
+  const adjustedScrollTop = wasAtBottom
+    ? Math.max(0, state.playlist.length * measuredHeight - viewportHeight)
+    : (anchorIndex * measuredHeight) + Math.min(offsetWithinAnchorRow, measuredHeight);
 
-    playlistVirtualRowHeight = measuredHeight;
-    renderPlaylist({ sort: false, persistTab: false, virtualScrollTop: adjustedScrollTop });
-    if (refs.playlistBodyWrap) refs.playlistBodyWrap.scrollTop = adjustedScrollTop;
-    const tab = findActivePlaylistTab();
-    if (tab) tab.scrollTop = Math.max(0, Number(refs.playlistBodyWrap?.scrollTop) || 0);
-    persistPlaylistTabs();
+  playlistVirtualRowHeight = measuredHeight;
+  renderPlaylist({
+    sort: false,
+    persistTab: false,
+    virtualScrollTop: adjustedScrollTop,
+    preserveVirtualRows: true
   });
+  if (refs.playlistBodyWrap) refs.playlistBodyWrap.scrollTop = adjustedScrollTop;
+  const tab = findActivePlaylistTab();
+  if (tab) tab.scrollTop = Math.max(0, Number(refs.playlistBodyWrap?.scrollTop) || 0);
+  persistPlaylistTabs();
 }
 
 function makePlaylistVirtualSpacer(height, side) {
@@ -432,7 +437,6 @@ function reconcilePlaylistVirtualRows(startIndex, endIndex) {
   }
   if (bottomSpacer && bottomSpacer !== body.lastElementChild) body.appendChild(bottomSpacer);
   scheduleSelectionIndicators();
-  schedulePlaylistRowMeasurement();
 }
 
 refs.playlistBodyWrap?.addEventListener("scroll", schedulePlaylistViewportRender, { passive: true });
@@ -2289,7 +2293,7 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
     } else {
       if (spacers?.bottom > 0) refs.playlistBody.appendChild(makePlaylistVirtualSpacer(spacers.bottom, "bottom"));
       scheduleSelectionIndicators();
-      schedulePlaylistRowMeasurement();
+      measurePlaylistRowHeight();
     }
   };
   if (synchronous) appendBatch();
