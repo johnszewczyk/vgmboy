@@ -79,10 +79,9 @@
     });
   }
 
-  function pitch() {
-    const rootSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 15;
-    return Math.max(2, Math.min(3, Math.round(rootSize / 7.5)));
-  }
+  // One CSS pixel pair is one LCD cell on all three screens. The glyph
+  // geometry never grows with the surrounding interface font setting.
+  const LCD_CELL_PITCH = 2;
 
   function draw(entry) {
     const { element, canvas, isBlock } = entry;
@@ -95,8 +94,8 @@
       return;
     }
 
-    const baseSize = pitch();
-    const cellSize = element.id === "deck-title" ? Math.min(3.5, baseSize + 0.5) : baseSize;
+    const baseSize = LCD_CELL_PITCH;
+    const cellSize = baseSize;
     if (screen?.style.getPropertyValue("--lcd-cell-pitch") !== `${baseSize}px`) {
       screen?.style.setProperty("--lcd-cell-pitch", `${baseSize}px`);
     }
@@ -120,16 +119,16 @@
       ? [...cells.slice(0, maxChars - 3), ".", ".", "."]
       : cells.slice(0, maxChars);
     context.fillStyle = ink;
-    context.shadowColor = "rgba(22, 39, 28, 0.36)";
-    context.shadowBlur = 0.7;
-    context.shadowOffsetX = 0.35;
-    context.shadowOffsetY = 0.65;
+    context.shadowColor = "rgba(22, 39, 28, 0.2)";
+    context.shadowBlur = 0.45;
+    context.shadowOffsetX = 0.2;
+    context.shadowOffsetY = 0.4;
     for (let index = 0; index < shown.length; index += 1) {
       const rows = GLYPHS[shown[index]];
       for (let row = 0; row < 7; row += 1) {
         for (let column = 0; column < 5; column += 1) {
           if (rows[row] & (1 << (4 - column))) {
-            const dotSize = cellSize === 2 ? 2 : cellSize - 0.5;
+            const dotSize = cellSize - 0.25;
             context.fillRect((index * 6 + column) * cellSize,
               y + row * cellSize, dotSize, dotSize);
           }

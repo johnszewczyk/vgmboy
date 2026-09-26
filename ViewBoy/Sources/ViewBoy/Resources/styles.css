@@ -708,7 +708,7 @@ body.is-file-drag-over::after {
   -webkit-user-select: none;
 }
 
-/* Selection movement is drawn by the shared underline. */
+/* Selection movement is drawn by the presentation's shared row indicator. */
 .playlist-row:focus,
 .playlist-row:focus-visible {
   outline: none;
@@ -1266,16 +1266,16 @@ body.is-file-drag-over::after {
 /* Active and latched controls use the accent as their state surface. Keeping
    the rule centralized prevents individual controls from reverting to an
    accent-colored label on a dark background. */
-button:not(.tree-node):not(.database-game-row):not(.database-console-row):is(:active, [aria-pressed="true"]) {
+button:not(.tree-node):not(.database-game-row):not(.database-console-row):not(.deck-power-switch):not(.deck-mode-key):is(:active, [aria-pressed="true"]) {
   background: var(--accent);
   color: var(--accent-ink);
 }
 
-button:not(.tree-node):not(.database-game-row):not(.database-console-row):is(:active, [aria-pressed="true"]) .ui-icon {
+button:not(.tree-node):not(.database-game-row):not(.database-console-row):not(.deck-power-switch):not(.deck-mode-key):is(:active, [aria-pressed="true"]) .ui-icon {
   color: inherit;
 }
 
-/* The shared underline marks selection; row text and row backgrounds stay calm. */
+/* The shared indicator marks selection; row text and backgrounds stay calm. */
 button:is(.tree-node, .database-game-row, .database-console-row).is-selected {
   background: transparent;
   color: var(--sidebar-text-color);

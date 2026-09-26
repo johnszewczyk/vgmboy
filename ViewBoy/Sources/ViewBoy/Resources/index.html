@@ -49,19 +49,23 @@
             </div>
           </div>
           <div class="deck-control-bank">
-            <div class="deck-power" aria-hidden="true"><span class="deck-power-led"></span><span class="deck-power-label">POWER</span></div>
+            <div class="deck-power">
+              <button id="stop-button" class="deck-power-switch" type="button" title="Power on" aria-label="Power on" aria-pressed="false"><span class="deck-power-slot"><span class="deck-power-thumb"></span></span><span class="deck-power-label">POWER</span></button>
+              <span class="deck-power-led" aria-hidden="true"></span><span class="deck-power-state" aria-hidden="true">ON</span>
+            </div>
             <div class="transport-toolbar toolbar" aria-label="Playback controls">
               <div class="transport toolbar-fixed">
                 <button id="previous-button" class="tool-button glyph-button ui-control" title="Previous" aria-label="Previous"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-back"></use></svg></button>
                 <button id="play-button" class="tool-button glyph-button ui-control is-primary" title="Play / Pause" aria-label="Play / Pause"><svg class="ui-icon" aria-hidden="true"><use href="#icon-play"></use></svg></button>
                 <button id="next-button" class="tool-button glyph-button ui-control" title="Next" aria-label="Next"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-forward"></use></svg></button>
-                <button id="stop-button" class="tool-button glyph-button ui-control" type="button" title="Stop" aria-label="Stop"><svg class="ui-icon" aria-hidden="true"><use href="#icon-stop"></use></svg></button>
-                <button id="equalizer-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Enable Equalizer" aria-label="Enable Equalizer" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg></button>
-                <button id="long-play-button" class="tool-button glyph-button ui-control" type="button" title="Toggle Long Play" aria-label="Toggle Long Play"><svg class="ui-icon" aria-hidden="true"><use href="#icon-infinity"></use></svg></button>
-                <button id="repeat-button" class="tool-button glyph-button ui-control" type="button" title="Repeat off" aria-label="Repeat off"><svg class="ui-icon" aria-hidden="true"><use href="#icon-repeat-2"></use></svg></button>
-                <button id="mono-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Enable Mono" aria-label="Enable Mono" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-mono"></use></svg></button>
-                <button id="mute-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Mute" aria-label="Mute" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use id="mute-toolbar-icon" href="#icon-volume"></use></svg></button>
               </div>
+            </div>
+            <div class="deck-mode-strip" role="group" aria-label="Playback modes">
+              <button id="equalizer-toolbar-button" class="deck-mode-key" type="button" title="Enable Equalizer" aria-label="Enable Equalizer" aria-pressed="false"><span>EQ</span></button>
+              <button id="long-play-button" class="deck-mode-key" type="button" title="Toggle Long Play" aria-label="Toggle Long Play" aria-pressed="false"><span>LONG</span></button>
+              <button id="repeat-button" class="deck-mode-key" type="button" title="Repeat off" aria-label="Repeat off" aria-pressed="false"><span>RPT</span></button>
+              <button id="mono-toolbar-button" class="deck-mode-key" type="button" title="Enable Mono" aria-label="Enable Mono" aria-pressed="false"><span>MONO</span></button>
+              <button id="mute-toolbar-button" class="deck-mode-key" type="button" title="Mute" aria-label="Mute" aria-pressed="false"><span>MUTE</span><svg class="ui-icon" aria-hidden="true"><use id="mute-toolbar-icon" href="#icon-volume"></use></svg></button>
             </div>
           </div>
         </div>

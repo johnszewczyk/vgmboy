@@ -45,7 +45,7 @@ const appDelegateSource = fs.readFileSync(
   "utf8"
 );
 
-test("ViewBoy uses one settable 200 ms timing for width and selection transitions", () => {
+test("ViewBoy keeps settable column timing and a shared 2 px LCD cell", () => {
   assert.match(appCoreSource, /DEFAULT_ANIMATION_DURATION_MILLISECONDS\s*=\s*200/);
   assert.match(indexSource, /id="animation-duration-input"[^>]*value="200"/);
   assert.doesNotMatch(indexSource, /auto-resize-animation-input|selection-animation-input/);
@@ -55,9 +55,8 @@ test("ViewBoy uses one settable 200 ms timing for width and selection transition
   assert.match(uiSource, /void refs\.playlistHeaderTable\.offsetWidth/);
   assert.match(uiSource, /if \(initialColumnWidths\) window\.requestAnimationFrame\(\(\) => syncPlaylistColumnWidths\(\)\)/);
   assert.match(indexSource, /viewboy-gameboy\.css/);
-  assert.match(gameboySource, /repeating-linear-gradient\(0deg, rgb\(54 65 33 \/ 7%\) 0 3px, transparent 3px 4px\)/);
-  assert.match(gameboySource, /repeating-linear-gradient\(90deg, rgb\(54 65 33 \/ 7%\) 0 3px, transparent 3px 4px\)/);
-  assert.match(gameboySource, /background-size: 4px 4px, 4px 4px, 100% 100%/);
+  assert.match(gameboySource, /html \.deck-screen,\s*html \.tree-root,\s*html \.playlist-body-wrap[\s\S]*?background-size: 2px 2px, 2px 2px, 100% 100%/);
+  assert.match(fs.readFileSync(path.resolve(__dirname, "../Sources/ViewBoy/Resources/lcd-pixels.js"), "utf8"), /LCD_CELL_PITCH = 2/);
   assert.match(gameboySource, /--vb-type-base: 0\.9rem/);
   assert.match(stylesSource, /font-size: calc\(var\(--playlist-font-size-pt\) \* 0\.9pt\)/);
   assert.match(gameboySource, /grid-template-columns: repeat\(7, minmax\(0, 1fr\)\)/);
@@ -568,10 +567,11 @@ test("ViewBoy ignores delayed native status events", () => {
   assert.equal(state.nativePlayback.statusSequence, 20);
 });
 
-test("ViewBoy uses a one-pixel font-color locator for sidebar and playlist", () => {
-  assert.match(stylesSource, /\.list-selection-indicator[\s\S]*?height: 1px/);
-  assert.match(stylesSource, /\.list-selection-indicator[\s\S]*?background: var\(--selection-indicator-color, var\(--accent\)\)/);
-  assert.match(gameboySource, /html \.list-selection-indicator[\s\S]*?height: 1px[\s\S]*?background: var\(--selection-indicator-color, #333\)[\s\S]*?box-shadow: none/);
+test("ViewBoy slides one shaded row bar across the two content screens", () => {
+  assert.match(uiSource, /isRowBar \? visibleTop : visibleBottom - 1/);
+  assert.match(uiSource, /--lcd-row-slide-duration.*250ms/);
+  assert.match(gameboySource, /html #sidebar-selection-indicator,\s*html #playlist-selection-indicator[\s\S]*?transition: transform var\(--lcd-row-slide-duration, 250ms\) ease/);
+  assert.match(gameboySource, /selection-indicators-following-scroll #sidebar-selection-indicator[\s\S]*?transition-duration: 0ms/);
   assert.match(stylesSource, /button:is\(\.tree-node, \.database-game-row, \.database-console-row\)\.is-selected[\s\S]*?background: transparent/);
   assert.match(stylesSource, /\.tree-node[\s\S]*?transition: color var\(--selection-animation-duration\)/);
   assert.match(stylesSource, /\.playlist-table td[\s\S]*?transition: width[\s\S]*?color var\(--selection-animation-duration\)/);

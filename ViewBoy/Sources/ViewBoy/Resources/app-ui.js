@@ -268,8 +268,10 @@ function positionSelectionIndicator(container, indicator, target) {
     return;
   }
   const left = visibleLeft;
-  const top = visibleBottom - 1;
+  const isRowBar = indicator.id === "sidebar-selection-indicator" || indicator.id === "playlist-selection-indicator";
+  const top = isRowBar ? visibleTop : visibleBottom - 1;
   indicator.style.width = `${visibleRight - visibleLeft}px`;
+  indicator.style.height = `${isRowBar ? visibleBottom - visibleTop : 1}px`;
   indicator.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
   indicator.style.opacity = "1";
 }
@@ -2115,6 +2117,7 @@ function applyUISettings() {
   rootStyle.setProperty("--item-spacing-rem", String(state.uiItemSpacingRem));
   rootStyle.setProperty("--column-resize-duration", `${state.autoResizeAnimationEnabled ? state.autoResizeAnimationMilliseconds : 0}ms`);
   rootStyle.setProperty("--selection-animation-duration", `${state.selectionAnimationEnabled ? state.selectionAnimationMilliseconds : 0}ms`);
+  rootStyle.setProperty("--lcd-row-slide-duration", state.selectionAnimationEnabled ? "250ms" : "0ms");
   if (refs.uiFontSizeReadout) refs.uiFontSizeReadout.textContent = `${state.uiFontSizePt} PT`;
 }
 
