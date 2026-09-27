@@ -71,11 +71,13 @@ is restored on launch when no command-line document was supplied.
 ## Appearance options
 
 Choose **Options…** from the app menu or press **⌘,** to open the native
-appearance window. Light and dark palettes follow the macOS appearance and
-each named color can be entered as 3/6 digit hex, an RGB triplet, or a CSS
-named color. The same window adjusts interface and table font sizes and the
-corner radii of table frames and cells. These preferences are stored in
-UACMan's local app preferences; they are not written to UAC manifests.
+appearance window. The **System**, **Light**, and **Dark** controls immediately
+set the workspace appearance; System follows macOS. Light and dark palettes
+can be edited separately, and each color accepts 3/6 digit hex, an RGB triplet,
+or a CSS named color. The table title-bar background has its own color setting.
+The same window adjusts interface and table font sizes and the corner radii of
+table frames and cells. These preferences are stored in UACMan's local app
+preferences; they are not written to UAC manifests.
 
 **Tag Analyzer** (Beta) is a separate workspace page that works with or without
 an open package. **Browse** selects and saves a folder path. The magnifier

@@ -10,7 +10,6 @@ struct UACManOptionsView: View {
     }
 
     @Bindable var model: UACManModel
-    @State private var darkPalette = false
     @State private var draftColors: [String: String]
     @State private var invalidColorKeys: Set<String> = []
 
@@ -18,6 +17,7 @@ struct UACManOptionsView: View {
         ColorToken(key: "bg", label: "Window background"),
         ColorToken(key: "panel", label: "Panel"),
         ColorToken(key: "panel-2", label: "Raised panel"),
+        ColorToken(key: "table-title-bg", label: "Table title bar background"),
         ColorToken(key: "line", label: "Borders"),
         ColorToken(key: "text", label: "Main text"),
         ColorToken(key: "muted", label: "Muted text"),
@@ -32,7 +32,8 @@ struct UACManOptionsView: View {
 
     init(model: UACManModel) {
         self.model = model
-        _draftColors = State(initialValue: model.skinPreferences.lightColors)
+        let initialDarkPalette = model.skinPreferences.appearanceMode == .dark
+        _draftColors = State(initialValue: initialDarkPalette ? model.skinPreferences.darkColors : model.skinPreferences.lightColors)
     }
 
     var body: some View {
@@ -67,13 +68,15 @@ struct UACManOptionsView: View {
         }
         .frame(minWidth: 640, minHeight: 620)
         .onAppear {
-            darkPalette = colorScheme == .dark
+            draftColors = currentDraftPalette
         }
         .onChange(of: colorScheme) { _, scheme in
-            darkPalette = scheme == .dark
+            if model.skinPreferences.appearanceMode == .system {
+                draftColors = scheme == .dark ? model.skinPreferences.darkColors : model.skinPreferences.lightColors
+            }
         }
-        .onChange(of: darkPalette) { _, useDark in
-            draftColors = useDark ? model.skinPreferences.darkColors : model.skinPreferences.lightColors
+        .onChange(of: model.skinPreferences.appearanceMode) { _, _ in
+            draftColors = currentDraftPalette
             invalidColorKeys.removeAll()
         }
     }
@@ -84,16 +87,17 @@ struct UACManOptionsView: View {
                 Text("Colors")
                     .font(.headline)
                 Spacer()
-                Picker("Palette", selection: $darkPalette) {
-                    Text("Light").tag(false)
-                    Text("Dark").tag(true)
+                Picker("Appearance", selection: appearanceModeBinding) {
+                    Text("System").tag(UACManAppearanceMode.system)
+                    Text("Light").tag(UACManAppearanceMode.light)
+                    Text("Dark").tag(UACManAppearanceMode.dark)
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 190)
+                .frame(width: 250)
                 .labelsHidden()
             }
 
-            Text("The active palette follows the macOS appearance. Use 3 or 6 digit hex, RGB channels such as 255 128 0, or any CSS named color.")
+            Text("System follows macOS. Light and Dark switch the workspace skin immediately. Set the table title bar background independently; use 3 or 6 digit hex, RGB channels such as 255 128 0, or any CSS named color.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -190,9 +194,26 @@ struct UACManOptionsView: View {
                 draftColors[token] = newValue
                 invalidColorKeys.remove(token)
                 guard let normalized = UACManSkinPreferences.normalizedColorInput(newValue) else { return }
-                _ = model.setSkinColor(normalized, token: token, darkPalette: darkPalette)
+                _ = model.setSkinColor(normalized, token: token, darkPalette: editsDarkPalette)
             }
         )
+    }
+
+    private var appearanceModeBinding: Binding<UACManAppearanceMode> {
+        Binding(
+            get: { model.skinPreferences.appearanceMode },
+            set: { mode in
+                model.updateSkinPreferences { $0.appearanceMode = mode }
+            }
+        )
+    }
+
+    private var editsDarkPalette: Bool {
+        model.skinPreferences.usesDarkPalette(systemIsDark: colorScheme == .dark)
+    }
+
+    private var currentDraftPalette: [String: String] {
+        editsDarkPalette ? model.skinPreferences.darkColors : model.skinPreferences.lightColors
     }
 
     private func fontSizeBinding(
@@ -216,20 +237,19 @@ struct UACManOptionsView: View {
             }
             return
         }
-        _ = model.setSkinColor(normalized, token: token, darkPalette: darkPalette)
+        _ = model.setSkinColor(normalized, token: token, darkPalette: editsDarkPalette)
         draftColors[token] = normalized
     }
 
     private func resetColor(_ token: String) {
-        model.resetSkinColor(token: token, darkPalette: darkPalette)
-        let palette = darkPalette ? model.skinPreferences.darkColors : model.skinPreferences.lightColors
-        draftColors[token] = palette[token]
+        model.resetSkinColor(token: token, darkPalette: editsDarkPalette)
+        draftColors[token] = currentDraftPalette[token]
         invalidColorKeys.remove(token)
     }
 
     private func restoreDefaults() {
         model.resetSkinPreferences()
-        draftColors = darkPalette ? model.skinPreferences.darkColors : model.skinPreferences.lightColors
+        draftColors = currentDraftPalette
         invalidColorKeys.removeAll()
     }
 }

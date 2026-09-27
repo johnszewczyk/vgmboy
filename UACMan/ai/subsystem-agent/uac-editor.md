@@ -38,10 +38,12 @@
   access to the page.
 - The native **Options…** window stores appearance preferences in UserDefaults,
   separately from package state. Color values are normalized and limited to
-  the shared CSS color-token allowlist. Apply colors and table geometry through
-  the existing bundled `workspace.css` CSSOM rules to retain the page's
-  `style-src 'self'` policy; do not write appearance values into UAC manifests
-  or add inline page styles.
+  the shared CSS color-token allowlist. `workspace.js` applies colors and table
+  geometry as CSS custom properties on the document root, and `workspace.css`
+  consumes those properties. System/Light/Dark mode sets `data-uacman-theme` to
+  select the active palette. Table title-bar background is an independent
+  token and must not change its text or border styling. Keep appearance values
+  in local app preferences, never in UAC manifests.
 - MetaManCore owns native SPC tag reading. UACMan never writes ID666/xID6 into
   native SPC bytes.
 

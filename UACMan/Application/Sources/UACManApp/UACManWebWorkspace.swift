@@ -214,6 +214,7 @@ struct UACManWebWorkspace: NSViewRepresentable {
 private extension UACManSkinPreferences {
     var javascriptValue: [String: Any] {
         [
+            "appearanceMode": appearanceMode.rawValue,
             "lightColors": lightColors,
             "darkColors": darkColors,
             "interfaceFontSize": interfaceFontSize,

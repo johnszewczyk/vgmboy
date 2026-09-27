@@ -1,6 +1,13 @@
 import Foundation
 
+public enum UACManAppearanceMode: String, Codable, CaseIterable, Sendable {
+    case system
+    case light
+    case dark
+}
+
 public struct UACManSkinPreferences: Codable, Equatable, Sendable {
+    public var appearanceMode: UACManAppearanceMode
     public var lightColors: [String: String]
     public var darkColors: [String: String]
     public var interfaceFontSize: Double
@@ -8,7 +15,18 @@ public struct UACManSkinPreferences: Codable, Equatable, Sendable {
     public var tableSurfaceRadius: Double
     public var tableCellRadius: Double
 
+    private enum CodingKeys: String, CodingKey {
+        case appearanceMode
+        case lightColors
+        case darkColors
+        case interfaceFontSize
+        case tableFontSize
+        case tableSurfaceRadius
+        case tableCellRadius
+    }
+
     public init(
+        appearanceMode: UACManAppearanceMode = .system,
         lightColors: [String: String] = Self.defaultLightColors,
         darkColors: [String: String] = Self.defaultDarkColors,
         interfaceFontSize: Double = 13,
@@ -16,6 +34,7 @@ public struct UACManSkinPreferences: Codable, Equatable, Sendable {
         tableSurfaceRadius: Double = 4,
         tableCellRadius: Double = 0
     ) {
+        self.appearanceMode = appearanceMode
         self.lightColors = lightColors
         self.darkColors = darkColors
         self.interfaceFontSize = interfaceFontSize
@@ -24,15 +43,41 @@ public struct UACManSkinPreferences: Codable, Equatable, Sendable {
         self.tableCellRadius = tableCellRadius
     }
 
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        appearanceMode = try values.decodeIfPresent(UACManAppearanceMode.self, forKey: .appearanceMode) ?? .system
+        lightColors = Self.colors(
+            try values.decodeIfPresent([String: String].self, forKey: .lightColors),
+            fillingFrom: Self.defaultLightColors
+        )
+        darkColors = Self.colors(
+            try values.decodeIfPresent([String: String].self, forKey: .darkColors),
+            fillingFrom: Self.defaultDarkColors
+        )
+        interfaceFontSize = try values.decodeIfPresent(Double.self, forKey: .interfaceFontSize) ?? 13
+        tableFontSize = try values.decodeIfPresent(Double.self, forKey: .tableFontSize) ?? 10
+        tableSurfaceRadius = try values.decodeIfPresent(Double.self, forKey: .tableSurfaceRadius) ?? 4
+        tableCellRadius = try values.decodeIfPresent(Double.self, forKey: .tableCellRadius) ?? 0
+    }
+
+    private static func colors(_ saved: [String: String]?, fillingFrom defaults: [String: String]) -> [String: String] {
+        var result = defaults
+        for (key, value) in saved ?? [:] where colorKeys.contains(key) {
+            result[key] = value
+        }
+        return result
+    }
+
     public static let colorKeys = [
-        "bg", "panel", "panel-2", "line", "text", "muted", "soft",
+        "bg", "panel", "panel-2", "line", "text", "muted", "soft", "table-title-bg",
         "accent", "accent-soft", "hover", "selected", "green", "red"
     ]
 
     public static let defaultLightColors: [String: String] = [
         "bg": "#f1f3f6", "panel": "#ffffff", "panel-2": "#f7f8fa",
         "line": "#e1e5eb", "text": "#202630", "muted": "#78818e",
-        "soft": "#a1a8b1", "accent": "#345fdb", "accent-soft": "#edf2ff",
+        "soft": "#a1a8b1", "table-title-bg": "#f7f8fa",
+        "accent": "#345fdb", "accent-soft": "#edf2ff",
         "hover": "#f1f5fc", "selected": "#e8efff", "green": "#228664",
         "red": "#bd4848"
     ]
@@ -40,10 +85,19 @@ public struct UACManSkinPreferences: Codable, Equatable, Sendable {
     public static let defaultDarkColors: [String: String] = [
         "bg": "#181b20", "panel": "#22262c", "panel-2": "#292e35",
         "line": "#373d46", "text": "#e6e9ee", "muted": "#a0a8b4",
-        "soft": "#747d89", "accent": "#89a9ff", "accent-soft": "#303d5c",
+        "soft": "#747d89", "table-title-bg": "#292e35",
+        "accent": "#89a9ff", "accent-soft": "#303d5c",
         "hover": "#2d333d", "selected": "#303c56", "green": "#64c4a1",
         "red": "#ff8c8c"
     ]
+
+    public func usesDarkPalette(systemIsDark: Bool) -> Bool {
+        switch appearanceMode {
+        case .system: systemIsDark
+        case .light: false
+        case .dark: true
+        }
+    }
 
     /// Accepts CSS named colors, 3/6 digit hex with an optional #, and RGB
     /// triplets written as three decimal channels separated by spaces or commas.

@@ -631,7 +631,7 @@
   let tagAnalyzerMatchesRootPath = "";
   const uiMotionDuration = 250;
   let skinPreferences = null;
-  const colorProperties = ["bg", "panel", "panel-2", "line", "text", "muted", "soft", "accent", "accent-soft", "hover", "selected", "green", "red"];
+  const colorProperties = ["bg", "panel", "panel-2", "line", "text", "muted", "soft", "table-title-bg", "accent", "accent-soft", "hover", "selected", "green", "red"];
 
   function normalizeSkinColor(raw) {
     const value = String(raw ?? "").trim();
@@ -652,51 +652,26 @@
     return window.CSS?.supports?.("color", value) ? value : null;
   }
 
-  function workspaceThemeRules() {
-    let lightRule = null;
-    let darkRule = null;
-    const inspect = (rules, insideDarkMedia = false) => {
-      for (const rule of rules) {
-        const isThemeRoot = rule.selectorText?.split(",").some(selector => selector.trim() === ":root");
-        if (isThemeRoot && rule.style?.getPropertyValue("--bg")) {
-          if (insideDarkMedia) darkRule ||= rule;
-          else lightRule ||= rule;
-        }
-        if (rule.cssRules) {
-          const isDarkMedia = /prefers-color-scheme\s*:\s*dark/i.test(rule.conditionText || "");
-          inspect(rule.cssRules, insideDarkMedia || isDarkMedia);
-        }
-      }
-    };
-    for (const sheet of document.styleSheets) {
-      try { inspect(sheet.cssRules); } catch { /* Skip stylesheets the page cannot inspect. */ }
-    }
-    return lightRule && darkRule ? { lightRule, darkRule } : null;
-  }
-
-  function applySkinPalette(rule, colors) {
-    if (!rule || !colors || typeof colors !== "object") return;
+  function applySkinPalette(style, colors) {
+    if (!style || !colors || typeof colors !== "object") return;
     for (const key of colorProperties) {
       const value = normalizeSkinColor(colors[key]);
-      if (value) rule.style.setProperty(`--${key}`, value);
+      if (value) style.setProperty(`--${key}`, value);
     }
   }
 
   function applyCurrentSkinPalette() {
     if (!skinPreferences) return;
-    const rules = workspaceThemeRules();
-    if (!rules) return;
-    const useDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
-    applySkinPalette(useDark ? rules.darkRule : rules.lightRule, useDark ? skinPreferences.darkColors : skinPreferences.lightColors);
+    const systemIsDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+    const useDark = skinPreferences.appearanceMode === "dark"
+      || (skinPreferences.appearanceMode !== "light" && systemIsDark);
+    document.documentElement.dataset.uacmanTheme = useDark ? "dark" : "light";
+    applySkinPalette(document.documentElement.style, useDark ? skinPreferences.darkColors : skinPreferences.lightColors);
   }
 
   function applySkin(preferences) {
     if (!preferences || typeof preferences !== "object") return;
     skinPreferences = preferences;
-    const rules = workspaceThemeRules();
-    if (!rules) return;
-    applySkinPalette(rules.lightRule, preferences.lightColors);
-    applySkinPalette(rules.darkRule, preferences.darkColors);
     const values = [
       ["--ui-font-size", preferences.interfaceFontSize, 11, 18],
       ["--table-font-size", preferences.tableFontSize, 8, 16],
@@ -705,7 +680,7 @@
     ];
     for (const [property, raw, minimum, maximum] of values) {
       const number = Number(raw);
-      if (Number.isFinite(number)) rules.lightRule.style.setProperty(property, `${Math.min(maximum, Math.max(minimum, number))}px`);
+      if (Number.isFinite(number)) document.documentElement.style.setProperty(property, `${Math.min(maximum, Math.max(minimum, number))}px`);
     }
     applyCurrentSkinPalette();
   }
