@@ -851,22 +851,31 @@ body.is-file-drag-over::after {
 .favorite-toggle .ui-icon { fill: none; }
 .favorite-toggle.is-favorite .ui-icon { fill: currentColor; }
 
-/* Keep the shared capsule below row text so its border cannot blend into glyphs. */
+/* Solid stays behind row content; the hollow outline clears playing-row decorations. */
 .list-selection-indicator {
   position: absolute;
-  z-index: 1;
+  z-index: 0;
   top: 0;
   left: 0;
   width: 0;
   height: 0;
   border-radius: 999px;
   border: 1px solid var(--accent);
-  background: var(--selection-bar-background);
+  background: transparent;
   pointer-events: none;
   opacity: 0;
   transform: translate3d(0, 0, 0);
   will-change: transform;
   transition: transform var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1);
+}
+
+.list-selection-indicator.is-solid {
+  z-index: 0;
+  background: var(--accent);
+}
+
+.list-selection-indicator:not(.is-solid) {
+  z-index: 2;
 }
 
 /* A sidebar preview has no playlist selection. Do not leave the old capsule

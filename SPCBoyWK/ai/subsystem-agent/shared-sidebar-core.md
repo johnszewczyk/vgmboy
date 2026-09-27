@@ -31,9 +31,10 @@ and persistence. This project owns only the typed native adapter and WebKit rend
   persistence.
 - Database game selection updates the playlist directly; it must not invoke a full sidebar redraw or deferred metadata pass when catalog rows already contain metadata.
 - The playlist and database sidebar selection indicators share one presentation
-  mode. `solidSelectionBar` updates both indicators; outline and solid capsules
-  stay below row text so they never blend with glyphs. Selected row backgrounds
-  stay transparent to reveal the capsule.
+  mode. `solidSelectionBar` must update both indicator elements together;
+  outline mode keeps a transparent fill and layers above playing-row
+  decorations; solid mode stays behind row content and fills with the accent.
+  Selected row backgrounds stay transparent to reveal the capsule.
 - Large catalog playlists are rendered through a fixed-height visible window;
   the database result remains fully selectable without creating one WebKit DOM
   row per catalog track.
