@@ -2231,15 +2231,14 @@ function createPlaylistRow(track, rowIndex) {
 
   row.addEventListener("mousedown", (event) => {
     if (event.button !== 0) return;
-    // Let selection focus the row with preventScroll below. WebKit's native
-    // mouse-down focus can scroll a bottom row before that guarded focus runs.
+    // Pointer selection stays focus-neutral because WebKit can scroll a row
+    // during focus; keyboard navigation focuses explicitly with preventScroll.
     event.preventDefault();
   });
 
   row.addEventListener("click", (event) => {
     if (!row.isConnected || row.dataset.trackId !== track.id) return;
     selectPlaylistTrack(track.id, {
-      focus: true,
       extend: event.metaKey || event.ctrlKey,
       range: event.shiftKey
     });
