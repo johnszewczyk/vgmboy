@@ -68,6 +68,15 @@ When a single UAC is opened directly, the library rail collapses automatically;
 it returns when a collection is opened. The last existing UAC or collection path
 is restored on launch when no command-line document was supplied.
 
+## Appearance options
+
+Choose **Options…** from the app menu or press **⌘,** to open the native
+appearance window. Light and dark palettes follow the macOS appearance and
+each named color can be entered as 3/6 digit hex, an RGB triplet, or a CSS
+named color. The same window adjusts interface and table font sizes and the
+corner radii of table frames and cells. These preferences are stored in
+UACMan's local app preferences; they are not written to UAC manifests.
+
 **Tag Analyzer** (Beta) is a separate workspace page that works with or without
 an open package. **Browse** selects and saves a folder path. The magnifier
 button starts scanning its regular `.uac` packages recursively. The selected
@@ -160,6 +169,8 @@ not own the application or wrapper. UACMan does not provide playback.
 ## Files
 
 - `Application/Sources/UACManApp/ContentView.swift`
+- `Application/Sources/UACManApp/UACManApp.swift`
+- `Application/Sources/UACManApp/UACManOptionsView.swift`
 - `Application/Sources/UACManApp/UACManWebWorkspace.swift`
 - `Application/Sources/UACManApp/Resources/index.html`
 - `Application/Sources/UACManApp/Resources/workspace.css`
@@ -167,6 +178,7 @@ not own the application or wrapper. UACMan does not provide playback.
 - `Application/Sources/UACManApp/UACManModel.swift`
 - `Application/Sources/UACManApp/ZstandardCLIManifestCodec.swift`
 - `Application/Sources/UACManCore/UACCollectionScanner.swift`
+- `Application/Sources/UACManCore/UACManSkinPreferences.swift`
 - `Application/Sources/UACManCore/UACManifestEditor.swift`
 - `Application/Sources/UACManCore/SPCMetadataHarvester.swift`
 - `Application/Sources/UACManCore/SPCMetadataProjection.swift`

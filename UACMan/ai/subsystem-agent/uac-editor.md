@@ -36,6 +36,12 @@
   snapshot, but all mutations go through the named `uacman` script-message
   actions. Do not expose arbitrary file reads, shell commands, or network
   access to the page.
+- The native **Options…** window stores appearance preferences in UserDefaults,
+  separately from package state. Color values are normalized and limited to
+  the shared CSS color-token allowlist. Apply colors and table geometry through
+  the existing bundled `workspace.css` CSSOM rules to retain the page's
+  `style-src 'self'` policy; do not write appearance values into UAC manifests
+  or add inline page styles.
 - MetaManCore owns native SPC tag reading. UACMan never writes ID666/xID6 into
   native SPC bytes.
 
@@ -193,7 +199,11 @@ contents of a cell but may not change its table's columns.
 - `Application/Sources/UACManCore/UACTagAnalyzer.swift`
 - `Application/Tests/UACManCoreTests/UACManifestEditorTests.swift`
 - `Application/Sources/UACManApp/UACManModel.swift`
+- `Application/Sources/UACManApp/UACManApp.swift`
+- `Application/Sources/UACManApp/UACManOptionsView.swift`
 - `Application/Sources/UACManApp/UACManWebWorkspace.swift`
+- `Application/Sources/UACManCore/UACManSkinPreferences.swift`
+- `Application/Tests/UACManCoreTests/UACManSkinPreferencesTests.swift`
 - `Application/Sources/UACManApp/Resources/workspace.js`
 - `Application/Sources/UACManApp/Resources/workspace.css`
 - `Application/Sources/UACManApp/ZstandardCLIManifestCodec.swift`

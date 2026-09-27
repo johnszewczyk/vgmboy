@@ -6,9 +6,10 @@ import UACManCore
 struct UACManWebWorkspace: NSViewRepresentable {
     let model: UACManModel
     let snapshot: [String: Any]
+    let skinPreferences: UACManSkinPreferences
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(model: model)
+        Coordinator(model: model, skinPreferences: skinPreferences)
     }
 
     func makeNSView(context: Context) -> WKWebView {
@@ -30,8 +31,12 @@ struct UACManWebWorkspace: NSViewRepresentable {
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
+        let stateChanged = !NSDictionary(dictionary: context.coordinator.snapshot).isEqual(to: snapshot)
+        let skinChanged = context.coordinator.skinPreferences != skinPreferences
         context.coordinator.snapshot = snapshot
-        context.coordinator.renderIfReady()
+        context.coordinator.skinPreferences = skinPreferences
+        if skinChanged { context.coordinator.applySkinIfReady() }
+        if stateChanged { context.coordinator.renderIfReady() }
     }
 
     @MainActor
@@ -39,10 +44,12 @@ struct UACManWebWorkspace: NSViewRepresentable {
         let model: UACManModel
         weak var webView: WKWebView?
         var snapshot: [String: Any] = [:]
+        var skinPreferences: UACManSkinPreferences
         private var pageReady = false
 
-        init(model: UACManModel) {
+        init(model: UACManModel, skinPreferences: UACManSkinPreferences) {
             self.model = model
+            self.skinPreferences = skinPreferences
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -75,8 +82,18 @@ struct UACManWebWorkspace: NSViewRepresentable {
         func renderIfReady() {
             guard pageReady, let webView else { return }
             webView.callAsyncJavaScript(
-                "window.UACMan && window.UACMan.render(state)",
-                arguments: ["state": snapshot],
+                "if (window.UACMan) { window.UACMan.applySkin(skin); window.UACMan.render(state); }",
+                arguments: ["state": snapshot, "skin": skinPreferences.javascriptValue],
+                in: nil,
+                in: .page
+            ) { _ in }
+        }
+
+        func applySkinIfReady() {
+            guard pageReady, let webView else { return }
+            webView.callAsyncJavaScript(
+                "window.UACMan && window.UACMan.applySkin(skin)",
+                arguments: ["skin": skinPreferences.javascriptValue],
                 in: nil,
                 in: .page
             ) { _ in }
@@ -191,5 +208,18 @@ struct UACManWebWorkspace: NSViewRepresentable {
             default: break
             }
         }
+    }
+}
+
+private extension UACManSkinPreferences {
+    var javascriptValue: [String: Any] {
+        [
+            "lightColors": lightColors,
+            "darkColors": darkColors,
+            "interfaceFontSize": interfaceFontSize,
+            "tableFontSize": tableFontSize,
+            "tableSurfaceRadius": tableSurfaceRadius,
+            "tableCellRadius": tableCellRadius
+        ]
     }
 }

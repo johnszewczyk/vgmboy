@@ -171,6 +171,7 @@ final class UACManModel {
         static let lastDocumentPath = "UACMan.lastDocumentPath"
         static let lastCollectionPath = "UACMan.lastCollectionPath"
         static let lastTagAnalyzerPath = "UACMan.lastTagAnalyzerPath"
+        static let skinPreferences = "UACMan.skinPreferences"
     }
 
     var documentURL: URL?
@@ -221,6 +222,9 @@ final class UACManModel {
     var harvestProgressMessage = ""
     var statusMessage = "Open a .uac package to inspect its metadata."
     var errorMessage: String?
+    var skinPreferences = UACManModel.restoreSkinPreferences() {
+        didSet { Self.persistSkinPreferences(skinPreferences) }
+    }
 
     @ObservationIgnored private let codec = ZstandardCLIManifestCodec()
     @ObservationIgnored private var loadedContainer: UACContainer?
@@ -236,6 +240,53 @@ final class UACManModel {
     @ObservationIgnored private var tagAnalyzerDeletionTask: Task<Void, Never>?
     @ObservationIgnored private var tagAnalyzerDeletionID: UUID?
     @ObservationIgnored private var lastTagAnalysisProgressUpdate = 0.0
+
+    func setSkinColor(_ input: String, token: String, darkPalette: Bool) -> Bool {
+        guard UACManSkinPreferences.colorKeys.contains(token),
+              let normalized = UACManSkinPreferences.normalizedColorInput(input) else { return false }
+        var updated = skinPreferences
+        if darkPalette {
+            updated.darkColors[token] = normalized
+        } else {
+            updated.lightColors[token] = normalized
+        }
+        skinPreferences = updated
+        return true
+    }
+
+    func resetSkinColor(token: String, darkPalette: Bool) {
+        guard UACManSkinPreferences.colorKeys.contains(token) else { return }
+        var updated = skinPreferences
+        if darkPalette {
+            updated.darkColors[token] = UACManSkinPreferences.defaultDarkColors[token]
+        } else {
+            updated.lightColors[token] = UACManSkinPreferences.defaultLightColors[token]
+        }
+        skinPreferences = updated
+    }
+
+    func updateSkinPreferences(_ update: (inout UACManSkinPreferences) -> Void) {
+        var updated = skinPreferences
+        update(&updated)
+        skinPreferences = updated
+    }
+
+    func resetSkinPreferences() {
+        skinPreferences = UACManSkinPreferences()
+    }
+
+    private static func restoreSkinPreferences() -> UACManSkinPreferences {
+        guard let data = UserDefaults.standard.data(forKey: PreferenceKey.skinPreferences),
+              let preferences = try? JSONDecoder().decode(UACManSkinPreferences.self, from: data) else {
+            return UACManSkinPreferences()
+        }
+        return preferences
+    }
+
+    private static func persistSkinPreferences(_ preferences: UACManSkinPreferences) {
+        guard let data = try? JSONEncoder().encode(preferences) else { return }
+        UserDefaults.standard.set(data, forKey: PreferenceKey.skinPreferences)
+    }
 
     var selectedMember: UACMember? {
         guard let selectedMemberPath else { return nil }

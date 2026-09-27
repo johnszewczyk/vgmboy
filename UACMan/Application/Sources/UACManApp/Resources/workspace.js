@@ -630,6 +630,87 @@
   let tagAnalyzerMatchesByName = new Map();
   let tagAnalyzerMatchesRootPath = "";
   const uiMotionDuration = 250;
+  let skinPreferences = null;
+  const colorProperties = ["bg", "panel", "panel-2", "line", "text", "muted", "soft", "accent", "accent-soft", "hover", "selected", "green", "red"];
+
+  function normalizeSkinColor(raw) {
+    const value = String(raw ?? "").trim();
+    if (!value) return null;
+    const hex = value.startsWith("#") ? value.slice(1) : value;
+    if (/^(?:[\da-f]{3}|[\da-f]{6})$/i.test(hex)) {
+      const expanded = hex.length === 3 ? [...hex].map(character => character + character).join("") : hex;
+      return `#${expanded.toUpperCase()}`;
+    }
+    const rgbText = value.match(/^rgb\(\s*(.*?)\s*\)$/i)?.[1] ?? value;
+    const channels = rgbText.split(/[\s,]+/).filter(Boolean);
+    if (channels.length === 3 && channels.every(channel => /^\d+$/.test(channel))) {
+      const values = channels.map(Number);
+      if (values.every(channel => channel >= 0 && channel <= 255)) {
+        return `#${values.map(channel => channel.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+      }
+    }
+    return window.CSS?.supports?.("color", value) ? value : null;
+  }
+
+  function workspaceThemeRules() {
+    let lightRule = null;
+    let darkRule = null;
+    const inspect = (rules, insideDarkMedia = false) => {
+      for (const rule of rules) {
+        const isThemeRoot = rule.selectorText?.split(",").some(selector => selector.trim() === ":root");
+        if (isThemeRoot && rule.style?.getPropertyValue("--bg")) {
+          if (insideDarkMedia) darkRule ||= rule;
+          else lightRule ||= rule;
+        }
+        if (rule.cssRules) {
+          const isDarkMedia = /prefers-color-scheme\s*:\s*dark/i.test(rule.conditionText || "");
+          inspect(rule.cssRules, insideDarkMedia || isDarkMedia);
+        }
+      }
+    };
+    for (const sheet of document.styleSheets) {
+      try { inspect(sheet.cssRules); } catch { /* Skip stylesheets the page cannot inspect. */ }
+    }
+    return lightRule && darkRule ? { lightRule, darkRule } : null;
+  }
+
+  function applySkinPalette(rule, colors) {
+    if (!rule || !colors || typeof colors !== "object") return;
+    for (const key of colorProperties) {
+      const value = normalizeSkinColor(colors[key]);
+      if (value) rule.style.setProperty(`--${key}`, value);
+    }
+  }
+
+  function applyCurrentSkinPalette() {
+    if (!skinPreferences) return;
+    const rules = workspaceThemeRules();
+    if (!rules) return;
+    const useDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+    applySkinPalette(useDark ? rules.darkRule : rules.lightRule, useDark ? skinPreferences.darkColors : skinPreferences.lightColors);
+  }
+
+  function applySkin(preferences) {
+    if (!preferences || typeof preferences !== "object") return;
+    skinPreferences = preferences;
+    const rules = workspaceThemeRules();
+    if (!rules) return;
+    applySkinPalette(rules.lightRule, preferences.lightColors);
+    applySkinPalette(rules.darkRule, preferences.darkColors);
+    const values = [
+      ["--ui-font-size", preferences.interfaceFontSize, 11, 18],
+      ["--table-font-size", preferences.tableFontSize, 8, 16],
+      ["--table-surface-radius", preferences.tableSurfaceRadius, 0, 16],
+      ["--table-cell-radius", preferences.tableCellRadius, 0, 10]
+    ];
+    for (const [property, raw, minimum, maximum] of values) {
+      const number = Number(raw);
+      if (Number.isFinite(number)) rules.lightRule.style.setProperty(property, `${Math.min(maximum, Math.max(minimum, number))}px`);
+    }
+    applyCurrentSkinPalette();
+  }
+
+  window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", applyCurrentSkinPalette);
 
   function animateRowRemoval(row, completion) {
     if (!row) return;
@@ -2378,5 +2459,5 @@
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { const field = $("#member-filter"); if (field) { event.preventDefault(); field.focus(); } }
   });
 
-  window.UACMan = { render };
+  window.UACMan = { render, applySkin };
 })();
