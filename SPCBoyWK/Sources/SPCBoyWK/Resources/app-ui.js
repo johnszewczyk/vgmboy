@@ -2453,6 +2453,7 @@ function applyUISettings() {
   rootStyle.setProperty("--sidebar-font-family", state.sidebarMonospace || state.applicationMonospace ? "var(--mono-font-family)" : "var(--ui-font-family)");
   rootStyle.setProperty("--playlist-font-size-pt", String(state.playlistFontSizePt));
   rootStyle.setProperty("--playlist-text-color", state.playlistTextColor);
+  rootStyle.setProperty("--playlist-header-text-color", state.playlistHeaderTextColor);
   rootStyle.setProperty("--playlist-font-family", state.playlistMonospace || state.applicationMonospace ? "var(--mono-font-family)" : "var(--ui-font-family)");
   rootStyle.setProperty("--playlist-header-font-weight", state.playlistHeaderBold ? "700" : "400");
   rootStyle.setProperty("--sidebar-width-percent", String(state.sidebarWidthPercent));
@@ -2474,6 +2475,7 @@ function appearanceSettings() {
     sidebarPathCounts: state.sidebarPathCounts,
     playlistFontSizePt: state.playlistFontSizePt,
     playlistTextColor: state.playlistTextColor,
+    playlistHeaderTextColor: state.playlistHeaderTextColor,
     playlistMonospace: state.playlistMonospace,
     applicationMonospace: state.applicationMonospace,
     playlistHeaderBold: state.playlistHeaderBold,
@@ -2562,6 +2564,9 @@ function renderAll() {
   renderRoutingConflicts();
   if (document.activeElement !== refs.sidebarFontSizeInput) refs.sidebarFontSizeInput.value = String(state.uiFontSizePt);
   if (document.activeElement !== refs.sidebarTextColorInput) refs.sidebarTextColorInput.value = state.sidebarTextColor;
+  if (refs.playlistHeaderTextColorInput && document.activeElement !== refs.playlistHeaderTextColorInput) {
+    refs.playlistHeaderTextColorInput.value = state.playlistHeaderTextColor;
+  }
   refs.sidebarPathCountsCheckbox.checked = state.sidebarPathCounts;
   if (document.activeElement !== refs.accentColorInput) refs.accentColorInput.value = state.accentColor;
   if (document.activeElement !== refs.uiChromeColorInput) refs.uiChromeColorInput.value = state.uiChromeColor;
@@ -2679,7 +2684,6 @@ function playSelectedTrack() {
 }
 
 function isPlaylistSelectionTarget(focusTarget = document.activeElement) {
-  if (refs.treeRoot?.contains(focusTarget)) return false;
   if (refs.playlistScrollWrap?.contains(focusTarget)
       || refs.playlistBodyWrap?.contains(focusTarget)
       || refs.playlistBody?.contains(focusTarget)) return true;
@@ -2768,19 +2772,18 @@ function setArchiveCacheLimit(value) {
   renderAll();
 }
 
-function audioSettingsPayload() {
-  return {
-    equalizerEnabled: state.equalizerEnabled,
-    equalizerBandGains: [...state.equalizerBandGains],
-    appVolume: state.appVolume,
-    monoEnabled: state.monoEnabled
-  };
+function sendEqualizerSettings() {
+  window.spcBoyWK?.nativePlaybackSetEqualizer?.({
+    enabled: state.equalizerEnabled,
+    bandGains: [...state.equalizerBandGains]
+  }).catch?.(() => {});
 }
 
-function broadcastAudioSettings() {
-  const settings = audioSettingsPayload();
-  uiApp.playback.setAudioSettings?.(settings);
-  uiApp.playback.configureAudioSettings?.(settings).catch?.(() => {});
+function persistEqualizerSettings() {
+  window.spcBoyWK?.frontendEqualizerSettingsSave?.({
+    equalizerEnabled: state.equalizerEnabled,
+    equalizerBandGains: [...state.equalizerBandGains]
+  }).catch?.((error) => console.error("[SPCBoy] native equalizer settings save failed", error));
 }
 
 function syncEqualizerControls() {
@@ -2797,37 +2800,37 @@ function syncEqualizerControls() {
 
 function setEqualizerEnabled(enabled) {
   state.equalizerEnabled = Boolean(enabled);
-  persistSettings();
-  broadcastAudioSettings();
+  persistEqualizerSettings();
+  sendEqualizerSettings();
   syncEqualizerControls();
 }
 
 function setEqualizerBandGain(index, gain) {
   if (!state.equalizerBandGains[index]) state.equalizerBandGains[index] = 0;
   state.equalizerBandGains[index] = uiApp.normalizeEqualizerGain(gain);
-  persistSettings();
-  broadcastAudioSettings();
+  persistEqualizerSettings();
+  sendEqualizerSettings();
   syncEqualizerControls();
 }
 
 function resetEqualizer() {
   state.equalizerBandGains = state.equalizerBandGains.map(() => 0);
-  persistSettings();
-  broadcastAudioSettings();
+  persistEqualizerSettings();
+  sendEqualizerSettings();
   syncEqualizerControls();
 }
 
 function setAppVolume(volume) {
   state.appVolume = uiApp.normalizeAppVolume(volume);
   persistSettings();
-  broadcastAudioSettings();
+  window.spcBoyWK?.nativePlaybackSetVolume?.({ outputVolume: state.appVolume }).catch?.(() => {});
   renderAll();
 }
 
 function setMonoEnabled(enabled) {
   state.monoEnabled = Boolean(enabled);
   persistSettings();
-  broadcastAudioSettings();
+  window.spcBoyWK?.nativePlaybackSetMono?.({ enabled: state.monoEnabled }).catch?.(() => {});
   renderAll();
 }
 
@@ -2963,6 +2966,13 @@ function setPlaylistTextColor(color) {
   renderAll();
 }
 
+function setPlaylistHeaderTextColor(color) {
+  state.playlistHeaderTextColor = uiApp.normalizeFontColor(color);
+  persistSettings();
+  broadcastAppearanceSettings();
+  renderAll();
+}
+
 function setPlaylistMonospace(enabled) {
   state.playlistMonospace = Boolean(enabled);
   persistSettings();
@@ -3027,6 +3037,9 @@ function applyAppearanceSettings(settings) {
     const color = uiApp.normalizeFontColor(interfaceFontColor);
     state.sidebarTextColor = color;
     state.playlistTextColor = color;
+  }
+  if (settings.playlistHeaderTextColor !== undefined) {
+    state.playlistHeaderTextColor = uiApp.normalizeFontColor(settings.playlistHeaderTextColor);
   }
   const interfaceMonospace = settings.applicationMonospace ?? settings.sidebarMonospace ?? settings.playlistMonospace;
   if (interfaceMonospace !== undefined) {
@@ -3269,6 +3282,7 @@ uiApp.ui = {
   setSidebarPathCounts,
   commitPlaylistFontSizeInput,
   setPlaylistTextColor,
+  setPlaylistHeaderTextColor,
   setPlaylistMonospace,
   setApplicationMonospace,
   setPlaylistHeaderBold,

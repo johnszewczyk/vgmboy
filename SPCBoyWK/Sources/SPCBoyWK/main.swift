@@ -28,6 +28,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             self?.broadcastAppearanceSettings(settings)
         }
         nativeBridge.onFrontendSettingsChanged = { [weak self] settings in self?.receiveFrontendSettings(settings) }
+        nativeBridge.onFrontendEqualizerSettingsChanged = { [weak self] settings in
+            self?.broadcastFrontendEqualizerSettings(settings)
+        }
         let remoteTransport = FocusedMediaTransportController { [weak self] command in
             self?.dispatchCustom(command)
         }
@@ -166,6 +169,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             self?.broadcastAppearanceSettings(settings)
         }
         bridge.onFrontendSettingsChanged = { [weak self] settings in self?.receiveFrontendSettings(settings) }
+        bridge.onFrontendEqualizerSettingsChanged = { [weak self] settings in
+            self?.broadcastFrontendEqualizerSettings(settings)
+        }
         let optionsWebView = makeWebView(bridge: bridge, includeCommandDispatcher: false)
         guard let page = Bundle.module.url(forResource: "index", withExtension: "html") else { return }
         optionsWebView.loadFileURL(page, allowingReadAccessTo: page.deletingLastPathComponent())
@@ -205,6 +211,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     private func broadcastFrontendSettings(_ settings: SPCBoyPreferencesSnapshot) {
+        guard let data = try? JSONEncoder().encode(settings),
+              let json = String(data: data, encoding: .utf8) else { return }
+        let script = "window.__spcBoyWKEvent('frontendSettingsChanged', \(json));"
+        webView?.evaluateJavaScript(script, completionHandler: nil)
+        optionsWebView?.evaluateJavaScript(script, completionHandler: nil)
+    }
+
+    private func broadcastFrontendEqualizerSettings(_ settings: SPCBoyEqualizerPreferencesPatch) {
         guard let data = try? JSONEncoder().encode(settings),
               let json = String(data: data, encoding: .utf8) else { return }
         let script = "window.__spcBoyWKEvent('frontendSettingsChanged', \(json));"

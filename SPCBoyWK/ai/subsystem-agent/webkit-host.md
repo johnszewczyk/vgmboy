@@ -159,8 +159,9 @@ currently loaded timing cap unchanged.
 
 `nativePlaybackAudioConfig` receives one object decoded as
 `PlaybackTransportAudioConfigurationRequest` rather than positional arguments. The shared transport
-normalizes and serializes the volume, EQ, and mono commands together. Both initial setup and option
-changes send the complete snapshot, so a persisted mono choice is applied before the first track.
+normalizes the complete volume, EQ, and mono snapshot during playback initialization, so persisted
+settings are applied before the first track. Live EQ, output-volume, and mono changes use separate
+commands so changing one control cannot write either of the other two output settings.
 Timing and tempo settings carry both the renderer playback generation and a
 settings-request revision across bridge awaits. A late timing plan, reconfigure
 reply, or `set_tempo` status may not update a replacement track or supersede a

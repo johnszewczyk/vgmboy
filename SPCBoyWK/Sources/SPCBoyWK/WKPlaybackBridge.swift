@@ -3,6 +3,19 @@ import PlaybackQueueCore
 import PlaybackTransportCore
 import VGMBoyKit
 
+private struct SPCBoyEqualizerSettingsRequest: Decodable {
+    let enabled: Bool
+    let bandGains: [Float]
+}
+
+private struct SPCBoyOutputVolumeRequest: Decodable {
+    let outputVolume: Float
+}
+
+private struct SPCBoyMonoSettingsRequest: Decodable {
+    let enabled: Bool
+}
+
 /// Thin WK adapter over the shared in-process VGMBoy control surface.
 /// Queue selection remains in the web frontend; completion claiming/decision,
 /// decoder transport, and audio configuration remain behind the shared native
@@ -82,6 +95,27 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 errorMessage: "Audio configuration requires complete output settings."
             )
             return statusResponse(try transport.configureAudio(request))
+        case "nativePlaybackSetEqualizer":
+            let request: SPCBoyEqualizerSettingsRequest = try bridgeRequest(
+                args,
+                errorMessage: "Equalizer updates require an enabled flag and band gains."
+            )
+            transport.setEqualizer(enabled: request.enabled, bandGains: request.bandGains)
+            return statusResponse()
+        case "nativePlaybackSetVolume":
+            let request: SPCBoyOutputVolumeRequest = try bridgeRequest(
+                args,
+                errorMessage: "Volume updates require an output volume."
+            )
+            transport.setAppVolume(request.outputVolume)
+            return statusResponse()
+        case "nativePlaybackSetMono":
+            let request: SPCBoyMonoSettingsRequest = try bridgeRequest(
+                args,
+                errorMessage: "Mono updates require an enabled flag."
+            )
+            transport.setMonoEnabled(request.enabled)
+            return statusResponse()
         case "nativePlaybackTiming":
             let request: PlaybackTimingPreviewRequest = try bridgeRequest(
                 args,

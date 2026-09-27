@@ -16,6 +16,11 @@ import VGMBoyEndpointCore
 import VGMBoyKit
 import WebKit
 
+struct SPCBoyEqualizerPreferencesPatch: Codable, Sendable {
+    let equalizerEnabled: Bool
+    let equalizerBandGains: [Double]
+}
+
 /// The only JavaScript-to-native boundary in SPCBoy WK.
 ///
 /// The web skin owns presentation and sends named requests. Swift owns the
@@ -80,6 +85,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     var onChooseAACExportDirectory: (() -> String?)?
     var onAppearanceSettingsChanged: (([String: Any]) -> Void)?
     var onFrontendSettingsChanged: ((SPCBoyPreferencesSnapshot) -> Void)?
+    var onFrontendEqualizerSettingsChanged: ((SPCBoyEqualizerPreferencesPatch) -> Void)?
     var onPlaybackEvent: (@MainActor (String, [String: Any]) -> Void)?
     var onNowPlayingInfoChanged: (@MainActor (RemoteTransportNowPlaying?) -> Void)?
 
@@ -213,6 +219,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             frontendOptionsManifest: () => request("frontendOptionsManifest"),
             frontendSettingsLoad: (...args) => request("frontendSettingsLoad", args),
             frontendSettingsSave: (...args) => request("frontendSettingsSave", args),
+            frontendEqualizerSettingsSave: (...args) => request("frontendEqualizerSettingsSave", args),
             endpointSurface: (...args) => request("endpointSurface", args),
             reloadDatabaseLibrary: (...args) => request("reloadDatabaseLibrary", args),
             configureArchiveCache: (...args) => request("configureArchiveCache", args),
@@ -230,6 +237,9 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             showInFinder: (...args) => request("showInFinder", args),
             nativePlaybackInit: (...args) => request("nativePlaybackInit", args),
             nativePlaybackAudioConfig: (...args) => request("nativePlaybackAudioConfig", args),
+            nativePlaybackSetEqualizer: (...args) => request("nativePlaybackSetEqualizer", args),
+            nativePlaybackSetVolume: (...args) => request("nativePlaybackSetVolume", args),
+            nativePlaybackSetMono: (...args) => request("nativePlaybackSetMono", args),
             nativePlaybackTiming: (...args) => request("nativePlaybackTiming", args),
             nativePlaybackReconfigure: (...args) => request("nativePlaybackReconfigure", args),
             nativePlaybackStart: (...args) => request("nativePlaybackStart", args),
@@ -316,6 +326,24 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 let savedSettings = try Self.frontendSettingsSave(settings)
                 Task { @MainActor in
                     handler?(savedSettings)
+                    await Self.reply(to: message.webView, id: id, success: true, valueJSON: "true")
+                }
+            } catch {
+                Task { await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": error.localizedDescription])) }
+            }
+            return
+        }
+
+        if method == "frontendEqualizerSettingsSave" {
+            guard let settings = args.first as? [String: Any] else {
+                Task { await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": BridgeError.invalidSettings.localizedDescription])) }
+                return
+            }
+            let handler = onFrontendEqualizerSettingsChanged
+            do {
+                let equalizerSettings = try Self.frontendEqualizerSettingsSave(settings)
+                Task { @MainActor in
+                    handler?(equalizerSettings)
                     await Self.reply(to: message.webView, id: id, success: true, valueJSON: "true")
                 }
             } catch {
@@ -552,6 +580,10 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             guard let settings = args.first as? [String: Any] else { throw BridgeError.invalidSettings }
             _ = try frontendSettingsSave(settings)
             return true
+        case "frontendEqualizerSettingsSave":
+            guard let settings = args.first as? [String: Any] else { throw BridgeError.invalidSettings }
+            _ = try frontendEqualizerSettingsSave(settings)
+            return true
         case "endpointSurface":
             return try JSONSerialization.jsonObject(with: JSONEncoder().encode(VGMBoyEndpointSurface.v1))
         case "configureArchiveCache":
@@ -574,7 +606,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return NSNull()
         case "setRoutingPreferences":
             return args.first ?? [:]
-        case "nativePlaybackInit", "nativePlaybackAudioConfig", "nativePlaybackTiming", "nativePlaybackReconfigure", "nativePlaybackSetTempo", "nativePlaybackStart",
+        case "nativePlaybackInit", "nativePlaybackAudioConfig", "nativePlaybackSetEqualizer", "nativePlaybackSetVolume", "nativePlaybackSetMono", "nativePlaybackTiming", "nativePlaybackReconfigure", "nativePlaybackSetTempo", "nativePlaybackStart",
              "nativePlaybackResume", "nativePlaybackPause", "nativePlaybackStop",
              "nativePlaybackClose", "nativePlaybackUnload", "nativePlaybackSeek",
              "nativePlaybackState", "nativePlaybackRampGain",
@@ -1062,6 +1094,25 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         FrontendPreferencesStore(defaults: .standard, keys: .spcBoyWK).save(snapshot.frontendInterfacePreferences)
         UserDefaults.standard.set(try JSONEncoder().encode(snapshot), forKey: frontendSettingsKey)
         return snapshot
+    }
+
+    nonisolated private static func frontendEqualizerSettingsSave(_ settings: [String: Any]) throws -> SPCBoyEqualizerPreferencesPatch {
+        guard JSONSerialization.isValidJSONObject(settings) else { throw BridgeError.invalidSettings }
+        let patch: SPCBoyEqualizerPreferencesPatch
+        do {
+            patch = try JSONDecoder().decode(
+                SPCBoyEqualizerPreferencesPatch.self,
+                from: JSONSerialization.data(withJSONObject: settings)
+            )
+        } catch {
+            throw BridgeError.invalidSettings
+        }
+        var snapshot = try frontendSettingsLoad()
+        snapshot.equalizerEnabled = patch.equalizerEnabled
+        snapshot.equalizerBandGains = patch.equalizerBandGains
+        snapshot.normalizeForPersistence()
+        UserDefaults.standard.set(try JSONEncoder().encode(snapshot), forKey: frontendSettingsKey)
+        return patch
     }
 
     nonisolated private static func int64(_ value: Any?) -> Int64? {

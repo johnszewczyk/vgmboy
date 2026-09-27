@@ -196,6 +196,13 @@ refs.sidebarTextColorInput.addEventListener("blur", (event) => {
   app.ui.setSidebarTextColor(event.target.value);
 });
 
+refs.playlistHeaderTextColorInput.addEventListener("change", (event) => {
+  app.ui.setPlaylistHeaderTextColor(event.target.value);
+});
+refs.playlistHeaderTextColorInput.addEventListener("blur", (event) => {
+  app.ui.setPlaylistHeaderTextColor(event.target.value);
+});
+
 refs.sidebarPathCountsCheckbox.addEventListener("change", (event) => {
   app.ui.setSidebarPathCounts(event.target.checked);
 });
@@ -285,6 +292,12 @@ if (window.spcBoyWK?.onFrontendSettingsChanged) {
     if (settings.longPlayEnabled !== undefined) state.longPlayEnabled = Boolean(settings.longPlayEnabled);
     if (settings.fadeEnabled !== undefined) state.fadeEnabled = Boolean(settings.fadeEnabled);
     if (settings.spcFadeSeconds !== undefined) state.spcFadeSeconds = app.normalizeFadeTime(settings.spcFadeSeconds);
+    if (settings.equalizerEnabled !== undefined) state.equalizerEnabled = Boolean(settings.equalizerEnabled);
+    if (Array.isArray(settings.equalizerBandGains)) {
+      state.equalizerBandGains = settings.equalizerBandGains.map(app.normalizeEqualizerGain);
+    }
+    if (settings.appVolume !== undefined) state.appVolume = app.normalizeAppVolume(settings.appVolume);
+    if (settings.monoEnabled !== undefined) state.monoEnabled = Boolean(settings.monoEnabled);
     const timingChanged = previousTiming.longPlayEnabled !== state.longPlayEnabled
       || (state.longPlayEnabled && previousTiming.manualPlayTimeSeconds !== state.manualPlayTimeSeconds)
       || previousTiming.unknownDurationSeconds !== state.unknownDurationSeconds
@@ -596,12 +609,12 @@ window.addEventListener("keydown", (event) => {
       || refs.playlistBodyWrap?.contains(event.target)
       || refs.playlistBody?.contains(event.target)
       || app.ui.isPlaylistSelectionTarget(event.target);
+    if (playlistTarget) {
+      app.ui.playSelectedTrack();
+      return;
+    }
     app.ui.activateFocusedItem(event.target).then((handled) => {
       if (handled) return;
-      if (playlistTarget) {
-        app.ui.playSelectedTrack();
-        return;
-      }
       if (state.sidebarView.contentMode === "database") {
         app.ui.activateDatabaseSelection();
         return;

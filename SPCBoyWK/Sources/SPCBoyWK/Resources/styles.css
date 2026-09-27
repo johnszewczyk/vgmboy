@@ -26,6 +26,7 @@
   --playlist-font-size-pt: 10;
   --playlist-text-color: #a9a9a9;
   --playlist-font-family: var(--ui-font-family);
+  --playlist-header-text-color: gray;
   --app-font-family: var(--ui-font-family);
   --playlist-header-font-weight: 400;
   --control-background: var(--bg-chrome);
@@ -217,7 +218,6 @@ body.is-file-drag-over::after {
 
 .sidebar-search-actions, .sidebar-view-actions, .sidebar-fold-actions { display: flex; flex: 0 0 auto; gap: var(--toolbar-gap); }
 .sidebar-mode-button { display: inline-flex; align-items: center; justify-content: center; width: var(--top-toolbar-control-height); height: var(--top-toolbar-control-height); padding: 0; border: 1px solid rgb(30 30 30); border-radius: 5px; background: var(--bg-chrome); color: var(--muted); cursor: pointer; line-height: 1; }
-.sidebar-mode-button:hover { background: var(--bg-subpanel); }
 .icon-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 .ui-icon { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .sidebar-mode-button .ui-icon { width: 1rem; height: 1rem; vertical-align: middle; }
@@ -248,17 +248,14 @@ body.is-file-drag-over::after {
   text-align: left;
   cursor: pointer;
 }
-.sidebar-context-menu button:hover,
 .sidebar-context-menu button:focus-visible { background: var(--accent); color: rgb(20 20 20); outline: 0; }
 
 .database-game-row { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%; padding: var(--list-item-padding-y) 0.5rem; border: 0; border-radius: 999px; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
-.database-game-row:hover { background: var(--bg-hover); }
 .database-game-row.is-selected { box-shadow: none; }
 .database-game-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .database-game-meta { flex: 0 0 auto; color: var(--muted); font-variant-numeric: tabular-nums; }
 .database-console-group { position: relative; z-index: 1; }
 .database-console-row { display: flex; align-items: center; gap: 0; width: 100%; padding: var(--list-item-padding-y) 0.5rem; border: 0; border-radius: 999px; background: transparent; color: var(--text); font: inherit; font-weight: 400; text-align: left; cursor: pointer; }
-.database-console-row:hover { background: var(--bg-hover); }
 .database-console-row.is-selected { box-shadow: none; }
 .database-console-games { display: flex; flex-direction: column; min-width: 0; overflow: hidden; padding-left: 1rem; }
 .database-disclosure { flex: 0 0 1rem; width: 1rem; color: var(--muted); text-align: center; }
@@ -275,7 +272,7 @@ body.is-file-drag-over::after {
   cursor: pointer;
 }
 
-.tool-button:hover {
+body.options-window .tool-button:hover {
   background: var(--bg-hover);
 }
 
@@ -330,9 +327,6 @@ body.is-file-drag-over::after {
   box-shadow: none;
 }
 
-.tree-node:hover {
-  background: var(--bg-hover);
-}
 
 .tree-node.tree-file { color: var(--sidebar-text-color); }
 
@@ -713,7 +707,7 @@ body.is-file-drag-over::after {
   height: var(--top-toolbar-height);
   padding: 0;
   line-height: 1.25;
-  color: var(--muted);
+  color: var(--playlist-header-text-color);
   text-align: center;
   background: transparent;
   border: 0;
@@ -740,7 +734,7 @@ body.is-file-drag-over::after {
   overflow: hidden;
   border-radius: 5px;
   background: var(--bg-chrome);
-  color: var(--muted);
+  color: var(--playlist-header-text-color);
   text-overflow: ellipsis;
 }
 
@@ -816,7 +810,7 @@ body.is-file-drag-over::after {
   background: var(--bg-panel);
 }
 
-.playlist-row.is-current:not(.is-selected) td {
+.playlist-row.is-current td {
   color: var(--accent);
 }
 
@@ -1142,7 +1136,6 @@ body.is-file-drag-over::after {
   cursor: pointer;
 }
 
-.options-nav-item:hover { background: var(--bg-hover); }
 .options-nav-item.is-selected {
   background: var(--accent);
   color: var(--accent-ink);
@@ -1524,8 +1517,8 @@ body.options-window .options-header { display: none; }
 }
 
 .options-color-text-input {
-  width: 24ch;
-  max-width: 24ch;
+  width: 18ch;
+  max-width: 18ch;
 }
 
 .options-number-input {

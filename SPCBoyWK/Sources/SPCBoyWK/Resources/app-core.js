@@ -82,6 +82,7 @@ const state = {
   sidebarPathCounts: true,
   playlistFontSizePt: 10,
   playlistTextColor: "#a9a9a9",
+  playlistHeaderTextColor: "gray",
   playlistMonospace: false,
   applicationMonospace: false,
   playlistHeaderBold: false,
@@ -217,6 +218,7 @@ const refs = {
   libraryCacheDefaultButton: document.getElementById("library-cache-default-button"),
   sidebarFontSizeInput: document.getElementById("sidebar-font-size-input"),
   sidebarTextColorInput: document.getElementById("sidebar-text-color-input"),
+  playlistHeaderTextColorInput: document.getElementById("playlist-header-text-color-input"),
   sidebarPathCountsCheckbox: document.getElementById("sidebar-path-counts-checkbox"),
   applicationMonospaceCheckbox: document.getElementById("application-monospace-checkbox"),
   aacExportDirectoryPath: document.getElementById("aac-export-directory-path"),
@@ -324,6 +326,7 @@ async function loadSettings() {
     state.sidebarPathCounts = parsed.sidebarPathCounts !== false;
     state.playlistFontSizePt = interfaceFontSize;
     state.playlistTextColor = interfaceFontColor;
+    state.playlistHeaderTextColor = normalizeFontColor(parsed.playlistHeaderTextColor ?? "gray");
     state.playlistMonospace = interfaceMonospace;
     state.applicationMonospace = interfaceMonospace;
     state.playlistHeaderBold = Boolean(parsed.playlistHeaderBold);
@@ -398,6 +401,7 @@ function persistSettings() {
     sidebarPathCounts: state.sidebarPathCounts,
     playlistFontSizePt: state.playlistFontSizePt,
     playlistTextColor: state.playlistTextColor,
+    playlistHeaderTextColor: state.playlistHeaderTextColor,
     playlistMonospace: state.playlistMonospace,
     applicationMonospace: state.applicationMonospace,
     playlistHeaderBold: state.playlistHeaderBold,

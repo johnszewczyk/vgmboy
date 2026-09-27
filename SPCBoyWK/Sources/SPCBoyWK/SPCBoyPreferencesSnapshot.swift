@@ -66,6 +66,7 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
     var sidebarPathCounts: Bool?
     var playlistFontSizePt: Double?
     var playlistTextColor: String?
+    var playlistHeaderTextColor: String?
     var playlistMonospace: Bool?
     var applicationMonospace: Bool?
     var playlistHeaderBold: Bool?
