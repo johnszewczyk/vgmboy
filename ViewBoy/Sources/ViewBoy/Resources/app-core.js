@@ -1,6 +1,6 @@
 const DEFAULT_PLAY_FADE_SECONDS = 6;
 const DEFAULT_LONG_PLAY_SECONDS = 180;
-const DEFAULT_ANIMATION_DURATION_MILLISECONDS = 200;
+const DEFAULT_ANIMATION_DURATION_MILLISECONDS = 250;
 const DEFAULT_ACCENT_COLOR = "#812d46";
 const SAMPLE_RATE = 44_100;
 const DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES = 2 * 1024 * 1024 * 1024;
@@ -342,9 +342,10 @@ async function loadSettings() {
     state.columnAutoSize = parsed.columnAutoSize !== false;
     state.sortColumn = normalizeSortColumn(parsed.sortColumn);
     state.sortDirection = normalizeSortDirection(parsed.sortDirection);
-    const animationDuration = normalizeAnimationMilliseconds(
+    const savedAnimationDuration = normalizeAnimationMilliseconds(
       parsed.selectionAnimationMilliseconds ?? parsed.autoResizeAnimationMilliseconds
     );
+    const animationDuration = savedAnimationDuration === 200 ? 250 : savedAnimationDuration;
     state.autoResizeAnimationMilliseconds = animationDuration;
     state.selectionAnimationMilliseconds = animationDuration;
     state.autoResizeAnimationEnabled = parsed.autoResizeAnimationEnabled !== false;

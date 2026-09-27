@@ -36,6 +36,10 @@ opens or manipulates an audio device.
   as SPCBoy's queued skip. The request changes only the core-owned final output gain; it does not
   create a second frontend audio graph or modify the user's volume/EQ setting.
 - Diagnostics contain output facts only and never choose a queue transition.
+- A 2048-frame post-EQ stereo PCM tap lives on the producer side. The ten-band
+  spectrum snapshot copies that tap under the producer lock and measures its
+  frequencies on the requesting thread. It is read-only and does not add work
+  or locks to the AudioUnit callback.
 - `vgmboy_audio_unit_render_offline` runs the exact ring, underrun, and envelope callback path
   without opening a device. It exists for deterministic transport regression tests and must stay
   behavior-identical to the AudioUnit callback.

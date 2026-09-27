@@ -130,6 +130,8 @@ final class PlaybackSession: @unchecked Sendable {
         output = AudioOutput()
     }
 
+    func spectrum() -> (left: [Float], right: [Float]) { output.spectrum() }
+
     public func setStatusHandler(_ handler: (@Sendable (PlaybackStatus) -> Void)?) {
         queue.async { self.statusHandler = handler }
     }

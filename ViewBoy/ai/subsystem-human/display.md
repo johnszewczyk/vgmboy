@@ -8,22 +8,31 @@ below. The compact layout leaves more room for the text-first library and
 playlist. Game Boy Core is the only presentation: a molded DMG-gray shell,
 charcoal screen bezel, pea-green LCD, blue-purple markings and keys, muted
 maroon Play key, and a red power lamp. Engraved labels and inset seams give the
-deck its console character. The LCD, content area, and playlist use a subtle
-4 px square-cell grid with one-pixel gaps, matching the tiny square cells
-visible in original DMG LCD macro photos.
-The sidebar stays smooth gray plastic without a tiled texture. Folder rows
-expand with one click anywhere on the row; nested folders and game rows indent
-without bullet markers. Small raised seams and inset edges give the panels
-hardware character without large textures or heavy effects. The bundled Doto
-face remains consistent across the app at a compact 0.9 rem base, with
-Interface Scale applied globally.
+deck its console character. The player, library, and playlist each sit in a
+recessed LCD screen. The library and playlist use a fine 2 px square-cell
+texture; their controls, tabs, and column headings remain inside the lit glass.
+The player renders its own 5×7 glyph cells over the same fine LCD texture.
+Folder rows expand with one click anywhere on the row; nested folders and game rows indent
+without bullet markers. The bundled Doto face remains consistent across the
+library and playlist at a compact 0.9 rem base, with Interface Scale applied
+globally.
 
-The bundled Doto face covers controls, lists, headings, and readouts. One
+The bundled Doto face covers controls, lists, headings, and fallback readouts. One
 Interface Scale setting resizes text throughout the player, library, playlist,
 and Settings. High-contrast dark text stays readable on the pale shell and LCD.
-Fixed highlights and inset readouts give the screen a hardware appearance;
-scrolling rows stay simple. Reduced-motion settings remove control and
-selection transitions.
+The player LCD draws supported Latin letters, digits, and common punctuation
+as discrete 5×7 square-cell glyphs. Each LCD cell is 2 px across in all three
+screens, independent of the surrounding interface font setting. A faint pixel
+shadow strengthens the glyphs,
+and the time readout sits directly on the glass without its former box. Long
+titles truncate within the screen. Titles with characters outside that
+alphabet remain in the bundled Doto face, preserving their original spelling.
+The library and playlist use the bundled dotted face with a restrained stroke
+and shadow, keeping long and multilingual catalog text in selectable DOM rows.
+The two lower screens have pale molded frames around their dark glass bezels;
+each LCD cell has a faint recessed edge and highlight. Four fixed green-gray
+tones distinguish unlit cells, soft cells, mid tones, and active ink.
+Reduced-motion settings remove control and selection transitions.
 
 The interface remains in WebKit and CSS. A transparent, click-through Metal
 overlay aligns fine plastic grain to the deck, matte shading to the screen
@@ -31,21 +40,27 @@ bezel, and scanlines and glass sheen to the LCD. It adds a glow around the
 power lamp during playback. A short pale phosphor sweep crosses the LCD when
 transport state or track generation changes. The sweep is disabled with
 Reduced Motion. The overlay does not change layout or controls and stays
-paused between state changes. Previous,
-Play/Pause, Next, Stop, Equalizer, Long Play, Repeat, Mono, and Mute use a 3x3
-button matrix.
+paused between state changes. Nine round keys handle Previous, Play/Pause,
+Next, Stop, Equalizer, Long Play, Repeat, Mono, and Mute. The red power LED
+sits on plastic outside the LCD. A ten-band stereo spectrum occupies the
+right side of the top display. It reads post-EQ PCM at 10 Hz and draws
+mirrored bars with falling peak caps. It rests when playback stops.
 
-File, playlist, and Settings selections use a persistent 1 px rectangular
-locator in the active font color that glides under the selected row or section.
-The locator stays mounted while virtualized rows are patched, then follows the
-visible selected row without fading. Large-playlist scrolling retains existing
+Library and playlist selections use one persistent shaded row bar that slides
+to the selected item with a 250 ms ease transition. It snaps to the clipped
+visible row while scrolling and stays mounted while virtualized rows are
+patched. Settings retains its compact locator. Large-playlist scrolling retains existing
 row nodes and creates or removes only rows entering or leaving the visible
 window. Rows keep a restrained LCD tint and readable text. Reduced Motion
-stops the locator transition.
+stops the bar transition. Sidebar folder and console-group expansion uses
+the same ease timing; the default shared duration is 250 ms. Options has a
+white bezel and two LCD screens for navigation and settings.
 
 ## Files
 
 - `Sources/ViewBoy/Resources/styles.css`
 - `Sources/ViewBoy/Resources/viewboy-gameboy.css`
+- `Sources/ViewBoy/Resources/lcd-pixels.js`
+- `Sources/ViewBoy/Resources/lcd-spectrum.js`
 - `Sources/ViewBoy/Resources/Fonts/`
 - `Sources/ViewBoy/ViewBoyPhosphorShader.swift`

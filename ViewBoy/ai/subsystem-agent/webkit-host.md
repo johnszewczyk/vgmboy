@@ -37,7 +37,9 @@ without losing position or paused state.
 
 The shared `FrontendPreferencesCore` contract owns the validated animation
 timing range and 200 ms default. ViewBoy exposes one shared configurable
-duration for auto-resize and selection movement, with independent effect toggles. DOM geometry and CSS remain WebKit-owned so
+duration for auto-resize and other selection transitions, with independent
+effect toggles. The LCD row bar uses a 250 ms ease slide when selection
+animation is enabled and snaps while scrolling. DOM geometry and CSS remain WebKit-owned so
 ViewBoy can replace the presentation skin without moving layout policy into
 native code; native Swift owns persistence and window levels.
 
@@ -45,6 +47,8 @@ The accent color is a persisted CSS color in the typed settings projection.
 `app-ui.js` applies it as the root `--accent` value. Sidebar, playlist, and
 Settings navigation use persistent body-level selection locators that move by
 transform; they stay outside scrolling and frequently replaced row containers.
+The library and playlist locators cover the clipped selected row with a single
+translucent shade; Settings keeps its 1 px locator.
 During virtual row replacement, the locator holds its last frame until the new
 selected row is attached, preventing a blank flash. Scrolling follows the
 selected row without animation. The bundled Doto face and
@@ -53,10 +57,19 @@ shared relative sizes for captions, controls, and display text.
 
 `index.html` loads one `viewboy-gameboy.css` presentation sheet after
 `styles.css`. Game Boy Core is the only skin: a gray molded shell, charcoal
-bezel, green LCD, blue-purple markings and keys, maroon Play key, and a subtle
-4 px square-cell LCD grid with one-pixel gaps across the display and playlist
-surfaces. The sidebar uses smooth gray without a tiled grid. Keep presentation
-colors out of the inherited transport bridge.
+bezel, three green LCD surfaces, blue-purple markings and keys, and maroon Play
+key. The library and playlist each have a 2 px square-cell surface, while the
+player draws 5×7 glyphs directly. Their controls and headings remain within the
+LCDs. The renderer uses a fixed 2 px cell for the player glyphs and all three
+LCD textures, while Doto remains the fallback for unsupported characters and
+the list font. Keep presentation colors out of the inherited transport bridge.
+
+`lcd-pixels.js` owns only the visible canvas glyph layer inside the LCD. It
+observes the existing readout nodes so playback code continues writing text
+normally. Original DOM text remains available to accessibility; unsupported
+Unicode leaves the canvas path and displays the original font. Cell pitch is
+fixed at 2 px, with no native playback bridge
+requests or continuous rendering loop.
 
 ## Selection and Search
 
@@ -272,6 +285,11 @@ application, and browser-selection ordering guard; those presentation concerns
 remain intentionally local.
 
 ## Failure Boundaries
+
+The ViewBoy bridge exposes `nativePlaybackSpectrum` as a read-only ten-band
+stereo snapshot. VGMBoy owns the post-EQ PCM tap and frequency measurements;
+the frontend owns only the 10 Hz LCD drawing and peak-cap motion. The audio
+render callback does no spectrum work.
 
 Missing packaged resources are fatal. The host must not silently fall back to
 raw filesystem scanning or a second catalog implementation.

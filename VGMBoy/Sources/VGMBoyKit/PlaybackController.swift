@@ -38,6 +38,7 @@ public final class PlaybackController: @unchecked Sendable {
     public var controlSurface: PlaybackControlSurface { PlaybackControlSurface() }
 
     public func diagnostics() -> PlaybackDiagnostics { session.status().diagnostics }
+    public func spectrum() -> (left: [Float], right: [Float]) { session.spectrum() }
 
     public func status() -> PlaybackStatus { session.status() }
 

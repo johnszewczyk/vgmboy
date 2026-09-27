@@ -41,5 +41,7 @@ size_t vgmboy_audio_unit_enqueue_pcm(VGMBoyAudioUnit* output, int16_t* interleav
 /* Runs the exact realtime PCM/ring/envelope path without opening a device. */
 size_t vgmboy_audio_unit_render_offline(VGMBoyAudioUnit* output, int16_t* interleaved_stereo, size_t frame_count);
 int vgmboy_audio_unit_snapshot(const VGMBoyAudioUnit* output, VGMBoyAudioUnitSnapshot* snapshot);
+/* Ten stereo frequency magnitudes from recent post-EQ PCM; values are 0...1. */
+int vgmboy_audio_unit_spectrum(VGMBoyAudioUnit* output, float* left, float* right, size_t band_count);
 
 #endif

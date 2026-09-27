@@ -204,6 +204,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             nativePlaybackSeek: (...args) => request("nativePlaybackSeek", args),
             nativePlaybackSetTempo: (...args) => request("nativePlaybackSetTempo", args),
             nativePlaybackState: (...args) => request("nativePlaybackState", args),
+            nativePlaybackSpectrum: (...args) => request("nativePlaybackSpectrum", args),
             nativePlaybackRampGain: (...args) => request("nativePlaybackRampGain", args),
             nativeExportAAC: (...args) => request("nativeExportAAC", args),
             nativeCancelAACExport: (...args) => request("nativeExportAACCancel", args),
@@ -657,7 +658,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         case "nativePlaybackInit", "nativePlaybackAudioConfig", "nativePlaybackTiming", "nativePlaybackReconfigure", "nativePlaybackSetTempo", "nativePlaybackStart",
              "nativePlaybackResume", "nativePlaybackPause", "nativePlaybackStop",
              "nativePlaybackClose", "nativePlaybackUnload", "nativePlaybackSeek",
-             "nativePlaybackState", "nativePlaybackRampGain",
+             "nativePlaybackState", "nativePlaybackSpectrum", "nativePlaybackRampGain",
              "nativeExportAAC", "nativeExportAACCancel":
             return try WKPlaybackBridge.shared.handle(method: method, args: args)
         default:
