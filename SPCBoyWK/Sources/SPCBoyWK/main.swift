@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private weak var optionsWebView: WKWebView?
     private weak var closePlaylistMenuItem: NSMenuItem?
     private var playlistTabShortcutMonitor: Any?
+    private var mediaKeyMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
@@ -62,6 +63,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 return event
             }
             self.dispatchCustom("selectPlaylistTab:\(digit)")
+            return nil
+        }
+        mediaKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.systemDefined]) { [weak self] event in
+            guard let self,
+                  NSApp.isActive,
+                  event.type == .systemDefined,
+                  event.subtype.rawValue == 8 else {
+                return event
+            }
+
+            let keyCode = (event.data1 & 0xFFFF0000) >> 16
+            let keyState = (event.data1 & 0x0000FF00) >> 8
+            let command: String
+            switch keyCode {
+            case 18: command = "previous"
+            case 16: command = "playPause"
+            case 17: command = "next"
+            default: return event
+            }
+
+            if keyState == 0xA {
+                self.dispatchCustom(command)
+            }
+            // Consume both press and release while SPCBoy is active so the
+            // system does not hand the same transport key to Music.
             return nil
         }
         applyWindowLevels()
@@ -362,6 +388,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if let playlistTabShortcutMonitor { NSEvent.removeMonitor(playlistTabShortcutMonitor) }
+        if let mediaKeyMonitor { NSEvent.removeMonitor(mediaKeyMonitor) }
+        playlistTabShortcutMonitor = nil
+        mediaKeyMonitor = nil
     }
 }
 
