@@ -39,6 +39,7 @@ let package = Package(
             resources: [.process("Resources")],
             linkerSettings: [
                 .linkedFramework("AppKit"),
+                .linkedFramework("MediaPlayer"),
                 .linkedFramework("WebKit")
             ]
         )

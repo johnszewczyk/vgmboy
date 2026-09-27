@@ -432,13 +432,25 @@ function bindMediaSessionHandlers() {
 }
 
 function syncMediaSessionState() {
+  const track = state.currentTrackId ? activeTrackInfo() : null;
+  const nativeInfo = track ? {
+    title: track.title || track.displayName || track.filename || "SPCBoy",
+    artist: track.artist && track.artist !== "—" ? track.artist : "",
+    albumTitle: track.game || "",
+    elapsedSeconds: state.elapsedSeconds,
+    durationSeconds: state.totalSeconds,
+    isPlaying: state.isPlaying
+  } : null;
+  window.spcBoyWK?.setNowPlayingInfo(nativeInfo).catch((error) => {
+    console.error("[SPCBoy] Now Playing update failed", error);
+  });
+
   if (!("mediaSession" in navigator)) {
     return;
   }
 
   bindMediaSessionHandlers();
 
-  const track = activeTrackInfo();
   navigator.mediaSession.playbackState = state.isPlaying ? "playing" : "paused";
 
   if (!track) {

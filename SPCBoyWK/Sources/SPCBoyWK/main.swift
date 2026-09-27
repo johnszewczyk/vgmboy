@@ -1,5 +1,6 @@
 import AppKit
 import FrontendCommandCore
+import MediaPlayer
 import WebKit
 
 @MainActor
@@ -11,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private weak var closePlaylistMenuItem: NSMenuItem?
     private var playlistTabShortcutMonitor: Any?
     private var mediaKeyMonitor: Any?
+    private var remoteTransportController: FocusedMediaTransportController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
@@ -26,6 +28,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             self?.broadcastAppearanceSettings(settings)
         }
         nativeBridge.onFrontendSettingsChanged = { [weak self] settings in self?.receiveFrontendSettings(settings) }
+        let remoteTransport = FocusedMediaTransportController { [weak self] command in
+            self?.dispatchCustom(command)
+        }
+        remoteTransport.configure()
+        remoteTransportController = remoteTransport
+        nativeBridge.onNowPlayingInfoChanged = { [weak remoteTransport] nowPlaying in
+            remoteTransport?.updateNowPlaying(nowPlaying)
+        }
         nativeBridge.onPlaybackEvent = { [weak self] name, payload in
             self?.broadcastPlaybackEvent(name: name, payload: payload)
         }
@@ -117,6 +127,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                     }
                     switch (command) {
                       case "previous": app.playback?.playAdjacent(-1); break;
+                      case "play": if (!app.state?.isPlaying) app.playback?.togglePlayback?.(); break;
+                      case "pause": if (app.state?.isPlaying) app.playback?.togglePlayback?.(); break;
                       case "playPause": app.playback?.togglePlayback?.(); break;
                       case "next": app.playback?.playAdjacent(1); break;
                       case "newPlaylistTab": app.ui?.createPlaylistTab?.({ duplicateActive: true }); break;

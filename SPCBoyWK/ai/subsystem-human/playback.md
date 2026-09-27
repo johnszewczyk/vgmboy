@@ -30,9 +30,11 @@ Pause/resume and seek operate on the already-loaded VGMBoy session through the s
 track's timing window. The frontend generation guard still discards a late status response from
 an older UI transition.
 
-While SPCBoy is the active app, macOS Previous, Play/Pause, and Next media
-keys route to SPCBoy's transport and are consumed before another media app can
-handle the same press.
+During playback, SPCBoy publishes the current track and playback state through
+`MPNowPlayingInfoCenter` and registers Previous, Play, Pause, Play/Pause, and
+Next handlers with `MPRemoteCommandCenter`. Those handlers use the same native
+transport dispatcher as the app menu. The AppKit system-defined event monitor
+also consumes matching media-key events delivered while SPCBoy is active.
 
 Queued adjacent-track fade eligibility and duration come from the shared
 `FrontendCore.PlaybackTransportCore.PlaybackFadePolicy`; the native bridge projects that result

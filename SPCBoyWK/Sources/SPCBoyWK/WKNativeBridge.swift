@@ -81,6 +81,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     var onAppearanceSettingsChanged: (([String: Any]) -> Void)?
     var onFrontendSettingsChanged: ((SPCBoyPreferencesSnapshot) -> Void)?
     var onPlaybackEvent: (@MainActor (String, [String: Any]) -> Void)?
+    var onNowPlayingInfoChanged: (@MainActor (RemoteTransportNowPlaying?) -> Void)?
 
     init(catalogURL: URL = WKNativeBridge.defaultCatalogURL, isOptionsWindow: Bool = false) {
         self.catalogURL = catalogURL
@@ -241,6 +242,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             nativePlaybackSetTempo: (...args) => request("nativePlaybackSetTempo", args),
             nativePlaybackState: (...args) => request("nativePlaybackState", args),
             nativePlaybackRampGain: (...args) => request("nativePlaybackRampGain", args),
+            setNowPlayingInfo: (...args) => request("setNowPlayingInfo", args),
             nativeExportAAC: (...args) => request("nativeExportAAC", args),
             nativeCancelAACExport: (...args) => request("nativeExportAACCancel", args),
             setPlaybackPowerSaveBlocker: (...args) => request("setPlaybackPowerSaveBlocker", args),
@@ -289,6 +291,16 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             let handler = onAppearanceSettingsChanged
             Task { @MainActor in handler?(settings) }
             Task {
+                await Self.reply(to: message.webView, id: id, success: true, valueJSON: "null")
+            }
+            return
+        }
+
+        if method == "setNowPlayingInfo" {
+            let item = (args.first as? [String: Any]).flatMap(RemoteTransportNowPlaying.init(payload:))
+            let handler = onNowPlayingInfoChanged
+            Task { @MainActor in
+                handler?(item)
                 await Self.reply(to: message.webView, id: id, success: true, valueJSON: "null")
             }
             return
