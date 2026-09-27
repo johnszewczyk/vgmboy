@@ -2229,6 +2229,13 @@ function createPlaylistRow(track, rowIndex) {
     row.appendChild(renderPlaylistCell(track, column, rowIndex));
   }
 
+  row.addEventListener("mousedown", (event) => {
+    if (event.button !== 0) return;
+    // Let selection focus the row with preventScroll below. WebKit's native
+    // mouse-down focus can scroll a bottom row before that guarded focus runs.
+    event.preventDefault();
+  });
+
   row.addEventListener("click", (event) => {
     if (!row.isConnected || row.dataset.trackId !== track.id) return;
     selectPlaylistTrack(track.id, {
