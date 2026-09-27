@@ -92,24 +92,10 @@ enum SPCArchiveMaterialization {
     static func cacheSummary() -> [String: Any] {
         let policy = cachePolicy()
         let rootURL = cacheStore.materializationRootURL(policy: policy)
-        var fileCount = 0
-        var byteCount: Int64 = 0
-        if let enumerator = FileManager.default.enumerator(
-            at: rootURL,
-            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
-            options: [.skipsHiddenFiles]
-        ) {
-            for case let fileURL as URL in enumerator {
-                guard let values = try? fileURL.resourceValues(
-                    forKeys: [.isRegularFileKey, .fileSizeKey]
-                ), values.isRegularFile == true else { continue }
-                fileCount += 1
-                byteCount += Int64(values.fileSize ?? 0)
-            }
-        }
+        let usage = cacheStore.cacheUsage()
         var result: [String: Any] = [
-            "fileCount": fileCount,
-            "byteCount": byteCount,
+            "fileCount": usage.fileCount,
+            "byteCount": usage.byteCount,
             "enabled": policy.isEnabled,
             "limitBytes": policy.maximumBytes
         ]

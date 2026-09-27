@@ -107,28 +107,9 @@ enum ZipArchiveSupport {
 
     static func cacheSummary() -> CacheSummary {
         let rootURL = materializationCacheRootURL()
-        let fileManager = FileManager.default
         let availableBytes = cacheStore.availableCapacityNear(rootURL)
-        guard fileManager.fileExists(atPath: rootURL.path),
-              let enumerator = fileManager.enumerator(
-                at: rootURL,
-                includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
-                options: [.skipsHiddenFiles]
-              ) else {
-            return CacheSummary(fileCount: 0, byteCount: 0, availableBytes: availableBytes)
-        }
-
-        var fileCount = 0
-        var byteCount: Int64 = 0
-        for case let fileURL as URL in enumerator {
-            guard let values = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
-                  values.isRegularFile == true else {
-                continue
-            }
-            fileCount += 1
-            byteCount += Int64(values.fileSize ?? 0)
-        }
-        return CacheSummary(fileCount: fileCount, byteCount: byteCount, availableBytes: availableBytes)
+        let usage = cacheStore.cacheUsage()
+        return CacheSummary(fileCount: usage.fileCount, byteCount: usage.byteCount, availableBytes: availableBytes)
     }
 
     static func clearCache() throws {

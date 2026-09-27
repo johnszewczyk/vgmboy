@@ -30,8 +30,22 @@ public struct ArchiveCacheLifecycle: Sendable {
 
     public func clearAllPlaybackMaterialization() throws {
         let fileManager = FileManager.default
-        for rootURL in [durableRootURL, disposableRootURL] where fileManager.fileExists(atPath: rootURL.path) {
-            try fileManager.removeItem(at: rootURL)
+        guard fileManager.fileExists(atPath: cacheRootURL.path) else { return }
+        let entries = try fileManager.contentsOfDirectory(
+            at: cacheRootURL,
+            includingPropertiesForKeys: nil,
+            options: []
+        )
+        for entry in entries {
+            do {
+                try fileManager.removeItem(at: entry)
+            } catch {
+                // Older extracted sets can carry directory modes that prevent
+                // recursive removal. Cache entries are disposable, so restore
+                // traversal permissions before retrying the deletion.
+                try makeDirectoryTreeRemovable(at: entry)
+                try fileManager.removeItem(at: entry)
+            }
         }
     }
 
@@ -123,5 +137,21 @@ public struct ArchiveCacheLifecycle: Sendable {
             bytes += Int64(values.fileSize ?? 0)
         }
         return bytes
+    }
+
+    private func makeDirectoryTreeRemovable(at url: URL) throws {
+        let fileManager = FileManager.default
+        let values = try url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        guard values.isSymbolicLink != true, values.isDirectory == true else { return }
+
+        try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+        let children = try fileManager.contentsOfDirectory(
+            at: url,
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+            options: []
+        )
+        for child in children {
+            try makeDirectoryTreeRemovable(at: child)
+        }
     }
 }

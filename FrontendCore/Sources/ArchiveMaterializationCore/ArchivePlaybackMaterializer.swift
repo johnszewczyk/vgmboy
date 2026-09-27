@@ -133,22 +133,8 @@ public final class ArchivePlaybackMaterializer: @unchecked Sendable {
 
     public func cacheSummary() -> (fileCount: Int, byteCount: Int64, availableBytes: Int64?) {
         let rootURL = cacheStore.materializationRootURL(policy: ArchiveCachePolicy.load(keys: preferenceKeys))
-        var fileCount = 0
-        var byteCount: Int64 = 0
-        if let enumerator = FileManager.default.enumerator(
-            at: rootURL,
-            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
-            options: [.skipsHiddenFiles]
-        ) {
-            for case let fileURL as URL in enumerator {
-                guard let values = try? fileURL.resourceValues(
-                    forKeys: [.isRegularFileKey, .fileSizeKey]
-                ), values.isRegularFile == true else { continue }
-                fileCount += 1
-                byteCount += Int64(values.fileSize ?? 0)
-            }
-        }
-        return (fileCount, byteCount, cacheStore.availableCapacityNear(rootURL))
+        let usage = cacheStore.cacheUsage()
+        return (usage.fileCount, usage.byteCount, cacheStore.availableCapacityNear(rootURL))
     }
 
     public func clearCache() throws {

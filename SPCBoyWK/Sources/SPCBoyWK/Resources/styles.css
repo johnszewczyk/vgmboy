@@ -848,9 +848,10 @@ body.is-file-drag-over::after {
 .favorite-toggle .ui-icon { fill: none; }
 .favorite-toggle.is-favorite .ui-icon { fill: currentColor; }
 
+/* Keep the shared capsule below row text so its border cannot blend into glyphs. */
 .list-selection-indicator {
   position: absolute;
-  z-index: 0;
+  z-index: 1;
   top: 0;
   left: 0;
   width: 0;

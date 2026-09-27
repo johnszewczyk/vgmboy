@@ -555,6 +555,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         case "archiveCacheSummary":
             return SPCArchiveMaterialization.cacheSummary()
         case "clearArchiveCache":
+            _ = try WKPlaybackBridge.shared.handle(method: "nativePlaybackStop", args: [])
             try SPCArchiveMaterialization.clearCache()
             return true
         case "setPlaybackPowerSaveBlocker":

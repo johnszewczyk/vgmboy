@@ -1,6 +1,11 @@
 import CryptoKit
 import Foundation
 
+public struct ArchiveCacheUsage: Sendable, Equatable {
+    public let fileCount: Int
+    public let byteCount: Int64
+}
+
 /// Shared identity and policy-facing storage operations for extracted archive
 /// material. Frontends provide their policy; they do not reimplement cache
 /// identity, root selection, free-space checks, or eviction rules.
@@ -26,6 +31,31 @@ public struct ArchiveCacheStore: Sendable {
     }
 
     public var cacheRootURL: URL { lifecycle.cacheRootURL }
+
+    /// Reports disk usage for the whole archive-cache directory. The usage is
+    /// independent of the active policy so turning caching off does not make
+    /// already-retained durable entries disappear from the readout.
+    public func cacheUsage() -> ArchiveCacheUsage {
+        let fileManager = FileManager.default
+        guard let enumerator = fileManager.enumerator(
+            at: cacheRootURL,
+            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
+            options: []
+        ) else {
+            return ArchiveCacheUsage(fileCount: 0, byteCount: 0)
+        }
+
+        var fileCount = 0
+        var byteCount: Int64 = 0
+        for case let fileURL as URL in enumerator {
+            guard let values = try? fileURL.resourceValues(
+                forKeys: [.isRegularFileKey, .fileSizeKey]
+            ), values.isRegularFile == true else { continue }
+            fileCount += 1
+            byteCount += Int64(values.fileSize ?? 0)
+        }
+        return ArchiveCacheUsage(fileCount: fileCount, byteCount: byteCount)
+    }
 
     public func materializationRootURL(policy: ArchiveCachePolicy) -> URL {
         policy.isEnabled ? lifecycle.durableRootURL : lifecycle.disposableRootURL
