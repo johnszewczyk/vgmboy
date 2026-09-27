@@ -630,7 +630,10 @@ window.addEventListener("focus", () => {
   app.ui.refreshFavorites()
     .then(() => {
       app.ui.renderSidebar();
-      app.ui.renderPlaylist();
+      // Rebuilding the table clears its rows before the next animation frame.
+      // WebKit clamps the scroller to zero during that gap, so refresh only
+      // the favorite buttons in place when the window regains focus.
+      app.ui.refreshPlaylistFavoriteRows();
     })
     .catch((error) => console.error("[SPCBoy] Favorites refresh failed", error));
 });

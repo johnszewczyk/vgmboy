@@ -329,10 +329,6 @@ function playlistUsesVirtualRows() {
   return state.playlist.length > PLAYLIST_VIRTUALIZATION_THRESHOLD;
 }
 
-function clearStalePlaylistRowFocus() {
-  document.activeElement?.closest?.(".playlist-row")?.blur?.();
-}
-
 function schedulePlaylistViewportRender() {
   if (!playlistUsesVirtualRows() || playlistViewportFrame) return;
   playlistViewportFrame = window.requestAnimationFrame(() => {
@@ -2139,7 +2135,6 @@ function selectPlaylistTrack(trackId, { focus = false, extend = false, range = f
   const track = state.playlist.find((entry) => entry.id === trackId);
   if (!track) return null;
 
-  const previousIds = new Set(state.selectedTrackIds);
   const selection = window.SPCBoyPlaylistController.reduceSelection({
     playlist: state.playlist,
     selectedIds: state.selectedTrackIds,
@@ -2150,8 +2145,19 @@ function selectPlaylistTrack(trackId, { focus = false, extend = false, range = f
   state.selectedTrackId = selection.primaryId;
   state.playlistSelectionAnchorId = selection.anchorId;
   lastPlaylistSelectionID = selection.primaryId;
-  if (previousIds.size !== selection.selectedIds.length || selection.selectedIds.some((id) => !previousIds.has(id))) persistSettings();
+  // Playlist selection belongs to playlist-tab state. Saving all frontend
+  // settings here broadcasts a settings refresh, whose renderAll() rebuilds
+  // this table while a pointer click is still being dispatched.
   persistPlaylistTabs();
+
+  if (focus && playlistUsesVirtualRows() && !playlistRowsByTrackId.has(track.id)) {
+    const trackIndex = state.playlist.findIndex((entry) => entry.id === track.id);
+    refs.playlistBodyWrap.scrollTop = Math.max(
+      0,
+      trackIndex * playlistVirtualRowHeight - (refs.playlistBodyWrap.clientHeight / 2)
+    );
+    renderPlaylist({ sort: false });
+  }
 
   for (const [id, row] of playlistRowsByTrackId) updatePlaylistRowState(row, id);
   const primaryRow = selection.primaryId ? playlistRowsByTrackId.get(selection.primaryId) || null : null;
@@ -2201,6 +2207,20 @@ function refreshPlaylistRow(trackId) {
   return true;
 }
 
+function refreshPlaylistFavoriteRows() {
+  const tracksByID = new Map(state.playlist.map((track) => [track.id, track]));
+  for (const [trackId, row] of playlistRowsByTrackId) {
+    const track = tracksByID.get(trackId);
+    const button = row.querySelector('[data-column-id="favorite"] button');
+    if (!track || !button) continue;
+    const favorite = isFavoritePresentation(track);
+    button.classList.toggle("is-favorite", favorite);
+    button.title = favorite ? "Remove from Favorites" : "Add to Favorites";
+    button.setAttribute("aria-label", button.title);
+    button.setAttribute("aria-pressed", favorite ? "true" : "false");
+  }
+}
+
 function playlistSortDependsOnMetadata() {
   return !isCatalogPlaylistProjection()
     && state.playlistSortEnabled
@@ -2247,9 +2267,6 @@ function createPlaylistRow(track, rowIndex) {
       range: event.shiftKey
     });
     if (!selectedTrack) return;
-    // Pointer selection stays focus-neutral. Clear any old row focus so a
-    // later Enter uses the new selection instead of that stale row.
-    clearStalePlaylistRowFocus();
     uiApp.playback.updateTimingSummary();
   });
 
@@ -2272,7 +2289,9 @@ function createPlaylistRow(track, rowIndex) {
     if (event.target !== row && event.target?.closest?.("button, input, select, a, [contenteditable=true]")) return;
     event.preventDefault();
     event.stopPropagation();
-    const selectedTrack = selectPlaylistTrack(track.id, { focus: true });
+    // Pointer selection deliberately leaves DOM focus alone. Enter follows
+    // the logical playlist selection, which may differ from an older focused row.
+    const selectedTrack = uiApp.selectedTrack();
     if (!selectedTrack) return;
     playVisibleTrack(selectedTrack.id, 0).catch((error) => {
       console.error(error);
@@ -2315,6 +2334,9 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
 }
 
 function renderPlaylist({ sort = true, persistTab = true, virtualScrollTop = null, preserveVirtualRows = false } = {}) {
+  // Capture before clearing the table: WebKit clamps scrollTop to zero while
+  // its tbody is empty, so reading it after replacement loses the user's row.
+  const preservedScrollTop = Math.max(0, Number(refs.playlistBodyWrap?.scrollTop) || 0);
   if (persistTab && findActivePlaylistTab()) persistPlaylistTabs();
   updateAutomaticColumnVisibility();
   playlistRenderGeneration += 1;
@@ -2362,12 +2384,15 @@ function renderPlaylist({ sort = true, persistTab = true, virtualScrollTop = nul
     syncPlaylistColumnWidths();
   }
   if (!virtualized) {
-    appendPlaylistRowsInBatches(generation);
+    // Small lists are cheaper to restore synchronously than to let batched
+    // insertion clamp the scroller between animation frames.
+    appendPlaylistRowsInBatches(generation, 0, state.playlist.length, null, { synchronous: true });
+    if (refs.playlistBodyWrap) refs.playlistBodyWrap.scrollTop = preservedScrollTop;
     return;
   }
 
   const scrollTop = virtualScrollTop === null
-    ? (refs.playlistBodyWrap?.scrollTop || 0)
+    ? preservedScrollTop
     : Math.max(0, Number(virtualScrollTop) || 0);
   const viewportHeight = refs.playlistBodyWrap?.clientHeight || (playlistVirtualRowHeight * 24);
   const firstVisibleRow = Math.max(0, Math.floor(scrollTop / playlistVirtualRowHeight) - PLAYLIST_VIRTUAL_OVERSCAN);
@@ -2389,6 +2414,7 @@ function renderPlaylist({ sort = true, persistTab = true, virtualScrollTop = nul
     },
     { synchronous: true }
   );
+  if (refs.playlistBodyWrap) refs.playlistBodyWrap.scrollTop = scrollTop;
 }
 
 function scheduleMetadataRefresh(trackId) {
@@ -2625,14 +2651,6 @@ function moveSelection(delta, { range = false, extend = false } = {}) {
   // can be routed through an old sidebar/focused row after arrow navigation.
   selectPlaylistTrack(state.playlist[nextIndex].id, { focus: true, range, extend });
   uiApp.playback.updateTimingSummary();
-  if (playlistUsesVirtualRows() && !playlistRowsByTrackId.has(state.selectedTrackId)) {
-    refs.playlistBodyWrap.scrollTop = Math.max(
-      0,
-      nextIndex * playlistVirtualRowHeight - (refs.playlistBodyWrap.clientHeight / 2)
-    );
-    renderPlaylist({ sort: false });
-    selectPlaylistTrack(state.selectedTrackId, { focus: true, range, extend });
-  }
   scrollSelectedTrackIntoView();
 }
 
@@ -3203,6 +3221,7 @@ uiApp.ui = {
   renderTree,
   syncTreeSelection,
   renderPlaylist,
+  refreshPlaylistFavoriteRows,
   renderPlaylistTabs,
   createPlaylistTab,
   activatePlaylistTab,
