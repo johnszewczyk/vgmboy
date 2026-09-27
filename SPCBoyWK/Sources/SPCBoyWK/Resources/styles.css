@@ -538,6 +538,9 @@ body.is-file-drag-over::after {
   min-height: 0;
   overflow-x: visible;
   overflow-y: auto;
+  /* Virtual-row spacer updates preserve scrollTop; native anchoring would
+     apply a second adjustment when rows above the viewport are replaced. */
+  overflow-anchor: none;
   scrollbar-gutter: stable;
 }
 

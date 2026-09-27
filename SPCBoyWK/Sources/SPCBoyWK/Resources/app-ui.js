@@ -329,6 +329,10 @@ function playlistUsesVirtualRows() {
   return state.playlist.length > PLAYLIST_VIRTUALIZATION_THRESHOLD;
 }
 
+function clearStalePlaylistRowFocus() {
+  document.activeElement?.closest?.(".playlist-row")?.blur?.();
+}
+
 function schedulePlaylistViewportRender() {
   if (!playlistUsesVirtualRows() || playlistViewportFrame) return;
   playlistViewportFrame = window.requestAnimationFrame(() => {
@@ -2238,10 +2242,14 @@ function createPlaylistRow(track, rowIndex) {
 
   row.addEventListener("click", (event) => {
     if (!row.isConnected || row.dataset.trackId !== track.id) return;
-    selectPlaylistTrack(track.id, {
+    const selectedTrack = selectPlaylistTrack(track.id, {
       extend: event.metaKey || event.ctrlKey,
       range: event.shiftKey
     });
+    if (!selectedTrack) return;
+    // Pointer selection stays focus-neutral. Clear any old row focus so a
+    // later Enter uses the new selection instead of that stale row.
+    clearStalePlaylistRowFocus();
     uiApp.playback.updateTimingSummary();
   });
 
