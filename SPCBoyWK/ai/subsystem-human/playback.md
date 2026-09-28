@@ -34,7 +34,10 @@ During playback, SPCBoy publishes the current track and playback state through
 `MPNowPlayingInfoCenter` and registers Previous, Play, Pause, Play/Pause, and
 Next handlers with `MPRemoteCommandCenter`. Those handlers use the same native
 transport dispatcher as the app menu. The AppKit system-defined event monitor
-also consumes matching media-key events delivered while SPCBoy is active.
+also consumes matching media-key events delivered while SPCBoy is active. When
+the same hardware press arrives through both APIs, SPCBoy coalesces matching
+transport actions within 150 ms. Play and Pause intents are serialized and
+checked against native transport state before the frontend toggles playback.
 
 Queued adjacent-track fade eligibility and duration come from the shared
 `FrontendCore.PlaybackTransportCore.PlaybackFadePolicy`; the native bridge projects that result

@@ -13,6 +13,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var playlistTabShortcutMonitor: Any?
     private var mediaKeyMonitor: Any?
     private var remoteTransportController: FocusedMediaTransportController?
+    private enum TransportInputSource: Equatable {
+        case focusedMediaKey
+        case remoteCommand
+    }
+    private struct PendingRemoteTransportInput {
+        let token: UUID
+        let task: Task<Void, Never>
+    }
+    private var recentFocusedTransportInputs: [String: TimeInterval] = [:]
+    private var pendingRemoteTransportInputs: [String: PendingRemoteTransportInput] = [:]
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
@@ -32,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             self?.broadcastFrontendEqualizerSettings(settings)
         }
         let remoteTransport = FocusedMediaTransportController { [weak self] command in
-            self?.dispatchCustom(command)
+            self?.dispatchTransportCommand(command, source: .remoteCommand)
         }
         remoteTransport.configure()
         remoteTransportController = remoteTransport
@@ -97,7 +107,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             }
 
             if keyState == 0xA {
-                self.dispatchCustom(command)
+                self.dispatchTransportCommand(command, source: .focusedMediaKey)
             }
             // Consume both press and release while SPCBoy is active so the
             // system does not hand the same transport key to Music.
@@ -116,6 +126,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 source: """
                 window.SPCBoyWK = (() => {
                   const pending = [];
+                  let playbackCommandQueue = Promise.resolve();
+                  function playbackIsPlaying(app) {
+                    const transportState = app.state?.nativePlayback?.transportState;
+                    return typeof transportState === "string"
+                      ? transportState === "playing"
+                      : Boolean(app.state?.isPlaying);
+                  }
+                  function dispatchPlaybackCommand(app, command) {
+                    const operation = playbackCommandQueue.catch(() => {}).then(async () => {
+                      const isPlaying = playbackIsPlaying(app);
+                      if (command === "playPause"
+                          || (command === "play" && !isPlaying)
+                          || (command === "pause" && isPlaying)) {
+                        await app.playback?.togglePlayback?.();
+                      }
+                    });
+                    playbackCommandQueue = operation.catch((error) => {
+                      console.error("[SPCBoy] transport command failed", error);
+                    });
+                  }
                   function dispatch(command) {
                     const app = window.SPCBoyApp;
                     if (!app) {
@@ -130,9 +160,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                     }
                     switch (command) {
                       case "previous": app.playback?.playAdjacent(-1); break;
-                      case "play": if (!app.state?.isPlaying) app.playback?.togglePlayback?.(); break;
-                      case "pause": if (app.state?.isPlaying) app.playback?.togglePlayback?.(); break;
-                      case "playPause": app.playback?.togglePlayback?.(); break;
+                      case "play": dispatchPlaybackCommand(app, "play"); break;
+                      case "pause": dispatchPlaybackCommand(app, "pause"); break;
+                      case "playPause": dispatchPlaybackCommand(app, "playPause"); break;
                       case "next": app.playback?.playAdjacent(1); break;
                       case "newPlaylistTab": app.ui?.createPlaylistTab?.({ duplicateActive: true }); break;
                       case "closePlaylistTab": app.ui?.closePlaylistTab?.(); break;
@@ -402,6 +432,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func dispatchCustom(_ command: String) {
         let encoded = try! JSONEncoder().encode(command)
         webView?.evaluateJavaScript("window.SPCBoyWK?.dispatch(\(String(decoding: encoded, as: UTF8.self)));", completionHandler: nil)
+    }
+
+    private func dispatchTransportCommand(_ command: String, source: TransportInputSource) {
+        let action: String
+        switch command {
+        case "previous": action = "previous"
+        case "play", "pause", "playPause": action = "playPause"
+        case "next": action = "next"
+        default:
+            dispatchCustom(command)
+            return
+        }
+
+        let now = ProcessInfo.processInfo.systemUptime
+        if source == .focusedMediaKey {
+            pendingRemoteTransportInputs.removeValue(forKey: action)?.task.cancel()
+            recentFocusedTransportInputs[action] = now
+            dispatchCustom(command)
+            return
+        }
+
+        if let focusedTimestamp = recentFocusedTransportInputs[action] {
+            if now >= focusedTimestamp, now - focusedTimestamp <= 0.15 {
+                recentFocusedTransportInputs.removeValue(forKey: action)
+                return
+            }
+            recentFocusedTransportInputs.removeValue(forKey: action)
+        }
+
+        if NSApp.isActive {
+            guard pendingRemoteTransportInputs[action] == nil else { return }
+            let token = UUID()
+            let task = Task { @MainActor [weak self] in
+                do {
+                    try await Task.sleep(for: .milliseconds(150))
+                } catch {
+                    return
+                }
+                guard let self,
+                      self.pendingRemoteTransportInputs[action]?.token == token else { return }
+                self.pendingRemoteTransportInputs.removeValue(forKey: action)
+                self.dispatchCustom(command)
+            }
+            pendingRemoteTransportInputs[action] = PendingRemoteTransportInput(token: token, task: task)
+            return
+        }
+
+        dispatchCustom(command)
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
