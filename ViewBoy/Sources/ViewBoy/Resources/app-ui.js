@@ -2215,8 +2215,10 @@ function applyRoutingPreferences(preferences) {
 
 function renderAll() {
   applyUISettings();
+  document.body.classList.toggle("options-page-open", state.optionsOpen);
   refs.optionsOverlay.classList.toggle("is-hidden", !state.optionsOpen);
   refs.optionsOverlay.setAttribute("aria-hidden", state.optionsOpen ? "false" : "true");
+  document.querySelector(".app-shell")?.setAttribute("aria-hidden", state.optionsOpen ? "true" : "false");
   const databaseSelected = state.optionsSection === "database";
   const routingSelected = state.optionsSection === "routing";
   const playbackSelected = state.optionsSection === "playback";
@@ -2254,7 +2256,6 @@ function renderAll() {
   refs.animationDurationInput.value = String(state.autoResizeAnimationMilliseconds);
   refs.selectionAnimationEnabledCheckbox.checked = state.selectionAnimationEnabled;
   refs.mainWindowAlwaysOnTopCheckbox.checked = state.mainWindowAlwaysOnTop;
-  refs.settingsWindowAlwaysOnTopCheckbox.checked = state.settingsWindowAlwaysOnTop;
   refs.archiveCacheEnabledCheckbox.checked = state.archiveCacheEnabled;
   refs.archiveCacheLimitSelect.value = String(state.archiveCacheLimitBytes);
   refs.archiveCacheLimitSelect.disabled = !state.archiveCacheEnabled;
@@ -2747,14 +2748,7 @@ function commitSidebarWidthInput(rawValue) {
 }
 
 function setOptionsOpen(nextOpen) {
-  if (nextOpen && !window.spcBoyWK?.isOptionsWindow) {
-    window.spcBoyWK.openOptionsWindow().catch((error) => console.error("[SPCBoy] open options failed", error));
-    return;
-  }
-  if (!nextOpen && window.spcBoyWK?.isOptionsWindow) {
-    window.spcBoyWK.closeOptionsWindow();
-    return;
-  }
+  if (state.optionsOpen === nextOpen) return;
   state.optionsOpen = nextOpen;
   if (nextOpen) {
     state.optionsSection = "database";
@@ -2762,24 +2756,16 @@ function setOptionsOpen(nextOpen) {
     uiApp.ui.refreshArchiveCacheSummary().catch((error) => console.error("[SPCBoy] archive cache refresh failed", error));
   }
   renderAll();
+  (nextOpen ? refs.optionsCloseButton : refs.optionsOpenButton).focus();
 }
 
 
 async function bootstrap() {
-  // Load persisted appearance before the first Options-window paint. The
-  // window is native-sized and immediately visible; deferring this until
-  // after catalog/cache requests produces a distracting default-style flash.
+  // Apply the native options manifest and appearance before loading the catalog.
   window.SPCBoyOptionsController.applyManifest(await window.spcBoyWK.frontendOptionsManifest());
   await loadSettings();
   await syncSidebarView();
-  if (!window.spcBoyWK?.isOptionsWindow) await refreshFavorites();
-  if (window.spcBoyWK?.isOptionsWindow) {
-    document.body.classList.add("options-window");
-    state.optionsOpen = true;
-    // Paint the native Settings window before any catalog/cache request can
-    // delay or reject. The controls remain usable while those values load.
-    renderAll();
-  }
+  await refreshFavorites();
   if (!window.spcBoyWK?.bootstrap || !window.spcBoyWK?.refreshTree) {
     const message = "SPCBoy WK native bridge is unavailable. File loading is unavailable.";
     showStartupFailure(message);
@@ -2801,17 +2787,7 @@ async function bootstrap() {
     persistSettings();
   }
   let snapshot;
-  if (window.spcBoyWK?.isOptionsWindow) {
-    // Options owns settings/library controls, not the raw browser. Do not
-    // enumerate the persisted JoshW root just to paint this window.
-    snapshot = {
-      rootPath: state.rootPath,
-      tree: [],
-      selectedFolderPath: state.selectedFolderPath,
-      selectedBrowserPath: state.selectedBrowserPath,
-      playlist: []
-    };
-  } else if (state.localBrowserEnabled && state.rootPath) {
+  if (state.localBrowserEnabled && state.rootPath) {
     state.sidebarMode = "diskPath";
     snapshot = await window.spcBoyWK.refreshTree(state.rootPath, state.selectedFolderPath || state.rootPath);
   } else {
@@ -2827,7 +2803,7 @@ async function bootstrap() {
   state.lastSelectedTrackId = state.selectedTrackId;
   state.totalSeconds = targetPlaybackSeconds();
   persistSettings();
-  if (!state.localBrowserEnabled && !window.spcBoyWK?.isOptionsWindow && window.spcBoyWK?.databaseRoots) {
+  if (!state.localBrowserEnabled && window.spcBoyWK?.databaseRoots) {
     state.libraryRoots = await window.spcBoyWK.databaseRoots();
     await uiApp.ui.handleLibraryRootsChanged(state.libraryRoots);
   }

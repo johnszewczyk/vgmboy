@@ -31,9 +31,9 @@ change-event path are intentionally absent; they were no-op plumbing that made
 Long Play appear to have a native settings interface while playback actually
 read a different state. Long Play changes now persist through the snapshot and
 cross the shared VGMBoy boundary at both `nativePlaybackStart` and
-`nativePlaybackReconfigure`. The separate Options WebView relays timing fields
-to the main WebView, which asks VGMBoyKit to reconfigure the loaded session
-without losing position or paused state.
+`nativePlaybackReconfigure`. The in-screen Options page shares the main WebView
+and asks VGMBoyKit to reconfigure the loaded session without losing position
+or paused state.
 
 The shared `FrontendPreferencesCore` contract owns the validated animation
 timing range and 200 ms default. ViewBoy exposes one shared configurable
@@ -41,7 +41,7 @@ duration for auto-resize and other selection transitions, with independent
 effect toggles. The LCD row bar uses a 250 ms ease slide when selection
 animation is enabled and snaps while scrolling. DOM geometry and CSS remain WebKit-owned so
 ViewBoy can replace the presentation skin without moving layout policy into
-native code; native Swift owns persistence and window levels.
+native code; native Swift owns persistence and the main window level.
 
 The accent color is a persisted CSS color in the typed settings projection.
 `app-ui.js` applies it as the root `--accent` value. Sidebar, playlist, and
@@ -52,7 +52,7 @@ translucent shade; Settings keeps its 1 px locator.
 During virtual row replacement, the locator holds its last frame until the new
 selected row is attached, preventing a blank flash. Scrolling follows the
 selected row without animation. The bundled Doto face and
-one root Interface Scale apply across both the main and Settings windows, with
+one root Interface Scale apply across the player and Options pages, with
 shared relative sizes for captions, controls, and display text.
 
 `index.html` loads one `viewboy-gameboy.css` presentation sheet after
@@ -166,7 +166,7 @@ normalizes timing, fade, EQ, volume, mono, and native-tempo values through
 `VGMBoyKit.PlaybackPreferences` before persisting the frontend JSON shape.
 
 AAC export is a native offline task: `WKPlaybackBridge` forwards VGMBoy frame
-progress and terminal events to both the main and Options windows. The WebKit
+progress and terminal events to the main WebView, including its Options page. The WebKit
 surface only renders those events and can request cancellation; VGMBoy removes
 the temporary partial file rather than exposing an incomplete `.aac` result.
 
@@ -237,7 +237,7 @@ bridge; there are no JavaScript preload or metadata-hydration workers.
 Natural completion is delivered to the page through `nativePlaybackEnded`; the
 shared native transport also publishes complete `nativePlaybackState`
 snapshots at most four times per second while audio is playing. The AppKit host
-broadcasts each snapshot to both the main and separate Options WebViews, so the
+broadcasts each snapshot to the main WebView, so the
 elapsed readout and Diagnostics page describe the same native session. The
 WebKit skin renders those events and does not run a status-poll loop or infer
 end from elapsed time.

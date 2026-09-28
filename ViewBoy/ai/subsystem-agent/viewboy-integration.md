@@ -7,8 +7,8 @@ packages without forking catalog or playback behavior.
 
 ## Ownership
 
-- ViewBoy owns its AppKit host, WebKit surface, display resources, settings
-  window, and preference namespace.
+- ViewBoy owns its AppKit host, WebKit surface, display resources, in-screen
+  Options page, and preference namespace.
 - CatalogReader owns catalog reads and browser projections.
 - FrontendCore owns shared archive, queue, preferences, and transport policy.
 - VGMBoy owns format admission, decoding, timing, and audio output.

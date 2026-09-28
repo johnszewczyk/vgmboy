@@ -63,7 +63,7 @@ function paint() {
 }
 
 function queueSave(titleChanged = false) {
-  if (!ready || window.spcBoyWK?.isOptionsWindow) return;
+  if (!ready) return;
   window.clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
     saveTimer = 0;
@@ -82,12 +82,12 @@ function queueSave(titleChanged = false) {
 }
 
 function scheduleSave() {
-  if (!ready || window.spcBoyWK?.isOptionsWindow) return;
+  if (!ready) return;
   queueSave(snapshotCurrent());
 }
 
 function scheduleSelectionSave() {
-  if (!ready || window.spcBoyWK?.isOptionsWindow) return;
+  if (!ready) return;
   const tab = activeTab();
   if (!tab) return;
   tab.selectedTrackId = state.selectedTrackId || null;
@@ -96,7 +96,7 @@ function scheduleSelectionSave() {
 }
 
 function scheduleScrollSave() {
-  if (!ready || window.spcBoyWK?.isOptionsWindow) return;
+  if (!ready) return;
   const tab = activeTab();
   if (!tab) return;
   tab.scrollTop = Math.max(0, Number(refs.playlistBodyWrap?.scrollTop) || 0);
@@ -189,7 +189,6 @@ function restoreSaved(value) {
 const bootstrap = app.ui.bootstrap;
 app.ui.bootstrap = async (...args) => {
   await bootstrap(...args);
-  if (window.spcBoyWK?.isOptionsWindow) return;
   let saved = null;
   try { saved = await window.spcBoyWK?.playlistTabsLoad?.(); }
   catch (error) { console.error("[ViewBoy] playlist tabs load failed", error); }

@@ -114,7 +114,6 @@ const state = {
   autoResizeAnimationEnabled: true,
   selectionAnimationEnabled: true,
   mainWindowAlwaysOnTop: false,
-  settingsWindowAlwaysOnTop: false,
   optionsOpen: false,
   optionsSection: "database",
   libraryRoots: [],
@@ -171,6 +170,7 @@ const refs = {
   playlistBodyTable: document.querySelector(".playlist-body-table"),
   playlistBody: document.getElementById("playlist-body"),
   optionsOverlay: document.getElementById("options-overlay"),
+  optionsOpenButton: document.getElementById("options-open-button"),
   optionsCloseButton: document.getElementById("options-close-button"),
   optionsNav: document.querySelector(".options-nav"),
   optionsSelectionIndicator: document.getElementById("options-selection-indicator"),
@@ -221,7 +221,6 @@ const refs = {
   animationDurationInput: document.getElementById("animation-duration-input"),
   selectionAnimationEnabledCheckbox: document.getElementById("selection-animation-enabled-checkbox"),
   mainWindowAlwaysOnTopCheckbox: document.getElementById("main-window-always-on-top-checkbox"),
-  settingsWindowAlwaysOnTopCheckbox: document.getElementById("settings-window-always-on-top-checkbox"),
   sidebarWidthInput: document.getElementById("sidebar-width-input"),
   accentColorInput: document.getElementById("accent-color-input"),
   uiItemSpacingInput: document.getElementById("ui-item-spacing-input"),
@@ -351,7 +350,6 @@ async function loadSettings() {
     state.autoResizeAnimationEnabled = parsed.autoResizeAnimationEnabled !== false;
     state.selectionAnimationEnabled = parsed.selectionAnimationEnabled !== false;
     state.mainWindowAlwaysOnTop = Boolean(parsed.mainWindowAlwaysOnTop);
-    state.settingsWindowAlwaysOnTop = Boolean(parsed.settingsWindowAlwaysOnTop);
   } catch {
     return;
   }
@@ -410,8 +408,7 @@ function persistSettings() {
     selectionAnimationMilliseconds: state.selectionAnimationMilliseconds,
     autoResizeAnimationEnabled: state.autoResizeAnimationEnabled,
     selectionAnimationEnabled: state.selectionAnimationEnabled,
-    mainWindowAlwaysOnTop: state.mainWindowAlwaysOnTop,
-    settingsWindowAlwaysOnTop: state.settingsWindowAlwaysOnTop
+    mainWindowAlwaysOnTop: state.mainWindowAlwaysOnTop
   };
   window.spcBoyWK.frontendSettingsSave(settings)
     .catch((error) => console.error("[SPCBoy] native settings save failed", error));

@@ -38,7 +38,7 @@
         <div class="deck-main">
           <div class="deck-screen-bezel">
             <div class="deck-screen" aria-live="polite">
-              <div class="deck-screen-top"><span class="deck-brand-line"><strong class="deck-brand-name">VIEWBOY</strong><span class="deck-brand-divider" aria-hidden="true">/</span><span id="deck-state">STANDBY</span></span><span id="deck-index">00 / 00</span></div>
+              <div class="deck-screen-top"><span class="deck-brand-line"><strong class="deck-brand-name">VIEWBOY</strong><span class="deck-brand-divider" aria-hidden="true">/</span><span id="deck-state">STANDBY</span></span><span class="deck-screen-actions"><span id="deck-index">00 / 00</span><button id="options-open-button" class="screen-page-button" type="button" aria-label="Open Options page">OPTIONS</button></span></div>
               <div class="deck-display-body">
                 <div class="deck-display-track">
                   <div id="deck-title" class="deck-title">SELECT A TRACK</div>
@@ -113,10 +113,10 @@
     </div>
 
     <div id="options-overlay" class="options-overlay is-hidden" aria-hidden="true">
-      <div class="options-panel" role="dialog" aria-modal="true" aria-label="Options">
+      <div class="options-panel" role="region" aria-label="Options page">
         <div class="options-header">
-          <span>Options</span>
-          <button id="options-close-button" class="tool-button glyph-button" title="Close" aria-label="Close">×</button>
+          <span>VIEWBOY / OPTIONS</span>
+          <button id="options-close-button" class="screen-page-button" type="button" title="Return to player" aria-label="Return to player">◀ PLAYER</button>
         </div>
 
         <div class="options-body">
@@ -174,7 +174,6 @@
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Always on Top</div>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="main-window-always-on-top-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Main Window</span><small>Keep main window on top of other apps.</small></span></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="settings-window-always-on-top-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Options Window</span><small>Keep options window on top of main window.</small></span></span></label>
               </div>
             </div>
 

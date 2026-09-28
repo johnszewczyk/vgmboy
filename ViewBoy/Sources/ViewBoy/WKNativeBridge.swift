@@ -24,13 +24,10 @@ import WebKit
 /// catalog bridge, keeping playback policy in the shared native boundary.
 final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     private let catalogURL: URL
-    private let isOptionsWindow: Bool
     private let catalogSessions = CatalogSessionCoordinator()
     private weak var playbackEventWebView: WKWebView?
 
-    var onOpenOptionsWindow: (() -> Void)?
     var onMaterialGeometry: (([String: Any]) -> Void)?
-    var onCloseOptionsWindow: (() -> Void)?
     var onCloseMainWindow: (() -> Void)?
     var onChooseRootFolder: (() -> String?)?
     var onChoosePath: (() -> String?)?
@@ -39,9 +36,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     var onFrontendSettingsChanged: ((SPCBoyPreferencesSnapshot) -> Void)?
     var onPlaybackEvent: (@MainActor (String, [String: Any]) -> Void)?
 
-    init(catalogURL: URL = WKNativeBridge.defaultCatalogURL, isOptionsWindow: Bool = false) {
+    init(catalogURL: URL = WKNativeBridge.defaultCatalogURL) {
         self.catalogURL = catalogURL
-        self.isOptionsWindow = isOptionsWindow
         super.init()
     }
 
@@ -106,7 +102,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     }
 
     func userScript() -> WKUserScript {
-        let optionsWindowFlag = isOptionsWindow ? "true" : "false"
         return WKUserScript(source: """
         (() => {
           const pending = new Map();
@@ -142,7 +137,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
           };
 
           const api = {
-            isOptionsWindow: \(optionsWindowFlag),
             playbackBackends: \(Self.json(Self.playbackBackendManifest)),
             bootstrap: (...args) => request("bootstrap", args),
             playlistTabsLoad: () => request("playlistTabsLoad"),
@@ -181,8 +175,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             setAppearanceSettings: (...args) => request("setAppearanceSettings", args),
             chooseAACExportDirectory: () => request("chooseAACExportDirectory"),
             defaultAACExportDirectory: () => request("defaultAACExportDirectory"),
-            openOptionsWindow: () => request("openOptionsWindow"),
-            closeOptionsWindow: () => request("closeOptionsWindow"),
             closeMainWindow: () => request("closeMainWindow"),
             openPath: (...args) => request("openPath", args),
             chooseRootFolder: (...args) => request("chooseRootFolder", args),
@@ -241,13 +233,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
         print("[SPCBoy WK] request \(method)")
 
-        if method == "openOptionsWindow" || method == "closeOptionsWindow" || method == "closeMainWindow" {
-            let handler: (() -> Void)?
-            switch method {
-            case "openOptionsWindow": handler = onOpenOptionsWindow
-            case "closeOptionsWindow": handler = onCloseOptionsWindow
-            default: handler = onCloseMainWindow
-            }
+        if method == "closeMainWindow" {
+            let handler = onCloseMainWindow
             Task { @MainActor in handler?() }
             Task {
                 await Self.reply(to: message.webView, id: id, success: true, valueJSON: "null")

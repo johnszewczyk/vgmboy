@@ -80,7 +80,7 @@ async function handleCatalogReloaded(result) {
     : state.databaseLocation?.requiresRestart
       ? "Restart SPCBoy to use the selected database."
       : "The shared ScanSong catalog is active and opened read-only.";
-  if (!window.spcBoyWK?.isOptionsWindow && window.spcBoyWK?.databaseRoots) {
+  if (window.spcBoyWK?.databaseRoots) {
     state.libraryRoots = await window.spcBoyWK.databaseRoots();
     await handleLibraryRootsChanged(state.libraryRoots);
   }

@@ -578,7 +578,7 @@ test("ViewBoy slides one shaded row bar across the two content screens", () => {
   assert.doesNotMatch(stylesSource, /button:not\([^\n]*\):is\([^\n]*\.is-selected/);
 });
 
-test("ViewBoy broadcasts complete native status to both windows", () => {
+test("ViewBoy broadcasts complete native status to its in-screen pages", () => {
   assert.match(statusPayloadSource, /"status_sequence": statusSequence/);
   assert.match(statusPayloadSource, /"buffered_frames": bufferedFrames/);
   assert.match(statusPayloadSource, /"frames_requested": framesRequested/);
@@ -587,7 +587,9 @@ test("ViewBoy broadcasts complete native status to both windows", () => {
   assert.match(playbackBridgeSource, /PlaybackTransportStatusPayload\(/);
   assert.match(nativeBridgeSource, /if let onPlaybackEvent\s*\{\s*onPlaybackEvent\(name, payload\)/);
   assert.match(appDelegateSource, /broadcastPlaybackEvent\(name: name, payload: payload\)/);
-  assert.match(appDelegateSource, /optionsWebView\?\.evaluateJavaScript\(script, completionHandler: nil\)/);
+  assert.match(appDelegateSource, /webView\?\.evaluateJavaScript\(script, completionHandler: nil\)/);
+  assert.match(uiSource, /document\.body\.classList\.toggle\("options-page-open", state\.optionsOpen\)/);
+  assert.doesNotMatch(appDelegateSource, /optionsWebView|optionsWindow/);
 });
 
 test("ViewBoy delegates completion retirement to the shared transport", () => {

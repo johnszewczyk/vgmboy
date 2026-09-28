@@ -5,9 +5,7 @@ import WebKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var window: NSWindow?
-    private var optionsWindow: NSWindow?
     private weak var webView: WKWebView?
-    private weak var optionsWebView: WKWebView?
     private var localBrowserEnabled = false
     private var playlistTabShortcutMonitor: Any?
 
@@ -18,7 +16,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             NSApp.applicationIconImage = icon
         }
         let nativeBridge = WKNativeBridge()
-        nativeBridge.onOpenOptionsWindow = { [weak self] in self?.showOptionsWindow() }
         nativeBridge.onCloseMainWindow = { [weak self] in self?.window?.performClose(nil) }
         nativeBridge.onChooseRootFolder = { [weak self] in self?.choosePath(allowFiles: false) }
         nativeBridge.onChoosePath = { [weak self] in self?.choosePath(allowFiles: true) }
@@ -51,7 +48,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         window.title = "ViewBoy"
         window.tabbingMode = .disallowed
         window.contentView = ViewBoySurfaceView(webView: webView)
-        window.delegate = self
         if !window.setFrameAutosaveName("ViewBoy.Main") {
             window.center()
         }
@@ -86,7 +82,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                   let pending = false;
                   const report = () => {
                     pending = false;
-                    if (document.body.classList.contains('options-window')) return;
                     const width = document.documentElement.clientWidth;
                     const height = document.documentElement.clientHeight;
                     if (!width || !height) return;
@@ -103,7 +98,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                     if (!pending) { pending = true; requestAnimationFrame(report); }
                   };
                   const start = () => {
-                    if (document.body.classList.contains('options-window')) return;
                     const observer = new ResizeObserver(queue);
                     for (const selector of Object.values(selectors)) {
                       const element = document.querySelector(selector);
@@ -143,6 +137,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                       case "next": app.playback?.playAdjacent(1); break;
                       case "newPlaylistTab": app.ui?.createPlaylistTab?.(); break;
                       case "closePlaylistTab": app.ui?.closePlaylistTab?.(); break;
+                      case "closeWindow":
+                        if (app.state?.optionsOpen) app.ui?.setOptionsOpen?.(false);
+                        else app.ui?.closePlaylistTab?.();
+                        break;
                       case "openPath":
                         window.spcBoyWK?.choosePath?.().then((snapshot) => {
                           if (snapshot) app.ui?.applyLibrarySnapshot?.(snapshot);
@@ -160,7 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                         }
                         break;
                       case "favoritesPlaylist": app.ui?.showFavoritesPlaylist?.(); break;
-                      case "settings": window.spcBoyWK?.openOptionsWindow?.(); break;
+                      case "settings": app.ui?.setOptionsOpen?.(true); break;
                       default: break;
                     }
                   }
@@ -176,57 +174,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return webView
     }
 
-    private func showOptionsWindow() {
-        if let optionsWindow {
-            optionsWindow.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-            return
-        }
-
-        let bridge = WKNativeBridge(isOptionsWindow: true)
-        bridge.onCloseOptionsWindow = { [weak self] in self?.closeOptionsWindow() }
-        bridge.onChooseRootFolder = { [weak self] in self?.choosePath(allowFiles: false) }
-        bridge.onChoosePath = { [weak self] in self?.choosePath(allowFiles: true) }
-        bridge.onChooseAACExportDirectory = { [weak self] in self?.chooseDirectory(title: "Choose AAC Export Folder") }
-        bridge.onAppearanceSettingsChanged = { [weak self] settings in
-            self?.broadcastAppearanceSettings(settings)
-        }
-        bridge.onFrontendSettingsChanged = { [weak self] settings in self?.receiveFrontendSettings(settings) }
-        let optionsWebView = makeWebView(bridge: bridge, includeCommandDispatcher: false)
-        guard let page = Bundle.module.url(forResource: "index", withExtension: "html") else { return }
-        optionsWebView.loadFileURL(page, allowingReadAccessTo: page.deletingLastPathComponent())
-
-        let optionsWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 820, height: 720),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        optionsWindow.title = "ViewBoy Settings"
-        optionsWindow.contentView = ViewBoySurfaceView(webView: optionsWebView)
-        if !optionsWindow.setFrameAutosaveName("ViewBoy.Options") {
-            optionsWindow.center()
-        }
-        optionsWindow.isReleasedWhenClosed = false
-        optionsWindow.delegate = self
-        self.optionsWebView = optionsWebView
-        self.optionsWindow = optionsWindow
-        applyWindowLevels()
-        optionsWindow.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
-    private func closeOptionsWindow() {
-        optionsWindow?.close()
-    }
-
     private func broadcastAppearanceSettings(_ settings: [String: Any]) {
         guard JSONSerialization.isValidJSONObject(settings),
               let data = try? JSONSerialization.data(withJSONObject: settings),
               let json = String(data: data, encoding: .utf8) else { return }
         let script = "window.__spcBoyWKEvent('appearanceSettingsChanged', \(json));"
         webView?.evaluateJavaScript(script, completionHandler: nil)
-        optionsWebView?.evaluateJavaScript(script, completionHandler: nil)
     }
 
     private func broadcastFrontendSettings(_ settings: SPCBoyPreferencesSnapshot) {
@@ -234,7 +187,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
               let json = String(data: data, encoding: .utf8) else { return }
         let script = "window.__spcBoyWKEvent('frontendSettingsChanged', \(json));"
         webView?.evaluateJavaScript(script, completionHandler: nil)
-        optionsWebView?.evaluateJavaScript(script, completionHandler: nil)
     }
 
     private func broadcastPlaybackEvent(name: String, payload: [String: Any]) {
@@ -251,16 +203,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
               let nameJSON = String(data: nameData, encoding: .utf8) else { return }
         let script = "window.__spcBoyWKEvent(\(nameJSON), \(json));"
         webView?.evaluateJavaScript(script, completionHandler: nil)
-        optionsWebView?.evaluateJavaScript(script, completionHandler: nil)
     }
 
     private func receiveFrontendSettings(_ settings: SPCBoyPreferencesSnapshot) {
         localBrowserEnabled = settings.localBrowserEnabled ?? false
         if let value = settings.mainWindowAlwaysOnTop {
             window?.level = value ? .floating : .normal
-        }
-        if let value = settings.settingsWindowAlwaysOnTop {
-            optionsWindow?.level = value ? .floating : .normal
         }
         NSApp.mainMenu?.update()
         broadcastFrontendSettings(settings)
@@ -270,11 +218,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         guard let data = UserDefaults.standard.data(forKey: "ViewBoy.frontendPreferencesV3"),
               let snapshot = try? JSONDecoder().decode(SPCBoyPreferencesSnapshot.self, from: data) else {
             window?.level = .normal
-            optionsWindow?.level = .normal
             return
         }
         window?.level = snapshot.mainWindowAlwaysOnTop == true ? .floating : .normal
-        optionsWindow?.level = snapshot.settingsWindowAlwaysOnTop == true ? .floating : .normal
     }
 
     private func choosePath(allowFiles: Bool) -> String? {
@@ -398,8 +344,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     @objc private func quit(_ sender: Any?) { NSApp.terminate(sender) }
     @objc private func closeWindow(_ sender: Any?) {
-        if NSApp.keyWindow === optionsWindow { optionsWindow?.performClose(sender) }
-        else { dispatchCustom("closePlaylistTab") }
+        dispatchCustom("closeWindow")
     }
     @objc private func newPlaylistTab(_ sender: Any?) { dispatchCustom("newPlaylistTab") }
     @objc private func minimizeWindow(_ sender: Any?) { (NSApp.keyWindow ?? window)?.performMiniaturize(sender) }
@@ -409,7 +354,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc private func sidebarDiskPath(_ sender: Any?) { dispatch(.sidebarDiskPath) }
     @objc private func favoritesPlaylist(_ sender: Any?) { dispatch(.favoritesPlaylist) }
     @objc private func settings(_ sender: Any?) {
-        showOptionsWindow()
+        dispatch(.settings)
     }
     @objc private func previous(_ sender: Any?) { dispatch(.previous) }
     @objc private func playPause(_ sender: Any?) { dispatch(.playPause) }
@@ -423,15 +368,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
-    }
-}
-
-extension AppDelegate: NSWindowDelegate {
-    func windowWillClose(_ notification: Notification) {
-        guard let closingWindow = notification.object as? NSWindow, closingWindow === optionsWindow else { return }
-        optionsWebView?.configuration.userContentController.removeAllUserScripts()
-        optionsWebView = nil
-        optionsWindow = nil
     }
 }
 

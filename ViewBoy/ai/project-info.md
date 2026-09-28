@@ -9,7 +9,7 @@ owning its app identity and phosphor display skin.
 ## Major Components
 
 - AppKit window, WebKit renderer, and typed native bridge.
-- ViewBoy-specific preferences and settings window.
+- ViewBoy-specific preferences and in-screen Options page.
 - WebKit/CSS interface and a transparent Metal phosphor overlay.
 - Shared CatalogReader catalog and browser projections.
 - Shared FrontendCore queue, archive, preferences, and transport policy.

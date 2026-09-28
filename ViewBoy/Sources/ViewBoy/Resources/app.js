@@ -243,10 +243,6 @@ refs.selectionAnimationEnabledCheckbox.addEventListener("change", (event) => {
 refs.mainWindowAlwaysOnTopCheckbox.addEventListener("change", (event) => {
   app.ui.setWindowAlwaysOnTop("mainWindowAlwaysOnTop", event.target.checked);
 });
-refs.settingsWindowAlwaysOnTopCheckbox.addEventListener("change", (event) => {
-  app.ui.setWindowAlwaysOnTop("settingsWindowAlwaysOnTop", event.target.checked);
-});
-
 refs.sidebarWidthInput.addEventListener("change", (event) => {
   app.ui.commitSidebarWidthInput(event.target.value);
 });
@@ -307,8 +303,7 @@ if (window.spcBoyWK?.onFrontendSettingsChanged) {
     if (settings.autoResizeAnimationEnabled !== undefined) state.autoResizeAnimationEnabled = settings.autoResizeAnimationEnabled !== false;
     if (settings.selectionAnimationEnabled !== undefined) state.selectionAnimationEnabled = settings.selectionAnimationEnabled !== false;
     if (settings.mainWindowAlwaysOnTop !== undefined) state.mainWindowAlwaysOnTop = Boolean(settings.mainWindowAlwaysOnTop);
-    if (settings.settingsWindowAlwaysOnTop !== undefined) state.settingsWindowAlwaysOnTop = Boolean(settings.settingsWindowAlwaysOnTop);
-    if (!window.spcBoyWK.isOptionsWindow && state.localBrowserEnabled && (!wasEnabled || previousRootPath !== state.rootPath || state.sidebarMode !== "diskPath")) {
+    if (state.localBrowserEnabled && (!wasEnabled || previousRootPath !== state.rootPath || state.sidebarMode !== "diskPath")) {
       window.spcBoyWK.refreshTree(state.rootPath, state.selectedFolderPath || state.rootPath)
         .then((snapshot) => {
           Object.assign(state, snapshot);
@@ -316,13 +311,13 @@ if (window.spcBoyWK?.onFrontendSettingsChanged) {
           app.ui.renderAll();
         })
         .catch((error) => console.error("[SPCBoy] local settings sync failed", error));
-    } else if (!window.spcBoyWK.isOptionsWindow && wasEnabled && !state.localBrowserEnabled) {
+    } else if (wasEnabled && !state.localBrowserEnabled) {
       state.sidebarMode = "consoles";
       app.ui.setSidebarMode("consoles").catch((error) => console.error(error));
     } else {
       app.ui.renderAll();
     }
-    if (!window.spcBoyWK.isOptionsWindow && timingChanged) {
+    if (timingChanged) {
       app.playback.refreshPlaybackForTimingChange().catch((error) => console.error("[SPCBoy] playback timing sync failed", error));
     }
     if (previousFavoriteSortOrder !== state.favoriteSortOrder) {
@@ -345,6 +340,9 @@ if (window.spcBoyWK?.onCatalogReloaded) {
 
 refs.optionsCloseButton.addEventListener("click", () => {
   app.ui.setOptionsOpen(false);
+});
+refs.optionsOpenButton.addEventListener("click", () => {
+  app.ui.setOptionsOpen(true);
 });
 
 refs.optionsInterfaceTab.addEventListener("click", () => {
@@ -473,12 +471,6 @@ refs.archiveCacheLimitSelect.addEventListener("change", (event) => {
   app.ui.setArchiveCacheLimit(event.target.value);
 });
 
-refs.optionsOverlay.addEventListener("click", (event) => {
-  if (event.target === refs.optionsOverlay) {
-    app.ui.setOptionsOpen(false);
-  }
-});
-
 let dragDepth = 0;
 
 function droppedPath(event) {
@@ -533,7 +525,7 @@ refs.sidebarViewToggleButton?.addEventListener("click", () => {
 if (window.spcBoyWK?.onTransportShortcut) {
   window.spcBoyWK.onTransportShortcut((action) => {
     if (action === "settings") {
-      window.spcBoyWK.openOptionsWindow().catch((error) => console.error(error));
+      app.ui.setOptionsOpen(true);
       return;
     }
 
@@ -717,7 +709,6 @@ app.ui.bootstrap().catch((error) => {
 });
 
 window.addEventListener("focus", () => {
-  if (window.spcBoyWK?.isOptionsWindow) return;
   app.ui.refreshFavorites()
     .then(() => {
       app.ui.renderSidebar();
