@@ -57,11 +57,13 @@ negative tag. Absence of a loop field means no loop was identified. Keep a
 positive loop map in structured member metadata and the player playlist; do
 not flatten it into duplicate `LOOP_*` tags.
 
-For raw XA, MetaManCore's `nativeMetadata.technicalFacts` can describe the
-reader's interpretation. Keep such facts out of the visible music-tag surface;
-retain only the structured values a decoder, player, or verified loop mapping
-actually needs. Do not duplicate them as `XA_*` tags. Suppress the reader's
-generic `comment: Sony XA header` placeholder; it is not a source comment.
+For raw XA, MetaManCore can report facts about the reader's interpretation.
+Do not serialize its broad `nativeMetadata.technicalFacts` object into a PSX
+UAC member. Retain a narrowly scoped structured value only when a decoder,
+player, or verified loop mapping needs it; keep source-sector evidence in the
+preservation report. Do not duplicate these facts as `XA_*` tags. Suppress the
+reader's generic `comment: Sony XA header` placeholder; it is not a source
+comment.
 `TXTP_*`, JoshW-specific, and other external-loop fields remain in research
 records, not playable member metadata.
 
@@ -91,19 +93,23 @@ Every playable XA member with a native loop carries:
 }
 ```
 
-For a Red Book member, use the native WAV/APE/FLAC tag interface as the
-candidate track surface. The exact tags and any manifest synchronization
-remain open under the PSX disc-audio profile. For XA, a UAC member object may
-carry the positive loop mapping a player needs because a raw sector member has
-no general-purpose tag block. Repeat a loop in the playlist only when the
-player requires it.
+For a Red Book member, project selected populated source tags directly into
+ordinary UAC member metadata as defined by the PSX disc-audio profile. Do not
+write a nested native-tag object. For XA, a UAC member object may carry the
+positive loop mapping a player needs because a raw sector member has no
+general-purpose tag block. Repeat a loop in the playlist only when the player
+requires it.
 
 Include the original CUE as a byte-exact ordinary member and point to it with
 `game.metadata.cue_sheet`. Add loop or sector research documents only when
 they support a concrete source-mapping or review need. Set identity uses the
 shared `game.metadata.set` object. A playlist points to audio members and
 contains playback fields only when a consumer needs them; it does not copy the
-audio payload.
+audio payload. A positive `playLengthMs` may support UACMan duration
+display/sorting and player playlist-duration readouts, but it is optional
+operational timing, not required to decode a member. Do not store
+`pregapFrames` in member metadata or playlist extras: no production consumer
+reads it, while the attached CUE preserves disc indexes and pregap information.
 
 Do not duplicate the full BIN or downloaded archive inside the UAC unless a
 future package explicitly elects to be self-contained. Keep the source BIN

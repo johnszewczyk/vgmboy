@@ -2,11 +2,11 @@
 
 ## Status and scope
 
-This profile sets the PSX-specific provenance and tag-surface boundaries. The
-exact track-tag vocabulary, native-tag passthrough versus UAC-manifest
-synchronization, and whether a UAC package is needed for a given soundtrack
-remain under discussion. Those choices must not be inferred from the SPC
-profile.
+This profile sets the PSX-specific provenance and tag-surface boundaries.
+Keep the PSX surface concise and flat; do not inherit SPC-specific hashes or
+metadata policy. Selected ordinary tags belong directly in UAC package/member
+metadata so UACMan can read them without opening the audio payload. The source
+audio bytes remain unchanged.
 
 The [2026-09-26 Redump cleanup report](Reports/PSX-Redump-Metadata-Cleanup-2026-09-26.md)
 records packages built under the previous tag and hash rules. It remains a
@@ -40,11 +40,29 @@ remain in the [PSX preservation protocol](../protocols/PSX-CDXA.protocol.md).
 
 ## Track tag surface
 
-There is no approved PSX-wide track-tag allowlist yet. Keep tag names and
-values in the APE/FLAC native tag interface when present. Whether UAC should
-pass those tags through or synchronize selected values into its manifest is
-open; do not duplicate native values in the manifest merely to make them
-visible twice.
+Use proper Title Case for visible tag names and store each selected value as an
+ordinary, direct UAC metadata field. Do not create a `NativeMetadata` object or
+copy the full reader output into a hidden/nested map. The unchanged APE/FLAC
+member remains the byte-exact preservation copy of its native tags. Project
+only useful, populated, source-backed values to UAC metadata; do not duplicate
+one fact under aliases.
+
+Current PSX projection direction:
+
+| Field | UAC location and rule |
+| --- | --- |
+| Platform | Use the shared `game.console` field with value `PSX`. Present it to users as **Platform**; do not add duplicate `system` or `platform` metadata keys. |
+| Album | Use the standard **Album** member tag for the established game/soundtrack title (for example, `Darkstalkers - The Night Warriors`). Do not add a parallel `Game` tag or append the region to Album. |
+| Region | Keep the release region once at package scope as `game.metadata["Region"]`, using the two-letter code (for example, `US`). Use the same code in the package filename, such as `(US)`, not `(USA)`. |
+| Title and credits | Preserve populated, useful, source-backed tags such as **Title**, **Artist**, **Composer**, **Publisher**, and **Developer** under those names. Do not infer credits from a game's company identity or synthesize a title from a filename. |
+| Year and Date | Keep populated, source-backed values under **Year** and **Date**. Do not invent values or add blank tags. |
+| Contained / Subcontainer | Prefer the concise label **Contained** for the proposed common field. Its value vocabulary and whether it describes each member or the package still need a shared UAC contract decision; until then, do not emit competing `format`, `Contained`, and `Subcontainer` aliases. |
+
+Do not create a visible `Disc Track Number` or `discTrackNumber` tag. The
+byte-exact attached CUE carries physical disc track numbers and indexes; the
+ordered UAC playlist carries playback order. Do not conflate those two number
+spaces. A conventional audio track number may be added only if a consumer
+requires it and its sequence is explicitly defined.
 
 Do not synthesize a title from a filename, a generic “Redbook Audio Track”
 label, an album from a game filename, or credits from game-level information.
@@ -54,29 +72,35 @@ reviewed as source metadata; its absence does not authorize a fallback value.
 The following do not belong on the music-tag surface:
 
 - Red Book/CD-DA's fixed sample format or generic format label, including
-  `system: Standard audio`.
+  `format` or `system: Standard audio` tags.
 - APE encoder/version/compression details, reader diagnostics, or a nested
-  technical/verification object presented as if it were one ordinary tag.
+  `NativeMetadata`, technical, or verification object on the PSX music-tag
+  surface.
 - CUE indexes, pregap values, region, and source-set facts repeated on every
-  track when the attached CUE or package source record already carries them.
+  track when the attached CUE or package metadata already carries them.
 - Negative loop markers. Store a loop only when the PSX source research
   establishes a positive loop; otherwise omit loop fields.
 
-Measured playback duration may be retained as operational timing data where a
-UAC consumer needs it. It is not a music-tag decision. XA reader facts and
-source-sector mappings are handled by the XA preservation protocol; do not
-flatten them into invented `XA_*` tags.
+`playLengthMs` is optional operational timing, not a music tag and not a
+decode-required field. UACMan uses it for duration display and sorting;
+catalog/player presentation uses it for track length and playlist-total
+readouts. Keep a positive, source-backed value when those readouts benefit, but
+do not invent a fallback or mistake it for a decoder instruction.
 
-The profile does not yet resolve whether the visible track fields should use
-`Album`, `Game Title`, or another game/OST distinction; how physical CUE track
-numbers relate to audio-only sequence numbers; how unnamed tracks should appear;
-or which source can establish artist, composer, publisher, developer, year, or
-official OST titles. Leave those values unchanged or absent pending review.
+`pregapFrames` has no production consumer in the inspected UACMan, ScanSong, or
+CocoaSpice source. The attached CUE already records physical indexes/pregaps,
+and the current extraction keeps the audio samples in the member. Do not copy
+`pregapFrames` into track metadata or playlist extras; retain the CUE unchanged.
 
-If a future profile decision mirrors native tags into the manifest, use the
-UAC tag-map contract: a JSON object keyed by the original tag name, with arrays
-for repeated values in source order. This storage shape does not decide which
-tags are visible in the UACMan tag grid.
+XA reader facts and source-sector mappings belong only in the preservation
+record where a decoder or verified loop mapping needs them. Do not serialize a
+broad `NativeMetadata` object or flatten reader facts into invented `XA_*`
+tags. Keep any required positive loop mapping in its playback structure and
+source-sector evidence in the report.
+
+For this PSX profile, selected source tags are projected as direct member
+metadata fields; unselected native tags remain only in the byte-identical audio
+member. Do not create a native-tag map or an alternate `{name, value}` list.
 
 ## XA interpretation
 
@@ -94,9 +118,10 @@ protocol.
    files solely to repeat already established provenance.
 2. Preserve and include the source CUE byte-for-byte when making a UAC, with a
    package-level CUE reference. Keep source BIN checksums at source scope.
-3. Review actual APE/FLAC tags before deciding what to surface. Record which
-   values are present in the member, which came from the CUE, and which would
-   be newly authored. Do not auto-promote filenames, parser placeholders, or
+3. Review actual APE/FLAC tags before deciding what to surface. Project only
+   populated, useful, source-backed fields from the profile above. Record which
+   values came from the member, which came from the CUE, and which would be
+   newly authored. Do not auto-promote filenames, parser placeholders, or
    disc-format facts.
 4. Decide per soundtrack whether tagged audio plus the CUE is sufficient or a
    UAC bundle is useful. If a UAC is built, use the normal wrapper integrity
