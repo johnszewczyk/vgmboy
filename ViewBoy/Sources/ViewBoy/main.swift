@@ -6,8 +6,6 @@ import WebKit
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var window: NSWindow?
     private weak var webView: WKWebView?
-    private var localBrowserEnabled = false
-    private var playlistTabShortcutMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
@@ -27,10 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         nativeBridge.onPlaybackEvent = { [weak self] name, payload in
             self?.broadcastPlaybackEvent(name: name, payload: payload)
         }
-        nativeBridge.onMaterialGeometry = { [weak self] geometry in
-            (self?.window?.contentView as? ViewBoySurfaceView)?.updateMaterialGeometry(geometry)
-        }
-        let webView = makeWebView(bridge: nativeBridge, includeCommandDispatcher: true)
+        let webView = makeWebView(bridge: nativeBridge)
         self.webView = webView
         nativeBridge.attachPlaybackEvents(to: webView)
         installApplicationMenu()
@@ -47,129 +42,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         )
         window.title = "ViewBoy"
         window.tabbingMode = .disallowed
-        window.contentView = ViewBoySurfaceView(webView: webView)
+        window.contentView = webView
         if !window.setFrameAutosaveName("ViewBoy.Main") {
             window.center()
         }
         window.makeKeyAndOrderFront(nil)
         self.window = window
-        playlistTabShortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self,
-                  NSApp.keyWindow === self.window,
-                  event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-                  let character = event.charactersIgnoringModifiers,
-                  let digit = character.first?.wholeNumberValue,
-                  (1...9).contains(digit) else { return event }
-            self.dispatchCustom("selectPlaylistTab:\(digit)")
-            return nil
-        }
         applyWindowLevels()
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func makeWebView(bridge: WKNativeBridge, includeCommandDispatcher: Bool) -> WKWebView {
+    private func makeWebView(bridge: WKNativeBridge) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.userContentController.add(bridge, name: "spcBoyWK")
         configuration.userContentController.addUserScript(bridge.userScript())
-        if includeCommandDispatcher {
-            configuration.userContentController.addUserScript(WKUserScript(
-                source: """
-                (() => {
-                  const selectors = {
-                    deck: '.player-deck', bezel: '.deck-screen-bezel',
-                    screen: '.deck-screen', led: '.deck-power-led'
-                  };
-                  let pending = false;
-                  const report = () => {
-                    pending = false;
-                    const width = document.documentElement.clientWidth;
-                    const height = document.documentElement.clientHeight;
-                    if (!width || !height) return;
-                    const geometry = { method: 'viewBoyMaterialGeometry' };
-                    for (const [key, selector] of Object.entries(selectors)) {
-                      const element = document.querySelector(selector);
-                      if (!element) return;
-                      const r = element.getBoundingClientRect();
-                      geometry[key] = [r.x / width, r.y / height, r.width / width, r.height / height];
-                    }
-                    window.webkit.messageHandlers.spcBoyWK.postMessage(geometry);
-                  };
-                  const queue = () => {
-                    if (!pending) { pending = true; requestAnimationFrame(report); }
-                  };
-                  const start = () => {
-                    const observer = new ResizeObserver(queue);
-                    for (const selector of Object.values(selectors)) {
-                      const element = document.querySelector(selector);
-                      if (element) observer.observe(element);
-                    }
-                    window.addEventListener('resize', queue, { passive: true });
-                    queue();
-                  };
-                  if (document.readyState === 'loading') {
-                    document.addEventListener('DOMContentLoaded', start, { once: true });
-                  } else { start(); }
-                })();
-                """,
-                injectionTime: .atDocumentEnd,
-                forMainFrameOnly: true
-            ))
-        }
-        if includeCommandDispatcher {
-            configuration.userContentController.addUserScript(WKUserScript(
-                source: """
-                window.SPCBoyWK = (() => {
-                  const pending = [];
-                  function dispatch(command) {
-                    const app = window.SPCBoyApp;
-                    if (!app) {
-                      pending.push(command);
-                      return;
-                    }
-                    const playlistTabPrefix = "selectPlaylistTab:";
-                    if (command.startsWith(playlistTabPrefix)) {
-                      app.ui?.activatePlaylistTabAtIndex?.(Number(command.slice(playlistTabPrefix.length)) - 1);
-                      return;
-                    }
-                    switch (command) {
-                      case "previous": app.playback?.playAdjacent(-1); break;
-                      case "playPause": app.playback?.togglePlayback?.(); break;
-                      case "next": app.playback?.playAdjacent(1); break;
-                      case "newPlaylistTab": app.ui?.createPlaylistTab?.(); break;
-                      case "closePlaylistTab": app.ui?.closePlaylistTab?.(); break;
-                      case "closeWindow":
-                        if (app.state?.optionsOpen) app.ui?.setOptionsOpen?.(false);
-                        else app.ui?.closePlaylistTab?.();
-                        break;
-                      case "openPath":
-                        window.spcBoyWK?.choosePath?.().then((snapshot) => {
-                          if (snapshot) app.ui?.applyLibrarySnapshot?.(snapshot);
-                        });
-                        break;
-                      case "sidebarPaths": app.ui?.setSidebarMode?.("paths"); break;
-                      case "sidebarConsoles": app.ui?.setSidebarMode?.("consoles"); break;
-                      case "sidebarDiskPath":
-                        if (app.state?.localBrowserEnabled && app.state?.rootPath) {
-                          app.ui?.setSidebarMode?.("diskPath");
-                        } else {
-                          window.spcBoyWK?.choosePath?.().then((snapshot) => {
-                            if (snapshot) app.ui?.applyLibrarySnapshot?.(snapshot);
-                          });
-                        }
-                        break;
-                      case "favoritesPlaylist": app.ui?.showFavoritesPlaylist?.(); break;
-                      case "settings": app.ui?.setOptionsOpen?.(true); break;
-                      default: break;
-                    }
-                  }
-                  window.addEventListener("load", () => pending.splice(0).forEach(dispatch), { once: true });
-                  return { dispatch };
-                })();
-                """,
-                injectionTime: .atDocumentStart,
-                forMainFrameOnly: true
-            ))
-        }
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: """
+            window.__viewBoyCommandQueue = [];
+            window.SPCBoyWK = {
+              dispatch(command) { window.__viewBoyCommandQueue.push(command); }
+            };
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        ))
         let webView = WKWebView(frame: .zero, configuration: configuration)
         return webView
     }
@@ -190,12 +86,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     private func broadcastPlaybackEvent(name: String, payload: [String: Any]) {
-        if (name == "nativePlaybackState" || name == "nativePlaybackEnded"),
-           let transportState = payload["transport_state"] as? String,
-           let generation = payload["generation"] as? Int {
-            (window?.contentView as? ViewBoySurfaceView)?
-                .updatePlaybackVisual(transportState: transportState, generation: generation)
-        }
         guard JSONSerialization.isValidJSONObject(payload),
               let data = try? JSONSerialization.data(withJSONObject: payload),
               let json = String(data: data, encoding: .utf8),
@@ -206,7 +96,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     private func receiveFrontendSettings(_ settings: SPCBoyPreferencesSnapshot) {
-        localBrowserEnabled = settings.localBrowserEnabled ?? false
         if let value = settings.mainWindowAlwaysOnTop {
             window?.level = value ? .floating : .normal
         }
@@ -263,19 +152,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let fileMenuItem = NSMenuItem()
         let fileMenu = NSMenu(title: "File")
         fileMenu.addItem(menuItem("Open Path…", command: .openPath, action: #selector(openPath(_:))))
-        let newPlaylistItem = NSMenuItem(title: "New Playlist Tab", action: #selector(newPlaylistTab(_:)), keyEquivalent: "t")
-        newPlaylistItem.target = self
-        fileMenu.addItem(newPlaylistItem)
         fileMenuItem.submenu = fileMenu
         mainMenu.addItem(fileMenuItem)
 
         let viewMenuItem = NSMenuItem()
         let viewMenu = NSMenu(title: "View")
-        viewMenu.addItem(menuItem(FrontendSidebarView.consoles.title, command: .sidebarConsoles, action: #selector(sidebarConsoles(_:))))
-        viewMenu.addItem(menuItem(FrontendSidebarView.paths.title, command: .sidebarPaths, action: #selector(sidebarPaths(_:))))
-        viewMenu.addItem(menuItem("Favorites Playlist", command: .favoritesPlaylist, action: #selector(favoritesPlaylist(_:))))
-        viewMenu.addItem(.separator())
-        viewMenu.addItem(menuItem("Local Files", command: .sidebarDiskPath, action: #selector(sidebarDiskPath(_:))))
+        viewMenu.addItem(NSMenuItem(title: "Library", action: #selector(showLibrary(_:)), keyEquivalent: "1").configured { $0.target = self })
+        viewMenu.addItem(NSMenuItem(title: "Queue", action: #selector(showQueue(_:)), keyEquivalent: "2").configured { $0.target = self })
         viewMenuItem.submenu = viewMenu
         mainMenu.addItem(viewMenuItem)
 
@@ -290,7 +173,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let windowMenuItem = NSMenuItem()
         let windowMenu = NSMenu(title: "Window")
         windowMenu.addItem(menuItem("Minimize", command: .minimizeWindow, action: #selector(minimizeWindow(_:))))
-        windowMenu.addItem(menuItem("Close Playlist", command: .closeWindow, action: #selector(closeWindow(_:))))
+        windowMenu.addItem(menuItem("Close Window", command: .closeWindow, action: #selector(closeWindow(_:))))
         windowMenuItem.submenu = windowMenu
         mainMenu.addItem(windowMenuItem)
         NSApp.windowsMenu = windowMenu
@@ -346,13 +229,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc private func closeWindow(_ sender: Any?) {
         dispatchCustom("closeWindow")
     }
-    @objc private func newPlaylistTab(_ sender: Any?) { dispatchCustom("newPlaylistTab") }
+    @objc private func showLibrary(_ sender: Any?) { dispatchCustom("library") }
+    @objc private func showQueue(_ sender: Any?) { dispatchCustom("queue") }
     @objc private func minimizeWindow(_ sender: Any?) { (NSApp.keyWindow ?? window)?.performMiniaturize(sender) }
     @objc private func openPath(_ sender: Any?) { dispatch(.openPath) }
-    @objc private func sidebarPaths(_ sender: Any?) { dispatch(.sidebarPaths) }
-    @objc private func sidebarConsoles(_ sender: Any?) { dispatch(.sidebarConsoles) }
-    @objc private func sidebarDiskPath(_ sender: Any?) { dispatch(.sidebarDiskPath) }
-    @objc private func favoritesPlaylist(_ sender: Any?) { dispatch(.favoritesPlaylist) }
     @objc private func settings(_ sender: Any?) {
         dispatch(.settings)
     }
@@ -360,11 +240,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc private func playPause(_ sender: Any?) { dispatch(.playPause) }
     @objc private func next(_ sender: Any?) { dispatch(.next) }
 
-    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        guard menuItem.action == #selector(sidebarConsoles(_:))
-                || menuItem.action == #selector(sidebarPaths(_:)) else { return true }
-        return !localBrowserEnabled
-    }
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool { true }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true

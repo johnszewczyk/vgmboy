@@ -1,44 +1,7 @@
 # ViewBoy Integration
 
-## Scope
+ViewBoy owns its AppKit host, Yoga canvas presentation, in-screen Options page, and preference namespace. CatalogReader supplies read-only game and track projections; FrontendCore supplies queue, archive, preference, and transport contracts; VGMBoy supplies decoding and audio. Keep package dependencies relative to their sibling repositories.
 
-Keep the independent ViewBoy app identity attached to the shared VGMMan
-packages without forking catalog or playback behavior.
+The bundle identifier is `com.john.viewboy`. The injected bridge remains `window.spcBoyWK`, and the macOS menu dispatcher remains `window.SPCBoyWK.dispatch`. The current menus expose only implemented Library, Queue, Settings, Open Path, and transport actions. Playlist tabs and Favorites from the retired interface have not been ported.
 
-## Ownership
-
-- ViewBoy owns its AppKit host, WebKit surface, display resources, in-screen
-  Options page, and preference namespace.
-- CatalogReader owns catalog reads and browser projections.
-- FrontendCore owns shared archive, queue, preferences, and transport policy.
-- VGMBoy owns format admission, decoding, timing, and audio output.
-
-## Invariants
-
-- Package dependencies are relative siblings in the VGMMan tree.
-- Bundle identifier is `com.john.viewboy`; deployment minimum agrees between
-  `Package.swift` and `app-info.plist`.
-- Keep the renderer dispatcher named `window.SPCBoyWK` until a deliberate
-  bridge migration updates both native and renderer clients together.
-- `PlaylistTabsStore` persists only ViewBoy playlist presentation in its own
-  application-support directory. Tab switches leave the shared playback
-  session and queue untouched.
-- The app must not write catalogs, add a private archive extractor, or create
-  another decoder/playback implementation.
-
-## Build and Verification
-
-- `./build.sh` cleans `.build`, builds the release executable, packages the app,
-  and signs it.
-- `./launch.sh` builds first and opens `.build/ViewBoy.app`.
-- Run `node --test Tests/ViewBoyTransport.test.js` for the renderer and bridge
-  contract; use the family verifier for package integration.
-
-## Files
-
-- `Package.swift`
-- `build.sh`
-- `launch.sh`
-- `app-info.plist`
-- `Sources/ViewBoy/PlaylistTabsStore.swift`
-- `Sources/ViewBoy/Resources/viewboy-tabs.js`
+`./build.sh` makes a clean release app and signs it. `./launch.sh` then opens that app. Validate the packaged canvas and live catalog/transport at the app boundary; syntax or Swift compilation alone does not establish interactive behavior.

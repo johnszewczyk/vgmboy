@@ -1,19 +1,9 @@
 # ViewBoy
 
-ViewBoy is the VGMMan family's phosphor-styled native WebKit player. It is a
-separate frontend from SPCBoyWK, with its own app identity, visual resources,
-and preferences. Both frontends use the shared catalog and playback packages.
+ViewBoy is the VGMMan family's native macOS Yoga LCD player. Its compact, four-shade canvas front end reads the shared catalog and sends playback through VGMBoy. AppKit and WebKit host the screen and native bridge; CatalogReader, FrontendCore, and VGMBoy retain their shared responsibilities.
 
-ViewBoy reads the schema-24 catalog through CatalogReader and sends playback
-requests through FrontendCore to VGMBoy. It does not scan or write catalogs,
-decode audio, or own archive extraction policy.
+Run `./launch.sh` from this directory to build, package, and open `.build/ViewBoy.app`. The current screen has a system/game sidebar, track table, full-width Queue page, transport buttons, and a full-screen Options page. Double-click or press Enter on a track to play; Space toggles playback. Open Path in the File menu loads local tracks.
 
-From this directory, run `./launch.sh` to clean-build, package, and open
-`.build/ViewBoy.app`. `node --test Tests/ViewBoyTransport.test.js` runs the
-renderer and bridge contract tests.
+`node --test Tests/YogaCanvas.test.mjs` exercises the canvas module with the real Yoga runtime and a simulated native catalog/playback bridge.
 
-For engineering routes, read [`AGENTS.md`](AGENTS.md), then
-[`ai/project-info.md`](ai/project-info.md). The phosphor presentation is
-described in [`ai/subsystem-human/display.md`](ai/subsystem-human/display.md).
-Current UI parity and open checks are in
-[`ai/reports/frontend-parity.md`](../ai/reports/frontend-parity.md).
+Read `AGENTS.md`, then `ai/project-info.md` for implementation routes and current limits. The retired interface is recoverable from `LocalRecovery/ViewBoy/ViewBoy-webkit-9a2048ed.zip`.

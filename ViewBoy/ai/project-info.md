@@ -1,53 +1,18 @@
 # Project Info
 
-## Product
+ViewBoy is the VGMMan family's native macOS player with a screen-first Yoga LCD front end. AppKit hosts one WKWebView. The web view paints a four-shade framebuffer into a canvas; native Swift retains the catalog, preferences, archive, and VGMBoy playback bridge. The former DOM/CSS Game Boy interface was archived in `LocalRecovery/ViewBoy/ViewBoy-webkit-9a2048ed.zip` before its resources were removed.
 
-ViewBoy is a native macOS WebKit frontend in the VGMMan family. It shares
-catalog, archive, queue, and playback services with the other frontends while
-owning its app identity and phosphor display skin.
+## Routes
 
-## Major Components
+- Display and pixel scale: `subsystem-human/display.md`.
+- In-screen settings: `subsystem-human/options.md`.
+- Playback: `subsystem-human/playback.md`.
+- Native bridge and app packaging: `subsystem-agent/webkit-host.md` and `subsystem-agent/viewboy-integration.md`.
+- Source exploration and transition: `investigations/yoga-lcd-canvas-preview.md`.
 
-- AppKit window, WebKit renderer, and typed native bridge.
-- ViewBoy-specific preferences and in-screen Options page.
-- WebKit/CSS interface and a transparent Metal phosphor overlay.
-- Shared CatalogReader catalog and browser projections.
-- Shared FrontendCore queue, archive, preferences, and transport policy.
-- Shared VGMBoy decoder, timing, and audio playback.
+## Boundaries
 
-## Task Routing
-
-Human-facing behavior:
-
-- Display and phosphor treatment: `subsystem-human/display.md`.
-- Settings and preferences: `subsystem-human/options.md`.
-- Playback and transport: `subsystem-human/playback.md`.
-- Playlist tabs and shortcuts: `subsystem-human/playlist-tabs.md`.
-
-Engineering constraints:
-
-- Shared sidebar behavior: `subsystem-agent/shared-sidebar-core.md`.
-- WebKit host and bridge: `subsystem-agent/webkit-host.md`.
-- App identity, package links, and build boundary:
-  `subsystem-agent/viewboy-integration.md`.
-
-Design exploration:
-
-- Screen-first Yoga canvas preview (standalone exploration, not packaged UI):
-  [Yoga LCD canvas preview](investigations/yoga-lcd-canvas-preview.md).
-
-## Local Rules
-
-- Build dependencies are sibling packages `../CatalogReader`, `../FrontendCore`,
-  and `../VGMBoy`; keep those paths relative and do not copy shared behavior.
-- Catalog access is read-only. ScanSong is the only catalog writer.
-- Keep decoder selection, audio output, timing, and transport policy in VGMBoy
-  and FrontendCore; this app owns presentation and bridge adaptation.
-- Keep ViewBoy preference keys and bundle identity separate from SPCBoyWK.
-- Keep the inherited `window.SPCBoyWK` dispatcher stable until a typed bridge
-  migration is separately scoped.
-- `launch.sh` performs a clean release build and opens the packaged app.
-
-## Human Docs
-
-Human-facing behavior is documented in the routed `subsystem-human/` notes.
+- ViewBoy owns layout, hit testing, the bitmap font, framebuffer, AppKit host, and its preference namespace.
+- CatalogReader reads the ScanSong catalog. ViewBoy never writes it.
+- FrontendCore owns shared queue and transport policy; VGMBoy owns decoding, timing, and audio output.
+- `launch.sh` builds, packages, signs, and opens the application.
