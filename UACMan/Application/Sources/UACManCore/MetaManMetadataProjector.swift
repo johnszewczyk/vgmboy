@@ -4,11 +4,13 @@ import UACWrapperCore
 
 /// Projects MetaMan's lossless read result into format-neutral UAC member
 /// metadata. Native file bytes stay untouched; raw metadata payloads are
-/// represented by their names and sizes while ordered decoded tags and facts
-/// remain available for inspection.
+/// represented by their names and sizes while decoded native tags and facts
+/// remain available for inspection. Native tags use their source names as JSON
+/// object keys; repeated names retain their values in source order.
 public enum MetaManMetadataProjector {
     public static func memberFields(from document: MetadataDocument) -> [String: UACJSONValue] {
         var member: [String: UACJSONValue] = [:]
+        var canonicalValuesByName: [String: String] = [:]
         let commonFields: [(String, String?)] = [
             ("title", document.fields.title),
             ("game", document.fields.game),
@@ -25,6 +27,7 @@ public enum MetaManMetadataProjector {
         for (key, value) in commonFields {
             if let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 member[key] = .string(value)
+                canonicalValuesByName[key.lowercased()] = value
             }
         }
         if let timing = document.timing {
@@ -55,12 +58,28 @@ public enum MetaManMetadataProjector {
             ])
         }
 
+        var tagValues: [String: [String]] = [:]
+        for tag in document.tags {
+            tagValues[tag.name, default: []].append(tag.value)
+        }
+        let tagMap = tagValues.reduce(into: [String: UACJSONValue]()) { result, entry in
+            let (sourceName, values) = entry
+            // A one-to-one source tag already represented by the same canonical
+            // UAC value adds no information. Repeated source names and values
+            // that differ from the canonical projection remain preserved.
+            if values.count == 1,
+               let canonicalValue = canonicalValuesByName[sourceName.lowercased()],
+               canonicalValue == values[0] {
+                return
+            }
+            result[sourceName] = values.count == 1
+                ? .string(values[0])
+                : .array(values.map(UACJSONValue.string))
+        }
+
         var native: [String: UACJSONValue] = [
             "format": .string(document.format),
-            "tags": .array(document.tags.map { .object([
-                "name": .string($0.name),
-                "value": .string($0.value)
-            ]) }),
+            "tags": .object(tagMap),
             "technicalFacts": .object(document.technicalFacts.mapValues(UACJSONValue.string)),
             "diagnostics": .array(document.diagnostics.map(UACJSONValue.string))
         ]

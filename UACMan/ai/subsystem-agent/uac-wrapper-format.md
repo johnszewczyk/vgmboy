@@ -69,6 +69,32 @@ The required top-level fields are `manifestVersion` (`1` or `2`), `packageID`,
 `payload`, `game`, `variants`, `members`, `playlists`, `sources`,
 `transformations`, and `extensions`.
 
+### Manifest fields and tags
+
+Each UAC has one manifest: its JSON record in the UAC metadata frame. Tags are
+key/value fields inside that manifest, primarily in `game.metadata` and
+`member.metadata`; the manifest is not a second tag store. The GUI reads and
+edits these stored fields only. It does not inspect member contents or invoke
+format readers to fill or refresh tags. The UACMan command-line tools may use
+MetaMan before packaging to read source formats and project their tags into
+the manifest.
+
+When a profile retains source-native tags, `member.metadata.nativeMetadata.tags`
+is a JSON object keyed by each exact source tag name, for example
+`{"Discnumber":"1"}`. A repeated source tag name has one key whose value is an
+array in source order. Do not store MetaMan reader records as
+`[{"name":"Discnumber","value":"1"}]`: `name` and `value` are fields of
+MetaMan's in-memory reader model, not UAC tag names. This tuple-list shape
+creates another representation of the same tag and makes a generic manifest
+editor display the misleading `name` and `value` rows. Canonical UAC fields
+and preserved source-native tags serve different purposes, but must not
+duplicate the same fact. If one source tag name maps directly to a canonical
+UAC field and its single value exactly matches that field, omit it from
+`nativeMetadata.tags`. Keep repeated source names, differently valued source
+tags, and source tags with no canonical UAC field under their original names.
+This keeps one canonical value for ordinary fields while retaining source
+information that the canonical projection does not represent.
+
 The envelope header remains binary version 1.0. `manifestVersion` versions the
 JSON contract independently: new writers emit manifest version 2, while
 current readers retain support for version 1 packages. Older readers that only
@@ -85,16 +111,18 @@ before distributing newly packed files.
   list notes, text files, Markdown, and other documentation. These open JSON
   fields do not change member bytes. References should resolve to manifest
   member paths, and image/document payloads remain independently hashed members.
-  When source records establish one clear collection and set, the package may
-  expose distinct scalar tags `game.metadata.setCollection`,
-  `game.metadata.setName`, and `game.metadata.setUrl`. Optional legacy and archive
-  links use `setLegacyUrl` and `setArchiveUrl`. A set date is included only when
-  the source provides a trustworthy date. These are package-level tags, not
-  track tags; do not nest them under a `set` object or bundle them into an array.
+  When source records establish one clear collection and set, the package
+  exposes one structured package-level tag at `game.metadata.set`:
+  `{"collection":"…","name":"…","url":"…"}`. Optional legacy and
+  archive links are fields on that same object (`legacyUrl` and `archiveUrl`).
+  A set date is included only when the source provides a trustworthy date.
+  This is a package-level tag, not a track tag. The former scalar fields
+  `setCollection`, `setName`, `setUrl`, `setLegacyUrl`, and `setArchiveUrl` are
+  legacy input accepted for migration only; new writers must not emit them.
   The complete source records remain authoritative in `sources[]`; omit the
   projection when sources conflict or no trustworthy URL is available.
-  Project2612 uses `setUrl` for the current VGMRips system listing,
-  `setLegacyUrl` for the original `project2612.org` address, and `setArchiveUrl`
+  Project2612 uses `set.url` for the current VGMRips system listing,
+  `set.legacyUrl` for the original `project2612.org` address, and `set.archiveUrl`
   for its Wayback snapshot. Project2612 is defunct; the VGMRips directory link is
   not a claim that every historic pack was migrated one-to-one. The `enrich-sets`
   command adds these tags to existing packages as a manifest-only rewrite and
@@ -223,8 +251,8 @@ before distributing newly packed files.
   concept, and must not emit synonymous aliases. For example, the canonical
   system identity is `game.console`; do not also write the same value as
   `game.metadata.system` or `platform`. Package set tags use
-  `game.metadata.setCollection`, `setName`, `setUrl`,
-  `setLegacyUrl`, and `setArchiveUrl`, while source-specific identifiers remain
+  `game.metadata.set` with `collection`, `name`, and `url` fields (and optional
+  `legacyUrl`, `archiveUrl`, or `date`), while source-specific identifiers remain
   in their documented `sources[]` fields. Common attachment keys include
   `game.metadata.cover_front`, `cover_back`, `cue_sheet`, and `documents`.
   Format-specific and genuinely user-defined fields remain open-ended typed
@@ -236,9 +264,19 @@ before distributing newly packed files.
   a common field. MetaManCore owns native-tag parsing. The UACMan creation-time
   bridge consumes its structured projection; the wrapper does not implement
   or duplicate format parsers. UAC catalog scans trust the stored manifest
-  instead of re-reading member tags. Native source tags and member bytes remain
-  unchanged; normalization applies only to the UAC manifest projection, while
-  MetaMan's retained raw/ordered metadata preserves source spelling and order.
+  instead of re-reading member tags. Format profiles own the reader-to-UAC tag
+  mapping. When a profile retains decoded native tags in
+  `member.metadata.nativeMetadata.tags`, serialize a JSON object keyed by each
+  original tag name, such as `{"body":"10"}`; repeated names use an array of
+  values in source order. Do not serialize MetaMan's `{name, value}` reader
+  records as an array of objects. MetaMan currently reports decoded tag values
+  as strings; use a numeric or other JSON type only when a format profile and
+  reader establish that type. Native member bytes preserve original ordering,
+  encoding, duplicate layout, and undecoded data. A format profile may omit the
+  native tag map when it would duplicate canonical fields or the unchanged
+  source member is the designated preservation copy. Existing manifests using
+  the older name/value-array form remain valid input and are not rewritten by
+  readers.
 
 Member paths are relative POSIX paths. Manifest version 1 places every
 variant member below `variants/<variantID>/`. Version 2 uses the source-relative

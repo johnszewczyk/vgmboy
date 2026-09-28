@@ -56,7 +56,7 @@ import UACWrapperCore
     #expect(try Data(contentsOf: memberURL) == fixture)
 }
 
-@Test func apeDirectoryHarvestKeepsUnknownNativeTagsInTheUACProjection() throws {
+@Test func apeDirectoryHarvestKeysNativeTagMapBySourceName() throws {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("uac-ape-harvest-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -67,20 +67,37 @@ import UACWrapperCore
         at: memberURL.deletingLastPathComponent(),
         withIntermediateDirectories: true
     )
-    let fixture = makeAPEFixture(tags: [("Title", "Lossless track"), ("X-Producer", "Studio=One")])
+    let fixture = makeAPEFixture(tags: [
+        ("Title", "Lossless track"),
+        ("Album", "Studio album"),
+        ("Discnumber", "1"),
+        ("Tracknumber", "1"),
+        ("X-Producer", "Studio=One"),
+        ("body", "10"),
+        ("X-Repeated", "first"),
+        ("X-Repeated", "second")
+    ])
     try fixture.write(to: memberURL)
 
     let outcome = try MetaManMetadataHarvester.harvest(directoryURL: root, formatExtension: "ape")
     let metadata = outcome.memberMetadata["Album/track.ape"]
     #expect(outcome.failures.isEmpty)
     #expect(metadata?["title"] == .string("Lossless track"))
+    #expect(metadata?["album"] == .string("Studio album"))
+    #expect(metadata?["game"] == .string("Studio album"))
     if case let .object(native)? = metadata?["nativeMetadata"],
-       case let .array(tags)? = native["tags"] {
-        #expect(tags.contains(.object([
-            "name": .string("X-Producer"), "value": .string("Studio=One")
-        ])))
+       case let .object(tags)? = native["tags"] {
+        #expect(tags["Title"] == nil)
+        #expect(tags["Album"] == nil)
+        #expect(tags["Discnumber"] == .string("1"))
+        #expect(tags["Tracknumber"] == .string("1"))
+        #expect(tags["X-Producer"] == .string("Studio=One"))
+        #expect(tags["body"] == .string("10"))
+        #expect(tags["X-Repeated"] == .array([.string("first"), .string("second")]))
+        #expect(tags["name"] == nil)
+        #expect(tags["value"] == nil)
     } else {
-        Issue.record("The UAC projection must retain MetaMan's ordered native tags.")
+        Issue.record("Native tags must be keyed by their source names in the UAC projection.")
     }
     #expect(try Data(contentsOf: memberURL) == fixture)
 }
