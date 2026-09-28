@@ -3,15 +3,18 @@ import test from 'node:test';
 
 const canvas = {
   style: {},
+  frames: 0,
   addEventListener() {},
   focus() {},
   getContext() { return {
     createImageData(width, height) { return { data: new Uint8ClampedArray(width * height * 4) }; },
-    putImageData(image) { canvas.image = image; },
+    putImageData(image) { canvas.image = image; canvas.frames += 1; },
   }; },
 };
 const status = { textContent: '' };
-const screen = { getBoundingClientRect() { return { width: 800, height: 500 }; } };
+let screenWidth = 800;
+const screen = { getBoundingClientRect() { return { width: screenWidth, height: 500 }; } };
+const windowListeners = new Map();
 const calls = [];
 const groupStateCalls = [];
 const rows = [
@@ -55,7 +58,7 @@ globalThis.window = globalThis;
 globalThis.innerWidth = 420;
 globalThis.innerHeight = 300;
 globalThis.devicePixelRatio = 2;
-globalThis.addEventListener = () => {};
+globalThis.addEventListener = (name, callback) => windowListeners.set(name, callback);
 globalThis.requestAnimationFrame = (callback) => setImmediate(() => callback(performance.now() + 250));
 globalThis.cancelAnimationFrame = (frame) => clearImmediate(frame);
 globalThis.document = { querySelector(selector) {
@@ -66,7 +69,7 @@ globalThis.document = { querySelector(selector) {
 globalThis.viewBoy = bridge;
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
-test('canvas renders live rows and uses native playback and queue retirement', async () => {
+test('canvas renders adaptive columns, grouped options, and native playback', async () => {
   await import('../Sources/ViewBoy/Resources/yoga-app.js');
   await tick();
   await tick();
@@ -75,6 +78,11 @@ test('canvas renders live rows and uses native playback and queue retirement', a
   assert.ok(groupStateCalls.some(([action, system, gameID]) =>
     action === 'selectGame' && system === 'SNES' && gameID === '1:SNES:Sample'));
   assert.ok(canvas.image.data.some((value) => value !== 0));
+  const firstLayoutFrameCount = canvas.frames;
+  screenWidth = 620;
+  windowListeners.get('resize')();
+  await tick();
+  assert.ok(canvas.frames >= firstLayoutFrameCount + 2, 'auto-sized columns repaint through the shared resize transition');
   globalThis.ViewBoy.dispatch('playPause');
   await tick();
   assert.equal(calls.find(([name]) => name === 'start')[1].path, '/music/a.spc');
@@ -83,6 +91,8 @@ test('canvas renders live rows and uses native playback and queue retirement', a
   await tick();
   await tick();
   assert.equal(calls.filter(([name]) => name === 'start').at(-1)[1].path, '/music/b.spc');
+  const libraryPixels = new Uint8Array(canvas.image.data);
   globalThis.ViewBoy.dispatch('settings');
   assert.match(status.textContent, /SETTINGS/);
+  assert.notDeepEqual(canvas.image.data, libraryPixels, 'Options paints a distinct grouped screen');
 });

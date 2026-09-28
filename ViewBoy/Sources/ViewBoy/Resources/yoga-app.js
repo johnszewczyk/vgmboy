@@ -185,6 +185,10 @@ let selectionBand = null;
 let selectionAnimation = null;
 let selectionAnimationFrame = 0;
 let sidebarAnimationFrame = 0;
+let columnAnimationFrame = 0;
+let columnLayoutAnimation = null;
+let lastColumnWidths = null;
+let currentRenderTime = 0;
 let paintClip = null;
 const state = {
   tab: "LIBRARY",
@@ -257,6 +261,16 @@ function easeSelection(progress) {
   return progress < 0.5
     ? 2 * progress * progress
     : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+}
+
+function animationEnabled(key) {
+  return state.preferences[key] !== false;
+}
+
+function animationMilliseconds(key) {
+  const value = Number(state.preferences[key]);
+  if (!Number.isFinite(value)) return 200;
+  return Math.max(0, Math.min(1000, value));
 }
 
 function selectionYAt(time = performance.now()) {
@@ -474,11 +488,97 @@ function pixelButton(parent, text, onClick, style = {}) {
     flexGrow: style.flexGrow ?? 0,
   }, {
     border: 1,
+    fill: style.selected ? 2 : undefined,
     textShade: 0,
     inset: Math.max(1, Math.floor((font.advance - 1) / 2)),
     align: "center",
     onClick,
   });
+}
+
+function optionSection(parent, title) {
+  return panelTitle(parent, title);
+}
+
+function optionToggle(parent, title, checked, onClick) {
+  const height = rowHeight(5);
+  const row = makeWidget(parent, {
+    direction: FlexDirection.Row,
+    alignItems: Align.Center,
+    height,
+    paddingHorizontal: 2,
+  }, {
+    onClick,
+    paint(box) {
+      line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2);
+    },
+  });
+  label(row, title, { flexGrow: 1, height }, { textShade: 0, inset: 1 });
+  makeWidget(row, { width: 9, height: 9 }, {
+    paint(box) {
+      strokeRect(box.x, box.y, box.width, box.height, 1);
+      if (!checked) return;
+      fillRect(box.x + 2, box.y + 2, box.width - 4, box.height - 4, 0);
+      [[2, 5], [3, 6], [4, 5], [5, 4], [6, 3]].forEach(([x, y]) => {
+        const px = box.x + x - 2;
+        const py = box.y + y - 2;
+        if (px >= box.x && px < box.x + box.width && py >= box.y && py < box.y + box.height) {
+          pixels[py * WIDTH + px] = 3;
+        }
+      });
+    },
+  });
+  return row;
+}
+
+function optionChoice(parent, title, choices) {
+  const height = rowHeight(6);
+  const row = makeWidget(parent, {
+    direction: FlexDirection.Row,
+    alignItems: Align.Center,
+    height,
+    gap: oneDot(),
+    paddingHorizontal: 2,
+  }, {
+    paint(box) {
+      line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2);
+    },
+  });
+  const titleWidth = (Array.from(title).length * fontProfile().advance + 4) / STYLE_SCALE;
+  label(row, title, { width: titleWidth, height }, { textShade: 0, inset: 1 });
+  choices.forEach((choice) => pixelButton(row, choice.title, choice.onClick, {
+    flexGrow: 1,
+    height: rowHeight(4),
+    selected: choice.selected,
+  }));
+  return row;
+}
+
+function optionAdjuster(parent, title, value, onDecrease, onIncrease) {
+  const height = rowHeight(6);
+  const row = makeWidget(parent, {
+    direction: FlexDirection.Row,
+    alignItems: Align.Center,
+    height,
+    gap: oneDot(),
+    paddingHorizontal: 2,
+  }, {
+    paint(box) {
+      line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2);
+    },
+  });
+  label(row, title, { flexGrow: 1, height }, { textShade: 0, inset: 1 });
+  const controlHeight = rowHeight(4);
+  const controlWidth = (fontProfile().advance + 5) / STYLE_SCALE;
+  pixelButton(row, "-", onDecrease, { width: controlWidth, height: controlHeight });
+  label(row, value, { width: (Array.from(value).length * fontProfile().advance + 4) / STYLE_SCALE, height: controlHeight }, {
+    border: 1,
+    textShade: 0,
+    align: "center",
+    inset: 0,
+  });
+  pixelButton(row, "+", onIncrease, { width: controlWidth, height: controlHeight });
+  return row;
 }
 
 function formatSize(bytes) {
@@ -544,6 +644,18 @@ function tableColumns(items = activeTracks()) {
     { key: "length", title: "LENGTH", width: 32, align: "right", mandatory: true },
     { key: "size", title: "SIZE", width: 28 },
   ];
+
+  if (state.preferences.columnAutoSize !== false) {
+    columns.forEach((column) => {
+      if (column.key === "favorite" || column.key === "title") return;
+      const longest = [column.title, ...items.slice(0, 256)
+        .map((track, index) => tableValue(track, column.key, index))]
+        .reduce((max, value) => Math.max(max, Array.from(normalizedText(value)).length), 0);
+      const textWidth = (longest * fontProfile().advance + 4) / STYLE_SCALE;
+      column.width = Math.min(column.width, Math.max(4, textWidth));
+    });
+  }
+
   const chosen = new Set(columns.filter((column) => column.mandatory).map((column) => column.key));
   let used = columns.filter((column) => column.mandatory)
     .reduce((sum, column) => sum + column.width, 0) + (chosen.size - 1) * gap;
@@ -555,7 +667,78 @@ function tableColumns(items = activeTracks()) {
       used += column.width + gap;
     }
   }
-  return columns.filter((column) => chosen.has(column.key));
+  return { all: columns, visible: columns.filter((column) => chosen.has(column.key)) };
+}
+
+function columnWidthSignature(widths) {
+  return Object.keys(widths).sort()
+    .map((key) => `${key}:${Math.round(widths[key] * 100)}`).join("|");
+}
+
+function columnWidthsAt(time) {
+  const animation = columnLayoutAnimation;
+  if (!animation) return lastColumnWidths;
+  const progress = Math.max(0, Math.min(1, (time - animation.startedAt) / animation.duration));
+  const eased = easeSelection(progress);
+  const widths = {};
+  Object.keys(animation.to).forEach((key) => {
+    const from = animation.from[key] ?? 0;
+    const to = animation.to[key] ?? 0;
+    widths[key] = from + (to - from) * eased;
+  });
+  return widths;
+}
+
+function resolveTableColumns(layout, time) {
+  const visibleKeys = new Set(layout.visible.map((column) => column.key));
+  const target = Object.fromEntries(layout.all
+    .filter((column) => column.key !== "title")
+    .map((column) => [column.key, visibleKeys.has(column.key) ? column.width : 0]));
+  const targetSignature = columnWidthSignature(target);
+  let current = columnLayoutAnimation ? columnWidthsAt(time) : lastColumnWidths;
+
+  if (!current) {
+    lastColumnWidths = target;
+    return layout.visible;
+  }
+
+  if (columnLayoutAnimation?.targetSignature !== targetSignature) {
+    if (columnWidthSignature(current) === targetSignature) {
+      columnLayoutAnimation = null;
+      lastColumnWidths = target;
+      return layout.visible;
+    }
+    const duration = animationMilliseconds("autoResizeAnimationMilliseconds");
+    if (animationEnabled("autoResizeAnimationEnabled") && duration > 0) {
+      columnLayoutAnimation = {
+        from: current,
+        to: target,
+        targetSignature,
+        startedAt: time,
+        duration,
+      };
+      current = columnWidthsAt(time);
+    } else {
+      columnLayoutAnimation = null;
+      lastColumnWidths = target;
+      return layout.visible;
+    }
+  } else if (columnLayoutAnimation) {
+    current = columnWidthsAt(time);
+  }
+
+  if (!columnLayoutAnimation) {
+    lastColumnWidths = current;
+    return layout.visible;
+  }
+
+  lastColumnWidths = current;
+  return layout.all.filter((column) => column.key === "title"
+    || (current[column.key] ?? 0) > 0.5
+    || (columnLayoutAnimation.to[column.key] ?? 0) > 0.5).map((column) => ({
+    ...column,
+    width: column.key === "title" ? column.width : Math.max(0, current[column.key] ?? 0),
+  }));
 }
 
 function createTableHeader(parent, columns) {
@@ -721,7 +904,7 @@ function addCatalogPane(parent, mode) {
   const heading = mode === "QUEUE" ? "PLAY QUEUE"
     : mode === "FAVORITES" ? "FAVORITES" : "TRACK CATALOG";
   panelTitle(panel, heading, `${viewTracks.length} TRACKS`, 60);
-  const columns = tableColumns(viewTracks);
+  const columns = resolveTableColumns(tableColumns(viewTracks), currentRenderTime);
   createTableHeader(panel, columns);
   const count = visibleRowCount();
   state.queueScroll = Math.max(0, Math.min(state.queueScroll, Math.max(0, viewTracks.length - count)));
@@ -752,37 +935,92 @@ function addOptionsContent(parent) {
   });
   panelTitle(panel, "OPTIONS", "VIEWBOY", 48);
   const pref = state.preferences;
-  const rows = [
-    ["FONT GLYPHS", fontProfile().label, () => toggleFont()],
-    ["LCD CONTRAST", state.contrast === "CURRENT" ? "CURRENT" : "HIGH", () => toggleContrast()],
-    ["LCD DOT", "3 DEVICE PX"],
-    ["LONG PLAY", pref.longPlayEnabled ? "ON" : "OFF", () => setPreference("longPlayEnabled", !pref.longPlayEnabled)],
-    ["END FADE", pref.fadeEnabled === false ? "OFF" : "ON", () => setPreference("fadeEnabled", pref.fadeEnabled === false)],
-    ["REPEAT", String(pref.repeatMode || "off"), () => cycleRepeat()],
-    ["MONO", pref.monoEnabled ? "ON" : "OFF", () => setPreference("monoEnabled", !pref.monoEnabled, true)],
-    ["VOLUME -", `${Math.round(Number(pref.appVolume ?? 1) * 100)}%`, () => changeVolume(-0.1)],
-    ["VOLUME +", `${Math.round(Number(pref.appVolume ?? 1) * 100)}%`, () => changeVolume(0.1)],
-    ["RELOAD LIBRARY", "RUN", () => loadCatalog()],
-  ];
-  rows.forEach(([name, value, onClick]) => {
-    const optionHeight = rowHeight(4);
-    const row = makeWidget(panel, {
-      direction: FlexDirection.Row,
-      alignItems: Align.Center,
-      height: optionHeight,
-      paddingHorizontal: 2,
-    }, {
-      onClick,
-      paint(box) {
-        line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2);
-      },
-    });
-    label(row, name, { flexGrow: 1, height: optionHeight }, { textShade: 0, inset: 1 });
-    label(row, value, { width: 100, height: optionHeight }, {
-      textShade: 0,
-      align: "right",
-      inset: 1,
-    });
+  optionSection(panel, "DISPLAY");
+  optionChoice(panel, "FONT", [
+    { title: "MICRO", selected: state.font === "MICRO", onClick: () => setFontProfile("MICRO") },
+    { title: "STANDARD", selected: state.font === "STANDARD", onClick: () => setFontProfile("STANDARD") },
+  ]);
+  optionChoice(panel, "CONTRAST", [
+    { title: "CURRENT", selected: state.contrast === "CURRENT", onClick: () => setContrastProfile("CURRENT") },
+    { title: "HIGH", selected: state.contrast === "HIGH_CONTRAST", onClick: () => setContrastProfile("HIGH_CONTRAST") },
+  ]);
+  const gridInfo = makeWidget(panel, {
+    direction: FlexDirection.Row,
+    alignItems: Align.Center,
+    height: rowHeight(4),
+    paddingHorizontal: 2,
+  }, {
+    paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
+  });
+  label(gridInfo, "LCD GRID", { flexGrow: 1, height: rowHeight(4) }, { textShade: 0, inset: 1 });
+  label(gridInfo, "3 PX / 4 SHADES", { width: (16 * fontProfile().advance + 2) / STYLE_SCALE, height: rowHeight(4) }, {
+    textShade: 0, align: "right", inset: 1,
+  });
+
+  optionSection(panel, "PLAYBACK");
+  optionToggle(panel, "LONG PLAY", pref.longPlayEnabled === true,
+    () => setPreference("longPlayEnabled", pref.longPlayEnabled !== true));
+  optionToggle(panel, "END FADE", pref.fadeEnabled !== false,
+    () => setPreference("fadeEnabled", pref.fadeEnabled === false));
+  optionChoice(panel, "REPEAT", [
+    { title: "OFF", selected: (pref.repeatMode || "off") === "off", onClick: () => setPreference("repeatMode", "off") },
+    { title: "ALL", selected: pref.repeatMode === "all", onClick: () => setPreference("repeatMode", "all") },
+    { title: "ONE", selected: pref.repeatMode === "one", onClick: () => setPreference("repeatMode", "one") },
+  ]);
+  optionToggle(panel, "MONO OUTPUT", pref.monoEnabled === true,
+    () => setPreference("monoEnabled", pref.monoEnabled !== true, true));
+  const volume = Math.max(0, Math.min(1, Number(pref.appVolume ?? 1)));
+  const volumeRow = makeWidget(panel, {
+    direction: FlexDirection.Row,
+    alignItems: Align.Center,
+    height: rowHeight(6),
+    gap: oneDot(),
+    paddingHorizontal: 2,
+  }, {
+    paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
+  });
+  label(volumeRow, "VOLUME", { width: (6 * fontProfile().advance + 4) / STYLE_SCALE, height: rowHeight(6) }, {
+    textShade: 0, inset: 1,
+  });
+  const volumeControlHeight = rowHeight(4);
+  const volumeControlWidth = (fontProfile().advance + 5) / STYLE_SCALE;
+  pixelButton(volumeRow, "-", () => changeVolume(-0.1), { width: volumeControlWidth, height: volumeControlHeight });
+  makeWidget(volumeRow, { flexGrow: 1, height: volumeControlHeight }, {
+    paint(box) {
+      strokeRect(box.x, box.y, box.width, box.height, 1);
+      const count = 10;
+      const gap = 1;
+      const segmentWidth = Math.max(1, Math.floor((box.width - 2 - (count - 1) * gap) / count));
+      const active = Math.round(volume * count);
+      for (let index = 0; index < count; index += 1) {
+        if (index >= active) break;
+        fillRect(box.x + 1 + index * (segmentWidth + gap), box.y + 1,
+          segmentWidth, Math.max(1, box.height - 2), 0);
+      }
+    },
+  });
+  label(volumeRow, `${Math.round(volume * 100)}%`, { width: (4 * fontProfile().advance + 3) / STYLE_SCALE, height: volumeControlHeight }, {
+    textShade: 0, align: "right", inset: 0,
+  });
+  pixelButton(volumeRow, "+", () => changeVolume(0.1), { width: volumeControlWidth, height: volumeControlHeight });
+
+  optionSection(panel, "INTERFACE");
+  optionToggle(panel, "AUTO-SIZE COLUMNS", pref.columnAutoSize !== false,
+    () => setPreference("columnAutoSize", pref.columnAutoSize === false));
+  optionToggle(panel, "AUTO-RESIZE MOTION", animationEnabled("autoResizeAnimationEnabled"),
+    () => setPreference("autoResizeAnimationEnabled", !animationEnabled("autoResizeAnimationEnabled")));
+  optionAdjuster(panel, "RESIZE TIME", `${animationMilliseconds("autoResizeAnimationMilliseconds")} MS`,
+    () => adjustAnimationTime("autoResizeAnimationMilliseconds", -50),
+    () => adjustAnimationTime("autoResizeAnimationMilliseconds", 50));
+  optionToggle(panel, "SELECTION SLIDE", animationEnabled("selectionAnimationEnabled"),
+    () => setPreference("selectionAnimationEnabled", !animationEnabled("selectionAnimationEnabled")));
+  optionAdjuster(panel, "SLIDE TIME", `${animationMilliseconds("selectionAnimationMilliseconds")} MS`,
+    () => adjustAnimationTime("selectionAnimationMilliseconds", -50),
+    () => adjustAnimationTime("selectionAnimationMilliseconds", 50));
+
+  optionSection(panel, "LIBRARY");
+  pixelButton(panel, "RELOAD LIBRARY", () => loadCatalog(), {
+    height: rowHeight(5),
   });
 }
 
@@ -927,11 +1165,27 @@ function animateSelectionFrame(time) {
   }
 }
 
-function render(animateSelection = false) {
-  if (selectionAnimationFrame) cancelAnimationFrame(selectionAnimationFrame);
-  selectionAnimationFrame = 0;
+function animateColumnLayoutFrame(time) {
+  columnAnimationFrame = 0;
+  if (!columnLayoutAnimation) return;
+  if (time - columnLayoutAnimation.startedAt >= columnLayoutAnimation.duration) {
+    lastColumnWidths = columnLayoutAnimation.to;
+    columnLayoutAnimation = null;
+    render(false, true, time);
+    return;
+  }
+  render(false, true, time);
+}
+
+function render(animateSelection = false, preserveAnimations = false, frameTime = performance.now()) {
+  currentRenderTime = frameTime;
   const priorBand = selectionBand;
-  const priorY = selectionYAt();
+  const priorY = selectionYAt(frameTime);
+  const priorSelectionAnimation = selectionAnimation;
+  if (selectionAnimationFrame && !preserveAnimations) {
+    cancelAnimationFrame(selectionAnimationFrame);
+    selectionAnimationFrame = 0;
+  }
   if (widgetTree) widgetTree.yoga.freeRecursive();
   boxesById = new Map();
   hitTargets = [];
@@ -943,7 +1197,9 @@ function render(animateSelection = false) {
   selectionRows = layoutEntries.filter((entry) => Number.isInteger(entry.widget.meta.trackIndex));
   const selectedRow = selectionRows.find((entry) => entry.widget.meta.trackIndex === state.selectedTrack);
   const nextBand = selectedRow ? { ...selectedRow.box } : null;
-  const canSlide = animateSelection && priorBand && nextBand
+  const selectionDuration = animationMilliseconds("selectionAnimationMilliseconds");
+  const canSlide = animateSelection && animationEnabled("selectionAnimationEnabled") && selectionDuration > 0
+    && priorBand && nextBand
     && priorBand.x === nextBand.x && priorBand.width === nextBand.width
     && priorBand.height === nextBand.height && Math.abs(priorY - nextBand.y) > 0.5;
   selectionBand = nextBand;
@@ -951,15 +1207,21 @@ function render(animateSelection = false) {
     selectionAnimation = {
       fromY: priorY,
       toY: nextBand.y,
-      startedAt: performance.now(),
-      duration: 250,
+      startedAt: frameTime,
+      duration: selectionDuration,
       lastY: priorY,
     };
     paintSelectionAt(priorY);
     selectionAnimationFrame = requestAnimationFrame(animateSelectionFrame);
+  } else if (preserveAnimations && priorSelectionAnimation && nextBand) {
+    selectionAnimation = priorSelectionAnimation;
+    paintSelectionAt(selectionYAt(frameTime));
   } else {
     selectionAnimation = null;
     paintSelectionAt(nextBand?.y ?? null);
+  }
+  if (columnLayoutAnimation && !columnAnimationFrame) {
+    columnAnimationFrame = requestAnimationFrame(animateColumnLayoutFrame);
   }
   const selected = visibleTracks()[state.selectedTrack];
   status.textContent = `${state.tab}. ${state.status}. ${state.transport}. `
@@ -971,16 +1233,28 @@ function announce(message) {
 }
 
 function toggleFont() {
-  state.font = state.font === "MICRO" ? "STANDARD" : "MICRO";
+  setFontProfile(state.font === "MICRO" ? "STANDARD" : "MICRO");
+}
+
+function setFontProfile(font) {
+  state.font = font;
   saveDisplayOptions();
   render();
 }
 
 function toggleContrast() {
-  state.contrast = state.contrast === "CURRENT" ? "HIGH_CONTRAST" : "CURRENT";
+  setContrastProfile(state.contrast === "CURRENT" ? "HIGH_CONTRAST" : "CURRENT");
+}
+
+function setContrastProfile(contrast) {
+  state.contrast = contrast;
   RGB = paletteRGB(PALETTES[state.contrast]);
   saveDisplayOptions();
   render();
+}
+
+function adjustAnimationTime(key, delta) {
+  setPreference(key, Math.max(0, Math.min(1000, animationMilliseconds(key) + delta)));
 }
 
 async function loadFavorites() {
@@ -1044,12 +1318,12 @@ function animateSidebarFrame(time) {
     (time - transition.startedAt) / transition.duration));
   transition.progress = transition.fromProgress
     + (transition.toProgress - transition.fromProgress) * easeSelection(progress);
-  render();
+  render(false, true, time);
   if (progress < 1) {
     sidebarAnimationFrame = requestAnimationFrame(animateSidebarFrame);
   } else {
     state.sidebarTransition = null;
-    render();
+    render(false, true, time);
   }
 }
 
@@ -1062,13 +1336,20 @@ async function toggleSystem(system) {
   sidebarAnimationFrame = 0;
   try {
     if (await reduceDatabaseGroupState("toggle", system)) {
+      const duration = animationMilliseconds("autoResizeAnimationMilliseconds")
+        * Math.abs(targetProgress - currentProgress);
+      if (!animationEnabled("autoResizeAnimationEnabled") || duration <= 0) {
+        state.sidebarTransition = null;
+        render();
+        return;
+      }
       state.sidebarTransition = {
         system,
         fromProgress: currentProgress,
         toProgress: targetProgress,
         progress: currentProgress,
         startedAt: performance.now(),
-        duration: Math.max(1, 250 * Math.abs(targetProgress - currentProgress)),
+        duration,
       };
       render();
       sidebarAnimationFrame = requestAnimationFrame(animateSidebarFrame);
@@ -1488,6 +1769,7 @@ window.addEventListener("load", fitCanvas, { once: true });
 window.addEventListener("pagehide", () => {
   if (selectionAnimationFrame) cancelAnimationFrame(selectionAnimationFrame);
   if (sidebarAnimationFrame) cancelAnimationFrame(sidebarAnimationFrame);
+  if (columnAnimationFrame) cancelAnimationFrame(columnAnimationFrame);
   screenResizeObserver?.disconnect();
   if (widgetTree) widgetTree.yoga.freeRecursive();
 });
