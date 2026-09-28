@@ -1,9 +1,17 @@
 # Display
 
-The current screen is one canvas laid out with bundled Yoga 3.2.1 WebAssembly. Library shows a system and game tree beside a compact track table. Queue shows the table across the screen. Settings replaces the content with an Options page. The top two rows are page tabs and rectangular transport buttons; the bottom strip shows the current track and transport state. This is a minimalist terminal-like layout with shaded selection bars.
+ViewBoy uses one responsive LCD canvas for its library, track list, settings, and playback status. Yoga lays out the screen; a four-shade framebuffer paints every border, selection, and bitmap glyph. The window adds only a narrow plastic surround around the screen.
 
-Every control, border, row, and character is painted into a four-shade framebuffer. Text uses a 5×7 bitmap glyph with a six-dot advance. Unsupported characters currently render as `?`; the font is deliberately small and needs broader coverage. Rows are paged to the visible count and scroll with the mouse wheel. Arrow keys change the selected track, Enter plays it, Space toggles transport, and 1–3 change pages. Double-click plays a row.
+The top row contains Options and the four transport controls. Library, Current Queue, Favorites, and Open Path live in the sidebar. The sidebar groups catalog games by system; selecting a system folds or unfolds its games, and selecting a game loads its tracks from the read-only catalog bridge. The system disclosure eases over 250 ms. Current Queue shows the active playback list, or the browsed game's tracks before playback starts. Favorites comes from the shared favorite store. The table can show favorite, index, file, title, game, artist, system, path, length, and size columns as the screen width and available metadata allow. Column headers sort the rows, and the favorite cell toggles a track in the shared favorite store.
 
-The LCD currently uses three physical display pixels per software dot. A 2×2 face and a one-pixel seam produce the dot effect. The canvas is crisp-scaled using `devicePixelRatio`; the exact size and subpixel treatment remain an open display decision. The palette is `#0C300C`, `#285428`, `#78940D`, and `#9BBC0F`.
+Track selection moves with a 250 ms eased slide. The canvas uses small pixel rows, 1-pixel outlines, and vertically centered column headings. The Micro 3×5 and Standard 5×7 bitmap fonts are independently authored and switchable in Options. The current LCD palette preserves the four established shades; High Contrast darkens the foreground shade while retaining the same four-level framebuffer.
 
-The older Metal phosphor overlay implementation remains in source but is not mounted by the current host. It was designed for DOM geometry and would require a new canvas-aware geometry contract. The active screen is the Yoga canvas in `Sources/ViewBoy/Resources/yoga-app.js`, `yoga-screen.css`, and `index.html`.
+Each logical dot occupies a 3×3 device-pixel cell with a 2×2 shaded face and an unlit LCD seam. The grid scales with the available display and device-pixel ratio; it does not imitate the Game Boy's 160×144 resolution.
+
+Click a sidebar row to change views, open or close a system group, or select a game. Click a track to select it, double-click to play it, and click a header to sort. Arrow keys move selection, Enter plays, Space toggles playback, and keys 1–3 open Library, Queue, and Options. The macOS menus and playback commands use the same native bridge.
+
+## Files
+
+- `Sources/ViewBoy/Resources/index.html`
+- `Sources/ViewBoy/Resources/yoga-app.js`
+- `Sources/ViewBoy/Resources/yoga-screen.css`

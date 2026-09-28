@@ -1,7 +1,30 @@
 # ViewBoy Integration
 
-ViewBoy owns its AppKit host, Yoga canvas presentation, in-screen Options page, and preference namespace. CatalogReader supplies read-only game and track projections; FrontendCore supplies queue, archive, preference, and transport contracts; VGMBoy supplies decoding and audio. Keep package dependencies relative to their sibling repositories.
+ViewBoy owns its AppKit host, Yoga canvas renderer, bitmap fonts, framebuffer, in-screen options, and preference namespace. The app loads `Resources/index.html` in one WKWebView. Keep screen content in the canvas; HTML and CSS provide only the canvas host and its narrow plastic surround.
 
-The bundle identifier is `com.john.viewboy`. The injected bridge remains `window.spcBoyWK`, and the macOS menu dispatcher remains `window.SPCBoyWK.dispatch`. The current menus expose only implemented Library, Queue, Settings, Open Path, and transport actions. Playlist tabs and Favorites from the retired interface have not been ported.
+## Data and Playback
 
-`./build.sh` makes a clean release app and signs it. `./launch.sh` then opens that app. Validate the packaged canvas and live catalog/transport at the app boundary; syntax or Swift compilation alone does not establish interactive behavior.
+The injected `window.spcBoyWK` bridge supplies read-only CatalogReader projections, shared favorite operations, frontend preferences, local-path selection, and VGMBoy transport. `window.SPCBoyWK.dispatch` remains the macOS menu command boundary. Preserve both names and their separate roles.
+
+Catalog and favorite state belongs to the native/shared cores. JavaScript owns the visible tree, current view, table layout, sorting, font and contrast preferences, and hit testing. It must not scan source paths or write the catalog. Track activation sends the native playback fields supplied by the bridge, including archive path and entry.
+
+## Rendering and Lifecycle
+
+- `yoga-app.js` paints the full UI as four integer framebuffer shades and authored bitmap glyphs. Keep browser text, gradients, or selection overlays out of the screen.
+- One LCD dot occupies a 3×3 device-pixel cell. The 2×2 face uses one of four palette entries; its edge always uses the background shade.
+- Resize events recreate canvas buffers and then render synchronously. Track selection paints from the cached base framebuffer without rebuilding the Yoga tree. Sidebar disclosure updates row heights during its 250 ms animation. A full redraw cancels an active selection tween; page teardown cancels both pending animation frames.
+- The Micro and Standard glyph tables and contrast choice are presentation preferences stored in WebKit local storage. Playback preferences remain in `SPCBoyPreferencesSnapshot`.
+- The browser canvas without the injected native bridge cannot query the catalog or control playback. Real catalog and transport checks must run in the packaged app.
+
+## Build and Verification
+
+`./build.sh` clean-builds and packages ViewBoy. `./launch.sh` closes the prior ViewBoy process, builds, signs, and opens the package. Validate the packaged screen and native bridge after changing the WebKit host or resource files; JavaScript syntax and Swift compilation alone do not prove live catalog or transport behavior.
+
+## Files
+
+- `Sources/ViewBoy/Resources/index.html`
+- `Sources/ViewBoy/Resources/yoga-app.js`
+- `Sources/ViewBoy/Resources/yoga-screen.css`
+- `Sources/ViewBoy/WKNativeBridge.swift`
+- `Sources/ViewBoy/WKPlaybackBridge.swift`
+- `Sources/ViewBoy/main.swift`

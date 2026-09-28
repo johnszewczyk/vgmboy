@@ -139,8 +139,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
           const api = {
             playbackBackends: \(Self.json(Self.playbackBackendManifest)),
             bootstrap: (...args) => request("bootstrap", args),
-            playlistTabsLoad: () => request("playlistTabsLoad"),
-            playlistTabsSave: (...args) => request("playlistTabsSave", args),
             refreshTree: (...args) => request("refreshTree", args),
             databaseLocation: (...args) => request("databaseLocation", args),
             databaseRoots: (...args) => request("databaseRoots", args),
@@ -467,11 +465,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         switch method {
         case "bootstrap":
             return emptySnapshot()
-        case "playlistTabsLoad":
-            return try PlaylistTabsStore.shared.load()
-        case "playlistTabsSave":
-            guard let payload = args.first as? [String: Any] else { throw BridgeError.invalidArguments }
-            return try PlaylistTabsStore.shared.save(payload)
         case "refreshTree":
             guard let rootPath = args.first as? String, !rootPath.isEmpty else { return emptySnapshot() }
             let selectedPath = args.dropFirst().first as? String

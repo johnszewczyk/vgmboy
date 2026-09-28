@@ -6,4 +6,4 @@ Run `./launch.sh` from this directory to build, package, and open `.build/ViewBo
 
 `node --test Tests/YogaCanvas.test.mjs` exercises the canvas module with the real Yoga runtime and a simulated native catalog/playback bridge.
 
-Read `AGENTS.md`, then `ai/project-info.md` for implementation routes and current limits. The retired interface is recoverable from `LocalRecovery/ViewBoy/ViewBoy-webkit-9a2048ed.zip`.
+Read `AGENTS.md`, then `ai/project-info.md` for the implementation routes and current behavior.

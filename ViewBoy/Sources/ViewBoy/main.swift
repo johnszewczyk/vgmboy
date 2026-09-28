@@ -29,10 +29,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         self.webView = webView
         nativeBridge.attachPlaybackEvents(to: webView)
         installApplicationMenu()
-        guard let page = Bundle.module.url(forResource: "index", withExtension: "html") else {
-            fatalError("ViewBoy resources are missing index.html")
+        guard let page = URL(string: "viewboy://app/index.html") else {
+            fatalError("ViewBoy resource URL is invalid")
         }
-        webView.loadFileURL(page, allowingReadAccessTo: page.deletingLastPathComponent())
+        webView.load(URLRequest(url: page))
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 980, height: 640),
@@ -54,6 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     private func makeWebView(bridge: WKNativeBridge) -> WKWebView {
         let configuration = WKWebViewConfiguration()
+        configuration.setURLSchemeHandler(ViewBoyResourceSchemeHandler(), forURLScheme: "viewboy")
         configuration.userContentController.add(bridge, name: "spcBoyWK")
         configuration.userContentController.addUserScript(bridge.userScript())
         configuration.userContentController.addUserScript(WKUserScript(

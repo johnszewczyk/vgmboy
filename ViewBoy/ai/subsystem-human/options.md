@@ -1,7 +1,16 @@
 # Options
 
-Options is a full page inside the LCD screen, reached from the Settings tab, key 3, or the macOS Options menu. Library or Queue returns without changing playback.
+Options opens inside the LCD canvas. The screen controls the bitmap font size and LCD contrast, along with the playback preferences owned by ViewBoy.
 
-The initial controls expose Long Play, End Fade, Repeat, Mono, Volume, and Reload Library. Changes persist through the typed `frontendSettingsSave` bridge; audio controls are applied to VGMBoy, and timing controls reconfigure loaded playback. The page also reports the current three-device-pixel dot size and 5×7 bitmap font. It does not yet expose the older interface's equalizer, routing, diagnostics, archive cache, or full typography controls.
+- **Font Glyphs** switches between independently authored Micro 3×5 and Standard 5×7 fonts. The choice is remembered in WebKit local storage when available.
+- **LCD Contrast** switches between the current four-shade palette and High Contrast. High Contrast changes only the darkest foreground shade; the screen still uses four discrete colors.
+- **Long Play**, **End Fade**, **Repeat**, **Mono**, and **Volume** keep using the typed frontend-preference and VGMBoy playback bridges.
+- **Reload Library** requests a fresh read from the catalog.
 
-The owning files are `Sources/ViewBoy/Resources/yoga-app.js`, `Sources/ViewBoy/WKNativeBridge.swift`, and `Sources/ViewBoy/SPCBoyPreferencesSnapshot.swift`.
+The macOS Options menu opens the same in-screen page. Library and Queue remain available in the sidebar while Options is open; changing display settings does not stop playback.
+
+## Files
+
+- `Sources/ViewBoy/Resources/yoga-app.js`
+- `Sources/ViewBoy/WKNativeBridge.swift`
+- `Sources/ViewBoy/SPCBoyPreferencesSnapshot.swift`

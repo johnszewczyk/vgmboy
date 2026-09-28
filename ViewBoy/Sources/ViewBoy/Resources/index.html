@@ -4,16 +4,24 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
-    <title>ViewBoy · Game Music Player</title>
+    <title>ViewBoy</title>
     <link rel="stylesheet" href="./yoga-screen.css" />
   </head>
   <body>
-    <main class="surround" aria-label="ViewBoy Game Music Player">
+    <main class="surround" aria-label="ViewBoy">
       <div class="bezel">
-      <canvas id="lcd" width="320" height="200" tabindex="0" aria-label="Game music player display"></canvas>
+        <div id="screen-window">
+          <canvas id="lcd" width="320" height="200" tabindex="0" aria-label="ViewBoy library and playback screen"></canvas>
+        </div>
       </div>
     </main>
     <div id="screen-reader-status" class="sr-only" aria-live="polite"></div>
-    <script type="module" src="./yoga-app.js"></script>
+    <script>
+      import("./yoga-app.js").catch((error) => {
+        const message = error?.message || String(error);
+        document.title = `ViewBoy — ${message}`;
+        document.querySelector("#screen-reader-status").textContent = `Screen startup failed: ${message}`;
+      });
+    </script>
   </body>
 </html>

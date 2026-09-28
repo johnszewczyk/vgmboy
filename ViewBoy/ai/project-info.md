@@ -1,14 +1,14 @@
 # Project Info
 
-ViewBoy is the VGMMan family's native macOS player with a screen-first Yoga LCD front end. AppKit hosts one WKWebView. The web view paints a four-shade framebuffer into a canvas; native Swift retains the catalog, preferences, archive, and VGMBoy playback bridge. The former DOM/CSS Game Boy interface was archived in `LocalRecovery/ViewBoy/ViewBoy-webkit-9a2048ed.zip` before its resources were removed.
+ViewBoy is the VGMMan family's native macOS player with a screen-first Yoga LCD front end. AppKit hosts one WKWebView. The web view paints a four-shade framebuffer into a canvas; native Swift retains the catalog, preferences, archive, and VGMBoy playback bridge.
 
 ## Routes
 
 - Display and pixel scale: `subsystem-human/display.md`.
 - In-screen settings: `subsystem-human/options.md`.
 - Playback: `subsystem-human/playback.md`.
+- System and game sidebar: `subsystem-agent/shared-sidebar-core.md`.
 - Native bridge and app packaging: `subsystem-agent/webkit-host.md` and `subsystem-agent/viewboy-integration.md`.
-- Source exploration and transition: `investigations/yoga-lcd-canvas-preview.md`.
 
 ## Boundaries
 
