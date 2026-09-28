@@ -31,6 +31,11 @@ Engineering constraints:
 - App identity, package links, and build boundary:
   `subsystem-agent/viewboy-integration.md`.
 
+Design exploration:
+
+- Screen-first Yoga canvas preview (standalone exploration, not packaged UI):
+  [Yoga LCD canvas preview](investigations/yoga-lcd-canvas-preview.md).
+
 ## Local Rules
 
 - Build dependencies are sibling packages `../CatalogReader`, `../FrontendCore`,
