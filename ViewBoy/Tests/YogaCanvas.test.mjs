@@ -17,6 +17,7 @@ const screen = { getBoundingClientRect() { return { width: screenWidth, height: 
 const windowListeners = new Map();
 const calls = [];
 const groupStateCalls = [];
+let frontendSettingsChanged;
 const rows = [
   { playlistId: 'a', path: '/music/a.spc', title: 'First', game: 'Sample', system: 'SNES' },
   { playlistId: 'b', path: '/music/b.spc', title: 'Second', game: 'Sample', system: 'SNES' },
@@ -50,7 +51,7 @@ const bridge = {
   },
   onNativePlaybackState() {},
   onNativePlaybackEnded(callback) { ended = callback; },
-  onFrontendSettingsChanged() {},
+  onFrontendSettingsChanged(callback) { frontendSettingsChanged = callback; },
   onCatalogReloaded() {},
   onLibrarySnapshot() {},
 };
@@ -95,4 +96,11 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   globalThis.ViewBoy.dispatch('settings');
   assert.match(status.textContent, /SETTINGS/);
   assert.notDeepEqual(canvas.image.data, libraryPixels, 'Options paints a distinct grouped screen');
+  globalThis.ViewBoy.dispatch('library');
+  const defaultColumnsPixels = new Uint8Array(canvas.image.data);
+  frontendSettingsChanged({ appVolume: 1, repeatMode: 'off', columnVisibility: { game: false } });
+  assert.notDeepEqual(canvas.image.data, defaultColumnsPixels, 'saved column visibility changes the playlist layout');
+  frontendSettingsChanged({ appVolume: 1, repeatMode: 'off', columnVisibility: { game: true } });
+  assert.deepEqual(new Uint8Array(canvas.image.data), defaultColumnsPixels,
+    'restoring column visibility restores the default layout');
 });

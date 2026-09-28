@@ -607,6 +607,14 @@ function tableValue(track, key, rowIndex = 0) {
   }
 }
 
+const configurableColumns = [
+  { key: "filename", title: "FILE" },
+  { key: "game", title: "GAME" },
+  { key: "artist", title: "ARTIST" },
+  { key: "path", title: "PATH" },
+  { key: "size", title: "SIZE" },
+];
+
 function toggleSort(columnKey) {
   const selectedID = visibleTracks()[state.selectedTrack]
     ? trackID(visibleTracks()[state.selectedTrack]) : null;
@@ -659,9 +667,12 @@ function tableColumns(items = activeTracks()) {
   const chosen = new Set(columns.filter((column) => column.mandatory).map((column) => column.key));
   let used = columns.filter((column) => column.mandatory)
     .reduce((sum, column) => sum + column.width, 0) + (chosen.size - 1) * gap;
+  const columnVisibility = state.preferences.columnVisibility || {};
   for (const column of columns) {
-    if (column.mandatory || !items.slice(0, 256)
-      .some((track, index) => String(tableValue(track, column.key, index)).trim())) continue;
+    if (column.mandatory || columnVisibility[column.key] === false) continue;
+    const hasValue = items.slice(0, 256)
+      .some((track, index) => String(tableValue(track, column.key, index)).trim());
+    if (!hasValue && columnVisibility[column.key] !== true) continue;
     if (used + column.width + gap <= available) {
       chosen.add(column.key);
       used += column.width + gap;
@@ -1017,6 +1028,16 @@ function addOptionsContent(parent) {
   optionAdjuster(panel, "SLIDE TIME", `${animationMilliseconds("selectionAnimationMilliseconds")} MS`,
     () => adjustAnimationTime("selectionAnimationMilliseconds", -50),
     () => adjustAnimationTime("selectionAnimationMilliseconds", 50));
+
+  optionSection(panel, "PLAYLIST COLUMNS");
+  configurableColumns.forEach(({ key, title }) => {
+    const visibility = pref.columnVisibility || {};
+    optionToggle(panel, title, visibility[key] !== false,
+      () => setPreference("columnVisibility", {
+        ...(state.preferences.columnVisibility || {}),
+        [key]: state.preferences.columnVisibility?.[key] === false,
+      }));
+  });
 
   optionSection(panel, "LIBRARY");
   pixelButton(panel, "RELOAD LIBRARY", () => loadCatalog(), {

@@ -13,7 +13,7 @@ Catalog and favorite state belongs to the native/shared cores. JavaScript owns t
 - `yoga-app.js` paints the full UI as four integer framebuffer shades and authored bitmap glyphs. Keep browser text, gradients, or selection overlays out of the screen.
 - One LCD dot occupies a 3×3 device-pixel cell. The 2×2 face uses one of four palette entries; its edge always uses the background shade.
 - Resize events recreate canvas buffers and then render synchronously. Auto-sized table columns interpolate their widths with the shared auto-resize duration; header cells and track cells use the same widths. Track selection paints from the cached base framebuffer without rebuilding the Yoga tree and follows the shared selection duration. Sidebar disclosure follows the shared auto-resize duration. Page teardown cancels pending selection, sidebar, and column animation frames.
-- The Micro and Standard glyph tables and contrast choice are presentation preferences stored in WebKit local storage. Playback preferences remain in `ViewBoyPreferencesSnapshot`.
+- The Micro and Standard glyph tables and contrast choice are presentation preferences stored in WebKit local storage. Playback and playlist-column visibility preferences remain in `ViewBoyPreferencesSnapshot`.
 - The browser canvas without the injected native bridge cannot query the catalog or control playback. Real catalog and transport checks must run in the packaged app.
 
 ## Build and Verification
