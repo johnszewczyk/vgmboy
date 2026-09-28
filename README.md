@@ -18,10 +18,11 @@ ownership and preservation rules.
 | [FrontendCore](FrontendCore/README.md) | Shared archive, preference, queue, and transport policy. |
 | [CocoaSpice](CocoaSpice/README.md) | Native AppKit/SwiftUI player frontend. |
 | [SPCBoyWK](SPCBoyWK/README.md) | Native WebKit player frontend. |
-| [ViewBoy](ViewBoy/README.md) | Independent phosphor-styled WebKit player frontend. |
+| [ViewBoy](ViewBoy/README.md) | Native player with a screen-first, four-shade Yoga LCD interface. |
 
-The legacy Electron player is recovery-only; LaunchPad targets SPCBoyWK. The
-verified Electron archive is listed in [`LocalRecovery/README.md`](LocalRecovery/README.md).
+The legacy Electron SPCBoy player is recovery-only. LaunchPad has separate
+entries for the maintained SPCBoyWK and ViewBoy apps. The verified Electron
+archive is listed in [`LocalRecovery/README.md`](LocalRecovery/README.md).
 LaunchPad remains a sibling workspace tool because it launches projects beyond
 this family.
 

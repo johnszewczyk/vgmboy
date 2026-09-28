@@ -16,7 +16,7 @@ import VGMBoyEndpointCore
 import VGMBoyKit
 import WebKit
 
-/// The only JavaScript-to-native boundary in SPCBoy WK.
+/// The only JavaScript-to-native boundary in ViewBoy.
 ///
 /// The web skin owns presentation and sends named requests. Swift owns the
 /// read-only catalog and returns plain JSON records. Transport completion
@@ -33,7 +33,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     var onChoosePath: (() -> String?)?
     var onChooseAACExportDirectory: (() -> String?)?
     var onAppearanceSettingsChanged: (([String: Any]) -> Void)?
-    var onFrontendSettingsChanged: ((SPCBoyPreferencesSnapshot) -> Void)?
+    var onFrontendSettingsChanged: ((ViewBoyPreferencesSnapshot) -> Void)?
     var onPlaybackEvent: (@MainActor (String, [String: Any]) -> Void)?
 
     init(catalogURL: URL = WKNativeBridge.defaultCatalogURL) {
@@ -112,11 +112,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return new Promise((resolve, reject) => {
               const id = String(nextRequestID++);
               pending.set(id, { resolve, reject });
-              window.webkit.messageHandlers.spcBoyWK.postMessage({ id, method, args });
+              window.webkit.messageHandlers.viewBoy.postMessage({ id, method, args });
             });
           }
 
-          window.__spcBoyWKReply = (id, ok, value) => {
+          window.__viewBoyReply = (id, ok, value) => {
             const entry = pending.get(String(id));
             if (!entry) return;
             pending.delete(String(id));
@@ -124,7 +124,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             else entry.reject(Object.assign(new Error(value?.message || "Native request failed."), value || {}));
           };
 
-          window.__spcBoyWKEvent = (name, value) => {
+          window.__viewBoyEvent = (name, value) => {
             for (const listener of listeners.get(name) || []) listener(value);
           };
 
@@ -211,25 +211,25 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             onTransportShortcut: (listener) => on("transportShortcut", listener),
             onScanLogData: (listener) => on("scanLogData", listener)
           };
-          window.spcBoyWK = Object.freeze(api);
+          window.viewBoy = Object.freeze(api);
         })();
         """, injectionTime: .atDocumentStart, forMainFrameOnly: true)
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        if message.name == "spcBoyWK",
+        if message.name == "viewBoy",
            let body = message.body as? [String: Any],
            body["method"] as? String == "viewBoyMaterialGeometry" {
             onMaterialGeometry?(body)
             return
         }
-        guard message.name == "spcBoyWK",
+        guard message.name == "viewBoy",
               let body = message.body as? [String: Any],
               let id = body["id"] as? String,
               let method = body["method"] as? String,
               let args = body["args"] as? [Any] else { return }
 
-        print("[SPCBoy WK] request \(method)")
+        print("[ViewBoy] request \(method)")
 
         if method == "closeMainWindow" {
             let handler = onCloseMainWindow
@@ -354,7 +354,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                     let result = try Self.handle(method: requestMethod, args: detachedArgs, catalogURL: requestCatalogURL)
                     return (true, Self.json(result))
                 } catch {
-                    print("[SPCBoy WK] request \(requestMethod) failed: \(error.localizedDescription)")
+                    print("[ViewBoy] request \(requestMethod) failed: \(error.localizedDescription)")
                     return (false, Self.json(["message": error.localizedDescription]))
                 }
             }.value
@@ -381,7 +381,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         guard let webView else { return }
         let idJSON = json(id)
         await MainActor.run {
-            webView.evaluateJavaScript("window.__spcBoyWKReply(\(idJSON), \(success ? "true" : "false"), \(valueJSON));", completionHandler: nil)
+            webView.evaluateJavaScript("window.__viewBoyReply(\(idJSON), \(success ? "true" : "false"), \(valueJSON));", completionHandler: nil)
         }
     }
 
@@ -456,7 +456,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         guard let webView = playbackEventWebView else { return }
         Task { @MainActor in
             _ = try? await webView.evaluateJavaScript(
-                "window.__spcBoyWKEvent(\(Self.json(name)), \(valueJSON));"
+                "window.__viewBoyEvent(\(Self.json(name)), \(valueJSON));"
             )
         }
     }
@@ -1194,14 +1194,14 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
     nonisolated private static let frontendSettingsKey = "ViewBoy.frontendPreferencesV3"
 
-    nonisolated private static func frontendSettingsLoad() throws -> SPCBoyPreferencesSnapshot {
+    nonisolated private static func frontendSettingsLoad() throws -> ViewBoyPreferencesSnapshot {
         let defaults = UserDefaults.standard
         if let data = defaults.data(forKey: frontendSettingsKey) {
-            var snapshot = try JSONDecoder().decode(SPCBoyPreferencesSnapshot.self, from: data)
+            var snapshot = try JSONDecoder().decode(ViewBoyPreferencesSnapshot.self, from: data)
             snapshot.apply(frontendInterface: FrontendPreferencesStore(defaults: defaults, keys: .viewBoy).load())
             return snapshot
         }
-        var snapshot = SPCBoyPreferencesSnapshot()
+        var snapshot = ViewBoyPreferencesSnapshot()
         let frontendPreferences = FrontendPreferencesStore(defaults: defaults, keys: .viewBoy).load()
         snapshot.apply(frontendInterface: frontendPreferences)
         let data = try JSONEncoder().encode(snapshot)
@@ -1210,8 +1210,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     }
 
     @discardableResult
-    nonisolated private static func frontendSettingsSave(_ settings: [String: Any]) throws -> SPCBoyPreferencesSnapshot {
-        let snapshot = try SPCBoyPreferencesSnapshot(jsonObject: settings)
+    nonisolated private static func frontendSettingsSave(_ settings: [String: Any]) throws -> ViewBoyPreferencesSnapshot {
+        let snapshot = try ViewBoyPreferencesSnapshot(jsonObject: settings)
         FrontendPreferencesStore(defaults: .standard, keys: .viewBoy).save(snapshot.frontendInterfacePreferences)
         UserDefaults.standard.set(try JSONEncoder().encode(snapshot), forKey: frontendSettingsKey)
         return snapshot
@@ -1252,10 +1252,10 @@ private enum BridgeError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .unsupported(let method): return "SPCBoy WK native bridge does not implement \(method) yet."
+        case .unsupported(let method): return "ViewBoy native bridge does not implement \(method) yet."
         case .catalogMissing(let path): return "The read-only catalog is not available at \(path)."
-        case .invalidArguments: return "SPCBoy WK received invalid bridge arguments."
-        case .invalidSettings: return "SPCBoy WK received an invalid frontend settings snapshot."
+        case .invalidArguments: return "ViewBoy received invalid bridge arguments."
+        case .invalidSettings: return "ViewBoy received an invalid frontend settings snapshot."
         }
     }
 }

@@ -221,7 +221,7 @@ RGB = paletteRGB(PALETTES[state.contrast]);
 
 let tracks = [];
 
-const bridge = window.spcBoyWK;
+const bridge = window.viewBoy;
 
 function trackID(track) {
   return track?.playlistId || `${track?.path || ""}:${track?.trackIndex || 0}`;
@@ -1496,7 +1496,7 @@ requestAnimationFrame(fitCanvas);
 fitCanvas();
 
 const pendingCommands = window.__viewBoyCommandQueue || [];
-window.SPCBoyWK = Object.freeze({
+window.ViewBoy = Object.freeze({
   dispatch(command) {
     switch (command) {
       case "previous": selectPrevious(); break;
@@ -1511,7 +1511,7 @@ window.SPCBoyWK = Object.freeze({
     }
   },
 });
-pendingCommands.splice(0).forEach((command) => window.SPCBoyWK.dispatch(command));
+pendingCommands.splice(0).forEach((command) => window.ViewBoy.dispatch(command));
 
 if (bridge) {
   bridge.onNativePlaybackState?.(applyNativeStatus);

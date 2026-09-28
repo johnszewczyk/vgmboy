@@ -55,12 +55,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func makeWebView(bridge: WKNativeBridge) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.setURLSchemeHandler(ViewBoyResourceSchemeHandler(), forURLScheme: "viewboy")
-        configuration.userContentController.add(bridge, name: "spcBoyWK")
+        configuration.userContentController.add(bridge, name: "viewBoy")
         configuration.userContentController.addUserScript(bridge.userScript())
         configuration.userContentController.addUserScript(WKUserScript(
             source: """
             window.__viewBoyCommandQueue = [];
-            window.SPCBoyWK = {
+            window.ViewBoy = {
               dispatch(command) { window.__viewBoyCommandQueue.push(command); }
             };
             """,
@@ -75,14 +75,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         guard JSONSerialization.isValidJSONObject(settings),
               let data = try? JSONSerialization.data(withJSONObject: settings),
               let json = String(data: data, encoding: .utf8) else { return }
-        let script = "window.__spcBoyWKEvent('appearanceSettingsChanged', \(json));"
+        let script = "window.__viewBoyEvent('appearanceSettingsChanged', \(json));"
         webView?.evaluateJavaScript(script, completionHandler: nil)
     }
 
-    private func broadcastFrontendSettings(_ settings: SPCBoyPreferencesSnapshot) {
+    private func broadcastFrontendSettings(_ settings: ViewBoyPreferencesSnapshot) {
         guard let data = try? JSONEncoder().encode(settings),
               let json = String(data: data, encoding: .utf8) else { return }
-        let script = "window.__spcBoyWKEvent('frontendSettingsChanged', \(json));"
+        let script = "window.__viewBoyEvent('frontendSettingsChanged', \(json));"
         webView?.evaluateJavaScript(script, completionHandler: nil)
     }
 
@@ -92,11 +92,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
               let json = String(data: data, encoding: .utf8),
               let nameData = try? JSONEncoder().encode(name),
               let nameJSON = String(data: nameData, encoding: .utf8) else { return }
-        let script = "window.__spcBoyWKEvent(\(nameJSON), \(json));"
+        let script = "window.__viewBoyEvent(\(nameJSON), \(json));"
         webView?.evaluateJavaScript(script, completionHandler: nil)
     }
 
-    private func receiveFrontendSettings(_ settings: SPCBoyPreferencesSnapshot) {
+    private func receiveFrontendSettings(_ settings: ViewBoyPreferencesSnapshot) {
         if let value = settings.mainWindowAlwaysOnTop {
             window?.level = value ? .floating : .normal
         }
@@ -106,7 +106,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     private func applyWindowLevels() {
         guard let data = UserDefaults.standard.data(forKey: "ViewBoy.frontendPreferencesV3"),
-              let snapshot = try? JSONDecoder().decode(SPCBoyPreferencesSnapshot.self, from: data) else {
+              let snapshot = try? JSONDecoder().decode(ViewBoyPreferencesSnapshot.self, from: data) else {
             window?.level = .normal
             return
         }
@@ -217,13 +217,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func dispatch(_ command: FrontendCommand) {
         let encoded = try! JSONEncoder().encode(command.rawValue)
         let value = String(decoding: encoded, as: UTF8.self)
-        webView?.evaluateJavaScript("window.SPCBoyWK?.dispatch(\(value));", completionHandler: nil)
+        webView?.evaluateJavaScript("window.ViewBoy?.dispatch(\(value));", completionHandler: nil)
     }
 
     private func dispatchCustom(_ command: String) {
         let encoded = try! JSONEncoder().encode(command)
         let value = String(decoding: encoded, as: UTF8.self)
-        webView?.evaluateJavaScript("window.SPCBoyWK?.dispatch(\(value));", completionHandler: nil)
+        webView?.evaluateJavaScript("window.ViewBoy?.dispatch(\(value));", completionHandler: nil)
     }
 
     @objc private func quit(_ sender: Any?) { NSApp.terminate(sender) }

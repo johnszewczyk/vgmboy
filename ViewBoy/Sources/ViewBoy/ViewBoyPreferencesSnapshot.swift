@@ -14,9 +14,9 @@ extension FrontendPreferencesKeySet {
     )
 }
 
-/// The typed native persistence boundary for SPCBoy. JavaScript receives a JSON
+/// The typed native persistence boundary for ViewBoy. JavaScript receives a JSON
 /// projection, but it no longer owns or migrates the durable preference schema.
-struct SPCBoyPreferencesSnapshot: Codable, Sendable {
+struct ViewBoyPreferencesSnapshot: Codable, Sendable {
     enum SnapshotError: Error { case invalidJSON }
     struct PlaybackRate: Codable, Sendable { var numerator: Int?; var denominator: Int? }
     enum RepeatMode: String, Codable, Sendable { case off, all, one }

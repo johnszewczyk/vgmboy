@@ -8,7 +8,7 @@ import VGMBoyFormatCore
 /// This is intentionally an adapter, not a second archive engine. VGMBoy
 /// decides whether an entry needs one file or a dependency-complete set;
 /// FrontendCore owns cache identity, staging, leases, and tool execution.
-/// SPCBoyWK supplies only its preference keys and the shared cache location.
+/// ViewBoy supplies only its preference keys and uses the shared cache location.
 enum SPCArchiveMaterialization {
     private static let cacheRootURL: URL = {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!

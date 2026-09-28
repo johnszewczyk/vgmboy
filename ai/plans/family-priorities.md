@@ -18,7 +18,7 @@ unit; the monorepo is the only source tree for maintained family code.
 | Playback admission, decoders, timing, transport, and audio output | VGMBoy |
 | AppKit/SwiftUI presentation | CocoaSpice |
 | Native WebKit presentation | SPCBoyWK |
-| Phosphor WebKit presentation | ViewBoy |
+| Screen-first Yoga LCD presentation | ViewBoy |
 | Electron SPCBoy | Recovery source and archive only; never a LaunchPad target |
 
 ## Format decisions

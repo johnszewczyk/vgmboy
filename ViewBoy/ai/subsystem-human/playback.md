@@ -6,4 +6,4 @@ The Yoga canvas listens for pushed `nativePlaybackState` and `nativePlaybackEnde
 
 Options exposes Long Play, End Fade, Repeat, Mono, and Volume alongside the switchable LCD font and contrast. Changes persist through the typed native preferences snapshot. Audio controls call `nativePlaybackAudioConfig`; timing controls call `nativePlaybackReconfigure` for a loaded track. The Favorites view reads and updates the shared favorite store. The single screen uses the active playback list for Current Queue; playlist tabs and seek controls are not part of the current interface.
 
-Opening a local path through the File menu uses native `choosePath`; a chosen folder is projected to its directly playable tracks through `selectFolder`. The canvas currently shows that selection in the Queue page.
+Opening a local path through the File menu uses native `choosePath`; a chosen folder is projected to its directly playable tracks through `selectFolder`. The canvas shows that selection in the Queue view.

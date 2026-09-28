@@ -30,7 +30,7 @@ window that merely opens does not establish audio parity.
 | Decoder session, timing, and output | VGMBoy | Render status and issue named commands. |
 | Queue, transitions, fade eligibility | FrontendCore | Present queue state and local animation. |
 | Preferences and playlist layout policy | FrontendCore | Persist local keys and adapt shared values to each renderer. |
-| Display and app identity | Each frontend | Keep native/WebKit/Metal presentation and preferences product-specific. |
+| Display and app identity | Each frontend | Keep each app's host, screen renderer, and preferences product-specific. |
 
 [`../verification/family.md`](../verification/family.md) contains the package
 results and clean checkout procedure. This report tracks the cross-app user

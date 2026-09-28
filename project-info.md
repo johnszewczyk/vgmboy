@@ -26,7 +26,7 @@ history live in this repository.
 | Shared archive/cache, preferences, queue, and transport policy | [FrontendCore/AGENTS.md](FrontendCore/AGENTS.md) |
 | AppKit/SwiftUI presentation | [CocoaSpice/AGENTS.md](CocoaSpice/AGENTS.md) |
 | Native WebKit player and typed host bridge | [SPCBoyWK/AGENTS.md](SPCBoyWK/AGENTS.md) |
-| Phosphor-styled WebKit player | [ViewBoy/AGENTS.md](ViewBoy/AGENTS.md) |
+| Screen-first Yoga LCD player | [ViewBoy/AGENTS.md](ViewBoy/AGENTS.md) |
 | Legacy Electron recovery material | [LocalRecovery/README.md](LocalRecovery/README.md) |
 
 For a component task, follow its `AGENTS.md` → `ai/AGENTS.md` →

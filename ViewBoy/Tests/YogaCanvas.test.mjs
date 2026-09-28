@@ -63,7 +63,7 @@ globalThis.document = { querySelector(selector) {
   if (selector === '#screen-window') return screen;
   return status;
 } };
-globalThis.spcBoyWK = bridge;
+globalThis.viewBoy = bridge;
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 test('canvas renders live rows and uses native playback and queue retirement', async () => {
@@ -75,7 +75,7 @@ test('canvas renders live rows and uses native playback and queue retirement', a
   assert.ok(groupStateCalls.some(([action, system, gameID]) =>
     action === 'selectGame' && system === 'SNES' && gameID === '1:SNES:Sample'));
   assert.ok(canvas.image.data.some((value) => value !== 0));
-  globalThis.SPCBoyWK.dispatch('playPause');
+  globalThis.ViewBoy.dispatch('playPause');
   await tick();
   assert.equal(calls.find(([name]) => name === 'start')[1].path, '/music/a.spc');
   await ended({ transport_state: 'ended', generation, status_sequence: generation + 1 });
@@ -83,6 +83,6 @@ test('canvas renders live rows and uses native playback and queue retirement', a
   await tick();
   await tick();
   assert.equal(calls.filter(([name]) => name === 'start').at(-1)[1].path, '/music/b.spc');
-  globalThis.SPCBoyWK.dispatch('settings');
+  globalThis.ViewBoy.dispatch('settings');
   assert.match(status.textContent, /SETTINGS/);
 });

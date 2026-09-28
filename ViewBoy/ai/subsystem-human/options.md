@@ -13,4 +13,4 @@ The macOS Options menu opens the same in-screen page. Library and Queue remain a
 
 - `Sources/ViewBoy/Resources/yoga-app.js`
 - `Sources/ViewBoy/WKNativeBridge.swift`
-- `Sources/ViewBoy/SPCBoyPreferencesSnapshot.swift`
+- `Sources/ViewBoy/ViewBoyPreferencesSnapshot.swift`

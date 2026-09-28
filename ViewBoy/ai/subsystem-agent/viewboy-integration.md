@@ -4,7 +4,7 @@ ViewBoy owns its AppKit host, Yoga canvas renderer, bitmap fonts, framebuffer, i
 
 ## Data and Playback
 
-The injected `window.spcBoyWK` bridge supplies read-only CatalogReader projections, shared favorite operations, frontend preferences, local-path selection, and VGMBoy transport. `window.SPCBoyWK.dispatch` remains the macOS menu command boundary. Preserve both names and their separate roles.
+The injected `window.viewBoy` bridge supplies read-only CatalogReader projections, shared favorite operations, frontend preferences, local-path selection, and VGMBoy transport. `window.ViewBoy.dispatch` is the macOS menu command boundary. Both names are local to ViewBoy.
 
 Catalog and favorite state belongs to the native/shared cores. JavaScript owns the visible tree, current view, table layout, sorting, font and contrast preferences, and hit testing. It must not scan source paths or write the catalog. Track activation sends the native playback fields supplied by the bridge, including archive path and entry.
 
@@ -13,7 +13,7 @@ Catalog and favorite state belongs to the native/shared cores. JavaScript owns t
 - `yoga-app.js` paints the full UI as four integer framebuffer shades and authored bitmap glyphs. Keep browser text, gradients, or selection overlays out of the screen.
 - One LCD dot occupies a 3×3 device-pixel cell. The 2×2 face uses one of four palette entries; its edge always uses the background shade.
 - Resize events recreate canvas buffers and then render synchronously. Track selection paints from the cached base framebuffer without rebuilding the Yoga tree. Sidebar disclosure updates row heights during its 250 ms animation. A full redraw cancels an active selection tween; page teardown cancels both pending animation frames.
-- The Micro and Standard glyph tables and contrast choice are presentation preferences stored in WebKit local storage. Playback preferences remain in `SPCBoyPreferencesSnapshot`.
+- The Micro and Standard glyph tables and contrast choice are presentation preferences stored in WebKit local storage. Playback preferences remain in `ViewBoyPreferencesSnapshot`.
 - The browser canvas without the injected native bridge cannot query the catalog or control playback. Real catalog and transport checks must run in the packaged app.
 
 ## Build and Verification

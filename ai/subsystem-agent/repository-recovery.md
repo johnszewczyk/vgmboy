@@ -13,8 +13,9 @@ family.
 - Cross-package changes belong in one family-root commit so the checked-in
   package combination stays reviewable.
 - `SPCBoy/` is retained Electron recovery source, not the active player target.
-  LaunchPad targets `SPCBoyWK/`. CocoaSpice, SPCBoyWK, and ViewBoy remain
-  separate app packages with independent identities and presentation.
+  Native SPCBoy work belongs in `SPCBoyWK/`; LaunchPad has separate entries
+  for SPCBoyWK and ViewBoy. CocoaSpice, SPCBoyWK, and ViewBoy remain separate
+  app packages with independent identities and presentation.
 - Vendored decoder snapshots under `VGMBoy/vendor/` are ordinary tracked files,
   not submodules. Their upstream pins and provenance are documented beside the
   vendor tree.
