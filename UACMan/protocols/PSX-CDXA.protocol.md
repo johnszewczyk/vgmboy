@@ -1,20 +1,21 @@
 # PSX CD-XA preservation protocol
 
-This protocol defines the canonical conversion path for PlayStation Redump
-discs whose music is stored as CD-XA sectors. The result is a playable UAC
-package containing the exact native XA sector members and, when present, a
-Redbook/CD-DA track encoded as APE Insane. The disc's loop decisions and
-source identity are retained as machine-readable metadata. The original
-Redump BIN/CUE remains the immutable source of truth; the UAC is a derived
-playback package.
+This protocol covers XA extraction and game-specific loop research for
+PlayStation Redump discs. It does not define the visible PSX track-tag
+vocabulary or require a UAC package for every soundtrack; those decisions live
+in the [PSX disc-audio profile](../Procedures/PSX-CDXA.md). Treat the sector and
+loop details here as operational source evidence, not as a list of music tags.
+The original Redump BIN/CUE remains the source of record.
 
 ## Authority and source boundary
 
-Use a verified Redump BIN and its matching CUE. Record the BIN and CUE
-BLAKE3-256 (and any available SHA-1/MD5) in the UAC source object. Preserve the
-source archive identity and retrieval URL. Do not infer loop points from a
-third-party rip, filename, or decoded waveform when the game has a native
-playback table.
+Use the declared Redump BIN and its matching CUE. Record the Redump release
+identity and URL plus the published checksums for the original BIN once in the
+package source record. Keep the original CUE as a byte-exact package member
+when making a UAC. Reuse exact-scope checksum records already in the database;
+do not add per-track hash arrays or repeat disc facts on each member. Do not
+infer loop points from a third-party rip, filename, or decoded waveform when
+the game has a native playback table.
 
 For SOTN, the authoritative loop source is the disc's `DRA.BIN`
 `XaMusicConfig` table and the game playback code. A native loop pair consists
@@ -30,29 +31,24 @@ they are never filled from an external rip.
 
 ## Audio conversion
 
-Extract every disc-native XA stream as the exact selected 2352-byte sectors,
-preserving XA headers, subheaders, interleave order, and source sector
-boundaries. Hash every resulting member and require equality with the source
-BIN-derived stream hash. Extract each audio track named by the CUE as its own
-source-state member; for a Redbook/CD-DA track, decode to PCM and encode one
-APE Insane member. Verify that APE with `mac -V` and compare decoded PCM
-BLAKE3-256 plus byte count. The native XA members remain byte-reconstructible
-from the source sectors; only the Redbook member is transcoded.
+Extract each disc-native XA stream from its selected 2352-byte sectors,
+preserving the source representation needed by the decoder and any verified
+loop mapping. Extract each audio track named by the CUE as its own member.
+Red Book CD-DA may be kept as WAV or encoded losslessly as APE/FLAC when that
+serves the chosen delivery. This profile does not require a second PCM hash,
+per-track checksum catalog, or separate encode-verification report. The UAC
+wrapper's standard integrity data remain governed by its own contract.
 
-For XA members, the extracted XA bytes are the canonical stream. The member
-`blake3` and the source-XA BLAKE3 are therefore the identity hash; a separate
-`streamBlake3` is redundant and may be omitted. If retained for compatibility,
-it must equal the raw-XA digest and identify the `raw-member-v1` profile. The
-Redbook APE has a distinct stored-member hash and may additionally carry a
-`decoded-pcm-v1` hash with its PCM parameters. Documentation and cue members
-have no stream hash because they are not audio streams. This is a source-state
-rule, not a claim that every audio format has a meaningful rendered-stream
-hash.
+For XA members, the selected disc sectors define the extracted source stream.
+Keep any sector-to-member mapping only where it is needed to explain a
+playback or loop decision. Do not add a second `streamBlake3`, decoded-PCM
+hash, or four-algorithm hash list as PSX music metadata. Keep Redump identity
+and original BIN checksums once in the package source record. Wrapper member
+integrity fields are not track tags.
 
-Keep populated music tags on the playable member. Store Redump identity and
-disc-wide facts once in the package source record. Each playable member keeps
-its four playable-payload hashes in `hashes[]`; do not duplicate those digests
-as ad hoc `SOURCE_XA_*` tags.
+Do not generate music tags from the disc filename, CUE track number, codec,
+or reader defaults. APE/FLAC native tags and whether selected values are
+mirrored into the UAC manifest are governed by the PSX disc-audio profile.
 
 Generic loop fields are replaced with the disc-native values only where a
 verified native mapping exists. A member with no loop has no `loop` object,
@@ -61,23 +57,22 @@ negative tag. Absence of a loop field means no loop was identified. Keep a
 positive loop map in structured member metadata and the player playlist; do
 not flatten it into duplicate `LOOP_*` tags.
 
-For raw XA, MetaManCore's `nativeMetadata.technicalFacts` is the technical
-record. Retain measured XA header facts there, including the actual
-`bitsPerSample` value (4 for the SOTN members checked in the 2026-09-26
-report). Do not duplicate these as `XA_*` tags. Suppress the reader's generic
-`comment: Sony XA header` placeholder; it is not a source comment. The
-byte-identical XA member and `sourceXA` mapping retain the native stream and
-its disc-sector relationship. `TXTP_*`, JoshW-specific, and other
-external-loop fields remain in research records, not playable member metadata.
+For raw XA, MetaManCore's `nativeMetadata.technicalFacts` can describe the
+reader's interpretation. Keep such facts out of the visible music-tag surface;
+retain only the structured values a decoder, player, or verified loop mapping
+actually needs. Do not duplicate them as `XA_*` tags. Suppress the reader's
+generic `comment: Sony XA header` placeholder; it is not a source comment.
+`TXTP_*`, JoshW-specific, and other external-loop fields remain in research
+records, not playable member metadata.
 
 Keep set-level provenance in `sources[]` or `game.metadata`; do not repeat it
-on every track. In particular, the source archive hash, BIN hash, CUE hash,
-download URL, source format, and region do not need per-track copies. A track's
-sector range, native loop mapping, track number, title, and stream identity are
-track facts. Avoid duplicate spellings such as `discFilename` plus
-`ON_DISC_NAME`, `sourceBinBlake3` plus `SOURCE_BIN_BLAKE3`, or a `sourceXA`
-object plus the same values in flattened tags. Keep one canonical structured
-field and retain the full raw research report as a documentation member.
+on every track. Record the Redump identity and known source BIN checksums once.
+The attached CUE carries its own track layout and indexes. A physical disc
+track number may be needed to interpret a playlist, but that does not decide
+which number belongs in visible music tags. Keep sector/loop mapping only when
+it supports playback or source research. Do not duplicate structured values as
+flattened tags or parallel spellings. Add research documents only when they
+support a concrete source-mapping or review need.
 
 ## UAC member metadata
 
@@ -96,59 +91,45 @@ Every playable XA member with a native loop carries:
 }
 ```
 
-For a transcoded Redbook member, APE tags mirror its source evidence. For XA,
-the UAC member object is authoritative because the native sector file has no
-general-purpose tag block. The loop object is also repeated in the playlist
-for players that consume ordered UAC entries.
+For a Red Book member, use the native WAV/APE/FLAC tag interface as the
+candidate track surface. The exact tags and any manifest synchronization
+remain open under the PSX disc-audio profile. For XA, a UAC member object may
+carry the positive loop mapping a player needs because a raw sector member has
+no general-purpose tag block. Repeat a loop in the playlist only when the
+player requires it.
 
 Include the original CUE as a byte-exact ordinary member and point to it with
-`game.metadata.cue_sheet`. Include the native loop report, the certification
-list, the duration-candidate report, XA sector inventory, and source manifest as
-documentation members. Set-level metadata uses the shared
-shape `game.metadata.setCollection`, `setName`, and `setUrl`. A playlist points to each
-APE member and repeats the loop fields needed by a player UI; it does not copy
-the audio payload.
+`game.metadata.cue_sheet`. Add loop or sector research documents only when
+they support a concrete source-mapping or review need. Set identity uses the
+shared `game.metadata.set` object. A playlist points to audio members and
+contains playback fields only when a consumer needs them; it does not copy the
+audio payload.
 
-Do not duplicate the full BIN/CUE source inside the UAC unless a future
-package explicitly elects to be self-contained. Source hashes and the source
-package identity are sufficient for this derived package, while the verified
-source remains available in the source-state tree.
+Do not duplicate the full BIN or downloaded archive inside the UAC unless a
+future package explicitly elects to be self-contained. Keep the source BIN
+checksums and Redump identity at package/source scope; the CUE attachment
+documents the disc layout. The source files remain in the source-state tree.
 
 ## OST title matching
 
-Official OST durations are evidence for candidate labels only. Match by
-duration after accounting for the native loop body, but do not automatically
-rename or retag a stream when multiple OST tracks share the same duration or
-when no candidate is close. Publish a Markdown certification list with the
-current stream filename, native loop interval, duration candidates, and an
-explicit status (`clear`, `ambiguous`, `no-clear-match`, or `no-native-loop`).
-Human certification can later promote a title into the authored metadata.
+Official OST names and durations may support a separate title research task.
+Do not promote candidate labels into track tags until the source and matching
+decision are explicit. Keep unresolved candidates in research material.
 
 ## External-rip comparison
 
-JoshW material is a comparison fixture, never loop authority. Compare its XA
-members to the Redump extraction at the raw sector/channel level and record
-byte-identical, missing, and differing members. Compare its TXTPlay loop
-values against the independently derived native values. Differences are
-evidence to investigate; they do not change the native UAC tags.
+External rips are optional research material, not routine packaging inputs or
+tag authority. Use them only for a specific unresolved title or loop question;
+record candidates outside the ordinary track-tag surface.
 
 ## Required validation
 
-Before publishing a package:
-
-1. Verify the Redump source archive, BIN, and CUE hashes. Keep source hashes at
-   package/source scope; keep each member's four playable-payload hashes with
-   that member.
-2. Confirm every staged APE passes `mac -V` and PCM BLAKE3 equality.
-3. Run `uacman inspect --verify` and a payload read/unpack check.
-4. Confirm the UAC has every intended native XA member, the Redbook APE, the
-   CUE, and documentation members; no `.DS_Store`, BIN, TXTP, or unrelated
-   source archives are admitted.
-5. Confirm a verified native loop is present at member and playlist level.
-   Members without a verified loop have no negative loop field or tag; a loop
-   certification report may record their review status.
-6. Confirm XA technical facts come from MetaManCore and are not duplicated as
-   flattened `XA_*` tags; there is no synthetic XA-header comment.
+When creating a UAC, identify the declared Redump source once, include the CUE,
+and run the wrapper's normal package-integrity check. Keep the package's
+intended audio members and avoid unrelated files. Verify positive XA loop
+mapping when a package carries one. Do not require per-track hash arrays,
+decoded-PCM comparisons, Red Book technical tags, or reader diagnostic tags as
+part of this PSX profile.
 
 This protocol is the format-specific companion to the general UAC wrapper
 contract in `ai/subsystem-agent/uac-wrapper-format.md`.

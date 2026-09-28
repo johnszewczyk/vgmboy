@@ -1,66 +1,109 @@
-# PlayStation CD-XA and Red Book to UAC
+# PlayStation Disc Audio to UAC Profile
 
-This profile covers Redump PlayStation discs whose music is stored as native
-CD-XA sectors, Red Book CD-DA tracks, or both. MetaManCore reads XA headers and
-APE metadata. The UAC keeps original XA sector members byte-for-byte and
-represents verified Red Book audio as APE; it does not replace the Redump
-source archive.
+## Status and scope
 
-## MetaManCore XA fields
+This profile sets the PSX-specific provenance and tag-surface boundaries. The
+exact track-tag vocabulary, native-tag passthrough versus UAC-manifest
+synchronization, and whether a UAC package is needed for a given soundtrack
+remain under discussion. Those choices must not be inferred from the SPC
+profile.
 
-The `xa` reader reports these `nativeMetadata.technicalFacts` when the XA
-header exposes them:
+The [2026-09-26 Redump cleanup report](Reports/PSX-Redump-Metadata-Cleanup-2026-09-26.md)
+records packages built under the previous tag and hash rules. It remains a
+historical package audit; this profile governs future PSX tag-surface decisions.
 
-| Field | Meaning |
-| --- | --- |
-| `container` | Member representation, such as `raw-sector`. |
-| `form`, `codingInfo`, `submode`, `xaConfiguration` | XA sector coding/header facts. |
-| `bitsPerSample`, `channels`, `sampleRateHz` | Values decoded from the XA coding byte. |
-| `sampleCountPerSector`, `audioSectorCount` | Measured audio frame and sector counts. |
-| `sectorHeaderBytes`, `sectorPayloadBytes`, `sectorSizeBytes` | XA sector layout. |
-| `xaFileNumber`, `xaChannelNumber`, `visibleTrackIndex` | Stream identity in the source disc. |
+It covers Redump PlayStation disc audio represented as native XA streams,
+Red Book CD-DA tracks, or both. Extraction and game-specific loop research
+remain in the [PSX preservation protocol](../protocols/PSX-CDXA.protocol.md).
 
-Keep those facts in the MetaMan technical object. Do not flatten them into
-duplicate `XA_*` track tags. A raw XA sector stream has no generic-purpose tag
-block and this profile does not define a CD-XA **Sub-Container Version** tag.
-Do not expose the reader's descriptive `comment: Sony XA header` as a source
-comment. It is a reader placeholder, not native tag data.
+## Source identity and package shape
 
-## UAC member fields
+- Treat the declared Redump disc as the source identity for this PSX workflow.
+  Keep its Redump release name and URL, plus the known original BIN checksums,
+  once in the package source record. Reuse matching checksums already recorded
+  in the database or Redump record; do not build another multi-algorithm hash
+  catalog for every derived track.
+- Include the original CUE byte-for-byte as an ordinary package member and
+  reference it from `game.metadata.cue_sheet`. The CUE preserves the disc's
+  track layout and indexes.
+- Do not include the full BIN or downloaded archive by default. Keep those
+  source files in their source-study location and link them by the package-level
+  source record. A self-contained disc-image package would be a separate,
+  explicit packaging choice.
+- A UAC is an optional convenience bundle for lossless audio members and the
+  CUE. A tagged APE/FLAC collection with its CUE can remain the deliverable
+  when a single UAC adds no useful handling benefit.
+- The wrapper's own integrity fields remain governed by the UAC format. They
+  are package integrity data, not PSX music tags. This profile adds no
+  per-track four-algorithm stream-hash set, decoded-PCM hash catalog, or
+  repeated source-image checksum fields.
 
-| Evidence | UAC location | Rule |
-| --- | --- | --- |
-| Populated music metadata | `member.metadata` | Retain only meaningful Album, Title, Artist, Composer, Date, Year, Publisher, Developer, Disc Number, Track Number, and source OST fields when present. Preserve original populated values. |
-| XA technical facts | `member.metadata.nativeMetadata.technicalFacts` | Keep MetaManCore values, including valid format-specific variation. Do not add duplicate user tags. |
-| XA-to-disc mapping | `member.metadata.sourceXA` | Keep the source BIN sector range and XA file/channel identity when known. Keep one structured representation. |
-| Validated native loop | `member.metadata.loop` | Include only a positive, source-backed loop mapping. The playlist may repeat that positive object for playback. |
-| No loop | no field | Omit `loop`, `loopStatus`, `LOOP_TYPE=none`, and all equivalent negative tags. Absence means no loop was identified. |
-| Stream hashes | `member.hashes[]` | Keep the four playable-payload hashes (BLAKE3-256, CRC32/ISO-HDLC, SHA-1, MD5) for the exact stored stream bytes. Do not duplicate them as `SOURCE_XA_*` tags. |
-| Disc/source hashes and URL | `sources[]` | Keep the source archive, BIN, CUE, and source-set identifiers at package/source scope, not repeated on every track. |
-| APE-native tags | `member.metadata.nativeMetadata.tags` | Read through MetaManCore. Retain populated music tags; omit synthetic loop sentinels and repeated system, region, and CUE facts already represented structurally. |
+## Track tag surface
 
-Keep measured `playLengthMs`. Keep the CUE as a byte-exact UAC member and use
-its structured reference. Do not embed the full BIN or source archive unless a
-package is explicitly designed to be self-contained. There is no APE
-**Sub-Container Version** user tag in this profile; MetaMan's APE version fact
-remains technical data.
+There is no approved PSX-wide track-tag allowlist yet. Keep tag names and
+values in the APE/FLAC native tag interface when present. Whether UAC should
+pass those tags through or synchronize selected values into its manifest is
+open; do not duplicate native values in the manifest merely to make them
+visible twice.
+
+Do not synthesize a title from a filename, a generic “Redbook Audio Track”
+label, an album from a game filename, or credits from game-level information.
+Do not emit blank tags. A populated CUE `TITLE` or `PERFORMER` value may be
+reviewed as source metadata; its absence does not authorize a fallback value.
+
+The following do not belong on the music-tag surface:
+
+- Red Book/CD-DA's fixed sample format or generic format label, including
+  `system: Standard audio`.
+- APE encoder/version/compression details, reader diagnostics, or a nested
+  technical/verification object presented as if it were one ordinary tag.
+- CUE indexes, pregap values, region, and source-set facts repeated on every
+  track when the attached CUE or package source record already carries them.
+- Negative loop markers. Store a loop only when the PSX source research
+  establishes a positive loop; otherwise omit loop fields.
+
+Measured playback duration may be retained as operational timing data where a
+UAC consumer needs it. It is not a music-tag decision. XA reader facts and
+source-sector mappings are handled by the XA preservation protocol; do not
+flatten them into invented `XA_*` tags.
+
+The profile does not yet resolve whether the visible track fields should use
+`Album`, `Game Title`, or another game/OST distinction; how physical CUE track
+numbers relate to audio-only sequence numbers; how unnamed tracks should appear;
+or which source can establish artist, composer, publisher, developer, year, or
+official OST titles. Leave those values unchanged or absent pending review.
+
+If a future profile decision mirrors native tags into the manifest, use the
+UAC tag-map contract: a JSON object keyed by the original tag name, with arrays
+for repeated values in source order. This storage shape does not decide which
+tags are visible in the UACMan tag grid.
+
+## XA interpretation
+
+MetaManCore's XA facts describe source-sector interpretation, not conventional
+music tags. Keep only the facts required by the XA reader, playback, or a
+source-backed loop mapping in the appropriate structured record or research
+report. Do not promote uniform technical values to visible track tags. The
+game-specific XA loop and sector rules remain in the linked preservation
+protocol.
 
 ## Procedure
 
-1. Verify the Redump archive and its BIN/CUE identity against available source
-   records. Reuse recorded hashes where the byte scope matches; do not hash a
-   source again just to populate a duplicate per-track tag.
-2. Extract each XA stream as its exact selected 2352-byte source sectors and
-   verify member hashes against the BIN-derived selection.
-3. Decode each Red Book track to PCM, encode APE, verify with Monkey's Audio,
-   and compare decoded PCM against the Redump track extraction.
-4. Harvest APE and XA metadata with MetaManCore. Review the fields against the
-   UAC member rules above; do not promote reader placeholders or duplicate
-   technical/source values.
-5. Record loop evidence in the set report. Write a loop object only when the
-   native source establishes one; leave all other members without a loop
-   field.
-6. Verify the final UAC payload, member hashes, playlists, and documentation.
-
-The collection-specific SOTN and Darkstalkers results are recorded in
-[`Reports/PSX-Redump-Metadata-Cleanup-2026-09-26.md`](Reports/PSX-Redump-Metadata-Cleanup-2026-09-26.md).
+1. Identify the declared Redump release and source BINs. Consult its published
+   checksums or an exact-scope stored database record; do not rescan source
+   files solely to repeat already established provenance.
+2. Preserve and include the source CUE byte-for-byte when making a UAC, with a
+   package-level CUE reference. Keep source BIN checksums at source scope.
+3. Review actual APE/FLAC tags before deciding what to surface. Record which
+   values are present in the member, which came from the CUE, and which would
+   be newly authored. Do not auto-promote filenames, parser placeholders, or
+   disc-format facts.
+4. Decide per soundtrack whether tagged audio plus the CUE is sufficient or a
+   UAC bundle is useful. If a UAC is built, use the normal wrapper integrity
+   checks. The PSX profile does not require per-track PCM comparisons or a
+   separate stream-hash catalog.
+5. Keep verified game-native loop research for XA in the preservation report
+   and encode only positive, source-backed loop data. Never emit a “no loop”
+   tag or object.
+6. Report unresolved title, album, numbering, or credit conflicts for review;
+   do not resolve them by promoting one unverified value.
