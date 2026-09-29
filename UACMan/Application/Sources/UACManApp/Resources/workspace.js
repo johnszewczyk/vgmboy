@@ -470,7 +470,7 @@
     trackTags:"var(--canonical-number-column) 110px minmax(160px,1fr) minmax(220px,1.5fr) var(--canonical-action-column) var(--canonical-action-column)",
     trackBrowser:"var(--canonical-number-column) minmax(0,1fr) 56px",
     newTagSidebar:"var(--canonical-number-column) 36px minmax(0,1fr)",
-    newTagEditor:"var(--canonical-number-column) 10rem minmax(12rem,.8fr) minmax(14rem,1.2fr) var(--canonical-action-column)",
+    newTagEditor:"var(--canonical-number-column) 10rem 10rem minmax(12rem,.8fr) minmax(14rem,1.2fr) var(--canonical-action-column)",
     tagAnalyzer:"var(--canonical-number-column) minmax(0,4fr) minmax(0,1fr) minmax(0,1fr) var(--canonical-action-column)",
     tagAnalyzerPacks:"var(--canonical-number-column) minmax(0,1fr) 58px 82px",
     tagAnalyzerFields:"var(--canonical-number-column) minmax(100px,.9fr) minmax(110px,1fr) minmax(180px,1.5fr) var(--canonical-action-column) var(--canonical-action-column)",
@@ -782,7 +782,9 @@
     $("#save-button").disabled = !state.hasUnsavedChanges;
     $("#revert-button").disabled = !state.hasUnsavedChanges;
     $("#collection-root").textContent = state.collectionRoot || "No collection selected";
-    $("#collection-foot").textContent = state.isScanningCollection ? "Reading package manifests…" : state.collectionStatus || `${state.collectionEntries.length} packages`;
+    const collectionSelectionCount = (state.selectedCollectionPackagePaths || []).length;
+    const collectionFoot = state.isScanningCollection ? "Reading package manifests…" : state.collectionStatus || `${state.collectionEntries.length} packages`;
+    $("#collection-foot").textContent = collectionSelectionCount ? `${collectionFoot} · ${collectionSelectionCount} selected` : collectionFoot;
     $("#rescan-button").disabled = !state.collectionRoot;
     $("#rescan-button").dataset.action = state.isScanningCollection ? "cancelCollectionScan" : "rescanCollection";
     $("#rescan-button").title = state.isScanningCollection ? "Cancel collection scan" : "Rescan collection";
@@ -838,7 +840,8 @@
     $("#collection-list").innerHTML = entries.map(entry => {
       const title = entry.title || entry.relativePath.split("/").pop().replace(/\.uac$/i, "");
       const selected = state.selectedCollectionPackagePath === entry.relativePath;
-      return `<div class="collection-item ${selected ? "selected" : ""}" data-package="${esc(entry.relativePath)}" title="${esc(entry.packageID)} · ${bytes(entry.fileByteCount)}"><div class="collection-title">${esc(title)}</div><div class="collection-meta">${esc(entry.console || "Unknown system")} · ${entry.playableMemberCount} playable · ${entry.totalMemberCount} members</div><div class="collection-path">${esc(entry.relativePath)}</div></div>`;
+      const checked = (state.selectedCollectionPackagePaths || []).includes(entry.relativePath);
+      return `<div class="collection-item ${selected ? "selected" : ""}" data-package="${esc(entry.relativePath)}" title="${esc(entry.packageID)} · ${bytes(entry.fileByteCount)}"><button class="collection-package-select" type="button" data-action="toggleCollectionPackageSelection" data-package-path="${esc(entry.relativePath)}" role="checkbox" aria-checked="${checked}" aria-label="${checked ? "Remove" : "Add"} ${esc(title)} ${checked ? "from" : "to"} batch selection">${checked ? "✓" : "−"}</button><div class="collection-item-copy"><div class="collection-title">${esc(title)}</div><div class="collection-meta">${esc(entry.console || "Unknown system")} · ${entry.playableMemberCount} playable · ${entry.totalMemberCount} members</div><div class="collection-path">${esc(entry.relativePath)}</div></div></div>`;
     }).join("");
     if (entries.length === 0) $("#collection-list").innerHTML = `<div class="empty-note">${state.collectionEntries.length ? "No packages match this filter." : "Choose Collection to scan a folder of UAC packages."}</div>`;
   }
@@ -1009,14 +1012,15 @@
 
   function renderNewTagPage() {
     const tracks = tagEligibleTracks();
+    const selectedPackages = state?.selectedCollectionPackagePaths || [];
     const query = $("#member-filter")?.value.trim().toLocaleLowerCase() || "";
     const visibleTracks = tracks.filter(member => !query || [member.title, member.artist, member.album, member.name, member.path, member.role, member.format, ...Object.values(memberFields(member))].some(value => String(typeof value === "object" ? JSON.stringify(value) : (value || "")).toLocaleLowerCase().includes(query)));
     const sidebarRows = visibleTracks.map(member => {
       const number = tracks.indexOf(member) + 1;
-      const checked = selectedTagTrackPaths.has(member.path) ? " checked" : "";
+      const checked = selectedTagTrackPaths.has(member.path);
       const cells = [
         canonicalNumberCellMarkup(number, `Track row ${number}`),
-        canonicalCellMarkup(`<input class="new-tag-track-checkbox" type="checkbox" data-new-tag-track value="${esc(member.path)}" aria-label="Select ${esc(member.name)}"${checked}>`, { className:"canonical-table-action-cell new-tag-checkbox-cell" }),
+        canonicalCellMarkup(`<button class="new-tag-selection-toggle" type="button" role="checkbox" aria-checked="${checked}" data-action="toggleNewTagTrack" data-track-path="${esc(member.path)}" data-track-name="${esc(member.name)}" aria-label="${checked ? "Remove" : "Add"} ${esc(member.name)} ${checked ? "from" : "to"} selected tracks">${checked ? "✓" : "−"}</button>`, { className:"new-tag-checkbox-cell" }),
         canonicalCellMarkup(`<input class="tag-table-field file-name-field" value="${esc(member.name)}" aria-label="Track filename" title="${esc(member.path)}" disabled>`)
       ];
       return canonicalRowMarkup(cells, { className:"new-tag-track-row" });
@@ -1026,13 +1030,20 @@
       columns:CanonicalTableColumns.newTagSidebar,
       title:"Tracks",
       ariaLabel:"Select tracks for a new tag",
-      header:canonicalHeaderMarkup(["#", "✓", "Track"]),
+      header:canonicalHeaderMarkup(["#", "Select", "Track"]),
       rows:sidebarRows,
       empty:canonicalEmptyRowMarkup("No tracks match this filter")
     });
+    const targetOptions = [];
+    if (tracks.length) targetOptions.push({ value:"allTracks", label:"All Tracks" }, { value:"selectedTracks", label:"Selected Tracks" });
+    if (state?.documentName) targetOptions.push({ value:"package", label:"Package" });
+    if (selectedPackages.length) targetOptions.push({ value:"selectedPackages", label:`${selectedPackages.length} Selected Package${selectedPackages.length === 1 ? "" : "s"}` });
+    const defaultTarget = tracks.length ? "allTracks" : state?.documentName ? "package" : "selectedPackages";
+    const targetMarkup = targetOptions.map(option => `<option value="${option.value}"${option.value === defaultTarget ? " selected" : ""}>${esc(option.label)}</option>`).join("");
     const draft = canonicalRowMarkup([
       canonicalNumberCellMarkup("＋", "Create tag"),
-      canonicalCellMarkup('<select class="tag-table-field" data-new-tag-target aria-label="Apply to"><option value="allTracks">All Tracks</option><option value="selectedTracks">Selected Tracks</option><option value="package">Package</option></select>'),
+      canonicalCellMarkup(`<select class="tag-table-field" data-new-tag-target aria-label="Apply to"${targetOptions.length <= 1 ? " disabled" : ""}>${targetMarkup}</select>`),
+      canonicalCellMarkup('<select class="tag-table-field" data-new-tag-operation aria-label="Batch operation" disabled><option value="set">Set value</option><option value="fillMissing">Fill missing</option><option value="remove">Remove</option></select>'),
       canonicalCellMarkup('<input class="tag-table-field" data-new-tag-key placeholder="Tag Name" aria-label="New tag name" required>'),
       canonicalCellMarkup('<input class="tag-table-field" data-new-tag-value placeholder="Tag Value" aria-label="New tag value">'),
       canonicalCellMarkup('<button class="icon-button" type="submit" data-new-tag-submit title="Apply new tag" aria-label="Apply new tag">✓</button>', { className:"canonical-table-action-cell" })
@@ -1042,7 +1053,7 @@
       columns:CanonicalTableColumns.newTagEditor,
       title:"New Tag",
       ariaLabel:"Create a new tag",
-      header:canonicalHeaderMarkup(["#", "Apply To", "Tag Name", "Tag Value", "✓"]),
+      header:canonicalHeaderMarkup(["#", "Apply To", "Operation", "Tag Name", "Tag Value", "✓"]),
       rows:draft
     });
     const detail = `<section class="track-browser-pane new-tag-editor-pane" aria-label="New tag fields"><form class="${canonicalTableSurfaceClassName("data-table-scroll", "new-tag-form")}" data-new-tag-form>${newTagTable}</form></section>`;
@@ -1634,7 +1645,8 @@
       inspector.innerHTML = renderProfilesPage();
       return;
     }
-    if (!hasPackage) {
+    const canBatchEditPackages = (state.selectedCollectionPackagePaths || []).length > 0;
+    if (!hasPackage && !(mainView === "newTag" && canBatchEditPackages)) {
       inspector.innerHTML = `<div class="metadata-empty"><div class="empty-icon">⌁</div><h3>Open a package to edit metadata</h3><p>Choose a collection entry or open a UAC file.</p></div>`;
       return;
     }
@@ -1937,9 +1949,18 @@
   function updateNewTagSubmitState(form = $("[data-new-tag-form]")) {
     if (!form) return;
     const target = $("[data-new-tag-target]", form)?.value;
-    const hasTargets = target === "package" || (target === "selectedTracks" ? selectedTagTrackPaths.size > 0 : tagEligibleTracks().length > 0);
+    const selectedPackages = state?.selectedCollectionPackagePaths || [];
+    const hasTargets = target === "package"
+      || (target === "selectedTracks" ? selectedTagTrackPaths.size > 0 : false)
+      || (target === "selectedPackages" ? selectedPackages.length > 0 : false)
+      || (target === "allTracks" ? tagEligibleTracks().length > 0 : false);
+    const operation = $("[data-new-tag-operation]", form);
+    if (operation) operation.disabled = target !== "selectedPackages";
+    const operationNeedsValue = target === "selectedPackages" && operation?.value !== "remove";
+    const key = $("[data-new-tag-key]", form)?.value.trim() || "";
+    const value = $("[data-new-tag-value]", form)?.value.trim() || "";
     const submit = $("[data-new-tag-submit]", form);
-    if (submit) submit.disabled = !hasTargets;
+    if (submit) submit.disabled = !hasTargets || !key || (operationNeedsValue && !value);
   }
 
   function submitNewTag(form) {
@@ -1949,6 +1970,14 @@
     if (!key) { keyField?.focus(); return; }
     const value = $("[data-new-tag-value]", form)?.value || "";
     const target = $("[data-new-tag-target]", form)?.value || "allTracks";
+    if (target === "selectedPackages") {
+      bridge("stageCollectionPackageTagEdit", {
+        key,
+        operation:$('[data-new-tag-operation]', form)?.value || "set",
+        value
+      });
+      return;
+    }
     if (target === "package") {
       bridge("addMetadataKey", { key, scope:"package", value });
       return;
@@ -2341,7 +2370,10 @@
     const packageItem = event.target.closest("[data-package]");
     const memberRow = event.target.closest("tr[data-member]");
     const trackRow = event.target.closest("[data-track-row]");
-    if (packageItem) { bridge("selectPackage", { path:packageItem.dataset.package }); return; }
+    if (packageItem && !event.target.closest("[data-action=toggleCollectionPackageSelection]")) {
+      bridge("selectPackage", { path:packageItem.dataset.package });
+      return;
+    }
     if (memberRow && !event.target.closest("input[type=checkbox]")) {
       mainView = "trackBrowser";
       trackBrowserPath = memberRow.dataset.member;
@@ -2356,7 +2388,22 @@
       render(state);
     }
     if (!action) return;
-    if (action === "deleteTag") {
+    if (action === "toggleCollectionPackageSelection") {
+      bridge("toggleCollectionPackageSelection", { path:event.target.closest("[data-package-path]")?.dataset.packagePath || "" });
+      return;
+    }
+    if (action === "toggleNewTagTrack") {
+      const toggle = event.target.closest("[data-track-path]");
+      const path = toggle?.dataset.trackPath || "";
+      if (!path || !toggle) return;
+      if (selectedTagTrackPaths.has(path)) selectedTagTrackPaths.delete(path); else selectedTagTrackPaths.add(path);
+      const checked = selectedTagTrackPaths.has(path);
+      toggle.textContent = checked ? "✓" : "−";
+      toggle.setAttribute("aria-checked", String(checked));
+      toggle.setAttribute("aria-label", `${checked ? "Remove" : "Add"} ${toggle.dataset.trackName || "track"} ${checked ? "from" : "to"} selected tracks`);
+      updateNewTagSubmitState(toggle.closest(".new-tag-page")?.querySelector("[data-new-tag-form]"));
+    }
+    else if (action === "deleteTag") {
       const row = event.target.closest("[data-tag-row]");
       const key = row?.dataset.tagFrom || "";
       if (key) animateRowRemoval(row, () => bridge("deleteMetadataKey", { key, scope:row.dataset.tagScope || "" }));
@@ -2497,11 +2544,7 @@
 
   document.addEventListener("change", event => {
     const target = event.target;
-    if (target.matches("[data-new-tag-track]")) {
-      if (target.checked) selectedTagTrackPaths.add(target.value); else selectedTagTrackPaths.delete(target.value);
-      updateNewTagSubmitState(target.closest(".new-tag-page")?.querySelector("[data-new-tag-form]"));
-    }
-    else if (target.matches("[data-new-tag-target]")) updateNewTagSubmitState(target.closest("[data-new-tag-form]"));
+    if (target.matches("[data-new-tag-target], [data-new-tag-operation]")) updateNewTagSubmitState(target.closest("[data-new-tag-form]"));
     else if (target.matches("[data-track-cell]")) commitTrackCell(target);
     else if (target.matches("[data-file-name]")) bridge("renameMember", { path:target.dataset.filePath || "", name:target.value });
   });
@@ -2509,6 +2552,7 @@
   document.addEventListener("input", event => {
     if (event.target.id === "collection-filter") renderCollections();
     else if (event.target.id === "member-filter") ["files", "newTag", "tagAnalyzer"].includes(mainView) ? render(state) : renderMembers();
+    else if (event.target.matches("[data-new-tag-key], [data-new-tag-value]")) updateNewTagSubmitState(event.target.closest("[data-new-tag-form]"));
     else if (event.target.matches("[data-tag-analyzer-json-scalar], [data-tag-analyzer-json-key]")) {
       refreshTagAnalyzerJSONTree(event.target.closest(".canonical-table[data-json-node]"));
     }

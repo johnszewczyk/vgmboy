@@ -237,6 +237,8 @@ final class UACManModel {
     var collectionEntries: [UACCollectionEntry] = []
     var collectionIssues: [UACCollectionIssue] = []
     var selectedCollectionPackagePath: String?
+    var selectedCollectionPackagePaths: Set<String> = []
+    private var pendingCollectionPackageTagEdits: [String: PendingCollectionPackageTagEdit] = [:]
     var isScanningCollection = false
     var collectionStatusMessage = "Choose a folder to browse its UAC packages."
     var tagAnalyzerRootURL: URL?
@@ -443,6 +445,7 @@ final class UACManModel {
             },
             "collectionIssues": collectionIssues.map { ["relativePath": $0.relativePath, "message": $0.message] },
             "selectedCollectionPackagePath": selectedCollectionPackagePath ?? NSNull(),
+            "selectedCollectionPackagePaths": selectedCollectionPackagePaths.sorted(),
             "isScanningCollection": isScanningCollection,
             "tagAnalyzerRootPath": tagAnalyzerRootURL?.path ?? "",
             "tagAnalyzerTags": tagAnalyzerTags.map { tag in
@@ -566,7 +569,13 @@ final class UACManModel {
     }
 
     func openCollection(_ url: URL) {
+        if hasUnsavedChanges {
+            guard confirmDiscardIfNeeded() else { return }
+            revert()
+        }
+        pendingCollectionPackageTagEdits.removeAll()
         let root = url.standardizedFileURL
+        let keepPackageSelection = collectionRootURL == root
         UserDefaults.standard.set(root.path, forKey: PreferenceKey.lastCollectionPath)
         collectionScanTask?.cancel()
         let scanID = UUID()
@@ -575,6 +584,7 @@ final class UACManModel {
         collectionEntries = []
         collectionIssues = []
         selectedCollectionPackagePath = nil
+        if !keepPackageSelection { selectedCollectionPackagePaths.removeAll() }
         isScanningCollection = true
         collectionStatusMessage = "Reading UAC manifests…"
         errorMessage = nil
@@ -1160,6 +1170,8 @@ final class UACManModel {
         guard relativePath != selectedCollectionPackagePath else { return }
         guard confirmDiscardIfNeeded() else { return }
 
+        pendingCollectionPackageTagEdits.removeAll()
+
         let previousSelection = selectedCollectionPackagePath
         let packageURL = collectionRootURL.appendingPathComponent(relativePath).standardizedFileURL
         selectedCollectionPackagePath = relativePath
@@ -1169,8 +1181,118 @@ final class UACManModel {
         }
     }
 
+    func toggleCollectionPackageSelection(_ relativePath: String) {
+        guard collectionEntries.contains(where: { $0.relativePath == relativePath }) else { return }
+        if selectedCollectionPackagePaths.contains(relativePath) {
+            selectedCollectionPackagePaths.remove(relativePath)
+        } else {
+            selectedCollectionPackagePaths.insert(relativePath)
+        }
+    }
+
+    func stageCollectionPackageTagEdit(
+        key rawKey: String,
+        operation rawOperation: String,
+        value: String,
+        searchText: String = ""
+    ) {
+        let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { errorMessage = "Enter a tag name."; return }
+        guard let operation = UACBatchFieldOperation(rawValue: rawOperation) else {
+            errorMessage = "Choose a valid batch operation."
+            return
+        }
+        guard let collectionRootURL, !selectedCollectionPackagePaths.isEmpty else {
+            errorMessage = "Select one or more collection packages first."
+            return
+        }
+        if operation != .remove && value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            errorMessage = "Enter a tag value for this batch operation."
+            return
+        }
+
+        do {
+            if documentURL != nil { try flushEditorBuffers() }
+            let currentDocumentURL = documentURL?.standardizedFileURL
+            var updatedDraft: Data?
+            var stagedEdits = pendingCollectionPackageTagEdits
+            var changedPackageCount = 0
+            let edit = UACCollectionPackageTagEdit(
+                key: key,
+                operation: operation,
+                value: value,
+                searchText: searchText
+            )
+
+            for relativePath in selectedCollectionPackagePaths.sorted() {
+                guard collectionEntries.contains(where: { $0.relativePath == relativePath }) else {
+                    throw UACManifestEditorError.memberRecordMissing(relativePath)
+                }
+                let packageURL = collectionRootURL.appendingPathComponent(relativePath).standardizedFileURL
+                let container = try UACContainerReader.read(
+                    from: packageURL,
+                    decompressManifestFrame: codec.decoder
+                )
+                let actualSnapshot = try OpenedFileSnapshot(url: packageURL, manifestSHA256: container.manifestSHA256)
+                let isCurrentDocument = currentDocumentURL == packageURL
+                let expectedSnapshot = isCurrentDocument
+                    ? (openedSnapshot ?? actualSnapshot)
+                    : (stagedEdits[relativePath]?.snapshot ?? actualSnapshot)
+                guard actualSnapshot == expectedSnapshot else { throw UACManError.fileChangedExternally }
+
+                let startingManifest = isCurrentDocument ? draftManifestJSON : container.manifestJSON
+                var manifestJSON = startingManifest
+                let operations: [UACCollectionPackageTagEdit]
+                if isCurrentDocument {
+                    // Earlier package edits are already in this open draft.
+                    operations = [edit]
+                } else {
+                    operations = (stagedEdits[relativePath]?.edits ?? []) + [edit]
+                }
+                for operation in operations {
+                    manifestJSON = try UACManifestEditor.applyBatchGameMetadataEdit(
+                        in: manifestJSON,
+                        key: operation.key,
+                        operation: operation.operation,
+                        value: operation.value,
+                        searchText: operation.searchText
+                    ).manifestJSON
+                }
+                if Self.manifestJSONDiffers(manifestJSON, startingManifest) { changedPackageCount += 1 }
+
+                if isCurrentDocument {
+                    updatedDraft = manifestJSON
+                } else {
+                    stagedEdits[relativePath] = PendingCollectionPackageTagEdit(
+                        snapshot: expectedSnapshot,
+                        edits: operations
+                    )
+                }
+            }
+
+            pendingCollectionPackageTagEdits = stagedEdits
+            if let updatedDraft {
+                draftManifestJSON = updatedDraft
+                let manifest = try UACManifestEditor.decode(updatedDraft)
+                gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata)
+                gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
+                refreshMemberSummaries(from: manifest)
+                if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
+            }
+            updateUnsavedChangeState()
+            statusMessage = changedPackageCount == 0
+                ? "No selected package needs a change for \(key)."
+                : "Staged \(key) for \(changedPackageCount) selected package(s). Save changes to write the manifests."
+            errorMessage = nil
+        } catch {
+            errorMessage = String(describing: error)
+            statusMessage = "Batch edit was not staged; existing changes were kept."
+        }
+    }
+
     func openDocument(_ url: URL) {
         guard confirmDiscardIfNeeded() else { return }
+        pendingCollectionPackageTagEdits.removeAll()
         let standardizedURL = url.standardizedFileURL
         let collectionRelativePath = collectionEntries.first {
             collectionRootURL?.appendingPathComponent($0.relativePath).standardizedFileURL == standardizedURL
@@ -1185,6 +1307,7 @@ final class UACManModel {
             collectionEntries = []
             collectionIssues = []
             selectedCollectionPackagePath = nil
+            selectedCollectionPackagePaths.removeAll()
         }
     }
 
@@ -1249,7 +1372,7 @@ final class UACManModel {
             let currentManifest = try UACManifestEditor.decode(draftManifestJSON)
             try loadMemberEditor(path: path, from: currentManifest)
             selectedMemberPath = path
-            hasUnsavedChanges = hasUnsavedChanges || draftManifestJSON != originalManifestJSON
+            updateUnsavedChangeState()
             errorMessage = nil
         } catch {
             errorMessage = String(describing: error)
@@ -1335,7 +1458,7 @@ final class UACManModel {
             gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
             refreshMemberSummaries(from: manifest)
             if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
-            hasUnsavedChanges = draftManifestJSON != originalManifestJSON
+            updateUnsavedChangeState()
             statusMessage = "Renamed \(oldKey) to \(newKey) in \(result.affectedCount) location(s). Save to commit the package change."
             errorMessage = nil
         } catch {
@@ -1374,7 +1497,7 @@ final class UACManModel {
             gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
             refreshMemberSummaries(from: manifest)
             if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
-            hasUnsavedChanges = draftManifestJSON != originalManifestJSON
+            updateUnsavedChangeState()
             statusMessage = "Added \(key) to \(targetAllTracks ? "all tracks" : "the package"). Save to commit the package change."
             errorMessage = nil
         } catch { errorMessage = String(describing: error) }
@@ -1399,7 +1522,7 @@ final class UACManModel {
             gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
             refreshMemberSummaries(from: manifest)
             if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
-            hasUnsavedChanges = draftManifestJSON != originalManifestJSON
+            updateUnsavedChangeState()
             statusMessage = "Deleted \(key) from \(removed) location(s). Save to commit the package change."
             errorMessage = nil
         } catch { errorMessage = String(describing: error) }
@@ -1424,7 +1547,7 @@ final class UACManModel {
             gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
             refreshMemberSummaries(from: manifest)
             if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
-            hasUnsavedChanges = draftManifestJSON != originalManifestJSON; statusMessage = "Updated \(key) in \(changed) location(s). Save to commit the package change."; errorMessage = nil
+            updateUnsavedChangeState(); statusMessage = "Updated \(key) in \(changed) location(s). Save to commit the package change."; errorMessage = nil
         } catch { errorMessage = String(describing: error) }
     }
 
@@ -1475,7 +1598,7 @@ final class UACManModel {
             gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
             refreshMemberSummaries(from: manifest)
             if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
-            hasUnsavedChanges = draftManifestJSON != originalManifestJSON; statusMessage = "Updated \(key) in \(changed) location(s). Save to commit the package change."; errorMessage = nil
+            updateUnsavedChangeState(); statusMessage = "Updated \(key) in \(changed) location(s). Save to commit the package change."; errorMessage = nil
         } catch { errorMessage = String(describing: error) }
     }
 
@@ -1547,7 +1670,7 @@ final class UACManModel {
             gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
             refreshMemberSummaries(from: manifest)
             if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
-            hasUnsavedChanges = draftManifestJSON != originalManifestJSON
+            updateUnsavedChangeState()
             statusMessage = "Added \(key) to \(result.affectedCount) track(s). Save to commit the package change."
             errorMessage = nil
         } catch { errorMessage = String(describing: error) }
@@ -1629,7 +1752,7 @@ final class UACManModel {
         gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
         refreshMemberSummaries(from: manifest)
         if let selectedMemberPath { try loadMemberEditor(path: selectedMemberPath, from: manifest) }
-        hasUnsavedChanges = draftManifestJSON != originalManifestJSON
+        updateUnsavedChangeState()
     }
 
     func commitTechnicalRow(scope: String, key: String, newKey: String, value: String) {
@@ -1660,7 +1783,7 @@ final class UACManModel {
             gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata)
             gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
             refreshMemberSummaries(from: manifest)
-            hasUnsavedChanges = draftManifestJSON != originalManifestJSON
+            updateUnsavedChangeState()
             statusMessage = "Updated package technical field. Save to commit the package change."
             errorMessage = nil
         } catch { errorMessage = String(describing: error) }
@@ -1684,14 +1807,20 @@ final class UACManModel {
             gameMetadataJSON = try UACManifestEditor.prettyJSON(manifest.game.metadata)
             gameExtensionsJSON = try UACManifestEditor.prettyJSON(manifest.game.extensions)
             refreshMemberSummaries(from: manifest)
-            hasUnsavedChanges = draftManifestJSON != originalManifestJSON
+            updateUnsavedChangeState()
             statusMessage = "Deleted package technical field. Save to commit the package change."
             errorMessage = nil
         } catch { errorMessage = String(describing: error) }
     }
 
     func revert() {
-        guard let loadedContainer else { return }
+        pendingCollectionPackageTagEdits.removeAll()
+        guard let loadedContainer else {
+            updateUnsavedChangeState()
+            errorMessage = nil
+            statusMessage = "Reverted staged package tag changes."
+            return
+        }
         do {
             draftManifestJSON = originalManifestJSON
             packageTitle = loadedContainer.manifest.game.title
@@ -1702,7 +1831,7 @@ final class UACManModel {
             if let selectedMemberPath {
                 try loadMemberEditor(path: selectedMemberPath, from: loadedContainer.manifest)
             }
-            hasUnsavedChanges = false
+            updateUnsavedChangeState()
             errorMessage = nil
             statusMessage = "Reverted unsaved metadata edits."
         } catch {
@@ -1711,51 +1840,107 @@ final class UACManModel {
     }
 
     func save() {
-        guard let documentURL, let openedSnapshot else { return }
-        let temporaryURL = documentURL.deletingLastPathComponent()
-            .appendingPathComponent(".\(documentURL.lastPathComponent).uacman-\(UUID().uuidString).tmp")
-        defer { try? FileManager.default.removeItem(at: temporaryURL) }
-
+        var temporaryURLs: [URL] = []
+        var replacedRelativePaths: Set<String> = []
+        defer { temporaryURLs.forEach { try? FileManager.default.removeItem(at: $0) } }
         do {
-            try flushEditorBuffers()
-            let finalJSON = draftManifestJSON
-            guard finalJSON != originalManifestJSON else {
-                hasUnsavedChanges = false
+            if documentURL != nil { try flushEditorBuffers() }
+            var writes: [(url: URL, relativePath: String?, manifestJSON: Data, snapshot: OpenedFileSnapshot)] = []
+
+            if let documentURL, let openedSnapshot, Self.manifestJSONDiffers(draftManifestJSON, originalManifestJSON) {
+                writes.append((documentURL, selectedCollectionPackagePath, draftManifestJSON, openedSnapshot))
+            }
+
+            if !pendingCollectionPackageTagEdits.isEmpty {
+                guard let collectionRootURL else {
+                    throw UACManifestEditorError.invalidMetadataJSON("The selected collection is no longer available.")
+                }
+                for (relativePath, pending) in pendingCollectionPackageTagEdits.sorted(by: { $0.key < $1.key }) {
+                    guard collectionEntries.contains(where: { $0.relativePath == relativePath }) else {
+                        throw UACManifestEditorError.memberRecordMissing(relativePath)
+                    }
+                    let packageURL = collectionRootURL.appendingPathComponent(relativePath).standardizedFileURL
+                    if packageURL == documentURL?.standardizedFileURL {
+                        guard openedSnapshot == pending.snapshot else { throw UACManError.fileChangedExternally }
+                        continue
+                    }
+                    let current = try UACContainerReader.read(from: packageURL, decompressManifestFrame: codec.decoder)
+                    let currentSnapshot = try OpenedFileSnapshot(url: packageURL, manifestSHA256: current.manifestSHA256)
+                    guard currentSnapshot == pending.snapshot else { throw UACManError.fileChangedExternally }
+                    var finalJSON = current.manifestJSON
+                    for edit in pending.edits {
+                        finalJSON = try UACManifestEditor.applyBatchGameMetadataEdit(
+                            in: finalJSON,
+                            key: edit.key,
+                            operation: edit.operation,
+                            value: edit.value,
+                            searchText: edit.searchText
+                        ).manifestJSON
+                    }
+                    if Self.manifestJSONDiffers(finalJSON, current.manifestJSON) {
+                        writes.append((packageURL, relativePath, finalJSON, pending.snapshot))
+                    }
+                }
+            }
+
+            guard !writes.isEmpty else {
+                pendingCollectionPackageTagEdits.removeAll()
+                updateUnsavedChangeState()
                 statusMessage = "No metadata changes to save."
                 errorMessage = nil
                 return
             }
 
             try codec.ensureAvailable()
-            let current = try UACContainerReader.read(from: documentURL, decompressManifestFrame: codec.decoder)
-            let currentSnapshot = try OpenedFileSnapshot(url: documentURL, manifestSHA256: current.manifestSHA256)
-            guard currentSnapshot == openedSnapshot else { throw UACManError.fileChangedExternally }
-
-            let rewritten = try UACContainerWriter.rewriteManifest(
-                manifestJSON: finalJSON,
-                in: documentURL,
-                to: temporaryURL,
-                compressManifestFrame: codec.encoder,
-                decompressManifestFrame: codec.decoder
-            )
-            guard rewritten.manifestJSON == finalJSON else { throw UACManError.rewriteVerificationFailed }
-            let unchangedSource = try UACContainerReader.read(from: documentURL, decompressManifestFrame: codec.decoder)
-            let unchangedSnapshot = try OpenedFileSnapshot(url: documentURL, manifestSHA256: unchangedSource.manifestSHA256)
-            guard unchangedSnapshot == openedSnapshot else { throw UACManError.fileChangedExternally }
-            let originalAttributes = try FileManager.default.attributesOfItem(atPath: documentURL.path)
-            if let permissions = originalAttributes[.posixPermissions] as? NSNumber {
-                try FileManager.default.setAttributes(
-                    [.posixPermissions: permissions],
-                    ofItemAtPath: temporaryURL.path
+            for write in writes {
+                let current = try UACContainerReader.read(from: write.url, decompressManifestFrame: codec.decoder)
+                let currentSnapshot = try OpenedFileSnapshot(url: write.url, manifestSHA256: current.manifestSHA256)
+                guard currentSnapshot == write.snapshot else { throw UACManError.fileChangedExternally }
+                let temporaryURL = write.url.deletingLastPathComponent()
+                    .appendingPathComponent(".\(write.url.lastPathComponent).uacman-\(UUID().uuidString).tmp")
+                temporaryURLs.append(temporaryURL)
+                let rewritten = try UACContainerWriter.rewriteManifest(
+                    manifestJSON: write.manifestJSON,
+                    in: write.url,
+                    to: temporaryURL,
+                    compressManifestFrame: codec.encoder,
+                    decompressManifestFrame: codec.decoder
                 )
+                guard rewritten.manifestJSON == write.manifestJSON else { throw UACManError.rewriteVerificationFailed }
+                let unchangedSource = try UACContainerReader.read(from: write.url, decompressManifestFrame: codec.decoder)
+                let unchangedSnapshot = try OpenedFileSnapshot(url: write.url, manifestSHA256: unchangedSource.manifestSHA256)
+                guard unchangedSnapshot == write.snapshot else { throw UACManError.fileChangedExternally }
+                let originalAttributes = try FileManager.default.attributesOfItem(atPath: write.url.path)
+                if let permissions = originalAttributes[.posixPermissions] as? NSNumber {
+                    try FileManager.default.setAttributes([.posixPermissions: permissions], ofItemAtPath: temporaryURL.path)
+                }
+                let lastSourceRead = try UACContainerReader.read(from: write.url, decompressManifestFrame: codec.decoder)
+                let lastSourceSnapshot = try OpenedFileSnapshot(url: write.url, manifestSHA256: lastSourceRead.manifestSHA256)
+                guard lastSourceSnapshot == write.snapshot else { throw UACManError.fileChangedExternally }
+                guard Darwin.rename(temporaryURL.path, write.url.path) == 0 else {
+                    throw UACManError.atomicReplaceFailed(String(cString: strerror(errno)))
+                }
+                if let relativePath = write.relativePath { replacedRelativePaths.insert(relativePath) }
             }
-            guard Darwin.rename(temporaryURL.path, documentURL.path) == 0 else {
-                throw UACManError.atomicReplaceFailed(String(cString: strerror(errno)))
-            }
-            loadDocumentWithoutPrompt(documentURL)
-            statusMessage = "Saved metadata; the compressed payload was preserved byte-for-byte."
+            pendingCollectionPackageTagEdits.removeAll()
+            if let documentURL { loadDocumentWithoutPrompt(documentURL) }
+            else { updateUnsavedChangeState() }
+            statusMessage = writes.count == 1
+                ? "Saved metadata; the compressed payload was preserved byte-for-byte."
+                : "Saved metadata to \(writes.count) packages; each compressed payload was preserved byte-for-byte."
+            errorMessage = nil
         } catch {
+            for path in replacedRelativePaths { pendingCollectionPackageTagEdits.removeValue(forKey: path) }
+            if let documentURL, replacedRelativePaths.contains(where: { path in
+                collectionRootURL?.appendingPathComponent(path).standardizedFileURL == documentURL.standardizedFileURL
+            }) {
+                loadDocumentWithoutPrompt(documentURL)
+            }
+            updateUnsavedChangeState()
             errorMessage = String(describing: error)
+            if !replacedRelativePaths.isEmpty {
+                errorMessage = "Some package manifests were saved before the remaining write failed: \(replacedRelativePaths.sorted().joined(separator: ", ")). \(String(describing: error))"
+            }
         }
     }
 
@@ -1817,7 +2002,20 @@ final class UACManModel {
             extensionsJSON: gameExtensionsJSON
         )
         draftManifestJSON = updated
-        hasUnsavedChanges = draftManifestJSON != originalManifestJSON
+        updateUnsavedChangeState()
+    }
+
+    private func updateUnsavedChangeState() {
+        hasUnsavedChanges = Self.manifestJSONDiffers(draftManifestJSON, originalManifestJSON)
+            || !pendingCollectionPackageTagEdits.isEmpty
+    }
+
+    private static func manifestJSONDiffers(_ lhs: Data, _ rhs: Data) -> Bool {
+        guard let left = try? JSONSerialization.jsonObject(with: lhs) as? [String: Any],
+              let right = try? JSONSerialization.jsonObject(with: rhs) as? [String: Any] else {
+            return lhs != rhs
+        }
+        return !NSDictionary(dictionary: left).isEqual(to: right)
     }
 
     private func finishCollectionScan(
@@ -1829,6 +2027,7 @@ final class UACManModel {
         collectionScanTask = nil
         isScanningCollection = false
         collectionEntries = result.entries
+        selectedCollectionPackagePaths.formIntersection(Set(result.entries.map(\.relativePath)))
         collectionIssues = result.issues
         if result.entries.isEmpty && result.issues.isEmpty {
             collectionStatusMessage = "No .uac packages found in this folder."
@@ -1862,6 +2061,18 @@ final class UACManModel {
         alert.addButton(withTitle: "Cancel")
         return alert.runModal() == .alertFirstButtonReturn
     }
+}
+
+private struct UACCollectionPackageTagEdit {
+    let key: String
+    let operation: UACBatchFieldOperation
+    let value: String
+    let searchText: String
+}
+
+private struct PendingCollectionPackageTagEdit {
+    let snapshot: OpenedFileSnapshot
+    let edits: [UACCollectionPackageTagEdit]
 }
 
 private struct UACTagAnalyzerTrackDeletionPackage: Sendable {

@@ -54,11 +54,17 @@ three-column tagged-file table on the left and an exhaustive metadata table on
 the right. They share the same cells and geometry, with no merged
 sidebar/content bar. The left table is a compact, auto-height canonical table;
 its frame does not fill the page when it has only a few rows. **New Tag** pairs a
-scrollable canonical track list with checkboxes and a canonical draft table.
-The target selector applies the new string tag to **All Tracks**, **Selected
-Tracks**, or the **Package**. Search filters the track list without clearing
-checkbox selections. Batch track additions are applied atomically and refused
-if the tag already exists on any target track. **Pack Tags** contains the
+scrollable canonical track list with canonical-cell selection controls and a
+canonical tag editor. Track selection cells show **−** when clear and **✓**
+when selected. The target selector applies a string tag to **All Tracks**,
+**Selected Tracks**, or the **Package**. When a collection is loaded, each
+collection entry also has a separate selection control; choose **Selected
+Packages** to edit package-level tags across those packages. Its **Operation**
+supports **Set value**, **Fill missing**, or **Remove**. Search filters the
+track list without clearing track or package selections. Track tag additions
+are applied atomically and refused if the tag already exists on any target
+track. Collection package edits are staged until **Save changes** and can be
+discarded with **Revert changes**. **Pack Tags** contains the
 package-level tag table, a final inline draft row marked with **＋**, and the
 attachments table. Each table title is part of its own canonical grid rather
 than a separate decorative section heading. Non-string
@@ -141,7 +147,13 @@ without rewriting them.
 Pack Tags edits use canonical table rows; its final draft row adds a
 package-level string tag, and existing rows can be renamed, edited, submitted,
 or deleted. The **New Tag** page adds one string tag to a chosen package or
-track scope; selected-track mode requires at least one checked track.
+track scope; selected-track mode requires at least one selected track. With a
+collection open, selected-package mode edits only the package metadata map in
+each selected `.uac` manifest. **Set value** adds or replaces the named field,
+**Fill missing** preserves existing non-empty values, and **Remove** deletes
+that package field. These changes share the normal Save/Revert controls; saving
+reopens and validates each changed package and preserves every compressed
+payload.
 Structured values remain editable through the small-table inserted
 subtable or the giga-table popup, using canonical title and action rows.
 Malformed JSON is rejected without closing or submitting the popup or

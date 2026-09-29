@@ -119,6 +119,35 @@ import UACWrapperCore
     #expect(member.metadata["title"] == .string("Old title"))
 }
 
+@Test func batchGameTagOperationsOnlyEditPackageMetadata() throws {
+    let original = Data(manifestJSON.utf8)
+    let first = try UACManifestEditor.applyBatchGameMetadataEdit(
+        in: original,
+        key: "Set Name",
+        operation: .set,
+        value: "Castlevania"
+    )
+    let second = try UACManifestEditor.applyBatchGameMetadataEdit(
+        in: first.manifestJSON,
+        key: "Set Name",
+        operation: .fillMissing,
+        value: "Do not replace"
+    )
+    let removed = try UACManifestEditor.applyBatchGameMetadataEdit(
+        in: second.manifestJSON,
+        key: "Set Name",
+        operation: .remove
+    )
+    let manifest = try UACManifestEditor.decode(removed.manifestJSON)
+
+    #expect(first.affectedCount == 1)
+    #expect(second.affectedCount == 0)
+    #expect(manifest.game.metadata["Set Name"] == nil)
+    #expect(manifest.members.first?.metadata["title"] == .string("Old title"))
+    #expect(String(decoding: removed.manifestJSON, as: UTF8.self).contains("futureRootField"))
+    #expect(String(decoding: removed.manifestJSON, as: UTF8.self).contains("futureMemberField"))
+}
+
 @Test func packageWideRenamePreservesNamespacesAndUnknownFields() throws {
     let seeded = try UACManifestEditor.updateGameFields(
         in: Data(manifestJSON.utf8),

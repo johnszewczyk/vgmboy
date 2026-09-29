@@ -10,6 +10,13 @@
   operations. They validate every destination before returning a new manifest,
   preserve unknown JSON, and report the number of affected records. Keep these
   mutations out of the WebView and app-model dictionary plumbing.
+- Collection package tag edits use `applyBatchGameMetadataEdit` on each
+  selected manifest's `game.metadata` map. The model stages ordered operations
+  with the package's opened-file snapshot; Save re-reads and validates every
+  source before preparing manifest-only rewrites. Each `.uac` replacement is
+  atomic and preserves compressed payload bytes. A multi-package save is not a
+  filesystem transaction: if a later replacement fails, the UI reports which
+  package manifests were already saved and retains the remaining staged edits.
 - `UACCollectionScanner` recursively enumerates regular `.uac` files beneath a
   selected folder and asks `UACWrapperCore` for each manifest. It is a
   transient browser index only: do not persist it as a second catalog, follow
@@ -59,6 +66,19 @@
   `applyColumnSchemas` sets the schema on the table root, and shared row CSS
   consumes it. Semantic table modifiers may style cell content or a table's
   minimum width, but must not define separate row markup or column tracks.
+- New Tag track selection controls live inside ordinary canonical cells. They
+  use a compact button with checkbox accessibility state and a `−`/`✓` glyph;
+  do not embed native checkbox chrome that competes with the cell border.
+  Collection package selection is separate from opening the package and stays
+  in transient model state, not a second catalog. The filename filter only
+  changes which packages are visible; it does not change the selected set.
+- Batch package operations touch only `game.metadata`. Validate the operation
+  against every selected manifest before replacing any staged operation set.
+  Preserve the source snapshot for conflict detection; do not queue WebView
+  dictionaries as authoritative metadata or inspect member contents. Save
+  revalidates each source, prepares and verifies a manifest-only rewrite, then
+  atomically replaces that package. Multi-package saves are sequential; the UI
+  reports partial completion and retains edits for packages not yet saved.
 - `.canonical-table-surface` owns the outer border, radius, and scrolling for a
   top-level table. A nested table uses the same `.canonical-table` root and row
   and cell primitives inside its unfold row, without another surface class,

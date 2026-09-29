@@ -223,6 +223,66 @@ public enum UACManifestEditor {
         )
     }
 
+    /// Applies one batch operation to the package-level metadata map. This is
+    /// used when the user explicitly selects several collection packages; it
+    /// never inspects member contents or changes member-level fields.
+    public static func applyBatchGameMetadataEdit(
+        in manifestJSON: Data,
+        key: String,
+        operation: UACBatchFieldOperation,
+        value: String = "",
+        searchText: String = ""
+    ) throws -> UACManifestEditResult {
+        let fieldKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !fieldKey.isEmpty else { throw UACManifestEditorError.invalidFieldKey }
+        if operation == .replaceText, searchText.isEmpty {
+            throw UACManifestEditorError.emptySearchText
+        }
+
+        var root = try jsonObject(manifestJSON)
+        guard var game = root["game"] as? [String: Any] else {
+            throw UACManifestEditorError.gameRecordMissing
+        }
+        var metadata = game["metadata"] as? [String: Any] ?? [:]
+        let previousValue = metadata[fieldKey]
+
+        switch operation {
+        case .set:
+            if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                metadata.removeValue(forKey: fieldKey)
+            } else {
+                metadata[fieldKey] = value
+            }
+        case .fillMissing:
+            let existing = metadata[fieldKey]
+            let isEmptyString = (existing as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? false
+            if !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               existing == nil || existing is NSNull || isEmptyString {
+                metadata[fieldKey] = value
+            }
+        case .replaceText:
+            if let existing = metadata[fieldKey] as? String {
+                let replacement = existing.replacingOccurrences(of: searchText, with: value)
+                if replacement.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    metadata.removeValue(forKey: fieldKey)
+                } else {
+                    metadata[fieldKey] = replacement
+                }
+            }
+        case .remove:
+            metadata.removeValue(forKey: fieldKey)
+        }
+
+        let changed = !NSDictionary(dictionary: ["value": previousValue ?? NSNull()])
+            .isEqual(to: ["value": metadata[fieldKey] ?? NSNull()])
+        game["metadata"] = metadata
+        root["game"] = game
+        return UACManifestEditResult(
+            manifestJSON: try validatedJSON(root),
+            affectedCount: changed ? 1 : 0
+        )
+    }
+
     /// Applies one field operation to only the requested member paths. Other
     /// member fields and unmodeled manifest JSON remain untouched.
     public static func applyBatchMetadataEdit(

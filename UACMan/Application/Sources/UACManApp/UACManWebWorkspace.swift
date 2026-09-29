@@ -145,6 +145,15 @@ struct UACManWebWorkspace: NSViewRepresentable {
                 )
             case "selectPackage":
                 if let path = payload["path"] as? String { model.selectCollectionPackage(path) }
+            case "toggleCollectionPackageSelection":
+                if let path = payload["path"] as? String { model.toggleCollectionPackageSelection(path) }
+            case "stageCollectionPackageTagEdit":
+                model.stageCollectionPackageTagEdit(
+                    key: payload["key"] as? String ?? "",
+                    operation: payload["operation"] as? String ?? "set",
+                    value: payload["value"] as? String ?? "",
+                    searchText: payload["searchText"] as? String ?? ""
+                )
             case "selectMember":
                 if let path = payload["path"] as? String { model.selectMember(path) }
             case "previewMember":
