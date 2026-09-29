@@ -25,6 +25,8 @@ let screenWidth = 800;
 const screen = { getBoundingClientRect() { return { width: screenWidth, height: 500 }; } };
 const windowListeners = new Map();
 const calls = [];
+const audioConfigCalls = [];
+const reconfigureCalls = [];
 const groupStateCalls = [];
 const savedPreferences = [];
 let frontendSettingsChanged;
@@ -41,7 +43,7 @@ let generation = 0;
 const bridge = {
   frontendSettingsLoad: async () => ({ appVolume: 1, repeatMode: 'off' }),
   frontendSettingsSave: async (settings) => { savedPreferences.push({ ...settings }); },
-  nativePlaybackAudioConfig: async () => {},
+  nativePlaybackAudioConfig: async (...args) => { audioConfigCalls.push(args); },
   databaseGames: async () => [
     { rootId: 1, name: 'Sample', displayName: 'Sample', system: 'SNES', trackCount: 3 },
     { rootId: 2, name: 'Other', displayName: 'Other', system: 'ZZZ', trackCount: 1 },
@@ -59,7 +61,10 @@ const bridge = {
   },
   nativePlaybackInit: async () => {},
   nativePlaybackState: async () => ({ transport_state: generation ? 'playing' : 'stopped', generation }),
-  nativePlaybackReconfigure: async () => ({ transport_state: 'playing', generation }),
+  nativePlaybackReconfigure: async (request) => {
+    reconfigureCalls.push(request);
+    return { transport_state: 'playing', generation };
+  },
   nativePlaybackStart: async (request) => {
     calls.push(['start', request]);
     return { transport_state: 'playing', generation: ++generation, status_sequence: generation };
@@ -100,7 +105,17 @@ function pixelChecksum(data) {
 }
 
 test('canvas renders adaptive columns, grouped options, and native playback', async () => {
-  await import('../Sources/ViewBoy/Resources/yoga-app.js');
+  const { animationFrameIsDue } = await import('../Sources/ViewBoy/Resources/yoga-app.js');
+  const animationGate = {};
+  assert.equal(animationFrameIsDue(animationGate, 0), true, 'the first animation frame paints immediately');
+  assert.equal(animationFrameIsDue(animationGate, 1000 / 120), false,
+    '120 Hz displays skip alternate updates to preserve the 60 Hz cap');
+  assert.equal(animationFrameIsDue(animationGate, 1000 / 60), true,
+    'the next update paints at 60 Hz');
+  assert.equal(animationFrameIsDue(animationGate, 1000 / 40), false,
+    'faster-than-target display frames remain gated');
+  assert.equal(animationFrameIsDue(animationGate, 1000 / 30), true,
+    '60 Hz spaced updates are accepted');
   await tick();
   await tick();
   assert.match(status.textContent, /FIRST/i);
@@ -224,6 +239,26 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(savedPreferences.at(-1).appVolume, 0.9,
     'the Playback page volume button updates native audio preferences');
+  clickScreen(0.88, 0.32);
+  await tick();
+  assert.equal(savedPreferences.at(-1).equalizerEnabled, true,
+    'the Playback page equalizer checkbox updates native audio preferences');
+  assert.equal(audioConfigCalls.at(-1)[1], true,
+    'the equalizer toggle is applied to the native audio path');
+  clickScreen(0.93, 0.35);
+  await tick();
+  assert.equal(savedPreferences.at(-1).equalizerBandGains[0], 0.5,
+    'the first equalizer band uses half-decibel button steps');
+  assert.equal(savedPreferences.at(-1).equalizerBandGains[0], 0.5,
+    'the first equalizer band uses half-decibel button steps');
+  assert.equal(audioConfigCalls.at(-1)[2][0], 0.5,
+    'equalizer band edits are applied to the native audio path');
+  clickScreen(0.47, 0.39);
+  await tick();
+  assert.equal(savedPreferences.at(-1).manualPlayTimeSeconds, 210,
+    'the Long Play duration adjuster increases in 30-second steps');
+  assert.equal(reconfigureCalls.at(-1).manualPlayMilliseconds, 210_000,
+    'Long Play duration changes reconfigure the active native track');
   clickScreen(0.61, 0.12);
   clickScreen(0.48, 0.20);
   await tick();
