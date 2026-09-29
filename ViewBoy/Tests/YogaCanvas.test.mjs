@@ -4,8 +4,17 @@ import test from 'node:test';
 const canvas = {
   style: {},
   frames: 0,
-  addEventListener() {},
+  listeners: new Map(),
+  addEventListener(name, callback) { canvas.listeners.set(name, callback); },
   focus() {},
+  getBoundingClientRect() {
+    return {
+      left: 0,
+      top: 0,
+      width: Number.parseFloat(canvas.style.width),
+      height: Number.parseFloat(canvas.style.height),
+    };
+  },
   getContext() { return {
     createImageData(width, height) { return { data: new Uint8ClampedArray(width * height * 4) }; },
     putImageData(image) { canvas.image = image; canvas.frames += 1; },
@@ -77,6 +86,11 @@ globalThis.document = { querySelector(selector) {
   return status;
 } };
 globalThis.viewBoy = bridge;
+const displayOptionsStore = new Map();
+globalThis.localStorage = {
+  getItem(key) { return displayOptionsStore.get(key) ?? null; },
+  setItem(key, value) { displayOptionsStore.set(key, value); },
+};
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 function pixelChecksum(data) {
   let hash = 2166136261;
@@ -169,6 +183,24 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   globalThis.ViewBoy.dispatch('settings');
   assert.match(status.textContent, /SETTINGS/);
   assert.notEqual(pixelChecksum(canvas.image.data), libraryPixels, 'Options paints a distinct grouped screen');
+  const gameBoyPixels = pixelChecksum(canvas.image.data);
+  const clickScreen = (x, y) => {
+    const rect = canvas.getBoundingClientRect();
+    canvas.listeners.get('click')({ clientX: rect.width * x, clientY: rect.height * y, detail: 1 });
+  };
+  clickScreen(0.75, 0.23);
+  const nightBoyPixels = pixelChecksum(canvas.image.data);
+  assert.notEqual(nightBoyPixels, gameBoyPixels, 'NightBoy repaints the same four-tone pixel screen with its dark-purple palette');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'NIGHTBOY');
+  clickScreen(0.75, 0.28);
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'HIGH_CONTRAST',
+    'the ink control persists the brighter silver high-contrast setting');
+  clickScreen(0.375, 0.12);
+  assert.notEqual(pixelChecksum(canvas.image.data), nightBoyPixels, 'Options sub-pages navigate inside the LCD');
+  clickScreen(0.125, 0.12);
+  clickScreen(0.25, 0.23);
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'GAMEBOY',
+    'the palette selector returns to the authentic Game Boy theme');
   globalThis.ViewBoy.dispatch('library');
   screenWidth = 1400;
   windowListeners.get('resize')();

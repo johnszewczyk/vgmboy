@@ -15,8 +15,14 @@ const LCD_FACE_DEVICE_PIXELS = DEVICE_PIXELS_PER_LCD_DOT - 1;
 const BASELINE_LAYOUT_UNIT_CSS_PIXELS = 2.5;
 const RANDOM_HISTORY_LIMIT = 256;
 const PALETTES = {
-  CURRENT: ["#0C300C", "#285428", "#78940D", "#9BBC0F"],
-  HIGH_CONTRAST: ["#041604", "#285428", "#78940D", "#9BBC0F"],
+  GAMEBOY: {
+    STANDARD: ["#0C300C", "#285428", "#78940D", "#9BBC0F"],
+    HIGH_CONTRAST: ["#333333", "#285428", "#78940D", "#9BBC0F"],
+  },
+  NIGHTBOY: {
+    STANDARD: ["#D8D6DF", "#A5A2AF", "#51495E", "#211A2B"],
+    HIGH_CONTRAST: ["#F0EFF4", "#A5A2AF", "#51495E", "#211A2B"],
+  },
 };
 function paletteRGB(palette) {
   return palette.map((color) => {
@@ -24,7 +30,7 @@ function paletteRGB(palette) {
     return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
   });
 }
-let RGB = paletteRGB(PALETTES.CURRENT);
+let RGB = paletteRGB(PALETTES.GAMEBOY.STANDARD);
 const standardGlyphs = {
   A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
   B: ["11110", "10001", "10001", "11110", "10001", "10001", "11110"],
@@ -155,8 +161,18 @@ function storedDisplayOptions() {
   try { return JSON.parse(localStorage.getItem(DISPLAY_OPTIONS_KEY) || "{}"); }
   catch { return {}; }
 }
+const savedDisplayOptions = storedDisplayOptions();
+function displayPalette() {
+  return PALETTES[state.theme][state.contrast];
+}
 function saveDisplayOptions() {
-  try { localStorage.setItem(DISPLAY_OPTIONS_KEY, JSON.stringify({ font: state.font, contrast: state.contrast })); }
+  try {
+    localStorage.setItem(DISPLAY_OPTIONS_KEY, JSON.stringify({
+      font: state.font,
+      contrast: state.contrast,
+      theme: state.theme,
+    }));
+  }
   catch { /* Display remains usable when browser storage is unavailable. */ }
 }
 
@@ -195,8 +211,10 @@ const state = {
   tab: "LIBRARY",
   selectedTrack: 0,
   playing: false,
-  font: storedDisplayOptions().font === "STANDARD" ? "STANDARD" : "MICRO",
-  contrast: storedDisplayOptions().contrast === "HIGH_CONTRAST" ? "HIGH_CONTRAST" : "CURRENT",
+  font: savedDisplayOptions.font === "STANDARD" ? "STANDARD" : "MICRO",
+  contrast: savedDisplayOptions.contrast === "HIGH_CONTRAST" ? "HIGH_CONTRAST" : "STANDARD",
+  theme: savedDisplayOptions.theme === "NIGHTBOY" ? "NIGHTBOY" : "GAMEBOY",
+  optionsPage: "DISPLAY",
   transport: "stopped",
   currentTrackId: null,
   activeQueue: [],
@@ -230,7 +248,7 @@ const state = {
   playbackToken: 0,
   retiredGeneration: 0,
 };
-RGB = paletteRGB(PALETTES[state.contrast]);
+RGB = paletteRGB(displayPalette());
 
 let tracks = [];
 
@@ -510,7 +528,7 @@ function optionSection(parent, title) {
 }
 
 function optionToggle(parent, title, checked, onClick) {
-  const height = rowHeight(5);
+  const height = rowHeight(8);
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
@@ -541,7 +559,7 @@ function optionToggle(parent, title, checked, onClick) {
 }
 
 function optionChoice(parent, title, choices) {
-  const height = rowHeight(6);
+  const height = rowHeight(8);
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
@@ -564,7 +582,7 @@ function optionChoice(parent, title, choices) {
 }
 
 function optionAdjuster(parent, title, value, onDecrease, onIncrease) {
-  const height = rowHeight(6);
+  const height = rowHeight(8);
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
@@ -662,6 +680,16 @@ function tableColumns(items = activeTracks()) {
     { key: "size", title: "SIZE", width: 28 },
   ];
 
+  // Reserve the sort-marker cell in every sortable heading. Without this
+  // floor, an auto-sized header can clip its arrow even though row widths and
+  // the 250 ms resize animation are using the same column measurements.
+  columns.forEach((column) => {
+    if (column.key === "favorite") return;
+    const headingCharacters = Array.from(column.title).length + 1;
+    const headingWidth = (headingCharacters * fontProfile().advance + 4) / STYLE_SCALE;
+    column.width = Math.max(column.width, headingWidth);
+  });
+
   if (state.preferences.columnAutoSize !== false) {
     columns.forEach((column) => {
       if (column.key === "favorite" || column.key === "title") return;
@@ -669,7 +697,9 @@ function tableColumns(items = activeTracks()) {
         .map((track, index) => tableValue(track, column.key, index))]
         .reduce((max, value) => Math.max(max, Array.from(normalizedText(value)).length), 0);
       const textWidth = (longest * fontProfile().advance + 4) / STYLE_SCALE;
-      column.width = Math.min(column.width, Math.max(4, textWidth));
+      const headingCharacters = Array.from(column.title).length + 1;
+      const headingWidth = (headingCharacters * fontProfile().advance + 4) / STYLE_SCALE;
+      column.width = Math.max(headingWidth, Math.min(column.width, Math.max(4, textWidth)));
     });
   }
 
@@ -942,42 +972,53 @@ function addCatalogPane(parent, mode) {
   return panel;
 }
 
-function addOptionsContent(parent) {
-  const panel = makeWidget(parent, {
-    direction: FlexDirection.Column,
+function addPalettePreview(parent) {
+  const preview = makeWidget(parent, {
+    direction: FlexDirection.Row,
     flexGrow: 1,
-    gap: 0,
-    padding: 2,
+    gap: oneDot(),
+    paddingHorizontal: 2,
+    paddingVertical: 1,
+  });
+  RGB.forEach((_, shade) => makeWidget(preview, {
+    flexGrow: 1,
+    height: rowHeight(8),
   }, {
     paint(box) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
+      fillRect(box.x + 1, box.y + 1, box.width - 2, box.height - 2, shade);
+      drawText(String(shade), box.x + 2, box.y + Math.floor((box.height - fontProfile().height) / 2),
+        box.width - 4, shade < 2 ? 3 : 0, "center");
     },
-  });
-  panelTitle(panel, "OPTIONS", "VIEWBOY", 48);
-  const pref = state.preferences;
-  optionSection(panel, "DISPLAY");
-  optionChoice(panel, "FONT", [
-    { title: "MICRO", selected: state.font === "MICRO", onClick: () => setFontProfile("MICRO") },
-    { title: "STANDARD", selected: state.font === "STANDARD", onClick: () => setFontProfile("STANDARD") },
-  ]);
-  optionChoice(panel, "CONTRAST", [
-    { title: "CURRENT", selected: state.contrast === "CURRENT", onClick: () => setContrastProfile("CURRENT") },
-    { title: "HIGH", selected: state.contrast === "HIGH_CONTRAST", onClick: () => setContrastProfile("HIGH_CONTRAST") },
-  ]);
-  const gridInfo = makeWidget(panel, {
-    direction: FlexDirection.Row,
-    alignItems: Align.Center,
-    height: rowHeight(4),
-    paddingHorizontal: 2,
-  }, {
-    paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
-  });
-  label(gridInfo, "LCD GRID", { flexGrow: 1, height: rowHeight(4) }, { textShade: 0, inset: 1 });
-  label(gridInfo, "3 PX / 4 SHADES", { width: (16 * fontProfile().advance + 2) / STYLE_SCALE, height: rowHeight(4) }, {
-    textShade: 0, align: "right", inset: 1,
-  });
+  }));
+}
 
-  optionSection(panel, "PLAYBACK");
+function addDisplayOptions(panel, pref) {
+  optionSection(panel, "SCREEN PROFILE");
+  optionChoice(panel, "FONT", [
+    { title: "MICRO 3X5", selected: state.font === "MICRO", onClick: () => setFontProfile("MICRO") },
+    { title: "STANDARD 5X7", selected: state.font === "STANDARD", onClick: () => setFontProfile("STANDARD") },
+  ]);
+  optionChoice(panel, "THEME", [
+    { title: "GAMEBOY", selected: state.theme === "GAMEBOY", onClick: () => setTheme("GAMEBOY") },
+    { title: "NIGHTBOY", selected: state.theme === "NIGHTBOY", onClick: () => setTheme("NIGHTBOY") },
+  ]);
+  optionChoice(panel, "INK", [
+    { title: state.theme === "GAMEBOY" ? "LCD GREEN" : "SILVER", selected: state.contrast === "STANDARD",
+      onClick: () => setContrastProfile("STANDARD") },
+    { title: state.theme === "GAMEBOY" ? "CHARCOAL" : "BRIGHT", selected: state.contrast === "HIGH_CONTRAST",
+      onClick: () => setContrastProfile("HIGH_CONTRAST") },
+  ]);
+  optionSection(panel, "FOUR LCD TONES");
+  addPalettePreview(panel);
+  const inkColor = displayPalette()[0];
+  label(panel, `INK ${inkColor}   DOT MATRIX 3 PX`, { height: rowHeight(6) }, {
+    textShade: 0, inset: 2,
+  });
+}
+
+function addPlaybackOptions(panel, pref) {
+  optionSection(panel, "PLAYBACK BEHAVIOR");
   optionToggle(panel, "LONG PLAY", pref.longPlayEnabled === true,
     () => setPreference("longPlayEnabled", pref.longPlayEnabled !== true));
   optionToggle(panel, "END FADE", pref.fadeEnabled !== false,
@@ -998,7 +1039,7 @@ function addOptionsContent(parent) {
   const volumeRow = makeWidget(panel, {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
-    height: rowHeight(6),
+    height: rowHeight(8),
     gap: oneDot(),
     paddingHorizontal: 2,
   }, {
@@ -1007,7 +1048,7 @@ function addOptionsContent(parent) {
   label(volumeRow, "VOLUME", { width: (6 * fontProfile().advance + 4) / STYLE_SCALE, height: rowHeight(6) }, {
     textShade: 0, inset: 1,
   });
-  const volumeControlHeight = rowHeight(4);
+  const volumeControlHeight = rowHeight(5);
   const volumeControlWidth = (fontProfile().advance + 5) / STYLE_SCALE;
   pixelButton(volumeRow, "-", () => changeVolume(-0.1), { width: volumeControlWidth, height: volumeControlHeight });
   makeWidget(volumeRow, { flexGrow: 1, height: volumeControlHeight }, {
@@ -1017,8 +1058,7 @@ function addOptionsContent(parent) {
       const gap = 1;
       const segmentWidth = Math.max(1, Math.floor((box.width - 2 - (count - 1) * gap) / count));
       const active = Math.round(volume * count);
-      for (let index = 0; index < count; index += 1) {
-        if (index >= active) break;
+      for (let index = 0; index < active; index += 1) {
         fillRect(box.x + 1 + index * (segmentWidth + gap), box.y + 1,
           segmentWidth, Math.max(1, box.height - 2), 0);
       }
@@ -1028,11 +1068,14 @@ function addOptionsContent(parent) {
     textShade: 0, align: "right", inset: 0,
   });
   pixelButton(volumeRow, "+", () => changeVolume(0.1), { width: volumeControlWidth, height: volumeControlHeight });
+}
 
-  optionSection(panel, "INTERFACE");
+function addInterfaceOptions(panel, pref) {
+  optionSection(panel, "PLAYLIST LAYOUT");
   optionToggle(panel, "AUTO-SIZE COLUMNS", pref.columnAutoSize !== false,
     () => setPreference("columnAutoSize", pref.columnAutoSize === false));
-  optionToggle(panel, "AUTO-RESIZE MOTION", animationEnabled("autoResizeAnimationEnabled"),
+  optionSection(panel, "MOTION");
+  optionToggle(panel, "AUTO-RESIZE HEADERS + ROWS", animationEnabled("autoResizeAnimationEnabled"),
     () => setPreference("autoResizeAnimationEnabled", !animationEnabled("autoResizeAnimationEnabled")));
   optionAdjuster(panel, "RESIZE TIME", `${animationMilliseconds("autoResizeAnimationMilliseconds")} MS`,
     () => adjustAnimationTime("autoResizeAnimationMilliseconds", -50),
@@ -1042,7 +1085,12 @@ function addOptionsContent(parent) {
   optionAdjuster(panel, "SLIDE TIME", `${animationMilliseconds("selectionAnimationMilliseconds")} MS`,
     () => adjustAnimationTime("selectionAnimationMilliseconds", -50),
     () => adjustAnimationTime("selectionAnimationMilliseconds", 50));
+  label(panel, "SAME EASE PROFILE THROUGHOUT THE SCREEN", { height: rowHeight(6) }, {
+    textShade: 0, inset: 2,
+  });
+}
 
+function addLibraryOptions(panel, pref) {
   optionSection(panel, "PLAYLIST COLUMNS");
   configurableColumns.forEach(({ key, title }) => {
     const visibility = pref.columnVisibility || {};
@@ -1052,11 +1100,39 @@ function addOptionsContent(parent) {
         [key]: state.preferences.columnVisibility?.[key] === false,
       }));
   });
-
-  optionSection(panel, "LIBRARY");
+  optionSection(panel, "CATALOG");
   pixelButton(panel, "RELOAD LIBRARY", () => loadCatalog(), {
-    height: rowHeight(5),
+    height: rowHeight(8),
   });
+}
+
+function addOptionsContent(parent) {
+  const panel = makeWidget(parent, {
+    direction: FlexDirection.Column,
+    flexGrow: 1,
+    gap: oneDot(),
+    padding: 2,
+  }, {
+    paint(box) {
+      strokeRect(box.x, box.y, box.width, box.height, 1);
+    },
+  });
+  panelTitle(panel, "OPTIONS", state.theme, 64);
+  const navigation = makeWidget(panel, {
+    direction: FlexDirection.Row,
+    height: rowHeight(7),
+    gap: oneDot(),
+  });
+  ["DISPLAY", "PLAYBACK", "INTERFACE", "LIBRARY"].forEach((page) => pixelButton(navigation, page, () => {
+    state.optionsPage = page;
+    render();
+  }, { flexGrow: 1, height: rowHeight(5), selected: state.optionsPage === page }));
+
+  const pref = state.preferences;
+  if (state.optionsPage === "PLAYBACK") addPlaybackOptions(panel, pref);
+  else if (state.optionsPage === "INTERFACE") addInterfaceOptions(panel, pref);
+  else if (state.optionsPage === "LIBRARY") addLibraryOptions(panel, pref);
+  else addDisplayOptions(panel, pref);
 }
 
 function buildTree() {
@@ -1290,12 +1366,19 @@ function setFontProfile(font) {
 }
 
 function toggleContrast() {
-  setContrastProfile(state.contrast === "CURRENT" ? "HIGH_CONTRAST" : "CURRENT");
+  setContrastProfile(state.contrast === "STANDARD" ? "HIGH_CONTRAST" : "STANDARD");
 }
 
 function setContrastProfile(contrast) {
-  state.contrast = contrast;
-  RGB = paletteRGB(PALETTES[state.contrast]);
+  state.contrast = contrast === "HIGH_CONTRAST" ? "HIGH_CONTRAST" : "STANDARD";
+  RGB = paletteRGB(displayPalette());
+  saveDisplayOptions();
+  render();
+}
+
+function setTheme(theme) {
+  state.theme = theme === "NIGHTBOY" ? "NIGHTBOY" : "GAMEBOY";
+  RGB = paletteRGB(displayPalette());
   saveDisplayOptions();
   render();
 }
