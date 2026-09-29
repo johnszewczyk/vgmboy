@@ -20,10 +20,10 @@ import UACWrapperCore
     let outcome = try MetaManMetadataHarvester.harvest(directoryURL: root, formatExtension: "sid")
     #expect(outcome.failures.isEmpty)
     #expect(outcome.diagnosticCount == 0)
-    #expect(outcome.memberMetadata["variant-a/tune.sid"]?["title"] == .string("Test Tune"))
-    #expect(outcome.memberMetadata["variant-a/tune.sid"]?["artist"] == .string("Test Composer"))
-    #expect(outcome.memberMetadata["variant-a/tune.sid"]?["system"] == .string("Commodore 64"))
-    #expect(outcome.memberMetadata["variant-a/tune.sid"]?["playLengthMs"] == nil)
+    #expect(outcome.memberMetadata["variant-a/tune.sid"]?["Title"] == .string("Test Tune"))
+    #expect(outcome.memberMetadata["variant-a/tune.sid"]?["Artist"] == .string("Test Composer"))
+    #expect(outcome.memberMetadata["variant-a/tune.sid"]?["System"] == .string("Commodore 64"))
+    #expect(outcome.memberMetadata["variant-a/tune.sid"]?["Play Length (ms)"] == nil)
     #expect(try Data(contentsOf: memberURL) == fixture)
 }
 
@@ -48,15 +48,15 @@ import UACWrapperCore
     let metadata = outcome.memberMetadata["Genesis/track.vgm"]
     #expect(outcome.failures.isEmpty)
     #expect(outcome.diagnosticCount == 0)
-    #expect(metadata?["title"] == .string("Tune"))
-    #expect(metadata?["game"] == .string("Game"))
-    #expect(metadata?["system"] == .string("Sega Mega Drive / Genesis"))
-    #expect(metadata?["artist"] == .string("Composer"))
-    #expect(metadata?["playLengthMs"] == .integer(1_000))
+    #expect(metadata?["Title"] == .string("Tune"))
+    #expect(metadata?["Game"] == .string("Game"))
+    #expect(metadata?["System"] == .string("Sega Mega Drive / Genesis"))
+    #expect(metadata?["Artist"] == .string("Composer"))
+    #expect(metadata?["Play Length (ms)"] == .integer(1_000))
     #expect(try Data(contentsOf: memberURL) == fixture)
 }
 
-@Test func apeDirectoryHarvestKeysNativeTagMapBySourceName() throws {
+@Test func apeDirectoryHarvestProjectsUsefulFieldsWithoutCopyingNativeTags() throws {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("uac-ape-harvest-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -82,23 +82,10 @@ import UACWrapperCore
     let outcome = try MetaManMetadataHarvester.harvest(directoryURL: root, formatExtension: "ape")
     let metadata = outcome.memberMetadata["Album/track.ape"]
     #expect(outcome.failures.isEmpty)
-    #expect(metadata?["title"] == .string("Lossless track"))
-    #expect(metadata?["album"] == .string("Studio album"))
-    #expect(metadata?["game"] == .string("Studio album"))
-    if case let .object(native)? = metadata?["nativeMetadata"],
-       case let .object(tags)? = native["tags"] {
-        #expect(tags["Title"] == nil)
-        #expect(tags["Album"] == nil)
-        #expect(tags["Discnumber"] == .string("1"))
-        #expect(tags["Tracknumber"] == .string("1"))
-        #expect(tags["X-Producer"] == .string("Studio=One"))
-        #expect(tags["body"] == .string("10"))
-        #expect(tags["X-Repeated"] == .array([.string("first"), .string("second")]))
-        #expect(tags["name"] == nil)
-        #expect(tags["value"] == nil)
-    } else {
-        Issue.record("Native tags must be keyed by their source names in the UAC projection.")
-    }
+    #expect(metadata?["Title"] == .string("Lossless track"))
+    #expect(metadata?["Album"] == .string("Studio album"))
+    #expect(metadata?["Game"] == .string("Studio album"))
+    #expect(metadata?["nativeMetadata"] == nil)
     #expect(try Data(contentsOf: memberURL) == fixture)
 }
 
@@ -121,14 +108,14 @@ import UACWrapperCore
     let tracks = outcome.trackMetadata["NES/game.nsf"]
     #expect(outcome.failures.isEmpty)
     #expect(outcome.diagnosticCount == 0)
-    #expect(member?["game"] == .string("Fixture Game"))
-    #expect(member?["system"] == .string("Nintendo NES"))
-    #expect(member?["artist"] == .string("Fixture Composer"))
-    #expect(member?["title"] == nil)
-    #expect(member?["playLengthMs"] == nil)
+    #expect(member?["Game"] == .string("Fixture Game"))
+    #expect(member?["System"] == .string("Nintendo NES"))
+    #expect(member?["Artist"] == .string("Fixture Composer"))
+    #expect(member?["Title"] == nil)
+    #expect(member?["Play Length (ms)"] == nil)
     #expect(tracks?.count == 3)
     #expect(tracks?.compactMap(\.sourceTrackIndex) == [0, 1, 2])
-    #expect(tracks?.allSatisfy { $0.metadata["playLengthMs"] == .integer(150_000) } == true)
+    #expect(tracks?.allSatisfy { $0.metadata["Play Length (ms)"] == .integer(150_000) } == true)
     #expect(try Data(contentsOf: memberURL) == fixture)
 }
 
@@ -163,13 +150,13 @@ import UACWrapperCore
     let tracks = outcome.trackMetadata["GB/game.gbs"]
     #expect(outcome.failures.isEmpty)
     #expect(outcome.diagnosticCount == 0)
-    #expect(metadata?["game"] == .string("M3U Album"))
+    #expect(metadata?["Game"] == .string("M3U Album"))
     #expect(tracks?.count == 2)
-    #expect(tracks?[0].metadata["title"] == .string("Opening Theme"))
-    #expect(tracks?[0].metadata["playLengthMs"] == .integer(42_000))
-    #expect(tracks?[0].metadata["loopLengthMs"] == .integer(20_000))
-    #expect(tracks?[0].metadata["artist"] == .string("M3U Artist"))
-    #expect(tracks?[1].metadata["title"] == nil)
+    #expect(tracks?[0].metadata["Title"] == .string("Opening Theme"))
+    #expect(tracks?[0].metadata["Play Length (ms)"] == .integer(42_000))
+    #expect(tracks?[0].metadata["Loop Length (ms)"] == .integer(20_000))
+    #expect(tracks?[0].metadata["Artist"] == .string("M3U Artist"))
+    #expect(tracks?[1].metadata["Title"] == nil)
     #expect(try Data(contentsOf: gbsURL) == gbs)
     #expect(try Data(contentsOf: m3uURL) == m3u)
 }
@@ -212,7 +199,7 @@ import UACWrapperCore
     try sapBytes.write(to: memberURL)
     let outcome = try MetaManMetadataHarvester.harvest(directoryURL: root, formatExtension: "sap")
     #expect(outcome.failures.isEmpty)
-    #expect(outcome.memberMetadata["subtunes.sap"]?["title"] == nil)
+    #expect(outcome.memberMetadata["subtunes.sap"]?["Title"] == nil)
     #expect(outcome.trackMetadata["subtunes.sap"]?.count == 2)
     #expect(outcome.trackMetadata["subtunes.sap"]?.compactMap(\.sourceTrackIndex) == [0, 1])
 }
@@ -236,11 +223,11 @@ import UACWrapperCore
     let tracks = outcome.trackMetadata["Atari ST/score.sndh"]
     #expect(outcome.failures.isEmpty)
     #expect(outcome.diagnosticCount == 0)
-    #expect(member?["system"] == .string("Atari ST"))
+    #expect(member?["System"] == .string("Atari ST"))
     #expect(tracks?.count == 2)
     #expect(tracks?.compactMap(\.sourceTrackIndex) == [1, 2])
-    #expect(tracks?.compactMap { $0.metadata["title"] } == [.string("Intro"), .string("Level 1")])
-    #expect(tracks?.compactMap { $0.metadata["playLengthMs"] } == [.integer(10_000), .integer(20_000)])
+    #expect(tracks?.compactMap { $0.metadata["Title"] } == [.string("Intro"), .string("Level 1")])
+    #expect(tracks?.compactMap { $0.metadata["Play Length (ms)"] } == [.integer(10_000), .integer(20_000)])
     #expect(try Data(contentsOf: memberURL) == fixture)
 }
 

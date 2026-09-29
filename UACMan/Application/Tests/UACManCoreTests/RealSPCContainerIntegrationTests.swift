@@ -46,8 +46,8 @@ import UACWrapperCore
     #expect(harvested.items.count == spcPaths.count)
     #expect(harvested.failures.isEmpty)
     #expect(harvested.diagnosticCount == 0)
-    #expect(harvested.items.allSatisfy { $0.projection.memberFields["title"] != nil })
-    #expect(harvested.items.allSatisfy { $0.projection.memberFields["nativeMetadata"] != nil })
+    #expect(harvested.items.allSatisfy { $0.projection.memberFields["Title"] != nil })
+    #expect(harvested.items.allSatisfy { $0.projection.memberFields["nativeMetadata"] == nil })
 
     let merged = try SPCMetadataProjector.merge(items: harvested.items, into: original.manifestJSON)
     let temporaryURL = FileManager.default.temporaryDirectory
@@ -64,7 +64,13 @@ import UACWrapperCore
     )
     let reopened = try UACContainerReader.read(from: temporaryURL, decompressManifestFrame: manifestDecoder)
     #expect(rewritten.manifestJSON == merged.manifestJSON)
-    #expect(reopened.manifest.members.filter { $0.metadata["nativeMetadata"] != nil }.count == spcPaths.count)
+    let originalNativeMetadataPaths = Set(original.manifest.members.compactMap { member in
+        member.metadata["nativeMetadata"] == nil ? nil : member.path
+    })
+    let rewrittenNativeMetadataPaths = Set(reopened.manifest.members.compactMap { member in
+        member.metadata["nativeMetadata"] == nil ? nil : member.path
+    })
+    #expect(rewrittenNativeMetadataPaths == originalNativeMetadataPaths)
     #expect(try readPayload(url: sourceURL, offset: original.payloadOffset, length: original.payloadLength)
         == readPayload(url: temporaryURL, offset: reopened.payloadOffset, length: reopened.payloadLength))
 }

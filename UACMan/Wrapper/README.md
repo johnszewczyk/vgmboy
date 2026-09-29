@@ -46,24 +46,24 @@ For creation-time SPC metadata, build `UACManMetadataCLI` from the project
 root and pass it with `--harvest-spc-metadata`. For another MetaMan-supported
 format, use `--harvest-format-metadata vgm <UACManMetadataCLI>` (`mdx`, SID,
 NSF, NSFE, GBS, standard audio, and APE are also supported); the option can be
-repeated for additional extensions. FLAC Vorbis comments and APE/ID3 tags are
-retained as ordered native metadata while the original compressed audio remains intact.
-Track-aware NSF-family results become ordered UAC
-`subsong` playlist entries and retain their per-track MetaMan projection. Every
-entry points at the same unchanged native member and records its decoder track
-index. The reader is MetaManCore; the wrapper does not edit source tags. Use
-new output paths, inspect the recipe/source mapping, and round-trip into a
-separate directory before promotion. A successfully harvested member defaults
-to UAC role `playable`; an explicit recipe role remains authoritative.
+repeated for additional extensions. MetaManCore projects selected, useful
+source fields directly into Title Case UAC tags. It does not copy a bulk native
+tag map or parser dump into the manifest; unchanged audio members retain their
+original embedded tags byte-for-byte. Track-aware NSF-family results become
+ordered UAC `subsong` playlist entries with only per-track fields not already
+stored on the target member, plus the decoder track index. Use new output paths,
+inspect the recipe/source mapping, and round-trip into a separate directory
+before promotion. A successfully harvested member defaults to UAC role
+`playable`; an explicit recipe role remains authoritative.
 
 When source records identify one unambiguous distributor and set, the packer
-projects it to the flat package tags `game.metadata.setCollection`, `setName`,
-and `setUrl`. For
-Redump packages, the `redump-disc-archive` record is authoritative over derived
-output and metadata-only association records; its Archive.org download URL is
+projects it to direct Title Case package tags: `Set Collection`, `Set Name`, and
+`Set URL`, with optional `Set Legacy URL` and `Set Archive URL`. For Redump
+packages, the `redump-disc-archive` record is authoritative over derived output
+and metadata-only association records; its Archive.org download URL is
 projected to the matching item details page. Existing collections can be audited
 with `enrich-sets <root>`; this is a dry run by default. Add `--apply` to add the
-field to matching manifests in place. The command validates each update and
+fields to matching manifests in place. The command validates each update and
 copies the compressed payload byte-for-byte; unmapped, conflicting, or
 otherwise already-tagged packages are left unchanged.
 The one scoped refresh updates previously archived Project2612 links to current
@@ -71,9 +71,10 @@ VGMRips system pages and retains both the old Project2612 address and its
 Wayback snapshot. This is a useful current directory link, not a claim that
 every original Project2612 package was one-to-one migrated.
 
-New packages also write `game.metadata.containedContainerVersions`, which
-records SPC and VGM version/count groups at package level and lists formats
-with mixed versions. Each SPC member exposes
+New packages write `game.metadata.containedContainerVersions` only when SPC or
+VGM members are present. It records SPC and VGM version/count groups at package
+level; mixed-version review belongs to AudioMan rather than the generic wrapper.
+Each SPC member exposes
 `metadata.spcVersion` (from its version byte), `metadata.spcVersionByte`, and
 `metadata.spcHeaderVersion` (from the signature text). The byte and signature
 are reported separately because real SPCs can disagree between them; neither

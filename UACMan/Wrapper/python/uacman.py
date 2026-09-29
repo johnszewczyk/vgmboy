@@ -170,6 +170,53 @@ def require_string(record: dict, field: str, owner: str) -> str:
     return value
 
 
+def normalize_authored_metadata_fields(
+    metadata: dict,
+    owner: str,
+    structural_fields: frozenset[str] = frozenset(),
+) -> dict:
+    """Title-case newly authored tag names while retaining schema properties."""
+    normalized: dict = {}
+    for raw_name, value in metadata.items():
+        if not isinstance(raw_name, str) or not raw_name.strip():
+            raise UACError(f"{owner} metadata keys must be non-empty strings.")
+        if is_native_metadata_tag_name(raw_name):
+            raise UACError(
+                f"{owner} may not contain nativeMetadata; project selected tags directly and keep source bytes intact."
+            )
+        name = raw_name if raw_name in structural_fields else imported_metadata_tag_name(raw_name)
+        if name in normalized:
+            if normalized[name] == value:
+                continue
+            raise UACError(f"{owner} has conflicting values for the same tag after Title Case normalization: {name}")
+        normalized[name] = value
+    return normalized
+
+
+def normalize_package_set_tags(metadata: dict) -> None:
+    """Convert the legacy nested set object into direct, Title Case package tags."""
+    nested = metadata.pop("set", None)
+    if nested is None:
+        return
+    if not isinstance(nested, dict):
+        raise UACError("Game metadata set must be an object when supplied.")
+    fields = {
+        "collection": "Set Collection",
+        "name": "Set Name",
+        "url": "Set URL",
+        "legacyUrl": "Set Legacy URL",
+        "archiveUrl": "Set Archive URL",
+        "date": "Set Date",
+    }
+    for raw_name, value in nested.items():
+        name = fields.get(raw_name)
+        if name is None:
+            raise UACError(f"Unknown field in game metadata set: {raw_name}")
+        if name in metadata and metadata[name] != value:
+            raise UACError(f"Game metadata contains conflicting nested and direct values for {name}.")
+        metadata[name] = value
+
+
 def normalize_recipe(recipe: dict) -> dict:
     """Fill Codable-required empty fields and reject malformed known records."""
     game = recipe["game"]
@@ -184,6 +231,24 @@ def normalize_recipe(recipe: dict) -> dict:
         raise UACError("Game canonicalIDs must be an array of strings.")
     if not isinstance(game["metadata"], dict) or not isinstance(game["extensions"], dict):
         raise UACError("Game metadata and extensions must be JSON objects.")
+    normalize_package_set_tags(game["metadata"])
+    game["metadata"] = normalize_authored_metadata_fields(
+        game["metadata"],
+        "Game",
+        frozenset({"cover_front", "cover_back", "cue_sheet", "documents", "containedContainerVersions"}),
+    )
+    member_overrides = recipe.get("memberOverrides", {})
+    if not isinstance(member_overrides, dict):
+        raise UACError("Recipe memberOverrides must be an object keyed by input-relative path.")
+    for member_path, override in member_overrides.items():
+        if not isinstance(override, dict):
+            raise UACError(f"Member override must be an object: {member_path}")
+        metadata = override.get("metadata", {})
+        if not isinstance(metadata, dict):
+            raise UACError(f"Member metadata must be an object: {member_path}")
+        override["metadata"] = normalize_authored_metadata_fields(
+            metadata, f"Member {member_path}"
+        )
 
     if not isinstance(recipe["variants"], list) or not recipe["variants"]:
         raise UACError("Recipe 'variants' must be a non-empty array.")
@@ -206,6 +271,9 @@ def normalize_recipe(recipe: dict) -> dict:
             raise UACError(f"Variant canonicalReleaseIDs must be an array of strings: {variant_id}")
         if not isinstance(variant["metadata"], dict) or not isinstance(variant["extensions"], dict):
             raise UACError(f"Variant metadata and extensions must be JSON objects: {variant_id}")
+        variant["metadata"] = normalize_authored_metadata_fields(
+            variant["metadata"], f"Variant {variant_id}"
+        )
 
     for source in recipe["sources"]:
         if not isinstance(source, dict):
@@ -277,6 +345,9 @@ def normalize_recipe(recipe: dict) -> dict:
         playlist.setdefault("extensions", {})
         if not isinstance(playlist["metadata"], dict) or not isinstance(playlist["extensions"], dict):
             raise UACError(f"Playlist metadata and extensions must be JSON objects: {playlist['id']}")
+        playlist["metadata"] = normalize_authored_metadata_fields(
+            playlist["metadata"], f"Playlist {playlist_id}"
+        )
         for entry in playlist["entries"]:
             if not isinstance(entry, dict):
                 raise UACError(f"Playlist entries must be objects: {playlist_id}")
@@ -286,6 +357,9 @@ def normalize_recipe(recipe: dict) -> dict:
             entry.setdefault("extensions", {})
             if not isinstance(entry["extraFields"], dict) or not isinstance(entry["extensions"], dict):
                 raise UACError(f"Playlist entry extraFields/extensions must be JSON objects: {playlist_id}")
+            entry["extraFields"] = normalize_authored_metadata_fields(
+                entry["extraFields"], f"Playlist {playlist_id} entry"
+            )
             if not isinstance(entry["entryKind"], str) or not entry["entryKind"].strip():
                 raise UACError(f"Playlist entryKind must be a non-empty string: {playlist_id}")
             if entry["entryKind"] == "subsong":
@@ -344,7 +418,7 @@ def source_set_metadata(sources: object) -> dict | None:
         if len(projections) != 1:
             return None
         collection, name, url = next(iter(projections))
-        return {"setCollection": collection, "setName": name, "setUrl": url}
+        return {"Set Collection": collection, "Set Name": name, "Set URL": url}
 
     projections: set[tuple[str, str, str, str | None, str | None]] = set()
     for source in sources:
@@ -373,11 +447,11 @@ def source_set_metadata(sources: object) -> dict | None:
     if len(projections) != 1:
         return None
     collection, name, url, legacy_url, archive_url = next(iter(projections))
-    result = {"setCollection": collection, "setName": name, "setUrl": url}
+    result = {"Set Collection": collection, "Set Name": name, "Set URL": url}
     if legacy_url is not None:
-        result["setLegacyUrl"] = legacy_url
+        result["Set Legacy URL"] = legacy_url
     if archive_url is not None:
-        result["setArchiveUrl"] = archive_url
+        result["Set Archive URL"] = archive_url
     return result
 
 
@@ -387,7 +461,10 @@ def add_source_set_metadata(manifest: dict) -> bool:
     if not isinstance(game, dict):
         return False
     metadata = game.get("metadata")
-    set_fields = ("setCollection", "setName", "setUrl", "setLegacyUrl", "setArchiveUrl")
+    set_fields = (
+        "Set Collection", "Set Name", "Set URL", "Set Legacy URL", "Set Archive URL",
+        "setCollection", "setName", "setUrl", "setLegacyUrl", "setArchiveUrl",
+    )
     if not isinstance(metadata, dict) or "set" in metadata or any(key in metadata for key in set_fields):
         return False
     set_metadata = source_set_metadata(manifest.get("sources"))
@@ -406,15 +483,19 @@ def refresh_project2612_set_metadata(manifest: dict) -> bool:
 
     existing = metadata.get("set")
     legacy_nested = isinstance(existing, dict)
-    collection = existing.get("collection") if legacy_nested else metadata.get("setCollection")
-    url = existing.get("url") if legacy_nested else metadata.get("setUrl")
+    collection = existing.get("collection") if legacy_nested else metadata.get(
+        "Set Collection", metadata.get("setCollection")
+    )
+    url = existing.get("url") if legacy_nested else metadata.get("Set URL", metadata.get("setUrl"))
     if collection != "Project2612" or url != SOURCE_ARCHIVE_URLS["Project2612"]:
         return False
     updated = source_set_metadata(manifest.get("sources"))
-    if updated is None or updated.get("setCollection") != "Project2612":
+    if updated is None or updated.get("Set Collection") != "Project2612":
         return False
     if legacy_nested:
         metadata.pop("set", None)
+    for legacy_key in ("setCollection", "setName", "setUrl", "setLegacyUrl", "setArchiveUrl"):
+        metadata.pop(legacy_key, None)
     metadata.update(updated)
     return True
 
@@ -750,8 +831,7 @@ def harvest_spc_metadata(
 
     game = recipe["game"]
     for key, value in game_metadata.items():
-        if key not in game["metadata"] or game["metadata"][key] in (None, ""):
-            game["metadata"][key] = value
+        merge_imported_metadata_tag(game["metadata"], key, value)
     for path, fields in members.items():
         override = recipe["memberOverrides"].setdefault(path, {})
         if not isinstance(override, dict):
@@ -760,8 +840,7 @@ def harvest_spc_metadata(
         if not isinstance(metadata, dict):
             raise UACError(f"Member metadata override must be an object: {path}")
         for key, value in fields.items():
-            if key not in metadata or metadata[key] in (None, ""):
-                metadata[key] = value
+            merge_imported_metadata_tag(metadata, key, value)
     extension = recipe.setdefault("extensions", {}).setdefault("spcMetadataImport", {})
     if not isinstance(extension, dict):
         raise UACError("Recipe extensions.spcMetadataImport must be an object.")
@@ -772,6 +851,98 @@ def harvest_spc_metadata(
         "sharedFieldConflicts": [str(item) for item in conflicts],
     })
     return len(members), diagnostic_count, [str(item) for item in conflicts]
+
+
+_CANONICAL_IMPORTED_TAG_NAMES = {
+    "title": "Title",
+    "game": "Game",
+    "system": "System",
+    "artist": "Artist",
+    "album": "Album",
+    "date": "Date",
+    "year": "Year",
+    "genre": "Genre",
+    "comment": "Comment",
+    "copyright": "Copyright",
+    "encodedby": "Encoded By",
+    "tracknumber": "Track Number",
+    "introlengthms": "Intro Length (ms)",
+    "looplengthms": "Loop Length (ms)",
+    "playlengthms": "Play Length (ms)",
+    "durationms": "Duration (ms)",
+    "fadelengthms": "Fade Length (ms)",
+    "loop": "Loop",
+    "gameid": "Game ID",
+    "setcollection": "Set Collection",
+    "setname": "Set Name",
+    "seturl": "Set URL",
+    "setlegacyurl": "Set Legacy URL",
+    "setarchiveurl": "Set Archive URL",
+    "setdate": "Set Date",
+    "discnumber": "Disc Number",
+    "osttrack": "OST Track",
+    "osttitle": "OST Title",
+    "gametitle": "Game Title",
+    "subcontainerversion": "Sub-Container Version",
+}
+_TAG_NAME_ACRONYMS = {
+    "api", "ape", "blake3", "cd", "cue", "eu", "id", "jp", "json",
+    "lba", "md5", "ost", "pcm", "psf", "psx", "rom", "sha1", "sha256",
+    "spc", "uac", "url", "us", "vgm", "xa", "xml",
+}
+
+
+def imported_metadata_tag_name(raw_name: object) -> str:
+    """Return a professional Title Case name for a newly imported UAC tag."""
+    name = str(raw_name).strip()
+    token = re.sub(r"[^a-z0-9]+", "", name.lower())
+    if token in _CANONICAL_IMPORTED_TAG_NAMES:
+        return _CANONICAL_IMPORTED_TAG_NAMES[token]
+    words = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", name)
+    words = re.sub(r"[_-]+", " ", words)
+    acronyms = {word.lower() for word in re.findall(r"\b[A-Z0-9]{2,}\b", words)}
+    result = []
+    for word in words.split():
+        lower = word.lower()
+        if lower in _TAG_NAME_ACRONYMS or word.upper() in acronyms:
+            result.append(word.upper())
+        else:
+            result.append(lower[:1].upper() + lower[1:])
+    return " ".join(result)
+
+
+def is_native_metadata_tag_name(raw_name: object) -> bool:
+    return re.sub(r"[^a-z0-9]+", "", str(raw_name).lower()) == "nativemetadata"
+
+
+def merge_imported_metadata_tag(metadata: dict, raw_name: object, value: object) -> None:
+    """Merge one projected tag without creating a casing-only duplicate."""
+    if is_native_metadata_tag_name(raw_name):
+        return
+    canonical_name = imported_metadata_tag_name(raw_name)
+    aliases = [
+        name for name in metadata
+        if imported_metadata_tag_name(name) == canonical_name
+    ]
+    existing_name = canonical_name if canonical_name in metadata else (aliases[0] if aliases else None)
+    if existing_name is not None and existing_name != canonical_name and canonical_name not in metadata:
+        metadata[canonical_name] = metadata.pop(existing_name)
+        existing_name = canonical_name
+    if existing_name is None or metadata[existing_name] in (None, ""):
+        metadata[canonical_name] = value
+        existing_name = canonical_name
+    for alias in aliases:
+        if alias != existing_name and metadata.get(alias) == metadata.get(existing_name):
+            metadata.pop(alias, None)
+
+
+def normalize_imported_metadata_fields(fields: dict) -> dict:
+    normalized: dict = {}
+    for key, value in fields.items():
+        if is_native_metadata_tag_name(key):
+            continue
+        normalized.setdefault(imported_metadata_tag_name(key), value)
+    return normalized
 
 
 def harvest_format_metadata(
@@ -857,7 +1028,10 @@ def harvest_format_metadata(
                 raise UACError(f"UACMan metadata helper returned an invalid source track index: {path}#{ordinal}")
             if source_index is not None:
                 indexes.append(source_index)
-            normalized.append({"sourceTrackIndex": source_index, "metadata": track["metadata"]})
+            normalized.append({
+                "sourceTrackIndex": source_index,
+                "metadata": normalize_imported_metadata_fields(track["metadata"]),
+            })
         if len(normalized) > 1 and (len(indexes) != len(normalized) or len(set(indexes)) != len(indexes)):
             raise UACError(
                 f"MetaMan .{extension} tracks do not have unique playable source indexes: {path}."
@@ -877,8 +1051,7 @@ def harvest_format_metadata(
         if not isinstance(metadata, dict):
             raise UACError(f"Member metadata override must be an object: {path}")
         for key, value in fields.items():
-            if key not in metadata or metadata[key] in (None, ""):
-                metadata[key] = value
+            merge_imported_metadata_tag(metadata, key, value)
 
     playlist_id = None
     # Track-aware formats need explicit playlist entries even when a stream
@@ -904,7 +1077,7 @@ def harvest_format_metadata(
         entries = []
         for path in sorted(expected_paths):
             tracks = normalized_tracks[path]
-            for ordinal, track in enumerate(tracks):
+            for track in tracks:
                 metadata = track["metadata"]
                 source_index = track["sourceTrackIndex"]
                 decoder_index = source_index if source_index is not None else 0
@@ -912,15 +1085,23 @@ def harvest_format_metadata(
                 target_path = variant_member_path(source_path, variant_id, recipe.get("variants", []))
                 if not safe_relative_path(target_path):
                     raise UACError(f"Unsafe UAC subsong target path: {target_path}")
-                title = metadata.get("title")
-                artist = metadata.get("artist")
-                extra_fields = {
-                    "visibleTrackIndex": ordinal,
-                    "trackCount": len(tracks),
-                    "metaManMetadata": metadata,
-                }
-                if source_index is not None:
-                    extra_fields["sourceTrackIndex"] = source_index
+                title = metadata.get("Title")
+                artist = metadata.get("Artist")
+                extra_fields = {}
+                member_metadata = recipe["memberOverrides"].get(path, {}).get("metadata", {})
+                for key, value in metadata.items():
+                    if key in {"Title", "Artist"}:
+                        continue
+                    matching_member_key = next(
+                        (
+                            existing for existing in member_metadata
+                            if imported_metadata_tag_name(existing) == key
+                        ),
+                        None,
+                    ) if isinstance(member_metadata, dict) else None
+                    if matching_member_key is not None and member_metadata[matching_member_key] == value:
+                        continue
+                    extra_fields[key] = value
                 entries.append({
                     "targetMemberPath": target_path,
                     "entryKind": "subsong",
@@ -1100,7 +1281,9 @@ def create_tar(
             override = overrides.get(relative, {})
             if not isinstance(override, dict):
                 raise UACError(f"Member override must be an object: {relative}")
-            allowed_override_fields = {"role", "format", "metadata", "extensions", "sourceIDs"}
+            allowed_override_fields = {
+                "role", "format", "metadata", "extensions", "sourceIDs", "originalName",
+            }
             unknown = set(override) - allowed_override_fields
             if unknown:
                 raise UACError(f"Unknown override fields for {relative}: {', '.join(sorted(unknown))}")
@@ -1116,6 +1299,7 @@ def create_tar(
                 raise UACError(f"Member role must be a non-empty string: {relative}")
             metadata = override.get("metadata", {})
             extensions = override.get("extensions", {})
+            original_name = override.get("originalName", PurePosixPath(archive_relative).name)
             member_source_ids = override.get("sourceIDs", source_ids)
             if len(source_ids) > 1 and "sourceIDs" not in override:
                 raise UACError(
@@ -1123,6 +1307,13 @@ def create_tar(
                 )
             if not isinstance(metadata, dict) or not isinstance(extensions, dict):
                 raise UACError(f"Member metadata and extensions must be JSON objects: {relative}")
+            if (
+                not isinstance(original_name, str)
+                or not original_name.strip()
+                or PurePosixPath(original_name).name != original_name
+                or "\\" in original_name
+            ):
+                raise UACError(f"Member originalName must be one non-empty filename: {relative}")
             if not isinstance(member_source_ids, list) or any(item not in source_ids for item in member_source_ids):
                 raise UACError(f"Member references an undeclared source: {relative}")
 
@@ -1196,7 +1387,7 @@ def create_tar(
                 raise UACError(f"Input changed while it was being packaged: {relative}")
             records.append({
                 "path": member_path,
-                "originalName": PurePosixPath(archive_relative).name,
+                "originalName": original_name,
                 "variantID": variant_id,
                 "sourceIDs": member_source_ids,
                 "role": role,
@@ -1719,9 +1910,6 @@ def pack_source_archive_tree(args: argparse.Namespace) -> None:
                     member for member in manifest["members"]
                     if str(member.get("format", "")).lower() == "spc"
                 ]
-                if any(not isinstance(member.get("metadata"), dict)
-                       or "nativeMetadata" not in member["metadata"] for member in spc_members):
-                    raise UACError(f"SPC tag metadata is missing from the UAC manifest: {relative_text}")
                 if any(Path(str(member.get("originalName", ""))).suffix.lower() == ".spc"
                        for member in manifest["members"]) and len(spc_members) == 0:
                     raise UACError(f"SPC files were not classified as SPC members: {relative_text}")

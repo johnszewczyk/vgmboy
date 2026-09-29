@@ -2,32 +2,59 @@ import Foundation
 import MetaManCore
 import UACWrapperCore
 
-/// Projects MetaMan's lossless read result into format-neutral UAC member
-/// metadata. Native file bytes stay untouched; raw metadata payloads are
-/// represented by their names and sizes while decoded native tags and facts
-/// remain available for inspection. Native tags use their source names as JSON
-/// object keys; repeated names retain their values in source order.
+/// Projects only normalized, useful fields from MetaMan's read result into
+/// UAC metadata. The unchanged source member remains the preservation copy of
+/// its native tags, raw blocks, technical facts, and parser details.
 public enum MetaManMetadataProjector {
+    /// Converts known legacy machine keys to their canonical Title Case tag
+    /// names. Unknown user fields stay untouched.
+    public static func canonicalStandardTagName(for key: String) -> String? {
+        let token = key.unicodeScalars
+            .filter(CharacterSet.alphanumerics.contains)
+            .map(String.init)
+            .joined()
+            .lowercased()
+        switch token {
+        case "title": return "Title"
+        case "game": return "Game"
+        case "system": return "System"
+        case "artist": return "Artist"
+        case "album": return "Album"
+        case "date": return "Date"
+        case "year": return "Year"
+        case "genre": return "Genre"
+        case "comment": return "Comment"
+        case "copyright": return "Copyright"
+        case "encodedby": return "Encoded By"
+        case "tracknumber": return "Track Number"
+        case "introlengthms": return "Intro Length (ms)"
+        case "looplengthms": return "Loop Length (ms)"
+        case "playlengthms": return "Play Length (ms)"
+        case "durationms": return "Duration (ms)"
+        case "fadelengthms": return "Fade Length (ms)"
+        case "loop": return "Loop"
+        default: return nil
+        }
+    }
+
     public static func memberFields(from document: MetadataDocument) -> [String: UACJSONValue] {
         var member: [String: UACJSONValue] = [:]
-        var canonicalValuesByName: [String: String] = [:]
         let commonFields: [(String, String?)] = [
-            ("title", document.fields.title),
-            ("game", document.fields.game),
-            ("system", document.fields.system),
-            ("artist", document.fields.artist),
-            ("album", document.fields.album),
-            ("date", document.fields.date),
-            ("year", document.fields.year),
-            ("genre", document.fields.genre),
-            ("comment", document.fields.comment),
-            ("copyright", document.fields.copyright),
-            ("encodedBy", document.fields.encodedBy)
+            ("Title", document.fields.title),
+            ("Game", document.fields.game),
+            ("System", document.fields.system),
+            ("Artist", document.fields.artist),
+            ("Album", document.fields.album),
+            ("Date", document.fields.date),
+            ("Year", document.fields.year),
+            ("Genre", document.fields.genre),
+            ("Comment", document.fields.comment),
+            ("Copyright", document.fields.copyright),
+            ("Encoded By", document.fields.encodedBy)
         ]
         for (key, value) in commonFields {
             if let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 member[key] = .string(value)
-                canonicalValuesByName[key.lowercased()] = value
             }
         }
         if let timing = document.timing {
@@ -35,20 +62,20 @@ public enum MetaManMetadataProjector {
             // Do not materialize those defaults as package tags; a present value
             // must describe a measured duration.
             if timing.introLengthMs > 0 {
-                member["introLengthMs"] = .integer(Int64(timing.introLengthMs))
+                member["Intro Length (ms)"] = .integer(Int64(timing.introLengthMs))
             }
             if timing.loopLengthMs > 0 {
-                member["loopLengthMs"] = .integer(Int64(timing.loopLengthMs))
+                member["Loop Length (ms)"] = .integer(Int64(timing.loopLengthMs))
             }
             if timing.playLengthMs > 0 {
-                member["playLengthMs"] = .integer(Int64(timing.playLengthMs))
+                member["Play Length (ms)"] = .integer(Int64(timing.playLengthMs))
             }
             if timing.fadeLengthMs > 0 {
-                member["fadeLengthMs"] = .integer(Int64(timing.fadeLengthMs))
+                member["Fade Length (ms)"] = .integer(Int64(timing.fadeLengthMs))
             }
         }
         if let loop = document.loop {
-            member["loop"] = .object([
+            member["Loop"] = .object([
                 "mode": .string(loop.mode),
                 "startSamples": .integer(loop.startSample),
                 "endSamples": .integer(loop.endSample),
@@ -58,63 +85,26 @@ public enum MetaManMetadataProjector {
             ])
         }
 
-        var tagValues: [String: [String]] = [:]
-        for tag in document.tags {
-            tagValues[tag.name, default: []].append(tag.value)
-        }
-        let tagMap = tagValues.reduce(into: [String: UACJSONValue]()) { result, entry in
-            let (sourceName, values) = entry
-            // A one-to-one source tag already represented by the same canonical
-            // UAC value adds no information. Repeated source names and values
-            // that differ from the canonical projection remain preserved.
-            if values.count == 1,
-               let canonicalValue = canonicalValuesByName[sourceName.lowercased()],
-               canonicalValue == values[0] {
-                return
-            }
-            result[sourceName] = values.count == 1
-                ? .string(values[0])
-                : .array(values.map(UACJSONValue.string))
-        }
-
-        var native: [String: UACJSONValue] = [
-            "format": .string(document.format),
-            "tags": .object(tagMap),
-            "technicalFacts": .object(document.technicalFacts.mapValues(UACJSONValue.string)),
-            "diagnostics": .array(document.diagnostics.map(UACJSONValue.string))
-        ]
-        if let sourceEncoding = document.sourceEncoding {
-            native["sourceEncoding"] = .string(sourceEncoding)
-        }
-        if let rawMetadataBlocks = document.rawMetadataBlocks {
-            native["rawBlockByteCounts"] = .object(rawMetadataBlocks.mapValues {
-                .integer(Int64($0.count))
-            })
-        } else if let rawTagBlock = document.rawTagBlock {
-            native["rawTagBlockByteCount"] = .integer(Int64(rawTagBlock.count))
-        }
-        member["nativeMetadata"] = .object(native)
         return member
     }
 
     /// Multi-track members receive only metadata that describes the whole
     /// source. Track-specific values stay on their ordered playlist entries.
     public static func sharedMemberFields(
-        from documents: [MetadataDocument],
-        sourceTrackIndices: [Int]
+        from documents: [MetadataDocument]
     ) -> [String: UACJSONValue] {
-        guard let first = documents.first else { return [:] }
+        guard !documents.isEmpty else { return [:] }
         let commonFields: [(String, (MetadataDocument) -> String?)] = [
-            ("game", { $0.fields.game }),
-            ("system", { $0.fields.system }),
-            ("artist", { $0.fields.artist }),
-            ("album", { $0.fields.album }),
-            ("date", { $0.fields.date }),
-            ("year", { $0.fields.year }),
-            ("genre", { $0.fields.genre }),
-            ("comment", { $0.fields.comment }),
-            ("copyright", { $0.fields.copyright }),
-            ("encodedBy", { $0.fields.encodedBy })
+            ("Game", { $0.fields.game }),
+            ("System", { $0.fields.system }),
+            ("Artist", { $0.fields.artist }),
+            ("Album", { $0.fields.album }),
+            ("Date", { $0.fields.date }),
+            ("Year", { $0.fields.year }),
+            ("Genre", { $0.fields.genre }),
+            ("Comment", { $0.fields.comment }),
+            ("Copyright", { $0.fields.copyright }),
+            ("Encoded By", { $0.fields.encodedBy })
         ]
         var member: [String: UACJSONValue] = [:]
         for (key, valueForDocument) in commonFields {
@@ -122,11 +112,6 @@ public enum MetaManMetadataProjector {
             guard let value = values.first, !value.isEmpty, values.allSatisfy({ $0 == value }) else { continue }
             member[key] = .string(value)
         }
-        member["nativeMetadata"] = .object([
-            "format": .string(first.format),
-            "trackCount": .integer(Int64(documents.count)),
-            "sourceTrackIndices": .array(sourceTrackIndices.map { .integer(Int64($0)) })
-        ])
         return member
     }
 }

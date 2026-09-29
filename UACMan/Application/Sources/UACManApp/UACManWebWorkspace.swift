@@ -152,9 +152,6 @@ struct UACManWebWorkspace: NSViewRepresentable {
             case "closeFilePreview": model.closeFilePreview()
             case "save": model.save()
             case "revert": model.revert()
-            case "harvest": model.harvestSPCMetadata()
-            case "replaceHarvest": model.harvestSPCMetadata(replaceExisting: true)
-            case "cancelHarvest": model.cancelSPCMetadataHarvest()
             case "renameMetadataKey":
                 model.renameMetadataKey(
                     from: payload["from"] as? String ?? "",

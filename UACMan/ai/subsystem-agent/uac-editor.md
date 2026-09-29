@@ -32,7 +32,8 @@
   does not own container semantics.
 - `UACManWebWorkspace` hosts the bundled local WKWebView surface. Swift and
   `UACManModel` remain authoritative for package state, file access, prompts,
-  validation, harvest, and writes. The page may filter/sort its current
+  validation, and writes. The GUI reads and edits manifest fields only; it
+  must never open member contents for format-specific metadata reads. The page may filter/sort its current
   snapshot, but all mutations go through the named `uacman` script-message
   actions. Do not expose arbitrary file reads, shell commands, or network
   access to the page.
@@ -168,14 +169,17 @@ contents of a cell but may not change its table's columns.
 - Batch operations must be path-scoped to the explicit member selection. Fill
   missing is the default import behavior; replacement requires explicit user
   action and remains reversible until Save.
-- Store ordered native tags, parser facts/diagnostics, and raw-block byte counts
-  on the member whose SPC was read. Do not duplicate raw ID666/xID6 bytes in
-  manifest JSON; those remain in the immutable SPC member payload. Promote
-  shared game/soundtrack fields only when every successfully inspected member
-  provides the same non-empty value; keep normalized per-track values too.
-- Native SPC harvesting is currently limited to seekable
-  `tar+zstd-seekable` payloads. Use `UACSeekableMemberFile` and validate the
-  seek-table frame checksum; do not extract members to edit manifest metadata.
+- Follow the format procedure when projecting source metadata. Store only
+  populated, useful, source-backed canonical fields in the manifest. Keep
+  native tags and raw blocks in the byte-identical source member and parser
+  diagnostics in the conversion report. Do not add a generic `nativeMetadata`
+  copy or a complete per-track reader result to playlist extras. Store new
+  projected and authored tag names directly in Title Case. Keep UAC structural
+  properties in their contract spelling, and preserve a legacy tag's name when
+  only its value is edited.
+- Promote shared fields only when that format procedure allows it and every
+  successfully inspected member provides the same non-empty value. Keep the
+  resulting location and type consistent with the procedure.
 - Creation-time SPC harvesting reads bounded raw members from the staged input
   directory before packing. A failed or partial read must abort publication of
   the UAC; imported fields fill missing recipe values and never rewrite SPC

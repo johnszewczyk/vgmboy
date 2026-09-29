@@ -51,6 +51,7 @@ func uacManifestProducesStructuredMetaManDocuments() throws {
     #expect(track.technicalFacts["uac.memberFormat"] == "vgm")
     #expect(track.technicalFacts["uac.memberBLAKE3"] == String(repeating: "b", count: 64))
     #expect(track.tags.first(where: { $0.name == "custom" })?.value == "42")
+    #expect(track.tags.contains(where: { $0.name == "Title" }))
     #expect(track.tags.first(where: { $0.name == "emptyTag" }) == nil)
 
     guard case .object(let scoped)? = track.structuredMetadata,
@@ -75,6 +76,21 @@ func uacManifestVersionTwoUsesFlatMemberPaths() throws {
     #expect(result.containerDocument?.technicalFacts["uac.manifestVersion"] == "2")
     #expect(result.tracks.first?.document.technicalFacts["uac.memberPath"] == "song.vgm")
     #expect(result.tracks.first?.document.fields.title == "Manifest Song")
+}
+
+@Test("UAC readers accept legacy lower-case standard tag names")
+func uacManifestLegacyTagNamesRemainReadable() throws {
+    let fixture = try makeUACMetadataFixture(
+        compressedManifest: false,
+        legacyLowercaseMetadata: true
+    )
+    defer { try? FileManager.default.removeItem(at: fixture.directoryURL) }
+
+    let result = try MetaManCore.readResult(fileURL: fixture.packageURL)
+    let track = try #require(result.tracks.first?.document)
+    #expect(track.fields.title == "Manifest Song")
+    #expect(track.fields.artist == "Manifest Artist")
+    #expect(track.timing?.playLengthMs == 10_000)
 }
 
 @Test("UAC compressed manifests use the host decoder with the declared bounds")
@@ -131,7 +147,8 @@ private struct UACMetadataFixture {
 private func makeUACMetadataFixture(
     compressedManifest: Bool,
     subsongTracks: Bool = false,
-    manifestVersion: Int = 1
+    manifestVersion: Int = 1,
+    legacyLowercaseMetadata: Bool = false
 ) throws -> UACMetadataFixture {
     let directoryURL = FileManager.default.temporaryDirectory
         .appendingPathComponent("MetaMan-uac-\(UUID().uuidString)", isDirectory: true)
@@ -177,18 +194,31 @@ private func makeUACMetadataFixture(
                 format: "vgm",
                 byteSize: 5,
                 blake3: String(repeating: "b", count: 64),
-                metadata: [
-                    "title": .string("Manifest Song"),
-                    "game": .string("Manifest Game"),
-                    "system": .string("Mega Drive"),
-                    "artist": .string("Manifest Artist"),
-                    "introLengthMs": .integer(1_250),
-                    "loopLengthMs": .integer(3_500),
-                    "playLengthMs": .integer(10_000),
-                    "fadeLengthMs": .integer(500),
-                    "emptyTag": .string("   "),
-                    "custom": .integer(42)
-                ],
+                metadata: legacyLowercaseMetadata
+                    ? [
+                        "title": .string("Manifest Song"),
+                        "game": .string("Manifest Game"),
+                        "system": .string("Mega Drive"),
+                        "artist": .string("Manifest Artist"),
+                        "introLengthMs": .integer(1_250),
+                        "loopLengthMs": .integer(3_500),
+                        "playLengthMs": .integer(10_000),
+                        "fadeLengthMs": .integer(500),
+                        "emptyTag": .string("   "),
+                        "custom": .integer(42)
+                    ]
+                    : [
+                        "Title": .string("Manifest Song"),
+                        "Game": .string("Manifest Game"),
+                        "System": .string("Mega Drive"),
+                        "Artist": .string("Manifest Artist"),
+                        "Intro Length (ms)": .integer(1_250),
+                        "Loop Length (ms)": .integer(3_500),
+                        "Play Length (ms)": .integer(10_000),
+                        "Fade Length (ms)": .integer(500),
+                        "emptyTag": .string("   "),
+                        "custom": .integer(42)
+                    ],
                 extensions: ["future": .array([.string("kept"), .integer(7)])]
             ),
             UACMember(
@@ -226,16 +256,9 @@ private func makeUACMetadataFixture(
                             title: title,
                             artist: "NSF Composer",
                             extraFields: [
-                                "visibleTrackIndex": .integer(Int64(index)),
-                                "trackCount": .integer(3),
-                                "metaManMetadata": .object([
-                                    "title": .string(title),
-                                    "game": .string("Fixture Game"),
-                                    "system": .string("Nintendo NES"),
-                                    "artist": .string("NSF Composer"),
-                                    "playLengthMs": .integer(150_000),
-                                    "nativeMetadata": .object(["format": .string("nsf")])
-                                ])
+                                "Game": .string("Fixture Game"),
+                                "System": .string("Nintendo NES"),
+                                "Play Length (ms)": .integer(150_000)
                             ]
                         )
                     }

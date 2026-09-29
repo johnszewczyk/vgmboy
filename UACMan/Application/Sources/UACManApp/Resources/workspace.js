@@ -23,23 +23,44 @@
     try { const value = JSON.parse(raw || "{}"); return value && typeof value === "object" && !Array.isArray(value) ? value : null; }
     catch { return null; }
   };
-  const preferredMetadataColumns = ["title", "artist", "album", "year", "genre", "playLengthMs", "durationMs"];
+  const preferredMetadataColumns = ["Title", "Artist", "Album", "Year", "Genre", "Play Length (ms)", "Duration (ms)"];
   const metadataDisplayNames = {
     title: "Title",
+    Title: "Title",
     artist: "Artist",
+    Artist: "Artist",
     album: "Album",
+    Album: "Album",
     game: "Game",
+    Game: "Game",
     system: "System",
+    System: "System",
     year: "Year",
+    Year: "Year",
     genre: "Genre",
+    Genre: "Genre",
     comment: "Comment",
-    trackNumber: "Track #",
-    playLengthMs: "Play length",
-    durationMs: "Duration",
-    introLengthMs: "Intro length",
-    loopLengthMs: "Loop length",
-    fadeLengthMs: "Fade length",
-    discFilename: "Disc filename",
+    Comment: "Comment",
+    trackNumber: "Track Number",
+    "Track Number": "Track Number",
+    playLengthMs: "Play Length (ms)",
+    "Play Length (ms)": "Play Length (ms)",
+    durationMs: "Duration (ms)",
+    "Duration (ms)": "Duration (ms)",
+    introLengthMs: "Intro Length (ms)",
+    "Intro Length (ms)": "Intro Length (ms)",
+    loopLengthMs: "Loop Length (ms)",
+    "Loop Length (ms)": "Loop Length (ms)",
+    fadeLengthMs: "Fade Length (ms)",
+    "Fade Length (ms)": "Fade Length (ms)",
+    discFilename: "Disc Filename",
+    "Disc Filename": "Disc Filename",
+    encodedBy: "Encoded By",
+    "Encoded By": "Encoded By",
+    setUrl: "Set URL",
+    "Set URL": "Set URL",
+    gameID: "Game ID",
+    "Game ID": "Game ID",
     filename: "Filename"
   };
   const displayMetadataKey = key => {
@@ -68,6 +89,15 @@
     }).join(" ");
   };
   const displayTrackKey = key => String(key).startsWith("extension.") ? `Extension: ${displayMetadataKey(String(key).slice("extension.".length))}` : displayMetadataKey(key);
+  const metadataKeyFromLabel = (label, originalKey) => {
+    const raw = String(label ?? "").trim();
+    if (raw === displayTrackKey(originalKey)) return originalKey;
+    if (String(originalKey).startsWith("extension.")) {
+      const extensionLabel = raw.replace(/^(?:extension\.|extension:\s*)/i, "").trim();
+      return `extension.${titleCaseTagName(extensionLabel)}`;
+    }
+    return titleCaseTagName(raw);
+  };
   const canonicalCellMarkup = (content, options = {}) => {
     const classes = [
       "canonical-table-cell",
@@ -469,7 +499,7 @@
     const keys = new Set();
     playableMembers().forEach(member => Object.keys(memberFields(member)).forEach(key => keys.add(key)));
     return [...keys].sort((a, b) => {
-      const ai = preferredMetadataColumns.indexOf(a), bi = preferredMetadataColumns.indexOf(b);
+      const ai = preferredMetadataColumns.indexOf(displayTrackKey(a)), bi = preferredMetadataColumns.indexOf(displayTrackKey(b));
       if (ai >= 0 || bi >= 0) return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
       return a.localeCompare(b, undefined, { numeric:true, sensitivity:"base" });
     });
@@ -748,8 +778,8 @@
     const singleDocumentMode = Boolean(state.documentName) && !state.collectionRoot;
     $("#workspace").classList.toggle("library-collapsed", singleDocumentMode);
     $("#library-panel").classList.toggle("single-document-hidden", singleDocumentMode);
-    $("#save-button").disabled = !state.hasUnsavedChanges || state.isHarvestingMetadata;
-    $("#revert-button").disabled = !state.hasUnsavedChanges && !state.isHarvestingMetadata;
+    $("#save-button").disabled = !state.hasUnsavedChanges;
+    $("#revert-button").disabled = !state.hasUnsavedChanges;
     $("#collection-root").textContent = state.collectionRoot || "No collection selected";
     $("#collection-foot").textContent = state.isScanningCollection ? "Reading package manifests…" : state.collectionStatus || `${state.collectionEntries.length} packages`;
     $("#rescan-button").disabled = !state.collectionRoot;
@@ -775,10 +805,8 @@
       }
     }
 
-    $("#status-message").textContent = state.isHarvestingMetadata ? state.harvestProgressMessage || "Reading metadata…" : state.statusMessage || "Ready";
+    $("#status-message").textContent = state.statusMessage || "Ready";
     $("#encoding-info").textContent = state.manifestEncodingDescription || "";
-    $("#notice").textContent = state.isHarvestingMetadata ? "Reading SPC metadata through the seek table. Package payload bytes remain untouched." : "";
-    $("#notice").classList.toggle("hidden", !state.isHarvestingMetadata);
     $("#error-text").textContent = state.errorMessage || "";
     $("#error-banner").classList.toggle("hidden", !state.errorMessage);
     if (focusId) {
@@ -861,7 +889,7 @@
     const keys = new Set();
     playableMembers().forEach(member => Object.keys(memberFields(member)).forEach(key => keys.add(key)));
     return [...keys].sort((a, b) => {
-      const ai = preferredMetadataColumns.indexOf(a), bi = preferredMetadataColumns.indexOf(b);
+      const ai = preferredMetadataColumns.indexOf(displayTrackKey(a)), bi = preferredMetadataColumns.indexOf(displayTrackKey(b));
       if (ai >= 0 || bi >= 0) return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
       return a.localeCompare(b, undefined, { numeric:true, sensitivity:"base" });
     });
@@ -934,6 +962,7 @@
       } else {
         valueInput = `<input data-tag-value aria-label="Tag value for ${esc(entry.key)}" value="${esc(sample)}">`;
       }
+      const displayName = displayTrackKey(entry.key);
       const tagType = multipleValues ? "Multiple Values" : signatures.size === 1 ? (Array.isArray(sample) ? "list" : typeof sample) : "various";
       const readOnlyMultipleValues = multipleValues && !editableMultipleValues;
       const submitTitle = readOnlyMultipleValues ? "Multiple Values contain different values" : "Submit changed fields";
@@ -941,7 +970,7 @@
       const cells = [
         canonicalNumberCellMarkup(index + 1, `Tag number ${index + 1}`, { className:"tag-number-cell" }),
         canonicalCellMarkup(`<input class="tag-table-field" value="${esc(tagType)}" aria-label="Tag type for ${esc(entry.key)}" disabled>`, { className:"tag-type-cell" }),
-        canonicalCellMarkup(`<input class="tag-table-field" data-tag-to value="${esc(entry.key)}" aria-label="Tag name for ${esc(entry.key)}">`, { className:"tag-name-cell" }),
+        canonicalCellMarkup(`<input class="tag-table-field" data-tag-to value="${esc(displayName)}" aria-label="Tag name for ${esc(displayName)}">`, { className:"tag-name-cell" }),
         canonicalCellMarkup(`<span class="tag-inline-editor">${valueInput}</span>`, { className:"tag-value-cell" }),
         canonicalCellMarkup(`<input class="tag-table-field" value="${count}" aria-label="Uses for ${esc(entry.key)}" disabled>`, { className:"tag-uses-cell" }),
         canonicalCellMarkup(`<button class="icon-button" data-action="commitTagRow" title="${submitTitle}" aria-label="${submitTitle}"${readOnlyMultipleValues ? " disabled" : ""}>✓</button>`, { className:"tag-submit-cell" }),
@@ -1109,6 +1138,7 @@
     const entries = fileTagEntries(member);
     const header = canonicalHeaderMarkup(["#", "Scope", "Tag Name", "Tag Value", "✓", "×"]);
     const rows = entries.map((entry, index) => {
+      const displayName = displayTrackKey(entry.key);
       const structuredValue = tagAnalyzerStructuredValue(entry.value);
       const structured = Boolean(structuredValue);
       let valueMarkup = memberTagValueMarkup(member, entry);
@@ -1116,7 +1146,7 @@
       if (structured) {
         const foldID = `file-tag/${encodeURIComponent(member.path)}/${index}`;
         valueMarkup = multipleValuesTriggerMarkup(foldID);
-        const subtable = multipleValuesSubtableMarkup(structuredValue.value, { target:"member", path:member.path, scope:entry.scope, key:entry.key, foldID, title:entry.key, jsonStringified:structuredValue.encodedString }, { editable:true });
+        const subtable = multipleValuesSubtableMarkup(structuredValue.value, { target:"member", path:member.path, scope:entry.scope, key:entry.key, foldID, title:displayName, jsonStringified:structuredValue.encodedString }, { editable:true });
         unfoldedContent = subtable;
       }
       const foldID = `file-tag/${encodeURIComponent(member.path)}/${index}`;
@@ -1124,7 +1154,7 @@
       const cells = [
         canonicalNumberCellMarkup(index + 1, `Tag number ${index + 1}`, { className:"tag-number-cell" }),
         canonicalCellMarkup(`<input class="tag-table-field file-tag-scope" value="${entry.scope === "memberExtensions" ? "extension" : "metadata"}" disabled>`, { className:"tag-type-cell" }),
-        canonicalCellMarkup(`<input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(entry.key)}" aria-label="Tag name">`, { className:"tag-name-cell" }),
+        canonicalCellMarkup(`<input class="tag-table-field file-tag-key" data-file-tag-key value="${esc(displayName)}" aria-label="Tag name ${esc(displayName)}">`, { className:"tag-name-cell" }),
         canonicalCellMarkup(`<span class="tag-inline-editor">${valueMarkup}</span>`, { className:"tag-value-cell" }),
         canonicalCellMarkup(`<button class="icon-button" data-action="commitFileTag" title="Submit changed tag" aria-label="Submit changed tag">✓</button>`, { className:"tag-submit-cell" }),
         canonicalCellMarkup(canonicalDeleteButtonMarkup("deleteFileTag", {
@@ -1737,13 +1767,12 @@
     const fileRow = editor.closest("[data-file-tag-row]");
     if (editor.dataset.multipleTarget === "metadata") {
       const key = editor.dataset.multipleKey || tagRow?.dataset.tagFrom || "";
-      let newKey = $("[data-tag-to]", tagRow)?.value.trim() || key;
-      if (key.startsWith("extension.") && !newKey.startsWith("extension.")) newKey = `extension.${newKey}`;
+      const newKey = metadataKeyFromLabel($("[data-tag-to]", tagRow)?.value || key, key);
       bridge("commitMetadataRow", { key, newKey, scope:editor.dataset.multipleScope || "", value:null, valueJSON });
     } else {
       const key = editor.dataset.multipleKey || fileRow?.dataset.fileTagFrom || "";
       const path = editor.dataset.multiplePath || fileRow?.dataset.fileTagPath || "";
-      const newKey = $("[data-file-tag-key]", fileRow)?.value || key;
+      const newKey = metadataKeyFromLabel($("[data-file-tag-key]", fileRow)?.value || key, key);
       markTrackDirty(path);
       bridge("commitMemberTag", { path, scope:editor.dataset.multipleScope || fileRow?.dataset.fileTagScope || "memberMetadata", key, newKey, value:"", valueJSON });
     }
@@ -2303,8 +2332,8 @@
         const editor = multipleValuesEditorForRow(row);
         if (editor) { commitMultipleValues(editor); return; }
         const from = row.dataset.tagFrom || "";
-        const rawTo = $('[data-tag-to]', row)?.value.trim() || "";
-        const to = rawTo === from ? from : titleCaseTagName(rawTo);
+        const rawTo = $('[data-tag-to]', row)?.value || from;
+        const to = metadataKeyFromLabel(rawTo, from);
         bridge("commitMetadataRow", { key:from, newKey:to, scope:row.dataset.tagScope || "", value:$('[data-tag-value]', row)?.disabled ? null : ($('[data-tag-value]', row)?.value || "") });
       }
     }
@@ -2321,8 +2350,8 @@
         const editor = multipleValuesEditorForRow(row);
         if (editor) { commitMultipleValues(editor); return; }
         const from = row.dataset.fileTagFrom || "";
-        const rawTo = $('[data-file-tag-key]', row)?.value.trim() || "";
-        const newKey = rawTo === from ? from : titleCaseTagName(rawTo);
+        const rawTo = $('[data-file-tag-key]', row)?.value || from;
+        const newKey = metadataKeyFromLabel(rawTo, from);
         markTrackDirty(row.dataset.fileTagPath || "");
         bridge("commitMemberTag", { path:row.dataset.fileTagPath || "", scope:row.dataset.fileTagScope || "", key:from, newKey, value:$('[data-file-tag-value]', row)?.value || "" });
       }
@@ -2343,7 +2372,6 @@
     else if (action === "closeInspector") { mainView = "members"; render(state); }
     else if (action === "rescanCollection") bridge("rescanCollection");
     else if (action === "cancelCollectionScan") bridge("cancelCollectionScan");
-    else if (action === "cancelHarvest") bridge("cancelHarvest");
     else if (["chooseTagAnalyzerFolder", "startTagAnalysis", "cancelTagAnalysis"].includes(action)) {
       if (action !== "cancelTagAnalysis") {
         CanonicalTable.clearFoldPrefix("tag-analyzer/");
@@ -2351,7 +2379,7 @@
       }
       bridge(action);
     }
-    else if (action === "openUAC" || action === "openCollection" || action === "save" || action === "revert" || action === "harvest") bridge(action);
+    else if (action === "openUAC" || action === "openCollection" || action === "save" || action === "revert") bridge(action);
   });
 
   document.addEventListener("submit", event => {

@@ -34,6 +34,67 @@ def minimal_vgm(version: int, commands: bytes = b"\x66") -> bytes:
     return bytes(header) + commands
 
 
+class AuthoredTagNamingTests(unittest.TestCase):
+    def test_new_recipe_tags_are_title_case_and_set_fields_are_direct_tags(self) -> None:
+        recipe = uacman.normalize_recipe({
+            "game": {
+                "id": "title-case-fixture",
+                "title": "Title Case Fixture",
+                "console": "Nintendo SNES",
+                "metadata": {
+                    "gameId": "ABCD",
+                    "playLengthMs": 1234,
+                    "cue_sheet": {"memberPath": "disc.cue"},
+                    "set": {
+                        "collection": "Fixture",
+                        "name": "Test Set",
+                        "url": "https://example.invalid/set",
+                    },
+                },
+            },
+            "variants": [{
+                "id": "original", "label": "Original", "kind": "release",
+                "metadata": {"gameTitle": "Source Title"},
+            }],
+            "sources": [], "transformations": [],
+            "playlists": [{
+                "id": "tracks",
+                "metadata": {"comment": "Fixture list"},
+                "entries": [{
+                    "targetMemberPath": "track.spc",
+                    "extraFields": {"discTrackNumber": "02"},
+                }],
+            }],
+            "extensions": {},
+            "memberOverrides": {"track.spc": {"metadata": {"trackNumber": "02"}}},
+        })
+
+        self.assertEqual(recipe["game"]["metadata"]["Game ID"], "ABCD")
+        self.assertEqual(recipe["game"]["metadata"]["Play Length (ms)"], 1234)
+        self.assertEqual(recipe["game"]["metadata"]["cue_sheet"], {"memberPath": "disc.cue"})
+        self.assertNotIn("set", recipe["game"]["metadata"])
+        self.assertEqual(recipe["game"]["metadata"]["Set Collection"], "Fixture")
+        self.assertEqual(recipe["game"]["metadata"]["Set Name"], "Test Set")
+        self.assertEqual(recipe["variants"][0]["metadata"]["Game Title"], "Source Title")
+        self.assertEqual(recipe["memberOverrides"]["track.spc"]["metadata"]["Track Number"], "02")
+        self.assertEqual(recipe["playlists"][0]["metadata"]["Comment"], "Fixture list")
+        self.assertEqual(recipe["playlists"][0]["entries"][0]["extraFields"]["Disc Track Number"], "02")
+
+    def test_new_recipe_rejects_bulk_native_metadata_and_conflicting_tag_aliases(self) -> None:
+        base_recipe = {
+            "game": {"id": "fixture", "title": "Fixture", "console": "Nintendo SNES"},
+            "variants": [{"id": "original", "label": "Original", "kind": "release"}],
+            "sources": [], "transformations": [], "playlists": [], "extensions": {},
+            "memberOverrides": {"track.spc": {"metadata": {"nativeMetadata": {"tags": []}}}},
+        }
+        with self.assertRaisesRegex(uacman.UACError, "may not contain nativeMetadata"):
+            uacman.normalize_recipe(base_recipe)
+
+        base_recipe["memberOverrides"]["track.spc"]["metadata"] = {"title": "First", "Title": "Second"}
+        with self.assertRaisesRegex(uacman.UACError, "conflicting values.*Title"):
+            uacman.normalize_recipe(base_recipe)
+
+
 @unittest.skipUnless(
     shutil.which("zstd"),
     "UAC round-trip integration test requires the zstd command-line tool",
@@ -263,8 +324,8 @@ class UACManRoundTripTests(unittest.TestCase):
             package_step = manifest["transformations"][0]
             self.assertEqual(member["format"], "spc")
             self.assertEqual(member["role"], "playable")
-            self.assertEqual(member["metadata"]["song"], "Track 01")
-            self.assertEqual(member["metadata"]["playLengthMs"], 154000)
+            self.assertEqual(member["metadata"]["Song"], "Track 01")
+            self.assertEqual(member["metadata"]["Play Length (ms)"], 154000)
             self.assertEqual(entry["targetMemberBlake3"], member["blake3"])
             self.assertEqual(entry["lengthRaw"], "2:34")
             self.assertEqual(entry["loopStartRaw"], "0:42")
@@ -390,7 +451,12 @@ class UACManRoundTripTests(unittest.TestCase):
             self.assertEqual(len(imported["entries"]), 4)
             self.assertEqual([entry["trackIndex"] for entry in imported["entries"]], ["0", "1", "2", "0"])
             self.assertEqual({entry["targetMemberPath"] for entry in imported["entries"][:3]}, {"game.nsf"})
-            self.assertEqual(imported["entries"][1]["extraFields"]["metaManMetadata"]["title"], "Track 2")
+            self.assertEqual(imported["entries"][1]["title"], "Track 2")
+            self.assertEqual(imported["entries"][1]["extraFields"]["Play Length (ms)"], 150000)
+            self.assertNotIn("visibleTrackIndex", imported["entries"][1]["extraFields"])
+            self.assertNotIn("sourceTrackIndex", imported["entries"][1]["extraFields"])
+            self.assertNotIn("metaManMetadata", imported["entries"][1]["extraFields"])
+            self.assertNotIn("nativeMetadata", imported["entries"][1]["extraFields"])
             self.assertEqual(game.read_bytes(), game_bytes)
             self.assertEqual(one_track.read_bytes(), one_track_bytes)
 
@@ -490,10 +556,8 @@ class UACManRoundTripTests(unittest.TestCase):
                 [entry["targetMemberPath"] for entry in track_list["entries"]],
                 ["game.gbs", "game.gbs", "one-track.gbs"],
             )
-            self.assertEqual(
-                track_list["entries"][1]["extraFields"]["metaManMetadata"]["nativeMetadata"]["format"],
-                "gbs",
-            )
+            self.assertNotIn("metaManMetadata", track_list["entries"][1]["extraFields"])
+            self.assertNotIn("nativeMetadata", track_list["entries"][1]["extraFields"])
             self.assertEqual((unpacked / "game.gbs").read_bytes(), game_bytes)
             self.assertEqual((unpacked / "one-track.gbs").read_bytes(), one_track_bytes)
 
@@ -752,7 +816,7 @@ class UACManRoundTripTests(unittest.TestCase):
             with self.assertRaisesRegex(uacman.UACError, "Invalid or truncated SPC"):
                 uacman.apply_contained_container_versions(source, recipe)
 
-    def test_standard_audio_and_ape_are_playable_uac_members_with_native_metadata(self) -> None:
+    def test_standard_audio_and_ape_are_playable_without_native_metadata_dump(self) -> None:
         with tempfile.TemporaryDirectory(prefix="uacman-audio-test-") as temporary:
             root = Path(temporary)
             source = root / "source"
@@ -809,11 +873,8 @@ class UACManRoundTripTests(unittest.TestCase):
                 name = Path(relative).name
                 member = members[name]
                 self.assertEqual(member["role"], "playable")
-                self.assertEqual(member["metadata"]["title"], Path(name).stem)
-                self.assertEqual(
-                    member["metadata"]["nativeMetadata"]["tags"],
-                    [{"name": "X-CUSTOM", "value": "preserved"}],
-                )
+                self.assertEqual(member["metadata"]["Title"], Path(name).stem)
+                self.assertNotIn("nativeMetadata", member["metadata"])
                 self.assertEqual(
                     (unpacked / relative).read_bytes(), data
                 )
@@ -837,17 +898,17 @@ class SetMetadataTests(unittest.TestCase):
                 "collection": "JoshW", "setName": "Nintendo SNES",
             }]),
             {
-                "setCollection": "JoshW",
-                "setName": "Nintendo SNES",
-                "setUrl": "https://spc.joshw.info/",
+                "Set Collection": "JoshW",
+                "Set Name": "Nintendo SNES",
+                "Set URL": "https://spc.joshw.info/",
             },
         )
         archived = uacman.source_set_metadata([{
             "collection": "Project2612", "setName": "Sega Genesis",
         }])
-        self.assertEqual(archived["setUrl"], "https://vgmrips.net/packs/system/sega/mega-drive")
-        self.assertEqual(archived["setLegacyUrl"], "https://project2612.org/list.php")
-        self.assertEqual(archived["setArchiveUrl"], "https://web.archive.org/web/20240809092444/https://project2612.org/list.php")
+        self.assertEqual(archived["Set URL"], "https://vgmrips.net/packs/system/sega/mega-drive")
+        self.assertEqual(archived["Set Legacy URL"], "https://project2612.org/list.php")
+        self.assertEqual(archived["Set Archive URL"], "https://web.archive.org/web/20240809092444/https://project2612.org/list.php")
         self.assertIsNone(uacman.source_set_metadata([
             {"collection": "JoshW", "setName": "Nintendo SNES"},
             {"collection": "ZopharsDomain", "setName": "Game Boy"},
@@ -877,9 +938,9 @@ class SetMetadataTests(unittest.TestCase):
             },
         ]
         expected = {
-            "setCollection": "Redump",
-            "setName": "SNK - Neo Geo CD - (2019-10-16)",
-            "setUrl": "https://archive.org/details/RedumpSnkNeoGeoCd16Oct2019",
+            "Set Collection": "Redump",
+            "Set Name": "SNK - Neo Geo CD - (2019-10-16)",
+            "Set URL": "https://archive.org/details/RedumpSnkNeoGeoCd16Oct2019",
         }
         self.assertEqual(uacman.source_set_metadata(sources), expected)
         manifest = {"game": {"metadata": {}}, "sources": sources}
@@ -907,9 +968,9 @@ class SetMetadataTests(unittest.TestCase):
         self.assertTrue(uacman.refresh_project2612_set_metadata(manifest))
         metadata = manifest["game"]["metadata"]
         self.assertNotIn("set", metadata)
-        self.assertEqual(metadata["setCollection"], "Project2612")
-        self.assertEqual(metadata["setName"], "Sega Genesis")
-        self.assertEqual(metadata["setUrl"], "https://vgmrips.net/packs/system/sega/mega-drive")
+        self.assertEqual(metadata["Set Collection"], "Project2612")
+        self.assertEqual(metadata["Set Name"], "Sega Genesis")
+        self.assertEqual(metadata["Set URL"], "https://vgmrips.net/packs/system/sega/mega-drive")
         self.assertFalse(uacman.refresh_project2612_set_metadata(manifest))
 
     def test_manifest_rewrite_adds_set_metadata_without_changing_payload_bytes(self) -> None:
@@ -942,17 +1003,20 @@ class SetMetadataTests(unittest.TestCase):
             manifest, old_offset, _, _, _, _ = uacman.read_uac(container)
             expected_payload = container.read_bytes()[old_offset:]
             old_manifest = json.loads(json.dumps(manifest))
-            for key in ("setCollection", "setName", "setUrl", "setLegacyUrl", "setArchiveUrl"):
+            for key in (
+                "Set Collection", "Set Name", "Set URL", "Set Legacy URL", "Set Archive URL",
+                "setCollection", "setName", "setUrl", "setLegacyUrl", "setArchiveUrl",
+            ):
                 manifest["game"]["metadata"].pop(key, None)
             self.assertTrue(uacman.add_source_set_metadata(manifest))
-            self.assertEqual(manifest["game"]["metadata"]["setCollection"], "Fixture")
-            self.assertEqual(manifest["game"]["metadata"]["setName"], "Test Set")
-            self.assertEqual(manifest["game"]["metadata"]["setUrl"], "https://example.invalid/test-set")
+            self.assertEqual(manifest["game"]["metadata"]["Set Collection"], "Fixture")
+            self.assertEqual(manifest["game"]["metadata"]["Set Name"], "Test Set")
+            self.assertEqual(manifest["game"]["metadata"]["Set URL"], "https://example.invalid/test-set")
 
             uacman.rewrite_uac_manifest(container, manifest, old_manifest)
             rewritten, new_offset, _, _, _, _ = uacman.read_uac(container)
             self.assertEqual(container.read_bytes()[new_offset:], expected_payload)
-            self.assertEqual(rewritten["game"]["metadata"]["setName"], "Test Set")
+            self.assertEqual(rewritten["game"]["metadata"]["Set Name"], "Test Set")
 
 class MetaManMetadataImportTests(unittest.TestCase):
     def test_unicode_metadata_and_subsong_paths_resolve_to_source_spelling(self) -> None:
@@ -999,7 +1063,7 @@ class MetaManMetadataImportTests(unittest.TestCase):
             )
 
             self.assertEqual((count, diagnostics), (1, 0))
-            self.assertEqual(recipe["memberOverrides"][filesystem_path]["metadata"]["title"], "Native title")
+            self.assertEqual(recipe["memberOverrides"][filesystem_path]["metadata"]["Title"], "Native title")
             self.assertEqual(recipe["playlists"][0]["entries"][0]["targetMemberPath"], native_name)
             self.assertEqual(recipe["playlists"][0]["entries"][1]["targetMemberPath"], native_name)
 
@@ -1070,8 +1134,8 @@ class MetaManMetadataImportTests(unittest.TestCase):
             )
 
             self.assertEqual((member_count, diagnostic_count), (1, 2))
-            self.assertEqual(recipe["memberOverrides"]["track.sid"]["metadata"]["title"], "Curator title")
-            self.assertEqual(recipe["memberOverrides"]["track.sid"]["metadata"]["artist"], "Native composer")
+            self.assertEqual(recipe["memberOverrides"]["track.sid"]["metadata"]["Title"], "Curator title")
+            self.assertEqual(recipe["memberOverrides"]["track.sid"]["metadata"]["Artist"], "Native composer")
             self.assertEqual(
                 recipe["extensions"]["metaManMetadataImport"]["sid"],
                 {"reader": "MetaManCore", "memberCount": 1, "diagnosticCount": 2},

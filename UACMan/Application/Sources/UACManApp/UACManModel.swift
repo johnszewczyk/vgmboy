@@ -128,13 +128,15 @@ struct UACMemberRow: Identifiable {
         self.hashes = hashes
         self.metadata = metadata
         self.extensions = extensions
-        title = Self.text(metadata["title"])
-        artist = Self.text(metadata["artist"])
-        album = Self.text(metadata["album"])
-        let date = Self.text(metadata["date"])
-        year = Self.text(metadata["year"]) ?? date.map { String($0.prefix(4)) }
-        genre = Self.text(metadata["genre"])
-        playLengthMs = Self.integer(metadata["playLengthMs"])
+        title = Self.text(metadata["Title"]) ?? Self.text(metadata["title"])
+        artist = Self.text(metadata["Artist"]) ?? Self.text(metadata["artist"])
+        album = Self.text(metadata["Album"]) ?? Self.text(metadata["album"])
+        let date = Self.text(metadata["Date"]) ?? Self.text(metadata["date"])
+        year = Self.text(metadata["Year"]) ?? Self.text(metadata["year"]) ?? date.map { String($0.prefix(4)) }
+        genre = Self.text(metadata["Genre"]) ?? Self.text(metadata["genre"])
+        playLengthMs = Self.integer(metadata["Play Length (ms)"])
+            ?? Self.integer(metadata["playLengthMs"])
+            ?? Self.integer(metadata["Duration (ms)"])
             ?? Self.integer(metadata["durationMs"])
     }
 
@@ -218,8 +220,6 @@ final class UACManModel {
     var tagAnalyzerDeletionCurrentPath = ""
     var tagAnalyzerHasResult = false
     var hasUnsavedChanges = false
-    var isHarvestingMetadata = false
-    var harvestProgressMessage = ""
     var statusMessage = "Open a .uac package to inspect its metadata."
     var errorMessage: String?
     var skinPreferences = UACManModel.restoreSkinPreferences() {
@@ -232,7 +232,6 @@ final class UACManModel {
     @ObservationIgnored private var draftManifestJSON = Data()
     @ObservationIgnored private var openedSnapshot: OpenedFileSnapshot?
     @ObservationIgnored private var handledCommandLineFile = false
-    @ObservationIgnored private var harvestTask: Task<Void, Never>?
     @ObservationIgnored private var collectionScanTask: Task<Void, Never>?
     @ObservationIgnored private var collectionScanID: UUID?
     @ObservationIgnored private var tagAnalysisTask: Task<Void, Never>?
@@ -452,9 +451,6 @@ final class UACManModel {
             "allMemberCount": allMemberCount,
             "manifestEncodingDescription": manifestEncodingDescription,
             "hasUnsavedChanges": hasUnsavedChanges,
-            "isHarvestingMetadata": isHarvestingMetadata,
-            "harvestProgressMessage": harvestProgressMessage,
-            "canHarvestSPCMetadata": canHarvestSPCMetadata,
             "statusMessage": statusMessage,
             "errorMessage": errorMessage ?? NSNull()
         ]
@@ -470,20 +466,6 @@ final class UACManModel {
         case .array(let values): return values.map(foundationValue)
         case .object(let values): return values.mapValues(foundationValue)
         }
-    }
-
-    var canHarvestSPCMetadata: Bool {
-        loadedContainer?.manifest.payload.format == "tar+zstd-seekable"
-            && loadedContainer?.seekTable != nil
-            && !spcMemberPaths.isEmpty
-    }
-
-    private var spcMemberPaths: [String] {
-        loadedContainer?.manifest.members.compactMap { member in
-            let format = member.format?.lowercased()
-                ?? URL(fileURLWithPath: member.originalName).pathExtension.lowercased()
-            return format == "spc" ? member.path : nil
-        } ?? []
     }
 
     func openCommandLineFileIfPresent() {
@@ -1156,9 +1138,6 @@ final class UACManModel {
     }
 
     private func loadDocumentWithoutPrompt(_ url: URL) {
-        harvestTask?.cancel()
-        harvestTask = nil
-        isHarvestingMetadata = false
         filePreviewPath = nil
         filePreviewName = ""
         filePreviewContent = ""
@@ -1660,62 +1639,7 @@ final class UACManModel {
         } catch { errorMessage = String(describing: error) }
     }
 
-    func harvestSPCMetadata(replaceExisting: Bool = false) {
-        guard !isHarvestingMetadata else { return }
-        guard let documentURL else { return }
-        guard canHarvestSPCMetadata else {
-            errorMessage = "Native SPC tag harvest requires SPC members in a seekable tar+zstd-seekable UAC payload."
-            return
-        }
-        guard !spcMemberPaths.isEmpty else {
-            errorMessage = "This UAC has no SPC members to harvest."
-            return
-        }
-        do {
-            try flushEditorBuffers()
-        } catch {
-            errorMessage = String(describing: error)
-            return
-        }
-
-        isHarvestingMetadata = true
-        harvestProgressMessage = "Preparing SPC metadata reader…"
-        statusMessage = "Reading embedded SPC headers through the UAC seek table."
-        let memberPaths = spcMemberPaths
-        let manifestDecoder = codec.decoder
-        let frameDecoder = codec.seekableFrameDecoder
-        let packageURL = documentURL
-        let progressRelay = SPCMetadataProgressRelay(model: self)
-        harvestTask = Task.detached(priority: .utility) { [weak self] in
-            do {
-                let outcome = try SPCMetadataHarvester.harvest(
-                    packageURL: packageURL,
-                    memberPaths: memberPaths,
-                    decompressManifestFrame: manifestDecoder,
-                    decompressFrame: frameDecoder,
-                    progress: { completed, total, path in
-                        Task { @MainActor in
-                            progressRelay.report(completed: completed, total: total, path: path)
-                        }
-                    }
-                )
-                await self?.finishSPCMetadataHarvest(outcome, replaceExisting: replaceExisting, packageURL: packageURL)
-            } catch {
-                await self?.failSPCMetadataHarvest(error, packageURL: packageURL)
-            }
-        }
-    }
-
-    func cancelSPCMetadataHarvest() {
-        harvestTask?.cancel()
-        harvestTask = nil
-        isHarvestingMetadata = false
-        harvestProgressMessage = ""
-        statusMessage = "SPC metadata harvest cancelled; no partial import was applied."
-    }
-
     func revert() {
-        cancelSPCMetadataHarvest()
         guard let loadedContainer else { return }
         do {
             draftManifestJSON = originalManifestJSON
@@ -1845,59 +1769,6 @@ final class UACManModel {
         hasUnsavedChanges = draftManifestJSON != originalManifestJSON
     }
 
-    private func finishSPCMetadataHarvest(
-        _ outcome: SPCMetadataHarvestOutcome,
-        replaceExisting: Bool,
-        packageURL: URL
-    ) {
-        guard documentURL == packageURL else { return }
-        isHarvestingMetadata = false
-        harvestTask = nil
-        harvestProgressMessage = ""
-        if outcome.wasCancelled {
-            statusMessage = "SPC metadata harvest cancelled; no partial import was applied."
-            return
-        }
-        guard !outcome.items.isEmpty else {
-            statusMessage = "No SPC metadata could be imported."
-            errorMessage = outcome.failures.prefix(4).joined(separator: "\n")
-            return
-        }
-        do {
-            let result = try SPCMetadataProjector.merge(
-                items: outcome.items,
-                into: draftManifestJSON,
-                overwriteExisting: replaceExisting
-            )
-            draftManifestJSON = result.manifestJSON
-            let mergedManifest = try UACManifestEditor.decode(draftManifestJSON)
-            gameMetadataJSON = try UACManifestEditor.prettyJSON(mergedManifest.game.metadata)
-            refreshMemberSummaries(from: mergedManifest)
-            if let selectedMemberPath {
-                try loadMemberEditor(path: selectedMemberPath, from: mergedManifest)
-            }
-            hasUnsavedChanges = draftManifestJSON != originalManifestJSON
-            let mode = replaceExisting ? "replaced" : "filled missing"
-            var summary = "Harvested native SPC metadata for \(result.importedMemberCount) track(s); \(mode) UAC fields."
-            if !result.sharedFieldsApplied.isEmpty {
-                summary += " Shared soundtrack fields: \(result.sharedFieldsApplied.joined(separator: ", "))."
-            }
-            if !result.conflicts.isEmpty {
-                summary += " Kept differing or incomplete fields track-level: \(result.conflicts.joined(separator: ", "))."
-            }
-            if outcome.diagnosticCount > 0 {
-                summary += " MetaMan reported \(outcome.diagnosticCount) parser diagnostic(s)."
-            }
-            if !outcome.failures.isEmpty {
-                summary += " \(outcome.failures.count) track(s) could not be read."
-            }
-            statusMessage = summary
-            errorMessage = outcome.failures.isEmpty ? nil : outcome.failures.prefix(6).joined(separator: "\n")
-        } catch {
-            errorMessage = String(describing: error)
-        }
-    }
-
     private func finishCollectionScan(
         _ result: UACCollectionScanResult,
         scanID: UUID,
@@ -1927,14 +1798,6 @@ final class UACManModel {
         collectionScanTask = nil
         isScanningCollection = false
         collectionStatusMessage = "Could not read this collection folder."
-        errorMessage = String(describing: error)
-    }
-
-    private func failSPCMetadataHarvest(_ error: Error, packageURL: URL) {
-        guard documentURL == packageURL else { return }
-        isHarvestingMetadata = false
-        harvestTask = nil
-        harvestProgressMessage = ""
         errorMessage = String(describing: error)
     }
 
@@ -1973,19 +1836,6 @@ private final class UACTagAnalysisProgressRelay {
 
     func report(_ progress: UACTagAnalysisProgress) {
         model?.receiveTagAnalysisProgress(progress, scanID: scanID)
-    }
-}
-
-@MainActor
-private final class SPCMetadataProgressRelay {
-    weak var model: UACManModel?
-
-    init(model: UACManModel) {
-        self.model = model
-    }
-
-    func report(completed: Int, total: Int, path: String) {
-        model?.harvestProgressMessage = "Read \(completed) of \(total): \(URL(fileURLWithPath: path).lastPathComponent)"
     }
 }
 

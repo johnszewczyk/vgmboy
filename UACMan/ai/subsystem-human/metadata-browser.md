@@ -125,13 +125,13 @@ reports folder discovery and package reads, and **×** stops the scan. Cancellin
 clears the incomplete list. Unreadable folders or packages are reported, and
 their presence marks the result as potentially incomplete.
 
-The shared game metadata may use flat camelCase set fields such as `setName`,
-`setUrl`, and `setCollection` for a concise source-set summary. The complete
-source records remain in the manifest's Sources section. UACMan does not require
-camelCase or reject other key casing: metadata maps preserve arbitrary
-case-sensitive JSON keys, while camelCase remains the convention for shared
-fields. Nested values remain available when they carry real structure, but a
-simple set summary should not be nested needlessly.
+New projected and authored tag names are stored in Title Case. Standard UAC
+structure keeps its contract spelling for attachment references such as
+`game.metadata.cue_sheet`. Package set facts use the direct Title Case tags
+**Set Collection**, **Set Name**, and **Set URL**, with optional **Set Legacy
+URL**, **Set Archive URL**, and **Set Date**. The Tag Analyzer reports the
+exact stored tag name, including legacy casing, so it can audit old manifests
+without rewriting them.
 
 ## Editing and import
 
@@ -154,14 +154,11 @@ workflow.
 Revert discards unsaved manifest changes.
 Saving refuses to overwrite a package that changed on disk after it was opened.
 
-For SPC packages, native ID666/xID6 harvesting reads embedded members through
-MetaMan and requires a seekable `tar+zstd-seekable` payload. It retains ordered
-duplicate tags, technical facts, diagnostics, and raw-block byte counts in
-per-track metadata. Original ID666/xID6 bytes remain inside the unchanged SPC
-member; they are not duplicated in the manifest. The default import fills
-missing fields. Replacing existing values is explicit and remains reversible
-before Save. Shared soundtrack facts are promoted only when every inspected
-track has the same non-empty value.
+The GUI treats the UAC manifest as the complete source of displayed metadata.
+Opening a package, selecting a member, and browsing a collection read manifest
+records only; the GUI does not inspect or parse member contents. Source-format
+metadata is read by the separate UACMan command-line tooling through MetaMan
+before packages are created or converted.
 
 MetaMan remains the command-line tool and MetaManCore owns format parsing.
 UACMan is part of the VGMMan project and presents the UAC-specific collection

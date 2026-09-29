@@ -118,26 +118,26 @@ enum UACMetadataReader {
             let document = MetadataDocument(
                 format: "uac",
                 fields: MetadataFields(
-                    title: string(metadata["title"]),
-                    game: string(metadata["game"]),
-                    system: string(metadata["system"]),
-                    artist: string(metadata["artist"]),
-                    album: string(metadata["album"]),
-                    date: string(metadata["date"]),
-                    year: string(metadata["year"]),
-                    genre: string(metadata["genre"]),
-                    comment: string(metadata["comment"]),
-                    copyright: string(metadata["copyright"]),
-                    encodedBy: string(metadata["encodedBy"])
+                    title: string(metadataValue(metadata, key: "title")),
+                    game: string(metadataValue(metadata, key: "game")),
+                    system: string(metadataValue(metadata, key: "system")),
+                    artist: string(metadataValue(metadata, key: "artist")),
+                    album: string(metadataValue(metadata, key: "album")),
+                    date: string(metadataValue(metadata, key: "date")),
+                    year: string(metadataValue(metadata, key: "year")),
+                    genre: string(metadataValue(metadata, key: "genre")),
+                    comment: string(metadataValue(metadata, key: "comment")),
+                    copyright: string(metadataValue(metadata, key: "copyright")),
+                    encodedBy: string(metadataValue(metadata, key: "encodedBy"))
                 ),
                 tags: tags,
                 structuredMetadata: .object(scopedMetadata),
                 sourceEncoding: "UAC manifest JSON",
                 timing: MetadataTiming(
-                    introLengthMs: milliseconds(metadata["introLengthMs"]),
-                    loopLengthMs: loop?.loopLengthMs ?? milliseconds(metadata["loopLengthMs"]),
-                    playLengthMs: milliseconds(metadata["playLengthMs"]),
-                    fadeLengthMs: milliseconds(metadata["fadeLengthMs"])
+                    introLengthMs: milliseconds(metadataValue(metadata, key: "introLengthMs")),
+                    loopLengthMs: loop?.loopLengthMs ?? milliseconds(metadataValue(metadata, key: "loopLengthMs")),
+                    playLengthMs: milliseconds(metadataValue(metadata, key: "playLengthMs")),
+                    fadeLengthMs: milliseconds(metadataValue(metadata, key: "fadeLengthMs"))
                 ),
                 loop: loop,
                 technicalFacts: [
@@ -195,10 +195,18 @@ enum UACMetadataReader {
                   let (memberIndex, member) = playableMembersByPath[reference.entry.targetMemberPath] else { continue }
             var metadata = member.metadata
             if case .object(let projected)? = reference.entry.extraFields["metaManMetadata"] {
-                metadata.merge(projected) { _, trackValue in trackValue }
+                for (name, value) in projected {
+                    guard let tagName = canonicalMetadataTagName(name) else { continue }
+                    metadata[tagName] = value
+                }
             }
-            if let title = reference.entry.title { metadata["title"] = .string(title) }
-            if let artist = reference.entry.artist { metadata["artist"] = .string(artist) }
+            for (name, value) in reference.entry.extraFields {
+                guard name != "metaManMetadata",
+                      let tagName = canonicalMetadataTagName(name) else { continue }
+                metadata[tagName] = value
+            }
+            if let title = reference.entry.title { metadata["Title"] = .string(title) }
+            if let artist = reference.entry.artist { metadata["Artist"] = .string(artist) }
             let loop = loopMetadata(
                 metadata: metadata,
                 playlistEntry: reference.entry
@@ -243,6 +251,66 @@ enum UACMetadataReader {
         return values
     }
 
+    private static func metadataValue(_ metadata: [String: UACJSONValue], key: String) -> UACJSONValue? {
+        let titleCaseKey: String
+        switch key {
+        case "title": titleCaseKey = "Title"
+        case "game": titleCaseKey = "Game"
+        case "system": titleCaseKey = "System"
+        case "artist": titleCaseKey = "Artist"
+        case "album": titleCaseKey = "Album"
+        case "date": titleCaseKey = "Date"
+        case "year": titleCaseKey = "Year"
+        case "genre": titleCaseKey = "Genre"
+        case "comment": titleCaseKey = "Comment"
+        case "copyright": titleCaseKey = "Copyright"
+        case "encodedBy": titleCaseKey = "Encoded By"
+        case "introLengthMs": titleCaseKey = "Intro Length (ms)"
+        case "loopLengthMs": titleCaseKey = "Loop Length (ms)"
+        case "playLengthMs": titleCaseKey = "Play Length (ms)"
+        case "fadeLengthMs": titleCaseKey = "Fade Length (ms)"
+        default: return metadata[key]
+        }
+        return metadata[titleCaseKey] ?? metadata[key]
+    }
+
+    private static func canonicalMetadataTagName(_ key: String) -> String? {
+        let token = key.lowercased().filter { $0.isLetter || $0.isNumber }
+        switch token {
+        case "nativemetadata", "metamanmetadata", "visibletrackindex", "trackcount", "sourcetrackindex":
+            return nil
+        case "title": return "Title"
+        case "game": return "Game"
+        case "system": return "System"
+        case "artist": return "Artist"
+        case "album": return "Album"
+        case "date": return "Date"
+        case "year": return "Year"
+        case "genre": return "Genre"
+        case "comment": return "Comment"
+        case "copyright": return "Copyright"
+        case "encodedby": return "Encoded By"
+        case "tracknumber": return "Track Number"
+        case "introlengthms": return "Intro Length (ms)"
+        case "looplengthms": return "Loop Length (ms)"
+        case "playlengthms": return "Play Length (ms)"
+        case "durationms": return "Duration (ms)"
+        case "fadelengthms": return "Fade Length (ms)"
+        case "gameid": return "Game ID"
+        case "setcollection": return "Set Collection"
+        case "setname": return "Set Name"
+        case "seturl": return "Set URL"
+        case "setlegacyurl": return "Set Legacy URL"
+        case "setarchiveurl": return "Set Archive URL"
+        case "discnumber": return "Disc Number"
+        case "osttrack": return "OST Track"
+        case "osttitle": return "OST Title"
+        case "gametitle": return "Game Title"
+        case "subcontainerversion": return "Sub-Container Version"
+        default: return key
+        }
+    }
+
     private static func string(_ value: UACJSONValue?) -> String? {
         guard case .string(let text)? = value else { return nil }
         let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -264,7 +332,7 @@ enum UACMetadataReader {
         metadata: [String: UACJSONValue],
         playlistEntry: UACPlaylistEntry?
     ) -> MetadataLoop? {
-        if case .object(let object)? = metadata["loop"],
+        if case .object(let object)? = metadata["Loop"] ?? metadata["loop"],
            let loop = parseLoopObject(object, source: "uac-manifest") {
             return loop
         }

@@ -4,8 +4,8 @@ import UACWrapperCore
 
 public struct SPCMetadataProjection: Equatable, Sendable {
     /// Normalized values useful for search, display, and ordinary editing.
-    /// Track-specific values remain attached to the member even when equal
-    /// values are also promoted to the soundtrack/game record.
+    /// Track-specific values stay on the member; unanimous package values are
+    /// promoted to the game record without a duplicate member copy.
     public let memberFields: [String: UACJSONValue]
     public let sharedCandidates: [String: UACJSONValue]
 }
@@ -34,12 +34,22 @@ public struct SPCMetadataMergeResult: Equatable, Sendable {
 
 public enum SPCMetadataProjector {
     public static func project(_ document: MetadataDocument) -> SPCMetadataProjection {
-        let member = MetaManMetadataProjector.memberFields(from: document)
+        var member = MetaManMetadataProjector.memberFields(from: document)
+        // The package title and canonical console belong to the game record.
+        // Their exact source bytes remain in the byte-identical SPC member.
+        member.removeValue(forKey: "Game")
+        member.removeValue(forKey: "System")
+        // SPC soundtracks describe a game, not an album. Preserve the raw
+        // soundtrack-title bytes in the SPC member, but do not project Album.
+        member.removeValue(forKey: "Album")
+        if let rawTrack = document.technicalFacts["soundtrackTrack"],
+           let trackNumber = UInt16(rawTrack, radix: 16),
+           trackNumber > 0 {
+            member["Track Number"] = .integer(Int64(trackNumber))
+        }
 
         var shared: [String: UACJSONValue] = [:]
-        if let game = document.fields.game { shared["sourceGameTitle"] = .string(game) }
-        if let system = document.fields.system { shared["sourceSystem"] = .string(system) }
-        for key in ["album", "date", "year", "genre", "copyright"] {
+        for key in ["Artist", "Date", "Year", "Genre", "Comment", "Copyright", "Encoded By"] {
             if let value = member[key] { shared[key] = value }
         }
         return SPCMetadataProjection(memberFields: member, sharedCandidates: shared)
@@ -96,6 +106,7 @@ public enum SPCMetadataProjector {
                   let item = itemByPath[path] else { continue }
             foundPaths.insert(path)
             var metadata = members[index]["metadata"] as? [String: Any] ?? [:]
+            canonicalizeKnownTagNames(in: &metadata)
             for (key, value) in item.projection.memberFields {
                 if overwriteExisting || isMissing(metadata[key]) {
                     metadata[key] = try jsonObjectValue(value)
@@ -111,11 +122,36 @@ public enum SPCMetadataProjector {
 
         let shared = sharedFields(from: items.map(\.projection))
         var gameMetadata = game["metadata"] as? [String: Any] ?? [:]
+        canonicalizeKnownTagNames(in: &gameMetadata)
         var applied: [String] = []
+        var promotedValues: [String: Any] = [:]
         for (key, value) in shared.fields {
+            let projectedValue = try jsonObjectValue(value)
             if overwriteExisting || isMissing(gameMetadata[key]) {
-                gameMetadata[key] = try jsonObjectValue(value)
+                gameMetadata[key] = projectedValue
                 applied.append(key)
+            }
+            if let storedValue = gameMetadata[key],
+               JSONSerialization.isValidJSONObject(["value": storedValue]),
+               let storedData = try? JSONSerialization.data(withJSONObject: ["value": storedValue], options: [.sortedKeys]),
+               let projectedData = try? JSONSerialization.data(withJSONObject: ["value": projectedValue], options: [.sortedKeys]),
+               storedData == projectedData {
+                promotedValues[key] = storedValue
+            }
+        }
+        if !promotedValues.isEmpty {
+            for index in members.indices {
+                guard let path = members[index]["path"] as? String,
+                      itemByPath[path] != nil,
+                      var metadata = members[index]["metadata"] as? [String: Any] else { continue }
+                for (key, value) in promotedValues where metadata[key] != nil {
+                    if let metadataData = try? JSONSerialization.data(withJSONObject: ["value": metadata[key]!], options: [.sortedKeys]),
+                       let promotedData = try? JSONSerialization.data(withJSONObject: ["value": value], options: [.sortedKeys]),
+                       metadataData == promotedData {
+                        metadata.removeValue(forKey: key)
+                    }
+                }
+                members[index]["metadata"] = metadata
             }
         }
         game["metadata"] = gameMetadata
@@ -138,6 +174,16 @@ public enum SPCMetadataProjector {
         guard let value else { return true }
         if value is NSNull { return true }
         return (value as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? false
+    }
+
+    private static func canonicalizeKnownTagNames(in fields: inout [String: Any]) {
+        for oldKey in Array(fields.keys) {
+            guard let canonicalKey = MetaManMetadataProjector.canonicalStandardTagName(for: oldKey),
+                  canonicalKey != oldKey,
+                  fields[canonicalKey] == nil,
+                  let value = fields.removeValue(forKey: oldKey) else { continue }
+            fields[canonicalKey] = value
+        }
     }
 
     private static func jsonObjectValue(_ value: UACJSONValue) throws -> Any {

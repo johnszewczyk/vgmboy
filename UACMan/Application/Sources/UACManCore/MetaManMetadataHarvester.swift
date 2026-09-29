@@ -150,8 +150,7 @@ public enum MetaManMetadataHarvester {
                         throw MetaManMetadataHarvesterError.unrepresentableTrackMap(file.path)
                     }
                     memberMetadata[file.path] = MetaManMetadataProjector.sharedMemberFields(
-                        from: result.tracks.map(\.document),
-                        sourceTrackIndices: indexes
+                        from: result.tracks.map(\.document)
                     )
                 }
             } catch {

@@ -4,27 +4,27 @@ import Testing
 import UACWrapperCore
 @testable import UACManCore
 
-@Test func spcProjectionRetainsDuplicateTagsAndOriginalBlocks() throws {
+@Test func spcProjectionOmitsGenericNativeMetadataAndKeepsCanonicalFields() throws {
     let document = MetadataDocument(
         format: "spc",
         fields: MetadataFields(title: "Track", game: "Game", artist: "Composer", album: "Album", year: "1995"),
-        tags: [MetadataTag(name: "Artist", value: "Short"), MetadataTag(name: "ARTIST", value: "Long")],
+        tags: [
+            MetadataTag(name: "Artist", value: "Short"),
+            MetadataTag(name: "ARTIST", value: "Long"),
+            MetadataTag(name: "Artist", value: "Second occurrence")
+        ],
         rawMetadataBlocks: ["id666": Data([0, 1, 2]), "xid6": Data([3, 4])],
         timing: MetadataTiming(introLengthMs: 1200, loopLengthMs: 3000, playLengthMs: 4200),
         diagnostics: ["sample diagnostic"]
     )
     let projection = SPCMetadataProjector.project(document)
-    guard case .object(let native)? = projection.memberFields["nativeMetadata"],
-          case .array(let tags)? = native["tags"],
-          case .object(let blockSizes)? = native["rawBlockByteCounts"] else {
-        Issue.record("Native SPC metadata was not represented in the member map.")
-        return
-    }
-
-    #expect(tags.count == 2)
-    #expect(blockSizes["id666"] == .integer(3))
-    #expect(projection.memberFields["introLengthMs"] == .integer(1200))
-    #expect(projection.sharedCandidates["album"] == .string("Album"))
+    #expect(projection.memberFields["nativeMetadata"] == nil)
+    #expect(projection.memberFields["Intro Length (ms)"] == .integer(1200))
+    #expect(projection.memberFields["Game"] == nil)
+    #expect(projection.memberFields["System"] == nil)
+    #expect(projection.memberFields["Album"] == nil)
+    #expect(projection.sharedCandidates["Album"] == nil)
+    #expect(projection.memberFields["Artist"] == .string("Composer"))
 }
 
 @Test func sharedMetadataRequiresEveryTrackToAgree() {
@@ -41,12 +41,21 @@ import UACWrapperCore
         SPCMetadataProjector.project(second)
     ])
 
-    #expect(result.fields["sourceGameTitle"] == .string("Game"))
-    #expect(result.fields["album"] == nil)
-    #expect(result.conflicts.contains("album"))
+    #expect(result.fields["Game Title"] == nil)
+    #expect(result.fields["Album"] == nil)
+    #expect(!result.conflicts.contains("Album"))
 }
 
-@Test func spcImportKeepsManualFieldsAndAddsUnanimousSoundtrackData() throws {
+@Test func spcOstTrackBecomesTrackNumber() {
+    let document = MetadataDocument(
+        format: "spc",
+        fields: MetadataFields(),
+        technicalFacts: ["soundtrackTrack": "0007"]
+    )
+    #expect(SPCMetadataProjector.project(document).memberFields["Track Number"] == .integer(7))
+}
+
+@Test func spcImportKeepsManualFieldsAndPromotesSharedMetadataWithoutDuplication() throws {
     let document = MetadataDocument(
         format: "spc",
         fields: MetadataFields(title: "Native track", game: "Native game", artist: "Track artist", album: "Soundtrack")
@@ -59,10 +68,12 @@ import UACWrapperCore
     let manifest = try UACManifestEditor.decode(merged.manifestJSON)
     let member = try #require(manifest.members.first)
 
-    #expect(member.metadata["title"] == .string("Manually corrected title"))
-    #expect(member.metadata["artist"] == .string("Track artist"))
-    #expect(manifest.game.metadata["sourceGameTitle"] == .string("Native game"))
-    #expect(manifest.game.metadata["album"] == .string("Soundtrack"))
+    #expect(member.metadata["Title"] == .string("Manually corrected title"))
+    #expect(member.metadata["Artist"] == nil)
+    #expect(member.metadata["Album"] == nil)
+    #expect(manifest.game.metadata["sourceGameTitle"] == nil)
+    #expect(manifest.game.metadata["Artist"] == .string("Track artist"))
+    #expect(manifest.game.metadata["Album"] == nil)
     #expect(manifest.game.metadata["curatorNote"] == .string("keep"))
 }
 

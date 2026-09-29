@@ -39,8 +39,12 @@ The wide master Tracks table opens structured values in a centered Nested Tags
 popup, so horizontal scrolling does not hide the editor. The smaller Pack Tags
 and selected-file Track Tags tables keep the left-aligned full-width child subtable
 beneath the source row, using the same canonical field-grid presentation.
-Metadata keys are case-sensitive arbitrary JSON
-keys; camelCase is the shared naming convention, not a validation restriction.
+New imported and authored tag names are stored directly in Title Case
+(Title, Artist, Track Number, Play Length (ms)). The editor keeps UAC
+structural property names such as game.title in their defined schema form.
+Readers accept legacy lower-case tag names, and value-only edits preserve
+those existing keys. The analyzer reports exact stored names so legacy casing
+remains visible during audits.
 When a single UAC is opened directly, the library rail collapses to give the
 track table the full width; it returns automatically when a collection is open.
 UACMan restores the last existing UAC path (or collection path) on launch when there is no
@@ -49,23 +53,26 @@ command-line document argument. The Meta Tags example is the shared value when e
 `Object · N` or `List · N` entries. The app does not write native SPC bytes or
 play audio.
 
-The app reads native SPC tags from a seekable `tar+zstd-seekable` UAC wrapper.
-The `UACManMetadataCLI` product reads source directories through MetaManCore for
-creation-time harvest. SPC keeps its soundtrack-aware projection; VGM and VGZ
-use the common member projection, including GD3 metadata such as Genesis game,
-system, composer, and timing fields. Standard audio (including FLAC) and APE
-preserve their ordered native tags, including unknown fields, in the UAC
-metadata projection while retaining the unchanged source audio. PNG, `.cue`,
+The GUI reads and edits the finished tags in the UAC manifest. It does not
+inspect member contents or invoke format readers. The separate
+`UACManMetadataCLI` product uses MetaManCore to read source directories and
+project selected, useful, source-backed metadata at package-creation time. SPC
+keeps its soundtrack-aware projection; VGM and VGZ use the common member
+projection, including GD3 metadata such as Genesis game, system, composer, and
+timing fields. Standard audio (including FLAC) and APE project selected
+canonical fields while their unchanged source members retain the complete
+native tags. New imports do not copy bulk `nativeMetadata`, parser details, or
+full reader results into the UAC manifest. PNG, `.cue`,
 `.txt`, `.md`, and other source files are ordinary byte-exact UAC members with
 BLAKE3 identities; arbitrary JSON metadata can point to them (for example
 `cover_front`, `cover_back`, and `cue_sheet`). Current players preserve but do
 not interpret external CUE indexes to split one FLAC member into virtual
 tracks. NSF, NSFE, and GBS track-aware results can
 be represented as ordered UAC `subsong` playlist entries that point to the
-same original member. The member retains only shared metadata, while each entry
-retains its MetaMan track projection and decoder track index. Original members
-remain byte-identical; metadata saves rewrite only the manifest and preserve
-the compressed payload byte-for-byte.
+same original member. The member retains shared metadata, while each entry keeps
+only selected per-track fields that are not already on that member, plus its
+decoder track index. Original members remain byte-identical; metadata saves
+rewrite only the manifest and preserve the compressed payload byte-for-byte.
 
 For GBS, the directory harvester also supplies sibling NEZplug extended-M3U
 sidecars to MetaMan. Authored track names, timing, and M3U comment tags are
@@ -121,6 +128,8 @@ and the format-specific
 [`protocols/SNES-SPC.protocol.md`](protocols/SNES-SPC.protocol.md) and
 [`protocols/PSX-CDXA.protocol.md`](protocols/PSX-CDXA.protocol.md)
 for editing, format, and consumer contracts.
+Format conversion procedures and dated field reports are indexed in
+[`Procedures/README.md`](Procedures/README.md).
 
 The Python pack/inspect/unpack CLI is `Wrapper/python/uacman.py`; its tests and
 vendored BLAKE3 runtime are kept beside the wrapper.
