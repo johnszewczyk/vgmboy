@@ -188,30 +188,71 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     const rect = canvas.getBoundingClientRect();
     canvas.listeners.get('click')({ clientX: rect.width * x, clientY: rect.height * y, detail: 1 });
   };
-  clickScreen(0.75, 0.23);
+  clickScreen(0.41, 0.25);
   const nightBoyPixels = pixelChecksum(canvas.image.data);
   assert.notEqual(nightBoyPixels, gameBoyPixels, 'NightBoy repaints the same four-tone pixel screen with its dark-purple palette');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'NIGHTBOY');
-  clickScreen(0.75, 0.28);
+  clickScreen(0.41, 0.296);
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'HIGH_CONTRAST',
     'the ink control persists the brighter silver high-contrast setting');
-  clickScreen(0.375, 0.12);
+  clickScreen(0.38, 0.12);
   assert.notEqual(pixelChecksum(canvas.image.data), nightBoyPixels, 'Options sub-pages navigate inside the LCD');
-  clickScreen(0.125, 0.12);
-  clickScreen(0.25, 0.23);
+  clickScreen(0.38, 0.296);
+  await tick();
+  assert.equal(savedPreferences.at(-1).repeatMode, 'one',
+    'the Playback page repeat buttons save their selected mode');
+  clickScreen(0.20, 0.34);
+  await tick();
+  assert.equal(savedPreferences.at(-1).randomMode, 'off',
+    'the Playback page random buttons save their selected mode');
+  const checkedRowPixels = pixelChecksum(canvas.image.data);
+  clickScreen(0.42, 0.20);
+  await tick();
+  assert.equal(savedPreferences.at(-1).longPlayEnabled, false,
+    'the Playback page checkbox updates the native playback preferences');
+  assert.notEqual(pixelChecksum(canvas.image.data), checkedRowPixels,
+    'the bitmap checkbox marker visibly changes with the saved value');
+  clickScreen(0.93, 0.21);
+  await tick();
+  assert.equal(savedPreferences.at(-1).monoEnabled, true,
+    'the Playback page output checkbox saves and applies mono output');
+  clickScreen(0.60, 0.255);
+  await tick();
+  assert.equal(savedPreferences.at(-1).appVolume, 0.9,
+    'the Playback page volume button updates native audio preferences');
+  clickScreen(0.61, 0.12);
+  clickScreen(0.48, 0.20);
+  await tick();
+  assert.equal(savedPreferences.at(-1).columnAutoSize, false,
+    'the Interface page checkbox updates the saved column behavior');
+  clickScreen(0.84, 0.12);
+  clickScreen(0.48, 0.20);
+  await tick();
+  assert.equal(savedPreferences.at(-1).columnVisibility.filename, false,
+    'the Library page checkbox persists field visibility');
+  clickScreen(0.61, 0.12);
+  clickScreen(0.48, 0.20);
+  await tick();
+  assert.equal(savedPreferences.at(-1).columnAutoSize, true,
+    'the Interface page checkbox can restore automatic sizing');
+  clickScreen(0.15, 0.12);
+  clickScreen(0.21, 0.25);
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'GAMEBOY',
     'the palette selector returns to the authentic Game Boy theme');
+  clickScreen(0.20, 0.296);
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'STANDARD');
   globalThis.ViewBoy.dispatch('library');
   screenWidth = 1400;
   windowListeners.get('resize')();
   await tick();
   await tick();
   const defaultColumnsPixels = pixelChecksum(canvas.image.data);
-  frontendSettingsChanged({ appVolume: 1, longPlayEnabled: true, repeatMode: 'off', randomMode: 'library', columnVisibility: { game: false } });
+  frontendSettingsChanged({ appVolume: 1, longPlayEnabled: true, repeatMode: 'off', randomMode: 'library', columnVisibility: { game: false, filename: false } });
   await tick();
   assert.notEqual(pixelChecksum(canvas.image.data), defaultColumnsPixels, 'saved column visibility changes the playlist layout');
-  frontendSettingsChanged({ appVolume: 1, longPlayEnabled: true, repeatMode: 'off', randomMode: 'library', columnVisibility: { game: true } });
+  const hiddenColumnsPixels = pixelChecksum(canvas.image.data);
+  frontendSettingsChanged({ appVolume: 1, longPlayEnabled: true, repeatMode: 'off', randomMode: 'library', columnVisibility: { game: true, filename: false } });
   await tick();
-  assert.equal(pixelChecksum(canvas.image.data), defaultColumnsPixels,
-    'restoring column visibility restores the default layout');
+  assert.notEqual(pixelChecksum(canvas.image.data), hiddenColumnsPixels,
+    'restoring column visibility repaints the playlist columns');
 });

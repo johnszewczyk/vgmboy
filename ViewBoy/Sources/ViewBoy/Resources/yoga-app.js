@@ -527,6 +527,25 @@ function optionSection(parent, title) {
   return panelTitle(parent, title);
 }
 
+function optionColumns(parent) {
+  const row = makeWidget(parent, {
+    direction: FlexDirection.Row,
+    flexGrow: 1,
+    gap: oneDot() * 2,
+    alignItems: Align.Stretch,
+  });
+  const makeColumn = () => makeWidget(row, {
+    direction: FlexDirection.Column,
+    flexGrow: 1,
+    flexBasis: 0,
+    gap: oneDot(),
+    padding: 3,
+  }, {
+    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
+  });
+  return [makeColumn(), makeColumn()];
+}
+
 function optionToggle(parent, title, checked, onClick) {
   const height = rowHeight(8);
   const row = makeWidget(parent, {
@@ -541,20 +560,11 @@ function optionToggle(parent, title, checked, onClick) {
     },
   });
   label(row, title, { flexGrow: 1, height }, { textShade: 0, inset: 1 });
-  makeWidget(row, { width: 9, height: 9 }, {
-    paint(box) {
-      strokeRect(box.x, box.y, box.width, box.height, 1);
-      if (!checked) return;
-      fillRect(box.x + 2, box.y + 2, box.width - 4, box.height - 4, 0);
-      [[2, 5], [3, 6], [4, 5], [5, 4], [6, 3]].forEach(([x, y]) => {
-        const px = box.x + x - 2;
-        const py = box.y + y - 2;
-        if (px >= box.x && px < box.x + box.width && py >= box.y && py < box.y + box.height) {
-          pixels[py * WIDTH + px] = 3;
-        }
-      });
-    },
-  });
+  const marker = checked ? "[ X ]" : "[   ]";
+  label(row, marker, {
+    width: (Array.from(marker).length * fontProfile().advance + 2) / STYLE_SCALE,
+    height: fontProfile().height / STYLE_SCALE,
+  }, { textShade: 0, align: "center", inset: 0 });
   return row;
 }
 
@@ -993,50 +1003,54 @@ function addPalettePreview(parent) {
   }));
 }
 
-function addDisplayOptions(panel, pref) {
-  optionSection(panel, "SCREEN PROFILE");
-  optionChoice(panel, "FONT", [
+function addDisplayOptions(columns) {
+  const [profile, tones] = columns;
+  optionSection(profile, "SCREEN PROFILE");
+  optionChoice(profile, "FONT", [
     { title: "MICRO 3X5", selected: state.font === "MICRO", onClick: () => setFontProfile("MICRO") },
     { title: "STANDARD 5X7", selected: state.font === "STANDARD", onClick: () => setFontProfile("STANDARD") },
   ]);
-  optionChoice(panel, "THEME", [
+  optionChoice(profile, "THEME", [
     { title: "GAMEBOY", selected: state.theme === "GAMEBOY", onClick: () => setTheme("GAMEBOY") },
     { title: "NIGHTBOY", selected: state.theme === "NIGHTBOY", onClick: () => setTheme("NIGHTBOY") },
   ]);
-  optionChoice(panel, "INK", [
+  optionChoice(profile, "INK", [
     { title: state.theme === "GAMEBOY" ? "LCD GREEN" : "SILVER", selected: state.contrast === "STANDARD",
       onClick: () => setContrastProfile("STANDARD") },
     { title: state.theme === "GAMEBOY" ? "CHARCOAL" : "BRIGHT", selected: state.contrast === "HIGH_CONTRAST",
       onClick: () => setContrastProfile("HIGH_CONTRAST") },
   ]);
-  optionSection(panel, "FOUR LCD TONES");
-  addPalettePreview(panel);
+  optionSection(tones, "FOUR LCD TONES");
+  label(tones, "SELECTED PALETTE", { height: rowHeight(6) }, { textShade: 0, inset: 2 });
+  addPalettePreview(tones);
   const inkColor = displayPalette()[0];
-  label(panel, `INK ${inkColor}   DOT MATRIX 3 PX`, { height: rowHeight(6) }, {
+  label(tones, `INK ${inkColor}   DOT MATRIX 3 PX`, { height: rowHeight(6) }, {
     textShade: 0, inset: 2,
   });
 }
 
-function addPlaybackOptions(panel, pref) {
-  optionSection(panel, "PLAYBACK BEHAVIOR");
-  optionToggle(panel, "LONG PLAY", pref.longPlayEnabled === true,
+function addPlaybackOptions(columns, pref) {
+  const [behavior, output] = columns;
+  optionSection(behavior, "PLAYBACK BEHAVIOR");
+  optionToggle(behavior, "LONG PLAY", pref.longPlayEnabled === true,
     () => setPreference("longPlayEnabled", pref.longPlayEnabled !== true));
-  optionToggle(panel, "END FADE", pref.fadeEnabled !== false,
+  optionToggle(behavior, "END FADE", pref.fadeEnabled !== false,
     () => setPreference("fadeEnabled", pref.fadeEnabled === false));
-  optionChoice(panel, "REPEAT", [
+  optionChoice(behavior, "REPEAT", [
     { title: "OFF", selected: (pref.repeatMode || "off") === "off", onClick: () => setPreference("repeatMode", "off") },
     { title: "ALL", selected: pref.repeatMode === "all", onClick: () => setPreference("repeatMode", "all") },
     { title: "ONE", selected: pref.repeatMode === "one", onClick: () => setPreference("repeatMode", "one") },
   ]);
-  optionChoice(panel, "RANDOM", [
+  optionChoice(behavior, "RANDOM", [
     { title: "OFF", selected: (pref.randomMode || "off") === "off", onClick: () => setRandomMode("off") },
     { title: "PLAYLIST", selected: pref.randomMode === "playlist", onClick: () => setRandomMode("playlist") },
     { title: "LIBRARY", selected: pref.randomMode === "library", onClick: () => setRandomMode("library") },
   ]);
-  optionToggle(panel, "MONO OUTPUT", pref.monoEnabled === true,
+  optionSection(output, "OUTPUT");
+  optionToggle(output, "MONO OUTPUT", pref.monoEnabled === true,
     () => setPreference("monoEnabled", pref.monoEnabled !== true, true));
   const volume = Math.max(0, Math.min(1, Number(pref.appVolume ?? 1)));
-  const volumeRow = makeWidget(panel, {
+  const volumeRow = makeWidget(output, {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
     height: rowHeight(8),
@@ -1068,42 +1082,57 @@ function addPlaybackOptions(panel, pref) {
     textShade: 0, align: "right", inset: 0,
   });
   pixelButton(volumeRow, "+", () => changeVolume(0.1), { width: volumeControlWidth, height: volumeControlHeight });
-}
-
-function addInterfaceOptions(panel, pref) {
-  optionSection(panel, "PLAYLIST LAYOUT");
-  optionToggle(panel, "AUTO-SIZE COLUMNS", pref.columnAutoSize !== false,
-    () => setPreference("columnAutoSize", pref.columnAutoSize === false));
-  optionSection(panel, "MOTION");
-  optionToggle(panel, "AUTO-RESIZE HEADERS + ROWS", animationEnabled("autoResizeAnimationEnabled"),
-    () => setPreference("autoResizeAnimationEnabled", !animationEnabled("autoResizeAnimationEnabled")));
-  optionAdjuster(panel, "RESIZE TIME", `${animationMilliseconds("autoResizeAnimationMilliseconds")} MS`,
-    () => adjustAnimationTime("autoResizeAnimationMilliseconds", -50),
-    () => adjustAnimationTime("autoResizeAnimationMilliseconds", 50));
-  optionToggle(panel, "SELECTION SLIDE", animationEnabled("selectionAnimationEnabled"),
-    () => setPreference("selectionAnimationEnabled", !animationEnabled("selectionAnimationEnabled")));
-  optionAdjuster(panel, "SLIDE TIME", `${animationMilliseconds("selectionAnimationMilliseconds")} MS`,
-    () => adjustAnimationTime("selectionAnimationMilliseconds", -50),
-    () => adjustAnimationTime("selectionAnimationMilliseconds", 50));
-  label(panel, "SAME EASE PROFILE THROUGHOUT THE SCREEN", { height: rowHeight(6) }, {
+  label(output, "VOLUME IS STORED WITH PLAYBACK SETTINGS", { height: rowHeight(6) }, {
     textShade: 0, inset: 2,
   });
 }
 
-function addLibraryOptions(panel, pref) {
-  optionSection(panel, "PLAYLIST COLUMNS");
+function addInterfaceOptions(columns, pref) {
+  const [layout, motion] = columns;
+  optionSection(layout, "PLAYLIST LAYOUT");
+  optionToggle(layout, "AUTO-SIZE COLUMNS", pref.columnAutoSize !== false,
+    () => setPreference("columnAutoSize", pref.columnAutoSize === false));
+  label(layout, "HEADERS AND ROWS SHARE COLUMN WIDTHS", { height: rowHeight(7) }, {
+    textShade: 0, inset: 2,
+  });
+  optionSection(motion, "MOTION");
+  optionToggle(motion, "AUTO-RESIZE HEADERS + ROWS", animationEnabled("autoResizeAnimationEnabled"),
+    () => setPreference("autoResizeAnimationEnabled", !animationEnabled("autoResizeAnimationEnabled")));
+  optionAdjuster(motion, "RESIZE TIME", `${animationMilliseconds("autoResizeAnimationMilliseconds")} MS`,
+    () => adjustAnimationTime("autoResizeAnimationMilliseconds", -50),
+    () => adjustAnimationTime("autoResizeAnimationMilliseconds", 50));
+  optionToggle(motion, "SELECTION SLIDE", animationEnabled("selectionAnimationEnabled"),
+    () => setPreference("selectionAnimationEnabled", !animationEnabled("selectionAnimationEnabled")));
+  optionAdjuster(motion, "SLIDE TIME", `${animationMilliseconds("selectionAnimationMilliseconds")} MS`,
+    () => adjustAnimationTime("selectionAnimationMilliseconds", -50),
+    () => adjustAnimationTime("selectionAnimationMilliseconds", 50));
+  label(motion, "SHARED EASE PROFILE FOR SCREEN MOTION", { height: rowHeight(6) }, {
+    textShade: 0, inset: 2,
+  });
+}
+
+function addLibraryOptions(columns, pref) {
+  const [fields, catalog] = columns;
+  optionSection(fields, "PLAYLIST COLUMNS");
   configurableColumns.forEach(({ key, title }) => {
     const visibility = pref.columnVisibility || {};
-    optionToggle(panel, title, visibility[key] !== false,
+    optionToggle(fields, title, visibility[key] !== false,
       () => setPreference("columnVisibility", {
         ...(state.preferences.columnVisibility || {}),
         [key]: state.preferences.columnVisibility?.[key] === false,
       }));
   });
-  optionSection(panel, "CATALOG");
-  pixelButton(panel, "RELOAD LIBRARY", () => loadCatalog(), {
+  optionSection(catalog, "CATALOG");
+  label(catalog, `GAMES ${state.games.length}`, { height: rowHeight(8) }, {
+    textShade: 0, inset: 2,
+  });
+  label(catalog, `TRACKS ${tracks.length}`, { height: rowHeight(8) }, {
+    textShade: 0, inset: 2,
+  });
+  pixelButton(catalog, "RELOAD LIBRARY", () => loadCatalog(), {
     height: rowHeight(8),
   });
+  label(catalog, state.status, { height: rowHeight(8) }, { textShade: 0, inset: 2 });
 }
 
 function addOptionsContent(parent) {
@@ -1128,11 +1157,12 @@ function addOptionsContent(parent) {
     render();
   }, { flexGrow: 1, height: rowHeight(5), selected: state.optionsPage === page }));
 
+  const columns = optionColumns(panel);
   const pref = state.preferences;
-  if (state.optionsPage === "PLAYBACK") addPlaybackOptions(panel, pref);
-  else if (state.optionsPage === "INTERFACE") addInterfaceOptions(panel, pref);
-  else if (state.optionsPage === "LIBRARY") addLibraryOptions(panel, pref);
-  else addDisplayOptions(panel, pref);
+  if (state.optionsPage === "PLAYBACK") addPlaybackOptions(columns, pref);
+  else if (state.optionsPage === "INTERFACE") addInterfaceOptions(columns, pref);
+  else if (state.optionsPage === "LIBRARY") addLibraryOptions(columns, pref);
+  else addDisplayOptions(columns);
 }
 
 function buildTree() {
