@@ -1,24 +1,15 @@
 # Source format to UAC tag procedures
 
-This directory documents how native metadata from source members is reviewed
-and mapped into UAC tags. The UACMan GUI reads and edits tags in `.uac` files.
-The UACMan tool can also use MetaManCore during package creation to read source
-formats and map their metadata into a UAC manifest. Each profile records the
-UAC fields retained, source data preserved outside that projection, provenance
-and hash scopes, version handling, reader limitations, and required validation.
-The source member bytes remain unchanged. Dated set audits belong in
-`Reports/`; they record observations without changing the evergreen procedure.
-
-A UAC has one manifest record. Tag names and values are direct fields in its
-`game.metadata`, `variant.metadata`, `member.metadata`, or playlist entry fields;
-there is no second tag store. New tag names use Title Case. Fixed structural
-properties such as attachment references keep their contract spelling and are
-not free-form tags.
+This directory documents source-format-to-UAC mapping. The UACMan GUI reads
+and edits `.uac` manifests only. The UACMan tool can use MetaManCore during
+explicit package creation to read source formats. Apply the shared
+[`BASE-UAC-PROFILE.md`](BASE-UAC-PROFILE.md); each format profile records only
+its reader, field mapping, format-specific exceptions, and required checks.
+Dated set audits belong in `Reports/`.
 
 System identity uses the single structural `game.console` field. Apply the
 approved names and source-label mappings in
-[`CANONICAL-SYSTEM-NAMES.md`](CANONICAL-SYSTEM-NAMES.md); do not duplicate a
-system as `System`, `Platform`, `Console`, or `game.metadata.system`.
+[`CANONICAL-SYSTEM-NAMES.md`](CANONICAL-SYSTEM-NAMES.md).
 
 ## Source-format ingest register
 
@@ -82,27 +73,14 @@ been reviewed.
    reader support means a format can be inspected; it does not approve a UAC
    projection. Complete the field mapping and required fixture checks for that
    format first. Do not treat an unprofiled harvest as an approved conversion.
-3. State which source fields are decoded, which are projected to canonical
-   UAC fields, which remain source-only, and which survive only in the
-   byte-identical member. Mark unknown, ambiguous, and defaulted values
-   explicitly.
-4. Use **Format** as the one direct member tag for the contained source format.
-   When the format defines a version, combine name and version in one value on
-   every applicable member (for example, `SPC v.30` or `VGM v.1.71`), even
-   when all members share it. Omit a version only when that format has none;
-   never guess from an unreadable or malformed header. Report valid version
-   variation and follow the format/set review rule while preserving each
-   member's actual value. Do not duplicate it as Sub-Container Version, add a
-   package version inventory, or use structural `member.format` as a visible
-   tag; that field describes UAC's stored member encoding.
-5. Specify package/source hashes separately from member/playable hashes,
-   including the algorithm, scope, and profile. Keep package-level facts out
-   of repeated track metadata.
-6. For each collection conversion, write a dated report under `Reports/` with
+3. Record each reader fact's disposition in the format mapping table. Mark
+   unknown or ambiguous values for review; use the base profile for shared
+   tag, version, and hash rules.
+4. For each collection conversion, write a dated report under `Reports/` with
    package/member counts, field coverage, diagnostics, version inventory,
    identity/hash checks, review findings, and validation evidence. Do not put
    collection-specific counts in an evergreen format procedure.
-7. Promote a register row from pending only after its profile describes the
+5. Promote a register row from pending only after its profile describes the
    complete reader-to-UAC mapping and has a verified collection report or
    an explicit format fixture report.
 
@@ -133,32 +111,13 @@ is not a sample-accurate loop point. Record a loop only when positive,
 source-backed data and the target player require it; never emit a negative
 "no loop" marker.
 
-## Native tag projection rule
+## Shared field and ownership rules
 
-The `MetadataTag` `{name, value}` pair is MetaManCore's reader interface, not a
-UAC tag or metadata schema. New harvests must not serialize a bulk copy of
-native tags, parser diagnostics, or reader facts under `nativeMetadata` (or an
-equivalent nested field). Keep the original member byte-for-byte and project
-only populated, source-backed fields that are useful in the UAC manifest.
-Store each selected field directly in ordinary UAC metadata using its
-Title Case tag name, with the type and meaning defined by the format profile.
-Put parser findings in the conversion report.
-
-Project a source collection once as direct package tags **Set Collection**,
-**Set Name**, and **Set URL**, with optional **Set Legacy URL**, **Set Archive
-URL**, and **Set Date**. Keep matching source records in `sources[]` for
-provenance; do not write a second nested `set` representation alongside these
-tags. New recipe input using the former nested form is normalized to these
-fields.
-
-Each format profile must identify which source values become direct UAC
-fields and which remain only in the unchanged member. Do not emit
-`{"name":"body","value":"10"}` records or a second source-tag map. Use
-Title Case for every tag name, including established names such as **Artist**,
-**Album**, **Date**, and **Dumper**. Do not leak reader-side camelCase or
-lowercase aliases into the tag map. Structural manifest properties are not
-tags. Existing manifests with legacy `nativeMetadata` fields remain readable
-and are not silently rewritten by readers.
+Use the [UAC Base Profile](BASE-UAC-PROFILE.md) for direct-field mapping,
+Title Case, omission, and system-identity rules. `MetadataTag {name, value}` is
+MetaManCore's reader interface, not a UAC tag format. Source provenance belongs
+in `sources[]`; profile a direct metadata field only when it is useful to UAC
+users. Existing legacy fields remain readable and are not rewritten by readers.
 
 ## Source-set profiles
 
@@ -175,12 +134,15 @@ or content overlap alone.
 - SPC native reader and field layout:
   [`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md)
 - SPC-to-UAC profile: [`SPC.md`](SPC.md)
+- Shared field-mapping rules: [`BASE-UAC-PROFILE.md`](BASE-UAC-PROFILE.md)
 - Canonical system names: [`CANONICAL-SYSTEM-NAMES.md`](CANONICAL-SYSTEM-NAMES.md)
 - Compact pre-disc hash policy: [`PRE-DISC-NATIVE.md`](PRE-DISC-NATIVE.md)
 - VGM/VGZ profile: [`VGM.md`](VGM.md)
 - NSF/NSFE profile: [`NSF-NSFE.md`](NSF-NSFE.md)
 - GBS profile: [`GBS.md`](GBS.md)
 - PlayStation CD-XA and Red Book profile: [`PSX-CDXA.md`](PSX-CDXA.md)
+- Current PSX beta-package review:
+  [`Reports/PSX-Beta-UAC-Review-2026-09-29.md`](Reports/PSX-Beta-UAC-Review-2026-09-29.md)
 - Dated field and set audit:
   [`Reports/SNESMusicOrg-SPC-2026-09-23.md`](Reports/SNESMusicOrg-SPC-2026-09-23.md)
 - Current SNESMusic.org tag-cleanup preview:

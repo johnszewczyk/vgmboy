@@ -1,5 +1,11 @@
 # Darkstalkers PSX UAC tag pass — 2026-09-28
 
+> **Superseded by the final manifest and later reviews.** This preview contains
+> obsolete one-based Track Number, Disc Number, Set Collection, and hash-list
+> claims. For the current package state, see the [2026-09-29 track-number
+> repair report](PSX-Darkstalkers-Track-Number-Repair-2026-09-29.md) and the
+> [PSX beta review, pass 1](PSX-Beta-UAC-Review-2026-09-29.md).
+
 ## Candidate
 
 Candidate package: `Darkstalkers - The Night Warriors (US).uac`.

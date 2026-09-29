@@ -1,60 +1,33 @@
-# Compact Pre-Disc Native Music Profile
+# Compact Pre-Disc Native Procedure
 
-## Status and scope
+Apply the shared [UAC Base Profile](BASE-UAC-PROFILE.md). This procedure covers
+compact, file-native, non-PCM music members such as SPC, VGM/VGZ, NSF/NSFE, and
+GBS. It does not cover decoded disc audio. Reader-specific tag mappings belong
+in each format profile; only SPC is currently approved against its collection
+fixtures.
 
-Shared policy for compact, file-native, non-PCM game-music formats whose
-stored member is the music program/container itself. It includes SPC, VGM/VGZ,
-NSF/NSFE, GBS, and other supported golden-era pre-disc formats such as SID,
-AY/SAP, HES, KSS, and S98 once their reader profiles define the member scope.
-Format-specific field mappings live in the linked profiles. This policy does
-not apply to decoded CD audio or other large PCM streams. VGM, NSF/NSFE, and
-GBS mappings are drafts until representative fixtures have been checked
-against the reader and UACMan GUI.
+## File and playlist model
 
-These profiles use the shared [canonical system names](CANONICAL-SYSTEM-NAMES.md)
-for package-level `game.console`. Do not duplicate that identity as a member
-tag.
+- Store each physical native file once. Subsongs and logical tracks are ordered
+  playlist entries that point to the file and retain their source indexes.
+- Preserve source-authored order and repeated indexes. Do not copy a member or
+  multiply its metadata and hashes for each playlist entry.
+- Preserve companion playlists such as M3U files when they contribute titles,
+  order, timing, or loop behavior. Keep their original bytes as package assets.
+- Keep the exact playable source bytes in the member. For explicit container
+  normalization such as VGZ to VGM, record the transformation and hash the
+  normalized member according to the format profile.
 
-## Common member rules
+## Required review
 
-- Preserve the complete source member bytes. Put populated, useful, source-backed
-  values in direct Title Case tag fields; omit blanks, reader defaults, and
-  invented aliases. Keep undecoded details in the retained member or a dated
-  report.
-- Use one **Format** tag on each member. Put format and actual container version
-  in one value when a version exists, such as `SPC v.30`, `VGM v.1.71`,
-  `NSF v.1`, or `GBS v.1`. Repeat a uniform version on every member. For a
-  format without a version, use its concise format name. Never add a parallel
-  Sub-Container Version field or package inventory.
-- Calculate four `uac-playable-payload-v1` hashes for every physical native
-  file: BLAKE3-256, CRC32/ISO-HDLC, SHA-1, and MD5. Hash the exact playable
-  member scope defined by its format profile. Do this once per file, regardless
-  of the number of subsongs or playlist entries. Keep the separate raw-member
-  integrity records required by the UAC wrapper.
-- Let the UAC packer hash bytes while writing the UAC. Reuse database hashes
-  only when algorithm, exact bytes, scope, and profile match; otherwise compute
-  the missing values during packaging. Do not separately rescan already
-  verified data to build duplicate hash tables.
-- Hashes belong in UAC's integrity/hash model and Stream Hashes view, not in
-  invented music-tag keys. A hash is byte identity evidence, not game
-  identification or proof that a set is complete.
-- Store a physical file once and represent subsongs through ordered playlist
-  entries. Preserve authored order and repeated indexes. Do not multiply file
-  hashes or member metadata into one copy per subsong.
-- Keep positive source-authored timing when a consumer needs it. Do not expose
-  parser defaults, estimated durations, or raw timing counters as music tags.
-  A duration in milliseconds is not itself a sample-accurate loop instruction.
-  Preserve positive loop data only when the native format or companion data
-  carries it and the player uses it; never record a negative “no loop” value.
+Check each format profile for its exact playable byte scope and reader-specific
+signature, header, version, track-count, chunk, and offset constraints. Compare
+playlist references with source indexes. Report malformed input, parser
+diagnostics, and duplicate streams; a duplicate match alone does not authorize
+removing a valid alternate version. Apply the shared hash and timing rules in
+[`Procedures README`](README.md#hash-and-timing-scope), then verify the written
+UAC and read back its member paths, sizes, and source-byte identity.
 
-## Validation before promotion
-
-Check signature, minimum header size, version, declared track count, chunk or
-offset bounds, and reader diagnostics. Compare playlist entries to source
-indexes; detect duplicate member bytes without deleting a valid alternate
-version. Inspect any companion playlist/M3U as source evidence and preserve its
-bytes when it contributes titles, order, timing, or loop playback behavior.
-Verify `uacman inspect --verify`, then unpack and compare member paths, sizes,
-source bytes, and all four playable hashes. Keep format fixture reports in
-`Procedures/Reports/` and do not mark a profile complete before fixture and GUI
-field visibility are confirmed.
+Keep fixture and collection findings in dated reports. A profile stays draft
+until its representative fixtures, package checks, and UACMan field visibility
+have been verified.

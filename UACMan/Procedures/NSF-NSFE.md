@@ -1,58 +1,31 @@
-# Nintendo NES NSF and NSFE to UAC Profile
+# Nintendo NES NSF / NSFE Profile
 
-## Status and scope
+Apply the [UAC Base Profile](BASE-UAC-PROFILE.md) and
+[Pre-Disc Native Procedure](PRE-DISC-NATIVE.md). **Draft pending fixture
+validation.** The MetaManCore `nsf` and `nsfe` readers handle fixed-header NSF
+and chunk-based NSFE files; see
+[`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md).
 
-Draft pending fixture validation. Covers NSF/NESM fixed-header files and NSFE
-chunk files read by MetaManCore's `nsf` and `nsfe` readers. See
-[`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md), the shared
-[`PRE-DISC-NATIVE.md`](PRE-DISC-NATIVE.md) policy, and
-[`CANONICAL-SYSTEM-NAMES.md`](CANONICAL-SYSTEM-NAMES.md).
+## Field mapping
 
-## NSF projection
+| Source fact | UAC location | Type and normalization | Omission or review rule |
+| --- | --- | --- | --- |
+| System | `game.console` | `Nintendo NES` | Set once for either format. |
+| NSF version byte | `member.metadata["Format"]` | `NSF v.<integer>` | Use the actual header value. |
+| NSFE format | `member.metadata["Format"]` | `NSFE` | NSFE has no global version byte. |
+| Game / `auth` game | `member.metadata["Album"]` | Populated source text | Keep separate from package identity. |
+| Artist / `auth` artist | `member.metadata["Artist"]` | Populated source text | `taut` may add track-specific artists. |
+| Copyright/comment / `auth` copyright and ripper | `member.metadata["Comment"]` / `Dumper` | Populated source text | Omit empty values. |
+| NSFE `tlbl` / `taut` | Playlist entry `Title` / `Artist` | Source labels in ordered entries | Preserve unlabeled entries without blank fields. |
+| NSF track index / NSFE `PLST` | Playlist entry source index | Zero-based index and authored order | Preserve repeats; do not infer titles. |
+| NSFE `time` / `fade` | Playlist entry timing | Positive authored values | Include only when a player or UI consumes them. |
+| NSFE `psfx` | Source member / playback behavior | Preserve chunk bytes | Surface only when a consumer uses its sound-effect distinction. |
 
-NSF has a 128-byte header. The version, declared track count, and first-track
-index are at offsets `0x05`, `0x06`, and `0x07`. One ordered result entry is
-created per declared source track; the source itself is stored once.
+## NSF/NSFE-specific checks
 
-| Source field | UAC field | Rule |
-| --- | --- | --- |
-| NSF / NSFE system identity | `game.console` | Set once at package scope to `Nintendo NES` for either format; do not repeat it as a member `System` or `Platform` tag. |
-| NSF version byte | `Format` | `NSF v.<integer>` on the member. |
-| Game | `Album` | Keep a nonempty source value. |
-| Artist | `Artist` | Keep a nonempty source value. |
-| Copyright/comment | `Comment` | Keep only useful, nonempty source text. |
-| Track identity | Playlist source index | Preserve zero-based source index and the header's first-track offset; do not fabricate per-track titles. |
-
-The reader's 150-second fallback is not source-authored duration and must not
-be surfaced. Header addresses, speed fields, banks, and playback flags remain
-in the source bytes/report unless a specific playback consumer requires them.
-
-## NSFE projection
-
-NSFE has no global version byte. Use `Format: NSFE`; do not invent a version.
-Preserve the full source member. The reader validates `INFO`, `DATA`, and
-`NEND`, applies `PLST` order (including repeated source indexes), and retains
-the non-audio chunk bytes.
-
-| NSFE chunk | UAC field or use | Rule |
-| --- | --- | --- |
-| `auth` | `Album`, `Artist`, `Comment`, `Dumper` | Map the populated game, artist, copyright, and ripper values respectively. |
-| `tlbl` | `Title` per ordered playlist entry | Use populated source-track labels; preserve unlabeled entries without blank tags. |
-| `taut` | `Artist` per playlist entry | Use populated per-track authors; do not replace shared artist. |
-| `PLST` | Playlist order | Preserve exact ordered source indexes and repeats. Hash the NSFE file once. |
-| `time`, `fade` | Playback timing | Preserve positive authored values only where a player/UI consumes them; omit nonpositive values and reader-generated 150-second fallback. |
-| `psfx` | Report or playback behavior | Preserve the source chunk; surface only if an actual consumer uses its sound-effect distinction. |
-
-Do not promote region/speed, expansion-chip flags, raw data byte counts, chunk
-inventory, or reader diagnostics as ordinary music tags. Keep malformed
-required chunks and invalid playlist references in review.
-
-## Hashes and validation
-
-For both formats, hash the complete physical NSF/NSFE file with BLAKE3-256,
-CRC32/ISO-HDLC, SHA-1, and MD5 under `uac-playable-payload-v1`. A playlist
-containing many source tracks does not create additional copies or hashes.
-Check version/header bounds for NSF, chunk boundaries and required chunk order
-for NSFE, and playlist indexes/repeats for both. Confirm UACMan presents one
-Format tag and keeps ordered playlist entries associated with the single
-physical file.
+For NSF, check the 128-byte header, version, declared track count, first-track
+index, and index bounds. For NSFE, validate `INFO`, `DATA`, and `NEND`, chunk
+bounds, `PLST` references and repeats, and preserved non-audio chunks. The
+reader's 150-second fallback is not source metadata. Keep header addresses,
+speed fields, banks, region, expansion-chip flags, raw counters, and parser
+diagnostics out of ordinary tags.

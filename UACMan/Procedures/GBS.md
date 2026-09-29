@@ -1,43 +1,26 @@
-# Nintendo Game Boy GBS to UAC Profile
+# Nintendo Game Boy GBS Profile
 
-## Status and scope
+Apply the [UAC Base Profile](BASE-UAC-PROFILE.md) and
+[Pre-Disc Native Procedure](PRE-DISC-NATIVE.md). **Draft pending fixture
+validation.** The MetaManCore `gbs` reader handles `.gbs` files and optional
+NEZplug extended-M3U sidecars; see
+[`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md).
 
-Draft pending fixture validation. Covers Game Boy Sound System (`.gbs`) files
-and authored NEZplug extended-M3U sidecars used by the MetaManCore `gbs`
-reader. See [`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md),
-the shared [`PRE-DISC-NATIVE.md`](PRE-DISC-NATIVE.md) policy, and
-[`CANONICAL-SYSTEM-NAMES.md`](CANONICAL-SYSTEM-NAMES.md).
+## Field mapping
 
-## Projection
+| Source fact | UAC location | Type and normalization | Omission or review rule |
+| --- | --- | --- | --- |
+| System | `game.console` | `Nintendo Game Boy` | Set once per package. |
+| GBS version byte | `member.metadata["Format"]` | `GBS v.<integer>` | Use the actual header value. |
+| Game | `member.metadata["Album"]` | Populated source text | Omit empty values. |
+| Artist | `member.metadata["Artist"]` | Populated source text | M3U track artist may add track-specific detail without replacing the shared value. |
+| Copyright/comment | `member.metadata["Comment"]` | Useful source text | Omit empty or non-informative values. |
+| M3U title/artist | Playlist entry `Title` / `Artist` | Referenced GBS and zero-based source index | Preserve variation; do not fabricate titles. |
+| M3U order/time/loop/fade | Playlist entry | Authored order and positive values | Apply only to valid target indexes and when supported by the player. Decimal and `$hex` indexes follow the reader's zero-based convention. |
 
-GBS has a 112-byte header. The version, declared track count, and first-track
-index are at offsets `0x03`, `0x04`, and `0x05`. Store each physical GBS once;
-represent each declared track as a playlist entry with its zero-based source
-index.
+## GBS-specific checks
 
-| Source field | UAC field | Rule |
-| --- | --- | --- |
-| GBS system identity | `game.console` | Set once at package scope to `Nintendo Game Boy`; do not repeat it as a member `System` or `Platform` tag. |
-| GBS version byte | `Format` | `GBS v.<integer>` on the physical member. |
-| Game | `Album` | Use populated source value. |
-| Artist | `Artist` | Use populated source value. |
-| Copyright/comment | `Comment` | Keep useful nonempty source text. |
-| NEZplug M3U `# @TITLE` / `# @ARTIST` | `Title` / `Artist` on matching playlist entries | Apply only to the referenced GBS and zero-based track index. Preserve track-level variation without overwriting the header's common artist. |
-| NEZplug `filename::GBS,index,title,time,loop,fade,loopcount` row | Ordered playlist entry | Preserve authored title/order and positive timing/loop data when the player consumes it. Decimal and `$hex` indexes follow the documented zero-based convention. |
-
-Preserve the exact M3U bytes as a companion member when it supplies track
-names, order, timing, or loop information. Do not invent per-track titles or
-timings when no M3U provides them. The reader's 150-second fallback is not
-source data. Do not surface header addresses, timer registers, or reader facts
-as tags.
-
-## Hashes and validation
-
-Hash each complete physical GBS file once with BLAKE3-256,
-CRC32/ISO-HDLC, SHA-1, and MD5 under `uac-playable-payload-v1`. Do not create
-separate hash lists for its playlist entries. Preserve and separately hash an
-M3U companion as an ordinary UAC member under wrapper integrity if included.
-Validate the header signature and bounds, version and track count, M3U target
-filename, source index range, playlist ordering, and each timing/loop field.
-Do not translate authored loop counts into exact sample loop points without a
-player-specific verified mapping.
+The header is 112 bytes. Check its signature and bounds, version, declared
+track count, and first-track index. Validate M3U target names, index ranges,
+ordering, and timing/loop fields. Preserve the M3U bytes when it contributes
+playback data. The reader's 150-second fallback is not source metadata.

@@ -21,7 +21,10 @@ contain no useful titles or credits, so those fields remain absent.
 The 45 APE payloads are byte-identical to the previous verified members under
 their new paths. The CUE and Redump verification TSV are byte-identical. The
 archive source hashes and published BIN/CUE checksums remain at their existing
-source/attachment locations; no per-track payload hash catalog was added.
+source/attachment locations. No separate per-track hash catalog was added; the
+UAC packer still writes its standard scoped playable-payload integrity records
+for playable members. Those wrapper records are part of the UAC integrity
+contract and are verified by `uacman inspect --verify`.
 
 `uacman inspect --verify` passed. A complete unpack verified all 48 members,
 and a byte comparison confirmed the 45 APE streams, CUE, and verification TSV.
