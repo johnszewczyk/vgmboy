@@ -166,6 +166,14 @@ struct UACMemberRow: Identifiable {
     }
 }
 
+private struct UACProfileDocument: Sendable {
+    let id: String
+    let title: String
+    let formats: String
+    let status: String
+    let markdown: String
+}
+
 @MainActor
 @Observable
 final class UACManModel {
@@ -174,6 +182,38 @@ final class UACManModel {
         static let lastCollectionPath = "UACMan.lastCollectionPath"
         static let lastTagAnalyzerPath = "UACMan.lastTagAnalyzerPath"
         static let skinPreferences = "UACMan.skinPreferences"
+    }
+
+    private static let profileDocuments = loadProfileDocuments()
+
+    private static func loadProfileDocuments() -> [UACProfileDocument] {
+        let definitions: [(id: String, title: String, formats: String, file: String, shared: Bool)] = [
+            ("pre-disc", "Pre-Disc Native", "SPC · VGM · NSF · GBS", "PRE-DISC-NATIVE", true),
+            ("spc", "Super Nintendo SPC", ".spc", "SPC", false),
+            ("gbs", "Game Boy Sound System", ".gbs", "GBS", false),
+            ("nsf-nsfe", "NSF / NSFE", ".nsf · .nsfe", "NSF-NSFE", false),
+            ("vgm-vgz", "VGM / VGZ", ".vgm · .vgz", "VGM", false),
+            ("psx-cdxa", "PlayStation Disc Audio", "XA · CD-DA · APE · FLAC", "PSX-CDXA", false)
+        ]
+        return definitions.map { definition in
+            let url = Bundle.module.url(
+                forResource: definition.file,
+                withExtension: "md",
+                subdirectory: "Profiles"
+            ) ?? Bundle.module.url(forResource: definition.file, withExtension: "md")
+            let markdown = url.flatMap { try? String(contentsOf: $0, encoding: .utf8) }
+                ?? "Profile document could not be loaded from the application bundle."
+            let status = definition.shared
+                ? "Shared rules"
+                : (markdown.localizedCaseInsensitiveContains("Draft pending fixture validation") ? "Draft" : "Profile")
+            return UACProfileDocument(
+                id: definition.id,
+                title: definition.title,
+                formats: definition.formats,
+                status: status,
+                markdown: markdown
+            )
+        }
     }
 
     var documentURL: URL?
@@ -377,6 +417,15 @@ final class UACManModel {
             "filePreviewError": filePreviewError ?? NSNull(),
             "variantCount": loadedContainer?.manifest.variants.count ?? 0,
             "members": members.map(Self.webMemberSnapshot),
+            "profiles": Self.profileDocuments.map { profile in
+                [
+                    "id": profile.id,
+                    "title": profile.title,
+                    "formats": profile.formats,
+                    "status": profile.status,
+                    "markdown": profile.markdown
+                ] as [String: Any]
+            },
             "collectionRoot": collectionRootURL?.path ?? "",
             "collectionStatus": collectionStatusMessage,
             "collectionEntries": collectionEntries.map { entry in
