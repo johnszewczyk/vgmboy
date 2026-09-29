@@ -123,6 +123,13 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   await tick();
   assert.match(status.textContent, /FIRST/i);
+  const toolbarTargets = hitTargetSnapshot();
+  assert.ok(toolbarTargets.find((target) => target.name === 'OPTIONS').box.y
+    < toolbarTargets.find((target) => target.name === 'PREVIOUS').box.y,
+  'app navigation has its own row above transport controls');
+  assert.ok(toolbarTargets.find((target) => target.name === 'PREVIOUS').box.y
+    < toolbarTargets.find((target) => target.name === 'LONG PLAY').box.y,
+  'playback modes have a separate row below transport controls');
   assert.ok(groupStateCalls.some(([action, system]) => action === 'toggle' && system === 'SNES'));
   assert.ok(groupStateCalls.some(([action, system, gameID]) =>
     action === 'selectGame' && system === 'SNES' && gameID === '1:SNES:Sample'));
@@ -209,9 +216,19 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     const rect = canvas.getBoundingClientRect();
     canvas.listeners.get('click')({ clientX: rect.width * x, clientY: rect.height * y, detail: 1 });
   };
+  const clickEntry = (target) => {
+    const rect = canvas.getBoundingClientRect();
+    const logicalWidth = canvas.width / 3;
+    const logicalHeight = canvas.height / 3;
+    canvas.listeners.get('click')({
+      clientX: rect.width * (target.box.x + target.box.width / 2) / logicalWidth,
+      clientY: rect.height * (target.box.y + target.box.height / 2) / logicalHeight,
+      detail: 1,
+    });
+  };
   const clickTarget = (name, occurrence = 0, xFraction = 0.5, yFraction = 0.5) => {
     const target = hitTargetSnapshot().filter((entry) => entry.name === name)[occurrence];
-    assert.ok(target, `the ${name} control is present in the current screen`);
+    assert.ok(target, `the ${name} control is present in the current screen; found ${hitTargetSnapshot().map((entry) => entry.name).join(', ')}`);
     const logicalWidth = canvas.width / 3;
     const logicalHeight = canvas.height / 3;
     clickScreen(
@@ -219,7 +236,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
       (target.box.y + target.box.height * yFraction) / logicalHeight,
     );
   };
-  const pages = ['DISPLAY', 'PLAYBACK', 'AUDIO', 'INTERFACE', 'LIBRARY'];
+  const pages = ['DISPLAY', 'THEME', 'TRANSPORT', 'PLAYBACK', 'METHODS', 'AUDIO', 'INTERFACE', 'LIBRARY'];
   const clickPage = (index) => clickTarget(pages[index]);
   const commandKey = (key) => canvas.listeners.get('keydown')({
     key,
@@ -229,6 +246,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     shiftKey: false,
     preventDefault() {},
   });
+  clickPage(1);
   clickTarget('THEME NIGHTBOY');
   const nightBoyPixels = pixelChecksum(canvas.image.data);
   assert.notEqual(nightBoyPixels, gameBoyPixels, 'NightBoy repaints the same four-tone pixel screen with its dark-purple palette');
@@ -238,7 +256,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   clickTarget('INK BRIGHT');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'HIGH_CONTRAST',
     'the ink control persists the brighter silver high-contrast setting');
-  clickPage(1);
+  clickPage(3);
   assert.notEqual(pixelChecksum(canvas.image.data), nightBoyPixels, 'Options sub-pages navigate inside the LCD');
   globalThis.ViewBoy.dispatch('optionsPage:PLAYBACK');
   clickTarget('REPEAT ONE');
@@ -256,7 +274,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the Playback page checkbox updates the native playback preferences');
   assert.notEqual(pixelChecksum(canvas.image.data), checkedRowPixels,
     'the bitmap checkbox marker visibly changes with the saved value');
-  clickPage(2);
+  clickPage(5);
   globalThis.ViewBoy.dispatch('optionsPage:AUDIO');
   clickTarget('MONO OUTPUT');
   await tick();
@@ -285,7 +303,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(savedPreferences.at(-1).equalizerBandGains[0], 0,
     'the left edge of a full-width equalizer bar returns the band to flat');
-  clickPage(1);
+  clickPage(3);
   globalThis.ViewBoy.dispatch('optionsPage:PLAYBACK');
   clickTarget('LONG PLAY +');
   await tick();
@@ -323,31 +341,66 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(savedPlaylistTabs.at(-1)?.tabs[0]?.playlist.length, 0,
     'closing the final tab saves it empty even while audio continues playing');
   globalThis.ViewBoy.dispatch('settings');
-  clickPage(3);
+  clickPage(6);
   globalThis.ViewBoy.dispatch('optionsPage:INTERFACE');
   clickTarget('AUTO-SIZE COLUMNS');
   await tick();
   assert.equal(savedPreferences.at(-1).columnAutoSize, false,
     'the Interface page checkbox updates the saved column behavior');
-  clickPage(4);
+  assert.equal(hitTargetSnapshot().some((target) => target.name === 'PREVIOUS'), false,
+    'transport controls are kept off the Options screen');
+  const paddingBefore = hitTargetSnapshot().find((target) => target.name === 'BACK').box.height;
+  clickTarget('CONTROL PADDING +');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).controlPaddingDots, 5,
+    'control padding is adjustable and persists in display preferences');
+  assert.ok(hitTargetSnapshot().find((target) => target.name === 'BACK').box.height > paddingBefore,
+    'control padding changes the shared button row height');
+  clickTarget('UI GUTTER +');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGutterDots, 5,
+    'the shared interface gutter has an independent persisted setting');
+  clickTarget('PLAYLIST GAP +');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).playlistGapDots, 5,
+    'playlist column and tab spacing has an independent persisted setting');
+  clickTarget('CONTROL PADDING -');
+  clickTarget('UI GUTTER -');
+  clickTarget('PLAYLIST GAP -');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).controlPaddingDots, 4);
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGutterDots, 4);
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).playlistGapDots, 4);
+  clickPage(7);
   globalThis.ViewBoy.dispatch('optionsPage:LIBRARY');
   clickTarget('FILE');
   await tick();
   assert.equal(savedPreferences.at(-1).columnVisibility.filename, false,
     'the Library page checkbox persists field visibility');
-  clickPage(3);
+  clickPage(6);
   globalThis.ViewBoy.dispatch('optionsPage:INTERFACE');
   clickTarget('AUTO-SIZE COLUMNS');
   await tick();
   assert.equal(savedPreferences.at(-1).columnAutoSize, true,
     'the Interface page checkbox can restore automatic sizing');
-  clickPage(0);
+  clickPage(1);
   clickTarget('THEME GAMEBOY');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'GAMEBOY',
     'the palette selector returns to the authentic Game Boy theme');
   clickTarget('INK LCD GREEN');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'STANDARD');
-  clickPage(1);
+  clickPage(2);
+  clickTarget('BUTTONS SYMBOLS');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).transportSymbols, true,
+    'the Transport page persists its Words/Symbols control setting');
+  globalThis.ViewBoy.dispatch('library');
+  const symbolTransportWidth = hitTargetSnapshot().find((target) => target.name === 'PREVIOUS').box.width;
+  globalThis.ViewBoy.dispatch('settings');
+  clickPage(2);
+  clickTarget('BUTTONS WORDS');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).transportSymbols, false);
+  globalThis.ViewBoy.dispatch('library');
+  const wordTransportWidth = hitTargetSnapshot().find((target) => target.name === 'PREVIOUS').box.width;
+  assert.ok(symbolTransportWidth < wordTransportWidth,
+    'symbol controls use the compact bitmap transport glyphs');
+  globalThis.ViewBoy.dispatch('settings');
+  clickPage(4);
   clickTarget('LIBGME SPEED');
   await tick();
   assert.equal(savedPreferences.at(-1).playbackSpeedEnabled, true,
@@ -396,22 +449,47 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const rect = canvas.getBoundingClientRect();
   let contextMenuPrevented = false;
   const beforeColumnMenu = pixelChecksum(canvas.image.data);
+  const contextFileHeader = hitTargetSnapshot().find((target) => target.name === 'FILE');
+  assert.ok(contextFileHeader, 'the current playlist exposes its File heading');
+  const logicalWidth = canvas.width / 3;
+  const logicalHeight = canvas.height / 3;
   canvas.listeners.get('contextmenu')({
-    clientX: rect.width * 0.60,
-    clientY: rect.height * 0.13,
+    clientX: rect.width * (contextFileHeader.box.x + contextFileHeader.box.width / 2) / logicalWidth,
+    clientY: rect.height * (contextFileHeader.box.y + contextFileHeader.box.height / 2) / logicalHeight,
     preventDefault() { contextMenuPrevented = true; },
   });
   assert.ok(contextMenuPrevented, 'right-clicking a column heading opens its visibility menu');
   assert.notEqual(pixelChecksum(canvas.image.data), beforeColumnMenu,
     'the column menu is painted into the LCD framebuffer');
-  clickScreen(0.62, 0.19);
+  const initialFileToggle = hitTargetSnapshot().find((target) => target.name === 'FILE' && target.columnMenuItem);
+  assert.ok(initialFileToggle, 'the open menu exposes the File checkbox as a hit target');
+  const savesBeforeHide = savedPreferences.length;
+  clickEntry(initialFileToggle);
   await tick();
+  assert.equal(savedPreferences.length, savesBeforeHide + 1,
+    'the context-menu checkbox persists its column visibility change');
   assert.equal(savedPreferences.at(-1).columnVisibility.filename, false,
     'the column menu hides the selected field through the native preference bridge');
-  clickScreen(0.62, 0.19);
+  const reopenHeader = hitTargetSnapshot().find((target) => target.name.startsWith('TITLE'));
+  let reopenMenuPrevented = false;
+  canvas.listeners.get('contextmenu')({
+    clientX: rect.width * (reopenHeader.box.x + reopenHeader.box.width / 2) / logicalWidth,
+    clientY: rect.height * (reopenHeader.box.y + reopenHeader.box.height / 2) / logicalHeight,
+    preventDefault() { reopenMenuPrevented = true; },
+  });
+  assert.ok(reopenMenuPrevented, 'the column menu can reopen from the still-visible Title heading');
+  assert.ok(hitTargetSnapshot().some((target) => target.name === 'FILE'),
+    'the reopened menu includes the hidden File column toggle');
+  const visibleFileToggle = hitTargetSnapshot().filter((target) => target.name === 'FILE')
+    .find((target) => target.columnMenuItem);
+  assert.ok(visibleFileToggle, 'the File hit target belongs to the open visibility menu');
+  const savesBeforeRestore = savedPreferences.length;
+  clickEntry(visibleFileToggle);
   await tick();
+  assert.equal(savedPreferences.length, savesBeforeRestore + 1,
+    'selecting a menu checkbox submits a native preference update');
   assert.equal(savedPreferences.at(-1).columnVisibility.filename, true,
-    'the same column menu restores the selected field');
+    `the same column menu restores the selected field; recent saves ${JSON.stringify(savedPreferences.slice(-3).map((entry) => entry.columnVisibility?.filename))}`);
   canvas.listeners.get('keydown')({ code: 'Escape', preventDefault() {} });
   canvas.listeners.get('wheel')({
     clientX: rect.width * 0.72,

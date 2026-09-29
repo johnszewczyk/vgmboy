@@ -18,15 +18,11 @@ const BASELINE_LAYOUT_UNIT_CSS_PIXELS = 2.5;
 const RANDOM_HISTORY_LIMIT = 256;
 const APP_BORDER_GAP_DOTS = 8;
 const BUTTON_BORDER_DOTS = 1;
-const BUTTON_HORIZONTAL_INSET_DOTS = 4;
-const BUTTON_VERTICAL_INSET_DOTS = 4;
-const PANE_INSET_DOTS = 4;
-const UI_SPACING_DOTS = Object.freeze({
-  minimumGap: 4,
-  sectionGap: 8,
-  groupInset: 4,
-  optionsInset: 8,
-});
+const DEFAULT_CONTROL_PADDING_DOTS = 4;
+const DEFAULT_UI_GUTTER_DOTS = 4;
+const DEFAULT_PLAYLIST_GAP_DOTS = 4;
+const SPACING_DOTS_MIN = 1;
+const SPACING_DOTS_MAX = 8;
 const EQ_BAR_MIN_DOTS = 100;
 const EQ_GAIN_MIN_DB = 0;
 const EQ_GAIN_MAX_DB = 12;
@@ -99,6 +95,7 @@ const standardGlyphs = {
   ")": ["01000", "00100", "00010", "00010", "00010", "00100", "01000"],
   "<": ["00010", "00100", "01000", "10000", "01000", "00100", "00010"],
   ">": ["01000", "00100", "00010", "00001", "00010", "00100", "01000"],
+  "|": ["00100", "00100", "00100", "00100", "00100", "00100", "00100"],
   "=": ["00000", "11111", "00000", "11111", "00000", "00000", "00000"],
   "#": ["01010", "01010", "11111", "01010", "11111", "01010", "01010"],
   "•": ["00000", "00000", "00100", "00000", "00000", "00000", "00000"],
@@ -159,6 +156,7 @@ const microGlyphs = {
   ")": ["100", "010", "001", "010", "100"],
   "<": ["001", "010", "100", "010", "001"],
   ">": ["100", "010", "001", "010", "100"],
+  "|": ["010", "010", "010", "010", "010"],
   "↑": ["010", "101", "010", "010", "010"],
   "↓": ["010", "010", "010", "101", "010"],
   "=": ["000", "111", "000", "111", "000"],
@@ -183,6 +181,11 @@ function storedDisplayOptions() {
   catch { return {}; }
 }
 const savedDisplayOptions = storedDisplayOptions();
+function storedSpacing(value, fallback) {
+  const number = Number(value);
+  return Math.max(SPACING_DOTS_MIN, Math.min(SPACING_DOTS_MAX,
+    Number.isFinite(number) ? Math.round(number) : fallback));
+}
 function displayPalette() {
   return PALETTES[state.theme][state.contrast];
 }
@@ -192,6 +195,10 @@ function saveDisplayOptions() {
       font: state.font,
       contrast: state.contrast,
       theme: state.theme,
+      controlPaddingDots: state.controlPaddingDots,
+      uiGutterDots: state.uiGutterDots,
+      playlistGapDots: state.playlistGapDots,
+      transportSymbols: state.transportSymbols,
       columnOrder: state.columnOrder,
     }));
   }
@@ -245,6 +252,10 @@ const state = {
   font: savedDisplayOptions.font === "STANDARD" ? "STANDARD" : "MICRO",
   contrast: savedDisplayOptions.contrast === "HIGH_CONTRAST" ? "HIGH_CONTRAST" : "STANDARD",
   theme: savedDisplayOptions.theme === "NIGHTBOY" ? "NIGHTBOY" : "GAMEBOY",
+  controlPaddingDots: storedSpacing(savedDisplayOptions.controlPaddingDots, DEFAULT_CONTROL_PADDING_DOTS),
+  uiGutterDots: storedSpacing(savedDisplayOptions.uiGutterDots, DEFAULT_UI_GUTTER_DOTS),
+  playlistGapDots: storedSpacing(savedDisplayOptions.playlistGapDots, DEFAULT_PLAYLIST_GAP_DOTS),
+  transportSymbols: savedDisplayOptions.transportSymbols === true,
   optionsPage: "DISPLAY",
   transport: "stopped",
   currentTrackId: null,
@@ -510,6 +521,8 @@ export function hitTargetSnapshot() {
   return hitTargets.map(({ widget, box }) => ({
     name: widget.meta.controlTitle || widget.meta.text
       || (Number.isInteger(widget.meta.equalizerBar) ? `EQ BAND ${widget.meta.equalizerBar + 1}` : ""),
+    columnMenuItem: widget.meta.columnMenuItem === true,
+    columnHeader: widget.meta.columnHeader === true,
     box: { ...box },
   })).filter((target) => target.name);
 }
@@ -692,8 +705,8 @@ function label(parent, text, style = {}, meta = {}) {
       if (meta.paint) meta.paint(box);
       const textY = meta.revealProgress !== undefined
         ? box.y : box.y + Math.floor((box.height - fontProfile().height) / 2);
-      drawText(text, box.x + (meta.inset ?? BUTTON_HORIZONTAL_INSET_DOTS), textY,
-        box.width - (meta.inset ?? BUTTON_HORIZONTAL_INSET_DOTS) * 2,
+      drawText(text, box.x + (meta.inset ?? controlPaddingDots()), textY,
+        box.width - (meta.inset ?? controlPaddingDots()) * 2,
         meta.textShade ?? 0, meta.align ?? "left");
       paintClip = previousClip;
     },
@@ -704,25 +717,45 @@ function rowHeight(extraDots = 0) {
   return (fontProfile().height + extraDots) / STYLE_SCALE;
 }
 
+function controlPaddingDots() {
+  return state.controlPaddingDots;
+}
+
+function uiGutterDots() {
+  return state.uiGutterDots;
+}
+
+function uiGroupInsetDots() {
+  return uiGutterDots();
+}
+
+function uiOptionsInsetDots() {
+  return uiGutterDots() * 2;
+}
+
 function buttonStandardHeight() {
-  return rowHeight(2 * BUTTON_VERTICAL_INSET_DOTS + 2 * BUTTON_BORDER_DOTS);
+  return rowHeight(2 * controlPaddingDots() + 2 * BUTTON_BORDER_DOTS);
 }
 
 function uiGap() {
-  return UI_SPACING_DOTS.minimumGap / STYLE_SCALE;
+  return uiGutterDots() / STYLE_SCALE;
 }
 
 function uiSectionGap() {
-  return UI_SPACING_DOTS.sectionGap / STYLE_SCALE;
+  return uiGutterDots() * 2 / STYLE_SCALE;
 }
 
-function textLayoutWidth(text, horizontalInsetDots = BUTTON_HORIZONTAL_INSET_DOTS) {
+function playlistGap() {
+  return state.playlistGapDots / STYLE_SCALE;
+}
+
+function textLayoutWidth(text, horizontalInsetDots = controlPaddingDots()) {
   return (Array.from(String(text)).length * fontProfile().advance + horizontalInsetDots * 2) / STYLE_SCALE;
 }
 
 function framedTextWidth(text) {
   return (Array.from(String(text)).length * fontProfile().advance
-    + (BUTTON_BORDER_DOTS + BUTTON_HORIZONTAL_INSET_DOTS) * 2) / STYLE_SCALE;
+    + (BUTTON_BORDER_DOTS + controlPaddingDots()) * 2) / STYLE_SCALE;
 }
 
 function buttonWidth(text) {
@@ -731,7 +764,7 @@ function buttonWidth(text) {
 
 function minimumColumnWidth(characterCount = 1) {
   return (characterCount * fontProfile().advance
-    + (BUTTON_BORDER_DOTS + BUTTON_HORIZONTAL_INSET_DOTS) * 2) / STYLE_SCALE;
+    + (BUTTON_BORDER_DOTS + controlPaddingDots()) * 2) / STYLE_SCALE;
 }
 
 function oneDot() {
@@ -767,7 +800,7 @@ function statusBar(parent, text) {
   label(row, text, { flexGrow: 1, height }, {
     textShade: 0,
     align: "center",
-    inset: BUTTON_HORIZONTAL_INSET_DOTS,
+    inset: controlPaddingDots(),
   });
   return row;
 }
@@ -785,7 +818,7 @@ function panelTitle(parent, text) {
     },
   });
   label(row, text, { flexGrow: 1, height: titleHeight }, {
-    textShade: 0, inset: BUTTON_HORIZONTAL_INSET_DOTS, align: "center",
+    textShade: 0, inset: controlPaddingDots(), align: "center",
   });
   return row;
 }
@@ -802,7 +835,7 @@ function pixelButton(parent, text, onClick, style = {}) {
     border: 1,
     fill: style.selected ? 2 : undefined,
     textShade: 0,
-    inset: BUTTON_HORIZONTAL_INSET_DOTS,
+    inset: controlPaddingDots(),
     align: "center",
     controlTitle: style.controlTitle,
     onClick,
@@ -842,8 +875,8 @@ function optionToggle(parent, title, checked, onClick, extraMeta = {}) {
   label(row, marker, {
     width: textLayoutWidth(marker),
     height,
-  }, { textShade: 0, align: "center", inset: BUTTON_HORIZONTAL_INSET_DOTS });
-  label(row, title, { flexGrow: 1, height }, { textShade: 0, inset: BUTTON_HORIZONTAL_INSET_DOTS });
+  }, { textShade: 0, align: "center", inset: controlPaddingDots() });
+  label(row, title, { flexGrow: 1, height }, { textShade: 0, inset: controlPaddingDots() });
   return row;
 }
 
@@ -858,7 +891,7 @@ function optionChoice(parent, title, choices) {
     },
   });
   const titleWidth = textLayoutWidth(title);
-  label(row, title, { width: titleWidth, height }, { textShade: 0, inset: BUTTON_HORIZONTAL_INSET_DOTS });
+  label(row, title, { width: titleWidth, height }, { textShade: 0, inset: controlPaddingDots() });
   choices.forEach((choice) => pixelButton(row, choice.title, choice.onClick, {
     flexGrow: 1,
     selected: choice.selected,
@@ -875,7 +908,7 @@ function optionAdjuster(parent, title, value, onDecrease, onIncrease) {
     },
   });
   label(row, title, { flexGrow: 1, height }, {
-    textShade: 0, inset: BUTTON_HORIZONTAL_INSET_DOTS,
+    textShade: 0, inset: controlPaddingDots(),
   });
   const controlHeight = buttonStandardHeight();
   pixelButton(row, "[-]", onDecrease, { controlTitle: `${title} -` });
@@ -883,7 +916,7 @@ function optionAdjuster(parent, title, value, onDecrease, onIncrease) {
     border: 1,
     textShade: 0,
     align: "center",
-    inset: BUTTON_HORIZONTAL_INSET_DOTS,
+    inset: controlPaddingDots(),
   });
   pixelButton(row, "[+]", onIncrease, { controlTitle: `${title} +` });
   return row;
@@ -996,7 +1029,7 @@ function tableColumns(items = activeTracks()) {
     if (column.key === "favorite" || column.key === "index") return;
     const headingCharacters = Array.from(column.title).length + 1;
     const headingWidth = (headingCharacters * fontProfile().advance
-      + 2 * (BUTTON_BORDER_DOTS + BUTTON_HORIZONTAL_INSET_DOTS)) / STYLE_SCALE;
+      + 2 * (BUTTON_BORDER_DOTS + controlPaddingDots())) / STYLE_SCALE;
     column.width = Math.max(column.width, headingWidth);
   });
 
@@ -1006,10 +1039,10 @@ function tableColumns(items = activeTracks()) {
     columns.forEach((column) => {
       if (column.key === "favorite" || column.key === "index" || column.key === "title") return;
       const textWidth = ((content.lengths[column.key] ?? 0) * fontProfile().advance
-        + 2 * (BUTTON_BORDER_DOTS + BUTTON_HORIZONTAL_INSET_DOTS)) / STYLE_SCALE;
+        + 2 * (BUTTON_BORDER_DOTS + controlPaddingDots())) / STYLE_SCALE;
       const headingCharacters = Array.from(column.title).length + 1;
       const headingWidth = (headingCharacters * fontProfile().advance
-        + 2 * (BUTTON_BORDER_DOTS + BUTTON_HORIZONTAL_INSET_DOTS)) / STYLE_SCALE;
+        + 2 * (BUTTON_BORDER_DOTS + controlPaddingDots())) / STYLE_SCALE;
       column.width = Math.max(headingWidth, textWidth);
     });
   }
@@ -1104,7 +1137,7 @@ function createTableHeader(parent, columns) {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
     height: headerHeight,
-    gap: uiGap(),
+    gap: playlistGap(),
   }, {
     paint(box) {
       line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 1);
@@ -1119,7 +1152,7 @@ function createTableHeader(parent, columns) {
       height: headerHeight,
     }, {
       textShade: 0,
-      inset: BUTTON_HORIZONTAL_INSET_DOTS,
+      inset: controlPaddingDots(),
       border: 1,
       fill: marker ? 2 : undefined,
       align: "center",
@@ -1133,12 +1166,12 @@ function createTableHeader(parent, columns) {
 }
 
 function createQueueRow(parent, index, track, columns) {
-  const rowHeightValue = rowHeight(4);
+  const rowHeightValue = rowHeight(2 * controlPaddingDots());
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
     height: rowHeightValue,
-    gap: uiGap(),
+    gap: playlistGap(),
   }, {
     onClick: (event) => {
       selectTrack(index, false);
@@ -1152,7 +1185,7 @@ function createQueueRow(parent, index, track, columns) {
     height: rowHeightValue,
   }, {
     textShade: 0,
-    inset: BUTTON_HORIZONTAL_INSET_DOTS,
+    inset: controlPaddingDots(),
     align: column.rowAlign ?? column.align ?? "left",
     onClick: column.key === "favorite" ? () => toggleFavorite(track) : undefined,
   }));
@@ -1161,11 +1194,11 @@ function createQueueRow(parent, index, track, columns) {
 
 function createLibraryRow(parent, text, options = {}) {
   const selected = options.selected ?? false;
-  const rowHeightValue = rowHeight(2);
+  const rowHeightValue = rowHeight(2 * controlPaddingDots());
   const revealProgress = options.revealProgress;
   return label(parent, text, {
     height: rowHeightValue * (revealProgress ?? 1),
-    paddingHorizontal: BUTTON_HORIZONTAL_INSET_DOTS,
+    paddingHorizontal: controlPaddingDots(),
   }, {
     textShade: 0,
     clipToBox: revealProgress !== undefined,
@@ -1179,7 +1212,9 @@ function createLibraryRow(parent, text, options = {}) {
 }
 
 function visibleRowCount() {
-  return Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - 78) / rowHeight(3)));
+  const toolbarGrowth = 2 * (buttonStandardHeight() + uiGap());
+  return Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - 78 - toolbarGrowth)
+    / rowHeight(2 * controlPaddingDots())));
 }
 
 function libraryRows() {
@@ -1213,7 +1248,7 @@ function addLibraryPane(parent) {
     direction: FlexDirection.Column,
     width: libraryPaneWidth(),
     gap: 0,
-    padding: PANE_INSET_DOTS,
+    padding: uiGutterDots(),
   }, {
     paint(box) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
@@ -1228,7 +1263,9 @@ function addLibraryPane(parent) {
   makeWidget(library, { height: uiGap() });
   panelTitle(library, "SYSTEMS");
   const rows = libraryRows();
-  const count = Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - 96) / rowHeight(3)));
+  const toolbarGrowth = 2 * (buttonStandardHeight() + uiGap());
+  const count = Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - 96 - toolbarGrowth)
+    / rowHeight(2 * controlPaddingDots())));
   state.libraryScroll = Math.max(0, Math.min(state.libraryScroll, Math.max(0, rows.length - count)));
   rows.slice(state.libraryScroll, state.libraryScroll + count).forEach((row) => {
     createLibraryRow(library, row.text, {
@@ -1253,19 +1290,19 @@ function addCatalogPane(parent) {
     flexGrow: 1,
     flexShrink: 1,
     gap: 0,
-    padding: PANE_INSET_DOTS,
+    padding: uiGutterDots(),
   }, {
     paint(box) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
     },
   });
   if (state.tab !== "FAVORITES") {
-    const tabRow = controlRow(panel);
+    const tabRow = controlRow(panel, { gap: playlistGap() });
     const tabList = makeWidget(tabRow, {
       direction: FlexDirection.Row,
       flexGrow: 1,
       flexBasis: 0,
-      gap: uiGap(),
+      gap: playlistGap(),
       overflow: Overflow.Hidden,
     }, { clipChildren: true });
     state.playlistTabs.forEach((tab) => {
@@ -1273,7 +1310,7 @@ function addCatalogPane(parent) {
         direction: FlexDirection.Row,
         flexGrow: 1,
         flexBasis: 0,
-        gap: uiGap(),
+        gap: playlistGap(),
       });
       pixelButton(item, tab.title, () => activatePlaylistTab(tab.id), {
         flexGrow: 1,
@@ -1288,7 +1325,7 @@ function addCatalogPane(parent) {
     });
   }
   const columns = resolveTableColumns(tableColumns(viewTracks), currentRenderTime);
-  const tableGap = Math.max(0, columns.length - 1) * uiGap();
+  const tableGap = Math.max(0, columns.length - 1) * playlistGap();
   state.tableContentMinimumWidth = columns.reduce((sum, column) => sum + column.width, 0) + tableGap;
   const viewport = makeWidget(panel, {
     direction: FlexDirection.Column,
@@ -1313,8 +1350,8 @@ function addCatalogPane(parent) {
   state.queueScroll = Math.max(0, Math.min(state.queueScroll, Math.max(0, viewTracks.length - count)));
   viewTracks.slice(state.queueScroll, state.queueScroll + count).forEach((track, offset) =>
     createQueueRow(content, state.queueScroll + offset, track, columns));
-  if (!viewTracks.length) label(content, state.status, { height: rowHeight(4) }, {
-    textShade: 0, inset: BUTTON_HORIZONTAL_INSET_DOTS,
+  if (!viewTracks.length) label(content, state.status, { height: rowHeight(2 * controlPaddingDots()) }, {
+    textShade: 0, inset: controlPaddingDots(),
   });
   makeWidget(panel, {
     height: rowHeight(4),
@@ -1359,10 +1396,10 @@ function addColumnContextMenu(parent) {
 
   const height = (configurableColumns.length + 2) * buttonStandardHeight()
     + (configurableColumns.length + 1) * uiGap()
-    + 2 * UI_SPACING_DOTS.groupInset / STYLE_SCALE + 2 / STYLE_SCALE;
+    + 2 * uiGroupInsetDots() / STYLE_SCALE + 2 / STYLE_SCALE;
   const contentWidth = textLayoutWidth("[x]") + uiGap() + textLayoutWidth("ARTIST");
   const width = Math.min(WIDTH / STYLE_SCALE - 16,
-    Math.max(68, contentWidth + 2 * UI_SPACING_DOTS.groupInset / STYLE_SCALE + 2 / STYLE_SCALE));
+    Math.max(68, contentWidth + 2 * uiGroupInsetDots() / STYLE_SCALE + 2 / STYLE_SCALE));
   const widthPixels = width * STYLE_SCALE;
   const heightPixels = height * STYLE_SCALE;
   const edge = 8 * STYLE_SCALE;
@@ -1377,7 +1414,7 @@ function addColumnContextMenu(parent) {
     height,
     direction: FlexDirection.Column,
     gap: uiGap(),
-    padding: UI_SPACING_DOTS.groupInset / STYLE_SCALE,
+    padding: uiGroupInsetDots() / STYLE_SCALE,
   }, {
     paint(box) {
       fillRect(box.x, box.y, box.width, box.height, 2);
@@ -1404,8 +1441,8 @@ function addPalettePreview(parent) {
     direction: FlexDirection.Row,
     flexGrow: 1,
     gap: uiGap(),
-    paddingHorizontal: UI_SPACING_DOTS.groupInset / STYLE_SCALE,
-    paddingVertical: UI_SPACING_DOTS.minimumGap / STYLE_SCALE,
+    paddingHorizontal: uiGroupInsetDots() / STYLE_SCALE,
+    paddingVertical: uiGutterDots() / STYLE_SCALE,
   });
   RGB.forEach((_, shade) => makeWidget(preview, {
     flexGrow: 1,
@@ -1424,7 +1461,7 @@ function optionGroup(parent, title) {
   const group = makeWidget(parent, {
     direction: FlexDirection.Column,
     gap: uiGap(),
-    padding: UI_SPACING_DOTS.groupInset / STYLE_SCALE,
+    padding: uiGroupInsetDots() / STYLE_SCALE,
   }, {
     paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
@@ -1434,7 +1471,7 @@ function optionGroup(parent, title) {
 
 function optionsTocWidth() {
   const available = WIDTH / STYLE_SCALE;
-  const labelWidth = framedTextWidth("INTERFACE") + UI_SPACING_DOTS.optionsInset / STYLE_SCALE * 2;
+  const labelWidth = framedTextWidth("TRANSPORT") + uiOptionsInsetDots() / STYLE_SCALE * 2;
   return Math.min(available * 0.34, Math.max(labelWidth, Math.min(220, available * 0.20)));
 }
 
@@ -1444,6 +1481,10 @@ function addDisplayOptions(parent) {
     { title: "MICRO 3X5", selected: state.font === "MICRO", onClick: () => setFontProfile("MICRO") },
     { title: "STANDARD 5X7", selected: state.font === "STANDARD", onClick: () => setFontProfile("STANDARD") },
   ]);
+}
+
+function addThemeOptions(parent) {
+  const profile = optionGroup(parent, "COLOR THEME");
   optionChoice(profile, "THEME", [
     { title: "GAMEBOY", selected: state.theme === "GAMEBOY", onClick: () => setTheme("GAMEBOY") },
     { title: "NIGHTBOY", selected: state.theme === "NIGHTBOY", onClick: () => setTheme("NIGHTBOY") },
@@ -1456,6 +1497,14 @@ function addDisplayOptions(parent) {
   ]);
   const tones = optionGroup(parent, "FOUR LCD TONES");
   addPalettePreview(tones);
+}
+
+function addTransportOptions(parent) {
+  const controls = optionGroup(parent, "TRANSPORT CONTROLS");
+  optionChoice(controls, "BUTTONS", [
+    { title: "WORDS", selected: !state.transportSymbols, onClick: () => setTransportSymbols(false) },
+    { title: "SYMBOLS", selected: state.transportSymbols, onClick: () => setTransportSymbols(true) },
+  ]);
 }
 
 function optionDuration(seconds, allowOpen = false) {
@@ -1572,7 +1621,9 @@ function addPlaybackOptions(parent, pref) {
   optionAdjuster(timing, "FADE LENGTH", optionDuration(pref.spcFadeSeconds ?? 6),
     () => adjustPlaybackDuration("spcFadeSeconds", -1, 0, 60, 6),
     () => adjustPlaybackDuration("spcFadeSeconds", 1, 0, 60, 6));
+}
 
+function addMethodOptions(parent, pref) {
   const speed = optionGroup(parent, "DECODER SPEED");
   optionToggle(speed, "LIBGME SPEED", pref.playbackSpeedEnabled === true,
     () => setPreference("playbackSpeedEnabled", pref.playbackSpeedEnabled !== true));
@@ -1617,7 +1668,7 @@ function equalizerBand(parent, title, index, gain) {
   });
   label(row, title, { width: textLayoutWidth("16K HZ"), height: buttonStandardHeight() }, {
     textShade: 0,
-    inset: BUTTON_HORIZONTAL_INSET_DOTS,
+    inset: controlPaddingDots(),
   });
   makeWidget(row, {
     flexGrow: 1,
@@ -1646,7 +1697,7 @@ function equalizerBand(parent, title, index, gain) {
     border: 1,
     textShade: 0,
     align: "center",
-    inset: BUTTON_HORIZONTAL_INSET_DOTS,
+    inset: controlPaddingDots(),
   });
 }
 
@@ -1690,14 +1741,14 @@ function addAudioOptions(parent, pref) {
     paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
   });
   label(volumeRow, "VOLUME", { width: textLayoutWidth("VOLUME"), height: buttonStandardHeight() }, {
-    textShade: 0, inset: BUTTON_HORIZONTAL_INSET_DOTS,
+    textShade: 0, inset: controlPaddingDots(),
   });
   pixelButton(volumeRow, "[-]", () => changeVolume(-0.1), { controlTitle: "VOLUME -" });
   makeWidget(volumeRow, { flexGrow: 1, minWidth: EQ_BAR_MIN_DOTS / STYLE_SCALE, height: buttonStandardHeight() }, {
     paint(box) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
       const count = 10;
-      const gap = UI_SPACING_DOTS.minimumGap;
+      const gap = uiGutterDots();
       const segmentWidth = Math.max(1, Math.floor((box.width - 2 - (count - 1) * gap) / count));
       const active = Math.round(volume * count);
       for (let index = 0; index < active; index += 1) {
@@ -1708,7 +1759,7 @@ function addAudioOptions(parent, pref) {
   });
   label(volumeRow, `${Math.round(volume * 100)}%`, {
     width: framedTextWidth("100%"), height: buttonStandardHeight(),
-  }, { textShade: 0, align: "right", inset: BUTTON_HORIZONTAL_INSET_DOTS });
+  }, { textShade: 0, align: "right", inset: controlPaddingDots() });
   pixelButton(volumeRow, "[+]", () => changeVolume(0.1), { controlTitle: "VOLUME +" });
 
   const equalizer = optionGroup(parent, "TEN BAND EQUALIZER");
@@ -1722,6 +1773,16 @@ function addInterfaceOptions(parent, pref) {
   const layout = optionGroup(parent, "PLAYLIST LAYOUT");
   optionToggle(layout, "AUTO-SIZE COLUMNS", pref.columnAutoSize !== false,
     () => setPreference("columnAutoSize", pref.columnAutoSize === false));
+  const spacing = optionGroup(parent, "LAYOUT SPACING");
+  optionAdjuster(spacing, "CONTROL PADDING", `${controlPaddingDots()} DOTS`,
+    () => adjustDisplaySpacing("controlPaddingDots", -1),
+    () => adjustDisplaySpacing("controlPaddingDots", 1));
+  optionAdjuster(spacing, "UI GUTTER", `${uiGutterDots()} DOTS`,
+    () => adjustDisplaySpacing("uiGutterDots", -1),
+    () => adjustDisplaySpacing("uiGutterDots", 1));
+  optionAdjuster(spacing, "PLAYLIST GAP", `${state.playlistGapDots} DOTS`,
+    () => adjustDisplaySpacing("playlistGapDots", -1),
+    () => adjustDisplaySpacing("playlistGapDots", 1));
   const window = optionGroup(parent, "WINDOW");
   optionToggle(window, "MAIN WINDOW ON TOP", pref.mainWindowAlwaysOnTop === true,
     () => setPreference("mainWindowAlwaysOnTop", pref.mainWindowAlwaysOnTop !== true));
@@ -1758,13 +1819,13 @@ function addOptionsContent(parent) {
     direction: FlexDirection.Column,
     width: navigationWidth,
     gap: uiGap(),
-    padding: UI_SPACING_DOTS.optionsInset / STYLE_SCALE,
+    padding: uiOptionsInsetDots() / STYLE_SCALE,
   }, {
     paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
   panelTitle(toc, "OPTIONS");
-  const pageButtonWidth = navigationWidth - 2 * UI_SPACING_DOTS.optionsInset / STYLE_SCALE;
-  ["DISPLAY", "PLAYBACK", "AUDIO", "INTERFACE", "LIBRARY"].forEach((page) => {
+  const pageButtonWidth = navigationWidth - 2 * uiOptionsInsetDots() / STYLE_SCALE;
+  ["DISPLAY", "THEME", "TRANSPORT", "PLAYBACK", "METHODS", "AUDIO", "INTERFACE", "LIBRARY"].forEach((page) => {
     pixelButton(toc, page, () => {
       state.optionsPage = page;
       render();
@@ -1777,7 +1838,7 @@ function addOptionsContent(parent) {
     direction: FlexDirection.Column,
     flexGrow: 1,
     gap: uiGap(),
-    padding: UI_SPACING_DOTS.optionsInset / STYLE_SCALE,
+    padding: uiOptionsInsetDots() / STYLE_SCALE,
   }, {
     paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
@@ -1788,7 +1849,10 @@ function addOptionsContent(parent) {
     gap: uiSectionGap(),
   });
   const pref = state.preferences;
-  if (state.optionsPage === "PLAYBACK") addPlaybackOptions(content, pref);
+  if (state.optionsPage === "THEME") addThemeOptions(content);
+  else if (state.optionsPage === "TRANSPORT") addTransportOptions(content);
+  else if (state.optionsPage === "PLAYBACK") addPlaybackOptions(content, pref);
+  else if (state.optionsPage === "METHODS") addMethodOptions(content, pref);
   else if (state.optionsPage === "AUDIO") addAudioOptions(content, pref);
   else if (state.optionsPage === "INTERFACE") addInterfaceOptions(content, pref);
   else if (state.optionsPage === "LIBRARY") addLibraryOptions(content, pref);
@@ -1816,33 +1880,52 @@ function buildTree() {
     },
   });
 
-  const toolbar = controlRow(root, { height: toolbarHeight });
-  label(toolbar, "VIEWBOY", { flexGrow: 1, height: toolbarHeight }, {
+  const navigation = controlRow(root, { height: toolbarHeight });
+  label(navigation, "VIEWBOY", { flexGrow: 1, height: toolbarHeight }, {
     textShade: 0, inset: 0,
   });
   const buttonWidth = (text) => framedTextWidth(text);
-  pixelButton(toolbar, state.tab === "SETTINGS" ? "BACK" : "OPTIONS", () => {
+  pixelButton(navigation, state.tab === "SETTINGS" ? "BACK" : "OPTIONS", () => {
     state.tab = state.tab === "SETTINGS" ? "LIBRARY" : "SETTINGS";
     render();
   }, { width: buttonWidth(state.tab === "SETTINGS" ? "BACK" : "OPTIONS") });
-  pixelButton(toolbar, "PREV", () => selectPrevious(), { width: buttonWidth("PREV") });
-  pixelButton(toolbar, state.playing ? "PAUSE" : "PLAY", () => togglePlaying(), {
-    width: buttonWidth(state.playing ? "PAUSE" : "PLAY"),
-  });
-  pixelButton(toolbar, "NEXT", () => selectNext(), { width: buttonWidth("NEXT") });
-  pixelButton(toolbar, "STOP", () => stopPlayback(), { width: buttonWidth("STOP") });
-  pixelButton(toolbar, "LP", () => toggleLongPlay(), {
-    width: buttonWidth("LP"), selected: state.preferences.longPlayEnabled === true,
-  });
-  pixelButton(toolbar, "R1", () => toggleRepeatOne(), {
-    width: buttonWidth("R1"), selected: state.preferences.repeatMode === "one",
-  });
-  pixelButton(toolbar, "P-RND", () => toggleRandomMode("playlist"), {
-    width: buttonWidth("P-RND"), selected: state.preferences.randomMode === "playlist",
-  });
-  pixelButton(toolbar, "L-RND", () => toggleRandomMode("library"), {
-    width: buttonWidth("L-RND"), selected: state.preferences.randomMode === "library",
-  });
+
+  if (state.tab !== "SETTINGS") {
+    const transport = controlRow(root, { height: toolbarHeight });
+    const transportLabels = state.transportSymbols
+      ? { previous: "<<", play: state.playing ? "||" : ">", next: ">>", stop: "[]" }
+      : { previous: "PREV", play: state.playing ? "PAUSE" : "PLAY", next: "NEXT", stop: "STOP" };
+    pixelButton(transport, transportLabels.previous, () => selectPrevious(), {
+      width: buttonWidth(transportLabels.previous), controlTitle: "PREVIOUS",
+    });
+    pixelButton(transport, transportLabels.play, () => togglePlaying(), {
+      width: buttonWidth(transportLabels.play), controlTitle: state.playing ? "PAUSE" : "PLAY",
+    });
+    pixelButton(transport, transportLabels.next, () => selectNext(), {
+      width: buttonWidth(transportLabels.next), controlTitle: "NEXT",
+    });
+    pixelButton(transport, transportLabels.stop, () => stopPlayback(), {
+      width: buttonWidth(transportLabels.stop), controlTitle: "STOP",
+    });
+
+    const playbackModes = controlRow(root, { height: toolbarHeight });
+    pixelButton(playbackModes, "LP", () => toggleLongPlay(), {
+      width: buttonWidth("LP"), selected: state.preferences.longPlayEnabled === true,
+      controlTitle: "LONG PLAY",
+    });
+    pixelButton(playbackModes, "R1", () => toggleRepeatOne(), {
+      width: buttonWidth("R1"), selected: state.preferences.repeatMode === "one",
+      controlTitle: "REPEAT ONE",
+    });
+    pixelButton(playbackModes, "P-RND", () => toggleRandomMode("playlist"), {
+      width: buttonWidth("P-RND"), selected: state.preferences.randomMode === "playlist",
+      controlTitle: "PLAYLIST RANDOM",
+    });
+    pixelButton(playbackModes, "L-RND", () => toggleRandomMode("library"), {
+      width: buttonWidth("L-RND"), selected: state.preferences.randomMode === "library",
+      controlTitle: "LIBRARY RANDOM",
+    });
+  }
 
   const content = makeWidget(root, {
     direction: FlexDirection.Row,
@@ -2109,6 +2192,30 @@ function setTheme(theme) {
   RGB = paletteRGB(displayPalette());
   saveDisplayOptions();
   render();
+}
+
+function setTransportSymbols(enabled) {
+  state.transportSymbols = enabled === true;
+  saveDisplayOptions();
+  render();
+}
+
+function setDisplaySpacing(key, value) {
+  const defaults = {
+    controlPaddingDots: DEFAULT_CONTROL_PADDING_DOTS,
+    uiGutterDots: DEFAULT_UI_GUTTER_DOTS,
+    playlistGapDots: DEFAULT_PLAYLIST_GAP_DOTS,
+  };
+  if (!(key in defaults)) return;
+  state[key] = storedSpacing(value, defaults[key]);
+  saveDisplayOptions();
+  render();
+}
+
+function adjustDisplaySpacing(key, delta) {
+  const current = Number(state[key]);
+  if (!Number.isFinite(current)) return;
+  setDisplaySpacing(key, current + delta);
 }
 
 function adjustAnimationTime(key, delta) {
@@ -3062,7 +3169,10 @@ window.ViewBoy = Object.freeze({
       case "library": selectSidebarView("LIBRARY"); break;
       case "queue": selectSidebarView("QUEUE"); break;
       case "optionsPage:DISPLAY": state.tab = "SETTINGS"; state.optionsPage = "DISPLAY"; render(); break;
+      case "optionsPage:THEME": state.tab = "SETTINGS"; state.optionsPage = "THEME"; render(); break;
+      case "optionsPage:TRANSPORT": state.tab = "SETTINGS"; state.optionsPage = "TRANSPORT"; render(); break;
       case "optionsPage:PLAYBACK": state.tab = "SETTINGS"; state.optionsPage = "PLAYBACK"; render(); break;
+      case "optionsPage:METHODS": state.tab = "SETTINGS"; state.optionsPage = "METHODS"; render(); break;
       case "optionsPage:AUDIO": state.tab = "SETTINGS"; state.optionsPage = "AUDIO"; render(); break;
       case "optionsPage:INTERFACE": state.tab = "SETTINGS"; state.optionsPage = "INTERFACE"; render(); break;
       case "optionsPage:LIBRARY": state.tab = "SETTINGS"; state.optionsPage = "LIBRARY"; render(); break;
