@@ -87,6 +87,13 @@ label, an album from a game filename, or credits from game-level information.
 Do not emit blank tags. A populated CUE `TITLE` or `PERFORMER` value may be
 reviewed as source metadata; its absence does not authorize a fallback value.
 
+For a mixed-mode package explicitly sequenced to mirror an OST, **Track Number**
+may express one continuous logical UAC sequence across XA tracks and appended
+disc-only extras, including a Red Book bonus. In that case the attached CUE
+alone carries physical disc numbering; do not mix physical and logical numbers
+in the member tag. Record the chosen sequence and any title mapping corrections
+in the set's source study.
+
 The following do not belong on the music-tag surface:
 
 - CD-DA sample rate, bit depth, channel count, reader/encoder facts, or a
