@@ -28,11 +28,12 @@ const calls = [];
 const groupStateCalls = [];
 const savedPreferences = [];
 let frontendSettingsChanged;
+let catalogReloaded;
 const originalRandom = Math.random;
-const rows = [
-  { playlistId: 'a', path: '/music/a.spc', title: 'First', game: 'Sample', system: 'SNES' },
-  { playlistId: 'b', path: '/music/b.spc', title: 'Second', game: 'Sample', system: 'SNES' },
-  { playlistId: 'c', path: '/music/c.spc', title: 'Third', game: 'Sample', system: 'SNES' },
+let rows = [
+  { playlistId: 'a', path: '/music/a.spc', filename: 'INITIAL_FILENAME.SPC', title: 'First', game: 'Sample', system: 'SNES' },
+  { playlistId: 'b', path: '/music/b.spc', filename: 'INITIAL_FILENAME.SPC', title: 'Second', game: 'Sample', system: 'SNES' },
+  { playlistId: 'c', path: '/music/c.spc', filename: 'INITIAL_FILENAME.SPC', title: 'Third', game: 'Sample', system: 'SNES' },
 ];
 const otherRow = { playlistId: 'other', path: '/music/other.spc', title: 'Other Track', game: 'Other', system: 'ZZZ' };
 let ended;
@@ -70,7 +71,7 @@ const bridge = {
   onNativePlaybackState() {},
   onNativePlaybackEnded(callback) { ended = callback; },
   onFrontendSettingsChanged(callback) { frontendSettingsChanged = callback; },
-  onCatalogReloaded() {},
+  onCatalogReloaded(callback) { catalogReloaded = callback; },
   onLibrarySnapshot() {},
 };
 globalThis.window = globalThis;
@@ -255,4 +256,17 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.notEqual(pixelChecksum(canvas.image.data), hiddenColumnsPixels,
     'restoring column visibility repaints the playlist columns');
+  frontendSettingsChanged({ appVolume: 1, longPlayEnabled: true, repeatMode: 'off', randomMode: 'library', columnVisibility: { game: false, filename: true } });
+  await tick();
+  await tick();
+  const shortFilenamePixels = pixelChecksum(canvas.image.data);
+  rows = rows.map((track, index) => index === 0 ? {
+    ...track,
+    filename: 'INITIAL_FILENAME.SPC-WITH-A-LONG-TAIL-THAT-MUST-FIT-THE-COLUMN.SPC',
+  } : track);
+  await catalogReloaded();
+  await tick();
+  await tick();
+  assert.notEqual(pixelChecksum(canvas.image.data), shortFilenamePixels,
+    'the File column expands beyond its default width to fit the longest catalog value');
 });

@@ -651,6 +651,30 @@ const configurableColumns = [
   { key: "path", title: "PATH" },
   { key: "size", title: "SIZE" },
 ];
+const tableContentLengthCache = new WeakMap();
+
+function tableContentLengths(items, columns) {
+  const cached = tableContentLengthCache.get(items);
+  if (cached) return cached;
+
+  const measured = {
+    lengths: Object.fromEntries(columns
+      .filter((column) => column.key !== "favorite" && column.key !== "title")
+      .map((column) => [column.key, Array.from(normalizedText(column.title)).length])),
+    hasValue: Object.fromEntries(columns.map((column) => [column.key, false])),
+  };
+  items.forEach((track, index) => {
+    for (const column of columns) {
+      if (column.key === "favorite" || column.key === "title") continue;
+      const value = tableValue(track, column.key, index);
+      const valueLength = Array.from(normalizedText(value)).length;
+      measured.lengths[column.key] = Math.max(measured.lengths[column.key] ?? 0, valueLength);
+      if (String(value).trim()) measured.hasValue[column.key] = true;
+    }
+  });
+  tableContentLengthCache.set(items, measured);
+  return measured;
+}
 
 function toggleSort(columnKey) {
   const selectedID = visibleTracks()[state.selectedTrack]
@@ -681,7 +705,7 @@ function tableColumns(items = activeTracks()) {
     { key: "favorite", title: "*", width: 7, align: "center", mandatory: true },
     { key: "index", title: "#", width: 12, align: "right", mandatory: true },
     { key: "filename", title: "FILE", width: 34 },
-    { key: "title", title: "TITLE", width: minimumTitleWidth, flexGrow: 1, mandatory: true, align: "center" },
+    { key: "title", title: "TITLE", width: minimumTitleWidth, flexGrow: 1, mandatory: true },
     { key: "game", title: "GAME", width: 40 },
     { key: "artist", title: "ARTIST", width: 40 },
     { key: "system", title: "SYSTEM", width: 28, mandatory: true },
@@ -700,16 +724,15 @@ function tableColumns(items = activeTracks()) {
     column.width = Math.max(column.width, headingWidth);
   });
 
-  if (state.preferences.columnAutoSize !== false) {
+  const autoSize = state.preferences.columnAutoSize !== false;
+  const content = tableContentLengths(items, columns);
+  if (autoSize) {
     columns.forEach((column) => {
       if (column.key === "favorite" || column.key === "title") return;
-      const longest = [column.title, ...items.slice(0, 256)
-        .map((track, index) => tableValue(track, column.key, index))]
-        .reduce((max, value) => Math.max(max, Array.from(normalizedText(value)).length), 0);
-      const textWidth = (longest * fontProfile().advance + 4) / STYLE_SCALE;
+      const textWidth = ((content.lengths[column.key] ?? 0) * fontProfile().advance + 4) / STYLE_SCALE;
       const headingCharacters = Array.from(column.title).length + 1;
       const headingWidth = (headingCharacters * fontProfile().advance + 4) / STYLE_SCALE;
-      column.width = Math.max(headingWidth, Math.min(column.width, Math.max(4, textWidth)));
+      column.width = Math.max(headingWidth, textWidth);
     });
   }
 
@@ -719,8 +742,7 @@ function tableColumns(items = activeTracks()) {
   const columnVisibility = state.preferences.columnVisibility || {};
   for (const column of columns) {
     if (column.mandatory || columnVisibility[column.key] === false) continue;
-    const hasValue = items.slice(0, 256)
-      .some((track, index) => String(tableValue(track, column.key, index)).trim());
+    const hasValue = content.hasValue[column.key];
     if (!hasValue && columnVisibility[column.key] !== true) continue;
     if (used + column.width + gap <= available) {
       chosen.add(column.key);
@@ -825,7 +847,7 @@ function createTableHeader(parent, columns) {
       inset: 1,
       border: 1,
       fill: marker ? 2 : undefined,
-      align: column.align ?? "center",
+      align: column.align ?? "left",
       onClick: column.key === "favorite" ? undefined : () => toggleSort(column.key),
     });
   });
@@ -964,7 +986,7 @@ function addCatalogPane(parent, mode) {
   const heading = mode === "QUEUE" ? "PLAY QUEUE"
     : mode === "FAVORITES" ? "FAVORITES" : "TRACK CATALOG";
   panelTitle(panel, heading, `${viewTracks.length} TRACKS`, 60);
-  const columns = resolveTableColumns(tableColumns(viewTracks), currentRenderTime);
+  const columns = resolveTableColumns(tableColumns(activeTracks()), currentRenderTime);
   createTableHeader(panel, columns);
   const count = visibleRowCount();
   state.queueScroll = Math.max(0, Math.min(state.queueScroll, Math.max(0, viewTracks.length - count)));
