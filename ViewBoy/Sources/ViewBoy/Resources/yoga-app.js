@@ -19,7 +19,7 @@ const RANDOM_HISTORY_LIMIT = 256;
 const APP_BORDER_GAP_DOTS = 8;
 const BUTTON_BORDER_DOTS = 1;
 const DEFAULT_CONTROL_PADDING_DOTS = 4;
-const DEFAULT_UI_GUTTER_DOTS = 4;
+const DEFAULT_UI_GAP_DOTS = 4;
 const DEFAULT_PLAYLIST_GAP_DOTS = 4;
 const SPACING_DOTS_MIN = 1;
 const SPACING_DOTS_MAX = 8;
@@ -85,6 +85,7 @@ const standardGlyphs = {
   9: ["01110", "10001", "10001", "01111", "00001", "00001", "01110"],
   ":": ["00000", "00100", "00100", "00000", "00100", "00100", "00000"],
   ".": ["00000", "00000", "00000", "00000", "00000", "00110", "00110"],
+  "…": ["00000", "00000", "00000", "00000", "00000", "10101", "10101"],
   ",": ["00000", "00000", "00000", "00000", "00110", "00110", "00100"],
   "-": ["00000", "00000", "00000", "11111", "00000", "00000", "00000"],
   "+": ["00000", "00100", "00100", "11111", "00100", "00100", "00000"],
@@ -146,6 +147,7 @@ const microGlyphs = {
   9: ["010", "101", "011", "001", "110"],
   ":": ["000", "010", "000", "010", "000"],
   ".": ["000", "000", "000", "000", "010"],
+  "…": ["000", "000", "000", "000", "101"],
   ",": ["000", "000", "000", "010", "100"],
   "-": ["000", "000", "111", "000", "000"],
   "+": ["000", "010", "111", "010", "000"],
@@ -196,7 +198,7 @@ function saveDisplayOptions() {
       contrast: state.contrast,
       theme: state.theme,
       controlPaddingDots: state.controlPaddingDots,
-      uiGutterDots: state.uiGutterDots,
+      uiGapDots: state.uiGapDots,
       playlistGapDots: state.playlistGapDots,
       transportSymbols: state.transportSymbols,
       columnOrder: state.columnOrder,
@@ -253,8 +255,10 @@ const state = {
   contrast: savedDisplayOptions.contrast === "HIGH_CONTRAST" ? "HIGH_CONTRAST" : "STANDARD",
   theme: savedDisplayOptions.theme === "NIGHTBOY" ? "NIGHTBOY" : "GAMEBOY",
   controlPaddingDots: storedSpacing(savedDisplayOptions.controlPaddingDots, DEFAULT_CONTROL_PADDING_DOTS),
-  uiGutterDots: storedSpacing(savedDisplayOptions.uiGutterDots, DEFAULT_UI_GUTTER_DOTS),
+  uiGapDots: storedSpacing(savedDisplayOptions.uiGapDots ?? savedDisplayOptions.uiGutterDots, DEFAULT_UI_GAP_DOTS),
   playlistGapDots: storedSpacing(savedDisplayOptions.playlistGapDots, DEFAULT_PLAYLIST_GAP_DOTS),
+  searchQuery: "",
+  searchFocused: false,
   transportSymbols: savedDisplayOptions.transportSymbols === true,
   optionsPage: "DISPLAY",
   transport: "stopped",
@@ -523,6 +527,9 @@ export function hitTargetSnapshot() {
       || (Number.isInteger(widget.meta.equalizerBar) ? `EQ BAND ${widget.meta.equalizerBar + 1}` : ""),
     columnMenuItem: widget.meta.columnMenuItem === true,
     columnHeader: widget.meta.columnHeader === true,
+    searchField: widget.meta.searchField === true,
+    playlistTabTitle: widget.meta.playlistTabTitle === true,
+    playlistTabClose: widget.meta.playlistTabClose === true,
     box: { ...box },
   })).filter((target) => target.name);
 }
@@ -604,11 +611,7 @@ function drawText(value, x, y, width, shade = 0, align = "left") {
   let text = normalizedText(value);
   const chars = Array.from(text);
   if (chars.length > maxCharacters) {
-    if (maxCharacters <= 3) {
-      text = ".".repeat(maxCharacters);
-    } else {
-      text = `${chars.slice(0, maxCharacters - 3).join("")}...`;
-    }
+    text = maxCharacters === 1 ? "…" : `${chars.slice(0, maxCharacters - 1).join("")}…`;
   }
   const measuredWidth = Math.max(0, Array.from(text).length * font.advance - 1);
   let textX = x;
@@ -721,16 +724,16 @@ function controlPaddingDots() {
   return state.controlPaddingDots;
 }
 
-function uiGutterDots() {
-  return state.uiGutterDots;
+function uiGapDots() {
+  return state.uiGapDots;
 }
 
 function uiGroupInsetDots() {
-  return uiGutterDots();
+  return uiGapDots();
 }
 
 function uiOptionsInsetDots() {
-  return uiGutterDots() * 2;
+  return uiGapDots() * 2;
 }
 
 function buttonStandardHeight() {
@@ -738,11 +741,11 @@ function buttonStandardHeight() {
 }
 
 function uiGap() {
-  return uiGutterDots() / STYLE_SCALE;
+  return uiGapDots() / STYLE_SCALE;
 }
 
 function uiSectionGap() {
-  return uiGutterDots() * 2 / STYLE_SCALE;
+  return uiGapDots() * 2 / STYLE_SCALE;
 }
 
 function playlistGap() {
@@ -778,6 +781,11 @@ function libraryToolbarItems() {
     { title: "FAV", view: "FAVORITES", onClick: () => selectSidebarView("FAVORITES") },
     { title: "OPEN", onClick: () => openLocalPath() },
     { title: "SYNC", onClick: () => loadCatalog() },
+    { title: "OPT", controlTitle: "OPTIONS", onClick: () => {
+      state.searchFocused = false;
+      state.tab = "SETTINGS";
+      render();
+    } },
   ];
 }
 
@@ -830,7 +838,10 @@ function pixelButton(parent, text, onClick, style = {}) {
     justifyContent: Justify.Center,
     height: buttonStandardHeight(),
     width: style.width ?? buttonWidth(text),
+    minWidth: style.minWidth,
     flexGrow: style.flexGrow ?? 0,
+    flexShrink: style.flexShrink,
+    flexBasis: style.flexBasis,
   }, {
     border: 1,
     fill: style.selected ? 2 : undefined,
@@ -1217,19 +1228,32 @@ function visibleRowCount() {
     / rowHeight(2 * controlPaddingDots())));
 }
 
+function visibleLibraryRowCount() {
+  const rootChrome = 2 * APP_BORDER_GAP_DOTS + 2 * buttonStandardHeight() + 3 * uiGap()
+    + rowHeight(4);
+  const sidebarChrome = 5 * buttonStandardHeight() + 5 * uiGap();
+  return Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - rootChrome - sidebarChrome)
+    / rowHeight(2 * controlPaddingDots())));
+}
+
 function libraryRows() {
+  const query = normalizedText(state.searchQuery).trim();
   const groups = new Map();
   for (const game of state.games) {
     const system = game.system || "OTHER";
+    const gameName = game.displayName || game.name || "";
+    const matches = !query || normalizedText(`${gameName} ${game.name || ""} ${system}`).includes(query);
+    if (!matches) continue;
     if (!groups.has(system)) groups.set(system, []);
     groups.get(system).push(game);
   }
   const rows = [];
   const transition = state.sidebarTransition;
   for (const system of [...groups.keys()].sort()) {
-    rows.push({ text: `${state.expandedSystems.has(system) ? "V" : ">"} ${system}`, system, group: true });
+    const searching = Boolean(query);
+    rows.push({ text: `${searching || state.expandedSystems.has(system) ? "V" : ">"} ${system}`, system, group: true });
     const isTransitioning = transition?.system === system;
-    if (state.expandedSystems.has(system) || (isTransitioning && transition.progress > 0)) {
+    if (searching || state.expandedSystems.has(system) || (isTransitioning && transition.progress > 0)) {
       for (const game of groups.get(system)) {
         rows.push({
           text: game.displayName || game.name,
@@ -1248,24 +1272,40 @@ function addLibraryPane(parent) {
     direction: FlexDirection.Column,
     width: libraryPaneWidth(),
     gap: 0,
-    padding: uiGutterDots(),
+    padding: uiGapDots(),
   }, {
     paint(box) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
     },
   });
+  label(library, state.searchQuery ? `SEARCH: ${state.searchQuery}` : "SEARCH LIBRARY", {
+    height: buttonStandardHeight(),
+  }, {
+    textShade: 0,
+    inset: controlPaddingDots(),
+    border: 1,
+    fill: state.searchFocused ? 2 : undefined,
+    searchField: true,
+    controlTitle: "SEARCH LIBRARY",
+    onClick: () => { state.searchFocused = true; render(); },
+  });
+  makeWidget(library, { height: uiGap() });
   panelTitle(library, "BROWSE");
-  const navigation = controlRow(library);
+  makeWidget(library, { height: uiGap() });
+  const navigation = controlRow(library, { gap: uiGap() });
   libraryToolbarItems().forEach((item) => pixelButton(navigation, item.title, item.onClick, {
-    width: buttonWidth(item.title),
+    width: 0,
+    minWidth: 0,
+    flexBasis: 0,
+    flexGrow: 1,
+    flexShrink: 1,
     selected: item.view === state.tab,
+    controlTitle: item.controlTitle,
   }));
   makeWidget(library, { height: uiGap() });
   panelTitle(library, "SYSTEMS");
   const rows = libraryRows();
-  const toolbarGrowth = 2 * (buttonStandardHeight() + uiGap());
-  const count = Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - 96 - toolbarGrowth)
-    / rowHeight(2 * controlPaddingDots())));
+  const count = visibleLibraryRowCount();
   state.libraryScroll = Math.max(0, Math.min(state.libraryScroll, Math.max(0, rows.length - count)));
   rows.slice(state.libraryScroll, state.libraryScroll + count).forEach((row) => {
     createLibraryRow(library, row.text, {
@@ -1276,10 +1316,15 @@ function addLibraryPane(parent) {
     });
   });
   makeWidget(library, { flexGrow: 1 });
-  const systemCount = new Set(state.games.map((game) => game.system || "OTHER")).size;
+  const query = normalizedText(state.searchQuery).trim();
+  const filteredGames = query ? state.games.filter((game) =>
+    normalizedText(`${game.displayName || game.name || ""} ${game.name || ""} ${game.system || "OTHER"}`)
+      .includes(query)) : state.games;
+  const systemCount = new Set(filteredGames.map((game) => game.system || "OTHER")).size;
   const first = rows.length ? state.libraryScroll + 1 : 0;
   const last = Math.min(rows.length, state.libraryScroll + count);
-  statusBar(library, `SYS ${systemCount} ${first}-${last}/${rows.length}`);
+  statusBar(library, query ? `MATCH ${filteredGames.length} SYS ${systemCount}`
+    : `SYS ${systemCount} ${first}-${last}/${rows.length}`);
   return library;
 }
 
@@ -1290,19 +1335,19 @@ function addCatalogPane(parent) {
     flexGrow: 1,
     flexShrink: 1,
     gap: 0,
-    padding: uiGutterDots(),
+    padding: uiGapDots(),
   }, {
     paint(box) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
     },
   });
   if (state.tab !== "FAVORITES") {
-    const tabRow = controlRow(panel, { gap: playlistGap() });
+    const tabRow = controlRow(panel, { gap: uiGap() });
     const tabList = makeWidget(tabRow, {
       direction: FlexDirection.Row,
       flexGrow: 1,
       flexBasis: 0,
-      gap: playlistGap(),
+      gap: uiGap(),
       overflow: Overflow.Hidden,
     }, { clipChildren: true });
     state.playlistTabs.forEach((tab) => {
@@ -1310,19 +1355,47 @@ function addCatalogPane(parent) {
         direction: FlexDirection.Row,
         flexGrow: 1,
         flexBasis: 0,
-        gap: playlistGap(),
+        flexShrink: 1,
+        minWidth: 0,
+        gap: uiGap(),
+        height: buttonStandardHeight(),
+        alignItems: Align.Center,
+      }, {
+        paint(box) {
+          if (tab.id === state.activePlaylistTabId) fillRect(box.x, box.y, box.width, box.height, 2);
+          strokeRect(box.x, box.y, box.width, box.height, 1);
+        },
       });
-      pixelButton(item, tab.title, () => activatePlaylistTab(tab.id), {
+      label(item, tab.title, {
         flexGrow: 1,
-        selected: tab.id === state.activePlaylistTabId,
+        flexBasis: 0,
+        flexShrink: 1,
+        minWidth: 0,
+      height: buttonStandardHeight(),
+    }, {
+      textShade: 0,
+      inset: controlPaddingDots(),
+        playlistTabTitle: true,
+        controlTitle: `TAB ${tab.title}`,
+        onClick: () => activatePlaylistTab(tab.id),
       });
-      pixelButton(item, "X", () => closePlaylistTab(tab.id), {
+      label(item, "X", {
         width: buttonWidth("X"),
+        flexShrink: 0,
+        height: buttonStandardHeight(),
+      }, {
+        textShade: 0,
+        inset: controlPaddingDots(),
+        align: "center",
+        playlistTabClose: true,
+        controlTitle: "X",
+        onClick: () => closePlaylistTab(tab.id),
       });
     });
     pixelButton(tabRow, "[+]", () => createPlaylistTab({ duplicateActive: true }), {
       width: buttonWidth("[+]"),
     });
+    makeWidget(panel, { height: uiGap() });
   }
   const columns = resolveTableColumns(tableColumns(viewTracks), currentRenderTime);
   const tableGap = Math.max(0, columns.length - 1) * playlistGap();
@@ -1442,7 +1515,7 @@ function addPalettePreview(parent) {
     flexGrow: 1,
     gap: uiGap(),
     paddingHorizontal: uiGroupInsetDots() / STYLE_SCALE,
-    paddingVertical: uiGutterDots() / STYLE_SCALE,
+    paddingVertical: uiGapDots() / STYLE_SCALE,
   });
   RGB.forEach((_, shade) => makeWidget(preview, {
     flexGrow: 1,
@@ -1748,7 +1821,7 @@ function addAudioOptions(parent, pref) {
     paint(box) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
       const count = 10;
-      const gap = uiGutterDots();
+      const gap = uiGapDots();
       const segmentWidth = Math.max(1, Math.floor((box.width - 2 - (count - 1) * gap) / count));
       const active = Math.round(volume * count);
       for (let index = 0; index < active; index += 1) {
@@ -1777,9 +1850,9 @@ function addInterfaceOptions(parent, pref) {
   optionAdjuster(spacing, "CONTROL PADDING", `${controlPaddingDots()} DOTS`,
     () => adjustDisplaySpacing("controlPaddingDots", -1),
     () => adjustDisplaySpacing("controlPaddingDots", 1));
-  optionAdjuster(spacing, "UI GUTTER", `${uiGutterDots()} DOTS`,
-    () => adjustDisplaySpacing("uiGutterDots", -1),
-    () => adjustDisplaySpacing("uiGutterDots", 1));
+  optionAdjuster(spacing, "UI GAP", `${uiGapDots()} DOTS`,
+    () => adjustDisplaySpacing("uiGapDots", -1),
+    () => adjustDisplaySpacing("uiGapDots", 1));
   optionAdjuster(spacing, "PLAYLIST GAP", `${state.playlistGapDots} DOTS`,
     () => adjustDisplaySpacing("playlistGapDots", -1),
     () => adjustDisplaySpacing("playlistGapDots", 1));
@@ -1880,49 +1953,67 @@ function buildTree() {
     },
   });
 
-  const navigation = controlRow(root, { height: toolbarHeight });
-  label(navigation, "VIEWBOY", { flexGrow: 1, height: toolbarHeight }, {
-    textShade: 0, inset: 0,
-  });
   const buttonWidth = (text) => framedTextWidth(text);
-  pixelButton(navigation, state.tab === "SETTINGS" ? "BACK" : "OPTIONS", () => {
-    state.tab = state.tab === "SETTINGS" ? "LIBRARY" : "SETTINGS";
-    render();
-  }, { width: buttonWidth(state.tab === "SETTINGS" ? "BACK" : "OPTIONS") });
+  if (state.tab === "SETTINGS") {
+    const navigation = controlRow(root, {
+      height: toolbarHeight,
+      justifyContent: Justify.FlexEnd,
+    });
+    pixelButton(navigation, "BACK", () => {
+      state.tab = "LIBRARY";
+      state.searchFocused = false;
+      render();
+    }, { width: buttonWidth("BACK") });
+  } else {
+    const toolbarWidth = (WIDTH / STYLE_SCALE - 2 * APP_BORDER_GAP_DOTS) / 2;
+    const toolbarStage = makeWidget(root, {
+      direction: FlexDirection.Row,
+      alignItems: Align.Stretch,
+    });
+    makeWidget(toolbarStage, { flexGrow: 1, minWidth: 0 });
+    const toolbarGroup = makeWidget(toolbarStage, {
+      direction: FlexDirection.Column,
+      width: toolbarWidth,
+      gap: uiGap(),
+    });
+    makeWidget(toolbarStage, { flexGrow: 1, minWidth: 0 });
 
-  if (state.tab !== "SETTINGS") {
-    const transport = controlRow(root, { height: toolbarHeight });
+    const fillButton = (parent, text, onClick, style = {}) => pixelButton(parent, text, onClick, {
+      width: 0,
+      minWidth: 0,
+      flexBasis: 0,
+      flexGrow: 1,
+      flexShrink: 1,
+      ...style,
+    });
+    const transport = controlRow(toolbarGroup, { height: toolbarHeight, gap: uiGap() });
     const transportLabels = state.transportSymbols
       ? { previous: "<<", play: state.playing ? "||" : ">", next: ">>", stop: "[]" }
       : { previous: "PREV", play: state.playing ? "PAUSE" : "PLAY", next: "NEXT", stop: "STOP" };
-    pixelButton(transport, transportLabels.previous, () => selectPrevious(), {
-      width: buttonWidth(transportLabels.previous), controlTitle: "PREVIOUS",
+    fillButton(transport, transportLabels.previous, () => selectPrevious(), {
+      controlTitle: "PREVIOUS",
     });
-    pixelButton(transport, transportLabels.play, () => togglePlaying(), {
-      width: buttonWidth(transportLabels.play), controlTitle: state.playing ? "PAUSE" : "PLAY",
+    fillButton(transport, transportLabels.play, () => togglePlaying(), {
+      controlTitle: state.playing ? "PAUSE" : "PLAY",
     });
-    pixelButton(transport, transportLabels.next, () => selectNext(), {
-      width: buttonWidth(transportLabels.next), controlTitle: "NEXT",
-    });
-    pixelButton(transport, transportLabels.stop, () => stopPlayback(), {
-      width: buttonWidth(transportLabels.stop), controlTitle: "STOP",
-    });
+    fillButton(transport, transportLabels.next, () => selectNext(), { controlTitle: "NEXT" });
+    fillButton(transport, transportLabels.stop, () => stopPlayback(), { controlTitle: "STOP" });
 
-    const playbackModes = controlRow(root, { height: toolbarHeight });
-    pixelButton(playbackModes, "LP", () => toggleLongPlay(), {
-      width: buttonWidth("LP"), selected: state.preferences.longPlayEnabled === true,
+    const playbackModes = controlRow(toolbarGroup, { height: toolbarHeight, gap: uiGap() });
+    fillButton(playbackModes, "LP", () => toggleLongPlay(), {
+      selected: state.preferences.longPlayEnabled === true,
       controlTitle: "LONG PLAY",
     });
-    pixelButton(playbackModes, "R1", () => toggleRepeatOne(), {
-      width: buttonWidth("R1"), selected: state.preferences.repeatMode === "one",
+    fillButton(playbackModes, "R1", () => toggleRepeatOne(), {
+      selected: state.preferences.repeatMode === "one",
       controlTitle: "REPEAT ONE",
     });
-    pixelButton(playbackModes, "P-RND", () => toggleRandomMode("playlist"), {
-      width: buttonWidth("P-RND"), selected: state.preferences.randomMode === "playlist",
+    fillButton(playbackModes, "P-RND", () => toggleRandomMode("playlist"), {
+      selected: state.preferences.randomMode === "playlist",
       controlTitle: "PLAYLIST RANDOM",
     });
-    pixelButton(playbackModes, "L-RND", () => toggleRandomMode("library"), {
-      width: buttonWidth("L-RND"), selected: state.preferences.randomMode === "library",
+    fillButton(playbackModes, "L-RND", () => toggleRandomMode("library"), {
+      selected: state.preferences.randomMode === "library",
       controlTitle: "LIBRARY RANDOM",
     });
   }
@@ -2203,7 +2294,7 @@ function setTransportSymbols(enabled) {
 function setDisplaySpacing(key, value) {
   const defaults = {
     controlPaddingDots: DEFAULT_CONTROL_PADDING_DOTS,
-    uiGutterDots: DEFAULT_UI_GUTTER_DOTS,
+    uiGapDots: DEFAULT_UI_GAP_DOTS,
     playlistGapDots: DEFAULT_PLAYLIST_GAP_DOTS,
   };
   if (!(key in defaults)) return;
@@ -3019,6 +3110,10 @@ canvas.addEventListener("click", (event) => {
     return;
   }
   const target = findTarget(logicalPoint(event));
+  if (state.searchFocused && !target?.meta.searchField) {
+    state.searchFocused = false;
+    if (!target?.meta.onClick) render();
+  }
   if (state.columnMenu && !target?.meta.columnMenuItem) {
     state.columnMenu = null;
     if (target?.meta.onClick) target.meta.onClick(event);
@@ -3047,8 +3142,9 @@ canvas.addEventListener("wheel", (event) => {
   const library = point.x < sidebarWidth;
   const key = library ? "libraryScroll" : "queueScroll";
   const length = library ? libraryRows().length : visibleTracks().length;
+  const visibleCount = library ? visibleLibraryRowCount() : visibleRowCount();
   const direction = Math.sign(event.deltaY);
-  state[key] = Math.max(0, Math.min(Math.max(0, length - visibleRowCount()), state[key] + direction * 3));
+  state[key] = Math.max(0, Math.min(Math.max(0, length - visibleCount), state[key] + direction * 3));
   render();
 }, { passive: false });
 
@@ -3056,12 +3152,29 @@ canvas.addEventListener("keydown", (event) => {
   const commandKey = event.metaKey || event.ctrlKey;
   if (commandKey && event.key === ",") {
     event.preventDefault();
+    state.searchFocused = false;
     state.tab = "SETTINGS";
     render();
   } else if (commandKey && /^[1-9]$/.test(event.key)) {
     event.preventDefault();
     const tab = state.playlistTabs[Number(event.key) - 1];
     if (tab) activatePlaylistTab(tab.id);
+  } else if (state.searchFocused && state.tab !== "SETTINGS") {
+    if (event.key === "Escape") {
+      if (state.searchQuery) state.searchQuery = "";
+      else state.searchFocused = false;
+    } else if (event.key === "Backspace") {
+      state.searchQuery = Array.from(state.searchQuery).slice(0, -1).join("");
+    } else if (event.key === "Enter") {
+      state.searchFocused = false;
+    } else if (event.key.length === 1 && !event.altKey) {
+      state.searchQuery += normalizedText(event.key);
+    } else {
+      return;
+    }
+    event.preventDefault();
+    state.libraryScroll = 0;
+    render();
   } else if (event.code === "Escape" && state.columnMenu) {
     event.preventDefault();
     state.columnMenu = null;
@@ -3165,7 +3278,7 @@ window.ViewBoy = Object.freeze({
       case "newPlaylistTab": createPlaylistTab({ duplicateActive: true }); break;
       case "closePlaylistTab": closePlaylistTab(); break;
       case "openPath": openLocalPath(); break;
-      case "settings": state.tab = "SETTINGS"; render(); break;
+      case "settings": state.searchFocused = false; state.tab = "SETTINGS"; render(); break;
       case "library": selectSidebarView("LIBRARY"); break;
       case "queue": selectSidebarView("QUEUE"); break;
       case "optionsPage:DISPLAY": state.tab = "SETTINGS"; state.optionsPage = "DISPLAY"; render(); break;

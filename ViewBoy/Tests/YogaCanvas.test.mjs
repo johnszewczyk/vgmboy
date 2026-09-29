@@ -124,12 +124,24 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.match(status.textContent, /FIRST/i);
   const toolbarTargets = hitTargetSnapshot();
-  assert.ok(toolbarTargets.find((target) => target.name === 'OPTIONS').box.y
-    < toolbarTargets.find((target) => target.name === 'PREVIOUS').box.y,
-  'app navigation has its own row above transport controls');
-  assert.ok(toolbarTargets.find((target) => target.name === 'PREVIOUS').box.y
-    < toolbarTargets.find((target) => target.name === 'LONG PLAY').box.y,
-  'playback modes have a separate row below transport controls');
+  const transportTargets = ['PREVIOUS', 'PLAY', 'NEXT', 'STOP']
+    .map((name) => toolbarTargets.find((target) => target.name === name));
+  const modeTargets = ['LONG PLAY', 'REPEAT ONE', 'PLAYLIST RANDOM', 'LIBRARY RANDOM']
+    .map((name) => toolbarTargets.find((target) => target.name === name));
+  assert.ok(transportTargets.every((target) => target && target.box.y === transportTargets[0].box.y),
+    'core transport buttons share one toolbar row');
+  assert.ok(modeTargets.every((target) => target && target.box.y === modeTargets[0].box.y),
+    'playback methods share a second toolbar row');
+  assert.ok(Math.max(...transportTargets.map((target) => target.box.width))
+    - Math.min(...transportTargets.map((target) => target.box.width)) <= 1,
+  'core transport buttons share their toolbar width evenly');
+  assert.ok(Math.max(...modeTargets.map((target) => target.box.width))
+    - Math.min(...modeTargets.map((target) => target.box.width)) <= 1,
+    'playback methods share their toolbar width evenly');
+  assert.ok(Math.abs(transportTargets[0].box.x - modeTargets[0].box.x) <= 1,
+    'the centered half-width wrapper aligns both toolbar rows');
+  assert.ok(toolbarTargets.some((target) => target.name === 'OPTIONS'),
+    'Options remains reachable from the sidebar controls');
   assert.ok(groupStateCalls.some(([action, system]) => action === 'toggle' && system === 'SNES'));
   assert.ok(groupStateCalls.some(([action, system, gameID]) =>
     action === 'selectGame' && system === 'SNES' && gameID === '1:SNES:Sample'));
@@ -236,8 +248,53 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
       (target.box.y + target.box.height * yFraction) / logicalHeight,
     );
   };
+  const typeSearchKey = (key) => canvas.listeners.get('keydown')({
+    key,
+    code: key === 'Backspace' ? 'Backspace' : key === 'Escape' ? 'Escape' : `Key${key.toUpperCase()}`,
+    metaKey: false,
+    ctrlKey: false,
+    altKey: false,
+    shiftKey: false,
+    preventDefault() {},
+  });
   const pages = ['DISPLAY', 'THEME', 'TRANSPORT', 'PLAYBACK', 'METHODS', 'AUDIO', 'INTERFACE', 'LIBRARY'];
   const clickPage = (index) => clickTarget(pages[index]);
+  globalThis.ViewBoy.dispatch('library');
+  assert.ok(hitTargetSnapshot().some((target) => target.searchField && target.name === 'SEARCH LIBRARY'),
+    'the sidebar begins with a pixel-rendered search field');
+  clickTarget('SEARCH LIBRARY');
+  for (const character of 'sample') typeSearchKey(character);
+  const searchTargets = hitTargetSnapshot().map((target) => target.name);
+  assert.ok(searchTargets.includes('Sample'), 'typing filters the sidebar tree to matching catalog games');
+  assert.equal(searchTargets.includes('Other'), false, 'nonmatching games are hidden by the sidebar search');
+  typeSearchKey('Escape');
+  assert.ok(hitTargetSnapshot().some((target) => target.name.includes('ZZZ')),
+    'Escape clears the search and restores the complete sidebar tree');
+  typeSearchKey('Escape');
+  globalThis.ViewBoy.dispatch('newPlaylistTab');
+  const tabGap = () => {
+    const titles = hitTargetSnapshot().filter((target) => target.playlistTabTitle);
+    const closes = hitTargetSnapshot().filter((target) => target.playlistTabClose);
+    assert.equal(titles.length, 2, 'both playlist tabs expose a clipped title region');
+    assert.equal(closes.length, 2, 'each playlist tab exposes its unframed close glyph');
+    return titles[1].box.x - (closes[0].box.x + closes[0].box.width);
+  };
+  const defaultTabGap = tabGap();
+  clickTarget('OPTIONS');
+  clickPage(6);
+  clickTarget('UI GAP +');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 5,
+    'the renamed UI Gap setting persists under its current name');
+  globalThis.ViewBoy.dispatch('library');
+  assert.ok(tabGap() > defaultTabGap, 'playlist tabs respond to UI Gap while retaining independent column spacing');
+  clickTarget('X', 1);
+  clickTarget('OPTIONS');
+  clickPage(6);
+  clickTarget('UI GAP -');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 4,
+    'the UI Gap returns to its original value');
+  clickTarget('BACK');
+  globalThis.ViewBoy.dispatch('settings');
   const commandKey = (key) => canvas.listeners.get('keydown')({
     key,
     code: key === ',' ? 'Comma' : `Digit${key}`,
@@ -355,17 +412,17 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'control padding is adjustable and persists in display preferences');
   assert.ok(hitTargetSnapshot().find((target) => target.name === 'BACK').box.height > paddingBefore,
     'control padding changes the shared button row height');
-  clickTarget('UI GUTTER +');
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGutterDots, 5,
-    'the shared interface gutter has an independent persisted setting');
+  clickTarget('UI GAP +');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 5,
+    'the shared interface gap has an independent persisted setting');
   clickTarget('PLAYLIST GAP +');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).playlistGapDots, 5,
     'playlist column and tab spacing has an independent persisted setting');
   clickTarget('CONTROL PADDING -');
-  clickTarget('UI GUTTER -');
+  clickTarget('UI GAP -');
   clickTarget('PLAYLIST GAP -');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).controlPaddingDots, 4);
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGutterDots, 4);
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 4);
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).playlistGapDots, 4);
   clickPage(7);
   globalThis.ViewBoy.dispatch('optionsPage:LIBRARY');
@@ -390,15 +447,14 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).transportSymbols, true,
     'the Transport page persists its Words/Symbols control setting');
   globalThis.ViewBoy.dispatch('library');
-  const symbolTransportWidth = hitTargetSnapshot().find((target) => target.name === 'PREVIOUS').box.width;
+  const symbolTransportPixels = pixelChecksum(canvas.image.data);
   globalThis.ViewBoy.dispatch('settings');
   clickPage(2);
   clickTarget('BUTTONS WORDS');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).transportSymbols, false);
   globalThis.ViewBoy.dispatch('library');
-  const wordTransportWidth = hitTargetSnapshot().find((target) => target.name === 'PREVIOUS').box.width;
-  assert.ok(symbolTransportWidth < wordTransportWidth,
-    'symbol controls use the compact bitmap transport glyphs');
+  assert.notEqual(pixelChecksum(canvas.image.data), symbolTransportPixels,
+    'symbol mode replaces word labels while keeping equal-width toolbar controls');
   globalThis.ViewBoy.dispatch('settings');
   clickPage(4);
   clickTarget('LIBGME SPEED');
