@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
     <title>ViewBoy</title>
+    <script>
+      try {
+        if (JSON.parse(localStorage.getItem("ViewBoy.displayOptions") || "{}").theme === "NIGHTBOY") {
+          document.documentElement.dataset.theme = "NIGHTBOY";
+        }
+      } catch {}
+    </script>
     <link rel="stylesheet" href="./yoga-screen.css" />
   </head>
   <body>

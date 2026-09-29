@@ -81,7 +81,7 @@ globalThis.devicePixelRatio = 2;
 globalThis.addEventListener = (name, callback) => windowListeners.set(name, callback);
 globalThis.requestAnimationFrame = (callback) => setImmediate(() => callback(performance.now() + 250));
 globalThis.cancelAnimationFrame = (frame) => clearImmediate(frame);
-globalThis.document = { querySelector(selector) {
+globalThis.document = { documentElement: { dataset: {} }, querySelector(selector) {
   if (selector === '#lcd') return canvas;
   if (selector === '#screen-window') return screen;
   return status;
@@ -194,6 +194,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const nightBoyPixels = pixelChecksum(canvas.image.data);
   assert.notEqual(nightBoyPixels, gameBoyPixels, 'NightBoy repaints the same four-tone pixel screen with its dark-purple palette');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'NIGHTBOY');
+  assert.equal(document.documentElement.dataset.theme, 'NIGHTBOY',
+    'the selected LCD theme also updates the surrounding shell');
   clickScreen(0.41, 0.296);
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'HIGH_CONTRAST',
     'the ink control persists the brighter silver high-contrast setting');
@@ -279,6 +281,25 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   const narrowLayoutPixels = pixelChecksum(canvas.image.data);
   const rect = canvas.getBoundingClientRect();
+  let contextMenuPrevented = false;
+  const beforeColumnMenu = pixelChecksum(canvas.image.data);
+  canvas.listeners.get('contextmenu')({
+    clientX: rect.width * 0.60,
+    clientY: rect.height * 0.09,
+    preventDefault() { contextMenuPrevented = true; },
+  });
+  assert.ok(contextMenuPrevented, 'right-clicking a column heading opens its visibility menu');
+  assert.notEqual(pixelChecksum(canvas.image.data), beforeColumnMenu,
+    'the column menu is painted into the LCD framebuffer');
+  clickScreen(0.62, 0.145);
+  await tick();
+  assert.equal(savedPreferences.at(-1).columnVisibility.filename, false,
+    'the column menu hides the selected field through the native preference bridge');
+  clickScreen(0.62, 0.145);
+  await tick();
+  assert.equal(savedPreferences.at(-1).columnVisibility.filename, true,
+    'the same column menu restores the selected field');
+  canvas.listeners.get('keydown')({ code: 'Escape', preventDefault() {} });
   canvas.listeners.get('wheel')({
     clientX: rect.width * 0.72,
     clientY: rect.height * 0.34,
@@ -304,17 +325,17 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     shiftKey: false,
     preventDefault() {},
   });
-  sendPointer('pointerdown', 0.60, 0.125);
-  sendPointer('pointermove', 0.80, 0.125);
-  sendPointer('pointerup', 0.80, 0.125);
+  sendPointer('pointerdown', 0.60, 0.09);
+  sendPointer('pointermove', 0.88, 0.09);
+  sendPointer('pointerup', 0.88, 0.09);
   const savedColumnOrder = JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).columnOrder;
   assert.ok(savedColumnOrder.indexOf('filename') > savedColumnOrder.indexOf('title'),
-    'dragging a header reorders columns and keeps the order in display preferences');
+    `dragging a header reorders columns and keeps the order in display preferences: ${savedColumnOrder.join(',')}`);
   assert.ok(!savedColumnOrder.includes('index'), 'the numbered column is pinned outside the movable order');
   const headerOrder = [...savedColumnOrder];
-  sendPointer('pointerdown', 0.45, 0.125);
-  sendPointer('pointermove', 0.80, 0.125);
-  sendPointer('pointerup', 0.80, 0.125);
+  sendPointer('pointerdown', 0.43, 0.09);
+  sendPointer('pointermove', 0.80, 0.09);
+  sendPointer('pointerup', 0.80, 0.09);
   assert.deepEqual(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).columnOrder, headerOrder,
     'dragging other headers across # cannot move the numbered column');
 });

@@ -7,6 +7,7 @@ import Yoga, {
   Gutter,
   Justify,
   Overflow,
+  PositionType,
 } from "./yoga-layout.js";
 
 // Each LCD dot occupies three physical display pixels per side. On a Retina
@@ -263,8 +264,10 @@ const state = {
   groupTransitionToken: 0,
   playbackToken: 0,
   retiredGeneration: 0,
+  columnMenu: null,
 };
 RGB = paletteRGB(displayPalette());
+if (document.documentElement) document.documentElement.dataset.theme = state.theme;
 
 let tracks = [];
 
@@ -451,8 +454,11 @@ function makeWidget(parent, style = {}, meta = {}) {
   yoga.setAlignItems(style.alignItems ?? Align.Stretch);
   yoga.setJustifyContent(style.justifyContent ?? Justify.FlexStart);
   yoga.setFlexShrink(style.flexShrink ?? 0);
+  if (style.positionType !== undefined) yoga.setPositionType(style.positionType);
   if (style.width !== undefined) yoga.setWidth(style.width * STYLE_SCALE);
   if (style.height !== undefined) yoga.setHeight(style.height * STYLE_SCALE);
+  if (style.left !== undefined) yoga.setPosition(Edge.Left, style.left * STYLE_SCALE);
+  if (style.top !== undefined) yoga.setPosition(Edge.Top, style.top * STYLE_SCALE);
   if (style.flexGrow !== undefined) yoga.setFlexGrow(style.flexGrow);
   if (style.flexBasis !== undefined) yoga.setFlexBasis(style.flexBasis * STYLE_SCALE);
   if (style.padding !== undefined) yoga.setPadding(Edge.All, style.padding * STYLE_SCALE);
@@ -513,7 +519,41 @@ function oneDot() {
   return 1 / STYLE_SCALE;
 }
 
-function panelTitle(parent, text, suffix = "", suffixWidth = 40) {
+function libraryToolbarItems() {
+  return [
+    { title: "LIB", view: "LIBRARY", onClick: () => selectSidebarView("LIBRARY") },
+    { title: "Q", view: "QUEUE", onClick: () => selectSidebarView("QUEUE") },
+    { title: "FAV", view: "FAVORITES", onClick: () => selectSidebarView("FAVORITES") },
+    { title: "OPEN", onClick: () => openLocalPath() },
+    { title: "SYNC", onClick: () => loadCatalog() },
+  ];
+}
+
+function libraryPaneWidth() {
+  const items = libraryToolbarItems();
+  const buttonsWidth = items.reduce((sum, item) => sum
+    + (Array.from(item.title).length * fontProfile().advance + 4) / STYLE_SCALE, 0);
+  return Math.max(WIDTH < 420 ? 94 : 128, buttonsWidth + items.length - 1 + 4);
+}
+
+function statusBar(parent, text) {
+  const height = rowHeight(4);
+  const row = makeWidget(parent, {
+    direction: FlexDirection.Row,
+    alignItems: Align.Center,
+    height,
+  }, {
+    paint(box) { line(box.x, box.y, box.x + box.width, box.y, 1); },
+  });
+  label(row, text, { flexGrow: 1, height }, {
+    textShade: 0,
+    align: "center",
+    inset: 1,
+  });
+  return row;
+}
+
+function panelTitle(parent, text) {
   const titleHeight = rowHeight(2);
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
@@ -525,8 +565,7 @@ function panelTitle(parent, text, suffix = "", suffixWidth = 40) {
       fillRect(box.x, box.y, box.width, box.height, 2);
     },
   });
-  label(row, text, { flexGrow: 1, height: titleHeight }, { textShade: 0, inset: 2 });
-  if (suffix) label(row, suffix, { width: suffixWidth, height: titleHeight }, { textShade: 0, align: "right", inset: 2 });
+  label(row, text, { flexGrow: 1, height: titleHeight }, { textShade: 0, inset: 2, align: "center" });
   return row;
 }
 
@@ -572,25 +611,28 @@ function optionColumns(parent) {
   return [makeColumn(), makeColumn()];
 }
 
-function optionToggle(parent, title, checked, onClick) {
-  const height = rowHeight(8);
+function optionToggle(parent, title, checked, onClick, extraMeta = {}) {
+  const height = buttonStandardHeight();
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
     height,
+    gap: oneDot(),
     paddingHorizontal: 2,
   }, {
     onClick,
     paint(box) {
-      line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2);
+      if (checked) fillRect(box.x + 1, box.y + 1, box.width - 2, box.height - 2, 2);
+      strokeRect(box.x, box.y, box.width, box.height, 1);
     },
+    ...extraMeta,
   });
-  label(row, title, { flexGrow: 1, height }, { textShade: 0, inset: 1 });
   const marker = checked ? "[x]" : "[ ]";
   label(row, marker, {
     width: (Array.from(marker).length * fontProfile().advance + 2) / STYLE_SCALE,
     height: fontProfile().height / STYLE_SCALE,
   }, { textShade: 0, align: "center", inset: 0 });
+  label(row, title, { flexGrow: 1, height }, { textShade: 0, inset: 1 });
   return row;
 }
 
@@ -652,7 +694,7 @@ function formatSize(bytes) {
 
 function tableValue(track, key, rowIndex = 0) {
   switch (key) {
-    case "favorite": return state.favoriteIDs.has(trackID(track)) ? "*" : "";
+    case "favorite": return state.favoriteIDs.has(trackID(track)) ? "[x]" : "[ ]";
     case "index": return String(rowIndex + 1);
     case "filename": return track.filename || "";
     case "title": return track.title || track.filename || "UNTITLED";
@@ -732,7 +774,7 @@ function tableColumns(items = activeTracks()) {
       reorderable: false,
       sortable: false,
     },
-    { key: "favorite", title: "*", width: minimumColumnWidth(1), align: "center", mandatory: true, sortable: false },
+    { key: "favorite", title: "FAV", width: minimumColumnWidth(3), align: "center", mandatory: true, sortable: false },
     { key: "filename", title: "FILE", width: 34 },
     { key: "title", title: "TITLE", width: minimumTitleWidth, flexGrow: 1, mandatory: true },
     { key: "game", title: "GAME", width: 40 },
@@ -873,7 +915,7 @@ function createTableHeader(parent, columns) {
       inset: 1,
       border: 1,
       fill: marker ? 2 : undefined,
-      align: column.align ?? "left",
+      align: "center",
       columnKey: column.key,
       columnHeader: true,
       reorderable: column.reorderable !== false,
@@ -962,7 +1004,7 @@ function libraryRows() {
 function addLibraryPane(parent) {
   const library = makeWidget(parent, {
     direction: FlexDirection.Column,
-    width: WIDTH < 420 ? 94 : 128,
+    width: libraryPaneWidth(),
     gap: 0,
     padding: 2,
   }, {
@@ -970,21 +1012,20 @@ function addLibraryPane(parent) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
     },
   });
-  panelTitle(library, "VIEWS", "03");
-  [
-    ["LIBRARY", "LIBRARY"],
-    ["CURRENT QUEUE", "QUEUE"],
-    ["FAVORITES", "FAVORITES"],
-  ].forEach(([title, view]) => createLibraryRow(library, title, {
-    selected: state.tab === view,
-    onClick: () => selectSidebarView(view),
-  }));
-  label(library, "OPEN PATH", { height: rowHeight(2) }, {
-    textShade: 0, inset: 1, onClick: () => openLocalPath(),
+  panelTitle(library, "BROWSE");
+  const navigation = makeWidget(library, {
+    direction: FlexDirection.Row,
+    alignItems: Align.Center,
+    height: buttonStandardHeight(),
+    gap: oneDot(),
   });
-  panelTitle(library, "SYSTEMS", String(state.games.length));
+  libraryToolbarItems().forEach((item) => pixelButton(navigation, item.title, item.onClick, {
+    width: (Array.from(item.title).length * fontProfile().advance + 4) / STYLE_SCALE,
+    selected: item.view === state.tab,
+  }));
+  panelTitle(library, `SYSTEMS ${state.games.length}`);
   const rows = libraryRows();
-  const count = Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - 116) / rowHeight(3)));
+  const count = Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - 88) / rowHeight(3)));
   state.libraryScroll = Math.max(0, Math.min(state.libraryScroll, Math.max(0, rows.length - count)));
   rows.slice(state.libraryScroll, state.libraryScroll + count).forEach((row) => {
     createLibraryRow(library, row.text, {
@@ -994,13 +1035,11 @@ function addLibraryPane(parent) {
       onClick: row.game ? () => loadGame(row.game) : () => toggleSystem(row.system),
     });
   });
-  label(library, `${rows.length ? state.libraryScroll + 1 : 0}-${Math.min(rows.length, state.libraryScroll + count)} / ${rows.length}`, {
-    flexGrow: 1, height: rowHeight(2),
-  }, { textShade: 0, align: "right", inset: 1 });
+  statusBar(library, `${rows.length ? state.libraryScroll + 1 : 0}-${Math.min(rows.length, state.libraryScroll + count)} / ${rows.length} ITEMS`);
   return library;
 }
 
-function addCatalogPane(parent, mode) {
+function addCatalogPane(parent) {
   const viewTracks = visibleTracks();
   const panel = makeWidget(parent, {
     direction: FlexDirection.Column,
@@ -1013,9 +1052,6 @@ function addCatalogPane(parent, mode) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
     },
   });
-  const heading = mode === "QUEUE" ? "PLAY QUEUE"
-    : mode === "FAVORITES" ? "FAVORITES" : "TRACK CATALOG";
-  panelTitle(panel, heading, `${viewTracks.length} TRACKS`, 60);
   const columns = resolveTableColumns(tableColumns(viewTracks), currentRenderTime);
   const tableGap = Math.max(0, columns.length - 1) * oneDot();
   state.tableContentMinimumWidth = columns.reduce((sum, column) => sum + column.width, 0) + tableGap;
@@ -1075,14 +1111,50 @@ function addCatalogPane(parent, mode) {
       state.tableScrollbarThumb = { x: thumbLeft, y: centerY, width: thumbWidth, height: 1 };
     },
   });
-  label(panel, `${viewTracks.length ? state.queueScroll + 1 : 0}-${Math.min(viewTracks.length, state.queueScroll + count)} / ${viewTracks.length}`, {
-    height: rowHeight(2),
-  }, {
-    textShade: 0,
-    align: "right",
-    inset: 1,
-  });
+  statusBar(panel, `${viewTracks.length ? state.queueScroll + 1 : 0}-${Math.min(viewTracks.length, state.queueScroll + count)} / ${viewTracks.length} TRACKS`);
   return panel;
+}
+
+function addColumnContextMenu(parent) {
+  if (!state.columnMenu) return;
+
+  const height = rowHeight(2) + 6 * buttonStandardHeight() + 6 * oneDot() + 4;
+  const width = Math.min(WIDTH / STYLE_SCALE - 16,
+    Math.max(68, (8 * fontProfile().advance + 12) / STYLE_SCALE));
+  const widthPixels = width * STYLE_SCALE;
+  const heightPixels = height * STYLE_SCALE;
+  const edge = 8 * STYLE_SCALE;
+  const left = Math.max(edge, Math.min(state.columnMenu.x, WIDTH - edge - widthPixels));
+  const top = Math.max(edge, Math.min(state.columnMenu.y + oneDot() * STYLE_SCALE,
+    HEIGHT - edge - heightPixels));
+  const menu = makeWidget(parent, {
+    positionType: PositionType.Absolute,
+    left: left / STYLE_SCALE,
+    top: top / STYLE_SCALE,
+    width,
+    height,
+    direction: FlexDirection.Column,
+    gap: oneDot(),
+    padding: 2,
+  }, {
+    paint(box) {
+      fillRect(box.x, box.y, box.width, box.height, 2);
+      strokeRect(box.x, box.y, box.width, box.height, 0);
+    },
+  });
+  panelTitle(menu, "COLUMNS");
+  configurableColumns.forEach(({ key, title }) => {
+    const visibility = state.preferences.columnVisibility || {};
+    optionToggle(menu, title, visibility[key] !== false,
+      () => setPreference("columnVisibility", {
+        ...(state.preferences.columnVisibility || {}),
+        [key]: state.preferences.columnVisibility?.[key] === false,
+      }), { columnMenuItem: true });
+  });
+  pixelButton(menu, "DONE", () => {
+    state.columnMenu = null;
+    render();
+  }, { flexGrow: 1 });
 }
 
 function addPalettePreview(parent) {
@@ -1185,9 +1257,6 @@ function addPlaybackOptions(columns, pref) {
     textShade: 0, align: "right", inset: 0,
   });
   pixelButton(volumeRow, "+", () => changeVolume(0.1), { width: volumeControlWidth });
-  label(output, "VOLUME IS STORED WITH PLAYBACK SETTINGS", { height: rowHeight(6) }, {
-    textShade: 0, inset: 2,
-  });
 }
 
 function addInterfaceOptions(columns, pref) {
@@ -1249,16 +1318,27 @@ function addOptionsContent(parent) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
     },
   });
-  panelTitle(panel, "OPTIONS", state.theme, 64);
+  panelTitle(panel, "OPTIONS");
   const navigation = makeWidget(panel, {
     direction: FlexDirection.Row,
-    height: rowHeight(7),
-    gap: oneDot(),
+    alignItems: Align.Center,
+    height: buttonStandardHeight(),
+    gap: oneDot() * 2,
   });
-  ["DISPLAY", "PLAYBACK", "INTERFACE", "LIBRARY"].forEach((page) => pixelButton(navigation, page, () => {
-    state.optionsPage = page;
-    render();
-  }, { flexGrow: 1, height: rowHeight(5), selected: state.optionsPage === page }));
+  [ ["DISPLAY", "PLAYBACK"], ["INTERFACE", "LIBRARY"] ].forEach((pages, index) => {
+    const toolbar = makeWidget(navigation, {
+      direction: FlexDirection.Row,
+      flexGrow: 1,
+      flexBasis: 0,
+      gap: oneDot(),
+    }, index === 1 ? {
+      paint(box) { line(box.x - oneDot() * STYLE_SCALE, box.y, box.x - oneDot() * STYLE_SCALE, box.y + box.height, 1); },
+    } : {});
+    pages.forEach((page) => pixelButton(toolbar, page, () => {
+      state.optionsPage = page;
+      render();
+    }, { flexGrow: 1, selected: state.optionsPage === page }));
+  });
 
   const columns = optionColumns(panel);
   const pref = state.preferences;
@@ -1278,6 +1358,7 @@ function buildTree() {
     direction: FlexDirection.Column,
     width: WIDTH / STYLE_SCALE,
     height: HEIGHT / STYLE_SCALE,
+    positionType: PositionType.Relative,
     padding: 8,
     gap: oneDot(),
     alignItems: Align.Stretch,
@@ -1330,7 +1411,7 @@ function buildTree() {
     addOptionsContent(content);
   } else {
     addLibraryPane(content);
-    addCatalogPane(content, state.tab);
+    addCatalogPane(content);
   }
 
   const bottom = makeWidget(root, {
@@ -1359,6 +1440,8 @@ function buildTree() {
     align: "right",
     inset: 0,
   });
+
+  addColumnContextMenu(root);
 
   root.yoga.calculateLayout(WIDTH, HEIGHT, Direction.LTR);
   if (state.tableViewportWidget && state.tableContentWidget) {
@@ -1563,6 +1646,7 @@ function setContrastProfile(contrast) {
 
 function setTheme(theme) {
   state.theme = theme === "NIGHTBOY" ? "NIGHTBOY" : "GAMEBOY";
+  if (document.documentElement) document.documentElement.dataset.theme = state.theme;
   RGB = paletteRGB(displayPalette());
   saveDisplayOptions();
   render();
@@ -2296,6 +2380,15 @@ canvas.addEventListener("pointerup", (event) => {
 
 canvas.addEventListener("pointercancel", () => { pointerInteraction = null; });
 
+canvas.addEventListener("contextmenu", (event) => {
+  const point = logicalPoint(event);
+  const header = findTargetEntry(point, (widget) => widget.meta.columnHeader);
+  if (!header) return;
+  event.preventDefault();
+  state.columnMenu = { x: point.x, y: point.y };
+  render();
+});
+
 canvas.addEventListener("click", (event) => {
   canvas.focus({ preventScroll: true });
   if (suppressNextClick) {
@@ -2303,6 +2396,12 @@ canvas.addEventListener("click", (event) => {
     return;
   }
   const target = findTarget(logicalPoint(event));
+  if (state.columnMenu && !target?.meta.columnMenuItem) {
+    state.columnMenu = null;
+    if (target?.meta.onClick) target.meta.onClick(event);
+    else render();
+    return;
+  }
   if (target?.meta.onClick) target.meta.onClick(event);
 });
 
@@ -2321,7 +2420,7 @@ canvas.addEventListener("wheel", (event) => {
     render();
     return;
   }
-  const sidebarWidth = (WIDTH < 420 ? 94 : 128) * STYLE_SCALE + 8 * STYLE_SCALE;
+  const sidebarWidth = libraryPaneWidth() * STYLE_SCALE + 8 * STYLE_SCALE;
   const library = point.x < sidebarWidth;
   const key = library ? "libraryScroll" : "queueScroll";
   const length = library ? libraryRows().length : visibleTracks().length;
@@ -2331,7 +2430,11 @@ canvas.addEventListener("wheel", (event) => {
 }, { passive: false });
 
 canvas.addEventListener("keydown", (event) => {
-  if (event.shiftKey && (event.code === "ArrowLeft" || event.code === "ArrowRight")) {
+  if (event.code === "Escape" && state.columnMenu) {
+    event.preventDefault();
+    state.columnMenu = null;
+    render();
+  } else if (event.shiftKey && (event.code === "ArrowLeft" || event.code === "ArrowRight")) {
     event.preventDefault();
     state.tableHorizontalScroll = Math.max(0, Math.min(state.tableHorizontalMax,
       state.tableHorizontalScroll + (event.code === "ArrowRight" ? 1 : -1) * 8 * fontProfile().advance));
