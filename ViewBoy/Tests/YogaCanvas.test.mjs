@@ -209,57 +209,71 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     const rect = canvas.getBoundingClientRect();
     canvas.listeners.get('click')({ clientX: rect.width * x, clientY: rect.height * y, detail: 1 });
   };
-  clickScreen(0.41, 0.25);
+  const pageY = [0.155, 0.195, 0.235, 0.275, 0.315];
+  const clickPage = (index) => clickScreen(0.08, pageY[index]);
+  const commandKey = (key) => canvas.listeners.get('keydown')({
+    key,
+    code: key === ',' ? 'Comma' : `Digit${key}`,
+    metaKey: true,
+    ctrlKey: false,
+    shiftKey: false,
+    preventDefault() {},
+  });
+  clickScreen(0.80, 0.247);
   const nightBoyPixels = pixelChecksum(canvas.image.data);
   assert.notEqual(nightBoyPixels, gameBoyPixels, 'NightBoy repaints the same four-tone pixel screen with its dark-purple palette');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'NIGHTBOY');
   assert.equal(document.documentElement.dataset.theme, 'NIGHTBOY',
     'the selected LCD theme also updates the surrounding shell');
-  clickScreen(0.41, 0.296);
+  clickScreen(0.80, 0.287);
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'HIGH_CONTRAST',
     'the ink control persists the brighter silver high-contrast setting');
-  clickScreen(0.38, 0.12);
+  clickPage(1);
   assert.notEqual(pixelChecksum(canvas.image.data), nightBoyPixels, 'Options sub-pages navigate inside the LCD');
-  clickScreen(0.38, 0.296);
+  globalThis.ViewBoy.dispatch('optionsPage:PLAYBACK');
+  clickScreen(0.84, 0.287);
   await tick();
   assert.equal(savedPreferences.at(-1).repeatMode, 'one',
     'the Playback page repeat buttons save their selected mode');
-  clickScreen(0.20, 0.34);
+  clickScreen(0.47, 0.327);
   await tick();
   assert.equal(savedPreferences.at(-1).randomMode, 'off',
     'the Playback page random buttons save their selected mode');
   const checkedRowPixels = pixelChecksum(canvas.image.data);
-  clickScreen(0.42, 0.20);
+  clickScreen(0.50, 0.207);
   await tick();
   assert.equal(savedPreferences.at(-1).longPlayEnabled, false,
     'the Playback page checkbox updates the native playback preferences');
   assert.notEqual(pixelChecksum(canvas.image.data), checkedRowPixels,
     'the bitmap checkbox marker visibly changes with the saved value');
-  clickScreen(0.50, 0.12);
-  clickScreen(0.42, 0.21);
+  clickPage(2);
+  globalThis.ViewBoy.dispatch('optionsPage:AUDIO');
+  clickScreen(0.50, 0.207);
   await tick();
   assert.equal(savedPreferences.at(-1).monoEnabled, true,
     'the Audio page output checkbox saves and applies mono output');
-  clickScreen(0.15, 0.24);
+  clickScreen(0.35, 0.247);
   await tick();
   assert.equal(savedPreferences.at(-1).appVolume, 0.9,
     'the Audio page volume button updates native audio preferences');
-  clickScreen(0.60, 0.21);
+  clickScreen(0.50, 0.364);
   await tick();
   assert.equal(savedPreferences.at(-1).equalizerEnabled, true,
     'the Audio page equalizer checkbox updates native audio preferences');
   assert.equal(audioConfigCalls.at(-1)[1], true,
     'the equalizer toggle is applied to the native audio path');
-  clickScreen(0.91, 0.24);
+  clickScreen(0.63, 0.412);
   await tick();
-  assert.equal(savedPreferences.at(-1).equalizerBandGains[0], 0.5,
-    'the first equalizer band uses half-decibel button steps');
-  assert.equal(savedPreferences.at(-1).equalizerBandGains[0], 0.5,
-    'the first equalizer band uses half-decibel button steps');
-  assert.equal(audioConfigCalls.at(-1)[2][0], 0.5,
-    'equalizer band edits are applied to the native audio path');
-  clickScreen(0.30, 0.12);
-  clickScreen(0.47, 0.39);
+  const changedBandGain = savedPreferences.at(-1).equalizerBandGains[0];
+  assert.notEqual(changedBandGain, 0,
+    'clicking a full-width equalizer bar changes its gain');
+  assert.equal(Number.isInteger(changedBandGain * 2), true,
+    'equalizer bars quantize to the supported half-decibel granularity');
+  assert.equal(audioConfigCalls.at(-1)[2][0], changedBandGain,
+    'equalizer bar edits are applied to the native audio path');
+  clickPage(1);
+  globalThis.ViewBoy.dispatch('optionsPage:PLAYBACK');
+  clickScreen(0.92, 0.443);
   await tick();
   assert.equal(savedPreferences.at(-1).manualPlayTimeSeconds, 210,
     'the Long Play duration adjuster increases in 30-second steps');
@@ -269,6 +283,18 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(savedPlaylistTabs.at(-1)?.tabs.length, 2,
     'the plus tab control duplicates the current list and persists it through the native bridge');
+  const [firstPlaylistID, secondPlaylistID] = savedPlaylistTabs.at(-1).tabs.map((tab) => tab.id);
+  commandKey('1');
+  await tick();
+  assert.equal(savedPlaylistTabs.at(-1)?.activeID, firstPlaylistID,
+    'Command-1 selects the first playlist tab');
+  commandKey('2');
+  await tick();
+  assert.equal(savedPlaylistTabs.at(-1)?.activeID, secondPlaylistID,
+    'Command-2 selects the second playlist tab');
+  commandKey(',');
+  assert.match(status.textContent, /SETTINGS/,
+    'Command-comma opens the Options screen');
   globalThis.ViewBoy.dispatch('closePlaylistTab');
   await tick();
   assert.equal(savedPlaylistTabs.at(-1)?.tabs.length, 1,
@@ -280,33 +306,36 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(savedPlaylistTabs.at(-1)?.tabs[0]?.playlist.length, 0,
     'closing the final tab saves it empty even while audio continues playing');
   globalThis.ViewBoy.dispatch('settings');
-  clickScreen(0.61, 0.12);
-  clickScreen(0.48, 0.20);
+  clickPage(3);
+  globalThis.ViewBoy.dispatch('optionsPage:INTERFACE');
+  clickScreen(0.50, 0.207);
   await tick();
   assert.equal(savedPreferences.at(-1).columnAutoSize, false,
     'the Interface page checkbox updates the saved column behavior');
-  clickScreen(0.84, 0.12);
-  clickScreen(0.48, 0.20);
+  clickPage(4);
+  globalThis.ViewBoy.dispatch('optionsPage:LIBRARY');
+  clickScreen(0.50, 0.207);
   await tick();
   assert.equal(savedPreferences.at(-1).columnVisibility.filename, false,
     'the Library page checkbox persists field visibility');
-  clickScreen(0.61, 0.12);
-  clickScreen(0.48, 0.20);
+  clickPage(3);
+  globalThis.ViewBoy.dispatch('optionsPage:INTERFACE');
+  clickScreen(0.50, 0.207);
   await tick();
   assert.equal(savedPreferences.at(-1).columnAutoSize, true,
     'the Interface page checkbox can restore automatic sizing');
-  clickScreen(0.15, 0.12);
-  clickScreen(0.21, 0.25);
+  clickPage(0);
+  clickScreen(0.45, 0.247);
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'GAMEBOY',
     'the palette selector returns to the authentic Game Boy theme');
-  clickScreen(0.20, 0.296);
+  clickScreen(0.45, 0.287);
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'STANDARD');
-  clickScreen(0.30, 0.12);
-  clickScreen(0.60, 0.20);
+  clickPage(1);
+  clickScreen(0.50, 0.646);
   await tick();
   assert.equal(savedPreferences.at(-1).playbackSpeedEnabled, true,
     'the Playback page enables libgme tempo through the shared preferences');
-  clickScreen(0.91, 0.23);
+  clickScreen(0.92, 0.686);
   await tick();
   assert.equal(savedPreferences.at(-1).playbackSpeed.numerator, 33,
     'the libgme speed adjuster advances in 1/32 steps');
@@ -352,7 +381,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const beforeColumnMenu = pixelChecksum(canvas.image.data);
   canvas.listeners.get('contextmenu')({
     clientX: rect.width * 0.60,
-    clientY: rect.height * 0.12,
+    clientY: rect.height * 0.13,
     preventDefault() { contextMenuPrevented = true; },
   });
   assert.ok(contextMenuPrevented, 'right-clicking a column heading opens its visibility menu');
@@ -392,17 +421,17 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     shiftKey: false,
     preventDefault() {},
   });
-  sendPointer('pointerdown', 0.60, 0.12);
-  sendPointer('pointermove', 0.88, 0.12);
-  sendPointer('pointerup', 0.88, 0.12);
+  sendPointer('pointerdown', 0.60, 0.13);
+  sendPointer('pointermove', 0.88, 0.13);
+  sendPointer('pointerup', 0.88, 0.13);
   const savedColumnOrder = JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).columnOrder;
   assert.ok(savedColumnOrder.indexOf('filename') > savedColumnOrder.indexOf('title'),
     `dragging a header reorders columns and keeps the order in display preferences: ${savedColumnOrder.join(',')}`);
   assert.ok(!savedColumnOrder.includes('index'), 'the numbered column is pinned outside the movable order');
   const headerOrder = [...savedColumnOrder];
-  sendPointer('pointerdown', 0.43, 0.12);
-  sendPointer('pointermove', 0.80, 0.12);
-  sendPointer('pointerup', 0.80, 0.12);
+  sendPointer('pointerdown', 0.43, 0.13);
+  sendPointer('pointermove', 0.80, 0.13);
+  sendPointer('pointerup', 0.80, 0.13);
   assert.deepEqual(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).columnOrder, headerOrder,
     'dragging other headers across # cannot move the numbered column');
 });

@@ -1,13 +1,10 @@
 :root {
   color-scheme: dark;
-  background: #10180e;
+  background: #10130f;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  --stage-background: radial-gradient(ellipse at center, #26321f 0%, #182016 62%, #10160e 100%);
-  --shell-edge: #aab06c;
-  --shell-surface: linear-gradient(145deg, #d3d79a, #a9ae76 56%, #858d5c);
-  --shell-lowlight: #5d6840;
-  --bezel-edge: #3d492d;
-  --bezel-surface: #202a19;
+  --membrane-outer: #c3c6bc;
+  --membrane-middle: #7c8076;
+  --membrane-inner: #454941;
   --screen-surface: #9bbc0f;
 }
 
@@ -24,31 +21,28 @@ body {
   display: grid;
   place-items: center;
   overflow: hidden;
-  padding: 8px;
-  background: var(--stage-background);
+  padding: 3px;
+  background: #10130f;
 }
 
 .surround {
   width: 100%;
   height: 100%;
-  padding: 4px;
-  border: 1px solid var(--shell-edge);
-  border-radius: 7px;
-  background: var(--shell-surface);
-  box-shadow:
-    0 7px 18px #0006,
-    inset 1px 1px 0 #fff,
-    inset -1px -1px 0 var(--shell-lowlight);
+  padding: 2px;
+  border: 1px solid var(--membrane-outer);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .bezel {
   width: 100%;
   height: 100%;
   padding: 1px;
-  border: 1px solid var(--bezel-edge);
-  border-radius: 3px;
-  background: var(--bezel-surface);
-  box-shadow: inset 0 1px 2px #111b;
+  border: 1px solid var(--membrane-middle);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 #screen-window {
@@ -57,19 +51,21 @@ body {
   height: 100%;
   place-items: center;
   overflow: hidden;
-  border-radius: 2px;
+  border: 1px solid var(--membrane-inner);
+  border-radius: 0;
   background: var(--screen-surface);
 }
 
 :root[data-theme="NIGHTBOY"] {
   background: #100c18;
-  --stage-background: radial-gradient(ellipse at center, #393244 0%, #211b2a 62%, #100c18 100%);
-  --shell-edge: #c9c6d2;
-  --shell-surface: linear-gradient(145deg, #51495e, #393244 56%, #211a2b);
-  --shell-lowlight: #17121e;
-  --bezel-edge: #a5a2af;
-  --bezel-surface: #211a2b;
+  --membrane-outer: #c7c5cf;
+  --membrane-middle: #77747f;
+  --membrane-inner: #3c3844;
   --screen-surface: #211a2b;
+}
+
+:root[data-theme="NIGHTBOY"] body {
+  background: #100c18;
 }
 
 #lcd {

@@ -17,9 +17,17 @@ const LCD_FACE_DEVICE_PIXELS = DEVICE_PIXELS_PER_LCD_DOT - 1;
 const BASELINE_LAYOUT_UNIT_CSS_PIXELS = 2.5;
 const RANDOM_HISTORY_LIMIT = 256;
 const BUTTON_BORDER_DOTS = 1;
-const BUTTON_HORIZONTAL_INSET_DOTS = 1;
+const BUTTON_HORIZONTAL_INSET_DOTS = 2;
+const BUTTON_VERTICAL_INSET_DOTS = 2;
 const PANE_INSET_DOTS = 2;
-const PANE_STATUS_HEIGHT_DOTS = 4;
+const UI_SPACING_DOTS = Object.freeze({
+  minimumGap: 2,
+  sectionGap: 6,
+  groupInset: 4,
+  optionsInset: 6,
+});
+const EQ_BAR_MIN_DOTS = 100;
+const EQ_GAIN_STEPS = 48;
 const ANIMATION_FRAME_INTERVAL_MS = 1000 / 60;
 const PALETTES = {
   GAMEBOY: {
@@ -89,6 +97,7 @@ const standardGlyphs = {
   ">": ["01000", "00100", "00010", "00001", "00010", "00100", "01000"],
   "=": ["00000", "11111", "00000", "11111", "00000", "00000", "00000"],
   "#": ["01010", "01010", "11111", "01010", "11111", "01010", "01010"],
+  "•": ["00000", "00000", "00100", "00000", "00000", "00000", "00000"],
   "%": ["11001", "11010", "00100", "01000", "10110", "00110", "00000"],
   "?": ["01110", "10001", "00001", "00010", "00100", "00000", "00100"],
   "!": ["00100", "00100", "00100", "00100", "00100", "00000", "00100"],
@@ -150,6 +159,7 @@ const microGlyphs = {
   "↓": ["010", "010", "010", "101", "010"],
   "=": ["000", "111", "000", "111", "000"],
   "#": ["101", "111", "101", "111", "101"],
+  "•": ["000", "000", "010", "000", "000"],
   "*": ["010", "101", "111", "101", "010"],
   "%": ["101", "001", "010", "100", "101"],
   "?": ["110", "001", "010", "000", "010"],
@@ -237,6 +247,7 @@ const state = {
   randomPlaylistQueue: [],
   randomHistory: [],
   randomHistoryIndex: -1,
+  equalizerBarBoxes: [],
   libraryRandomToken: 0,
   games: [],
   favoriteTracks: [],
@@ -376,8 +387,9 @@ function restorePlaylistTabs(value) {
 
 function activatePlaylistTab(id) {
   const tab = state.playlistTabs.find((entry) => entry.id === id);
-  if (!tab || tab.id === state.activePlaylistTabId) return false;
-  syncActivePlaylistTab();
+  if (!tab) return false;
+  if (tab.id !== state.activePlaylistTabId) syncActivePlaylistTab();
+  else if (state.tab !== "SETTINGS" && state.tab !== "FAVORITES") return false;
   state.activePlaylistTabId = tab.id;
   tracks = [...tab.playlist];
   state.activeQueue = [...tab.playlist];
@@ -624,6 +636,7 @@ function makeWidget(parent, style = {}, meta = {}) {
   yoga.setFlexShrink(style.flexShrink ?? 0);
   if (style.positionType !== undefined) yoga.setPositionType(style.positionType);
   if (style.width !== undefined) yoga.setWidth(style.width * STYLE_SCALE);
+  if (style.minWidth !== undefined) yoga.setMinWidth(style.minWidth * STYLE_SCALE);
   if (style.height !== undefined) yoga.setHeight(style.height * STYLE_SCALE);
   if (style.left !== undefined) yoga.setPosition(Edge.Left, style.left * STYLE_SCALE);
   if (style.top !== undefined) yoga.setPosition(Edge.Top, style.top * STYLE_SCALE);
@@ -674,8 +687,19 @@ function rowHeight(extraDots = 0) {
 }
 
 function buttonStandardHeight() {
-  // Two clear LCD dots above and below the glyph, plus the one-dot outline.
-  return rowHeight(6);
+  return rowHeight(2 * BUTTON_VERTICAL_INSET_DOTS + 2 * BUTTON_BORDER_DOTS);
+}
+
+function uiGap() {
+  return UI_SPACING_DOTS.minimumGap / STYLE_SCALE;
+}
+
+function uiSectionGap() {
+  return UI_SPACING_DOTS.sectionGap / STYLE_SCALE;
+}
+
+function textLayoutWidth(text, horizontalInsetDots = BUTTON_HORIZONTAL_INSET_DOTS) {
+  return (Array.from(String(text)).length * fontProfile().advance + horizontalInsetDots * 2) / STYLE_SCALE;
 }
 
 function framedTextWidth(text) {
@@ -709,11 +733,12 @@ function libraryToolbarItems() {
 function libraryPaneWidth() {
   const items = libraryToolbarItems();
   const buttonsWidth = items.reduce((sum, item) => sum + buttonWidth(item.title), 0);
-  return Math.max(WIDTH < 420 ? 94 : 128, buttonsWidth + items.length - 1 + 4);
+  return Math.max(WIDTH < 420 ? 94 : 128,
+    buttonsWidth + Math.max(0, items.length - 1) * uiGap() + 4);
 }
 
 function statusBar(parent, text) {
-  const height = rowHeight(PANE_STATUS_HEIGHT_DOTS);
+  const height = buttonStandardHeight();
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
@@ -724,13 +749,13 @@ function statusBar(parent, text) {
   label(row, text, { flexGrow: 1, height }, {
     textShade: 0,
     align: "center",
-    inset: 1,
+    inset: BUTTON_HORIZONTAL_INSET_DOTS,
   });
   return row;
 }
 
 function panelTitle(parent, text) {
-  const titleHeight = rowHeight(2);
+  const titleHeight = buttonStandardHeight();
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
     height: titleHeight,
@@ -763,28 +788,18 @@ function pixelButton(parent, text, onClick, style = {}) {
   });
 }
 
-function optionSection(parent, title) {
-  return panelTitle(parent, title);
+function controlRow(parent, style = {}, meta = {}) {
+  return makeWidget(parent, {
+    direction: FlexDirection.Row,
+    alignItems: Align.Center,
+    height: buttonStandardHeight(),
+    gap: uiGap(),
+    ...style,
+  }, meta);
 }
 
-function optionColumns(parent) {
-  const row = makeWidget(parent, {
-    direction: FlexDirection.Row,
-    flexGrow: 1,
-    gap: oneDot() * 2,
-    alignItems: Align.Stretch,
-  });
-  const makeColumn = () => makeWidget(row, {
-    direction: FlexDirection.Column,
-    flexGrow: 1,
-    flexBasis: 0,
-    gap: oneDot(),
-    paddingVertical: 3,
-    paddingHorizontal: fontProfile().advance,
-  }, {
-    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
-  });
-  return [makeColumn(), makeColumn()];
+function optionSection(parent, title) {
+  return panelTitle(parent, title);
 }
 
 function optionToggle(parent, title, checked, onClick, extraMeta = {}) {
@@ -793,40 +808,36 @@ function optionToggle(parent, title, checked, onClick, extraMeta = {}) {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
     height,
-    gap: oneDot(),
-    paddingHorizontal: BUTTON_BORDER_DOTS,
+    gap: uiGap(),
+    paddingHorizontal: BUTTON_HORIZONTAL_INSET_DOTS,
   }, {
     onClick,
     paint(box) {
-      if (checked) fillRect(box.x + 1, box.y + 1, box.width - 2, box.height - 2, 2);
       strokeRect(box.x, box.y, box.width, box.height, 1);
     },
     ...extraMeta,
   });
-  const marker = checked ? "[x]" : "[]";
+  const marker = checked ? "[•]" : "[]";
   label(row, marker, {
-    width: (Array.from(marker).length * fontProfile().advance + 2) / STYLE_SCALE,
+    width: textLayoutWidth(marker),
     height: fontProfile().height / STYLE_SCALE,
   }, { textShade: 0, align: "center", inset: BUTTON_HORIZONTAL_INSET_DOTS });
-  label(row, title, { flexGrow: 1, height }, { textShade: 0, inset: 1 });
+  label(row, title, { flexGrow: 1, height }, { textShade: 0, inset: BUTTON_HORIZONTAL_INSET_DOTS });
   return row;
 }
 
 function optionChoice(parent, title, choices) {
-  const height = rowHeight(8);
-  const row = makeWidget(parent, {
-    direction: FlexDirection.Row,
-    alignItems: Align.Center,
+  const height = buttonStandardHeight();
+  const row = controlRow(parent, {
     height,
-    gap: oneDot(),
-    paddingHorizontal: 0,
+    gap: uiGap(),
   }, {
     paint(box) {
       line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2);
     },
   });
-  const titleWidth = (Array.from(title).length * fontProfile().advance + 4) / STYLE_SCALE;
-  label(row, title, { width: titleWidth, height }, { textShade: 0, inset: 1 });
+  const titleWidth = textLayoutWidth(title);
+  label(row, title, { width: titleWidth, height }, { textShade: 0, inset: BUTTON_HORIZONTAL_INSET_DOTS });
   choices.forEach((choice) => pixelButton(row, choice.title, choice.onClick, {
     flexGrow: 1,
     selected: choice.selected,
@@ -835,14 +846,8 @@ function optionChoice(parent, title, choices) {
 }
 
 function optionAdjuster(parent, title, value, onDecrease, onIncrease) {
-  const height = rowHeight(8);
-  const row = makeWidget(parent, {
-    direction: FlexDirection.Row,
-    alignItems: Align.Center,
-    height,
-    gap: oneDot(),
-    paddingHorizontal: 0,
-  }, {
+  const height = buttonStandardHeight();
+  const row = controlRow(parent, { height }, {
     paint(box) {
       line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2);
     },
@@ -966,7 +971,8 @@ function tableColumns(items = activeTracks()) {
   columns.forEach((column) => {
     if (column.key === "favorite" || column.key === "index") return;
     const headingCharacters = Array.from(column.title).length + 1;
-    const headingWidth = (headingCharacters * fontProfile().advance + 4) / STYLE_SCALE;
+    const headingWidth = (headingCharacters * fontProfile().advance
+      + 2 * (BUTTON_BORDER_DOTS + BUTTON_HORIZONTAL_INSET_DOTS)) / STYLE_SCALE;
     column.width = Math.max(column.width, headingWidth);
   });
 
@@ -975,9 +981,11 @@ function tableColumns(items = activeTracks()) {
   if (autoSize) {
     columns.forEach((column) => {
       if (column.key === "favorite" || column.key === "index" || column.key === "title") return;
-      const textWidth = ((content.lengths[column.key] ?? 0) * fontProfile().advance + 4) / STYLE_SCALE;
+      const textWidth = ((content.lengths[column.key] ?? 0) * fontProfile().advance
+        + 2 * (BUTTON_BORDER_DOTS + BUTTON_HORIZONTAL_INSET_DOTS)) / STYLE_SCALE;
       const headingCharacters = Array.from(column.title).length + 1;
-      const headingWidth = (headingCharacters * fontProfile().advance + 4) / STYLE_SCALE;
+      const headingWidth = (headingCharacters * fontProfile().advance
+        + 2 * (BUTTON_BORDER_DOTS + BUTTON_HORIZONTAL_INSET_DOTS)) / STYLE_SCALE;
       column.width = Math.max(headingWidth, textWidth);
     });
   }
@@ -1087,7 +1095,7 @@ function createTableHeader(parent, columns) {
       height: headerHeight,
     }, {
       textShade: 0,
-      inset: 1,
+      inset: BUTTON_HORIZONTAL_INSET_DOTS,
       border: 1,
       fill: marker ? 2 : undefined,
       align: "center",
@@ -1188,19 +1196,15 @@ function addLibraryPane(parent) {
     },
   });
   panelTitle(library, "BROWSE");
-  const navigation = makeWidget(library, {
-    direction: FlexDirection.Row,
-    alignItems: Align.Center,
-    height: buttonStandardHeight(),
-    gap: oneDot(),
-  });
+  const navigation = controlRow(library);
   libraryToolbarItems().forEach((item) => pixelButton(navigation, item.title, item.onClick, {
     width: buttonWidth(item.title),
     selected: item.view === state.tab,
   }));
+  makeWidget(library, { height: uiGap() });
   panelTitle(library, "SYSTEMS");
   const rows = libraryRows();
-  const count = Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - 88) / rowHeight(3)));
+  const count = Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - 96) / rowHeight(3)));
   state.libraryScroll = Math.max(0, Math.min(state.libraryScroll, Math.max(0, rows.length - count)));
   rows.slice(state.libraryScroll, state.libraryScroll + count).forEach((row) => {
     createLibraryRow(library, row.text, {
@@ -1210,6 +1214,7 @@ function addLibraryPane(parent) {
       onClick: row.game ? () => loadGame(row.game) : () => toggleSystem(row.system),
     });
   });
+  makeWidget(library, { flexGrow: 1 });
   const systemCount = new Set(state.games.map((game) => game.system || "OTHER")).size;
   const first = rows.length ? state.libraryScroll + 1 : 0;
   const last = Math.min(rows.length, state.libraryScroll + count);
@@ -1231,17 +1236,12 @@ function addCatalogPane(parent) {
     },
   });
   if (state.tab !== "FAVORITES") {
-    const tabRow = makeWidget(panel, {
-      direction: FlexDirection.Row,
-      alignItems: Align.Center,
-      height: buttonStandardHeight(),
-      gap: oneDot(),
-    });
+    const tabRow = controlRow(panel);
     const tabList = makeWidget(tabRow, {
       direction: FlexDirection.Row,
       flexGrow: 1,
       flexBasis: 0,
-      gap: oneDot(),
+      gap: uiGap(),
       overflow: Overflow.Hidden,
     }, { clipChildren: true });
     state.playlistTabs.forEach((tab) => {
@@ -1249,7 +1249,7 @@ function addCatalogPane(parent) {
         direction: FlexDirection.Row,
         flexGrow: 1,
         flexBasis: 0,
-        gap: 0,
+        gap: uiGap(),
       });
       pixelButton(item, tab.title, () => activatePlaylistTab(tab.id), {
         flexGrow: 1,
@@ -1374,9 +1374,9 @@ function addPalettePreview(parent) {
   const preview = makeWidget(parent, {
     direction: FlexDirection.Row,
     flexGrow: 1,
-    gap: oneDot(),
-    paddingHorizontal: 2,
-    paddingVertical: 1,
+    gap: uiGap(),
+    paddingHorizontal: UI_SPACING_DOTS.groupInset / STYLE_SCALE,
+    paddingVertical: UI_SPACING_DOTS.minimumGap / STYLE_SCALE,
   });
   RGB.forEach((_, shade) => makeWidget(preview, {
     flexGrow: 1,
@@ -1391,9 +1391,26 @@ function addPalettePreview(parent) {
   }));
 }
 
-function addDisplayOptions(columns) {
-  const [profile, tones] = columns;
-  optionSection(profile, "SCREEN PROFILE");
+function optionGroup(parent, title) {
+  const group = makeWidget(parent, {
+    direction: FlexDirection.Column,
+    gap: uiGap(),
+    padding: UI_SPACING_DOTS.groupInset / STYLE_SCALE,
+  }, {
+    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
+  });
+  optionSection(group, title);
+  return group;
+}
+
+function optionsTocWidth() {
+  const available = WIDTH / STYLE_SCALE;
+  const labelWidth = framedTextWidth("INTERFACE") + UI_SPACING_DOTS.optionsInset / STYLE_SCALE * 2;
+  return Math.min(available * 0.34, Math.max(labelWidth, Math.min(220, available * 0.20)));
+}
+
+function addDisplayOptions(parent) {
+  const profile = optionGroup(parent, "SCREEN PROFILE");
   optionChoice(profile, "FONT", [
     { title: "MICRO 3X5", selected: state.font === "MICRO", onClick: () => setFontProfile("MICRO") },
     { title: "STANDARD 5X7", selected: state.font === "STANDARD", onClick: () => setFontProfile("STANDARD") },
@@ -1408,7 +1425,7 @@ function addDisplayOptions(columns) {
     { title: state.theme === "GAMEBOY" ? "CHARCOAL" : "BRIGHT", selected: state.contrast === "HIGH_CONTRAST",
       onClick: () => setContrastProfile("HIGH_CONTRAST") },
   ]);
-  optionSection(tones, "FOUR LCD TONES");
+  const tones = optionGroup(parent, "FOUR LCD TONES");
   addPalettePreview(tones);
 }
 
@@ -1429,8 +1446,12 @@ function equalizerGain(index, preferences = state.preferences) {
 }
 
 function changeEqualizerGain(index, delta) {
+  setEqualizerGain(index, equalizerGain(index) + delta);
+}
+
+function setEqualizerGain(index, value) {
   const gains = Array.from({ length: 10 }, (_, band) => equalizerGain(band));
-  gains[index] = Math.max(-12, Math.min(12, Math.round((gains[index] + delta) * 2) / 2));
+  gains[index] = Math.max(-12, Math.min(12, Math.round(Number(value) * 2) / 2));
   setPreference("equalizerBandGains", gains, true);
 }
 
@@ -1469,9 +1490,8 @@ function playbackTempoForTrack(track, preferences = state.preferences) {
   return preferences[enabledKey] === true ? playbackRateSteps(family, preferences) / 32 : 1;
 }
 
-function addPlaybackOptions(columns, pref) {
-  const [behavior, speed] = columns;
-  optionSection(behavior, "PLAYBACK BEHAVIOR");
+function addPlaybackOptions(parent, pref) {
+  const behavior = optionGroup(parent, "PLAYBACK BEHAVIOR");
   optionToggle(behavior, "LONG PLAY", pref.longPlayEnabled === true,
     () => setPreference("longPlayEnabled", pref.longPlayEnabled !== true));
   optionToggle(behavior, "END FADE", pref.fadeEnabled !== false,
@@ -1486,56 +1506,115 @@ function addPlaybackOptions(columns, pref) {
     { title: "PLAYLIST", selected: pref.randomMode === "playlist", onClick: () => setRandomMode("playlist") },
     { title: "LIBRARY", selected: pref.randomMode === "library", onClick: () => setRandomMode("library") },
   ]);
-  optionSection(behavior, "TRACK TIMING");
-  optionAdjuster(behavior, "LONG PLAY", optionDuration(pref.manualPlayTimeSeconds ?? 180, true),
+
+  const timing = optionGroup(parent, "TRACK TIMING");
+  optionAdjuster(timing, "LONG PLAY", optionDuration(pref.manualPlayTimeSeconds ?? 180, true),
     () => adjustPlaybackDuration("manualPlayTimeSeconds", -30, 0, 3600, 180),
     () => adjustPlaybackDuration("manualPlayTimeSeconds", 30, 0, 3600, 180));
-  optionAdjuster(behavior, "UNKNOWN LENGTH", optionDuration(pref.unknownDurationSeconds ?? 150),
+  optionAdjuster(timing, "UNKNOWN LENGTH", optionDuration(pref.unknownDurationSeconds ?? 150),
     () => adjustPlaybackDuration("unknownDurationSeconds", -30, 30, 3600, 150),
     () => adjustPlaybackDuration("unknownDurationSeconds", 30, 30, 3600, 150));
-  optionAdjuster(behavior, "FADE LENGTH", optionDuration(pref.spcFadeSeconds ?? 6),
+  optionAdjuster(timing, "FADE LENGTH", optionDuration(pref.spcFadeSeconds ?? 6),
     () => adjustPlaybackDuration("spcFadeSeconds", -1, 0, 60, 6),
     () => adjustPlaybackDuration("spcFadeSeconds", 1, 0, 60, 6));
 
-  optionSection(speed, "LIBGME SPEED");
-  optionToggle(speed, "ENABLE SPEED", pref.playbackSpeedEnabled === true,
+  const speed = optionGroup(parent, "DECODER SPEED");
+  optionToggle(speed, "LIBGME SPEED", pref.playbackSpeedEnabled === true,
     () => setPreference("playbackSpeedEnabled", pref.playbackSpeedEnabled !== true));
-  optionAdjuster(speed, "RATE", playbackRateLabel(playbackRateSteps("libgme", pref)),
+  optionAdjuster(speed, "LIBGME RATE", playbackRateLabel(playbackRateSteps("libgme", pref)),
     () => adjustPlaybackRate("libgme", -1),
     () => adjustPlaybackRate("libgme", 1));
-  optionSection(speed, "LIBVGM SPEED");
-  optionToggle(speed, "ENABLE SPEED", pref.libvgmPlaybackSpeedEnabled === true,
+  optionToggle(speed, "LIBVGM SPEED", pref.libvgmPlaybackSpeedEnabled === true,
     () => setPreference("libvgmPlaybackSpeedEnabled", pref.libvgmPlaybackSpeedEnabled !== true));
-  optionAdjuster(speed, "RATE", playbackRateLabel(playbackRateSteps("libvgm", pref)),
+  optionAdjuster(speed, "LIBVGM RATE", playbackRateLabel(playbackRateSteps("libvgm", pref)),
     () => adjustPlaybackRate("libvgm", -1),
     () => adjustPlaybackRate("libvgm", 1));
 }
 
-function addAudioOptions(columns, pref) {
-  const [output, equalizer] = columns;
-  optionSection(output, "OUTPUT");
+function paintEqualizerBar(box, gain) {
+  strokeRect(box.x, box.y, box.width, box.height, 1);
+  const left = box.x + 2;
+  const right = Math.max(left + EQ_GAIN_STEPS, box.x + box.width - 3);
+  const span = right - left;
+  const centerY = box.y + Math.floor(box.height / 2);
+  const zeroStep = EQ_GAIN_STEPS / 2;
+  const currentStep = Math.max(0, Math.min(EQ_GAIN_STEPS, Math.round((gain + 12) * 2)));
+  const zeroX = left + Math.round(span * zeroStep / EQ_GAIN_STEPS);
+  const currentX = left + Math.round(span * currentStep / EQ_GAIN_STEPS);
+  const cellWidth = Math.max(1, Math.min(4, Math.floor(span / EQ_GAIN_STEPS)));
+
+  line(left, centerY, right, centerY, 2);
+  for (let step = 0; step <= EQ_GAIN_STEPS; step += 1) {
+    const x = left + Math.round(span * step / EQ_GAIN_STEPS);
+    if (step === zeroStep) continue;
+    line(x, centerY - 2, x, centerY + 2, 2);
+    if ((currentStep >= zeroStep && step > zeroStep && step <= currentStep)
+      || (currentStep < zeroStep && step >= currentStep && step < zeroStep)) {
+      fillRect(x - Math.floor(cellWidth / 2), centerY - 1, cellWidth, 3, 1);
+    }
+  }
+  line(zeroX, box.y + 2, zeroX, box.y + box.height - 3, 0);
+  fillRect(currentX - 1, box.y + 2, 3, Math.max(1, box.height - 4), 0);
+}
+
+function equalizerBand(parent, title, index, gain) {
+  const row = makeWidget(parent, {
+    direction: FlexDirection.Row,
+    alignItems: Align.Center,
+    height: rowHeight(12),
+    gap: uiGap(),
+  });
+  label(row, title, { width: textLayoutWidth("16K HZ"), height: buttonStandardHeight() }, {
+    textShade: 0,
+    inset: BUTTON_HORIZONTAL_INSET_DOTS,
+  });
+  makeWidget(row, {
+    flexGrow: 1,
+    minWidth: EQ_BAR_MIN_DOTS / STYLE_SCALE,
+    height: buttonStandardHeight(),
+  }, {
+    equalizerBar: index,
+    onClick(event) {
+      const box = state.equalizerBarBoxes[index];
+      if (!box) return;
+      const point = logicalPoint(event);
+      const fraction = Math.max(0, Math.min(1, (point.x - box.x - 2) / Math.max(1, box.width - 4)));
+      const step = Math.round(fraction * EQ_GAIN_STEPS);
+      setEqualizerGain(index, (step - EQ_GAIN_STEPS / 2) / 2);
+    },
+    paint(box) {
+      state.equalizerBarBoxes[index] = box;
+      paintEqualizerBar(box, gain);
+    },
+  });
+  label(row, equalizerGainLabel(gain), {
+    width: framedTextWidth("-12.0"),
+    height: buttonStandardHeight(),
+  }, {
+    border: 1,
+    textShade: 0,
+    align: "center",
+    inset: BUTTON_HORIZONTAL_INSET_DOTS,
+  });
+}
+
+function addAudioOptions(parent, pref) {
+  const output = optionGroup(parent, "OUTPUT");
   optionToggle(output, "MONO OUTPUT", pref.monoEnabled === true,
     () => setPreference("monoEnabled", pref.monoEnabled !== true, true));
   const volume = Math.max(0, Math.min(1, Number(pref.appVolume ?? 1)));
-  const volumeRow = makeWidget(output, {
-    direction: FlexDirection.Row,
-    alignItems: Align.Center,
-    height: rowHeight(8),
-    gap: oneDot(),
-    paddingHorizontal: 0,
-  }, {
+  const volumeRow = controlRow(output, {}, {
     paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
   });
-  label(volumeRow, "VOLUME", { width: (6 * fontProfile().advance + 4) / STYLE_SCALE, height: rowHeight(6) }, {
-    textShade: 0, inset: 1,
+  label(volumeRow, "VOLUME", { width: textLayoutWidth("VOLUME"), height: buttonStandardHeight() }, {
+    textShade: 0, inset: BUTTON_HORIZONTAL_INSET_DOTS,
   });
-  const volumeControlHeight = rowHeight(5);
   pixelButton(volumeRow, "[-]", () => changeVolume(-0.1));
-  makeWidget(volumeRow, { flexGrow: 1, height: volumeControlHeight }, {
+  makeWidget(volumeRow, { flexGrow: 1, minWidth: EQ_BAR_MIN_DOTS / STYLE_SCALE, height: buttonStandardHeight() }, {
     paint(box) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
       const count = 10;
-      const gap = 1;
+      const gap = UI_SPACING_DOTS.minimumGap;
       const segmentWidth = Math.max(1, Math.floor((box.width - 2 - (count - 1) * gap) / count));
       const active = Math.round(volume * count);
       for (let index = 0; index < active; index += 1) {
@@ -1544,32 +1623,26 @@ function addAudioOptions(columns, pref) {
       }
     },
   });
-  label(volumeRow, `${Math.round(volume * 100)}%`, { width: (4 * fontProfile().advance + 3) / STYLE_SCALE, height: volumeControlHeight }, {
-    textShade: 0, align: "right", inset: 0,
-  });
+  label(volumeRow, `${Math.round(volume * 100)}%`, {
+    width: framedTextWidth("100%"), height: buttonStandardHeight(),
+  }, { textShade: 0, align: "right", inset: BUTTON_HORIZONTAL_INSET_DOTS });
   pixelButton(volumeRow, "[+]", () => changeVolume(0.1));
 
-  optionSection(equalizer, "TEN BAND EQUALIZER");
+  const equalizer = optionGroup(parent, "TEN BAND EQUALIZER");
   optionToggle(equalizer, "EQUALIZER", pref.equalizerEnabled === true,
     () => setPreference("equalizerEnabled", pref.equalizerEnabled !== true, true));
   const equalizerBands = ["31 HZ", "62 HZ", "125 HZ", "250 HZ", "500 HZ", "1K HZ", "2K HZ", "4K HZ", "8K HZ", "16K HZ"];
-  equalizerBands.forEach((title, index) => {
-    const gain = equalizerGain(index, pref);
-    optionAdjuster(equalizer, title, equalizerGainLabel(gain),
-      () => changeEqualizerGain(index, -0.5),
-      () => changeEqualizerGain(index, 0.5));
-  });
+  equalizerBands.forEach((title, index) => equalizerBand(equalizer, title, index, equalizerGain(index, pref)));
 }
 
-function addInterfaceOptions(columns, pref) {
-  const [layout, motion] = columns;
-  optionSection(layout, "PLAYLIST LAYOUT");
+function addInterfaceOptions(parent, pref) {
+  const layout = optionGroup(parent, "PLAYLIST LAYOUT");
   optionToggle(layout, "AUTO-SIZE COLUMNS", pref.columnAutoSize !== false,
     () => setPreference("columnAutoSize", pref.columnAutoSize === false));
-  optionSection(layout, "WINDOW");
-  optionToggle(layout, "MAIN WINDOW ON TOP", pref.mainWindowAlwaysOnTop === true,
+  const window = optionGroup(parent, "WINDOW");
+  optionToggle(window, "MAIN WINDOW ON TOP", pref.mainWindowAlwaysOnTop === true,
     () => setPreference("mainWindowAlwaysOnTop", pref.mainWindowAlwaysOnTop !== true));
-  optionSection(motion, "MOTION");
+  const motion = optionGroup(parent, "MOTION");
   optionToggle(motion, "AUTO-RESIZE HEADERS + ROWS", animationEnabled("autoResizeAnimationEnabled"),
     () => setPreference("autoResizeAnimationEnabled", !animationEnabled("autoResizeAnimationEnabled")));
   optionAdjuster(motion, "RESIZE TIME", `${animationMilliseconds("autoResizeAnimationMilliseconds")} MS`,
@@ -1582,9 +1655,8 @@ function addInterfaceOptions(columns, pref) {
     () => adjustAnimationTime("selectionAnimationMilliseconds", 50));
 }
 
-function addLibraryOptions(columns, pref) {
-  const [fields, catalog] = columns;
-  optionSection(fields, "PLAYLIST COLUMNS");
+function addLibraryOptions(parent, pref) {
+  const fields = optionGroup(parent, "PLAYLIST COLUMNS");
   configurableColumns.forEach(({ key, title }) => {
     const visibility = pref.columnVisibility || {};
     optionToggle(fields, title, visibility[key] !== false,
@@ -1593,42 +1665,51 @@ function addLibraryOptions(columns, pref) {
         [key]: state.preferences.columnVisibility?.[key] === false,
       }));
   });
-  optionSection(catalog, "CATALOG");
-  pixelButton(catalog, "RELOAD LIBRARY", () => loadCatalog(), { flexGrow: 1 });
+  const catalog = optionGroup(parent, "CATALOG");
+  pixelButton(catalog, "RELOAD LIBRARY", () => loadCatalog());
 }
 
 function addOptionsContent(parent) {
+  const navigationWidth = optionsTocWidth();
+  const toc = makeWidget(parent, {
+    direction: FlexDirection.Column,
+    width: navigationWidth,
+    gap: uiGap(),
+    padding: UI_SPACING_DOTS.optionsInset / STYLE_SCALE,
+  }, {
+    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
+  });
+  panelTitle(toc, "OPTIONS");
+  const pageButtonWidth = navigationWidth - 2 * UI_SPACING_DOTS.optionsInset / STYLE_SCALE;
+  ["DISPLAY", "PLAYBACK", "AUDIO", "INTERFACE", "LIBRARY"].forEach((page) => {
+    pixelButton(toc, page, () => {
+      state.optionsPage = page;
+      render();
+    }, { width: pageButtonWidth, selected: state.optionsPage === page });
+  });
+  makeWidget(toc, { flexGrow: 1 });
+  statusBar(toc, "SETTINGS");
+
   const panel = makeWidget(parent, {
     direction: FlexDirection.Column,
     flexGrow: 1,
-    gap: oneDot(),
-    padding: PANE_INSET_DOTS,
+    gap: uiGap(),
+    padding: UI_SPACING_DOTS.optionsInset / STYLE_SCALE,
   }, {
-    paint(box) {
-      strokeRect(box.x, box.y, box.width, box.height, 1);
-    },
+    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
-  panelTitle(panel, "OPTIONS");
-  const navigation = makeWidget(panel, {
-    direction: FlexDirection.Row,
-    alignItems: Align.Center,
-    height: buttonStandardHeight(),
-    gap: oneDot(),
+  panelTitle(panel, state.optionsPage);
+  const content = makeWidget(panel, {
+    direction: FlexDirection.Column,
+    flexGrow: 1,
+    gap: uiSectionGap(),
   });
-  ["DISPLAY", "PLAYBACK", "AUDIO", "INTERFACE", "LIBRARY"].forEach((page) => {
-    pixelButton(navigation, page, () => {
-      state.optionsPage = page;
-      render();
-    }, { flexGrow: 1, selected: state.optionsPage === page });
-  });
-
-  const columns = optionColumns(panel);
   const pref = state.preferences;
-  if (state.optionsPage === "PLAYBACK") addPlaybackOptions(columns, pref);
-  else if (state.optionsPage === "AUDIO") addAudioOptions(columns, pref);
-  else if (state.optionsPage === "INTERFACE") addInterfaceOptions(columns, pref);
-  else if (state.optionsPage === "LIBRARY") addLibraryOptions(columns, pref);
-  else addDisplayOptions(columns);
+  if (state.optionsPage === "PLAYBACK") addPlaybackOptions(content, pref);
+  else if (state.optionsPage === "AUDIO") addAudioOptions(content, pref);
+  else if (state.optionsPage === "INTERFACE") addInterfaceOptions(content, pref);
+  else if (state.optionsPage === "LIBRARY") addLibraryOptions(content, pref);
+  else addDisplayOptions(content);
   statusBar(panel, `${state.optionsPage} OPTIONS`);
 }
 
@@ -1644,7 +1725,7 @@ function buildTree() {
     height: HEIGHT / STYLE_SCALE,
     positionType: PositionType.Relative,
     padding: 8,
-    gap: oneDot(),
+    gap: uiGap(),
     alignItems: Align.Stretch,
   }, {
     paint() {
@@ -1652,12 +1733,7 @@ function buildTree() {
     },
   });
 
-  const toolbar = makeWidget(root, {
-    direction: FlexDirection.Row,
-    height: toolbarHeight,
-    gap: oneDot(),
-    alignItems: Align.Center,
-  });
+  const toolbar = controlRow(root, { height: toolbarHeight });
   label(toolbar, "VIEWBOY", { flexGrow: 1, height: toolbarHeight }, {
     textShade: 0, inset: 0,
   });
@@ -1688,7 +1764,7 @@ function buildTree() {
   const content = makeWidget(root, {
     direction: FlexDirection.Row,
     flexGrow: 1,
-    gap: oneDot() * 2,
+    gap: uiGap(),
     alignItems: Align.Stretch,
   });
   if (state.tab === "SETTINGS") {
@@ -2781,7 +2857,16 @@ canvas.addEventListener("wheel", (event) => {
 }, { passive: false });
 
 canvas.addEventListener("keydown", (event) => {
-  if (event.code === "Escape" && state.columnMenu) {
+  const commandKey = event.metaKey || event.ctrlKey;
+  if (commandKey && event.key === ",") {
+    event.preventDefault();
+    state.tab = "SETTINGS";
+    render();
+  } else if (commandKey && /^[1-9]$/.test(event.key)) {
+    event.preventDefault();
+    const tab = state.playlistTabs[Number(event.key) - 1];
+    if (tab) activatePlaylistTab(tab.id);
+  } else if (event.code === "Escape" && state.columnMenu) {
     event.preventDefault();
     state.columnMenu = null;
     render();
@@ -2886,7 +2971,11 @@ window.ViewBoy = Object.freeze({
       case "settings": state.tab = "SETTINGS"; render(); break;
       case "library": selectSidebarView("LIBRARY"); break;
       case "queue": selectSidebarView("QUEUE"); break;
+      case "optionsPage:DISPLAY": state.tab = "SETTINGS"; state.optionsPage = "DISPLAY"; render(); break;
+      case "optionsPage:PLAYBACK": state.tab = "SETTINGS"; state.optionsPage = "PLAYBACK"; render(); break;
       case "optionsPage:AUDIO": state.tab = "SETTINGS"; state.optionsPage = "AUDIO"; render(); break;
+      case "optionsPage:INTERFACE": state.tab = "SETTINGS"; state.optionsPage = "INTERFACE"; render(); break;
+      case "optionsPage:LIBRARY": state.tab = "SETTINGS"; state.optionsPage = "LIBRARY"; render(); break;
       case "closeWindow": bridge?.closeMainWindow?.(); break;
       default: break;
     }
