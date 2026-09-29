@@ -15,6 +15,11 @@ there is no second tag store. New tag names use Title Case. Fixed structural
 properties such as attachment references keep their contract spelling and are
 not free-form tags.
 
+System identity uses the single structural `game.console` field. Apply the
+approved names and source-label mappings in
+[`CANONICAL-SYSTEM-NAMES.md`](CANONICAL-SYSTEM-NAMES.md); do not duplicate a
+system as `System`, `Platform`, `Console`, or `game.metadata.system`.
+
 ## Source-format ingest register
 
 The reader IDs below are sourced from `MetaManCore.supportedFormats`. The
@@ -170,6 +175,7 @@ or content overlap alone.
 - SPC native reader and field layout:
   [`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md)
 - SPC-to-UAC profile: [`SPC.md`](SPC.md)
+- Canonical system names: [`CANONICAL-SYSTEM-NAMES.md`](CANONICAL-SYSTEM-NAMES.md)
 - Compact pre-disc hash policy: [`PRE-DISC-NATIVE.md`](PRE-DISC-NATIVE.md)
 - VGM/VGZ profile: [`VGM.md`](VGM.md)
 - NSF/NSFE profile: [`NSF-NSFE.md`](NSF-NSFE.md)

@@ -1,4 +1,4 @@
-# PlayStation Disc Audio to UAC Profile
+# Sony PlayStation Disc Audio to UAC Profile
 
 ## Status and scope
 
@@ -18,6 +18,7 @@ record current examples of the physical CD-DA and logical XA numbering rules.
 It covers Redump PlayStation disc audio represented as native XA streams,
 Red Book CD-DA tracks, or both. Extraction and game-specific loop research
 remain in the [PSX preservation protocol](../protocols/PSX-CDXA.protocol.md).
+System identity follows the [shared system-name registry](CANONICAL-SYSTEM-NAMES.md).
 
 ## Source identity and package shape
 
@@ -58,11 +59,11 @@ member remains the byte-exact preservation copy of its native tags. Project
 only useful, populated, source-backed values to UAC metadata; do not duplicate
 one fact under aliases.
 
-Current PSX projection direction:
+Current Sony PlayStation projection direction:
 
 | Field | UAC location and rule |
 | --- | --- |
-| Platform | Keep `game.console` as structural package identity and project **Platform** `PSX` as a direct member tag for track-level consumers. Do not add a duplicate package-level `Platform` metadata tag. |
+| System | Set `game.console` once at package scope to `Sony PlayStation`. Do not add a duplicate member `System` or `Platform` tag. |
 | Album | Use the standard **Album** member tag for the established game/soundtrack title (for example, `Darkstalkers - The Night Warriors`). Do not add a parallel `Game` tag or append the region to Album. |
 | Region | Keep the release region once at package scope as `game.metadata["Region"]`, using the two-letter code (for example, `US`). Use the same code in the package filename, such as `(US)`, not `(USA)`. |
 | Title and credits | Preserve populated, useful, source-backed tags such as **Title**, **Artist**, **Composer**, **Publisher**, and **Developer** under those names. Do not infer credits from a game's company identity or synthesize a title from a filename. |

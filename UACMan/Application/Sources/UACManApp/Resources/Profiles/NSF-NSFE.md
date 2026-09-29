@@ -1,11 +1,12 @@
-# NSF and NSFE to UAC Profile
+# Nintendo NES NSF and NSFE to UAC Profile
 
 ## Status and scope
 
 Draft pending fixture validation. Covers NSF/NESM fixed-header files and NSFE
 chunk files read by MetaManCore's `nsf` and `nsfe` readers. See
-[`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md) and the shared
-[`PRE-DISC-NATIVE.md`](PRE-DISC-NATIVE.md) policy.
+[`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md), the shared
+[`PRE-DISC-NATIVE.md`](PRE-DISC-NATIVE.md) policy, and
+[`CANONICAL-SYSTEM-NAMES.md`](CANONICAL-SYSTEM-NAMES.md).
 
 ## NSF projection
 
@@ -15,6 +16,7 @@ created per declared source track; the source itself is stored once.
 
 | Source field | UAC field | Rule |
 | --- | --- | --- |
+| NSF / NSFE system identity | `game.console` | Set once at package scope to `Nintendo NES` for either format; do not repeat it as a member `System` or `Platform` tag. |
 | NSF version byte | `Format` | `NSF v.<integer>` on the member. |
 | Game | `Album` | Keep a nonempty source value. |
 | Artist | `Artist` | Keep a nonempty source value. |

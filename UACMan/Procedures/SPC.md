@@ -1,4 +1,4 @@
-# SPC to UAC procedure and field profile
+# Nintendo SNES SPC to UAC Profile
 
 This procedure defines the reusable metadata, provenance, integrity, naming,
 and review steps for SPC members packaged in UAC. MetaManCore is the native
@@ -111,7 +111,7 @@ legacy key, and the Tag Analyzer shows the exact stored name.
 | OST Title | `member.metadata["OST Title"]` | Preserve the xID6 source name and value separately from Album and Game Title. |
 | Disc Number | `member.metadata["Disc Number"]` | Map the populated source OST Disc value to this tag; keep the numeric text exactly as recorded. |
 | Region | `game.metadata["Region"]` | Include only when source or positive release-ID evidence establishes one region. Omit when unknown; use explicit variants when the package contains distinct regional releases. |
-| System | `game.console` | Canonical value `Nintendo SNES`; do not repeat source synonyms such as `Super Nintendo` on each track. |
+| System | `game.console` | Canonical value `Nintendo SNES` from the [shared system-name registry](CANONICAL-SYSTEM-NAMES.md); do not repeat source synonyms such as `Super Nintendo` on each track. |
 | Package Set | `game.metadata["Set Collection"]`, `game.metadata["Set Name"]`, `game.metadata["Set URL"]` | Store each populated source fact once as a direct Title Case package tag. New recipes accept the former nested `set` object and normalize it to these fields. |
 | Title | `member.metadata["Title"]` | Project the SPC Song field when nonempty. |
 | Artist | `member.metadata["Artist"]` | Project the source Artist field when present. |

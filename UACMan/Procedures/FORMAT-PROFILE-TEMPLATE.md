@@ -13,11 +13,12 @@
 
 | Source field | UAC location | Type and normalization | Omission/default rule |
 | --- | --- | --- | --- |
+| Source system | `game.console` | Use the canonical name in [`CANONICAL-SYSTEM-NAMES.md`](CANONICAL-SYSTEM-NAMES.md). | Required package identity; review missing, mixed, or unrecognized systems. Do not add a duplicate `System` or `Platform` tag. |
 
-Keep one canonical field per meaning. Put package-wide identity, release,
-system, and source-set facts at game/package level. Put member-specific values
-on the member. Keep typed format-specific extensions namespaced and distinct
-from shared fields.
+Keep one canonical field per meaning. Put package-wide identity, release, and
+source-set facts at game/package level. Put member-specific values on the
+member. Keep typed format-specific extensions namespaced and distinct from
+shared fields.
 
 ## Source tag projection
 

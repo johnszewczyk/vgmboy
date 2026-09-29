@@ -4,8 +4,9 @@
 
 Draft pending fixture validation. Covers `.vgm` and gzip-compressed `.vgz` read
 by MetaManCore's `vgm` reader. See the native layout summary in
-[`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md) and the shared
-[`PRE-DISC-NATIVE.md`](PRE-DISC-NATIVE.md) policy.
+[`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md), the shared
+[`PRE-DISC-NATIVE.md`](PRE-DISC-NATIVE.md) policy, and
+[`CANONICAL-SYSTEM-NAMES.md`](CANONICAL-SYSTEM-NAMES.md).
 
 ## Projection
 
@@ -14,7 +15,7 @@ by MetaManCore's `vgm` reader. See the native layout summary in
 | Header version | `Format` | `VGM v.<version>` from the header's encoded version; retain on every applicable member. |
 | GD3 English/original title | `Title` | Prefer English, then original. Do not use a filename fallback as a source tag. |
 | GD3 English/original game | `Album` | Prefer English, then original. Keep it distinct from package identity. |
-| GD3 English/original system | `Platform` | Prefer English, then original; retain only when populated. |
+| GD3 English/original system | `game.console` | Prefer English, then original. Normalize a clear match using [`CANONICAL-SYSTEM-NAMES.md`](CANONICAL-SYSTEM-NAMES.md); do not add a member `System` or `Platform` tag. Hold missing, mixed, or unrecognized system labels for review. |
 | GD3 English/original artist | `Artist` | Prefer English, then original. |
 | GD3 release date | `Date` | Keep populated source text. Derive `Year` only when the leading four digits form a valid year. |
 | GD3 converted-by | `Dumper` | Preserve the source meaning; do not rename it `Encoded By`. |

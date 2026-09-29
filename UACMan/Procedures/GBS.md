@@ -1,11 +1,12 @@
-# GBS to UAC Profile
+# Nintendo Game Boy GBS to UAC Profile
 
 ## Status and scope
 
 Draft pending fixture validation. Covers Game Boy Sound System (`.gbs`) files
 and authored NEZplug extended-M3U sidecars used by the MetaManCore `gbs`
-reader. See [`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md) and
-the shared [`PRE-DISC-NATIVE.md`](PRE-DISC-NATIVE.md) policy.
+reader. See [`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md),
+the shared [`PRE-DISC-NATIVE.md`](PRE-DISC-NATIVE.md) policy, and
+[`CANONICAL-SYSTEM-NAMES.md`](CANONICAL-SYSTEM-NAMES.md).
 
 ## Projection
 
@@ -16,6 +17,7 @@ index.
 
 | Source field | UAC field | Rule |
 | --- | --- | --- |
+| GBS system identity | `game.console` | Set once at package scope to `Nintendo Game Boy`; do not repeat it as a member `System` or `Platform` tag. |
 | GBS version byte | `Format` | `GBS v.<integer>` on the physical member. |
 | Game | `Album` | Use populated source value. |
 | Artist | `Artist` | Use populated source value. |

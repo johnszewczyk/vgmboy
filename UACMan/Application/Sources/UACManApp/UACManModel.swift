@@ -188,12 +188,13 @@ final class UACManModel {
 
     private static func loadProfileDocuments() -> [UACProfileDocument] {
         let definitions: [(id: String, title: String, formats: String, file: String, shared: Bool)] = [
+            ("system-names", "Canonical System Names", "UAC system identity", "CANONICAL-SYSTEM-NAMES", true),
             ("pre-disc", "Pre-Disc Native", "SPC · VGM · NSF · GBS", "PRE-DISC-NATIVE", true),
-            ("spc", "Super Nintendo SPC", ".spc", "SPC", false),
-            ("gbs", "Game Boy Sound System", ".gbs", "GBS", false),
-            ("nsf-nsfe", "NSF / NSFE", ".nsf · .nsfe", "NSF-NSFE", false),
+            ("spc", "Nintendo SNES SPC", ".spc", "SPC", false),
+            ("gbs", "Nintendo Game Boy GBS", ".gbs", "GBS", false),
+            ("nsf-nsfe", "Nintendo NES NSF / NSFE", ".nsf · .nsfe", "NSF-NSFE", false),
             ("vgm-vgz", "VGM / VGZ", ".vgm · .vgz", "VGM", false),
-            ("psx-cdxa", "PlayStation Disc Audio", "XA · CD-DA · APE · FLAC", "PSX-CDXA", false)
+            ("psx-cdxa", "Sony PlayStation Disc Audio", "XA · CD-DA · APE · FLAC", "PSX-CDXA", false)
         ]
         return definitions.map { definition in
             let url = Bundle.module.url(

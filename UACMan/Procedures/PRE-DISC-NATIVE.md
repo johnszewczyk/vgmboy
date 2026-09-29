@@ -11,6 +11,10 @@ not apply to decoded CD audio or other large PCM streams. VGM, NSF/NSFE, and
 GBS mappings are drafts until representative fixtures have been checked
 against the reader and UACMan GUI.
 
+These profiles use the shared [canonical system names](CANONICAL-SYSTEM-NAMES.md)
+for package-level `game.console`. Do not duplicate that identity as a member
+tag.
+
 ## Common member rules
 
 - Preserve the complete source member bytes. Put populated, useful, source-backed
