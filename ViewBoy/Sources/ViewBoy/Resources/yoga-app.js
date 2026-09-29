@@ -6,6 +6,7 @@ import Yoga, {
   FlexDirection,
   Gutter,
   Justify,
+  Overflow,
 } from "./yoga-layout.js";
 
 // Each LCD dot occupies three physical display pixels per side. On a Retina
@@ -171,6 +172,7 @@ function saveDisplayOptions() {
       font: state.font,
       contrast: state.contrast,
       theme: state.theme,
+      columnOrder: state.columnOrder,
     }));
   }
   catch { /* Display remains usable when browser storage is unavailable. */ }
@@ -207,6 +209,8 @@ let columnLayoutAnimation = null;
 let lastColumnWidths = null;
 let currentRenderTime = 0;
 let paintClip = null;
+let pointerInteraction = null;
+let suppressNextClick = false;
 const state = {
   tab: "LIBRARY",
   selectedTrack: 0,
@@ -231,6 +235,18 @@ const state = {
   selectedGameKey: null,
   sortColumn: null,
   sortDirection: "ASCENDING",
+  columnOrder: Array.isArray(savedDisplayOptions.columnOrder)
+    ? savedDisplayOptions.columnOrder.filter((key) => typeof key === "string") : [],
+  tableHorizontalScroll: 0,
+  tableHorizontalMax: 0,
+  tableViewportWidth: 0,
+  tableViewportBox: null,
+  tableContentWidth: 0,
+  tableScrollbarBox: null,
+  tableScrollbarThumb: null,
+  tableViewportWidget: null,
+  tableContentWidget: null,
+  tableContentMinimumWidth: 0,
   activeGameKey: null,
   expandedSystems: new Set(),
   sidebarTransition: null,
@@ -463,7 +479,7 @@ function label(parent, text, style = {}, meta = {}) {
     text,
     paint(box) {
       const previousClip = paintClip;
-      if (meta.clipToBox) paintClip = box;
+      if (meta.clipToBox) paintClip = intersectBoxes(paintClip, box);
       if (meta.fill !== undefined) fillRect(box.x, box.y, box.width, box.height, meta.fill);
       if (meta.border !== undefined) strokeRect(box.x, box.y, box.width, box.height, meta.border);
       if (meta.bottomLine !== undefined) {
@@ -481,6 +497,16 @@ function label(parent, text, style = {}, meta = {}) {
 
 function rowHeight(extraDots = 0) {
   return (fontProfile().height + extraDots) / STYLE_SCALE;
+}
+
+function buttonStandardHeight() {
+  // Two clear LCD dots above and below the glyph, plus the one-dot outline.
+  return rowHeight(6);
+}
+
+function minimumColumnWidth(characterCount = 1) {
+  // One glyph plus a one-dot inset on either side and the two border pixels.
+  return (characterCount * fontProfile().advance + 4) / STYLE_SCALE;
 }
 
 function oneDot() {
@@ -510,7 +536,7 @@ function pixelButton(parent, text, onClick, style = {}) {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
     justifyContent: Justify.Center,
-    height: style.height ?? rowHeight(6),
+    height: buttonStandardHeight(),
     width: style.width,
     flexGrow: style.flexGrow ?? 0,
   }, {
@@ -560,7 +586,7 @@ function optionToggle(parent, title, checked, onClick) {
     },
   });
   label(row, title, { flexGrow: 1, height }, { textShade: 0, inset: 1 });
-  const marker = checked ? "[ X ]" : "[   ]";
+  const marker = checked ? "[x]" : "[ ]";
   label(row, marker, {
     width: (Array.from(marker).length * fontProfile().advance + 2) / STYLE_SCALE,
     height: fontProfile().height / STYLE_SCALE,
@@ -585,7 +611,6 @@ function optionChoice(parent, title, choices) {
   label(row, title, { width: titleWidth, height }, { textShade: 0, inset: 1 });
   choices.forEach((choice) => pixelButton(row, choice.title, choice.onClick, {
     flexGrow: 1,
-    height: rowHeight(4),
     selected: choice.selected,
   }));
   return row;
@@ -607,14 +632,14 @@ function optionAdjuster(parent, title, value, onDecrease, onIncrease) {
   label(row, title, { flexGrow: 1, height }, { textShade: 0, inset: 1 });
   const controlHeight = rowHeight(4);
   const controlWidth = (fontProfile().advance + 5) / STYLE_SCALE;
-  pixelButton(row, "-", onDecrease, { width: controlWidth, height: controlHeight });
+  pixelButton(row, "-", onDecrease, { width: controlWidth });
   label(row, value, { width: (Array.from(value).length * fontProfile().advance + 4) / STYLE_SCALE, height: controlHeight }, {
     border: 1,
     textShade: 0,
     align: "center",
     inset: 0,
   });
-  pixelButton(row, "+", onIncrease, { width: controlWidth, height: controlHeight });
+  pixelButton(row, "+", onIncrease, { width: controlWidth });
   return row;
 }
 
@@ -628,7 +653,7 @@ function formatSize(bytes) {
 function tableValue(track, key, rowIndex = 0) {
   switch (key) {
     case "favorite": return state.favoriteIDs.has(trackID(track)) ? "*" : "";
-    case "index": return String(rowIndex + 1).padStart(2, "0");
+    case "index": return String(rowIndex + 1);
     case "filename": return track.filename || "";
     case "title": return track.title || track.filename || "UNTITLED";
     case "game": return track.game || "";
@@ -659,17 +684,15 @@ function tableContentLengths(items, columns) {
 
   const measured = {
     lengths: Object.fromEntries(columns
-      .filter((column) => column.key !== "favorite" && column.key !== "title")
+      .filter((column) => !["favorite", "index", "title"].includes(column.key))
       .map((column) => [column.key, Array.from(normalizedText(column.title)).length])),
-    hasValue: Object.fromEntries(columns.map((column) => [column.key, false])),
   };
   items.forEach((track, index) => {
     for (const column of columns) {
-      if (column.key === "favorite" || column.key === "title") continue;
+      if (["favorite", "index", "title"].includes(column.key)) continue;
       const value = tableValue(track, column.key, index);
       const valueLength = Array.from(normalizedText(value)).length;
       measured.lengths[column.key] = Math.max(measured.lengths[column.key] ?? 0, valueLength);
-      if (String(value).trim()) measured.hasValue[column.key] = true;
     }
   });
   tableContentLengthCache.set(items, measured);
@@ -697,13 +720,19 @@ function toggleSort(columnKey) {
 }
 
 function tableColumns(items = activeTracks()) {
-  const gap = oneDot();
-  const sidebarWidth = state.tab === "SETTINGS" ? 0 : (WIDTH < 420 ? 94 : 128);
-  const available = Math.max(0, WIDTH / STYLE_SCALE - 16 - sidebarWidth - 12);
   const minimumTitleWidth = (20 * fontProfile().advance) / STYLE_SCALE;
   const columns = [
-    { key: "favorite", title: "*", width: 7, align: "center", mandatory: true },
-    { key: "index", title: "#", width: 12, align: "right", mandatory: true },
+    {
+      key: "index",
+      title: "#",
+      width: minimumColumnWidth(String(Math.max(1, items.length)).length),
+      align: "center",
+      rowAlign: "right",
+      mandatory: true,
+      reorderable: false,
+      sortable: false,
+    },
+    { key: "favorite", title: "*", width: minimumColumnWidth(1), align: "center", mandatory: true, sortable: false },
     { key: "filename", title: "FILE", width: 34 },
     { key: "title", title: "TITLE", width: minimumTitleWidth, flexGrow: 1, mandatory: true },
     { key: "game", title: "GAME", width: 40 },
@@ -718,7 +747,7 @@ function tableColumns(items = activeTracks()) {
   // floor, an auto-sized header can clip its arrow even though row widths and
   // the 250 ms resize animation are using the same column measurements.
   columns.forEach((column) => {
-    if (column.key === "favorite") return;
+    if (column.key === "favorite" || column.key === "index") return;
     const headingCharacters = Array.from(column.title).length + 1;
     const headingWidth = (headingCharacters * fontProfile().advance + 4) / STYLE_SCALE;
     column.width = Math.max(column.width, headingWidth);
@@ -728,7 +757,7 @@ function tableColumns(items = activeTracks()) {
   const content = tableContentLengths(items, columns);
   if (autoSize) {
     columns.forEach((column) => {
-      if (column.key === "favorite" || column.key === "title") return;
+      if (column.key === "favorite" || column.key === "index" || column.key === "title") return;
       const textWidth = ((content.lengths[column.key] ?? 0) * fontProfile().advance + 4) / STYLE_SCALE;
       const headingCharacters = Array.from(column.title).length + 1;
       const headingWidth = (headingCharacters * fontProfile().advance + 4) / STYLE_SCALE;
@@ -736,20 +765,17 @@ function tableColumns(items = activeTracks()) {
     });
   }
 
-  const chosen = new Set(columns.filter((column) => column.mandatory).map((column) => column.key));
-  let used = columns.filter((column) => column.mandatory)
-    .reduce((sum, column) => sum + column.width, 0) + (chosen.size - 1) * gap;
   const columnVisibility = state.preferences.columnVisibility || {};
-  for (const column of columns) {
-    if (column.mandatory || columnVisibility[column.key] === false) continue;
-    const hasValue = content.hasValue[column.key];
-    if (!hasValue && columnVisibility[column.key] !== true) continue;
-    if (used + column.width + gap <= available) {
-      chosen.add(column.key);
-      used += column.width + gap;
-    }
-  }
-  return { all: columns, visible: columns.filter((column) => chosen.has(column.key)) };
+  const visible = columns.filter((column) => column.mandatory || columnVisibility[column.key] !== false);
+  const byKey = new Map(columns.map((column) => [column.key, column]));
+  const preferredOrder = state.columnOrder.filter((key) => key !== "index" && byKey.has(key));
+  const orderedKeys = [...new Set(preferredOrder)];
+  columns.forEach((column) => {
+    if (column.key !== "index" && !orderedKeys.includes(column.key)) orderedKeys.push(column.key);
+  });
+  const ordered = [byKey.get("index"), ...orderedKeys.map((key) => byKey.get(key))]
+    .filter(Boolean);
+  return { all: ordered, visible: ordered.filter((column) => visible.includes(column)) };
 }
 
 function columnWidthSignature(widths) {
@@ -824,7 +850,7 @@ function resolveTableColumns(layout, time) {
 }
 
 function createTableHeader(parent, columns) {
-  const headerHeight = rowHeight(4);
+  const headerHeight = buttonStandardHeight();
   const header = makeWidget(parent, {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
@@ -848,14 +874,17 @@ function createTableHeader(parent, columns) {
       border: 1,
       fill: marker ? 2 : undefined,
       align: column.align ?? "left",
-      onClick: column.key === "favorite" ? undefined : () => toggleSort(column.key),
+      columnKey: column.key,
+      columnHeader: true,
+      reorderable: column.reorderable !== false,
+      onClick: column.sortable === false ? undefined : () => toggleSort(column.key),
     });
   });
   return header;
 }
 
 function createQueueRow(parent, index, track, columns) {
-  const rowHeightValue = rowHeight(2);
+  const rowHeightValue = rowHeight(4);
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
@@ -875,7 +904,7 @@ function createQueueRow(parent, index, track, columns) {
   }, {
     textShade: 0,
     inset: 0,
-    align: column.align ?? "left",
+    align: column.rowAlign ?? column.align ?? "left",
     onClick: column.key === "favorite" ? () => toggleFavorite(track) : undefined,
   }));
   return row;
@@ -976,6 +1005,7 @@ function addCatalogPane(parent, mode) {
   const panel = makeWidget(parent, {
     direction: FlexDirection.Column,
     flexGrow: 1,
+    flexShrink: 1,
     gap: 0,
     padding: 2,
   }, {
@@ -986,15 +1016,66 @@ function addCatalogPane(parent, mode) {
   const heading = mode === "QUEUE" ? "PLAY QUEUE"
     : mode === "FAVORITES" ? "FAVORITES" : "TRACK CATALOG";
   panelTitle(panel, heading, `${viewTracks.length} TRACKS`, 60);
-  const columns = resolveTableColumns(tableColumns(activeTracks()), currentRenderTime);
-  createTableHeader(panel, columns);
+  const columns = resolveTableColumns(tableColumns(viewTracks), currentRenderTime);
+  const tableGap = Math.max(0, columns.length - 1) * oneDot();
+  state.tableContentMinimumWidth = columns.reduce((sum, column) => sum + column.width, 0) + tableGap;
+  const viewport = makeWidget(panel, {
+    direction: FlexDirection.Column,
+    flexGrow: 1,
+    overflow: Overflow.Hidden,
+  }, {
+    id: "catalog-horizontal-viewport",
+    clipChildren: true,
+  });
+  const content = makeWidget(viewport, {
+    direction: FlexDirection.Column,
+    width: state.tableContentMinimumWidth,
+    gap: 0,
+  }, {
+    id: "catalog-scroll-content",
+    translateX: -state.tableHorizontalScroll,
+  });
+  state.tableViewportWidget = viewport;
+  state.tableContentWidget = content;
+  createTableHeader(content, columns);
   const count = visibleRowCount();
   state.queueScroll = Math.max(0, Math.min(state.queueScroll, Math.max(0, viewTracks.length - count)));
   viewTracks.slice(state.queueScroll, state.queueScroll + count).forEach((track, offset) =>
-    createQueueRow(panel, state.queueScroll + offset, track, columns));
-  if (!viewTracks.length) label(panel, state.status, { height: rowHeight(4) }, { textShade: 0, inset: 1 });
+    createQueueRow(content, state.queueScroll + offset, track, columns));
+  if (!viewTracks.length) label(content, state.status, { height: rowHeight(4) }, { textShade: 0, inset: 1 });
+  makeWidget(panel, {
+    height: rowHeight(4),
+  }, {
+    horizontalScrollbar: true,
+    onClick(event) {
+      if (state.tableHorizontalMax <= 0) return;
+      const point = logicalPoint(event);
+      const box = state.tableScrollbarBox;
+      if (!box) return;
+      const trackWidth = Math.max(1, box.width - 2);
+      state.tableHorizontalScroll = Math.max(0, Math.min(state.tableHorizontalMax,
+        ((point.x - box.x - 1) / trackWidth) * state.tableHorizontalMax));
+      render();
+    },
+    paint(box) {
+      state.tableScrollbarBox = box;
+      const trackLeft = box.x + 1;
+      const trackWidth = Math.max(1, box.width - 2);
+      const centerY = box.y + Math.floor(box.height / 2);
+      line(trackLeft, centerY, trackLeft + trackWidth, centerY, 2);
+      const contentWidth = Math.max(trackWidth, state.tableContentWidth);
+      const viewportWidth = Math.min(contentWidth, state.tableViewportWidth || contentWidth);
+      const thumbWidth = state.tableHorizontalMax > 0
+        ? Math.max(6, Math.min(trackWidth, Math.floor(trackWidth * viewportWidth / contentWidth)))
+        : trackWidth;
+      const thumbTravel = Math.max(0, trackWidth - thumbWidth);
+      const thumbLeft = trackLeft + (state.tableHorizontalMax > 0
+        ? Math.round(thumbTravel * state.tableHorizontalScroll / state.tableHorizontalMax) : 0);
+      fillRect(thumbLeft, centerY, thumbWidth, 1, 0);
+      state.tableScrollbarThumb = { x: thumbLeft, y: centerY, width: thumbWidth, height: 1 };
+    },
+  });
   label(panel, `${viewTracks.length ? state.queueScroll + 1 : 0}-${Math.min(viewTracks.length, state.queueScroll + count)} / ${viewTracks.length}`, {
-    flexGrow: 1,
     height: rowHeight(2),
   }, {
     textShade: 0,
@@ -1086,7 +1167,7 @@ function addPlaybackOptions(columns, pref) {
   });
   const volumeControlHeight = rowHeight(5);
   const volumeControlWidth = (fontProfile().advance + 5) / STYLE_SCALE;
-  pixelButton(volumeRow, "-", () => changeVolume(-0.1), { width: volumeControlWidth, height: volumeControlHeight });
+  pixelButton(volumeRow, "-", () => changeVolume(-0.1), { width: volumeControlWidth });
   makeWidget(volumeRow, { flexGrow: 1, height: volumeControlHeight }, {
     paint(box) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
@@ -1103,7 +1184,7 @@ function addPlaybackOptions(columns, pref) {
   label(volumeRow, `${Math.round(volume * 100)}%`, { width: (4 * fontProfile().advance + 3) / STYLE_SCALE, height: volumeControlHeight }, {
     textShade: 0, align: "right", inset: 0,
   });
-  pixelButton(volumeRow, "+", () => changeVolume(0.1), { width: volumeControlWidth, height: volumeControlHeight });
+  pixelButton(volumeRow, "+", () => changeVolume(0.1), { width: volumeControlWidth });
   label(output, "VOLUME IS STORED WITH PLAYBACK SETTINGS", { height: rowHeight(6) }, {
     textShade: 0, inset: 2,
   });
@@ -1188,6 +1269,10 @@ function addOptionsContent(parent) {
 }
 
 function buildTree() {
+  state.tableViewportWidget = null;
+  state.tableContentWidget = null;
+  state.tableScrollbarBox = null;
+  state.tableScrollbarThumb = null;
   const toolbarHeight = rowHeight(6);
   const root = makeWidget(null, {
     direction: FlexDirection.Column,
@@ -1276,42 +1361,68 @@ function buildTree() {
   });
 
   root.yoga.calculateLayout(WIDTH, HEIGHT, Direction.LTR);
+  if (state.tableViewportWidget && state.tableContentWidget) {
+    const viewportWidth = state.tableViewportWidget.yoga.getComputedLayout().width;
+    const contentWidth = Math.max(
+      state.tableContentMinimumWidth * STYLE_SCALE,
+      viewportWidth,
+    );
+    state.tableContentWidget.yoga.setWidth(contentWidth);
+    root.yoga.calculateLayout(WIDTH, HEIGHT, Direction.LTR);
+  }
   return root;
 }
 
-function collect(widget, parentX = 0, parentY = 0, output = []) {
+function intersectBoxes(first, second) {
+  if (!first) return second;
+  if (!second) return first;
+  const x = Math.max(first.x, second.x);
+  const y = Math.max(first.y, second.y);
+  const right = Math.min(first.x + first.width, second.x + second.width);
+  const bottom = Math.min(first.y + first.height, second.y + second.height);
+  return { x, y, width: Math.max(0, right - x), height: Math.max(0, bottom - y) };
+}
+
+function collect(widget, parentX = 0, parentY = 0, output = [], inheritedClip = null) {
   const layout = widget.yoga.getComputedLayout();
   const box = {
-    x: floor(parentX + layout.left),
+    x: floor(parentX + layout.left + (widget.meta.translateX ?? 0)),
     y: floor(parentY + layout.top),
     width: floor(layout.width),
     height: floor(layout.height),
   };
-  const entry = { widget, box };
+  const entry = { widget, box, clip: inheritedClip };
   output.push(entry);
-  boxesById.set(widget.meta.id, box);
-  if (widget.meta.onClick) hitTargets.push(entry);
-  for (const child of widget.children) collect(child, box.x, box.y, output);
+  if (widget.meta.id) boxesById.set(widget.meta.id, box);
+  if (widget.meta.onClick || widget.meta.columnHeader) hitTargets.push(entry);
+  const childClip = widget.meta.clipChildren ? intersectBoxes(inheritedClip, box) : inheritedClip;
+  for (const child of widget.children) collect(child, box.x, box.y, output, childClip);
   return output;
 }
 
-function paintTree(widget, box) {
+function paintTree(widget, box, inheritedClip = null) {
+  const priorClip = paintClip;
+  paintClip = intersectBoxes(paintClip, inheritedClip);
   if (widget.meta.paint) widget.meta.paint(box);
+  const childClip = widget.meta.clipChildren ? intersectBoxes(inheritedClip, box) : inheritedClip;
   for (const child of widget.children) {
     const layout = child.yoga.getComputedLayout();
     paintTree(child, {
-      x: floor(box.x + layout.left),
+      x: floor(box.x + layout.left + (child.meta.translateX ?? 0)),
       y: floor(box.y + layout.top),
       width: floor(layout.width),
       height: floor(layout.height),
-    });
+    }, childClip);
   }
+  paintClip = priorClip;
 }
 
 function paintSelectionAt(y, startY = 0, endY = HEIGHT) {
   pixels.set(basePixels);
   if (selectionBand && y !== null) {
     const bandTop = floor(y);
+    const priorClip = paintClip;
+    paintClip = intersectBoxes(paintClip, selectionBand.clip);
     fillRect(selectionBand.x, bandTop, selectionBand.width, selectionBand.height, 2);
     for (const row of selectionRows) {
       if (row.box.y >= bandTop + selectionBand.height || row.box.y + row.box.height <= bandTop) continue;
@@ -1320,6 +1431,7 @@ function paintSelectionAt(y, startY = 0, endY = HEIGHT) {
         if (entry?.widget.meta.paint) entry.widget.meta.paint(entry.box);
       }
     }
+    paintClip = priorClip;
   }
   present(startY, endY);
 }
@@ -1366,12 +1478,33 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
   hitTargets = [];
   pixels.fill(3);
   widgetTree = buildTree();
+  if (state.tableViewportWidget && state.tableContentWidget) {
+    const viewportLayout = state.tableViewportWidget.yoga.getComputedLayout();
+    const contentLayout = state.tableContentWidget.yoga.getComputedLayout();
+    state.tableViewportWidth = Math.floor(viewportLayout.width);
+    state.tableContentWidth = Math.floor(contentLayout.width);
+    state.tableHorizontalMax = Math.max(0, state.tableContentWidth - state.tableViewportWidth);
+    state.tableHorizontalScroll = Math.max(0, Math.min(state.tableHorizontalMax, state.tableHorizontalScroll));
+    state.tableContentWidget.meta.translateX = -state.tableHorizontalScroll;
+  } else {
+    state.tableHorizontalMax = 0;
+    state.tableHorizontalScroll = 0;
+    state.tableViewportBox = null;
+  }
   layoutEntries = collect(widgetTree);
+  state.tableViewportBox = boxesById.get("catalog-horizontal-viewport") ?? null;
   paintTree(widgetTree, { x: 0, y: 0, width: WIDTH, height: HEIGHT });
   basePixels = pixels.slice();
   selectionRows = layoutEntries.filter((entry) => Number.isInteger(entry.widget.meta.trackIndex));
   const selectedRow = selectionRows.find((entry) => entry.widget.meta.trackIndex === state.selectedTrack);
-  const nextBand = selectedRow ? { ...selectedRow.box } : null;
+  const nextBand = selectedRow ? {
+    ...selectedRow.box,
+    ...(selectedRow.clip ? {
+      x: selectedRow.clip.x,
+      width: selectedRow.clip.width,
+      clip: selectedRow.clip,
+    } : {}),
+  } : null;
   const selectionDuration = animationMilliseconds("selectionAnimationMilliseconds");
   const canSlide = animateSelection && animationEnabled("selectionAnimationEnabled") && selectionDuration > 0
     && priorBand && nextBand
@@ -2044,22 +2177,131 @@ function logicalPoint(event) {
   };
 }
 
-function findTarget(point) {
+function findTargetEntry(point, predicate = () => true) {
   for (let index = hitTargets.length - 1; index >= 0; index -= 1) {
-    const { widget, box } = hitTargets[index];
+    const entry = hitTargets[index];
+    const { widget, box, clip } = entry;
+    if (!predicate(widget) || (clip && (point.x < clip.x || point.x >= clip.x + clip.width
+      || point.y < clip.y || point.y >= clip.y + clip.height))) continue;
     if (point.x >= box.x && point.x < box.x + box.width
-      && point.y >= box.y && point.y < box.y + box.height) return widget;
+      && point.y >= box.y && point.y < box.y + box.height) return entry;
   }
   return null;
 }
 
+function findTarget(point) {
+  return findTargetEntry(point)?.widget ?? null;
+}
+
+function setHorizontalScrollFromThumb(pointerX, thumbOffset) {
+  const box = state.tableScrollbarBox;
+  const thumb = state.tableScrollbarThumb;
+  if (!box || !thumb || state.tableHorizontalMax <= 0) return;
+  const trackLeft = box.x + 1;
+  const trackWidth = Math.max(1, box.width - 2);
+  const travel = Math.max(0, trackWidth - thumb.width);
+  if (travel <= 0) return;
+  const thumbLeft = Math.max(trackLeft, Math.min(trackLeft + travel, pointerX - thumbOffset));
+  state.tableHorizontalScroll = (thumbLeft - trackLeft) / travel * state.tableHorizontalMax;
+  render();
+}
+
+function reorderTableColumn(sourceKey, targetKey, targetBox, pointerX) {
+  if (!sourceKey || !targetKey || sourceKey === "index" || targetKey === "index") return;
+  const keys = tableColumns(activeTracks()).all.map((column) => column.key)
+    .filter((key) => key !== "index");
+  const sourceIndex = keys.indexOf(sourceKey);
+  const targetIndex = keys.indexOf(targetKey);
+  if (sourceIndex < 0 || targetIndex < 0) return;
+  keys.splice(sourceIndex, 1);
+  let insertionIndex = targetIndex + (pointerX >= targetBox.x + targetBox.width / 2 ? 1 : 0);
+  if (sourceIndex < insertionIndex) insertionIndex -= 1;
+  keys.splice(Math.max(0, Math.min(keys.length, insertionIndex)), 0, sourceKey);
+  state.columnOrder = keys;
+  saveDisplayOptions();
+  render();
+}
+
+canvas.addEventListener("pointerdown", (event) => {
+  const point = logicalPoint(event);
+  const entry = findTargetEntry(point);
+  const target = entry?.widget;
+  if (target?.meta.horizontalScrollbar) {
+    const thumb = state.tableScrollbarThumb;
+    const localX = point.x - (thumb?.x ?? point.x);
+    const thumbOffset = thumb && localX >= 0 && localX < thumb.width
+      ? localX : Math.floor((thumb?.width ?? 1) / 2);
+    pointerInteraction = { kind: "scrollbar", pointerId: event.pointerId, thumbOffset, startX: point.x };
+    canvas.setPointerCapture?.(event.pointerId);
+    setHorizontalScrollFromThumb(point.x, thumbOffset);
+    event.preventDefault?.();
+  } else if (target?.meta.columnHeader && target.meta.reorderable) {
+    pointerInteraction = {
+      kind: "column",
+      pointerId: event.pointerId,
+      sourceKey: target.meta.columnKey,
+      targetKey: target.meta.columnKey,
+      targetBox: entry.box,
+      startX: point.x,
+      startY: point.y,
+      moved: false,
+    };
+    canvas.setPointerCapture?.(event.pointerId);
+  }
+});
+
 canvas.addEventListener("pointermove", (event) => {
-  const target = findTarget(logicalPoint(event));
+  const point = logicalPoint(event);
+  if (pointerInteraction?.kind === "scrollbar") {
+    if (Math.abs(point.x - pointerInteraction.startX) >= 1) suppressNextClick = true;
+    pointerInteraction.startX = point.x;
+    setHorizontalScrollFromThumb(point.x, pointerInteraction.thumbOffset);
+    return;
+  }
+  if (pointerInteraction?.kind === "column") {
+    const distance = Math.hypot(point.x - pointerInteraction.startX, point.y - pointerInteraction.startY);
+    if (distance >= 3) {
+      pointerInteraction.moved = true;
+      suppressNextClick = true;
+      const dropTarget = findTargetEntry(point, (widget) => widget.meta.columnHeader);
+      if (dropTarget?.widget.meta.reorderable) {
+        pointerInteraction.targetKey = dropTarget.widget.meta.columnKey;
+        pointerInteraction.targetBox = dropTarget.box;
+      }
+    }
+    return;
+  }
+  const target = findTarget(point);
   canvas.style.cursor = target ? "pointer" : "default";
 });
 
+canvas.addEventListener("pointerup", (event) => {
+  if (!pointerInteraction || (pointerInteraction.pointerId !== undefined
+    && event.pointerId !== undefined && pointerInteraction.pointerId !== event.pointerId)) return;
+  const interaction = pointerInteraction;
+  pointerInteraction = null;
+  if (interaction.kind === "column" && interaction.moved) {
+    const point = logicalPoint(event);
+    const dropTarget = findTargetEntry(point, (widget) => widget.meta.columnHeader && widget.meta.reorderable);
+    if (dropTarget) {
+      interaction.targetKey = dropTarget.widget.meta.columnKey;
+      interaction.targetBox = dropTarget.box;
+    }
+    reorderTableColumn(interaction.sourceKey, interaction.targetKey, interaction.targetBox, point.x);
+    suppressNextClick = true;
+  } else if (interaction.kind === "scrollbar") {
+    suppressNextClick = true;
+  }
+});
+
+canvas.addEventListener("pointercancel", () => { pointerInteraction = null; });
+
 canvas.addEventListener("click", (event) => {
   canvas.focus({ preventScroll: true });
+  if (suppressNextClick) {
+    suppressNextClick = false;
+    return;
+  }
   const target = findTarget(logicalPoint(event));
   if (target?.meta.onClick) target.meta.onClick(event);
 });
@@ -2068,6 +2310,17 @@ canvas.addEventListener("wheel", (event) => {
   if (state.tab === "SETTINGS") return;
   event.preventDefault();
   const point = logicalPoint(event);
+  const viewport = state.tableViewportBox;
+  const overTable = viewport && point.x >= viewport.x && point.x < viewport.x + viewport.width
+    && point.y >= viewport.y && point.y < viewport.y + viewport.height;
+  if (overTable && (event.shiftKey || Math.abs(event.deltaX) > 0)) {
+    const rect = canvas.getBoundingClientRect();
+    const delta = event.deltaX || event.deltaY;
+    state.tableHorizontalScroll = Math.max(0, Math.min(state.tableHorizontalMax,
+      state.tableHorizontalScroll + delta * WIDTH / Math.max(1, rect.width)));
+    render();
+    return;
+  }
   const sidebarWidth = (WIDTH < 420 ? 94 : 128) * STYLE_SCALE + 8 * STYLE_SCALE;
   const library = point.x < sidebarWidth;
   const key = library ? "libraryScroll" : "queueScroll";
@@ -2078,7 +2331,12 @@ canvas.addEventListener("wheel", (event) => {
 }, { passive: false });
 
 canvas.addEventListener("keydown", (event) => {
-  if (event.code === "Space") {
+  if (event.shiftKey && (event.code === "ArrowLeft" || event.code === "ArrowRight")) {
+    event.preventDefault();
+    state.tableHorizontalScroll = Math.max(0, Math.min(state.tableHorizontalMax,
+      state.tableHorizontalScroll + (event.code === "ArrowRight" ? 1 : -1) * 8 * fontProfile().advance));
+    render();
+  } else if (event.code === "Space") {
     event.preventDefault();
     togglePlaying();
   } else if (event.code === "ArrowDown") {

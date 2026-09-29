@@ -112,7 +112,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   screenWidth = 620;
   windowListeners.get('resize')();
   await tick();
-  assert.ok(canvas.frames >= firstLayoutFrameCount + 2, 'auto-sized columns repaint through the shared resize transition');
+  assert.ok(canvas.frames >= firstLayoutFrameCount + 1,
+    'resizing repaints the table viewport while preserving the complete column strip');
   globalThis.ViewBoy.dispatch('playPause');
   await tick();
   assert.equal(calls.find(([name]) => name === 'start')[1].path, '/music/a.spc');
@@ -269,4 +270,51 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.notEqual(pixelChecksum(canvas.image.data), shortFilenamePixels,
     'the File column expands beyond its default width to fit the longest catalog value');
+
+  rows = rows.map((track) => ({ ...track, filename: 'INITIAL_FILENAME.SPC' }));
+  await catalogReloaded();
+  screenWidth = 620;
+  windowListeners.get('resize')();
+  await tick();
+  await tick();
+  const narrowLayoutPixels = pixelChecksum(canvas.image.data);
+  const rect = canvas.getBoundingClientRect();
+  canvas.listeners.get('wheel')({
+    clientX: rect.width * 0.72,
+    clientY: rect.height * 0.34,
+    deltaX: 120,
+    deltaY: 0,
+    shiftKey: false,
+    preventDefault() {},
+  });
+  assert.notEqual(pixelChecksum(canvas.image.data), narrowLayoutPixels,
+    'the complete table scrolls horizontally inside its clipped viewport');
+
+  const sendPointer = (name, x, y) => canvas.listeners.get(name)({
+    clientX: rect.width * x,
+    clientY: rect.height * y,
+    pointerId: 1,
+    preventDefault() {},
+  });
+  canvas.listeners.get('wheel')({
+    clientX: rect.width * 0.72,
+    clientY: rect.height * 0.34,
+    deltaX: -500,
+    deltaY: 0,
+    shiftKey: false,
+    preventDefault() {},
+  });
+  sendPointer('pointerdown', 0.60, 0.125);
+  sendPointer('pointermove', 0.80, 0.125);
+  sendPointer('pointerup', 0.80, 0.125);
+  const savedColumnOrder = JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).columnOrder;
+  assert.ok(savedColumnOrder.indexOf('filename') > savedColumnOrder.indexOf('title'),
+    'dragging a header reorders columns and keeps the order in display preferences');
+  assert.ok(!savedColumnOrder.includes('index'), 'the numbered column is pinned outside the movable order');
+  const headerOrder = [...savedColumnOrder];
+  sendPointer('pointerdown', 0.45, 0.125);
+  sendPointer('pointermove', 0.80, 0.125);
+  sendPointer('pointerup', 0.80, 0.125);
+  assert.deepEqual(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).columnOrder, headerOrder,
+    'dragging other headers across # cannot move the numbered column');
 });
