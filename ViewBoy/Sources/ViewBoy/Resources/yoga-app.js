@@ -13,6 +13,7 @@ import Yoga, {
 const DEVICE_PIXELS_PER_LCD_DOT = 3;
 const LCD_FACE_DEVICE_PIXELS = DEVICE_PIXELS_PER_LCD_DOT - 1;
 const BASELINE_LAYOUT_UNIT_CSS_PIXELS = 2.5;
+const RANDOM_HISTORY_LIMIT = 256;
 const PALETTES = {
   CURRENT: ["#0C300C", "#285428", "#78940D", "#9BBC0F"],
   HIGH_CONTRAST: ["#041604", "#285428", "#78940D", "#9BBC0F"],
@@ -199,6 +200,12 @@ const state = {
   transport: "stopped",
   currentTrackId: null,
   activeQueue: [],
+  randomSeenIDs: new Set(),
+  randomQueueSignature: "",
+  randomPlaylistQueue: [],
+  randomHistory: [],
+  randomHistoryIndex: -1,
+  libraryRandomToken: 0,
   games: [],
   favoriteTracks: [],
   favoriteIDs: new Set(),
@@ -216,6 +223,8 @@ const state = {
   nativeGeneration: 0,
   playbackGeneration: 0,
   statusSequence: 0,
+  preferenceMutationToken: 0,
+  preferenceSaveChain: Promise.resolve(),
   catalogToken: 0,
   groupTransitionToken: 0,
   playbackToken: 0,
@@ -978,6 +987,11 @@ function addOptionsContent(parent) {
     { title: "ALL", selected: pref.repeatMode === "all", onClick: () => setPreference("repeatMode", "all") },
     { title: "ONE", selected: pref.repeatMode === "one", onClick: () => setPreference("repeatMode", "one") },
   ]);
+  optionChoice(panel, "RANDOM", [
+    { title: "OFF", selected: (pref.randomMode || "off") === "off", onClick: () => setRandomMode("off") },
+    { title: "PLAYLIST", selected: pref.randomMode === "playlist", onClick: () => setRandomMode("playlist") },
+    { title: "LIBRARY", selected: pref.randomMode === "library", onClick: () => setRandomMode("library") },
+  ]);
   optionToggle(panel, "MONO OUTPUT", pref.monoEnabled === true,
     () => setPreference("monoEnabled", pref.monoEnabled !== true, true));
   const volume = Math.max(0, Math.min(1, Number(pref.appVolume ?? 1)));
@@ -1080,6 +1094,18 @@ function buildTree() {
   });
   pixelButton(toolbar, "NEXT", () => selectNext(), { width: buttonWidth("NEXT") });
   pixelButton(toolbar, "STOP", () => stopPlayback(), { width: buttonWidth("STOP") });
+  pixelButton(toolbar, "LP", () => toggleLongPlay(), {
+    width: buttonWidth("LP"), selected: state.preferences.longPlayEnabled === true,
+  });
+  pixelButton(toolbar, "R1", () => toggleRepeatOne(), {
+    width: buttonWidth("R1"), selected: state.preferences.repeatMode === "one",
+  });
+  pixelButton(toolbar, "P-RND", () => toggleRandomMode("playlist"), {
+    width: buttonWidth("P-RND"), selected: state.preferences.randomMode === "playlist",
+  });
+  pixelButton(toolbar, "L-RND", () => toggleRandomMode("library"), {
+    width: buttonWidth("L-RND"), selected: state.preferences.randomMode === "library",
+  });
 
   const content = makeWidget(root, {
     direction: FlexDirection.Row,
@@ -1458,6 +1484,129 @@ function applyNativeStatus(snapshot) {
       || snapshot.error) render();
 }
 
+function randomQueue() {
+  return state.activeQueue.length ? state.activeQueue : activeTracks();
+}
+
+function queueSignature(queue) {
+  return JSON.stringify(queue.map(trackID));
+}
+
+function preparePlaylistRandom(queue) {
+  const signature = queueSignature(queue);
+  if (signature === state.randomQueueSignature) return;
+  state.randomQueueSignature = signature;
+  state.randomPlaylistQueue = queue;
+  state.randomSeenIDs = new Set();
+  if (queue.some((track) => trackID(track) === state.currentTrackId)) {
+    state.randomSeenIDs.add(state.currentTrackId);
+  }
+}
+
+function randomItem(items) {
+  return items.length ? items[Math.floor(Math.random() * items.length)] : null;
+}
+
+function pickPlaylistRandom(queue, allowRepeat = false) {
+  if (!queue.length) return null;
+  preparePlaylistRandom(queue);
+  let candidates = queue.filter((track) => !state.randomSeenIDs.has(trackID(track)));
+  if (!candidates.length && allowRepeat) {
+    state.randomSeenIDs = new Set(state.currentTrackId ? [state.currentTrackId] : []);
+    candidates = queue.filter((track) => !state.randomSeenIDs.has(trackID(track)));
+    if (!candidates.length && queue.length === 1) candidates = queue;
+  }
+  return randomItem(candidates);
+}
+
+async function pickLibraryRandom() {
+  if (!bridge?.databaseGameTracks || !state.games.length) return null;
+  const token = ++state.libraryRandomToken;
+  const currentTrack = randomQueue().find((track) => trackID(track) === state.currentTrackId);
+  const currentGame = currentTrack && state.games.find((game) => game.name === currentTrack.game
+    && game.system === currentTrack.system
+    && (!game.rootPath || !currentTrack.rootPath || currentTrack.rootPath.startsWith(game.rootPath)));
+  const candidates = state.games.map((game) => ({
+    game,
+    weight: Math.max(0, Number(game.trackCount) || 0)
+      - (currentGame && gameKey(game) === gameKey(currentGame) ? 1 : 0),
+  })).filter(({ weight }) => weight > 0);
+  if (!candidates.length) {
+    state.games.forEach((game) => candidates.push({ game, weight: Math.max(1, Number(game.trackCount) || 1) }));
+  }
+
+  while (candidates.length) {
+    const totalWeight = candidates.reduce((sum, candidate) => sum + candidate.weight, 0);
+    let choice = Math.random() * totalWeight;
+    const selectedIndex = candidates.findIndex(({ weight }) => {
+      choice -= weight;
+      return choice < 0;
+    });
+    const [{ game }] = candidates.splice(selectedIndex < 0 ? 0 : selectedIndex, 1);
+    try {
+      const rows = await bridge.databaseGameTracks([game]);
+      if (token !== state.libraryRandomToken) return null;
+      if (!Array.isArray(rows) || !rows.length) continue;
+      const differentTracks = rows.filter((track) => trackID(track) !== state.currentTrackId);
+      const track = randomItem(differentTracks.length ? differentTracks : rows);
+      return { track, queue: rows };
+    } catch (error) {
+      if (token !== state.libraryRandomToken) return null;
+      state.status = `RANDOM ERROR: ${error.message}`;
+      render();
+    }
+  }
+  return null;
+}
+
+function recordRandomHistory(track, queue) {
+  const mode = state.preferences.randomMode || "off";
+  if (mode === "off") return;
+  const id = trackID(track);
+  const current = state.randomHistory[state.randomHistoryIndex];
+  if (current?.id === id) {
+    current.track = track;
+    return;
+  }
+  state.randomHistory = state.randomHistory.slice(0, state.randomHistoryIndex + 1);
+  const historyQueue = mode === "library" ? [track]
+    : (state.randomPlaylistQueue.length ? state.randomPlaylistQueue : queue);
+  state.randomHistory.push({ id, track, queue: historyQueue });
+  state.randomHistoryIndex = state.randomHistory.length - 1;
+  if (state.randomHistory.length > RANDOM_HISTORY_LIMIT) {
+    state.randomHistory.splice(0, state.randomHistory.length - RANDOM_HISTORY_LIMIT);
+    state.randomHistoryIndex = state.randomHistory.length - 1;
+  }
+}
+
+function playRandomHistory(delta) {
+  const index = state.randomHistoryIndex + delta;
+  if (index < 0 || index >= state.randomHistory.length) return false;
+  const entry = state.randomHistory[index];
+  state.randomHistoryIndex = index;
+  startTrack(entry.track, entry.queue, { recordHistory: false });
+  return true;
+}
+
+function resetRandomPlaybackState() {
+  ++state.libraryRandomToken;
+  state.randomSeenIDs = new Set();
+  state.randomQueueSignature = "";
+  state.randomPlaylistQueue = [];
+  state.randomHistory = [];
+  state.randomHistoryIndex = -1;
+  if ((state.preferences.randomMode || "off") === "off" || !state.currentTrackId) return;
+  const queue = randomQueue();
+  const current = queue.find((track) => trackID(track) === state.currentTrackId);
+  if (current) {
+    if (state.preferences.randomMode === "playlist") {
+      preparePlaylistRandom(queue);
+      state.randomSeenIDs.add(state.currentTrackId);
+    }
+    recordRandomHistory(current, queue);
+  }
+}
+
 async function handleNativeEnded(snapshot) {
   const generation = Number(snapshot?.generation) || 0;
   if (!generation || generation !== state.playbackGeneration
@@ -1475,15 +1624,30 @@ async function handleNativeEnded(snapshot) {
         pendingTrackId: null,
       },
       playlistIds: queue.map(trackID),
-      intent: { repeatMode: state.preferences.repeatMode || "off" },
+      intent: { repeatMode: state.preferences.repeatMode === "one" ? "one" : "off" },
     });
     if (state.currentTrackId !== completedId) return;
-    const next = decision?.action === "play"
-      ? queue.find((track) => trackID(track) === decision.trackId) : null;
+    const repeatMode = state.preferences.repeatMode || "off";
+    const randomMode = state.preferences.randomMode || "off";
+    let next = null;
+    let nextQueue = queue;
+    if (repeatMode === "one") {
+      next = queue.find((track) => trackID(track) === completedId) || null;
+    } else if (randomMode === "playlist") {
+      next = pickPlaylistRandom(queue, repeatMode === "all");
+    } else if (randomMode === "library") {
+      const selection = await pickLibraryRandom();
+      if (state.currentTrackId !== completedId) return;
+      next = selection?.track || null;
+      nextQueue = selection?.queue || queue;
+    } else {
+      next = decision?.action === "play"
+        ? queue.find((track) => trackID(track) === decision.trackId) : null;
+    }
     if (next) {
       const visibleIndex = visibleTracks().findIndex((track) => trackID(track) === trackID(next));
       if (visibleIndex >= 0) selectTrack(visibleIndex, false);
-      await startTrack(next, queue);
+      await startTrack(next, nextQueue);
     } else {
       state.currentTrackId = null;
       state.playbackGeneration = 0;
@@ -1533,12 +1697,18 @@ async function configureAudio() {
   );
 }
 
-async function startTrack(track, queue = activeTracks()) {
+async function startTrack(track, queue = activeTracks(), { recordHistory = true } = {}) {
   if (!track || !bridge?.nativePlaybackStart) return;
+  ++state.libraryRandomToken;
   const token = ++state.playbackToken;
   state.currentTrackId = trackID(track);
   state.playbackGeneration = 0;
   state.activeQueue = [...queue];
+  if (state.preferences.randomMode === "playlist") {
+    preparePlaylistRandom(state.activeQueue);
+    state.randomSeenIDs.add(state.currentTrackId);
+  }
+  if (recordHistory) recordRandomHistory(track, state.activeQueue);
   state.status = `LOADING ${track.title || track.filename}`;
   render();
   try {
@@ -1594,6 +1764,7 @@ async function togglePlaying() {
 async function stopPlayback() {
   if (!bridge?.nativePlaybackStop) return;
   ++state.playbackToken;
+  ++state.libraryRandomToken;
   try {
     applyNativeStatus(await bridge.nativePlaybackStop());
     state.currentTrackId = null;
@@ -1619,10 +1790,39 @@ function selectTrack(index, wrap = true) {
   render(true);
 }
 
-function playAdjacent(delta) {
+async function playAdjacent(delta) {
   const shownTracks = visibleTracks();
   const queue = state.activeQueue.length ? state.activeQueue : shownTracks;
   if (!queue.length) return;
+  const randomMode = state.preferences.randomMode || "off";
+  if (randomMode !== "off") {
+    if (playRandomHistory(delta)) return;
+    if (delta < 0) return;
+    if (randomMode === "playlist") {
+      const next = pickPlaylistRandom(queue, state.preferences.repeatMode === "all");
+      if (next) {
+        const visibleIndex = shownTracks.findIndex((track) => trackID(track) === trackID(next));
+        if (visibleIndex >= 0) selectTrack(visibleIndex, false);
+        await startTrack(next, queue);
+      } else {
+        state.status = "RANDOM CYCLE COMPLETE";
+        render();
+      }
+      return;
+    }
+    const currentId = state.currentTrackId;
+    const selection = await pickLibraryRandom();
+    if (state.currentTrackId !== currentId) return;
+    if (!selection) {
+      state.status = "NO LIBRARY TRACKS";
+      render();
+      return;
+    }
+    const visibleIndex = shownTracks.findIndex((track) => trackID(track) === trackID(selection.track));
+    if (visibleIndex >= 0) selectTrack(visibleIndex, false);
+    await startTrack(selection.track, selection.queue);
+    return;
+  }
   const index = queue.findIndex((track) => trackID(track) === state.currentTrackId);
   const nextIndex = index < 0 ? (delta < 0 ? queue.length - 1 : 0)
     : (index + delta + queue.length) % queue.length;
@@ -1643,10 +1843,16 @@ function selectNext() {
 async function setPreference(key, value, updateAudio = false) {
   if (!bridge?.frontendSettingsSave) return;
   const prior = state.preferences;
+  const token = ++state.preferenceMutationToken;
   state.preferences = { ...prior, [key]: value };
+  if (key === "randomMode") resetRandomPlaybackState();
   render();
   try {
-    await bridge.frontendSettingsSave(state.preferences);
+    const snapshot = { ...state.preferences };
+    const save = state.preferenceSaveChain.catch(() => {})
+      .then(() => bridge.frontendSettingsSave(snapshot));
+    state.preferenceSaveChain = save.catch(() => {});
+    await save;
     if (updateAudio) await configureAudio();
     if (state.currentTrackId && ["longPlayEnabled", "fadeEnabled"].includes(key)) {
       const pref = state.preferences;
@@ -1659,10 +1865,28 @@ async function setPreference(key, value, updateAudio = false) {
       }));
     }
   } catch (error) {
+    if (token !== state.preferenceMutationToken) return;
     state.preferences = prior;
+    if (key === "randomMode") resetRandomPlaybackState();
     state.status = `OPTION ERROR: ${error.message}`;
     render();
   }
+}
+
+function toggleLongPlay() {
+  setPreference("longPlayEnabled", state.preferences.longPlayEnabled !== true);
+}
+
+function toggleRepeatOne() {
+  setPreference("repeatMode", state.preferences.repeatMode === "one" ? "off" : "one");
+}
+
+function setRandomMode(mode) {
+  setPreference("randomMode", mode);
+}
+
+function toggleRandomMode(mode) {
+  setRandomMode(state.preferences.randomMode === mode ? "off" : mode);
 }
 
 function cycleRepeat() {
@@ -1805,6 +2029,10 @@ window.ViewBoy = Object.freeze({
       case "previous": selectPrevious(); break;
       case "playPause": togglePlaying(); break;
       case "next": selectNext(); break;
+      case "longPlay": toggleLongPlay(); break;
+      case "repeatOne": toggleRepeatOne(); break;
+      case "playlistRandom": toggleRandomMode("playlist"); break;
+      case "libraryRandom": toggleRandomMode("library"); break;
       case "openPath": openLocalPath(); break;
       case "settings": state.tab = "SETTINGS"; render(); break;
       case "library": selectSidebarView("LIBRARY"); break;
@@ -1820,7 +2048,9 @@ if (bridge) {
   bridge.onNativePlaybackState?.(applyNativeStatus);
   bridge.onNativePlaybackEnded?.(handleNativeEnded);
   bridge.onFrontendSettingsChanged?.((settings) => {
+    const priorRandomMode = state.preferences.randomMode || "off";
     state.preferences = settings || {};
+    if (priorRandomMode !== (state.preferences.randomMode || "off")) resetRandomPlaybackState();
     render();
   });
   bridge.onCatalogReloaded?.(() => loadCatalog());

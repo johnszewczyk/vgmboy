@@ -4,7 +4,7 @@ Options opens inside the LCD canvas as grouped Display, Playback, Interface, and
 
 - **Font** selects the Micro 3×5 or Standard 5×7 bitmap glyphs. The choice is remembered in WebKit local storage when available.
 - **Contrast** selects the current four-shade palette or High Contrast, which darkens the foreground while retaining the same four LCD shades.
-- **Playback** groups Long Play, End Fade, Repeat Off/All/One, Mono Output, and a segmented Volume control. Playback options keep using the typed frontend-preference and VGMBoy bridges.
+- **Playback** groups Long Play, End Fade, Repeat Off/All/One, Random Off/Playlist/Library, Mono Output, and a segmented Volume control. Random modes are mutually exclusive and match the `LP`, `R1`, `P-RND`, and `L-RND` quick toggles in the main toolbar. Playback options keep using the typed frontend-preference and VGMBoy bridges.
 - **Interface** controls automatic column sizing, its motion toggle and duration, and the track-selection slide toggle and duration. The column header and row cells share the automatic resize timing preference.
 - **Playlist Columns** persists visibility for File, Game, Artist, Path, and Size. Enabled fields appear when the current screen has enough room; disabling a field immediately gives its space back to the other columns.
 - **Library** reloads a fresh read from the catalog.

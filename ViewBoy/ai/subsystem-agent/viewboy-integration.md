@@ -4,7 +4,7 @@ ViewBoy owns its AppKit host, Yoga canvas renderer, bitmap fonts, framebuffer, i
 
 ## Data and Playback
 
-The injected `window.viewBoy` bridge supplies read-only CatalogReader projections, shared favorite operations, frontend preferences, local-path selection, and VGMBoy transport. `window.ViewBoy.dispatch` is the macOS menu command boundary. Both names are local to ViewBoy.
+The injected `window.viewBoy` bridge supplies read-only CatalogReader projections, shared favorite operations, frontend preferences, local-path selection, and VGMBoy transport. `window.ViewBoy.dispatch` is the macOS menu command boundary. Both names are local to ViewBoy. Long Play, Repeat One, and the `randomMode` (`off`, `playlist`, or `library`) preference are stored in `ViewBoyPreferencesSnapshot`; random shuffle history and per-cycle seen-track state stay in the renderer. Playlist Random chooses from the active queue without replacement until a cycle ends. Library Random weights catalog game groups by `trackCount`, queries only the selected game's tracks, and avoids immediately replaying the current track when another song is available. Previous and Next in either random mode use a renderer history capped at 256 track entries; Library Random history retains only each selected track rather than previously fetched game playlists.
 
 Catalog and favorite state belongs to the native/shared cores. JavaScript owns the visible tree, current view, table layout, sorting, font and contrast preferences, and hit testing. It must not scan source paths or write the catalog. Track activation sends the native playback fields supplied by the bridge, including archive path and entry.
 

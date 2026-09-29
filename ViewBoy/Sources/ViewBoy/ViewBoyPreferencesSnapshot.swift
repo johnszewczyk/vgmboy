@@ -20,6 +20,7 @@ struct ViewBoyPreferencesSnapshot: Codable, Sendable {
     enum SnapshotError: Error { case invalidJSON }
     struct PlaybackRate: Codable, Sendable { var numerator: Int?; var denominator: Int? }
     enum RepeatMode: String, Codable, Sendable { case off, all, one }
+    enum RandomMode: String, Codable, Sendable { case off, playlist, library }
     enum SidebarMode: String, Codable, Sendable { case paths, consoles, diskPath, favorites }
     enum FavoriteOrder: String, Codable, Sendable { case historical, alphabetical }
     enum PlaylistSortColumn: String, Codable, Sendable { case filename, title, game, artist, system, path, lengthLabel }
@@ -29,6 +30,7 @@ struct ViewBoyPreferencesSnapshot: Codable, Sendable {
     var unknownDurationSeconds: Int?
     var longPlayEnabled: Bool?
     var repeatMode: RepeatMode?
+    var randomMode: RandomMode?
     var queuedSkipsEnabled: Bool?
     var fadeEnabled: Bool?
     var equalizerEnabled: Bool?
@@ -83,6 +85,7 @@ struct ViewBoyPreferencesSnapshot: Codable, Sendable {
         let data = try JSONSerialization.data(withJSONObject: jsonObject)
         self = try JSONDecoder().decode(Self.self, from: data)
         normalizeSharedPlaybackPreferences()
+        randomMode = randomMode ?? .off
         autoResizeAnimationMilliseconds = FrontendAnimationTimings.clamp(
             autoResizeAnimationMilliseconds ?? FrontendAnimationTimings.defaultDurationMilliseconds
         )
@@ -98,6 +101,7 @@ struct ViewBoyPreferencesSnapshot: Codable, Sendable {
         manualPlayTimeSeconds = shared.timing.longPlaySeconds
         unknownDurationSeconds = shared.timing.unknownDurationSeconds
         longPlayEnabled = false
+        randomMode = .off
         fadeEnabled = shared.fadeEnabled
         spcFadeSeconds = shared.timing.fadeSeconds
         equalizerEnabled = shared.equalizer.enabled
