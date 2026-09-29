@@ -18,6 +18,8 @@ const BASELINE_LAYOUT_UNIT_CSS_PIXELS = 2.5;
 const RANDOM_HISTORY_LIMIT = 256;
 const BUTTON_BORDER_DOTS = 1;
 const BUTTON_HORIZONTAL_INSET_DOTS = 1;
+const PANE_INSET_DOTS = 2;
+const PANE_STATUS_HEIGHT_DOTS = 4;
 const ANIMATION_FRAME_INTERVAL_MS = 1000 / 60;
 const PALETTES = {
   GAMEBOY: {
@@ -217,6 +219,10 @@ let pointerInteraction = null;
 let suppressNextClick = false;
 const state = {
   tab: "LIBRARY",
+  playlistTabs: [],
+  activePlaylistTabId: null,
+  playlistTabsReady: false,
+  playlistSaveChain: Promise.resolve(),
   selectedTrack: 0,
   playing: false,
   font: savedDisplayOptions.font === "STANDARD" ? "STANDARD" : "MICRO",
@@ -290,9 +296,159 @@ function formatTime(milliseconds) {
 }
 
 function activeTracks() {
-  if (state.tab === "QUEUE") return state.activeQueue.length ? state.activeQueue : tracks;
+  if (state.tab === "QUEUE") return state.activeQueue.length
+    ? state.activeQueue : (activePlaylistTab()?.playlist || tracks);
   if (state.tab === "FAVORITES") return state.favoriteTracks;
-  return tracks;
+  return activePlaylistTab()?.playlist || tracks;
+}
+
+function activePlaylistTab() {
+  return state.playlistTabs.find((tab) => tab.id === state.activePlaylistTabId) || null;
+}
+
+function samePlaylist(first, second) {
+  return first.length === second.length
+    && first.every((track, index) => trackID(track) === trackID(second[index]));
+}
+
+function playlistTabID() {
+  return globalThis.crypto?.randomUUID?.()
+    || `viewboy-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function syncActivePlaylistTab() {
+  const tab = activePlaylistTab();
+  if (!tab || state.tab === "FAVORITES" || state.tab === "SETTINGS") return;
+  tab.playlist = [...(state.tab === "QUEUE" && state.activeQueue.length ? state.activeQueue : tracks)];
+  tab.selectedTrack = state.selectedTrack;
+  tab.scroll = state.queueScroll;
+  tab.gameKey = state.activeGameKey;
+}
+
+function persistPlaylistTabs() {
+  if (!state.playlistTabsReady || !bridge?.playlistTabsSave) return;
+  syncActivePlaylistTab();
+  const payload = {
+    version: 1,
+    activeID: state.activePlaylistTabId,
+    tabs: state.playlistTabs.slice(0, 64).map((tab) => ({
+      id: tab.id,
+      title: tab.title,
+      gameKey: tab.gameKey || null,
+      playlist: Array.isArray(tab.playlist) ? tab.playlist : [],
+      selectedTrack: Math.max(0, Number(tab.selectedTrack) || 0),
+      scroll: Math.max(0, Number(tab.scroll) || 0),
+    })),
+  };
+  state.playlistSaveChain = state.playlistSaveChain.catch(() => {})
+    .then(() => bridge.playlistTabsSave(payload))
+    .catch((error) => { console.error("[ViewBoy] playlist tabs could not be saved", error); });
+}
+
+function restorePlaylistTabs(value) {
+  if (value?.version !== 1 || !Array.isArray(value.tabs)) return false;
+  const seen = new Set();
+  const restored = value.tabs.slice(0, 64).filter((tab) => {
+    if (!tab || typeof tab.id !== "string" || !tab.id || seen.has(tab.id)) return false;
+    seen.add(tab.id);
+    return true;
+  }).map((tab) => ({
+    id: tab.id,
+    title: typeof tab.title === "string" && tab.title.trim() ? tab.title : "PLAYLIST",
+    gameKey: typeof tab.gameKey === "string" ? tab.gameKey : null,
+    playlist: Array.isArray(tab.playlist) ? tab.playlist : [],
+    selectedTrack: Math.max(0, Number(tab.selectedTrack) || 0),
+    scroll: Math.max(0, Number(tab.scroll) || 0),
+  }));
+  if (!restored.length) return false;
+  state.playlistTabs = restored;
+  state.activePlaylistTabId = seen.has(value.activeID) ? value.activeID : restored[0].id;
+  const active = activePlaylistTab();
+  tracks = [...active.playlist];
+  state.activeQueue = [...active.playlist];
+  state.activeGameKey = active.gameKey;
+  state.selectedGameKey = active.gameKey;
+  state.selectedTrack = Math.min(active.selectedTrack, Math.max(0, active.playlist.length - 1));
+  state.queueScroll = active.scroll;
+  state.tab = "LIBRARY";
+  return true;
+}
+
+function activatePlaylistTab(id) {
+  const tab = state.playlistTabs.find((entry) => entry.id === id);
+  if (!tab || tab.id === state.activePlaylistTabId) return false;
+  syncActivePlaylistTab();
+  state.activePlaylistTabId = tab.id;
+  tracks = [...tab.playlist];
+  state.activeQueue = [...tab.playlist];
+  state.activeGameKey = tab.gameKey;
+  state.selectedTrack = Math.min(tab.selectedTrack || 0, Math.max(0, tab.playlist.length - 1));
+  state.queueScroll = Math.max(0, tab.scroll || 0);
+  state.tableHorizontalScroll = 0;
+  state.tab = "QUEUE";
+  render();
+  persistPlaylistTabs();
+  return true;
+}
+
+function createPlaylistTab({ duplicateActive = true, title = null, playlist = null, gameKey = null } = {}) {
+  syncActivePlaylistTab();
+  if (state.playlistTabs.length >= 64) return null;
+  const source = activePlaylistTab();
+  const next = {
+    id: playlistTabID(),
+    title: String(title || `PLAYLIST ${state.playlistTabs.length + 1}`),
+    gameKey,
+    playlist: Array.isArray(playlist) ? [...playlist]
+      : duplicateActive && source ? [...source.playlist] : [],
+    selectedTrack: duplicateActive && source ? source.selectedTrack : 0,
+    scroll: duplicateActive && source ? source.scroll : 0,
+  };
+  state.playlistTabs.push(next);
+  state.activePlaylistTabId = next.id;
+  tracks = [...next.playlist];
+  state.activeQueue = [...next.playlist];
+  state.activeGameKey = next.gameKey;
+  state.selectedTrack = Math.min(next.selectedTrack, Math.max(0, next.playlist.length - 1));
+  state.queueScroll = next.scroll;
+  state.tab = "QUEUE";
+  state.tableHorizontalScroll = 0;
+  render();
+  persistPlaylistTabs();
+  return next;
+}
+
+function closePlaylistTab(id = state.activePlaylistTabId) {
+  const index = state.playlistTabs.findIndex((tab) => tab.id === id);
+  if (index < 0) return false;
+  if (state.playlistTabs.length === 1) {
+    const tab = state.playlistTabs[0];
+    tab.title = "PLAYLIST";
+    tab.gameKey = null;
+    tab.playlist = [];
+    tab.selectedTrack = 0;
+    tab.scroll = 0;
+    if (tab.id === state.activePlaylistTabId) {
+      tracks = [];
+      state.activeQueue = state.currentTrackId ? state.activeQueue : [];
+      state.selectedTrack = 0;
+      state.queueScroll = 0;
+      state.activeGameKey = null;
+      state.tab = "LIBRARY";
+    }
+  } else {
+    const wasActive = state.playlistTabs[index].id === state.activePlaylistTabId;
+    state.playlistTabs.splice(index, 1);
+    if (wasActive) {
+      const next = state.playlistTabs[Math.min(index, state.playlistTabs.length - 1)];
+      state.activePlaylistTabId = null;
+      activatePlaylistTab(next.id);
+      return true;
+    }
+  }
+  render();
+  persistPlaylistTabs();
+  return true;
 }
 
 function visibleTracks() {
@@ -557,7 +713,7 @@ function libraryPaneWidth() {
 }
 
 function statusBar(parent, text) {
-  const height = rowHeight(4);
+  const height = rowHeight(PANE_STATUS_HEIGHT_DOTS);
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
@@ -647,7 +803,7 @@ function optionToggle(parent, title, checked, onClick, extraMeta = {}) {
     },
     ...extraMeta,
   });
-  const marker = checked ? "[x]" : "[ ]";
+  const marker = checked ? "[x]" : "[]";
   label(row, marker, {
     width: (Array.from(marker).length * fontProfile().advance + 2) / STYLE_SCALE,
     height: fontProfile().height / STYLE_SCALE,
@@ -713,7 +869,7 @@ function formatSize(bytes) {
 
 function tableValue(track, key, rowIndex = 0) {
   switch (key) {
-    case "favorite": return state.favoriteIDs.has(trackID(track)) ? "[x]" : "[ ]";
+    case "favorite": return state.favoriteIDs.has(trackID(track)) ? "[x]" : "[]";
     case "index": return String(rowIndex + 1);
     case "filename": return track.filename || "";
     case "title": return track.title || track.filename || "UNTITLED";
@@ -991,7 +1147,7 @@ function createLibraryRow(parent, text, options = {}) {
 }
 
 function visibleRowCount() {
-  return Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - 66) / rowHeight(3)));
+  return Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - 78) / rowHeight(3)));
 }
 
 function libraryRows() {
@@ -1025,7 +1181,7 @@ function addLibraryPane(parent) {
     direction: FlexDirection.Column,
     width: libraryPaneWidth(),
     gap: 0,
-    padding: 2,
+    padding: PANE_INSET_DOTS,
   }, {
     paint(box) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
@@ -1042,7 +1198,7 @@ function addLibraryPane(parent) {
     width: buttonWidth(item.title),
     selected: item.view === state.tab,
   }));
-  panelTitle(library, `SYSTEMS ${state.games.length}`);
+  panelTitle(library, "SYSTEMS");
   const rows = libraryRows();
   const count = Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - 88) / rowHeight(3)));
   state.libraryScroll = Math.max(0, Math.min(state.libraryScroll, Math.max(0, rows.length - count)));
@@ -1054,7 +1210,10 @@ function addLibraryPane(parent) {
       onClick: row.game ? () => loadGame(row.game) : () => toggleSystem(row.system),
     });
   });
-  statusBar(library, `${rows.length ? state.libraryScroll + 1 : 0}-${Math.min(rows.length, state.libraryScroll + count)} / ${rows.length} ITEMS`);
+  const systemCount = new Set(state.games.map((game) => game.system || "OTHER")).size;
+  const first = rows.length ? state.libraryScroll + 1 : 0;
+  const last = Math.min(rows.length, state.libraryScroll + count);
+  statusBar(library, `SYS ${systemCount} ${first}-${last}/${rows.length}`);
   return library;
 }
 
@@ -1065,12 +1224,45 @@ function addCatalogPane(parent) {
     flexGrow: 1,
     flexShrink: 1,
     gap: 0,
-    padding: 2,
+    padding: PANE_INSET_DOTS,
   }, {
     paint(box) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
     },
   });
+  if (state.tab !== "FAVORITES") {
+    const tabRow = makeWidget(panel, {
+      direction: FlexDirection.Row,
+      alignItems: Align.Center,
+      height: buttonStandardHeight(),
+      gap: oneDot(),
+    });
+    const tabList = makeWidget(tabRow, {
+      direction: FlexDirection.Row,
+      flexGrow: 1,
+      flexBasis: 0,
+      gap: oneDot(),
+      overflow: Overflow.Hidden,
+    }, { clipChildren: true });
+    state.playlistTabs.forEach((tab) => {
+      const item = makeWidget(tabList, {
+        direction: FlexDirection.Row,
+        flexGrow: 1,
+        flexBasis: 0,
+        gap: 0,
+      });
+      pixelButton(item, tab.title, () => activatePlaylistTab(tab.id), {
+        flexGrow: 1,
+        selected: tab.id === state.activePlaylistTabId,
+      });
+      pixelButton(item, "[x]", () => closePlaylistTab(tab.id), {
+        width: buttonWidth("[x]"),
+      });
+    });
+    pixelButton(tabRow, "[+]", () => createPlaylistTab({ duplicateActive: true }), {
+      width: buttonWidth("[+]"),
+    });
+  }
   const columns = resolveTableColumns(tableColumns(viewTracks), currentRenderTime);
   const tableGap = Math.max(0, columns.length - 1) * oneDot();
   state.tableContentMinimumWidth = columns.reduce((sum, column) => sum + column.width, 0) + tableGap;
@@ -1130,7 +1322,9 @@ function addCatalogPane(parent) {
       state.tableScrollbarThumb = { x: thumbLeft, y: centerY, width: thumbWidth, height: 1 };
     },
   });
-  statusBar(panel, `${viewTracks.length ? state.queueScroll + 1 : 0}-${Math.min(viewTracks.length, state.queueScroll + count)} / ${viewTracks.length} TRACKS`);
+  const first = viewTracks.length ? state.queueScroll + 1 : 0;
+  const last = Math.min(viewTracks.length, state.queueScroll + count);
+  statusBar(panel, `TRACKS ${first}-${last}/${viewTracks.length}`);
   return panel;
 }
 
@@ -1244,8 +1438,39 @@ function equalizerGainLabel(value) {
   return `${value > 0 ? "+" : ""}${value.toFixed(1)}`;
 }
 
+function playbackRateSteps(backend, preferences = state.preferences) {
+  const key = backend === "libvgm" ? "libvgmPlaybackSpeed" : "playbackSpeed";
+  const rate = preferences[key] || { numerator: 1, denominator: 1 };
+  const numerator = Number(rate.numerator) || 1;
+  const denominator = Number(rate.denominator) || 1;
+  return Math.max(1, Math.min(256, Math.round(numerator / denominator * 32)));
+}
+
+function playbackRateLabel(steps) {
+  return steps === 32 ? "1X" : `${steps}/32X`;
+}
+
+function adjustPlaybackRate(backend, delta) {
+  const key = backend === "libvgm" ? "libvgmPlaybackSpeed" : "playbackSpeed";
+  const steps = Math.max(1, Math.min(256, playbackRateSteps(backend) + delta));
+  setPreference(key, { numerator: steps, denominator: 32 });
+}
+
+function playbackTempoForTrack(track, preferences = state.preferences) {
+  const path = String(track?.archiveEntry || track?.path || track?.filename || "");
+  const extension = path.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase();
+  if (!extension) return 1;
+  const descriptor = bridge?.playbackBackends?.find((backend) => backend.supportsTempo
+    && backend.extensions?.some((candidate) => String(candidate).toLowerCase() === extension));
+  const family = descriptor?.id === "libvgm" ? "libvgm"
+    : descriptor?.id === "libgme" ? "libgme" : null;
+  if (!family) return 1;
+  const enabledKey = family === "libvgm" ? "libvgmPlaybackSpeedEnabled" : "playbackSpeedEnabled";
+  return preferences[enabledKey] === true ? playbackRateSteps(family, preferences) / 32 : 1;
+}
+
 function addPlaybackOptions(columns, pref) {
-  const [behavior, output] = columns;
+  const [behavior, speed] = columns;
   optionSection(behavior, "PLAYBACK BEHAVIOR");
   optionToggle(behavior, "LONG PLAY", pref.longPlayEnabled === true,
     () => setPreference("longPlayEnabled", pref.longPlayEnabled !== true));
@@ -1272,6 +1497,22 @@ function addPlaybackOptions(columns, pref) {
     () => adjustPlaybackDuration("spcFadeSeconds", -1, 0, 60, 6),
     () => adjustPlaybackDuration("spcFadeSeconds", 1, 0, 60, 6));
 
+  optionSection(speed, "LIBGME SPEED");
+  optionToggle(speed, "ENABLE SPEED", pref.playbackSpeedEnabled === true,
+    () => setPreference("playbackSpeedEnabled", pref.playbackSpeedEnabled !== true));
+  optionAdjuster(speed, "RATE", playbackRateLabel(playbackRateSteps("libgme", pref)),
+    () => adjustPlaybackRate("libgme", -1),
+    () => adjustPlaybackRate("libgme", 1));
+  optionSection(speed, "LIBVGM SPEED");
+  optionToggle(speed, "ENABLE SPEED", pref.libvgmPlaybackSpeedEnabled === true,
+    () => setPreference("libvgmPlaybackSpeedEnabled", pref.libvgmPlaybackSpeedEnabled !== true));
+  optionAdjuster(speed, "RATE", playbackRateLabel(playbackRateSteps("libvgm", pref)),
+    () => adjustPlaybackRate("libvgm", -1),
+    () => adjustPlaybackRate("libvgm", 1));
+}
+
+function addAudioOptions(columns, pref) {
+  const [output, equalizer] = columns;
   optionSection(output, "OUTPUT");
   optionToggle(output, "MONO OUTPUT", pref.monoEnabled === true,
     () => setPreference("monoEnabled", pref.monoEnabled !== true, true));
@@ -1308,13 +1549,13 @@ function addPlaybackOptions(columns, pref) {
   });
   pixelButton(volumeRow, "[+]", () => changeVolume(0.1));
 
-  optionSection(output, "TEN BAND EQUALIZER");
-  optionToggle(output, "EQUALIZER", pref.equalizerEnabled === true,
+  optionSection(equalizer, "TEN BAND EQUALIZER");
+  optionToggle(equalizer, "EQUALIZER", pref.equalizerEnabled === true,
     () => setPreference("equalizerEnabled", pref.equalizerEnabled !== true, true));
   const equalizerBands = ["31 HZ", "62 HZ", "125 HZ", "250 HZ", "500 HZ", "1K HZ", "2K HZ", "4K HZ", "8K HZ", "16K HZ"];
   equalizerBands.forEach((title, index) => {
     const gain = equalizerGain(index, pref);
-    optionAdjuster(output, title, equalizerGainLabel(gain),
+    optionAdjuster(equalizer, title, equalizerGainLabel(gain),
       () => changeEqualizerGain(index, -0.5),
       () => changeEqualizerGain(index, 0.5));
   });
@@ -1325,6 +1566,9 @@ function addInterfaceOptions(columns, pref) {
   optionSection(layout, "PLAYLIST LAYOUT");
   optionToggle(layout, "AUTO-SIZE COLUMNS", pref.columnAutoSize !== false,
     () => setPreference("columnAutoSize", pref.columnAutoSize === false));
+  optionSection(layout, "WINDOW");
+  optionToggle(layout, "MAIN WINDOW ON TOP", pref.mainWindowAlwaysOnTop === true,
+    () => setPreference("mainWindowAlwaysOnTop", pref.mainWindowAlwaysOnTop !== true));
   optionSection(motion, "MOTION");
   optionToggle(motion, "AUTO-RESIZE HEADERS + ROWS", animationEnabled("autoResizeAnimationEnabled"),
     () => setPreference("autoResizeAnimationEnabled", !animationEnabled("autoResizeAnimationEnabled")));
@@ -1350,16 +1594,7 @@ function addLibraryOptions(columns, pref) {
       }));
   });
   optionSection(catalog, "CATALOG");
-  label(catalog, `GAMES ${state.games.length}`, { height: rowHeight(8) }, {
-    textShade: 0, inset: 2,
-  });
-  label(catalog, `TRACKS ${tracks.length}`, { height: rowHeight(8) }, {
-    textShade: 0, inset: 2,
-  });
-  pixelButton(catalog, "RELOAD LIBRARY", () => loadCatalog(), {
-    height: rowHeight(8),
-  });
-  label(catalog, state.status, { height: rowHeight(8) }, { textShade: 0, inset: 2 });
+  pixelButton(catalog, "RELOAD LIBRARY", () => loadCatalog(), { flexGrow: 1 });
 }
 
 function addOptionsContent(parent) {
@@ -1367,7 +1602,7 @@ function addOptionsContent(parent) {
     direction: FlexDirection.Column,
     flexGrow: 1,
     gap: oneDot(),
-    padding: 2,
+    padding: PANE_INSET_DOTS,
   }, {
     paint(box) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
@@ -1378,29 +1613,23 @@ function addOptionsContent(parent) {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
     height: buttonStandardHeight(),
-    gap: oneDot() * 2,
+    gap: oneDot(),
   });
-  [ ["DISPLAY", "PLAYBACK"], ["INTERFACE", "LIBRARY"] ].forEach((pages, index) => {
-    const toolbar = makeWidget(navigation, {
-      direction: FlexDirection.Row,
-      flexGrow: 1,
-      flexBasis: 0,
-      gap: oneDot(),
-    }, index === 1 ? {
-      paint(box) { line(box.x - oneDot() * STYLE_SCALE, box.y, box.x - oneDot() * STYLE_SCALE, box.y + box.height, 1); },
-    } : {});
-    pages.forEach((page) => pixelButton(toolbar, page, () => {
+  ["DISPLAY", "PLAYBACK", "AUDIO", "INTERFACE", "LIBRARY"].forEach((page) => {
+    pixelButton(navigation, page, () => {
       state.optionsPage = page;
       render();
-    }, { flexGrow: 1, selected: state.optionsPage === page }));
+    }, { flexGrow: 1, selected: state.optionsPage === page });
   });
 
   const columns = optionColumns(panel);
   const pref = state.preferences;
   if (state.optionsPage === "PLAYBACK") addPlaybackOptions(columns, pref);
+  else if (state.optionsPage === "AUDIO") addAudioOptions(columns, pref);
   else if (state.optionsPage === "INTERFACE") addInterfaceOptions(columns, pref);
   else if (state.optionsPage === "LIBRARY") addLibraryOptions(columns, pref);
   else addDisplayOptions(columns);
+  statusBar(panel, `${state.optionsPage} OPTIONS`);
 }
 
 function buildTree() {
@@ -1752,10 +1981,30 @@ async function toggleFavorite(track) {
 }
 
 function selectSidebarView(view) {
+  if (view === "QUEUE") {
+    const queue = state.activeQueue.length
+      ? [...state.activeQueue] : [...(activePlaylistTab()?.playlist || tracks)];
+    let tab = state.playlistTabs.find((entry) => samePlaylist(entry.playlist, queue));
+    if (!tab) {
+      syncActivePlaylistTab();
+      tab = state.playlistTabs.length < 64 ? {
+        id: playlistTabID(), title: "QUEUE", gameKey: null,
+        playlist: [...queue], selectedTrack: state.selectedTrack, scroll: state.queueScroll,
+      } : activePlaylistTab();
+      if (tab && !state.playlistTabs.some((entry) => entry.id === tab.id)) state.playlistTabs.push(tab);
+      if (tab) tab.playlist = [...queue];
+    }
+    if (tab) {
+      state.activePlaylistTabId = tab.id;
+      tracks = [...queue];
+    }
+    if (!state.activeQueue.length) state.activeQueue = [...queue];
+  }
   state.tab = view;
   state.selectedTrack = 0;
   state.queueScroll = 0;
   render();
+  if (view === "QUEUE") persistPlaylistTabs();
   if (view === "FAVORITES") loadFavorites();
 }
 
@@ -1877,7 +2126,28 @@ async function loadGame(game) {
     state.selectedTrack = 0;
     state.queueScroll = 0;
     state.status = tracks.length ? (game.displayName || game.name) : "NO TRACKS";
+    let tab = state.playlistTabs.find((entry) => entry.gameKey === selectedKey);
+    if (!tab && state.playlistTabs.length < 64) {
+      tab = {
+        id: playlistTabID(),
+        title: game.displayName || game.name || "PLAYLIST",
+        gameKey: selectedKey,
+        playlist: [],
+        selectedTrack: 0,
+        scroll: 0,
+      };
+      state.playlistTabs.push(tab);
+    }
+    if (tab) {
+      tab.title = game.displayName || game.name || tab.title;
+      tab.playlist = [...tracks];
+      tab.selectedTrack = 0;
+      tab.scroll = 0;
+      state.activePlaylistTabId = tab.id;
+    }
+    if (!state.currentTrackId) state.activeQueue = [...tracks];
     state.tab = "LIBRARY";
+    persistPlaylistTabs();
     render();
   } catch (error) {
     if (token !== state.catalogToken) return;
@@ -2094,13 +2364,12 @@ async function openLocalPath() {
     if ((!Array.isArray(playlist) || !playlist.length) && snapshot.rootPath && bridge.selectFolder) {
       playlist = (await bridge.selectFolder(snapshot.rootPath))?.playlist;
     }
-    tracks = Array.isArray(playlist) ? playlist : [];
-    state.selectedTrack = 0;
-    state.queueScroll = 0;
-    state.activeGameKey = null;
-    state.activeQueue = tracks;
+    const localTracks = Array.isArray(playlist) ? playlist : [];
+    const sourceName = String(snapshot.rootPath || snapshot.path || "LOCAL FILES").split(/[\\/]/).filter(Boolean).at(-1) || "LOCAL FILES";
+    state.status = localTracks.length ? "LOCAL FILES" : "NO PLAYABLE FILES AT PATH";
+    createPlaylistTab({ duplicateActive: false, title: sourceName, playlist: localTracks });
     state.tab = "QUEUE";
-    state.status = tracks.length ? "LOCAL FILES" : "NO PLAYABLE FILES AT PATH";
+    persistPlaylistTabs();
     render();
   } catch (error) {
     state.status = `OPEN ERROR: ${error.message}`;
@@ -2146,7 +2415,7 @@ async function startTrack(track, queue = activeTracks(), { recordHistory = true 
       startMilliseconds: 0,
       playMilliseconds: pref.longPlayEnabled ? Math.max(0, Number(pref.manualPlayTimeSeconds ?? 180)) * 1000 : 0,
       fadeMilliseconds: pref.fadeEnabled === false ? 0 : Math.max(0, Number(pref.spcFadeSeconds ?? 6)) * 1000,
-      tempo: 1,
+      tempo: playbackTempoForTrack(track, pref),
       longPlayEnabled: pref.longPlayEnabled === true,
       timedOverride: false,
       unknownDurationMilliseconds: Math.max(1, Number(pref.unknownDurationSeconds ?? 150)) * 1000,
@@ -2282,14 +2551,20 @@ async function setPreference(key, value, updateAudio = false) {
       "unknownDurationSeconds",
       "fadeEnabled",
       "spcFadeSeconds",
+      "playbackSpeed",
+      "playbackSpeedEnabled",
+      "libvgmPlaybackSpeed",
+      "libvgmPlaybackSpeedEnabled",
     ].includes(key)) {
       const pref = state.preferences;
+      const currentTrack = state.activeQueue.find((track) => trackID(track) === state.currentTrackId)
+        || tracks.find((track) => trackID(track) === state.currentTrackId);
       applyNativeStatus(await bridge.nativePlaybackReconfigure({
         longPlayEnabled: pref.longPlayEnabled === true,
         manualPlayMilliseconds: Math.max(0, Number(pref.manualPlayTimeSeconds ?? 180)) * 1000,
         fadeMilliseconds: pref.fadeEnabled === false ? 0 : Math.max(0, Number(pref.spcFadeSeconds ?? 6)) * 1000,
         unknownDurationMilliseconds: Math.max(1, Number(pref.unknownDurationSeconds ?? 150)) * 1000,
-        tempo: 1,
+        tempo: playbackTempoForTrack(currentTrack, pref),
       }));
     }
   } catch (error) {
@@ -2605,10 +2880,13 @@ window.ViewBoy = Object.freeze({
       case "repeatOne": toggleRepeatOne(); break;
       case "playlistRandom": toggleRandomMode("playlist"); break;
       case "libraryRandom": toggleRandomMode("library"); break;
+      case "newPlaylistTab": createPlaylistTab({ duplicateActive: true }); break;
+      case "closePlaylistTab": closePlaylistTab(); break;
       case "openPath": openLocalPath(); break;
       case "settings": state.tab = "SETTINGS"; render(); break;
       case "library": selectSidebarView("LIBRARY"); break;
       case "queue": selectSidebarView("QUEUE"); break;
+      case "optionsPage:AUDIO": state.tab = "SETTINGS"; state.optionsPage = "AUDIO"; render(); break;
       case "closeWindow": bridge?.closeMainWindow?.(); break;
       default: break;
     }
@@ -2616,7 +2894,7 @@ window.ViewBoy = Object.freeze({
 });
 pendingCommands.splice(0).forEach((command) => window.ViewBoy.dispatch(command));
 
-if (bridge) {
+  if (bridge) {
   bridge.onNativePlaybackState?.(applyNativeStatus);
   bridge.onNativePlaybackEnded?.(handleNativeEnded);
   bridge.onFrontendSettingsChanged?.((settings) => {
@@ -2628,22 +2906,34 @@ if (bridge) {
   bridge.onCatalogReloaded?.(() => loadCatalog());
   bridge.onLibrarySnapshot?.((snapshot) => {
     if (Array.isArray(snapshot?.playlist)) {
-      tracks = snapshot.playlist;
-      state.selectedTrack = 0;
+      createPlaylistTab({ duplicateActive: false, title: "QUEUE", playlist: snapshot.playlist });
       state.tab = "QUEUE";
+      persistPlaylistTabs();
       render();
     }
   });
   (async () => {
+    let restoredTabs = false;
     try {
       state.preferences = await bridge.frontendSettingsLoad();
       await configureAudio();
       await loadFavorites();
+      restoredTabs = restorePlaylistTabs(await bridge.playlistTabsLoad?.());
     } catch (error) {
       state.status = `OPTION ERROR: ${error.message}`;
       render();
     }
     await loadCatalog();
+    if (restoredTabs) restorePlaylistTabs(await bridge.playlistTabsLoad?.());
+    if (!state.playlistTabs.length) {
+      state.playlistTabs = [{
+        id: playlistTabID(), title: "PLAYLIST", gameKey: null, playlist: [...tracks], selectedTrack: 0, scroll: 0,
+      }];
+      state.activePlaylistTabId = state.playlistTabs[0].id;
+    }
+    state.playlistTabsReady = true;
+    persistPlaylistTabs();
+    render();
     try { applyNativeStatus(await bridge.nativePlaybackState()); } catch (_) { /* No active transport. */ }
   })();
 }

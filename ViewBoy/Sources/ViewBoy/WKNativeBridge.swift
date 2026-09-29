@@ -162,6 +162,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             frontendOptionsManifest: () => request("frontendOptionsManifest"),
             frontendSettingsLoad: (...args) => request("frontendSettingsLoad", args),
             frontendSettingsSave: (...args) => request("frontendSettingsSave", args),
+            playlistTabsLoad: () => request("playlistTabsLoad"),
+            playlistTabsSave: (...args) => request("playlistTabsSave", args),
             endpointSurface: (...args) => request("endpointSurface", args),
             reloadDatabaseLibrary: (...args) => request("reloadDatabaseLibrary", args),
             configureArchiveCache: (...args) => request("configureArchiveCache", args),
@@ -262,6 +264,26 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                     handler?(savedSettings)
                     await Self.reply(to: message.webView, id: id, success: true, valueJSON: "true")
                 }
+            } catch {
+                Task { await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": error.localizedDescription])) }
+            }
+            return
+        }
+
+        if method == "playlistTabsLoad" {
+            let valueJSON = Self.playlistTabsLoad().map(Self.json) ?? "null"
+            Task { await Self.reply(to: message.webView, id: id, success: true, valueJSON: valueJSON) }
+            return
+        }
+
+        if method == "playlistTabsSave" {
+            guard let payload = args.first as? [String: Any] else {
+                Task { await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": BridgeError.invalidSettings.localizedDescription])) }
+                return
+            }
+            do {
+                _ = try Self.playlistTabsSave(payload)
+                Task { await Self.reply(to: message.webView, id: id, success: true, valueJSON: "true") }
             } catch {
                 Task { await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": error.localizedDescription])) }
             }
@@ -1193,6 +1215,30 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     }
 
     nonisolated private static let frontendSettingsKey = "ViewBoy.frontendPreferencesV3"
+    nonisolated private static let playlistTabsKey = "ViewBoy.playlistTabsV1"
+
+    nonisolated private static func playlistTabsLoad() -> Any? {
+        guard let data = UserDefaults.standard.data(forKey: playlistTabsKey),
+              let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              value["version"] as? Int == 1,
+              let tabs = value["tabs"] as? [Any], tabs.count <= 64 else { return nil }
+        return value
+    }
+
+    @discardableResult
+    nonisolated private static func playlistTabsSave(_ value: [String: Any]) throws -> Bool {
+        guard value["version"] as? Int == 1,
+              let tabs = value["tabs"] as? [[String: Any]], tabs.count <= 64,
+              tabs.allSatisfy({
+                  ($0["id"] as? String)?.isEmpty == false
+                      && $0["title"] is String
+                      && (($0["playlist"] as? [Any])?.count ?? 0) <= 100_000
+              }) else { throw BridgeError.invalidSettings }
+        let data = try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys])
+        guard data.count <= 64 * 1_024 * 1_024 else { throw BridgeError.invalidSettings }
+        UserDefaults.standard.set(data, forKey: playlistTabsKey)
+        return true
+    }
 
     nonisolated private static func frontendSettingsLoad() throws -> ViewBoyPreferencesSnapshot {
         let defaults = UserDefaults.standard

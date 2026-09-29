@@ -29,6 +29,7 @@ const audioConfigCalls = [];
 const reconfigureCalls = [];
 const groupStateCalls = [];
 const savedPreferences = [];
+const savedPlaylistTabs = [];
 let frontendSettingsChanged;
 let catalogReloaded;
 const originalRandom = Math.random;
@@ -41,8 +42,11 @@ const otherRow = { playlistId: 'other', path: '/music/other.spc', title: 'Other 
 let ended;
 let generation = 0;
 const bridge = {
+  playbackBackends: [{ id: 'libgme', supportsTempo: true, extensions: ['spc'] }],
   frontendSettingsLoad: async () => ({ appVolume: 1, repeatMode: 'off' }),
   frontendSettingsSave: async (settings) => { savedPreferences.push({ ...settings }); },
+  playlistTabsLoad: async () => null,
+  playlistTabsSave: async (settings) => { savedPlaylistTabs.push(structuredClone(settings)); },
   nativePlaybackAudioConfig: async (...args) => { audioConfigCalls.push(args); },
   databaseGames: async () => [
     { rootId: 1, name: 'Sample', displayName: 'Sample', system: 'SNES', trackCount: 3 },
@@ -231,21 +235,22 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the Playback page checkbox updates the native playback preferences');
   assert.notEqual(pixelChecksum(canvas.image.data), checkedRowPixels,
     'the bitmap checkbox marker visibly changes with the saved value');
-  clickScreen(0.93, 0.21);
+  clickScreen(0.50, 0.12);
+  clickScreen(0.42, 0.21);
   await tick();
   assert.equal(savedPreferences.at(-1).monoEnabled, true,
-    'the Playback page output checkbox saves and applies mono output');
-  clickScreen(0.60, 0.255);
+    'the Audio page output checkbox saves and applies mono output');
+  clickScreen(0.15, 0.24);
   await tick();
   assert.equal(savedPreferences.at(-1).appVolume, 0.9,
-    'the Playback page volume button updates native audio preferences');
-  clickScreen(0.88, 0.32);
+    'the Audio page volume button updates native audio preferences');
+  clickScreen(0.60, 0.21);
   await tick();
   assert.equal(savedPreferences.at(-1).equalizerEnabled, true,
-    'the Playback page equalizer checkbox updates native audio preferences');
+    'the Audio page equalizer checkbox updates native audio preferences');
   assert.equal(audioConfigCalls.at(-1)[1], true,
     'the equalizer toggle is applied to the native audio path');
-  clickScreen(0.93, 0.35);
+  clickScreen(0.91, 0.24);
   await tick();
   assert.equal(savedPreferences.at(-1).equalizerBandGains[0], 0.5,
     'the first equalizer band uses half-decibel button steps');
@@ -253,12 +258,28 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the first equalizer band uses half-decibel button steps');
   assert.equal(audioConfigCalls.at(-1)[2][0], 0.5,
     'equalizer band edits are applied to the native audio path');
+  clickScreen(0.30, 0.12);
   clickScreen(0.47, 0.39);
   await tick();
   assert.equal(savedPreferences.at(-1).manualPlayTimeSeconds, 210,
     'the Long Play duration adjuster increases in 30-second steps');
   assert.equal(reconfigureCalls.at(-1).manualPlayMilliseconds, 210_000,
     'Long Play duration changes reconfigure the active native track');
+  globalThis.ViewBoy.dispatch('newPlaylistTab');
+  await tick();
+  assert.equal(savedPlaylistTabs.at(-1)?.tabs.length, 2,
+    'the plus tab control duplicates the current list and persists it through the native bridge');
+  globalThis.ViewBoy.dispatch('closePlaylistTab');
+  await tick();
+  assert.equal(savedPlaylistTabs.at(-1)?.tabs.length, 1,
+    'closing the active tab selects the remaining playlist and saves the tab set');
+  globalThis.ViewBoy.dispatch('closePlaylistTab');
+  await tick();
+  assert.equal(savedPlaylistTabs.at(-1)?.tabs.length, 1,
+    'closing the final tab leaves one reusable empty playlist tab');
+  assert.equal(savedPlaylistTabs.at(-1)?.tabs[0]?.playlist.length, 0,
+    'closing the final tab saves it empty even while audio continues playing');
+  globalThis.ViewBoy.dispatch('settings');
   clickScreen(0.61, 0.12);
   clickScreen(0.48, 0.20);
   await tick();
@@ -280,6 +301,17 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the palette selector returns to the authentic Game Boy theme');
   clickScreen(0.20, 0.296);
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'STANDARD');
+  clickScreen(0.30, 0.12);
+  clickScreen(0.60, 0.20);
+  await tick();
+  assert.equal(savedPreferences.at(-1).playbackSpeedEnabled, true,
+    'the Playback page enables libgme tempo through the shared preferences');
+  clickScreen(0.91, 0.23);
+  await tick();
+  assert.equal(savedPreferences.at(-1).playbackSpeed.numerator, 33,
+    'the libgme speed adjuster advances in 1/32 steps');
+  assert.equal(reconfigureCalls.at(-1).tempo, 33 / 32,
+    'a speed change updates the active native decoder immediately');
   globalThis.ViewBoy.dispatch('library');
   screenWidth = 1400;
   windowListeners.get('resize')();
@@ -320,17 +352,17 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const beforeColumnMenu = pixelChecksum(canvas.image.data);
   canvas.listeners.get('contextmenu')({
     clientX: rect.width * 0.60,
-    clientY: rect.height * 0.09,
+    clientY: rect.height * 0.12,
     preventDefault() { contextMenuPrevented = true; },
   });
   assert.ok(contextMenuPrevented, 'right-clicking a column heading opens its visibility menu');
   assert.notEqual(pixelChecksum(canvas.image.data), beforeColumnMenu,
     'the column menu is painted into the LCD framebuffer');
-  clickScreen(0.62, 0.145);
+  clickScreen(0.62, 0.19);
   await tick();
   assert.equal(savedPreferences.at(-1).columnVisibility.filename, false,
     'the column menu hides the selected field through the native preference bridge');
-  clickScreen(0.62, 0.145);
+  clickScreen(0.62, 0.19);
   await tick();
   assert.equal(savedPreferences.at(-1).columnVisibility.filename, true,
     'the same column menu restores the selected field');
@@ -360,17 +392,17 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     shiftKey: false,
     preventDefault() {},
   });
-  sendPointer('pointerdown', 0.60, 0.09);
-  sendPointer('pointermove', 0.88, 0.09);
-  sendPointer('pointerup', 0.88, 0.09);
+  sendPointer('pointerdown', 0.60, 0.12);
+  sendPointer('pointermove', 0.88, 0.12);
+  sendPointer('pointerup', 0.88, 0.12);
   const savedColumnOrder = JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).columnOrder;
   assert.ok(savedColumnOrder.indexOf('filename') > savedColumnOrder.indexOf('title'),
     `dragging a header reorders columns and keeps the order in display preferences: ${savedColumnOrder.join(',')}`);
   assert.ok(!savedColumnOrder.includes('index'), 'the numbered column is pinned outside the movable order');
   const headerOrder = [...savedColumnOrder];
-  sendPointer('pointerdown', 0.43, 0.09);
-  sendPointer('pointermove', 0.80, 0.09);
-  sendPointer('pointerup', 0.80, 0.09);
+  sendPointer('pointerdown', 0.43, 0.12);
+  sendPointer('pointermove', 0.80, 0.12);
+  sendPointer('pointerup', 0.80, 0.12);
   assert.deepEqual(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).columnOrder, headerOrder,
     'dragging other headers across # cannot move the numbered column');
 });
