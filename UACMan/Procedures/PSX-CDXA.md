@@ -11,6 +11,9 @@ audio bytes remain unchanged.
 The [2026-09-26 Redump cleanup report](Reports/PSX-Redump-Metadata-Cleanup-2026-09-26.md)
 records packages built under the previous tag and hash rules. It remains a
 historical package audit; this profile governs future PSX tag-surface decisions.
+The [Darkstalkers track-number repair](Reports/PSX-Darkstalkers-Track-Number-Repair-2026-09-29.md)
+and [SOTN metadata cleanup](Reports/PSX-SOTN-Metadata-Cleanup-2026-09-29.md)
+record current examples of the physical CD-DA and logical XA numbering rules.
 
 It covers Redump PlayStation disc audio represented as native XA streams,
 Red Book CD-DA tracks, or both. Extraction and game-specific loop research
@@ -23,6 +26,11 @@ remain in the [PSX preservation protocol](../protocols/PSX-CDXA.protocol.md).
   original BIN/CUE checksums in the included verification attachment, reusing
   matching database or Redump records rather than rehashing large images.
   Preserve the source archive hashes only when already established.
+- Project verified package identity as direct Title Case tags **Game ID**,
+  **Region**, **Set Name**, and **Set URL**. Do not add **Set Collection**;
+  broader collection context belongs in the source record. Omit **Year** and
+  **Date** when the source does not provide release-date evidence. A source
+  `observedAt` timestamp records capture time, not a game's release date.
 - Include the original CUE byte-for-byte as an ordinary package asset member.
   UACMan exposes it in the package attachment list; do not add a redundant
   lowercase `cue_sheet` tag or repeat its path on every audio member. The CUE
@@ -58,16 +66,20 @@ Current PSX projection direction:
 | Album | Use the standard **Album** member tag for the established game/soundtrack title (for example, `Darkstalkers - The Night Warriors`). Do not add a parallel `Game` tag or append the region to Album. |
 | Region | Keep the release region once at package scope as `game.metadata["Region"]`, using the two-letter code (for example, `US`). Use the same code in the package filename, such as `(US)`, not `(USA)`. |
 | Title and credits | Preserve populated, useful, source-backed tags such as **Title**, **Artist**, **Composer**, **Publisher**, and **Developer** under those names. Do not infer credits from a game's company identity or synthesize a title from a filename. |
-| Year and Date | Keep populated, source-backed values under **Year** and **Date**. Do not invent values or add blank tags. |
+| Year and Date | Keep populated, source-backed release values under **Year** and **Date**. Do not project source-capture timestamps or add blank tags. |
 | Game ID | Use a package-level **Game ID** for the canonical release name including the agreed region suffix, such as `Darkstalkers - The Night Warriors (US)`. Keep **Region** separately as its two-letter code. Add a No-Intro identifier only when a verified matching record supplies it; do not substitute a guessed serial. |
-| Set Collection, Set Name, and Set URL | Store the source collection, exact set name, and source URL once as direct Title Case package tags. Keep archive/member download identifiers and their source checksums in the source record. |
+| Set Name and Set URL | Store the exact source set name and URL once as direct Title Case package tags. Keep broader collection context, archive/member download identifiers, and source checksums in the source record. |
 | Format | Use one direct member tag, **Format**, with the contained source format. For these Red Book tracks use `Red Book CD-DA`; CD-DA has no per-file version to append. This is distinct from structural `member.format: ape`, which identifies the stored APE encoding. |
+| Track Number | Use a source-backed sequence with an explicit meaning. In a file-per-track CD-DA harvest that omits data track 01, use physical CUE track numbers for the audio members and filenames (for example, `02`–`46`). In a mixed-mode XA soundtrack, follow its logical OST sequence starting at `01`; XA streams are inside physical data track 01 and are not separate CD tracks. The attached CUE remains authoritative for physical disc numbering. |
+| Disc Number | Omit a repeated `1` for a single-disc package. Keep a populated **Disc Number** when a package spans multiple source discs or the value distinguishes members. |
 
-Do not create a visible `Disc Track Number` tag. The
-byte-exact attached CUE carries physical disc track numbers and indexes; the
-ordered UAC playlist carries playback order. Do not conflate those two number
-spaces. A conventional audio track number may be added only if a consumer
-requires it and its sequence is explicitly defined.
+Do not add a second physical-track alias such as **Disc Track Number**. For a
+Red Book member whose file maps one-to-one to a physical CUE audio track, use
+that physical number in **Track Number**. For XA streams, keep logical OST
+numbering in **Track Number** when the set follows a soundtrack sequence; the
+attached CUE records that the XA data resides in physical track 01. The UAC
+playlist preserves playback order. Never use one number field to silently mix
+physical-disc positions and logical OST positions.
 
 Do not synthesize a title from a filename, a generic “Redbook Audio Track”
 label, an album from a game filename, or credits from game-level information.
@@ -102,7 +114,9 @@ XA reader facts and source-sector mappings belong only in the preservation
 record where a decoder or verified loop mapping needs them. Do not serialize a
 broad `NativeMetadata` object or flatten reader facts into invented `XA_*`
 tags. Keep any required positive loop mapping in its playback structure and
-source-sector evidence in the report.
+source-sector evidence in the report. The wrapper-defined lowercase
+`metadata.loop` object is playback structure, not a free-form tag; preserve its
+sample boundaries exactly.
 
 For this PSX profile, selected source tags are projected as direct member
 metadata fields; unselected native tags remain only in the byte-identical audio

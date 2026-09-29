@@ -54,8 +54,9 @@ Generic loop fields are replaced with the disc-native values only where a
 verified native mapping exists. A member with no loop has no `loop` object,
 no `loopStatus`, and no `LOOP_TYPE=none`, `LOOP_PROVENANCE`, or equivalent
 negative tag. Absence of a loop field means no loop was identified. Keep a
-positive loop map in structured member metadata and the player playlist; do
-not flatten it into duplicate `LOOP_*` tags.
+positive loop map in the wrapper-defined lowercase `metadata.loop` member
+object; repeat loop coordinates in a playlist only when its playback consumer
+requires them. Do not flatten loops into duplicate `LOOP_*` tags.
 
 For raw XA, MetaManCore can report facts about the reader's interpretation.
 Do not serialize its broad `nativeMetadata.technicalFacts` object into a PSX
@@ -95,17 +96,19 @@ Every playable XA member with a native loop carries:
 
 For a Red Book member, project selected populated source tags directly into
 ordinary UAC member metadata as defined by the PSX disc-audio profile. Do not
-write a nested native-tag object. For XA, a UAC member object may carry the
+write a nested native-tag object. For XA, a UAC member object carries the
 positive loop mapping a player needs because a raw sector member has no
-general-purpose tag block. Repeat a loop in the playlist only when the player
-requires it.
+general-purpose tag block. The member loop is authoritative; repeat its values
+in the playlist only when the player requires them.
 
-Include the original CUE as a byte-exact ordinary member and point to it with
-`game.metadata.cue_sheet`. Add loop or sector research documents only when
-they support a concrete source-mapping or review need. Set identity uses the
-shared `game.metadata.set` object. A playlist points to audio members and
-contains playback fields only when a consumer needs them; it does not copy the
-audio payload. A positive `playLengthMs` may support UACMan duration
+Include the original CUE as a byte-exact ordinary member. The member inventory
+already exposes it as a package attachment; do not add a redundant lowercase
+`cue_sheet` tag or path pointer. Add loop or sector research documents only
+when they support a concrete source-mapping or review need. PSX package tags
+use direct Title Case **Game ID**, **Region**, **Set Name**, and **Set URL**;
+broader collection context stays in the source record. A playlist points to
+audio members and contains playback fields only when a consumer needs them; it
+does not copy the audio payload. A positive `playLengthMs` may support UACMan duration
 display/sorting and player playlist-duration readouts, but it is optional
 operational timing, not required to decode a member. Do not store
 `pregapFrames` in member metadata or playlist extras: no production consumer
