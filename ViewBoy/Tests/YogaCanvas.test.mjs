@@ -22,7 +22,7 @@ const canvas = {
 };
 const status = { textContent: '' };
 let screenWidth = 800;
-const screen = { getBoundingClientRect() { return { width: screenWidth, height: 500 }; } };
+const screen = { getBoundingClientRect() { return { width: screenWidth, height: 800 }; } };
 const windowListeners = new Map();
 const calls = [];
 const audioConfigCalls = [];
@@ -109,7 +109,7 @@ function pixelChecksum(data) {
 }
 
 test('canvas renders adaptive columns, grouped options, and native playback', async () => {
-  const { animationFrameIsDue } = await import('../Sources/ViewBoy/Resources/yoga-app.js');
+  const { animationFrameIsDue, hitTargetSnapshot } = await import('../Sources/ViewBoy/Resources/yoga-app.js');
   const animationGate = {};
   assert.equal(animationFrameIsDue(animationGate, 0), true, 'the first animation frame paints immediately');
   assert.equal(animationFrameIsDue(animationGate, 1000 / 120), false,
@@ -209,8 +209,18 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     const rect = canvas.getBoundingClientRect();
     canvas.listeners.get('click')({ clientX: rect.width * x, clientY: rect.height * y, detail: 1 });
   };
-  const pageY = [0.155, 0.195, 0.235, 0.275, 0.315];
-  const clickPage = (index) => clickScreen(0.08, pageY[index]);
+  const clickTarget = (name, occurrence = 0, xFraction = 0.5, yFraction = 0.5) => {
+    const target = hitTargetSnapshot().filter((entry) => entry.name === name)[occurrence];
+    assert.ok(target, `the ${name} control is present in the current screen`);
+    const logicalWidth = canvas.width / 3;
+    const logicalHeight = canvas.height / 3;
+    clickScreen(
+      (target.box.x + target.box.width * xFraction) / logicalWidth,
+      (target.box.y + target.box.height * yFraction) / logicalHeight,
+    );
+  };
+  const pages = ['DISPLAY', 'PLAYBACK', 'AUDIO', 'INTERFACE', 'LIBRARY'];
+  const clickPage = (index) => clickTarget(pages[index]);
   const commandKey = (key) => canvas.listeners.get('keydown')({
     key,
     code: key === ',' ? 'Comma' : `Digit${key}`,
@@ -219,28 +229,28 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     shiftKey: false,
     preventDefault() {},
   });
-  clickScreen(0.80, 0.247);
+  clickTarget('THEME NIGHTBOY');
   const nightBoyPixels = pixelChecksum(canvas.image.data);
   assert.notEqual(nightBoyPixels, gameBoyPixels, 'NightBoy repaints the same four-tone pixel screen with its dark-purple palette');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'NIGHTBOY');
   assert.equal(document.documentElement.dataset.theme, 'NIGHTBOY',
     'the selected LCD theme also updates the surrounding shell');
-  clickScreen(0.80, 0.287);
+  clickTarget('INK BRIGHT');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'HIGH_CONTRAST',
     'the ink control persists the brighter silver high-contrast setting');
   clickPage(1);
   assert.notEqual(pixelChecksum(canvas.image.data), nightBoyPixels, 'Options sub-pages navigate inside the LCD');
   globalThis.ViewBoy.dispatch('optionsPage:PLAYBACK');
-  clickScreen(0.84, 0.287);
+  clickTarget('REPEAT ONE');
   await tick();
   assert.equal(savedPreferences.at(-1).repeatMode, 'one',
     'the Playback page repeat buttons save their selected mode');
-  clickScreen(0.47, 0.327);
+  clickTarget('RANDOM OFF');
   await tick();
   assert.equal(savedPreferences.at(-1).randomMode, 'off',
     'the Playback page random buttons save their selected mode');
   const checkedRowPixels = pixelChecksum(canvas.image.data);
-  clickScreen(0.50, 0.207);
+  clickTarget('LONG PLAY');
   await tick();
   assert.equal(savedPreferences.at(-1).longPlayEnabled, false,
     'the Playback page checkbox updates the native playback preferences');
@@ -248,32 +258,36 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the bitmap checkbox marker visibly changes with the saved value');
   clickPage(2);
   globalThis.ViewBoy.dispatch('optionsPage:AUDIO');
-  clickScreen(0.50, 0.207);
+  clickTarget('MONO OUTPUT');
   await tick();
   assert.equal(savedPreferences.at(-1).monoEnabled, true,
     'the Audio page output checkbox saves and applies mono output');
-  clickScreen(0.35, 0.247);
+  clickTarget('VOLUME -');
   await tick();
   assert.equal(savedPreferences.at(-1).appVolume, 0.9,
     'the Audio page volume button updates native audio preferences');
-  clickScreen(0.50, 0.364);
+  clickTarget('EQUALIZER');
   await tick();
   assert.equal(savedPreferences.at(-1).equalizerEnabled, true,
     'the Audio page equalizer checkbox updates native audio preferences');
   assert.equal(audioConfigCalls.at(-1)[1], true,
     'the equalizer toggle is applied to the native audio path');
-  clickScreen(0.63, 0.412);
+  clickTarget('EQ 31 HZ', 0, 0.99);
   await tick();
   const changedBandGain = savedPreferences.at(-1).equalizerBandGains[0];
-  assert.notEqual(changedBandGain, 0,
-    'clicking a full-width equalizer bar changes its gain');
+  assert.equal(changedBandGain, 12,
+    'the right edge of a full-width equalizer bar selects the +12 dB boost limit');
   assert.equal(Number.isInteger(changedBandGain * 2), true,
     'equalizer bars quantize to the supported half-decibel granularity');
   assert.equal(audioConfigCalls.at(-1)[2][0], changedBandGain,
     'equalizer bar edits are applied to the native audio path');
+  clickTarget('EQ 31 HZ', 0, 0.01);
+  await tick();
+  assert.equal(savedPreferences.at(-1).equalizerBandGains[0], 0,
+    'the left edge of a full-width equalizer bar returns the band to flat');
   clickPage(1);
   globalThis.ViewBoy.dispatch('optionsPage:PLAYBACK');
-  clickScreen(0.92, 0.443);
+  clickTarget('LONG PLAY +');
   await tick();
   assert.equal(savedPreferences.at(-1).manualPlayTimeSeconds, 210,
     'the Long Play duration adjuster increases in 30-second steps');
@@ -295,11 +309,14 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   commandKey(',');
   assert.match(status.textContent, /SETTINGS/,
     'Command-comma opens the Options screen');
-  globalThis.ViewBoy.dispatch('closePlaylistTab');
+  clickTarget('BACK');
+  assert.equal(hitTargetSnapshot().filter((target) => target.name === 'X').length, 2,
+    'each visible playlist tab uses the compact X close control');
+  clickTarget('X', 1);
   await tick();
   assert.equal(savedPlaylistTabs.at(-1)?.tabs.length, 1,
     'closing the active tab selects the remaining playlist and saves the tab set');
-  globalThis.ViewBoy.dispatch('closePlaylistTab');
+  clickTarget('X');
   await tick();
   assert.equal(savedPlaylistTabs.at(-1)?.tabs.length, 1,
     'closing the final tab leaves one reusable empty playlist tab');
@@ -308,34 +325,34 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   globalThis.ViewBoy.dispatch('settings');
   clickPage(3);
   globalThis.ViewBoy.dispatch('optionsPage:INTERFACE');
-  clickScreen(0.50, 0.207);
+  clickTarget('AUTO-SIZE COLUMNS');
   await tick();
   assert.equal(savedPreferences.at(-1).columnAutoSize, false,
     'the Interface page checkbox updates the saved column behavior');
   clickPage(4);
   globalThis.ViewBoy.dispatch('optionsPage:LIBRARY');
-  clickScreen(0.50, 0.207);
+  clickTarget('FILE');
   await tick();
   assert.equal(savedPreferences.at(-1).columnVisibility.filename, false,
     'the Library page checkbox persists field visibility');
   clickPage(3);
   globalThis.ViewBoy.dispatch('optionsPage:INTERFACE');
-  clickScreen(0.50, 0.207);
+  clickTarget('AUTO-SIZE COLUMNS');
   await tick();
   assert.equal(savedPreferences.at(-1).columnAutoSize, true,
     'the Interface page checkbox can restore automatic sizing');
   clickPage(0);
-  clickScreen(0.45, 0.247);
+  clickTarget('THEME GAMEBOY');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'GAMEBOY',
     'the palette selector returns to the authentic Game Boy theme');
-  clickScreen(0.45, 0.287);
+  clickTarget('INK LCD GREEN');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'STANDARD');
   clickPage(1);
-  clickScreen(0.50, 0.646);
+  clickTarget('LIBGME SPEED');
   await tick();
   assert.equal(savedPreferences.at(-1).playbackSpeedEnabled, true,
     'the Playback page enables libgme tempo through the shared preferences');
-  clickScreen(0.92, 0.686);
+  clickTarget('LIBGME RATE +');
   await tick();
   assert.equal(savedPreferences.at(-1).playbackSpeed.numerator, 33,
     'the libgme speed adjuster advances in 1/32 steps');
@@ -421,17 +438,31 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     shiftKey: false,
     preventDefault() {},
   });
-  sendPointer('pointerdown', 0.60, 0.13);
-  sendPointer('pointermove', 0.88, 0.13);
-  sendPointer('pointerup', 0.88, 0.13);
+  const headerCenter = (name) => {
+    const target = hitTargetSnapshot().find((entry) => entry.name === name);
+    assert.ok(target, `the ${name} playlist heading is visible`);
+    return {
+      x: (target.box.x + target.box.width / 2) / (canvas.width / 3),
+      y: (target.box.y + target.box.height / 2) / (canvas.height / 3),
+      box: target.box,
+    };
+  };
+  const fileHeader = headerCenter('FILE');
+  const titleHeader = headerCenter('TITLE');
+  const titleRightSide = (titleHeader.box.x + titleHeader.box.width * 0.75) / (canvas.width / 3);
+  sendPointer('pointerdown', fileHeader.x, fileHeader.y);
+  sendPointer('pointermove', titleRightSide, titleHeader.y);
+  sendPointer('pointerup', titleRightSide, titleHeader.y);
   const savedColumnOrder = JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).columnOrder;
   assert.ok(savedColumnOrder.indexOf('filename') > savedColumnOrder.indexOf('title'),
     `dragging a header reorders columns and keeps the order in display preferences: ${savedColumnOrder.join(',')}`);
   assert.ok(!savedColumnOrder.includes('index'), 'the numbered column is pinned outside the movable order');
   const headerOrder = [...savedColumnOrder];
-  sendPointer('pointerdown', 0.43, 0.13);
-  sendPointer('pointermove', 0.80, 0.13);
-  sendPointer('pointerup', 0.80, 0.13);
+  const titleHeaderAfter = headerCenter('TITLE');
+  const indexHeader = headerCenter('#');
+  sendPointer('pointerdown', titleHeaderAfter.x, titleHeaderAfter.y);
+  sendPointer('pointermove', indexHeader.x, indexHeader.y);
+  sendPointer('pointerup', indexHeader.x, indexHeader.y);
   assert.deepEqual(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).columnOrder, headerOrder,
     'dragging other headers across # cannot move the numbered column');
 });

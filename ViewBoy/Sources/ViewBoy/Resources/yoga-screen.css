@@ -21,7 +21,7 @@ body {
   display: grid;
   place-items: center;
   overflow: hidden;
-  padding: 3px;
+  padding: 8px;
   background: #10130f;
 }
 
