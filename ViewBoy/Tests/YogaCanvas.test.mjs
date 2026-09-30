@@ -115,6 +115,24 @@ function pixelChecksum(data) {
 
 test('canvas renders adaptive columns, grouped options, and native playback', async () => {
   const { animationFrameIsDue, hitTargetSnapshot } = await import('../Sources/ViewBoy/Resources/yoga-app.js');
+  const clickTargetBox = (target) => {
+    const rect = canvas.getBoundingClientRect();
+    const logicalWidth = canvas.width / 3;
+    const logicalHeight = canvas.height / 3;
+    canvas.listeners.get('click')({
+      clientX: rect.width * (target.box.x + target.box.width / 2) / logicalWidth,
+      clientY: rect.height * (target.box.y + target.box.height / 2) / logicalHeight,
+      detail: 1,
+    });
+  };
+  const selectTabWithCommandNumber = (number) => canvas.listeners.get('keydown')({
+    key: String(number),
+    code: `Digit${number}`,
+    metaKey: true,
+    ctrlKey: false,
+    shiftKey: false,
+    preventDefault() {},
+  });
   const animationGate = {};
   assert.equal(animationFrameIsDue(animationGate, 0), true, 'the first animation frame paints immediately');
   assert.equal(animationFrameIsDue(animationGate, 1000 / 120), false,
@@ -125,6 +143,15 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'faster-than-target display frames remain gated');
   assert.equal(animationFrameIsDue(animationGate, 1000 / 30), true,
     '60 Hz spaced updates are accepted');
+  for (const refreshRate of [60, 90, 120, 144]) {
+    const gate = {};
+    let frames = 0;
+    for (let frame = 0; frame <= refreshRate; frame += 1) {
+      if (animationFrameIsDue(gate, frame * 1000 / refreshRate)) frames += 1;
+    }
+    assert.ok(frames >= 60 && frames <= 61,
+      `${refreshRate} Hz display timestamps retain a 60 Hz animation cadence (${frames} updates)`);
+  }
   await tick();
   await tick();
   assert.match(status.textContent, /FIRST/i);
@@ -151,6 +178,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.ok(groupStateCalls.some(([action, system, gameID]) =>
     action === 'selectGame' && system === 'SNES' && gameID === '1:SNES:Sample'));
   assert.ok(canvas.image.data.some((value) => value !== 0));
+  assert.deepEqual(Array.from(canvas.image.data.slice(0, 4)), [155, 188, 15, 255],
+    'packed framebuffer presentation preserves the four-tone LCD substrate color');
   const firstLayoutFrameCount = canvas.frames;
   screenWidth = 620;
   windowListeners.get('resize')();
@@ -203,6 +232,49 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(calls.filter(([name]) => name === 'start').at(-1)[1].path, '/music/c.spc');
 
+  globalThis.ViewBoy.dispatch('playlistRandom');
+  await tick();
+  globalThis.ViewBoy.dispatch('library');
+  let otherGame = hitTargetSnapshot().find((target) => target.name === 'Other');
+  if (!otherGame) {
+    const otherSystem = hitTargetSnapshot().find((target) => target.name.endsWith('ZZZ'));
+    assert.ok(otherSystem, 'the other catalog system is available to expand');
+    clickTargetBox(otherSystem);
+    await tick();
+    await tick();
+    otherGame = hitTargetSnapshot().find((target) => target.name === 'Other');
+  }
+  assert.ok(otherGame, 'the second playlist can be opened while the first is playing');
+  const originalTabIDs = new Set(hitTargetSnapshot()
+    .filter((target) => target.playlistTabTitle).map((target) => target.playlistTabId));
+  clickTargetBox(otherGame);
+  await tick();
+  await tick();
+  await tick();
+  const otherPlaylistTab = hitTargetSnapshot().find((target) => target.playlistTabTitle
+    && !originalTabIDs.has(target.playlistTabId));
+  assert.ok(otherPlaylistTab, 'browsing another game opens a separate playlist tab');
+  selectTabWithCommandNumber(1);
+  selectTabWithCommandNumber(2);
+  clickTargetBox(otherPlaylistTab);
+  globalThis.ViewBoy.dispatch('next');
+  await tick();
+  await tick();
+  assert.equal(calls.filter(([name]) => name === 'start').at(-1)[1].path, '/music/a.spc',
+    'Next stays in the playback queue after another playlist tab becomes selected');
+  await ended({ transport_state: 'ended', generation, status_sequence: generation + 1 });
+  await tick();
+  await tick();
+  assert.deepEqual(calls.filter(([name]) => name === 'retire').at(-1)[1].playlistIds, ['a', 'b', 'c'],
+    'natural completion retires against the playing playlist after another tab is selected');
+  assert.equal(calls.filter(([name]) => name === 'start').at(-1)[1].path, '/music/b.spc',
+    'natural completion advances within the playing playlist');
+  const otherTabClose = hitTargetSnapshot().find((target) => target.playlistTabClose
+    && target.playlistTabId === otherPlaylistTab.playlistTabId);
+  assert.ok(otherTabClose, 'the test playlist tab retains its close control');
+  clickTargetBox(otherTabClose);
+  await tick();
+
   globalThis.Math.random = () => 0.999999;
   globalThis.ViewBoy.dispatch('libraryRandom');
   await tick();
@@ -213,7 +285,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'Library Random weights game groups by track count and loads only the selected game');
   globalThis.ViewBoy.dispatch('previous');
   await tick();
-  assert.equal(calls.filter(([name]) => name === 'start').at(-1)[1].path, '/music/c.spc');
+  assert.equal(calls.filter(([name]) => name === 'start').at(-1)[1].path, '/music/b.spc',
+    'Library Random history starts from the playing track after browsing another playlist');
   globalThis.ViewBoy.dispatch('next');
   await tick();
   await tick();
@@ -267,7 +340,14 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   globalThis.ViewBoy.dispatch('library');
   assert.ok(hitTargetSnapshot().some((target) => target.searchField && target.name === 'SEARCH LIBRARY'),
     'the sidebar begins with a pixel-rendered search field');
+  const idleSearchPixels = pixelChecksum(canvas.image.data);
   clickTarget('SEARCH LIBRARY');
+  const highlightedCursor = pixelChecksum(canvas.image.data);
+  assert.notEqual(highlightedCursor, idleSearchPixels,
+    'focusing Search highlights the field and paints its bitmap cursor');
+  await new Promise((resolve) => setTimeout(resolve, 550));
+  assert.notEqual(pixelChecksum(canvas.image.data), highlightedCursor,
+    'the focused Search cursor blinks without removing the field highlight');
   for (const character of 'sample') typeSearchKey(character);
   const filteredSidebar = hitTargetSnapshot();
   const searchTargets = filteredSidebar.map((target) => target.name);
@@ -302,8 +382,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const tabGap = () => {
     const titles = tabTitles();
     const closes = hitTargetSnapshot().filter((target) => target.playlistTabClose);
-    assert.equal(titles.length, 2, 'both playlist tabs expose a clipped title region');
-    assert.equal(closes.length, 2, 'each playlist tab exposes its unframed close glyph');
+    assert.ok(titles.length >= 2, 'playlist tabs expose clipped title regions');
+    assert.equal(closes.length, titles.length, 'each playlist tab exposes its unframed close glyph');
     return titles[1].box.x - (closes[0].box.x + closes[0].box.width);
   };
   const defaultTabGap = tabGap();

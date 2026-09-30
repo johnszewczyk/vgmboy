@@ -13,7 +13,6 @@ import Yoga, {
 // Each LCD dot occupies three physical display pixels per side. On a Retina
 // display (2x), that is a 1.5-CSS-pixel dot with a 2x2 face and a fine edge.
 const DEVICE_PIXELS_PER_LCD_DOT = 3;
-const LCD_FACE_DEVICE_PIXELS = DEVICE_PIXELS_PER_LCD_DOT - 1;
 const BASELINE_LAYOUT_UNIT_CSS_PIXELS = 2.5;
 const RANDOM_HISTORY_LIMIT = 256;
 const APP_BORDER_GAP_DOTS = 8;
@@ -46,6 +45,11 @@ function paletteRGB(palette) {
   });
 }
 let RGB = paletteRGB(PALETTES.GAMEBOY.STANDARD);
+function packedPalette(palette) {
+  return Uint32Array.from(palette, ([red, green, blue]) =>
+    ((255 << 24) | (blue << 16) | (green << 8) | red) >>> 0);
+}
+let packedRGB = packedPalette(RGB);
 const standardGlyphs = {
   A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
   B: ["11110", "10001", "10001", "11110", "10001", "10001", "11110"],
@@ -223,6 +227,7 @@ let image = context.createImageData(
   WIDTH * DEVICE_PIXELS_PER_LCD_DOT,
   HEIGHT * DEVICE_PIXELS_PER_LCD_DOT,
 );
+let imageWords = new Uint32Array(image.data.buffer, image.data.byteOffset, image.data.byteLength / 4);
 let widgetTree = null;
 let hitTargets = [];
 let boxesById = new Map();
@@ -238,6 +243,8 @@ let equalizerAnimationFrame = 0;
 let libraryScrollFrame = 0;
 let pendingLibraryScrollDelta = 0;
 const libraryScrollFrameTiming = { lastFrameAt: Number.NaN };
+let searchCursorTimer = 0;
+let searchCursorVisible = false;
 let equalizerFrameTiming = { lastFrameAt: Number.NaN };
 let equalizerAnimations = new Map();
 let columnLayoutAnimation = null;
@@ -270,6 +277,7 @@ const state = {
   transport: "stopped",
   currentTrackId: null,
   activeQueue: [],
+  playbackQueue: [],
   randomSeenIDs: new Set(),
   randomQueueSignature: "",
   randomPlaylistQueue: [],
@@ -318,6 +326,7 @@ const state = {
   columnMenu: null,
 };
 RGB = paletteRGB(displayPalette());
+packedRGB = packedPalette(RGB);
 if (document.documentElement) document.documentElement.dataset.theme = state.theme;
 
 let tracks = [];
@@ -361,7 +370,7 @@ function playlistTabID() {
 function syncActivePlaylistTab() {
   const tab = activePlaylistTab();
   if (!tab || state.tab === "FAVORITES" || state.tab === "SETTINGS") return;
-  tab.playlist = [...(state.tab === "QUEUE" && state.activeQueue.length ? state.activeQueue : tracks)];
+  tab.playlist = [...tracks];
   tab.selectedTrack = state.selectedTrack;
   tab.scroll = state.queueScroll;
   tab.gameKey = state.activeGameKey;
@@ -585,12 +594,15 @@ function animationMilliseconds(key) {
 }
 
 export function animationFrameIsDue(animation, time) {
-  if (!Number.isFinite(animation.lastFrameAt)
-    || time - animation.lastFrameAt >= ANIMATION_FRAME_INTERVAL_MS - 0.25) {
+  if (!Number.isFinite(animation.lastFrameAt)) {
     animation.lastFrameAt = time;
     return true;
   }
-  return false;
+  const elapsed = time - animation.lastFrameAt;
+  if (elapsed < ANIMATION_FRAME_INTERVAL_MS - 0.25) return false;
+  const intervals = Math.max(1, Math.floor((elapsed + 0.25) / ANIMATION_FRAME_INTERVAL_MS));
+  animation.lastFrameAt += intervals * ANIMATION_FRAME_INTERVAL_MS;
+  return true;
 }
 
 export function hitTargetSnapshot() {
@@ -654,6 +666,47 @@ function normalizedText(value) {
     .toUpperCase();
 }
 
+function setSearchFocused(focused) {
+  state.searchFocused = focused === true;
+  if (searchCursorTimer) clearTimeout(searchCursorTimer);
+  searchCursorTimer = 0;
+  searchCursorVisible = state.searchFocused;
+  if (state.searchFocused) searchCursorTimer = setTimeout(blinkSearchCursor, 500);
+}
+
+function resetSearchCursorBlink() {
+  if (!state.searchFocused) return;
+  if (searchCursorTimer) clearTimeout(searchCursorTimer);
+  searchCursorVisible = true;
+  searchCursorTimer = setTimeout(blinkSearchCursor, 500);
+}
+
+function blinkSearchCursor() {
+  searchCursorTimer = 0;
+  if (!state.searchFocused) return;
+  searchCursorVisible = !searchCursorVisible;
+  render();
+  searchCursorTimer = setTimeout(blinkSearchCursor, 500);
+}
+
+function searchFieldText(box) {
+  const query = state.searchQuery;
+  const prefix = query ? "SEARCH: " : "SEARCH LIBRARY";
+  const cursor = state.searchFocused && searchCursorVisible ? "|" : "";
+  const text = `${prefix}${query}${cursor}`;
+  const availableWidth = box.width - 2 * controlPaddingDots();
+  const limit = Math.max(1, Math.floor((availableWidth + 1) / fontProfile().advance));
+  const characters = Array.from(text);
+  if (characters.length <= limit) return text;
+  if (state.searchFocused && query) {
+    const queryCharacters = Array.from(query);
+    const queryLength = Math.max(0, limit - Array.from(prefix).length - cursor.length);
+    return `${Array.from(prefix).slice(0, Math.max(0, limit - queryLength - cursor.length)).join("")}`
+      + `${queryCharacters.slice(-queryLength).join("")}${cursor}`;
+  }
+  return `${characters.slice(0, Math.max(0, limit - 1)).join("")}…`;
+}
+
 function fontProfile() {
   return FONT_PROFILES[state.font] ?? FONT_PROFILES.MICRO;
 }
@@ -704,32 +757,32 @@ function line(x1, y1, x2, y2, shade) {
 }
 
 function present(startY = 0, endY = HEIGHT, startX = 0, endX = WIDTH) {
-  const target = image.data;
   const outputWidth = WIDTH * DEVICE_PIXELS_PER_LCD_DOT;
   const firstRow = Math.max(0, Math.floor(startY));
   const lastRow = Math.min(HEIGHT, Math.ceil(endY));
   const firstColumn = Math.max(0, Math.floor(startX));
   const lastColumn = Math.min(WIDTH, Math.ceil(endX));
   if (lastRow <= firstRow || lastColumn <= firstColumn) return;
+  const background = packedRGB[3];
   for (let y = firstRow; y < lastRow; y += 1) {
+    const sourceRow = y * WIDTH;
+    const topRow = y * DEVICE_PIXELS_PER_LCD_DOT * outputWidth;
     for (let x = firstColumn; x < lastColumn; x += 1) {
-      const baseShade = pixels[y * WIDTH + x];
-      for (let subY = 0; subY < DEVICE_PIXELS_PER_LCD_DOT; subY += 1) {
-      for (let subX = 0; subX < DEVICE_PIXELS_PER_LCD_DOT; subX += 1) {
-        // A 2x2 shaded face leaves a one-device-pixel reflective edge.
-        const pixelCore = subX < LCD_FACE_DEVICE_PIXELS
-          && subY < LCD_FACE_DEVICE_PIXELS;
-        // The seam is the unlit screen substrate. UI color only reaches the
-        // LCD face; empty matrix space always shows the background shade.
-        const color = pixelCore ? RGB[baseShade] : RGB[3];
-        const outputIndex = ((y * DEVICE_PIXELS_PER_LCD_DOT + subY) * outputWidth
-          + x * DEVICE_PIXELS_PER_LCD_DOT + subX) * 4;
-        target[outputIndex] = color[0];
-        target[outputIndex + 1] = color[1];
-        target[outputIndex + 2] = color[2];
-        target[outputIndex + 3] = 255;
-      }
-      }
+      const face = packedRGB[pixels[sourceRow + x]];
+      const outputX = x * DEVICE_PIXELS_PER_LCD_DOT;
+      const top = topRow + outputX;
+      const middle = top + outputWidth;
+      const bottom = middle + outputWidth;
+      // A two-by-two shaded face leaves an unlit one-device-pixel seam.
+      imageWords[top] = face;
+      imageWords[top + 1] = face;
+      imageWords[top + 2] = background;
+      imageWords[middle] = face;
+      imageWords[middle + 1] = face;
+      imageWords[middle + 2] = background;
+      imageWords[bottom] = background;
+      imageWords[bottom + 1] = background;
+      imageWords[bottom + 2] = background;
     }
   }
   context.putImageData(image, 0, 0, firstColumn * DEVICE_PIXELS_PER_LCD_DOT,
@@ -786,7 +839,8 @@ function label(parent, text, style = {}, meta = {}) {
       if (meta.paint) meta.paint(box);
       const textY = meta.revealProgress !== undefined
         ? box.y : box.y + Math.floor((box.height - fontProfile().height) / 2);
-      drawText(text, box.x + (meta.inset ?? controlPaddingDots()), textY,
+      const displayText = typeof meta.textValue === "function" ? meta.textValue(box) : text;
+      drawText(displayText, box.x + (meta.inset ?? controlPaddingDots()), textY,
         box.width - (meta.inset ?? controlPaddingDots()) * 2,
         meta.textShade ?? 0, meta.align ?? "left");
       paintClip = previousClip;
@@ -860,7 +914,7 @@ function libraryToolbarItems() {
     { title: "OPEN", onClick: () => openLocalPath() },
     { title: "SYNC", onClick: () => loadCatalog() },
     { title: "OPT", controlTitle: "OPTIONS", onClick: () => {
-      state.searchFocused = false;
+      setSearchFocused(false);
       state.tab = "SETTINGS";
       render();
     } },
@@ -1371,8 +1425,9 @@ function addLibraryPane(parent) {
     border: 1,
     fill: state.searchFocused ? 2 : undefined,
     searchField: true,
+    textValue: searchFieldText,
     controlTitle: "SEARCH LIBRARY",
-    onClick: () => { state.searchFocused = true; render(); },
+    onClick: () => { setSearchFocused(true); render(); },
   });
   makeWidget(library, { height: uiGap() });
   panelTitle(library, "BROWSE");
@@ -2086,7 +2141,7 @@ function buildTree() {
     });
     pixelButton(navigation, "BACK", () => {
       state.tab = "LIBRARY";
-      state.searchFocused = false;
+      setSearchFocused(false);
       render();
     }, { width: buttonWidth("BACK") });
   } else {
@@ -2435,6 +2490,7 @@ function toggleContrast() {
 function setContrastProfile(contrast) {
   state.contrast = contrast === "HIGH_CONTRAST" ? "HIGH_CONTRAST" : "STANDARD";
   RGB = paletteRGB(displayPalette());
+  packedRGB = packedPalette(RGB);
   saveDisplayOptions();
   render();
 }
@@ -2443,6 +2499,7 @@ function setTheme(theme) {
   state.theme = theme === "NIGHTBOY" ? "NIGHTBOY" : "GAMEBOY";
   if (document.documentElement) document.documentElement.dataset.theme = state.theme;
   RGB = paletteRGB(displayPalette());
+  packedRGB = packedPalette(RGB);
   saveDisplayOptions();
   render();
 }
@@ -2507,8 +2564,10 @@ async function toggleFavorite(track) {
 
 function selectSidebarView(view) {
   if (view === "QUEUE") {
-    const queue = state.activeQueue.length
-      ? [...state.activeQueue] : [...(activePlaylistTab()?.playlist || tracks)];
+    const currentQueue = state.currentTrackId && state.playbackQueue.length
+      ? state.playbackQueue : state.activeQueue;
+    const queue = currentQueue.length
+      ? [...currentQueue] : [...(activePlaylistTab()?.playlist || tracks)];
     let tab = state.playlistTabs.find((entry) => samePlaylist(entry.playlist, queue));
     if (!tab) {
       syncActivePlaylistTab();
@@ -2702,6 +2761,7 @@ function applyNativeStatus(snapshot) {
 }
 
 function randomQueue() {
+  if (state.currentTrackId && state.playbackQueue.length) return state.playbackQueue;
   return state.activeQueue.length ? state.activeQueue : activeTracks();
 }
 
@@ -2831,7 +2891,7 @@ async function handleNativeEnded(snapshot) {
   applyNativeStatus(snapshot);
   state.retiredGeneration = generation;
   const completedId = state.currentTrackId;
-  const queue = [...state.activeQueue];
+  const queue = [...(state.playbackQueue.length ? state.playbackQueue : state.activeQueue)];
   try {
     const decision = await bridge.playbackCompletionRetire({
       generation,
@@ -2920,6 +2980,7 @@ async function startTrack(track, queue = activeTracks(), { recordHistory = true 
   state.currentTrackId = trackID(track);
   state.playbackGeneration = 0;
   state.activeQueue = [...queue];
+  state.playbackQueue = [...queue];
   if (state.preferences.randomMode === "playlist") {
     preparePlaylistRandom(state.activeQueue);
     state.randomSeenIDs.add(state.currentTrackId);
@@ -2953,6 +3014,7 @@ async function startTrack(track, queue = activeTracks(), { recordHistory = true 
     if (token !== state.playbackToken) return;
     state.currentTrackId = null;
     state.playbackGeneration = 0;
+    state.playbackQueue = [];
     state.playing = false;
     state.transport = "stopped";
     state.status = `PLAYBACK ERROR: ${error.message}`;
@@ -2985,6 +3047,7 @@ async function stopPlayback() {
     applyNativeStatus(await bridge.nativePlaybackStop());
     state.currentTrackId = null;
     state.playbackGeneration = 0;
+    state.playbackQueue = [];
     state.status = "STOPPED";
     render();
   } catch (error) {
@@ -3008,7 +3071,8 @@ function selectTrack(index, wrap = true) {
 
 async function playAdjacent(delta) {
   const shownTracks = visibleTracks();
-  const queue = state.activeQueue.length ? state.activeQueue : shownTracks;
+  const queue = state.currentTrackId && state.playbackQueue.length
+    ? state.playbackQueue : (state.activeQueue.length ? state.activeQueue : shownTracks);
   if (!queue.length) return;
   const randomMode = state.preferences.randomMode || "off";
   if (randomMode !== "off") {
@@ -3367,7 +3431,7 @@ canvas.addEventListener("click", (event) => {
   }
   const target = findTarget(logicalPoint(event));
   if (state.searchFocused && !target?.meta.searchField) {
-    state.searchFocused = false;
+    setSearchFocused(false);
     if (!target?.meta.onClick) render();
   }
   if (state.columnMenu && !target?.meta.columnMenuItem) {
@@ -3417,7 +3481,7 @@ canvas.addEventListener("keydown", (event) => {
   const commandKey = event.metaKey || event.ctrlKey;
   if (commandKey && event.key === ",") {
     event.preventDefault();
-    state.searchFocused = false;
+    setSearchFocused(false);
     state.tab = "SETTINGS";
     render();
   } else if (commandKey && /^[1-9]$/.test(event.key)) {
@@ -3427,17 +3491,18 @@ canvas.addEventListener("keydown", (event) => {
   } else if (state.searchFocused && state.tab !== "SETTINGS") {
     if (event.key === "Escape") {
       if (state.searchQuery) state.searchQuery = "";
-      else state.searchFocused = false;
+      else setSearchFocused(false);
     } else if (event.key === "Backspace") {
       state.searchQuery = Array.from(state.searchQuery).slice(0, -1).join("");
     } else if (event.key === "Enter") {
-      state.searchFocused = false;
+      setSearchFocused(false);
     } else if (event.key.length === 1 && !event.altKey) {
       state.searchQuery += normalizedText(event.key);
     } else {
       return;
     }
     event.preventDefault();
+    resetSearchCursorBlink();
     state.libraryScrollOffset = 0;
     render();
   } else if (event.code === "Escape" && state.columnMenu) {
@@ -3506,6 +3571,7 @@ function fitCanvas() {
       WIDTH * DEVICE_PIXELS_PER_LCD_DOT,
       HEIGHT * DEVICE_PIXELS_PER_LCD_DOT,
     );
+    imageWords = new Uint32Array(image.data.buffer, image.data.byteOffset, image.data.byteLength / 4);
   }
 
   if (changed || !widgetTree) render();
@@ -3523,6 +3589,8 @@ window.addEventListener("pagehide", () => {
   if (columnAnimationFrame) cancelAnimationFrame(columnAnimationFrame);
   if (libraryScrollFrame) cancelAnimationFrame(libraryScrollFrame);
   if (equalizerAnimationFrame) cancelAnimationFrame(equalizerAnimationFrame);
+  if (searchCursorTimer) clearTimeout(searchCursorTimer);
+  searchCursorTimer = 0;
   screenResizeObserver?.disconnect();
   if (widgetTree) widgetTree.yoga.freeRecursive();
 });
@@ -3544,17 +3612,17 @@ window.ViewBoy = Object.freeze({
       case "newPlaylistTab": createPlaylistTab({ duplicateActive: true }); break;
       case "closePlaylistTab": closePlaylistTab(); break;
       case "openPath": openLocalPath(); break;
-      case "settings": state.searchFocused = false; state.tab = "SETTINGS"; render(); break;
+      case "settings": setSearchFocused(false); state.tab = "SETTINGS"; render(); break;
       case "library": selectSidebarView("LIBRARY"); break;
       case "queue": selectSidebarView("QUEUE"); break;
-      case "optionsPage:DISPLAY": state.tab = "SETTINGS"; state.optionsPage = "DISPLAY"; render(); break;
-      case "optionsPage:THEME": state.tab = "SETTINGS"; state.optionsPage = "THEME"; render(); break;
-      case "optionsPage:TRANSPORT": state.tab = "SETTINGS"; state.optionsPage = "TRANSPORT"; render(); break;
-      case "optionsPage:PLAYBACK": state.tab = "SETTINGS"; state.optionsPage = "PLAYBACK"; render(); break;
-      case "optionsPage:METHODS": state.tab = "SETTINGS"; state.optionsPage = "METHODS"; render(); break;
-      case "optionsPage:AUDIO": state.tab = "SETTINGS"; state.optionsPage = "AUDIO"; render(); break;
-      case "optionsPage:INTERFACE": state.tab = "SETTINGS"; state.optionsPage = "INTERFACE"; render(); break;
-      case "optionsPage:LIBRARY": state.tab = "SETTINGS"; state.optionsPage = "LIBRARY"; render(); break;
+      case "optionsPage:DISPLAY": setSearchFocused(false); state.tab = "SETTINGS"; state.optionsPage = "DISPLAY"; render(); break;
+      case "optionsPage:THEME": setSearchFocused(false); state.tab = "SETTINGS"; state.optionsPage = "THEME"; render(); break;
+      case "optionsPage:TRANSPORT": setSearchFocused(false); state.tab = "SETTINGS"; state.optionsPage = "TRANSPORT"; render(); break;
+      case "optionsPage:PLAYBACK": setSearchFocused(false); state.tab = "SETTINGS"; state.optionsPage = "PLAYBACK"; render(); break;
+      case "optionsPage:METHODS": setSearchFocused(false); state.tab = "SETTINGS"; state.optionsPage = "METHODS"; render(); break;
+      case "optionsPage:AUDIO": setSearchFocused(false); state.tab = "SETTINGS"; state.optionsPage = "AUDIO"; render(); break;
+      case "optionsPage:INTERFACE": setSearchFocused(false); state.tab = "SETTINGS"; state.optionsPage = "INTERFACE"; render(); break;
+      case "optionsPage:LIBRARY": setSearchFocused(false); state.tab = "SETTINGS"; state.optionsPage = "LIBRARY"; render(); break;
       case "closeWindow": bridge?.closeMainWindow?.(); break;
       default: break;
     }
