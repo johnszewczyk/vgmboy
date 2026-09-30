@@ -1,28 +1,43 @@
-# SNESMusic.org Set Procedure
+# SNESMusic.org Set Profile
 
 Apply the [Base Set Profile](BASE-SET-PROFILE.md) and the
-[Nintendo SNES SPC procedure](../SPC.md). The set-specific rules here cover
-SNESMusic.org source linkage, hash scopes, and identity enrichment.
+[Nintendo SNES SPC profile](../SPC.md). These rules cover SNESMusic.org source
+linkage, hash scopes, and identity enrichment.
 
-## Set source
+## Scope
 
-- Set Name: `SNESMusic.org`.
-- Set URL: `https://snesmusic.org/v2/torrent.php`.
-- The source archive is the original `.rsn`, which contains SPC entries; the
-  RSN itself is not a UAC member.
-- Record four checksums for each complete source RSN: BLAKE3-256,
-  CRC32/ISO-HDLC, SHA-1, and MD5. Store them as scoped hash records, not as
-  ordinary metadata tags.
-- Each complete, unchanged `.spc` member has the four
-  `uac-playable-payload-v1` hashes. UACMan presents these as Stream Hashes.
+- **Collection** — Historic SNES soundtrack collection distributed as RSN
+  archives containing SPC entries.
+- **Member format** — `.spc`; apply the SPC profile for source fields and UAC
+  mappings.
 
-## Identity enrichment
+## Source Authority
 
-The identity pass uses the AudioMan canonical-game database populated from the
-No-Intro SNES DAT. Apply its result using the positive-match and uncertainty
-rules in the Base Set Profile.
+- **Set name** — `SNESMusic.org`.
+- **Set URL** — `https://snesmusic.org/v2/torrent.php`.
+- **Source archive** — The original `.rsn`; it contains SPC entries but is not
+  itself a UAC member.
+- **Archive hashes** — Record BLAKE3-256, CRC32/ISO-HDLC, SHA-1, and MD5 for
+  each complete source RSN as scoped hash records, not metadata tags.
+- **SPC hashes** — Record the same four hashes for each complete, unchanged
+  `.spc` under `uac-playable-payload-v1`; UACMan presents these as Stream
+  Hashes.
 
-## Package checks
+## Identity Enrichment
 
-Verify each source RSN's hashes and the SPC member relationships recorded for
-it. Keep collection counts and exceptions in dated reports under `Reports/`.
+- **Identity source** — Use the AudioMan canonical-game database populated
+  from the No-Intro SNES DAT.
+- **Match rule** — Apply its result only after a positive, unique match under
+  the Base Set Profile. Keep unresolved releases unresolved.
+
+## Set Procedures
+
+- **Source relationship** — Keep the source RSN and each derived SPC linked
+  through their recorded source/member relationship.
+
+## Required Checks
+
+- **Hash verification** — Verify each source RSN's scoped hashes and its SPC
+  member relationships.
+- **Collection report** — Keep counts and exceptions in dated reports under
+  `Reports/`.

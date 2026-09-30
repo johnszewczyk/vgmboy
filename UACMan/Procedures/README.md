@@ -65,9 +65,10 @@ been reviewed.
 ## Profile and report workflow
 
 1. Copy [`FORMAT-PROFILE-TEMPLATE.md`](FORMAT-PROFILE-TEMPLATE.md) for a new
-   reader profile. Keep reader implementation facts linked to MetaManCore and
-   UAC wrapper contracts; do not duplicate those contracts as competing
-   authorities.
+   reader profile and use its standard headings: Scope, Field Mapping, Format
+   Procedures, and Required Checks. Write list entries as concise
+   `- **Topic** — definition` lines. Keep reader facts linked to MetaManCore
+   and wrapper contracts rather than repeating those contracts.
 2. Before creating or rewriting a collection, check the register. MetaManCore
    reader support means a format can be inspected; it does not approve a UAC
    projection. Complete the field mapping and required fixture checks for that
@@ -75,11 +76,14 @@ been reviewed.
 3. Record each reader fact's disposition in the format mapping table. Mark
    unknown or ambiguous values for review; use the base profile for shared
    tag, version, and hash rules.
-4. For each collection conversion, write a dated report under `Reports/` with
+4. Copy [`Sets/SET-PROFILE-TEMPLATE.md`](Sets/SET-PROFILE-TEMPLATE.md) for a
+   new set profile. Use its standard headings and keep set-specific identity
+   and provenance rules out of format field tables.
+5. For each collection conversion, write a dated report under `Reports/` with
    package/member counts, field coverage, diagnostics, version inventory,
    identity/hash checks, review findings, and validation evidence. Do not put
    collection-specific counts in an evergreen format procedure.
-5. Promote a register row from pending only after its profile describes the
+6. Promote a register row from pending only after its profile describes the
    complete reader-to-UAC mapping and has a verified collection report or
    an explicit format fixture report.
 

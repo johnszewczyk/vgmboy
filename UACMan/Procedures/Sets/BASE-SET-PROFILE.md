@@ -1,42 +1,56 @@
 # Base Set Profile
 
-Apply this profile to a collection conversion together with the procedure for
-each source format. It defines shared set provenance, metadata-harvest stages,
-and identity confidence.
+Shared rules for every collection conversion. Apply this profile alongside
+the procedure for each member's source format.
 
-## Source authority
+## Scope
 
-- Record the set name and authoritative source URL or release reference.
-- Keep original source packages in source-state outside derived UAC payloads;
-  link each UAC package to its source through `sources[]`.
-- Record hashes at their actual byte scope with algorithm, size, and profile.
-  Keep source-archive hashes separate from member integrity and playable-payload
-  hashes. Use the nested hash model for repeated records.
-- Matching hashes prove byte identity only. They do not establish shared
-  provenance, set membership, authority, or game identity.
+- **Purpose** — Define shared set provenance, metadata-harvest stages, and
+  identity confidence.
+- **Format mappings** — Keep source-field recognition and UAC mappings in
+  each member format profile.
 
-## Two-pass harvest
+## Source Authority
 
-1. **Source pass:** map populated, recognized source-format fields through the
-   format profile. Keep only selected canonical UAC fields. Do not enrich from
-   scraped databases during this pass.
-2. **Identity pass:** match the known game title against the authoritative game
-   database. Add a release **Game ID** and selected database metadata only after
-   a positive, unique identity match; record the enrichment source in
-   provenance.
+- **Source reference** — Record the set name and authoritative source URL or
+  release reference.
+- **Original packages** — Keep source packages in source-state outside derived
+  UAC payloads; link each UAC package through `sources[]`.
+- **Hash scope** — Record each hash with its actual byte scope, algorithm,
+  size, and profile. Keep source-archive hashes separate from member
+  integrity and playable-payload hashes.
+- **Hash meaning** — Matching hashes prove byte identity only. They do not
+  prove shared provenance, set membership, source authority, or game identity.
 
-The source pass is useful on its own. An unresolved release is normal. Keep the
-known base game title in `game.title`, but omit **Game ID** while the release,
-region, or revision is uncertain. Do not quarantine a package solely because
-the second pass has not resolved it.
+## Identity Enrichment
 
-## Region and uncertainty
+- **Source pass** — Map populated, recognized source fields through the format
+  profile. Keep selected canonical UAC fields; do not add database enrichment.
+- **Identity pass** — Match the known title against an authoritative game
+  database. Add a release Game ID and selected database fields only after a
+  positive, unique match; record the enrichment source in provenance.
+- **Unresolved release** — This is normal after the source pass. Keep the
+  known base title in `game.title`, omit Game ID while release, region, or
+  revision is uncertain, and do not quarantine solely because identity remains
+  unresolved.
 
-- Preserve a region explicitly stated by the source as package **Region**.
-- If region has been reviewed and remains unknown, use **Region** = `--` to
-  state that the uncertainty is known. `--` means unknown; it is not a region
-  code or a release identifier.
-- A base-title or region match alone does not establish a release ID. Do not
-  add a candidate ID or an ID-based filename suffix until the identity pass
-  confirms one unique release. Use the known title and source-supported facts
-  for the package name.
+## Set Procedures
+
+- **Known region** — Preserve a region explicitly stated by the source as
+  package Region.
+- **Reviewed unknown region** — Use `Region: --` when review confirms the
+  region is unknown. `--` records known uncertainty; it is not a region code
+  or release identifier.
+- **Candidate releases** — A title or region match alone does not establish a
+  release ID. Do not add a candidate ID or ID-based filename suffix until one
+  unique release is confirmed; otherwise use the known title and
+  source-supported facts in the package name.
+
+## Required Checks
+
+- **Source linkage** — Confirm source references identify the authority and
+  original package used for each derived UAC.
+- **Hash accounting** — Keep hash records scoped to the exact bytes they
+  identify; do not use byte identity as proof of provenance or game identity.
+- **Identity review** — Record confirmed IDs and database enrichment sources;
+  leave ambiguous candidates unresolved.

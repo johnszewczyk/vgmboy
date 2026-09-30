@@ -1,17 +1,19 @@
-# Nintendo SNES SPC Format Procedure
+# Nintendo SNES · SPC Profile
 
 Apply the [UAC Base Profile](BASE-UAC-PROFILE.md),
-[Pre-Disc Native Procedure](PRE-DISC-NATIVE.md), and, for set conversions,
-the applicable [Base Set Profile](Sets/BASE-SET-PROFILE.md). MetaManCore reads
-SPC ID666 and xID6 metadata without starting an emulator. See
+[Pre-Disc Native Procedure](PRE-DISC-NATIVE.md), and, for set conversions, the
+applicable [Base Set Profile](Sets/BASE-SET-PROFILE.md). MetaManCore reads SPC
+ID666 and xID6 metadata without starting an emulator. See
 [`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md).
 
-## Reader Scope
+## Scope
 
-- Reader ID: `spc`; source member: `.spc`.
-- Reader: `MetaMan/Sources/MetaManCore/SPCMetadataReader.swift`.
-- The reader exposes populated ID666 and xID6 labels as `MetadataTag` names;
-  xID6 takes precedence where both blocks provide the same field.
+- **Reader** — `spc`; `SPCMetadataReader.swift`.
+- **Source members** — `.spc`.
+- **Coverage** — Populated ID666 and xID6 fields; xID6 takes precedence when
+  both blocks provide the same field.
+- **Status** — Approved against collection fixtures; set-specific findings
+  remain in dated reports.
 
 ## Field Mapping
 
@@ -20,32 +22,35 @@ Store the canonical platform once as structural
 
 | Source Tag | UAC Tag | UAC Coded Tag | Tag Notes |
 | --- | --- | --- | --- |
-| ID666/xID6: Game | Album | `game.metadata["Album"]` | Package-wide game/album title; keep package identity in structural `game.title`. |
-| ID666/xID6: Song | Title | `members[].metadata["Title"]` | Song title for this SPC member. |
-| xID6 `0x10`: Official Soundtrack Title | OST Title | `members[].metadata["OST Title"]` | Distinct soundtrack-title field. |
-| xID6 `0x11`: OST Disc | Disc Number | `members[].metadata["Disc Number"]` | Track's soundtrack disc index. |
-| xID6 `0x12`: OST Track | Track Number | `members[].metadata["Track Number"]` | Store the source OST sequence number; do not use it to reorder package members. |
-| ID666/xID6: Artist | Album Artist / Artist | `game.metadata["Album Artist"]` or `members[].metadata["Artist"]` | Use Album Artist for a package-wide credit and track Artist only for a track-specific credit. |
-| ID666/xID6: Dumper | Dumper | `game.metadata["Dumper"]` or `members[].metadata["Dumper"]` | Store a shared credit once; retain a differing per-track value on that member. |
-| xID6: Publisher | Publisher | `game.metadata["Publisher"]` or `members[].metadata["Publisher"]` | Store a shared fact once; retain a genuinely differing member value. |
-| ID666/xID6: Comment | Comment | `game.metadata["Comment"]` or `members[].metadata["Comment"]` | Store a shared comment once; retain a genuinely track-specific comment. |
-| ID666/xID6: Date | Date | `game.metadata["Date"]` or `members[].metadata["Date"]` | Explicit source date. |
-| xID6 `0x14`: Copyright Year | Year | `game.metadata["Year"]` or `members[].metadata["Year"]` | Source copyright year. |
+| ID666/xID6 `Game` | Album | `game.metadata["Album"]` | Package-wide title; package identity remains in structural `game.title`. |
+| ID666/xID6 `Song` | Title | `members[].metadata["Title"]` | Title for this SPC member. |
+| xID6 `0x10` `Official Soundtrack Title` | OST Title | `members[].metadata["OST Title"]` | Distinct soundtrack title. |
+| xID6 `0x11` `OST Disc` | Disc Number | `members[].metadata["Disc Number"]` | Soundtrack disc index. |
+| xID6 `0x12` `OST Track` | Track Number | `members[].metadata["Track Number"]` | Source soundtrack order; do not reorder package members. |
+| ID666/xID6 `Artist` | Album Artist / Artist | `game.metadata["Album Artist"]` or `members[].metadata["Artist"]` | Use Album Artist for a shared credit and Artist only for a track-specific credit. |
+| ID666/xID6 `Dumper` | Dumper | `game.metadata["Dumper"]` or `members[].metadata["Dumper"]` | Store a shared credit once; keep a differing member value on that member. |
+| xID6 `Publisher` | Publisher | `game.metadata["Publisher"]` or `members[].metadata["Publisher"]` | Store a shared fact once; keep a genuinely differing member value. |
+| ID666/xID6 `Comment` | Comment | `game.metadata["Comment"]` or `members[].metadata["Comment"]` | Store shared comments once; keep genuinely track-specific comments. |
+| ID666/xID6 `Date` | Date | `game.metadata["Date"]` or `members[].metadata["Date"]` | Explicit source date. |
+| xID6 `0x14` `Copyright Year` | Year | `game.metadata["Year"]` or `members[].metadata["Year"]` | Source copyright year. |
 
 ## Format Procedures
 
-- OST Title, OST Disc, and OST Track are defined xID6 items (`0x10`, `0x11`,
-  and `0x12`); they are SPC-format fields, not arbitrary user-defined tags.
-- ID666 and xID6 can both supply a field. Keep both source blocks byte-for-byte
-  and record contradictory headers or parser diagnostics in the dated report.
-- Keep source playback timing only when the timing policy and consumer use it.
-  A parser's 150-second fallback is not source timing. Store timing in the
-  wrapper's playback fields, not as descriptive metadata tags.
+- **OST fields** — `OST Title`, `OST Disc`, and `OST Track` are defined xID6
+  fields (`0x10`, `0x11`, and `0x12`), not arbitrary user-defined tags.
+- **Dual tag blocks** — Preserve ID666 and xID6 source bytes; record
+  contradictory fields or parser diagnostics in the dated report.
+- **Playback timing** — Keep source timing only when policy and a consumer use
+  it. A parser's 150-second fallback is not source timing; store playback data
+  in wrapper playback fields, not descriptive tags.
 
 ## Required Checks
 
-Validate the SPC signature, minimum size, revision byte, ID666 layout, xID6
-bounds, duplicate tags, and reader diagnostics. Confirm every source archive
-and extracted member is accounted for, run `uacman inspect --verify`, then
-unpack and compare member paths, sizes, and source-byte identity. Keep
-collection counts and exceptions in dated reports under `Reports/`.
+- **SPC structure** — Validate signature, minimum size, revision byte, ID666
+  layout, xID6 bounds, duplicates, and reader diagnostics.
+- **Source accounting** — Account for every source archive and extracted
+  member.
+- **Package integrity** — Run `uacman inspect --verify`, then unpack and
+  compare member paths, sizes, and source-byte identity.
+- **Collection findings** — Keep counts and exceptions in dated reports under
+  `Reports/`.
