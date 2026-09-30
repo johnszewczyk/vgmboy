@@ -228,7 +228,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     @objc private func quit(_ sender: Any?) { NSApp.terminate(sender) }
     @objc private func closeWindow(_ sender: Any?) {
-        dispatchCustom("closeWindow")
+        guard let window, window.isVisible else { return }
+        window.performClose(sender)
     }
     @objc private func showLibrary(_ sender: Any?) { dispatchCustom("library") }
     @objc private func showQueue(_ sender: Any?) { dispatchCustom("queue") }

@@ -4,4 +4,6 @@
 
 `Resources/yoga-app.js` loads catalog games and tracks, reduces system-group disclosure and game selection through CatalogBrowserCore, and forwards playback to the native bridge. The canvas keeps its selected game visible while Library, Queue, Favorites, or Options is open. A chosen local file or folder is loaded through `choosePath` and `selectFolder`.
 
+The Window menu owns Command-W. Its AppKit action closes the main `NSWindow` directly so the shortcut cannot be interpreted as a playlist-tab action or lost in a WebKit round trip. Command-Q remains the application quit command. The canvas handles Command-W as a native-close fallback before search keystrokes; closing a playlist tab remains an explicit `X` action.
+
 `index.html` loads only `yoga-screen.css` and `yoga-app.js`. The HTML and CSS provide one canvas and a narrow plastic surround. All screen text, controls, borders, and selection treatment are framebuffer pixels. The four-shade LCD renderer runs in WebKit.

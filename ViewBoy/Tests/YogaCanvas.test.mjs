@@ -27,6 +27,7 @@ const windowListeners = new Map();
 const calls = [];
 const audioConfigCalls = [];
 const reconfigureCalls = [];
+let closeWindowRequests = 0;
 const groupStateCalls = [];
 const savedPreferences = [];
 const savedPlaylistTabs = [];
@@ -43,6 +44,7 @@ let ended;
 let generation = 0;
 let nextFrameAdvanceMs = 250;
 const bridge = {
+  closeMainWindow: async () => { closeWindowRequests += 1; },
   playbackBackends: [{ id: 'libgme', supportsTempo: true, extensions: ['spc'] }],
   frontendSettingsLoad: async () => ({ appVolume: 1, repeatMode: 'off' }),
   frontendSettingsSave: async (settings) => { savedPreferences.push({ ...settings }); },
@@ -155,6 +157,19 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   await tick();
   assert.match(status.textContent, /FIRST/i);
+  const initialTabCloseCount = hitTargetSnapshot()
+    .filter((target) => target.playlistTabClose).length;
+  const closeWindowEvent = {
+    key: 'w', code: 'KeyW', metaKey: true, ctrlKey: false, altKey: false, shiftKey: false,
+    preventDefault() { this.defaultPrevented = true; },
+    stopPropagation() { this.propagationStopped = true; },
+  };
+  canvas.listeners.get('keydown')(closeWindowEvent);
+  assert.equal(closeWindowRequests, 1, 'Command-W requests the native main-window close');
+  assert.equal(closeWindowEvent.defaultPrevented, true,
+    'Command-W cannot fall through to WebKit keyboard handling');
+  assert.equal(hitTargetSnapshot().filter((target) => target.playlistTabClose).length, initialTabCloseCount,
+    'Command-W does not close the active playlist tab');
   const toolbarTargets = hitTargetSnapshot();
   const transportTargets = ['PREVIOUS', 'PLAY', 'NEXT', 'STOP']
     .map((name) => toolbarTargets.find((target) => target.name === name));
@@ -235,15 +250,33 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   globalThis.ViewBoy.dispatch('playlistRandom');
   await tick();
   globalThis.ViewBoy.dispatch('library');
-  let otherGame = hitTargetSnapshot().find((target) => target.name === 'Other');
-  if (!otherGame) {
-    const otherSystem = hitTargetSnapshot().find((target) => target.name.endsWith('ZZZ'));
-    assert.ok(otherSystem, 'the other catalog system is available to expand');
+  const sidebarLayout = () => {
+    const targets = hitTargetSnapshot();
+    const search = targets.find((target) => target.name === 'SEARCH LIBRARY');
+    const firstColumn = targets.find((target) => target.columnHeader && target.name === '#');
+    assert.ok(search && firstColumn, 'the sidebar and playlist layout anchors remain visible');
+    return { sidebarWidth: search.box.width, playlistX: firstColumn.box.x };
+  };
+  let otherSystem = hitTargetSnapshot().find((target) => target.name.endsWith('ZZZ'));
+  assert.ok(otherSystem, 'the other catalog system is available to expand');
+  if (otherSystem.name.startsWith('V')) {
     clickTargetBox(otherSystem);
     await tick();
     await tick();
-    otherGame = hitTargetSnapshot().find((target) => target.name === 'Other');
+    otherSystem = hitTargetSnapshot().find((target) => target.name.endsWith('ZZZ'));
   }
+  assert.ok(otherSystem?.name.startsWith('>'), 'the system is collapsed before the sizing check');
+  const closedSidebarLayout = sidebarLayout();
+  nextFrameAdvanceMs = 30;
+  clickTargetBox(otherSystem);
+  await tick();
+  assert.deepEqual(sidebarLayout(), closedSidebarLayout,
+    'the pane and playlist keep their geometry during an in-progress dropdown');
+  await tick();
+  await tick();
+  assert.deepEqual(sidebarLayout(), closedSidebarLayout,
+    'the pane and playlist keep their geometry after a system dropdown settles');
+  const otherGame = hitTargetSnapshot().find((target) => target.name === 'Other');
   assert.ok(otherGame, 'the second playlist can be opened while the first is playing');
   const originalTabIDs = new Set(hitTargetSnapshot()
     .filter((target) => target.playlistTabTitle).map((target) => target.playlistTabId));
@@ -454,8 +487,17 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the Audio page equalizer checkbox updates native audio preferences');
   assert.equal(audioConfigCalls.at(-1)[1], true,
     'the equalizer toggle is applied to the native audio path');
+  const equalizerStartPixels = pixelChecksum(canvas.image.data);
+  nextFrameAdvanceMs = 40;
   clickTarget('EQ 31 HZ', 0, 0.99);
   await tick();
+  const equalizerInFlightPixels = pixelChecksum(canvas.image.data);
+  assert.notEqual(equalizerInFlightPixels, equalizerStartPixels,
+    'the equalizer fill begins moving before its snapped target is reached');
+  await tick();
+  await tick();
+  assert.notEqual(pixelChecksum(canvas.image.data), equalizerInFlightPixels,
+    'the equalizer fill continues to the clicked snap point using shared slide timing');
   const changedBandGain = savedPreferences.at(-1).equalizerBandGains[0];
   assert.equal(changedBandGain, 12,
     'the right edge of a full-width equalizer bar selects the +12 dB boost limit');

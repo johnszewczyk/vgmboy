@@ -1407,9 +1407,15 @@ function libraryRows() {
 }
 
 function addLibraryPane(parent) {
+  const paneWidth = libraryPaneWidth();
   const library = makeWidget(parent, {
     direction: FlexDirection.Column,
-    width: libraryPaneWidth(),
+    width: paneWidth,
+    minWidth: paneWidth,
+    maxWidth: paneWidth,
+    flexBasis: paneWidth,
+    flexGrow: 0,
+    flexShrink: 0,
     gap: 0,
     padding: uiGapDots(),
   }, {
@@ -1462,6 +1468,9 @@ function addLibraryPane(parent) {
   const viewport = makeWidget(library, {
     flexGrow: 1,
     flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    minHeight: 0,
     overflow: Overflow.Hidden,
   }, {
     id: "sidebar-tree-viewport",
@@ -3479,7 +3488,11 @@ canvas.addEventListener("wheel", (event) => {
 
 canvas.addEventListener("keydown", (event) => {
   const commandKey = event.metaKey || event.ctrlKey;
-  if (commandKey && event.key === ",") {
+  if (commandKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "w") {
+    event.preventDefault();
+    event.stopPropagation();
+    bridge?.closeMainWindow?.();
+  } else if (commandKey && event.key === ",") {
     event.preventDefault();
     setSearchFocused(false);
     state.tab = "SETTINGS";
