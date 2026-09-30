@@ -16,7 +16,9 @@ const canvas = {
     };
   },
   getContext() { return {
-    createImageData(width, height) { return { data: new Uint8ClampedArray(width * height * 4) }; },
+    createImageData(width, height) {
+      return { width, height, data: new Uint8ClampedArray(width * height * 4) };
+    },
     putImageData(image) { canvas.image = image; canvas.frames += 1; },
   }; },
 };
@@ -112,6 +114,20 @@ const tick = () => new Promise((resolve) => setImmediate(resolve));
 function pixelChecksum(data) {
   let hash = 2166136261;
   for (const value of data) hash = Math.imul(hash ^ value, 16777619);
+  return hash >>> 0;
+}
+function pixelChecksumForBox(box) {
+  const scale = 3;
+  const image = canvas.image;
+  let hash = 2166136261;
+  for (let y = box.y * scale; y < (box.y + box.height) * scale; y += 1) {
+    for (let x = box.x * scale; x < (box.x + box.width) * scale; x += 1) {
+      const offset = (y * image.width + x) * 4;
+      for (let channel = 0; channel < 4; channel += 1) {
+        hash = Math.imul(hash ^ image.data[offset + channel], 16777619);
+      }
+    }
+  }
   return hash >>> 0;
 }
 
@@ -473,6 +489,28 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the bitmap checkbox marker visibly changes with the saved value');
   clickPage(5);
   globalThis.ViewBoy.dispatch('optionsPage:AUDIO');
+  const equalizerBands = hitTargetSnapshot().filter((target) => /^EQ \d/.test(target.name));
+  assert.equal(equalizerBands.length, 10, 'Audio renders ten independently adjustable EQ bands');
+  assert.equal(new Set(equalizerBands.map((target) => target.box.x)).size, 1,
+    'all equalizer sliders share the same left edge');
+  assert.equal(new Set(equalizerBands.map((target) => target.box.width)).size, 1,
+    'all equalizer sliders have identical widths');
+  assert.equal(new Set(equalizerBands.map((target) => target.box.height)).size, 1,
+    'all equalizer sliders have identical heights');
+  assert.equal(new Set(equalizerBands.map((target) => target.equalizerValueBox?.x)).size, 1,
+    'all equalizer value readouts share the same right-column alignment');
+  assert.equal(new Set(equalizerBands.map((target) => target.equalizerValueBox?.width)).size, 1,
+    'all equalizer value readouts have identical widths');
+  assert.ok(equalizerBands.every((target) => target.equalizerValueBox?.y === target.box.y
+    && target.equalizerValueBox?.height === target.box.height),
+  'each gain readout aligns vertically with its slider');
+  assert.equal(new Set(equalizerBands.map((target) =>
+    target.equalizerValueBox.x - target.box.x)).size, 1,
+  'all equalizer bands keep the same slider-to-value spacing');
+  const equalizerRowSteps = equalizerBands.slice(1).map((target, index) =>
+    target.box.y - equalizerBands[index].box.y);
+  assert.equal(new Set(equalizerRowSteps).size, 1,
+    'equalizer sliders use a uniform vertical rhythm');
   clickTarget('MONO OUTPUT');
   await tick();
   assert.equal(savedPreferences.at(-1).monoEnabled, true,
@@ -488,16 +526,20 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(audioConfigCalls.at(-1)[1], true,
     'the equalizer toggle is applied to the native audio path');
   const equalizerStartPixels = pixelChecksum(canvas.image.data);
+  const equalizerStartValuePixels = pixelChecksumForBox(equalizerBands[0].equalizerValueBox);
   nextFrameAdvanceMs = 40;
   clickTarget('EQ 31 HZ', 0, 0.99);
   await tick();
   const equalizerInFlightPixels = pixelChecksum(canvas.image.data);
+  const equalizerInFlightValuePixels = pixelChecksumForBox(equalizerBands[0].equalizerValueBox);
   assert.notEqual(equalizerInFlightPixels, equalizerStartPixels,
     'the equalizer fill begins moving before its snapped target is reached');
+  assert.notEqual(equalizerInFlightValuePixels, equalizerStartValuePixels,
+    'the numeric equalizer readout moves with the animated fill');
   await tick();
   await tick();
   assert.notEqual(pixelChecksum(canvas.image.data), equalizerInFlightPixels,
-    'the equalizer fill continues to the clicked snap point using shared slide timing');
+    'the equalizer fill and numeric readout continue to the clicked snap point using shared slide timing');
   const changedBandGain = savedPreferences.at(-1).equalizerBandGains[0];
   assert.equal(changedBandGain, 12,
     'the right edge of a full-width equalizer bar selects the +12 dB boost limit');

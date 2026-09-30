@@ -23,6 +23,8 @@ const DEFAULT_PLAYLIST_GAP_DOTS = 4;
 const SPACING_DOTS_MIN = 1;
 const SPACING_DOTS_MAX = 8;
 const EQ_BAR_MIN_DOTS = 100;
+const EQ_BAR_INSET_DOTS = 2;
+const EQ_MARKER_HALF_WIDTH_DOTS = 1;
 const EQ_GAIN_MIN_DB = 0;
 const EQ_GAIN_MAX_DB = 12;
 const EQ_GAIN_STEP_DB = 0.5;
@@ -284,6 +286,7 @@ const state = {
   randomHistory: [],
   randomHistoryIndex: -1,
   equalizerBarBoxes: [],
+  equalizerValueBoxes: [],
   libraryRandomToken: 0,
   games: [],
   favoriteTracks: [],
@@ -621,6 +624,8 @@ export function hitTargetSnapshot() {
     reorderKey: widget.meta.reorderKey ?? null,
     textAlign: widget.meta.align ?? "left",
     box: { ...box },
+    equalizerValueBox: Number.isInteger(widget.meta.equalizerBar)
+      ? { ...state.equalizerValueBoxes[widget.meta.equalizerBar] } : null,
   })).filter((target) => target.name);
 }
 
@@ -929,20 +934,12 @@ function libraryPaneWidth() {
 }
 
 function statusBar(parent, text) {
-  const height = buttonStandardHeight();
-  const row = makeWidget(parent, {
-    direction: FlexDirection.Row,
-    alignItems: Align.Center,
-    height,
-  }, {
-    paint(box) { line(box.x, box.y, box.x + box.width, box.y, 1); },
-  });
-  label(row, text, { flexGrow: 1, height }, {
+  return label(parent, text, { height: buttonStandardHeight() }, {
+    border: BUTTON_BORDER_DOTS,
     textShade: 0,
     align: "center",
     inset: controlPaddingDots(),
   });
-  return row;
 }
 
 function panelTitle(parent, text) {
@@ -1910,8 +1907,8 @@ function addMethodOptions(parent, pref) {
 
 function paintEqualizerBar(box, gain) {
   strokeRect(box.x, box.y, box.width, box.height, 1);
-  const left = box.x + 2;
-  const right = Math.max(left + EQ_GAIN_STEPS, box.x + box.width - 3);
+  const left = box.x + EQ_BAR_INSET_DOTS;
+  const right = box.x + box.width - 1 - EQ_BAR_INSET_DOTS;
   const span = right - left;
   const centerY = box.y + Math.floor(box.height / 2);
   const currentStep = Math.max(0, Math.min(EQ_GAIN_STEPS,
@@ -1927,10 +1924,27 @@ function paintEqualizerBar(box, gain) {
       fillRect(x - Math.floor(cellWidth / 2), centerY - 1, cellWidth, 3, 1);
     }
   }
-  fillRect(currentX - 1, box.y + 2, 3, Math.max(1, box.height - 4), 0);
+  fillRect(currentX - EQ_MARKER_HALF_WIDTH_DOTS, box.y + EQ_BAR_INSET_DOTS,
+    EQ_MARKER_HALF_WIDTH_DOTS * 2 + 1,
+    Math.max(1, box.height - EQ_BAR_INSET_DOTS * 2), 0);
 }
 
-function equalizerBand(parent, title, index, gain) {
+function paintEqualizerValue(box, gain) {
+  fillRect(box.x + 1, box.y + 1, box.width - 2, box.height - 2, 3);
+  drawText(equalizerGainLabel(gain), box.x + controlPaddingDots(),
+    box.y + Math.floor((box.height - fontProfile().height) / 2),
+    box.width - controlPaddingDots() * 2, 0, "center");
+}
+
+function equalizerTrackBounds(box) {
+  const inset = EQ_BAR_INSET_DOTS;
+  return {
+    left: box.x + inset,
+    right: box.x + box.width - 1 - inset,
+  };
+}
+
+function equalizerBand(parent, title, index) {
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
@@ -1952,7 +1966,9 @@ function equalizerBand(parent, title, index, gain) {
       const box = state.equalizerBarBoxes[index];
       if (!box) return;
       const point = logicalPoint(event);
-      const fraction = Math.max(0, Math.min(1, (point.x - box.x - 2) / Math.max(1, box.width - 4)));
+      const bounds = equalizerTrackBounds(box);
+      const fraction = Math.max(0, Math.min(1,
+        (point.x - bounds.left) / Math.max(1, bounds.right - bounds.left)));
       const step = Math.round(fraction * EQ_GAIN_STEPS);
       setEqualizerGain(index, EQ_GAIN_MIN_DB + step * EQ_GAIN_STEP_DB);
     },
@@ -1961,7 +1977,7 @@ function equalizerBand(parent, title, index, gain) {
       paintEqualizerBar(box, equalizerGainAt(index, currentRenderTime));
     },
   });
-  label(row, equalizerGainLabel(gain), {
+  label(row, equalizerGainLabel(equalizerGainAt(index, currentRenderTime)), {
     width: framedTextWidth("+12.0"),
     height: buttonStandardHeight(),
   }, {
@@ -1969,6 +1985,7 @@ function equalizerBand(parent, title, index, gain) {
     textShade: 0,
     align: "center",
     inset: controlPaddingDots(),
+    paint(box) { state.equalizerValueBoxes[index] = box; },
   });
 }
 
@@ -1981,7 +1998,7 @@ function animateEqualizerFrame(time) {
   }
 
   const complete = [...equalizerAnimations.values()]
-    .some((animation) => time - animation.startedAt >= animation.duration);
+    .every((animation) => time - animation.startedAt >= animation.duration);
   if (!complete && !animationFrameIsDue(equalizerFrameTiming, time)) {
     equalizerAnimationFrame = requestAnimationFrame(animateEqualizerFrame);
     return;
@@ -1989,12 +2006,19 @@ function animateEqualizerFrame(time) {
 
   pixels.set(basePixels);
   state.equalizerBarBoxes.forEach((box, index) => {
-    if (box) paintEqualizerBar(box, equalizerGainAt(index, time));
+    if (!box) return;
+    const gain = equalizerGainAt(index, time);
+    paintEqualizerBar(box, gain);
+    const valueBox = state.equalizerValueBoxes[index];
+    if (valueBox) paintEqualizerValue(valueBox, gain);
   });
   for (const [index, animation] of equalizerAnimations) {
     if (time - animation.startedAt >= animation.duration) equalizerAnimations.delete(index);
   }
   state.equalizerBarBoxes.forEach((box) => {
+    if (box) present(box.y, box.y + box.height, box.x, box.x + box.width);
+  });
+  state.equalizerValueBoxes.forEach((box) => {
     if (box) present(box.y, box.y + box.height, box.x, box.x + box.width);
   });
   if (equalizerAnimations.size) {
@@ -2004,6 +2028,7 @@ function animateEqualizerFrame(time) {
 
 function addAudioOptions(parent, pref) {
   state.equalizerBarBoxes = [];
+  state.equalizerValueBoxes = [];
   const output = optionGroup(parent, "OUTPUT");
   optionToggle(output, "MONO OUTPUT", pref.monoEnabled === true,
     () => setPreference("monoEnabled", pref.monoEnabled !== true, true));
@@ -2037,7 +2062,7 @@ function addAudioOptions(parent, pref) {
   optionToggle(equalizer, "EQUALIZER", pref.equalizerEnabled === true,
     () => setPreference("equalizerEnabled", pref.equalizerEnabled !== true, true));
   const equalizerBands = ["31 HZ", "62 HZ", "125 HZ", "250 HZ", "500 HZ", "1K HZ", "2K HZ", "4K HZ", "8K HZ", "16K HZ"];
-  equalizerBands.forEach((title, index) => equalizerBand(equalizer, title, index, equalizerGain(index, pref)));
+  equalizerBands.forEach((title, index) => equalizerBand(equalizer, title, index));
 }
 
 function addInterfaceOptions(parent, pref) {
@@ -2408,6 +2433,7 @@ function applyLibraryScrollFrame(time) {
 function render(animateSelection = false, preserveAnimations = false, frameTime = performance.now()) {
   currentRenderTime = frameTime;
   state.equalizerBarBoxes = [];
+  state.equalizerValueBoxes = [];
   if (state.tab !== "SETTINGS" || state.optionsPage !== "AUDIO") {
     equalizerAnimations.clear();
     if (equalizerAnimationFrame) cancelAnimationFrame(equalizerAnimationFrame);
