@@ -445,6 +445,11 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   nextFrameAdvanceMs = 30;
   clickTargetBox(otherSystem);
   await tick();
+  const expandingGame = hitTargetSnapshot().find((target) => target.name === 'Other');
+  assert.equal(expandingGame?.box.height, bitmapFontSnapshot('MICRO').height,
+    'a game row keeps its full glyph height during the system slide reveal');
+  assert.ok(expandingGame.box.y < otherSystem.box.y + otherSystem.box.height + 1,
+    'the full-size game row slides into position beneath its system heading');
   assert.deepEqual(sidebarLayout(), closedSidebarLayout,
     'the pane and playlist keep their geometry during an in-progress dropdown');
   await tick();
@@ -1348,13 +1353,22 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(subRow.box.y - (musicRow.box.y + musicRow.box.height), 1,
     'Path roots and child folders use the one-dot Sidebar Line Gap');
   clickTarget('SUB');
+  nextFrameAdvanceMs = 30;
   await tick();
   const pathRows = hitTargetSnapshot();
   const expandedSubRow = pathRows.find((target) => target.name === 'SUB');
   const pathFileRow = pathRows.find((target) => target.name === 'path.spc');
   assert.ok(pathFileRow,
     'the Path tree expands folders to show indexed files');
-  assert.equal(pathFileRow.box.y - (expandedSubRow.box.y + expandedSubRow.box.height), 1,
+  assert.equal(pathFileRow.box.height, bitmapFontSnapshot('MICRO').height,
+    'a path row keeps its full glyph height during the folder slide reveal');
+  assert.ok(pathFileRow.box.y < expandedSubRow.box.y + expandedSubRow.box.height + 1,
+    'the full-size file row slides into position beneath its folder');
+  await tick();
+  const settledPathRows = hitTargetSnapshot();
+  const settledSubRow = settledPathRows.find((target) => target.name === 'SUB');
+  const settledFileRow = settledPathRows.find((target) => target.name === 'path.spc');
+  assert.equal(settledFileRow.box.y - (settledSubRow.box.y + settledSubRow.box.height), 1,
     'expanded Path folders and files keep the same one-dot Sidebar Line Gap');
   clickTarget('SUB', 0, 0.5, 0.5, 2);
   await tick();
@@ -1363,6 +1377,23 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(pathFileCalls.length, 1, 'selecting a catalog file loads its indexed tracks');
   assert.equal(pathFileCalls[0][0].path, '/music/sub/path.spc');
+  nextFrameAdvanceMs = 80;
+  clickTargetBox(hitTargetSnapshot().find((target) => target.name === 'SUB'
+    && target.sidebarDisclosure));
+  await tick();
+  const foldingPathFile = hitTargetSnapshot().find((target) => target.name === 'path.spc');
+  assert.equal(foldingPathFile?.box.height, bitmapFontSnapshot('MICRO').height,
+    'a path row keeps its full glyph height during the folder slide shut');
+  const foldingSubRow = hitTargetSnapshot().find((target) => target.name === 'SUB'
+    && target.sidebarDisclosure);
+  assert.ok(foldingSubRow?.disclosureProgress < 0.9,
+    'the folder disclosure is visibly progressing through its closing animation');
+  assert.ok(foldingPathFile.box.y < foldingSubRow.box.y + foldingSubRow.box.height + 1,
+    'the full-size file row slides upward as the folder closes');
+  await tick();
+  await tick();
+  assert.equal(hitTargetSnapshot().some((target) => target.name === 'path.spc'), false,
+    'folding clips the full-size path rows away when the animation completes');
 
   commandKey('2');
   await tick();

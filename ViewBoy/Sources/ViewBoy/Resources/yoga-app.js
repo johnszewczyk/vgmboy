@@ -1683,19 +1683,16 @@ function createLibraryRow(parent, text, options = {}) {
   const selected = options.selected ?? false;
   if (options.spacer) {
     return makeWidget(parent, {
-      height: spacingValue("sidebarLineGapDots") / STYLE_SCALE * (options.revealProgress ?? 1),
+      height: spacingValue("sidebarLineGapDots") / STYLE_SCALE,
       flexShrink: 0,
     });
   }
   const rowHeightValue = rowHeight();
-  const revealProgress = options.revealProgress;
   return label(parent, text, {
-    height: rowHeightValue * (revealProgress ?? 1),
+    height: rowHeightValue,
     paddingHorizontal: controlPaddingDots(),
   }, {
     textShade: 0,
-    clipToBox: revealProgress !== undefined,
-    revealProgress,
     onClick: options.onClick,
     sidebarDisclosure: options.disclosure === true,
     contentRowKind: "sidebar",
@@ -1896,19 +1893,19 @@ function addLibraryPane(parent) {
   }, { translateY: -partialRowOffset });
   state.libraryViewportWidget = viewport;
   const lastRow = Math.min(rows.length, firstRow + count * 2 + 2);
-  rows.slice(firstRow, lastRow).forEach((row) => {
+  const visibleRows = rows.slice(firstRow, lastRow);
+  const appendRow = (parent, row) => {
     if (row.spacer) {
-      createLibraryRow(content, "", { spacer: true, revealProgress: row.revealProgress });
+      createLibraryRow(parent, "", { spacer: true });
       return;
     }
-    createLibraryRow(content, row.text, {
+    createLibraryRow(parent, row.text, {
       selected: row.node ? row.node.path === state.selectedPathKey
         : row.game && gameKey(row.game) === state.selectedGameKey,
       indent: row.indent,
       disclosure: row.group,
       disclosureProgress: row.disclosureProgress,
       disclosureIndent: row.disclosureIndent,
-      revealProgress: row.revealProgress,
       onClick: (event) => {
         if (row.node) {
           if (row.node.kind === "folder" && row.node.children?.length) {
@@ -1919,7 +1916,36 @@ function addLibraryPane(parent) {
         else if (row.system) void toggleSystem(row.system);
       },
     });
-  });
+  };
+  for (let index = 0; index < visibleRows.length;) {
+    const row = visibleRows[index];
+    if (row.revealProgress === undefined) {
+      appendRow(content, row);
+      index += 1;
+      continue;
+    }
+
+    let end = index + 1;
+    while (end < visibleRows.length && visibleRows[end].revealProgress !== undefined) end += 1;
+    const transitionRows = visibleRows.slice(index, end);
+    const progress = row.revealProgress;
+    const fullHeightPixels = transitionRows.reduce((sum, transitionRow) =>
+      sum + libraryRowPixelHeight({ ...transitionRow, revealProgress: undefined }), 0);
+    const revealViewport = makeWidget(content, {
+      height: fullHeightPixels * progress / STYLE_SCALE,
+      flexShrink: 0,
+      minHeight: 0,
+      overflow: Overflow.Hidden,
+    }, { clipChildren: true });
+    const slidingContent = makeWidget(revealViewport, {
+      direction: FlexDirection.Column,
+      flexShrink: 0,
+    }, {
+      translateY: -rowHeight() * STYLE_SCALE * (1 - progress),
+    });
+    transitionRows.forEach((transitionRow) => appendRow(slidingContent, transitionRow));
+    index = end;
+  }
   return library;
 }
 
