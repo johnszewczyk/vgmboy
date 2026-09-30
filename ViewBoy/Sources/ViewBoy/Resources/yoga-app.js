@@ -1366,7 +1366,7 @@ function visibleRowCount() {
 function visibleLibraryRowCount() {
   const rootChrome = 2 * APP_BORDER_GAP_DOTS + 2 * buttonStandardHeight() + 3 * uiGap()
     + rowHeight(4);
-  const sidebarChrome = 5 * buttonStandardHeight() + 5 * uiGap();
+  const sidebarChrome = 3 * buttonStandardHeight() + 4 * uiGap();
   return Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - rootChrome - sidebarChrome)
     / rowHeight(2 * controlPaddingDots())));
 }
@@ -1406,6 +1406,22 @@ function libraryRows() {
   return rows;
 }
 
+function libraryStatusText(filteredGames, systemCount, query) {
+  if (query) return `MATCH ${filteredGames.length} / ${state.games.length} GAMES`;
+  const selectedGame = state.games.find((game) => gameKey(game) === state.selectedGameKey);
+  if (selectedGame) {
+    const title = selectedGame.displayName || selectedGame.name || "GAME";
+    const trackCount = Number(selectedGame.trackCount);
+    const tracksLabel = Number.isFinite(trackCount) ? `${trackCount} TRK` : "TRACKS";
+    return `${title} / ${tracksLabel}`;
+  }
+  if (state.selectedSystem) {
+    const gamesInSystem = state.games.filter((game) => (game.system || "OTHER") === state.selectedSystem).length;
+    return `${state.selectedSystem} / ${gamesInSystem} GAMES`;
+  }
+  return `${state.games.length} GAMES / ${systemCount} SYSTEMS`;
+}
+
 function addLibraryPane(parent) {
   const paneWidth = libraryPaneWidth();
   const library = makeWidget(parent, {
@@ -1436,8 +1452,6 @@ function addLibraryPane(parent) {
     onClick: () => { setSearchFocused(true); render(); },
   });
   makeWidget(library, { height: uiGap() });
-  panelTitle(library, "BROWSE");
-  makeWidget(library, { height: uiGap() });
   const navigation = controlRow(library, { gap: uiGap() });
   libraryToolbarItems().forEach((item) => pixelButton(navigation, item.title, item.onClick, {
     width: 0,
@@ -1449,7 +1463,6 @@ function addLibraryPane(parent) {
     controlTitle: item.controlTitle,
   }));
   makeWidget(library, { height: uiGap() });
-  panelTitle(library, "SYSTEMS");
   const rows = libraryRows();
   const count = visibleLibraryRowCount();
   const rowHeightDots = rowHeight(2 * controlPaddingDots()) * STYLE_SCALE;
@@ -1494,10 +1507,7 @@ function addLibraryPane(parent) {
     normalizedText(`${game.displayName || game.name || ""} ${game.name || ""} ${game.system || "OTHER"}`)
       .includes(query)) : state.games;
   const systemCount = new Set(filteredGames.map((game) => game.system || "OTHER")).size;
-  const first = rows.length ? firstRow + 1 : 0;
-  const last = Math.min(rows.length, firstRow + count);
-  statusBar(library, query ? `MATCH ${filteredGames.length} SYS ${systemCount}`
-    : `SYS ${systemCount} ${first}-${last}/${rows.length}`);
+  statusBar(library, libraryStatusText(filteredGames, systemCount, query));
   return library;
 }
 
