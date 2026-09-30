@@ -713,6 +713,13 @@ export function hitTargetSnapshot() {
   return snapshot;
 }
 
+export function appStatusAreaSnapshot() {
+  return layoutEntries.flatMap(({ widget, box }) => {
+    const field = widget.meta.statusField;
+    return field ? [{ field, text: widget.meta.text, box: { ...box } }] : [];
+  });
+}
+
 export function contentRowLayoutSnapshot() {
   return layoutEntries.flatMap(({ widget, box }) => {
     const kind = widget.meta.contentRowKind;
@@ -1080,18 +1087,102 @@ function libraryPaneWidth() {
     buttonsWidth + Math.max(0, items.length - 1) * uiGap() + 4);
 }
 
-function statusBar(parent, leftText, rightText = state.transport.toUpperCase()) {
-  const row = controlRow(parent, { height: buttonStandardHeight(), gap: uiGap() });
-  for (const [text, align] of [[leftText, "left"], [rightText, "right"]]) {
-    label(row, text, { flexGrow: 1, flexBasis: 0, minWidth: 0, height: buttonStandardHeight() }, {
-      border: BUTTON_BORDER_DOTS,
-      textShade: 0,
-      align,
-      inset: controlPaddingDots(),
-      statusReadout: true,
-    });
-  }
-  return row;
+function appStatusDetails() {
+  const playingQueue = state.currentTrackId && state.playbackQueue.length
+    ? state.playbackQueue : null;
+  const queue = playingQueue || (state.activeQueue.length ? state.activeQueue : visibleTracks());
+  const playingIndex = playingQueue
+    ? playingQueue.findIndex((track) => trackID(track) === state.currentTrackId) : -1;
+  const selected = visibleTracks()[state.selectedTrack] || null;
+  const track = playingIndex >= 0 ? playingQueue[playingIndex] : selected;
+  const position = playingIndex >= 0 ? playingIndex + 1
+    : track ? Math.min(state.selectedTrack + 1, queue.length || state.selectedTrack + 1) : 0;
+  const playbackError = /^PLAYBACK ERROR:/i.test(state.status);
+  const transport = playbackError ? "ERROR"
+    : /^LOADING\b/i.test(state.status) ? "LOADING"
+      : state.playing ? "PLAYING"
+        : state.transport === "paused" ? "PAUSED"
+          : state.transport === "ended" || state.transport === "stopped" ? "STOPPED"
+            : String(state.transport || "READY").toUpperCase();
+  const title = track
+    ? `${state.playing || state.transport === "paused" ? "NOW" : "SELECTED"} ${track.title || track.filename || "UNTITLED"}`
+    : "NO TRACK SELECTED";
+  const context = playbackError ? state.status
+    : track
+      ? [track.game || track.artist || "", track.system || ""].filter(Boolean).join(" / ")
+      : state.status || "CATALOG READY";
+  const duration = Number(track?.playLengthMs) > 0 ? formatTime(track.playLengthMs)
+    : track?.lengthLabel || "--:--";
+  const queuePosition = position
+    ? `TRACK ${String(position).padStart(2, "0")}/${String(queue.length).padStart(2, "0")}`
+    : "TRACK --/--";
+  return {
+    title,
+    transport,
+    context,
+    queuePosition,
+    time: `TIME ${formatTime(state.positionMs)}/${duration}`,
+  };
+}
+
+function appStatusArea(parent) {
+  const details = appStatusDetails();
+  const rowHeightDots = rowHeight();
+  const status = makeWidget(parent, {
+    direction: FlexDirection.Column,
+    height: rowHeightDots * 2 + oneDot(),
+    gap: oneDot(),
+  }, {
+    paint(box) {
+      line(box.x, box.y, box.x + box.width, box.y, 2);
+      line(box.x, box.y + rowHeightDots, box.x + box.width, box.y + rowHeightDots, 2);
+    },
+  });
+  const addField = (row, field, text, style = {}) => label(row, text, {
+    height: rowHeightDots,
+    minWidth: 0,
+    flexShrink: 1,
+    ...style,
+  }, {
+    statusField: field,
+    textShade: 0,
+    inset: 1,
+  });
+  const divider = (row) => makeWidget(row, {
+    width: oneDot(),
+    height: rowHeightDots,
+  }, {
+    paint(box) { line(box.x, box.y, box.x, box.y + box.height, 2); },
+  });
+
+  const headline = makeWidget(status, {
+    direction: FlexDirection.Row,
+    height: rowHeightDots,
+    alignItems: Align.Center,
+  });
+  addField(headline, "track", details.title, { flexGrow: 1, flexBasis: 0 });
+  divider(headline);
+  addField(headline, "transport", details.transport, {
+    width: textLayoutWidth("PLAYING", 1),
+    align: "right",
+  });
+
+  const detailRow = makeWidget(status, {
+    direction: FlexDirection.Row,
+    height: rowHeightDots,
+    alignItems: Align.Center,
+  });
+  addField(detailRow, "context", details.context, { flexGrow: 1, flexBasis: 0 });
+  divider(detailRow);
+  addField(detailRow, "queue", details.queuePosition, {
+    width: textLayoutWidth("TRACK 000/000", 1),
+  });
+  divider(detailRow);
+  addField(detailRow, "time", details.time, {
+    width: textLayoutWidth("TIME 000:00/000:00", 1),
+    align: "right",
+  });
+  return status;
 }
 
 function panelTitle(parent, text) {
@@ -2607,7 +2698,6 @@ function addOptionsContent(parent) {
       });
   });
   makeWidget(toc, { flexGrow: 1 });
-  statusBar(toc, "SETTINGS");
 
   const panel = makeWidget(parent, {
     direction: FlexDirection.Column,
@@ -2633,7 +2723,6 @@ function addOptionsContent(parent) {
   else if (state.optionsPage === "INTERFACE") addInterfaceOptions(content, pref);
   else if (state.optionsPage === "LIBRARY") addLibraryOptions(content, pref);
   else addDisplayOptions(content);
-  statusBar(panel, `${state.optionsPage} OPTIONS`);
 }
 
 function buildTree() {
@@ -2733,32 +2822,7 @@ function buildTree() {
     addCatalogPane(content);
   }
 
-  const bottom = makeWidget(root, {
-    direction: FlexDirection.Row,
-    alignItems: Align.Center,
-    height: rowHeight(4),
-  }, {
-    paint(box) {
-      line(box.x, box.y, box.x + box.width, box.y, 2);
-    },
-  });
-  const current = state.activeQueue.find((track) => trackID(track) === state.currentTrackId);
-  const selected = visibleTracks()[state.selectedTrack];
-  label(bottom, "NOW / " + (current?.title || current?.filename || selected?.title || selected?.filename || state.status), {
-    flexGrow: 1,
-    height: rowHeight(2),
-  }, {
-    textShade: 0,
-    inset: 0,
-  });
-  label(bottom, state.playing ? "PLAYING" : state.transport.toUpperCase(), {
-    width: 48,
-    height: rowHeight(2),
-  }, {
-    textShade: 0,
-    align: "right",
-    inset: 0,
-  });
+  appStatusArea(root);
 
   addColumnContextMenu(root);
 

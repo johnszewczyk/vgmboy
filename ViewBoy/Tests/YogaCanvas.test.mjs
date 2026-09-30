@@ -232,6 +232,7 @@ function pixelChecksumForBox(box) {
 test('canvas renders adaptive columns, grouped options, and native playback', async () => {
   const {
     animationFrameIsDue,
+    appStatusAreaSnapshot,
     bitmapFontSnapshot,
     contentRowLayoutSnapshot,
     hitTargetSnapshot,
@@ -309,7 +310,23 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'Command-W closes the active playlist tab and saves the remaining tab set');
   const toolbarTargets = hitTargetSnapshot();
   assert.equal(toolbarTargets.filter((target) => target.statusReadout).length, 0,
-    'the sidebar and playlist use their full panes for content without framed footer readouts');
+    'the sidebar and playlist contain no pane-specific footer readouts');
+  const globalStatus = appStatusAreaSnapshot();
+  assert.deepEqual(globalStatus.map(({ field }) => field),
+    ['track', 'transport', 'context', 'queue', 'time'],
+    'the shared bottom status area has an organized track, transport, context, queue, and time layout');
+  assert.match(globalStatus.find(({ field }) => field === 'track').text, /SELECTED FIRST/i);
+  assert.equal(globalStatus.find(({ field }) => field === 'transport').text, 'STOPPED');
+  assert.match(globalStatus.find(({ field }) => field === 'context').text, /SAMPLE \/ SNES/i);
+  assert.equal(globalStatus.find(({ field }) => field === 'queue').text, 'TRACK 01/03');
+  assert.equal(globalStatus.find(({ field }) => field === 'time').text, 'TIME 0:00/--:--');
+  const topStatusFields = globalStatus.filter(({ field }) => ['track', 'transport'].includes(field));
+  const detailStatusFields = globalStatus.filter(({ field }) => ['context', 'queue', 'time'].includes(field));
+  assert.ok(topStatusFields.every(({ box }) => box.height > 0
+    && box.y === topStatusFields[0].box.y), 'track and transport share one status row');
+  assert.ok(detailStatusFields.every(({ box }) => box.height > 0
+    && box.y === detailStatusFields[0].box.y
+    && box.y > topStatusFields[0].box.y), 'context, queue, and timing share a second row');
   const transportTargets = ['PREVIOUS', 'PLAY', 'NEXT', 'STOP']
     .map((name) => toolbarTargets.find((target) => target.name === name));
   const modeTargets = ['LONG PLAY', 'REPEAT ONE', 'PLAYLIST RANDOM', 'LIBRARY RANDOM']
@@ -358,6 +375,10 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   globalThis.ViewBoy.dispatch('playPause');
   await tick();
   assert.equal(calls.find(([name]) => name === 'start')[1].path, '/music/a.spc');
+  const playingStatus = appStatusAreaSnapshot();
+  assert.match(playingStatus.find(({ field }) => field === 'track').text, /^NOW FIRST$/i);
+  assert.equal(playingStatus.find(({ field }) => field === 'transport').text, 'PLAYING');
+  assert.equal(playingStatus.find(({ field }) => field === 'queue').text, 'TRACK 01/03');
   await ended({ transport_state: 'ended', generation, status_sequence: generation + 1 });
   assert.deepEqual(calls.find(([name]) => name === 'retire')[1].playlistIds, ['a', 'b', 'c']);
   await tick();
@@ -491,6 +512,11 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   globalThis.ViewBoy.dispatch('settings');
   assert.match(status.textContent, /SETTINGS/);
   await tick();
+  assert.equal(hitTargetSnapshot().filter((target) => target.statusReadout).length, 0,
+    'Options has no status footers attached to either pane');
+  assert.deepEqual(appStatusAreaSnapshot().map(({ field }) => field),
+    ['track', 'transport', 'context', 'queue', 'time'],
+    'the same app-wide status area remains below Options');
   const rollingOptionsPixels = pixelChecksum(canvas.image.data);
   assert.notEqual(rollingOptionsPixels, libraryPixels,
     'Options rolls down over the source screen instead of swapping immediately');
@@ -892,6 +918,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'Command-comma opens Options from above using the shared screen roll');
   assert.match(status.textContent, /SETTINGS/,
     'Command-comma opens the Options screen');
+  assert.equal(hitTargetSnapshot().filter((target) => target.statusReadout).length, 0,
+    'the keyboard Options entry has no pane-specific status readouts either');
   await tick();
   const openOptionsPixels = pixelChecksum(canvas.image.data);
   nextFrameAdvanceMs = 100;
