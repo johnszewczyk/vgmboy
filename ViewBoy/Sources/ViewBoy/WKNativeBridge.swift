@@ -28,7 +28,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     private let catalogSessions = CatalogSessionCoordinator()
     private weak var playbackEventWebView: WKWebView?
 
-    var onMaterialGeometry: (([String: Any]) -> Void)?
+    var onMetalChevronUpdate: (@MainActor ([String: Any]) -> Void)?
     var onCloseMainWindow: (() -> Void)?
     var onChooseRootFolder: (() -> String?)?
     var onChoosePath: (() -> String?)?
@@ -224,8 +224,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         if message.name == "viewBoy",
            let body = message.body as? [String: Any],
-           body["method"] as? String == "viewBoyMaterialGeometry" {
-            onMaterialGeometry?(body)
+           body["method"] as? String == "viewBoyMetalChevrons" {
+            Task { @MainActor [weak self] in self?.onMetalChevronUpdate?(body) }
             return
         }
         guard message.name == "viewBoy",

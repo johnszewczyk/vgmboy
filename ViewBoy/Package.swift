@@ -41,6 +41,8 @@ let package = Package(
             resources: [.process("Resources")],
             linkerSettings: [
                 .linkedFramework("AppKit"),
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalKit"),
                 .linkedFramework("WebKit")
             ]
         )

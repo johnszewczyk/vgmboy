@@ -230,7 +230,21 @@ function pixelChecksumForBox(box) {
 }
 
 test('canvas renders adaptive columns, grouped options, and native playback', async () => {
-  const { animationFrameIsDue, hitTargetSnapshot } = await import('../Sources/ViewBoy/Resources/yoga-app.js');
+  const {
+    animationFrameIsDue,
+    bitmapFontSnapshot,
+    hitTargetSnapshot,
+    screenTransitionSnapshot,
+  } = await import('../Sources/ViewBoy/Resources/yoga-app.js');
+  const standardFont = bitmapFontSnapshot('STANDARD');
+  for (const character of 'abcdefghijklmnopqrstuvwxyz') {
+    const glyph = standardFont.glyphs[character];
+    assert.equal(glyph?.length, 7, `Standard 5x7 includes a seven-row lowercase ${character}`);
+    assert.ok(glyph.every((row) => /^[01]{5}$/.test(row)),
+      `lowercase ${character} is authored as five LCD dots per row`);
+  }
+  assert.notDeepEqual(standardFont.glyphs.a, standardFont.glyphs.A,
+    'Standard font preserves lowercase forms instead of mapping them to uppercase');
   const clickTargetBox = (target) => {
     const rect = canvas.getBoundingClientRect();
     const logicalWidth = canvas.width / 3;
@@ -322,6 +336,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the centered half-width wrapper aligns both toolbar rows');
   assert.ok(toolbarTargets.some((target) => target.name === 'OPTIONS'),
     'Options remains reachable from the sidebar controls');
+  assert.ok(toolbarTargets.some((target) => target.name === 'HISTORY'),
+    'the sidebar exposes the shared Playback History view alongside Library and Queue');
   const defaultHeader = toolbarTargets.find((target) => target.columnHeader && target.name === '#');
   assert.ok(defaultHeader, 'the numbered playlist heading is visible');
   const firstPlaylistBody = toolbarTargets.find((target) => target.trackIndex === 0
@@ -329,6 +345,12 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.ok(firstPlaylistBody, 'the playlist heading and its first content row are visible');
   assert.equal(firstPlaylistBody.box.y - (defaultHeader.box.y + defaultHeader.box.height), 4,
     'the playlist table applies the standard four-dot UI Gap between its headings and rows');
+  const rowTops = new Map(toolbarTargets.filter((target) => Number.isInteger(target.trackIndex))
+    .map((target) => [target.trackIndex, target.box.y]));
+  const rowHeights = new Map(toolbarTargets.filter((target) => Number.isInteger(target.trackIndex))
+    .map((target) => [target.trackIndex, target.box.height]));
+  assert.equal(rowTops.get(1) - (rowTops.get(0) + rowHeights.get(0)), 4,
+    'the playlist uses the standard UI Gap between track rows as well as below its headings');
   assert.ok(groupStateCalls.some(([action, system]) => action === 'toggle' && system === 'SNES'));
   assert.ok(groupStateCalls.some(([action, system, gameID]) =>
     action === 'selectGame' && system === 'SNES' && gameID === '1:SNES:Sample'));
@@ -770,12 +792,16 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(savedPlaylistTabs.at(-1)?.activeID, secondPlaylistID,
     'Command-Option-2 selects the second playlist tab');
   commandKey(',');
+  assert.equal(screenTransitionSnapshot()?.direction, 'down',
+    'Command-comma opens Options from above using the shared screen roll');
   assert.match(status.textContent, /SETTINGS/,
     'Command-comma opens the Options screen');
   await tick();
   const openOptionsPixels = pixelChecksum(canvas.image.data);
   nextFrameAdvanceMs = 100;
   clickTarget('BACK');
+  assert.equal(screenTransitionSnapshot()?.direction, 'up',
+    'the Back action dismisses Options upward');
   await tick();
   const rollingBackPixels = pixelChecksum(canvas.image.data);
   assert.notEqual(rollingBackPixels, openOptionsPixels,
@@ -796,6 +822,16 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(savedPlaylistTabs.at(-1)?.tabs[0]?.playlist.length, 0,
     'closing the final tab saves it empty even while audio continues playing');
   globalThis.ViewBoy.dispatch('settings');
+  assert.equal(screenTransitionSnapshot()?.direction, 'down',
+    'the settings command enters Options from above');
+  await tick();
+  commandKey(',');
+  assert.equal(screenTransitionSnapshot()?.direction, 'up',
+    'Command-comma toggles the Options view off with the reverse roll');
+  await tick();
+  commandKey(',');
+  assert.equal(screenTransitionSnapshot()?.direction, 'down',
+    'Command-comma toggles Options back on');
   await tick();
   clickPage('INTERFACE');
   globalThis.ViewBoy.dispatch('optionsPage:INTERFACE');
@@ -818,6 +854,20 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 5,
     'the shared interface gap has an independent persisted setting');
+  globalThis.ViewBoy.dispatch('settings');
+  assert.equal(screenTransitionSnapshot()?.direction, 'up',
+    'the UI Gap check returns to the playlist view through the shared screen roll');
+  await tick();
+  const fiveDotHeader = hitTargetSnapshot().find((target) => target.columnHeader && target.name === '#');
+  const fiveDotBody = hitTargetSnapshot().filter((target) => !target.columnHeader
+    && target.box.y > fiveDotHeader.box.y).sort((first, second) => first.box.y - second.box.y)[0];
+  assert.ok(fiveDotBody, 'the playlist body remains laid out below its header at the larger UI Gap');
+  assert.equal(fiveDotBody.box.y - (fiveDotHeader.box.y + fiveDotHeader.box.height), 5,
+    'playlist header-to-body spacing follows the adjusted UI Gap');
+  globalThis.ViewBoy.dispatch('settings');
+  assert.equal(screenTransitionSnapshot()?.direction, 'down',
+    'the UI Gap check can return to Options');
+  await tick();
   clickPage('AUDIO');
   const expandedGapBands = hitTargetSnapshot().filter((target) => /^EQ \d/.test(target.name)
     && !/[+-]$/.test(target.name));

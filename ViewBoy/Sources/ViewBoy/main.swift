@@ -6,6 +6,7 @@ import WebKit
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var window: NSWindow?
     private weak var webView: WKWebView?
+    private weak var surfaceView: ViewBoySurfaceView?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
@@ -25,8 +26,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         nativeBridge.onPlaybackEvent = { [weak self] name, payload in
             self?.broadcastPlaybackEvent(name: name, payload: payload)
         }
-        let webView = makeWebView(bridge: nativeBridge)
+        let metalChevronOverlay = ViewBoyMetalChevronOverlay(frame: .zero)
+        let webView = makeWebView(
+            bridge: nativeBridge,
+            metalChevronOverlayAvailable: metalChevronOverlay.isAvailable
+        )
         self.webView = webView
+        let surfaceView = ViewBoySurfaceView(webView: webView, metalChevronOverlay: metalChevronOverlay)
+        self.surfaceView = surfaceView
+        nativeBridge.onMetalChevronUpdate = { [weak self] geometry in
+            self?.surfaceView?.updateMetalChevrons(geometry)
+        }
         nativeBridge.attachPlaybackEvents(to: webView)
         installApplicationMenu()
         guard let page = URL(string: "viewboy://app/index.html") else {
@@ -42,7 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         )
         window.title = "ViewBoy"
         window.tabbingMode = .disallowed
-        window.contentView = webView
+        window.contentView = surfaceView
         if !window.setFrameAutosaveName("ViewBoy.Main") {
             window.center()
         }
@@ -52,11 +62,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func makeWebView(bridge: WKNativeBridge) -> WKWebView {
+    private func makeWebView(bridge: WKNativeBridge, metalChevronOverlayAvailable: Bool) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.setURLSchemeHandler(ViewBoyResourceSchemeHandler(), forURLScheme: "viewboy")
         configuration.userContentController.add(bridge, name: "viewBoy")
         configuration.userContentController.addUserScript(bridge.userScript())
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: "window.__viewBoyMetalChevronOverlay = \(metalChevronOverlayAvailable ? "true" : "false");",
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        ))
         configuration.userContentController.addUserScript(WKUserScript(
             source: """
             window.__viewBoyCommandQueue = [];

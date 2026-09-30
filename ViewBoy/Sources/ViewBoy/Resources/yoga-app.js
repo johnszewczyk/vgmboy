@@ -3315,7 +3315,7 @@ async function showPlaybackHistory() {
         timestamp: historyTimestamp(timestampMilliseconds),
       };
     }).filter(Boolean);
-    state.tab = "HISTORY";
+    if (!leavingOptions) state.tab = "HISTORY";
     state.sortColumn = "timestamp";
     state.sortDirection = "DESCENDING";
     state.selectedTrack = 0;
@@ -4258,7 +4258,7 @@ canvas.addEventListener("pointermove", (event) => {
     const distance = Math.hypot(point.x - pointerInteraction.startX, point.y - pointerInteraction.startY);
     pointerInteraction.lastPointX = point.x;
     pointerInteraction.pointX = point.x;
-    if (distance >= 3) {
+    if (distance >= 1) {
       pointerInteraction.dragging = true;
       suppressNextClick = true;
       const dropTarget = pointerInteraction.itemKind === "column"
