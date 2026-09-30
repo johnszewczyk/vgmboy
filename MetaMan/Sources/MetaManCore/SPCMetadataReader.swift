@@ -364,7 +364,7 @@ public enum SPCMetadataReader {
         case (0x13, 1): metadata.publisher = string; appendTag("Publisher", string, to: &metadata.tags)
         case (0x14, 0):
             metadata.copyrightYear = value.map(String.init)
-            appendTag("Copyright Year", metadata.copyrightYear, to: &metadata.tags)
+            appendTag("Year", metadata.copyrightYear, to: &metadata.tags)
         case (0x30, 4): metadata.introLengthMs = ticksToMilliseconds(payload); appendTimingTag("Intro Length (ms)", metadata.introLengthMs, to: &metadata.tags)
         case (0x31, 4): metadata.loopLengthMs = ticksToMilliseconds(payload); appendTimingTag("Loop Length (ms)", metadata.loopLengthMs, to: &metadata.tags)
         case (0x32, 4): metadata.endLengthMs = ticksToMilliseconds(payload); appendTimingTag("End Length (ms)", metadata.endLengthMs, to: &metadata.tags)

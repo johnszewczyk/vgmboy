@@ -135,6 +135,7 @@ import Testing
     #expect(document.fields.copyright == nil)
     #expect(document.values(forTag: "Publisher") == ["Publisher"])
     #expect(document.fields.year == "1998")
+    #expect(document.values(forTag: "Year") == ["1998"])
     #expect(document.timing == MetadataTiming(introLengthMs: 2_000, loopLengthMs: 3_000, playLengthMs: 12_000, fadeLengthMs: 5_000))
     #expect(document.technicalFacts["xid6ItemCount"] == "20")
     #expect(document.technicalFacts["soundtrackDisc"] == "1")

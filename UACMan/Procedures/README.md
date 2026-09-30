@@ -7,9 +7,8 @@ explicit package creation to read source formats. Apply the shared
 its reader, field mapping, format-specific exceptions, and required checks.
 Dated set audits belong in `Reports/`.
 
-System identity uses the single structural `game.console` field. Apply the
-approved names and source-label mappings in
-[`CANONICAL-SYSTEM-NAMES.md`](CANONICAL-SYSTEM-NAMES.md).
+Platform identity uses one canonical package-level value. Apply the approved
+names and source-label mappings in [`PLATFORMS.md`](PLATFORMS.md).
 
 ## Source-format ingest register
 
@@ -26,9 +25,9 @@ been reviewed.
 | `nsf` | Draft profile | See [`NSF-NSFE.md`](NSF-NSFE.md); fixture validation pending. |
 | `gbs` | Draft profile | See [`GBS.md`](GBS.md); fixture validation pending. |
 | `nsfe` | Draft profile | See [`NSF-NSFE.md`](NSF-NSFE.md); fixture validation pending. |
-| `hes` | Profile pending | Document bounded sidecar and track mapping. |
+| `hes` | Draft profile | See [`HES.md`](HES.md); fixture validation pending. |
 | `sndh` | Profile pending | Document subtune and timing projection. |
-| `kss` | Profile pending | Document KSSX tracks and hardware facts. |
+| `kss` | Draft profile | See [`KSS.md`](KSS.md); fixture validation pending. |
 | `s98` | Profile pending | Document device table, tags, and timing fields. |
 | `vgm` | Draft profile | See [`VGM.md`](VGM.md); fixture validation pending. |
 | `mdx` | Profile pending | Document Shift-JIS title and PDX dependency. |
@@ -114,18 +113,17 @@ source-backed data and the target player require it; never emit a negative
 ## Shared field and ownership rules
 
 Use the [UAC Base Profile](BASE-UAC-PROFILE.md) for direct-field mapping,
-Title Case, omission, and system-identity rules. `MetadataTag {name, value}` is
+Title Case, omission, and platform-identity rules. `MetadataTag {name, value}` is
 MetaManCore's reader interface, not a UAC tag format. Source provenance belongs
 in `sources[]`; profile a direct metadata field only when it is useful to UAC
-users. Existing legacy fields remain readable and are not rewritten by readers.
+users.
 
-## Source-set profiles
+## Set-Based Procedures
 
-Set-specific provenance, identity, naming, and review rules live in
-[`Sets/`](Sets/README.md). A format profile describes SPC-to-UAC behavior;
-the set profile identifies source authority and release identity for one
-collection. Never infer a source relationship between collections from title
-or content overlap alone.
+Procedures based on one source set live in [`Sets/`](Sets/README.md). A format
+procedure describes reader-to-UAC behavior; a set-based procedure records the
+set's source authority, identity, naming, and review rules. Never infer a
+source relationship between collections from title or content overlap alone.
 
 ## Wrapper and ownership references
 
@@ -135,9 +133,11 @@ or content overlap alone.
   [`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md)
 - SPC-to-UAC profile: [`SPC.md`](SPC.md)
 - Shared field-mapping rules: [`BASE-UAC-PROFILE.md`](BASE-UAC-PROFILE.md)
-- Canonical system names: [`CANONICAL-SYSTEM-NAMES.md`](CANONICAL-SYSTEM-NAMES.md)
+- Canonical platforms: [`PLATFORMS.md`](PLATFORMS.md)
 - Compact pre-disc hash policy: [`PRE-DISC-NATIVE.md`](PRE-DISC-NATIVE.md)
 - VGM/VGZ profile: [`VGM.md`](VGM.md)
+- HES profile: [`HES.md`](HES.md)
+- KSS profile: [`KSS.md`](KSS.md)
 - NSF/NSFE profile: [`NSF-NSFE.md`](NSF-NSFE.md)
 - GBS profile: [`GBS.md`](GBS.md)
 - PlayStation CD-XA and Red Book profile: [`PSX-CDXA.md`](PSX-CDXA.md)

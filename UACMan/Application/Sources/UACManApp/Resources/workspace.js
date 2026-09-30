@@ -1736,9 +1736,19 @@
     const profiles = Array.isArray(state.profiles) ? state.profiles : [];
     if (!profiles.some(profile => profile.id === activeProfileID)) activeProfileID = profiles[0]?.id || "";
     const selected = profiles.find(profile => profile.id === activeProfileID);
-    const list = profiles.map(profile => `<button class="profile-choice${profile.id === activeProfileID ? " active" : ""}" type="button" data-action="selectProfile" data-profile-id="${esc(profile.id)}"><strong>${esc(profile.title)}</strong><span>${esc(profile.formats)}</span><small>${esc(profile.status)}</small></button>`).join("");
+    const groups = [];
+    profiles.forEach(profile => {
+      const category = profile.category || "Profiles";
+      let group = groups.find(item => item.category === category);
+      if (!group) {
+        group = { category, profiles: [] };
+        groups.push(group);
+      }
+      group.profiles.push(profile);
+    });
+    const list = groups.map(group => `<section class="profile-group"><h3>${esc(group.category)}</h3>${group.profiles.map(profile => `<button class="profile-choice${profile.id === activeProfileID ? " active" : ""}" type="button" data-action="selectProfile" data-profile-id="${esc(profile.id)}">${esc(profile.title)}</button>`).join("")}</section>`).join("");
     const document = selected
-      ? `<article class="profile-document"><header class="profile-document-heading"><div><h3>${esc(selected.title)}</h3><p>${esc(selected.formats)} <span>·</span> ${esc(selected.status)}</p></div><span class="beta-badge">Read Only</span></header><div class="profile-markdown">${renderProfileMarkdown(selected.markdown)}</div></article>`
+      ? `<article class="profile-document"><div class="profile-markdown">${renderProfileMarkdown(selected.markdown)}</div></article>`
       : '<div class="profile-document profile-empty">No profile documents are bundled.</div>';
     return `<section class="data-page profile-page" aria-label="UAC tag profiles"><div class="data-page-heading"><div><div class="tag-analyzer-heading-line"><h2>Profiles</h2><span class="beta-badge">Beta</span></div><p>Read the source-format profiles to see which metadata UAC packages should carry.</p></div><span class="data-page-count">${profiles.length} profile(s)</span></div><div class="profile-browser"><nav class="profile-list" aria-label="Format profiles">${list}</nav>${document}</div></section>`;
   }

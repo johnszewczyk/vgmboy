@@ -169,8 +169,7 @@ struct UACMemberRow: Identifiable {
 private struct UACProfileDocument: Sendable {
     let id: String
     let title: String
-    let formats: String
-    let status: String
+    let category: String
     let markdown: String
 }
 
@@ -187,15 +186,19 @@ final class UACManModel {
     private static let profileDocuments = loadProfileDocuments()
 
     private static func loadProfileDocuments() -> [UACProfileDocument] {
-        let definitions: [(id: String, title: String, formats: String, file: String, shared: Bool)] = [
-            ("base-uac", "UAC Base Profile", "Shared rules", "BASE-UAC-PROFILE", true),
-            ("system-names", "Canonical System Names", "UAC system identity", "CANONICAL-SYSTEM-NAMES", true),
-            ("pre-disc", "Pre-Disc Native Procedure", "SPC · VGM · NSF · GBS", "PRE-DISC-NATIVE", true),
-            ("spc", "Nintendo SNES SPC", ".spc", "SPC", false),
-            ("gbs", "Nintendo Game Boy GBS", ".gbs", "GBS", false),
-            ("nsf-nsfe", "Nintendo NES NSF / NSFE", ".nsf · .nsfe", "NSF-NSFE", false),
-            ("vgm-vgz", "VGM / VGZ", ".vgm · .vgz", "VGM", false),
-            ("psx-cdxa", "Sony PlayStation Disc Audio", "XA · CD-DA · APE · FLAC", "PSX-CDXA", false)
+        let definitions: [(id: String, title: String, category: String, file: String)] = [
+            ("base-uac", "UAC Base Profile", "Shared Rules", "BASE-UAC-PROFILE"),
+            ("platforms", "Platforms", "Shared Rules", "PLATFORMS"),
+            ("pre-disc", "Pre-Disc Native Procedure", "Format Procedures", "PRE-DISC-NATIVE"),
+            ("spc", "Nintendo SNES · SPC", "Format Procedures", "SPC"),
+            ("gbs", "Nintendo Game Boy · GBS", "Format Procedures", "GBS"),
+            ("nsf-nsfe", "Nintendo NES · NSF / NSFE", "Format Procedures", "NSF-NSFE"),
+            ("hes", "NEC TurboGrafx-16 · HES", "Format Procedures", "HES"),
+            ("kss", "Multi-Platform · KSS", "Format Procedures", "KSS"),
+            ("vgm-vgz", "VGM / VGZ", "Format Procedures", "VGM"),
+            ("psx-cdxa", "Sony PlayStation · Disc Audio", "Format Procedures", "PSX-CDXA"),
+            ("snesmusicorg", "SNESMusic.org · RSN", "Set-Based Procedures", "SNESMUSICORG"),
+            ("project2612", "Project 2612 · VGM", "Set-Based Procedures", "PROJECT2612")
         ]
         return definitions.map { definition in
             let url = Bundle.module.url(
@@ -205,14 +208,10 @@ final class UACManModel {
             ) ?? Bundle.module.url(forResource: definition.file, withExtension: "md")
             let markdown = url.flatMap { try? String(contentsOf: $0, encoding: .utf8) }
                 ?? "Profile document could not be loaded from the application bundle."
-            let status = definition.shared
-                ? "Shared rules"
-                : (markdown.localizedCaseInsensitiveContains("Draft pending fixture validation") ? "Draft" : "Profile")
             return UACProfileDocument(
                 id: definition.id,
                 title: definition.title,
-                formats: definition.formats,
-                status: status,
+                category: definition.category,
                 markdown: markdown
             )
         }
@@ -425,8 +424,7 @@ final class UACManModel {
                 [
                     "id": profile.id,
                     "title": profile.title,
-                    "formats": profile.formats,
-                    "status": profile.status,
+                    "category": profile.category,
                     "markdown": profile.markdown
                 ] as [String: Any]
             },

@@ -1,10 +1,10 @@
 # Compact Pre-Disc Native Procedure
 
 Apply the shared [UAC Base Profile](BASE-UAC-PROFILE.md). This procedure covers
-compact, file-native, non-PCM music members such as SPC, VGM/VGZ, NSF/NSFE, and
-GBS. It does not cover decoded disc audio. Reader-specific tag mappings belong
-in each format profile; only SPC is currently approved against its collection
-fixtures.
+compact, file-native, non-PCM music members such as SPC, VGM/VGZ, NSF/NSFE,
+GBS, HES, and KSS. It does not cover decoded disc audio. Reader-specific tag
+mappings belong in each format procedure; only SPC is currently approved
+against its collection fixtures.
 
 ## File and playlist model
 
@@ -18,7 +18,7 @@ fixtures.
   normalization such as VGZ to VGM, record the transformation and hash the
   normalized member according to the format profile.
 
-## Required review
+## Required Checks
 
 Check each format profile for its exact playable byte scope and reader-specific
 signature, header, version, track-count, chunk, and offset constraints. Compare

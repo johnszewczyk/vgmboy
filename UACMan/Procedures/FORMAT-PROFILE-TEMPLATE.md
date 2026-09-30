@@ -1,4 +1,4 @@
-# <Format> to UAC Profile
+# <Platform> · <Format> Format Procedure
 
 Apply the shared [UAC Base Profile](BASE-UAC-PROFILE.md). Keep this file to
 format-specific facts; do not copy its shared tag, hash, ownership, or
@@ -10,17 +10,23 @@ preservation rules.
 - Reader implementation and authoritative source-layout reference:
 - Supported variants and diagnostics:
 
-## Field mapping
+## Field Mapping
 
-| Source fact or tag | UAC location | Type and normalization | Omission or review rule |
+| Source Tag | UAC Tag | UAC Coded Tag | Tag Notes |
 | --- | --- | --- | --- |
 | | | | |
 
-## Format-specific exceptions
+Use the exact metadata tag name presented by the source reader in **Source
+Tag**. Use the canonical Title Case field name in **UAC Tag**. **UAC Coded
+Tag** is the manifest field path. Put only normalization, omission, and review
+rules in **Tag Notes**. Use `—` when a field is structural or derived rather
+than a displayed source metadata tag.
+
+## Format Procedures
 
 -
 
-## Required checks
+## Required Checks
 
 - Representative source fixtures and expected reader results:
 - Playlist/member mapping and duplicate handling:

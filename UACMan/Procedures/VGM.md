@@ -1,32 +1,45 @@
-# VGM / VGZ Profile
+# VGM / VGZ Format Procedure
 
 Apply the [UAC Base Profile](BASE-UAC-PROFILE.md) and
 [Pre-Disc Native Procedure](PRE-DISC-NATIVE.md). **Draft pending fixture
-validation.** MetaManCore's `vgm` reader handles `.vgm` and gzip-compressed
-`.vgz`; see [`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md).
+validation.** MetaManCore reads `.vgm` and gzip-compressed `.vgz` members.
+See [`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md).
 
-## Field mapping
+## Reader Scope
 
-| Source fact | UAC location | Type and normalization | Omission or review rule |
+- Reader ID: `vgm`; source members: `.vgm` and `.vgz`.
+- Reader: `MetaMan/Sources/MetaManCore/VGMMetadataReader.swift`.
+- The reader exposes the GD3 names `title_english`, `title_original`,
+  `game_english`, `game_original`, `system_english`, `system_original`,
+  `artist_english`, `artist_original`, `date`, `converted_by`, and `notes`.
+
+## Field Mapping
+
+| Source Tag | UAC Tag | UAC Coded Tag | Tag Notes |
 | --- | --- | --- | --- |
-| GD3 system | `game.console` | Canonical name from [`CANONICAL-SYSTEM-NAMES.md`](CANONICAL-SYSTEM-NAMES.md) | Prefer English, then original. Hold missing, mixed, or unknown labels for review. |
-| VGM header version | `member.metadata["Format"]` | `VGM v.<version>` | Use the encoded header version. |
-| GD3 title | `member.metadata["Title"]` | Prefer English, then original | Do not use a filename fallback. |
-| GD3 game | `member.metadata["Album"]` | Prefer English, then original | Keep distinct from package identity. |
-| GD3 artist | `member.metadata["Artist"]` | Prefer English, then original | Omit when empty. |
-| GD3 release date | `member.metadata["Date"]` | Populated source text | Use **Year** only when the value gives a year without a full date. |
-| GD3 converted-by | `member.metadata["Dumper"]` | Populated source text | Do not rename to `Encoded By`. |
-| GD3 notes | `member.metadata["Comment"]` | Useful nonempty source text | Omit empty values. |
-| Total/loop sample counts | Playback fields | Positive source-backed values | Use only when a playback consumer requires them; counts alone do not authorize synthetic loop objects. |
+| system_english / system_original | Platform | `game.platform` | Prefer populated English, then original. Preserve the GD3 platform label; VGM/VGZ is exempt from the limited aliases in [Platforms](PLATFORMS.md). |
+| — | Format | `track.metadata["Format"]` | Use the header version as `VGM v.<version>`. |
+| title_english / title_original | Title | `track.metadata["Title"]` | Prefer English, then original; do not use a filename fallback. |
+| game_english / game_original | Game Title | `track.metadata["Game Title"]` | Prefer English, then original; keep distinct from package title and soundtrack **Album**. |
+| artist_english / artist_original | Artist | `track.metadata["Artist"]` | Prefer English, then original; omit when empty. |
+| date | Date | `track.metadata["Date"]` | Preserve a complete source date. |
+| date | Year | `track.metadata["Year"]` | Use only when the source value is a year; do not derive a full date. |
+| converted_by | Dumper | `track.metadata["Dumper"]` | Preserve the GD3 credit; do not rename it **Encoded By**. |
+| notes | Comment | `track.metadata["Comment"]` | Keep useful nonempty source text. |
 
-## VGZ normalization and checks
+## Format Procedures
 
-The UAC packer does not accept `.vgz` as a playable member. Retain the exact
-VGZ as source evidence or a scoped attachment, decompress it to a VGM member,
-and record that transformation. Profile hashes cover the complete normalized
-VGM member, not emulator output or the compressed wrapper.
+- The UAC packer does not accept `.vgz` as a playable member. Retain the
+  original VGZ as source evidence or a scoped attachment, decompress it to a
+  VGM member, and record the transformation.
+- Profile hashes cover the complete normalized VGM member, not emulator
+  output or the compressed wrapper.
+- Preserve source bytes and the versioned UTF-16LE GD3 block. Do not promote
+  sample rate, clocks, chip flags, offsets, sample counts, or reader
+  diagnostics as music tags.
 
-Preserve the source bytes and versioned UTF-16LE GD3 block. Check header bounds,
-EOF/data/GD3/loop offsets, truncation, UTF-16 diagnostics, and contradictory
-timing. Do not promote sample rate, clocks, chip flags, offsets, or reader
-diagnostics as music tags.
+## Required Checks
+
+Check header bounds, EOF/data/GD3/loop offsets, truncation, UTF-16 diagnostics,
+and contradictory timing. Hold missing, mixed, or ambiguous GD3 platform
+labels for review.
