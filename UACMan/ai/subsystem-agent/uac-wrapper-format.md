@@ -101,13 +101,21 @@ Editing the value of a legacy field alone preserves its stored name; a
 deliberate rename can normalize it to Title Case. The Tag Analyzer reports the
 exact stored name so legacy casing remains auditable.
 
+Use package metadata **Album** for a useful release or soundtrack title;
+`game.title` remains the required structural identity. Do not create a
+**Game Title** metadata tag. Store a shared package credit as **Album Artist**
+in `game.metadata`; store a track-specific artist, author, performer, or
+composer as **Artist** on that logical track. Readers may project the package
+Album Artist as the track's display-artist fallback, but must not copy it into
+member or playlist-entry metadata.
+
 The envelope header remains binary version 1.0. `manifestVersion` versions the
 JSON contract independently: new writers emit manifest version 2, while
 current readers retain support for version 1 packages. Older readers that only
 know manifest version 1 reject new version-2 packages; ship updated consumers
 before distributing newly packed files.
 
-- `game` contains the logical game ID, canonical title/system, canonical
+- `game` contains the logical game ID, canonical title/platform, canonical
   release IDs, and extensible metadata. Common attachment pointers belong in
   this metadata map and resolve to ordinary members. For example,
   `game.metadata.cover_front` and `cover_back` may each be one reference object

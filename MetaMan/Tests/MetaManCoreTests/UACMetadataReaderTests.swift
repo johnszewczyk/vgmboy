@@ -93,6 +93,40 @@ func uacManifestLegacyTagNamesRemainReadable() throws {
     #expect(track.timing?.playLengthMs == 10_000)
 }
 
+@Test("UAC package Album Artist is the display fallback when a member has no Artist")
+func uacPackageAlbumArtistFallsBackToTrackProjection() throws {
+    let fixture = try makeUACMetadataFixture(
+        compressedManifest: false,
+        packageAlbum: "Package Album",
+        packageAlbumArtist: "Package Artist",
+        memberArtist: nil,
+        memberGame: nil,
+        memberSystem: nil
+    )
+    defer { try? FileManager.default.removeItem(at: fixture.directoryURL) }
+
+    let result = try MetaManCore.readResult(fileURL: fixture.packageURL)
+    let track = try #require(result.tracks.first?.document)
+    #expect(track.fields.game == "Package Game")
+    #expect(track.fields.system == "Sega Genesis")
+    #expect(track.fields.album == "Package Album")
+    #expect(track.fields.artist == "Package Artist")
+    #expect(track.tags.contains(where: { $0.name == "Artist" }) == false)
+}
+
+@Test("UAC track Artist takes precedence over package Album Artist")
+func uacTrackArtistOverridesPackageAlbumArtist() throws {
+    let fixture = try makeUACMetadataFixture(
+        compressedManifest: false,
+        packageAlbumArtist: "Package Artist",
+        memberArtist: "Track Artist"
+    )
+    defer { try? FileManager.default.removeItem(at: fixture.directoryURL) }
+
+    let result = try MetaManCore.readResult(fileURL: fixture.packageURL)
+    #expect(result.tracks.first?.document.fields.artist == "Track Artist")
+}
+
 @Test("UAC compressed manifests use the host decoder with the declared bounds")
 func uacCompressedManifestUsesInjectedCodec() throws {
     let fixture = try makeUACMetadataFixture(compressedManifest: true)
@@ -148,7 +182,12 @@ private func makeUACMetadataFixture(
     compressedManifest: Bool,
     subsongTracks: Bool = false,
     manifestVersion: Int = 1,
-    legacyLowercaseMetadata: Bool = false
+    legacyLowercaseMetadata: Bool = false,
+    packageAlbum: String? = nil,
+    packageAlbumArtist: String? = nil,
+    memberArtist: String? = "Manifest Artist",
+    memberGame: String? = "Manifest Game",
+    memberSystem: String? = "Mega Drive"
 ) throws -> UACMetadataFixture {
     let directoryURL = FileManager.default.temporaryDirectory
         .appendingPathComponent("MetaMan-uac-\(UUID().uuidString)", isDirectory: true)
@@ -158,6 +197,51 @@ private func makeUACMetadataFixture(
         ? .string(String(repeating: "x", count: 2_048))
         : .array([.string("kept"), .integer(7)])
     let memberRoot = manifestVersion == 2 ? "" : "variants/original/"
+    var gameMetadata: [String: UACJSONValue] = [
+        "region": .string("US"),
+        "cover_front": .array([.object([
+            "memberPath": .string("\(memberRoot)scans/front.png"),
+            "mediaType": .string("image/png")
+        ])]),
+        "cue_sheet": .object([
+            "memberPath": .string("\(memberRoot)disc.cue"),
+            "mediaType": .string("application/x-cue")
+        ])
+    ]
+    if let packageAlbum {
+        gameMetadata["Album"] = .string(packageAlbum)
+    }
+    if let packageAlbumArtist {
+        gameMetadata["Album Artist"] = .string(packageAlbumArtist)
+    }
+    var memberMetadata: [String: UACJSONValue] = legacyLowercaseMetadata
+        ? [
+            "title": .string("Manifest Song"),
+            "introLengthMs": .integer(1_250),
+            "loopLengthMs": .integer(3_500),
+            "playLengthMs": .integer(10_000),
+            "fadeLengthMs": .integer(500),
+            "emptyTag": .string("   "),
+            "custom": .integer(42)
+        ]
+        : [
+            "Title": .string("Manifest Song"),
+            "Intro Length (ms)": .integer(1_250),
+            "Loop Length (ms)": .integer(3_500),
+            "Play Length (ms)": .integer(10_000),
+            "Fade Length (ms)": .integer(500),
+            "emptyTag": .string("   "),
+            "custom": .integer(42)
+        ]
+    if let memberGame {
+        memberMetadata[legacyLowercaseMetadata ? "game" : "Game"] = .string(memberGame)
+    }
+    if let memberSystem {
+        memberMetadata[legacyLowercaseMetadata ? "system" : "System"] = .string(memberSystem)
+    }
+    if let memberArtist {
+        memberMetadata[legacyLowercaseMetadata ? "artist" : "Artist"] = .string(memberArtist)
+    }
     let manifest = UACManifest(
         manifestVersion: manifestVersion,
         packageID: "metaman-uac-fixture",
@@ -171,17 +255,7 @@ private func makeUACMetadataFixture(
             id: "package-game-id",
             title: "Package Game",
             console: "Sega Genesis",
-            metadata: [
-                "region": .string("US"),
-                "cover_front": .array([.object([
-                    "memberPath": .string("\(memberRoot)scans/front.png"),
-                    "mediaType": .string("image/png")
-                ])]),
-                "cue_sheet": .object([
-                    "memberPath": .string("\(memberRoot)disc.cue"),
-                    "mediaType": .string("application/x-cue")
-                ])
-            ],
+            metadata: gameMetadata,
             extensions: ["futureGame": .object(["kept": .bool(true)])]
         ),
         variants: [UACVariant(id: "original", label: "Original", kind: "source")],
@@ -194,31 +268,7 @@ private func makeUACMetadataFixture(
                 format: "vgm",
                 byteSize: 5,
                 blake3: String(repeating: "b", count: 64),
-                metadata: legacyLowercaseMetadata
-                    ? [
-                        "title": .string("Manifest Song"),
-                        "game": .string("Manifest Game"),
-                        "system": .string("Mega Drive"),
-                        "artist": .string("Manifest Artist"),
-                        "introLengthMs": .integer(1_250),
-                        "loopLengthMs": .integer(3_500),
-                        "playLengthMs": .integer(10_000),
-                        "fadeLengthMs": .integer(500),
-                        "emptyTag": .string("   "),
-                        "custom": .integer(42)
-                    ]
-                    : [
-                        "Title": .string("Manifest Song"),
-                        "Game": .string("Manifest Game"),
-                        "System": .string("Mega Drive"),
-                        "Artist": .string("Manifest Artist"),
-                        "Intro Length (ms)": .integer(1_250),
-                        "Loop Length (ms)": .integer(3_500),
-                        "Play Length (ms)": .integer(10_000),
-                        "Fade Length (ms)": .integer(500),
-                        "emptyTag": .string("   "),
-                        "custom": .integer(42)
-                    ],
+                metadata: memberMetadata,
                 extensions: ["future": .array([.string("kept"), .integer(7)])]
             ),
             UACMember(

@@ -564,11 +564,11 @@ button { cursor:pointer; }
 .tag-analyzer-issue-list { padding-top:5px; }
 .tag-analyzer-empty { padding:0 8px; }
 .profile-page { padding:0 12px 12px; }
-.profile-browser { display:grid; grid-template-columns:minmax(190px,245px) minmax(0,1fr); gap:10px; flex:1 1 auto; min-height:0; overflow:hidden; }
-.profile-list { display:flex; flex-direction:column; gap:10px; min-width:0; min-height:0; padding:9px; overflow:auto; border:1px solid var(--line); border-radius:var(--table-surface-radius); background:var(--panel); }
-.profile-group { display:flex; flex-direction:column; gap:3px; min-width:0; }
-.profile-group h3 { margin:3px 8px 4px; color:var(--muted); font-size:9px; font-weight:650; letter-spacing:.04em; text-transform:uppercase; }
-.profile-choice { display:block; width:100%; min-width:0; padding:8px 9px; border:1px solid transparent; border-radius:var(--table-cell-radius); background:transparent; color:var(--text); text-align:left; }
+.profile-browser { display:grid; grid-template-columns:minmax(190px,245px) minmax(0,1fr); gap:.25rem; flex:1 1 auto; min-height:0; overflow:hidden; }
+.profile-list { display:flex; flex-direction:column; gap:.25rem; min-width:0; min-height:0; padding:.25rem; overflow:auto; border:1px solid var(--line); border-radius:var(--table-surface-radius); background:var(--panel); }
+.profile-group { display:flex; flex-direction:column; gap:.25rem; min-width:0; }
+.profile-group h3 { margin:.25rem .5rem; color:var(--muted); font-size:9px; font-weight:650; letter-spacing:.04em; text-transform:uppercase; }
+.profile-choice { display:block; width:100%; min-width:0; padding:.25rem .5rem; border:1px solid transparent; border-radius:var(--table-cell-radius); background:transparent; color:var(--text); text-align:left; }
 .profile-choice:hover { background:var(--hover); }
 .profile-choice.active { border-color:var(--line); background:var(--selected); }
 .profile-document { min-width:0; min-height:0; overflow:auto; border:1px solid var(--line); border-radius:var(--table-surface-radius); background:var(--panel); }

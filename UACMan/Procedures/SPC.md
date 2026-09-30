@@ -1,4 +1,4 @@
-# Nintendo SNES · SPC Format Procedure
+# Nintendo SNES SPC Format Procedure
 
 Apply the [UAC Base Profile](BASE-UAC-PROFILE.md) and
 [Pre-Disc Native Procedure](PRE-DISC-NATIVE.md). MetaManCore reads SPC ID666
@@ -14,29 +14,31 @@ and xID6 metadata without starting an emulator. See
 
 ## Field Mapping
 
+Store the canonical platform once as structural
+`game.console = "Nintendo SNES"`. The stored member format is `spc`.
+
 | Source Tag | UAC Tag | UAC Coded Tag | Tag Notes |
 | --- | --- | --- | --- |
-| — | Platform | `game.platform` | Set once per package to **Nintendo SNES**. |
-| — | Game ID | `pack.metadata["Game ID"]` | Four-digit No-Intro ID; add only for a unique, high-confidence release match. |
-| Game | Game Title | `track.metadata["Game Title"]` | Keep separate from package title and **Album**. Preserve lists and variation. |
-| Song | Title | `track.metadata["Title"]` | Omit empty values. |
-| OST Title | OST Title | `track.metadata["OST Title"]` | Keep as soundtrack title; do not relabel it as **Album**. |
-| OST Disc | Disc Number | `track.metadata["Disc Number"]` | Preserve the source value; do not infer an OST disc. |
-| OST Track | OST Track | `track.metadata["OST Track"]` | This is not display order or **Track Number**. |
-| Artist | Artist | `track.metadata["Artist"]` | Preserve populated source text. |
-| Dumper | Dumper | `track.metadata["Dumper"]` | Preserve populated source text. |
-| Publisher | Publisher | `track.metadata["Publisher"]` | Preserve populated source text. |
-| Comment | Comment | `track.metadata["Comment"]` | Preserve populated source text. |
-| Date | Date | `track.metadata["Date"]` | Keep an explicit source date; do not use capture time. |
-| Year | Year | `track.metadata["Year"]` | Preserve the source year; do not derive it from **Date**. |
-| — | Format | `track.metadata["Format"]` | Use the SPC header revision as `SPC v.<revision>`; report disagreement with the text header. |
+| — | Game ID | `game.metadata["Game ID"]` | Four-digit No-Intro ID; add only for a unique, high-confidence release match. |
+| Game | Album | `game.metadata["Album"]` | Use the package-wide game/album title. Keep package identity in structural `game.title`. |
+| Song | Title | `members[].metadata["Title"]` | Song title for this SPC member. |
+| OST Title | OST Title | `members[].metadata["OST Title"]` | Keep the source's distinct soundtrack-title fact; do not overwrite Album when the values differ. |
+| OST Disc | Disc Number | `game.metadata["Disc Number"]` | Use only when the source establishes a disc in a multi-disc release. |
+| OST Track | OST Track | `members[].metadata["OST Track"]` | OST source index, not logical package order or **Track Number**. |
+| Artist | Album Artist / Artist | `game.metadata["Album Artist"]` or `members[].metadata["Artist"]` | Use Album Artist when the credit is shared across the package; use track Artist only for a track-specific credit. |
+| Dumper | Dumper | `game.metadata["Dumper"]` or `members[].metadata["Dumper"]` | Store a shared credit once; retain a differing per-track value on that member. |
+| Publisher | Publisher | `game.metadata["Publisher"]` or `members[].metadata["Publisher"]` | Store a shared fact once; retain a genuinely differing member value. |
+| Comment | Comment | `game.metadata["Comment"]` or `members[].metadata["Comment"]` | Store a shared comment once; retain a genuinely track-specific comment on that member. |
+| Date | Date | `game.metadata["Date"]` or `members[].metadata["Date"]` | Keep an explicit source date; do not use capture time. |
+| Year | Year | `game.metadata["Year"]` or `members[].metadata["Year"]` | Keep a distinct source year; do not derive it from Date. |
 
 ## Format Procedures
 
 - ID666 and xID6 can both supply a field. Keep both source blocks byte-for-byte
-  and record parser diagnostics or contradictory headers in the dated report.
-- The reader may supply a 150-second duration fallback. Do not write it as
-  **Play Length (ms)** without positive source timing.
+  and record contradictory headers or parser diagnostics in the dated report.
+- The reader may supply a 150-second duration fallback. Do not project it as
+  source playback timing. Keep positive source timing only when the playback
+  policy uses it.
 - Keep source tags and unknown xID6 items in the unchanged SPC bytes. Do not
   copy the reader document, bulk native tags, raw tag blocks, diagnostics, or
   header facts into ordinary metadata.

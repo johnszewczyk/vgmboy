@@ -1,4 +1,4 @@
-# Nintendo Game Boy · GBS Format Procedure
+# Nintendo Game Boy GBS Format Procedure
 
 Apply the [UAC Base Profile](BASE-UAC-PROFILE.md) and
 [Pre-Disc Native Procedure](PRE-DISC-NATIVE.md). **Draft pending fixture
@@ -10,31 +10,29 @@ sidecars. See [`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md).
 - Reader ID: `gbs`; source member: `.gbs`.
 - Readers: `MetaMan/Sources/MetaManCore/GameMusicMetadataReader.swift` and
   `GBSM3UMetadataReader.swift`.
-- Fixed-header fields are exposed as lowercase `game`, `artist`, and
-  `comment`. M3U entry titles are exposed as lowercase `title`; recognized M3U
-  comment keys retain their source spelling.
+- Header fields are `game`, `artist`, and `comment`. M3U entry titles are
+  `title`; recognized M3U comment keys keep their source spelling.
 
 ## Field Mapping
 
+Store the canonical platform once as structural
+`game.console = "Nintendo Game Boy"`. Store the member format as `gbs`.
+
 | Source Tag | UAC Tag | UAC Coded Tag | Tag Notes |
 | --- | --- | --- | --- |
-| — | Platform | `game.platform` | Set once per package to **Nintendo Game Boy**. |
-| — | Format | `track.metadata["Format"]` | Use the header version as `GBS v.<integer>`. |
-| game | Game Title | `track.metadata["Game Title"]` | Preserve populated source text; omit empty values. |
-| artist | Artist | `track.metadata["Artist"]` | Preserve populated source text. |
-| comment | Comment | `track.metadata["Comment"]` | Preserve populated source text. |
-| title | Title | `track.metadata["Title"]` | M3U entry title for its referenced source index; omit when empty. |
-| TITLE | Game Title | `track.metadata["Game Title"]` | M3U `@TITLE`; use common game identity, not a filename. |
-| ARTIST | Artist | `track.metadata["Artist"]` | M3U `@ARTIST`; use only when it supplies useful artist metadata. |
-| DATE | Date | `track.metadata["Date"]` | M3U `@DATE`; keep only a populated date. |
+| game / M3U `TITLE` | Album | `game.metadata["Album"]` | Package-wide game/album title; an M3U title comment overrides the header value. |
+| artist / M3U `ARTIST` | Album Artist | `game.metadata["Album Artist"]` | Package-wide artist; keep it once even when the reader repeats it for every M3U entry. |
+| comment | Comment | `game.metadata["Comment"]` | Package-wide header comment. |
+| M3U `title` | Title | `playlists[].entries[].title` | Entry title for its referenced source index. |
+| M3U `DATE` | Date | `game.metadata["Date"]` | Package-wide date comment. |
 
 ## Format Procedures
 
-- Other M3U comment names are reader output, not automatically approved UAC
-  tags. Add a mapping before projecting them.
-- Keep playlist order, source indexes, and positive authored timing in their
-  playback fields when a consumer uses them. Do not turn order, loop, fade, or
-  the reader's default duration into ordinary metadata.
+- Other M3U comment names are reader output, not approved UAC fields. Add a
+  mapping before projecting them.
+- Keep playlist order and source indexes in ordered playlist entries. Preserve
+  positive authored timing in the playlist's playback fields when a consumer
+  uses it; do not turn order, loop, fade, or reader defaults into tags.
 - Preserve the companion M3U bytes when it contributes titles, identity, or
   playback data.
 

@@ -1,7 +1,7 @@
 # Platforms
 
-Set one canonical package-level value at `game.platform`. Platform names are
-structural identity, not a repeated per-track tag. Match only complete,
+Set one canonical package-level value in structural `game.console`. Platform
+names are identity, not a repeated per-track tag. Match only complete,
 unambiguous source labels; do not infer a platform from a title, filename,
 directory, chip list, or partial text match.
 

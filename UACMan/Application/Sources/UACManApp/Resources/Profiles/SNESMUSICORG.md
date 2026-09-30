@@ -27,10 +27,9 @@ and its original RSNs are source-state evidence rather than UAC members.
 - Resolve the canonical Game ID using AudioMan's canonical-game database, whose
   release records come from the No-Intro SNES DAT. When one high-confidence
   Nintendo SNES DAT ID is established, surface its four-digit value as the
-  package-level **Game ID** tag. Keep this separate from package `game.title`,
-  track **Game Title**, **Album**, and **OST Title** until their values are
-  reconciled. Do not assign a Game ID from a multi-ID, medium-confidence, or
-  unmatched result.
+  package-level **Game ID** tag. Keep it separate from structural package
+  `game.title`, **Album**, and **OST Title**. Do not assign a Game ID from a
+  multi-ID, medium-confidence, or unmatched result.
 - Recommended package filename: `<Canonical No-Intro Title> [<GameID>].uac`.
   Keep the SPC member filename as `NN-Track Name.spc`; the prefix is the
   visible track sequence, not the package GameID.
@@ -38,42 +37,31 @@ and its original RSNs are source-state evidence rather than UAC members.
   `Review/Unidentified Games/Nintendo SNES/` and preserve the source RSN link.
   A plausible title match or shared hash alone does not resolve release,
   region, or revision identity.
-- Track tags use populated source values with Title Case display labels. Keep
-  **Album**, **Game Title**, and **OST Title** as separate fields. Use **Album**
-  only when the source has a distinct Album field; never create it by relabeling
-  `OST Title`. Keep source **Game Title** values and list multiplicity intact
-  until the later reconciliation pass.
-- Route packages with list-valued **Game Title** entries or per-track
-  **Game Title** variation to `Review/Game Title Conflicts/Nintendo SNES/`.
-  Preserve every value as stored; do not flatten a list or promote a value.
-- Preserve **Artist**, **Publisher**, and **Dumper** as those tag names. Map
-  the source year value to canonical **Year** without changing SPC source
-  bytes. Preserve a source **Date** as Date. Do not derive Year from Date.
+- Use the source **Game** value as package **Album** when useful. Do not create
+  **Game Title** tags or repeat the package title on every SPC member. Keep a
+  distinct source **OST Title** as **OST Title**; do not replace Album with it.
+- A shared source **Artist** becomes package **Album Artist**. Keep **Artist**
+  on a member only when the source credit is specifically for that track. Keep
+  **Publisher** and **Dumper** at package scope when shared, and at member scope
+  only when their source values genuinely differ by track.
+- Map a source year to canonical **Year** without changing SPC source bytes.
+  Preserve a source **Date** as Date. Do not derive Year from Date.
 - Map a populated source **OST Disc** value to the UAC track tag **Disc Number**;
-  retain its value exactly. The original SPC bytes continue to contain the
-  source field.
+  retain its value exactly only for a multi-disc release. Omit Disc Number for
+  a single-disc release. The original SPC bytes continue to contain the source
+  field.
 - Do not infer Developer from Publisher. Add Developer only when separately
   established by the user or an authoritative source.
-- Package `game.title`, package **Game ID**, member **Game Title**, **Album**,
-  and xID6 **OST Title** are distinct fields. Keep their current values
-  separate until the [discrepancy report](../Reports/SNESMusicOrg-Album-GameTitle-Discrepancy-2026-09-24.md)
-  is reviewed and an explicit mapping is adopted. Current indexed manifests
-  have no literal member **Album** field; do not synthesize one from **OST
-  Title**.
 
 ## Minimal fields and exceptions
 
-- Track projection: Title, Game Title, distinct source Album when present,
-  OST Title, Artist, Publisher, Developer when present, Dumper, Track Number,
-  Disc Number (from OST Disc), OST Track, Format, Year, Date,
-  and Comment when populated. Add explicit timing or other source-backed
-  fields only when meaningful.
-- Record **Format** on every SPC track using the version read from that
-  track's header, including repeated `SPC v.30`. Every valid version is
-  ordinary track metadata; a `SPC v.10` value is not an exceptional tag.
-  Keep each member's value. If a package contains multiple valid versions,
-  report the distribution and route that package to the mixed-version review
-  path. Review malformed, unreadable, or contradictory headers separately.
+- Track projection: **Title**, distinct **OST Title**, track-specific **Artist**,
+  **OST Track**, **Track Number** when the set's logical order is explicit,
+  **Disc Number** only for a multi-disc release, **Year**, **Date**, and
+  source-backed **Comment**. Shared release fields belong on the package.
+- Store the actual `.spc` member format in `members[].format`. Header revisions
+  and parser facts are not ordinary **Format** tags; report mixed or malformed
+  revision evidence when it affects source validation.
 - Do not emit Formats Scanned, schema version, a verbose container-version
   inventory, or an opaque Native Metadata field as ordinary tags.
 - Keep **Set Name**, **Set URL**, **Source RSN**, and **Source .rsn Hashes** at the

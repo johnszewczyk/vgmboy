@@ -34,7 +34,11 @@ value for the complete manifest. The ordered result returns one document per
 playable member unless explicit `subsong` playlist entries map individual
 decoder indexes inside that member; those entries become separate ordered
 track documents with their per-track metadata. Ordinary file entries do not
-duplicate member documents. See
+duplicate member documents. Common fields prefer logical-track metadata. A
+missing **Game** or platform value falls back to structural `game.title` or
+`game.console`; **Artist** and **Album** fall back to package **Album Artist**
+and **Album**. These are reader projections and do not create duplicate member
+tags. See
 [`uac-wrapper-format.md`](../UACMan/ai/subsystem-agent/uac-wrapper-format.md)
 for the complete binary and manifest contract.
 

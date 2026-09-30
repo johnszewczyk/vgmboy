@@ -94,6 +94,13 @@ enum UACMetadataReader {
             visibleTrackIndex: Int? = nil,
             loop: MetadataLoop? = nil
         ) -> MetadataTrack {
+            let trackArtist = string(metadataValue(metadata, key: "artist"))
+                ?? string(metadataValue(metadata, key: "albumArtist"))
+                ?? string(metadataValue(container.manifest.game.metadata, key: "albumArtist"))
+                // Older packages sometimes stored the shared credit as Artist.
+                ?? string(metadataValue(container.manifest.game.metadata, key: "artist"))
+            let trackAlbum = string(metadataValue(metadata, key: "album"))
+                ?? string(metadataValue(container.manifest.game.metadata, key: "album"))
             var scopedMetadata: [String: MetadataJSONValue] = [
                 "packageID": .string(container.manifest.packageID),
                 "game": gameValue,
@@ -119,10 +126,10 @@ enum UACMetadataReader {
                 format: "uac",
                 fields: MetadataFields(
                     title: string(metadataValue(metadata, key: "title")),
-                    game: string(metadataValue(metadata, key: "game")),
-                    system: string(metadataValue(metadata, key: "system")),
-                    artist: string(metadataValue(metadata, key: "artist")),
-                    album: string(metadataValue(metadata, key: "album")),
+                    game: string(metadataValue(metadata, key: "game")) ?? container.manifest.game.title,
+                    system: string(metadataValue(metadata, key: "system")) ?? container.manifest.game.console,
+                    artist: trackArtist,
+                    album: trackAlbum,
                     date: string(metadataValue(metadata, key: "date")),
                     year: string(metadataValue(metadata, key: "year")),
                     genre: string(metadataValue(metadata, key: "genre")),
@@ -258,6 +265,7 @@ enum UACMetadataReader {
         case "game": titleCaseKey = "Game"
         case "system": titleCaseKey = "System"
         case "artist": titleCaseKey = "Artist"
+        case "albumArtist": titleCaseKey = "Album Artist"
         case "album": titleCaseKey = "Album"
         case "date": titleCaseKey = "Date"
         case "year": titleCaseKey = "Year"
@@ -283,6 +291,7 @@ enum UACMetadataReader {
         case "game": return "Game"
         case "system": return "System"
         case "artist": return "Artist"
+        case "albumartist": return "Album Artist"
         case "album": return "Album"
         case "date": return "Date"
         case "year": return "Year"
