@@ -41,6 +41,7 @@ let rows = [
 const otherRow = { playlistId: 'other', path: '/music/other.spc', title: 'Other Track', game: 'Other', system: 'ZZZ' };
 let ended;
 let generation = 0;
+let nextFrameAdvanceMs = 250;
 const bridge = {
   playbackBackends: [{ id: 'libgme', supportsTempo: true, extensions: ['spc'] }],
   frontendSettingsLoad: async () => ({ appVolume: 1, repeatMode: 'off' }),
@@ -88,7 +89,11 @@ globalThis.innerWidth = 420;
 globalThis.innerHeight = 300;
 globalThis.devicePixelRatio = 2;
 globalThis.addEventListener = (name, callback) => windowListeners.set(name, callback);
-globalThis.requestAnimationFrame = (callback) => setImmediate(() => callback(performance.now() + 250));
+globalThis.requestAnimationFrame = (callback) => setImmediate(() => {
+  const advance = nextFrameAdvanceMs;
+  nextFrameAdvanceMs = 250;
+  callback(performance.now() + advance);
+});
 globalThis.cancelAnimationFrame = (frame) => clearImmediate(frame);
 globalThis.document = { documentElement: { dataset: {} }, querySelector(selector) {
   if (selector === '#lcd') return canvas;
@@ -264,16 +269,38 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the sidebar begins with a pixel-rendered search field');
   clickTarget('SEARCH LIBRARY');
   for (const character of 'sample') typeSearchKey(character);
-  const searchTargets = hitTargetSnapshot().map((target) => target.name);
+  const filteredSidebar = hitTargetSnapshot();
+  const searchTargets = filteredSidebar.map((target) => target.name);
   assert.ok(searchTargets.includes('Sample'), 'typing filters the sidebar tree to matching catalog games');
   assert.equal(searchTargets.includes('Other'), false, 'nonmatching games are hidden by the sidebar search');
+  const parentSystemRow = filteredSidebar.find((target) => target.name.endsWith('SNES'));
+  const childGameRow = filteredSidebar.find((target) => target.name === 'Sample');
+  assert.ok(parentSystemRow && childGameRow, 'the filtered system disclosure and game row are both visible');
+  assert.equal(childGameRow.textInset - parentSystemRow.textInset, 2 * childGameRow.glyphAdvance,
+    'sidebar game labels align exactly two glyph advances after their parent disclosure marker');
   typeSearchKey('Escape');
   assert.ok(hitTargetSnapshot().some((target) => target.name.includes('ZZZ')),
     'Escape clears the search and restores the complete sidebar tree');
   typeSearchKey('Escape');
+  const tabFrames = () => hitTargetSnapshot().filter((target) => target.reorderKind === 'tab');
+  const tabTitles = () => hitTargetSnapshot().filter((target) => target.playlistTabTitle);
+  const oldTabFrames = tabFrames();
+  const oldTabIDs = new Set(oldTabFrames.map((target) => target.reorderKey));
+  nextFrameAdvanceMs = 125;
   globalThis.ViewBoy.dispatch('newPlaylistTab');
+  await tick();
+  const openingFrames = tabFrames();
+  const openingTab = openingFrames.find((target) => !oldTabIDs.has(target.reorderKey));
+  const neighboringTab = openingFrames.find((target) => oldTabIDs.has(target.reorderKey));
+  assert.ok(openingTab && neighboringTab && openingTab.box.width > 0
+    && openingTab.box.width < neighboringTab.box.width,
+  'a new tab slides open with the shared eased width animation');
+  await tick();
+  const settledTabWidths = tabFrames().map((target) => target.box.width);
+  assert.ok(Math.max(...settledTabWidths) - Math.min(...settledTabWidths) <= 1,
+    'the opening tab reaches its equal-share resting width');
   const tabGap = () => {
-    const titles = hitTargetSnapshot().filter((target) => target.playlistTabTitle);
+    const titles = tabTitles();
     const closes = hitTargetSnapshot().filter((target) => target.playlistTabClose);
     assert.equal(titles.length, 2, 'both playlist tabs expose a clipped title region');
     assert.equal(closes.length, 2, 'each playlist tab exposes its unframed close glyph');
@@ -606,8 +633,6 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
 
   globalThis.ViewBoy.dispatch('newPlaylistTab');
   await tick();
-  const tabFrames = () => hitTargetSnapshot().filter((target) => target.reorderKind === 'tab');
-  const tabTitles = () => hitTargetSnapshot().filter((target) => target.playlistTabTitle);
   assert.ok(tabTitles().every((target) => target.textAlign === 'left'),
     'playlist tab labels remain left-aligned');
   const tabsBeforeDrag = tabFrames().sort((first, second) => first.box.x - second.box.x);
@@ -628,11 +653,29 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'neighboring tabs push aside during the drag');
   sendPointer('pointerup', (destinationTab.box.x + destinationTab.box.width * 0.85) / (canvas.width / 3),
     (destinationTab.box.y + destinationTab.box.height / 2) / (canvas.height / 3));
+  clickScreen((destinationTab.box.x + destinationTab.box.width * 0.85) / (canvas.width / 3),
+    (destinationTab.box.y + destinationTab.box.height / 2) / (canvas.height / 3));
   await tick();
   await tick();
   const savedTabOrder = savedPlaylistTabs.at(-1).tabs.map((tab) => tab.id);
   assert.deepEqual(savedTabOrder, [...tabIDsBeforeDrag.slice(1), tabIDsBeforeDrag[0]],
     'dropping a tab commits its pushed position to the native playlist snapshot');
+  const closingTabID = savedTabOrder[0];
+  const closeControl = hitTargetSnapshot().find((target) =>
+    target.playlistTabClose && target.playlistTabId === closingTabID);
+  assert.ok(closeControl, 'the reordered tab exposes its own close control');
+  nextFrameAdvanceMs = 125;
+  clickScreen((closeControl.box.x + closeControl.box.width / 2) / (canvas.width / 3),
+    (closeControl.box.y + closeControl.box.height / 2) / (canvas.height / 3));
+  await tick();
+  const closingFrame = tabFrames().find((target) => target.reorderKey === closingTabID);
+  const remainingFrame = tabFrames().find((target) => target.reorderKey !== closingTabID);
+  assert.ok(closingFrame && remainingFrame && closingFrame.box.width > 0
+    && closingFrame.box.width < remainingFrame.box.width,
+  'a closing tab slides shut as its neighbor expands');
+  await tick();
+  assert.equal(tabFrames().some((target) => target.reorderKey === closingTabID), false,
+    'the closed tab leaves the strip when its width animation finishes');
 
   bridge.databaseGames = async () => Array.from({ length: 80 }, (_, index) => ({
     rootId: 1000 + index,

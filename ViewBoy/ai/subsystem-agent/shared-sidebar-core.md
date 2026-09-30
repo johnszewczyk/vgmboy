@@ -1,6 +1,6 @@
 # System and Game Sidebar
 
-The LCD sidebar presents four views: Library, Current Queue, Favorites, and Open Path. The Library view groups the read-only catalog's games by system. Selecting a system opens or closes its game rows; selecting a game loads its tracks into the main pane.
+The LCD sidebar presents four views: Library, Current Queue, Favorites, and Open Path. The Library view groups the read-only catalog's games by system. Selecting a system opens or closes its game rows; child game labels align two bitmap glyph advances after the disclosure marker. Selecting a game loads its tracks into the main pane.
 
 `CatalogBrowserCore` reduces system disclosure and game selection through the native `databaseGroupState` bridge. JavaScript keeps the returned expansion and selection state for rendering. Disclosure follows the shared auto-resize motion setting and duration. `CatalogReader` supplies catalog games and tracks; the UI does not scan folders or write catalog data.
 

@@ -242,6 +242,7 @@ let equalizerFrameTiming = { lastFrameAt: Number.NaN };
 let equalizerAnimations = new Map();
 let columnLayoutAnimation = null;
 let lastColumnWidths = null;
+let tabLayoutAnimation = null;
 let reorderAnimation = null;
 let reorderPreview = null;
 let currentRenderTime = 0;
@@ -433,7 +434,45 @@ function activatePlaylistTab(id) {
   return true;
 }
 
+function captureTabWidths() {
+  const tabIDs = new Set(state.playlistTabs.map((tab) => tab.id));
+  return Object.fromEntries(hitTargets
+    .filter(({ widget }) => widget.meta.reorderKind === "tab" && tabIDs.has(widget.meta.reorderKey))
+    .map(({ widget, box }) => [widget.meta.reorderKey, box.width]));
+}
+
+function animateTabLayout(fromWidths, visualTabs) {
+  tabLayoutAnimation = null;
+  if (!fromWidths || !visualTabs.length || !state.playlistTabs.length) return;
+  const duration = animationMilliseconds("autoResizeAnimationMilliseconds");
+  if (!animationEnabled("autoResizeAnimationEnabled") || duration <= 0) return;
+  const priorWidth = Object.values(fromWidths).reduce((sum, width) => sum + width, 0);
+  if (priorWidth <= 0) return;
+  const targetWidth = priorWidth / state.playlistTabs.length;
+  const targetIDs = new Set(state.playlistTabs.map((tab) => tab.id));
+  const from = Object.fromEntries(visualTabs.map((tab) => [tab.id, fromWidths[tab.id] ?? 0]));
+  const to = Object.fromEntries(visualTabs.map((tab) => [tab.id, targetIDs.has(tab.id) ? targetWidth : 0]));
+  if (!visualTabs.some((tab) => from[tab.id] !== to[tab.id])) return;
+  tabLayoutAnimation = {
+    from,
+    to,
+    visualTabs,
+    startedAt: performance.now(),
+    duration,
+  };
+}
+
+function tabLayoutWeightAt(id, time = currentRenderTime) {
+  const animation = tabLayoutAnimation;
+  if (!animation || !Object.hasOwn(animation.to, id)) return 1;
+  const progress = Math.max(0, Math.min(1, (time - animation.startedAt) / animation.duration));
+  const eased = easeSelection(progress);
+  return animation.from[id] + (animation.to[id] - animation.from[id]) * eased;
+}
+
 function createPlaylistTab({ duplicateActive = true, title = null, playlist = null, gameKey = null } = {}) {
+  const priorWidths = state.tab !== "FAVORITES" && state.tab !== "SETTINGS"
+    ? captureTabWidths() : null;
   syncActivePlaylistTab();
   if (state.playlistTabs.length >= 64) return null;
   const source = activePlaylistTab();
@@ -447,6 +486,7 @@ function createPlaylistTab({ duplicateActive = true, title = null, playlist = nu
     scroll: duplicateActive && source ? source.scroll : 0,
   };
   state.playlistTabs.push(next);
+  if (priorWidths) animateTabLayout(priorWidths, [...state.playlistTabs]);
   state.activePlaylistTabId = next.id;
   tracks = [...next.playlist];
   state.activeQueue = [...next.playlist];
@@ -479,8 +519,12 @@ function closePlaylistTab(id = state.activePlaylistTabId) {
       state.tab = "LIBRARY";
     }
   } else {
+    const priorTabs = [...state.playlistTabs];
+    const priorWidths = state.tab !== "FAVORITES" && state.tab !== "SETTINGS"
+      ? captureTabWidths() : null;
     const wasActive = state.playlistTabs[index].id === state.activePlaylistTabId;
     state.playlistTabs.splice(index, 1);
+    if (priorWidths) animateTabLayout(priorWidths, priorTabs);
     if (wasActive) {
       const next = state.playlistTabs[Math.min(index, state.playlistTabs.length - 1)];
       state.activePlaylistTabId = null;
@@ -559,6 +603,8 @@ export function hitTargetSnapshot() {
     playlistTabTitle: widget.meta.playlistTabTitle === true,
     playlistTabClose: widget.meta.playlistTabClose === true,
     playlistTabId: widget.meta.playlistTabId ?? null,
+    textInset: widget.meta.inset ?? controlPaddingDots(),
+    glyphAdvance: fontProfile().advance,
     reorderKind: widget.meta.reorderKind ?? null,
     reorderKey: widget.meta.reorderKey ?? null,
     textAlign: widget.meta.align ?? "left",
@@ -1297,7 +1343,7 @@ function libraryRows() {
         rows.push({
           text: game.displayName || game.name,
           game,
-          indent: 7,
+          indent: 2 * fontProfile().advance,
           revealProgress: isTransitioning ? transition.progress : undefined,
         });
       }
@@ -1415,11 +1461,12 @@ function addCatalogPane(parent) {
     }, { clipChildren: true });
     const tabs = reorderPreview?.kind === "tab"
       ? reorderPreview.keys.map((id) => state.playlistTabs.find((tab) => tab.id === id)).filter(Boolean)
-      : state.playlistTabs;
+      : tabLayoutAnimation?.visualTabs ?? state.playlistTabs;
     tabs.forEach((tab) => {
+      const isExiting = !state.playlistTabs.some((entry) => entry.id === tab.id);
       const item = makeWidget(tabList, {
         direction: FlexDirection.Row,
-        flexGrow: 1,
+        flexGrow: tabLayoutWeightAt(tab.id),
         flexBasis: 0,
         flexShrink: 1,
         minWidth: 0,
@@ -1427,10 +1474,12 @@ function addCatalogPane(parent) {
         height: buttonStandardHeight(),
         alignItems: Align.Center,
       }, {
-        reorderContainer: true,
+        clipChildren: true,
+        tabLayoutVisual: true,
+        reorderContainer: !isExiting && !tabLayoutAnimation,
         reorderKind: "tab",
         reorderKey: tab.id,
-        onClick: () => activatePlaylistTab(tab.id),
+        onClick: isExiting ? undefined : () => activatePlaylistTab(tab.id),
         controlTitle: `TAB ${tab.title}`,
         paint(box) {
           if (tab.id === state.activePlaylistTabId) fillRect(box.x, box.y, box.width, box.height, 2);
@@ -1451,7 +1500,7 @@ function addCatalogPane(parent) {
         playlistTabId: tab.id,
         reorderKey: tab.id,
         controlTitle: `TAB ${tab.title}`,
-        onClick: () => activatePlaylistTab(tab.id),
+        onClick: isExiting ? undefined : () => activatePlaylistTab(tab.id),
       });
       label(item, "X", {
         width: buttonWidth("X"),
@@ -1462,8 +1511,9 @@ function addCatalogPane(parent) {
         inset: controlPaddingDots(),
         align: "center",
         playlistTabClose: true,
+        playlistTabId: tab.id,
         controlTitle: "X",
-        onClick: () => closePlaylistTab(tab.id),
+        onClick: isExiting || tabLayoutAnimation ? undefined : () => closePlaylistTab(tab.id),
       });
     });
     pixelButton(tabRow, "[+]", () => createPlaylistTab({ duplicateActive: true }), {
@@ -2178,7 +2228,7 @@ function collect(widget, parentX = 0, parentY = 0, output = [], inheritedClip = 
   const entry = { widget, box, clip: inheritedClip };
   output.push(entry);
   if (widget.meta.id) boxesById.set(widget.meta.id, box);
-  if (widget.meta.onClick || widget.meta.columnHeader) hitTargets.push(entry);
+  if (widget.meta.onClick || widget.meta.columnHeader || widget.meta.tabLayoutVisual) hitTargets.push(entry);
   const childClip = widget.meta.clipChildren ? intersectBoxes(inheritedClip, box) : inheritedClip;
   for (const child of widget.children) collect(child, box.x, box.y, output, childClip);
   return output;
@@ -2244,8 +2294,8 @@ function animateSelectionFrame(time) {
 function animateColumnLayoutFrame(time) {
   columnAnimationFrame = 0;
   const isDragging = pointerInteraction?.kind === "reorder" && pointerInteraction.dragging;
-  if (!columnLayoutAnimation && !reorderAnimation && !isDragging) return;
-  const timing = columnLayoutAnimation || reorderAnimation || pointerInteraction;
+  if (!columnLayoutAnimation && !tabLayoutAnimation && !reorderAnimation && !isDragging) return;
+  const timing = columnLayoutAnimation || tabLayoutAnimation || reorderAnimation || pointerInteraction;
   if (!animationFrameIsDue(timing, time)) {
     columnAnimationFrame = requestAnimationFrame(animateColumnLayoutFrame);
     return;
@@ -2257,8 +2307,10 @@ function animateColumnLayoutFrame(time) {
   }
   if (reorderAnimation
     && time - reorderAnimation.startedAt >= reorderAnimation.duration) reorderAnimation = null;
+  if (tabLayoutAnimation
+    && time - tabLayoutAnimation.startedAt >= tabLayoutAnimation.duration) tabLayoutAnimation = null;
   render(false, true, time);
-  if ((columnLayoutAnimation || reorderAnimation) && !columnAnimationFrame) {
+  if ((columnLayoutAnimation || tabLayoutAnimation || reorderAnimation) && !columnAnimationFrame) {
     columnAnimationFrame = requestAnimationFrame(animateColumnLayoutFrame);
   }
 }
@@ -2354,7 +2406,7 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
     selectionAnimation = null;
     paintSelectionAt(nextBand?.y ?? null);
   }
-  if ((columnLayoutAnimation || reorderAnimation) && !columnAnimationFrame) {
+  if ((columnLayoutAnimation || tabLayoutAnimation || reorderAnimation) && !columnAnimationFrame) {
     columnAnimationFrame = requestAnimationFrame(animateColumnLayoutFrame);
   }
   const selected = visibleTracks()[state.selectedTrack];
