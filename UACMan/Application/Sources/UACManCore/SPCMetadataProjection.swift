@@ -49,9 +49,10 @@ public enum SPCMetadataProjector {
         }
 
         var shared: [String: UACJSONValue] = [:]
-        for key in ["Artist", "Date", "Year", "Genre", "Comment", "Copyright", "Encoded By"] {
+        for key in ["Date", "Year", "Genre", "Comment", "Copyright", "Encoded By"] {
             if let value = member[key] { shared[key] = value }
         }
+        if let artist = member["Artist"] { shared["Album Artist"] = artist }
         return SPCMetadataProjection(memberFields: member, sharedCandidates: shared)
     }
 
@@ -144,11 +145,13 @@ public enum SPCMetadataProjector {
                 guard let path = members[index]["path"] as? String,
                       itemByPath[path] != nil,
                       var metadata = members[index]["metadata"] as? [String: Any] else { continue }
-                for (key, value) in promotedValues where metadata[key] != nil {
-                    if let metadataData = try? JSONSerialization.data(withJSONObject: ["value": metadata[key]!], options: [.sortedKeys]),
+                for (key, value) in promotedValues {
+                    let memberKey = key == "Album Artist" ? "Artist" : key
+                    guard let memberValue = metadata[memberKey] else { continue }
+                    if let metadataData = try? JSONSerialization.data(withJSONObject: ["value": memberValue], options: [.sortedKeys]),
                        let promotedData = try? JSONSerialization.data(withJSONObject: ["value": value], options: [.sortedKeys]),
                        metadataData == promotedData {
-                        metadata.removeValue(forKey: key)
+                        metadata.removeValue(forKey: memberKey)
                     }
                 }
                 members[index]["metadata"] = metadata

@@ -197,6 +197,7 @@ final class UACManModel {
             ("kss", "KSS", "Format Procedures", "KSS"),
             ("vgm-vgz", "VGM / VGZ", "Format Procedures", "VGM"),
             ("psx-cdxa", "Sony PlayStation", "Format Procedures", "PSX-CDXA"),
+            ("base-set", "Base Set Profile", "Set-Based Procedures", "BASE-SET-PROFILE"),
             ("snesmusicorg", "SNESMusic.org · RSN", "Set-Based Procedures", "SNESMUSICORG"),
             ("project2612", "Project 2612 · VGM", "Set-Based Procedures", "PROJECT2612")
         ]

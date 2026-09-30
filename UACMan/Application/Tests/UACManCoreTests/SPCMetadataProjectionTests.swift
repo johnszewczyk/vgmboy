@@ -25,6 +25,7 @@ import UACWrapperCore
     #expect(projection.memberFields["Album"] == nil)
     #expect(projection.sharedCandidates["Album"] == nil)
     #expect(projection.memberFields["Artist"] == .string("Composer"))
+    #expect(projection.sharedCandidates["Album Artist"] == .string("Composer"))
 }
 
 @Test func sharedMetadataRequiresEveryTrackToAgree() {
@@ -72,7 +73,8 @@ import UACWrapperCore
     #expect(member.metadata["Artist"] == nil)
     #expect(member.metadata["Album"] == nil)
     #expect(manifest.game.metadata["sourceGameTitle"] == nil)
-    #expect(manifest.game.metadata["Artist"] == .string("Track artist"))
+    #expect(manifest.game.metadata["Artist"] == nil)
+    #expect(manifest.game.metadata["Album Artist"] == .string("Track artist"))
     #expect(manifest.game.metadata["Album"] == nil)
     #expect(manifest.game.metadata["curatorNote"] == .string("keep"))
 }
