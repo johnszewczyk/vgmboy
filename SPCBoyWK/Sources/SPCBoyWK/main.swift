@@ -169,6 +169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                       case "sidebarPaths": app.ui?.setSidebarMode?.("paths"); break;
                       case "sidebarConsoles": app.ui?.setSidebarMode?.("consoles"); break;
                       case "favoritesPlaylist": app.ui?.showFavoritesPlaylist?.(); break;
+                      case "playbackHistory": app.ui?.showPlaybackHistory?.(); break;
                       case "settings": window.spcBoyWK?.openOptionsWindow?.(); break;
                       default: break;
                     }
@@ -330,6 +331,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         viewMenu.addItem(menuItem("Path View", command: .sidebarPaths, action: #selector(sidebarPaths(_:))))
         viewMenu.addItem(.separator())
         viewMenu.addItem(menuItem("Favorites Playlist", command: .favoritesPlaylist, action: #selector(favoritesPlaylist(_:))))
+        viewMenu.addItem(menuItem("Playback History", command: .playbackHistory, action: #selector(playbackHistory(_:))))
         viewMenuItem.submenu = viewMenu
         mainMenu.addItem(viewMenuItem)
 
@@ -412,6 +414,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
     @objc private func minimizeWindow(_ sender: Any?) { (NSApp.keyWindow ?? window)?.performMiniaturize(sender) }
     @objc private func favoritesPlaylist(_ sender: Any?) { dispatch(.favoritesPlaylist) }
+    @objc private func playbackHistory(_ sender: Any?) { dispatch(.playbackHistory) }
     @objc private func sidebarPaths(_ sender: Any?) { dispatch(.sidebarPaths) }
     @objc private func sidebarConsoles(_ sender: Any?) { dispatch(.sidebarConsoles) }
     @objc private func settings(_ sender: Any?) {

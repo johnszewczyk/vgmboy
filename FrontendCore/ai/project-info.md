@@ -10,7 +10,8 @@ CocoaSpice, SPCBoyWK, and ViewBoy frontends.
 - Archive listing, process execution, materialization, cache, and lease cores.
 - Archive playback materialization consumes the UAC wrapper API owned by
   `VGMMan/UACMan`.
-- Local-file browser, favorite identity/store, and playlist identity cores.
+- Local-file browser, favorite identity/store, playback-history store, and
+  playlist identity cores.
 - Typed frontend preference validation and storage coordination.
 - Playback request, queue, and native transport coordination.
 

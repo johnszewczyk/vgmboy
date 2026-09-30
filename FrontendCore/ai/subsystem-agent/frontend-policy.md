@@ -8,8 +8,10 @@ contracts shared by CocoaSpice and SPCBoyWK.
 ## Ownership
 
 - `LocalFileBrowserCore` owns explicit local-folder navigation values.
-- `FavoriteTrackCore`, `FavoriteStoreCore`, and `PlaylistIdentityCore` own stable
-  identities, group semantics, ordered shared persistence, and playlist identity.
+- `FavoriteTrackCore`, `FavoriteStoreCore`, `PlaybackHistoryCore`, and
+  `PlaylistIdentityCore` own stable identities, group semantics, shared
+  persistence, and playlist identity. PlaybackHistoryCore stores successful
+  play events as timestamped JSON records shared by the native player hosts.
 - `FrontendPreferencesCore` owns typed option organization, shared values, and
   playlist preference validation (known columns, fixed positions, one-visible
   fallback, and explicit sortable-column requests); each frontend retains its
@@ -73,12 +75,16 @@ contracts shared by CocoaSpice and SPCBoyWK.
   padding contract. It is a presentation setting carried through the WebKit
   snapshot, not a per-column rule or a second pixel-geometry implementation.
 - App-specific UserDefaults keys and presentation state remain in the frontend.
+- History entries use event IDs rather than song IDs so repeated plays remain
+  distinct rows. Persist absolute Unix milliseconds and source/member identity;
+  display formatting and queue selection remain frontend concerns.
 
 ## Files
 
 - `Sources/LocalFileBrowserCore/`
 - `Sources/FavoriteTrackCore/`
 - `Sources/FavoriteStoreCore/`
+- `Sources/PlaybackHistoryCore/`
 - `Sources/PlaylistIdentityCore/`
 - `Sources/FrontendPreferencesCore/`
 - `Sources/PlaybackRequestCore/`

@@ -205,25 +205,47 @@ struct TrackItem: Identifiable, Hashable, Sendable {
     let trackIndex: Int
     let trackCount: Int
     let trackNumber: Int?
+    let historyEntryID: String?
+    let historyTimestampMilliseconds: Int64?
 
-    init(url: URL, trackIndex: Int = 0, trackCount: Int = 1, trackNumber: Int? = nil) {
+    init(
+        url: URL,
+        trackIndex: Int = 0,
+        trackCount: Int = 1,
+        trackNumber: Int? = nil,
+        historyEntryID: String? = nil,
+        historyTimestampMilliseconds: Int64? = nil
+    ) {
         self.source = TrackSource(fileURL: url)
         self.trackIndex = max(0, trackIndex)
         self.trackCount = max(1, trackCount)
         self.trackNumber = trackNumber
+        self.historyEntryID = historyEntryID
+        self.historyTimestampMilliseconds = historyTimestampMilliseconds
     }
 
-    init(archiveURL: URL, entryPath: String, trackIndex: Int = 0, trackCount: Int = 1, trackNumber: Int? = nil) {
+    init(
+        archiveURL: URL,
+        entryPath: String,
+        trackIndex: Int = 0,
+        trackCount: Int = 1,
+        trackNumber: Int? = nil,
+        historyEntryID: String? = nil,
+        historyTimestampMilliseconds: Int64? = nil
+    ) {
         self.source = TrackSource(archiveURL: archiveURL, entryPath: entryPath)
         self.trackIndex = max(0, trackIndex)
         self.trackCount = max(1, trackCount)
         self.trackNumber = trackNumber
+        self.historyEntryID = historyEntryID
+        self.historyTimestampMilliseconds = historyTimestampMilliseconds
     }
 
     var url: URL { source.sourceURL }
     var revealURL: URL { source.revealURL }
     var id: String {
-        PlaylistTrackIdentity.trackID(
+        if let historyEntryID { return historyEntryID }
+        return PlaylistTrackIdentity.trackID(
             sourcePath: url.path,
             archiveEntry: archiveEntryPath,
             trackIndex: trackIndex
@@ -288,7 +310,9 @@ struct TrackItem: Identifiable, Hashable, Sendable {
             entryPath: archiveEntryPath,
             trackIndex: trackIndex,
             trackCount: trackCount,
-            trackNumber: trackNumber
+            trackNumber: trackNumber,
+            historyEntryID: historyEntryID,
+            historyTimestampMilliseconds: historyTimestampMilliseconds
         )
         guard let data = try? JSONEncoder().encode(payload),
               let encoded = String(data: data, encoding: .utf8) else {
@@ -306,14 +330,18 @@ struct TrackItem: Identifiable, Hashable, Sendable {
                     entryPath: entryPath,
                     trackIndex: payload.trackIndex,
                     trackCount: payload.trackCount,
-                    trackNumber: payload.trackNumber
+                    trackNumber: payload.trackNumber,
+                    historyEntryID: payload.historyEntryID,
+                    historyTimestampMilliseconds: payload.historyTimestampMilliseconds
                 )
             }
             return TrackItem(
                 url: URL(fileURLWithPath: payload.path),
                 trackIndex: payload.trackIndex,
                 trackCount: payload.trackCount,
-                trackNumber: payload.trackNumber
+                trackNumber: payload.trackNumber,
+                historyEntryID: payload.historyEntryID,
+                historyTimestampMilliseconds: payload.historyTimestampMilliseconds
             )
         }
 
@@ -337,6 +365,8 @@ private struct PersistedTrackItem: Codable {
     let trackIndex: Int
     let trackCount: Int
     let trackNumber: Int?
+    let historyEntryID: String?
+    let historyTimestampMilliseconds: Int64?
 }
 
 struct PlaylistColumnWidthHints: Equatable, Sendable {

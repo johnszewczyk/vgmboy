@@ -12,6 +12,7 @@ let package = Package(
         .library(name: "FavoriteTrackCore", targets: ["FavoriteTrackCore"]),
         .library(name: "PlaylistIdentityCore", targets: ["PlaylistIdentityCore"]),
         .library(name: "FavoriteStoreCore", targets: ["FavoriteStoreCore"]),
+        .library(name: "PlaybackHistoryCore", targets: ["PlaybackHistoryCore"]),
         .library(name: "FrontendPreferencesCore", targets: ["FrontendPreferencesCore"]),
         .library(name: "PlaybackRequestCore", targets: ["PlaybackRequestCore"]),
         .library(name: "PlaybackQueueCore", targets: ["PlaybackQueueCore"]),
@@ -39,6 +40,7 @@ let package = Package(
             dependencies: ["FavoriteTrackCore"],
             linkerSettings: [.linkedLibrary("sqlite3")]
         ),
+        .target(name: "PlaybackHistoryCore", dependencies: ["FavoriteStoreCore"]),
         .target(name: "FrontendPreferencesCore"),
         .target(name: "PlaybackRequestCore"),
         .target(name: "PlaybackQueueCore", dependencies: ["PlaybackRequestCore"]),

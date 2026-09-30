@@ -10,6 +10,7 @@ import FavoriteTrackCore
 import FrontendPreferencesCore
 import Foundation
 import PlaybackQueueCore
+import PlaybackHistoryCore
 import PlaybackTransportCore
 import PlaylistIdentityCore
 import VGMBoyEndpointCore
@@ -216,6 +217,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             favoritesList: (...args) => request("favoritesList", args),
             favoritesToggle: (...args) => request("favoritesToggle", args),
             favoritesRevision: () => request("favoritesRevision"),
+            playbackHistoryList: () => request("playbackHistoryList"),
+            playbackHistoryRecord: (...args) => request("playbackHistoryRecord", args),
             frontendOptionsManifest: () => request("frontendOptionsManifest"),
             frontendSettingsLoad: (...args) => request("frontendSettingsLoad", args),
             frontendSettingsSave: (...args) => request("frontendSettingsSave", args),
@@ -572,6 +575,19 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return try favoriteResponses(store.snapshots(), order: favoriteSortOrder(args.dropFirst().first))
         case "favoritesRevision":
             return try FavoriteStore().revision()
+        case "playbackHistoryList":
+            return try Self.object(PlaybackHistoryStore().records())
+        case "playbackHistoryRecord":
+            guard let row = args.first as? [String: Any],
+                  let snapshot = favoriteSnapshots([row]).first else {
+                throw BridgeError.invalidArguments
+            }
+            let playedAtMilliseconds = (args.dropFirst().first as? NSNumber)?.int64Value
+            let playedAt = playedAtMilliseconds.map {
+                Date(timeIntervalSince1970: Double($0) / 1_000)
+            } ?? Date()
+            _ = try PlaybackHistoryStore().record(snapshot, at: playedAt)
+            return true
         case "frontendOptionsManifest":
             return try Self.object(FrontendOptionsManifest.v1)
         case "frontendSettingsLoad":

@@ -33,6 +33,9 @@ content strings for column measurement.
   bounded local, mixed, and Favorites lists use the Codable
   `CatalogPlaylistSortRequest` and receive only ordered row IDs. Neither route
   permits a renderer-owned field comparator.
+- The `timestamp` sort column accepts epoch milliseconds supplied by a
+  frontend row. Catalog records leave that field absent; timestamp sorting is
+  used by timestamp-bearing projections such as playback history.
 - Empty title, game, author, system, and duration values use the visible
   fallbacks (`displayName`, group name, `—`, `—`, `—`) in every frontend.
 - There are no AppKit, SwiftUI, WebKit, DOM, decoder, scanner, write, or

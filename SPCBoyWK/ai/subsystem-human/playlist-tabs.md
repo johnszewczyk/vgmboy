@@ -11,6 +11,11 @@ Playlist” in the sidebar opens that source in its own tab. Command-1 through
 Command-9 selects the matching tab from left to right. Command-W or a tab's
 close button closes it; closing the final tab closes the main window.
 
+Command-Shift-H replaces the current playlist with the shared playback history,
+newest play first. The sortable Date/Time column shows local timestamps as
+`YYYY.MM.DD-HH.MM.SS.MS` and automatically hides when the displayed rows have no
+history timestamp.
+
 Playlist columns retain their saved order. Columns with no meaningful content
 are hidden for the active playlist and reappear when content returns, while
 manually hidden columns stay hidden. The `#` column always numbers visible rows

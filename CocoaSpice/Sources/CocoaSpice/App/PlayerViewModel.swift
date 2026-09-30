@@ -10,6 +10,7 @@ import FavoriteStoreCore
 import FavoriteTrackCore
 import OSLog
 import Observation
+import PlaybackHistoryCore
 import PlaybackQueueCore
 import PlaybackTransportCore
 import UniformTypeIdentifiers
@@ -63,6 +64,7 @@ private extension CatalogPlaylistSortColumn {
         case .system: "System"
         case .path: "Path"
         case .length: "Length"
+        case .timestamp: "Date/Time"
         }
     }
 }
@@ -85,6 +87,7 @@ final class PlayerViewModel {
         .init(id: "author"),
         .init(id: "system"),
         .init(id: "path"),
+        .init(id: "timestamp"),
         .init(id: "length"),
         .init(id: "fileSize", isSortable: false)
     ])
@@ -1557,6 +1560,74 @@ final class PlayerViewModel {
         statusText = playlist.isEmpty ? "No favorites yet." : "Showing \(playlist.count) favorite tracks."
     }
 
+    func showPlaybackHistory() {
+        Task { @MainActor [weak self] in
+            do {
+                let records = try await Task.detached(priority: .userInitiated) {
+                    try PlaybackHistoryStore().records()
+                }.value
+                guard let self else { return }
+                let rows = records.map { record -> (TrackItem, TrackMetadata) in
+                    let identity = record.snapshot.identity
+                    let track: TrackItem
+                    if let entry = identity.archiveEntry {
+                        track = TrackItem(
+                            archiveURL: URL(fileURLWithPath: identity.sourcePath),
+                            entryPath: entry,
+                            trackIndex: identity.trackIndex,
+                            trackCount: identity.trackCount,
+                            trackNumber: identity.trackCount > 1 ? identity.trackIndex + 1 : nil,
+                            historyEntryID: record.id,
+                            historyTimestampMilliseconds: record.timestampMilliseconds
+                        )
+                    } else {
+                        track = TrackItem(
+                            url: URL(fileURLWithPath: identity.sourcePath),
+                            trackIndex: identity.trackIndex,
+                            trackCount: identity.trackCount,
+                            trackNumber: identity.trackCount > 1 ? identity.trackIndex + 1 : nil,
+                            historyEntryID: record.id,
+                            historyTimestampMilliseconds: record.timestampMilliseconds
+                        )
+                    }
+                    let metadata = TrackMetadata(
+                        game: record.snapshot.game,
+                        song: record.snapshot.title,
+                        system: record.snapshot.system,
+                        author: record.snapshot.author,
+                        comment: "",
+                        introLengthMs: 0,
+                        loopLengthMs: 0,
+                        playLengthMs: record.snapshot.playLengthMilliseconds,
+                        fadeLengthMs: 0
+                    )
+                    return (track, metadata)
+                }
+                self.playlistMetadataTaskOwner.cancel()
+                self.playlist = rows.map(\.0)
+                self.metadataCache = Dictionary(uniqueKeysWithValues: rows.map { ($0.0.id, $0.1) })
+                self.syncManualPlaylistOrder()
+                self.playlistSortColumn = .timestamp
+                self.playlistSortDirection = .descending
+                self.applyPlaylistSort(column: .timestamp, direction: .descending, updateStatus: false)
+                AppSessionPersistence.savePlaylistSortState(
+                    columnRawValue: CatalogPlaylistSortColumn.timestamp.rawValue,
+                    directionRawValue: CatalogPlaylistSortDirection.descending.rawValue
+                )
+                self.selectedTrackID = self.playlist.first?.id
+                self.selectedTrackIDs = self.selectedTrackID.map { [$0] } ?? []
+                self.playlistColumnWidthHints = nil
+                self.refreshPlaylistTotalDurationReadout()
+                self.refreshPlaylistMetadata()
+                self.statusText = self.playlist.isEmpty
+                    ? "No playback history yet."
+                    : "Showing \(self.playlist.count) playback history entries."
+            } catch {
+                self?.statusText = "Could not load playback history: \(error.localizedDescription)"
+            }
+        }
+    }
+
     func cycleLibrarySidebarMode() {
         let modes: [SidebarBrowserMode] = [.games, .files]
         let index = modes.firstIndex(of: sidebarBrowserMode) ?? -1
@@ -2330,6 +2401,7 @@ final class PlayerViewModel {
             let gameTitle = seedMetadata?.game.nonEmpty ?? track.groupDisplayName
             statusText = "\(gameTitle) • \(songTitle)"
             updateRemoteTransportState()
+            recordPlaybackHistory(track: track, metadata: seedMetadata, playedAt: Date())
         } catch is CancellationError {
             if playbackRequestState.isCurrent(generation) {
                 isPlaying = await playback.statusSnapshot().isPlaying
@@ -2350,6 +2422,31 @@ final class PlayerViewModel {
         isLoading = false
         playbackRequestState.finish(generation: generation)
         refreshPlaylistMetadata()
+    }
+
+    private func recordPlaybackHistory(track: TrackItem, metadata: TrackMetadata?, playedAt: Date) {
+        let snapshot = FavoriteTrackSnapshot(
+            identity: FavoriteTrackIdentity(
+                sourcePath: track.url.path,
+                archiveEntry: track.archiveEntryPath,
+                trackIndex: track.trackIndex,
+                trackCount: track.trackCount
+            ),
+            filename: track.filename,
+            title: metadata?.song ?? track.displayName,
+            game: metadata?.game ?? track.groupDisplayName,
+            author: metadata?.author ?? "",
+            system: metadata?.system ?? "",
+            playLengthMilliseconds: metadata?.playLengthMs ?? 0
+        )
+        Task.detached(priority: .utility) {
+            do {
+                _ = try PlaybackHistoryStore().record(snapshot, at: playedAt)
+            } catch {
+                Logger(subsystem: "com.local.cocoaspice", category: "playback-history")
+                    .error("Could not record playback history: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     var currentSongTitle: String {
@@ -3314,7 +3411,7 @@ final class PlayerViewModel {
     private func playlistSortDependsOnMetadata(_ column: CatalogPlaylistSortColumn?) -> Bool {
         guard let column else { return false }
         switch column {
-        case .index, .trackNumber, .file, .path:
+        case .index, .trackNumber, .file, .path, .timestamp:
             return false
         case .title, .game, .author, .system, .length:
             return true

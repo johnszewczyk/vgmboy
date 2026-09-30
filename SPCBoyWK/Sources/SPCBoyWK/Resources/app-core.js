@@ -12,7 +12,8 @@ const COLUMN_DEFS = [
   { id: "artist", label: "Artist" },
   { id: "system", label: "System" },
   { id: "path", label: "Path" },
-  { id: "lengthLabel", label: "Length", className: "mono col-length" }
+  { id: "lengthLabel", label: "Length", className: "mono col-length" },
+  { id: "timestamp", label: "Date/Time", className: "mono col-timestamp" }
 ];
 const DEFAULT_COLUMN_ORDER = COLUMN_DEFS.map((column) => column.id);
 const DEFAULT_COLUMN_WIDTHS = Object.freeze({
@@ -24,7 +25,8 @@ const DEFAULT_COLUMN_WIDTHS = Object.freeze({
   artist: 16,
   system: 10,
   path: 28,
-  lengthLabel: 8
+  lengthLabel: 8,
+  timestamp: 24
 });
 const DEFAULT_COLUMN_VISIBILITY = Object.freeze(Object.fromEntries(COLUMN_DEFS.map((column) => [column.id, true])));
 const EQUALIZER_BAND_FREQUENCIES = Object.freeze([31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]);

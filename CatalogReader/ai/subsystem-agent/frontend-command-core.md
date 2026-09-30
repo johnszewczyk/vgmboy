@@ -13,7 +13,8 @@ its own platform event layer.
 
 ## Invariants
 
-- Cmd-Q, Cmd-W, Cmd-M, Cmd-O, Cmd-1/2/3, Cmd-comma, and F7/F8/F9 have one shared semantic definition.
+- Cmd-Q, Cmd-W, Cmd-M, Cmd-O, Cmd-1/2/3, Cmd-comma, Cmd-Shift-H, Cmd-Shift-D,
+  and F7/F8/F9 have one shared semantic definition.
 - Host adapters may add skin-specific commands but must not silently rename these common commands.
 
 ## Files

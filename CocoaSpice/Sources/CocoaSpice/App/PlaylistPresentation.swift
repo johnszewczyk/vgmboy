@@ -117,7 +117,8 @@ enum PlaylistPresentation {
             systemText: systemText(for: metadata),
             pathText: track.fullPathText,
             lengthMilliseconds: metadata?.playLengthMs ?? 0,
-            trackNumber: track.trackNumber
+            trackNumber: track.trackNumber,
+            timestampMilliseconds: track.historyTimestampMilliseconds
         )
     }
 

@@ -76,6 +76,7 @@ public struct CatalogPlaylistSortRecord: Codable, Equatable, Sendable {
     public let systemText: String
     public let pathText: String
     public let lengthMilliseconds: Int
+    public let timestampMilliseconds: Int64?
 
     public init(
         id: String,
@@ -87,7 +88,8 @@ public struct CatalogPlaylistSortRecord: Codable, Equatable, Sendable {
         systemText: String,
         pathText: String,
         lengthMilliseconds: Int,
-        trackNumber: Int? = nil
+        trackNumber: Int? = nil,
+        timestampMilliseconds: Int64? = nil
     ) {
         self.id = id
         self.naturalOrder = naturalOrder
@@ -99,6 +101,7 @@ public struct CatalogPlaylistSortRecord: Codable, Equatable, Sendable {
         self.systemText = systemText
         self.pathText = pathText
         self.lengthMilliseconds = lengthMilliseconds
+        self.timestampMilliseconds = timestampMilliseconds
     }
 }
 
@@ -112,6 +115,7 @@ public enum CatalogPlaylistSortColumn: String, CaseIterable, Codable, Sendable {
     case system
     case path
     case length
+    case timestamp
 
     /// Frontends retain their user-facing column identifiers, while the shared
     /// contract carries one canonical set. These aliases are intentionally at
@@ -127,6 +131,7 @@ public enum CatalogPlaylistSortColumn: String, CaseIterable, Codable, Sendable {
         case "system": self = .system
         case "path": self = .path
         case "length", "lengthLabel": self = .length
+        case "timestamp": self = .timestamp
         default: return nil
         }
     }
@@ -212,6 +217,8 @@ public enum CatalogPlaylistSorting {
             return lhs.pathText.localizedStandardCompare(rhs.pathText)
         case .length:
             return compare(lhs.lengthMilliseconds, rhs.lengthMilliseconds)
+        case .timestamp:
+            return compareOptional(lhs.timestampMilliseconds, rhs.timestampMilliseconds)
         }
     }
 
@@ -227,6 +234,20 @@ public enum CatalogPlaylistSorting {
         switch (lhs, rhs) {
         case let (left?, right?):
             return compare(left, right)
+        case (nil, nil):
+            return .orderedSame
+        case (nil, _):
+            return .orderedDescending
+        case (_, nil):
+            return .orderedAscending
+        }
+    }
+
+    private static func compareOptional(_ lhs: Int64?, _ rhs: Int64?) -> ComparisonResult {
+        switch (lhs, rhs) {
+        case let (left?, right?):
+            if left == right { return .orderedSame }
+            return left < right ? .orderedAscending : .orderedDescending
         case (nil, nil):
             return .orderedSame
         case (nil, _):

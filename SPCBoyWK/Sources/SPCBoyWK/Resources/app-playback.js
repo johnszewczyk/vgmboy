@@ -877,6 +877,11 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
       allowNativeGenerationChange: true,
       allowPositionRewind: true
     });
+    if (typeof window.spcBoyWK?.playbackHistoryRecord === "function") {
+      void window.spcBoyWK.playbackHistoryRecord(track, Date.now()).catch((error) => {
+        console.error("[SPCBoy] could not record playback history", error);
+      });
+    }
     // Native status events advance the readout and native completion events
     // drive the generation-checked end handoff. JavaScript does not poll.
     playbackApp.ui.refreshPlaylistPlaybackState();

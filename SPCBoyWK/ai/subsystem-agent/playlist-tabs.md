@@ -25,6 +25,10 @@ support directory.
 - Keep automatic empty-column visibility presentation-local. Persist only the
   user's manual visibility choices and column order; the `index` column remains
   a non-sortable row-position projection.
+- History rows use a unique playback-event ID, plus an epoch-millisecond
+  timestamp, so repeated plays of one source remain independently selectable.
+  Record only after the native start request succeeds; pauses, resumes, and
+  seeks do not add events. PlaybackHistoryCore owns the shared JSON sidecar.
 
 ## Files
 

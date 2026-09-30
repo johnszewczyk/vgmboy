@@ -1395,6 +1395,75 @@ async function showFavoritesPlaylist() {
   renderSidebar();
 }
 
+function formatHistoryTimestamp(milliseconds) {
+  const date = new Date(Number(milliseconds));
+  if (!Number.isFinite(date.getTime())) return "";
+  const pad = (value, width = 2) => String(value).padStart(width, "0");
+  return `${pad(date.getFullYear(), 4)}.${pad(date.getMonth() + 1)}.${pad(date.getDate())}-${pad(date.getHours())}.${pad(date.getMinutes())}.${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`;
+}
+
+function historyRecordToPlaylistTrack(record) {
+  const snapshot = record?.snapshot || {};
+  const identity = snapshot.identity || {};
+  const sourcePath = String(identity.sourcePath || "");
+  if (!sourcePath) return null;
+
+  const archiveEntry = identity.archiveEntry || null;
+  const trackIndex = Math.max(0, Number(identity.trackIndex) || 0);
+  const trackCount = Math.max(1, Number(identity.trackCount) || 1);
+  const filename = String(snapshot.filename || sourcePath.split(/[\\/]/).at(-1) || "Track");
+  const timestampMilliseconds = Number(record.timestampMilliseconds);
+  const playLengthMilliseconds = Math.max(0, Number(snapshot.playLengthMilliseconds) || 0);
+  const seconds = playLengthMilliseconds / 1_000;
+  return {
+    id: String(record.id || `${sourcePath}|${timestampMilliseconds}`),
+    path: sourcePath,
+    archivePath: archiveEntry ? sourcePath : null,
+    archiveEntry,
+    trackIndex,
+    trackCount,
+    trackNumber: trackCount > 1 ? trackIndex + 1 : null,
+    rootPath: sourcePath.split(/[\\/]/).slice(0, -1).join("/"),
+    sourceFilename: filename,
+    filename,
+    displayName: String(snapshot.title || filename),
+    title: String(snapshot.title || ""),
+    game: String(snapshot.game || ""),
+    artist: String(snapshot.author || ""),
+    system: String(snapshot.system || ""),
+    basePlaybackSeconds: seconds,
+    lengthLabel: seconds > 0 ? uiApp.formatTime(Math.round(seconds)) : "",
+    timestampMilliseconds,
+    timestamp: formatHistoryTimestamp(timestampMilliseconds),
+    catalogRow: false
+  };
+}
+
+async function showPlaybackHistory() {
+  const renderGeneration = playlistRenderGeneration;
+  const records = await window.spcBoyWK.playbackHistoryList();
+  if (renderGeneration !== playlistRenderGeneration) return false;
+  await invalidatePlaylistCatalogSession();
+  state.playlist = (Array.isArray(records) ? records : [])
+    .map(historyRecordToPlaylistTrack)
+    .filter(Boolean);
+  state.playlistTitle = "History";
+  state.catalogPlaylistColumnContentHints = null;
+  state.catalogPlaylistSortSessionId = null;
+  state.playlistSortEnabled = true;
+  state.sortColumn = "timestamp";
+  state.sortDirection = "descending";
+  clearPlaylistSelection();
+  state.selectedTrackId = state.playlist[0]?.id || null;
+  state.selectedTrackIds = state.selectedTrackId ? [state.selectedTrackId] : [];
+  state.playlistSelectionAnchorId = state.selectedTrackId;
+  persistSettings();
+  renderPlaylistTabs();
+  renderPlaylist();
+  renderSidebar();
+  return true;
+}
+
 async function refreshDatabaseGamesForVisibleRoots() {
   const previousSelection = state.selectedDatabaseGameKey;
   try {
@@ -1754,7 +1823,10 @@ function playlistSortRecords() {
     authorText: String(track.artist || ""),
     systemText: String(track.system || ""),
     pathText: playlistDisplayPath(track),
-    lengthMilliseconds: Math.max(0, Math.round((Number(track.basePlaybackSeconds) || 0) * 1000))
+    lengthMilliseconds: Math.max(0, Math.round((Number(track.basePlaybackSeconds) || 0) * 1000)),
+    timestampMilliseconds: Number.isFinite(Number(track.timestampMilliseconds))
+      ? Number(track.timestampMilliseconds)
+      : null
   }));
 }
 
@@ -1782,6 +1854,7 @@ async function applyProjectionPlaylistSort() {
 }
 
 async function applyExplicitPlaylistSort() {
+  if (state.sortColumn === "timestamp" && state.playlistTitle !== "History") return false;
   if (isCatalogPlaylistProjection()) {
     return applyCatalogPlaylistSort();
   }
@@ -1988,6 +2061,8 @@ function renderPlaylistHeader() {
   refs.playlistHeaderRow.innerHTML = "";
 
   for (const column of orderedColumns()) {
+    const canSortColumn = column.sortable !== false
+      && (column.id !== "timestamp" || state.playlistTitle === "History");
     const th = document.createElement("th");
     th.dataset.columnId = column.id;
     th.draggable = true;
@@ -1997,7 +2072,7 @@ function renderPlaylistHeader() {
       columnMinimumWidthPercent(column.id, refs.playlistHeaderTable?.getBoundingClientRect().width || 0)
     );
     th.style.width = `${state.columnWidths[column.id]}%`;
-    th.title = column.sortable === false ? "Line number" : `Sort by ${column.label}`;
+    th.title = canSortColumn ? `Sort by ${column.label}` : (column.id === "index" ? "Line number" : column.label);
 
     const label = document.createElement("span");
     label.className = "playlist-header-label toolbar-control";
@@ -2017,7 +2092,7 @@ function renderPlaylistHeader() {
     });
     th.appendChild(resizeHandle);
 
-    if (column.sortable !== false) th.addEventListener("click", async (event) => {
+    if (canSortColumn) th.addEventListener("click", async (event) => {
       if (event.target === resizeHandle || columnResizePointerId !== null) return;
       if (state.playlistSortEnabled && state.sortColumn === column.id) {
         state.sortDirection = state.sortDirection === "ascending" ? "descending" : "ascending";
@@ -3306,6 +3381,7 @@ uiApp.ui = {
   toggleSelectedFavorites,
   refreshFavorites,
   showFavoritesPlaylist,
+  showPlaybackHistory,
   activateDatabaseSelection,
   activateFocusedItem,
   renderSidebar,

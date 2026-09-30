@@ -205,6 +205,11 @@ private struct CocoaSpiceCommands: Commands {
             }
             .keyboardShortcut("d", modifiers: [.command, .shift])
 
+            Button("Playback History") {
+                model.showPlaybackHistory()
+            }
+            .keyboardShortcut("h", modifiers: [.command, .shift])
+
         }
 
         CommandGroup(replacing: .appSettings) {

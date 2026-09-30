@@ -8,7 +8,7 @@
 
 ## Current State
 
-- Current columns are favorite, index, file, title, game, author, system, path, and length. Favorite is fixed immediately before index, uses a star header, and is user-hideable but not reorderable. The obsolete Play/Stop transport column is not part of the table.
+- Current columns are favorite, index, file, title, game, author, system, path, timestamp, and length. Timestamp values exist only on playback-history rows; the column follows automatic content visibility. Favorite is fixed immediately before index, uses a star header, and is user-hideable but not reorderable. The obsolete Play/Stop transport column is not part of the table.
 - Metadata-backed columns fall back to filename or parent-folder text when metadata is absent.
 - The Path column uses `TrackItem.fullPathText`: a full filesystem path for ordinary files and `archive-path#member-path` for archive members.
 - Column visibility, order, and width are persisted in `UserDefaults`. The

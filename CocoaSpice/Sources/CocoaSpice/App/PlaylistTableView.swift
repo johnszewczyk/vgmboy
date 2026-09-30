@@ -2,6 +2,7 @@ import AppKit
 import CatalogPlaylistPresentationCore
 import FrontendPreferencesCore
 import OSLog
+import PlaybackHistoryCore
 import SwiftUI
 
 private enum PlaylistHeaderMetrics {
@@ -105,6 +106,7 @@ struct PlaylistTableView: NSViewRepresentable {
             case author
             case system
             case path
+            case timestamp
             case length
             case fileSize
 
@@ -119,6 +121,7 @@ struct PlaylistTableView: NSViewRepresentable {
                 case .author: "Author"
                 case .system: "System"
                 case .path: "Path"
+                case .timestamp: "Date/Time"
                 case .length: "Length"
                 case .fileSize: "Size"
                 }
@@ -417,6 +420,15 @@ struct PlaylistTableView: NSViewRepresentable {
                     return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.systemText(for: track), isCurrentTrack: model.currentTrack?.id == track.id)
                 case .path:
                     return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.pathText(for: track), isCurrentTrack: model.currentTrack?.id == track.id)
+                case .timestamp:
+                    return configuredTextCell(
+                        in: tableView,
+                        row: row,
+                        identifier: column.rawValue,
+                        text: value(for: column, track: track),
+                        isCurrentTrack: model.currentTrack?.id == track.id,
+                        monospace: true
+                    )
                 case .length:
                     return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.lengthText(for: track), isCurrentTrack: model.currentTrack?.id == track.id, monospace: true)
                 case .fileSize:
@@ -649,7 +661,7 @@ struct PlaylistTableView: NSViewRepresentable {
                 return switch column {
                 case .title, .game, .author, .system, .length:
                     index
-                case .favorite, .index, .trackNumber, .file, .path, .fileSize:
+                case .favorite, .index, .trackNumber, .file, .path, .timestamp, .fileSize:
                     nil
                 }
             })
@@ -866,6 +878,8 @@ struct PlaylistTableView: NSViewRepresentable {
                 return model.visiblePlaylist.contains { track in
                     hasMeaningfulContent(value(for: column, track: track))
                 }
+            case .timestamp:
+                return model.visiblePlaylist.contains { $0.historyTimestampMilliseconds != nil }
             case .title, .game, .author, .system, .length:
                 if let hint = widthHintValue(for: column) {
                     return hasMeaningfulContent(hint)
@@ -1165,6 +1179,8 @@ struct PlaylistTableView: NSViewRepresentable {
                 hints.systemText
             case .path:
                 nil
+            case .timestamp:
+                nil
             case .length:
                 hints.lengthText
             case .fileSize:
@@ -1192,6 +1208,8 @@ struct PlaylistTableView: NSViewRepresentable {
                 model.systemText(for: track)
             case .path:
                 model.pathText(for: track)
+            case .timestamp:
+                track.historyTimestampMilliseconds.map { PlaybackHistoryRecord.timestampText(for: $0) } ?? ""
             case .length:
                 model.lengthText(for: track)
             case .fileSize:
