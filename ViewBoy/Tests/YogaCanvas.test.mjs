@@ -235,6 +235,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     bitmapFontSnapshot,
     contentRowLayoutSnapshot,
     hitTargetSnapshot,
+    spacingReadoutLayoutSnapshot,
     screenTransitionSnapshot,
   } = await import('../Sources/ViewBoy/Resources/yoga-app.js');
   const standardFont = bitmapFontSnapshot('STANDARD');
@@ -340,8 +341,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     .map((target) => [target.trackIndex, target.box.y]));
   const rowHeights = new Map(toolbarTargets.filter((target) => Number.isInteger(target.trackIndex))
     .map((target) => [target.trackIndex, target.box.height]));
-  assert.equal(rowTops.get(1) - (rowTops.get(0) + rowHeights.get(0)), 4,
-    'the playlist uses the standard UI Gap between track rows as well as below its headings');
+  assert.equal(rowTops.get(1) - (rowTops.get(0) + rowHeights.get(0)), 1,
+    'playlist rows use their dedicated one-dot line gap instead of UI Gap');
   assert.ok(groupStateCalls.some(([action, system]) => action === 'toggle' && system === 'SNES'));
   assert.ok(groupStateCalls.some(([action, system, gameID]) =>
     action === 'selectGame' && system === 'SNES' && gameID === '1:SNES:Sample'));
@@ -555,8 +556,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.ok(parentSystemRow && childGameRow, 'the filtered system disclosure and game row are both visible');
   assert.equal(childGameRow.textInset, parentSystemRow.textInset,
     'sidebar game labels align with the title column after the parent chevron');
-  assert.equal(childGameRow.box.y - (parentSystemRow.box.y + parentSystemRow.box.height), 4,
-    'the sidebar tree applies the standard four-dot UI Gap between a system header and its games');
+  assert.equal(childGameRow.box.y - (parentSystemRow.box.y + parentSystemRow.box.height), 1,
+    'the sidebar tree applies its one-dot Sidebar Line Gap between a system header and its games');
   typeSearchKey('Escape');
   assert.ok(hitTargetSnapshot().some((target) => target.name.includes('ZZZ')),
     'Escape clears the search and restores the complete sidebar tree');
@@ -589,13 +590,33 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   clickTarget('OPTIONS');
   await tick();
   clickPage('INTERFACE');
+  const initialGapReadout = spacingReadoutLayoutSnapshot().find((entry) => entry.title === 'UI GAP');
+  nextFrameAdvanceMs = 125;
   clickTarget('UI GAP +');
   await tick();
+  const midResizeGapReadout = spacingReadoutLayoutSnapshot().find((entry) => entry.title === 'UI GAP');
+  assert.equal(midResizeGapReadout.text, '5 DOTS',
+    'the animated spacing readout displays whole-dot values instead of decimal interpolation values');
+  assert.equal(midResizeGapReadout.box.width, initialGapReadout.box.width,
+    'the spacing value box keeps its width during intermediate resize frames');
+  await tick();
+  const settledGapReadout = spacingReadoutLayoutSnapshot().find((entry) => entry.title === 'UI GAP');
+  assert.equal(settledGapReadout.text, '5 DOTS');
+  assert.equal(settledGapReadout.box.width, initialGapReadout.box.width,
+    'the spacing value box width remains stable after the animated resize settles');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 5,
     'the renamed UI Gap setting persists under its current name');
   globalThis.ViewBoy.dispatch('library');
   await tick();
   assert.ok(tabGap() > defaultTabGap, 'playlist tabs respond to UI Gap while retaining independent column spacing');
+  const uiGapFiveRows = contentRowLayoutSnapshot();
+  for (const kind of ['playlist', 'sidebar']) {
+    const visibleRows = uiGapFiveRows.filter((row) => row.kind === kind)
+      .sort((first, second) => first.box.y - second.box.y);
+    assert.ok(visibleRows.slice(1).every((row, index) =>
+      row.box.y - (visibleRows[index].box.y + visibleRows[index].box.height) === 1),
+    `${kind} line spacing stays at one dot when general UI Gap changes`);
+  }
   clickTarget('OPTIONS');
   await tick();
   clickPage('INTERFACE');
@@ -604,7 +625,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     await tick();
   }
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 1,
-    'UI Gap can set a single blank LCD dot between text rows');
+    'UI Gap can independently set the general interface spacing');
   globalThis.ViewBoy.dispatch('library');
   await tick();
   const compactRows = contentRowLayoutSnapshot();
@@ -618,22 +639,66 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'playlist text rows have glyph-height boxes without vertical Control Padding');
   assert.ok(compactPlaylistRows.slice(1).every((row, index) =>
     row.box.y - (compactPlaylistRows[index].box.y + compactPlaylistRows[index].box.height) === 1),
-  'one UI Gap dot is the entire blank space between playlist rows');
+  'one Playlist Line Gap dot is the entire blank space between playlist rows');
   assert.ok(compactSidebarRows.length >= 2, 'sidebar text rows remain visible in the compact layout');
   assert.ok(compactSidebarRows.every((row) => row.box.height === glyphHeight),
     'sidebar text rows have glyph-height boxes without vertical Control Padding');
   assert.ok(compactSidebarRows.slice(1).every((row, index) =>
     row.box.y - (compactSidebarRows[index].box.y + compactSidebarRows[index].box.height) === 1),
-  'one UI Gap dot is the entire blank space between sidebar rows');
+  'one Sidebar Line Gap dot is the entire blank space between sidebar rows');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).playlistLineGapDots, 1,
+    'the dedicated playlist text line gap is persisted independently');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).sidebarLineGapDots, 1,
+    'the dedicated sidebar text line gap is persisted independently');
   clickTarget('OPTIONS');
   await tick();
   clickPage('INTERFACE');
+  clickTarget('PLAYLIST LINE GAP +');
+  await tick();
+  globalThis.ViewBoy.dispatch('library');
+  await tick();
+  const playlistGapRows = contentRowLayoutSnapshot();
+  const playlistGapPlaylistRows = playlistGapRows.filter((row) => row.kind === 'playlist')
+    .sort((first, second) => first.box.y - second.box.y);
+  const playlistGapSidebarRows = playlistGapRows.filter((row) => row.kind === 'sidebar')
+    .sort((first, second) => first.box.y - second.box.y);
+  assert.equal(playlistGapPlaylistRows[1].box.y
+    - (playlistGapPlaylistRows[0].box.y + playlistGapPlaylistRows[0].box.height), 2,
+  'Playlist Line Gap changes playlist rows to two dots');
+  assert.equal(playlistGapSidebarRows[1].box.y
+    - (playlistGapSidebarRows[0].box.y + playlistGapSidebarRows[0].box.height), 1,
+  'Playlist Line Gap does not affect sidebar rows');
+  clickTarget('OPTIONS');
+  await tick();
+  clickPage('INTERFACE');
+  clickTarget('SIDEBAR LINE GAP +');
+  await tick();
+  globalThis.ViewBoy.dispatch('library');
+  await tick();
+  const sidebarGapRows = contentRowLayoutSnapshot();
+  const sidebarGapPlaylistRows = sidebarGapRows.filter((row) => row.kind === 'playlist')
+    .sort((first, second) => first.box.y - second.box.y);
+  const sidebarGapSidebarRows = sidebarGapRows.filter((row) => row.kind === 'sidebar')
+    .sort((first, second) => first.box.y - second.box.y);
+  assert.equal(sidebarGapSidebarRows[1].box.y
+    - (sidebarGapSidebarRows[0].box.y + sidebarGapSidebarRows[0].box.height), 2,
+  'Sidebar Line Gap changes sidebar rows to two dots');
+  assert.equal(sidebarGapPlaylistRows[1].box.y
+    - (sidebarGapPlaylistRows[0].box.y + sidebarGapPlaylistRows[0].box.height), 2,
+  'Sidebar Line Gap does not affect playlist rows');
+  clickTarget('OPTIONS');
+  await tick();
+  clickPage('INTERFACE');
+  clickTarget('PLAYLIST LINE GAP -');
+  await tick();
+  clickTarget('SIDEBAR LINE GAP -');
+  await tick();
   for (let step = 0; step < 4; step += 1) {
     clickTarget('UI GAP +');
     await tick();
   }
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 5,
-    'the compact row-spacing check restores the prior UI Gap');
+    'the UI Gap can be changed without changing either text line gap');
   globalThis.ViewBoy.dispatch('library');
   await tick();
   clickTarget('X', 1);
@@ -901,8 +966,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const fiveDotParent = fiveDotSidebar.find((target) => target.name.endsWith('SNES'));
   const fiveDotChild = fiveDotSidebar.find((target) => target.name === 'Sample');
   assert.ok(fiveDotParent && fiveDotChild, 'filtered sidebar retains its matching parent and child');
-  assert.equal(fiveDotChild.box.y - (fiveDotParent.box.y + fiveDotParent.box.height), 5,
-    'sidebar parent, child, and sibling line spacing follows the adjusted UI Gap');
+  assert.equal(fiveDotChild.box.y - (fiveDotParent.box.y + fiveDotParent.box.height), 1,
+    'sidebar parent, child, and sibling line spacing stays independent of adjusted UI Gap');
   typeSearchKey('Escape');
   typeSearchKey('Escape');
   globalThis.ViewBoy.dispatch('settings');
@@ -1186,8 +1251,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const scrollGameBefore = sidebarGames().find((target) => target.name === 'Scroll Game 00');
   const scrollGameNext = sidebarGames().find((target) => target.name === 'Scroll Game 01');
   assert.ok(scrollGameBefore && scrollGameNext, 'the overflowing sidebar exposes its first game rows');
-  assert.equal(scrollGameNext.box.y - (scrollGameBefore.box.y + scrollGameBefore.box.height), 4,
-    'expanded sibling rows have the same standard line spacing as their parent group');
+  assert.equal(scrollGameNext.box.y - (scrollGameBefore.box.y + scrollGameBefore.box.height), 1,
+    'expanded sibling rows preserve the dedicated one-dot Sidebar Line Gap');
   const sidebarRowHeight = scrollGameNext.box.y - scrollGameBefore.box.y;
   canvas.listeners.get('wheel')({
     clientX: rect.width * 0.2,
@@ -1252,8 +1317,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const musicRow = hitTargetSnapshot().find((target) => target.name === 'music');
   const subRow = hitTargetSnapshot().find((target) => target.name === 'SUB');
   assert.ok(musicRow && subRow, 'the Path root and its first folder are visible');
-  assert.equal(subRow.box.y - (musicRow.box.y + musicRow.box.height), 4,
-    'Path roots and child folders use the shared sidebar line gap');
+  assert.equal(subRow.box.y - (musicRow.box.y + musicRow.box.height), 1,
+    'Path roots and child folders use the one-dot Sidebar Line Gap');
   clickTarget('SUB');
   await tick();
   const pathRows = hitTargetSnapshot();
@@ -1261,8 +1326,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const pathFileRow = pathRows.find((target) => target.name === 'path.spc');
   assert.ok(pathFileRow,
     'the Path tree expands folders to show indexed files');
-  assert.equal(pathFileRow.box.y - (expandedSubRow.box.y + expandedSubRow.box.height), 4,
-    'expanded Path folders and files keep the same sidebar line gap');
+  assert.equal(pathFileRow.box.y - (expandedSubRow.box.y + expandedSubRow.box.height), 1,
+    'expanded Path folders and files keep the same one-dot Sidebar Line Gap');
   clickTarget('SUB', 0, 0.5, 0.5, 2);
   await tick();
   assert.equal(pathFolderCalls.length, 1, 'double-clicking a catalog folder loads its indexed tracks');

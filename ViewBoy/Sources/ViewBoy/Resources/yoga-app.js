@@ -19,6 +19,8 @@ const APP_BORDER_GAP_DOTS = 8;
 const BUTTON_BORDER_DOTS = 1;
 const DEFAULT_CONTROL_PADDING_DOTS = 4;
 const DEFAULT_UI_GAP_DOTS = 4;
+const DEFAULT_SIDEBAR_LINE_GAP_DOTS = 1;
+const DEFAULT_PLAYLIST_LINE_GAP_DOTS = 1;
 const DEFAULT_PLAYLIST_GAP_DOTS = 4;
 const SPACING_DOTS_MIN = 1;
 const SPACING_DOTS_MAX = 8;
@@ -204,6 +206,8 @@ function saveDisplayOptions() {
       theme: state.theme,
       controlPaddingDots: state.controlPaddingDots,
       uiGapDots: state.uiGapDots,
+      sidebarLineGapDots: state.sidebarLineGapDots,
+      playlistLineGapDots: state.playlistLineGapDots,
       playlistGapDots: state.playlistGapDots,
       transportSymbols: state.transportSymbols,
       columnOrder: state.columnOrder,
@@ -277,6 +281,8 @@ const state = {
   theme: savedDisplayOptions.theme === "NIGHTBOY" ? "NIGHTBOY" : "GAMEBOY",
   controlPaddingDots: storedSpacing(savedDisplayOptions.controlPaddingDots, DEFAULT_CONTROL_PADDING_DOTS),
   uiGapDots: storedSpacing(savedDisplayOptions.uiGapDots ?? savedDisplayOptions.uiGutterDots, DEFAULT_UI_GAP_DOTS),
+  sidebarLineGapDots: storedSpacing(savedDisplayOptions.sidebarLineGapDots, DEFAULT_SIDEBAR_LINE_GAP_DOTS),
+  playlistLineGapDots: storedSpacing(savedDisplayOptions.playlistLineGapDots, DEFAULT_PLAYLIST_LINE_GAP_DOTS),
   playlistGapDots: storedSpacing(savedDisplayOptions.playlistGapDots, DEFAULT_PLAYLIST_GAP_DOTS),
   searchQuery: "",
   searchFocused: false,
@@ -714,6 +720,11 @@ export function contentRowLayoutSnapshot() {
   });
 }
 
+export function spacingReadoutLayoutSnapshot() {
+  return layoutEntries.flatMap(({ widget, box }) => widget.meta.spacingReadout
+    ? [{ title: widget.meta.spacingReadout, text: widget.meta.text, box: { ...box } }] : []);
+}
+
 function selectionYAt(time = performance.now()) {
   if (!selectionAnimation) return selectionBand?.y ?? null;
   const progress = Math.max(0, Math.min(1,
@@ -978,8 +989,9 @@ function rowHeight(extraDots = 0) {
   return (fontProfile().height + extraDots) / STYLE_SCALE;
 }
 
-function contentRowStride() {
-  return rowHeight() + uiGap();
+function contentRowStride(kind) {
+  const key = kind === "sidebar" ? "sidebarLineGapDots" : "playlistLineGapDots";
+  return rowHeight() + spacingValue(key) / STYLE_SCALE;
 }
 
 function spacingValue(key, time = currentRenderTime) {
@@ -1012,6 +1024,10 @@ function buttonStandardHeight() {
 
 function uiGap() {
   return uiGapDots() / STYLE_SCALE;
+}
+
+function spacingReadout(key) {
+  return `${Math.round(spacingValue(key))} DOTS`;
 }
 
 function uiSectionGap() {
@@ -1194,6 +1210,7 @@ function optionAdjuster(parent, title, value, onDecrease, onIncrease) {
     textShade: 0,
     align: "center",
     inset: controlPaddingDots(),
+    spacingReadout: title,
   });
   return row;
 }
@@ -1575,7 +1592,7 @@ function createLibraryRow(parent, text, options = {}) {
   const selected = options.selected ?? false;
   if (options.spacer) {
     return makeWidget(parent, {
-      height: uiGap() * (options.revealProgress ?? 1),
+      height: spacingValue("sidebarLineGapDots") / STYLE_SCALE * (options.revealProgress ?? 1),
       flexShrink: 0,
     });
   }
@@ -1606,7 +1623,7 @@ function visibleRowCount() {
   const toolbarGrowth = 2 * (buttonStandardHeight() + uiGap()) + uiGap();
   const fixedChrome = 78 - buttonStandardHeight() - uiGap();
   return Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - fixedChrome - toolbarGrowth)
-    / contentRowStride()));
+    / contentRowStride("playlist")));
 }
 
 function visibleLibraryRowCount() {
@@ -1614,11 +1631,11 @@ function visibleLibraryRowCount() {
     + rowHeight(4);
   const sidebarChrome = 2 * buttonStandardHeight() + 4 * uiGap();
   return Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - rootChrome - sidebarChrome)
-    / contentRowStride()));
+    / contentRowStride("sidebar")));
 }
 
 function libraryRowPixelHeight(row) {
-  if (row.spacer) return uiGapDots() * (row.revealProgress ?? 1);
+  if (row.spacer) return spacingValue("sidebarLineGapDots") * (row.revealProgress ?? 1);
   return rowHeight() * STYLE_SCALE * (row.revealProgress ?? 1);
 }
 
@@ -1759,7 +1776,7 @@ function addLibraryPane(parent) {
   makeWidget(library, { height: uiGap() });
   const rows = libraryRowsWithLineGaps(libraryRows());
   const count = visibleLibraryRowCount();
-  const rowHeightDots = contentRowStride() * STYLE_SCALE;
+  const rowHeightDots = contentRowStride("sidebar") * STYLE_SCALE;
   state.libraryContentHeight = rows.reduce((sum, row) => sum + libraryRowPixelHeight(row), 0);
   const estimatedViewportHeight = state.libraryViewportHeight || count * rowHeightDots;
   const maxScroll = Math.max(0, state.libraryContentHeight - estimatedViewportHeight);
@@ -1913,7 +1930,7 @@ function addCatalogPane(parent) {
   const content = makeWidget(viewport, {
     direction: FlexDirection.Column,
     width: state.tableContentMinimumWidth,
-    gap: uiGap(),
+    gap: 0,
   }, {
     id: "catalog-scroll-content",
     translateX: -state.tableHorizontalScroll,
@@ -1921,11 +1938,16 @@ function addCatalogPane(parent) {
   state.tableViewportWidget = viewport;
   state.tableContentWidget = content;
   createTableHeader(content, columns);
+  makeWidget(content, { height: uiGap(), flexShrink: 0 });
+  const tableRows = makeWidget(content, {
+    direction: FlexDirection.Column,
+    gap: spacingValue("playlistLineGapDots") / STYLE_SCALE,
+  }, { id: "catalog-table-rows" });
   const count = visibleRowCount();
   state.queueScroll = Math.max(0, Math.min(state.queueScroll, Math.max(0, viewTracks.length - count)));
   viewTracks.slice(state.queueScroll, state.queueScroll + count).forEach((track, offset) =>
-    createQueueRow(content, state.queueScroll + offset, track, columns));
-  if (!viewTracks.length) label(content, state.status, { height: rowHeight() }, {
+    createQueueRow(tableRows, state.queueScroll + offset, track, columns));
+  if (!viewTracks.length) label(tableRows, state.status, { height: rowHeight() }, {
     textShade: 0, inset: controlPaddingDots(),
   });
   makeWidget(panel, {
@@ -2389,13 +2411,19 @@ function addInterfaceOptions(parent, pref) {
   optionToggle(layout, "AUTO-SIZE COLUMNS", pref.columnAutoSize !== false,
     () => setPreference("columnAutoSize", pref.columnAutoSize === false));
   const spacing = optionGroup(parent, "LAYOUT SPACING");
-  optionAdjuster(spacing, "CONTROL PADDING", `${controlPaddingDots()} DOTS`,
+  optionAdjuster(spacing, "CONTROL PADDING", spacingReadout("controlPaddingDots"),
     () => adjustDisplaySpacing("controlPaddingDots", -1),
     () => adjustDisplaySpacing("controlPaddingDots", 1));
-  optionAdjuster(spacing, "UI GAP", `${uiGapDots()} DOTS`,
+  optionAdjuster(spacing, "UI GAP", spacingReadout("uiGapDots"),
     () => adjustDisplaySpacing("uiGapDots", -1),
     () => adjustDisplaySpacing("uiGapDots", 1));
-  optionAdjuster(spacing, "PLAYLIST GAP", `${state.playlistGapDots} DOTS`,
+  optionAdjuster(spacing, "SIDEBAR LINE GAP", spacingReadout("sidebarLineGapDots"),
+    () => adjustDisplaySpacing("sidebarLineGapDots", -1),
+    () => adjustDisplaySpacing("sidebarLineGapDots", 1));
+  optionAdjuster(spacing, "PLAYLIST LINE GAP", spacingReadout("playlistLineGapDots"),
+    () => adjustDisplaySpacing("playlistLineGapDots", -1),
+    () => adjustDisplaySpacing("playlistLineGapDots", 1));
+  optionAdjuster(spacing, "PLAYLIST GAP", spacingReadout("playlistGapDots"),
     () => adjustDisplaySpacing("playlistGapDots", -1),
     () => adjustDisplaySpacing("playlistGapDots", 1));
   const window = optionGroup(parent, "WINDOW");
@@ -3134,6 +3162,8 @@ function setDisplaySpacing(key, value) {
   const defaults = {
     controlPaddingDots: DEFAULT_CONTROL_PADDING_DOTS,
     uiGapDots: DEFAULT_UI_GAP_DOTS,
+    sidebarLineGapDots: DEFAULT_SIDEBAR_LINE_GAP_DOTS,
+    playlistLineGapDots: DEFAULT_PLAYLIST_LINE_GAP_DOTS,
     playlistGapDots: DEFAULT_PLAYLIST_GAP_DOTS,
   };
   if (!(key in defaults)) return;
