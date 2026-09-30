@@ -250,8 +250,6 @@ let HEIGHT = 1;
 let DEVICE_PIXEL_RATIO = 1;
 let UI_UNIT_CSS_PIXELS = DEVICE_PIXELS_PER_LCD_DOT;
 let STYLE_SCALE = 1;
-let lastMetalChevronSignature = "";
-const metalChevronOverlayAvailable = globalThis.__viewBoyMetalChevronOverlay === true;
 let pixels = new Uint8Array(WIDTH * HEIGHT);
 let image = context.createImageData(
   WIDTH * DEVICE_PIXELS_PER_LCD_DOT,
@@ -1566,7 +1564,6 @@ function disclosureSquare(box, indent = controlPaddingDots()) {
 }
 
 function paintChevron(box, progress, indent = controlPaddingDots()) {
-  if (metalChevronOverlayAvailable) return;
   const font = fontProfile();
   const square = disclosureSquare(box, indent);
   const glyph = font.glyphs[">"];
@@ -1586,56 +1583,6 @@ function paintChevron(box, progress, indent = controlPaddingDots()) {
       fillRect(x, y, 1, 1, 0);
     }
   }
-}
-
-function publishMetalChevronGeometry() {
-  if (!metalChevronOverlayAvailable) return;
-  const handler = globalThis.webkit?.messageHandlers?.viewBoy;
-  if (!handler?.postMessage) return;
-  const viewport = boxesById.get("sidebar-tree-viewport");
-  const canvasRect = canvas.getBoundingClientRect();
-  const pageWidth = document.documentElement.clientWidth || window.innerWidth;
-  const pageHeight = document.documentElement.clientHeight || window.innerHeight;
-  const scaleX = canvasRect.width / WIDTH;
-  const scaleY = canvasRect.height / HEIGHT;
-  const viewportRect = viewport && {
-    left: canvasRect.left + viewport.x * scaleX,
-    top: canvasRect.top + viewport.y * scaleY,
-    right: canvasRect.left + (viewport.x + viewport.width) * scaleX,
-    bottom: canvasRect.top + (viewport.y + viewport.height) * scaleY,
-  };
-  const items = viewportRect ? layoutEntries
-    .filter(({ widget }) => widget.meta.sidebarDisclosure)
-    .map(({ widget, box }) => {
-      const square = disclosureSquare(box, widget.meta.disclosureIndent);
-      const left = canvasRect.left + square.x * scaleX;
-      const top = canvasRect.top + square.y * scaleY;
-      const right = left + square.width * scaleX;
-      const bottom = top + square.height * scaleY;
-      const clipLeft = Math.max(left, canvasRect.left, viewportRect.left);
-      const clipTop = Math.max(top, canvasRect.top, viewportRect.top);
-      const clipRight = Math.min(right, canvasRect.right, viewportRect.right);
-      const clipBottom = Math.min(bottom, canvasRect.bottom, viewportRect.bottom);
-      if (clipRight <= clipLeft || clipBottom <= clipTop) return null;
-      return {
-        rect: [left / pageWidth, top / pageHeight,
-          (right - left) / pageWidth, (bottom - top) / pageHeight],
-        clip: [clipLeft / pageWidth, clipTop / pageHeight,
-          (clipRight - clipLeft) / pageWidth, (clipBottom - clipTop) / pageHeight],
-        progress: Math.max(0, Math.min(1, Number(widget.meta.disclosureProgress) || 0)),
-      };
-    }).filter(Boolean) : [];
-  const font = fontProfile();
-  const payload = {
-    method: "viewBoyMetalChevrons",
-    rows: font.glyphs[">"],
-    tint: RGB[0],
-    items,
-  };
-  const signature = JSON.stringify(payload);
-  if (signature === lastMetalChevronSignature) return;
-  lastMetalChevronSignature = signature;
-  handler.postMessage(payload);
 }
 
 function createLibraryRow(parent, text, options = {}) {
@@ -3030,7 +2977,6 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
   }
   layoutEntries = collect(widgetTree);
   state.tableViewportBox = boxesById.get("catalog-horizontal-viewport") ?? null;
-  publishMetalChevronGeometry();
   paintTree(widgetTree, { x: 0, y: 0, width: WIDTH, height: HEIGHT });
   basePixels = pixels.slice();
   selectionRows = layoutEntries.filter((entry) => Number.isInteger(entry.widget.meta.trackIndex));
