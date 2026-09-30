@@ -67,7 +67,6 @@
   this with a generic UI loader; the WK bridge needs an equivalent request
   generation at its native boundary first.
 - Files-mode labels omit archive track counts. The optional extension-hiding preference is presentation-only and must not alter database paths, drag payloads, or playback URLs.
-- Extension hiding removes an entire recognized compressed-TAR suffix (for example, `.tar.zst`) in one operation; it must never leave a misleading `.tar` label behind.
 - Scan Status has fixed one-line Current Activity, File Path, and File Name fields. Each middle-truncates before its row can grow; do not collapse them into one variable-length status string.
 
 ## Files

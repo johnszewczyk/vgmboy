@@ -36,16 +36,16 @@ import Testing
     #expect(groups.map { $0.items.map(\.name) } == [["Two"], ["Ten"], ["Mystery"]])
 }
 
-@Test func displayNamesStripWholeCompressedTarSuffixes() {
-    #expect(FilenamePresentation.withoutDisplayedExtension("Cool Spot.tar.zst") == "Cool Spot")
-    #expect(FilenamePresentation.withoutDisplayedExtension("Sonic.ZOPHAR.TAR.ZST") == "Sonic.ZOPHAR")
+@Test func displayNamesStripWholeRecognizedCompoundArchiveSuffixes() {
+    #expect(FilenamePresentation.withoutDisplayedExtension("Cool Spot.tar.gz") == "Cool Spot")
+    #expect(FilenamePresentation.withoutDisplayedExtension("Sonic.ZOPHAR.TAR.GZ") == "Sonic.ZOPHAR")
     #expect(FilenamePresentation.withoutDisplayedExtension("Theme.spc") == "Theme")
 
     let archiveTrack = TrackItem(
-        archiveURL: URL(fileURLWithPath: "/music/Cool Spot.tar.zst"),
+        archiveURL: URL(fileURLWithPath: "/music/Cool Spot.zip"),
         entryPath: "Theme.spc"
     )
-    #expect(archiveTrack.groupDisplayName == "Cool Spot.tar.zst")
+    #expect(archiveTrack.groupDisplayName == "Cool Spot.zip")
     #expect(archiveTrack.displayName == "Theme")
 }
 
@@ -68,7 +68,7 @@ import Testing
         rootID: 1,
         rootPath: rootPath,
         folderPath: "/music/Library/Neo Geo CD/KOF 96",
-        path: "/music/Library/Neo Geo CD/KOF 96/KOF96.tar.zst",
+        path: "/music/Library/Neo Geo CD/KOF 96/KOF96.zip",
         isArchive: true,
         trackCount: 26
     )
@@ -91,7 +91,7 @@ import Testing
             rootID: 1,
             rootPath: rootPath,
             folderPath: "/music/Library/Neo Geo CD/KOF 96",
-            path: "/music/Library/Neo Geo CD/KOF 96/KOF96.tar.zst",
+            path: "/music/Library/Neo Geo CD/KOF 96/KOF96.zip",
             isArchive: true,
             trackCount: 26
         ),
@@ -263,7 +263,7 @@ import Testing
         rootID: 1,
         rootPath: "/music/Library",
         folderPath: "/music/Library/Neo Geo CD",
-        path: "/music/Library/Neo Geo CD/KOF96.tar.zst",
+        path: "/music/Library/Neo Geo CD/KOF96.zip",
         isArchive: true,
         trackCount: 26
     )

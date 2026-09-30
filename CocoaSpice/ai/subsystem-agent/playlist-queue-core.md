@@ -21,7 +21,7 @@
 - Playlists can be saved to `.m3u` and loaded from `.m3u`.
 - Playlist `.m3u` save and load preserve multi-track container identity through `#COCOASPICE:` metadata lines.
 - Finder drops onto the playlist append supported files, folders, and supported
-  `.zip`, `.7z`, `.lha`, `.rsn`, or TAR+Zstandard archives into the queue. LHA
+  `.zip`, `.7z`, `.lha`, `.rsn`, or `.uac` archives into the queue. LHA
   Amiga members may require complete-set materialization; companion files remain
   dependency data rather than additional queue rows.
 - Archive drops expand supported members before queue mutation.

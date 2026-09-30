@@ -1094,7 +1094,7 @@ public enum CatalogIdentity {
 
     private static func stripArchiveExtension(_ name: String) -> String {
         let lower = name.lowercased()
-        for suffix in [".tar.zstd", ".tar.zst", ".tzst", ".uac", ".zip", ".7z", ".rar", ".rsn", ".zstd", ".zst"] where lower.hasSuffix(suffix) {
+        for suffix in [".uac", ".zip", ".7z", ".rar", ".rsn", ".zstd", ".zst"] where lower.hasSuffix(suffix) {
             let archiveBase = String(name.dropLast(suffix.count))
             let playableURL = URL(fileURLWithPath: archiveBase)
             if BuiltInScannerPlugins.registry.route(pathExtension: playableURL.pathExtension) != nil {

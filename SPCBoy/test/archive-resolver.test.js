@@ -24,8 +24,6 @@ const {
 } = require("../electron/archive-resolver");
 
 const execFileAsync = promisify(execFile);
-const TAR_BINARY = process.env.SPCBOY_TAR_BINARY || "/usr/bin/bsdtar";
-const ZSTD_BINARY = process.env.SPCBOY_ZSTD_BINARY || "/opt/homebrew/bin/zstd";
 
 test("streams ZIP listings with explicit caps and preserves filename whitespace", async (t) => {
   const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), "spcboy-listing-limits-"));
@@ -278,8 +276,8 @@ test("shares one inspection scratch root across archive members", async (t) => {
   }
 });
 
-test("materializes N64 miniUSF members with their USF library from TAR.ZST", async (t) => {
-  const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), "spcboy-usf-tzst-fixture-"));
+test("materializes N64 miniUSF members with their USF library from ZIP", async (t) => {
+  const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), "spcboy-usf-zip-fixture-"));
   try {
     const sourceRoot = path.join(fixtureRoot, "source");
     await fs.mkdir(sourceRoot);
@@ -287,13 +285,11 @@ test("materializes N64 miniUSF members with their USF library from TAR.ZST", asy
     const library = "NUS-NSME-USA.usflib";
     await fs.writeFile(path.join(sourceRoot, selected), "miniUSF fixture", "utf8");
     await fs.writeFile(path.join(sourceRoot, library), "USF library fixture", "utf8");
-    const rawTarPath = path.join(fixtureRoot, "fixture.tar");
-    const archivePath = path.join(fixtureRoot, "fixture.tar.zst");
+    const archivePath = path.join(fixtureRoot, "fixture.zip");
     try {
-      await execFileAsync(TAR_BINARY, ["-cf", rawTarPath, "-C", sourceRoot, selected, library]);
-      await execFileAsync(ZSTD_BINARY, ["-q", "-f", rawTarPath, "-o", archivePath]);
+      await execFileAsync("/usr/bin/zip", ["-q", archivePath, selected, library], { cwd: sourceRoot });
     } catch (error) {
-      return t.skip(`TAR/Zstandard fixture tools unavailable: ${error.message}`);
+      return t.skip(`zip fixture tool unavailable: ${error.message}`);
     }
 
     const materialized = await materializeArchiveEntryForInspection(archivePath, selected);
@@ -334,85 +330,10 @@ test("discovers and materializes module and standard-audio ZIP members", async (
   }
 });
 
-test("lists and materializes TZST and TAR.ZST members", async (t) => {
-  const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), "spcboy-tzst-fixture-"));
-  const previousScratchRoot = process.env.SPCBOY_INSPECTION_SCRATCH_ROOT;
-  process.env.SPCBOY_INSPECTION_SCRATCH_ROOT = path.join(fixtureRoot, "inspection-scratch");
-  try {
-    const members = ["01 module.xm", "02 recording.flac"];
-    for (const member of members) {
-      await fs.writeFile(path.join(fixtureRoot, member), member, "utf8");
-    }
-    const rawTarPath = path.join(fixtureRoot, "fixture.tar");
-    const archivePath = path.join(fixtureRoot, "fixture.tar.zst");
-    try {
-      await execFileAsync(TAR_BINARY, ["-cf", rawTarPath, "-C", fixtureRoot, ...members]);
-      await execFileAsync(ZSTD_BINARY, ["-q", "-f", rawTarPath, "-o", archivePath]);
-    } catch (error) {
-      if (error?.code === "ENOENT") return t.skip(`TZST fixture tools unavailable: ${error.message}`);
-      throw error;
-    }
-
-    assert.equal(archiveType(path.join(fixtureRoot, "fixture.tzst")), "tzst");
-    assert.equal(archiveType(archivePath), "tzst");
-    let reservedBytes = 0;
-    let capacityChecks = 0;
-    let releaseChecks = 0;
-    const playableEntries = await archivePlayableEntries(
-      archivePath,
-      (extension) => new Set([".xm", ".flac"]).has(extension),
-      {
-        scratchOwner: "inspection",
-        async ensureCapacity() { capacityChecks += 1; },
-        reserveScratchBytes(_rootPath, byteCount) { reservedBytes += byteCount; },
-        async onScratchReleased() { releaseChecks += 1; }
-      }
-    );
-    assert.deepEqual(playableEntries, members);
-    assert.equal(capacityChecks, 1);
-    assert.ok(reservedBytes > 0);
-    assert.equal(releaseChecks, 1);
-    assert.deepEqual(await inspectionScratchSummary(), { activeRootCount: 0, activeBytes: 0 });
-    const materializedPaths = await Promise.all(playableEntries.map((entry) => materializeZipEntry(archivePath, entry)));
-    assert.equal(new Set(materializedPaths).size, members.length);
-    for (let index = 0; index < members.length; index += 1) {
-      assert.equal(await fs.readFile(materializedPaths[index], "utf8"), members[index]);
-    }
-  } finally {
-    if (previousScratchRoot === undefined) delete process.env.SPCBOY_INSPECTION_SCRATCH_ROOT;
-    else process.env.SPCBOY_INSPECTION_SCRATCH_ROOT = previousScratchRoot;
-    await fs.rm(fixtureRoot, { recursive: true, force: true });
-  }
-});
-
-test("materializes selected TAR.ZST tracks when non-audio members follow them", async (t) => {
-  const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), "spcboy-tzst-tail-fixture-"));
-  try {
-    const selectedEntries = ["01 Title.vgm", "02 Ending.vgm"];
-    for (const entry of selectedEntries) await fs.writeFile(path.join(fixtureRoot, entry), entry, "utf8");
-    await fs.writeFile(path.join(fixtureRoot, "cover.bin"), Buffer.alloc(1024 * 1024, 0x5a));
-    const rawTarPath = path.join(fixtureRoot, "fixture.tar");
-    const archivePath = path.join(fixtureRoot, "fixture.tar.zst");
-    try {
-      await execFileAsync(TAR_BINARY, ["-cf", rawTarPath, "-C", fixtureRoot, ...selectedEntries, "cover.bin"]);
-      await execFileAsync(ZSTD_BINARY, ["-q", "-f", rawTarPath, "-o", archivePath]);
-    } catch (error) {
-      if (error?.code === "ENOENT") return t.skip(`TAR/Zstandard fixture tools unavailable: ${error.message}`);
-      throw error;
-    }
-
-    const materialized = await materializeArchiveEntriesForInspection(archivePath, selectedEntries);
-    try {
-      for (const entry of selectedEntries) {
-        assert.equal(await fs.readFile(materialized.paths.get(entry), "utf8"), entry);
-      }
-      await assert.rejects(fs.access(path.join(materialized.root, "cover.bin")));
-    } finally {
-      await materialized.cleanup();
-    }
-  } finally {
-    await fs.rm(fixtureRoot, { recursive: true, force: true });
-  }
+test("does not recognize retired TAR.ZST archive suffixes", () => {
+  assert.equal(archiveType("/music/set.tar.zst"), null);
+  assert.equal(archiveType("/music/set.tar.zstd"), null);
+  assert.equal(archiveType("/music/set.tzst"), null);
 });
 
 test("reports and clears the managed durable archive cache", async (t) => {

@@ -74,11 +74,11 @@ func playbackAdapterStateAllowsConcurrentTrackSnapshotReplacement() {
 func selectedCatalogMetadataDrivesPrePlaybackDurationReadout() {
     let model = PlayerViewModel()
     let track = TrackItem(
-        archiveURL: URL(fileURLWithPath: "/tmp/Resident Evil 2.tar.zst"),
+        archiveURL: URL(fileURLWithPath: "/tmp/Resident Evil 2.zip"),
         entryPath: "11 Secure Place.psf"
     )
     let staleTrack = TrackItem(
-        archiveURL: URL(fileURLWithPath: "/tmp/Resident Evil 2.tar.zst"),
+        archiveURL: URL(fileURLWithPath: "/tmp/Resident Evil 2.zip"),
         entryPath: "16 T-A.psf"
     )
     model.playlist = [track, staleTrack]

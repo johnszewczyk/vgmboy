@@ -17,14 +17,14 @@
     },
     {
       "id": "archived-gbs-children-with-delimiters",
-      "sourcePath": "/music/Sony PlayStation/Game#Collection.tar.zst",
+      "sourcePath": "/music/Sony PlayStation/Game#Collection.zip",
       "archiveEntry": "disc::music/game.gbs",
       "trackCount": 2,
       "metadataBefore": ["Track 1", "Track 2"],
       "metadataAfter": ["Opening", "Stage 1"],
       "expectedTrackIDs": [
-        "pt1|a|47|/music/Sony PlayStation/Game#Collection.tar.zst|20|disc::music/game.gbs|0",
-        "pt1|a|47|/music/Sony PlayStation/Game#Collection.tar.zst|20|disc::music/game.gbs|1"
+        "pt1|a|47|/music/Sony PlayStation/Game#Collection.zip|20|disc::music/game.gbs|0",
+        "pt1|a|47|/music/Sony PlayStation/Game#Collection.zip|20|disc::music/game.gbs|1"
       ]
     },
     {

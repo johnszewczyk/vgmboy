@@ -10,64 +10,12 @@ const { ArchiveCacheGate } = require("./archive-cache-gate");
 
 const ZIP_BINARY = process.env.SPCBOY_UNZIP_BINARY || "/usr/bin/unzip";
 const BSDTAR_BINARY = process.env.SPCBOY_BSDTAR_BINARY || "/usr/bin/bsdtar";
-const TAR_BINARY = process.env.SPCBOY_TAR_BINARY || "/usr/bin/bsdtar";
-const ZSTD_BINARY = process.env.SPCBOY_ZSTD_BINARY || "/opt/homebrew/bin/zstd";
 const SEVEN_ZIP_BINARY = process.env.SPCBOY_7Z_BINARY || "/opt/homebrew/bin/7zz";
 const LSAR_BINARY = process.env.SPCBOY_LSAR_BINARY || "/opt/homebrew/bin/lsar";
 const UNAR_BINARY = process.env.SPCBOY_UNAR_BINARY || "/opt/homebrew/bin/unar";
 const ARCHIVE_LIST_MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
 const ARCHIVE_LIST_MAX_ENTRIES = 250_000;
 const ARCHIVE_ENTRY_MAX_NAME_BYTES = 32 * 1024;
-const MAX_DECOMPRESSED_TARS = 2;
-
-// Session-scoped reuse of decompressed tar.zst streams so every member of an
-// archive shares one decompression instead of restarting zstd per extraction.
-const decompressedTarCache = new Map();
-
-async function acquireRawTar(archivePath, options = {}) {
-  const stat = await fs.stat(archivePath);
-  const key = `${archivePath}\0${stat.size}\0${stat.mtimeMs}`;
-  const cached = decompressedTarCache.get(archivePath);
-  if (cached && cached.key === key) {
-    const stillValid = await fs.access(cached.rawTarPath).then(() => true).catch(() => false);
-    if (stillValid) {
-      cached.lastUsedMs = Date.now();
-      return { rawTarPath: cached.rawTarPath };
-    }
-    await fs.rm(cached.temporaryRoot, { recursive: true, force: true });
-    decompressedTarCache.delete(archivePath);
-  }
-  const decompressed = await decompressTarZstandard(archivePath, null, options);
-  const latest = decompressedTarCache.get(archivePath);
-  if (latest && latest.key === key) {
-    await fs.rm(decompressed.temporaryRoot, { recursive: true, force: true });
-    latest.lastUsedMs = Date.now();
-    return { rawTarPath: latest.rawTarPath };
-  }
-  decompressedTarCache.set(archivePath, {
-    key,
-    rawTarPath: decompressed.rawTarPath,
-    temporaryRoot: decompressed.temporaryRoot,
-    lastUsedMs: Date.now()
-  });
-  if (decompressedTarCache.size > MAX_DECOMPRESSED_TARS) {
-    let oldestKey = null;
-    let oldestUsed = Infinity;
-    for (const [candidateKey, entry] of decompressedTarCache) {
-      if (entry.lastUsedMs < oldestUsed) {
-        oldestUsed = entry.lastUsedMs;
-        oldestKey = candidateKey;
-      }
-    }
-    if (oldestKey && oldestKey !== archivePath) {
-      const evicted = decompressedTarCache.get(oldestKey);
-      await fs.rm(evicted.temporaryRoot, { recursive: true, force: true });
-      decompressedTarCache.delete(oldestKey);
-    }
-  }
-  return { rawTarPath: decompressed.rawTarPath };
-}
-
 function cacheRootPath() {
   return process.env.SPCBOY_ARCHIVE_CACHE_ROOT
     || path.join(os.tmpdir(), "SPCBoy", "ArchiveCache");
@@ -479,8 +427,6 @@ function archiveType(archivePath) {
   const extension = path.extname(archivePath).toLowerCase();
   if (extension === ".zip") return "zip";
   if (extension === ".7z") return "7z";
-  if (extension === ".tzst") return "tzst";
-  if (extension === ".zst" && path.extname(path.basename(archivePath, extension)).toLowerCase() === ".tar") return "tzst";
   // RSN is a solid RAR archive, not a 7z archive.  Some RAR methods that
   // are common in SNESMusic.org sets are not supported by 7zz.
   if (extension === ".rsn") return "rsn";
@@ -512,50 +458,10 @@ async function listRsnEntries(archivePath, options = {}) {
   return collector.entries;
 }
 
-async function decompressTarZstandard(archivePath, parentRoot = null, options = {}) {
-  const temporaryRoot = await fs.mkdtemp(path.join(parentRoot || os.tmpdir(), parentRoot ? "tar-" : "spcboy-tzst-"));
-  const rawTarPath = path.join(temporaryRoot, "archive.tar");
-  await streamCommandToFile(ZSTD_BINARY, ["-d", "-q", "-c", "--", archivePath], rawTarPath, "zstd", options).catch(async (error) => {
-    await fs.rm(temporaryRoot, { recursive: true, force: true });
-    throw error;
-  });
-  return { temporaryRoot, rawTarPath };
-}
-
-async function listTarZstandardEntries(archivePath, options = {}) {
-  await options.ensureCapacity?.(archivePath);
-  const inspectionOwned = options.scratchOwner === "inspection";
-  const scratchRoot = inspectionOwned ? await createInspectionScratchRoot() : await createPlaybackScratchRoot();
-  const scratchOptions = {
-    ...options,
-    reserveBytes: inspectionOwned
-      ? disposableMaterializationReserve(options.reserveScratchBytes, scratchRoot)
-      : disposableMaterializationReserve()
-  };
-  try {
-    const { temporaryRoot, rawTarPath } = await decompressTarZstandard(archivePath, scratchRoot, scratchOptions);
-    try {
-      const collector = createArchiveEntryCollector(options);
-      await runListingCommand(TAR_BINARY, ["-tf", rawTarPath], "TAR listing", {
-        ...options,
-        onLine: (entry) => collector.add(entry)
-      });
-      return collector.entries;
-    } finally {
-      await fs.rm(temporaryRoot, { recursive: true, force: true });
-    }
-  } finally {
-    if (inspectionOwned) await removeInspectionScratchRoot(scratchRoot);
-    else await removePlaybackScratchRoot(scratchRoot);
-    await options.onScratchReleased?.();
-  }
-}
-
 async function listArchiveEntries(archivePath, options = {}) {
   if (archiveType(archivePath) === "zip") return listZipEntries(archivePath, options);
   if (archiveType(archivePath) === "7z") return listSevenZipEntries(archivePath, options);
   if (archiveType(archivePath) === "rsn") return listRsnEntries(archivePath, options);
-  if (archiveType(archivePath) === "tzst") return listTarZstandardEntries(archivePath, options);
   throw new Error(`Unsupported archive type: ${path.extname(archivePath)}`);
 }
 
@@ -643,7 +549,7 @@ function streamCommandToFile(program, args, outputPath, label, { reserveBytes = 
   });
 }
 
-async function streamArchiveEntryToFile(archivePath, entry, outputPath, rawTarPath = null, options = {}) {
+async function streamArchiveEntryToFile(archivePath, entry, outputPath, options = {}) {
   const type = archiveType(archivePath);
   if (type === "rsn") {
     // unar supports the solid RAR4 method used by these RSN sets and can
@@ -662,12 +568,6 @@ async function streamArchiveEntryToFile(archivePath, entry, outputPath, rawTarPa
       if (error?.code !== "ENOENT") throw error;
       // Keep 7zz as a fallback for systems without bsdtar.
     }
-  }
-
-  if (type === "tzst") {
-    if (rawTarPath) return streamCommandToFile(TAR_BINARY, ["-xOf", rawTarPath, escapeArchivePattern(entry)], outputPath, "bsdtar", options);
-    const { rawTarPath: sharedRawTar } = await acquireRawTar(archivePath, options);
-    return streamCommandToFile(TAR_BINARY, ["-xOf", sharedRawTar, escapeArchivePattern(entry)], outputPath, "bsdtar", options);
   }
 
   // 7zz treats the entry as an exact archive member.
@@ -699,7 +599,7 @@ async function materializeZipEntryUnlocked(archivePath, entry, options = {}) {
   await fs.mkdir(cacheRootPath(), { recursive: true });
   const tempPath = `${outputPath}.tmp-${process.pid}-${crypto.randomUUID()}`;
   try {
-    await streamArchiveEntryToFile(archivePath, entry, tempPath, null, options);
+    await streamArchiveEntryToFile(archivePath, entry, tempPath, options);
     await fs.rename(tempPath, outputPath);
   } finally {
     await fs.rm(tempPath, { force: true });
@@ -867,13 +767,6 @@ async function materializeDependencySetEntryIntoRoot(archivePath, selectedEntry,
   const entries = (await listArchiveEntries(archivePath, options)).filter((entry) => (
     (dependencyKind === "vgmstream" ? VGMSTREAM_COMPANION_EXTENSIONS : dependencyKind === "psf" ? PSF1_ARCHIVE_EXTENSIONS : dependencyKind === "psf2" ? PSF2_ARCHIVE_EXTENSIONS : DEPENDENCY_ARCHIVE_EXTENSIONS).has(path.extname(entry).toLowerCase())
   ));
-  // A tar.zst is a single compressed stream. Share one decompressed TAR for
-  // every member instead of restarting zstd (and charging the whole archive
-  // against the cache quota) on each extraction.
-  let rawTarPath = null;
-  if (archiveType(archivePath) === "tzst") {
-    ({ rawTarPath } = await acquireRawTar(archivePath, options));
-  }
   for (const entry of entries) {
     const destination = path.join(outputRoot, entry.split("/").join(path.sep));
     if (!destination.startsWith(`${outputRoot}${path.sep}`)) continue;
@@ -884,7 +777,7 @@ async function materializeDependencySetEntryIntoRoot(archivePath, selectedEntry,
     await fs.mkdir(path.dirname(destination), { recursive: true });
     const tempPath = `${destination}.tmp-${process.pid}-${crypto.randomUUID()}`;
     try {
-      await streamArchiveEntryToFile(archivePath, entry, tempPath, rawTarPath, options);
+      await streamArchiveEntryToFile(archivePath, entry, tempPath, options);
       await fs.rename(tempPath, destination);
     } finally {
       await fs.rm(tempPath, { force: true });
@@ -916,7 +809,7 @@ async function materializeArchiveEntryForInspection(archivePath, selectedEntry, 
       playablePath = path.join(scratchRoot, selectedEntry.split("/").join(path.sep));
       if (!playablePath.startsWith(`${scratchRoot}${path.sep}`)) throw new Error(`Unsafe archive entry path: ${selectedEntry}`);
       await fs.mkdir(path.dirname(playablePath), { recursive: true });
-      await streamArchiveEntryToFile(archivePath, selectedEntry, playablePath, null, scratchOptions);
+      await streamArchiveEntryToFile(archivePath, selectedEntry, playablePath, scratchOptions);
     }
     return {
       path: playablePath,
@@ -941,7 +834,7 @@ async function materializeArchiveEntryForPlayback(archivePath, selectedEntry) {
       playablePath = path.join(scratchRoot, selectedEntry.split("/").join(path.sep));
       if (!playablePath.startsWith(`${scratchRoot}${path.sep}`)) throw new Error(`Unsafe archive entry path: ${selectedEntry}`);
       await fs.mkdir(path.dirname(playablePath), { recursive: true });
-      await streamArchiveEntryToFile(archivePath, selectedEntry, playablePath, null, { reserveBytes });
+      await streamArchiveEntryToFile(archivePath, selectedEntry, playablePath, { reserveBytes });
     }
     return { path: playablePath, cleanup: () => removePlaybackScratchRoot(scratchRoot) };
   } catch (error) {
@@ -963,67 +856,6 @@ async function materializeArchiveEntriesForInspection(archivePath, selectedEntri
   const preparedDependencyKinds = new Set();
   const paths = new Map();
   try {
-    // A tar.zst is a single compressed stream. Extracting each member with
-    // extractArchiveEntry would restart zstd from byte zero for every PSF,
-    // PSF2, or vgmstream member. Keep one decompressed TAR for the whole
-    // playlist request so dependency families are extracted only once.
-    if (archiveType(archivePath) === "tzst") {
-      const { temporaryRoot, rawTarPath } = await decompressTarZstandard(archivePath, scratchRoot, scratchOptions);
-      try {
-        const collector = createArchiveEntryCollector(options);
-        await runListingCommand(TAR_BINARY, ["-tf", rawTarPath], "TAR listing", {
-          ...options,
-          onLine: (entry) => collector.add(entry)
-        });
-        const allEntries = collector.entries;
-        const requiredEntries = new Set(entries);
-        for (const selectedEntry of entries) {
-          const extension = path.extname(selectedEntry).toLowerCase();
-          if (!DEPENDENCY_ARCHIVE_EXTENSIONS.has(extension)) continue;
-          const dependencyKind = dependencyKindForExtension(extension);
-          if (preparedDependencyKinds.has(dependencyKind)) continue;
-          preparedDependencyKinds.add(dependencyKind);
-          const allowedExtensions = dependencyKind === "vgmstream"
-            ? VGMSTREAM_COMPANION_EXTENSIONS
-            : dependencyKind === "psf"
-              ? PSF1_ARCHIVE_EXTENSIONS
-              : dependencyKind === "psf2"
-                ? PSF2_ARCHIVE_EXTENSIONS
-                : DEPENDENCY_ARCHIVE_EXTENSIONS;
-          allEntries.forEach((entry) => {
-            if (allowedExtensions.has(path.extname(entry).toLowerCase())) requiredEntries.add(entry);
-          });
-        }
-        for (const entry of requiredEntries) {
-          const destination = path.join(scratchRoot, entry.split("/").join(path.sep));
-          if (!destination.startsWith(`${scratchRoot}${path.sep}`)) throw new Error(`Unsafe archive entry path: ${entry}`);
-          await fs.mkdir(path.dirname(destination), { recursive: true });
-          try {
-            await fs.access(destination);
-            continue;
-          } catch {}
-          const tempPath = `${destination}.tmp-${process.pid}`;
-          await streamArchiveEntryToFile(archivePath, entry, tempPath, rawTarPath, scratchOptions);
-          await fs.rename(tempPath, destination);
-        }
-        if (preparedDependencyKinds.has("vgmstream")) {
-          await materializeTxtpRelativeAliases(scratchRoot, [...requiredEntries]);
-        }
-        for (const selectedEntry of entries) {
-          const playablePath = path.join(scratchRoot, selectedEntry.split("/").join(path.sep));
-          await fs.access(playablePath);
-          paths.set(selectedEntry, playablePath);
-        }
-      } finally {
-        await fs.rm(temporaryRoot, { recursive: true, force: true });
-      }
-      return {
-        root: scratchRoot,
-        paths,
-        cleanup: () => removeInspectionScratchRoot(scratchRoot)
-      };
-    }
-
     for (const selectedEntry of entries) {
       const extension = path.extname(selectedEntry).toLowerCase();
       let playablePath;
@@ -1042,7 +874,7 @@ async function materializeArchiveEntriesForInspection(archivePath, selectedEntri
         } catch {
           await fs.mkdir(path.dirname(playablePath), { recursive: true });
           const tempPath = `${playablePath}.tmp-${process.pid}`;
-          await streamArchiveEntryToFile(archivePath, selectedEntry, tempPath, null, scratchOptions);
+          await streamArchiveEntryToFile(archivePath, selectedEntry, tempPath, scratchOptions);
           await fs.rename(tempPath, playablePath);
         }
       }

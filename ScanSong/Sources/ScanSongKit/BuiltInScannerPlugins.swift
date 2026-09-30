@@ -84,5 +84,5 @@ public enum BuiltInScannerPlugins {
         descriptors: directMetadataDescriptors + decoderMetadataDescriptors + deferredMetadataDescriptors
     )
 
-    public static let archiveExtensions: Set<String> = ["7z", "lha", "rar", "rsn", "tar.zst", "tar.zstd", "tzst", "uac", "zip", "zst", "zstd"]
+    public static let archiveExtensions: Set<String> = ["7z", "lha", "rar", "uac", "zip", "zst", "zstd"]
 }

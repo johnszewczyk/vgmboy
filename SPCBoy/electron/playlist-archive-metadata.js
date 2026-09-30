@@ -40,8 +40,8 @@ function createPlaylistArchiveMetadataService({ materializeArchiveEntries, inspe
       groups.set(track.archivePath, group);
     }
     const updates = [];
-    // One archive at a time prevents independent TAR.ZST decompression from
-    // competing with playback and keeps selection hydration predictable.
+    // One archive at a time keeps selection hydration predictable and avoids
+    // competing with playback for archive scratch space.
     for (const [archivePath, group] of groups) updates.push(...await inspectArchiveGroup(archivePath, group));
     return updates;
   }

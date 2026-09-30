@@ -103,8 +103,8 @@ public final class ArchiveMaterializer: @unchecked Sendable {
 
     /// Executes a shared archive-tool invocation without changing the
     /// materializer's temporary playback session. Cache-backed frontends use
-    /// this as their extraction adapter so process topology and TZST handling
-    /// remain identical to the reference materializer.
+    /// this as their extraction adapter so process topology remains identical
+    /// to the reference materializer.
     public func execute(
         _ invocation: ArchiveToolInvocation,
         outputURL: URL? = nil
@@ -144,18 +144,14 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         guard let kind = ArchiveContainerKind(archiveURL: archiveURL) else {
             throw ArchiveMaterializationError.toolUnavailable("supported archive format")
         }
-        if kind.usesTarZstandardPipeline {
-            try extractTarZstd(archiveURL: archiveURL, entry: entry, output: output)
-        } else {
-            try extractWithArchiveTool(
-                ArchiveToolRouting.selectedEntryToStdout(
-                    kind: kind,
-                    archiveURL: archiveURL,
-                    entryPath: entry
-                ),
-                outputURL: output
-            )
-        }
+        try extractWithArchiveTool(
+            ArchiveToolRouting.selectedEntryToStdout(
+                kind: kind,
+                archiveURL: archiveURL,
+                entryPath: entry
+            ),
+            outputURL: output
+        )
     }
 
     private func extractCompleteSet(archiveURL: URL, destination: URL) throws {
@@ -278,17 +274,6 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         } catch {
             throw ArchiveMaterializationError.extractFailed(Self.errorText(from: error))
         }
-    }
-
-    private func extractTarZstd(archiveURL: URL, entry: String, output: URL) throws {
-        try runZstandardTarPipeline(
-            zstdExecutable: try configuration.zstdURL().path,
-            zstdArguments: ["-d", "-q", "-c", archiveURL.path],
-            tarExecutable: try configuration.bsdtarURL().path,
-            tarArguments: ["-xOf", "-", entry],
-            outputURL: output,
-            allowEarlyConsumerExit: true
-        )
     }
 
     private func runZstandardTarPipeline(

@@ -22,13 +22,13 @@ test("hydrates archive rows through one materialization session per archive", as
   });
 
   const updates = await service.hydrate([
-    { id: "one", archivePath: "/music/one.tar.zst", archiveEntry: "one.vgm", sourceFilename: "one.vgm", trackIndex: 0 },
-    { id: "two", archivePath: "/music/one.tar.zst", archiveEntry: "two.vgm", sourceFilename: "two.vgm", trackIndex: 0 },
+    { id: "one", archivePath: "/music/one.zip", archiveEntry: "one.vgm", sourceFilename: "one.vgm", trackIndex: 0 },
+    { id: "two", archivePath: "/music/one.zip", archiveEntry: "two.vgm", sourceFilename: "two.vgm", trackIndex: 0 },
     { id: "three", archivePath: "/music/two.zip", archiveEntry: "three.vgm", sourceFilename: "three.vgm", trackIndex: 0 }
   ]);
 
   assert.deepEqual(materializedGroups, [
-    { archivePath: "/music/one.tar.zst", entries: ["one.vgm", "two.vgm"] },
+    { archivePath: "/music/one.zip", entries: ["one.vgm", "two.vgm"] },
     { archivePath: "/music/two.zip", entries: ["three.vgm"] }
   ]);
   assert.equal(cleanupCount, 2);

@@ -202,13 +202,10 @@ public struct DryRunProbe: Sendable {
     }
 
     private func isArchive(_ url: URL) -> Bool {
-        BuiltInScannerPlugins.archiveExtensions.contains(archiveExtension(url))
+        StandaloneArchiveExtractor.isSupportedArchive(url)
     }
 
     private func archiveExtension(_ url: URL) -> String {
-        let lower = url.lastPathComponent.lowercased()
-        if lower.hasSuffix(".tar.zstd") { return "tar.zstd" }
-        if lower.hasSuffix(".tar.zst") { return "tar.zst" }
         return url.pathExtension.lowercased()
     }
 }

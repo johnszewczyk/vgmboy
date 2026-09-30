@@ -22,7 +22,6 @@ From the `UACMan/` project root, run the wrapper CLI with:
 ```sh
 python3 -B Wrapper/python/uacman.py --help
 python3 -B Wrapper/python/uacman.py pack --help
-python3 -B Wrapper/python/uacman.py pack-source-tree --help
 python3 -B Wrapper/python/uacman.py enrich-sets <uac-collection>
 python3 -B -m unittest discover -s Wrapper/python/tests
 swift test --package-path Wrapper
@@ -87,17 +86,6 @@ SHA-1, and MD5 records for the playable-payload scope; for SPC this is the
 complete stored file. Existing BLAKE3 member identity remains available.
 AudioMan must convert VGZ to raw VGM and freshen VGM versions before
 packaging when that is the selected set policy.
-
-For bulk `.tar.zst` conversion, pass the same helper with `--metadata-cli` and
-add `--metadata-format vgm` (or `nsf`, `nsfe`, `gbs`, `flac`, or `ape`) to
-`pack-source-tree`. Formats absent from an input package are skipped without
-starting a reader process. Other standard-audio extensions can be named the
-same way.
-
-On macOS, TAR member names and MetaMan's filesystem paths can use different
-Unicode normalization forms. Bulk packaging matches those paths by canonical
-Unicode equivalence, but writes the original TAR member spelling into UAC.
-Distinct source names that collide after normalization fail closed.
 
 Native SPC replacement work is closed. `Container/` keeps the former research
 and state-profile prototype as historical material; this wrapper remains the

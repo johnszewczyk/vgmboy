@@ -68,6 +68,9 @@ and reader behavior live in
   callback never sees the TAR/audio payload. Catalog scans do not expand,
   hash, or inspect that payload, invoke an inner-format reader, or fill missing
   manifest fields from native member tags.
+- Loose `.tar.zst`, `.tar.zstd`, and `.tzst` source archives are retired from
+  scanner discovery. Standalone media `.zst`/`.zstd` and manifest-routed `.uac`
+  remain separate input contracts.
 - Structure and optional metadata policy are separate. Required child or
   dependency enumeration cannot be deferred because a metadata option is off.
 - A scanner plugin has a `ScannerPluginDescriptor` for routing and a
@@ -104,9 +107,6 @@ and reader behavior live in
   group, concurrent bounded output draining, timeout, cancellation
   termination, and wait-before-close. The native process runner currently
   limits execution to 30 seconds, stdout to 4 MiB, and stderr to 256 KiB.
-- TAR.ZST streams `zstd -dc` into `tar` without a second full temporary TAR.
-  Both processes are awaited. If `tar` accepts its end markers before zstd
-  drains the frame, a separate `zstd -t` must validate the source.
 - Standard output from `scansong` contains JSONL events only, with explicit
   contract name/version and increasing sequence numbers. Progress events are
   rate-limited to phase changes, completion, or one event per second.

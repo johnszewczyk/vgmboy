@@ -121,9 +121,9 @@ production resources and runtime routing do not read that environment variable.
 Archive-backed playback must receive a clean path from
 `FrontendCore.ArchivePlaybackMaterializer`. The required selected-entry or
 complete-set preparation is a VGMBoy format capability; extraction, cache
-identity, atomic staging, dependency preparation, output validation, lease
-protection, and the connected TZST tool pipeline are shared with CocoaSpice.
-ZIP, 7z, LHA, RSN, and TAR+Zstandard use the shared archive boundary. Amiga
+identity, atomic staging, dependency preparation, output validation, and lease
+protection are shared with CocoaSpice. ZIP, 7z, LHA, RSN, and UAC use the
+shared archive boundary. Amiga
 members identified by UADE filename prefixes use complete-set preparation so
 their player/sample companions remain available; an LHA member is not treated
 as a standalone suffix-only file. MDX keeps a matching PDX bank as dependency

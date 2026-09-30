@@ -8,9 +8,9 @@ import Testing
     #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.lha")) == .lha)
     #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.rsn")) == .rsn)
     #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.tar")) == .tar)
-    #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.tar.zst")) == .tarZstandard)
-    #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.tar.zstd")) == .tarZstandard)
-    #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.tzst")) == .tarZstandard)
+    #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.tar.zst")) == nil)
+    #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.tar.zstd")) == nil)
+    #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "set.tzst")) == nil)
     #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "game.uac")) == .uac)
     #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "track.vgm.zst")) == .singleFileZstandard)
     #expect(ArchiveContainerKind(archiveURL: URL(fileURLWithPath: "track.flac.zstd")) == .singleFileZstandard)
@@ -62,17 +62,6 @@ import Testing
         arguments: ["-xOf", "/tmp/library.tar", "Toki \\[JuJu Densetsu].nsf"]
     ))
     #expect(ArchiveToolRouting.selectedEntryToStdout(
-        kind: .tarZstandard,
-        archiveURL: URL(fileURLWithPath: "/tmp/library.tar.zst"),
-        entryPath: "Toki [JuJu Densetsu].nsf"
-    ) == .zstandardTar(
-        zstdExecutableName: "zstd",
-        zstdArguments: ["-d", "-q", "-c", "/tmp/library.tar.zst"],
-        tarExecutableName: "tar",
-        tarArguments: ["-xOf", "-", "Toki \\[JuJu Densetsu].nsf"],
-        allowEarlyConsumerExit: true
-    ))
-    #expect(ArchiveToolRouting.selectedEntryToStdout(
         kind: .uac,
         archiveURL: URL(fileURLWithPath: "/tmp/game.uac"),
         entryPath: "variants/original/track.spc"
@@ -81,22 +70,6 @@ import Testing
         zstdArguments: ["-d", "-q", "-c", "/tmp/game.uac"],
         tarExecutableName: "tar",
         tarArguments: ["-xOf", "-", "variants/original/track.spc"],
-        allowEarlyConsumerExit: true
-    ))
-}
-
-@Test func preservesTarPipelineAndLiteralSelectionRules() {
-    let invocation = ArchiveToolRouting.selectedEntries(
-        kind: .tarZstandard,
-        archiveURL: URL(fileURLWithPath: "/tmp/library.tar.zst"),
-        entryPaths: ["music/[track]?.spc"],
-        destinationURL: URL(fileURLWithPath: "/tmp/materialized")
-    )
-    #expect(invocation == .zstandardTar(
-        zstdExecutableName: "zstd",
-        zstdArguments: ["-d", "-q", "-c", "/tmp/library.tar.zst"],
-        tarExecutableName: "tar",
-        tarArguments: ["-xf", "-", "-C", "/tmp/materialized", "music/\\[track]\\?.spc"],
         allowEarlyConsumerExit: true
     ))
 }

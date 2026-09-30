@@ -27,7 +27,7 @@
   closure, complete-set staging, lazyUSF aliases, TXTP aliases, cache identity,
   warm-hit checks, atomic staging, completion markers, and cache-limit
   orchestration plus cache-lease activation. CocoaSpice retains only
-  archive-tool closures, archive listing/manifest reads, TAR+Zstandard piping,
+  archive-tool closures, archive listing/manifest reads, UAC TAR+Zstandard piping,
   cleanup scheduling, and app-facing error mapping.
 - `ArchiveMaterializationCore.ArchiveListingParser` owns bounded
   7-Zip/TAR/RSN listing parsing and reversible BSD-tar octal pathname
@@ -45,7 +45,7 @@
 - `ArchiveMaterializationCore.ArchiveContainerKind` and `ArchiveToolRouting`
   own exact archive-container detection and extraction command specifications.
   CocoaSpice retains executable discovery, process execution, error mapping,
-  and the specialized TAR+Zstandard raw-name pipeline.
+  and UAC's specialized TAR+Zstandard raw-name pipeline.
 - `PlaylistQueueLoader` converts stored game/file identities into playlist rows
   without rescanning source media.
 - `CatalogPlaylistCore` owns the indexed Games playlist projection. Its

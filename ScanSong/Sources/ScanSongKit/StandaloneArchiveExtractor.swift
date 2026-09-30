@@ -75,7 +75,8 @@ public struct StandaloneArchiveExtractor: Sendable {
 
     public static func isSupportedArchive(_ url: URL) -> Bool {
         let name = url.lastPathComponent.lowercased()
-        return [".7z", ".lha", ".rar", ".rsn", ".tar.zst", ".tar.zstd", ".tzst", ".uac", ".zip", ".zst", ".zstd"]
+        guard !isRetiredTarZstandard(name) else { return false }
+        return [".7z", ".lha", ".rar", ".rsn", ".uac", ".zip", ".zst", ".zstd"]
             .contains { name.hasSuffix($0) }
     }
 
@@ -118,9 +119,7 @@ public struct StandaloneArchiveExtractor: Sendable {
         let payload = root.appendingPathComponent("payload", isDirectory: true)
         try fileManager.createDirectory(at: payload, withIntermediateDirectories: true)
         do {
-            if Self.isTarZstandard(archiveURL) {
-                try await extractTarZstandard(archiveURL: archiveURL, payloadURL: payload, scratchURL: root)
-            } else if Self.isStandaloneZstandard(archiveURL) {
+            if Self.isStandaloneZstandard(archiveURL) {
                 guard let entryPath = Self.standaloneEntryPath(for: archiveURL, registry: registry) else {
                     throw StandaloneArchiveError.unsupported(archiveURL.lastPathComponent)
                 }
@@ -165,26 +164,6 @@ public struct StandaloneArchiveExtractor: Sendable {
 
     public func discard(_ extracted: ExtractedScanArchive) {
         try? fileManager.removeItem(at: extracted.scratchURL)
-    }
-
-    private func extractTarZstandard(archiveURL: URL, payloadURL: URL, scratchURL: URL) async throws {
-        let listing = try await ScannerCommand.runTarZstandard(
-            archiveURL: archiveURL,
-            tarArguments: ["-tf", "-"],
-            logURL: scratchURL.appendingPathComponent("tar-list.log")
-        )
-        try validateTarListing(listing)
-        let verboseListing = try await ScannerCommand.runTarZstandard(
-            archiveURL: archiveURL,
-            tarArguments: ["-tvf", "-"],
-            logURL: scratchURL.appendingPathComponent("tar-verbose-list.log")
-        )
-        try validateTarExpandedSize(verboseListing)
-        _ = try await ScannerCommand.runTarZstandard(
-            archiveURL: archiveURL,
-            tarArguments: ["-xf", "-", "-C", payloadURL.path],
-            logURL: scratchURL.appendingPathComponent("tar-extract.log")
-        )
     }
 
     private func extractWith7Zip(archiveURL: URL, payloadURL: URL, scratchURL: URL) async throws {
@@ -356,39 +335,6 @@ public struct StandaloneArchiveExtractor: Sendable {
         }
     }
 
-    private func validateTarListing(_ data: Data) throws {
-        let entries = String(decoding: data, as: UTF8.self).split(whereSeparator: \.isNewline)
-        guard entries.count <= Self.maximumMemberCount else {
-            throw StandaloneArchiveError.resourceLimit("Archive exceeds the \(Self.maximumMemberCount)-member safety limit.")
-        }
-        for entry in entries {
-            let path = String(entry)
-            guard Self.isSafeRelativePath(path) else { throw StandaloneArchiveError.unsafeEntry(path) }
-        }
-    }
-
-    private func validateTarExpandedSize(_ data: Data) throws {
-        var parsedEntries = 0
-        var totalBytes: Int64 = 0
-        for line in String(decoding: data, as: UTF8.self).split(whereSeparator: \.isNewline) {
-            let fields = line.split(whereSeparator: { $0 == " " || $0 == "\t" })
-            guard fields.count > 4, let size = Int64(fields[4]) else { continue }
-            parsedEntries += 1
-            let (sum, overflow) = totalBytes.addingReportingOverflow(size)
-            guard !overflow else {
-                throw StandaloneArchiveError.resourceLimit("Archive expanded size exceeds the scanner safety limit.")
-            }
-            totalBytes = sum
-            guard totalBytes <= Self.maximumExpandedBytes else {
-                throw StandaloneArchiveError.resourceLimit("Archive expands beyond the 8 GiB scan safety limit.")
-            }
-        }
-        // macOS tar emits a size field for regular files. If a future tar
-        // format changes that output, the post-extraction member accounting
-        // remains the fallback safety check.
-        _ = parsedEntries
-    }
-
     static func isSafeRelativePath(_ path: String) -> Bool {
         guard !path.isEmpty, !path.hasPrefix("/"), !path.contains("\\") else { return false }
         return !path.split(separator: "/", omittingEmptySubsequences: false).contains("..")
@@ -434,14 +380,13 @@ public struct StandaloneArchiveExtractor: Sendable {
         return URL(fileURLWithPath: path)
     }
 
-    private static func isTarZstandard(_ url: URL) -> Bool {
-        let name = url.lastPathComponent.lowercased()
-        return name.hasSuffix(".tar.zst") || name.hasSuffix(".tar.zstd") || name.hasSuffix(".tzst")
+    private static func isRetiredTarZstandard(_ name: String) -> Bool {
+        [".tar.zst", ".tar.zstd", ".tzst"].contains { name.hasSuffix($0) }
     }
 
     private static func isStandaloneZstandard(_ url: URL) -> Bool {
         let name = url.lastPathComponent.lowercased()
-        return (name.hasSuffix(".zst") || name.hasSuffix(".zstd")) && !isTarZstandard(url)
+        return (name.hasSuffix(".zst") || name.hasSuffix(".zstd")) && !isRetiredTarZstandard(name)
     }
 
 }
@@ -754,132 +699,5 @@ private enum ScannerCommand {
         try Task.checkCancellation()
     }
 
-    static func runTarZstandard(
-        archiveURL: URL,
-        tarArguments: [String],
-        logURL: URL
-    ) async throws -> Data {
-        let zstandard = try requiredTool([
-            "/opt/homebrew/bin/zstd", "/usr/local/bin/zstd", "/usr/bin/zstd"
-        ])
-        let tar = try requiredTool(["/usr/bin/tar"])
-        let bridge = Pipe()
-        let zstandardError = Pipe()
-        let tarError = Pipe()
-        FileManager.default.createFile(atPath: logURL.path, contents: nil)
-        let output = try FileHandle(forWritingTo: logURL)
-        var outputClosed = false
-        defer {
-            if !outputClosed { try? output.close() }
-        }
 
-        let zstandardProcess = Process()
-        zstandardProcess.executableURL = zstandard
-        zstandardProcess.arguments = ["-dc", "--", archiveURL.path]
-        zstandardProcess.standardOutput = bridge
-        zstandardProcess.standardError = zstandardError
-
-        let tarProcess = Process()
-        tarProcess.executableURL = tar
-        tarProcess.arguments = tarArguments
-        tarProcess.standardInput = bridge
-        tarProcess.standardOutput = output
-        tarProcess.standardError = tarError
-
-        let zstandardBox = ScannerManagedProcess()
-        let tarBox = ScannerManagedProcess()
-        zstandardBox.install(zstandardProcess)
-        tarBox.install(tarProcess)
-        defer {
-            zstandardBox.clear()
-            tarBox.clear()
-            try? output.close()
-            try? bridge.fileHandleForReading.close()
-            try? bridge.fileHandleForWriting.close()
-            try? zstandardError.fileHandleForReading.close()
-            try? tarError.fileHandleForReading.close()
-        }
-        let status = try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                let completion = ScannerPipelineStatus()
-                completion.install(continuation)
-                zstandardProcess.terminationHandler = { process in
-                    completion.recordZstandard(process.terminationStatus)
-                }
-                tarProcess.terminationHandler = { process in
-                    completion.recordTar(process.terminationStatus)
-                }
-                var tarLaunched = false
-                var zstandardLaunched = false
-                do {
-                    completion.begin(.tar)
-                    guard try tarBox.launch(tarProcess) else {
-                        completion.finishWithoutLaunch(.tar)
-                        throw CancellationError()
-                    }
-                    tarLaunched = true
-                    completion.begin(.zstandard)
-                    guard try zstandardBox.launch(zstandardProcess) else {
-                        completion.finishWithoutLaunch(.zstandard)
-                        throw CancellationError()
-                    }
-                    zstandardLaunched = true
-                } catch {
-                    if !tarLaunched { completion.finishWithoutLaunch(.tar) }
-                    if !zstandardLaunched { completion.finishWithoutLaunch(.zstandard) }
-                    tarBox.terminate()
-                    zstandardBox.terminate()
-                    completion.fail(error)
-                }
-            }
-        } onCancel: {
-            tarBox.terminate()
-            zstandardBox.terminate()
-        }
-        try output.close()
-        outputClosed = true
-
-        let standardOutput = (try? Data(contentsOf: logURL)) ?? Data()
-        let errorOutput = zstandardError.fileHandleForReading.readDataToEndOfFile()
-            + tarError.fileHandleForReading.readDataToEndOfFile()
-        let combinedOutput = standardOutput + errorOutput
-        try combinedOutput.write(to: logURL, options: .atomic)
-        if Task.isCancelled { throw CancellationError() }
-        if status.0 != 0, status.1 == 0 {
-            // Some tar readers stop at the standard end-of-archive blocks
-            // without draining trailing bytes from the compressed frame. In
-            // that case zstd can receive SIGPIPE even though tar accepted the
-            // archive. Accept that pipeline result only after a complete
-            // standalone pass verifies the entire compressed source.
-            let verificationLogURL = logURL.appendingPathExtension("zstd-verification")
-            defer { try? FileManager.default.removeItem(at: verificationLogURL) }
-            do {
-                _ = try await run(
-                    executable: zstandard,
-                    arguments: ["-t", "--", archiveURL.path],
-                    logURL: verificationLogURL
-                )
-                return combinedOutput
-            } catch {
-                let detail = String(decoding: errorOutput.suffix(8_192), as: UTF8.self)
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                throw StandaloneArchiveError.commandFailed(
-                    tool: zstandard.lastPathComponent,
-                    status: status.0,
-                    detail: "TAR accepted the archive, but the complete Zstandard frame did not verify: \(error.localizedDescription). \(detail)"
-                )
-            }
-        }
-        guard status.0 == 0, status.1 == 0 else {
-            let failedTool = status.0 == 0 ? tar.lastPathComponent : zstandard.lastPathComponent
-            let detail = String(decoding: errorOutput.suffix(8_192), as: UTF8.self)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            throw StandaloneArchiveError.commandFailed(
-                tool: failedTool,
-                status: status.0 == 0 ? status.1 : status.0,
-                detail: detail.isEmpty ? "No diagnostic output." : detail
-            )
-        }
-        return combinedOutput
-    }
 }

@@ -26,7 +26,7 @@
 ## Root Selection
 
 - Disk Path root: choose a folder or file through File > Open Path.
-- Library root: drag a folder, supported audio file, or ZIP/7z/RSN/TZST/TAR.ZST archive onto SPCBoy to open it.
+- Library root: drag a folder, supported audio file, or ZIP/7z/RSN archive onto SPCBoy to open it.
 - File selection: uses the containing folder as the library root.
 - Root and selected folder: restore between launches.
 
@@ -35,7 +35,7 @@
 - SPCBoy reads library roots, game buckets, tracks, and metadata from the shared MediaScanner schema-23 catalog through a read-only SQLite connection, without creating, migrating, or writing it.
 - Options / Database selects and validates the catalog path, shows library and archive-cache statistics, and reports when restart is required. Archive Cache remains SPCBoy-owned playback state and can still be configured or cleared while playback is stopped.
 - Options / Library shows the catalog's configured roots. Root mutation, scans, Test Files, and destructive database maintenance are disabled because MediaScanner is the sole catalog-writer boundary.
-- Database: ZIP-, 7z-, RSN-, and TZST-contained supported audio files appear as playable indexed tracks, including expanded internal songs from multi-track NSF and GBS files.
+- Database: ZIP-, 7z-, and RSN-contained supported audio files appear as playable indexed tracks, including expanded internal songs from multi-track NSF and GBS files.
 - Consoles: a game leaf previews its indexed tracks on selection, while console headings are expandable/collapsible and activate only with Enter or double-click. Console headings use a recognized collection tag such as `[PS1]`, then the nearest recognized collection folder by default; Prefer Embedded Console Tags reverses that priority. Known aliases are normalized after source selection. A recognized terminal console tag is omitted from an archive game name, while unrelated suffixes such as `[USA]` remain. Same-title games from separate library paths remain distinct and load only that root's indexed tracks.
 - Database mode: single-click preview is delayed just long enough to distinguish a double-click, so activation issues one track query instead of previewing and immediately loading the same game again. Database read/search/activation failures remain visible below the existing game list.
 - Console grouping: catalog games are always grouped under expandable console headings; there is no flat-list option. Grouping does not change search or activation behavior.

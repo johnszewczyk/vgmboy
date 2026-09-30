@@ -100,56 +100,6 @@ class AuthoredTagNamingTests(unittest.TestCase):
     "UAC round-trip integration test requires the zstd command-line tool",
 )
 class UACManRoundTripTests(unittest.TestCase):
-    def test_archive_member_names_survive_filesystem_unicode_normalization(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="uacman-unicode-path-test-") as temporary:
-            root = Path(temporary)
-            original_name = "track Flügels.spc"
-            source_tar = root / "source.tar"
-            source_zst = root / "source.tar.zst"
-            contents = b"SPC member bytes"
-            with tarfile.open(source_tar, mode="w", format=tarfile.PAX_FORMAT) as archive:
-                info = tarfile.TarInfo(original_name)
-                info.size = len(contents)
-                archive.addfile(info, io.BytesIO(contents))
-            with source_zst.open("wb") as output:
-                subprocess.run(
-                    ["zstd", "-q", "-c", str(source_tar)],
-                    stdout=output,
-                    check=True,
-                )
-
-            extracted = root / "extracted"
-            member_path_map: dict[str, str] = {}
-            uacman.extract_zstd_tar(source_zst, extracted, member_path_map)
-            files, _ = uacman.discover_files(extracted, include_macos_sidecars=False)
-            filesystem_path = files[0][1]
-            self.assertEqual(
-                member_path_map[unicodedata.normalize("NFC", filesystem_path)],
-                original_name,
-            )
-
-            recipe = uacman.normalize_recipe({
-                "game": {"id": "unicode", "title": "Unicode", "console": "Nintendo SNES"},
-                "variants": [{"id": "original", "label": "Original", "kind": "release"}],
-                "sources": [], "transformations": [], "playlists": [],
-                "extensions": {}, "memberOverrides": {},
-            })
-            output_tar = root / "output.tar"
-            records, _ = uacman.create_tar(
-                extracted,
-                output_tar,
-                recipe,
-                "original",
-                False,
-                member_path_map,
-            )
-            self.assertEqual(records[0]["path"], original_name)
-            self.assertEqual(records[0]["originalName"], original_name)
-            with tarfile.open(output_tar, mode="r:") as archive:
-                member = archive.getmembers()[0]
-                self.assertEqual(member.name, original_name)
-                self.assertEqual(archive.extractfile(member).read(), contents)
-
     def test_unicode_metadata_paths_match_and_reject_normalization_collisions(self) -> None:
         composed = "15 - Yokohama Flügels.spc"
         decomposed = unicodedata.normalize("NFD", composed)

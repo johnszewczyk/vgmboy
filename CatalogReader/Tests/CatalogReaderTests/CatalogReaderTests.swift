@@ -31,7 +31,7 @@ private func fixtureCatalog() throws -> URL {
         INSERT INTO library_roots VALUES (1, '/music', 1, 1, 2, 0, 0);
         INSERT INTO tracks VALUES (1, 1, '/music/Game', '/music/Game/Track 9.spc', 'Track 9.spc', 'Game', 'SNES', 0, 1, 9, NULL, NULL);
         INSERT INTO tracks VALUES (2, 1, '/music/Game', '/music/Game/Track 10.spc', 'Track 10.spc', 'Game', 'SNES', 0, 1, 10, NULL, NULL);
-        INSERT INTO tracks VALUES (3, 1, '/music/TG16', '/music/TG16/Chew-Man-Fu.tar.zst', 'Chew-Man-Fu.tar.zst', 'Chew Man Fu', '', 0, 1, NULL, '/music/TG16/Chew-Man-Fu.tar.zst', NULL);
+        INSERT INTO tracks VALUES (3, 1, '/music/TG16', '/music/TG16/Chew-Man-Fu.zip', 'Chew-Man-Fu.zip', 'Chew Man Fu', '', 0, 1, NULL, '/music/TG16/Chew-Man-Fu.zip', NULL);
         INSERT INTO track_metadata VALUES (1, 'Track 9', 'Game', 'Composer', 'SNES', '', 0, 0, 90000, 0);
         INSERT INTO track_metadata VALUES (2, 'Track 10', '', 'Composer', 'SNES', '', 0, 0, 100000, 0);
         INSERT INTO track_metadata VALUES (3, 'Chew Man Fu', 'Chew Man Fu', 'Composer', 'PC Engine', '', 0, 0, 120000, 0);
@@ -57,7 +57,7 @@ private func fixtureCatalog() throws -> URL {
     #expect(Set(try reader.fileBuckets().map(\.path)) == Set([
         "/music/Game/Track 9.spc",
         "/music/Game/Track 10.spc",
-        "/music/TG16/Chew-Man-Fu.tar.zst"
+        "/music/TG16/Chew-Man-Fu.zip"
     ]))
 }
 

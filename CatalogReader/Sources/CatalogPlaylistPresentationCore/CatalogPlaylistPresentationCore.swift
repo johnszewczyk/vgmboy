@@ -419,7 +419,7 @@ public enum CatalogPlaylistPresentation {
     private static func displayedBaseName(_ filename: String) -> String {
         let lowercaseFilename = filename.lowercased()
         let compoundArchiveSuffixes = [
-            ".tar.zst", ".tar.zstd", ".tar.gz", ".tar.bz2", ".tar.xz", ".tar.lz", ".tar.lz4"
+            ".tar.gz", ".tar.bz2", ".tar.xz", ".tar.lz", ".tar.lz4"
         ]
         if let suffix = compoundArchiveSuffixes.first(where: { lowercaseFilename.hasSuffix($0) }) {
             return String(filename.dropLast(suffix.count))

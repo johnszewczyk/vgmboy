@@ -392,9 +392,7 @@ matching), so they are not turned into false names such as `NOS.SMP.PDX`.
 For `name.MDX.zst`, the decompressed MDX is placed in disposable scratch and
 the matching dependency is materialized beside it before the inspector starts.
 Standalone compressed PDX, SMP, and PCM companions are suppressed from
-discovery. For TAR.ZST, the complete archive is extracted into disposable
-scratch, the MDX header is read, and its declared dependency remains data for
-that MDX rather than an independent track. A declared but missing dependency
+discovery. A declared but missing dependency
 is an explicit MDX failure. The inspector checks the materialized scratch
 directory before launching mdxmini and includes the declared name in the
 failure (`Required MDX dependency is missing: name.`); it is not a successful
@@ -1061,8 +1059,8 @@ fake playable records.
 
 - A loose file or physical archive is one source-level progress item. Archive
   members update detail/current path but never advance the source denominator.
-- Archive extraction is bounded and disposable. TAR.ZST streams `zstd -dc`
-  into `tar`; it does not create a second full temporary TAR.
+- Supported archive extraction is bounded and disposable. Standalone `.zst`
+  files are decoded as one implicit member. UAC payloads use the UAC reader.
 - Required external inspectors run through one bounded process runner with
   cancellation, concurrent stdout/stderr draining, a 30-second deadline, and
   output limits.

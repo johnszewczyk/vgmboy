@@ -16,7 +16,7 @@
     },
     {
       "id": "archive-console-tag-supplies-system-and-is-not-title",
-      "sourcePath": "/Library/JoshW/Unsorted/Castlevania - Curse of Darkness [PS2].tar.zst",
+      "sourcePath": "/Library/JoshW/Unsorted/Castlevania - Curse of Darkness [PS2].zip",
       "rootPath": "/Library/JoshW",
       "archiveEntry": "BGM/01.adx",
       "metadata": { "game": "", "system": "" },
@@ -124,7 +124,7 @@
     },
     {
       "id": "nes-filename-tag-and-embedded-tag-share-one-canonical-name",
-      "sourcePath": "/Library/JoshW/Unsorted/Castlevania [NES].tzst",
+      "sourcePath": "/Library/JoshW/Unsorted/Castlevania [NES].zip",
       "rootPath": "/Library/JoshW",
       "archiveEntry": "Castlevania.nsf",
       "metadata": { "game": "", "system": "NES" },

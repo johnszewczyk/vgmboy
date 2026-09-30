@@ -93,7 +93,7 @@ import zlib
     #expect(BuiltInScannerPlugins.archiveExtensions.contains("lha"))
     #expect(StandaloneArchiveExtractor.isSupportedArchive(URL(fileURLWithPath: "track.vgm.zst")))
     #expect(StandaloneArchiveExtractor.isSupportedArchive(URL(fileURLWithPath: "amiga.lha")))
-    #expect(StandaloneArchiveExtractor.isSupportedArchive(URL(fileURLWithPath: "set.tar.zst")))
+    #expect(!StandaloneArchiveExtractor.isSupportedArchive(URL(fileURLWithPath: "set.tar.zst")))
     #expect(StandaloneArchiveExtractor.isStandaloneSupportFile(URL(fileURLWithPath: "bank.PDX.zst")))
     for sidecar in ["bank.2sflib.zst", "bank.ssflib.zst", "bank.usflib.zst"] {
         #expect(StandaloneArchiveExtractor.isStandaloneSupportFile(URL(fileURLWithPath: sidecar)))
@@ -1268,136 +1268,6 @@ func qsfDirectRouteRejectsBrokenPayloads() async throws {
 }
 
 @Test(
-    "CocoaSpice NSFE rows match direct extraction from live archives",
-    .enabled(
-        if: ProcessInfo.processInfo.environment["SCANSONG_NSFE_LIVE_DB"] != nil,
-        "Set SCANSONG_NSFE_LIVE_DB to run the read-only live-catalog parity check."
-    )
-)
-func cocoaSpiceNSFELiveRowsMatchDirectExtraction() async throws {
-    let databasePath = try #require(ProcessInfo.processInfo.environment["SCANSONG_NSFE_LIVE_DB"])
-    let rootID = Int(ProcessInfo.processInfo.environment["SCANSONG_NSFE_LIVE_ROOT_ID"] ?? "1") ?? 1
-    let liveFiles = try readLiveNSFEFiles(
-        databaseURL: URL(fileURLWithPath: databasePath),
-        rootID: rootID
-    )
-    #expect(!liveFiles.isEmpty)
-
-    let registry = BuiltInScannerPlugins.registry
-    let archiveRoot = FileManager.default.temporaryDirectory
-        .appendingPathComponent("ScanSong-live-nsfe-\(UUID().uuidString)", isDirectory: true)
-    try FileManager.default.createDirectory(at: archiveRoot, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: archiveRoot) }
-
-    var trackCount = 0
-    var exactFieldMatches = 0
-    var authorImprovements = 0
-    var commentImprovements = 0
-    var timingImprovements = 0
-    var mismatches: [String] = []
-
-    for (fileNumber, liveFile) in liveFiles.enumerated() {
-        let archiveDirectory = archiveRoot.appendingPathComponent("archive-\(fileNumber)", isDirectory: true)
-        try FileManager.default.createDirectory(at: archiveDirectory, withIntermediateDirectories: true)
-        try extractTarZstd(
-            archiveURL: URL(fileURLWithPath: liveFile.archivePath),
-            into: archiveDirectory
-        )
-        let memberURL = try findExtractedArchiveMember(
-            named: liveFile.archiveEntry,
-            under: archiveDirectory
-        )
-        let route = try #require(registry.route(pathExtension: "nsfe"))
-        let handler = try #require(BuiltInFormatInspectors.registry.handler(for: route))
-        let inspection = try await handler.inspect(fileURL: memberURL, route: route)
-        let extractedTracks = inspection.tracks
-
-        if extractedTracks.count != liveFile.tracks.count {
-            mismatches.append(
-                "\(liveFile.archiveEntry): track count direct=\(extractedTracks.count) live=\(liveFile.tracks.count)"
-            )
-            continue
-        }
-
-        for (index, liveTrack) in liveFile.tracks.enumerated() {
-            trackCount += 1
-            guard let directMetadata = extractedTracks[index].metadata else {
-                mismatches.append("\(liveFile.archiveEntry)#\(index): direct metadata missing")
-                continue
-            }
-            func compare(_ field: String, _ directValue: Int, _ liveValue: Int) {
-                if directValue == liveValue {
-                    exactFieldMatches += 1
-                } else {
-                    mismatches.append(
-                        "\(liveFile.archiveEntry)#\(index) \(field): direct=\(directValue) live=\(liveValue)"
-                    )
-                }
-            }
-            func compare(_ field: String, _ directValue: String, _ liveValue: String) {
-                if directValue == liveValue {
-                    exactFieldMatches += 1
-                } else {
-                    mismatches.append(
-                        "\(liveFile.archiveEntry)#\(index) \(field): direct=\(directValue.debugDescription) live=\(liveValue.debugDescription)"
-                    )
-                }
-            }
-            compare("trackIndex", extractedTracks[index].trackIndex, liveTrack.trackIndex)
-            compare("trackCount", extractedTracks[index].trackCount, liveTrack.trackCount)
-            compare("song", directMetadata.song, liveTrack.song)
-            compare("game", directMetadata.game, liveTrack.game)
-            compare("system", directMetadata.system, liveTrack.system)
-            compare("intro", directMetadata.introLengthMs, liveTrack.introLengthMs)
-            compare("loop", directMetadata.loopLengthMs, liveTrack.loopLengthMs)
-            compare("play", directMetadata.playLengthMs, liveTrack.playLengthMs)
-            if directMetadata.fadeLengthMs == liveTrack.fadeLengthMs {
-                exactFieldMatches += 1
-            } else if liveTrack.fadeLengthMs == -1 && directMetadata.fadeLengthMs >= 0 {
-                timingImprovements += 1
-            } else {
-                mismatches.append(
-                    "\(liveFile.archiveEntry)#\(index) fade: direct=\(directMetadata.fadeLengthMs) live=\(liveTrack.fadeLengthMs)"
-                )
-            }
-
-            if directMetadata.author == liveTrack.author {
-                exactFieldMatches += 1
-            } else if isGenericLiveAuthor(liveTrack.author) && !directMetadata.author.isEmpty {
-                authorImprovements += 1
-            } else {
-                mismatches.append(
-                    "\(liveFile.archiveEntry)#\(index) author: direct=\(directMetadata.author.debugDescription) live=\(liveTrack.author.debugDescription)"
-                )
-            }
-
-            if directMetadata.comment == liveTrack.comment {
-                exactFieldMatches += 1
-            } else if liveTrack.comment.isEmpty && !directMetadata.comment.isEmpty {
-                commentImprovements += 1
-            } else if !liveTrack.comment.isEmpty && directMetadata.comment.contains(liveTrack.comment) {
-                commentImprovements += 1
-            } else {
-                mismatches.append(
-                    "\(liveFile.archiveEntry)#\(index) comment: direct=\(directMetadata.comment.debugDescription) live=\(liveTrack.comment.debugDescription)"
-                )
-            }
-        }
-    }
-
-    print(
-        "NSFE live parity: \(liveFiles.count) archive members, \(trackCount) tracks, "
-            + "\(exactFieldMatches) exact field matches, \(authorImprovements) author improvements, "
-            + "\(commentImprovements) comment improvements, \(timingImprovements) timing improvements, "
-            + "\(mismatches.count) mismatches"
-    )
-    for mismatch in mismatches.prefix(20) {
-        print("NSFE live parity mismatch: \(mismatch)")
-    }
-    #expect(mismatches.isEmpty)
-}
-
-@Test(
     "CocoaSpice GSF rows match or improve on direct extraction from live archives",
     .enabled(
         if: ProcessInfo.processInfo.environment["SCANSONG_GSF_LIVE_DB"] != nil,
@@ -1505,91 +1375,6 @@ func cocoaSpiceGSFFailedRowsRemainClassifiableWithoutDecoder() async throws {
 }
 
 @Test(
-    "CocoaSpice QSF rows match or improve on direct extraction from live archives",
-    .enabled(
-        if: ProcessInfo.processInfo.environment["SCANSONG_QSF_LIVE_DB"] != nil,
-        "Set SCANSONG_QSF_LIVE_DB to run the read-only QSF/miniQSF catalog parity check."
-    )
-)
-func cocoaSpiceQSFLiveRowsMatchDirectExtraction() async throws {
-    let databasePath = try #require(ProcessInfo.processInfo.environment["SCANSONG_QSF_LIVE_DB"])
-    let rootID = Int(ProcessInfo.processInfo.environment["SCANSONG_QSF_LIVE_ROOT_ID"] ?? "1") ?? 1
-    let allLiveArchives = try readLiveQSFArchives(
-        databaseURL: URL(fileURLWithPath: databasePath),
-        rootID: rootID
-    )
-    let archiveFilters = ProcessInfo.processInfo.environment["SCANSONG_QSF_LIVE_ARCHIVE_FILTER"]?
-        .split(separator: ",")
-        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-        .filter { !$0.isEmpty } ?? []
-    let liveArchives = archiveFilters.isEmpty
-        ? allLiveArchives
-        : allLiveArchives.filter { archive in
-            archiveFilters.contains { archive.path.lowercased().contains($0) }
-        }
-    #expect(!liveArchives.isEmpty)
-    print("QSF live parity scope: archives=\(liveArchives.count)/\(allLiveArchives.count)")
-
-    var summary = QSFParitySummary()
-    for (archiveIndex, archive) in liveArchives.enumerated() {
-        let extractionDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ScanSong-live-qsf-\(UUID().uuidString)-\(archiveIndex)", isDirectory: true)
-        let archiveSummary = try await inspectLiveQSFArchive(archive, extractionDirectory: extractionDirectory)
-        summary.merge(archiveSummary)
-    }
-
-    print(
-        "QSF live parity: archives=\(liveArchives.count), tracks=\(summary.trackCount), "
-            + "exactFields=\(summary.exactFieldMatches), improvements=\(summary.improvements), "
-            + "mismatches=\(summary.mismatchCount)"
-    )
-    for mismatch in summary.mismatchSamples.prefix(20) { print("QSF live parity mismatch: \(mismatch)") }
-    #expect(summary.mismatchCount == 0)
-}
-
-@Test(
-    "CocoaSpice failed QSF rows remain classifiable by the direct reader",
-    .enabled(
-        if: ProcessInfo.processInfo.environment["SCANSONG_QSF_LIVE_DB"] != nil,
-        "Set SCANSONG_QSF_LIVE_DB to inspect existing failed QSF/miniQSF rows."
-    )
-)
-func cocoaSpiceQSFFailedRowsRemainClassifiableWithoutDecoder() async throws {
-    let databasePath = try #require(ProcessInfo.processInfo.environment["SCANSONG_QSF_LIVE_DB"])
-    let rootID = Int(ProcessInfo.processInfo.environment["SCANSONG_QSF_LIVE_ROOT_ID"] ?? "1") ?? 1
-    let failedArchives = try readFailedLiveQSFArchives(
-        databaseURL: URL(fileURLWithPath: databasePath),
-        rootID: rootID
-    )
-    let archiveRoot = FileManager.default.temporaryDirectory
-        .appendingPathComponent("ScanSong-failed-qsf-\(UUID().uuidString)", isDirectory: true)
-    try FileManager.default.createDirectory(at: archiveRoot, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: archiveRoot) }
-
-    var rejected: [String] = []
-    var newlyReadable: [String] = []
-    for (archiveIndex, archive) in failedArchives.enumerated() {
-        let extractionDirectory = archiveRoot.appendingPathComponent("archive-\(archiveIndex)", isDirectory: true)
-        try FileManager.default.createDirectory(at: extractionDirectory, withIntermediateDirectories: true)
-        try extractTarZstd(archiveURL: URL(fileURLWithPath: archive.path), into: extractionDirectory)
-        for entry in archive.entries {
-            let memberURL = try findExtractedArchiveMember(named: entry, under: extractionDirectory)
-            do {
-                _ = try MetaManCore.read(fileURL: memberURL)
-                newlyReadable.append("\(archive.path):\(entry)")
-            } catch {
-                rejected.append("\(entry): \(error.localizedDescription)")
-            }
-        }
-        try? FileManager.default.removeItem(at: extractionDirectory)
-    }
-    print("Existing failed QSF members: \(rejected.count) still rejected, \(newlyReadable.count) newly readable")
-    for entry in newlyReadable.prefix(20) { print("Previously failed but structurally readable QSF: \(entry)") }
-    for entry in rejected.prefix(20) { print("Previously failed QSF still rejected: \(entry)") }
-    #expect(rejected.count + newlyReadable.count == failedArchives.reduce(0) { $0 + $1.entries.count })
-}
-
-@Test(
     "Amiga fixture publishes UADE replayer tracks",
     .enabled(
         if: ProcessInfo.processInfo.environment["SCANSONG_AMIGA_FIXTURE"] != nil
@@ -1673,77 +1458,6 @@ func amigaFixtureInspectsThroughUADE() async throws {
     let truncatedTable = try writeSPCTestFile(brokenSeekTable, name: "bad-seek-table.ape")
     defer { try? FileManager.default.removeItem(at: truncatedTable) }
     #expect(throws: MetadataReadError.self) { try MetaManCore.read(fileURL: truncatedTable) }
-}
-
-@Test(
-    "CocoaSpice APE rows match direct extraction from live archives",
-    .enabled(
-        if: ProcessInfo.processInfo.environment["SCANSONG_APE_LIVE_DB"] != nil,
-        "Set SCANSONG_APE_LIVE_DB to run the read-only APE catalog parity check."
-    )
-)
-func cocoaSpiceAPELiveRowsMatchDirectExtraction() async throws {
-    let databasePath = try #require(ProcessInfo.processInfo.environment["SCANSONG_APE_LIVE_DB"])
-    let rootID = Int(ProcessInfo.processInfo.environment["SCANSONG_APE_LIVE_ROOT_ID"] ?? "1") ?? 1
-    let archives = try readLiveAPEArchives(databaseURL: URL(fileURLWithPath: databasePath), rootID: rootID)
-    #expect(!archives.isEmpty)
-
-    let extractionRoot = FileManager.default.temporaryDirectory
-        .appendingPathComponent("ScanSong-live-ape-\(UUID().uuidString)", isDirectory: true)
-    try FileManager.default.createDirectory(at: extractionRoot, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: extractionRoot) }
-
-    var exactFields = 0
-    var mismatches: [String] = []
-    for (archiveIndex, archive) in archives.enumerated() {
-        let extractionDirectory = extractionRoot.appendingPathComponent("archive-\(archiveIndex)", isDirectory: true)
-        try FileManager.default.createDirectory(at: extractionDirectory, withIntermediateDirectories: true)
-        try extractTarZstd(archiveURL: URL(fileURLWithPath: archive.path), into: extractionDirectory)
-        for liveFile in archive.files {
-            let source = "\(archive.path):\(liveFile.entryPath)"
-            do {
-                let memberURL = try findExtractedArchiveMember(named: liveFile.entryPath, under: extractionDirectory)
-                let route = try #require(BuiltInScannerPlugins.registry.route(forPath: memberURL.path))
-                let handler = try #require(BuiltInFormatInspectors.registry.handler(for: route))
-                let inspection = try await handler.inspect(fileURL: memberURL, route: route)
-                guard inspection.tracks.count == 1, let track = inspection.tracks.first,
-                      track.trackIndex == liveFile.trackIndex,
-                      track.trackCount == liveFile.trackCount,
-                      let metadata = track.metadata else {
-                    mismatches.append("\(source): invalid direct track projection")
-                    continue
-                }
-                let pairs: [(String, String, String)] = [
-                    ("title", metadata.song, liveFile.title),
-                    ("game", metadata.game, liveFile.game),
-                    ("system", metadata.system, liveFile.system),
-                    ("author", metadata.author, liveFile.author),
-                    ("comment", metadata.comment, liveFile.comment)
-                ]
-                let times: [(String, Int, Int)] = [
-                    ("intro", metadata.introLengthMs, liveFile.introLengthMs),
-                    ("loop", metadata.loopLengthMs, liveFile.loopLengthMs),
-                    ("play", metadata.playLengthMs, liveFile.playLengthMs),
-                    ("fade", metadata.fadeLengthMs, liveFile.fadeLengthMs)
-                ]
-                for (field, direct, stored) in pairs {
-                    if direct == stored { exactFields += 1 }
-                    else { mismatches.append("\(source) \(field): direct=\(direct.debugDescription) live=\(stored.debugDescription)") }
-                }
-                for (field, direct, stored) in times {
-                    if direct == stored { exactFields += 1 }
-                    else { mismatches.append("\(source) \(field): direct=\(direct) live=\(stored)") }
-                }
-            } catch {
-                mismatches.append("\(source): direct extraction failed: \(error.localizedDescription)")
-            }
-        }
-        try? FileManager.default.removeItem(at: extractionDirectory)
-    }
-
-    print("APE live parity: archives=\(archives.count), tracks=\(archives.reduce(0) { $0 + $1.files.count }), exactFields=\(exactFields), mismatches=\(mismatches.count)")
-    for mismatch in mismatches.prefix(20) { print("APE live parity mismatch: \(mismatch)") }
-    #expect(mismatches.isEmpty)
 }
 
 @Test(
@@ -2301,13 +2015,11 @@ func catalogScannerExpandsKnownMultitrackFixtures() async throws {
     let fixturePath = try #require(ProcessInfo.processInfo.environment["SCANSONG_MULTITRACK_FIXTURE_DIR"])
     let fixtureRoot = URL(fileURLWithPath: fixturePath, isDirectory: true)
     let expectedNames: Set<String> = [
-        "Bionic Commando USA Version.tar.zst",
-        "Mario's Picross (1995)(Nintendo).tar.zst",
         "Dies irae.ay",
         "Bobo.sndh.zst",
         "Over Horizon.nsfe"
     ]
-    let expectedTrackCountsByExtension = ["sid": 2, "gbs": 19, "ay": 3, "sndh": 12, "nsfe": 14]
+    let expectedTrackCountsByExtension = ["ay": 3, "sndh": 12, "nsfe": 14]
     let fixtureURLs = try FileManager.default.contentsOfDirectory(
         at: fixtureRoot,
         includingPropertiesForKeys: nil
@@ -2352,7 +2064,7 @@ func catalogScannerExpandsKnownMultitrackFixtures() async throws {
 
     let persistedTrackCount = try #require(Int(catalogTrackCount[0]))
     #expect(persistedTrackCount == result.trackCount)
-    #expect(Set(groups.map { $0[0] }).isSuperset(of: ["sid", "gbs", "ay", "sndh", "nsfe"]))
+    #expect(Set(groups.map { $0[0] }).isSuperset(of: ["ay", "sndh", "nsfe"]))
     #expect(groups.contains { (Int($0[5]) ?? 0) > 1 })
     for (extensionName, expectedTrackCount) in expectedTrackCountsByExtension {
         let matchingGroups = groups.filter { $0[0] == extensionName }
@@ -3416,7 +3128,7 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
 }
 
 @Test func catalogBrowserSystemUsesTheParentConsoleFolderForGameArchives() {
-    let source = "/Audio/JoshW/Nintendo DS/Castlevania.tar.zst"
+    let source = "/Audio/JoshW/Nintendo DS/Castlevania.zip"
     #expect(CatalogIdentity.browserSystem(sourcePath: source, rootPath: "/Audio/JoshW") == "Nintendo DS")
 }
 
@@ -3473,80 +3185,6 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
     #expect(discovered.map(\.sourceURL.lastPathComponent) == ["album.customarchive", "game.nsf"])
     #expect(discovered.first?.route == nil)
     #expect(discovered.last?.route?.structurePolicy == .enumerate)
-}
-
-@Test(
-    "JoshW Resident Evil 2 tar.zst scans all PSF members and reports progress",
-    .enabled(
-        if: ProcessInfo.processInfo.environment["SCANSONG_RE2_ARCHIVE"] != nil,
-        "Set SCANSONG_RE2_ARCHIVE to run the JoshW Resident Evil 2 archive check."
-    )
-)
-func joshWResidentEvil2ArchiveScansThroughTarZstandard() async throws {
-    let archivePath = try #require(ProcessInfo.processInfo.environment["SCANSONG_RE2_ARCHIVE"])
-    let root = FileManager.default.temporaryDirectory
-        .appendingPathComponent("ScanSong-re2-\(UUID().uuidString)", isDirectory: true)
-    defer { try? FileManager.default.removeItem(at: root) }
-    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-    let archiveURL = root.appendingPathComponent("Resident Evil 2.tar.zst")
-    try FileManager.default.copyItem(at: URL(fileURLWithPath: archivePath), to: archiveURL)
-
-    let progress = ProgressCapture()
-    let databaseURL = root.appendingPathComponent("Library.sqlite")
-    let result = try await CatalogScanner(
-        databaseURL: databaseURL,
-        inspectionPermits: 4,
-        archivePipelineLimit: 1
-    ).scan(rootURL: root, mode: .newScan) { progress.append($0) }
-
-    #expect(result.discoveredSourceCount == 1)
-    #expect(result.trackCount == 75)
-    #expect(result.failures.isEmpty)
-    #expect(result.skipped.isEmpty)
-
-    let updates = progress.values()
-    #expect(updates.contains { $0.phase == .archiveListing })
-    #expect(updates.contains { $0.phase == .materialization })
-    #expect(updates.contains { $0.phase == .persistence && $0.processed == 1 && $0.discovered == 1 })
-    #expect(updates.last?.processed == 1)
-    #expect(updates.last?.discovered == 1)
-
-    var database: OpaquePointer?
-    #expect(sqlite3_open_v2(databaseURL.path, &database, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
-    let row = try querySingleRow(
-        database: try #require(database),
-        sql: "SELECT m.play_length_ms, m.fade_length_ms FROM tracks t INNER JOIN track_metadata m ON m.track_id=t.id WHERE t.archive_entry='11 Secure Place.psf';"
-    )
-    sqlite3_close(database)
-    #expect(row == ["43000", "10000"])
-}
-
-@Test(
-    "JoshW Dungeons and Dragons QSF archive scans all miniQSF members",
-    .enabled(
-        if: ProcessInfo.processInfo.environment["SCANSONG_QSF_ARCHIVE"] != nil,
-        "Set SCANSONG_QSF_ARCHIVE to run the archive-backed QSF scanner check."
-    )
-)
-func joshWQSFArchiveScansAllMiniQSFMembers() async throws {
-    let archivePath = try #require(ProcessInfo.processInfo.environment["SCANSONG_QSF_ARCHIVE"])
-    let root = FileManager.default.temporaryDirectory
-        .appendingPathComponent("ScanSong-qsf-\(UUID().uuidString)", isDirectory: true)
-    defer { try? FileManager.default.removeItem(at: root) }
-    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-    let archiveURL = root.appendingPathComponent("Dungeons & Dragons QSF.tar.zst")
-    try FileManager.default.copyItem(at: URL(fileURLWithPath: archivePath), to: archiveURL)
-
-    let result = try await CatalogScanner(
-        databaseURL: root.appendingPathComponent("Library.sqlite"),
-        inspectionPermits: 4,
-        archivePipelineLimit: 1
-    ).scan(rootURL: root, mode: .newScan)
-
-    #expect(result.discoveredSourceCount == 1)
-    #expect(result.trackCount == 39)
-    #expect(result.failures.isEmpty)
-    #expect(result.skipped.isEmpty)
 }
 
 @Test(
@@ -3620,7 +3258,7 @@ func joshWResidentEvil2GameCubeArchiveResolvesTXTHAliases() async throws {
     #expect(!lines.contains(where: { $0.contains("music/one.sgc") || $0.contains("music/two.sgc") }))
 
     let scratchFailure = ScanFailure(
-        identity: ScanItemIdentity(rootID: 1, path: "/library/Silent Hill HD Collection.tar.zst", archiveEntry: "sh3_bgm_02.hd"),
+        identity: ScanItemIdentity(rootID: 1, path: "/library/Silent Hill HD Collection.zip", archiveEntry: "sh3_bgm_02.hd"),
         fingerprint: fingerprint,
         route: nil,
         stage: .metadata,
@@ -3634,11 +3272,11 @@ func joshWResidentEvil2GameCubeArchiveResolvesTXTHAliases() async throws {
         failures: [scratchFailure],
         skipped: []
     )
-    #expect(scratchLines.contains("archive-error | metadata: failed opening | Silent Hill HD Collection.tar.zst#sh3_bgm_02.hd"))
+    #expect(scratchLines.contains("archive-error | metadata: failed opening | Silent Hill HD Collection.zip#sh3_bgm_02.hd"))
     #expect(!scratchLines.contains(where: { $0.contains("ScanSong-ScanScratch") || $0.contains("/private/var") }))
 
     let duplicateMemberFailure = ScanFailure(
-        identity: ScanItemIdentity(rootID: 1, path: "/library/Hard Corps.tar.zst", archiveEntry: "Stage01_Active.txtp"),
+        identity: ScanItemIdentity(rootID: 1, path: "/library/Hard Corps.zip", archiveEntry: "Stage01_Active.txtp"),
         fingerprint: fingerprint,
         route: nil,
         stage: .metadata,
@@ -3651,7 +3289,7 @@ func joshWResidentEvil2GameCubeArchiveResolvesTXTHAliases() async throws {
         failures: [duplicateMemberFailure],
         skipped: []
     )
-    #expect(duplicateLines.contains("archive-error | metadata: vgmstream returned invalid metadata | Hard Corps.tar.zst#Stage01_Active.txtp"))
+    #expect(duplicateLines.contains("archive-error | metadata: vgmstream returned invalid metadata | Hard Corps.zip#Stage01_Active.txtp"))
 }
 
 @Test func sharedLifecycleAndAccumulatorUseOneCrossHostVocabulary() async throws {
@@ -3697,26 +3335,6 @@ private struct GSFParitySummary: Sendable {
     var mismatchSamples: [String] = []
 }
 
-private struct LiveAPEFile {
-    let entryPath: String
-    let trackIndex: Int
-    let trackCount: Int
-    let title: String
-    let game: String
-    let system: String
-    let author: String
-    let comment: String
-    let introLengthMs: Int
-    let loopLengthMs: Int
-    let playLengthMs: Int
-    let fadeLengthMs: Int
-}
-
-private struct LiveAPEArchive {
-    let path: String
-    var files: [LiveAPEFile]
-}
-
 private struct LiveHESTrack {
     let entryPath: String
     let trackIndex: Int
@@ -3737,66 +3355,10 @@ private struct LiveHESArchive {
     var tracks: [LiveHESTrack]
 }
 
-private func readLiveAPEArchives(databaseURL: URL, rootID: Int) throws -> [LiveAPEArchive] {
-    var database: OpaquePointer?
-    let openStatus = sqlite3_open_v2(databaseURL.path, &database, SQLITE_OPEN_READONLY, nil)
-    guard openStatus == SQLITE_OK, let database else {
-        let message = database.map { String(cString: sqlite3_errmsg($0)) } ?? "SQLite could not open the live catalog."
-        sqlite3_close(database)
-        throw NSError(domain: "ScanSongTests", code: 50, userInfo: [NSLocalizedDescriptionKey: message])
-    }
-    defer { sqlite3_close(database) }
-    sqlite3_busy_timeout(database, 10_000)
-
-    let sql = """
-        SELECT t.path, t.filename, t.track_index, t.track_count,
-               m.title, m.game, m.system, m.author, m.comment,
-               m.intro_length_ms, m.loop_length_ms, m.play_length_ms,
-               m.fade_length_ms
-          FROM tracks t
-          JOIN track_metadata m ON m.track_id = t.id
-         WHERE t.root_id = ?1 AND lower(t.extension) = 'ape'
-         ORDER BY t.path, t.filename, t.track_index
-        """
-    var statement: OpaquePointer?
-    guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
-          let statement else {
-        throw NSError(domain: "ScanSongTests", code: 51, userInfo: [NSLocalizedDescriptionKey: String(cString: sqlite3_errmsg(database))])
-    }
-    defer { sqlite3_finalize(statement) }
-    guard sqlite3_bind_int(statement, 1, Int32(rootID)) == SQLITE_OK else {
-        throw NSError(domain: "ScanSongTests", code: 52)
-    }
-
-    var archives: [LiveAPEArchive] = []
-    var indexes: [String: Int] = [:]
-    while sqlite3_step(statement) == SQLITE_ROW {
-        let path = sqliteText(statement, 0)
-        let file = LiveAPEFile(
-            entryPath: sqliteText(statement, 1),
-            trackIndex: Int(sqlite3_column_int64(statement, 2)),
-            trackCount: Int(sqlite3_column_int64(statement, 3)),
-            title: sqliteText(statement, 4),
-            game: sqliteText(statement, 5),
-            system: sqliteText(statement, 6),
-            author: sqliteText(statement, 7),
-            comment: sqliteText(statement, 8),
-            introLengthMs: Int(sqlite3_column_int64(statement, 9)),
-            loopLengthMs: Int(sqlite3_column_int64(statement, 10)),
-            playLengthMs: Int(sqlite3_column_int64(statement, 11)),
-            fadeLengthMs: Int(sqlite3_column_int64(statement, 12))
-        )
-        if let index = indexes[path] {
-            archives[index].files.append(file)
-        } else {
-            indexes[path] = archives.count
-            archives.append(LiveAPEArchive(path: path, files: [file]))
-        }
-    }
-    guard sqlite3_errcode(database) == SQLITE_OK || sqlite3_errcode(database) == SQLITE_DONE else {
-        throw NSError(domain: "ScanSongTests", code: 53, userInfo: [NSLocalizedDescriptionKey: String(cString: sqlite3_errmsg(database))])
-    }
-    return archives
+private func isSupportedLiveArchivePath(_ path: String) -> Bool {
+    let url = URL(fileURLWithPath: path)
+    return !StandaloneArchiveExtractor.isUAC(url)
+        && StandaloneArchiveExtractor.isSupportedArchive(url)
 }
 
 private func readLiveHESArchives(databaseURL: URL, rootID: Int) throws -> [LiveHESArchive] {
@@ -3858,7 +3420,7 @@ private func readLiveHESArchives(databaseURL: URL, rootID: Int) throws -> [LiveH
     guard sqlite3_errcode(database) == SQLITE_OK || sqlite3_errcode(database) == SQLITE_DONE else {
         throw NSError(domain: "ScanSongTests", code: 57, userInfo: [NSLocalizedDescriptionKey: String(cString: sqlite3_errmsg(database))])
     }
-    return archives
+    return archives.filter { isSupportedLiveArchivePath($0.path) }
 }
 
 private func inspectLiveGSFArchive(
@@ -3932,90 +3494,6 @@ private func inspectLiveGSFArchive(
     return summary
 }
 
-private func inspectLiveQSFArchive(
-    _ archive: LiveQSFArchive,
-    extractionDirectory: URL
-) async throws -> QSFParitySummary {
-    try FileManager.default.createDirectory(at: extractionDirectory, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: extractionDirectory) }
-    try extractTarZstd(archiveURL: URL(fileURLWithPath: archive.path), into: extractionDirectory)
-
-    var summary = QSFParitySummary()
-    func mismatch(_ message: String) {
-        summary.mismatchCount += 1
-        if summary.mismatchSamples.count < 20 { summary.mismatchSamples.append(message) }
-    }
-    func compare(_ field: String, _ direct: String, _ live: String, source: String) {
-        if direct == live {
-            summary.exactFieldMatches += 1
-        } else {
-            mismatch("\(source) \(field): direct=\(direct.debugDescription) live=\(live.debugDescription)")
-        }
-    }
-    func compare(_ field: String, _ direct: Int, _ live: Int, source: String) {
-        if direct == live {
-            summary.exactFieldMatches += 1
-        } else if (field == "play" || field == "fade") && live <= 0 && direct > 0 {
-            summary.improvements += 1
-        } else {
-            mismatch("\(source) \(field): direct=\(direct) live=\(live)")
-        }
-    }
-
-    for liveFile in archive.files {
-        summary.trackCount += 1
-        let source = "\(archive.path):\(liveFile.entryPath)"
-        do {
-            let memberURL = try findExtractedArchiveMember(named: liveFile.entryPath, under: extractionDirectory)
-            let route = try #require(BuiltInScannerPlugins.registry.route(forPath: memberURL.path))
-            let handler = try #require(BuiltInFormatInspectors.registry.handler(for: route))
-            let inspection = try await handler.inspect(fileURL: memberURL, route: route)
-            guard inspection.tracks.count == 1, let track = inspection.tracks.first else {
-                mismatch("\(source) direct track count=\(inspection.tracks.count), expected 1")
-                continue
-            }
-            guard let metadata = track.metadata else {
-                mismatch("\(source) direct metadata is nil")
-                continue
-            }
-            compare("trackIndex", track.trackIndex, liveFile.trackIndex, source: source)
-            compare("trackCount", track.trackCount, liveFile.trackCount, source: source)
-            compare("song", metadata.song, liveFile.song, source: source)
-            compare("game", metadata.game, liveFile.game, source: source)
-            compare("author", metadata.author, liveFile.author, source: source)
-            compare("system", metadata.system, liveFile.system, source: source)
-            compare("comment", metadata.comment, liveFile.comment, source: source)
-            compare("intro", metadata.introLengthMs, liveFile.introLengthMs, source: source)
-            compare("loop", metadata.loopLengthMs, liveFile.loopLengthMs, source: source)
-            compare("play", metadata.playLengthMs, liveFile.playLengthMs, source: source)
-            compare("fade", metadata.fadeLengthMs, liveFile.fadeLengthMs, source: source)
-        } catch {
-            mismatch("\(source) direct extraction failed: \(error.localizedDescription)")
-        }
-    }
-    return summary
-}
-
-private struct LiveNSFETrack {
-    let trackIndex: Int
-    let trackCount: Int
-    let song: String
-    let game: String
-    let author: String
-    let system: String
-    let comment: String
-    let introLengthMs: Int
-    let loopLengthMs: Int
-    let playLengthMs: Int
-    let fadeLengthMs: Int
-}
-
-private struct LiveNSFEFile {
-    let archivePath: String
-    let archiveEntry: String
-    var tracks: [LiveNSFETrack]
-}
-
 private struct LiveGSFTrack: Sendable {
     let entryPath: String
     let trackIndex: Int
@@ -4034,42 +3512,6 @@ private struct LiveGSFTrack: Sendable {
 private struct LiveGSFArchive: Sendable {
     let path: String
     var files: [LiveGSFTrack]
-}
-
-private struct LiveQSFTrack: Sendable {
-    let entryPath: String
-    let trackIndex: Int
-    let trackCount: Int
-    let song: String
-    let game: String
-    let author: String
-    let system: String
-    let comment: String
-    let introLengthMs: Int
-    let loopLengthMs: Int
-    let playLengthMs: Int
-    let fadeLengthMs: Int
-}
-
-private struct LiveQSFArchive: Sendable {
-    let path: String
-    var files: [LiveQSFTrack]
-}
-
-private struct QSFParitySummary: Sendable {
-    var trackCount = 0
-    var exactFieldMatches = 0
-    var improvements = 0
-    var mismatchCount = 0
-    var mismatchSamples: [String] = []
-
-    mutating func merge(_ other: QSFParitySummary) {
-        trackCount += other.trackCount
-        exactFieldMatches += other.exactFieldMatches
-        improvements += other.improvements
-        mismatchCount += other.mismatchCount
-        mismatchSamples.append(contentsOf: other.mismatchSamples.prefix(max(0, 20 - mismatchSamples.count)))
-    }
 }
 
 private struct FailedLiveGSFArchive {
@@ -4121,54 +3563,7 @@ private func readFailedLiveGSFArchives(databaseURL: URL, rootID: Int) throws -> 
     guard sqlite3_errcode(database) == SQLITE_OK || sqlite3_errcode(database) == SQLITE_DONE else {
         throw NSError(domain: "ScanSongTests", code: 38, userInfo: [NSLocalizedDescriptionKey: String(cString: sqlite3_errmsg(database))])
     }
-    return archives
-}
-
-private func readFailedLiveQSFArchives(databaseURL: URL, rootID: Int) throws -> [FailedLiveGSFArchive] {
-    var database: OpaquePointer?
-    let openStatus = sqlite3_open_v2(databaseURL.path, &database, SQLITE_OPEN_READONLY, nil)
-    guard openStatus == SQLITE_OK, let database else {
-        let message = database.map { String(cString: sqlite3_errmsg($0)) } ?? "SQLite could not open the live catalog."
-        sqlite3_close(database)
-        throw NSError(domain: "ScanSongTests", code: 45, userInfo: [NSLocalizedDescriptionKey: message])
-    }
-    defer { sqlite3_close(database) }
-    sqlite3_busy_timeout(database, 10_000)
-
-    let sql = """
-        SELECT path, archive_entry
-          FROM scan_items
-         WHERE root_id = ?1 AND state = 'failed'
-           AND lower(format_extension) IN ('qsf', 'miniqsf')
-           AND archive_entry <> ''
-         ORDER BY path, archive_entry
-        """
-    var statement: OpaquePointer?
-    guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
-          let statement else {
-        throw NSError(domain: "ScanSongTests", code: 46, userInfo: [NSLocalizedDescriptionKey: String(cString: sqlite3_errmsg(database))])
-    }
-    defer { sqlite3_finalize(statement) }
-    guard sqlite3_bind_int(statement, 1, Int32(rootID)) == SQLITE_OK else {
-        throw NSError(domain: "ScanSongTests", code: 47)
-    }
-
-    var archives: [FailedLiveGSFArchive] = []
-    var indexes: [String: Int] = [:]
-    while sqlite3_step(statement) == SQLITE_ROW {
-        let path = sqliteText(statement, 0)
-        let entry = sqliteText(statement, 1)
-        if let index = indexes[path] {
-            archives[index].entries.append(entry)
-        } else {
-            indexes[path] = archives.count
-            archives.append(FailedLiveGSFArchive(path: path, entries: [entry]))
-        }
-    }
-    guard sqlite3_errcode(database) == SQLITE_OK || sqlite3_errcode(database) == SQLITE_DONE else {
-        throw NSError(domain: "ScanSongTests", code: 48, userInfo: [NSLocalizedDescriptionKey: String(cString: sqlite3_errmsg(database))])
-    }
-    return archives
+    return archives.filter { isSupportedLiveArchivePath($0.path) }
 }
 
 private func readLiveGSFArchives(databaseURL: URL, rootID: Int) throws -> [LiveGSFArchive] {
@@ -4230,171 +3625,7 @@ private func readLiveGSFArchives(databaseURL: URL, rootID: Int) throws -> [LiveG
     guard sqlite3_errcode(database) == SQLITE_OK || sqlite3_errcode(database) == SQLITE_DONE else {
         throw NSError(domain: "ScanSongTests", code: 33, userInfo: [NSLocalizedDescriptionKey: String(cString: sqlite3_errmsg(database))])
     }
-    return archives
-}
-
-private func readLiveQSFArchives(databaseURL: URL, rootID: Int) throws -> [LiveQSFArchive] {
-    var database: OpaquePointer?
-    let openStatus = sqlite3_open_v2(databaseURL.path, &database, SQLITE_OPEN_READONLY, nil)
-    guard openStatus == SQLITE_OK, let database else {
-        let message = database.map { String(cString: sqlite3_errmsg($0)) } ?? "SQLite could not open the live catalog."
-        sqlite3_close(database)
-        throw NSError(domain: "ScanSongTests", code: 41, userInfo: [NSLocalizedDescriptionKey: message])
-    }
-    defer { sqlite3_close(database) }
-    sqlite3_busy_timeout(database, 10_000)
-
-    let sql = """
-        SELECT t.path, t.filename, t.track_index, t.track_count,
-               m.title, m.game, m.author, m.system, m.comment,
-               m.intro_length_ms, m.loop_length_ms, m.play_length_ms,
-               m.fade_length_ms
-          FROM tracks t
-          JOIN track_metadata m ON m.track_id = t.id
-         WHERE t.root_id = ?1 AND lower(t.extension) IN ('qsf', 'miniqsf')
-         ORDER BY t.path, t.filename, t.track_index
-        """
-    var statement: OpaquePointer?
-    guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
-          let statement else {
-        throw NSError(domain: "ScanSongTests", code: 42, userInfo: [NSLocalizedDescriptionKey: String(cString: sqlite3_errmsg(database))])
-    }
-    defer { sqlite3_finalize(statement) }
-    guard sqlite3_bind_int(statement, 1, Int32(rootID)) == SQLITE_OK else {
-        throw NSError(domain: "ScanSongTests", code: 43)
-    }
-
-    var archives: [LiveQSFArchive] = []
-    var indexes: [String: Int] = [:]
-    while sqlite3_step(statement) == SQLITE_ROW {
-        let path = sqliteText(statement, 0)
-        let track = LiveQSFTrack(
-            entryPath: sqliteText(statement, 1),
-            trackIndex: Int(sqlite3_column_int64(statement, 2)),
-            trackCount: Int(sqlite3_column_int64(statement, 3)),
-            song: sqliteText(statement, 4),
-            game: sqliteText(statement, 5),
-            author: sqliteText(statement, 6),
-            system: sqliteText(statement, 7),
-            comment: sqliteText(statement, 8),
-            introLengthMs: Int(sqlite3_column_int64(statement, 9)),
-            loopLengthMs: Int(sqlite3_column_int64(statement, 10)),
-            playLengthMs: Int(sqlite3_column_int64(statement, 11)),
-            fadeLengthMs: Int(sqlite3_column_int64(statement, 12))
-        )
-        if let index = indexes[path] {
-            archives[index].files.append(track)
-        } else {
-            indexes[path] = archives.count
-            archives.append(LiveQSFArchive(path: path, files: [track]))
-        }
-    }
-    guard sqlite3_errcode(database) == SQLITE_OK || sqlite3_errcode(database) == SQLITE_DONE else {
-        throw NSError(domain: "ScanSongTests", code: 44, userInfo: [NSLocalizedDescriptionKey: String(cString: sqlite3_errmsg(database))])
-    }
-    return archives
-}
-
-private func readLiveNSFEFiles(databaseURL: URL, rootID: Int) throws -> [LiveNSFEFile] {
-    var database: OpaquePointer?
-    let openStatus = sqlite3_open_v2(
-        databaseURL.path,
-        &database,
-        SQLITE_OPEN_READONLY,
-        nil
-    )
-    guard openStatus == SQLITE_OK, let database else {
-        let message = database.map { String(cString: sqlite3_errmsg($0)) } ?? "SQLite could not open the live catalog."
-        sqlite3_close(database)
-        throw NSError(
-            domain: "ScanSongTests",
-            code: 20,
-            userInfo: [NSLocalizedDescriptionKey: message]
-        )
-    }
-    defer { sqlite3_close(database) }
-    sqlite3_busy_timeout(database, 10_000)
-
-    let sql = """
-        SELECT t.path, t.filename, t.track_index, t.track_count,
-               m.title, m.game, m.author, m.system, m.comment,
-               m.intro_length_ms, m.loop_length_ms, m.play_length_ms,
-               m.fade_length_ms
-          FROM tracks t
-          JOIN track_metadata m ON m.track_id = t.id
-         WHERE t.root_id = ?1 AND lower(t.extension) = 'nsfe'
-         ORDER BY t.path, t.filename, t.track_index
-        """
-    var statement: OpaquePointer?
-    guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
-          let statement else {
-        throw NSError(
-            domain: "ScanSongTests",
-            code: 21,
-            userInfo: [NSLocalizedDescriptionKey: String(cString: sqlite3_errmsg(database))]
-        )
-    }
-    defer { sqlite3_finalize(statement) }
-    guard sqlite3_bind_int(statement, 1, Int32(rootID)) == SQLITE_OK else {
-        throw NSError(domain: "ScanSongTests", code: 22)
-    }
-
-    var files: [LiveNSFEFile] = []
-    var indexes: [String: Int] = [:]
-    while sqlite3_step(statement) == SQLITE_ROW {
-        let archivePath = sqliteText(statement, 0)
-        let archiveEntry = sqliteText(statement, 1)
-        let key = "\(archivePath)\u{1f}\(archiveEntry)"
-        let track = LiveNSFETrack(
-            trackIndex: Int(sqlite3_column_int64(statement, 2)),
-            trackCount: Int(sqlite3_column_int64(statement, 3)),
-            song: sqliteText(statement, 4),
-            game: sqliteText(statement, 5),
-            author: sqliteText(statement, 6),
-            system: sqliteText(statement, 7),
-            comment: sqliteText(statement, 8),
-            introLengthMs: Int(sqlite3_column_int64(statement, 9)),
-            loopLengthMs: Int(sqlite3_column_int64(statement, 10)),
-            playLengthMs: Int(sqlite3_column_int64(statement, 11)),
-            fadeLengthMs: Int(sqlite3_column_int64(statement, 12))
-        )
-        if let index = indexes[key] {
-            files[index].tracks.append(track)
-        } else {
-            indexes[key] = files.count
-            files.append(LiveNSFEFile(
-                archivePath: archivePath,
-                archiveEntry: archiveEntry,
-                tracks: [track]
-            ))
-        }
-    }
-    guard sqlite3_errcode(database) == SQLITE_OK || sqlite3_errcode(database) == SQLITE_DONE else {
-        throw NSError(
-            domain: "ScanSongTests",
-            code: 23,
-            userInfo: [NSLocalizedDescriptionKey: String(cString: sqlite3_errmsg(database))]
-        )
-    }
-    return files
-}
-
-private func extractTarZstd(archiveURL: URL, into directoryURL: URL) throws {
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
-    process.arguments = ["--zstd", "-xf", archiveURL.path, "-C", directoryURL.path]
-    let errorPipe = Pipe()
-    process.standardError = errorPipe
-    try process.run()
-    process.waitUntilExit()
-    guard process.terminationStatus == 0 else {
-        let error = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "tar failed"
-        throw NSError(
-            domain: "ScanSongTests",
-            code: 24,
-            userInfo: [NSLocalizedDescriptionKey: "Could not extract \(archiveURL.lastPathComponent): \(error)"]
-        )
-    }
+    return archives.filter { isSupportedLiveArchivePath($0.path) }
 }
 
 private func findExtractedArchiveMember(named entry: String, under directoryURL: URL) throws -> URL {

@@ -7,27 +7,20 @@ public enum ArchiveContainerKind: String, CaseIterable, Equatable, Sendable {
     case lha
     case rsn
     case tar
-    case tarZstandard
     /// UAC is a Zstandard skippable metadata frame followed by a standard
     /// TAR+Zstandard frame, so the ordinary streaming TAR pipeline applies.
     case uac
     /// A single playable payload compressed directly with Zstandard, such as
-    /// `track.vgm.zst`. This is intentionally distinct from TAR.ZST: it has
-    /// no member listing and cannot satisfy a complete-set requirement.
+    /// `track.vgm.zst`. It has no member listing and cannot satisfy a
+    /// complete-set requirement.
     case singleFileZstandard
 
     public init?(archiveURL: URL) {
         let url = archiveURL.standardizedFileURL
         let extensionName = url.pathExtension.lowercased()
-        if extensionName == "zst",
+        if ["zst", "zstd"].contains(extensionName),
            url.deletingPathExtension().pathExtension.lowercased() == "tar" {
-            self = .tarZstandard
-            return
-        }
-        if extensionName == "zstd",
-           url.deletingPathExtension().pathExtension.lowercased() == "tar" {
-            self = .tarZstandard
-            return
+            return nil
         }
         switch extensionName {
         case "uac": self = .uac
@@ -36,14 +29,9 @@ public enum ArchiveContainerKind: String, CaseIterable, Equatable, Sendable {
         case "lha": self = .lha
         case "rsn": self = .rsn
         case "tar": self = .tar
-        case "tzst": self = .tarZstandard
         case "zst", "zstd": self = .singleFileZstandard
         default: return nil
         }
-    }
-
-    public var usesTarZstandardPipeline: Bool {
-        self == .tarZstandard || self == .uac
     }
 }
 
@@ -84,7 +72,7 @@ public enum ArchiveToolRouting {
                 executableName: "tar",
                 arguments: ["-xOf", archiveURL.path, tarMemberSelectionPattern(entryPath)]
             )
-        case .tarZstandard, .uac:
+        case .uac:
             return .zstandardTar(
                 zstdExecutableName: "zstd",
                 zstdArguments: ["-d", "-q", "-c", archiveURL.path],
@@ -125,7 +113,7 @@ public enum ArchiveToolRouting {
                 executableName: "tar",
                 arguments: ["-xf", archiveURL.path, "-C", destinationURL.path]
             )
-        case .tarZstandard, .uac:
+        case .uac:
             return .zstandardTar(
                 zstdExecutableName: "zstd",
                 zstdArguments: ["-d", "-q", "-c", archiveURL.path],
@@ -166,7 +154,7 @@ public enum ArchiveToolRouting {
                 arguments: ["-xf", archiveURL.path, "-C", destinationURL.path]
                     + ArchiveEntryPath.tarMemberSelectionPatterns(entryPaths)
             )
-        case .tarZstandard, .uac:
+        case .uac:
             return .zstandardTar(
                 zstdExecutableName: "zstd",
                 zstdArguments: ["-d", "-q", "-c", archiveURL.path],

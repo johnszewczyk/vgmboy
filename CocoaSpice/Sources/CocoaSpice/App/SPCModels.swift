@@ -119,7 +119,7 @@ enum TrackSource: Hashable, Sendable {
 
 enum FilenamePresentation {
     private static let compoundArchiveSuffixes = [
-        ".tar.zst", ".tar.zstd", ".tar.gz", ".tar.bz2", ".tar.xz", ".tar.lz", ".tar.lz4"
+        ".tar.gz", ".tar.bz2", ".tar.xz", ".tar.lz", ".tar.lz4"
     ]
 
     static func withoutDisplayedExtension(_ filename: String) -> String {

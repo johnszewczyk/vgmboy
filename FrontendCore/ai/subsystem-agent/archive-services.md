@@ -35,6 +35,10 @@ and playable-member lifetime shared by native frontends.
 - Selected-entry and complete-set materialization remain distinct contracts.
 - UAC member paths are manifest-relative archive paths, never filesystem
   locations; invalid manifests must not fall back to another container route.
+- Loose `.tar.zst`, `.tar.zstd`, and `.tzst` source archives are retired and
+  must not return to archive routing. Standalone media `.zst`/`.zstd` files
+  remain single-file wrappers, and UAC's internal TAR+Zstandard payload stays
+  behind the UAC manifest boundary.
 - Scanner discovery, scanner resource policy, and catalog grouping remain in
   ScanSong.
 

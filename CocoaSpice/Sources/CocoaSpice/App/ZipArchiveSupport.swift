@@ -9,7 +9,7 @@ import VGMBoyKit
 enum ZipArchiveSupport {
     static var cacheDirectoryURL: URL { cacheRootURL() }
 
-    static let supportedArchiveExtensions: Set<String> = ["zip", "7z", "lha", "rsn", "tzst", "zst", "zstd", "uac"]
+    static let supportedArchiveExtensions: Set<String> = ["zip", "7z", "lha", "rsn", "zst", "zstd", "uac"]
     private static let archiveListingTimeout: TimeInterval = 30
     private static let archiveExtractionTimeout: TimeInterval = 600
     private static let archiveListingMaximumBytes = 64 * 1024 * 1024
@@ -100,9 +100,11 @@ enum ZipArchiveSupport {
 
     static func canHandle(_ url: URL) -> Bool {
         let url = url.standardizedFileURL
+        let name = url.lastPathComponent.lowercased()
+        guard ![".tar.zst", ".tar.zstd", ".tzst"].contains(where: { name.hasSuffix($0) }) else {
+            return false
+        }
         return supportedArchiveExtensions.contains(url.pathExtension.lowercased())
-            || (url.pathExtension.lowercased() == "zst"
-                && url.deletingPathExtension().pathExtension.lowercased() == "tar")
     }
 
     static func cacheSummary() -> CacheSummary {
@@ -208,7 +210,7 @@ enum ZipArchiveSupport {
 
     /// Returns tool-reported archive details for an incremental scan. It
     /// never reads member payloads or derives a checksum: ZIP/7z retain the
-    /// 7-Zip header report and TAR+Zstandard retains Zstandard's own report.
+    /// 7-Zip header report.
     /// Unsupported or checksum-less containers return nil and retain ordinary
     /// file-size/modification-date incremental behavior.
     static func scanSignature(for archiveURL: URL) throws -> String? {
@@ -218,14 +220,6 @@ enum ZipArchiveSupport {
             return try listEntries(in: archiveURL).scanSignature
         case .tar:
             return nil
-        case .tarZstandard:
-            let data = try runProcess(
-                executable: try executable(named: "zstd"),
-                arguments: ["-lv", archiveURL.path]
-            )
-            let report = String(decoding: data, as: UTF8.self)
-            guard report.contains("Check: XXH64") else { return nil }
-            return "zstd-report:\n\(report)"
         case .uac:
             return try listEntries(in: archiveURL).scanSignature
         case .rsn:
@@ -337,11 +331,9 @@ enum ZipArchiveSupport {
         let normalizedEntryPath = normalizeEntryPath(entryPath)
         try validateUACIfNeeded(archiveURL, memberPaths: [normalizedEntryPath])
 
-        // A TAR+Zstandard stream must be decompressed from its beginning, but
-        // a selected-entry decoder still needs only one member. Extract that
-        // member into its durable selection cache; expanding every sibling
-        // makes small SPC playback wait on an unrelated archive-sized write.
-        if archiveKind(for: archiveURL).usesTarZstandardPipeline {
+        // Read a selected UAC member from its compressed TAR payload without
+        // expanding every sibling into the general archive materializer.
+        if archiveKind(for: archiveURL) == .uac {
             let rootURL = try materializeEntries(at: archiveURL, entryPaths: [normalizedEntryPath])
             let memberURL = archiveMemberURL(in: rootURL, entryPath: normalizedEntryPath)
             guard FileManager.default.fileExists(atPath: memberURL.path) else {
@@ -383,8 +375,8 @@ enum ZipArchiveSupport {
         try validateUACIfNeeded(archiveURL, memberPaths: [normalizedEntryPath])
 
         return try ArchiveManifestReader().read(entryPath: normalizedEntryPath) { rootURL, memberURL in
-            if archiveKind(for: archiveURL).usesTarZstandardPipeline {
-                try extractTarZstandardEntries(
+            if archiveKind(for: archiveURL) == .uac {
+                try extractUACEntries(
                     from: archiveURL,
                     entryPaths: [normalizedEntryPath],
                     into: rootURL
@@ -442,8 +434,8 @@ enum ZipArchiveSupport {
                 entryPaths: entryPaths,
                 policy: policy
             ) { stagingURL, normalizedPaths in
-                if archiveKind(for: archiveURL).usesTarZstandardPipeline {
-                    try extractTarZstandardEntries(
+                if archiveKind(for: archiveURL) == .uac {
+                    try extractUACEntries(
                         from: archiveURL,
                         entryPaths: normalizedPaths,
                         into: stagingURL
@@ -554,11 +546,6 @@ enum ZipArchiveSupport {
             return try parseListingErrors {
                 try ArchiveListingParser.parseTarListing(data)
             }
-        case .tarZstandard:
-            let data = try runTarZstandardListing(archiveURL)
-            return try parseListingErrors {
-                try ArchiveListingParser.parseTarListing(data)
-            }
         case .uac:
             let container = try UACContainerReader.read(
                 from: archiveURL,
@@ -655,17 +642,8 @@ enum ZipArchiveSupport {
         return environment
     }
 
-    private static func materializeTarZstandardArchive(_ archiveURL: URL, into destinationURL: URL) throws {
-        try runZstandardTarPipeline(
-            archiveURL: archiveURL,
-            tarArguments: ["-xf", "-", "-C", destinationURL.path]
-        )
-    }
-
-    /// BSD tar's built-in Zstandard helper is unreliable for selected-member
-    /// extraction. Stream zstd into tar ourselves so a cold selection never
-    /// writes and rereads a complete temporary TAR just to obtain one member.
-    private static func extractTarZstandardEntries(
+    /// Extract selected UAC members directly from its compressed TAR payload.
+    private static func extractUACEntries(
         from archiveURL: URL,
         entryPaths: [String],
         into destinationURL: URL
@@ -745,121 +723,6 @@ enum ZipArchiveSupport {
         ArchiveEntryPath.tarMemberSelectionPatterns(entryPaths)
     }
 
-    /// BSD tar's automatic Zstandard helper exits spuriously when many archive
-    /// listings run at once. Use the reliable `zstd` binary explicitly.
-    private static func runTarZstandardListing(_ archiveURL: URL) throws -> Data {
-        try acquireProcessPermit()
-        defer { processRunner.releasePermit() }
-
-        let outputURL = try processOutputURL()
-        FileManager.default.createFile(atPath: outputURL.path, contents: nil)
-        let outputHandle = try FileHandle(forWritingTo: outputURL)
-        defer {
-            try? outputHandle.close()
-            try? FileManager.default.removeItem(at: outputURL)
-        }
-
-        let archiveData = Pipe()
-        let decompressor = Process()
-        decompressor.executableURL = URL(fileURLWithPath: try executable(named: "zstd"))
-        decompressor.arguments = ["-d", "-q", "-c", archiveURL.path]
-        decompressor.environment = archiveProcessEnvironment()
-        decompressor.standardOutput = archiveData
-        let decompressorError = Pipe()
-        decompressor.standardError = decompressorError
-
-        let lister = Process()
-        lister.executableURL = URL(fileURLWithPath: try executable(named: "tar"))
-        lister.arguments = ["-tf", "-"]
-        lister.environment = archiveProcessEnvironment()
-        lister.standardInput = archiveData
-        lister.standardOutput = outputHandle
-        let listerError = Pipe()
-        lister.standardError = listerError
-
-        let decompressorCompletion = DispatchSemaphore(value: 0)
-        let listerCompletion = DispatchSemaphore(value: 0)
-        decompressor.terminationHandler = { _ in decompressorCompletion.signal() }
-        lister.terminationHandler = { _ in listerCompletion.signal() }
-        defer {
-            decompressor.terminationHandler = nil
-            lister.terminationHandler = nil
-        }
-
-        try lister.run()
-        do {
-            try decompressor.run()
-        } catch {
-            lister.terminate()
-            lister.waitUntilExit()
-            throw error
-        }
-        try? archiveData.fileHandleForWriting.close()
-        try? archiveData.fileHandleForReading.close()
-        try? decompressorError.fileHandleForWriting.close()
-        try? listerError.fileHandleForWriting.close()
-
-        let decompressorErrors = ArchiveProcessOutputCollector()
-        let listerErrors = ArchiveProcessOutputCollector()
-        let readers = DispatchGroup()
-        for (handle, collector) in [
-            (decompressorError.fileHandleForReading, decompressorErrors),
-            (listerError.fileHandleForReading, listerErrors)
-        ] {
-            readers.enter()
-            DispatchQueue.global(qos: .utility).async {
-                collector.set(handle.readDataToEndOfFile())
-                try? handle.close()
-                readers.leave()
-            }
-        }
-
-        do {
-            try waitForProcess(lister, completion: listerCompletion, executable: lister.executableURL!.path, timeout: archiveListingTimeout)
-            try waitForProcess(decompressor, completion: decompressorCompletion, executable: decompressor.executableURL!.path, timeout: archiveListingTimeout)
-        } catch {
-            if decompressor.isRunning { decompressor.terminate() }
-            if lister.isRunning { lister.terminate() }
-            if decompressor.isRunning { decompressor.waitUntilExit() }
-            if lister.isRunning { lister.waitUntilExit() }
-            readers.wait()
-            throw error
-        }
-        readers.wait()
-        try outputHandle.close()
-
-        // `tar -tf -` can close the pipe after it has parsed the TAR end
-        // markers. Depending on the zstd build, that arrives as SIGPIPE or
-        // its normal exit-70 "Write error ... Broken pipe" report. Tar is
-        // the authoritative consumer here: accept only that precise upstream
-        // closure after tar has completed successfully.
-        let decompressorErrorText = String(
-            decoding: decompressorErrors.value,
-            as: UTF8.self
-        )
-        let decompressorReportedBrokenPipe = isExpectedZstandardPipeClosure(
-            exitStatus: decompressor.terminationStatus,
-            terminationReason: decompressor.terminationReason,
-            stderr: decompressorErrorText
-        )
-        let decompressorSucceeded = decompressor.terminationStatus == 0
-            || decompressorReportedBrokenPipe
-        guard decompressorSucceeded, lister.terminationStatus == 0 else {
-            let messages = [decompressorErrors.value, listerErrors.value]
-                .map { String(decoding: $0, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-            throw ArchiveError.processFailed(
-                executable: "zstd/tar",
-                message: messages.isEmpty ? "exit code \(decompressor.terminationStatus)/\(lister.terminationStatus)" : messages.joined(separator: "\n")
-            )
-        }
-        let outputBytes = Int64((try? outputURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
-        guard outputBytes <= Int64(archiveListingMaximumBytes) else {
-            throw ArchiveError.listingLimitExceeded("more than 64 MiB of tool output")
-        }
-        return try Data(contentsOf: outputURL, options: .mappedIfSafe)
-    }
-
     static func isExpectedZstandardPipeClosure(
         exitStatus: Int32,
         terminationReason: Process.TerminationReason,
@@ -904,7 +767,7 @@ enum ZipArchiveSupport {
         arguments: [String]
     ) throws -> Data {
         // Listing is bounded tightly, but a valid extraction must be allowed
-        // to decompress a large solid TAR+Zstandard source. The scan pipeline
+        // to decompress a large UAC TAR+Zstandard payload. The scan pipeline
         // uses the same 10-minute extraction boundary.
         let executableName = URL(fileURLWithPath: executable).lastPathComponent
         let isExtraction = executableName == "unar"
@@ -986,9 +849,9 @@ enum ZipArchiveSupport {
         )
     }
 
-    /// Runs `zstd -d -c` directly into BSD tar. TAR+Zstandard is necessarily
-    /// sequential, but it does not need a second full disk pass through a
-    /// temporary TAR before playback can begin.
+    /// Runs `zstd -d -c` directly into BSD tar for a UAC payload. TAR+Zstandard
+    /// is necessarily sequential, but it does not need a second full disk pass
+    /// through a temporary TAR before playback can begin.
     private static func runZstandardTarPipeline(
         zstdExecutable: String,
         zstdArguments: [String],
