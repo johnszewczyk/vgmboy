@@ -153,13 +153,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let fileMenuItem = NSMenuItem()
         let fileMenu = NSMenu(title: "File")
         fileMenu.addItem(menuItem("Open Path…", command: .openPath, action: #selector(openPath(_:))))
+        let newPlaylistItem = NSMenuItem(title: "Duplicate Playlist in New Tab", action: #selector(newPlaylistTab(_:)), keyEquivalent: "t")
+        newPlaylistItem.keyEquivalentModifierMask = [.command]
+        newPlaylistItem.target = self
+        fileMenu.addItem(newPlaylistItem)
         fileMenuItem.submenu = fileMenu
         mainMenu.addItem(fileMenuItem)
 
         let viewMenuItem = NSMenuItem()
         let viewMenu = NSMenu(title: "View")
-        viewMenu.addItem(NSMenuItem(title: "Library", action: #selector(showLibrary(_:)), keyEquivalent: "1").configured { $0.target = self })
-        viewMenu.addItem(NSMenuItem(title: "Queue", action: #selector(showQueue(_:)), keyEquivalent: "2").configured { $0.target = self })
+        viewMenu.addItem(menuItem("Path View", command: .sidebarPaths, action: #selector(sidebarPaths(_:))))
+        viewMenu.addItem(menuItem("Console View", command: .sidebarConsoles, action: #selector(sidebarConsoles(_:))))
+        viewMenu.addItem(menuItem("Disk Path…", command: .sidebarDiskPath, action: #selector(sidebarDiskPath(_:))))
+        viewMenu.addItem(.separator())
+        viewMenu.addItem(menuItem("Favorites Playlist", command: .favoritesPlaylist, action: #selector(favoritesPlaylist(_:))))
+        viewMenu.addItem(menuItem("Playback History", command: .playbackHistory, action: #selector(playbackHistory(_:))))
         viewMenuItem.submenu = viewMenu
         mainMenu.addItem(viewMenuItem)
 
@@ -174,7 +182,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let windowMenuItem = NSMenuItem()
         let windowMenu = NSMenu(title: "Window")
         windowMenu.addItem(menuItem("Minimize", command: .minimizeWindow, action: #selector(minimizeWindow(_:))))
-        windowMenu.addItem(menuItem("Close Window", command: .closeWindow, action: #selector(closeWindow(_:))))
+        windowMenu.addItem(menuItem("Close Playlist Tab", command: .closeWindow, action: #selector(closeWindow(_:))))
+        windowMenu.addItem(.separator())
+        for index in 1...9 {
+            let tabItem = NSMenuItem(title: "Playlist \(index)", action: #selector(selectPlaylistTab(_:)), keyEquivalent: String(index))
+            tabItem.keyEquivalentModifierMask = [.command, .option]
+            tabItem.target = self
+            tabItem.tag = index
+            windowMenu.addItem(tabItem)
+        }
         windowMenuItem.submenu = windowMenu
         mainMenu.addItem(windowMenuItem)
         NSApp.windowsMenu = windowMenu
@@ -227,12 +243,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     @objc private func quit(_ sender: Any?) { NSApp.terminate(sender) }
-    @objc private func closeWindow(_ sender: Any?) {
-        guard let window, window.isVisible else { return }
-        window.performClose(sender)
+    @objc private func closeWindow(_ sender: Any?) { dispatch(.closeWindow) }
+    @objc private func newPlaylistTab(_ sender: Any?) { dispatchCustom("newPlaylistTab") }
+    @objc private func selectPlaylistTab(_ sender: NSMenuItem) {
+        dispatchCustom("selectPlaylistTab:\(sender.tag)")
     }
-    @objc private func showLibrary(_ sender: Any?) { dispatchCustom("library") }
-    @objc private func showQueue(_ sender: Any?) { dispatchCustom("queue") }
+    @objc private func sidebarPaths(_ sender: Any?) { dispatch(.sidebarPaths) }
+    @objc private func sidebarConsoles(_ sender: Any?) { dispatch(.sidebarConsoles) }
+    @objc private func sidebarDiskPath(_ sender: Any?) { dispatch(.sidebarDiskPath) }
+    @objc private func favoritesPlaylist(_ sender: Any?) { dispatch(.favoritesPlaylist) }
+    @objc private func playbackHistory(_ sender: Any?) { dispatch(.playbackHistory) }
     @objc private func minimizeWindow(_ sender: Any?) { (NSApp.keyWindow ?? window)?.performMiniaturize(sender) }
     @objc private func openPath(_ sender: Any?) { dispatch(.openPath) }
     @objc private func settings(_ sender: Any?) {

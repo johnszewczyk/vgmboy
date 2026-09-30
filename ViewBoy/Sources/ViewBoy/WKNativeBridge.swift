@@ -9,6 +9,7 @@ import FavoriteTrackCore
 import FrontendPreferencesCore
 import Foundation
 import LocalFileBrowserCore
+import PlaybackHistoryCore
 import PlaybackQueueCore
 import PlaybackTransportCore
 import PlaylistIdentityCore
@@ -156,6 +157,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             databaseFolderTracks: (...args) => request("databaseFolderTracks", args),
             favoritesList: (...args) => request("favoritesList", args),
             favoritesToggle: (...args) => request("favoritesToggle", args),
+            playbackHistoryList: () => request("playbackHistoryList"),
+            playbackHistoryRecord: (...args) => request("playbackHistoryRecord", args),
             favoritesRevision: () => request("favoritesRevision"),
             resolveSidebarState: (...args) => request("resolveSidebarState", args),
             resolveSidebarRowIntent: (...args) => request("resolveSidebarRowIntent", args),
@@ -617,6 +620,17 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return try favoriteResponses(store.snapshots(), order: favoriteSortOrder(args.dropFirst().first))
         case "favoritesRevision":
             return try FavoriteStore().revision()
+        case "playbackHistoryList":
+            return try Self.object(PlaybackHistoryStore().records())
+        case "playbackHistoryRecord":
+            guard let snapshot = Self.favoriteSnapshots(args.first).first else {
+                throw BridgeError.invalidArguments
+            }
+            let playedAtMilliseconds = (args.dropFirst().first as? NSNumber)?.int64Value
+            let playedAt = playedAtMilliseconds.map {
+                Date(timeIntervalSince1970: Double($0) / 1_000)
+            } ?? Date()
+            return try Self.object(PlaybackHistoryStore().record(snapshot, at: playedAt))
         case "resolveSidebarState":
             return sidebarState(mode: args.first as? String, query: args.dropFirst().first as? String)
         case "resolveSidebarRowIntent":

@@ -35,6 +35,40 @@ const savedPreferences = [];
 const savedPlaylistTabs = [];
 let frontendSettingsChanged;
 let catalogReloaded;
+let archiveCache = {
+  enabled: true,
+  limitBytes: 2 * 1024 ** 3,
+  fileCount: 3,
+  byteCount: 24 * 1024 ** 2,
+};
+let archiveCacheConfigurationCalls = [];
+let archiveCacheClearCount = 0;
+let archiveCacheFinderCalls = 0;
+let databaseFinderCalls = 0;
+let historyRecords = [];
+let historyRecordCalls = [];
+let favoriteTracks = [];
+let favoriteToggleCalls = [];
+let pathFileCalls = [];
+let pathFolderCalls = [];
+let databaseReloadCount = 0;
+const pathTrack = {
+  playlistId: 'path-track', path: '/music/sub/path.spc', filename: 'path.spc',
+  title: 'Path Track', game: 'Path Sample', system: 'SNES',
+};
+const pathTree = [{
+  kind: 'folder', path: 'catalog-root:1:/music', name: 'music',
+  catalogFolder: { rootId: 1, rootPath: '/music', folderPath: '' },
+  children: [{
+    kind: 'folder', path: 'catalog-folder:1:/music/sub', name: 'SUB',
+    catalogFolder: { rootId: 1, rootPath: '/music', folderPath: 'sub' },
+    children: [{
+      kind: 'file', path: 'catalog-file:1:/music/sub/path.spc', name: 'path.spc',
+      catalogFile: { rootId: 1, rootPath: '/music', folderPath: 'sub', path: '/music/sub/path.spc' },
+      children: [],
+    }],
+  }],
+}];
 const originalRandom = Math.random;
 let rows = [
   { playlistId: 'a', path: '/music/a.spc', filename: 'INITIAL_FILENAME.SPC', title: 'First', game: 'Sample', system: 'SNES' },
@@ -57,6 +91,70 @@ const bridge = {
     { rootId: 1, name: 'Sample', displayName: 'Sample', system: 'SNES', trackCount: 3 },
     { rootId: 2, name: 'Other', displayName: 'Other', system: 'ZZZ', trackCount: 1 },
   ],
+  databaseLocation: async () => ({
+    path: '/tmp/ViewBoy.sqlite', catalog: { schemaVersion: 24, trackCount: 99 },
+  }),
+  reloadDatabaseLibrary: async () => {
+    databaseReloadCount += 1;
+    return { path: '/tmp/ViewBoy.sqlite', catalog: { schemaVersion: 24, trackCount: 99 }, reloaded: true };
+  },
+  databaseFileTree: async () => structuredClone(pathTree),
+  databaseFileTracks: async (files) => { pathFileCalls.push(files); return [pathTrack]; },
+  databaseFolderTracks: async (folders) => { pathFolderCalls.push(folders); return [pathTrack]; },
+  choosePath: async () => ({ rootPath: '/tmp/hotkey-playlist', playlist: [{
+    playlistId: 'hotkey-track', path: '/tmp/hotkey-playlist/track.spc',
+    filename: 'track.spc', title: 'Hotkey Track', system: 'SNES',
+  }] }),
+  archiveCacheLocation: async () => '/tmp/ViewBoy/ArchiveCache',
+  archiveCacheSummary: async () => ({ ...archiveCache }),
+  configureArchiveCache: async (settings) => {
+    archiveCacheConfigurationCalls.push({ ...settings });
+    archiveCache = { ...archiveCache, ...settings };
+    return { ...settings, summary: { ...archiveCache } };
+  },
+  clearArchiveCache: async () => {
+    archiveCacheClearCount += 1;
+    archiveCache = { ...archiveCache, fileCount: 0, byteCount: 0 };
+    return true;
+  },
+  showArchiveCacheInFinder: async () => { archiveCacheFinderCalls += 1; return true; },
+  showInFinder: async () => { databaseFinderCalls += 1; return true; },
+  favoritesList: async () => structuredClone(favoriteTracks),
+  favoritesToggle: async (incoming) => {
+    favoriteToggleCalls.push(structuredClone(incoming));
+    for (const track of incoming) {
+      const identity = track.favoriteId || track.playlistId || track.path;
+      const index = favoriteTracks.findIndex((favorite) =>
+        (favorite.favoriteId || favorite.playlistId || favorite.path) === identity);
+      if (index >= 0) favoriteTracks.splice(index, 1);
+      else favoriteTracks.push({ ...track });
+    }
+    return structuredClone(favoriteTracks);
+  },
+  playbackHistoryList: async () => structuredClone(historyRecords),
+  playbackHistoryRecord: async (track, timestampMilliseconds) => {
+    historyRecordCalls.push({ track: { ...track }, timestampMilliseconds });
+    const record = {
+      id: `history-${historyRecords.length + 1}`,
+      timestampMilliseconds,
+      snapshot: {
+        identity: {
+          sourcePath: track.archivePath || track.path,
+          archiveEntry: track.archiveEntry || null,
+          trackIndex: track.trackIndex || 0,
+          trackCount: track.trackCount || 1,
+        },
+        filename: track.filename || '',
+        title: track.title || '',
+        game: track.game || '',
+        author: track.artist || '',
+        system: track.system || '',
+        playLengthMilliseconds: track.playLengthMs || 0,
+      },
+    };
+    historyRecords.unshift(record);
+    return record;
+  },
   databaseGameTracks: async (games) => games[0]?.name === 'Other' ? [otherRow] : rows,
   databaseGroupState: async (current, action, groupName, gameID) => {
     groupStateCalls.push([action, groupName, gameID]);
@@ -148,6 +246,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     code: `Digit${number}`,
     metaKey: true,
     ctrlKey: false,
+    altKey: true,
     shiftKey: false,
     preventDefault() {},
   });
@@ -173,20 +272,38 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   await tick();
   assert.match(status.textContent, /FIRST/i);
-  const initialTabCloseCount = hitTargetSnapshot()
-    .filter((target) => target.playlistTabClose).length;
+  globalThis.ViewBoy.dispatch('newPlaylistTab');
+  await tick();
+  const tabCountBeforeCommandClose = savedPlaylistTabs.at(-1).tabs.length;
+  assert.equal(tabCountBeforeCommandClose, 2, 'a second playlist tab is open for the close shortcut check');
   const closeWindowEvent = {
     key: 'w', code: 'KeyW', metaKey: true, ctrlKey: false, altKey: false, shiftKey: false,
     preventDefault() { this.defaultPrevented = true; },
     stopPropagation() { this.propagationStopped = true; },
   };
   canvas.listeners.get('keydown')(closeWindowEvent);
-  assert.equal(closeWindowRequests, 1, 'Command-W requests the native main-window close');
+  await tick();
+  assert.equal(closeWindowRequests, 0, 'Command-W does not request a native window close');
   assert.equal(closeWindowEvent.defaultPrevented, true,
     'Command-W cannot fall through to WebKit keyboard handling');
-  assert.equal(hitTargetSnapshot().filter((target) => target.playlistTabClose).length, initialTabCloseCount,
-    'Command-W does not close the active playlist tab');
+  assert.equal(savedPlaylistTabs.at(-1).tabs.length, tabCountBeforeCommandClose - 1,
+    'Command-W closes the active playlist tab and saves the remaining tab set');
   const toolbarTargets = hitTargetSnapshot();
+  const footerReadouts = toolbarTargets.filter((target) => target.statusReadout)
+    .sort((first, second) => first.box.x - second.box.x);
+  assert.equal(footerReadouts.length, 4,
+    'the sidebar and playlist each end in two outlined status readout buttons');
+  assert.ok(footerReadouts.every((target) => target.box.y === footerReadouts[0].box.y
+    && target.box.height === footerReadouts[0].box.height),
+  'both pane footers align on one shared standard button row');
+  for (const [left, right] of [[footerReadouts[0], footerReadouts[1]], [footerReadouts[2], footerReadouts[3]]]) {
+    assert.ok(Math.abs(left.box.width - right.box.width) <= 1,
+      'each footer splits its available width evenly between two readouts');
+    assert.equal(left.textAlign, 'left', 'the first footer readout aligns to the left');
+    assert.equal(right.textAlign, 'right', 'the second footer readout aligns to the right');
+    assert.equal(left.textInset, 4, 'footer labels use the shared standard text padding');
+    assert.equal(right.textInset, 4, 'both footer buttons use the same text padding');
+  }
   const transportTargets = ['PREVIOUS', 'PLAY', 'NEXT', 'STOP']
     .map((name) => toolbarTargets.find((target) => target.name === name));
   const modeTargets = ['LONG PLAY', 'REPEAT ONE', 'PLAYLIST RANDOM', 'LIBRARY RANDOM']
@@ -367,9 +484,9 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.notEqual(pixelChecksum(canvas.image.data), rollingOptionsPixels,
     'the roll-down reaches the fully settled Options screen');
   const gameBoyPixels = pixelChecksum(canvas.image.data);
-  const clickScreen = (x, y) => {
+  const clickScreen = (x, y, detail = 1) => {
     const rect = canvas.getBoundingClientRect();
-    canvas.listeners.get('click')({ clientX: rect.width * x, clientY: rect.height * y, detail: 1 });
+    canvas.listeners.get('click')({ clientX: rect.width * x, clientY: rect.height * y, detail });
   };
   const clickEntry = (target) => {
     const rect = canvas.getBoundingClientRect();
@@ -381,7 +498,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
       detail: 1,
     });
   };
-  const clickTarget = (name, occurrence = 0, xFraction = 0.5, yFraction = 0.5) => {
+  const clickTarget = (name, occurrence = 0, xFraction = 0.5, yFraction = 0.5, detail = 1) => {
     const target = hitTargetSnapshot().filter((entry) => entry.name === name)[occurrence];
     assert.ok(target, `the ${name} control is present in the current screen; found ${hitTargetSnapshot().map((entry) => entry.name).join(', ')}`);
     const logicalWidth = canvas.width / 3;
@@ -389,6 +506,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     clickScreen(
       (target.box.x + target.box.width * xFraction) / logicalWidth,
       (target.box.y + target.box.height * yFraction) / logicalHeight,
+      detail,
     );
   };
   const typeSearchKey = (key) => canvas.listeners.get('keydown')({
@@ -400,8 +518,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     shiftKey: false,
     preventDefault() {},
   });
-  const pages = ['DISPLAY', 'THEME', 'TRANSPORT', 'PLAYBACK', 'METHODS', 'AUDIO', 'INTERFACE', 'LIBRARY'];
-  const clickPage = (index) => clickTarget(pages[index]);
+  const pages = ['AUDIO', 'DATABASE', 'DISPLAY', 'INTERFACE', 'LIBRARY', 'METHODS', 'PLAYBACK', 'THEME', 'TRANSPORT'];
+  const clickPage = (page) => clickTarget(page);
   globalThis.ViewBoy.dispatch('library');
   await tick();
   assert.ok(hitTargetSnapshot().some((target) => target.searchField && target.name === 'SEARCH LIBRARY'),
@@ -457,7 +575,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const defaultTabGap = tabGap();
   clickTarget('OPTIONS');
   await tick();
-  clickPage(6);
+  clickPage('INTERFACE');
   clickTarget('UI GAP +');
   await tick();
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 5,
@@ -468,7 +586,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   clickTarget('X', 1);
   clickTarget('OPTIONS');
   await tick();
-  clickPage(6);
+  clickPage('INTERFACE');
   clickTarget('UI GAP -');
   await tick();
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 4,
@@ -477,15 +595,16 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   globalThis.ViewBoy.dispatch('settings');
   await tick();
-  const commandKey = (key) => canvas.listeners.get('keydown')({
+  const commandKey = (key, modifiers = {}) => canvas.listeners.get('keydown')({
     key,
     code: key === ',' ? 'Comma' : `Digit${key}`,
     metaKey: true,
     ctrlKey: false,
-    shiftKey: false,
+    altKey: modifiers.altKey === true,
+    shiftKey: modifiers.shiftKey === true,
     preventDefault() {},
   });
-  clickPage(1);
+  clickPage('THEME');
   clickTarget('THEME NIGHTBOY');
   const nightBoyPixels = pixelChecksum(canvas.image.data);
   assert.notEqual(nightBoyPixels, gameBoyPixels, 'NightBoy repaints the same four-tone pixel screen with its dark-purple palette');
@@ -495,7 +614,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   clickTarget('INK BRIGHT');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'HIGH_CONTRAST',
     'the ink control persists the brighter silver high-contrast setting');
-  clickPage(3);
+  clickPage('PLAYBACK');
   assert.notEqual(pixelChecksum(canvas.image.data), nightBoyPixels, 'Options sub-pages navigate inside the LCD');
   globalThis.ViewBoy.dispatch('optionsPage:PLAYBACK');
   clickTarget('REPEAT ONE');
@@ -513,9 +632,24 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the Playback page checkbox updates the native playback preferences');
   assert.notEqual(pixelChecksum(canvas.image.data), checkedRowPixels,
     'the bitmap checkbox marker visibly changes with the saved value');
-  clickPage(5);
+  clickPage('AUDIO');
   globalThis.ViewBoy.dispatch('optionsPage:AUDIO');
-  const equalizerBands = hitTargetSnapshot().filter((target) => /^EQ \d/.test(target.name));
+  const equalizerBands = hitTargetSnapshot().filter((target) => /^EQ \d/.test(target.name)
+    && !/[+-]$/.test(target.name));
+  const volumeControls = ['VOLUME -', 'VOLUME +', 'VOLUME GAUGE']
+    .map((name) => hitTargetSnapshot().find((target) => target.name === name));
+  assert.ok(volumeControls.every((target) => target && target.box.y === volumeControls[0].box.y),
+    'Volume buttons and gauge share one aligned row');
+  assert.ok(volumeControls[0].box.x < volumeControls[1].box.x
+    && volumeControls[1].box.x < volumeControls[2].box.x,
+  'Volume decrease and increase stay together before the gauge');
+  const firstBandControls = ['EQ 31 HZ -', 'EQ 31 HZ +', 'EQ 31 HZ']
+    .map((name) => hitTargetSnapshot().find((target) => target.name === name));
+  assert.ok(firstBandControls.every((target) => target && target.box.y === firstBandControls[0].box.y),
+    'EQ buttons and gauge share one aligned row');
+  assert.ok(firstBandControls[0].box.x < firstBandControls[1].box.x
+    && firstBandControls[1].box.x < firstBandControls[2].box.x,
+  'EQ decrease and increase stay together before the gauge');
   assert.equal(equalizerBands.length, 10, 'Audio renders ten independently adjustable EQ bands');
   assert.equal(new Set(equalizerBands.map((target) => target.box.x)).size, 1,
     'all equalizer sliders share the same left edge');
@@ -536,9 +670,16 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.ok(equalizerBands.every((target) => target.equalizerLabelBox?.y === target.box.y
     && target.equalizerLabelBox?.height === target.box.height),
   'each frequency label aligns vertically with its slider');
-  assert.equal(new Set(equalizerBands.map((target) =>
-    target.box.x - (target.equalizerLabelBox.x + target.equalizerLabelBox.width))).size, 1,
-  'all EQ rows retain the same gap between frequency labels and their fill bars');
+  const equalizerAdjusters = equalizerBands.map((target) => ({
+    band: target,
+    minus: hitTargetSnapshot().find((entry) => entry.name === `${target.name} -`),
+    plus: hitTargetSnapshot().find((entry) => entry.name === `${target.name} +`),
+  }));
+  assert.ok(equalizerAdjusters.every(({ band, minus, plus }) => minus && plus
+    && minus.box.x - (band.equalizerLabelBox.x + band.equalizerLabelBox.width) === 4
+    && plus.box.x - (minus.box.x + minus.box.width) === 4
+    && band.box.x - (plus.box.x + plus.box.width) === 4),
+  'EQ adjustment pairs keep the standard gap between label, buttons, and gauge');
   assert.equal(new Set(equalizerBands.map((target) =>
     target.equalizerValueBox.x - (target.box.x + target.box.width))).size, 1,
   'all EQ rows retain the same gap between fill bars and gain readouts');
@@ -595,27 +736,39 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(savedPreferences.at(-1).equalizerBandGains[0], 0,
     'the left edge of a full-width equalizer bar returns the band to flat');
-  clickPage(3);
+  clickPage('PLAYBACK');
   globalThis.ViewBoy.dispatch('optionsPage:PLAYBACK');
-  clickTarget('LONG PLAY +');
+  clickTarget('LONG PLAY TIME +');
   await tick();
   assert.equal(savedPreferences.at(-1).manualPlayTimeSeconds, 210,
     'the Long Play duration adjuster increases in 30-second steps');
   assert.equal(reconfigureCalls.at(-1).manualPlayMilliseconds, 210_000,
     'Long Play duration changes reconfigure the active native track');
+  const timeControls = hitTargetSnapshot();
+  const timeMinus = timeControls.find((target) => target.name === 'LONG PLAY TIME -');
+  const timePlus = timeControls.find((target) => target.name === 'LONG PLAY TIME +');
+  const timeInput = timeControls.find((target) => target.name === 'manualPlayTimeSeconds TIME');
+  assert.ok(timeMinus && timePlus && timeInput
+    && timeMinus.box.x < timePlus.box.x && timePlus.box.x < timeInput.box.x,
+  'the duration field follows an adjacent decrease/increase pair');
+  clickTarget('manualPlayTimeSeconds TIME');
+  for (const key of ['3', ':', '4', '5', 'Enter']) typeSearchKey(key);
+  await tick();
+  assert.equal(savedPreferences.at(-1).manualPlayTimeSeconds, 225,
+    'the Long Play time field accepts a typed minutes:seconds value');
   globalThis.ViewBoy.dispatch('newPlaylistTab');
   await tick();
   assert.equal(savedPlaylistTabs.at(-1)?.tabs.length, 2,
     'the plus tab control duplicates the current list and persists it through the native bridge');
   const [firstPlaylistID, secondPlaylistID] = savedPlaylistTabs.at(-1).tabs.map((tab) => tab.id);
-  commandKey('1');
+  commandKey('1', { altKey: true });
   await tick();
   assert.equal(savedPlaylistTabs.at(-1)?.activeID, firstPlaylistID,
-    'Command-1 selects the first playlist tab');
-  commandKey('2');
+    'Command-Option-1 selects the first playlist tab');
+  commandKey('2', { altKey: true });
   await tick();
   assert.equal(savedPlaylistTabs.at(-1)?.activeID, secondPlaylistID,
-    'Command-2 selects the second playlist tab');
+    'Command-Option-2 selects the second playlist tab');
   commandKey(',');
   assert.match(status.textContent, /SETTINGS/,
     'Command-comma opens the Options screen');
@@ -644,7 +797,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'closing the final tab saves it empty even while audio continues playing');
   globalThis.ViewBoy.dispatch('settings');
   await tick();
-  clickPage(6);
+  clickPage('INTERFACE');
   globalThis.ViewBoy.dispatch('optionsPage:INTERFACE');
   clickTarget('AUTO-SIZE COLUMNS');
   await tick();
@@ -665,15 +818,21 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 5,
     'the shared interface gap has an independent persisted setting');
-  clickPage(5);
-  const expandedGapBands = hitTargetSnapshot().filter((target) => /^EQ \d/.test(target.name));
-  assert.ok(expandedGapBands.every((target) =>
-    target.box.x - (target.equalizerLabelBox.x + target.equalizerLabelBox.width) === 5
-      && target.equalizerValueBox.x - (target.box.x + target.box.width) === 5),
-  'increasing UI Gap adds space on both sides of every EQ bar');
+  clickPage('AUDIO');
+  const expandedGapBands = hitTargetSnapshot().filter((target) => /^EQ \d/.test(target.name)
+    && !/[+-]$/.test(target.name));
+  assert.ok(expandedGapBands.every((target) => {
+    const minus = hitTargetSnapshot().find((entry) => entry.name === `${target.name} -`);
+    const plus = hitTargetSnapshot().find((entry) => entry.name === `${target.name} +`);
+    return minus && plus
+      && minus.box.x - (target.equalizerLabelBox.x + target.equalizerLabelBox.width) === 5
+      && plus.box.x - (minus.box.x + minus.box.width) === 5
+      && target.box.x - (plus.box.x + plus.box.width) === 5
+      && target.equalizerValueBox.x - (target.box.x + target.box.width) === 5;
+  }), 'increasing UI Gap preserves all button and gauge spacing on every EQ row');
   assert.ok(expandedGapBands[0].box.width < defaultEqualizerWidth,
     'the EQ bar gives available width to the larger UI gaps instead of consuming their padding');
-  clickPage(6);
+  clickPage('INTERFACE');
   clickTarget('UI GAP -');
   await tick();
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 4,
@@ -687,25 +846,25 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).controlPaddingDots, 4);
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 4);
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).playlistGapDots, 4);
-  clickPage(7);
+  clickPage('LIBRARY');
   globalThis.ViewBoy.dispatch('optionsPage:LIBRARY');
   clickTarget('FILE');
   await tick();
   assert.equal(savedPreferences.at(-1).columnVisibility.filename, false,
     'the Library page checkbox persists field visibility');
-  clickPage(6);
+  clickPage('INTERFACE');
   globalThis.ViewBoy.dispatch('optionsPage:INTERFACE');
   clickTarget('AUTO-SIZE COLUMNS');
   await tick();
   assert.equal(savedPreferences.at(-1).columnAutoSize, true,
     'the Interface page checkbox can restore automatic sizing');
-  clickPage(1);
+  clickPage('THEME');
   clickTarget('THEME GAMEBOY');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'GAMEBOY',
     'the palette selector returns to the authentic Game Boy theme');
   clickTarget('INK LCD GREEN');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'STANDARD');
-  clickPage(2);
+  clickPage('TRANSPORT');
   clickTarget('BUTTONS SYMBOLS');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).transportSymbols, true,
     'the Transport page persists its Words/Symbols control setting');
@@ -714,7 +873,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const symbolTransportPixels = pixelChecksum(canvas.image.data);
   globalThis.ViewBoy.dispatch('settings');
   await tick();
-  clickPage(2);
+  clickPage('TRANSPORT');
   clickTarget('BUTTONS WORDS');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).transportSymbols, false);
   globalThis.ViewBoy.dispatch('library');
@@ -723,7 +882,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'symbol mode replaces word labels while keeping equal-width toolbar controls');
   globalThis.ViewBoy.dispatch('settings');
   await tick();
-  clickPage(4);
+  clickPage('METHODS');
   clickTarget('LIBGME SPEED');
   await tick();
   assert.equal(savedPreferences.at(-1).playbackSpeedEnabled, true,
@@ -826,9 +985,13 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.notEqual(pixelChecksum(canvas.image.data), narrowLayoutPixels,
     'the complete table scrolls horizontally inside its clipped viewport');
 
+  screenWidth = 1400;
+  windowListeners.get('resize')();
+  await tick();
+  await tick();
   const sendPointer = (name, x, y) => canvas.listeners.get(name)({
-    clientX: rect.width * x,
-    clientY: rect.height * y,
+    clientX: canvas.getBoundingClientRect().width * x,
+    clientY: canvas.getBoundingClientRect().height * y,
     pointerId: 1,
     preventDefault() {},
   });
@@ -851,7 +1014,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   };
   const fileHeader = headerCenter('FILE');
   const titleHeader = headerCenter('TITLE');
-  const titleRightSide = (titleHeader.box.x + titleHeader.box.width * 0.75) / (canvas.width / 3);
+  const titleRightSide = (titleHeader.box.x + titleHeader.box.width * 0.525) / (canvas.width / 3);
   sendPointer('pointerdown', fileHeader.x, fileHeader.y);
   sendPointer('pointermove', titleRightSide, titleHeader.y);
   await tick();
@@ -945,4 +1108,88 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const sidebarPixelMovement = scrollGameBefore.box.y - scrollGameAfter.box.y;
   assert.ok(sidebarPixelMovement > 0 && sidebarPixelMovement < sidebarRowHeight,
     `the sidebar advances by LCD pixels rather than whole rows (${sidebarPixelMovement}/${sidebarRowHeight})`);
+
+  globalThis.ViewBoy.dispatch('settings');
+  await tick();
+  const visibleOptionPages = () => hitTargetSnapshot()
+    .map((target) => target.name).filter((name) => pages.includes(name));
+  assert.deepEqual(visibleOptionPages(), pages,
+    'the Options table of contents stays alphabetized');
+  clickPage('DATABASE');
+  await tick();
+  await tick();
+  const databaseTargets = hitTargetSnapshot();
+  assert.ok(databaseTargets.some((target) => target.name === 'DATABASE LOCATION'),
+    'Database options expose the catalog location');
+  assert.ok(databaseTargets.some((target) => target.name === 'ARCHIVE CACHE LOCATION'),
+    'Database options expose the archive cache path');
+  assert.ok(databaseTargets.some((target) => target.name === 'CACHE ENABLED')
+    && databaseTargets.some((target) => target.name === 'CLEAR CACHE')
+    && databaseTargets.some((target) => target.name === 'SHOW CACHE FOLDER'),
+  'Database options expose cache enable, clear, and Finder actions');
+  clickTarget('CACHE ENABLED');
+  await tick();
+  assert.equal(archiveCacheConfigurationCalls.at(-1).enabled, false,
+    'the cache checkbox updates the native cache policy');
+  clickTarget('LIMIT 4G');
+  await tick();
+  assert.equal(archiveCacheConfigurationCalls.at(-1).limitBytes, 4 * 1024 ** 3,
+    'the cache-limit choices update the native cache policy');
+  clickTarget('CLEAR CACHE');
+  await tick();
+  assert.equal(archiveCacheClearCount, 1, 'Clear Cache invokes the native cache purge');
+  assert.equal(archiveCache.fileCount, 0, 'cache usage refreshes after a purge');
+  clickTarget('DATABASE LOCATION');
+  clickTarget('ARCHIVE CACHE LOCATION');
+  await tick();
+  assert.equal(databaseFinderCalls, 1, 'the database path opens its location in Finder');
+  assert.equal(archiveCacheFinderCalls, 1, 'the archive-cache path opens its location in Finder');
+  clickTarget('RELOAD LIBRARY');
+  await tick();
+  await tick();
+  assert.equal(databaseReloadCount, 1, 'Reload Library requests a fresh native catalog projection');
+
+  commandKey('1');
+  await tick();
+  await tick();
+  assert.ok(hitTargetSnapshot().some((target) => target.name === 'SUB'),
+    'Command-1 switches the sidebar to its catalog Path view');
+  clickTarget('SUB');
+  await tick();
+  assert.ok(hitTargetSnapshot().some((target) => target.name === 'path.spc'),
+    'the Path tree expands folders to show indexed files');
+  clickTarget('SUB', 0, 0.5, 0.5, 2);
+  await tick();
+  assert.equal(pathFolderCalls.length, 1, 'double-clicking a catalog folder loads its indexed tracks');
+  clickTarget('path.spc');
+  await tick();
+  assert.equal(pathFileCalls.length, 1, 'selecting a catalog file loads its indexed tracks');
+  assert.equal(pathFileCalls[0][0].path, '/music/sub/path.spc');
+
+  commandKey('2');
+  await tick();
+  assert.ok(hitTargetSnapshot().some((target) => target.name === 'Scroll Game 00'),
+    'Command-2 restores the shared Console view');
+  commandKey('3');
+  await tick();
+  await tick();
+  assert.match(status.textContent, /HOTKEY TRACK/i,
+    'Command-3 opens the shared local Path picker and loads the selected playlist');
+  const tabCountBeforeCommandT = savedPlaylistTabs.at(-1).tabs.length;
+  commandKey('t');
+  await tick();
+  assert.equal(savedPlaylistTabs.at(-1).tabs.length, tabCountBeforeCommandT + 1,
+    'Command-T duplicates the current playlist in a new tab');
+  commandKey('d');
+  await tick();
+  assert.ok(favoriteToggleCalls.length > 0, 'Command-D toggles the selected track in shared Favorites');
+  commandKey('d', { shiftKey: true });
+  await tick();
+  assert.match(status.textContent, /FAVORITES/i, 'Command-Shift-D opens the Favorites playlist');
+  commandKey('h', { shiftKey: true });
+  await tick();
+  await tick();
+  assert.ok(historyRecordCalls.length > 0, 'successful playback is recorded through shared PlaybackHistory');
+  assert.ok(hitTargetSnapshot().some((target) => target.name.startsWith('DATE/TIME')),
+    'Command-Shift-H opens History with its timestamp column');
 });
