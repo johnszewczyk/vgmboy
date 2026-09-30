@@ -1020,7 +1020,7 @@
       const checked = selectedTagTrackPaths.has(member.path);
       const cells = [
         canonicalNumberCellMarkup(number, `Track row ${number}`),
-        canonicalCellMarkup(`<button class="new-tag-selection-toggle" type="button" role="checkbox" aria-checked="${checked}" data-action="toggleNewTagTrack" data-track-path="${esc(member.path)}" data-track-name="${esc(member.name)}" aria-label="${checked ? "Remove" : "Add"} ${esc(member.name)} ${checked ? "from" : "to"} selected tracks">${checked ? "✓" : "−"}</button>`, { className:"new-tag-checkbox-cell" }),
+        canonicalCellMarkup(`<button class="tag-table-field new-tag-selection-toggle" type="button" role="checkbox" aria-checked="${checked}" data-action="toggleNewTagTrack" data-track-path="${esc(member.path)}" data-track-name="${esc(member.name)}" aria-label="${checked ? "Remove" : "Add"} ${esc(member.name)} ${checked ? "from" : "to"} selected tracks">${checked ? "✓" : "−"}</button>`, { className:"new-tag-checkbox-cell" }),
         canonicalCellMarkup(`<input class="tag-table-field file-name-field" value="${esc(member.name)}" aria-label="Track filename" title="${esc(member.path)}" disabled>`)
       ];
       return canonicalRowMarkup(cells, { className:"new-tag-track-row" });

@@ -529,10 +529,11 @@ button { cursor:pointer; }
 
 .new-tag-page { grid-template-columns:33rem minmax(0,1fr); }
 .new-tag-checkbox-cell { justify-content:center; }
-.new-tag-selection-toggle { width:100%; height:100%; min-height:27px; padding:0; border:0; border-radius:0; background:transparent; color:var(--muted); font:600 13px ui-monospace,SFMono-Regular,Menlo,monospace; cursor:pointer; }
-.new-tag-selection-toggle[aria-checked="true"] { color:var(--accent); }
-.new-tag-selection-toggle:hover { background:var(--hover); color:var(--text); }
-.new-tag-selection-toggle:focus-visible { outline:1px solid var(--accent); outline-offset:-2px; }
+.new-tag-selection-toggle { text-align:center; cursor:pointer; }
+.new-tag-selection-toggle:not([aria-checked="true"]) { color:var(--muted)!important; }
+.new-tag-selection-toggle[aria-checked="true"] { color:var(--accent)!important; }
+.new-tag-selection-toggle:hover { border-color:var(--accent)!important; background:var(--hover)!important; color:var(--text)!important; }
+.new-tag-selection-toggle:focus-visible { border-color:var(--accent); outline:0; }
 .new-tag-editor-table { width:100%; min-width:760px; }
 .new-tag-form { width:100%; max-width:100%; }
 .new-tag-form [data-new-tag-submit] { justify-self:center; }
