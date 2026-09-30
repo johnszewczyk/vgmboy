@@ -232,9 +232,11 @@ function pixelChecksumForBox(box) {
 test('canvas renders adaptive columns, grouped options, and native playback', async () => {
   const {
     animationFrameIsDue,
+    animationSettingsSnapshot,
     appStatusAreaSnapshot,
     bitmapFontSnapshot,
     contentRowLayoutSnapshot,
+    equalizerAnimationSnapshot,
     hitTargetSnapshot,
     spacingReadoutLayoutSnapshot,
     screenTransitionSnapshot,
@@ -251,6 +253,11 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     assert.ok(glyph.every((row) => /^[01]{5}$/.test(row)),
       `uppercase ${character} is authored as five LCD dots per row`);
   }
+  assert.deepEqual(animationSettingsSnapshot(), {
+    enabled: true,
+    durationMilliseconds: 200,
+    framesPerSecond: 60,
+  }, 'all UI animation starts on the shared 200 ms duration and 60 FPS profile');
   const clickTargetBox = (target) => {
     const rect = canvas.getBoundingClientRect();
     const logicalWidth = canvas.width / 3;
@@ -312,21 +319,12 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(toolbarTargets.filter((target) => target.statusReadout).length, 0,
     'the sidebar and playlist contain no pane-specific footer readouts');
   const globalStatus = appStatusAreaSnapshot();
-  assert.deepEqual(globalStatus.map(({ field }) => field),
-    ['track', 'transport', 'context', 'queue', 'time'],
-    'the shared bottom status area has an organized track, transport, context, queue, and time layout');
-  assert.match(globalStatus.find(({ field }) => field === 'track').text, /SELECTED FIRST/i);
-  assert.equal(globalStatus.find(({ field }) => field === 'transport').text, 'STOPPED');
-  assert.match(globalStatus.find(({ field }) => field === 'context').text, /SAMPLE \/ SNES/i);
-  assert.equal(globalStatus.find(({ field }) => field === 'queue').text, 'TRACK 01/03');
-  assert.equal(globalStatus.find(({ field }) => field === 'time').text, 'TIME 0:00/--:--');
-  const topStatusFields = globalStatus.filter(({ field }) => ['track', 'transport'].includes(field));
-  const detailStatusFields = globalStatus.filter(({ field }) => ['context', 'queue', 'time'].includes(field));
-  assert.ok(topStatusFields.every(({ box }) => box.height > 0
-    && box.y === topStatusFields[0].box.y), 'track and transport share one status row');
-  assert.ok(detailStatusFields.every(({ box }) => box.height > 0
-    && box.y === detailStatusFields[0].box.y
-    && box.y > topStatusFields[0].box.y), 'context, queue, and timing share a second row');
+  assert.deepEqual(globalStatus.map(({ field }) => field), ['location'],
+    'the redesigned app footer uses one quiet file-location readout');
+  assert.equal(globalStatus[0].text, '/music/a.spc',
+    'the footer identifies the selected library file by path and filename');
+  assert.equal(globalStatus[0].box.height, bitmapFontSnapshot('MICRO').height,
+    'the compact file-location strip occupies one glyph row');
   const transportTargets = ['PREVIOUS', 'PLAY', 'NEXT', 'STOP']
     .map((name) => toolbarTargets.find((target) => target.name === name));
   const modeTargets = ['LONG PLAY', 'REPEAT ONE', 'PLAYLIST RANDOM', 'LIBRARY RANDOM']
@@ -376,9 +374,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(calls.find(([name]) => name === 'start')[1].path, '/music/a.spc');
   const playingStatus = appStatusAreaSnapshot();
-  assert.match(playingStatus.find(({ field }) => field === 'track').text, /^NOW FIRST$/i);
-  assert.equal(playingStatus.find(({ field }) => field === 'transport').text, 'PLAYING');
-  assert.equal(playingStatus.find(({ field }) => field === 'queue').text, 'TRACK 01/03');
+  assert.equal(playingStatus.find(({ field }) => field === 'location').text, '/music/a.spc',
+    'the footer keeps the active playback file visible while tracks play');
   await ended({ transport_state: 'ended', generation, status_sequence: generation + 1 });
   assert.deepEqual(calls.find(([name]) => name === 'retire')[1].playlistIds, ['a', 'b', 'c']);
   await tick();
@@ -519,9 +516,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(hitTargetSnapshot().filter((target) => target.statusReadout).length, 0,
     'Options has no status footers attached to either pane');
-  assert.deepEqual(appStatusAreaSnapshot().map(({ field }) => field),
-    ['track', 'transport', 'context', 'queue', 'time'],
-    'the same app-wide status area remains below Options');
+  assert.deepEqual(appStatusAreaSnapshot().map(({ field }) => field), ['location'],
+    'the same app-wide file-location strip remains below Options');
   const rollingOptionsPixels = pixelChecksum(canvas.image.data);
   assert.notEqual(rollingOptionsPixels, libraryPixels,
     'Options rolls down over the source screen instead of swapping immediately');
@@ -621,42 +617,42 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   clickTarget('OPTIONS');
   await tick();
   clickPage('INTERFACE');
-  const initialGapReadout = spacingReadoutLayoutSnapshot().find((entry) => entry.title === 'UI GAP');
+  const initialGapReadout = spacingReadoutLayoutSnapshot().find((entry) => entry.title === 'UI CHROME GAP');
   nextFrameAdvanceMs = 125;
-  clickTarget('UI GAP +');
+  clickTarget('UI CHROME GAP +');
   await tick();
-  const midResizeGapReadout = spacingReadoutLayoutSnapshot().find((entry) => entry.title === 'UI GAP');
+  const midResizeGapReadout = spacingReadoutLayoutSnapshot().find((entry) => entry.title === 'UI CHROME GAP');
   assert.equal(midResizeGapReadout.text, '5 DOTS',
     'the animated spacing readout displays whole-dot values instead of decimal interpolation values');
   assert.equal(midResizeGapReadout.box.width, initialGapReadout.box.width,
     'the spacing value box keeps its width during intermediate resize frames');
   await tick();
-  const settledGapReadout = spacingReadoutLayoutSnapshot().find((entry) => entry.title === 'UI GAP');
+  const settledGapReadout = spacingReadoutLayoutSnapshot().find((entry) => entry.title === 'UI CHROME GAP');
   assert.equal(settledGapReadout.text, '5 DOTS');
   assert.equal(settledGapReadout.box.width, initialGapReadout.box.width,
     'the spacing value box width remains stable after the animated resize settles');
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 5,
-    'the renamed UI Gap setting persists under its current name');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiChromeGapDots, 5,
+    'the shared UI Chrome Gap setting persists under its current name');
   globalThis.ViewBoy.dispatch('library');
   await tick();
-  assert.ok(tabGap() > defaultTabGap, 'playlist tabs respond to UI Gap while retaining independent column spacing');
+  assert.ok(tabGap() > defaultTabGap, 'playlist tabs respond to the UI Chrome Gap');
   const uiGapFiveRows = contentRowLayoutSnapshot();
   for (const kind of ['playlist', 'sidebar']) {
     const visibleRows = uiGapFiveRows.filter((row) => row.kind === kind)
       .sort((first, second) => first.box.y - second.box.y);
     assert.ok(visibleRows.slice(1).every((row, index) =>
       row.box.y - (visibleRows[index].box.y + visibleRows[index].box.height) === 1),
-    `${kind} line spacing stays at one dot when general UI Gap changes`);
+    `${kind} line spacing stays at one dot when UI Chrome Gap changes`);
   }
   clickTarget('OPTIONS');
   await tick();
   clickPage('INTERFACE');
   for (let step = 0; step < 4; step += 1) {
-    clickTarget('UI GAP -');
+    clickTarget('UI CHROME GAP -');
     await tick();
   }
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 1,
-    'UI Gap can independently set the general interface spacing');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiChromeGapDots, 1,
+    'UI Chrome Gap can be reduced independently of Text Line Gap');
   globalThis.ViewBoy.dispatch('library');
   await tick();
   const compactRows = contentRowLayoutSnapshot();
@@ -670,76 +666,56 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'playlist text rows have glyph-height boxes without vertical Control Padding');
   assert.ok(compactPlaylistRows.slice(1).every((row, index) =>
     row.box.y - (compactPlaylistRows[index].box.y + compactPlaylistRows[index].box.height) === 1),
-  'one Playlist Line Gap dot is the entire blank space between playlist rows');
+    'one Text Line Gap dot is the entire blank space between playlist rows');
   assert.ok(compactSidebarRows.length >= 2, 'sidebar text rows remain visible in the compact layout');
   assert.ok(compactSidebarRows.every((row) => row.box.height === glyphHeight),
     'sidebar text rows have glyph-height boxes without vertical Control Padding');
   assert.ok(compactSidebarRows.slice(1).every((row, index) =>
     row.box.y - (compactSidebarRows[index].box.y + compactSidebarRows[index].box.height) === 1),
-  'one Sidebar Line Gap dot is the entire blank space between sidebar rows');
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).playlistLineGapDots, 1,
-    'the dedicated playlist text line gap is persisted independently');
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).sidebarLineGapDots, 1,
-    'the dedicated sidebar text line gap is persisted independently');
+    'one Text Line Gap dot is the entire blank space between sidebar rows');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).textLineGapDots, 1,
+    'one Text Line Gap value persists for both text panes');
+  assert.equal(Object.hasOwn(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')), 'playlistGapDots'), false,
+    'the deprecated Playlist Gap is omitted from the new display preferences');
   clickTarget('OPTIONS');
   await tick();
   clickPage('INTERFACE');
-  clickTarget('PLAYLIST LINE GAP +');
+  clickTarget('TEXT LINE GAP +');
   await tick();
   globalThis.ViewBoy.dispatch('library');
   await tick();
-  const playlistGapRows = contentRowLayoutSnapshot();
-  const playlistGapPlaylistRows = playlistGapRows.filter((row) => row.kind === 'playlist')
+  const twoDotRows = contentRowLayoutSnapshot();
+  const twoDotPlaylistRows = twoDotRows.filter((row) => row.kind === 'playlist')
     .sort((first, second) => first.box.y - second.box.y);
-  const playlistGapSidebarRows = playlistGapRows.filter((row) => row.kind === 'sidebar')
+  const twoDotSidebarRows = twoDotRows.filter((row) => row.kind === 'sidebar')
     .sort((first, second) => first.box.y - second.box.y);
-  assert.equal(playlistGapPlaylistRows[1].box.y
-    - (playlistGapPlaylistRows[0].box.y + playlistGapPlaylistRows[0].box.height), 2,
-  'Playlist Line Gap changes playlist rows to two dots');
-  assert.equal(playlistGapSidebarRows[1].box.y
-    - (playlistGapSidebarRows[0].box.y + playlistGapSidebarRows[0].box.height), 1,
-  'Playlist Line Gap does not affect sidebar rows');
+  assert.equal(twoDotPlaylistRows[1].box.y
+    - (twoDotPlaylistRows[0].box.y + twoDotPlaylistRows[0].box.height), 2,
+  'Text Line Gap changes playlist rows to two dots');
+  assert.equal(twoDotSidebarRows[1].box.y
+    - (twoDotSidebarRows[0].box.y + twoDotSidebarRows[0].box.height), 2,
+  'the same Text Line Gap changes sidebar rows to two dots');
   clickTarget('OPTIONS');
   await tick();
   clickPage('INTERFACE');
-  clickTarget('SIDEBAR LINE GAP +');
-  await tick();
-  globalThis.ViewBoy.dispatch('library');
-  await tick();
-  const sidebarGapRows = contentRowLayoutSnapshot();
-  const sidebarGapPlaylistRows = sidebarGapRows.filter((row) => row.kind === 'playlist')
-    .sort((first, second) => first.box.y - second.box.y);
-  const sidebarGapSidebarRows = sidebarGapRows.filter((row) => row.kind === 'sidebar')
-    .sort((first, second) => first.box.y - second.box.y);
-  assert.equal(sidebarGapSidebarRows[1].box.y
-    - (sidebarGapSidebarRows[0].box.y + sidebarGapSidebarRows[0].box.height), 2,
-  'Sidebar Line Gap changes sidebar rows to two dots');
-  assert.equal(sidebarGapPlaylistRows[1].box.y
-    - (sidebarGapPlaylistRows[0].box.y + sidebarGapPlaylistRows[0].box.height), 2,
-  'Sidebar Line Gap does not affect playlist rows');
-  clickTarget('OPTIONS');
-  await tick();
-  clickPage('INTERFACE');
-  clickTarget('PLAYLIST LINE GAP -');
-  await tick();
-  clickTarget('SIDEBAR LINE GAP -');
+  clickTarget('TEXT LINE GAP -');
   await tick();
   for (let step = 0; step < 4; step += 1) {
-    clickTarget('UI GAP +');
+    clickTarget('UI CHROME GAP +');
     await tick();
   }
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 5,
-    'the UI Gap can be changed without changing either text line gap');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiChromeGapDots, 5,
+    'UI Chrome Gap can be changed without changing Text Line Gap');
   globalThis.ViewBoy.dispatch('library');
   await tick();
   clickTarget('X', 1);
   clickTarget('OPTIONS');
   await tick();
   clickPage('INTERFACE');
-  clickTarget('UI GAP -');
+  clickTarget('UI CHROME GAP -');
   await tick();
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 4,
-    'the UI Gap returns to its original value');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiChromeGapDots, 4,
+    'UI Chrome Gap returns to its original value');
   clickTarget('BACK');
   await tick();
   globalThis.ViewBoy.dispatch('settings');
@@ -859,6 +835,11 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the Audio page equalizer checkbox updates native audio preferences');
   assert.equal(audioConfigCalls.at(-1)[1], true,
     'the equalizer toggle is applied to the native audio path');
+  const flatBand = equalizerAnimationSnapshot().find((band) => band.index === 0);
+  assert.equal(flatBand.gain, 0);
+  assert.equal(flatBand.target, 0);
+  assert.equal(flatBand.fillWidth, 0,
+    'the equalizer gauge starts empty at its 0 dB baseline');
   const equalizerStartPixels = pixelChecksum(canvas.image.data);
   const equalizerStartValuePixels = pixelChecksumForBox(equalizerBands[0].equalizerValueBox);
   nextFrameAdvanceMs = 40;
@@ -881,10 +862,28 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'equalizer bars quantize to the supported half-decibel granularity');
   assert.equal(audioConfigCalls.at(-1)[2][0], changedBandGain,
     'equalizer bar edits are applied to the native audio path');
+  const fullBand = equalizerAnimationSnapshot().find((band) => band.index === 0);
+  assert.equal(fullBand.gain, 12);
+  assert.equal(fullBand.fillWidth, fullBand.maximumFillWidth,
+    'the +12 dB endpoint fills the entire tick-aligned range');
+  nextFrameAdvanceMs = 100;
+  clickTarget('EQ 31 HZ -');
+  await tick();
+  const decreasingBand = equalizerAnimationSnapshot(performance.now() + 100)
+    .find((band) => band.index === 0);
+  assert.equal(decreasingBand.target, 11.5,
+    'the decrement button targets exactly one half-decibel step');
+  assert.ok(decreasingBand.gain < decreasingBand.from
+    && decreasingBand.fillWidth < fullBand.fillWidth,
+  'decreases animate smoothly from the current filled value toward the snapped target');
+  await tick();
+  await tick();
   clickTarget('EQ 31 HZ', 0, 0.01);
   await tick();
   assert.equal(savedPreferences.at(-1).equalizerBandGains[0], 0,
     'the left edge of a full-width equalizer bar returns the band to flat');
+  assert.equal(equalizerAnimationSnapshot().find((band) => band.index === 0).fillWidth, 0,
+    'the flat endpoint returns to an empty bar');
   clickPage('PLAYBACK');
   globalThis.ViewBoy.dispatch('optionsPage:PLAYBACK');
   clickTarget('LONG PLAY TIME +');
@@ -971,28 +970,62 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(hitTargetSnapshot().some((target) => target.name === 'PREVIOUS'), false,
     'transport controls are kept off the Options screen');
   const paddingBefore = hitTargetSnapshot().find((target) => target.name === 'BACK').box.height;
-  clickTarget('CONTROL PADDING +');
+  clickTarget('UI BUTTON PAD +');
   await tick();
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).controlPaddingDots, 5,
-    'control padding is adjustable and persists in display preferences');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiButtonPadDots, 5,
+    'UI Button Pad is adjustable and persists in display preferences');
   assert.ok(hitTargetSnapshot().find((target) => target.name === 'BACK').box.height > paddingBefore,
     'control padding changes the shared button row height');
-  clickTarget('CONTROL PADDING -');
+  clickTarget('UI BUTTON PAD -');
   await tick();
-  clickTarget('UI GAP +');
+  clickTarget('ANIMATION DURATION +');
   await tick();
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 5,
-    'the shared interface gap has an independent persisted setting');
+  assert.equal(animationSettingsSnapshot().durationMilliseconds, 250,
+    'one Animation Duration setting controls the whole interface');
+  assert.equal(savedPreferences.at(-1).autoResizeAnimationMilliseconds, 250);
+  assert.equal(savedPreferences.at(-1).selectionAnimationMilliseconds, 250,
+    'the single duration setting keeps native legacy animation fields synchronized');
+  clickTarget('ANIMATION DURATION -');
+  await tick();
+  clickTarget('ANIMATION FPS 90');
+  await tick();
+  assert.equal(animationSettingsSnapshot().framesPerSecond, 90,
+    'the global animation FPS option is applied');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).animationFPS, 90,
+    'the global animation FPS setting persists locally');
+  const ninetyHzGate = {};
+  assert.equal(animationFrameIsDue(ninetyHzGate, 0), true);
+  assert.equal(animationFrameIsDue(ninetyHzGate, 10), false,
+    'the frame gate waits for a 90 FPS interval');
+  assert.equal(animationFrameIsDue(ninetyHzGate, 12), true,
+    'the frame gate accepts the next 90 FPS update');
+  clickTarget('ANIMATION FPS 60');
+  await tick();
+  clickTarget('ANIMATIONS');
+  await tick();
+  assert.equal(animationSettingsSnapshot().enabled, false,
+    'one animation switch disables all animated interactions');
+  assert.equal(savedPreferences.at(-1).autoResizeAnimationEnabled, false);
+  assert.equal(savedPreferences.at(-1).selectionAnimationEnabled, false,
+    'the global animation switch keeps native legacy enablement flags synchronized');
+  clickTarget('ANIMATIONS');
+  await tick();
+  assert.equal(animationSettingsSnapshot().enabled, true,
+    'the shared animation switch re-enables the interface motion system');
+  clickTarget('UI CHROME GAP +');
+  await tick();
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiChromeGapDots, 5,
+    'UI Chrome Gap has an independent persisted setting');
   globalThis.ViewBoy.dispatch('settings');
   assert.equal(screenTransitionSnapshot()?.direction, 'up',
-    'the UI Gap check returns to the playlist view through the shared screen roll');
+    'the UI Chrome Gap check returns to the playlist view through the shared screen roll');
   await tick();
   const fiveDotHeader = hitTargetSnapshot().find((target) => target.columnHeader && target.name === '#');
   const fiveDotBody = hitTargetSnapshot().filter((target) => !target.columnHeader
     && target.box.y > fiveDotHeader.box.y).sort((first, second) => first.box.y - second.box.y)[0];
   assert.ok(fiveDotBody, 'the playlist body remains laid out below its header at the larger UI Gap');
   assert.equal(fiveDotBody.box.y - (fiveDotHeader.box.y + fiveDotHeader.box.height), 5,
-    'playlist header-to-body spacing follows the adjusted UI Gap');
+    'playlist header-to-body spacing follows the adjusted UI Chrome Gap');
   clickTarget('SEARCH LIBRARY');
   for (const character of 'sample') typeSearchKey(character);
   const fiveDotSidebar = hitTargetSnapshot();
@@ -1000,12 +1033,12 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const fiveDotChild = fiveDotSidebar.find((target) => target.name === 'Sample');
   assert.ok(fiveDotParent && fiveDotChild, 'filtered sidebar retains its matching parent and child');
   assert.equal(fiveDotChild.box.y - (fiveDotParent.box.y + fiveDotParent.box.height), 1,
-    'sidebar parent, child, and sibling line spacing stays independent of adjusted UI Gap');
+    'sidebar parent, child, and sibling line spacing stays independent of UI Chrome Gap');
   typeSearchKey('Escape');
   typeSearchKey('Escape');
   globalThis.ViewBoy.dispatch('settings');
   assert.equal(screenTransitionSnapshot()?.direction, 'down',
-    'the UI Gap check can return to Options');
+    'the UI Chrome Gap check can return to Options');
   await tick();
   clickPage('AUDIO');
   const expandedGapBands = hitTargetSnapshot().filter((target) => /^EQ \d/.test(target.name)
@@ -1022,19 +1055,19 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.ok(expandedGapBands[0].box.width < defaultEqualizerWidth,
     'the EQ bar gives available width to the larger UI gaps instead of consuming their padding');
   clickPage('INTERFACE');
-  clickTarget('UI GAP -');
+  clickTarget('UI CHROME GAP -');
   await tick();
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 4,
-    'the UI Gap returns to its original value');
-  clickTarget('PLAYLIST GAP +');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiChromeGapDots, 4,
+    'UI Chrome Gap returns to its original value');
+  clickTarget('UI CHROME GAP +');
   await tick();
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).playlistGapDots, 5,
-    'playlist column and tab spacing has an independent persisted setting');
-  clickTarget('PLAYLIST GAP -');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiChromeGapDots, 5,
+    'playlist column spacing uses the shared UI Chrome Gap');
+  clickTarget('UI CHROME GAP -');
   await tick();
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).controlPaddingDots, 4);
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 4);
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).playlistGapDots, 4);
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiButtonPadDots, 4);
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiChromeGapDots, 4);
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).textLineGapDots, 1);
   clickPage('LIBRARY');
   globalThis.ViewBoy.dispatch('optionsPage:LIBRARY');
   clickTarget('FILE');

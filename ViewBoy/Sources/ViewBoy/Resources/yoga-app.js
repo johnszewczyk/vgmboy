@@ -19,9 +19,7 @@ const APP_BORDER_GAP_DOTS = 8;
 const BUTTON_BORDER_DOTS = 1;
 const DEFAULT_CONTROL_PADDING_DOTS = 4;
 const DEFAULT_UI_GAP_DOTS = 4;
-const DEFAULT_SIDEBAR_LINE_GAP_DOTS = 1;
-const DEFAULT_PLAYLIST_LINE_GAP_DOTS = 1;
-const DEFAULT_PLAYLIST_GAP_DOTS = 4;
+const DEFAULT_TEXT_LINE_GAP_DOTS = 1;
 const SPACING_DOTS_MIN = 1;
 const SPACING_DOTS_MAX = 8;
 const EQ_BAR_MIN_DOTS = 100;
@@ -30,7 +28,8 @@ const EQ_GAIN_MIN_DB = 0;
 const EQ_GAIN_MAX_DB = 12;
 const EQ_GAIN_STEP_DB = 0.5;
 const EQ_GAIN_STEPS = (EQ_GAIN_MAX_DB - EQ_GAIN_MIN_DB) / EQ_GAIN_STEP_DB;
-const ANIMATION_FRAME_INTERVAL_MS = 1000 / 60;
+const DEFAULT_ANIMATION_FPS = 60;
+const ANIMATION_FPS_OPTIONS = [30, 60, 90, 120, 144];
 const PALETTES = {
   GAMEBOY: {
     STANDARD: ["#0C300C", "#285428", "#78940D", "#9BBC0F"],
@@ -190,6 +189,14 @@ function storedDisplayOptions() {
   catch { return {}; }
 }
 const savedDisplayOptions = storedDisplayOptions();
+const legacyTextLineGapDots = Math.max(
+  storedSpacing(savedDisplayOptions.sidebarLineGapDots, DEFAULT_TEXT_LINE_GAP_DOTS),
+  storedSpacing(savedDisplayOptions.playlistLineGapDots, DEFAULT_TEXT_LINE_GAP_DOTS),
+);
+const legacyChromeGapDots = Math.max(
+  storedSpacing(savedDisplayOptions.uiGapDots ?? savedDisplayOptions.uiGutterDots, DEFAULT_UI_GAP_DOTS),
+  storedSpacing(savedDisplayOptions.playlistGapDots, DEFAULT_UI_GAP_DOTS),
+);
 function storedSpacing(value, fallback) {
   const number = Number(value);
   return Math.max(SPACING_DOTS_MIN, Math.min(SPACING_DOTS_MAX,
@@ -204,11 +211,10 @@ function saveDisplayOptions() {
       font: state.font,
       contrast: state.contrast,
       theme: state.theme,
-      controlPaddingDots: state.controlPaddingDots,
-      uiGapDots: state.uiGapDots,
-      sidebarLineGapDots: state.sidebarLineGapDots,
-      playlistLineGapDots: state.playlistLineGapDots,
-      playlistGapDots: state.playlistGapDots,
+      uiButtonPadDots: state.controlPaddingDots,
+      uiChromeGapDots: state.uiChromeGapDots,
+      textLineGapDots: state.textLineGapDots,
+      animationFPS: state.animationFPS,
       transportSymbols: state.transportSymbols,
       columnOrder: state.columnOrder,
       expandedPathNodes: [...state.expandedPathNodes],
@@ -279,11 +285,12 @@ const state = {
   font: savedDisplayOptions.font === "STANDARD" ? "STANDARD" : "MICRO",
   contrast: savedDisplayOptions.contrast === "HIGH_CONTRAST" ? "HIGH_CONTRAST" : "STANDARD",
   theme: savedDisplayOptions.theme === "NIGHTBOY" ? "NIGHTBOY" : "GAMEBOY",
-  controlPaddingDots: storedSpacing(savedDisplayOptions.controlPaddingDots, DEFAULT_CONTROL_PADDING_DOTS),
-  uiGapDots: storedSpacing(savedDisplayOptions.uiGapDots ?? savedDisplayOptions.uiGutterDots, DEFAULT_UI_GAP_DOTS),
-  sidebarLineGapDots: storedSpacing(savedDisplayOptions.sidebarLineGapDots, DEFAULT_SIDEBAR_LINE_GAP_DOTS),
-  playlistLineGapDots: storedSpacing(savedDisplayOptions.playlistLineGapDots, DEFAULT_PLAYLIST_LINE_GAP_DOTS),
-  playlistGapDots: storedSpacing(savedDisplayOptions.playlistGapDots, DEFAULT_PLAYLIST_GAP_DOTS),
+  controlPaddingDots: storedSpacing(savedDisplayOptions.uiButtonPadDots
+    ?? savedDisplayOptions.controlPaddingDots, DEFAULT_CONTROL_PADDING_DOTS),
+  uiChromeGapDots: storedSpacing(savedDisplayOptions.uiChromeGapDots, legacyChromeGapDots),
+  textLineGapDots: storedSpacing(savedDisplayOptions.textLineGapDots, legacyTextLineGapDots),
+  animationFPS: ANIMATION_FPS_OPTIONS.includes(Number(savedDisplayOptions.animationFPS))
+    ? Number(savedDisplayOptions.animationFPS) : DEFAULT_ANIMATION_FPS,
   searchQuery: "",
   searchFocused: false,
   transportSymbols: savedDisplayOptions.transportSymbols === true,
@@ -496,8 +503,8 @@ function captureTabWidths() {
 function animateTabLayout(fromWidths, visualTabs) {
   tabLayoutAnimation = null;
   if (!fromWidths || !visualTabs.length || !state.playlistTabs.length) return;
-  const duration = animationMilliseconds("autoResizeAnimationMilliseconds");
-  if (!animationEnabled("autoResizeAnimationEnabled") || duration <= 0) return;
+  const duration = animationDurationMilliseconds();
+  if (!animationEnabled() || duration <= 0) return;
   const priorWidth = Object.values(fromWidths).reduce((sum, width) => sum + width, 0);
   if (priorWidth <= 0) return;
   const targetWidth = priorWidth / state.playlistTabs.length;
@@ -632,26 +639,59 @@ function widgetTranslationX(widget, targetX, time) {
   return base + (reorderAnimation.fromX[key] - targetX) * (1 - easeSelection(progress));
 }
 
-function animationEnabled(key) {
-  return state.preferences[key] !== false;
+function animationEnabled() {
+  return state.preferences.autoResizeAnimationEnabled !== false
+    && state.preferences.selectionAnimationEnabled !== false;
 }
 
-function animationMilliseconds(key) {
-  const value = Number(state.preferences[key]);
+function animationDurationMilliseconds() {
+  const value = Number(state.preferences.autoResizeAnimationMilliseconds
+    ?? state.preferences.selectionAnimationMilliseconds);
   if (!Number.isFinite(value)) return 200;
   return Math.max(0, Math.min(1000, value));
 }
 
+function animationFrameIntervalMilliseconds() {
+  return 1000 / Math.max(1, Number(state.animationFPS) || DEFAULT_ANIMATION_FPS);
+}
+
 export function animationFrameIsDue(animation, time) {
+  const interval = animationFrameIntervalMilliseconds();
   if (!Number.isFinite(animation.lastFrameAt)) {
     animation.lastFrameAt = time;
     return true;
   }
   const elapsed = time - animation.lastFrameAt;
-  if (elapsed < ANIMATION_FRAME_INTERVAL_MS - 0.25) return false;
-  const intervals = Math.max(1, Math.floor((elapsed + 0.25) / ANIMATION_FRAME_INTERVAL_MS));
-  animation.lastFrameAt += intervals * ANIMATION_FRAME_INTERVAL_MS;
+  if (elapsed < interval - 0.25) return false;
+  const intervals = Math.max(1, Math.floor((elapsed + 0.25) / interval));
+  animation.lastFrameAt += intervals * interval;
   return true;
+}
+
+export function animationSettingsSnapshot() {
+  return {
+    enabled: animationEnabled(),
+    durationMilliseconds: animationDurationMilliseconds(),
+    framesPerSecond: state.animationFPS,
+  };
+}
+
+export function equalizerAnimationSnapshot(time = performance.now()) {
+  return state.equalizerBarBoxes.flatMap((box, index) => {
+    if (!box) return [];
+    const gain = equalizerGainAt(index, time);
+    const animation = equalizerAnimations.get(index);
+    const bounds = equalizerTrackBounds(box);
+    return [{
+      index,
+      gain,
+      target: equalizerGain(index),
+      from: animation?.from ?? gain,
+      fillWidth: equalizerFillWidth(box, gain),
+      maximumFillWidth: bounds.right - bounds.left,
+      bounds: { ...bounds },
+    }];
+  });
 }
 
 export function screenTransitionSnapshot() {
@@ -997,8 +1037,7 @@ function rowHeight(extraDots = 0) {
 }
 
 function contentRowStride(kind) {
-  const key = kind === "sidebar" ? "sidebarLineGapDots" : "playlistLineGapDots";
-  return rowHeight() + spacingValue(key) / STYLE_SCALE;
+  return rowHeight() + spacingValue("textLineGapDots") / STYLE_SCALE;
 }
 
 function spacingValue(key, time = currentRenderTime) {
@@ -1014,7 +1053,7 @@ function controlPaddingDots() {
 }
 
 function uiGapDots() {
-  return spacingValue("uiGapDots");
+  return spacingValue("uiChromeGapDots");
 }
 
 function uiGroupInsetDots() {
@@ -1041,8 +1080,12 @@ function uiSectionGap() {
   return uiGapDots() * 2 / STYLE_SCALE;
 }
 
-function playlistGap() {
-  return spacingValue("playlistGapDots") / STYLE_SCALE;
+function textLineGapDots() {
+  return spacingValue("textLineGapDots");
+}
+
+function playlistColumnGap() {
+  return uiGapDots() / STYLE_SCALE;
 }
 
 function textLayoutWidth(text, horizontalInsetDots = controlPaddingDots()) {
@@ -1090,117 +1133,51 @@ function libraryPaneWidth() {
 function appStatusDetails() {
   const playingQueue = state.currentTrackId && state.playbackQueue.length
     ? state.playbackQueue : null;
-  const queue = playingQueue || (state.activeQueue.length ? state.activeQueue : visibleTracks());
   const playingIndex = playingQueue
     ? playingQueue.findIndex((track) => trackID(track) === state.currentTrackId) : -1;
   const selected = visibleTracks()[state.selectedTrack] || null;
   const track = playingIndex >= 0 ? playingQueue[playingIndex] : selected;
-  const position = playingIndex >= 0 ? playingIndex + 1
-    : track ? Math.min(state.selectedTrack + 1, queue.length || state.selectedTrack + 1) : 0;
-  const playbackError = /^PLAYBACK ERROR:/i.test(state.status);
-  const transport = playbackError ? "ERROR"
-    : /^LOADING\b/i.test(state.status) ? "LOADING"
-      : state.playing ? "PLAYING"
-        : state.transport === "paused" ? "PAUSED"
-          : state.transport === "ended" || state.transport === "stopped" ? "STOPPED"
-            : String(state.transport || "READY").toUpperCase();
-  const title = track
-    ? `${state.playing || state.transport === "paused" ? "NOW" : "SELECTED"} ${track.title || track.filename || "UNTITLED"}`
-    : "NO TRACK SELECTED";
-  const context = playbackError ? state.status
-    : track
-      ? [track.game || track.artist || "", track.system || ""].filter(Boolean).join(" / ")
-      : state.status || "CATALOG READY";
-  const duration = Number(track?.playLengthMs) > 0 ? formatTime(track.playLengthMs)
-    : track?.lengthLabel || "--:--";
-  const queuePosition = position
-    ? `TRACK ${String(position).padStart(2, "0")}/${String(queue.length).padStart(2, "0")}`
-    : "TRACK --/--";
+  const sourcePath = String(track?.archivePath || track?.path || track?.filename || "");
+  const archiveEntry = String(track?.archiveEntry || "");
   return {
-    title,
-    transport,
-    context,
-    queuePosition,
-    time: `TIME ${formatTime(state.positionMs)}/${duration}`,
+    location: track
+      ? [sourcePath, archiveEntry].filter(Boolean).join(" :: ") || "FILE PATH UNAVAILABLE"
+      : state.status || "NO FILE SELECTED",
   };
 }
 
 function appStatusArea(parent) {
   const details = appStatusDetails();
-  const rowHeightDots = rowHeight();
+  const height = rowHeight();
   const status = makeWidget(parent, {
-    direction: FlexDirection.Column,
-    height: rowHeightDots * 2 + oneDot(),
-    gap: oneDot(),
+    direction: FlexDirection.Row,
+    height,
+    alignItems: Align.Center,
   }, {
     paint(box) {
       line(box.x, box.y, box.x + box.width, box.y, 2);
-      line(box.x, box.y + rowHeightDots, box.x + box.width, box.y + rowHeightDots, 2);
     },
   });
-  const addField = (row, field, text, style = {}) => label(row, text, {
-    height: rowHeightDots,
+  label(status, details.location, {
+    height,
+    flexGrow: 1,
+    flexBasis: 0,
     minWidth: 0,
     flexShrink: 1,
-    ...style,
   }, {
-    statusField: field,
+    statusField: "location",
     textShade: 0,
-    inset: 1,
-  });
-  const divider = (row) => makeWidget(row, {
-    width: oneDot(),
-    height: rowHeightDots,
-  }, {
-    paint(box) { line(box.x, box.y, box.x, box.y + box.height, 2); },
-  });
-
-  const headline = makeWidget(status, {
-    direction: FlexDirection.Row,
-    height: rowHeightDots,
-    alignItems: Align.Center,
-  });
-  addField(headline, "track", details.title, { flexGrow: 1, flexBasis: 0 });
-  divider(headline);
-  addField(headline, "transport", details.transport, {
-    width: textLayoutWidth("PLAYING", 1),
-    align: "right",
-  });
-
-  const detailRow = makeWidget(status, {
-    direction: FlexDirection.Row,
-    height: rowHeightDots,
-    alignItems: Align.Center,
-  });
-  addField(detailRow, "context", details.context, { flexGrow: 1, flexBasis: 0 });
-  divider(detailRow);
-  addField(detailRow, "queue", details.queuePosition, {
-    width: textLayoutWidth("TRACK 000/000", 1),
-  });
-  divider(detailRow);
-  addField(detailRow, "time", details.time, {
-    width: textLayoutWidth("TIME 000:00/000:00", 1),
-    align: "right",
+    inset: controlPaddingDots(),
   });
   return status;
 }
 
 function panelTitle(parent, text) {
-  const titleHeight = buttonStandardHeight();
-  const row = makeWidget(parent, {
-    direction: FlexDirection.Row,
-    height: titleHeight,
-    alignItems: Align.Center,
-  }, {
-    fill: 2,
-    paint(box) {
-      fillRect(box.x, box.y, box.width, box.height, 2);
-    },
+  return label(parent, text, { height: buttonStandardHeight() }, {
+    textShade: 0,
+    inset: controlPaddingDots(),
+    bottomLine: 2,
   });
-  label(row, text, { flexGrow: 1, height: titleHeight }, {
-    textShade: 0, inset: controlPaddingDots(), align: "center",
-  });
-  return row;
 }
 
 function pixelButton(parent, text, onClick, style = {}) {
@@ -1215,7 +1192,7 @@ function pixelButton(parent, text, onClick, style = {}) {
     flexShrink: style.flexShrink,
     flexBasis: style.flexBasis,
   }, {
-    border: 1,
+    border: style.outlined === false ? undefined : 1,
     fill: style.selected ? 2 : undefined,
     textShade: 0,
     inset: controlPaddingDots(),
@@ -1243,40 +1220,40 @@ function optionToggle(parent, title, checked, onClick, extraMeta = {}) {
   const height = buttonStandardHeight();
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
-    alignItems: Align.Stretch,
+    alignItems: Align.Center,
     height,
     gap: uiGap(),
   }, {
     onClick,
     controlTitle: title,
-    paint(box) {
-      strokeRect(box.x, box.y, box.width, box.height, 1);
-    },
     ...extraMeta,
   });
   const marker = checked ? "[x]" : "[ ]";
+  label(row, title, { flexGrow: 1, flexBasis: 0, height }, {
+    textShade: 0, inset: controlPaddingDots(),
+  });
   label(row, marker, {
     width: textLayoutWidth(marker),
     height,
-  }, { textShade: 0, align: "center", inset: controlPaddingDots() });
-  label(row, title, { flexGrow: 1, height }, { textShade: 0, inset: controlPaddingDots() });
+  }, { textShade: 0, align: "right", inset: controlPaddingDots() });
   return row;
 }
 
 function optionChoice(parent, title, choices) {
   const height = buttonStandardHeight();
-  const row = controlRow(parent, {
+  const row = makeWidget(parent, {
+    direction: FlexDirection.Row,
+    alignItems: Align.Center,
     height,
     gap: uiGap(),
-  }, {
-    paint(box) {
-      line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2);
-    },
   });
-  const titleWidth = textLayoutWidth(title);
-  label(row, title, { width: titleWidth, height }, { textShade: 0, inset: controlPaddingDots() });
+  label(row, title, { flexGrow: 1, flexBasis: 0, height }, {
+    textShade: 0, inset: controlPaddingDots(),
+  });
   choices.forEach((choice) => pixelButton(row, choice.title, choice.onClick, {
-    flexGrow: 1,
+    width: textLayoutWidth(choice.title) + uiGap() * 2,
+    flexShrink: 0,
+    outlined: false,
     selected: choice.selected,
     controlTitle: `${title} ${choice.title}`,
   }));
@@ -1285,21 +1262,16 @@ function optionChoice(parent, title, choices) {
 
 function optionAdjuster(parent, title, value, onDecrease, onIncrease) {
   const height = buttonStandardHeight();
-  const row = controlRow(parent, { height }, {
-    paint(box) {
-      line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2);
-    },
-  });
+  const row = controlRow(parent, { height });
   label(row, title, { flexGrow: 1, height }, {
     textShade: 0, inset: controlPaddingDots(),
   });
   const controlHeight = buttonStandardHeight();
-  pixelButton(row, "[-]", onDecrease, { controlTitle: `${title} -` });
-  pixelButton(row, "[+]", onIncrease, { controlTitle: `${title} +` });
-  label(row, value, { width: framedTextWidth(value), height: controlHeight }, {
-    border: 1,
+  pixelButton(row, "[-]", onDecrease, { outlined: false, controlTitle: `${title} -` });
+  pixelButton(row, "[+]", onIncrease, { outlined: false, controlTitle: `${title} +` });
+  label(row, value, { width: textLayoutWidth("000 DOTS"), height: controlHeight }, {
     textShade: 0,
-    align: "center",
+    align: "right",
     inset: controlPaddingDots(),
     spacingReadout: title,
   });
@@ -1347,16 +1319,16 @@ function durationInput(parent, key, value, minimum, maximum, fallback, allowOpen
 }
 
 function optionDurationAdjuster(parent, title, key, minimum, maximum, fallback, step, allowOpen = false) {
-  const row = controlRow(parent, { height: buttonStandardHeight() }, {
-    paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
-  });
+  const row = controlRow(parent, { height: buttonStandardHeight() });
   label(row, title, { flexGrow: 1, height: buttonStandardHeight() }, {
     textShade: 0, inset: controlPaddingDots(),
   });
   pixelButton(row, "[-]", () => adjustPlaybackDuration(key, -step, minimum, maximum, fallback), {
+    outlined: false,
     controlTitle: `${title} -`,
   });
   pixelButton(row, "[+]", () => adjustPlaybackDuration(key, step, minimum, maximum, fallback), {
+    outlined: false,
     controlTitle: `${title} +`,
   });
   durationInput(row, key, optionDuration(state.preferences[key] ?? fallback, allowOpen),
@@ -1546,8 +1518,8 @@ function resolveTableColumns(layout, time) {
       lastColumnWidths = target;
       return layout.visible;
     }
-    const duration = animationMilliseconds("autoResizeAnimationMilliseconds");
-    if (animationEnabled("autoResizeAnimationEnabled") && duration > 0) {
+    const duration = animationDurationMilliseconds();
+    if (animationEnabled() && duration > 0) {
       columnLayoutAnimation = {
         from: current,
         to: target,
@@ -1585,7 +1557,7 @@ function createTableHeader(parent, columns) {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
     height: headerHeight,
-    gap: playlistGap(),
+    gap: playlistColumnGap(),
   }, {
     paint(box) {
       line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 1);
@@ -1621,7 +1593,7 @@ function createQueueRow(parent, index, track, columns) {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
     height: rowHeightValue,
-    gap: playlistGap(),
+    gap: playlistColumnGap(),
   }, {
     onClick: (event) => {
       selectTrack(index, false);
@@ -1683,7 +1655,7 @@ function createLibraryRow(parent, text, options = {}) {
   const selected = options.selected ?? false;
   if (options.spacer) {
     return makeWidget(parent, {
-      height: spacingValue("sidebarLineGapDots") / STYLE_SCALE,
+      height: spacingValue("textLineGapDots") / STYLE_SCALE,
       flexShrink: 0,
     });
   }
@@ -1723,7 +1695,7 @@ function visibleLibraryRowCount() {
 }
 
 function libraryRowPixelHeight(row) {
-  if (row.spacer) return spacingValue("sidebarLineGapDots") * (row.revealProgress ?? 1);
+  if (row.spacer) return spacingValue("textLineGapDots") * (row.revealProgress ?? 1);
   return rowHeight() * STYLE_SCALE * (row.revealProgress ?? 1);
 }
 
@@ -2034,7 +2006,7 @@ function addCatalogPane(parent) {
     makeWidget(panel, { height: uiGap() });
   }
   const columns = resolveTableColumns(tableColumns(viewTracks), currentRenderTime);
-  const tableGap = Math.max(0, columns.length - 1) * playlistGap();
+  const tableGap = Math.max(0, columns.length - 1) * playlistColumnGap();
   state.tableContentMinimumWidth = columns.reduce((sum, column) => sum + column.width, 0) + tableGap;
   const viewport = makeWidget(panel, {
     direction: FlexDirection.Column,
@@ -2058,7 +2030,7 @@ function addCatalogPane(parent) {
   makeWidget(content, { height: uiGap(), flexShrink: 0 });
   const tableRows = makeWidget(content, {
     direction: FlexDirection.Column,
-    gap: spacingValue("playlistLineGapDots") / STYLE_SCALE,
+    gap: spacingValue("textLineGapDots") / STYLE_SCALE,
   }, { id: "catalog-table-rows" });
   const count = visibleRowCount();
   state.queueScroll = Math.max(0, Math.min(state.queueScroll, Math.max(0, viewTracks.length - count)));
@@ -2172,9 +2144,6 @@ function optionGroup(parent, title) {
   const group = makeWidget(parent, {
     direction: FlexDirection.Column,
     gap: uiGap(),
-    padding: uiGroupInsetDots() / STYLE_SCALE,
-  }, {
-    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
   optionSection(group, title);
   return group;
@@ -2182,7 +2151,7 @@ function optionGroup(parent, title) {
 
 function optionsTocWidth() {
   const available = WIDTH / STYLE_SCALE;
-  const labelWidth = framedTextWidth("TRANSPORT") + uiOptionsInsetDots() / STYLE_SCALE * 2;
+  const labelWidth = textLayoutWidth("TRANSPORT") + uiOptionsInsetDots() / STYLE_SCALE * 2;
   return Math.min(available * 0.34, Math.max(labelWidth, Math.min(220, available * 0.20)));
 }
 
@@ -2256,8 +2225,8 @@ function setEqualizerGain(index, value) {
     + Math.round((bounded - EQ_GAIN_MIN_DB) / EQ_GAIN_STEP_DB) * EQ_GAIN_STEP_DB;
   const gains = Array.from({ length: 10 }, (_, band) => equalizerGain(band));
   gains[index] = target;
-  const duration = animationMilliseconds("selectionAnimationMilliseconds");
-  if (animationEnabled("selectionAnimationEnabled") && duration > 0 && current !== target
+  const duration = animationDurationMilliseconds();
+  if (animationEnabled() && duration > 0 && current !== target
     && state.tab === "SETTINGS" && state.optionsPage === "AUDIO") {
     equalizerAnimations.set(index, { from: current, to: target, startedAt: now, duration });
     equalizerFrameTiming.lastFrameAt = Number.NaN;
@@ -2346,12 +2315,17 @@ function paintEqualizerBar(box, gain) {
   strokeRect(box.x, box.y, box.width, box.height, 1);
   const { left, right } = equalizerTrackBounds(box);
   const centerY = box.y + Math.floor(box.height / 2);
-  const fraction = Math.max(0, Math.min(1,
-    (gain - EQ_GAIN_MIN_DB) / (EQ_GAIN_MAX_DB - EQ_GAIN_MIN_DB)));
-  const fillWidth = Math.round((right - left) * fraction);
+  const fillWidth = equalizerFillWidth(box, gain);
   fillRect(left, box.y + 1, fillWidth, Math.max(1, box.height - 2), 1);
   const tickTop = centerY - 1;
   for (const x of equalizerTickPositions(box)) fillRect(x, tickTop, 1, 3, 2);
+}
+
+function equalizerFillWidth(box, gain) {
+  const { left, right } = equalizerTrackBounds(box);
+  const fraction = Math.max(0, Math.min(1,
+    (gain - EQ_GAIN_MIN_DB) / (EQ_GAIN_MAX_DB - EQ_GAIN_MIN_DB)));
+  return Math.round((right - left) * fraction);
 }
 
 function paintEqualizerValue(box, gain) {
@@ -2528,35 +2502,29 @@ function addInterfaceOptions(parent, pref) {
   optionToggle(layout, "AUTO-SIZE COLUMNS", pref.columnAutoSize !== false,
     () => setPreference("columnAutoSize", pref.columnAutoSize === false));
   const spacing = optionGroup(parent, "LAYOUT SPACING");
-  optionAdjuster(spacing, "CONTROL PADDING", spacingReadout("controlPaddingDots"),
+  optionAdjuster(spacing, "UI BUTTON PAD", spacingReadout("controlPaddingDots"),
     () => adjustDisplaySpacing("controlPaddingDots", -1),
     () => adjustDisplaySpacing("controlPaddingDots", 1));
-  optionAdjuster(spacing, "UI GAP", spacingReadout("uiGapDots"),
-    () => adjustDisplaySpacing("uiGapDots", -1),
-    () => adjustDisplaySpacing("uiGapDots", 1));
-  optionAdjuster(spacing, "SIDEBAR LINE GAP", spacingReadout("sidebarLineGapDots"),
-    () => adjustDisplaySpacing("sidebarLineGapDots", -1),
-    () => adjustDisplaySpacing("sidebarLineGapDots", 1));
-  optionAdjuster(spacing, "PLAYLIST LINE GAP", spacingReadout("playlistLineGapDots"),
-    () => adjustDisplaySpacing("playlistLineGapDots", -1),
-    () => adjustDisplaySpacing("playlistLineGapDots", 1));
-  optionAdjuster(spacing, "PLAYLIST GAP", spacingReadout("playlistGapDots"),
-    () => adjustDisplaySpacing("playlistGapDots", -1),
-    () => adjustDisplaySpacing("playlistGapDots", 1));
+  optionAdjuster(spacing, "UI CHROME GAP", spacingReadout("uiChromeGapDots"),
+    () => adjustDisplaySpacing("uiChromeGapDots", -1),
+    () => adjustDisplaySpacing("uiChromeGapDots", 1));
+  optionAdjuster(spacing, "TEXT LINE GAP", spacingReadout("textLineGapDots"),
+    () => adjustDisplaySpacing("textLineGapDots", -1),
+    () => adjustDisplaySpacing("textLineGapDots", 1));
   const window = optionGroup(parent, "WINDOW");
   optionToggle(window, "MAIN WINDOW ON TOP", pref.mainWindowAlwaysOnTop === true,
     () => setPreference("mainWindowAlwaysOnTop", pref.mainWindowAlwaysOnTop !== true));
   const motion = optionGroup(parent, "MOTION");
-  optionToggle(motion, "AUTO-RESIZE HEADERS + ROWS", animationEnabled("autoResizeAnimationEnabled"),
-    () => setPreference("autoResizeAnimationEnabled", !animationEnabled("autoResizeAnimationEnabled")));
-  optionAdjuster(motion, "RESIZE TIME", `${animationMilliseconds("autoResizeAnimationMilliseconds")} MS`,
-    () => adjustAnimationTime("autoResizeAnimationMilliseconds", -50),
-    () => adjustAnimationTime("autoResizeAnimationMilliseconds", 50));
-  optionToggle(motion, "SELECTION SLIDE", animationEnabled("selectionAnimationEnabled"),
-    () => setPreference("selectionAnimationEnabled", !animationEnabled("selectionAnimationEnabled")));
-  optionAdjuster(motion, "SLIDE TIME", `${animationMilliseconds("selectionAnimationMilliseconds")} MS`,
-    () => adjustAnimationTime("selectionAnimationMilliseconds", -50),
-    () => adjustAnimationTime("selectionAnimationMilliseconds", 50));
+  optionToggle(motion, "ANIMATIONS", animationEnabled(),
+    () => setPreference("animationsEnabled", !animationEnabled()));
+  optionAdjuster(motion, "ANIMATION DURATION", `${animationDurationMilliseconds()} MS`,
+    () => adjustAnimationTime(-50),
+    () => adjustAnimationTime(50));
+  optionChoice(motion, "ANIMATION FPS", ANIMATION_FPS_OPTIONS.map((fps) => ({
+    title: String(fps),
+    selected: state.animationFPS === fps,
+    onClick: () => setAnimationFPS(fps),
+  })));
 }
 
 function addLibraryOptions(parent, pref) {
@@ -2645,7 +2613,6 @@ function addDatabaseOptions(parent) {
   const database = optionGroup(parent, "CATALOG DATABASE");
   label(database, state.databaseLocation?.path || "DATABASE LOCATION",
     { height: buttonStandardHeight() }, {
-      border: BUTTON_BORDER_DOTS,
       textShade: 0,
       inset: controlPaddingDots(),
       controlTitle: "DATABASE LOCATION",
@@ -2670,7 +2637,6 @@ function addDatabaseOptions(parent) {
   const summary = state.archiveCache || {};
   label(cache, state.archiveCacheLocation || "ARCHIVE CACHE LOCATION",
     { height: buttonStandardHeight() }, {
-      border: BUTTON_BORDER_DOTS,
       textShade: 0,
       inset: controlPaddingDots(),
       controlTitle: "ARCHIVE CACHE LOCATION",
@@ -2713,7 +2679,7 @@ function addOptionsContent(parent) {
     gap: uiGap(),
     padding: uiOptionsInsetDots() / STYLE_SCALE,
   }, {
-    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
+    paint(box) { line(box.x + box.width, box.y, box.x + box.width, box.y + box.height, 1); },
   });
   panelTitle(toc, "OPTIONS");
   const pageButtonWidth = navigationWidth - 2 * uiOptionsInsetDots() / STYLE_SCALE;
@@ -2721,6 +2687,7 @@ function addOptionsContent(parent) {
     .forEach((page) => {
       pixelButton(toc, page, () => selectOptionsPage(page), {
         width: pageButtonWidth, selected: state.optionsPage === page,
+        outlined: false,
       });
   });
   makeWidget(toc, { flexGrow: 1 });
@@ -2730,8 +2697,6 @@ function addOptionsContent(parent) {
     flexGrow: 1,
     gap: uiGap(),
     padding: uiOptionsInsetDots() / STYLE_SCALE,
-  }, {
-    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
   panelTitle(panel, state.optionsPage);
   const content = makeWidget(panel, {
@@ -3066,8 +3031,8 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
       clip: selectedRow.clip,
     } : {}),
   } : null;
-  const selectionDuration = animationMilliseconds("selectionAnimationMilliseconds");
-  const canSlide = animateSelection && animationEnabled("selectionAnimationEnabled") && selectionDuration > 0
+  const selectionDuration = animationDurationMilliseconds();
+  const canSlide = animateSelection && animationEnabled() && selectionDuration > 0
     && priorBand && nextBand
     && priorBand.x === nextBand.x && priorBand.width === nextBand.width
     && priorBand.height === nextBand.height && Math.abs(priorY - nextBand.y) > 0.5;
@@ -3165,8 +3130,8 @@ function navigateAppTab(tab, optionsPage = null) {
   if (optionsPage) state.optionsPage = optionsPage;
   if (tab === "SETTINGS") setSearchFocused(false);
 
-  const duration = animationMilliseconds("autoResizeAnimationMilliseconds");
-  const shouldAnimate = crossesOptions && animationEnabled("autoResizeAnimationEnabled") && duration > 0;
+  const duration = animationDurationMilliseconds();
+  const shouldAnimate = crossesOptions && animationEnabled() && duration > 0;
   if (!shouldAnimate) {
     render();
     return;
@@ -3251,10 +3216,8 @@ function setTransportSymbols(enabled) {
 function setDisplaySpacing(key, value) {
   const defaults = {
     controlPaddingDots: DEFAULT_CONTROL_PADDING_DOTS,
-    uiGapDots: DEFAULT_UI_GAP_DOTS,
-    sidebarLineGapDots: DEFAULT_SIDEBAR_LINE_GAP_DOTS,
-    playlistLineGapDots: DEFAULT_PLAYLIST_LINE_GAP_DOTS,
-    playlistGapDots: DEFAULT_PLAYLIST_GAP_DOTS,
+    uiChromeGapDots: DEFAULT_UI_GAP_DOTS,
+    textLineGapDots: DEFAULT_TEXT_LINE_GAP_DOTS,
   };
   if (!(key in defaults)) return;
   const now = performance.now();
@@ -3264,11 +3227,11 @@ function setDisplaySpacing(key, value) {
   saveDisplayOptions();
   if (spacingAnimationFrame) cancelAnimationFrame(spacingAnimationFrame);
   spacingAnimationFrame = 0;
-  const duration = animationMilliseconds("autoResizeAnimationMilliseconds");
+  const duration = animationDurationMilliseconds();
   const to = Object.fromEntries(Object.keys(defaults).map((spacingKey) =>
     [spacingKey, state[spacingKey]]));
   const changed = Object.keys(defaults).some((spacingKey) => from[spacingKey] !== to[spacingKey]);
-  spacingAnimation = changed && animationEnabled("autoResizeAnimationEnabled") && duration > 0
+  spacingAnimation = changed && animationEnabled() && duration > 0
     ? { from, to, startedAt: now, duration, lastFrameAt: Number.NaN } : null;
   render();
   if (spacingAnimation) spacingAnimationFrame = requestAnimationFrame(animateSpacingFrame);
@@ -3280,8 +3243,22 @@ function adjustDisplaySpacing(key, delta) {
   setDisplaySpacing(key, current + delta);
 }
 
-function adjustAnimationTime(key, delta) {
-  setPreference(key, Math.max(0, Math.min(1000, animationMilliseconds(key) + delta)));
+function adjustAnimationTime(delta) {
+  setPreference("animationDurationMilliseconds", Math.max(0,
+    Math.min(1000, animationDurationMilliseconds() + delta)));
+}
+
+function setAnimationFPS(value) {
+  const fps = Number(value);
+  if (!ANIMATION_FPS_OPTIONS.includes(fps) || state.animationFPS === fps) return;
+  state.animationFPS = fps;
+  saveDisplayOptions();
+  [selectionAnimation, screenTransition, spacingAnimation, columnLayoutAnimation,
+    tabLayoutAnimation, reorderAnimation, pointerInteraction, state.sidebarTransition]
+    .filter(Boolean).forEach((animation) => { animation.lastFrameAt = Number.NaN; });
+  equalizerFrameTiming.lastFrameAt = Number.NaN;
+  libraryScrollFrameTiming.lastFrameAt = Number.NaN;
+  render(false, true);
 }
 
 async function loadFavorites() {
@@ -3451,9 +3428,9 @@ function togglePathNode(node) {
   saveDisplayOptions();
   if (sidebarAnimationFrame) cancelAnimationFrame(sidebarAnimationFrame);
   sidebarAnimationFrame = 0;
-  const duration = animationMilliseconds("autoResizeAnimationMilliseconds")
+  const duration = animationDurationMilliseconds()
     * Math.abs(targetProgress - currentProgress);
-  if (!animationEnabled("autoResizeAnimationEnabled") || duration <= 0) {
+  if (!animationEnabled() || duration <= 0) {
     state.sidebarTransition = null;
     render();
     return;
@@ -3574,9 +3551,9 @@ async function toggleSystem(system) {
   sidebarAnimationFrame = 0;
   try {
     if (await reduceDatabaseGroupState("toggle", system)) {
-      const duration = animationMilliseconds("autoResizeAnimationMilliseconds")
+      const duration = animationDurationMilliseconds()
         * Math.abs(targetProgress - currentProgress);
-      if (!animationEnabled("autoResizeAnimationEnabled") || duration <= 0) {
+      if (!animationEnabled() || duration <= 0) {
         state.sidebarTransition = null;
         render();
         return;
@@ -4067,7 +4044,19 @@ async function setPreference(key, value, updateAudio = false) {
   if (!bridge?.frontendSettingsSave) return;
   const prior = state.preferences;
   const token = ++state.preferenceMutationToken;
-  state.preferences = { ...prior, [key]: value };
+  let changes = { [key]: value };
+  if (key === "animationDurationMilliseconds") {
+    changes = {
+      autoResizeAnimationMilliseconds: value,
+      selectionAnimationMilliseconds: value,
+    };
+  } else if (key === "animationsEnabled") {
+    changes = {
+      autoResizeAnimationEnabled: value,
+      selectionAnimationEnabled: value,
+    };
+  }
+  state.preferences = { ...prior, ...changes };
   if (key === "randomMode") resetRandomPlaybackState();
   render();
   try {
@@ -4210,8 +4199,8 @@ function sameOrder(first, second) {
 }
 
 function setReorderAnimation(kind, fromX, time) {
-  const duration = animationMilliseconds("autoResizeAnimationMilliseconds");
-  reorderAnimation = animationEnabled("autoResizeAnimationEnabled") && duration > 0
+  const duration = animationDurationMilliseconds();
+  reorderAnimation = animationEnabled() && duration > 0
     ? { kind, fromX, startedAt: time, duration }
     : null;
 }
