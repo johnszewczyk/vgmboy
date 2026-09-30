@@ -1,7 +1,7 @@
 import Foundation
 import SQLite3
 
-/// Query-only view of a validated schema-24 catalog.
+/// Query-only view of a validated schema-24/25 catalog.
 ///
 /// Scanner presentation must remain able to display attached paths while a
 /// player has the catalog open. Mutations remain exclusively in
@@ -89,6 +89,38 @@ public final class CanonicalCatalogReader: @unchecked Sendable {
             failedSourceCount: Int(sqlite3_column_int64(statement, 3)),
             inactiveSourceCount: Int(sqlite3_column_int64(statement, 4))
         )
+    }
+
+    public func metadataTagSummaries() throws -> [CatalogMetadataTagSummary] {
+        let hasTagTable = try query(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='track_metadata_tags';"
+        ) { Self.string($0, index: 0) }.isEmpty == false
+        guard hasTagTable else { return [] }
+
+        return try query(
+            """
+            SELECT tags.normalized_name, tags.tag_name,
+                   COUNT(DISTINCT tags.track_id), COUNT(*)
+            FROM track_metadata_tags tags
+            JOIN tracks t ON t.id=tags.track_id
+            JOIN library_roots r ON r.id=t.root_id
+            WHERE r.is_attached=1 AND r.is_enabled=1
+              AND NOT EXISTS (
+                  SELECT 1 FROM dead_sources d
+                  WHERE d.root_id=t.root_id
+                    AND d.path=COALESCE(t.archive_path, t.path)
+              )
+            GROUP BY tags.normalized_name, tags.tag_name
+            ORDER BY tags.normalized_name, tags.tag_name;
+            """
+        ) { statement in
+            CatalogMetadataTagSummary(
+                normalizedName: Self.string(statement, index: 0),
+                tagName: Self.string(statement, index: 1),
+                trackCount: Int(sqlite3_column_int64(statement, 2)),
+                occurrenceCount: Int(sqlite3_column_int64(statement, 3))
+            )
+        }
     }
 
     private func query<T>(_ sql: String, map: (OpaquePointer) throws -> T) throws -> [T] {

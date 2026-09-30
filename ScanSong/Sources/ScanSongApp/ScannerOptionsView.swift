@@ -8,6 +8,7 @@ struct ScannerOptionsView: View {
 
     private enum OptionsSection: String, Identifiable {
         case fileTypes = "File Types"
+        case metadataTags = "Metadata Tags"
 
         var id: Self { self }
     }
@@ -18,9 +19,13 @@ struct ScannerOptionsView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $selection) {
-                Section("File Types") {
+                Section("Scanner") {
                     Label("Ignored Types", systemImage: "gearshape")
                         .tag(OptionsSection.fileTypes)
+                }
+                Section("Catalog") {
+                    Label("Metadata Tags", systemImage: "tag")
+                        .tag(OptionsSection.metadataTags)
                 }
             }
             .listStyle(.sidebar)
@@ -29,7 +34,7 @@ struct ScannerOptionsView: View {
         } detail: {
             VStack(spacing: 0) {
                 HStack {
-                        Text("Ignored Types")
+                    Text(selection == .fileTypes ? "Ignored Types" : "Metadata Tags")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(.white)
                     Spacer()
@@ -40,7 +45,12 @@ struct ScannerOptionsView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        fileTypesPage
+                        switch selection {
+                        case .fileTypes:
+                            fileTypesPage
+                        case .metadataTags:
+                            metadataTagsPage
+                        }
                     }
                     .padding(20)
                 }
@@ -83,6 +93,36 @@ struct ScannerOptionsView: View {
                 }
             }
             .padding(.top, 4)
+        }
+    }
+
+    private var metadataTagsPage: some View {
+        sectionCard(title: "Metadata Tags") {
+            Text("These names come from source metadata preserved during scanning. Exact source spellings stay separate; the lookup key is trimmed and uppercased. Track and value counts show catalog coverage. A Deep Scan is needed to collect tags for files already in an older catalog.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if model.metadataTagSummaries.isEmpty {
+                Text("No source tags are indexed yet. Run a Deep Scan to collect tags from existing files.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 180, alignment: .center)
+            } else {
+                Table(model.metadataTagSummaries) {
+                    TableColumn("Tag Name", value: \.tagName)
+                    TableColumn("Lookup Key", value: \.normalizedName)
+                    TableColumn("Tracks") { summary in
+                        Text(summary.trackCount.formatted())
+                            .monospacedDigit()
+                    }
+                    TableColumn("Values") { summary in
+                        Text(summary.occurrenceCount.formatted())
+                            .monospacedDigit()
+                    }
+                }
+                .frame(minHeight: 240)
+            }
         }
     }
 

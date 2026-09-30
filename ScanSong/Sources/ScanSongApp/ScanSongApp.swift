@@ -24,7 +24,7 @@ private enum PathAdditionOutcome: Sendable {
 
 private enum CatalogSnapshot: Sendable {
     case missing
-    case loaded(CanonicalCatalogSummary, [CatalogRoot], [Int64: CatalogScanTally])
+    case loaded(CanonicalCatalogSummary, [CatalogRoot], [Int64: CatalogScanTally], [CatalogMetadataTagSummary])
     case failure(String)
 
     static func read(databaseURL: URL) -> Self {
@@ -36,7 +36,8 @@ private enum CatalogSnapshot: Sendable {
             let tallies = try Dictionary(uniqueKeysWithValues: roots.map {
                 ($0.id, try reader.scanTally(rootID: $0.id))
             })
-            return .loaded(summary, roots, tallies)
+            let metadataTagSummaries = try reader.metadataTagSummaries()
+            return .loaded(summary, roots, tallies, metadataTagSummaries)
         } catch {
             return .failure(error.localizedDescription)
         }
@@ -59,6 +60,7 @@ final class ScannerAppModel: ObservableObject {
     @Published var catalogStatus = "Choose or create a canonical catalog."
     @Published var roots: [CatalogRoot] = []
     @Published var rootTallies: [Int64: CatalogScanTally] = [:]
+    @Published var metadataTagSummaries: [CatalogMetadataTagSummary] = []
     @Published var scanStatus = "Add one or more scan paths."
     @Published var currentPath: String?
     @Published var currentFile: String?
@@ -201,7 +203,7 @@ final class ScannerAppModel: ObservableObject {
                     userInfo: [NSLocalizedDescriptionKey: "A database already exists at that path. Choose a new file name."]
                 )
             }
-            // The writer creates the schema-24 file before it becomes selected.
+            // The writer creates the schema-25 file before it becomes selected.
             _ = try CanonicalCatalogWriter(databaseURL: databaseURL)
         }, targetURL: candidate, selectOnSuccess: true, kind: .catalog,
            successText: "Add one or more scan paths.")
@@ -451,15 +453,17 @@ final class ScannerAppModel: ObservableObject {
     private func applyCatalogSnapshot(_ snapshot: CatalogSnapshot) {
         switch snapshot {
         case .missing:
-            catalogStatus = "New schema-24 catalog will be created when scanning starts."
+            catalogStatus = "New schema-25 catalog will be created when scanning starts."
             roots = []
             rootTallies = [:]
+            metadataTagSummaries = []
             abbreviatedPaths = [:]
             if scanStatus == "Opening catalog…" { scanStatus = "Add one or more scan paths." }
-        case .loaded(let summary, let loadedRoots, let tallies):
+        case .loaded(let summary, let loadedRoots, let tallies, let tagSummaries):
             catalogStatus = "Schema \(summary.schemaVersion) • \(summary.rootCount) paths • \(summary.trackCount) tracks"
             roots = loadedRoots
             rootTallies = tallies
+            metadataTagSummaries = tagSummaries
             rebuildAbbreviatedPaths()
             if scanStatus == "Opening catalog…" || scanStatus.hasPrefix("Add one or more") {
                 scanStatus = readyText
@@ -468,6 +472,7 @@ final class ScannerAppModel: ObservableObject {
             catalogStatus = "Cannot use catalog: \(message)"
             roots = []
             rootTallies = [:]
+            metadataTagSummaries = []
             abbreviatedPaths = [:]
             scanStatus = "Catalog unavailable: \(message)"
         }

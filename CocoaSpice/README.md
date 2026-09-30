@@ -1,7 +1,7 @@
 # CocoaSpice
 
 CocoaSpice is the native AppKit/SwiftUI player frontend for the VGMMan family.
-It reads ScanSong’s schema-24 catalog, builds editable playlists, materializes
+It reads ScanSong’s schema-24/25 catalog, builds editable playlists, materializes
 archive members for playback, and bundles VGMBoyKit in-process. ScanSong owns
 catalog writes; VGMBoy owns decoding, timing, transport, and audio output.
 

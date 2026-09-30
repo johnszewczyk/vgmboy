@@ -1,7 +1,7 @@
 # CatalogReader
 
 `CatalogReader` is the shared read-only SQLite boundary for catalog-backed
-player frontends. It provides canonical schema-24 records, browser projections,
+player frontends. It provides canonical schema-24/25 records, browser projections,
 playlist presentation values, read sessions, and frontend command contracts.
 ScanSong remains the only catalog writer.
 

@@ -295,7 +295,7 @@
 **Path bar:** `{{model.configuredLibraryDatabasePath}}`  
 **Button:** folder icon, accessibility label `Browse`
 
-> CocoaSpice reads this schema-24 catalog. ScanSong owns scan paths, scanning, link checks, and cleanup.
+> CocoaSpice reads this schema-24/25 catalog. ScanSong owns scan paths, scanning, link checks, and cleanup.
 
 **Buttons, in order:** `Use Default` · `Reload Library` · `Show in Finder`
 

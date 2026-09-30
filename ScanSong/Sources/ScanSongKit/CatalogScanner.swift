@@ -573,7 +573,8 @@ public final class CatalogScanner: @unchecked Sendable {
                 fingerprint: candidate.fingerprint,
                 trackIndex: $0.trackIndex,
                 trackCount: $0.trackCount,
-                metadata: $0.metadata
+                metadata: $0.metadata,
+                tags: $0.tags
             )
         }
     }
@@ -670,7 +671,8 @@ public final class CatalogScanner: @unchecked Sendable {
                         fingerprint: member.fingerprint,
                         trackIndex: $0.trackIndex,
                         trackCount: $0.trackCount,
-                        metadata: $0.metadata
+                        metadata: $0.metadata,
+                        tags: $0.tags
                     )
                 })
             } else if let message = memberFailures[index] {
@@ -745,6 +747,7 @@ public final class CatalogScanner: @unchecked Sendable {
                 trackIndex: max(0, Int(document.technicalFacts["uac.trackIndex"] ?? "") ?? 0),
                 trackCount: max(1, Int(document.technicalFacts["uac.trackCount"] ?? "") ?? 1),
                 metadata: UACCatalogMetadataAdapter.project(document),
+                tags: ScanTrackMetadata.tags(from: document),
                 browserGameOverride: containerDocument.fields.title ?? "",
                 browserSystemOverride: containerDocument.fields.system ?? ""
             ))

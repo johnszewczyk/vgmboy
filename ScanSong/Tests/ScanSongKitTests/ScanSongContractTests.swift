@@ -2997,7 +2997,7 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
     }
 }
 
-@Test func catalogScannerCreatesAndPublishesAHostReadableSchema24Catalog() async throws {
+@Test func catalogScannerCreatesAndPublishesAHostReadableSchema25Catalog() async throws {
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("ScanSong-writer-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: directory) }
@@ -3015,7 +3015,7 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
     #expect(result.failures.isEmpty)
 
     let summary = try CanonicalCatalog.inspect(databaseURL: databaseURL)
-    #expect(summary.schemaVersion == 24)
+    #expect(summary.schemaVersion == 25)
     #expect(summary.rootCount == 1)
     #expect(summary.trackCount == 1)
 

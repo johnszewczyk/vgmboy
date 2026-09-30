@@ -57,7 +57,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 )
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "qsf-direct", "qsf-mini-direct":
             let document: MetadataDocument
             do {
@@ -70,7 +70,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 )
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "ape-direct":
             let document: MetadataDocument
             do {
@@ -86,7 +86,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 metadataDocument: document,
                 includeDateAndEncodedByInComment: false
             )
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "adx-direct":
             let document: MetadataDocument
             do {
@@ -99,7 +99,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 )
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "at3-direct":
             let document: MetadataDocument
             do {
@@ -112,7 +112,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 )
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "aus-direct":
             let document: MetadataDocument
             do {
@@ -125,7 +125,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 )
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "sony-msf-direct":
             let document: MetadataDocument
             do {
@@ -138,7 +138,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 )
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "svag-direct":
             let document: MetadataDocument
             do {
@@ -151,7 +151,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 )
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "xmd-direct":
             let document: MetadataDocument
             do {
@@ -164,7 +164,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 )
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "sshd-direct":
             let document: MetadataDocument
             do {
@@ -177,7 +177,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 )
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "mib-direct":
             let document: MetadataDocument
             do {
@@ -190,7 +190,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 )
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "adp-direct":
             let document: MetadataDocument
             do {
@@ -203,7 +203,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 )
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "ahx-direct":
             let document: MetadataDocument
             do {
@@ -216,7 +216,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 )
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "dvi-direct":
             let document: MetadataDocument
             do {
@@ -229,7 +229,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 )
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "bink-audio-direct":
             let result: MetadataReadResult
             do {
@@ -245,10 +245,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 ScanTrackMetadata(
                     trackIndex: index,
                     trackCount: result.tracks.count,
-                    metadata: ScannerMetadata(
-                        metadataDocument: track.document,
-                        includeDateAndEncodedByInComment: false
-                    )
+                    metadataDocument: track.document, includeDateAndEncodedByInComment: false
                 )
             }
             return ScanInspection(route: route, tracks: tracks)
@@ -264,7 +261,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 )
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "agsc-direct":
             let result: MetadataReadResult
             do {
@@ -280,10 +277,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 ScanTrackMetadata(
                     trackIndex: index,
                     trackCount: result.tracks.count,
-                    metadata: ScannerMetadata(
-                        metadataDocument: track.document,
-                        includeDateAndEncodedByInComment: false
-                    )
+                    metadataDocument: track.document, includeDateAndEncodedByInComment: false
                 )
             }
             return ScanInspection(route: route, tracks: tracks)
@@ -299,7 +293,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 )
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "nds-strm-direct":
             let document: MetadataDocument
             do {
@@ -312,7 +306,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 )
             }
             let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "xa-direct":
             let result: MetadataReadResult
             do {
@@ -328,26 +322,26 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 ScanTrackMetadata(
                     trackIndex: index,
                     trackCount: result.tracks.count,
-                    metadata: ScannerMetadata(
-                        metadataDocument: track.document,
-                        includeDateAndEncodedByInComment: false
-                    )
+                    metadataDocument: track.document, includeDateAndEncodedByInComment: false
                 )
             }
             return ScanInspection(route: route, tracks: tracks)
         case "highly-theoretical", "lazyusf", "twosf", "play-psf1", "play-psf2":
+            var tags: [ScannerMetadataTag] = []
             let metadata: ScannerMetadata?
             do {
+                let document = try MetaManCore.read(fileURL: fileURL)
                 metadata = ScannerMetadata(
-                    metadataDocument: try MetaManCore.read(fileURL: fileURL),
+                    metadataDocument: document,
                     includeDateAndEncodedByInComment: false
                 )
+                tags = ScanTrackMetadata.tags(from: document)
             } catch is MetadataReadError {
                 // The previous footer reader admitted the structurally-known
                 // source with empty metadata when its PSF signature was absent.
                 metadata = nil
             }
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: tags)])
         case "vgm-direct", "s98-direct":
             let document: MetadataDocument
             do {
@@ -359,7 +353,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 metadataDocument: document,
                 includeDateAndEncodedByInComment: route.pluginID == "s98-direct"
             )
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "libvgm":
             // GYM remains structure-known without a complete metadata adapter.
             return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: nil)])
@@ -376,7 +370,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 metadataDocument: document,
                 includeDateAndEncodedByInComment: false
             )
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)])
+            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
         case "openmpt":
             if fileURL.pathExtension.caseInsensitiveCompare("mod") == .orderedSame {
                 do {
@@ -387,7 +381,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                     )
                     return ScanInspection(
                         route: route,
-                        tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)]
+                        tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))]
                     )
                 } catch MetadataReadError.unsupportedFormat(_) {
                     return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: nil)])
@@ -407,10 +401,7 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 ScanTrackMetadata(
                     trackIndex: track.sourceTrackIndex ?? ordinal,
                     trackCount: result.tracks.count,
-                    metadata: ScannerMetadata(
-                        metadataDocument: track.document,
-                        includeDateAndEncodedByInComment: false
-                    )
+                    metadataDocument: track.document, includeDateAndEncodedByInComment: false
                 )
             }
             return ScanInspection(route: route, tracks: tracks)
@@ -443,10 +434,7 @@ private enum GameMusicMetadataInspector {
             ScanTrackMetadata(
                 trackIndex: visibleIndex,
                 trackCount: result.tracks.count,
-                metadata: ScannerMetadata(
-                    metadataDocument: track.document,
-                    includeDateAndEncodedByInComment: false
-                )
+                metadataDocument: track.document, includeDateAndEncodedByInComment: false
             )
         }
         return ScanInspection(route: route, tracks: tracks)
@@ -473,7 +461,8 @@ private enum SNDHInspector {
             return ScanTrackMetadata(
                 trackIndex: index,
                 trackCount: result.tracks.count,
-                metadata: metadata
+                metadata: metadata,
+                tags: ScanTrackMetadata.tags(from: document)
             )
         }
         return ScanInspection(route: route, tracks: tracks)
@@ -510,7 +499,7 @@ private enum SPCInspector {
         let metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
         return ScanInspection(
             route: route,
-            tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata)]
+            tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))]
         )
     }
 }
@@ -532,10 +521,7 @@ private enum AYInspector {
             ScanTrackMetadata(
                 trackIndex: track.sourceTrackIndex ?? ordinal,
                 trackCount: result.tracks.count,
-                metadata: ScannerMetadata(
-                    metadataDocument: track.document,
-                    includeDateAndEncodedByInComment: false
-                )
+                metadataDocument: track.document, includeDateAndEncodedByInComment: false
             )
         }
         return ScanInspection(route: route, tracks: tracks)
@@ -559,10 +545,7 @@ private enum SAPInspector {
             ScanTrackMetadata(
                 trackIndex: track.sourceTrackIndex ?? ordinal,
                 trackCount: result.tracks.count,
-                metadata: ScannerMetadata(
-                    metadataDocument: track.document,
-                    includeDateAndEncodedByInComment: false
-                )
+                metadataDocument: track.document, includeDateAndEncodedByInComment: false
             )
         }
         return ScanInspection(route: route, tracks: tracks)
@@ -601,7 +584,12 @@ private enum HESInspector {
             } else {
                 metadata = ScannerMetadata(metadataDocument: document, includeDateAndEncodedByInComment: false)
             }
-            return ScanTrackMetadata(trackIndex: index, trackCount: result.tracks.count, metadata: metadata)
+            return ScanTrackMetadata(
+                trackIndex: index,
+                trackCount: result.tracks.count,
+                metadata: metadata,
+                tags: ScanTrackMetadata.tags(from: document)
+            )
         }
         return ScanInspection(route: route, tracks: tracks)
     }
@@ -635,11 +623,12 @@ private enum KSSInspector {
             playLengthMs: document.timing?.playLengthMs ?? 150_000,
             fadeLengthMs: document.timing?.fadeLengthMs ?? -1
         )
-        let tracks = result.tracks.enumerated().map { index, _ in
+        let tracks = result.tracks.enumerated().map { index, track in
             return ScanTrackMetadata(
                 trackIndex: index,
                 trackCount: result.tracks.count,
-                metadata: metadata
+                metadata: metadata,
+                tags: ScanTrackMetadata.tags(from: track.document)
             )
         }
         return ScanInspection(route: route, tracks: tracks)

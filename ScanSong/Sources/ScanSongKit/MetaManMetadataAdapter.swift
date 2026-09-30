@@ -1,5 +1,28 @@
 import MetaManCore
 
+extension ScanTrackMetadata {
+    init(
+        trackIndex: Int,
+        trackCount: Int,
+        metadataDocument: MetadataDocument,
+        includeDateAndEncodedByInComment: Bool = true
+    ) {
+        self.init(
+            trackIndex: trackIndex,
+            trackCount: trackCount,
+            metadata: ScannerMetadata(
+                metadataDocument: metadataDocument,
+                includeDateAndEncodedByInComment: includeDateAndEncodedByInComment
+            ),
+            tags: Self.tags(from: metadataDocument)
+        )
+    }
+
+    static func tags(from document: MetadataDocument) -> [ScannerMetadataTag] {
+        document.tags.map { ScannerMetadataTag(name: $0.name, value: $0.value) }
+    }
+}
+
 extension ScannerMetadata {
     init(metadataDocument: MetadataDocument, includeDateAndEncodedByInComment: Bool = true) {
         let fields = metadataDocument.fields

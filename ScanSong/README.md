@@ -1,6 +1,6 @@
 # ScanSong
 
-ScanSong is the VGMMan family’s source inspector and schema-24 catalog writer.
+ScanSong is the VGMMan family’s source inspector and schema-25 catalog writer.
 It has a reusable `ScanSongKit`, a JSONL CLI (`scansong`), and a native macOS
 catalog-management app. Player apps read the published catalog; they do not
 scan or modify it.
@@ -22,7 +22,7 @@ swift run scansong probe --recursive --strict /path/to/folder
 ```
 
 `launch.sh` builds a fresh release app before opening it. The app can select an
-existing schema-24 catalog or create a new one, attach scan roots, scan or resume
+existing schema-24/25 catalog or create a new one, attach scan roots, scan or resume
 roots, inspect per-path logs, and check or clean links. **Clean Links** removes
 inactive catalog records only after confirmation; it never deletes source
 files. A normal scan reuses completed matching work; Deep Scan forces
@@ -34,9 +34,11 @@ when the scan has a meaningful total. Archive, publication, and cleanup phases
 keep an activity indicator and current detail visible. UI progress sampling
 does not pace the worker.
 
-The writer upgrades a schema-23 catalog to 24 by adding the optional
-`tracks.track_number` column. Player readers require schema 24; other legacy
-and unrelated databases are rejected.
+Schema 25 adds ordered source tags in `track_metadata_tags`. The writer upgrades
+schema 23 through 24 and then 25, and upgrades schema 24 directly to 25. Readers
+continue to accept schema 24 catalogs and also accept schema 25. Existing catalog
+rows need a Deep Scan before their source tags appear in the Options inventory.
+Other legacy and unrelated databases are rejected.
 
 The `scansong` CLI writes versioned JSONL events to stdout; errors and required
 unsupported adapters return a nonzero status. `probe` is dry-run and `scan`
@@ -45,7 +47,7 @@ writes only the catalog path supplied to it.
 ## Ownership and routes
 
 MetaMan owns direct format metadata readers. ScanSong adapts their ordered
-results into schema 24, owns scanner-specific archive/source handling, and
+results into schema 25, owns scanner-specific archive/source handling, and
 bundles VGMBoy-built inspection helpers only where required. It does not invoke
 player apps or link the playback kit.
 

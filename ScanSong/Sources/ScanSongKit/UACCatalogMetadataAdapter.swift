@@ -1,6 +1,6 @@
 import MetaManCore
 
-/// Projects the established schema-24 fields from UAC member metadata.
+/// Projects the established common fields from UAC member metadata.
 /// UAC is authoritative: absent, null, or invalid fields become blank/default
 /// values and never fall back to tags in the contained source file.
 enum UACCatalogMetadataAdapter {

@@ -2,14 +2,14 @@
 
 ## Scope
 
-- The ScanSong app manages a selected schema-24 catalog and its scan paths.
+- The ScanSong app manages a selected schema-25 catalog and its scan paths.
 
 ## Catalog
 
 - Database File always shows one selected catalog-file row, or `(None)` when
   that file no longer exists. Its controls open an existing catalog, while
   `Use Default` selects the standard catalog location and `Add New` creates a
-  fresh schema-24 SQLite catalog at a new path. Only one catalog is selected at
+  fresh schema-25 SQLite catalog at a new path. Only one catalog is selected at
   a time; Add New refuses to replace an existing file. Reset empties its
   contents with the circular x icon, and Delete permanently removes the file
   after confirmation.
@@ -71,8 +71,8 @@
 
 ## Options
 
-- The Options window uses the CocoaSpice split-sidebar layout. Its first sidebar
-  section is `File Types`.
+- The Options window is resizable and restores its saved position and size. It
+  has separate `Ignored Types` and `Metadata Tags` pages.
 - File Types shows checkbox controls for documented decoder-absent extensions.
   Checked types are ignored before discovery and archive-member inspection;
   supported formats remain active so malformed files still appear in the scan
@@ -82,6 +82,10 @@
   scanner route are grouped as `unrecognized` diagnostics unless they are known
   decoder support files, archive documentation, or extensionless material; none
   become playable candidates.
+- Metadata Tags lists exact preserved source spellings with their trimmed,
+  uppercased lookup keys and shows track coverage and value occurrence counts. Existing
+  catalog entries need a Deep Scan to collect raw tags. This page is an inventory;
+  it does not define aliases or add player playlist columns.
 
 ## Files
 

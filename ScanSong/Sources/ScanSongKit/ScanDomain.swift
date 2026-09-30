@@ -16,7 +16,7 @@ public struct ScannerMetadata: Codable, Equatable, Sendable {
     /// subsong index.
     public let trackNumber: Int?
     /// Exact source-unit loop facts when the format exposes them. The
-    /// established schema-24 catalog continues to persist millisecond timing;
+    /// established catalog timing fields continue to persist milliseconds;
     /// these fields remain available to scanner clients and UAC projection.
     public let loopStartSample: Int64?
     public let loopEndSample: Int64?
@@ -53,6 +53,22 @@ public struct ScannerMetadata: Codable, Equatable, Sendable {
         self.loopEndSample = loopEndSample
         self.loopSampleRateHz = loopSampleRateHz
         self.loopSource = loopSource
+    }
+}
+
+/// One source metadata tag retained separately from ScanSong's common-field
+/// projection. Names preserve source spelling; normalized names support lookup.
+public struct ScannerMetadataTag: Codable, Equatable, Sendable {
+    public let name: String
+    public let value: String
+
+    public init(name: String, value: String) {
+        self.name = name
+        self.value = value
+    }
+
+    public var normalizedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
     }
 }
 
@@ -147,11 +163,18 @@ public struct ScanTrackMetadata: Sendable {
     public let trackIndex: Int
     public let trackCount: Int
     public let metadata: ScannerMetadata?
+    public let tags: [ScannerMetadataTag]
 
-    public init(trackIndex: Int, trackCount: Int, metadata: ScannerMetadata?) {
+    public init(
+        trackIndex: Int,
+        trackCount: Int,
+        metadata: ScannerMetadata?,
+        tags: [ScannerMetadataTag] = []
+    ) {
         self.trackIndex = trackIndex
         self.trackCount = trackCount
         self.metadata = metadata
+        self.tags = tags
     }
 }
 

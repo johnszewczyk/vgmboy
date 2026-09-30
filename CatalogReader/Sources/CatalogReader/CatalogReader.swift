@@ -147,7 +147,8 @@ public enum CatalogReaderError: LocalizedError {
 }
 
 public final class ReadOnlyCatalog: @unchecked Sendable {
-    public static let supportedSchemaVersion = 24
+    public static let supportedSchemaVersion = 25
+    public static let supportedSchemaVersions: Set<Int> = [24, supportedSchemaVersion]
     private let database: OpaquePointer
     public let databaseURL: URL
 
@@ -171,7 +172,7 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
         database = handle
         sqlite3_busy_timeout(handle, 10_000)
         let schema = try scalarInt("PRAGMA user_version;")
-        guard schema == Self.supportedSchemaVersion else {
+        guard Self.supportedSchemaVersions.contains(schema) else {
             throw CatalogReaderError.unsupportedSchema(schema)
         }
         established = true

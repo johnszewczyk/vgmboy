@@ -16,11 +16,13 @@ public struct CanonicalCatalogSummary: Codable, Equatable, Sendable {
 }
 
 public enum CanonicalCatalog {
-    public static let schemaVersion = 24
+    public static let schemaVersion = 25
+    public static let supportedSchemaVersions: Set<Int> = [24, schemaVersion]
     public static let requiredTables: Set<String> = [
         "library_roots",
         "tracks",
         "track_metadata",
+        "track_metadata_tags",
         "scan_items",
         "scan_staging_roots",
         "scan_source_checkpoints",
@@ -52,14 +54,18 @@ public enum CanonicalCatalog {
         defer { sqlite3_close(handle) }
 
         let version = try scalarInt(handle, sql: "PRAGMA user_version;")
-        guard version == schemaVersion else {
-            throw catalogError("Unsupported library database schema \(version); expected \(schemaVersion).")
+        guard supportedSchemaVersions.contains(version) else {
+            throw catalogError("Unsupported library database schema \(version); expected schema 24 or \(schemaVersion).")
         }
         let presentTables = try stringSet(
             handle,
             sql: "SELECT name FROM sqlite_master WHERE type='table';"
         )
-        let missingTables = requiredTables.subtracting(presentTables).sorted()
+        var requiredTablesForVersion = requiredTables
+        if version < schemaVersion {
+            requiredTablesForVersion.remove("track_metadata_tags")
+        }
+        let missingTables = requiredTablesForVersion.subtracting(presentTables).sorted()
         guard missingTables.isEmpty else {
             throw catalogError("Library database is missing required tables: \(missingTables.joined(separator: ", ")).")
         }

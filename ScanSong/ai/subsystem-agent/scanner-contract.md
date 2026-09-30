@@ -10,7 +10,7 @@ and reader behavior live in
 ## Ownership
 
 - `ScanSongKit` owns source discovery, safe file/archive handling, inspection
-  orchestration, checkpointing, schema-24 projection, and root publication.
+  orchestration, checkpointing, schema-25 projection, and root publication.
 - `CatalogScanner` coordinates discovery, reuse, inspection, and publication.
   `CanonicalCatalogSchema` owns the exact schema; `CanonicalCatalogWriter`
   owns every SQLite mutation and transaction boundary.
@@ -28,10 +28,14 @@ and reader behavior live in
 
 ## Catalog and Resume Invariants
 
-- ScanSong creates schema 24, accepts it unchanged, and upgrades a schema-23
-  catalog by adding `tracks.track_number` before use. Other legacy or unrelated
-  databases are rejected. Player readers accept schema 24 only, so a catalog
-  needs the ScanSong upgrade before those apps open it.
+- ScanSong creates schema 25, accepts schemas 24 and 25 for read-only
+  presentation, upgrades 24 with the source-tag table, and upgrades 23 through
+  24 before adding that table. Other legacy or unrelated databases are rejected.
+  Player readers accept both 24 and 25 because the tag table is additive.
+- `track_metadata_tags` preserves source tag order, spelling, and values beside
+  the common `track_metadata` projection. Incremental reuse copies tag rows with
+  the track; existing pre-25 rows need Deep Scan before the tag inventory is
+  populated.
 - Player connections use OS-level read-only SQLite handles and
   `PRAGMA query_only=ON`. Opening a player does not block a ScanSong writer.
 - The writer holds an OS advisory lease beside the selected catalog. The lease

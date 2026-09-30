@@ -76,6 +76,22 @@ public struct CatalogScanTally: Equatable, Sendable {
     }
 }
 
+public struct CatalogMetadataTagSummary: Identifiable, Equatable, Sendable {
+    public let normalizedName: String
+    public let tagName: String
+    public let trackCount: Int
+    public let occurrenceCount: Int
+
+    public var id: String { tagName }
+
+    public init(normalizedName: String, tagName: String, trackCount: Int, occurrenceCount: Int) {
+        self.normalizedName = normalizedName
+        self.tagName = tagName
+        self.trackCount = trackCount
+        self.occurrenceCount = occurrenceCount
+    }
+}
+
 public struct CatalogTrackRecord: Sendable {
     public let sourcePath: String
     public let archiveEntry: String?
@@ -85,6 +101,7 @@ public struct CatalogTrackRecord: Sendable {
     public let trackCount: Int
     public let trackNumber: Int?
     public let metadata: ScannerMetadata?
+    public let tags: [ScannerMetadataTag]
     public let browserGameOverride: String?
     public let browserSystemOverride: String?
 
@@ -97,6 +114,7 @@ public struct CatalogTrackRecord: Sendable {
         trackCount: Int,
         metadata: ScannerMetadata?,
         trackNumber: Int? = nil,
+        tags: [ScannerMetadataTag] = [],
         browserGameOverride: String? = nil,
         browserSystemOverride: String? = nil
     ) {
@@ -108,6 +126,7 @@ public struct CatalogTrackRecord: Sendable {
         self.trackCount = trackCount
         self.trackNumber = trackNumber ?? metadata?.trackNumber
         self.metadata = metadata
+        self.tags = tags
         self.browserGameOverride = browserGameOverride
         self.browserSystemOverride = browserSystemOverride
     }
@@ -300,7 +319,7 @@ public final class CanonicalCatalogWriter: @unchecked Sendable {
     }
 
     /// Removes every indexed record and scan path while retaining the selected
-    /// schema-24 database file for immediate reuse.
+    /// schema-25 database file for immediate reuse.
     public func resetCatalog() throws {
         try execute("BEGIN IMMEDIATE;")
         do {
@@ -453,6 +472,20 @@ public final class CanonicalCatalogWriter: @unchecked Sendable {
                     AND COALESCE(live.archive_entry,'')=COALESCE(staged.archive_entry,'')
                     AND live.track_index=staged.track_index
                 JOIN track_metadata metadata ON metadata.track_id=live.id
+                WHERE staged.root_id=? AND staged.path=?;
+                """,
+                [.integer(rootID), .integer(stageID), .text(sourcePath)]
+            )
+            try execute(
+                """
+                INSERT INTO track_metadata_tags
+                    (track_id, tag_index, tag_name, normalized_name, value)
+                SELECT staged.id, tags.tag_index, tags.tag_name, tags.normalized_name, tags.value
+                FROM tracks staged
+                JOIN tracks live ON live.root_id=? AND live.path=staged.path
+                    AND COALESCE(live.archive_entry,'')=COALESCE(staged.archive_entry,'')
+                    AND live.track_index=staged.track_index
+                JOIN track_metadata_tags tags ON tags.track_id=live.id
                 WHERE staged.root_id=? AND staged.path=?;
                 """,
                 [.integer(rootID), .integer(stageID), .text(sourcePath)]
@@ -650,14 +683,27 @@ public final class CanonicalCatalogWriter: @unchecked Sendable {
             _ = try CanonicalCatalog.inspect(databaseURL: databaseURL)
             return
         }
-        if version == 23 {
-            try execute("ALTER TABLE tracks ADD COLUMN track_number INTEGER;")
-            try execute("PRAGMA user_version=24;")
+        if version == 23 || version == 24 {
+            try execute("BEGIN TRANSACTION;")
+            do {
+                if version == 23 {
+                    try execute("ALTER TABLE tracks ADD COLUMN track_number INTEGER;")
+                    try execute("PRAGMA user_version=24;")
+                }
+                for statement in CanonicalCatalogSchema.metadataTagMigrationStatements {
+                    try execute(statement)
+                }
+                try execute("PRAGMA user_version=25;")
+                try execute("COMMIT;")
+            } catch {
+                try? execute("ROLLBACK;")
+                throw error
+            }
             _ = try CanonicalCatalog.inspect(databaseURL: databaseURL)
             return
         }
         guard version == 0 else {
-            throw Self.error("ScanSong does not migrate legacy catalog schema \(version). Choose a schema-24 catalog or a new database path.")
+            throw Self.error("ScanSong does not migrate legacy catalog schema \(version). Choose a schema-24/25 catalog or a new database path.")
         }
         try CanonicalCatalogSchema.install { try execute($0) }
     }
@@ -736,22 +782,39 @@ public final class CanonicalCatalogWriter: @unchecked Sendable {
                 record.archiveEntry.map(SQLiteValue.text) ?? .null
             ]
         )
-        guard let metadata = record.metadata else { return }
-        try execute(
-            """
-            INSERT INTO track_metadata
-                (track_id, title, game, author, system, comment, intro_length_ms,
-                 loop_length_ms, play_length_ms, fade_length_ms, metadata_scanned_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-            """,
-            [
-                .integer(sqlite3_last_insert_rowid(database)), .text(metadata.song), .text(metadata.game),
-                .text(metadata.author), .text(metadata.system), .text(metadata.comment),
-                .integer(Int64(metadata.introLengthMs)), .integer(Int64(metadata.loopLengthMs)),
-                .integer(Int64(metadata.playLengthMs)), .integer(Int64(metadata.fadeLengthMs)),
-                .real(Date().timeIntervalSince1970)
-            ]
-        )
+        let trackID = sqlite3_last_insert_rowid(database)
+        if let metadata = record.metadata {
+            try execute(
+                """
+                INSERT INTO track_metadata
+                    (track_id, title, game, author, system, comment, intro_length_ms,
+                     loop_length_ms, play_length_ms, fade_length_ms, metadata_scanned_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                [
+                    .integer(trackID), .text(metadata.song), .text(metadata.game),
+                    .text(metadata.author), .text(metadata.system), .text(metadata.comment),
+                    .integer(Int64(metadata.introLengthMs)), .integer(Int64(metadata.loopLengthMs)),
+                    .integer(Int64(metadata.playLengthMs)), .integer(Int64(metadata.fadeLengthMs)),
+                    .real(Date().timeIntervalSince1970)
+                ]
+            )
+        }
+        for (index, tag) in record.tags.enumerated() {
+            let normalizedName = tag.normalizedName
+            guard !normalizedName.isEmpty else { continue }
+            try execute(
+                """
+                INSERT INTO track_metadata_tags
+                    (track_id, tag_index, tag_name, normalized_name, value)
+                VALUES (?, ?, ?, ?, ?);
+                """,
+                [
+                    .integer(trackID), .integer(Int64(index)), .text(tag.name),
+                    .text(normalizedName), .text(tag.value)
+                ]
+            )
+        }
     }
 
     private func upsertInventory(

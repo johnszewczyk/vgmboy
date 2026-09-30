@@ -3,7 +3,7 @@
 ## Product
 
 ScanSong is the VGMMan family's native catalog-management app and command-line
-scanner. It writes schema-24 catalogs read by CocoaSpice, SPCBoyWK, and ViewBoy.
+scanner. It writes schema-25 catalogs read by CocoaSpice, SPCBoyWK, and ViewBoy.
 
 ## Major Components
 
@@ -30,8 +30,9 @@ scanner. It writes schema-24 catalogs read by CocoaSpice, SPCBoyWK, and ViewBoy.
 
 ## Local Rules
 
-- ScanSong alone writes catalogs. Player apps open schema 24 read-only; the
-  ScanSong writer can upgrade schema 23 by adding `tracks.track_number`.
+- ScanSong alone writes catalogs. Player apps read schemas 24 and 25; schema 25
+  retains ordered source tags in `track_metadata_tags` for ScanSong's tag
+  inventory. The writer upgrades schemas 23 and 24.
 - Keep scanner discovery, source admission, archive handling, and catalog
   projection in ScanSongKit. Keep native format interpretation in MetaManCore
   and playback/decoder products in VGMBoy.
