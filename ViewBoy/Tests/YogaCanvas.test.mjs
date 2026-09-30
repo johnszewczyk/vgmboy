@@ -237,14 +237,14 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     screenTransitionSnapshot,
   } = await import('../Sources/ViewBoy/Resources/yoga-app.js');
   const standardFont = bitmapFontSnapshot('STANDARD');
-  for (const character of 'abcdefghijklmnopqrstuvwxyz') {
+  assert.equal(Object.keys(standardFont.glyphs).some((character) => /^[a-z]$/.test(character)), false,
+    'Standard 5x7 font contains no lowercase glyphs');
+  for (const character of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') {
     const glyph = standardFont.glyphs[character];
-    assert.equal(glyph?.length, 7, `Standard 5x7 includes a seven-row lowercase ${character}`);
+    assert.equal(glyph?.length, 7, `Standard 5x7 includes a seven-row uppercase ${character}`);
     assert.ok(glyph.every((row) => /^[01]{5}$/.test(row)),
-      `lowercase ${character} is authored as five LCD dots per row`);
+      `uppercase ${character} is authored as five LCD dots per row`);
   }
-  assert.notDeepEqual(standardFont.glyphs.a, standardFont.glyphs.A,
-    'Standard font preserves lowercase forms instead of mapping them to uppercase');
   const clickTargetBox = (target) => {
     const rect = canvas.getBoundingClientRect();
     const logicalWidth = canvas.width / 3;
