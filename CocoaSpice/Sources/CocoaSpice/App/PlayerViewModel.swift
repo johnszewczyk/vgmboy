@@ -1989,25 +1989,28 @@ final class PlayerViewModel {
 
     func toggleTrackPlayback(_ track: TrackItem) {
         if currentTrack?.id == track.id, isPlaying {
-            cancelFadedSkip()
-            playbackRequestState.cancel()
-            isLoading = false
-            let playback = self.playback
-            Task {
-                await playback.stopPlayback()
-            }
-            isPlaying = false
-            isSeeking = false
-            playbackElapsedSeconds = 0
-            seekPreviewSeconds = 0
-            statusText = "Stopped"
-            updateRemoteTransportState()
+            stopPlayback()
             return
         }
 
-        currentTrack = track
         didAutoAdvanceForCurrentTrack = false
-        requestPlayback(for: track)
+        requestFadedTrackChange(track)
+    }
+
+    func stopPlayback() {
+        guard currentTrack != nil || pendingPlaybackTrack != nil || isLoading || isPlaying || fadedSkipToken != nil else { return }
+        cancelFadedSkip()
+        playbackRequestState.cancel()
+        isLoading = false
+        isPlaying = false
+        isSeeking = false
+        playbackElapsedSeconds = 0
+        seekPreviewSeconds = 0
+        didAutoAdvanceForCurrentTrack = false
+        let playback = self.playback
+        Task { await playback.stopPlayback() }
+        statusText = "Stopped"
+        updateRemoteTransportState()
     }
 
     func playNext() {
@@ -2016,7 +2019,7 @@ final class PlayerViewModel {
             return
         }
         if randomPlaybackScope == .playlist, let randomTrack = randomPlaybackTarget() {
-            requestPlayback(for: randomTrack)
+            requestFadedTrackChange(randomTrack)
             return
         }
         guard let nextTrackID = playbackQueueState.adjacentTargetID(
@@ -2024,7 +2027,7 @@ final class PlayerViewModel {
             direction: .next,
             wraps: true
         ), let nextTrack = playlist.first(where: { $0.id == nextTrackID }) else { return }
-        requestAdjacentPlayback(nextTrack)
+        requestFadedTrackChange(nextTrack)
     }
 
     func cycleRandomPlaybackScope() {
@@ -2117,7 +2120,7 @@ final class PlayerViewModel {
 
     private func startRandomLibraryPlayback(_ track: TrackItem) {
         randomLibraryTracks = []
-        requestPlayback(for: track)
+        requestFadedTrackChange(track)
         loadRandomLibraryTracks()
     }
 
@@ -2147,10 +2150,10 @@ final class PlayerViewModel {
             direction: .previous,
             wraps: true
         ), let previousTrack = playlist.first(where: { $0.id == previousTrackID }) else { return }
-        requestAdjacentPlayback(previousTrack)
+        requestFadedTrackChange(previousTrack)
     }
 
-    private func requestAdjacentPlayback(_ track: TrackItem) {
+    private func requestFadedTrackChange(_ track: TrackItem) {
         guard let fadeDuration = PlaybackQueuedSkipFadeRequest(
             enabled: fadedSkipEnabled,
             isPlaying: isPlaying,
@@ -2164,7 +2167,7 @@ final class PlayerViewModel {
             return
         }
 
-        // A second adjacent command abandons the long musical fade and lets
+        // A second track-change command abandons the long musical fade and lets
         // ordinary replacement perform only its 10 ms de-click transition.
         guard fadedSkipToken == nil else {
             cancelFadedSkip()
@@ -2282,15 +2285,13 @@ final class PlayerViewModel {
 
     func playSelectedTrack() {
         guard let selectedTrackID, let track = playlist.first(where: { $0.id == selectedTrackID }) else { return }
-        currentTrack = track
-        requestPlayback(for: track)
+        requestFadedTrackChange(track)
     }
 
     func playTrack(_ track: TrackItem) {
-        currentTrack = track
         selectedTrackID = track.id
         selectedTrackIDs = [track.id]
-        requestPlayback(for: track)
+        requestFadedTrackChange(track)
     }
 
     func beginSeek() {

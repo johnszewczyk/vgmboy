@@ -69,6 +69,10 @@ refs.previousButton.addEventListener("click", () => {
   app.playback.playAdjacent(-1);
 });
 
+refs.stopButton.addEventListener("click", () => {
+  app.playback.stopPlaybackState().catch((error) => console.error("[SPCBoy] stop failed", error));
+});
+
 refs.databaseCollapseAllButton.addEventListener("click", () => {
   app.ui.setAllSidebarNodesCollapsed(true).catch((error) => console.error(error));
 });

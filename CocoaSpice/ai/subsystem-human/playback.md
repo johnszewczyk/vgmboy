@@ -12,6 +12,7 @@
 - Controls: Play and Pause are explicit desired states. Repeated Play after an output-device reconnect cannot toggle a resumed track back to Paused.
 - Repeat: the toolbar cycles Off, Repeat Playlist, and Repeat Song.
 - Controls: rapid previous or next commands use the newest requested track.
+- Faded Skip applies to direct playlist activation and Enter as well as Previous and Next. It fades the playing track before starting the selected target; when the setting is off or playback is paused, track activation starts immediately.
 - Playback: starts through VGMBoy's shared audio session.
 - Track changes: starting or skipping to another track makes a short clean output transition before
   the new track begins. The bundled audio endpoint stays ready between tracks, so CocoaSpice does

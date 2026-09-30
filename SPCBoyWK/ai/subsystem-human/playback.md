@@ -3,6 +3,9 @@
 The sidebar places transport controls in a toolbar above its search controls. The
 transport buttons keep their fixed sizes and the clock fills the remaining
 sidebar width. The progress slider remains in the playlist's bottom toolbar.
+Transport controls are ordered Previous, Stop, Play/Pause, and Next; Stop is a
+filled square button. When Faded Skip is enabled, direct playlist activation
+uses the same queued fade as Previous and Next.
 Transport, search, tabs, table headers, and the position bar share one toolbar
 height token derived from the interface font size.
 

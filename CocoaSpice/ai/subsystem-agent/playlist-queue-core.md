@@ -16,6 +16,7 @@
   excluded, so catalog metadata can never replace the row.
 - Double-click on a row starts playback of that row.
 - `Return` starts playback of the primary selected row.
+- Manual row activation and Return route through the faded track-change policy before playback replacement; automatic natural-end continuation stays on its separate completion path.
 - The row transport button plays that row, or stops it if that row is the active playing track.
 - Playlists can be saved to `.m3u` and loaded from `.m3u`.
 - Playlist `.m3u` save and load preserve multi-track container identity through `#COCOASPICE:` metadata lines.

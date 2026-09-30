@@ -69,3 +69,6 @@ Engineering constraints:
 
 The unconfirmed MediaRemote heap-corruption incident evidence is retained at
 [`Docs/investigations/MediaRemote-heap-corruption.md`](../Docs/investigations/MediaRemote-heap-corruption.md).
+The playlist-activation faded-skip regression and its source-level resolution
+are recorded at
+[`Docs/investigations/faded-skip-playlist-activation.md`](../Docs/investigations/faded-skip-playlist-activation.md).

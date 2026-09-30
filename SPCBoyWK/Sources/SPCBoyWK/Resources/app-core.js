@@ -258,6 +258,7 @@ const refs = {
   appVolumeValue: document.getElementById("app-volume-value"),
   monoEnabledCheckbox: document.getElementById("mono-enabled-checkbox"),
   previousButton: document.getElementById("previous-button"),
+  stopButton: document.getElementById("stop-button"),
   playButton: document.getElementById("play-button"),
   nextButton: document.getElementById("next-button"),
   equalizerToolbarButton: document.getElementById("equalizer-toolbar-button"),

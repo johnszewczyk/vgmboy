@@ -49,6 +49,11 @@
   live in `PlaybackQueueCore`; CocoaSpice retains only native model mapping and
   presentation state. Native transport request invalidation is shared and occurs
   before a stop or replacement can race a start.
+- User-selected playlist targets, including Return activation, and adjacent
+  transport targets pass through one `PlayerViewModel.requestFadedTrackChange`
+  policy boundary. Keep `requestPlayback` as the low-level start path for
+  resume, playlist replacement, and natural completion; bypassing the policy
+  on a user-selected target makes Faded Skip apply only to transport buttons.
 - `PlaybackControlSurface` is read by the shared coordinator and is the
   capability gate for frontend Audio-panel mappings. Volume, Mono, EQ, timing,
   and transport commands all reach VGMBoy through that one mapping point; no

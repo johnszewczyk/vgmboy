@@ -450,6 +450,7 @@ function updatePlaybackReadout() {
   const playlistTotalSeconds = state.playlist.reduce((sum, entry) => sum + currentOutputBasePlaybackSeconds(entry), 0);
   refs.playlistTotalLabel.textContent = formatTime(playlistTotalSeconds);
   refs.playButton.querySelector("use")?.setAttribute("href", state.isPlaying ? "#icon-pause" : "#icon-play");
+  refs.stopButton.disabled = !state.currentTrackId && !state.currentTrackInfo;
   syncMediaSessionState();
 }
 
@@ -752,7 +753,14 @@ async function continueAfterPlaybackRetirement({
     return;
   }
 
-  if (completedQueuedSkip) {
+  if (completedQueuedSkip?.targetTrackId) {
+    await playTrack(
+      completedQueuedSkip.targetTrackId,
+      completedQueuedSkip.startSeconds || 0,
+      true,
+      completedQueuedSkip.playbackOptions || null
+    );
+  } else if (completedQueuedSkip) {
     await advanceToAdjacent(completedQueuedSkip.delta);
   } else if (completionTargetId) {
     await playTrack(completionTargetId, 0);
@@ -760,6 +768,8 @@ async function continueAfterPlaybackRetirement({
 }
 
 async function stopPlaybackState({ declick = true, keepNativeOutput = false, nativeAlreadyRetired = false } = {}) {
+  queuedSkipRequest = null;
+  clearQueuedSkipTimer();
   const generation = ++playbackGeneration;
   if (!nativeAlreadyRetired) {
     await stopAllOutput({ declick, keepNativeOutput, generation });
@@ -905,6 +915,7 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
 }
 
 function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playbackOptions = null) {
+  const replacingQueuedSkip = !preserveQueuedSkip && Boolean(queuedSkipRequest);
   if (!preserveQueuedSkip) {
     queuedSkipRequest = null;
     clearQueuedSkipTimer();
@@ -914,7 +925,58 @@ function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playba
     state.playingPlaylist = [...state.playlist];
     state.playbackTabId = state.activePlaylistTabId || null;
   }
+  if (!preserveQueuedSkip
+      && !replacingQueuedSkip
+      && state.currentTrackId
+      && state.isPlaying) {
+    return playTrackWithFadedSkip(trackId, startSeconds, playbackOptions);
+  }
   return playTrackNow(trackId, startSeconds, playbackOptions);
+}
+
+async function playTrackWithFadedSkip(trackId, startSeconds = 0, playbackOptions = null) {
+  const track = playbackPlaylist().find((entry) => entry.id === trackId);
+  if (!track) return;
+
+  const generation = ++playbackGeneration;
+  const current = currentTrack();
+  const fadeDurationMs = await window.spcBoyWK.playbackFadeDuration({
+    enabled: state.queuedSkipsEnabled,
+    isPlaying: state.isPlaying,
+    hasCurrentTrack: Boolean(current),
+    elapsedSeconds: state.elapsedSeconds,
+    preFadeSeconds: currentOutputBasePlaybackSeconds(current),
+    fadeSeconds: currentFadeSeconds(current),
+    totalSeconds: currentTotalSeconds(current)
+  });
+  if (generation !== playbackGeneration) return;
+  if (!fadeDurationMs) return playTrackNow(trackId, startSeconds, playbackOptions);
+
+  queuedSkipRequest = {
+    targetTrackId: trackId,
+    startSeconds,
+    playbackOptions,
+    generation,
+    nativeGeneration: Number(state.nativePlayback.generation) || 0
+  };
+  fadeActiveOutput(fadeDurationMs).catch((error) => {
+    console.error("[SPCBoy] faded playlist activation failed", error);
+  });
+  queuedSkipTimer = window.setTimeout(() => {
+    void (async () => {
+      const request = queuedSkipRequest;
+      if (!request || request.generation !== playbackGeneration) return;
+      const snapshot = await window.spcBoyWK.nativePlaybackState();
+      if (request !== queuedSkipRequest || request.generation !== playbackGeneration) return;
+      if (request.nativeGeneration > 0
+          && Number(snapshot?.generation) !== request.nativeGeneration) {
+        await cancelQueuedSkip({ restoreOutput: true });
+        return;
+      }
+      queuedSkipTimer = 0;
+      await finalizePlaybackEnded();
+    })().catch((error) => console.error("[SPCBoy] faded playlist activation failed", error));
+  }, fadeDurationMs);
 }
 
 async function advanceToAdjacent(delta, generation = playbackGeneration) {

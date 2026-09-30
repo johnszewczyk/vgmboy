@@ -33,6 +33,10 @@ struct MainView: View {
             ToolbarItemGroup(placement: .secondaryAction) {
                 Button(action: model.playPrevious) { Image(systemName: "backward.fill") }
                     .disabled(model.playlist.isEmpty)
+                Button(action: model.stopPlayback) { Image(systemName: "stop.fill") }
+                    .disabled(model.currentTrack == nil && !model.isLoading)
+                    .help("Stop")
+                    .accessibilityLabel("Stop")
                 Button(action: model.togglePlayback) { Image(systemName: model.isPlaying ? "pause.fill" : "play.fill") }
                     .disabled(model.currentTrack == nil || model.isLoading)
                 Button(action: model.playNext) { Image(systemName: "forward.fill") }
