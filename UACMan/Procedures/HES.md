@@ -2,9 +2,17 @@
 
 Apply the [UAC Base Profile](BASE-UAC-PROFILE.md) and
 [Pre-Disc Native Procedure](PRE-DISC-NATIVE.md). **Draft pending fixture
-validation.** MetaManCore reads `.hes`
-header fields and an optional companion extended M3U without emulating the
-PC Engine. See [`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md).
+validation.** MetaManCore reads HES header fields and an optional companion
+extended M3U without emulating the PC Engine. See
+[`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md).
+
+## Reader Scope
+
+- Reader ID: `hes`; source member: `.hes`.
+- Reader: `MetaMan/Sources/MetaManCore/HESMetadataReader.swift`.
+- HES header labels are exposed as `game`, `artist`, and `copyright`. The
+  optional M3U contributes entry `title` values and keeps recognized comment
+  tag names in their source spelling.
 
 ## Field Mapping
 
