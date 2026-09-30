@@ -205,6 +205,13 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the centered half-width wrapper aligns both toolbar rows');
   assert.ok(toolbarTargets.some((target) => target.name === 'OPTIONS'),
     'Options remains reachable from the sidebar controls');
+  const defaultHeader = toolbarTargets.find((target) => target.columnHeader && target.name === '#');
+  assert.ok(defaultHeader, 'the numbered playlist heading is visible');
+  const firstPlaylistBody = toolbarTargets.find((target) => target.trackIndex === 0
+    && target.box.x >= defaultHeader.box.x && target.box.y > defaultHeader.box.y);
+  assert.ok(firstPlaylistBody, 'the playlist heading and its first content row are visible');
+  assert.equal(firstPlaylistBody.box.y - (defaultHeader.box.y + defaultHeader.box.height), 4,
+    'the playlist table applies the standard four-dot UI Gap between its headings and rows');
   assert.ok(groupStateCalls.some(([action, system]) => action === 'toggle' && system === 'SNES'));
   assert.ok(groupStateCalls.some(([action, system, gameID]) =>
     action === 'selectGame' && system === 'SNES' && gameID === '1:SNES:Sample'));
@@ -275,13 +282,13 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   };
   let otherSystem = hitTargetSnapshot().find((target) => target.name.endsWith('ZZZ'));
   assert.ok(otherSystem, 'the other catalog system is available to expand');
-  if (otherSystem.name.startsWith('V')) {
+  if (otherSystem.disclosureProgress > 0) {
     clickTargetBox(otherSystem);
     await tick();
     await tick();
     otherSystem = hitTargetSnapshot().find((target) => target.name.endsWith('ZZZ'));
   }
-  assert.ok(otherSystem?.name.startsWith('>'), 'the system is collapsed before the sizing check');
+  assert.equal(otherSystem?.disclosureProgress, 0, 'the system is collapsed before the sizing check');
   const closedSidebarLayout = sidebarLayout();
   nextFrameAdvanceMs = 30;
   clickTargetBox(otherSystem);
@@ -290,6 +297,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the pane and playlist keep their geometry during an in-progress dropdown');
   await tick();
   await tick();
+  assert.equal(hitTargetSnapshot().find((target) => target.name.endsWith('ZZZ')).disclosureProgress, 1,
+    'the disclosure chevron reaches its fully rotated expanded position');
   assert.deepEqual(sidebarLayout(), closedSidebarLayout,
     'the pane and playlist keep their geometry after a system dropdown settles');
   const otherGame = hitTargetSnapshot().find((target) => target.name === 'Other');
@@ -347,9 +356,16 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.notEqual(calls.filter(([name]) => name === 'start').at(-1)[1].path, '/music/other.spc');
   globalThis.Math.random = originalRandom;
   const libraryPixels = pixelChecksum(canvas.image.data);
+  nextFrameAdvanceMs = 100;
   globalThis.ViewBoy.dispatch('settings');
   assert.match(status.textContent, /SETTINGS/);
-  assert.notEqual(pixelChecksum(canvas.image.data), libraryPixels, 'Options paints a distinct grouped screen');
+  await tick();
+  const rollingOptionsPixels = pixelChecksum(canvas.image.data);
+  assert.notEqual(rollingOptionsPixels, libraryPixels,
+    'Options rolls down over the source screen instead of swapping immediately');
+  await tick();
+  assert.notEqual(pixelChecksum(canvas.image.data), rollingOptionsPixels,
+    'the roll-down reaches the fully settled Options screen');
   const gameBoyPixels = pixelChecksum(canvas.image.data);
   const clickScreen = (x, y) => {
     const rect = canvas.getBoundingClientRect();
@@ -387,6 +403,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const pages = ['DISPLAY', 'THEME', 'TRANSPORT', 'PLAYBACK', 'METHODS', 'AUDIO', 'INTERFACE', 'LIBRARY'];
   const clickPage = (index) => clickTarget(pages[index]);
   globalThis.ViewBoy.dispatch('library');
+  await tick();
   assert.ok(hitTargetSnapshot().some((target) => target.searchField && target.name === 'SEARCH LIBRARY'),
     'the sidebar begins with a pixel-rendered search field');
   const idleSearchPixels = pixelChecksum(canvas.image.data);
@@ -405,8 +422,10 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const parentSystemRow = filteredSidebar.find((target) => target.name.endsWith('SNES'));
   const childGameRow = filteredSidebar.find((target) => target.name === 'Sample');
   assert.ok(parentSystemRow && childGameRow, 'the filtered system disclosure and game row are both visible');
-  assert.equal(childGameRow.textInset - parentSystemRow.textInset, 2 * childGameRow.glyphAdvance,
-    'sidebar game labels align exactly two glyph advances after their parent disclosure marker');
+  assert.equal(childGameRow.textInset, parentSystemRow.textInset,
+    'sidebar game labels align with the title column after the parent chevron');
+  assert.equal(childGameRow.box.y - (parentSystemRow.box.y + parentSystemRow.box.height), 4,
+    'the sidebar tree applies the standard four-dot UI Gap between a system header and its games');
   typeSearchKey('Escape');
   assert.ok(hitTargetSnapshot().some((target) => target.name.includes('ZZZ')),
     'Escape clears the search and restores the complete sidebar tree');
@@ -437,20 +456,27 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   };
   const defaultTabGap = tabGap();
   clickTarget('OPTIONS');
+  await tick();
   clickPage(6);
   clickTarget('UI GAP +');
+  await tick();
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 5,
     'the renamed UI Gap setting persists under its current name');
   globalThis.ViewBoy.dispatch('library');
+  await tick();
   assert.ok(tabGap() > defaultTabGap, 'playlist tabs respond to UI Gap while retaining independent column spacing');
   clickTarget('X', 1);
   clickTarget('OPTIONS');
+  await tick();
   clickPage(6);
   clickTarget('UI GAP -');
+  await tick();
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 4,
     'the UI Gap returns to its original value');
   clickTarget('BACK');
+  await tick();
   globalThis.ViewBoy.dispatch('settings');
+  await tick();
   const commandKey = (key) => canvas.listeners.get('keydown')({
     key,
     code: key === ',' ? 'Comma' : `Digit${key}`,
@@ -501,9 +527,27 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'all equalizer value readouts share the same right-column alignment');
   assert.equal(new Set(equalizerBands.map((target) => target.equalizerValueBox?.width)).size, 1,
     'all equalizer value readouts have identical widths');
+  assert.equal(new Set(equalizerBands.map((target) =>
+    target.equalizerLabelBox?.width)).size, 1,
+  'all equalizer label columns have identical widths');
   assert.ok(equalizerBands.every((target) => target.equalizerValueBox?.y === target.box.y
     && target.equalizerValueBox?.height === target.box.height),
   'each gain readout aligns vertically with its slider');
+  assert.ok(equalizerBands.every((target) => target.equalizerLabelBox?.y === target.box.y
+    && target.equalizerLabelBox?.height === target.box.height),
+  'each frequency label aligns vertically with its slider');
+  assert.equal(new Set(equalizerBands.map((target) =>
+    target.box.x - (target.equalizerLabelBox.x + target.equalizerLabelBox.width))).size, 1,
+  'all EQ rows retain the same gap between frequency labels and their fill bars');
+  assert.equal(new Set(equalizerBands.map((target) =>
+    target.equalizerValueBox.x - (target.box.x + target.box.width))).size, 1,
+  'all EQ rows retain the same gap between fill bars and gain readouts');
+  assert.ok(equalizerBands.every((target) => target.equalizerTickXs.length === 25),
+    'every EQ bar has the same 25 gain ticks');
+  assert.ok(equalizerBands.every((target) => new Set(target.equalizerTickXs.slice(1)
+    .map((tick, index) => tick - target.equalizerTickXs[index])).size === 1),
+  'EQ tick fins have exactly even spacing across each life-gauge bar');
+  const defaultEqualizerWidth = equalizerBands[0].box.width;
   assert.equal(new Set(equalizerBands.map((target) =>
     target.equalizerValueBox.x - target.box.x)).size, 1,
   'all equalizer bands keep the same slider-to-value spacing');
@@ -575,7 +619,17 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   commandKey(',');
   assert.match(status.textContent, /SETTINGS/,
     'Command-comma opens the Options screen');
+  await tick();
+  const openOptionsPixels = pixelChecksum(canvas.image.data);
+  nextFrameAdvanceMs = 100;
   clickTarget('BACK');
+  await tick();
+  const rollingBackPixels = pixelChecksum(canvas.image.data);
+  assert.notEqual(rollingBackPixels, openOptionsPixels,
+    'Back rolls the Options screen upward as the prior view returns');
+  await tick();
+  assert.notEqual(pixelChecksum(canvas.image.data), rollingBackPixels,
+    'the reverse roll settles on the full playlist screen');
   assert.equal(hitTargetSnapshot().filter((target) => target.name === 'X').length, 2,
     'each visible playlist tab uses the compact X close control');
   clickTarget('X', 1);
@@ -589,6 +643,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(savedPlaylistTabs.at(-1)?.tabs[0]?.playlist.length, 0,
     'closing the final tab saves it empty even while audio continues playing');
   globalThis.ViewBoy.dispatch('settings');
+  await tick();
   clickPage(6);
   globalThis.ViewBoy.dispatch('optionsPage:INTERFACE');
   clickTarget('AUTO-SIZE COLUMNS');
@@ -599,19 +654,36 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'transport controls are kept off the Options screen');
   const paddingBefore = hitTargetSnapshot().find((target) => target.name === 'BACK').box.height;
   clickTarget('CONTROL PADDING +');
+  await tick();
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).controlPaddingDots, 5,
     'control padding is adjustable and persists in display preferences');
   assert.ok(hitTargetSnapshot().find((target) => target.name === 'BACK').box.height > paddingBefore,
     'control padding changes the shared button row height');
+  clickTarget('CONTROL PADDING -');
+  await tick();
   clickTarget('UI GAP +');
+  await tick();
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 5,
     'the shared interface gap has an independent persisted setting');
+  clickPage(5);
+  const expandedGapBands = hitTargetSnapshot().filter((target) => /^EQ \d/.test(target.name));
+  assert.ok(expandedGapBands.every((target) =>
+    target.box.x - (target.equalizerLabelBox.x + target.equalizerLabelBox.width) === 5
+      && target.equalizerValueBox.x - (target.box.x + target.box.width) === 5),
+  'increasing UI Gap adds space on both sides of every EQ bar');
+  assert.ok(expandedGapBands[0].box.width < defaultEqualizerWidth,
+    'the EQ bar gives available width to the larger UI gaps instead of consuming their padding');
+  clickPage(6);
+  clickTarget('UI GAP -');
+  await tick();
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 4,
+    'the UI Gap returns to its original value');
   clickTarget('PLAYLIST GAP +');
+  await tick();
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).playlistGapDots, 5,
     'playlist column and tab spacing has an independent persisted setting');
-  clickTarget('CONTROL PADDING -');
-  clickTarget('UI GAP -');
   clickTarget('PLAYLIST GAP -');
+  await tick();
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).controlPaddingDots, 4);
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 4);
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).playlistGapDots, 4);
@@ -638,15 +710,19 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).transportSymbols, true,
     'the Transport page persists its Words/Symbols control setting');
   globalThis.ViewBoy.dispatch('library');
+  await tick();
   const symbolTransportPixels = pixelChecksum(canvas.image.data);
   globalThis.ViewBoy.dispatch('settings');
+  await tick();
   clickPage(2);
   clickTarget('BUTTONS WORDS');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).transportSymbols, false);
   globalThis.ViewBoy.dispatch('library');
+  await tick();
   assert.notEqual(pixelChecksum(canvas.image.data), symbolTransportPixels,
     'symbol mode replaces word labels while keeping equal-width toolbar controls');
   globalThis.ViewBoy.dispatch('settings');
+  await tick();
   clickPage(4);
   clickTarget('LIBGME SPEED');
   await tick();
@@ -659,6 +735,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(reconfigureCalls.at(-1).tempo, 33 / 32,
     'a speed change updates the active native decoder immediately');
   globalThis.ViewBoy.dispatch('library');
+  await tick();
   screenWidth = 1400;
   windowListeners.get('resize')();
   await tick();
