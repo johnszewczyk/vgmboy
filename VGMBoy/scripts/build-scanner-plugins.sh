@@ -12,6 +12,7 @@ MDX_OUTPUT="$BUILD_DIR/vgmboy-mdx-inspect"
 AMIGA_OUTPUT="$BUILD_DIR/vgmboy-amiga-inspect"
 SCANNER_STAMP="$BUILD_DIR/scanner-inputs.sha256"
 MACOS_SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+export MACOSX_DEPLOYMENT_TARGET=26.0
 
 mkdir -p "$BUILD_DIR"
 
@@ -73,6 +74,7 @@ scanner_signature="$({
     pkg-config --modversion libavcodec vorbisfile ogg 2>/dev/null || true
     pkg-config --modversion uade 2>/dev/null || true
     printf '%s\n' "$MACOS_SDKROOT"
+    printf '%s\n' "$MACOSX_DEPLOYMENT_TARGET"
 } | shasum -a 256 | awk '{ print $1 }')"
 
 if [[ -x "$VGMSTREAM_OUTPUT" && -x "$MDX_OUTPUT" && -x "$AMIGA_OUTPUT" && -f "$SCANNER_STAMP" \
@@ -114,6 +116,7 @@ fi
 # C build to the active Xcode toolchain's matching SDK.
 cmake -S "$VGMSTREAM_SOURCE" -B "$VGMSTREAM_BUILD" \
     -DCMAKE_OSX_SYSROOT="$MACOS_SDKROOT" \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET" \
     -DBUILD_CLI=ON \
     -DBUILD_AUDACIOUS=OFF \
     -DBUILD_STATIC=OFF \

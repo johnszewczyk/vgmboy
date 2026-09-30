@@ -15,6 +15,8 @@ BUILD_DIR="$ROOT_DIR/.build/psgplay"
 }
 
 mkdir -p "$BUILD_DIR"
-make -C "$SOURCE_DIR" lib/psgplay/libpsgplay.a CC="${CC:-cc}"
+make -B -C "$SOURCE_DIR" lib/psgplay/libpsgplay.a \
+  CC="${CC:-cc}" \
+  CFLAGS="-mmacosx-version-min=${MACOSX_DEPLOYMENT_TARGET:-26.0}"
 cp "$SOURCE_DIR/lib/psgplay/libpsgplay.a" "$BUILD_DIR/libpsgplay.a"
 echo "Built $BUILD_DIR/libpsgplay.a"

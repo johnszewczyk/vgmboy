@@ -641,7 +641,9 @@ test("SPCBoyWK ignores delayed native status events", () => {
 });
 
 test("SPCBoyWK selection capsule leaves playlist text colors unchanged", () => {
-  assert.match(stylesSource, /\.list-selection-indicator[\s\S]*?background: var\(--accent\)/);
+  assert.match(stylesSource, /\.list-selection-indicator\s*\{[\s\S]*?background: transparent;/);
+  assert.match(stylesSource, /\.list-selection-indicator\.is-solid\s*\{[\s\S]*?background: var\(--accent\);/);
+  assert.match(uiSource, /function syncSelectionIndicatorStyle\(\)[\s\S]*?refs\.playlistSelectionIndicator[\s\S]*?ensureSidebarSelectionIndicator\(\)[\s\S]*?setSelectionIndicatorSolid\(indicator, solid\)/);
   assert.match(stylesSource, /\.list-selection-indicator\s*\{[^}]*transition: transform var\(--selection-animation-duration\)/);
   assert.doesNotMatch(stylesSource, /\.list-selection-indicator\s*\{[^}]*transition:[^}]*opacity/);
   assert.doesNotMatch(stylesSource, /\.list-selection-indicator\s*\{[^}]*transition:[^}]*,\s*(?:width|height)\s+var\(--selection-animation-duration\)/);

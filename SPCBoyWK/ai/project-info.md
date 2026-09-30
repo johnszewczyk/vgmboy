@@ -49,6 +49,7 @@ Agent engineering notes:
 
 - Shared sidebar behavior: [shared-sidebar-core.md](subsystem-agent/shared-sidebar-core.md)
 - Playlist-tab persistence and host boundary: [playlist-tabs.md](subsystem-agent/playlist-tabs.md)
+- Playback transport and faded-skip ownership: [playback-transport.md](subsystem-agent/playback-transport.md)
 - WebKit host boundary: [webkit-host.md](subsystem-agent/webkit-host.md)
 
 ## Local Rules

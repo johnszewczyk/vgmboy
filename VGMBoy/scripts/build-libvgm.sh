@@ -7,7 +7,7 @@ BUILD_DIR="$ROOT_DIR/.build/libvgm"
 
 if [[ ! -d "$SOURCE_DIR" ]]; then
   echo "Missing vendored libvgm source at $SOURCE_DIR"
-  echo "Clone it with: git clone --depth 1 https://github.com/ValleyBell/libvgm.git vendor/libvgm"
+  echo "Restore the tracked vendor source from the VGMMan checkout."
   exit 1
 fi
 
@@ -18,6 +18,8 @@ if ! command -v cmake >/dev/null 2>&1; then
 fi
 
 cmake -S "$SOURCE_DIR" -B "$BUILD_DIR" \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-26.0}" \
+  -DCMAKE_OSX_SYSROOT="${SDKROOT:-$(xcrun --sdk macosx --show-sdk-path)}" \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_LIBAUDIO=NO \
   -DBUILD_PLAYER=NO \

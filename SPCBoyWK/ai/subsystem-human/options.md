@@ -56,7 +56,7 @@ replaces the playlist with a snapshot of shared Favorites without changing the
 sidebar. Command-D toggles the selected track or selected database game/group.
 Both playlist headers use a visible star for the favorite column. Command-click and Shift-click select
 multiple playlist rows. Favorites are shared with CocoaSpice through VGMMan's application-support data
-store and remain separate from the read-only schema-23 scan catalog.
+store and remain separate from the read-only schema-24 scan catalog.
 
 ## Files
 

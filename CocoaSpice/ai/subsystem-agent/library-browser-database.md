@@ -2,7 +2,7 @@
 
 ## Scope
 
-- Query-only schema-23 catalog access.
+- Query-only schema-24 catalog access.
 - Games, Files, Search, activation, and queue loading.
 
 ## Ownership
@@ -11,7 +11,7 @@
   console identity, checkpoints, and sidebar projections.
 - `LibraryDatabase.configuredDatabaseURL` owns launch-time path selection.
 - CocoaSpice opens the selected file with `SQLITE_OPEN_READONLY` plus
-  `PRAGMA query_only`, validates schema 23, and exposes read APIs only in the
+  `PRAGMA query_only`, validates schema 24, and exposes read APIs only in the
   production app path.
 - `DatabaseSidebarLoader` owns snapshots and retains the last valid snapshot
   when a query fails.
@@ -61,7 +61,7 @@
 ## Invariants
 
 - Browse persists only an absolute standardized path accepted by CocoaSpice's
-  read-only schema-23 validation; a changed location applies after restart.
+  read-only schema-24 validation; a changed location applies after restart.
   Reloading the active location invalidates cached read-only sidebar snapshots
   and loads the current published catalog without changing playback.
 - CocoaSpice never creates, migrates, scans into, resets, cleans, rewrites, or

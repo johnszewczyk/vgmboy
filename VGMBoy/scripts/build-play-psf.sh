@@ -41,6 +41,8 @@ if ! grep -q 'm_ps2DynamicLinkHack' "$root/vendor/play/Source/MA_MIPSIV.h"; then
 fi
 
 cmake -S "$root/vendor/play" -B "$build" \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-26.0}" \
+  -DCMAKE_OSX_SYSROOT="${SDKROOT:-$(xcrun --sdk macosx --show-sdk-path)}" \
   -DBUILD_PLAY=OFF \
   -DBUILD_PSFPLAYER=ON \
   -DBUILD_TESTS=OFF \

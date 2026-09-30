@@ -14,7 +14,7 @@ inspection builds for the CocoaSpice, SPCBoyWK, ViewBoy, and ScanSong products.
   and is not an active consumer of VGMBoy changes.
 - ViewBoy is a separate active WebKit frontend with its own bundle identity and phosphor display
   layer. It reads the same catalog and links the shared core through its native bridge.
-- ScanSong is the native catalog-management app and the sole schema-23 catalog writer. It bundles
+- ScanSong is the native catalog-management app and the sole schema-24 catalog writer. It bundles
   the inspection executables produced through VGMBoy's scanner-plugin build boundary.
 - VGMBoy is database-free and never owns a playlist, catalog mutation, or frontend window.
 

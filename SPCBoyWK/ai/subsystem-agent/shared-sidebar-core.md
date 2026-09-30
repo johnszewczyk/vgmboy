@@ -37,7 +37,8 @@ and persistence. This project owns only the typed native adapter and WebKit rend
   Selected row backgrounds stay transparent to reveal the capsule.
 - Large catalog playlists are rendered through a fixed-height visible window;
   the database result remains fully selectable without creating one WebKit DOM
-  row per catalog track.
+  row per catalog track. Replace each visible window in one render turn so
+  scrolling never exposes an empty playlist or a stale row focus target.
 - Native playback and playlist commands use the shared `FrontendCommandCore`
   command contract. `Favorites Playlist` uses Command-Shift-D and changes only the queue snapshot,
   never the sidebar mode.
@@ -49,3 +50,5 @@ and persistence. This project owns only the typed native adapter and WebKit rend
 
 - `../../../CatalogReader/Sources/CatalogBrowserCore/CatalogBrowserCore.swift`
 - `../../Sources/SPCBoyWK/Resources/index.html`
+- `../../Sources/SPCBoyWK/Resources/app-ui.js`
+- `../../Sources/SPCBoyWK/Resources/styles.css`

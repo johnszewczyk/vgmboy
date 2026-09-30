@@ -51,9 +51,13 @@
   before a stop or replacement can race a start.
 - User-selected playlist targets, including Return activation, and adjacent
   transport targets pass through one `PlayerViewModel.requestFadedTrackChange`
-  policy boundary. Keep `requestPlayback` as the low-level start path for
-  resume, playlist replacement, and natural completion; bypassing the policy
-  on a user-selected target makes Faded Skip apply only to transport buttons.
+  policy boundary. It uses FrontendCore's `PlaybackQueuedSkipFadeRequest`, the
+  same eligibility and duration policy used by SPCBoyWK. CocoaSpice keeps its
+  own delayed target handoff; `VGMBoyPlaybackEngine.beginFadedSkip` sends the
+  ramp through the shared `PlaybackTransportCoordinator` and VGMBoy command
+  path. Keep `requestPlayback` as the low-level start path for resume, playlist
+  replacement, and natural completion; bypassing the policy on a
+  user-selected target makes Faded Skip apply only to transport buttons.
 - `PlaybackControlSurface` is read by the shared coordinator and is the
   capability gate for frontend Audio-panel mappings. Volume, Mono, EQ, timing,
   and transport commands all reach VGMBoy through that one mapping point; no

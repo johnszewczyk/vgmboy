@@ -689,7 +689,9 @@ struct PlaybackControlProtocolTests {
         #expect(PlaybackTempo.parse("15/12") == PlaybackTempo(numerator: 5, denominator: 4))
         #expect(PlaybackTempo.parse("1/3") == PlaybackTempo(numerator: 11, denominator: 32))
         #expect(PlaybackTempo.parse("1.01") == PlaybackTempo(numerator: 1, denominator: 1))
-        #expect(PlaybackTempo(numerator: 5, denominator: 4).displayString == "1.25")
+        #expect(PlaybackTempo(numerator: 5, denominator: 4).displayString == "5/4")
+        #expect(PlaybackTempo(numerator: 1, denominator: 2).displayString == "1/2")
+        #expect(PlaybackTempo(numerator: 101, denominator: 100).displayString == "1.01")
         #expect(PlaybackTempo(numerator: 1, denominator: 3).displayString == "1/3")
         #expect(PlaybackTempo.parse("1.0000001") == nil)
     }

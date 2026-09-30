@@ -1479,6 +1479,19 @@ body.options-window .options-header { display: none; }
   gap: 1rem;
 }
 
+.options-field-copy {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.options-field-copy small {
+  color: var(--muted);
+  font-size: 0.85em;
+  font-weight: 400;
+  line-height: 1.25;
+}
+
 .options-inline-leading {
   gap: 1rem;
   justify-content: flex-start;
@@ -1519,6 +1532,11 @@ body.options-window .options-header { display: none; }
 .options-color-text-input {
   width: 18ch;
   max-width: 18ch;
+}
+
+input.options-input[inputmode="numeric"],
+input.options-input[inputmode="decimal"] {
+  width: 4rem;
 }
 
 .options-number-input {

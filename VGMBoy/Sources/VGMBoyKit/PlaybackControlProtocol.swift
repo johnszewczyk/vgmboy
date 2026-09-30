@@ -12,6 +12,7 @@ public struct PlaybackTempo: Codable, Equatable, Sendable {
     public static let defaultValue = PlaybackTempo(numerator: 1, denominator: 1)
     public static let maxComponent = 1_000_000
     public static let maxDecimalPlaces = 6
+    private static let maxDisplayFractionDenominator = 32
 
     public let numerator: Int
     public let denominator: Int
@@ -66,6 +67,9 @@ public struct PlaybackTempo: Codable, Equatable, Sendable {
     }
 
     public var displayString: String {
+        if denominator > 1 && denominator <= Self.maxDisplayFractionDenominator {
+            return "\(numerator)/\(denominator)"
+        }
         let scale = Int(pow(10.0, Double(Self.maxDecimalPlaces)))
         guard scale % denominator == 0 else { return "\(numerator)/\(denominator)" }
         let scaled = numerator * (scale / denominator)

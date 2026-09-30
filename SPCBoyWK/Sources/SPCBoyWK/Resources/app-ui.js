@@ -453,14 +453,31 @@ function escapeHtml(value) {
   }[character]));
 }
 
+function setSelectionIndicatorSolid(indicator, solid) {
+  if (!indicator?.classList) return;
+  if (solid) indicator.classList.add("is-solid");
+  else indicator.classList.remove("is-solid");
+}
+
 function ensureSidebarSelectionIndicator() {
   let indicator = refs.treeRoot.querySelector(".list-selection-indicator");
-  if (indicator) return indicator;
+  if (indicator) {
+    setSelectionIndicatorSolid(indicator, Boolean(state.solidSelectionBar));
+    return indicator;
+  }
   indicator = document.createElement("div");
   indicator.className = "list-selection-indicator is-hidden";
   indicator.setAttribute("aria-hidden", "true");
+  setSelectionIndicatorSolid(indicator, Boolean(state.solidSelectionBar));
   refs.treeRoot.prepend(indicator);
   return indicator;
+}
+
+function syncSelectionIndicatorStyle() {
+  const solid = Boolean(state.solidSelectionBar);
+  [refs.playlistSelectionIndicator, ensureSidebarSelectionIndicator()]
+    .filter(Boolean)
+    .forEach((indicator) => setSelectionIndicatorSolid(indicator, solid));
 }
 
 function resetSidebarContent() {
@@ -2521,20 +2538,26 @@ function scheduleMetadataRefresh(trackId) {
 
 function applyUISettings() {
   const rootStyle = document.documentElement.style;
-  rootStyle.setProperty("--ui-font-size-pt", String(state.uiFontSizePt));
-  rootStyle.setProperty("--app-font-family", state.applicationMonospace ? "var(--mono-font-family)" : "var(--ui-font-family)");
+  rootStyle.setProperty("--ui-font-size-pt", String(state.uiChromeFontSizePt ?? state.uiFontSizePt));
+  rootStyle.setProperty("--app-font-family", state.uiChromeMonospace ? "var(--mono-font-family)" : "var(--ui-font-family)");
   rootStyle.setProperty("--sidebar-font-size-pt", String(state.sidebarFontSizePt));
   rootStyle.setProperty("--sidebar-text-color", state.sidebarTextColor);
-  rootStyle.setProperty("--sidebar-font-family", state.sidebarMonospace || state.applicationMonospace ? "var(--mono-font-family)" : "var(--ui-font-family)");
+  rootStyle.setProperty("--sidebar-font-family", state.contentMonospace || state.sidebarMonospace ? "var(--mono-font-family)" : "var(--ui-font-family)");
   rootStyle.setProperty("--playlist-font-size-pt", String(state.playlistFontSizePt));
   rootStyle.setProperty("--playlist-text-color", state.playlistTextColor);
   rootStyle.setProperty("--playlist-header-text-color", state.playlistHeaderTextColor);
-  rootStyle.setProperty("--playlist-font-family", state.playlistMonospace || state.applicationMonospace ? "var(--mono-font-family)" : "var(--ui-font-family)");
+  rootStyle.setProperty("--playlist-font-family", state.contentMonospace || state.playlistMonospace ? "var(--mono-font-family)" : "var(--ui-font-family)");
   rootStyle.setProperty("--playlist-header-font-weight", state.playlistHeaderBold ? "700" : "400");
   rootStyle.setProperty("--sidebar-width-percent", String(state.sidebarWidthPercent));
   rootStyle.setProperty("--accent", state.accentColor);
-  rootStyle.setProperty("--bg-chrome", state.uiChromeColor);
+  rootStyle.setProperty("--bg-chrome", state.uiChromePrimaryColor ?? state.uiChromeColor);
+  rootStyle.setProperty("--bg-panel", state.uiChromeSecondaryColor ?? "rgb(40 40 40)");
+  rootStyle.setProperty("--bg-subpanel", state.uiChromeSecondaryColor ?? "rgb(40 40 40)");
+  rootStyle.setProperty("--bg-sidebar", state.uiChromePaneColor ?? "rgb(20 20 20)");
+  rootStyle.setProperty("--bg-hover", state.uiChromeHoverColor ?? "rgb(50 50 50)");
+  rootStyle.setProperty("--line", state.uiChromeDividerColor ?? "rgb(40 40 40)");
   rootStyle.setProperty("--selection-bar-background", state.solidSelectionBar ? state.accentColor : "transparent");
+  syncSelectionIndicatorStyle();
   rootStyle.setProperty("--item-spacing-rem", String(state.uiItemSpacingRem));
   rootStyle.setProperty("--column-resize-duration", `${state.autoResizeAnimationEnabled ? state.autoResizeAnimationMilliseconds : 0}ms`);
   rootStyle.setProperty("--selection-animation-duration", `${state.selectionAnimationEnabled ? state.selectionAnimationMilliseconds : 0}ms`);
@@ -2544,6 +2567,8 @@ function appearanceSettings() {
   return {
     uiItemSpacingRem: state.uiItemSpacingRem,
     sidebarWidthPercent: state.sidebarWidthPercent,
+    uiChromeFontSizePt: state.uiChromeFontSizePt,
+    contentFontSizePt: state.sidebarFontSizePt,
     sidebarFontSizePt: state.sidebarFontSizePt,
     sidebarTextColor: state.sidebarTextColor,
     sidebarMonospace: state.sidebarMonospace,
@@ -2553,9 +2578,16 @@ function appearanceSettings() {
     playlistHeaderTextColor: state.playlistHeaderTextColor,
     playlistMonospace: state.playlistMonospace,
     applicationMonospace: state.applicationMonospace,
+    uiChromeMonospace: state.uiChromeMonospace,
+    contentMonospace: state.contentMonospace,
     playlistHeaderBold: state.playlistHeaderBold,
     accentColor: state.accentColor,
     uiChromeColor: state.uiChromeColor,
+    uiChromePrimaryColor: state.uiChromePrimaryColor,
+    uiChromeSecondaryColor: state.uiChromeSecondaryColor,
+    uiChromePaneColor: state.uiChromePaneColor,
+    uiChromeHoverColor: state.uiChromeHoverColor,
+    uiChromeDividerColor: state.uiChromeDividerColor,
     solidSelectionBar: state.solidSelectionBar
   };
 }
@@ -2637,16 +2669,22 @@ function renderAll() {
   refs.optionsDiagnosticsSection.classList.toggle("is-hidden", !diagnosticsSelected);
   refs.optionsAudioSection.classList.toggle("is-hidden", !audioSelected);
   renderRoutingConflicts();
-  if (document.activeElement !== refs.sidebarFontSizeInput) refs.sidebarFontSizeInput.value = String(state.uiFontSizePt);
+  if (refs.uiChromeFontSizeInput && document.activeElement !== refs.uiChromeFontSizeInput) refs.uiChromeFontSizeInput.value = String(state.uiChromeFontSizePt ?? state.uiFontSizePt);
+  if (document.activeElement !== refs.sidebarFontSizeInput) refs.sidebarFontSizeInput.value = String(state.sidebarFontSizePt);
   if (document.activeElement !== refs.sidebarTextColorInput) refs.sidebarTextColorInput.value = state.sidebarTextColor;
   if (refs.playlistHeaderTextColorInput && document.activeElement !== refs.playlistHeaderTextColorInput) {
     refs.playlistHeaderTextColorInput.value = state.playlistHeaderTextColor;
   }
   refs.sidebarPathCountsCheckbox.checked = state.sidebarPathCounts;
   if (document.activeElement !== refs.accentColorInput) refs.accentColorInput.value = state.accentColor;
-  if (document.activeElement !== refs.uiChromeColorInput) refs.uiChromeColorInput.value = state.uiChromeColor;
+  if (refs.uiChromePrimaryColorInput && document.activeElement !== refs.uiChromePrimaryColorInput) refs.uiChromePrimaryColorInput.value = state.uiChromePrimaryColor;
+  if (refs.uiChromeSecondaryColorInput && document.activeElement !== refs.uiChromeSecondaryColorInput) refs.uiChromeSecondaryColorInput.value = state.uiChromeSecondaryColor;
+  if (refs.uiChromePaneColorInput && document.activeElement !== refs.uiChromePaneColorInput) refs.uiChromePaneColorInput.value = state.uiChromePaneColor;
+  if (refs.uiChromeHoverColorInput && document.activeElement !== refs.uiChromeHoverColorInput) refs.uiChromeHoverColorInput.value = state.uiChromeHoverColor;
+  if (refs.uiChromeDividerColorInput && document.activeElement !== refs.uiChromeDividerColorInput) refs.uiChromeDividerColorInput.value = state.uiChromeDividerColor;
   refs.solidSelectionBarCheckbox.checked = state.solidSelectionBar;
-  refs.applicationMonospaceCheckbox.checked = state.applicationMonospace;
+  if (refs.uiChromeMonospaceCheckbox) refs.uiChromeMonospaceCheckbox.checked = state.uiChromeMonospace;
+  refs.applicationMonospaceCheckbox.checked = state.contentMonospace;
   if (refs.aacExportDirectoryPath) refs.aacExportDirectoryPath.value = state.aacExportDirectory || "";
   if (refs.aacExportStatus) refs.aacExportStatus.textContent = state.aacExportStatus || "";
   if (refs.aacExportCancelButton) refs.aacExportCancelButton.disabled = !state.aacExportInProgress;
@@ -2687,7 +2725,7 @@ function renderAll() {
     refs.libraryCachePath.value = archiveCachePath;
     refs.libraryCachePath.title = archiveCachePath;
   }
-  refs.libraryDatabaseLocationStatus.textContent = state.databaseLocationStatus || "SPCBoy reads this schema-23 catalog. ScanSong owns scan paths, scanning, link checks, and cleanup.";
+  refs.libraryDatabaseLocationStatus.textContent = state.databaseLocationStatus || "SPCBoy reads this schema-24 catalog. ScanSong owns scan paths, scanning, link checks, and cleanup.";
   refs.libraryDatabaseReloadButton.disabled = Boolean(state.databaseLocation?.requiresRestart);
   refs.libraryClearCacheButton.disabled = false;
   refs.databaseCacheSummary.textContent = state.archiveCacheSummary ? formatArchiveCacheSummary(state.archiveCacheSummary) : "—";
@@ -2975,14 +3013,26 @@ function setUiItemSpacing(nextSpacingRem) {
   renderAll();
 }
 
-function setFontSize(nextSize) {
+function setContentFontSize(nextSize) {
   const size = uiApp.normalizeFontSize(nextSize);
-  state.uiFontSizePt = size;
   state.sidebarFontSizePt = size;
   state.playlistFontSizePt = size;
   persistSettings();
   broadcastAppearanceSettings();
   renderAll();
+}
+
+function setUIChromeFontSize(nextSize) {
+  const size = uiApp.normalizeFontSize(nextSize);
+  state.uiChromeFontSizePt = size;
+  state.uiFontSizePt = size;
+  persistSettings();
+  broadcastAppearanceSettings();
+  renderAll();
+}
+
+function setFontSize(nextSize) {
+  setContentFontSize(nextSize);
 }
 
 function setSidebarWidth(nextWidth) {
@@ -2994,12 +3044,12 @@ function setSidebarWidth(nextWidth) {
 
 function commitFontSizeInput(rawValue) {
   const parsedValue = uiApp.parseNumericInput(rawValue);
-  setFontSize(parsedValue ?? state.uiFontSizePt);
+  setUIChromeFontSize(parsedValue ?? state.uiChromeFontSizePt ?? state.uiFontSizePt);
 }
 
 function commitSidebarFontSizeInput(rawValue) {
   const parsedValue = uiApp.parseNumericInput(rawValue);
-  setFontSize(parsedValue ?? state.uiFontSizePt);
+  setContentFontSize(parsedValue ?? state.sidebarFontSizePt);
 }
 
 function setSidebarTextColor(color) {
@@ -3057,9 +3107,18 @@ function setPlaylistMonospace(enabled) {
 
 function setApplicationMonospace(enabled) {
   const value = Boolean(enabled);
-  state.applicationMonospace = value;
+  state.contentMonospace = value;
   state.sidebarMonospace = value;
   state.playlistMonospace = value;
+  persistSettings();
+  broadcastAppearanceSettings();
+  renderAll();
+}
+
+function setUIChromeMonospace(enabled) {
+  const value = Boolean(enabled);
+  state.uiChromeMonospace = value;
+  state.applicationMonospace = value;
   persistSettings();
   broadcastAppearanceSettings();
   renderAll();
@@ -3100,12 +3159,17 @@ function setWindowAlwaysOnTop(key, enabled) {
 function applyAppearanceSettings(settings) {
   if (settings.uiItemSpacingRem !== undefined) state.uiItemSpacingRem = uiApp.normalizeItemSpacing(settings.uiItemSpacingRem);
   if (settings.sidebarWidthPercent !== undefined) state.sidebarWidthPercent = uiApp.normalizeSidebarWidth(settings.sidebarWidthPercent);
-  const interfaceFontSize = settings.uiFontSizePt ?? settings.sidebarFontSizePt ?? settings.playlistFontSizePt;
-  if (interfaceFontSize !== undefined) {
-    const size = uiApp.normalizeFontSize(interfaceFontSize);
-    state.uiFontSizePt = size;
+  const contentFontSize = settings.contentFontSizePt ?? settings.sidebarFontSizePt ?? settings.playlistFontSizePt;
+  if (contentFontSize !== undefined) {
+    const size = uiApp.normalizeFontSize(contentFontSize);
     state.sidebarFontSizePt = size;
     state.playlistFontSizePt = size;
+  }
+  const chromeFontSize = settings.uiChromeFontSizePt ?? settings.uiFontSizePt;
+  if (chromeFontSize !== undefined) {
+    const size = uiApp.normalizeFontSize(chromeFontSize);
+    state.uiChromeFontSizePt = size;
+    state.uiFontSizePt = size;
   }
   const interfaceFontColor = settings.sidebarTextColor ?? settings.playlistTextColor;
   if (interfaceFontColor !== undefined) {
@@ -3116,17 +3180,37 @@ function applyAppearanceSettings(settings) {
   if (settings.playlistHeaderTextColor !== undefined) {
     state.playlistHeaderTextColor = uiApp.normalizeFontColor(settings.playlistHeaderTextColor);
   }
-  const interfaceMonospace = settings.applicationMonospace ?? settings.sidebarMonospace ?? settings.playlistMonospace;
-  if (interfaceMonospace !== undefined) {
-    const enabled = Boolean(interfaceMonospace);
-    state.applicationMonospace = enabled;
+  const contentMonospace = settings.contentMonospace ?? settings.sidebarMonospace ?? settings.playlistMonospace;
+  if (contentMonospace !== undefined) {
+    const enabled = Boolean(contentMonospace);
+    state.contentMonospace = enabled;
     state.sidebarMonospace = enabled;
     state.playlistMonospace = enabled;
+  }
+  const chromeMonospace = settings.uiChromeMonospace ?? settings.applicationMonospace;
+  if (chromeMonospace !== undefined) {
+    state.uiChromeMonospace = Boolean(chromeMonospace);
+    state.applicationMonospace = Boolean(chromeMonospace);
   }
   if (settings.sidebarPathCounts !== undefined) state.sidebarPathCounts = Boolean(settings.sidebarPathCounts);
   if (settings.playlistHeaderBold !== undefined) state.playlistHeaderBold = Boolean(settings.playlistHeaderBold);
   if (settings.accentColor !== undefined) state.accentColor = uiApp.normalizeAccentColor(settings.accentColor);
-  if (settings.uiChromeColor !== undefined) state.uiChromeColor = uiApp.normalizeUIColor(settings.uiChromeColor, "rgb(30 30 30)");
+  if (settings.uiChromeColor !== undefined || settings.uiChromePrimaryColor !== undefined) {
+    state.uiChromePrimaryColor = uiApp.normalizeUIColor(settings.uiChromePrimaryColor ?? settings.uiChromeColor, "rgb(30 30 30)");
+    state.uiChromeColor = state.uiChromePrimaryColor;
+  }
+  if (settings.uiChromeSecondaryColor !== undefined || settings.uiChromeTertiaryColor !== undefined) {
+    state.uiChromeSecondaryColor = uiApp.normalizeUIColor(settings.uiChromeTertiaryColor ?? settings.uiChromeSecondaryColor, "rgb(40 40 40)");
+  }
+  if (settings.uiChromePaneColor !== undefined || settings.uiChromeSidebarColor !== undefined) {
+    state.uiChromePaneColor = uiApp.normalizeUIColor(settings.uiChromePaneColor ?? settings.uiChromeSidebarColor, "rgb(20 20 20)");
+  }
+  for (const [key, fallback] of Object.entries({
+    uiChromeHoverColor: "rgb(50 50 50)",
+    uiChromeDividerColor: "rgb(40 40 40)"
+  })) {
+    if (settings[key] !== undefined) state[key] = uiApp.normalizeUIColor(settings[key], fallback);
+  }
   if (settings.solidSelectionBar !== undefined) state.solidSelectionBar = Boolean(settings.solidSelectionBar);
   persistSettings();
   renderAll();
@@ -3140,7 +3224,22 @@ function setAccentColor(color) {
 }
 
 function setUIChromeColor(color) {
-  state.uiChromeColor = uiApp.normalizeUIColor(color, "rgb(30 30 30)");
+  state.uiChromePrimaryColor = uiApp.normalizeUIColor(color, "rgb(30 30 30)");
+  state.uiChromeColor = state.uiChromePrimaryColor;
+  persistSettings();
+  broadcastAppearanceSettings();
+  renderAll();
+}
+
+function setUIChromePaletteColor(role, color) {
+  const key = role === "pane" ? "uiChromePaneColor" : `uiChrome${String(role || "").charAt(0).toUpperCase()}${String(role || "").slice(1)}Color`;
+  const fallbacks = {
+    primary: "rgb(30 30 30)", secondary: "rgb(40 40 40)", pane: "rgb(20 20 20)",
+    hover: "rgb(50 50 50)", divider: "rgb(40 40 40)"
+  };
+  if (!Object.hasOwn(fallbacks, role)) return;
+  state[key] = uiApp.normalizeUIColor(color, fallbacks[role]);
+  if (role === "primary") state.uiChromeColor = state[key];
   persistSettings();
   broadcastAppearanceSettings();
   renderAll();
@@ -3346,9 +3445,12 @@ uiApp.ui = {
   setPlaybackSpeedEnabled,
   setUiItemSpacing,
   setFontSize,
+  setContentFontSize,
+  setUIChromeFontSize,
   setSidebarWidth,
   setAccentColor,
   setUIChromeColor,
+  setUIChromePaletteColor,
   setSolidSelectionBar,
   commitFontSizeInput,
   commitSidebarFontSizeInput,
@@ -3360,6 +3462,7 @@ uiApp.ui = {
   setPlaylistHeaderTextColor,
   setPlaylistMonospace,
   setApplicationMonospace,
+  setUIChromeMonospace,
   setPlaylistHeaderBold,
   setColumnAutoSize,
   setAnimationTiming,

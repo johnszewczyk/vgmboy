@@ -30,6 +30,10 @@ for ScanSong's external inspection executables.
   includes source contents and the patch so edits cannot hide behind a stale
   built product.
 - Compiled archives and scanner-plugin outputs belong under VGMBoy's `.build`.
+- The decoder-library and scanner-plugin builders target macOS 26.0, matching
+  the Swift packages. The dependency input stamps include the selected SDK and
+  deployment target, so changing either rebuilds native archives rather than
+  reusing incompatible products.
 - `build-scanner-plugins.sh` creates `.build/scanner-plugins` before staging
   products, so a clean checkout can build ScanSong without prior output state.
 - Its CMake build uses the SDK reported by the active `xcrun`, keeping the
@@ -58,7 +62,8 @@ for ScanSong's external inspection executables.
   reports upstream tags, installed Homebrew versions, missing source trees, and
   unpinned snapshots; it never changes a checkout or build product.
 - Native dependency products are keyed by source revision/diff, build script,
-  compatibility patch, compiler, and CMake version. `build-app.sh` removes only
+  compatibility patch, compiler, CMake version, SDK, and deployment target.
+  `build-app.sh` removes only
   its clean Swift release directory and app staging directory; it preserves the
   validated dependency products and stamps.
 - The vgmstream scanner executable has a combined input stamp; a warm

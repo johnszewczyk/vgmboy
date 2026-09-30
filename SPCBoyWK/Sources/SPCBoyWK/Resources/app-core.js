@@ -78,6 +78,7 @@ const state = {
   spcFadeSeconds: DEFAULT_PLAY_FADE_SECONDS,
   uiItemSpacingRem: 0.2,
   uiFontSizePt: 10,
+  uiChromeFontSizePt: 10,
   sidebarFontSizePt: 10,
   sidebarTextColor: "#a9a9a9",
   sidebarMonospace: false,
@@ -87,10 +88,17 @@ const state = {
   playlistHeaderTextColor: "gray",
   playlistMonospace: false,
   applicationMonospace: false,
+  uiChromeMonospace: false,
+  contentMonospace: false,
   playlistHeaderBold: false,
   sidebarWidthPercent: 20,
   accentColor: "lightskyblue",
   uiChromeColor: "rgb(30 30 30)",
+  uiChromePrimaryColor: "rgb(30 30 30)",
+  uiChromeSecondaryColor: "rgb(40 40 40)",
+  uiChromePaneColor: "rgb(20 20 20)",
+  uiChromeHoverColor: "rgb(50 50 50)",
+  uiChromeDividerColor: "rgb(40 40 40)",
   solidSelectionBar: false,
   routingPreferences: {},
   archiveCacheEnabled: true,
@@ -219,10 +227,12 @@ const refs = {
   libraryCacheBrowseButton: document.getElementById("library-cache-browse-button"),
   libraryCacheDefaultButton: document.getElementById("library-cache-default-button"),
   sidebarFontSizeInput: document.getElementById("sidebar-font-size-input"),
+  uiChromeFontSizeInput: document.getElementById("ui-chrome-font-size-input"),
   sidebarTextColorInput: document.getElementById("sidebar-text-color-input"),
   playlistHeaderTextColorInput: document.getElementById("playlist-header-text-color-input"),
   sidebarPathCountsCheckbox: document.getElementById("sidebar-path-counts-checkbox"),
   applicationMonospaceCheckbox: document.getElementById("application-monospace-checkbox"),
+  uiChromeMonospaceCheckbox: document.getElementById("ui-chrome-monospace-checkbox"),
   aacExportDirectoryPath: document.getElementById("aac-export-directory-path"),
   aacExportChooseButton: document.getElementById("aac-export-choose-button"),
   aacExportStatus: document.getElementById("aac-export-status"),
@@ -238,6 +248,11 @@ const refs = {
   sidebarWidthInput: document.getElementById("sidebar-width-input"),
   accentColorInput: document.getElementById("accent-color-input"),
   uiChromeColorInput: document.getElementById("ui-chrome-color-input"),
+  uiChromePrimaryColorInput: document.getElementById("ui-chrome-primary-color-input"),
+  uiChromeSecondaryColorInput: document.getElementById("ui-chrome-secondary-color-input"),
+  uiChromePaneColorInput: document.getElementById("ui-chrome-pane-color-input"),
+  uiChromeHoverColorInput: document.getElementById("ui-chrome-hover-color-input"),
+  uiChromeDividerColorInput: document.getElementById("ui-chrome-divider-color-input"),
   solidSelectionBarCheckbox: document.getElementById("solid-selection-bar-checkbox"),
   uiItemSpacingInput: document.getElementById("ui-item-spacing-input"),
   spcForceLengthCheckbox: document.getElementById("spc-force-length-checkbox"),
@@ -319,23 +334,35 @@ async function loadSettings() {
     state.collapsedConsoleNames = Array.isArray(parsed.collapsedConsoleNames)
       ? parsed.collapsedConsoleNames.filter((name) => typeof name === "string")
       : [];
-    const interfaceFontSize = normalizeFontSize(parsed.uiFontSizePt ?? parsed.sidebarFontSizePt ?? parsed.playlistFontSizePt);
+    const contentFontSize = normalizeFontSize(parsed.contentFontSizePt ?? parsed.sidebarFontSizePt ?? parsed.playlistFontSizePt ?? parsed.uiFontSizePt);
+    const chromeFontSize = normalizeFontSize(parsed.uiChromeFontSizePt ?? parsed.uiFontSizePt ?? contentFontSize);
     const interfaceFontColor = normalizeFontColor(parsed.sidebarTextColor ?? parsed.playlistTextColor);
-    const interfaceMonospace = Boolean(parsed.applicationMonospace ?? parsed.sidebarMonospace ?? parsed.playlistMonospace);
-    state.uiFontSizePt = interfaceFontSize;
-    state.sidebarFontSizePt = interfaceFontSize;
+    const contentMonospace = Boolean(parsed.contentMonospace ?? parsed.sidebarMonospace ?? parsed.playlistMonospace ?? parsed.applicationMonospace);
+    const chromeMonospace = Boolean(parsed.uiChromeMonospace ?? parsed.applicationMonospace);
+    state.uiFontSizePt = chromeFontSize;
+    state.uiChromeFontSizePt = chromeFontSize;
+    state.sidebarFontSizePt = contentFontSize;
     state.sidebarTextColor = interfaceFontColor;
-    state.sidebarMonospace = interfaceMonospace;
+    state.sidebarMonospace = contentMonospace;
     state.sidebarPathCounts = parsed.sidebarPathCounts !== false;
-    state.playlistFontSizePt = interfaceFontSize;
+    state.playlistFontSizePt = contentFontSize;
     state.playlistTextColor = interfaceFontColor;
     state.playlistHeaderTextColor = normalizeFontColor(parsed.playlistHeaderTextColor ?? "gray");
-    state.playlistMonospace = interfaceMonospace;
-    state.applicationMonospace = interfaceMonospace;
+    state.playlistMonospace = contentMonospace;
+    state.contentMonospace = contentMonospace;
+    state.uiChromeMonospace = chromeMonospace;
+    state.applicationMonospace = chromeMonospace;
     state.playlistHeaderBold = Boolean(parsed.playlistHeaderBold);
     state.sidebarWidthPercent = normalizeSidebarWidth(parsed.sidebarWidthPercent);
     state.accentColor = normalizeAccentColor(parsed.accentColor);
-    state.uiChromeColor = normalizeUIColor(parsed.uiChromeColor, "rgb(30 30 30)");
+    state.uiChromePrimaryColor = normalizeUIColor(parsed.uiChromePrimaryColor ?? parsed.uiChromeColor, "rgb(30 30 30)");
+    // The old palette exposed a no-op Secondary and used Tertiary for the
+    // visible secondary surface. Migrate that visible value into Secondary.
+    state.uiChromeSecondaryColor = normalizeUIColor(parsed.uiChromeTertiaryColor ?? parsed.uiChromeSecondaryColor, "rgb(40 40 40)");
+    state.uiChromePaneColor = normalizeUIColor(parsed.uiChromePaneColor ?? parsed.uiChromeSidebarColor, "rgb(20 20 20)");
+    state.uiChromeHoverColor = normalizeUIColor(parsed.uiChromeHoverColor, "rgb(50 50 50)");
+    state.uiChromeDividerColor = normalizeUIColor(parsed.uiChromeDividerColor, "rgb(40 40 40)");
+    state.uiChromeColor = state.uiChromePrimaryColor;
     state.solidSelectionBar = Boolean(parsed.solidSelectionBar);
     state.routingPreferences = parsed.routingPreferences && typeof parsed.routingPreferences === "object" ? { ...parsed.routingPreferences } : {};
     state.archiveCacheEnabled = parsed.archiveCacheEnabled !== false;
@@ -398,6 +425,8 @@ function persistSettings() {
     selectedDatabaseGameKey: state.selectedDatabaseGameKey,
     collapsedConsoleNames: state.collapsedConsoleNames,
     uiFontSizePt: state.uiFontSizePt,
+    uiChromeFontSizePt: state.uiChromeFontSizePt,
+    contentFontSizePt: state.sidebarFontSizePt,
     sidebarFontSizePt: state.sidebarFontSizePt,
     sidebarTextColor: state.sidebarTextColor,
     sidebarMonospace: state.sidebarMonospace,
@@ -407,10 +436,17 @@ function persistSettings() {
     playlistHeaderTextColor: state.playlistHeaderTextColor,
     playlistMonospace: state.playlistMonospace,
     applicationMonospace: state.applicationMonospace,
+    uiChromeMonospace: state.uiChromeMonospace,
+    contentMonospace: state.contentMonospace,
     playlistHeaderBold: state.playlistHeaderBold,
     sidebarWidthPercent: state.sidebarWidthPercent,
     accentColor: state.accentColor,
     uiChromeColor: state.uiChromeColor,
+    uiChromePrimaryColor: state.uiChromePrimaryColor,
+    uiChromeSecondaryColor: state.uiChromeSecondaryColor,
+    uiChromePaneColor: state.uiChromePaneColor,
+    uiChromeHoverColor: state.uiChromeHoverColor,
+    uiChromeDividerColor: state.uiChromeDividerColor,
     solidSelectionBar: state.solidSelectionBar,
     routingPreferences: state.routingPreferences,
     archiveCacheEnabled: state.archiveCacheEnabled,
@@ -533,6 +569,23 @@ function normalizeFontSize(value) {
 function normalizeUIColor(value, fallback) {
   const text = String(value || "").trim();
   if (!text) return fallback;
+  // Accept compact values commonly used while tuning a palette. Bare hex
+  // values gain their CSS prefix, and space-separated channels become modern
+  // rgb() syntax with optional alpha as the fourth value.
+  if (/^(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(text)) {
+    return `#${text.toLowerCase()}`;
+  }
+  const channels = text.match(/^(\d{1,3})\s+(\d{1,3})\s+(\d{1,3})(?:\s+([0-9]*\.?[0-9]+))?$/);
+  if (channels) {
+    const [, red, green, blue, alpha] = channels;
+    const rgb = [red, green, blue].map(Number);
+    const parsedAlpha = alpha === undefined ? null : Number(alpha);
+    if (rgb.every((channel) => channel <= 255) && (parsedAlpha === null || parsedAlpha <= 1)) {
+      return parsedAlpha === null
+        ? `rgb(${rgb.join(" ")})`
+        : `rgb(${rgb.join(" ")} / ${parsedAlpha})`;
+    }
+  }
   if (typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("color", text)) {
     return text;
   }

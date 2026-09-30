@@ -309,7 +309,7 @@ struct OptionsView: View {
 
     private var tempoCard: some View {
         sectionCard(title: "Play Speed") {
-            Text("Fractions and decimals are accepted and snap to 1/32 increments.")
+            Text("Fractions and decimals are accepted and snap to 1/32 increments; clean rates display as fractions.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
 

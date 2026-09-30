@@ -25,6 +25,26 @@ public struct UACCollectionScanResult: Equatable, Sendable {
     public let issues: [UACCollectionIssue]
 }
 
+public struct UACCollectionPackageFile: Identifiable, Equatable, Sendable {
+    public let url: URL
+    public let relativePath: String
+    public let fileByteCount: UInt64
+
+    public var id: String { relativePath }
+}
+
+public struct UACCollectionDiscoveryProgress: Equatable, Sendable {
+    public let directoriesVisited: Int
+    public let packagesFound: Int
+    public let currentRelativePath: String
+}
+
+public struct UACCollectionDiscoveryResult: Equatable, Sendable {
+    public let packages: [UACCollectionPackageFile]
+    public let issues: [UACCollectionIssue]
+    public let directoriesVisited: Int
+}
+
 public typealias UACCollectionManifestReader = @Sendable (URL) throws -> UACManifest
 
 /// Lists UAC manifests beneath a selected root. The scanner reads package
@@ -34,6 +54,49 @@ public enum UACCollectionScanner {
         root: URL,
         manifestReader: UACCollectionManifestReader
     ) throws -> UACCollectionScanResult {
+        let discovery = try discover(root: root)
+        var entries: [UACCollectionEntry] = []
+        var issues = discovery.issues
+
+        for package in discovery.packages {
+            if Task<Never, Never>.isCancelled { throw CancellationError() }
+            do {
+                let manifest = try manifestReader(package.url)
+                entries.append(UACCollectionEntry(
+                    relativePath: package.relativePath,
+                    packageID: manifest.packageID,
+                    title: manifest.game.title,
+                    console: manifest.game.console,
+                    totalMemberCount: manifest.members.count,
+                    playableMemberCount: manifest.members.filter {
+                        $0.role == "playable" || $0.role == "track"
+                    }.count,
+                    fileByteCount: package.fileByteCount
+                ))
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                issues.append(UACCollectionIssue(
+                    relativePath: package.relativePath,
+                    message: error.localizedDescription
+                ))
+            }
+        }
+
+        entries.sort {
+            let titleOrder = $0.title.localizedStandardCompare($1.title)
+            return titleOrder == .orderedSame
+                ? $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending
+                : titleOrder == .orderedAscending
+        }
+        issues.sort { $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending }
+        return UACCollectionScanResult(entries: entries, issues: issues)
+    }
+
+    public static func discover(
+        root: URL,
+        progress: (@Sendable (UACCollectionDiscoveryProgress) -> Void)? = nil
+    ) throws -> UACCollectionDiscoveryResult {
         let root = root.standardizedFileURL
         let rootValues = try root.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
         guard rootValues.isDirectory == true, rootValues.isSymbolicLink != true else {
@@ -41,8 +104,9 @@ public enum UACCollectionScanner {
         }
 
         var pendingDirectories = [root]
-        var entries: [UACCollectionEntry] = []
+        var packages: [UACCollectionPackageFile] = []
         var issues: [UACCollectionIssue] = []
+        var directoriesVisited = 0
 
         while let directory = pendingDirectories.popLast() {
             if Task<Never, Never>.isCancelled { throw CancellationError() }
@@ -57,6 +121,12 @@ public enum UACCollectionScanner {
                 issues.append(UACCollectionIssue(
                     relativePath: relativePath(for: directory, under: root),
                     message: error.localizedDescription
+                ))
+                directoriesVisited += 1
+                progress?(UACCollectionDiscoveryProgress(
+                    directoriesVisited: directoriesVisited,
+                    packagesFound: packages.count,
+                    currentRelativePath: relativePath(for: directory, under: root)
                 ))
                 continue
             }
@@ -81,37 +151,28 @@ public enum UACCollectionScanner {
                 guard values.isRegularFile == true,
                       child.pathExtension.lowercased() == "uac" else { continue }
 
-                let relativePath = relativePath(for: child, under: root)
-                do {
-                    let manifest = try manifestReader(child)
-                    entries.append(UACCollectionEntry(
-                        relativePath: relativePath,
-                        packageID: manifest.packageID,
-                        title: manifest.game.title,
-                        console: manifest.game.console,
-                        totalMemberCount: manifest.members.count,
-                        playableMemberCount: manifest.members.filter {
-                            $0.role == "playable" || $0.role == "track"
-                        }.count,
-                        fileByteCount: UInt64(max(0, values.fileSize ?? 0))
-                    ))
-                } catch {
-                    issues.append(UACCollectionIssue(
-                        relativePath: relativePath,
-                        message: error.localizedDescription
-                    ))
-                }
+                packages.append(UACCollectionPackageFile(
+                    url: child,
+                    relativePath: relativePath(for: child, under: root),
+                    fileByteCount: UInt64(max(0, values.fileSize ?? 0))
+                ))
             }
+
+            directoriesVisited += 1
+            progress?(UACCollectionDiscoveryProgress(
+                directoriesVisited: directoriesVisited,
+                packagesFound: packages.count,
+                currentRelativePath: relativePath(for: directory, under: root)
+            ))
         }
 
-        entries.sort {
-            let titleOrder = $0.title.localizedStandardCompare($1.title)
-            return titleOrder == .orderedSame
-                ? $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending
-                : titleOrder == .orderedAscending
-        }
+        packages.sort { $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending }
         issues.sort { $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending }
-        return UACCollectionScanResult(entries: entries, issues: issues)
+        return UACCollectionDiscoveryResult(
+            packages: packages,
+            issues: issues,
+            directoriesVisited: directoriesVisited
+        )
     }
 
     public static func relativePath(for url: URL, under root: URL) -> String {

@@ -17,7 +17,7 @@
 
 - CocoaSpice never initializes a scan controller in its production app model.
 - CocoaSpice exposes no library-root or maintenance controls.
-- The selected catalog is validated as schema 23 before its path is persisted.
+- The selected catalog is validated as schema 24 before its path is persisted.
 - A catalog switch requires restart and never replaces a live SQLite handle.
   Reloading the active catalog is safe: it invalidates read-only sidebar
   snapshots and opens fresh reader connections without touching playback.

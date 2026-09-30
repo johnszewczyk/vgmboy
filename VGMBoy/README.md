@@ -10,7 +10,7 @@ and ViewBoy.
 clients. It names the shared playback, audio, diagnostics, and export routes;
 the typed `PlaybackControlProtocol` remains the native Swift payload contract.
 
-VGMBoy is intentionally database-free. ScanSong remains the sole schema-23
+VGMBoy is intentionally database-free. ScanSong remains the sole schema-24
 catalog writer. The maintained player apps bundle `VGMBoyKit` in-process
 through host-specific adapters. The Electron SPCBoy bridge exists only for
 recovery of the archived player. ScanSong bundles VGMBoy-built inspection
@@ -155,7 +155,7 @@ checks before changing the manifest's `lastReviewed` date.
 
 - `VGMBoyKit` owns decoding, playback timing, and the macOS audio device.
 - The CLI and SwiftUI app are test skins over that one core.
-- ScanSong remains the only schema-23 catalog writer.
+- ScanSong remains the only schema-24 catalog writer.
 - CocoaSpice, SPCBoyWK, and ViewBoy bundle the same VGMBoyKit behind
   host-specific adapters. None has a second playback engine.
 

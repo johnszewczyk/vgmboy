@@ -65,13 +65,13 @@ Convenience fields use the last nonempty value for duplicate FLAC keys to
 match the former ScanSong projection: album becomes both `game` and `album`,
 title becomes `title`, and artist selection is `ARTIST`, `ALBUMARTIST`, then
 `COMPOSER`. Common AVFoundation metadata is the fallback. The scanner still
-projects only its existing schema-23 fields.
+projects only its existing schema-24 fields.
 
 When present, the shared loop vocabulary (`LOOP_START_SAMPLES`,
 `LOOP_END_SAMPLES` exclusive, or `LOOP_LENGTH_SAMPLES`, plus
 `LOOP_SAMPLE_RATE`/`XA_SAMPLE_RATE`, `LOOP_TYPE`, `LOOP_COUNT`, and
 `LOOP_SOURCE`) is exposed as the sample-accurate `MetadataDocument.loop`.
-`MetadataTiming.loopLengthMs` remains the additive schema-23 projection.
+`MetadataTiming.loopLengthMs` remains the additive schema-24 projection.
 
 ### NSF / NESM
 

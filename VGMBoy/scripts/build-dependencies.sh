@@ -14,6 +14,7 @@ if [[ -d /Applications/Xcode.app/Contents/Developer ]]; then
     export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
     export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
 fi
+export MACOSX_DEPLOYMENT_TARGET=26.0
 
 [[ -f "$ROOT_DIR/Package.swift" ]] || {
     echo "Missing VGMBoy package: $ROOT_DIR" >&2
@@ -26,6 +27,8 @@ dependency_signature() {
     local source_relative="$1"
     shift
     {
+        shasum -a 256 "$ROOT_DIR/scripts/build-dependencies.sh"
+        printf '%s\n' "${SDKROOT:-}" "$MACOSX_DEPLOYMENT_TARGET"
         local input
         for input in "$@"; do
             shasum -a 256 "$ROOT_DIR/$input"

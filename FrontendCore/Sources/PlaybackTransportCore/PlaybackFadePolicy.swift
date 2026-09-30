@@ -1,8 +1,9 @@
 import Foundation
 
-/// Typed transport facts used to decide whether an adjacent-navigation request
-/// should use the shared bounded fade. Both native and WebKit frontends submit
-/// this same value instead of unpacking parallel policy arguments.
+/// Typed transport facts used to decide whether a user-requested track change
+/// should use the shared bounded fade. Playlist activation and adjacent
+/// navigation submit this same value instead of unpacking parallel policy
+/// arguments.
 public struct PlaybackQueuedSkipFadeRequest: Codable, Equatable, Sendable {
     public let enabled: Bool
     public let isPlaying: Bool
@@ -47,11 +48,13 @@ public struct PlaybackQueuedSkipFadeRequest: Codable, Equatable, Sendable {
     }
 }
 
-/// UI-neutral policy for a queued adjacent-track fade.
+/// UI-neutral policy for a faded track change, including playlist activation
+/// and queued adjacent-track navigation.
 ///
 /// The frontend supplies the current transport facts and receives either the
 /// bounded fade duration or `nil` when an ordinary replacement is required.
-/// VGMBoy still owns the actual output ramp and audio timing.
+/// The frontends retain target handoff and cancellation; the common VGMBoy
+/// output-gain command performs the ramp.
 public enum PlaybackFadePolicy {
     public static func queuedSkipDuration(
         enabled: Bool,

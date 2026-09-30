@@ -193,6 +193,16 @@ refs.sidebarFontSizeInput.addEventListener("blur", (event) => {
   app.ui.commitSidebarFontSizeInput(event.target.value);
 });
 
+refs.uiChromeFontSizeInput.addEventListener("change", (event) => {
+  app.ui.commitFontSizeInput(event.target.value);
+});
+refs.uiChromeFontSizeInput.addEventListener("input", (event) => {
+  app.ui.commitFontSizeInput(event.target.value);
+});
+refs.uiChromeFontSizeInput.addEventListener("blur", (event) => {
+  app.ui.commitFontSizeInput(event.target.value);
+});
+
 refs.sidebarTextColorInput.addEventListener("change", (event) => {
   app.ui.setSidebarTextColor(event.target.value);
 });
@@ -212,6 +222,9 @@ refs.sidebarPathCountsCheckbox.addEventListener("change", (event) => {
 });
 refs.applicationMonospaceCheckbox.addEventListener("change", (event) => {
   app.ui.setApplicationMonospace(event.target.checked);
+});
+refs.uiChromeMonospaceCheckbox.addEventListener("change", (event) => {
+  app.ui.setUIChromeMonospace(event.target.checked);
 });
 refs.aacExportChooseButton.addEventListener("click", () => {
   app.playback.chooseAACExportDirectory().catch((error) => console.error("[SPCBoy] AAC export folder failed", error));
@@ -265,12 +278,16 @@ refs.accentColorInput.addEventListener("blur", (event) => {
   app.ui.setAccentColor(event.target.value);
 });
 
-refs.uiChromeColorInput.addEventListener("change", (event) => {
-  app.ui.setUIChromeColor(event.target.value);
-});
-refs.uiChromeColorInput.addEventListener("blur", (event) => {
-  app.ui.setUIChromeColor(event.target.value);
-});
+for (const [input, role] of [
+  [refs.uiChromePrimaryColorInput, "primary"],
+  [refs.uiChromeSecondaryColorInput, "secondary"],
+  [refs.uiChromePaneColorInput, "pane"],
+  [refs.uiChromeHoverColorInput, "hover"],
+  [refs.uiChromeDividerColorInput, "divider"]
+]) {
+  input.addEventListener("change", (event) => app.ui.setUIChromePaletteColor(role, event.target.value));
+  input.addEventListener("blur", (event) => app.ui.setUIChromePaletteColor(role, event.target.value));
+}
 refs.solidSelectionBarCheckbox.addEventListener("change", (event) => {
   app.ui.setSolidSelectionBar(event.target.checked);
 });

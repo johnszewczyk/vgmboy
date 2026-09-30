@@ -31,6 +31,7 @@ fi
 input_signature() {
   {
     printf '%s\n' 'CocoaSpice vgmstream build inputs v2'
+    printf '%s\n' "${SDKROOT:-}" "${MACOSX_DEPLOYMENT_TARGET:-26.0}"
     printf '%s\n' 'BUILD_CLI=OFF BUILD_STATIC=ON BUILD_SHARED_LIBS=OFF USE_FFMPEG=ON USE_MPEG=OFF USE_VORBIS=ON USE_G7221=ON USE_G719=OFF USE_ATRAC9=OFF USE_CELT=OFF USE_SPEEX=OFF'
     shasum -a 256 "$0" "$patch"
     # The fetched FFmpeg checkout is a large, immutable build input. Hashing
@@ -57,6 +58,8 @@ if [[ "${COCOASPICE_REBUILD_VGMSTREAM:-0}" != "1" && -f "$library" && -f "$stamp
 fi
 
 cmake -S "$source_dir" -B "$build_dir" \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-26.0}" \
+  -DCMAKE_OSX_SYSROOT="${SDKROOT:-$(xcrun --sdk macosx --show-sdk-path)}" \
   -DBUILD_CLI=OFF \
   -DBUILD_STATIC=ON \
   -DBUILD_SHARED_LIBS=OFF \

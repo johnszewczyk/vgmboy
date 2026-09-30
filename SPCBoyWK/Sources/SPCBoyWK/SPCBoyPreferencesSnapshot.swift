@@ -60,6 +60,8 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
     var selectedDatabaseGameKey: String?
     var collapsedConsoleNames: [String]?
     var uiFontSizePt: Double?
+    var uiChromeFontSizePt: Double?
+    var contentFontSizePt: Double?
     var sidebarFontSizePt: Double?
     var sidebarTextColor: String?
     var sidebarMonospace: Bool?
@@ -69,10 +71,17 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
     var playlistHeaderTextColor: String?
     var playlistMonospace: Bool?
     var applicationMonospace: Bool?
+    var uiChromeMonospace: Bool?
+    var contentMonospace: Bool?
     var playlistHeaderBold: Bool?
     var sidebarWidthPercent: Double?
     var accentColor: String?
     var uiChromeColor: String?
+    var uiChromePrimaryColor: String?
+    var uiChromeSecondaryColor: String?
+    var uiChromePaneColor: String?
+    var uiChromeHoverColor: String?
+    var uiChromeDividerColor: String?
     var solidSelectionBar: Bool?
     var aacExportDirectory: String?
     var routingPreferences: [String: String]?

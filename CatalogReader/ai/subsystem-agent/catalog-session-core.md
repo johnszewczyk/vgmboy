@@ -10,7 +10,7 @@
 - `LatestTaskOwner` owns only one workflow's task handle, generation, and
   cooperative cancellation state. The consuming frontend owns observable UI
   state, selection, presentation, and completion callbacks.
-- `CatalogSidebarReader` opens a read-only schema-23 `CatalogReader` connection
+- `CatalogSidebarReader` opens a read-only schema-24 `CatalogReader` connection
   for each snapshot request and returns published `CatalogGameBucket` or
   `CatalogFileBucket` values. It does not build rows, trees, search indexes, or
   queues.

@@ -24,8 +24,8 @@ contracts shared by CocoaSpice and SPCBoyWK.
   decisions, generation-checked natural-end claims, and their typed bridge
   request/response contracts.
 - `PlaybackTransportCore` owns serialized native commands, invalidation, timing
-  reconfiguration, monotonic status ordering, completion retirement, and queued
-  adjacent-track fade policy.
+  reconfiguration, monotonic status ordering, completion retirement, and the
+  shared faded-track-change eligibility and duration policy.
 
 ## Invariants
 
@@ -62,10 +62,11 @@ contracts shared by CocoaSpice and SPCBoyWK.
 - `PlaybackTransportSeekRequest` and `PlaybackTransportRampGainRequest` name
   the direct session controls at the bridge boundary. Their shared
   normalization keeps a renderer from relying on scalar argument order.
-- `PlaybackQueuedSkipFadeRequest` carries the complete queue-fade policy input
-  used by both CocoaSpice and WebKit. The shared request returns the bounded
-  duration in seconds or milliseconds; a renderer owns only its delayed UI
-  handoff and output-ramp invocation.
+- `PlaybackQueuedSkipFadeRequest` carries the complete faded-track-change
+  policy input used by both CocoaSpice and SPCBoyWK for playlist activation
+  and Previous/Next. The shared request returns the bounded duration in seconds
+  or milliseconds. Each renderer owns its delayed target handoff and
+  cancellation; both reach the same VGMBoy output-gain ramp command.
 - FrontendCore does not decode audio, ramp output gain, store UI models, or own
   renderer focus and selection.
 - `FrontendPlaylistColumnSchema` normalizes persisted layout/sort inputs before

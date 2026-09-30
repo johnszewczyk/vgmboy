@@ -78,6 +78,32 @@ const standardGlyphs = {
   X: ["10001", "10001", "01010", "00100", "01010", "10001", "10001"],
   Y: ["10001", "10001", "01010", "00100", "00100", "00100", "00100"],
   Z: ["11111", "00001", "00010", "00100", "01000", "10000", "11111"],
+  a: ["00000", "01110", "00001", "01111", "10001", "01111", "00000"],
+  b: ["10000", "10000", "11110", "10001", "10001", "10001", "11110"],
+  c: ["00000", "01111", "10000", "10000", "10000", "01111", "00000"],
+  d: ["00001", "00001", "01111", "10001", "10001", "10001", "01111"],
+  e: ["00000", "01110", "10001", "11111", "10000", "01111", "00000"],
+  f: ["00110", "01001", "01000", "11100", "01000", "01000", "01000"],
+  g: ["00000", "01111", "10001", "10001", "01111", "00001", "01110"],
+  h: ["10000", "10000", "11110", "10001", "10001", "10001", "10001"],
+  i: ["00100", "00000", "01100", "00100", "00100", "00100", "01110"],
+  j: ["00010", "00000", "00010", "00010", "00010", "10010", "01100"],
+  k: ["10000", "10000", "10010", "10100", "11000", "10100", "10010"],
+  l: ["01100", "00100", "00100", "00100", "00100", "00100", "01110"],
+  m: ["00000", "11010", "10101", "10101", "10101", "10101", "10101"],
+  n: ["00000", "11110", "10001", "10001", "10001", "10001", "10001"],
+  o: ["00000", "01110", "10001", "10001", "10001", "01110", "00000"],
+  p: ["00000", "11110", "10001", "10001", "11110", "10000", "10000"],
+  q: ["00000", "01111", "10001", "10001", "01111", "00001", "00001"],
+  r: ["00000", "10110", "11001", "10000", "10000", "10000", "10000"],
+  s: ["00000", "01111", "10000", "01110", "00001", "11110", "00000"],
+  t: ["01000", "01000", "11100", "01000", "01000", "01001", "00110"],
+  u: ["00000", "10001", "10001", "10001", "10001", "10011", "01101"],
+  v: ["00000", "10001", "10001", "10001", "01010", "01010", "00100"],
+  w: ["00000", "10001", "10001", "10101", "10101", "10101", "01010"],
+  x: ["00000", "10001", "01010", "00100", "01010", "10001", "00000"],
+  y: ["00000", "10001", "10001", "10001", "01111", "00001", "01110"],
+  z: ["00000", "11111", "00010", "00100", "01000", "11111", "00000"],
   0: ["01110", "10001", "10011", "10101", "11001", "10001", "01110"],
   1: ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
   2: ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
@@ -224,6 +250,8 @@ let HEIGHT = 1;
 let DEVICE_PIXEL_RATIO = 1;
 let UI_UNIT_CSS_PIXELS = DEVICE_PIXELS_PER_LCD_DOT;
 let STYLE_SCALE = 1;
+let lastMetalChevronSignature = "";
+const metalChevronOverlayAvailable = globalThis.__viewBoyMetalChevronOverlay === true;
 let pixels = new Uint8Array(WIDTH * HEIGHT);
 let image = context.createImageData(
   WIDTH * DEVICE_PIXELS_PER_LCD_DOT,
@@ -648,6 +676,21 @@ export function animationFrameIsDue(animation, time) {
   return true;
 }
 
+export function screenTransitionSnapshot() {
+  return screenTransition
+    ? { direction: screenTransition.direction, targetTab: screenTransition.targetTab }
+    : null;
+}
+
+export function bitmapFontSnapshot(name = "STANDARD") {
+  const font = FONT_PROFILES[name] ?? FONT_PROFILES.STANDARD;
+  return {
+    width: font.width,
+    height: font.height,
+    glyphs: Object.fromEntries(Object.entries(font.glyphs).map(([glyph, rows]) => [glyph, [...rows]])),
+  };
+}
+
 export function hitTargetSnapshot() {
   const snapshot = hitTargets.map(({ widget, box }) => ({
     name: widget.meta.controlTitle || widget.meta.text
@@ -726,12 +769,16 @@ function strokeRect(x, y, width, height, shade) {
 }
 
 function normalizedText(value) {
-  return String(value)
+  return normalizedBitmapText(value).toUpperCase();
+}
+
+function normalizedBitmapText(value) {
+  const text = String(value)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[–—]/g, "-")
-    .replace(/[’‘]/g, "'")
-    .toUpperCase();
+    .replace(/[’‘]/g, "'");
+  return state.font === "STANDARD" ? text : text.toUpperCase();
 }
 
 function setSearchFocused(focused) {
@@ -781,7 +828,7 @@ function fontProfile() {
 
 function drawRawText(value, x, y, shade) {
   const font = fontProfile();
-  const text = normalizedText(value);
+  const text = normalizedBitmapText(value);
   let cursor = floor(x);
   for (const character of text) {
     const rows = font.glyphs[character] ?? font.glyphs["?"];
@@ -807,7 +854,7 @@ function drawText(value, x, y, width, shade = 0, align = "left") {
   const font = fontProfile();
   const maxCharacters = Math.max(0, Math.floor((width + 1) / font.advance));
   if (maxCharacters < 1) return;
-  let text = normalizedText(value);
+  let text = normalizedBitmapText(value);
   const chars = Array.from(text);
   if (chars.length > maxCharacters) {
     text = maxCharacters === 1 ? "…" : `${chars.slice(0, maxCharacters - 1).join("")}…`;
@@ -865,12 +912,12 @@ function composeScreenTransition(transition, time) {
   const offset = Math.round(HEIGHT * easeSelection(progress));
   pixels.fill(3);
   for (let y = 0; y < HEIGHT; y += 1) {
-    const outgoingY = y - offset;
+    const outgoingY = transition.direction === "up" ? y + offset : y - offset;
     if (outgoingY >= 0 && outgoingY < HEIGHT) {
       const sourceStart = outgoingY * WIDTH;
       pixels.set(transition.fromPixels.subarray(sourceStart, sourceStart + WIDTH), y * WIDTH);
     }
-    const incomingY = y + HEIGHT - offset;
+    const incomingY = transition.direction === "up" ? y - HEIGHT + offset : y + HEIGHT - offset;
     if (incomingY >= 0 && incomingY < HEIGHT) {
       const sourceStart = incomingY * WIDTH;
       pixels.set(transition.toPixels.subarray(sourceStart, sourceStart + WIDTH), y * WIDTH);
@@ -1020,6 +1067,7 @@ function libraryToolbarItems() {
     { title: "PATH", view: "PATHS", onClick: () => { void setSidebarMode("paths"); selectSidebarView("LIBRARY"); } },
     { title: "Q", view: "QUEUE", onClick: () => selectSidebarView("QUEUE") },
     { title: "FAV", view: "FAVORITES", onClick: () => selectSidebarView("FAVORITES") },
+    { title: "HIST", view: "HISTORY", controlTitle: "HISTORY", onClick: () => { void showPlaybackHistory(); } },
     { title: "OPEN", onClick: () => openLocalPath() },
     { title: "SYNC", onClick: () => loadCatalog() },
     { title: "OPT", controlTitle: "OPTIONS", onClick: () => openOptionsScreen() },
@@ -1504,35 +1552,90 @@ function createQueueRow(parent, index, track, columns) {
   return row;
 }
 
-function paintRasterLine(x1, y1, x2, y2, shade = 0) {
-  let x = x1;
-  let y = y1;
-  const dx = Math.abs(x2 - x1);
-  const sx = x1 < x2 ? 1 : -1;
-  const dy = -Math.abs(y2 - y1);
-  const sy = y1 < y2 ? 1 : -1;
-  let error = dx + dy;
-  while (true) {
-    fillRect(x, y, 1, 1, shade);
-    if (x === x2 && y === y2) break;
-    const doubledError = 2 * error;
-    if (doubledError >= dy) { error += dy; x += sx; }
-    if (doubledError <= dx) { error += dx; y += sy; }
-  }
+function disclosureSquare(box, indent = controlPaddingDots()) {
+  const font = fontProfile();
+  const size = font.height;
+  const centerX = box.x + indent + font.advance / 2;
+  const centerY = box.y + Math.floor(box.height / 2);
+  return {
+    x: Math.floor(centerX - size / 2),
+    y: Math.floor(centerY - size / 2),
+    width: size,
+    height: size,
+  };
 }
 
 function paintChevron(box, progress, indent = controlPaddingDots()) {
-  const radius = Math.min(3, Math.max(2, Math.floor(fontProfile().height / 2)));
+  if (metalChevronOverlayAvailable) return;
+  const font = fontProfile();
+  const square = disclosureSquare(box, indent);
+  const glyph = font.glyphs[">"];
   const angle = Math.max(0, Math.min(1, progress)) * Math.PI / 2;
   const cosine = Math.cos(angle);
   const sine = Math.sin(angle);
-  const centerX = box.x + indent + fontProfile().advance / 2;
-  const centerY = box.y + Math.floor(box.height / 2);
-  const vertices = [[-radius, -radius], [radius, 0], [-radius, radius]]
-    .map(([x, y]) => [Math.round(centerX + x * cosine - y * sine),
-      Math.round(centerY + x * sine + y * cosine)]);
-  paintRasterLine(...vertices[0], ...vertices[1]);
-  paintRasterLine(...vertices[1], ...vertices[2]);
+  const glyphInset = Math.floor((square.width - font.width) / 2);
+  const centerX = square.x + square.width / 2;
+  const centerY = square.y + square.height / 2;
+  for (let row = 0; row < font.height; row += 1) {
+    for (let column = 0; column < font.width; column += 1) {
+      if (glyph[row][column] !== "1") continue;
+      const sourceX = glyphInset + column + 0.5 - square.width / 2;
+      const sourceY = row + 0.5 - square.height / 2;
+      const x = Math.round(centerX + sourceX * cosine - sourceY * sine - 0.5);
+      const y = Math.round(centerY + sourceX * sine + sourceY * cosine - 0.5);
+      fillRect(x, y, 1, 1, 0);
+    }
+  }
+}
+
+function publishMetalChevronGeometry() {
+  if (!metalChevronOverlayAvailable) return;
+  const handler = globalThis.webkit?.messageHandlers?.viewBoy;
+  if (!handler?.postMessage) return;
+  const viewport = boxesById.get("sidebar-tree-viewport");
+  const canvasRect = canvas.getBoundingClientRect();
+  const pageWidth = document.documentElement.clientWidth || window.innerWidth;
+  const pageHeight = document.documentElement.clientHeight || window.innerHeight;
+  const scaleX = canvasRect.width / WIDTH;
+  const scaleY = canvasRect.height / HEIGHT;
+  const viewportRect = viewport && {
+    left: canvasRect.left + viewport.x * scaleX,
+    top: canvasRect.top + viewport.y * scaleY,
+    right: canvasRect.left + (viewport.x + viewport.width) * scaleX,
+    bottom: canvasRect.top + (viewport.y + viewport.height) * scaleY,
+  };
+  const items = viewportRect ? layoutEntries
+    .filter(({ widget }) => widget.meta.sidebarDisclosure)
+    .map(({ widget, box }) => {
+      const square = disclosureSquare(box, widget.meta.disclosureIndent);
+      const left = canvasRect.left + square.x * scaleX;
+      const top = canvasRect.top + square.y * scaleY;
+      const right = left + square.width * scaleX;
+      const bottom = top + square.height * scaleY;
+      const clipLeft = Math.max(left, canvasRect.left, viewportRect.left);
+      const clipTop = Math.max(top, canvasRect.top, viewportRect.top);
+      const clipRight = Math.min(right, canvasRect.right, viewportRect.right);
+      const clipBottom = Math.min(bottom, canvasRect.bottom, viewportRect.bottom);
+      if (clipRight <= clipLeft || clipBottom <= clipTop) return null;
+      return {
+        rect: [left / pageWidth, top / pageHeight,
+          (right - left) / pageWidth, (bottom - top) / pageHeight],
+        clip: [clipLeft / pageWidth, clipTop / pageHeight,
+          (clipRight - clipLeft) / pageWidth, (clipBottom - clipTop) / pageHeight],
+        progress: Math.max(0, Math.min(1, Number(widget.meta.disclosureProgress) || 0)),
+      };
+    }).filter(Boolean) : [];
+  const font = fontProfile();
+  const payload = {
+    method: "viewBoyMetalChevrons",
+    rows: font.glyphs[">"],
+    tint: RGB[0],
+    items,
+  };
+  const signature = JSON.stringify(payload);
+  if (signature === lastMetalChevronSignature) return;
+  lastMetalChevronSignature = signature;
+  handler.postMessage(payload);
 }
 
 function createLibraryRow(parent, text, options = {}) {
@@ -1555,6 +1658,7 @@ function createLibraryRow(parent, text, options = {}) {
     onClick: options.onClick,
     sidebarDisclosure: options.disclosure === true,
     disclosureProgress: options.disclosureProgress ?? 0,
+    disclosureIndent: options.disclosureIndent ?? controlPaddingDots(),
     inset: options.indent ?? (options.disclosure ? controlPaddingDots() + 2 * fontProfile().advance : 0),
     paint(box) {
       if (selected) fillRect(box.x, box.y, box.width, box.height, 2);
@@ -1712,7 +1816,8 @@ function addLibraryPane(parent) {
     flexGrow: 1,
     flexShrink: 1,
     selected: item.view === "PATHS" ? state.sidebarMode === "paths"
-      : item.view === state.tab && state.sidebarMode !== "paths",
+      : item.view === "HISTORY" ? state.tab === "HISTORY"
+        : item.view === state.tab && state.sidebarMode !== "paths",
     controlTitle: item.controlTitle,
   }));
   makeWidget(library, { height: uiGap() });
@@ -1882,7 +1987,7 @@ function addCatalogPane(parent) {
   const content = makeWidget(viewport, {
     direction: FlexDirection.Column,
     width: state.tableContentMinimumWidth,
-    gap: 0,
+    gap: uiGap(),
   }, {
     id: "catalog-scroll-content",
     translateX: -state.tableHorizontalScroll,
@@ -1890,7 +1995,6 @@ function addCatalogPane(parent) {
   state.tableViewportWidget = viewport;
   state.tableContentWidget = content;
   createTableHeader(content, columns);
-  makeWidget(content, { height: uiGap(), flexShrink: 0 });
   const count = visibleRowCount();
   state.queueScroll = Math.max(0, Math.min(state.queueScroll, Math.max(0, viewTracks.length - count)));
   viewTracks.slice(state.queueScroll, state.queueScroll + count).forEach((track, offset) =>
@@ -2909,6 +3013,7 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
   }
   layoutEntries = collect(widgetTree);
   state.tableViewportBox = boxesById.get("catalog-horizontal-viewport") ?? null;
+  publishMetalChevronGeometry();
   paintTree(widgetTree, { x: 0, y: 0, width: WIDTH, height: HEIGHT });
   basePixels = pixels.slice();
   selectionRows = layoutEntries.filter((entry) => Number.isInteger(entry.widget.meta.trackIndex));
@@ -3035,6 +3140,7 @@ function navigateAppTab(tab, optionsPage = null) {
     fromPixels: visiblePixels,
     toPixels: destinationPixels,
     targetTab: tab,
+    direction: tab === "SETTINGS" ? "down" : "up",
     startedAt: performance.now(),
     duration,
     lastFrameAt: Number.NaN,
@@ -3049,6 +3155,11 @@ function navigateAppTab(tab, optionsPage = null) {
 function openOptionsScreen(page = null) {
   navigateAppTab("SETTINGS", page);
   if (page === "DATABASE") void refreshDatabaseOptions();
+}
+
+function toggleOptionsScreen() {
+  if (state.tab === "SETTINGS") closeOptionsScreen();
+  else openOptionsScreen();
 }
 
 function closeOptionsScreen() {
@@ -3171,6 +3282,7 @@ function historyTimestamp(milliseconds) {
 
 async function showPlaybackHistory() {
   if (!bridge?.playbackHistoryList) return;
+  const leavingOptions = state.tab === "SETTINGS";
   try {
     const records = await bridge.playbackHistoryList();
     state.historyTracks = (Array.isArray(records) ? records : []).map((record) => {
@@ -3210,7 +3322,8 @@ async function showPlaybackHistory() {
     state.queueScroll = 0;
     state.tableHorizontalScroll = 0;
     state.status = `${state.historyTracks.length} HISTORY ITEMS`;
-    render();
+    if (leavingOptions) navigateAppTab("HISTORY");
+    else render();
   } catch (error) {
     state.status = `HISTORY ERROR: ${error.message}`;
     render();
@@ -4288,7 +4401,7 @@ canvas.addEventListener("keydown", (event) => {
     closePlaylistTab();
   } else if (commandKey && !event.altKey && !event.shiftKey && event.key === ",") {
     event.preventDefault();
-    openOptionsScreen();
+    toggleOptionsScreen();
   } else if (commandKey && event.shiftKey && event.key.toLowerCase() === "d") {
     event.preventDefault();
     selectSidebarView("FAVORITES");
@@ -4458,7 +4571,7 @@ window.ViewBoy = Object.freeze({
       case "newPlaylistTab": createPlaylistTab({ duplicateActive: true }); break;
       case "closePlaylistTab": closePlaylistTab(); break;
       case "openPath": openLocalPath(); break;
-      case "settings": openOptionsScreen(); break;
+      case "settings": toggleOptionsScreen(); break;
       case "sidebarPaths": void setSidebarMode("paths").then(() => selectSidebarView("LIBRARY")); break;
       case "sidebarConsoles": void setSidebarMode("consoles").then(() => selectSidebarView("LIBRARY")); break;
       case "sidebarDiskPath": openLocalPath(); break;
