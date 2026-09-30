@@ -586,6 +586,10 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const titleRightSide = (titleHeader.box.x + titleHeader.box.width * 0.75) / (canvas.width / 3);
   sendPointer('pointerdown', fileHeader.x, fileHeader.y);
   sendPointer('pointermove', titleRightSide, titleHeader.y);
+  await tick();
+  const pushedTitleHeader = headerCenter('TITLE');
+  assert.ok(pushedTitleHeader.box.x < titleHeader.box.x,
+    'neighboring headings push aside during the drag using the shared easing duration');
   sendPointer('pointerup', titleRightSide, titleHeader.y);
   const savedColumnOrder = JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).columnOrder;
   assert.ok(savedColumnOrder.indexOf('filename') > savedColumnOrder.indexOf('title'),
@@ -599,4 +603,62 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   sendPointer('pointerup', indexHeader.x, indexHeader.y);
   assert.deepEqual(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).columnOrder, headerOrder,
     'dragging other headers across # cannot move the numbered column');
+
+  globalThis.ViewBoy.dispatch('newPlaylistTab');
+  await tick();
+  const tabFrames = () => hitTargetSnapshot().filter((target) => target.reorderKind === 'tab');
+  const tabTitles = () => hitTargetSnapshot().filter((target) => target.playlistTabTitle);
+  assert.ok(tabTitles().every((target) => target.textAlign === 'left'),
+    'playlist tab labels remain left-aligned');
+  const tabsBeforeDrag = tabFrames().sort((first, second) => first.box.x - second.box.x);
+  assert.ok(tabsBeforeDrag.length >= 2, 'at least two playlist tabs can be rearranged');
+  const tabIDsBeforeDrag = tabsBeforeDrag.map((target) => target.reorderKey);
+  const shiftedNeighborID = tabIDsBeforeDrag[1];
+  const shiftedNeighborBefore = tabTitles().find((target) => target.playlistTabId === shiftedNeighborID);
+  const sourceTab = tabsBeforeDrag[0];
+  const destinationTab = tabsBeforeDrag.at(-1);
+  const sourceTitle = tabTitles().find((target) => target.playlistTabId === sourceTab.reorderKey);
+  sendPointer('pointerdown', (sourceTitle.box.x + Math.min(3, sourceTitle.box.width / 3)) / (canvas.width / 3),
+    (sourceTitle.box.y + sourceTitle.box.height / 2) / (canvas.height / 3));
+  sendPointer('pointermove', (destinationTab.box.x + destinationTab.box.width * 0.85) / (canvas.width / 3),
+    (destinationTab.box.y + destinationTab.box.height / 2) / (canvas.height / 3));
+  await tick();
+  const shiftedNeighborAfter = tabTitles().find((target) => target.playlistTabId === shiftedNeighborID);
+  assert.ok(shiftedNeighborAfter.box.x < shiftedNeighborBefore.box.x,
+    'neighboring tabs push aside during the drag');
+  sendPointer('pointerup', (destinationTab.box.x + destinationTab.box.width * 0.85) / (canvas.width / 3),
+    (destinationTab.box.y + destinationTab.box.height / 2) / (canvas.height / 3));
+  await tick();
+  await tick();
+  const savedTabOrder = savedPlaylistTabs.at(-1).tabs.map((tab) => tab.id);
+  assert.deepEqual(savedTabOrder, [...tabIDsBeforeDrag.slice(1), tabIDsBeforeDrag[0]],
+    'dropping a tab commits its pushed position to the native playlist snapshot');
+
+  bridge.databaseGames = async () => Array.from({ length: 80 }, (_, index) => ({
+    rootId: 1000 + index,
+    name: `Scroll Game ${String(index).padStart(2, '0')}`,
+    displayName: `Scroll Game ${String(index).padStart(2, '0')}`,
+    system: 'SCROLL',
+    trackCount: 1,
+  }));
+  await catalogReloaded();
+  const sidebarGames = () => hitTargetSnapshot().filter((target) => target.name.startsWith('Scroll Game '));
+  const scrollGameBefore = sidebarGames().find((target) => target.name === 'Scroll Game 00');
+  const scrollGameNext = sidebarGames().find((target) => target.name === 'Scroll Game 01');
+  assert.ok(scrollGameBefore && scrollGameNext, 'the overflowing sidebar exposes its first game rows');
+  const sidebarRowHeight = scrollGameNext.box.y - scrollGameBefore.box.y;
+  canvas.listeners.get('wheel')({
+    clientX: rect.width * 0.2,
+    clientY: rect.height * 0.5,
+    deltaX: 0,
+    deltaY: 3,
+    deltaMode: 0,
+    shiftKey: false,
+    preventDefault() {},
+  });
+  await tick();
+  const scrollGameAfter = sidebarGames().find((target) => target.name === 'Scroll Game 00');
+  const sidebarPixelMovement = scrollGameBefore.box.y - scrollGameAfter.box.y;
+  assert.ok(sidebarPixelMovement > 0 && sidebarPixelMovement < sidebarRowHeight,
+    `the sidebar advances by LCD pixels rather than whole rows (${sidebarPixelMovement}/${sidebarRowHeight})`);
 });

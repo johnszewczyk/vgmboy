@@ -235,10 +235,15 @@ let selectionAnimationFrame = 0;
 let sidebarAnimationFrame = 0;
 let columnAnimationFrame = 0;
 let equalizerAnimationFrame = 0;
+let libraryScrollFrame = 0;
+let pendingLibraryScrollDelta = 0;
+const libraryScrollFrameTiming = { lastFrameAt: Number.NaN };
 let equalizerFrameTiming = { lastFrameAt: Number.NaN };
 let equalizerAnimations = new Map();
 let columnLayoutAnimation = null;
 let lastColumnWidths = null;
+let reorderAnimation = null;
+let reorderPreview = null;
 let currentRenderTime = 0;
 let paintClip = null;
 let pointerInteraction = null;
@@ -293,7 +298,10 @@ const state = {
   activeGameKey: null,
   expandedSystems: new Set(),
   sidebarTransition: null,
-  libraryScroll: 0,
+  libraryScrollOffset: 0,
+  libraryViewportHeight: 0,
+  libraryContentHeight: 0,
+  libraryViewportWidget: null,
   queueScroll: 0,
   status: "LOADING CATALOG",
   preferences: {},
@@ -502,6 +510,26 @@ function easeSelection(progress) {
     : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 }
 
+function reorderKeyFor(widget) {
+  if (!widget.meta.reorderKey) return null;
+  return widget.meta.reorderContainer || widget.meta.columnHeader ? widget.meta.reorderKey : null;
+}
+
+function widgetTranslationX(widget, targetX, time) {
+  const base = widget.meta.translateX ?? 0;
+  const key = reorderKeyFor(widget);
+  const kind = widget.meta.reorderKind;
+  if (!key || !kind) return base;
+  if (pointerInteraction?.kind === "reorder" && pointerInteraction.dragging
+    && pointerInteraction.itemKind === kind && pointerInteraction.sourceKey === key) {
+    return base + pointerInteraction.pointX - pointerInteraction.grabOffset - targetX;
+  }
+  if (reorderAnimation?.kind !== kind || !Object.hasOwn(reorderAnimation.fromX, key)) return base;
+  const progress = Math.max(0, Math.min(1,
+    (time - reorderAnimation.startedAt) / reorderAnimation.duration));
+  return base + (reorderAnimation.fromX[key] - targetX) * (1 - easeSelection(progress));
+}
+
 function animationEnabled(key) {
   return state.preferences[key] !== false;
 }
@@ -530,6 +558,10 @@ export function hitTargetSnapshot() {
     searchField: widget.meta.searchField === true,
     playlistTabTitle: widget.meta.playlistTabTitle === true,
     playlistTabClose: widget.meta.playlistTabClose === true,
+    playlistTabId: widget.meta.playlistTabId ?? null,
+    reorderKind: widget.meta.reorderKind ?? null,
+    reorderKey: widget.meta.reorderKey ?? null,
+    textAlign: widget.meta.align ?? "left",
     box: { ...box },
   })).filter((target) => target.name);
 }
@@ -1061,7 +1093,8 @@ function tableColumns(items = activeTracks()) {
   const columnVisibility = state.preferences.columnVisibility || {};
   const visible = columns.filter((column) => column.mandatory || columnVisibility[column.key] !== false);
   const byKey = new Map(columns.map((column) => [column.key, column]));
-  const preferredOrder = state.columnOrder.filter((key) => key !== "index" && byKey.has(key));
+  const savedOrder = reorderPreview?.kind === "column" ? reorderPreview.keys : state.columnOrder;
+  const preferredOrder = savedOrder.filter((key) => key !== "index" && byKey.has(key));
   const orderedKeys = [...new Set(preferredOrder)];
   columns.forEach((column) => {
     if (column.key !== "index" && !orderedKeys.includes(column.key)) orderedKeys.push(column.key);
@@ -1169,6 +1202,8 @@ function createTableHeader(parent, columns) {
       align: "center",
       columnKey: column.key,
       columnHeader: true,
+      reorderKind: "column",
+      reorderKey: column.key,
       reorderable: column.reorderable !== false,
       onClick: column.sortable === false ? undefined : () => toggleSort(column.key),
     });
@@ -1234,6 +1269,10 @@ function visibleLibraryRowCount() {
   const sidebarChrome = 5 * buttonStandardHeight() + 5 * uiGap();
   return Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - rootChrome - sidebarChrome)
     / rowHeight(2 * controlPaddingDots())));
+}
+
+function libraryRowPixelHeight(row) {
+  return rowHeight(2 * controlPaddingDots()) * STYLE_SCALE * (row.revealProgress ?? 1);
 }
 
 function libraryRows() {
@@ -1306,23 +1345,47 @@ function addLibraryPane(parent) {
   panelTitle(library, "SYSTEMS");
   const rows = libraryRows();
   const count = visibleLibraryRowCount();
-  state.libraryScroll = Math.max(0, Math.min(state.libraryScroll, Math.max(0, rows.length - count)));
-  rows.slice(state.libraryScroll, state.libraryScroll + count).forEach((row) => {
-    createLibraryRow(library, row.text, {
+  const rowHeightDots = rowHeight(2 * controlPaddingDots()) * STYLE_SCALE;
+  state.libraryContentHeight = rows.reduce((sum, row) => sum + libraryRowPixelHeight(row), 0);
+  const estimatedViewportHeight = state.libraryViewportHeight || count * rowHeightDots;
+  const maxScroll = Math.max(0, state.libraryContentHeight - estimatedViewportHeight);
+  state.libraryScrollOffset = Math.max(0, Math.min(maxScroll, state.libraryScrollOffset));
+  let firstRow = 0;
+  let rowTop = 0;
+  while (firstRow < rows.length
+    && rowTop + libraryRowPixelHeight(rows[firstRow]) <= state.libraryScrollOffset) {
+    rowTop += libraryRowPixelHeight(rows[firstRow]);
+    firstRow += 1;
+  }
+  const partialRowOffset = Math.max(0, state.libraryScrollOffset - rowTop);
+  const viewport = makeWidget(library, {
+    flexGrow: 1,
+    flexShrink: 1,
+    overflow: Overflow.Hidden,
+  }, {
+    id: "sidebar-tree-viewport",
+    clipChildren: true,
+  });
+  const content = makeWidget(viewport, {
+    direction: FlexDirection.Column,
+  }, { translateY: -partialRowOffset });
+  state.libraryViewportWidget = viewport;
+  const lastRow = Math.min(rows.length, firstRow + count + 2);
+  rows.slice(firstRow, lastRow).forEach((row) => {
+    createLibraryRow(content, row.text, {
       selected: row.game && gameKey(row.game) === state.selectedGameKey,
       indent: row.indent,
       revealProgress: row.revealProgress,
       onClick: row.game ? () => loadGame(row.game) : () => toggleSystem(row.system),
     });
   });
-  makeWidget(library, { flexGrow: 1 });
   const query = normalizedText(state.searchQuery).trim();
   const filteredGames = query ? state.games.filter((game) =>
     normalizedText(`${game.displayName || game.name || ""} ${game.name || ""} ${game.system || "OTHER"}`)
       .includes(query)) : state.games;
   const systemCount = new Set(filteredGames.map((game) => game.system || "OTHER")).size;
-  const first = rows.length ? state.libraryScroll + 1 : 0;
-  const last = Math.min(rows.length, state.libraryScroll + count);
+  const first = rows.length ? firstRow + 1 : 0;
+  const last = Math.min(rows.length, firstRow + count);
   statusBar(library, query ? `MATCH ${filteredGames.length} SYS ${systemCount}`
     : `SYS ${systemCount} ${first}-${last}/${rows.length}`);
   return library;
@@ -1350,7 +1413,10 @@ function addCatalogPane(parent) {
       gap: uiGap(),
       overflow: Overflow.Hidden,
     }, { clipChildren: true });
-    state.playlistTabs.forEach((tab) => {
+    const tabs = reorderPreview?.kind === "tab"
+      ? reorderPreview.keys.map((id) => state.playlistTabs.find((tab) => tab.id === id)).filter(Boolean)
+      : state.playlistTabs;
+    tabs.forEach((tab) => {
       const item = makeWidget(tabList, {
         direction: FlexDirection.Row,
         flexGrow: 1,
@@ -1361,6 +1427,11 @@ function addCatalogPane(parent) {
         height: buttonStandardHeight(),
         alignItems: Align.Center,
       }, {
+        reorderContainer: true,
+        reorderKind: "tab",
+        reorderKey: tab.id,
+        onClick: () => activatePlaylistTab(tab.id),
+        controlTitle: `TAB ${tab.title}`,
         paint(box) {
           if (tab.id === state.activePlaylistTabId) fillRect(box.x, box.y, box.width, box.height, 2);
           strokeRect(box.x, box.y, box.width, box.height, 1);
@@ -1371,11 +1442,14 @@ function addCatalogPane(parent) {
         flexBasis: 0,
         flexShrink: 1,
         minWidth: 0,
-      height: buttonStandardHeight(),
-    }, {
-      textShade: 0,
-      inset: controlPaddingDots(),
+        height: buttonStandardHeight(),
+      }, {
+        textShade: 0,
+        inset: controlPaddingDots(),
+        align: "left",
         playlistTabTitle: true,
+        playlistTabId: tab.id,
+        reorderKey: tab.id,
         controlTitle: `TAB ${tab.title}`,
         onClick: () => activatePlaylistTab(tab.id),
       });
@@ -1938,6 +2012,7 @@ function buildTree() {
   state.tableContentWidget = null;
   state.tableScrollbarBox = null;
   state.tableScrollbarThumb = null;
+  state.libraryViewportWidget = null;
   const toolbarHeight = buttonStandardHeight();
   const root = makeWidget(null, {
     direction: FlexDirection.Column,
@@ -2070,6 +2145,11 @@ function buildTree() {
     state.tableContentWidget.yoga.setWidth(contentWidth);
     root.yoga.calculateLayout(WIDTH, HEIGHT, Direction.LTR);
   }
+  if (state.libraryViewportWidget) {
+    state.libraryViewportHeight = state.libraryViewportWidget.yoga.getComputedLayout().height;
+    const maxLibraryScroll = Math.max(0, state.libraryContentHeight - state.libraryViewportHeight);
+    state.libraryScrollOffset = Math.max(0, Math.min(maxLibraryScroll, state.libraryScrollOffset));
+  }
   return root;
 }
 
@@ -2085,9 +2165,13 @@ function intersectBoxes(first, second) {
 
 function collect(widget, parentX = 0, parentY = 0, output = [], inheritedClip = null) {
   const layout = widget.yoga.getComputedLayout();
+  const translateX = widgetTranslationX(widget, parentX + layout.left, currentRenderTime);
+  const translateY = widget.meta.translateY ?? 0;
+  widget.meta.frameTranslateX = translateX;
+  widget.meta.frameTranslateY = translateY;
   const box = {
-    x: floor(parentX + layout.left + (widget.meta.translateX ?? 0)),
-    y: floor(parentY + layout.top),
+    x: floor(parentX + layout.left + translateX),
+    y: floor(parentY + layout.top + translateY),
     width: floor(layout.width),
     height: floor(layout.height),
   };
@@ -2108,8 +2192,8 @@ function paintTree(widget, box, inheritedClip = null) {
   for (const child of widget.children) {
     const layout = child.yoga.getComputedLayout();
     paintTree(child, {
-      x: floor(box.x + layout.left + (child.meta.translateX ?? 0)),
-      y: floor(box.y + layout.top),
+      x: floor(box.x + layout.left + (child.meta.frameTranslateX ?? child.meta.translateX ?? 0)),
+      y: floor(box.y + layout.top + (child.meta.frameTranslateY ?? child.meta.translateY ?? 0)),
       width: floor(layout.width),
       height: floor(layout.height),
     }, childClip);
@@ -2159,19 +2243,40 @@ function animateSelectionFrame(time) {
 
 function animateColumnLayoutFrame(time) {
   columnAnimationFrame = 0;
-  if (!columnLayoutAnimation) return;
-  const complete = time - columnLayoutAnimation.startedAt >= columnLayoutAnimation.duration;
-  if (!complete && !animationFrameIsDue(columnLayoutAnimation, time)) {
+  const isDragging = pointerInteraction?.kind === "reorder" && pointerInteraction.dragging;
+  if (!columnLayoutAnimation && !reorderAnimation && !isDragging) return;
+  const timing = columnLayoutAnimation || reorderAnimation || pointerInteraction;
+  if (!animationFrameIsDue(timing, time)) {
     columnAnimationFrame = requestAnimationFrame(animateColumnLayoutFrame);
     return;
   }
-  if (complete) {
+  if (columnLayoutAnimation
+    && time - columnLayoutAnimation.startedAt >= columnLayoutAnimation.duration) {
     lastColumnWidths = columnLayoutAnimation.to;
     columnLayoutAnimation = null;
-    render(false, true, time);
+  }
+  if (reorderAnimation
+    && time - reorderAnimation.startedAt >= reorderAnimation.duration) reorderAnimation = null;
+  render(false, true, time);
+  if ((columnLayoutAnimation || reorderAnimation) && !columnAnimationFrame) {
+    columnAnimationFrame = requestAnimationFrame(animateColumnLayoutFrame);
+  }
+}
+
+function applyLibraryScrollFrame(time) {
+  libraryScrollFrame = 0;
+  if (!animationFrameIsDue(libraryScrollFrameTiming, time)) {
+    libraryScrollFrame = requestAnimationFrame(applyLibraryScrollFrame);
     return;
   }
+  const delta = pendingLibraryScrollDelta;
+  pendingLibraryScrollDelta = 0;
+  const maxScroll = Math.max(0, state.libraryContentHeight - state.libraryViewportHeight);
+  state.libraryScrollOffset = Math.max(0, Math.min(maxScroll, state.libraryScrollOffset + delta));
   render(false, true, time);
+  if (pendingLibraryScrollDelta !== 0 && !libraryScrollFrame) {
+    libraryScrollFrame = requestAnimationFrame(applyLibraryScrollFrame);
+  }
 }
 
 function render(animateSelection = false, preserveAnimations = false, frameTime = performance.now()) {
@@ -2193,7 +2298,12 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
   boxesById = new Map();
   hitTargets = [];
   pixels.fill(3);
+  const libraryOffsetBeforeLayout = state.libraryScrollOffset;
   widgetTree = buildTree();
+  if (state.libraryViewportWidget && state.libraryScrollOffset !== libraryOffsetBeforeLayout) {
+    widgetTree.yoga.freeRecursive();
+    widgetTree = buildTree();
+  }
   if (state.tableViewportWidget && state.tableContentWidget) {
     const viewportLayout = state.tableViewportWidget.yoga.getComputedLayout();
     const contentLayout = state.tableContentWidget.yoga.getComputedLayout();
@@ -2244,7 +2354,7 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
     selectionAnimation = null;
     paintSelectionAt(nextBand?.y ?? null);
   }
-  if (columnLayoutAnimation && !columnAnimationFrame) {
+  if ((columnLayoutAnimation || reorderAnimation) && !columnAnimationFrame) {
     columnAnimationFrame = requestAnimationFrame(animateColumnLayoutFrame);
   }
   const selected = visibleTracks()[state.selectedTrack];
@@ -3004,20 +3114,80 @@ function setHorizontalScrollFromThumb(pointerX, thumbOffset) {
   render();
 }
 
-function reorderTableColumn(sourceKey, targetKey, targetBox, pointerX) {
-  if (!sourceKey || !targetKey || sourceKey === "index" || targetKey === "index") return;
-  const keys = tableColumns(activeTracks()).all.map((column) => column.key)
-    .filter((key) => key !== "index");
-  const sourceIndex = keys.indexOf(sourceKey);
-  const targetIndex = keys.indexOf(targetKey);
-  if (sourceIndex < 0 || targetIndex < 0) return;
-  keys.splice(sourceIndex, 1);
+function currentReorderOrder(kind) {
+  if (reorderPreview?.kind === kind) return [...reorderPreview.keys];
+  if (kind === "column") {
+    return tableColumns(activeTracks()).all.map((column) => column.key).filter((key) => key !== "index");
+  }
+  return state.playlistTabs.map((tab) => tab.id);
+}
+
+function captureReorderPositions(kind) {
+  const positions = {};
+  hitTargets.forEach(({ widget, box }) => {
+    if (widget.meta.reorderKind !== kind) return;
+    const key = widget.meta.reorderKey;
+    if (key && !Object.hasOwn(positions, key)) positions[key] = box.x;
+  });
+  return positions;
+}
+
+function orderWithDraggedItem(keys, sourceKey, targetKey, targetBox, pointerX) {
+  if (!sourceKey || !targetKey || sourceKey === targetKey) return keys;
+  const next = [...keys];
+  const sourceIndex = next.indexOf(sourceKey);
+  const targetIndex = next.indexOf(targetKey);
+  if (sourceIndex < 0 || targetIndex < 0) return keys;
+  next.splice(sourceIndex, 1);
   let insertionIndex = targetIndex + (pointerX >= targetBox.x + targetBox.width / 2 ? 1 : 0);
   if (sourceIndex < insertionIndex) insertionIndex -= 1;
-  keys.splice(Math.max(0, Math.min(keys.length, insertionIndex)), 0, sourceKey);
-  state.columnOrder = keys;
-  saveDisplayOptions();
-  render();
+  next.splice(Math.max(0, Math.min(next.length, insertionIndex)), 0, sourceKey);
+  return next;
+}
+
+function sameOrder(first, second) {
+  return first.length === second.length && first.every((key, index) => key === second[index]);
+}
+
+function setReorderAnimation(kind, fromX, time) {
+  const duration = animationMilliseconds("autoResizeAnimationMilliseconds");
+  reorderAnimation = animationEnabled("autoResizeAnimationEnabled") && duration > 0
+    ? { kind, fromX, startedAt: time, duration }
+    : null;
+}
+
+function applyReorderOrder(kind, keys) {
+  if (kind === "column") {
+    state.columnOrder = [...keys];
+    saveDisplayOptions();
+    return;
+  }
+  const tabsByID = new Map(state.playlistTabs.map((tab) => [tab.id, tab]));
+  state.playlistTabs = keys.map((id) => tabsByID.get(id)).filter(Boolean);
+  persistPlaylistTabs();
+}
+
+function finishReorderInteraction(interaction, commit, time = performance.now()) {
+  if (interaction.dragging) {
+    interaction.pointX = interaction.lastPointX;
+    render(false, true, time);
+  }
+  const fromX = captureReorderPositions(interaction.itemKind);
+  const previewKeys = reorderPreview?.kind === interaction.itemKind
+    ? reorderPreview.keys : interaction.originalOrder;
+  const nextKeys = commit ? previewKeys : interaction.originalOrder;
+  const changed = !sameOrder(nextKeys, interaction.originalOrder);
+  if (commit && changed) applyReorderOrder(interaction.itemKind, nextKeys);
+  reorderPreview = null;
+  pointerInteraction = null;
+  setReorderAnimation(interaction.itemKind, fromX, time);
+  render(false, true, time);
+  if (interaction.dragging) suppressNextClick = true;
+}
+
+function scheduleDragRender() {
+  if (columnAnimationFrame) return;
+  columnAnimationFrame = requestAnimationFrame(animateColumnLayoutFrame);
 }
 
 canvas.addEventListener("pointerdown", (event) => {
@@ -3033,16 +3203,27 @@ canvas.addEventListener("pointerdown", (event) => {
     canvas.setPointerCapture?.(event.pointerId);
     setHorizontalScrollFromThumb(point.x, thumbOffset);
     event.preventDefault?.();
-  } else if (target?.meta.columnHeader && target.meta.reorderable) {
+  } else {
+    const columnEntry = findTargetEntry(point,
+      (widget) => widget.meta.columnHeader && widget.meta.reorderable);
+    const tabEntry = findTargetEntry(point, (widget) => widget.meta.reorderContainer);
+    const draggable = columnEntry || (!target?.meta.playlistTabClose ? tabEntry : null);
+    if (!draggable) return;
+    const itemKind = columnEntry ? "column" : "tab";
+    const sourceKey = itemKind === "column"
+      ? draggable.widget.meta.columnKey : draggable.widget.meta.reorderKey;
     pointerInteraction = {
-      kind: "column",
+      kind: "reorder",
+      itemKind,
       pointerId: event.pointerId,
-      sourceKey: target.meta.columnKey,
-      targetKey: target.meta.columnKey,
-      targetBox: entry.box,
+      sourceKey,
+      originalOrder: currentReorderOrder(itemKind),
+      grabOffset: point.x - draggable.box.x,
       startX: point.x,
       startY: point.y,
-      moved: false,
+      lastPointX: point.x,
+      pointX: point.x,
+      dragging: false,
     };
     canvas.setPointerCapture?.(event.pointerId);
   }
@@ -3056,17 +3237,34 @@ canvas.addEventListener("pointermove", (event) => {
     setHorizontalScrollFromThumb(point.x, pointerInteraction.thumbOffset);
     return;
   }
-  if (pointerInteraction?.kind === "column") {
+  if (pointerInteraction?.kind === "reorder") {
     const distance = Math.hypot(point.x - pointerInteraction.startX, point.y - pointerInteraction.startY);
+    pointerInteraction.lastPointX = point.x;
+    pointerInteraction.pointX = point.x;
     if (distance >= 3) {
-      pointerInteraction.moved = true;
+      pointerInteraction.dragging = true;
       suppressNextClick = true;
-      const dropTarget = findTargetEntry(point, (widget) => widget.meta.columnHeader);
-      if (dropTarget?.widget.meta.reorderable) {
-        pointerInteraction.targetKey = dropTarget.widget.meta.columnKey;
-        pointerInteraction.targetBox = dropTarget.box;
+      const dropTarget = pointerInteraction.itemKind === "column"
+        ? findTargetEntry(point, (widget) => widget.meta.columnHeader && widget.meta.reorderable)
+        : findTargetEntry(point, (widget) => widget.meta.reorderContainer);
+      if (dropTarget) {
+        const targetKey = pointerInteraction.itemKind === "column"
+          ? dropTarget.widget.meta.columnKey : dropTarget.widget.meta.reorderKey;
+        const nextOrder = orderWithDraggedItem(
+          currentReorderOrder(pointerInteraction.itemKind),
+          pointerInteraction.sourceKey,
+          targetKey,
+          dropTarget.box,
+          point.x,
+        );
+        if (!sameOrder(nextOrder, currentReorderOrder(pointerInteraction.itemKind))) {
+          const fromX = captureReorderPositions(pointerInteraction.itemKind);
+          reorderPreview = { kind: pointerInteraction.itemKind, keys: nextOrder };
+          setReorderAnimation(pointerInteraction.itemKind, fromX, performance.now());
+        }
       }
     }
+    scheduleDragRender();
     return;
   }
   const target = findTarget(point);
@@ -3077,22 +3275,28 @@ canvas.addEventListener("pointerup", (event) => {
   if (!pointerInteraction || (pointerInteraction.pointerId !== undefined
     && event.pointerId !== undefined && pointerInteraction.pointerId !== event.pointerId)) return;
   const interaction = pointerInteraction;
-  pointerInteraction = null;
-  if (interaction.kind === "column" && interaction.moved) {
-    const point = logicalPoint(event);
-    const dropTarget = findTargetEntry(point, (widget) => widget.meta.columnHeader && widget.meta.reorderable);
-    if (dropTarget) {
-      interaction.targetKey = dropTarget.widget.meta.columnKey;
-      interaction.targetBox = dropTarget.box;
+  if (interaction.kind === "reorder") {
+    if (interaction.dragging) {
+      const point = logicalPoint(event);
+      interaction.lastPointX = point.x;
+      interaction.pointX = point.x;
+      finishReorderInteraction(interaction, true);
+    } else {
+      pointerInteraction = null;
     }
-    reorderTableColumn(interaction.sourceKey, interaction.targetKey, interaction.targetBox, point.x);
-    suppressNextClick = true;
   } else if (interaction.kind === "scrollbar") {
+    pointerInteraction = null;
     suppressNextClick = true;
   }
 });
 
-canvas.addEventListener("pointercancel", () => { pointerInteraction = null; });
+canvas.addEventListener("pointercancel", () => {
+  if (pointerInteraction?.kind === "reorder" && pointerInteraction.dragging) {
+    finishReorderInteraction(pointerInteraction, false);
+  } else {
+    pointerInteraction = null;
+  }
+});
 
 canvas.addEventListener("contextmenu", (event) => {
   const point = logicalPoint(event);
@@ -3140,9 +3344,18 @@ canvas.addEventListener("wheel", (event) => {
   }
   const sidebarWidth = libraryPaneWidth() * STYLE_SCALE + 8 * STYLE_SCALE;
   const library = point.x < sidebarWidth;
-  const key = library ? "libraryScroll" : "queueScroll";
-  const length = library ? libraryRows().length : visibleTracks().length;
-  const visibleCount = library ? visibleLibraryRowCount() : visibleRowCount();
+  if (library) {
+    const rect = canvas.getBoundingClientRect();
+    const cssDelta = event.deltaMode === 1 ? event.deltaY * 16
+      : event.deltaMode === 2 ? event.deltaY * rect.height : event.deltaY;
+    const dotDelta = cssDelta * HEIGHT / Math.max(1, rect.height);
+    pendingLibraryScrollDelta += dotDelta;
+    if (!libraryScrollFrame) libraryScrollFrame = requestAnimationFrame(applyLibraryScrollFrame);
+    return;
+  }
+  const key = "queueScroll";
+  const length = visibleTracks().length;
+  const visibleCount = visibleRowCount();
   const direction = Math.sign(event.deltaY);
   state[key] = Math.max(0, Math.min(Math.max(0, length - visibleCount), state[key] + direction * 3));
   render();
@@ -3173,7 +3386,7 @@ canvas.addEventListener("keydown", (event) => {
       return;
     }
     event.preventDefault();
-    state.libraryScroll = 0;
+    state.libraryScrollOffset = 0;
     render();
   } else if (event.code === "Escape" && state.columnMenu) {
     event.preventDefault();
@@ -3256,6 +3469,7 @@ window.addEventListener("pagehide", () => {
   if (selectionAnimationFrame) cancelAnimationFrame(selectionAnimationFrame);
   if (sidebarAnimationFrame) cancelAnimationFrame(sidebarAnimationFrame);
   if (columnAnimationFrame) cancelAnimationFrame(columnAnimationFrame);
+  if (libraryScrollFrame) cancelAnimationFrame(libraryScrollFrame);
   if (equalizerAnimationFrame) cancelAnimationFrame(equalizerAnimationFrame);
   screenResizeObserver?.disconnect();
   if (widgetTree) widgetTree.yoga.freeRecursive();
