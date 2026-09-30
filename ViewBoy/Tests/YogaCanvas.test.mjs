@@ -864,6 +864,16 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.ok(fiveDotBody, 'the playlist body remains laid out below its header at the larger UI Gap');
   assert.equal(fiveDotBody.box.y - (fiveDotHeader.box.y + fiveDotHeader.box.height), 5,
     'playlist header-to-body spacing follows the adjusted UI Gap');
+  clickTarget('SEARCH LIBRARY');
+  for (const character of 'sample') typeSearchKey(character);
+  const fiveDotSidebar = hitTargetSnapshot();
+  const fiveDotParent = fiveDotSidebar.find((target) => target.name.endsWith('SNES'));
+  const fiveDotChild = fiveDotSidebar.find((target) => target.name === 'Sample');
+  assert.ok(fiveDotParent && fiveDotChild, 'filtered sidebar retains its matching parent and child');
+  assert.equal(fiveDotChild.box.y - (fiveDotParent.box.y + fiveDotParent.box.height), 5,
+    'sidebar parent, child, and sibling line spacing follows the adjusted UI Gap');
+  typeSearchKey('Escape');
+  typeSearchKey('Escape');
   globalThis.ViewBoy.dispatch('settings');
   assert.equal(screenTransitionSnapshot()?.direction, 'down',
     'the UI Gap check can return to Options');
@@ -1066,11 +1076,12 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const titleHeader = headerCenter('TITLE');
   const titleRightSide = (titleHeader.box.x + titleHeader.box.width * 0.525) / (canvas.width / 3);
   sendPointer('pointerdown', fileHeader.x, fileHeader.y);
+  nextFrameAdvanceMs = 16;
   sendPointer('pointermove', titleRightSide, titleHeader.y);
   await tick();
   const pushedTitleHeader = headerCenter('TITLE');
-  assert.ok(pushedTitleHeader.box.x < titleHeader.box.x,
-    'neighboring headings push aside during the drag using the shared easing duration');
+  assert.ok(Math.abs(pushedTitleHeader.box.x - fileHeader.box.x) < 1,
+    'the neighboring heading immediately takes the dragged column’s slot on the first frame');
   sendPointer('pointerup', titleRightSide, titleHeader.y);
   const savedColumnOrder = JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).columnOrder;
   assert.ok(savedColumnOrder.indexOf('filename') > savedColumnOrder.indexOf('title'),
@@ -1099,12 +1110,13 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const sourceTitle = tabTitles().find((target) => target.playlistTabId === sourceTab.reorderKey);
   sendPointer('pointerdown', (sourceTitle.box.x + Math.min(3, sourceTitle.box.width / 3)) / (canvas.width / 3),
     (sourceTitle.box.y + sourceTitle.box.height / 2) / (canvas.height / 3));
+  nextFrameAdvanceMs = 16;
   sendPointer('pointermove', (destinationTab.box.x + destinationTab.box.width * 0.85) / (canvas.width / 3),
     (destinationTab.box.y + destinationTab.box.height / 2) / (canvas.height / 3));
   await tick();
   const shiftedNeighborAfter = tabTitles().find((target) => target.playlistTabId === shiftedNeighborID);
-  assert.ok(shiftedNeighborAfter.box.x < shiftedNeighborBefore.box.x,
-    'neighboring tabs push aside during the drag');
+  assert.ok(Math.abs(shiftedNeighborAfter.box.x - sourceTitle.box.x) < 1,
+    'a neighboring tab takes the dragged tab’s slot immediately instead of easing there');
   sendPointer('pointerup', (destinationTab.box.x + destinationTab.box.width * 0.85) / (canvas.width / 3),
     (destinationTab.box.y + destinationTab.box.height / 2) / (canvas.height / 3));
   clickScreen((destinationTab.box.x + destinationTab.box.width * 0.85) / (canvas.width / 3),
@@ -1143,6 +1155,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const scrollGameBefore = sidebarGames().find((target) => target.name === 'Scroll Game 00');
   const scrollGameNext = sidebarGames().find((target) => target.name === 'Scroll Game 01');
   assert.ok(scrollGameBefore && scrollGameNext, 'the overflowing sidebar exposes its first game rows');
+  assert.equal(scrollGameNext.box.y - (scrollGameBefore.box.y + scrollGameBefore.box.height), 4,
+    'expanded sibling rows have the same standard line spacing as their parent group');
   const sidebarRowHeight = scrollGameNext.box.y - scrollGameBefore.box.y;
   canvas.listeners.get('wheel')({
     clientX: rect.width * 0.2,
@@ -1204,10 +1218,20 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.ok(hitTargetSnapshot().some((target) => target.name === 'SUB'),
     'Command-1 switches the sidebar to its catalog Path view');
+  const musicRow = hitTargetSnapshot().find((target) => target.name === 'music');
+  const subRow = hitTargetSnapshot().find((target) => target.name === 'SUB');
+  assert.ok(musicRow && subRow, 'the Path root and its first folder are visible');
+  assert.equal(subRow.box.y - (musicRow.box.y + musicRow.box.height), 4,
+    'Path roots and child folders use the shared sidebar line gap');
   clickTarget('SUB');
   await tick();
-  assert.ok(hitTargetSnapshot().some((target) => target.name === 'path.spc'),
+  const pathRows = hitTargetSnapshot();
+  const expandedSubRow = pathRows.find((target) => target.name === 'SUB');
+  const pathFileRow = pathRows.find((target) => target.name === 'path.spc');
+  assert.ok(pathFileRow,
     'the Path tree expands folders to show indexed files');
+  assert.equal(pathFileRow.box.y - (expandedSubRow.box.y + expandedSubRow.box.height), 4,
+    'expanded Path folders and files keep the same sidebar line gap');
   clickTarget('SUB', 0, 0.5, 0.5, 2);
   await tick();
   assert.equal(pathFolderCalls.length, 1, 'double-clicking a catalog folder loads its indexed tracks');

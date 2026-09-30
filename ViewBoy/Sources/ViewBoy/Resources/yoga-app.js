@@ -1687,6 +1687,23 @@ function libraryRowPixelHeight(row) {
   return rowHeight(2 * controlPaddingDots()) * STYLE_SCALE * (row.revealProgress ?? 1);
 }
 
+function libraryRowsWithLineGaps(rows) {
+  const lines = rows.filter((row) => !row.spacer);
+  const spaced = [];
+  lines.forEach((row, index) => {
+    if (index > 0) {
+      const previousProgress = lines[index - 1].revealProgress ?? 1;
+      const currentProgress = row.revealProgress ?? 1;
+      spaced.push({
+        spacer: true,
+        revealProgress: Math.min(previousProgress, currentProgress),
+      });
+    }
+    spaced.push(row);
+  });
+  return spaced;
+}
+
 function libraryRows() {
   if (state.sidebarMode === "paths") return pathRows();
   const query = normalizedText(state.searchQuery).trim();
@@ -1709,9 +1726,6 @@ function libraryRows() {
     const disclosureProgress = isTransitioning ? transition.progress : Number(expanded);
     rows.push({ text: system, system, group: true, disclosureProgress });
     if (showChildren) {
-      if (groups.get(system).length) {
-        rows.push({ spacer: true, revealProgress: isTransitioning ? transition.progress : undefined });
-      }
       for (const game of groups.get(system)) {
         rows.push({
           text: game.displayName || game.name,
@@ -1729,7 +1743,7 @@ function pathRows() {
   const query = normalizedText(state.searchQuery).trim();
   const rows = [];
   const transition = state.sidebarTransition;
-  function append(node, depth, isRoot = false) {
+  function append(node, depth, isRoot = false, revealProgress) {
     const children = Array.isArray(node.children) ? node.children : [];
     const directMatch = !query || normalizedText(`${node.name || ""} ${node.path || ""}`).includes(query);
     const matchingChildren = query ? children.filter((child) => pathSubtreeMatches(child, query)) : children;
@@ -1745,10 +1759,13 @@ function pathRows() {
         + (children.length ? 2 * fontProfile().advance : 0),
       disclosureIndent: controlPaddingDots() + depth * 2 * fontProfile().advance,
       disclosureProgress: progress,
+      revealProgress,
     });
     if (children.length && (expanded || (inTransition && progress > 0))) {
-      rows.push({ spacer: true, revealProgress: inTransition ? progress : undefined });
-      for (const child of matchingChildren) append(child, depth + 1, false);
+      const childRevealProgress = inTransition ? transition.progress : revealProgress;
+      for (const child of matchingChildren) {
+        append(child, depth + 1, false, childRevealProgress);
+      }
     }
     return true;
   }
@@ -1821,7 +1838,7 @@ function addLibraryPane(parent) {
     controlTitle: item.controlTitle,
   }));
   makeWidget(library, { height: uiGap() });
-  const rows = libraryRows();
+  const rows = libraryRowsWithLineGaps(libraryRows());
   const count = visibleLibraryRowCount();
   const rowHeightDots = rowHeight(2 * controlPaddingDots()) * STYLE_SCALE;
   state.libraryContentHeight = rows.reduce((sum, row) => sum + libraryRowPixelHeight(row), 0);
@@ -1851,7 +1868,7 @@ function addLibraryPane(parent) {
     direction: FlexDirection.Column,
   }, { translateY: -partialRowOffset });
   state.libraryViewportWidget = viewport;
-  const lastRow = Math.min(rows.length, firstRow + count + 2);
+  const lastRow = Math.min(rows.length, firstRow + count * 2 + 2);
   rows.slice(firstRow, lastRow).forEach((row) => {
     if (row.spacer) {
       createLibraryRow(content, "", { spacer: true, revealProgress: row.revealProgress });
@@ -4149,14 +4166,15 @@ function captureReorderPositions(kind) {
   return positions;
 }
 
-function orderWithDraggedItem(keys, sourceKey, targetKey, targetBox, pointerX) {
+function orderWithDraggedItem(keys, sourceKey, targetKey, targetBox, draggedCenter) {
   if (!sourceKey || !targetKey || sourceKey === targetKey) return keys;
   const next = [...keys];
   const sourceIndex = next.indexOf(sourceKey);
   const targetIndex = next.indexOf(targetKey);
   if (sourceIndex < 0 || targetIndex < 0) return keys;
   next.splice(sourceIndex, 1);
-  let insertionIndex = targetIndex + (pointerX >= targetBox.x + targetBox.width / 2 ? 1 : 0);
+  let insertionIndex = targetIndex
+    + (draggedCenter >= targetBox.x + targetBox.width / 2 ? 1 : 0);
   if (sourceIndex < insertionIndex) insertionIndex -= 1;
   next.splice(Math.max(0, Math.min(next.length, insertionIndex)), 0, sourceKey);
   return next;
@@ -4236,6 +4254,7 @@ canvas.addEventListener("pointerdown", (event) => {
       sourceKey,
       originalOrder: currentReorderOrder(itemKind),
       grabOffset: point.x - draggable.box.x,
+      draggedWidth: draggable.box.width,
       startX: point.x,
       startY: point.y,
       lastPointX: point.x,
@@ -4260,6 +4279,7 @@ canvas.addEventListener("pointermove", (event) => {
     pointerInteraction.pointX = point.x;
     if (distance >= 1) {
       pointerInteraction.dragging = true;
+      reorderAnimation = null;
       suppressNextClick = true;
       const dropTarget = pointerInteraction.itemKind === "column"
         ? findTargetEntry(point, (widget) => widget.meta.columnHeader && widget.meta.reorderable)
@@ -4272,12 +4292,10 @@ canvas.addEventListener("pointermove", (event) => {
           pointerInteraction.sourceKey,
           targetKey,
           dropTarget.box,
-          point.x,
+          point.x - pointerInteraction.grabOffset + pointerInteraction.draggedWidth / 2,
         );
         if (!sameOrder(nextOrder, currentReorderOrder(pointerInteraction.itemKind))) {
-          const fromX = captureReorderPositions(pointerInteraction.itemKind);
           reorderPreview = { kind: pointerInteraction.itemKind, keys: nextOrder };
-          setReorderAnimation(pointerInteraction.itemKind, fromX, performance.now());
         }
       }
     }
