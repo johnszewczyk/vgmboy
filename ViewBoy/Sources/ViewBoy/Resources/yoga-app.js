@@ -10,9 +10,11 @@ import Yoga, {
   PositionType,
 } from "./yoga-layout.js";
 
-// Each LCD dot occupies three physical display pixels per side. On a Retina
-// display (2x), that is a 1.5-CSS-pixel dot with a 2x2 face and a fine edge.
-const DEVICE_PIXELS_PER_LCD_DOT = 3;
+// The framebuffer expands each LCD dot to a configurable device-pixel cell.
+// A one-pixel edge remains unlit so the matrix stays visible at every size.
+const DEFAULT_LCD_DOT_SIZE = 3;
+const LCD_DOT_SIZE_OPTIONS = [2, 3, 4, 5, 6];
+let DEVICE_PIXELS_PER_LCD_DOT = DEFAULT_LCD_DOT_SIZE;
 const BASELINE_LAYOUT_UNIT_CSS_PIXELS = 2.5;
 const RANDOM_HISTORY_LIMIT = 256;
 const APP_BORDER_GAP_DOTS = 8;
@@ -28,6 +30,8 @@ const EQ_GAIN_MIN_DB = 0;
 const EQ_GAIN_MAX_DB = 12;
 const EQ_GAIN_STEP_DB = 0.5;
 const EQ_GAIN_STEPS = (EQ_GAIN_MAX_DB - EQ_GAIN_MIN_DB) / EQ_GAIN_STEP_DB;
+const FAVORITES_TAB_SOURCE = "viewboy:special:favorites";
+const HISTORY_TAB_SOURCE = "viewboy:special:history";
 const DEFAULT_ANIMATION_FPS = 60;
 const ANIMATION_FPS_OPTIONS = [30, 60, 90, 120, 144];
 const PALETTES = {
@@ -211,6 +215,7 @@ function saveDisplayOptions() {
       font: state.font,
       contrast: state.contrast,
       theme: state.theme,
+      lcdDotSize: state.lcdDotSize,
       uiButtonPadDots: state.controlPaddingDots,
       uiChromeGapDots: state.uiChromeGapDots,
       textLineGapDots: state.textLineGapDots,
@@ -285,6 +290,8 @@ const state = {
   font: savedDisplayOptions.font === "STANDARD" ? "STANDARD" : "MICRO",
   contrast: savedDisplayOptions.contrast === "HIGH_CONTRAST" ? "HIGH_CONTRAST" : "STANDARD",
   theme: savedDisplayOptions.theme === "NIGHTBOY" ? "NIGHTBOY" : "GAMEBOY",
+  lcdDotSize: LCD_DOT_SIZE_OPTIONS.includes(Number(savedDisplayOptions.lcdDotSize))
+    ? Number(savedDisplayOptions.lcdDotSize) : DEFAULT_LCD_DOT_SIZE,
   controlPaddingDots: storedSpacing(savedDisplayOptions.uiButtonPadDots
     ?? savedDisplayOptions.controlPaddingDots, DEFAULT_CONTROL_PADDING_DOTS),
   uiChromeGapDots: storedSpacing(savedDisplayOptions.uiChromeGapDots, legacyChromeGapDots),
@@ -364,6 +371,7 @@ const state = {
   retiredGeneration: 0,
   columnMenu: null,
 };
+DEVICE_PIXELS_PER_LCD_DOT = state.lcdDotSize;
 RGB = paletteRGB(displayPalette());
 packedRGB = packedPalette(RGB);
 if (document.documentElement) document.documentElement.dataset.theme = state.theme;
@@ -392,13 +400,15 @@ function formatTime(milliseconds) {
 function activeTracks() {
   if (state.tab === "QUEUE") return state.activeQueue.length
     ? state.activeQueue : (activePlaylistTab()?.playlist || tracks);
-  if (state.tab === "FAVORITES") return state.favoriteTracks;
-  if (state.tab === "HISTORY") return state.historyTracks;
   return activePlaylistTab()?.playlist || tracks;
 }
 
 function activePlaylistTab() {
   return state.playlistTabs.find((tab) => tab.id === state.activePlaylistTabId) || null;
+}
+
+function playlistTabForSource(sourceKey) {
+  return state.playlistTabs.find((tab) => tab.sourceKey === sourceKey) || null;
 }
 
 function samePlaylist(first, second) {
@@ -413,7 +423,7 @@ function playlistTabID() {
 
 function syncActivePlaylistTab() {
   const tab = activePlaylistTab();
-  if (!tab || state.tab === "FAVORITES" || state.tab === "HISTORY" || state.tab === "SETTINGS") return;
+  if (!tab || state.tab === "SETTINGS") return;
   tab.playlist = [...tracks];
   tab.selectedTrack = state.selectedTrack;
   tab.scroll = state.queueScroll;
@@ -476,11 +486,18 @@ function activatePlaylistTab(id) {
   if (!tab) return false;
   const leavingOptions = state.tab === "SETTINGS";
   if (tab.id !== state.activePlaylistTabId) syncActivePlaylistTab();
-  else if (state.tab !== "SETTINGS" && state.tab !== "FAVORITES" && state.tab !== "HISTORY") return false;
+  else if (state.tab !== "SETTINGS") return false;
   state.activePlaylistTabId = tab.id;
   tracks = [...tab.playlist];
   state.activeQueue = [...tab.playlist];
   state.activeGameKey = tab.gameKey;
+  if (tab.sourceKey === HISTORY_TAB_SOURCE) {
+    state.sortColumn = "timestamp";
+    state.sortDirection = "DESCENDING";
+  } else if (state.sortColumn === "timestamp") {
+    state.sortColumn = null;
+    state.sortDirection = "ASCENDING";
+  }
   state.selectedTrack = Math.min(tab.selectedTrack || 0, Math.max(0, tab.playlist.length - 1));
   state.queueScroll = Math.max(0, tab.scroll || 0);
   state.tableHorizontalScroll = 0;
@@ -530,8 +547,7 @@ function tabLayoutWeightAt(id, time = currentRenderTime) {
 }
 
 function createPlaylistTab({ duplicateActive = true, title = null, playlist = null, gameKey = null } = {}) {
-  const priorWidths = state.tab !== "FAVORITES" && state.tab !== "HISTORY" && state.tab !== "SETTINGS"
-    ? captureTabWidths() : null;
+  const priorWidths = state.tab !== "SETTINGS" ? captureTabWidths() : null;
   syncActivePlaylistTab();
   if (state.playlistTabs.length >= 64) return null;
   const source = activePlaylistTab();
@@ -566,6 +582,7 @@ function closePlaylistTab(id = state.activePlaylistTabId) {
     const tab = state.playlistTabs[0];
     tab.title = "PLAYLIST";
     tab.gameKey = null;
+    tab.sourceKey = null;
     tab.playlist = [];
     tab.selectedTrack = 0;
     tab.scroll = 0;
@@ -579,8 +596,7 @@ function closePlaylistTab(id = state.activePlaylistTabId) {
     }
   } else {
     const priorTabs = [...state.playlistTabs];
-    const priorWidths = state.tab !== "FAVORITES" && state.tab !== "SETTINGS"
-      ? captureTabWidths() : null;
+    const priorWidths = state.tab !== "SETTINGS" ? captureTabWidths() : null;
     const wasActive = state.playlistTabs[index].id === state.activePlaylistTabId;
     state.playlistTabs.splice(index, 1);
     if (priorWidths) animateTabLayout(priorWidths, priorTabs);
@@ -676,6 +692,15 @@ export function animationSettingsSnapshot() {
   };
 }
 
+export function lcdDotSizeSnapshot() {
+  return {
+    devicePixelsPerDot: DEVICE_PIXELS_PER_LCD_DOT,
+    cssPixelsPerDot: UI_UNIT_CSS_PIXELS,
+    framebufferWidth: WIDTH,
+    framebufferHeight: HEIGHT,
+  };
+}
+
 export function equalizerAnimationSnapshot(time = performance.now()) {
   return state.equalizerBarBoxes.flatMap((box, index) => {
     if (!box) return [];
@@ -715,10 +740,13 @@ export function hitTargetSnapshot() {
       || (Number.isInteger(widget.meta.equalizerBar) ? `EQ BAND ${widget.meta.equalizerBar + 1}` : ""),
     columnMenuItem: widget.meta.columnMenuItem === true,
     columnHeader: widget.meta.columnHeader === true,
+    optionChecklistItem: widget.meta.optionChecklistItem === true,
     trackIndex: Number.isInteger(widget.meta.trackIndex) ? widget.meta.trackIndex : null,
     searchField: widget.meta.searchField === true,
+    searchText: widget.meta.searchField ? searchFieldText(box) : null,
     playlistTabTitle: widget.meta.playlistTabTitle === true,
     playlistTabClose: widget.meta.playlistTabClose === true,
+    activePlaylistTab: widget.meta.activePlaylistTab === true,
     editableDurationKey: widget.meta.editableDuration ?? null,
     playlistTabId: widget.meta.playlistTabId ?? null,
     textInset: widget.meta.inset ?? controlPaddingDots(),
@@ -843,20 +871,14 @@ function blinkSearchCursor() {
 
 function searchFieldText(box) {
   const query = state.searchQuery;
-  const prefix = query ? "SEARCH: " : "SEARCH LIBRARY";
   const cursor = state.searchFocused && searchCursorVisible ? "|" : "";
-  const text = `${prefix}${query}${cursor}`;
+  if (!query && !state.searchFocused) return "SEARCH LIBRARY";
   const availableWidth = box.width - 2 * controlPaddingDots();
   const limit = Math.max(1, Math.floor((availableWidth + 1) / fontProfile().advance));
-  const characters = Array.from(text);
-  if (characters.length <= limit) return text;
-  if (state.searchFocused && query) {
-    const queryCharacters = Array.from(query);
-    const queryLength = Math.max(0, limit - Array.from(prefix).length - cursor.length);
-    return `${Array.from(prefix).slice(0, Math.max(0, limit - queryLength - cursor.length)).join("")}`
-      + `${queryCharacters.slice(-queryLength).join("")}${cursor}`;
-  }
-  return `${characters.slice(0, Math.max(0, limit - 1)).join("")}…`;
+  const queryCharacters = Array.from(query);
+  const visibleCount = Math.max(0, limit - cursor.length);
+  const visibleQuery = visibleCount > 0 ? queryCharacters.slice(-visibleCount).join("") : "";
+  return `${visibleQuery}${cursor}`;
 }
 
 function fontProfile() {
@@ -916,25 +938,19 @@ function presentPixels(startY = 0, endY = HEIGHT, startX = 0, endX = WIDTH) {
   const lastColumn = Math.min(WIDTH, Math.ceil(endX));
   if (lastRow <= firstRow || lastColumn <= firstColumn) return;
   const background = packedRGB[3];
+  const faceSize = Math.max(1, DEVICE_PIXELS_PER_LCD_DOT - 1);
   for (let y = firstRow; y < lastRow; y += 1) {
     const sourceRow = y * WIDTH;
     const topRow = y * DEVICE_PIXELS_PER_LCD_DOT * outputWidth;
     for (let x = firstColumn; x < lastColumn; x += 1) {
       const face = packedRGB[pixels[sourceRow + x]];
       const outputX = x * DEVICE_PIXELS_PER_LCD_DOT;
-      const top = topRow + outputX;
-      const middle = top + outputWidth;
-      const bottom = middle + outputWidth;
-      // A two-by-two shaded face leaves an unlit one-device-pixel seam.
-      imageWords[top] = face;
-      imageWords[top + 1] = face;
-      imageWords[top + 2] = background;
-      imageWords[middle] = face;
-      imageWords[middle + 1] = face;
-      imageWords[middle + 2] = background;
-      imageWords[bottom] = background;
-      imageWords[bottom + 1] = background;
-      imageWords[bottom + 2] = background;
+      for (let dotY = 0; dotY < DEVICE_PIXELS_PER_LCD_DOT; dotY += 1) {
+        const row = topRow + dotY * outputWidth + outputX;
+        for (let dotX = 0; dotX < DEVICE_PIXELS_PER_LCD_DOT; dotX += 1) {
+          imageWords[row + dotX] = dotX < faceSize && dotY < faceSize ? face : background;
+        }
+      }
     }
   }
   context.putImageData(image, 0, 0, firstColumn * DEVICE_PIXELS_PER_LCD_DOT,
@@ -1236,6 +1252,24 @@ function optionToggle(parent, title, checked, onClick, extraMeta = {}) {
     width: textLayoutWidth(marker),
     height,
   }, { textShade: 0, align: "right", inset: controlPaddingDots() });
+  return row;
+}
+
+function optionChecklistRow(parent, title, checked, onClick) {
+  const height = buttonStandardHeight();
+  const marker = checked ? "[x]" : "[ ]";
+  const row = makeWidget(parent, {
+    direction: FlexDirection.Row,
+    alignItems: Align.Center,
+    height,
+    gap: uiGap(),
+  }, { onClick, controlTitle: title, optionChecklistItem: true });
+  label(row, marker, { width: textLayoutWidth(marker), height }, {
+    textShade: 0, inset: controlPaddingDots(),
+  });
+  label(row, title, { flexGrow: 1, height }, {
+    textShade: 0, inset: controlPaddingDots(),
+  });
   return row;
 }
 
@@ -1551,6 +1585,11 @@ function resolveTableColumns(layout, time) {
   }));
 }
 
+export function optionsPaneSnapshot() {
+  return layoutEntries.filter(({ widget }) => widget.meta.optionFrame)
+    .map(({ widget, box }) => ({ frame: widget.meta.optionFrame, box: { ...box } }));
+}
+
 function createTableHeader(parent, columns) {
   const headerHeight = buttonStandardHeight();
   const header = makeWidget(parent, {
@@ -1808,7 +1847,7 @@ function addLibraryPane(parent) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
     },
   });
-  label(library, state.searchQuery ? `SEARCH: ${state.searchQuery}` : "SEARCH LIBRARY", {
+  label(library, "SEARCH LIBRARY", {
     height: buttonStandardHeight(),
   }, {
     textShade: 0,
@@ -1818,7 +1857,12 @@ function addLibraryPane(parent) {
     searchField: true,
     textValue: searchFieldText,
     controlTitle: "SEARCH LIBRARY",
-    onClick: () => { setSearchFocused(true); render(); },
+    onClick: () => {
+      state.searchQuery = "";
+      state.libraryScrollOffset = 0;
+      setSearchFocused(true);
+      render();
+    },
   });
   makeWidget(library, { height: uiGap() });
   const navigation = controlRow(library, { gap: uiGap() });
@@ -1829,8 +1873,12 @@ function addLibraryPane(parent) {
     flexGrow: 1,
     flexShrink: 1,
     selected: item.view === "PATHS" ? state.sidebarMode === "paths"
-      : item.view === "HISTORY" ? state.tab === "HISTORY"
-        : item.view === state.tab && state.sidebarMode !== "paths",
+      : item.view === "FAVORITES" ? activePlaylistTab()?.sourceKey === FAVORITES_TAB_SOURCE
+        : item.view === "HISTORY" ? activePlaylistTab()?.sourceKey === HISTORY_TAB_SOURCE
+          : item.view === "QUEUE" ? state.tab === "QUEUE"
+            && activePlaylistTab()?.sourceKey !== FAVORITES_TAB_SOURCE
+            && activePlaylistTab()?.sourceKey !== HISTORY_TAB_SOURCE
+            : item.view === state.tab && state.sidebarMode !== "paths",
     controlTitle: item.controlTitle,
   }));
   makeWidget(library, { height: uiGap() });
@@ -1934,7 +1982,7 @@ function addCatalogPane(parent) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
     },
   });
-  if (state.tab !== "FAVORITES" && state.tab !== "HISTORY") {
+  {
     const tabRow = controlRow(panel, { gap: uiGap() });
     const tabList = makeWidget(tabRow, {
       direction: FlexDirection.Row,
@@ -1960,9 +2008,10 @@ function addCatalogPane(parent) {
       }, {
         clipChildren: true,
         tabLayoutVisual: true,
-        reorderContainer: !isExiting && !tabLayoutAnimation,
-        reorderKind: "tab",
-        reorderKey: tab.id,
+    reorderContainer: !isExiting && !tabLayoutAnimation,
+    reorderKind: "tab",
+    reorderKey: tab.id,
+    activePlaylistTab: tab.id === state.activePlaylistTabId,
         onClick: isExiting ? undefined : () => activatePlaylistTab(tab.id),
         controlTitle: `TAB ${tab.title}`,
         paint(box) {
@@ -1997,7 +2046,7 @@ function addCatalogPane(parent) {
         playlistTabClose: true,
         playlistTabId: tab.id,
         controlTitle: "X",
-        onClick: isExiting || tabLayoutAnimation ? undefined : () => closePlaylistTab(tab.id),
+        onClick: isExiting ? undefined : () => closePlaylistTab(tab.id),
       });
     });
     pixelButton(tabRow, "[+]", () => createPlaylistTab({ duplicateActive: true }), {
@@ -2161,6 +2210,9 @@ function addDisplayOptions(parent) {
     { title: "MICRO 3X5", selected: state.font === "MICRO", onClick: () => setFontProfile("MICRO") },
     { title: "STANDARD 5X7", selected: state.font === "STANDARD", onClick: () => setFontProfile("STANDARD") },
   ]);
+  optionAdjuster(profile, "LCD DOT SIZE", `${state.lcdDotSize} PX`,
+    () => setLCDDotSize(state.lcdDotSize - 1),
+    () => setLCDDotSize(state.lcdDotSize + 1));
 }
 
 function addThemeOptions(parent) {
@@ -2531,7 +2583,7 @@ function addLibraryOptions(parent, pref) {
   const fields = optionGroup(parent, "PLAYLIST COLUMNS");
   configurableColumns.forEach(({ key, title }) => {
     const visibility = pref.columnVisibility || {};
-    optionToggle(fields, title, visibility[key] !== false,
+    optionChecklistRow(fields, title, visibility[key] !== false,
       () => setPreference("columnVisibility", {
         ...(state.preferences.columnVisibility || {}),
         [key]: state.preferences.columnVisibility?.[key] === false,
@@ -2679,6 +2731,7 @@ function addOptionsContent(parent) {
     gap: uiGap(),
     padding: uiOptionsInsetDots() / STYLE_SCALE,
   }, {
+    optionFrame: "toc",
     paint(box) { line(box.x + box.width, box.y, box.x + box.width, box.y + box.height, 1); },
   });
   panelTitle(toc, "OPTIONS");
@@ -2697,6 +2750,8 @@ function addOptionsContent(parent) {
     flexGrow: 1,
     gap: uiGap(),
     padding: uiOptionsInsetDots() / STYLE_SCALE,
+  }, {
+    optionFrame: "content",
   });
   panelTitle(panel, state.optionsPage);
   const content = makeWidget(panel, {
@@ -3186,6 +3241,19 @@ function setFontProfile(font) {
   render();
 }
 
+function setLCDDotSize(value) {
+  const size = Number(value);
+  if (!LCD_DOT_SIZE_OPTIONS.includes(size) || size === state.lcdDotSize) return;
+  cancelScreenLocalAnimations();
+  if (screenTransitionFrame) cancelAnimationFrame(screenTransitionFrame);
+  screenTransitionFrame = 0;
+  screenTransition = null;
+  state.lcdDotSize = size;
+  DEVICE_PIXELS_PER_LCD_DOT = size;
+  saveDisplayOptions();
+  fitCanvas();
+}
+
 function toggleContrast() {
   setContrastProfile(state.contrast === "STANDARD" ? "HIGH_CONTRAST" : "STANDARD");
 }
@@ -3268,6 +3336,14 @@ async function loadFavorites() {
     if (!Array.isArray(favorites)) return;
     state.favoriteTracks = favorites;
     state.favoriteIDs = new Set(favorites.map(favoriteID));
+    const tab = playlistTabForSource(FAVORITES_TAB_SOURCE);
+    if (tab) tab.playlist = [...favorites];
+    if (activePlaylistTab()?.sourceKey === FAVORITES_TAB_SOURCE) {
+      tracks = [...favorites];
+      state.activeQueue = [...favorites];
+      state.selectedTrack = Math.min(state.selectedTrack, Math.max(0, favorites.length - 1));
+    }
+    persistPlaylistTabs();
     render();
   } catch (error) {
     state.status = `FAVORITES ERROR: ${error.message}`;
@@ -3282,11 +3358,86 @@ async function toggleFavorite(track) {
     if (Array.isArray(favorites)) {
       state.favoriteTracks = favorites;
       state.favoriteIDs = new Set(favorites.map(favoriteID));
+      const favoritesTab = playlistTabForSource(FAVORITES_TAB_SOURCE);
+      if (favoritesTab) favoritesTab.playlist = [...favorites];
+      if (activePlaylistTab()?.sourceKey === FAVORITES_TAB_SOURCE) {
+        tracks = [...favorites];
+        state.activeQueue = [...favorites];
+      }
       state.selectedTrack = Math.min(state.selectedTrack, Math.max(0, favorites.length - 1));
+      persistPlaylistTabs();
       render();
     }
   } catch (error) {
     state.status = `FAVORITE ERROR: ${error.message}`;
+    render();
+  }
+}
+
+function openProjectionPlaylist(sourceKey, title, playlist) {
+  const leavingOptions = state.tab === "SETTINGS";
+  const priorWidths = leavingOptions ? null : captureTabWidths();
+  if (!leavingOptions) syncActivePlaylistTab();
+  let tab = playlistTabForSource(sourceKey);
+  if (!tab) {
+    if (state.playlistTabs.length >= 64) {
+      state.status = "PLAYLIST TAB LIMIT REACHED";
+      render();
+      return false;
+    }
+    tab = {
+      id: playlistTabID(),
+      title,
+      gameKey: null,
+      sourceKey,
+      playlist: [...playlist],
+      selectedTrack: 0,
+      scroll: 0,
+    };
+    state.playlistTabs.push(tab);
+    if (priorWidths) animateTabLayout(priorWidths, [...state.playlistTabs]);
+  } else {
+    tab.title = title;
+    tab.playlist = [...playlist];
+  }
+
+  state.activePlaylistTabId = tab.id;
+  tracks = [...tab.playlist];
+  state.activeQueue = [...tab.playlist];
+  state.activeGameKey = null;
+  state.selectedGameKey = null;
+  tab.selectedTrack = 0;
+  tab.scroll = 0;
+  state.selectedTrack = 0;
+  state.queueScroll = 0;
+  state.tableHorizontalScroll = 0;
+  if (sourceKey === HISTORY_TAB_SOURCE) {
+    state.sortColumn = "timestamp";
+    state.sortDirection = "DESCENDING";
+  } else if (state.sortColumn === "timestamp") {
+    state.sortColumn = null;
+    state.sortDirection = "ASCENDING";
+  }
+  state.status = `${tab.playlist.length} ${title} TRACKS`;
+  if (leavingOptions) navigateAppTab("QUEUE");
+  else {
+    state.tab = "QUEUE";
+    render();
+  }
+  persistPlaylistTabs();
+  return true;
+}
+
+async function showFavoritesPlaylist() {
+  if (!bridge?.favoritesList) return;
+  try {
+    const favorites = await bridge.favoritesList("historical");
+    if (!Array.isArray(favorites)) return;
+    state.favoriteTracks = favorites;
+    state.favoriteIDs = new Set(favorites.map(favoriteID));
+    openProjectionPlaylist(FAVORITES_TAB_SOURCE, "FAVORITES", favorites);
+  } catch (error) {
+    state.status = `FAVORITES ERROR: ${error.message}`;
     render();
   }
 }
@@ -3301,7 +3452,6 @@ function historyTimestamp(milliseconds) {
 
 async function showPlaybackHistory() {
   if (!bridge?.playbackHistoryList) return;
-  const leavingOptions = state.tab === "SETTINGS";
   try {
     const records = await bridge.playbackHistoryList();
     state.historyTracks = (Array.isArray(records) ? records : []).map((record) => {
@@ -3334,15 +3484,7 @@ async function showPlaybackHistory() {
         timestamp: historyTimestamp(timestampMilliseconds),
       };
     }).filter(Boolean);
-    if (!leavingOptions) state.tab = "HISTORY";
-    state.sortColumn = "timestamp";
-    state.sortDirection = "DESCENDING";
-    state.selectedTrack = 0;
-    state.queueScroll = 0;
-    state.tableHorizontalScroll = 0;
-    state.status = `${state.historyTracks.length} HISTORY ITEMS`;
-    if (leavingOptions) navigateAppTab("HISTORY");
-    else render();
+    openProjectionPlaylist(HISTORY_TAB_SOURCE, "HISTORY", state.historyTracks);
   } catch (error) {
     state.status = `HISTORY ERROR: ${error.message}`;
     render();
@@ -3350,13 +3492,22 @@ async function showPlaybackHistory() {
 }
 
 function selectSidebarView(view) {
+  if (view === "FAVORITES") {
+    void showFavoritesPlaylist();
+    return;
+  }
+  if (view === "HISTORY") {
+    void showPlaybackHistory();
+    return;
+  }
   const leavingOptions = state.tab === "SETTINGS";
   if (view === "QUEUE") {
     const currentQueue = state.currentTrackId && state.playbackQueue.length
       ? state.playbackQueue : state.activeQueue;
     const queue = currentQueue.length
       ? [...currentQueue] : [...(activePlaylistTab()?.playlist || tracks)];
-    let tab = state.playlistTabs.find((entry) => samePlaylist(entry.playlist, queue));
+    let tab = state.playlistTabs.find((entry) => ![FAVORITES_TAB_SOURCE, HISTORY_TAB_SOURCE]
+      .includes(entry.sourceKey) && samePlaylist(entry.playlist, queue));
     if (!tab) {
       syncActivePlaylistTab();
       tab = state.playlistTabs.length < 64 ? {
@@ -3380,7 +3531,6 @@ function selectSidebarView(view) {
     render();
   }
   if (view === "QUEUE") persistPlaylistTabs();
-  if (view === "FAVORITES") loadFavorites();
 }
 
 async function loadDatabaseFiles() {
@@ -3464,8 +3614,7 @@ async function loadPathNode(node) {
     tracks = Array.isArray(rows) ? rows : [];
     let tab = state.playlistTabs.find((entry) => entry.sourceKey === key);
     if (!tab && state.playlistTabs.length < 64) {
-      const priorWidths = state.tab === "FAVORITES" || state.tab === "HISTORY" || state.tab === "SETTINGS"
-        ? null : captureTabWidths();
+      const priorWidths = state.tab === "SETTINGS" ? null : captureTabWidths();
       tab = {
         id: playlistTabID(),
         title: node.name || "PATH",
@@ -4170,6 +4319,24 @@ function currentReorderOrder(kind) {
   return state.playlistTabs.map((tab) => tab.id);
 }
 
+function findReorderTarget(point, kind, sourceKey) {
+  for (let index = hitTargets.length - 1; index >= 0; index -= 1) {
+    const entry = hitTargets[index];
+    const widget = entry.widget;
+    const targetKey = kind === "column" ? widget.meta.columnKey : widget.meta.reorderKey;
+    const targetable = kind === "column"
+      ? widget.meta.columnHeader && widget.meta.reorderable
+      : widget.meta.reorderContainer;
+    if (!targetable || widget.meta.reorderKind !== kind || targetKey === sourceKey) continue;
+    const { box, clip } = entry;
+    if (clip && (point.x < clip.x || point.x >= clip.x + clip.width
+      || point.y < clip.y || point.y >= clip.y + clip.height)) continue;
+    if (point.x >= box.x && point.x < box.x + box.width
+      && point.y >= box.y && point.y < box.y + box.height) return entry;
+  }
+  return null;
+}
+
 function captureReorderPositions(kind) {
   const positions = {};
   hitTargets.forEach(({ widget, box }) => {
@@ -4295,9 +4462,9 @@ canvas.addEventListener("pointermove", (event) => {
       pointerInteraction.dragging = true;
       reorderAnimation = null;
       suppressNextClick = true;
-      const dropTarget = pointerInteraction.itemKind === "column"
-        ? findTargetEntry(point, (widget) => widget.meta.columnHeader && widget.meta.reorderable)
-        : findTargetEntry(point, (widget) => widget.meta.reorderContainer);
+      const dropTarget = findReorderTarget(
+        point, pointerInteraction.itemKind, pointerInteraction.sourceKey,
+      );
       if (dropTarget) {
         const targetKey = pointerInteraction.itemKind === "column"
           ? dropTarget.widget.meta.columnKey : dropTarget.widget.meta.reorderKey;
@@ -4309,7 +4476,9 @@ canvas.addEventListener("pointermove", (event) => {
           point.x - pointerInteraction.grabOffset + pointerInteraction.draggedWidth / 2,
         );
         if (!sameOrder(nextOrder, currentReorderOrder(pointerInteraction.itemKind))) {
+          const fromX = captureReorderPositions(pointerInteraction.itemKind);
           reorderPreview = { kind: pointerInteraction.itemKind, keys: nextOrder };
+          setReorderAnimation(pointerInteraction.itemKind, fromX, performance.now());
         }
       }
     }
@@ -4440,15 +4609,10 @@ canvas.addEventListener("keydown", (event) => {
   } else if (commandKey && event.shiftKey && event.key.toLowerCase() === "h") {
     event.preventDefault();
     void showPlaybackHistory();
-  } else if (commandKey && !event.shiftKey && !event.altKey && event.key === "1") {
+  } else if (commandKey && !event.shiftKey && !event.altKey && /^[1-9]$/.test(event.key)) {
     event.preventDefault();
-    void setSidebarMode("paths").then(() => selectSidebarView("LIBRARY"));
-  } else if (commandKey && !event.shiftKey && !event.altKey && event.key === "2") {
-    event.preventDefault();
-    void setSidebarMode("consoles").then(() => selectSidebarView("LIBRARY"));
-  } else if (commandKey && !event.shiftKey && !event.altKey && event.key === "3") {
-    event.preventDefault();
-    openLocalPath();
+    const tab = state.playlistTabs[Number(event.key) - 1];
+    if (tab) activatePlaylistTab(tab.id);
   } else if (commandKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "d") {
     event.preventDefault();
     const selected = visibleTracks()[state.selectedTrack];

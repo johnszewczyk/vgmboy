@@ -238,11 +238,14 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     contentRowLayoutSnapshot,
     equalizerAnimationSnapshot,
     hitTargetSnapshot,
+    lcdDotSizeSnapshot,
+    optionsPaneSnapshot,
     spacingReadoutLayoutSnapshot,
     screenTransitionSnapshot,
   } = await import('../Sources/ViewBoy/Resources/yoga-app.js');
   const standardFont = bitmapFontSnapshot('STANDARD');
   const microFont = bitmapFontSnapshot('MICRO');
+  const dotsPerCell = () => lcdDotSizeSnapshot().devicePixelsPerDot;
   for (const [name, font] of [['Standard 5x7', standardFont], ['Micro 3x5', microFont]]) {
     assert.equal(Object.keys(font.glyphs).some((character) => /^[a-z]$/.test(character)), false,
       `${name} font contains no lowercase glyphs`);
@@ -260,8 +263,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   }, 'all UI animation starts on the shared 200 ms duration and 60 FPS profile');
   const clickTargetBox = (target) => {
     const rect = canvas.getBoundingClientRect();
-    const logicalWidth = canvas.width / 3;
-    const logicalHeight = canvas.height / 3;
+    const logicalWidth = canvas.width / dotsPerCell();
+    const logicalHeight = canvas.height / dotsPerCell();
     canvas.listeners.get('click')({
       clientX: rect.width * (target.box.x + target.box.width / 2) / logicalWidth,
       clientY: rect.height * (target.box.y + target.box.height / 2) / logicalHeight,
@@ -273,7 +276,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     code: `Digit${number}`,
     metaKey: true,
     ctrlKey: false,
-    altKey: true,
+    altKey: false,
     shiftKey: false,
     preventDefault() {},
   });
@@ -531,8 +534,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   };
   const clickEntry = (target) => {
     const rect = canvas.getBoundingClientRect();
-    const logicalWidth = canvas.width / 3;
-    const logicalHeight = canvas.height / 3;
+    const logicalWidth = canvas.width / dotsPerCell();
+    const logicalHeight = canvas.height / dotsPerCell();
     canvas.listeners.get('click')({
       clientX: rect.width * (target.box.x + target.box.width / 2) / logicalWidth,
       clientY: rect.height * (target.box.y + target.box.height / 2) / logicalHeight,
@@ -542,8 +545,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const clickTarget = (name, occurrence = 0, xFraction = 0.5, yFraction = 0.5, detail = 1) => {
     const target = hitTargetSnapshot().filter((entry) => entry.name === name)[occurrence];
     assert.ok(target, `the ${name} control is present in the current screen; found ${hitTargetSnapshot().map((entry) => entry.name).join(', ')}`);
-    const logicalWidth = canvas.width / 3;
-    const logicalHeight = canvas.height / 3;
+    const logicalWidth = canvas.width / dotsPerCell();
+    const logicalHeight = canvas.height / dotsPerCell();
     clickScreen(
       (target.box.x + target.box.width * xFraction) / logicalWidth,
       (target.box.y + target.box.height * yFraction) / logicalHeight,
@@ -568,6 +571,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const idleSearchPixels = pixelChecksum(canvas.image.data);
   clickTarget('SEARCH LIBRARY');
   const highlightedCursor = pixelChecksum(canvas.image.data);
+  assert.equal(hitTargetSnapshot().find((target) => target.searchField).searchText, '|',
+    'clicking Search clears its placeholder and places the bitmap cursor at the start');
   assert.notEqual(highlightedCursor, idleSearchPixels,
     'focusing Search highlights the field and paints its bitmap cursor');
   await new Promise((resolve) => setTimeout(resolve, 550));
@@ -575,6 +580,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the focused Search cursor blinks without removing the field highlight');
   for (const character of 'sample') typeSearchKey(character);
   const filteredSidebar = hitTargetSnapshot();
+  assert.equal(filteredSidebar.find((target) => target.searchField).searchText, 'SAMPLE|',
+    'the search field shows the query and caret without a Search prefix');
   const searchTargets = filteredSidebar.map((target) => target.name);
   assert.ok(searchTargets.includes('Sample'), 'typing filters the sidebar tree to matching catalog games');
   assert.equal(searchTargets.includes('Other'), false, 'nonmatching games are hidden by the sidebar search');
@@ -585,6 +592,12 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'sidebar game labels align with the title column after the parent chevron');
   assert.equal(childGameRow.box.y - (parentSystemRow.box.y + parentSystemRow.box.height), 1,
     'the sidebar tree applies its one-dot Sidebar Line Gap between a system header and its games');
+  clickTargetBox(filteredSidebar.find((target) => target.searchField));
+  assert.equal(hitTargetSnapshot().find((target) => target.searchField).searchText, '|',
+    'clicking a populated Search field clears it and resets the caret to the beginning');
+  for (const character of 'other') typeSearchKey(character);
+  assert.ok(hitTargetSnapshot().some((target) => target.name === 'Other'),
+    'typing after a click starts a fresh query from the beginning');
   typeSearchKey('Escape');
   assert.ok(hitTargetSnapshot().some((target) => target.name.includes('ZZZ')),
     'Escape clears the search and restores the complete sidebar tree');
@@ -909,14 +922,14 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(savedPlaylistTabs.at(-1)?.tabs.length, 2,
     'the plus tab control duplicates the current list and persists it through the native bridge');
   const [firstPlaylistID, secondPlaylistID] = savedPlaylistTabs.at(-1).tabs.map((tab) => tab.id);
-  commandKey('1', { altKey: true });
+  commandKey('1');
   await tick();
   assert.equal(savedPlaylistTabs.at(-1)?.activeID, firstPlaylistID,
-    'Command-Option-1 selects the first playlist tab');
-  commandKey('2', { altKey: true });
+    'Command-1 selects the first playlist tab');
+  commandKey('2');
   await tick();
   assert.equal(savedPlaylistTabs.at(-1)?.activeID, secondPlaylistID,
-    'Command-Option-2 selects the second playlist tab');
+    'Command-2 selects the second playlist tab');
   commandKey(',');
   assert.equal(screenTransitionSnapshot()?.direction, 'down',
     'Command-comma opens Options from above using the shared screen roll');
@@ -1070,7 +1083,13 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).textLineGapDots, 1);
   clickPage('LIBRARY');
   globalThis.ViewBoy.dispatch('optionsPage:LIBRARY');
-  clickTarget('FILE');
+  const playlistColumnChecks = hitTargetSnapshot().filter((target) => target.optionChecklistItem);
+  assert.deepEqual(playlistColumnChecks.map((target) => target.name).sort(),
+    ['ARTIST', 'DATE/TIME', 'FILE', 'GAME', 'PATH', 'SIZE'],
+    'Playlist Columns is a plain checkbox list');
+  const fileColumnCheck = playlistColumnChecks.find((target) => target.name === 'FILE');
+  assert.ok(fileColumnCheck, 'the File checkbox is directly selectable as a list row');
+  clickTargetBox(fileColumnCheck);
   await tick();
   assert.equal(savedPreferences.at(-1).columnVisibility.filename, false,
     'the Library page checkbox persists field visibility');
@@ -1156,8 +1175,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const beforeColumnMenu = pixelChecksum(canvas.image.data);
   const contextFileHeader = hitTargetSnapshot().find((target) => target.name === 'FILE');
   assert.ok(contextFileHeader, 'the current playlist exposes its File heading');
-  const logicalWidth = canvas.width / 3;
-  const logicalHeight = canvas.height / 3;
+  const logicalWidth = canvas.width / dotsPerCell();
+  const logicalHeight = canvas.height / dotsPerCell();
   canvas.listeners.get('contextmenu')({
     clientX: rect.width * (contextFileHeader.box.x + contextFileHeader.box.width / 2) / logicalWidth,
     clientY: rect.height * (contextFileHeader.box.y + contextFileHeader.box.height / 2) / logicalHeight,
@@ -1229,21 +1248,22 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     const target = hitTargetSnapshot().find((entry) => entry.name === name);
     assert.ok(target, `the ${name} playlist heading is visible`);
     return {
-      x: (target.box.x + target.box.width / 2) / (canvas.width / 3),
-      y: (target.box.y + target.box.height / 2) / (canvas.height / 3),
+      x: (target.box.x + target.box.width / 2) / (canvas.width / dotsPerCell()),
+      y: (target.box.y + target.box.height / 2) / (canvas.height / dotsPerCell()),
       box: target.box,
     };
   };
   const fileHeader = headerCenter('FILE');
   const titleHeader = headerCenter('TITLE');
-  const titleRightSide = (titleHeader.box.x + titleHeader.box.width * 0.525) / (canvas.width / 3);
+  const titleRightSide = (titleHeader.box.x + titleHeader.box.width * 0.525) / (canvas.width / dotsPerCell());
   sendPointer('pointerdown', fileHeader.x, fileHeader.y);
   nextFrameAdvanceMs = 16;
   sendPointer('pointermove', titleRightSide, titleHeader.y);
   await tick();
   const pushedTitleHeader = headerCenter('TITLE');
-  assert.ok(Math.abs(pushedTitleHeader.box.x - fileHeader.box.x) < 1,
-    'the neighboring heading immediately takes the dragged column’s slot on the first frame');
+  assert.ok(pushedTitleHeader.box.x < titleHeader.box.x
+    && pushedTitleHeader.box.x > fileHeader.box.x,
+  'the neighboring heading begins sliding into the dragged column’s slot during the drag');
   sendPointer('pointerup', titleRightSide, titleHeader.y);
   const savedColumnOrder = JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).columnOrder;
   assert.ok(savedColumnOrder.indexOf('filename') > savedColumnOrder.indexOf('title'),
@@ -1270,19 +1290,20 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const sourceTab = tabsBeforeDrag[0];
   const destinationTab = tabsBeforeDrag.at(-1);
   const sourceTitle = tabTitles().find((target) => target.playlistTabId === sourceTab.reorderKey);
-  sendPointer('pointerdown', (sourceTitle.box.x + Math.min(3, sourceTitle.box.width / 3)) / (canvas.width / 3),
-    (sourceTitle.box.y + sourceTitle.box.height / 2) / (canvas.height / 3));
+  sendPointer('pointerdown', (sourceTitle.box.x + Math.min(3, sourceTitle.box.width / 3)) / (canvas.width / dotsPerCell()),
+    (sourceTitle.box.y + sourceTitle.box.height / 2) / (canvas.height / dotsPerCell()));
   nextFrameAdvanceMs = 16;
-  sendPointer('pointermove', (destinationTab.box.x + destinationTab.box.width * 0.85) / (canvas.width / 3),
-    (destinationTab.box.y + destinationTab.box.height / 2) / (canvas.height / 3));
+  sendPointer('pointermove', (destinationTab.box.x + destinationTab.box.width * 0.85) / (canvas.width / dotsPerCell()),
+    (destinationTab.box.y + destinationTab.box.height / 2) / (canvas.height / dotsPerCell()));
   await tick();
   const shiftedNeighborAfter = tabTitles().find((target) => target.playlistTabId === shiftedNeighborID);
-  assert.ok(Math.abs(shiftedNeighborAfter.box.x - sourceTitle.box.x) < 1,
-    'a neighboring tab takes the dragged tab’s slot immediately instead of easing there');
-  sendPointer('pointerup', (destinationTab.box.x + destinationTab.box.width * 0.85) / (canvas.width / 3),
-    (destinationTab.box.y + destinationTab.box.height / 2) / (canvas.height / 3));
-  clickScreen((destinationTab.box.x + destinationTab.box.width * 0.85) / (canvas.width / 3),
-    (destinationTab.box.y + destinationTab.box.height / 2) / (canvas.height / 3));
+  assert.ok(shiftedNeighborAfter.box.x < shiftedNeighborBefore.box.x
+    && shiftedNeighborAfter.box.x > sourceTitle.box.x,
+  'a neighboring tab begins easing into the dragged tab’s slot before release');
+  sendPointer('pointerup', (destinationTab.box.x + destinationTab.box.width * 0.85) / (canvas.width / dotsPerCell()),
+    (destinationTab.box.y + destinationTab.box.height / 2) / (canvas.height / dotsPerCell()));
+  clickScreen((destinationTab.box.x + destinationTab.box.width * 0.85) / (canvas.width / dotsPerCell()),
+    (destinationTab.box.y + destinationTab.box.height / 2) / (canvas.height / dotsPerCell()));
   await tick();
   await tick();
   const savedTabOrder = savedPlaylistTabs.at(-1).tabs.map((tab) => tab.id);
@@ -1293,8 +1314,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     target.playlistTabClose && target.playlistTabId === closingTabID);
   assert.ok(closeControl, 'the reordered tab exposes its own close control');
   nextFrameAdvanceMs = 125;
-  clickScreen((closeControl.box.x + closeControl.box.width / 2) / (canvas.width / 3),
-    (closeControl.box.y + closeControl.box.height / 2) / (canvas.height / 3));
+  clickScreen((closeControl.box.x + closeControl.box.width / 2) / (canvas.width / dotsPerCell()),
+    (closeControl.box.y + closeControl.box.height / 2) / (canvas.height / dotsPerCell()));
   await tick();
   const closingFrame = tabFrames().find((target) => target.reorderKey === closingTabID);
   const remainingFrame = tabFrames().find((target) => target.reorderKey !== closingTabID);
@@ -1337,10 +1358,37 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
 
   globalThis.ViewBoy.dispatch('settings');
   await tick();
+  const optionPanes = optionsPaneSnapshot();
+  assert.deepEqual(optionPanes.map((pane) => pane.frame).sort(), ['content', 'toc'],
+    'Options keeps its table-of-contents and content dialog panes');
+  const optionToc = optionPanes.find((pane) => pane.frame === 'toc').box;
+  const optionContent = optionPanes.find((pane) => pane.frame === 'content').box;
+  assert.ok(optionToc.width > 0 && optionContent.width > 0
+    && optionContent.x >= optionToc.x + optionToc.width,
+  'the Options dialog retains adjacent navigation and content panes');
   const visibleOptionPages = () => hitTargetSnapshot()
     .map((target) => target.name).filter((name) => pages.includes(name));
   assert.deepEqual(visibleOptionPages(), pages,
     'the Options table of contents stays alphabetized');
+  clickPage('DISPLAY');
+  const initialDotSize = lcdDotSizeSnapshot();
+  assert.equal(initialDotSize.devicePixelsPerDot, 3, 'the LCD dot-size default preserves the established 3px cell');
+  clickTarget('LCD DOT SIZE +');
+  await tick();
+  const enlargedDotSize = lcdDotSizeSnapshot();
+  assert.equal(enlargedDotSize.devicePixelsPerDot, 4,
+    'LCD Dot Size increases the physical-pixel footprint of each dot');
+  assert.ok(enlargedDotSize.cssPixelsPerDot > initialDotSize.cssPixelsPerDot
+    && enlargedDotSize.framebufferWidth < initialDotSize.framebufferWidth,
+  'larger dots create a coarser responsive screen grid instead of scaling CSS overlays');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).lcdDotSize, 4,
+    'LCD Dot Size persists with the WebKit presentation preferences');
+  assert.equal(canvas.image.width, canvas.width,
+    'the expanded dot cell re-creates a correctly sized nearest-neighbor framebuffer');
+  clickTarget('LCD DOT SIZE -');
+  await tick();
+  assert.equal(lcdDotSizeSnapshot().devicePixelsPerDot, 3,
+    'LCD Dot Size returns to the prior density without changing the rest of the screen');
   clickPage('DATABASE');
   await tick();
   await tick();
@@ -1375,11 +1423,11 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(databaseReloadCount, 1, 'Reload Library requests a fresh native catalog projection');
 
-  commandKey('1');
+  globalThis.ViewBoy.dispatch('sidebarPaths');
   await tick();
   await tick();
   assert.ok(hitTargetSnapshot().some((target) => target.name === 'SUB'),
-    'Command-1 switches the sidebar to its catalog Path view');
+    'the Path View action switches the sidebar to its catalog Path view');
   const musicRow = hitTargetSnapshot().find((target) => target.name === 'music');
   const subRow = hitTargetSnapshot().find((target) => target.name === 'SUB');
   assert.ok(musicRow && subRow, 'the Path root and its first folder are visible');
@@ -1428,15 +1476,15 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(hitTargetSnapshot().some((target) => target.name === 'path.spc'), false,
     'folding clips the full-size path rows away when the animation completes');
 
-  commandKey('2');
+  globalThis.ViewBoy.dispatch('sidebarConsoles');
   await tick();
   assert.ok(hitTargetSnapshot().some((target) => target.name === 'Scroll Game 00'),
-    'Command-2 restores the shared Console view');
-  commandKey('3');
+    'the Console View action restores the shared Console view');
+  globalThis.ViewBoy.dispatch('sidebarDiskPath');
   await tick();
   await tick();
   assert.match(status.textContent, /HOTKEY TRACK/i,
-    'Command-3 opens the shared local Path picker and loads the selected playlist');
+    'the Disk Path action opens the shared local Path picker and loads the selected playlist');
   const tabCountBeforeCommandT = savedPlaylistTabs.at(-1).tabs.length;
   commandKey('t');
   await tick();
@@ -1448,10 +1496,28 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   commandKey('d', { shiftKey: true });
   await tick();
   assert.match(status.textContent, /FAVORITES/i, 'Command-Shift-D opens the Favorites playlist');
+  assert.ok(hitTargetSnapshot().some((target) => target.playlistTabTitle && target.name === 'TAB FAVORITES')
+    && hitTargetSnapshot().some((target) => target.playlistTabClose),
+  'Favorites opens as an ordinary closable playlist tab');
   commandKey('h', { shiftKey: true });
   await tick();
   await tick();
   assert.ok(historyRecordCalls.length > 0, 'successful playback is recorded through shared PlaybackHistory');
   assert.ok(hitTargetSnapshot().some((target) => target.name.startsWith('DATE/TIME')),
     'Command-Shift-H opens History with its timestamp column');
+  assert.ok(hitTargetSnapshot().some((target) => target.playlistTabTitle && target.name === 'TAB HISTORY')
+    && hitTargetSnapshot().some((target) => target.playlistTabClose),
+  'History opens as an ordinary closable playlist tab');
+
+  while (savedPlaylistTabs.at(-1).tabs.length < 9) {
+    globalThis.ViewBoy.dispatch('newPlaylistTab');
+    await tick();
+  }
+  const numberedTabIDs = savedPlaylistTabs.at(-1).tabs.map((tab) => tab.id);
+  for (let number = 1; number <= 9; number += 1) {
+    commandKey(String(number));
+    const active = hitTargetSnapshot().find((target) => target.activePlaylistTab);
+    assert.equal(active?.reorderKey, numberedTabIDs[number - 1],
+      `Command-${number} selects its corresponding playlist tab`);
+  }
 });

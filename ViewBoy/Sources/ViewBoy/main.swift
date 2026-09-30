@@ -162,9 +162,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
         let viewMenuItem = NSMenuItem()
         let viewMenu = NSMenu(title: "View")
-        viewMenu.addItem(menuItem("Path View", command: .sidebarPaths, action: #selector(sidebarPaths(_:))))
-        viewMenu.addItem(menuItem("Console View", command: .sidebarConsoles, action: #selector(sidebarConsoles(_:))))
-        viewMenu.addItem(menuItem("Disk Path…", command: .sidebarDiskPath, action: #selector(sidebarDiskPath(_:))))
+        viewMenu.addItem(menuItem("Path View", action: #selector(sidebarPaths(_:))))
+        viewMenu.addItem(menuItem("Console View", action: #selector(sidebarConsoles(_:))))
+        viewMenu.addItem(menuItem("Disk Path…", action: #selector(sidebarDiskPath(_:))))
         viewMenu.addItem(.separator())
         viewMenu.addItem(menuItem("Favorites Playlist", command: .favoritesPlaylist, action: #selector(favoritesPlaylist(_:))))
         viewMenu.addItem(menuItem("Playback History", command: .playbackHistory, action: #selector(playbackHistory(_:))))
@@ -186,7 +186,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         windowMenu.addItem(.separator())
         for index in 1...9 {
             let tabItem = NSMenuItem(title: "Playlist \(index)", action: #selector(selectPlaylistTab(_:)), keyEquivalent: String(index))
-            tabItem.keyEquivalentModifierMask = [.command, .option]
+            tabItem.keyEquivalentModifierMask = [.command]
             tabItem.target = self
             tabItem.tag = index
             windowMenu.addItem(tabItem)
@@ -208,6 +208,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let shortcut = FrontendShortcutCatalog.shortcut(for: command)
         let item = NSMenuItem(title: title, action: action, keyEquivalent: keyEquivalent(for: shortcut.key))
         item.keyEquivalentModifierMask = modifierFlags(for: shortcut.modifiers)
+        item.target = self
+        return item
+    }
+
+    private func menuItem(_ title: String, action: Selector) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
         item.target = self
         return item
     }
