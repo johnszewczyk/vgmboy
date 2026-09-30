@@ -32,16 +32,22 @@ required checks.
   Use **Date** for a full date and **Year** when only a year is known. Omit
   **Disc Number** for a single-disc release; keep Date and Year together only
   when they represent distinct facts.
-- **Member format** — `members[].format` identifies the stored member format;
-  do not add a duplicate Format tag. Keep source or reader versions only when
-  a format profile names a concrete need.
+- **Format** — Store one package-level **Format** field for the playable
+  content. A UAC package has one playable format; do not mix playable formats
+  in one package. Per-member storage extensions remain structural details and
+  do not replace this field. The packer must reject mixed-format packages.
+- **Format check** — Confirm all playable members belong to the package's
+  declared **Format**; reject a package that mixes formats.
 - **Playback data** — Use wrapper-defined loop objects and playlist-entry
   timing fields, not descriptive tags. Follow the shared
   [hash and timing policy](README.md#hash-and-timing-scope); do not duplicate
   provenance or wrapper hashes as metadata tags.
-- **Set provenance** — Keep source-set authority, URLs, and collection identity
-  in `sources[]`. Add a direct package field only when useful to users and
-  supported by one unambiguous source.
+- **Set identity** — When source evidence identifies one set, surface **Set
+  Collection**, **Set Name**, and **Set URL** once at package scope. Add
+  **Set Legacy URL**, **Set Archive URL**, or **Set Date** when applicable.
+  These direct fields help users compare and group packages; `sources[]`
+  remains the detailed provenance authority. Omit a projection when sources
+  conflict or the value is not trustworthy.
 
 ## Profile Structure
 

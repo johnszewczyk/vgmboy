@@ -18,7 +18,7 @@ ID666 and xID6 metadata without starting an emulator. See
 ## Field Mapping
 
 Store the canonical platform once as structural
-`game.console = "Nintendo SNES"`. The stored member format is `spc`.
+`game.console = "Nintendo SNES"`. Store package **Format** as **SPC**.
 
 | Source Tag | UAC Tag | UAC Coded Tag | Tag Notes |
 | --- | --- | --- | --- |

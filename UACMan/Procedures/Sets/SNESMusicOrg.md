@@ -8,13 +8,16 @@ linkage, hash scopes, and identity enrichment.
 
 - **Collection** — Historic SNES soundtrack collection distributed as RSN
   archives containing SPC entries.
-- **Member format** — `.spc`; apply the SPC profile for source fields and UAC
+- **Format** — **SPC**; apply the SPC profile for source fields and UAC
   mappings.
 
 ## Source Authority
 
-- **Set name** — `SNESMusic.org`.
-- **Set URL** — `https://snesmusic.org/v2/torrent.php`.
+- **Package fields** — **Set Collection** `SNESMusic.org`, **Set Name**
+  `Nintendo SNES`, **Set URL** `https://snesmusic.org/v2/torrent.php`.
+- **First-pass eligibility** — This completeness-targeted set may use an
+  ID-confirmed-only batch. Keep unmatched source items in AudioMan's set
+  report until a later identity pass; do not infer exclusion from missing ID.
 - **Source archive** — The original `.rsn`; it contains SPC entries but is not
   itself a UAC member.
 - **Archive hashes** — Record BLAKE3-256, CRC32/ISO-HDLC, SHA-1, and MD5 for

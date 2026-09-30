@@ -18,8 +18,8 @@ without emulating the PC Engine. See
 ## Field Mapping
 
 Store the canonical platform once as structural
-`game.console = "NEC TurboGrafx-16"`; `PC Engine` is a source alias. Store the
-member format in `members[].format`.
+`game.console = "NEC TurboGrafx-16"`; `PC Engine` is a source alias. Store
+package **Format** as **HES**.
 
 ### HES Header
 

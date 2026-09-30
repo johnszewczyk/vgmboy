@@ -25,7 +25,7 @@ gzip-compressed `.vgz` members. See
 | `date` | Date / Year | `game.metadata["Date"]` or `game.metadata["Year"]` | Use Date for a full date and Year when only a year is present. |
 | `converted_by` | Dumper | `game.metadata["Dumper"]` | Preserve the GD3 credit; do not rename it Encoded By. |
 | `notes` | Comment | `game.metadata["Comment"]` | Keep useful source text. |
-| Stored member format | — | `members[].format` | Store the actual extension; do not create a duplicate Format tag. |
+| `.vgm` or `.vgz` source | Format | `game.metadata["Format"]` | Store one package-level **VGM** value; `.vgz` is a compressed VGM source, not a second playable format. |
 
 ## Format Procedures
 

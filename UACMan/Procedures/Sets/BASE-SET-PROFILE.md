@@ -1,19 +1,21 @@
 # Base Set Profile
 
 Shared rules for every collection conversion. Apply this profile alongside
-the procedure for each member's source format.
+the procedure for each package's source format.
 
 ## Scope
 
-- **Purpose** — Define shared set provenance, metadata-harvest stages, and
-  identity confidence.
+- **Purpose** — Define shared set identity, package-level set fields,
+  first-pass eligibility, and identity confidence.
 - **Format mappings** — Keep source-field recognition and UAC mappings in
-  each member format profile.
+  each source-format profile.
 
 ## Source Authority
 
-- **Source reference** — Record the set name and authoritative source URL or
-  release reference.
+- **Package fields** — Project **Set Collection**, **Set Name**, and **Set
+  URL** once per package when the set is unambiguous. Add optional **Set Legacy
+  URL**, **Set Archive URL**, or **Set Date** when supported. Keep full source
+  records and hashes in `sources[]`.
 - **Original packages** — Keep source packages in source-state outside derived
   UAC payloads; link each UAC package through `sources[]`.
 - **Hash scope** — Record each hash with its actual byte scope, algorithm,
@@ -24,6 +26,11 @@ the procedure for each member's source format.
 
 ## Identity Enrichment
 
+- **First-pass eligibility** — Each set profile states which source items
+  enter the initial harvest. A completeness-targeted set may limit a batch to
+  positively identified games; a loose-file collection may include all
+  source-backed items and leave identity unresolved. Keep the chosen batch
+  scope explicit and do not silently exclude unmatched items.
 - **Source pass** — Map populated, recognized source fields through the format
   profile. Keep selected canonical UAC fields; do not add database enrichment.
 - **Identity pass** — Match the known title against an authoritative game
@@ -50,7 +57,12 @@ the procedure for each member's source format.
 
 - **Source linkage** — Confirm source references identify the authority and
   original package used for each derived UAC.
+- **Single format** — Keep each UAC package to one playable format and confirm
+  the package-level **Format** field agrees with its playable members.
 - **Hash accounting** — Keep hash records scoped to the exact bytes they
   identify; do not use byte identity as proof of provenance or game identity.
 - **Identity review** — Record confirmed IDs and database enrichment sources;
   leave ambiguous candidates unresolved.
+- **Report boundary** — Keep collection counts, unusual files, observed
+  arbitrary tags, and per-item exceptions in dated AudioMan set reports. Keep
+  this profile to reusable conversion rules.

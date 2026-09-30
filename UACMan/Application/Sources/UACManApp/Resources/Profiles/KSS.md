@@ -36,8 +36,8 @@ reader's `Game Gear` label to **Sega Game Gear** using [Platforms](PLATFORMS.md)
 
 ## Format Procedures
 
-- **Member format** — Store `.kss` as `members[].format = "kss"`; do not
-  create a Format tag from the `KSCC` or `KSSX` signature.
+- **Format** — Store package **Format** as **KSS**. `KSCC` and `KSSX` are
+  signatures within this format, not separate package tags.
 - **Song count** — KSS has no authored track count. The reader's 256
   compatibility slots are not track evidence; KSSX bounds do not make them a
   playlist. Do not fabricate titles, Track Number, or timing values.

@@ -2,7 +2,7 @@
 
 Set profiles define collection identity and source provenance. Apply the
 [Base Set Profile](BASE-SET-PROFILE.md) together with the procedure for each
-member's source format. Format procedures define which native fields are
+package's source format. Format procedures define which native fields are
 recognized and how selected facts map to UAC.
 
 ## Profile Template and Profiles
@@ -13,7 +13,7 @@ put source-field mappings in format profiles.
 
 - **Shared rules** — [`BASE-SET-PROFILE.md`](BASE-SET-PROFILE.md) defines
   source authority, provenance, two-pass harvesting, and unresolved identity.
-- **SNESMusic.org** — [`SNESMusicOrg.md`](SNESMusicOrg.md) records source
-  linkage, RSN/SPC hash scopes, and identity enrichment.
-- **Project 2612** — [`Project2612.md`](Project2612.md) records source package
-  layout and set-specific checks.
+- **SNESMusic.org** — [`SNESMusicOrg.md`](SNESMusicOrg.md) records package
+  set fields, RSN/SPC hash scopes, and identity enrichment.
+- **Project 2612** — [`Project2612.md`](Project2612.md) records package set
+  fields and set-specific identity rules.

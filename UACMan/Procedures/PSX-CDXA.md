@@ -1,14 +1,15 @@
 # Sony PlayStation · Disc Audio Profile
 
-Apply the [UAC Base Profile](BASE-UAC-PROFILE.md). This profile covers Redump
-PlayStation disc audio represented as XA streams, Red Book CD-DA tracks, or
-both. Extraction and game-specific loop evidence are defined in the
+Apply the [UAC Base Profile](BASE-UAC-PROFILE.md). This profile covers one
+playable source format per UAC: XA streams or Red Book CD-DA tracks. Keep
+different playable formats in separate UAC packages. Extraction and
+game-specific loop evidence are defined in the
 [PSX preservation protocol](../protocols/PSX-CDXA.protocol.md).
 
 ## Scope
 
-- **Source members** — XA, Red Book CD-DA, or both; stored formats may include
-  `xa`, `ape`, or `flac`.
+- **Source members** — One playable source format per UAC: XA or Red Book
+  CD-DA. Stored encodings may include `xa`, `ape`, or `flac`.
 - **Source authority** — Review source tags, CUE data, release records, and
   measured audio facts; do not infer metadata from filenames.
 - **Format boundary** — `.psf`, `.psf2`, `.minipsf`, and related PSF-family
@@ -39,12 +40,15 @@ Store the canonical platform once as structural
 | — | Year | `game.metadata["Year"]` | Use when an authoritative source gives only a year. |
 | CUE logical track number | Track Number | `members[].metadata["Track Number"]` | Store soundtrack order; physical CUE indexes stay in the attachment. |
 | — | Disc Number | `game.metadata["Disc Number"]` | Use only for a multi-disc release; omit for a single disc. |
+| XA stream or Red Book CD-DA | Format | `game.metadata["Format"]` | Use one package-level value; keep XA and Red Book audio in separate UAC packages. |
 | — | Play Length (ms) | `members[].metadata["Play Length (ms)"]` | Measured timing used by playback policy and duration readouts. |
 | — | — | `members[].metadata.loop` | Keep a source-backed sample-accurate loop only when playback uses it. |
-| — | — | `members[].format` | Store the actual extension; do not create a duplicate Format tag. |
 
 ## Format Procedures
 
+- **First-pass eligibility** — This loose-file collection includes all
+  source-backed items; do not require a Game ID for initial processing. Keep
+  unresolved release identity explicit until a positive match is established.
 - **XA and Red Book** — XA is a source stream. Red Book CD-DA is a disc
   source type, not an extension; retain source identity in the provenance or
   transformation record.

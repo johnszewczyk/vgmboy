@@ -17,7 +17,7 @@ sidecars. See [`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md).
 ## Field Mapping
 
 Store the canonical platform once as structural
-`game.console = "Nintendo Game Boy"`. Store the member format as `gbs`.
+`game.console = "Nintendo Game Boy"`. Store package **Format** as **GBS**.
 
 | Source Tag | UAC Tag | UAC Coded Tag | Tag Notes |
 | --- | --- | --- | --- |

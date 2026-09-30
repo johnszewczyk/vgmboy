@@ -17,8 +17,10 @@ fixed-header NSF and chunk-based NSFE files. See
 ## Field Mapping
 
 Store the canonical platform once as structural
-`game.console = "Nintendo NES"`. Store the source extension in
-`members[].format`; no format-version tag is needed.
+`game.console = "Nintendo NES"`. Store one package-level **Format** value,
+**NSF** or **NSFE**, matching the playable members. Do not mix NSF and NSFE
+members in one UAC; their stored extensions remain structural details, not
+per-member metadata tags.
 
 ### NSF
 
