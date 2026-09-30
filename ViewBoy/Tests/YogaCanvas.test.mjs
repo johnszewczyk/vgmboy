@@ -237,9 +237,13 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     bitmapFontSnapshot,
     contentRowLayoutSnapshot,
     equalizerAnimationSnapshot,
+    framebufferShadeSnapshot,
     hitTargetSnapshot,
     lcdDotSizeSnapshot,
     optionsPaneSnapshot,
+    optionsStyleSnapshot,
+    reorderAnimationSnapshot,
+    selectionBandSnapshot,
     spacingReadoutLayoutSnapshot,
     screenTransitionSnapshot,
   } = await import('../Sources/ViewBoy/Resources/yoga-app.js');
@@ -361,6 +365,21 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     .map((target) => [target.trackIndex, target.box.height]));
   assert.equal(rowTops.get(1) - (rowTops.get(0) + rowHeights.get(0)), 1,
     'playlist rows use their dedicated one-dot line gap instead of UI Gap');
+  const selectedPlaylistRow = toolbarTargets.find((target) => target.trackIndex === 0);
+  const selectionBand = selectionBandSnapshot();
+  assert.ok(selectionBand, 'the selected playlist row has an LCD selection band');
+  assert.equal(selectionBand.y, selectedPlaylistRow.box.y - 1,
+    'the playlist selection bar extends one LCD dot above its text row');
+  assert.equal(selectionBand.height, selectedPlaylistRow.box.height + 2,
+    'the playlist selection bar extends one LCD dot above and below its text row');
+  const selectedSidebarRow = toolbarTargets.find((target) => target.sidebarSelection);
+  assert.ok(selectedSidebarRow, 'the selected library row has an LCD selection bar');
+  const sidebarBarX = selectedSidebarRow.box.x + selectedSidebarRow.box.width - 2;
+  assert.equal(framebufferShadeSnapshot(sidebarBarX, selectedSidebarRow.box.y - 1), 2,
+    'the sidebar selection bar paints one LCD dot above its text row');
+  assert.equal(framebufferShadeSnapshot(sidebarBarX,
+    selectedSidebarRow.box.y + selectedSidebarRow.box.height), 2,
+  'the sidebar selection bar paints one LCD dot below its text row');
   assert.ok(groupStateCalls.some(([action, system]) => action === 'toggle' && system === 'SNES'));
   assert.ok(groupStateCalls.some(([action, system, gameID]) =>
     action === 'selectGame' && system === 'SNES' && gameID === '1:SNES:Sample'));
@@ -1236,6 +1255,12 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     pointerId: 1,
     preventDefault() {},
   });
+  const advanceAnimationFrames = async (count) => {
+    for (let frame = 0; frame < count; frame += 1) {
+      nextFrameAdvanceMs = 16;
+      await tick();
+    }
+  };
   canvas.listeners.get('wheel')({
     clientX: rect.width * 0.72,
     clientY: rect.height * 0.34,
@@ -1264,7 +1289,37 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.ok(pushedTitleHeader.box.x < titleHeader.box.x
     && pushedTitleHeader.box.x > fileHeader.box.x,
   'the neighboring heading begins sliding into the dragged column’s slot during the drag');
-  sendPointer('pointerup', titleRightSide, titleHeader.y);
+  const firstColumnPush = reorderAnimationSnapshot();
+  assert.equal(firstColumnPush.dragging, true, 'the column remains attached to the pointer while held');
+  assert.equal(firstColumnPush.animation?.duration, 200,
+    'column push uses the app-wide 200 ms animation');
+  assert.ok(firstColumnPush.animation.progress < 1
+    && firstColumnPush.preview.keys.indexOf('filename') > firstColumnPush.preview.keys.indexOf('title'),
+  'a column crossing immediately retargets a live eased push');
+  const titleLeftSide = (pushedTitleHeader.box.x + pushedTitleHeader.box.width * 0.2)
+    / (canvas.width / dotsPerCell());
+  nextFrameAdvanceMs = 16;
+  sendPointer('pointermove', titleLeftSide, pushedTitleHeader.y);
+  await advanceAnimationFrames(4);
+  const easingTitleBack = headerCenter('TITLE');
+  const columnReversed = reorderAnimationSnapshot();
+  const columnReversalSucceeded = columnReversed.animation?.fromX.title === pushedTitleHeader.box.x
+    && columnReversed.dragging && columnReversed.animation?.progress < 1
+    && columnReversed.preview.keys.indexOf('filename') < columnReversed.preview.keys.indexOf('title');
+  if (!columnReversalSucceeded) sendPointer('pointerup', titleLeftSide, pushedTitleHeader.y);
+  assert.ok(columnReversalSucceeded,
+    'a live column drag smoothly reverses its push when crossing back over the threshold');
+  const titleRightSideAgain = (easingTitleBack.box.x + easingTitleBack.box.width * 0.8)
+    / (canvas.width / dotsPerCell());
+  nextFrameAdvanceMs = 16;
+  sendPointer('pointermove', titleRightSideAgain, easingTitleBack.y);
+  await advanceAnimationFrames(4);
+  const columnPushedAgain = reorderAnimationSnapshot();
+  assert.ok(columnPushedAgain.animation?.fromX.title === easingTitleBack.box.x
+    && columnPushedAgain.dragging && columnPushedAgain.animation?.progress < 1
+    && columnPushedAgain.preview.keys.indexOf('filename') > columnPushedAgain.preview.keys.indexOf('title'),
+  're-crossing a column threshold smoothly re-targets the push animation');
+  sendPointer('pointerup', titleRightSideAgain, easingTitleBack.y);
   const savedColumnOrder = JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).columnOrder;
   assert.ok(savedColumnOrder.indexOf('filename') > savedColumnOrder.indexOf('title'),
     `dragging a header reorders columns and keeps the order in display preferences: ${savedColumnOrder.join(',')}`);
@@ -1300,10 +1355,46 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.ok(shiftedNeighborAfter.box.x < shiftedNeighborBefore.box.x
     && shiftedNeighborAfter.box.x > sourceTitle.box.x,
   'a neighboring tab begins easing into the dragged tab’s slot before release');
-  sendPointer('pointerup', (destinationTab.box.x + destinationTab.box.width * 0.85) / (canvas.width / dotsPerCell()),
-    (destinationTab.box.y + destinationTab.box.height / 2) / (canvas.height / dotsPerCell()));
-  clickScreen((destinationTab.box.x + destinationTab.box.width * 0.85) / (canvas.width / dotsPerCell()),
-    (destinationTab.box.y + destinationTab.box.height / 2) / (canvas.height / dotsPerCell()));
+  const firstTabPush = reorderAnimationSnapshot();
+  assert.equal(firstTabPush.animation?.duration, 200,
+    'tab push uses the same app-wide animation duration');
+  assert.deepEqual(firstTabPush.preview.keys, [...tabIDsBeforeDrag.slice(1), tabIDsBeforeDrag[0]],
+    'crossing a tab moves it in the live preview before release');
+  const shiftedNeighborFrame = tabFrames().find((target) => target.reorderKey === shiftedNeighborID);
+  const shiftedNeighborLeft = (shiftedNeighborFrame.box.x + 1)
+    / (canvas.width / dotsPerCell());
+  const neighborY = (shiftedNeighborFrame.box.y + shiftedNeighborFrame.box.height / 2)
+    / (canvas.height / dotsPerCell());
+  nextFrameAdvanceMs = 16;
+  sendPointer('pointermove', shiftedNeighborLeft, neighborY);
+  await advanceAnimationFrames(4);
+  const easingNeighborBack = tabTitles().find((target) => target.playlistTabId === shiftedNeighborID);
+  const tabReversed = reorderAnimationSnapshot();
+  const tabReversalSucceeded = tabReversed.animation?.fromX[shiftedNeighborID] === shiftedNeighborAfter.box.x
+    && tabReversed.dragging && tabReversed.animation?.progress < 1
+    && JSON.stringify(tabReversed.preview?.keys) === JSON.stringify(tabIDsBeforeDrag);
+  if (!tabReversalSucceeded) sendPointer('pointerup', shiftedNeighborLeft, neighborY);
+  assert.ok(tabReversalSucceeded,
+    `a live tab drag reverses the neighbor slide smoothly before release (${JSON.stringify({
+      ids: tabIDsBeforeDrag, source: sourceTab.reorderKey, neighbor: shiftedNeighborID,
+      before: shiftedNeighborBefore.box.x, after: shiftedNeighborAfter.box.x,
+      current: easingNeighborBack.box.x, targetFrame: shiftedNeighborFrame.box,
+      reversed: tabReversed,
+    })})`);
+  const destinationAgain = tabFrames().sort((first, second) => first.box.x - second.box.x).at(-1);
+  const destinationRight = (destinationAgain.box.x + destinationAgain.box.width - 1)
+    / (canvas.width / dotsPerCell());
+  const destinationY = (destinationAgain.box.y + destinationAgain.box.height / 2)
+    / (canvas.height / dotsPerCell());
+  nextFrameAdvanceMs = 16;
+  sendPointer('pointermove', destinationRight, destinationY);
+  await advanceAnimationFrames(4);
+  const tabPushedAgain = reorderAnimationSnapshot();
+  assert.ok(tabPushedAgain.animation?.fromX[shiftedNeighborID] === easingNeighborBack.box.x
+    && tabPushedAgain.dragging && tabPushedAgain.animation?.progress < 1,
+  're-crossing a tab threshold smoothly re-targets the push animation');
+  sendPointer('pointerup', destinationRight, destinationY);
+  clickScreen(destinationRight, destinationY);
   await tick();
   await tick();
   const savedTabOrder = savedPlaylistTabs.at(-1).tabs.map((tab) => tab.id);
@@ -1370,6 +1461,22 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     .map((target) => target.name).filter((name) => pages.includes(name));
   assert.deepEqual(visibleOptionPages(), pages,
     'the Options table of contents stays alphabetized');
+  clickPage('DISPLAY');
+  const optionStyles = optionsStyleSnapshot();
+  const optionsHeading = optionStyles.find((item) => item.kind === 'title' && item.name === 'OPTIONS');
+  const displayHeading = optionStyles.find((item) => item.kind === 'title' && item.name === 'DISPLAY');
+  const screenProfile = optionStyles.find((item) => item.kind === 'group' && item.name === 'SCREEN PROFILE');
+  assert.ok(optionsHeading && displayHeading && screenProfile,
+    'Options retains the dialog headings and grouped section structure');
+  assert.equal(framebufferShadeSnapshot(displayHeading.box.x + displayHeading.box.width - 2,
+    displayHeading.box.y + 1), 2,
+  'the Options page title keeps its filled LCD heading bar');
+  assert.equal(framebufferShadeSnapshot(screenProfile.box.x + 1,
+    screenProfile.box.y + screenProfile.box.height - 1), 1,
+  'Options groups retain their thin enclosing frame');
+  clickPage('LIBRARY');
+  assert.ok(optionsStyleSnapshot().some((item) => item.kind === 'checklist'),
+    'Playlist Columns stays a plain checkbox list inside the restored dialog');
   clickPage('DISPLAY');
   const initialDotSize = lcdDotSizeSnapshot();
   assert.equal(initialDotSize.devicePixelsPerDot, 3, 'the LCD dot-size default preserves the established 3px cell');

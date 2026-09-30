@@ -757,6 +757,7 @@ export function hitTargetSnapshot() {
     textAlign: widget.meta.align ?? "left",
     sidebarDisclosure: widget.meta.sidebarDisclosure === true,
     disclosureProgress: widget.meta.sidebarDisclosure ? widget.meta.disclosureProgress : null,
+    sidebarSelection: widget.meta.sidebarSelection === true,
     box: { ...box },
     equalizerValueBox: Number.isInteger(widget.meta.equalizerBar)
       ? { ...state.equalizerValueBoxes[widget.meta.equalizerBar] } : null,
@@ -1189,11 +1190,22 @@ function appStatusArea(parent) {
 }
 
 function panelTitle(parent, text) {
-  return label(parent, text, { height: buttonStandardHeight() }, {
+  const titleHeight = buttonStandardHeight();
+  const row = makeWidget(parent, {
+    direction: FlexDirection.Row,
+    height: titleHeight,
+    alignItems: Align.Center,
+  }, {
+    fill: 2,
+    optionPanelTitle: text,
+    paint(box) { fillRect(box.x, box.y, box.width, box.height, 2); },
+  });
+  label(row, text, { flexGrow: 1, height: titleHeight }, {
     textShade: 0,
     inset: controlPaddingDots(),
-    bottomLine: 2,
+    align: "center",
   });
+  return row;
 }
 
 function pixelButton(parent, text, onClick, style = {}) {
@@ -1208,7 +1220,7 @@ function pixelButton(parent, text, onClick, style = {}) {
     flexShrink: style.flexShrink,
     flexBasis: style.flexBasis,
   }, {
-    border: style.outlined === false ? undefined : 1,
+    border: 1,
     fill: style.selected ? 2 : undefined,
     textShade: 0,
     inset: controlPaddingDots(),
@@ -1236,22 +1248,21 @@ function optionToggle(parent, title, checked, onClick, extraMeta = {}) {
   const height = buttonStandardHeight();
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
-    alignItems: Align.Center,
+    alignItems: Align.Stretch,
     height,
     gap: uiGap(),
   }, {
     onClick,
     controlTitle: title,
+    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
     ...extraMeta,
   });
   const marker = checked ? "[x]" : "[ ]";
-  label(row, title, { flexGrow: 1, flexBasis: 0, height }, {
-    textShade: 0, inset: controlPaddingDots(),
-  });
   label(row, marker, {
     width: textLayoutWidth(marker),
     height,
-  }, { textShade: 0, align: "right", inset: controlPaddingDots() });
+  }, { textShade: 0, align: "center", inset: controlPaddingDots() });
+  label(row, title, { flexGrow: 1, height }, { textShade: 0, inset: controlPaddingDots() });
   return row;
 }
 
@@ -1275,19 +1286,17 @@ function optionChecklistRow(parent, title, checked, onClick) {
 
 function optionChoice(parent, title, choices) {
   const height = buttonStandardHeight();
-  const row = makeWidget(parent, {
-    direction: FlexDirection.Row,
-    alignItems: Align.Center,
+  const row = controlRow(parent, {
     height,
     gap: uiGap(),
+  }, {
+    paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
   });
-  label(row, title, { flexGrow: 1, flexBasis: 0, height }, {
+  label(row, title, { width: textLayoutWidth(title), height }, {
     textShade: 0, inset: controlPaddingDots(),
   });
   choices.forEach((choice) => pixelButton(row, choice.title, choice.onClick, {
-    width: textLayoutWidth(choice.title) + uiGap() * 2,
-    flexShrink: 0,
-    outlined: false,
+    flexGrow: 1,
     selected: choice.selected,
     controlTitle: `${title} ${choice.title}`,
   }));
@@ -1296,16 +1305,19 @@ function optionChoice(parent, title, choices) {
 
 function optionAdjuster(parent, title, value, onDecrease, onIncrease) {
   const height = buttonStandardHeight();
-  const row = controlRow(parent, { height });
+  const row = controlRow(parent, { height }, {
+    paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
+  });
   label(row, title, { flexGrow: 1, height }, {
     textShade: 0, inset: controlPaddingDots(),
   });
   const controlHeight = buttonStandardHeight();
-  pixelButton(row, "[-]", onDecrease, { outlined: false, controlTitle: `${title} -` });
-  pixelButton(row, "[+]", onIncrease, { outlined: false, controlTitle: `${title} +` });
-  label(row, value, { width: textLayoutWidth("000 DOTS"), height: controlHeight }, {
+  pixelButton(row, "[-]", onDecrease, { controlTitle: `${title} -` });
+  pixelButton(row, "[+]", onIncrease, { controlTitle: `${title} +` });
+  label(row, value, { width: framedTextWidth(value), height: controlHeight }, {
+    border: 1,
     textShade: 0,
-    align: "right",
+    align: "center",
     inset: controlPaddingDots(),
     spacingReadout: title,
   });
@@ -1353,16 +1365,16 @@ function durationInput(parent, key, value, minimum, maximum, fallback, allowOpen
 }
 
 function optionDurationAdjuster(parent, title, key, minimum, maximum, fallback, step, allowOpen = false) {
-  const row = controlRow(parent, { height: buttonStandardHeight() });
+  const row = controlRow(parent, { height: buttonStandardHeight() }, {
+    paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
+  });
   label(row, title, { flexGrow: 1, height: buttonStandardHeight() }, {
     textShade: 0, inset: controlPaddingDots(),
   });
   pixelButton(row, "[-]", () => adjustPlaybackDuration(key, -step, minimum, maximum, fallback), {
-    outlined: false,
     controlTitle: `${title} -`,
   });
   pixelButton(row, "[+]", () => adjustPlaybackDuration(key, step, minimum, maximum, fallback), {
-    outlined: false,
     controlTitle: `${title} +`,
   });
   durationInput(row, key, optionDuration(state.preferences[key] ?? fallback, allowOpen),
@@ -1590,6 +1602,48 @@ export function optionsPaneSnapshot() {
     .map(({ widget, box }) => ({ frame: widget.meta.optionFrame, box: { ...box } }));
 }
 
+export function optionsStyleSnapshot() {
+  return layoutEntries.flatMap(({ widget, box }) => {
+    if (widget.meta.optionPanelTitle) {
+      return [{ kind: "title", name: widget.meta.optionPanelTitle, box: { ...box } }];
+    }
+    if (widget.meta.optionGroupTitle) {
+      return [{ kind: "group", name: widget.meta.optionGroupTitle, box: { ...box } }];
+    }
+    if (widget.meta.optionChecklistItem) {
+      return [{ kind: "checklist", name: widget.meta.controlTitle, box: { ...box } }];
+    }
+    return [];
+  });
+}
+
+export function selectionBandSnapshot() {
+  return selectionBand ? { x: selectionBand.x, y: selectionBand.y,
+    width: selectionBand.width, height: selectionBand.height } : null;
+}
+
+export function reorderAnimationSnapshot(time = performance.now()) {
+  const animation = reorderAnimation ? {
+    kind: reorderAnimation.kind,
+    duration: reorderAnimation.duration,
+    progress: Math.max(0, Math.min(1,
+      (time - reorderAnimation.startedAt) / reorderAnimation.duration)),
+    fromX: { ...reorderAnimation.fromX },
+  } : null;
+  return {
+    dragging: pointerInteraction?.kind === "reorder" && pointerInteraction.dragging,
+    preview: reorderPreview ? { kind: reorderPreview.kind, keys: [...reorderPreview.keys] } : null,
+    animation,
+  };
+}
+
+export function framebufferShadeSnapshot(x, y) {
+  const column = Math.floor(x);
+  const row = Math.floor(y);
+  if (column < 0 || column >= WIDTH || row < 0 || row >= HEIGHT) return null;
+  return pixels[row * WIDTH + column];
+}
+
 function createTableHeader(parent, columns) {
   const headerHeight = buttonStandardHeight();
   const header = makeWidget(parent, {
@@ -1706,12 +1760,13 @@ function createLibraryRow(parent, text, options = {}) {
     textShade: 0,
     onClick: options.onClick,
     sidebarDisclosure: options.disclosure === true,
+    sidebarSelection: selected,
     contentRowKind: "sidebar",
     disclosureProgress: options.disclosureProgress ?? 0,
     disclosureIndent: options.disclosureIndent ?? controlPaddingDots(),
     inset: options.indent ?? (options.disclosure ? controlPaddingDots() + 2 * fontProfile().advance : 0),
     paint(box) {
-      if (selected) fillRect(box.x, box.y, box.width, box.height, 2);
+      if (selected) fillRect(box.x, box.y - 1, box.width, box.height + 2, 2);
       if (options.disclosure) paintChevron(box, options.disclosureProgress ?? 0,
         options.disclosureIndent ?? controlPaddingDots());
     },
@@ -2193,6 +2248,10 @@ function optionGroup(parent, title) {
   const group = makeWidget(parent, {
     direction: FlexDirection.Column,
     gap: uiGap(),
+    padding: uiGroupInsetDots() / STYLE_SCALE,
+  }, {
+    optionGroupTitle: title,
+    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
   optionSection(group, title);
   return group;
@@ -2200,7 +2259,7 @@ function optionGroup(parent, title) {
 
 function optionsTocWidth() {
   const available = WIDTH / STYLE_SCALE;
-  const labelWidth = textLayoutWidth("TRANSPORT") + uiOptionsInsetDots() / STYLE_SCALE * 2;
+  const labelWidth = framedTextWidth("TRANSPORT") + uiOptionsInsetDots() / STYLE_SCALE * 2;
   return Math.min(available * 0.34, Math.max(labelWidth, Math.min(220, available * 0.20)));
 }
 
@@ -2665,6 +2724,7 @@ function addDatabaseOptions(parent) {
   const database = optionGroup(parent, "CATALOG DATABASE");
   label(database, state.databaseLocation?.path || "DATABASE LOCATION",
     { height: buttonStandardHeight() }, {
+      border: BUTTON_BORDER_DOTS,
       textShade: 0,
       inset: controlPaddingDots(),
       controlTitle: "DATABASE LOCATION",
@@ -2689,6 +2749,7 @@ function addDatabaseOptions(parent) {
   const summary = state.archiveCache || {};
   label(cache, state.archiveCacheLocation || "ARCHIVE CACHE LOCATION",
     { height: buttonStandardHeight() }, {
+      border: BUTTON_BORDER_DOTS,
       textShade: 0,
       inset: controlPaddingDots(),
       controlTitle: "ARCHIVE CACHE LOCATION",
@@ -2732,7 +2793,7 @@ function addOptionsContent(parent) {
     padding: uiOptionsInsetDots() / STYLE_SCALE,
   }, {
     optionFrame: "toc",
-    paint(box) { line(box.x + box.width, box.y, box.x + box.width, box.y + box.height, 1); },
+    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
   panelTitle(toc, "OPTIONS");
   const pageButtonWidth = navigationWidth - 2 * uiOptionsInsetDots() / STYLE_SCALE;
@@ -2740,7 +2801,6 @@ function addOptionsContent(parent) {
     .forEach((page) => {
       pixelButton(toc, page, () => selectOptionsPage(page), {
         width: pageButtonWidth, selected: state.optionsPage === page,
-        outlined: false,
       });
   });
   makeWidget(toc, { flexGrow: 1 });
@@ -2752,6 +2812,7 @@ function addOptionsContent(parent) {
     padding: uiOptionsInsetDots() / STYLE_SCALE,
   }, {
     optionFrame: "content",
+    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
   panelTitle(panel, state.optionsPage);
   const content = makeWidget(panel, {
@@ -2997,7 +3058,8 @@ function animateColumnLayoutFrame(time) {
   if (tabLayoutAnimation
     && time - tabLayoutAnimation.startedAt >= tabLayoutAnimation.duration) tabLayoutAnimation = null;
   render(false, true, time);
-  if ((columnLayoutAnimation || tabLayoutAnimation || reorderAnimation) && !columnAnimationFrame) {
+  if ((columnLayoutAnimation || tabLayoutAnimation || reorderAnimation || isDragging)
+    && !columnAnimationFrame) {
     columnAnimationFrame = requestAnimationFrame(animateColumnLayoutFrame);
   }
 }
@@ -3080,6 +3142,8 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
   const selectedRow = selectionRows.find((entry) => entry.widget.meta.trackIndex === state.selectedTrack);
   const nextBand = selectedRow ? {
     ...selectedRow.box,
+    y: selectedRow.box.y - 1,
+    height: selectedRow.box.height + 2,
     ...(selectedRow.clip ? {
       x: selectedRow.clip.x,
       width: selectedRow.clip.width,
@@ -3109,7 +3173,9 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
     selectionAnimation = null;
     paintSelectionAt(nextBand?.y ?? null);
   }
-  if ((columnLayoutAnimation || tabLayoutAnimation || reorderAnimation) && !columnAnimationFrame) {
+  const isDragging = pointerInteraction?.kind === "reorder" && pointerInteraction.dragging;
+  if ((columnLayoutAnimation || tabLayoutAnimation || reorderAnimation || isDragging)
+    && !columnAnimationFrame) {
     columnAnimationFrame = requestAnimationFrame(animateColumnLayoutFrame);
   }
   const selected = visibleTracks()[state.selectedTrack];
@@ -4460,7 +4526,6 @@ canvas.addEventListener("pointermove", (event) => {
     pointerInteraction.pointX = point.x;
     if (distance >= 1) {
       pointerInteraction.dragging = true;
-      reorderAnimation = null;
       suppressNextClick = true;
       const dropTarget = findReorderTarget(
         point, pointerInteraction.itemKind, pointerInteraction.sourceKey,
