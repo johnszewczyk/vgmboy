@@ -20,6 +20,9 @@ export SWIFTPM_MODULECACHE_OVERRIDE="$BUILD_DIR/module-cache"
 export XDG_CACHE_HOME="$BUILD_DIR/cache"
 export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
 
+VGMBoy_DIR="$ROOT_DIR/../VGMBoy"
+"$VGMBoy_DIR/scripts/build-dependencies.sh"
+
 swift build --disable-sandbox --build-path "$BUILD_DIR" --configuration release --product ViewBoy
 
 BIN_DIR="$(swift build --disable-sandbox --build-path "$BUILD_DIR" --configuration release --show-bin-path)"
@@ -32,6 +35,7 @@ mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp "$EXECUTABLE" "$APP_DIR/Contents/MacOS/ViewBoy"
 cp "$ROOT_DIR/app-info.plist" "$APP_DIR/Contents/Info.plist"
 cp "$ROOT_DIR/app-icon.png" "$APP_DIR/Contents/Resources/app-icon.png"
+xattr -c "$APP_DIR/Contents/Resources/app-icon.png"
 ditto "$RESOURCE_BUNDLE" "$APP_DIR/Contents/Resources/ViewBoy_ViewBoy.bundle"
 chmod +x "$APP_DIR/Contents/MacOS/ViewBoy"
 SIGNING_IDENTITY="-"
