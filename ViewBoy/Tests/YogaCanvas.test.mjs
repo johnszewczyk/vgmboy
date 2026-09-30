@@ -233,12 +233,16 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const {
     animationFrameIsDue,
     bitmapFontSnapshot,
+    contentRowLayoutSnapshot,
     hitTargetSnapshot,
     screenTransitionSnapshot,
   } = await import('../Sources/ViewBoy/Resources/yoga-app.js');
   const standardFont = bitmapFontSnapshot('STANDARD');
-  assert.equal(Object.keys(standardFont.glyphs).some((character) => /^[a-z]$/.test(character)), false,
-    'Standard 5x7 font contains no lowercase glyphs');
+  const microFont = bitmapFontSnapshot('MICRO');
+  for (const [name, font] of [['Standard 5x7', standardFont], ['Micro 3x5', microFont]]) {
+    assert.equal(Object.keys(font.glyphs).some((character) => /^[a-z]$/.test(character)), false,
+      `${name} font contains no lowercase glyphs`);
+  }
   for (const character of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') {
     const glyph = standardFont.glyphs[character];
     assert.equal(glyph?.length, 7, `Standard 5x7 includes a seven-row uppercase ${character}`);
@@ -303,21 +307,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(savedPlaylistTabs.at(-1).tabs.length, tabCountBeforeCommandClose - 1,
     'Command-W closes the active playlist tab and saves the remaining tab set');
   const toolbarTargets = hitTargetSnapshot();
-  const footerReadouts = toolbarTargets.filter((target) => target.statusReadout)
-    .sort((first, second) => first.box.x - second.box.x);
-  assert.equal(footerReadouts.length, 4,
-    'the sidebar and playlist each end in two outlined status readout buttons');
-  assert.ok(footerReadouts.every((target) => target.box.y === footerReadouts[0].box.y
-    && target.box.height === footerReadouts[0].box.height),
-  'both pane footers align on one shared standard button row');
-  for (const [left, right] of [[footerReadouts[0], footerReadouts[1]], [footerReadouts[2], footerReadouts[3]]]) {
-    assert.ok(Math.abs(left.box.width - right.box.width) <= 1,
-      'each footer splits its available width evenly between two readouts');
-    assert.equal(left.textAlign, 'left', 'the first footer readout aligns to the left');
-    assert.equal(right.textAlign, 'right', 'the second footer readout aligns to the right');
-    assert.equal(left.textInset, 4, 'footer labels use the shared standard text padding');
-    assert.equal(right.textInset, 4, 'both footer buttons use the same text padding');
-  }
+  assert.equal(toolbarTargets.filter((target) => target.statusReadout).length, 0,
+    'the sidebar and playlist use their full panes for content without framed footer readouts');
   const transportTargets = ['PREVIOUS', 'PLAY', 'NEXT', 'STOP']
     .map((name) => toolbarTargets.find((target) => target.name === name));
   const modeTargets = ['LONG PLAY', 'REPEAT ONE', 'PLAYLIST RANDOM', 'LIBRARY RANDOM']
@@ -605,6 +596,46 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   globalThis.ViewBoy.dispatch('library');
   await tick();
   assert.ok(tabGap() > defaultTabGap, 'playlist tabs respond to UI Gap while retaining independent column spacing');
+  clickTarget('OPTIONS');
+  await tick();
+  clickPage('INTERFACE');
+  for (let step = 0; step < 4; step += 1) {
+    clickTarget('UI GAP -');
+    await tick();
+  }
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 1,
+    'UI Gap can set a single blank LCD dot between text rows');
+  globalThis.ViewBoy.dispatch('library');
+  await tick();
+  const compactRows = contentRowLayoutSnapshot();
+  const compactPlaylistRows = compactRows.filter((row) => row.kind === 'playlist')
+    .sort((first, second) => first.box.y - second.box.y);
+  const compactSidebarRows = compactRows.filter((row) => row.kind === 'sidebar')
+    .sort((first, second) => first.box.y - second.box.y);
+  const glyphHeight = bitmapFontSnapshot('MICRO').height;
+  assert.ok(compactPlaylistRows.length >= 2, 'playlist text rows remain visible in the compact layout');
+  assert.ok(compactPlaylistRows.every((row) => row.box.height === glyphHeight),
+    'playlist text rows have glyph-height boxes without vertical Control Padding');
+  assert.ok(compactPlaylistRows.slice(1).every((row, index) =>
+    row.box.y - (compactPlaylistRows[index].box.y + compactPlaylistRows[index].box.height) === 1),
+  'one UI Gap dot is the entire blank space between playlist rows');
+  assert.ok(compactSidebarRows.length >= 2, 'sidebar text rows remain visible in the compact layout');
+  assert.ok(compactSidebarRows.every((row) => row.box.height === glyphHeight),
+    'sidebar text rows have glyph-height boxes without vertical Control Padding');
+  assert.ok(compactSidebarRows.slice(1).every((row, index) =>
+    row.box.y - (compactSidebarRows[index].box.y + compactSidebarRows[index].box.height) === 1),
+  'one UI Gap dot is the entire blank space between sidebar rows');
+  clickTarget('OPTIONS');
+  await tick();
+  clickPage('INTERFACE');
+  for (let step = 0; step < 4; step += 1) {
+    clickTarget('UI GAP +');
+    await tick();
+  }
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiGapDots, 5,
+    'the compact row-spacing check restores the prior UI Gap');
+  globalThis.ViewBoy.dispatch('library');
+  await tick();
   clickTarget('X', 1);
   clickTarget('OPTIONS');
   await tick();

@@ -707,6 +707,13 @@ export function hitTargetSnapshot() {
   return snapshot;
 }
 
+export function contentRowLayoutSnapshot() {
+  return layoutEntries.flatMap(({ widget, box }) => {
+    const kind = widget.meta.contentRowKind;
+    return kind ? [{ kind, index: widget.meta.trackIndex ?? null, box: { ...box } }] : [];
+  });
+}
+
 function selectionYAt(time = performance.now()) {
   if (!selectionAnimation) return selectionBand?.y ?? null;
   const progress = Math.max(0, Math.min(1,
@@ -969,6 +976,10 @@ function label(parent, text, style = {}, meta = {}) {
 
 function rowHeight(extraDots = 0) {
   return (fontProfile().height + extraDots) / STYLE_SCALE;
+}
+
+function contentRowStride() {
+  return rowHeight() + uiGap();
 }
 
 function spacingValue(key, time = currentRenderTime) {
@@ -1497,7 +1508,7 @@ function createTableHeader(parent, columns) {
 }
 
 function createQueueRow(parent, index, track, columns) {
-  const rowHeightValue = rowHeight(2 * controlPaddingDots());
+  const rowHeightValue = rowHeight();
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
@@ -1509,6 +1520,7 @@ function createQueueRow(parent, index, track, columns) {
       if (event.detail >= 2) startTrack(track);
     },
     trackIndex: index,
+    contentRowKind: "playlist",
   });
   columns.forEach((column) => label(row, tableValue(track, column.key, index), {
     width: column.width,
@@ -1567,7 +1579,7 @@ function createLibraryRow(parent, text, options = {}) {
       flexShrink: 0,
     });
   }
-  const rowHeightValue = rowHeight(2 * controlPaddingDots());
+  const rowHeightValue = rowHeight();
   const revealProgress = options.revealProgress;
   return label(parent, text, {
     height: rowHeightValue * (revealProgress ?? 1),
@@ -1578,6 +1590,7 @@ function createLibraryRow(parent, text, options = {}) {
     revealProgress,
     onClick: options.onClick,
     sidebarDisclosure: options.disclosure === true,
+    contentRowKind: "sidebar",
     disclosureProgress: options.disclosureProgress ?? 0,
     disclosureIndent: options.disclosureIndent ?? controlPaddingDots(),
     inset: options.indent ?? (options.disclosure ? controlPaddingDots() + 2 * fontProfile().advance : 0),
@@ -1591,21 +1604,22 @@ function createLibraryRow(parent, text, options = {}) {
 
 function visibleRowCount() {
   const toolbarGrowth = 2 * (buttonStandardHeight() + uiGap()) + uiGap();
-  return Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - 78 - toolbarGrowth)
-    / rowHeight(2 * controlPaddingDots())));
+  const fixedChrome = 78 - buttonStandardHeight() - uiGap();
+  return Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - fixedChrome - toolbarGrowth)
+    / contentRowStride()));
 }
 
 function visibleLibraryRowCount() {
   const rootChrome = 2 * APP_BORDER_GAP_DOTS + 2 * buttonStandardHeight() + 3 * uiGap()
     + rowHeight(4);
-  const sidebarChrome = 3 * buttonStandardHeight() + 4 * uiGap();
+  const sidebarChrome = 2 * buttonStandardHeight() + 4 * uiGap();
   return Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - rootChrome - sidebarChrome)
-    / rowHeight(2 * controlPaddingDots())));
+    / contentRowStride()));
 }
 
 function libraryRowPixelHeight(row) {
   if (row.spacer) return uiGapDots() * (row.revealProgress ?? 1);
-  return rowHeight(2 * controlPaddingDots()) * STYLE_SCALE * (row.revealProgress ?? 1);
+  return rowHeight() * STYLE_SCALE * (row.revealProgress ?? 1);
 }
 
 function libraryRowsWithLineGaps(rows) {
@@ -1700,22 +1714,6 @@ function pathSubtreeMatches(node, query) {
     || (Array.isArray(node.children) && node.children.some((child) => pathSubtreeMatches(child, query)));
 }
 
-function libraryStatusText(filteredGames, systemCount, query) {
-  if (query) return `MATCH ${filteredGames.length} / ${state.games.length} GAMES`;
-  const selectedGame = state.games.find((game) => gameKey(game) === state.selectedGameKey);
-  if (selectedGame) {
-    const title = selectedGame.displayName || selectedGame.name || "GAME";
-    const trackCount = Number(selectedGame.trackCount);
-    const tracksLabel = Number.isFinite(trackCount) ? `${trackCount} TRK` : "TRACKS";
-    return `${title} / ${tracksLabel}`;
-  }
-  if (state.selectedSystem) {
-    const gamesInSystem = state.games.filter((game) => (game.system || "OTHER") === state.selectedSystem).length;
-    return `${state.selectedSystem} / ${gamesInSystem} GAMES`;
-  }
-  return `${state.games.length} GAMES / ${systemCount} SYSTEMS`;
-}
-
 function addLibraryPane(parent) {
   const paneWidth = libraryPaneWidth();
   const library = makeWidget(parent, {
@@ -1761,7 +1759,7 @@ function addLibraryPane(parent) {
   makeWidget(library, { height: uiGap() });
   const rows = libraryRowsWithLineGaps(libraryRows());
   const count = visibleLibraryRowCount();
-  const rowHeightDots = rowHeight(2 * controlPaddingDots()) * STYLE_SCALE;
+  const rowHeightDots = contentRowStride() * STYLE_SCALE;
   state.libraryContentHeight = rows.reduce((sum, row) => sum + libraryRowPixelHeight(row), 0);
   const estimatedViewportHeight = state.libraryViewportHeight || count * rowHeightDots;
   const maxScroll = Math.max(0, state.libraryContentHeight - estimatedViewportHeight);
@@ -1814,16 +1812,6 @@ function addLibraryPane(parent) {
       },
     });
   });
-  const query = normalizedText(state.searchQuery).trim();
-  const filteredGames = query ? state.games.filter((game) =>
-    normalizedText(`${game.displayName || game.name || ""} ${game.name || ""} ${game.system || "OTHER"}`)
-      .includes(query)) : state.games;
-  const systemCount = new Set(filteredGames.map((game) => game.system || "OTHER")).size;
-  const leftStatus = state.sidebarMode === "paths"
-    ? (state.selectedPathKey ? state.selectedPathKey.split("/").filter(Boolean).at(-1) || "PATHS"
-      : `${state.databaseFiles.length} ROOTS / ${state.databaseFilesReady ? "PATH INDEX" : "PATHS"}`)
-    : libraryStatusText(filteredGames, systemCount, query);
-  statusBar(library, leftStatus, state.status);
   return library;
 }
 
@@ -1937,7 +1925,7 @@ function addCatalogPane(parent) {
   state.queueScroll = Math.max(0, Math.min(state.queueScroll, Math.max(0, viewTracks.length - count)));
   viewTracks.slice(state.queueScroll, state.queueScroll + count).forEach((track, offset) =>
     createQueueRow(content, state.queueScroll + offset, track, columns));
-  if (!viewTracks.length) label(content, state.status, { height: rowHeight(2 * controlPaddingDots()) }, {
+  if (!viewTracks.length) label(content, state.status, { height: rowHeight() }, {
     textShade: 0, inset: controlPaddingDots(),
   });
   makeWidget(panel, {
@@ -1972,9 +1960,6 @@ function addCatalogPane(parent) {
       state.tableScrollbarThumb = { x: thumbLeft, y: centerY, width: thumbWidth, height: 1 };
     },
   });
-  const first = viewTracks.length ? state.queueScroll + 1 : 0;
-  const last = Math.min(viewTracks.length, state.queueScroll + count);
-  statusBar(panel, `TRACKS ${first}-${last}/${viewTracks.length}`, state.transport.toUpperCase());
   return panel;
 }
 
