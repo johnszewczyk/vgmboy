@@ -47,14 +47,14 @@ not a status report.
   **Dumper**, and `ID666 tags by` to package-level **Taggers**, preserving each
   exact source value. Keep SPC member-level **Dumper** tags unchanged; the
   package and member fields have different scopes. Surface mismatches in the
-  AudioMan per-set UAC dashboard for review.
-- **Set source fields** — Normalize URL aliases to the canonical **Set Name**
-  and **Set URL** only after the URL is confirmed as the archive source. A
-  `Downloaded from` claim is evidence, not proof that a site hosted the SPC
-  distribution. Keep the original claim in the bundled info document; do not
-  add a redundant `Downloaded From` tag when Set Name/Set URL represent the
-  reviewed source class. The `modz.lalula.de/snesamp` claims remain a proposed
-  second source class pending confirmation that the site supplied SPC files.
+  AudioMan per-set UAC dashboard for review. String comparison produces review
+  candidates, not proven conflicts; inspect name aliases and source scope before
+  changing any SPC tag.
+- **Set source fields** — Use **Set Name** `SNESMusic.org` and **Set URL**
+  `https://snesmusic.org/v2/torrent.php` for every package in this set. Treat
+  `Downloaded from` as a historical acquisition claim, not a source-class
+  selector. Preserve the exact claim inside the bundled info document; do not
+  add a redundant `Downloaded From` tag.
 - **SPC hashes** — Record the same four hashes for each complete, unchanged
   `.spc` under `uac-playable-payload-v1`; UACMan presents these as Stream
   Hashes.

@@ -20,10 +20,10 @@ profile defines only how confirmed values are represented in UAC packages.
 
 ## Source Authority
 
-- **Package fields** — **Set Name** `SNESMusic.org` and **Set URL**
-  `https://snesmusic.org/v2/torrent.php` for confirmed SNESMusic.org-source
-  packages. Keep the physical working set together for this pass; package-level
-  Set Name/Set URL may identify a different confirmed source class. Do not add
+- **Package fields** — Use **Set Name** `SNESMusic.org` and **Set URL**
+  `https://snesmusic.org/v2/torrent.php` throughout this UAC set. Do not split
+  package source labels from `Downloaded from` claims in informational text;
+  preserve those literal claims in the bundled documents. Do not add
   **Set Collection**.
 - **Source archive** — The original `.rsn`; it contains SPC entries but is not
   itself a UAC member.
@@ -41,11 +41,14 @@ profile defines only how confirmed values are represented in UAC packages.
   Keep member-level SPC **Dumper** tags unchanged; the two scopes may differ.
   Do not retain external metadata sidecars once their useful structured values
   have been surfaced in the UAC; the bundled source document remains evidence.
-- **Source URL claims** — Treat `Downloaded from` as a claim about acquisition,
-  not proof of which archive set supplied the files. Canonicalize aliases to
-  **Set Name** and **Set URL** only after the source class is confirmed. Keep
-  the exact original claim in `info.txt`; do not add a redundant
-  **Downloaded From** tag.
+- **Credit comparison** — Treat source `Dumped by` and SPC member `Dumper` as
+  different scopes. Name-string comparisons flag candidates, not proven
+  conflicts; manually review mismatches and likely aliases before changing any
+  track tag. Never overwrite SPC-native values based only on fuzzy name matches.
+- **Source URL claims** — Treat `Downloaded from` as a historical acquisition
+  claim, not a source-class selector. All packages in this UAC set use the
+  standard SNESMusic.org **Set Name** and **Set URL**. Keep the exact original
+  claim in `info.txt`; do not add a redundant **Downloaded From** tag.
 - **Track fields** — Map each SPC source **Game** name to track **Album**;
   retain **OST Title** separately when present. Record each member's actual
   sub-container version in **Format** (for example, `SPC v.30` or `SPC v.10`).
