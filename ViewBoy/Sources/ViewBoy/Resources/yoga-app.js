@@ -3707,11 +3707,11 @@ function paintSelectionBandPixels(y) {
   }
 }
 
-function paintSelectionAt(y, startY = 0, endY = HEIGHT, time = performance.now()) {
+function paintSelectionAt(y, startY = 0, endY = HEIGHT, time = performance.now(), startX = 0, endX = WIDTH) {
   pixels.set(basePixels);
   paintSelectionBandPixels(y);
   paintCheckboxAnimationsAt(time);
-  present(startY, endY);
+  present(startY, endY, startX, endX);
 }
 
 function paintCheckboxAnimationsAt(time) {
@@ -3783,6 +3783,8 @@ function animateColumnLayoutFrame(time) {
   columnAnimationFrame = 0;
   const isDragging = pointerInteraction?.kind === "reorder" && pointerInteraction.dragging;
   if (!columnLayoutAnimation && !tabLayoutAnimation && !reorderAnimation && !isDragging) return;
+  const resizeOnlyFrame = Boolean(columnLayoutAnimation
+    && !tabLayoutAnimation && !reorderAnimation && !isDragging);
   const timing = columnLayoutAnimation || tabLayoutAnimation || reorderAnimation || pointerInteraction;
   if (!animationFrameIsDue(timing, time)) {
     columnAnimationFrame = requestAnimationFrame(animateColumnLayoutFrame);
@@ -3797,7 +3799,10 @@ function animateColumnLayoutFrame(time) {
     && time - reorderAnimation.startedAt >= reorderAnimation.duration) reorderAnimation = null;
   if (tabLayoutAnimation
     && time - tabLayoutAnimation.startedAt >= tabLayoutAnimation.duration) tabLayoutAnimation = null;
-  render(false, true, time);
+  // Only the playlist viewport changes during an automatic column resize.
+  // Preserve the rest of the visible LCD and avoid expanding/blitting those
+  // unchanged pixels on every animation frame.
+  render(false, true, time, resizeOnlyFrame ? "playlist" : null);
   if ((columnLayoutAnimation || tabLayoutAnimation || reorderAnimation || isDragging)
     && !columnAnimationFrame) {
     columnAnimationFrame = requestAnimationFrame(animateColumnLayoutFrame);
@@ -3834,7 +3839,7 @@ function applyLibraryScrollFrame(time) {
   }
 }
 
-function render(animateSelection = false, preserveAnimations = false, frameTime = performance.now()) {
+function render(animateSelection = false, preserveAnimations = false, frameTime = performance.now(), partialPresentation = null) {
   currentRenderTime = frameTime;
   state.checkboxBoxes = [];
   state.equalizerBarBoxes = [];
@@ -3878,6 +3883,11 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
   layoutEntries = collect(widgetTree);
   state.tableViewportBox = boxesById.get("catalog-horizontal-viewport") ?? null;
   state.optionsContentViewportBox = boxesById.get("options-content-viewport") ?? null;
+  const partialBox = partialPresentation === "playlist" ? state.tableViewportBox : null;
+  const presentX = partialBox?.x ?? 0;
+  const presentY = partialBox?.y ?? 0;
+  const presentEndX = partialBox ? partialBox.x + partialBox.width : WIDTH;
+  const presentEndY = partialBox ? partialBox.y + partialBox.height : HEIGHT;
   paintTree(widgetTree, { x: 0, y: 0, width: WIDTH, height: HEIGHT });
   basePixels = pixels.slice();
   const isOptions = state.tab === "SETTINGS";
@@ -3923,14 +3933,14 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
       duration: selectionDuration,
       lastY: priorY,
     };
-    paintSelectionAt(priorY, 0, HEIGHT, frameTime);
+    paintSelectionAt(priorY, presentY, presentEndY, frameTime, presentX, presentEndX);
     selectionAnimationFrame = requestAnimationFrame(animateSelectionFrame);
   } else if (preserveAnimations && priorSelectionAnimation && nextBand) {
     selectionAnimation = priorSelectionAnimation;
-    paintSelectionAt(selectionYAt(frameTime), 0, HEIGHT, frameTime);
+    paintSelectionAt(selectionYAt(frameTime), presentY, presentEndY, frameTime, presentX, presentEndX);
   } else {
     selectionAnimation = null;
-    paintSelectionAt(nextBand?.y ?? null, 0, HEIGHT, frameTime);
+    paintSelectionAt(nextBand?.y ?? null, presentY, presentEndY, frameTime, presentX, presentEndX);
   }
   const isDragging = pointerInteraction?.kind === "reorder" && pointerInteraction.dragging;
   if ((columnLayoutAnimation || tabLayoutAnimation || reorderAnimation || isDragging)

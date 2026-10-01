@@ -4,6 +4,7 @@ import test from 'node:test';
 const canvas = {
   style: {},
   frames: 0,
+  presentations: [],
   listeners: new Map(),
   addEventListener(name, callback) { canvas.listeners.set(name, callback); },
   focus() {},
@@ -19,7 +20,12 @@ const canvas = {
     createImageData(width, height) {
       return { width, height, data: new Uint8ClampedArray(width * height * 4) };
     },
-    putImageData(image) { canvas.image = image; canvas.frames += 1; },
+    putImageData(image, ...args) {
+      canvas.image = image;
+      canvas.frames += 1;
+      const [, , dirtyX = 0, dirtyY = 0, dirtyWidth = image.width, dirtyHeight = image.height] = args;
+      canvas.presentations.push({ x: dirtyX, y: dirtyY, width: dirtyWidth, height: dirtyHeight });
+    },
   }; },
 };
 const status = { textContent: '' };
@@ -1399,11 +1405,15 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     ...track,
     filename: 'INITIAL_FILENAME.SPC-WITH-A-LONG-TAIL-THAT-MUST-FIT-THE-COLUMN.SPC',
   } : track);
+  canvas.presentations.length = 0;
   await catalogReloaded();
   await tick();
   await tick();
   assert.notEqual(pixelChecksum(canvas.image.data), shortFilenamePixels,
     'the File column expands beyond its default width to fit the longest catalog value');
+  assert.ok(canvas.presentations.some((region) => region.width < canvas.image.width
+    && region.height < canvas.image.height),
+  'automatic column resize presents only the playlist viewport during its animation frames');
 
   rows = rows.map((track) => ({ ...track, filename: 'INITIAL_FILENAME.SPC' }));
   await catalogReloaded();
