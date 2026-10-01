@@ -33,7 +33,7 @@ const EQ_GAIN_STEPS = (EQ_GAIN_MAX_DB - EQ_GAIN_MIN_DB) / EQ_GAIN_STEP_DB;
 const FAVORITES_TAB_SOURCE = "viewboy:special:favorites";
 const HISTORY_TAB_SOURCE = "viewboy:special:history";
 const DEFAULT_ANIMATION_FPS = 60;
-const ANIMATION_FPS_OPTIONS = [30, 60, 90, 120, 144];
+const ANIMATION_FPS_OPTIONS = [30, 60, 90, 120, 150, 180, 210, 240];
 const PALETTES = {
   GAMEBOY: {
     STANDARD: ["#0C300C", "#285428", "#78940D", "#9BBC0F"],
@@ -222,6 +222,7 @@ function saveDisplayOptions() {
       animationFPS: state.animationFPS,
       transportSymbols: state.transportSymbols,
       columnOrder: state.columnOrder,
+      autoHideEmptyColumns: state.autoHideEmptyColumns,
       expandedPathNodes: [...state.expandedPathNodes],
     }));
   }
@@ -257,6 +258,7 @@ let selectionAnimationFrame = 0;
 let sidebarAnimationFrame = 0;
 let columnAnimationFrame = 0;
 let equalizerAnimationFrame = 0;
+let checkboxAnimationFrame = 0;
 let libraryScrollFrame = 0;
 let screenTransitionFrame = 0;
 let spacingAnimationFrame = 0;
@@ -266,6 +268,8 @@ let searchCursorTimer = 0;
 let searchCursorVisible = false;
 let equalizerFrameTiming = { lastFrameAt: Number.NaN };
 let equalizerAnimations = new Map();
+let checkboxFrameTiming = { lastFrameAt: Number.NaN };
+let checkboxAnimations = new Map();
 let screenTransition = null;
 let spacingAnimation = null;
 let suppressFramePresentation = false;
@@ -297,7 +301,8 @@ const state = {
   uiChromeGapDots: storedSpacing(savedDisplayOptions.uiChromeGapDots, legacyChromeGapDots),
   textLineGapDots: storedSpacing(savedDisplayOptions.textLineGapDots, legacyTextLineGapDots),
   animationFPS: ANIMATION_FPS_OPTIONS.includes(Number(savedDisplayOptions.animationFPS))
-    ? Number(savedDisplayOptions.animationFPS) : DEFAULT_ANIMATION_FPS,
+    ? Number(savedDisplayOptions.animationFPS)
+    : Number(savedDisplayOptions.animationFPS) === 144 ? 150 : DEFAULT_ANIMATION_FPS,
   searchQuery: "",
   searchFocused: false,
   transportSymbols: savedDisplayOptions.transportSymbols === true,
@@ -331,6 +336,7 @@ const state = {
   archiveCacheLocation: "",
   archiveCache: null,
   volumeGaugeBox: null,
+  volumeValueBox: null,
   databaseOptionsStatus: "",
   editingDurationKey: null,
   durationDraft: "",
@@ -341,6 +347,11 @@ const state = {
   sortDirection: "ASCENDING",
   columnOrder: Array.isArray(savedDisplayOptions.columnOrder)
     ? savedDisplayOptions.columnOrder.filter((key) => typeof key === "string") : [],
+  autoHideEmptyColumns: savedDisplayOptions.autoHideEmptyColumns !== false,
+  autoHiddenColumnKeys: [],
+  checkboxBoxes: [],
+  editingRateBackend: null,
+  rateDraft: "",
   tableHorizontalScroll: 0,
   tableHorizontalMax: 0,
   tableViewportWidth: 0,
@@ -720,6 +731,18 @@ export function equalizerAnimationSnapshot(time = performance.now()) {
   });
 }
 
+export function checkboxAnimationSnapshot(time = performance.now()) {
+  return [...checkboxAnimations].map(([key, animation]) => {
+    const angle = checkboxAngleAt(animation, time);
+    return {
+      key,
+      angle,
+      horizontalScale: Math.abs(Math.cos(angle)),
+      faceChecked: angle >= Math.PI / 2,
+    };
+  });
+}
+
 export function screenTransitionSnapshot() {
   return screenTransition
     ? { direction: screenTransition.direction, targetTab: screenTransition.targetTab }
@@ -745,6 +768,7 @@ export function hitTargetSnapshot() {
     optionPage: widget.meta.optionPage === true,
     optionOwner: widget.meta.optionOwner ?? null,
     optionCheckboxChecked: widget.meta.optionCheckboxChecked ?? null,
+    optionCheckboxKey: widget.meta.optionCheckboxKey ?? null,
     optionCheckboxBox: widget.meta.optionCheckboxBox ? { ...widget.meta.optionCheckboxBox } : null,
     trackIndex: Number.isInteger(widget.meta.trackIndex) ? widget.meta.trackIndex : null,
     searchField: widget.meta.searchField === true,
@@ -753,6 +777,7 @@ export function hitTargetSnapshot() {
     playlistTabClose: widget.meta.playlistTabClose === true,
     activePlaylistTab: widget.meta.activePlaylistTab === true,
     editableDurationKey: widget.meta.editableDuration ?? null,
+    editableRateBackend: widget.meta.editableRateBackend ?? null,
     playlistTabId: widget.meta.playlistTabId ?? null,
     textInset: widget.meta.inset ?? controlPaddingDots(),
     glyphAdvance: fontProfile().advance,
@@ -790,7 +815,34 @@ export function hitTargetSnapshot() {
 export function appStatusAreaSnapshot() {
   return layoutEntries.flatMap(({ widget, box }) => {
     const field = widget.meta.statusField;
-    return field ? [{ field, text: widget.meta.text, box: { ...box } }] : [];
+    return field ? [{
+      field,
+      text: widget.meta.text,
+      textAlign: widget.meta.align ?? "left",
+      box: { ...box },
+    }] : [];
+  });
+}
+
+export function autoHiddenColumnSnapshot() {
+  return [...state.autoHiddenColumnKeys];
+}
+
+export function volumeControlSnapshot() {
+  return {
+    value: Math.max(0, Math.min(1, Number(state.preferences.appVolume ?? 1))),
+    gaugeBox: state.volumeGaugeBox ? { ...state.volumeGaugeBox } : null,
+    valueBox: state.volumeValueBox ? { ...state.volumeValueBox } : null,
+    tickXs: state.volumeGaugeBox ? linearTickPositions(state.volumeGaugeBox, 10) : [],
+  };
+}
+
+export function choiceControlLayoutSnapshot() {
+  const rows = new Map(layoutEntries.filter(({ widget }) => widget.meta.optionChoiceRow)
+    .map(({ widget, box }) => [widget.meta.optionChoiceRow, { ...box }]));
+  return layoutEntries.flatMap(({ widget, box }) => {
+    const title = widget.meta.optionChoiceControls;
+    return title ? [{ title, row: rows.get(title) || null, controls: { ...box } }] : [];
   });
 }
 
@@ -817,6 +869,10 @@ function selectionYAt(time = performance.now()) {
 
 function floor(value) {
   return Math.round(value);
+}
+
+function layoutPixelEdge(value) {
+  return Math.floor(value + 0.000001);
 }
 
 function fillRect(x, y, width, height, shade) {
@@ -1006,7 +1062,11 @@ function makeWidget(parent, style = {}, meta = {}) {
   yoga.setFlexShrink(style.flexShrink ?? 0);
   if (style.positionType !== undefined) yoga.setPositionType(style.positionType);
   if (style.width !== undefined) yoga.setWidth(style.width * STYLE_SCALE);
+  if (style.widthPercent !== undefined) yoga.setWidthPercent(style.widthPercent);
   if (style.minWidth !== undefined) yoga.setMinWidth(style.minWidth * STYLE_SCALE);
+  if (style.minWidthPercent !== undefined) yoga.setMinWidthPercent(style.minWidthPercent);
+  if (style.maxWidth !== undefined) yoga.setMaxWidth(style.maxWidth * STYLE_SCALE);
+  if (style.maxWidthPercent !== undefined) yoga.setMaxWidthPercent(style.maxWidthPercent);
   if (style.height !== undefined) yoga.setHeight(style.height * STYLE_SCALE);
   if (style.left !== undefined) yoga.setPosition(Edge.Left, style.left * STYLE_SCALE);
   if (style.top !== undefined) yoga.setPosition(Edge.Top, style.top * STYLE_SCALE);
@@ -1016,6 +1076,8 @@ function makeWidget(parent, style = {}, meta = {}) {
   if (style.paddingHorizontal !== undefined) {
     yoga.setPadding(Edge.Horizontal, style.paddingHorizontal * STYLE_SCALE);
   }
+  if (style.paddingLeft !== undefined) yoga.setPadding(Edge.Left, style.paddingLeft * STYLE_SCALE);
+  if (style.marginLeft !== undefined) yoga.setMargin(Edge.Left, style.marginLeft * STYLE_SCALE);
   if (style.paddingVertical !== undefined) {
     yoga.setPadding(Edge.Vertical, style.paddingVertical * STYLE_SCALE);
   }
@@ -1099,7 +1161,7 @@ function spacingReadout(key) {
 }
 
 function uiSectionGap() {
-  return uiGapDots() * 2 / STYLE_SCALE;
+  return uiGap();
 }
 
 function textLineGapDots() {
@@ -1161,11 +1223,44 @@ function appStatusDetails() {
   const track = playingIndex >= 0 ? playingQueue[playingIndex] : selected;
   const sourcePath = String(track?.archivePath || track?.path || track?.filename || "");
   const archiveEntry = String(track?.archiveEntry || "");
+  const playing = Boolean(track && state.currentTrackId === trackID(track));
+  const playlist = activeTracks();
+  const playlistDuration = playlist.reduce((sum, item) => sum + statusTrackDuration(item), 0);
+  const playlistIsOpen = playlist.some(statusTrackIsOpen);
+  const songDuration = track ? statusTrackDuration(track) : 0;
+  const clock = track
+    ? `${formatTime(playing ? state.positionMs : 0)} / ${songDuration > 0 ? formatTime(songDuration) : "OPEN"} / ${playlistIsOpen ? "OPEN" : formatTime(playlistDuration)}`
+    : `0:00 / OPEN / ${playlistIsOpen ? "OPEN" : formatTime(playlistDuration)}`;
   return {
     location: track
       ? [sourcePath, archiveEntry].filter(Boolean).join(" :: ") || "FILE PATH UNAVAILABLE"
       : state.status || "NO FILE SELECTED",
+    clock,
   };
+}
+
+function trackSupportsLongPlay(track) {
+  const path = String(track?.archiveEntry || track?.path || track?.filename || "");
+  const extension = path.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase();
+  return Boolean(extension && bridge?.playbackBackends?.some((backend) => backend.supportsLongPlay
+    && backend.extensions?.some((candidate) => String(candidate).toLowerCase() === extension)));
+}
+
+function statusTrackDuration(track) {
+  const nativeLength = Math.max(0, Number(track?.playLengthMs) || 0);
+  if (state.preferences.longPlayEnabled === true && trackSupportsLongPlay(track)) {
+    const playLength = Math.max(0, Number(state.preferences.manualPlayTimeSeconds ?? 180)) * 1_000;
+    if (playLength === 0) return 0;
+    const fadeLength = state.preferences.fadeEnabled === false
+      ? 0 : Math.max(0, Number(state.preferences.spcFadeSeconds ?? 6)) * 1_000;
+    return playLength + fadeLength;
+  }
+  return nativeLength;
+}
+
+function statusTrackIsOpen(track) {
+  return state.preferences.longPlayEnabled === true && trackSupportsLongPlay(track)
+    && Number(state.preferences.manualPlayTimeSeconds ?? 180) === 0;
 }
 
 function appStatusArea(parent) {
@@ -1174,11 +1269,8 @@ function appStatusArea(parent) {
   const status = makeWidget(parent, {
     direction: FlexDirection.Row,
     height,
+    gap: uiGap(),
     alignItems: Align.Center,
-  }, {
-    paint(box) {
-      line(box.x, box.y, box.x + box.width, box.y, 2);
-    },
   });
   label(status, details.location, {
     height,
@@ -1190,6 +1282,16 @@ function appStatusArea(parent) {
     statusField: "location",
     textShade: 0,
     inset: controlPaddingDots(),
+  });
+  label(status, details.clock, {
+    height,
+    width: textLayoutWidth(details.clock),
+    flexShrink: 0,
+  }, {
+    statusField: "clock",
+    textShade: 0,
+    inset: controlPaddingDots(),
+    align: "right",
   });
   return status;
 }
@@ -1255,14 +1357,73 @@ function optionToggle(parent, title, checked, onClick, extraMeta = {}) {
   return optionChecklistRow(parent, title, checked, onClick, extraMeta);
 }
 
+function appendOptionCheckboxGlyph(parent, checkboxKey, checked, metadata = {}) {
+  const checkboxSize = fontProfile().height;
+  return makeWidget(parent, { width: checkboxSize / STYLE_SCALE, height: checkboxSize / STYLE_SCALE }, {
+    paint(box) {
+      const square = checkboxSquareBox(box);
+      metadata.optionCheckboxBox = square;
+      if (!state.checkboxBoxes.some((entry) => entry.key === checkboxKey)) {
+        state.checkboxBoxes.push({ key: checkboxKey, box: square });
+      }
+      paintCheckboxFace(square, checked === true);
+    },
+  });
+}
+
+function checkboxSquareBox(box) {
+  const size = fontProfile().height;
+  return {
+    x: Math.floor(box.x + (box.width - size) / 2),
+    y: Math.floor(box.y + (box.height - size) / 2),
+    width: size,
+    height: size,
+  };
+}
+
+function paintCheckboxFace(box, checked, horizontalScale = 1) {
+  const width = Math.max(1, Math.min(box.width, Math.round(box.width * horizontalScale)));
+  const x = Math.floor(box.x + (box.width - width) / 2);
+  if (width === 1) {
+    fillRect(x, box.y, width, box.height, 1);
+    return;
+  }
+  strokeRect(x, box.y, width, box.height, 0);
+  if (checked && width > 2 && box.height > 2) {
+    fillRect(x + 1, box.y + 1, width - 2, box.height - 2, 0);
+  }
+}
+
+function checkboxAngleAt(animation, time = performance.now()) {
+  const progress = Math.max(0, Math.min(1, (time - animation.startedAt) / animation.duration));
+  return animation.fromAngle + (animation.toAngle - animation.fromAngle) * easeSelection(progress);
+}
+
+function startCheckboxAnimation(key, checked) {
+  const duration = animationDurationMilliseconds();
+  if (!animationEnabled() || duration <= 0) return;
+  const now = performance.now();
+  const active = checkboxAnimations.get(key);
+  const fromAngle = active ? checkboxAngleAt(active, now) : (checked ? Math.PI : 0);
+  const toAngle = checked ? 0 : Math.PI;
+  if (fromAngle === toAngle) return;
+  checkboxAnimations.set(key, { fromAngle, toAngle, startedAt: now, duration });
+  checkboxFrameTiming.lastFrameAt = Number.NaN;
+  if (!checkboxAnimationFrame) checkboxAnimationFrame = requestAnimationFrame(animateCheckboxFrame);
+}
+
 function optionChecklistRow(parent, title, checked, onClick, extraMeta = {}) {
   const height = buttonStandardHeight();
-  const checkboxSize = fontProfile().height;
+  const checkboxKey = extraMeta.optionCheckboxKey || `${state.optionsPage}:${title}`;
   const rowMeta = {
-    onClick,
+    onClick: () => {
+      startCheckboxAnimation(checkboxKey, checked === true);
+      onClick();
+    },
     controlTitle: title,
     optionChecklistItem: true,
     optionCheckboxChecked: checked === true,
+    optionCheckboxKey: checkboxKey,
     ...extraMeta,
   };
   const row = makeWidget(parent, {
@@ -1272,17 +1433,78 @@ function optionChecklistRow(parent, title, checked, onClick, extraMeta = {}) {
     gap: uiGap(),
     paddingHorizontal: controlPaddingDots() / STYLE_SCALE,
   }, rowMeta);
-  makeWidget(row, { width: checkboxSize / STYLE_SCALE, height: checkboxSize / STYLE_SCALE }, {
-    paint(box) {
-      rowMeta.optionCheckboxBox = { ...box };
-      strokeRect(box.x, box.y, box.width, box.height, 0);
-      if (checked && checkboxSize > 2) {
-        fillRect(box.x + 1, box.y + 1, box.width - 2, box.height - 2, 0);
-      }
-    },
-  });
+  appendOptionCheckboxGlyph(row, checkboxKey, checked, rowMeta);
   label(row, title, { flexGrow: 1, height }, {
     textShade: 0, inset: controlPaddingDots(),
+  });
+  return row;
+}
+
+function optionToggleDuration(parent, title, controlPrefix, checked, onClick, key,
+  minimum, maximum, fallback, step, allowOpen = false) {
+  const height = buttonStandardHeight();
+  const checkboxKey = `${state.optionsPage}:${title}`;
+  const rowMeta = {
+    onClick: () => {
+      startCheckboxAnimation(checkboxKey, checked === true);
+      onClick();
+    },
+    controlTitle: title,
+    optionChecklistItem: true,
+    optionCheckboxChecked: checked === true,
+    optionCheckboxKey: checkboxKey,
+  };
+  const row = controlRow(parent, {
+    height,
+    gap: uiGap(),
+    paddingHorizontal: controlPaddingDots() / STYLE_SCALE,
+  }, rowMeta);
+  appendOptionCheckboxGlyph(row, checkboxKey, checked, rowMeta);
+  label(row, title, { flexGrow: 1, height }, {
+    textShade: 0, inset: controlPaddingDots(),
+  });
+  pixelButton(row, "[-]", () => adjustPlaybackDuration(key, -step, minimum, maximum, fallback), {
+    controlTitle: `${controlPrefix} -`,
+  });
+  pixelButton(row, "[+]", () => adjustPlaybackDuration(key, step, minimum, maximum, fallback), {
+    controlTitle: `${controlPrefix} +`,
+  });
+  durationInput(row, key, optionDuration(state.preferences[key] ?? fallback, allowOpen),
+    minimum, maximum, fallback, allowOpen);
+  return row;
+}
+
+function optionToggleAdjuster(parent, title, controlPrefix, checked, onClick,
+  value, onDecrease, onIncrease) {
+  const height = buttonStandardHeight();
+  const checkboxKey = `${state.optionsPage}:${title}`;
+  const rowMeta = {
+    onClick: () => {
+      startCheckboxAnimation(checkboxKey, checked === true);
+      onClick();
+    },
+    controlTitle: title,
+    optionChecklistItem: true,
+    optionCheckboxChecked: checked === true,
+    optionCheckboxKey: checkboxKey,
+  };
+  const row = controlRow(parent, {
+    height,
+    gap: uiGap(),
+    paddingHorizontal: controlPaddingDots() / STYLE_SCALE,
+  }, rowMeta);
+  appendOptionCheckboxGlyph(row, checkboxKey, checked, rowMeta);
+  label(row, title, { flexGrow: 1, height }, {
+    textShade: 0, inset: controlPaddingDots(),
+  });
+  pixelButton(row, "[-]", onDecrease, { controlTitle: `${controlPrefix} -` });
+  pixelButton(row, "[+]", onIncrease, { controlTitle: `${controlPrefix} +` });
+  label(row, value, { width: framedTextWidth(value), height }, {
+    border: BUTTON_BORDER_DOTS,
+    textShade: 0,
+    align: "center",
+    inset: controlPaddingDots(),
+    spacingReadout: controlPrefix,
   });
   return row;
 }
@@ -1291,15 +1513,24 @@ function optionChoice(parent, title, choices) {
   const height = buttonStandardHeight();
   const row = controlRow(parent, {
     height,
-    gap: uiGap(),
+    gap: 0,
   }, {
+    optionChoiceRow: title,
     paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
   });
-  label(row, title, { width: textLayoutWidth(title), height }, {
+  label(row, title, { widthPercent: 33.3333, height }, {
     textShade: 0, inset: controlPaddingDots(),
   });
-  choices.forEach((choice) => pixelButton(row, choice.title, choice.onClick, {
+  const controls = makeWidget(row, {
+    direction: FlexDirection.Row,
+    widthPercent: 66.6667,
+    gap: uiGap(),
+    alignItems: Align.Center,
+  }, { optionChoiceControls: title });
+  choices.forEach((choice) => pixelButton(controls, choice.title, choice.onClick, {
     flexGrow: 1,
+    flexBasis: 0,
+    minWidth: 0,
     selected: choice.selected,
     controlTitle: `${title} ${choice.title}`,
   }));
@@ -1394,7 +1625,7 @@ function formatSize(bytes) {
 
 function tableValue(track, key, rowIndex = 0) {
   switch (key) {
-    case "favorite": return state.favoriteIDs.has(favoriteID(track)) ? "[x]" : "[]";
+    case "favorite": return "";
     case "index": return String(rowIndex + 1);
     case "filename": return track.filename || "";
     case "title": return track.title || track.filename || "UNTITLED";
@@ -1427,6 +1658,9 @@ function tableContentLengths(items, columns) {
   if (cached) return cached;
 
   const measured = {
+    hasContent: Object.fromEntries(columns
+      .filter((column) => !["favorite", "index", "title"].includes(column.key))
+      .map((column) => [column.key, false])),
     lengths: Object.fromEntries(columns
       .filter((column) => !["favorite", "index", "title"].includes(column.key))
       .map((column) => [column.key, Array.from(normalizedText(column.title)).length])),
@@ -1435,8 +1669,10 @@ function tableContentLengths(items, columns) {
     for (const column of columns) {
       if (["favorite", "index", "title"].includes(column.key)) continue;
       const value = tableValue(track, column.key, index);
-      const valueLength = Array.from(normalizedText(value)).length;
+      const normalized = normalizedText(value).trim();
+      const valueLength = Array.from(normalized).length;
       measured.lengths[column.key] = Math.max(measured.lengths[column.key] ?? 0, valueLength);
+      if (normalized && normalized !== "—") measured.hasContent[column.key] = true;
     }
   });
   tableContentLengthCache.set(items, measured);
@@ -1516,7 +1752,13 @@ function tableColumns(items = activeTracks()) {
   }
 
   const columnVisibility = state.preferences.columnVisibility || {};
-  const visible = columns.filter((column) => column.mandatory || columnVisibility[column.key] !== false);
+  const autoHidden = new Set(state.autoHideEmptyColumns
+    ? columns.filter((column) => !["favorite", "index", "title"].includes(column.key)
+      && !content.hasContent[column.key]).map((column) => column.key)
+    : []);
+  state.autoHiddenColumnKeys = [...autoHidden];
+  const visible = columns.filter((column) => !autoHidden.has(column.key)
+    && (column.mandatory || columnVisibility[column.key] !== false));
   const byKey = new Map(columns.map((column) => [column.key, column]));
   const savedOrder = reorderPreview?.kind === "column" ? reorderPreview.keys : state.columnOrder;
   const preferredOrder = savedOrder.filter((key) => key !== "index" && byKey.has(key));
@@ -1715,17 +1957,41 @@ function createQueueRow(parent, index, track, columns) {
     trackIndex: index,
     contentRowKind: "playlist",
   });
-  columns.forEach((column) => label(row, tableValue(track, column.key, index), {
-    width: column.width,
-    flexGrow: column.flexGrow,
-    height: rowHeightValue,
-  }, {
-    textShade: 0,
-    inset: controlPaddingDots(),
-    align: column.rowAlign ?? column.align ?? "left",
-    trackIndex: index,
-    onClick: column.key === "favorite" ? () => toggleFavorite(track) : undefined,
-  }));
+  columns.forEach((column) => {
+    if (column.key === "favorite") {
+      const checked = state.favoriteIDs.has(favoriteID(track));
+      const checkboxKey = `favorite:${favoriteID(track)}`;
+      makeWidget(row, {
+        width: column.width,
+        height: rowHeightValue,
+      }, {
+        trackIndex: index,
+        controlTitle: "FAVORITE",
+        onClick: () => {
+          startCheckboxAnimation(checkboxKey, checked);
+          void toggleFavorite(track);
+        },
+        paint(box) {
+          const square = checkboxSquareBox(box);
+          if (!state.checkboxBoxes.some((entry) => entry.key === checkboxKey)) {
+            state.checkboxBoxes.push({ key: checkboxKey, box: square });
+          }
+          paintCheckboxFace(square, checked);
+        },
+      });
+      return;
+    }
+    label(row, tableValue(track, column.key, index), {
+      width: column.width,
+      flexGrow: column.flexGrow,
+      height: rowHeightValue,
+    }, {
+      textShade: 0,
+      inset: controlPaddingDots(),
+      align: column.rowAlign ?? column.align ?? "left",
+      trackIndex: index,
+    });
+  });
   return row;
 }
 
@@ -2279,18 +2545,9 @@ function optionGroup(parent, title) {
   return group;
 }
 
-function optionOwnerHeading(parent, title) {
-  return label(parent, title, { height: rowHeight(1) }, {
-    optionOwnerTitle: title,
-    textShade: 0,
-    inset: 0,
-    bottomLine: 1,
-  });
-}
-
 function optionsTocWidth() {
   const available = WIDTH / STYLE_SCALE;
-  const labelWidth = framedTextWidth("DIAGNOSTICS") + uiOptionsInsetDots() / STYLE_SCALE * 2;
+  const labelWidth = framedTextWidth("OPTIONS - VGMBoy") + uiOptionsInsetDots() / STYLE_SCALE * 2;
   return Math.min(available * 0.34, Math.max(labelWidth, Math.min(220, available * 0.20)));
 }
 
@@ -2386,13 +2643,68 @@ function playbackRateSteps(backend, preferences = state.preferences) {
 }
 
 function playbackRateLabel(steps) {
-  return steps === 32 ? "1X" : `${steps}/32X`;
+  const divisor = greatestCommonDivisor(steps, 32);
+  const numerator = steps / divisor;
+  const denominator = 32 / divisor;
+  return denominator === 1 ? `${numerator}X` : `${numerator}/${denominator}X`;
+}
+
+function greatestCommonDivisor(left, right) {
+  let a = Math.abs(left);
+  let b = Math.abs(right);
+  while (b !== 0) [a, b] = [b, a % b];
+  return a || 1;
 }
 
 function adjustPlaybackRate(backend, delta) {
   const key = backend === "libvgm" ? "libvgmPlaybackSpeed" : "playbackSpeed";
   const steps = Math.max(1, Math.min(256, playbackRateSteps(backend) + delta));
   setPreference(key, { numerator: steps, denominator: 32 });
+}
+
+function beginPlaybackRateEdit(backend) {
+  state.editingRateBackend = backend;
+  state.rateDraft = "";
+  render();
+}
+
+function finishPlaybackRateEdit(commit) {
+  const backend = state.editingRateBackend;
+  const draft = state.rateDraft.trim();
+  state.editingRateBackend = null;
+  state.rateDraft = "";
+  if (!commit || !backend) { render(); return; }
+  let multiplier = Number.NaN;
+  const fraction = draft.match(/^(\d+)\s*\/\s*(\d+)$/);
+  if (fraction) {
+    const numerator = Number(fraction[1]);
+    const denominator = Number(fraction[2]);
+    if (denominator > 0) multiplier = numerator / denominator;
+  } else if (/^(?:\d+(?:\.\d{1,6})?|\.\d{1,6})$/.test(draft)) {
+    multiplier = Number(draft);
+  }
+  if (!Number.isFinite(multiplier) || multiplier <= 0 || multiplier > 8) {
+    render();
+    return;
+  }
+  const steps = Math.max(1, Math.min(256, Math.round(multiplier * 32)));
+  const divisor = greatestCommonDivisor(steps, 32);
+  const key = backend === "libvgm" ? "libvgmPlaybackSpeed" : "playbackSpeed";
+  setPreference(key, { numerator: steps / divisor, denominator: 32 / divisor });
+}
+
+function playbackRateInput(parent, backend) {
+  const editing = state.editingRateBackend === backend;
+  const value = editing ? `${state.rateDraft}|` : playbackRateLabel(playbackRateSteps(backend));
+  return label(parent, value, { width: framedTextWidth("255/32X"), height: buttonStandardHeight() }, {
+    border: BUTTON_BORDER_DOTS,
+    textShade: 0,
+    align: "center",
+    inset: controlPaddingDots(),
+    editableRateBackend: backend,
+    controlTitle: `${backend.toUpperCase()} RATE INPUT`,
+    onClick: () => beginPlaybackRateEdit(backend),
+  });
 }
 
 function playbackTempoForTrack(track, preferences = state.preferences) {
@@ -2410,11 +2722,11 @@ function playbackTempoForTrack(track, preferences = state.preferences) {
 
 function addPlaybackOptions(parent, pref) {
   const timing = optionGroup(parent, "PLAYBACK TIMING");
-  optionToggle(timing, "LONG PLAY", pref.longPlayEnabled === true,
-    () => setPreference("longPlayEnabled", pref.longPlayEnabled !== true));
+  optionToggleDuration(timing, "LONG PLAY", "LONG PLAY TIME", pref.longPlayEnabled === true,
+    () => setPreference("longPlayEnabled", pref.longPlayEnabled !== true),
+    "manualPlayTimeSeconds", 0, 3600, 180, 30, true);
   optionToggle(timing, "END FADE", pref.fadeEnabled !== false,
     () => setPreference("fadeEnabled", pref.fadeEnabled === false));
-  optionDurationAdjuster(timing, "LONG PLAY TIME", "manualPlayTimeSeconds", 0, 3600, 180, 30, true);
   optionDurationAdjuster(timing, "UNKNOWN LENGTH", "unknownDurationSeconds", 30, 3600, 150, 30);
   optionDurationAdjuster(timing, "FADE LENGTH", "spcFadeSeconds", 0, 60, 6, 1);
 }
@@ -2487,28 +2799,42 @@ function addDiagnosticsOptions(parent) {
   optionDiagnosticRow(decoder, "DECODE ERROR", snapshot.decode_error === true ? "YES" : hasStatus ? "NO" : "—");
 }
 
+function optionPlaybackRateRow(parent, backend) {
+  const title = backend.toUpperCase();
+  const indentDots = 2 * controlPaddingDots() + fontProfile().height + uiGapDots();
+  const row = controlRow(parent, {
+    height: buttonStandardHeight(),
+    gap: uiGap(),
+    paddingLeft: indentDots / STYLE_SCALE,
+  }, {
+    optionPlaybackRate: title,
+    paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
+  });
+  label(row, "RATE", { width: textLayoutWidth("RATE", 0), height: buttonStandardHeight() }, {
+    textShade: 0, inset: 0,
+  });
+  pixelButton(row, "[-]", () => adjustPlaybackRate(backend, -1), {
+    controlTitle: `${title} RATE -`,
+  });
+  pixelButton(row, "[+]", () => adjustPlaybackRate(backend, 1), {
+    controlTitle: `${title} RATE +`,
+  });
+  playbackRateInput(row, backend);
+}
+
 function addMethodOptions(parent, pref) {
   const speed = optionGroup(parent, "DECODER SPEED");
   optionToggle(speed, "LIBGME SPEED", pref.playbackSpeedEnabled === true,
     () => setPreference("playbackSpeedEnabled", pref.playbackSpeedEnabled !== true));
-  optionAdjuster(speed, "LIBGME RATE", playbackRateLabel(playbackRateSteps("libgme", pref)),
-    () => adjustPlaybackRate("libgme", -1),
-    () => adjustPlaybackRate("libgme", 1));
+  optionPlaybackRateRow(speed, "libgme");
   optionToggle(speed, "LIBVGM SPEED", pref.libvgmPlaybackSpeedEnabled === true,
     () => setPreference("libvgmPlaybackSpeedEnabled", pref.libvgmPlaybackSpeedEnabled !== true));
-  optionAdjuster(speed, "LIBVGM RATE", playbackRateLabel(playbackRateSteps("libvgm", pref)),
-    () => adjustPlaybackRate("libvgm", -1),
-    () => adjustPlaybackRate("libvgm", 1));
+  optionPlaybackRateRow(speed, "libvgm");
 }
 
 function paintEqualizerBar(box, gain) {
-  strokeRect(box.x, box.y, box.width, box.height, 1);
-  const { left, right } = equalizerTrackBounds(box);
-  const centerY = box.y + Math.floor(box.height / 2);
-  const fillWidth = equalizerFillWidth(box, gain);
-  fillRect(left, box.y + 1, fillWidth, Math.max(1, box.height - 2), 1);
-  const tickTop = centerY - 1;
-  for (const x of equalizerTickPositions(box)) fillRect(x, tickTop, 1, 3, 2);
+  paintGaugeBar(box,
+    (gain - EQ_GAIN_MIN_DB) / (EQ_GAIN_MAX_DB - EQ_GAIN_MIN_DB), EQ_GAIN_STEPS);
 }
 
 function equalizerFillWidth(box, gain) {
@@ -2526,25 +2852,43 @@ function paintEqualizerValue(box, gain) {
 }
 
 function equalizerTrackBounds(box) {
+  return linearTrackBounds(box, EQ_GAIN_STEPS);
+}
+
+function linearTrackBounds(box, steps) {
   const inset = EQ_BAR_INSET_DOTS;
   const innerLeft = box.x + inset;
   const innerRight = box.x + box.width - 1 - inset;
   const span = Math.max(1, innerRight - innerLeft);
-  const usableSpan = span - (span % 2);
-  const stepWidth = Math.max(1, Math.floor(usableSpan / EQ_GAIN_STEPS));
-  const tickSpan = stepWidth * EQ_GAIN_STEPS;
-  const left = innerLeft + Math.floor((usableSpan - tickSpan) / 2);
+  const stepWidth = Math.max(1, Math.floor(span / steps));
+  const tickSpan = stepWidth * steps;
+  const left = innerLeft + Math.floor((span - tickSpan) / 2);
   return {
     left,
     right: left + tickSpan,
     stepWidth,
+    steps,
   };
 }
 
-function equalizerTickPositions(box) {
-  const bounds = equalizerTrackBounds(box);
-  return Array.from({ length: EQ_GAIN_STEPS + 1 }, (_, index) =>
+function linearTickPositions(box, steps) {
+  const bounds = linearTrackBounds(box, steps);
+  return Array.from({ length: steps + 1 }, (_, index) =>
     bounds.left + index * bounds.stepWidth);
+}
+
+function equalizerTickPositions(box) {
+  return linearTickPositions(box, EQ_GAIN_STEPS);
+}
+
+function paintGaugeBar(box, fraction, steps) {
+  strokeRect(box.x, box.y, box.width, box.height, 1);
+  const { left, right } = linearTrackBounds(box, steps);
+  const centerY = box.y + Math.floor(box.height / 2);
+  const fillWidth = Math.round((right - left) * Math.max(0, Math.min(1, fraction)));
+  fillRect(left, box.y + 1, fillWidth, Math.max(1, box.height - 2), 1);
+  const tickTop = centerY - 1;
+  for (const x of linearTickPositions(box, steps)) fillRect(x, tickTop, 1, 3, 2);
 }
 
 function equalizerBand(parent, title, index) {
@@ -2592,6 +2936,8 @@ function equalizerBand(parent, title, index) {
   label(row, equalizerGainLabel(equalizerGainAt(index, currentRenderTime)), {
     width: framedTextWidth("+12.0"),
     height: buttonStandardHeight(),
+    // Preserve the rendered UI Gap after Yoga rounds a flexible gauge to LCD dots.
+    marginLeft: oneDot(),
   }, {
     border: 1,
     textShade: 0,
@@ -2642,6 +2988,8 @@ function addAudioOptions(parent, pref) {
   state.equalizerBarBoxes = [];
   state.equalizerLabelBoxes = [];
   state.equalizerValueBoxes = [];
+  state.volumeGaugeBox = null;
+  state.volumeValueBox = null;
   const output = optionGroup(parent, "OUTPUT");
   optionToggle(output, "MONO OUTPUT", pref.monoEnabled === true,
     () => setPreference("monoEnabled", pref.monoEnabled !== true, true));
@@ -2660,25 +3008,27 @@ function addAudioOptions(parent, pref) {
       const box = state.volumeGaugeBox;
       if (!box) return;
       const point = logicalPoint(event);
-      const fraction = Math.max(0, Math.min(1, (point.x - box.x) / Math.max(1, box.width)));
+      const bounds = linearTrackBounds(box, 10);
+      const fraction = Math.max(0, Math.min(1,
+        (point.x - bounds.left) / Math.max(1, bounds.right - bounds.left)));
       setPreference("appVolume", Math.round(fraction * 10) / 10, true);
     },
     paint(box) {
       state.volumeGaugeBox = box;
-      strokeRect(box.x, box.y, box.width, box.height, 1);
-      const count = 10;
-      const gap = uiGapDots();
-      const segmentWidth = Math.max(1, Math.floor((box.width - 2 - (count - 1) * gap) / count));
-      const active = Math.round(volume * count);
-      for (let index = 0; index < active; index += 1) {
-        fillRect(box.x + 1 + index * (segmentWidth + gap), box.y + 1,
-          segmentWidth, Math.max(1, box.height - 2), 0);
-      }
+      paintGaugeBar(box, volume, 10);
     },
   });
   label(volumeRow, `${Math.round(volume * 100)}%`, {
     width: framedTextWidth("100%"), height: buttonStandardHeight(),
-  }, { textShade: 0, align: "right", inset: controlPaddingDots() });
+    marginLeft: oneDot(),
+  }, {
+    border: BUTTON_BORDER_DOTS,
+    textShade: 0,
+    align: "center",
+    inset: controlPaddingDots(),
+    controlTitle: "VOLUME VALUE",
+    paint(box) { state.volumeValueBox = box; },
+  });
 
   const equalizer = optionGroup(parent, "TEN BAND EQUALIZER");
   optionToggle(equalizer, "EQUALIZER", pref.equalizerEnabled === true,
@@ -2710,20 +3060,26 @@ function addInterfaceOptions(parent, pref) {
   optionToggle(window, "MAIN WINDOW ON TOP", pref.mainWindowAlwaysOnTop === true,
     () => setPreference("mainWindowAlwaysOnTop", pref.mainWindowAlwaysOnTop !== true));
   const motion = optionGroup(parent, "MOTION");
-  optionToggle(motion, "ANIMATIONS", animationEnabled(),
-    () => setPreference("animationsEnabled", !animationEnabled()));
-  optionAdjuster(motion, "ANIMATION DURATION", `${animationDurationMilliseconds()} MS`,
+  optionToggleAdjuster(motion, "ANIMATIONS", "ANIMATION DURATION", animationEnabled(),
+    () => setPreference("animationsEnabled", !animationEnabled()),
+    `${animationDurationMilliseconds()} MS`,
     () => adjustAnimationTime(-50),
     () => adjustAnimationTime(50));
-  optionChoice(motion, "ANIMATION FPS", ANIMATION_FPS_OPTIONS.map((fps) => ({
-    title: String(fps),
-    selected: state.animationFPS === fps,
-    onClick: () => setAnimationFPS(fps),
-  })));
+  optionAdjuster(motion, "ANIMATION FPS", `${state.animationFPS} FPS`,
+    () => setAnimationFPS(Math.max(30, state.animationFPS - 30)),
+    () => setAnimationFPS(Math.min(240, state.animationFPS + 30)));
+}
+
+function setAutoHideEmptyColumns(enabled) {
+  state.autoHideEmptyColumns = enabled === true;
+  saveDisplayOptions();
+  render();
 }
 
 function addLibraryOptions(parent, pref) {
   const fields = optionGroup(parent, "PLAYLIST COLUMNS");
+  optionToggle(fields, "AUTO-HIDE EMPTY COLUMNS", state.autoHideEmptyColumns,
+    () => setAutoHideEmptyColumns(!state.autoHideEmptyColumns));
   configurableColumns.forEach(({ key, title }) => {
     const visibility = pref.columnVisibility || {};
     optionChecklistRow(fields, title, visibility[key] !== false,
@@ -2885,13 +3241,12 @@ function addOptionsContent(parent) {
     optionFrame: "toc",
     paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
-  panelTitle(toc, "OPTIONS");
   const pageButtonWidth = navigationWidth - 2 * uiOptionsInsetDots() / STYLE_SCALE;
   [
     { title: "VIEWBOY", pages: ["DATABASE", "DISPLAY", "INTERFACE", "LIBRARY", "QUEUE", "THEME"] },
     { title: "VGMBoy", pages: ["AUDIO", "DIAGNOSTICS", "METHODS", "PLAYBACK"] },
   ].forEach(({ title, pages }) => {
-    optionOwnerHeading(toc, title);
+    panelTitle(toc, `OPTIONS - ${title}`);
     pages.forEach((page) => pixelButton(toc, page, () => selectOptionsPage(page), {
       width: pageButtonWidth,
       selected: state.optionsPage === page,
@@ -3065,11 +3420,13 @@ function collect(widget, parentX = 0, parentY = 0, output = [], inheritedClip = 
   const translateY = widget.meta.translateY ?? 0;
   widget.meta.frameTranslateX = translateX;
   widget.meta.frameTranslateY = translateY;
+  const x = layoutPixelEdge(parentX + layout.left + translateX);
+  const y = layoutPixelEdge(parentY + layout.top + translateY);
   const box = {
-    x: floor(parentX + layout.left + translateX),
-    y: floor(parentY + layout.top + translateY),
-    width: floor(layout.width),
-    height: floor(layout.height),
+    x,
+    y,
+    width: Math.max(0, layoutPixelEdge(parentX + layout.left + translateX + layout.width) - x),
+    height: Math.max(0, layoutPixelEdge(parentY + layout.top + translateY + layout.height) - y),
   };
   const entry = { widget, box, clip: inheritedClip };
   output.push(entry);
@@ -3087,18 +3444,21 @@ function paintTree(widget, box, inheritedClip = null) {
   const childClip = widget.meta.clipChildren ? intersectBoxes(inheritedClip, box) : inheritedClip;
   for (const child of widget.children) {
     const layout = child.yoga.getComputedLayout();
+    const offsetX = layout.left + (child.meta.frameTranslateX ?? child.meta.translateX ?? 0);
+    const offsetY = layout.top + (child.meta.frameTranslateY ?? child.meta.translateY ?? 0);
+    const x = layoutPixelEdge(box.x + offsetX);
+    const y = layoutPixelEdge(box.y + offsetY);
     paintTree(child, {
-      x: floor(box.x + layout.left + (child.meta.frameTranslateX ?? child.meta.translateX ?? 0)),
-      y: floor(box.y + layout.top + (child.meta.frameTranslateY ?? child.meta.translateY ?? 0)),
-      width: floor(layout.width),
-      height: floor(layout.height),
+      x,
+      y,
+      width: Math.max(0, layoutPixelEdge(box.x + offsetX + layout.width) - x),
+      height: Math.max(0, layoutPixelEdge(box.y + offsetY + layout.height) - y),
     }, childClip);
   }
   paintClip = priorClip;
 }
 
-function paintSelectionAt(y, startY = 0, endY = HEIGHT) {
-  pixels.set(basePixels);
+function paintSelectionBandPixels(y) {
   if (selectionBand && y !== null) {
     const bandTop = floor(y);
     const priorClip = paintClip;
@@ -3113,7 +3473,57 @@ function paintSelectionAt(y, startY = 0, endY = HEIGHT) {
     }
     paintClip = priorClip;
   }
+}
+
+function paintSelectionAt(y, startY = 0, endY = HEIGHT, time = performance.now()) {
+  pixels.set(basePixels);
+  paintSelectionBandPixels(y);
+  paintCheckboxAnimationsAt(time);
   present(startY, endY);
+}
+
+function paintCheckboxAnimationsAt(time) {
+  const boxes = new Map(state.checkboxBoxes.map((entry) => [entry.key, entry.box]));
+  for (const [key, animation] of checkboxAnimations) {
+    const box = boxes.get(key);
+    if (!box) {
+      checkboxAnimations.delete(key);
+      continue;
+    }
+    const progress = Math.max(0, Math.min(1, (time - animation.startedAt) / animation.duration));
+    if (progress >= 1) {
+      checkboxAnimations.delete(key);
+      continue;
+    }
+    const angle = checkboxAngleAt(animation, time);
+    const scale = Math.max(1 / box.width, Math.abs(Math.cos(angle)));
+    const sampleX = box.x > 0 ? box.x - 1 : Math.min(WIDTH - 1, box.x + box.width);
+    for (let y = box.y; y < box.y + box.height; y += 1) {
+      const shade = pixels[y * WIDTH + sampleX] ?? 3;
+      fillRect(box.x, y, box.width, 1, shade);
+    }
+    paintCheckboxFace(box, angle >= Math.PI / 2, scale);
+  }
+}
+
+function animateCheckboxFrame(time) {
+  checkboxAnimationFrame = 0;
+  if (!checkboxAnimations.size) return;
+  if (!animationFrameIsDue(checkboxFrameTiming, time)) {
+    checkboxAnimationFrame = requestAnimationFrame(animateCheckboxFrame);
+    return;
+  }
+  const animatedKeys = new Set(checkboxAnimations.keys());
+  pixels.set(basePixels);
+  paintSelectionBandPixels(selectionYAt(time));
+  paintCheckboxAnimationsAt(time);
+  const paintedKeys = new Set();
+  for (const { key, box } of state.checkboxBoxes) {
+    if (paintedKeys.has(key) || !animatedKeys.has(key)) continue;
+    paintedKeys.add(key);
+    present(box.y, box.y + box.height, box.x, box.x + box.width);
+  }
+  if (checkboxAnimations.size) checkboxAnimationFrame = requestAnimationFrame(animateCheckboxFrame);
 }
 
 function animateSelectionFrame(time) {
@@ -3127,7 +3537,7 @@ function animateSelectionFrame(time) {
   const priorY = selectionAnimation.lastY;
   const y = selectionYAt(time);
   const extent = selectionBand?.height ?? 0;
-  paintSelectionAt(y, Math.min(priorY, y) - 1, Math.max(priorY, y) + extent + 1);
+  paintSelectionAt(y, Math.min(priorY, y) - 1, Math.max(priorY, y) + extent + 1, time);
   selectionAnimation.lastY = y;
   if (!complete) {
     selectionAnimationFrame = requestAnimationFrame(animateSelectionFrame);
@@ -3194,6 +3604,7 @@ function applyLibraryScrollFrame(time) {
 
 function render(animateSelection = false, preserveAnimations = false, frameTime = performance.now()) {
   currentRenderTime = frameTime;
+  state.checkboxBoxes = [];
   state.equalizerBarBoxes = [];
   state.equalizerLabelBoxes = [];
   state.equalizerValueBoxes = [];
@@ -3262,14 +3673,14 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
       duration: selectionDuration,
       lastY: priorY,
     };
-    paintSelectionAt(priorY);
+    paintSelectionAt(priorY, 0, HEIGHT, frameTime);
     selectionAnimationFrame = requestAnimationFrame(animateSelectionFrame);
   } else if (preserveAnimations && priorSelectionAnimation && nextBand) {
     selectionAnimation = priorSelectionAnimation;
-    paintSelectionAt(selectionYAt(frameTime));
+    paintSelectionAt(selectionYAt(frameTime), 0, HEIGHT, frameTime);
   } else {
     selectionAnimation = null;
-    paintSelectionAt(nextBand?.y ?? null);
+    paintSelectionAt(nextBand?.y ?? null, 0, HEIGHT, frameTime);
   }
   const isDragging = pointerInteraction?.kind === "reorder" && pointerInteraction.dragging;
   if ((columnLayoutAnimation || tabLayoutAnimation || reorderAnimation || isDragging)
@@ -3311,12 +3722,13 @@ function visiblePixelsAt(time) {
 
 function cancelScreenLocalAnimations() {
   [selectionAnimationFrame, sidebarAnimationFrame, columnAnimationFrame,
-    equalizerAnimationFrame, libraryScrollFrame, spacingAnimationFrame]
+    equalizerAnimationFrame, checkboxAnimationFrame, libraryScrollFrame, spacingAnimationFrame]
     .forEach((frame) => { if (frame) cancelAnimationFrame(frame); });
   selectionAnimationFrame = 0;
   sidebarAnimationFrame = 0;
   columnAnimationFrame = 0;
   equalizerAnimationFrame = 0;
+  checkboxAnimationFrame = 0;
   libraryScrollFrame = 0;
   spacingAnimationFrame = 0;
   selectionAnimation = null;
@@ -3326,6 +3738,7 @@ function cancelScreenLocalAnimations() {
   reorderAnimation = null;
   reorderPreview = null;
   equalizerAnimations.clear();
+  checkboxAnimations.clear();
   spacingAnimation = null;
   pendingLibraryScrollDelta = 0;
   pointerInteraction = null;
@@ -3489,6 +3902,7 @@ function setAnimationFPS(value) {
     tabLayoutAnimation, reorderAnimation, pointerInteraction, state.sidebarTransition]
     .filter(Boolean).forEach((animation) => { animation.lastFrameAt = Number.NaN; });
   equalizerFrameTiming.lastFrameAt = Number.NaN;
+  checkboxFrameTiming.lastFrameAt = Number.NaN;
   libraryScrollFrameTiming.lastFrameAt = Number.NaN;
   render(false, true);
 }
@@ -4371,6 +4785,11 @@ async function setPreference(key, value, updateAudio = false) {
     };
   }
   state.preferences = { ...prior, ...changes };
+  if (key === "animationsEnabled" && value === false) {
+    checkboxAnimations.clear();
+    if (checkboxAnimationFrame) cancelAnimationFrame(checkboxAnimationFrame);
+    checkboxAnimationFrame = 0;
+  }
   if (key === "randomMode") resetRandomPlaybackState();
   render();
   try {
@@ -4755,6 +5174,19 @@ canvas.addEventListener("keydown", (event) => {
     } else if (/^[0-9:]$/.test(event.key)
       || (state.durationBounds?.allowOpen && /^[OPEN]$/i.test(event.key))) {
       state.durationDraft += event.key.toUpperCase();
+      render();
+    } else return;
+    event.preventDefault();
+    return;
+  }
+  if (state.editingRateBackend) {
+    if (event.key === "Escape") finishPlaybackRateEdit(false);
+    else if (event.key === "Enter" || event.key === "Tab") finishPlaybackRateEdit(true);
+    else if (event.key === "Backspace") {
+      state.rateDraft = Array.from(state.rateDraft).slice(0, -1).join("");
+      render();
+    } else if (/^[0-9/.]$/.test(event.key)) {
+      state.rateDraft += event.key;
       render();
     } else return;
     event.preventDefault();

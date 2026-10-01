@@ -256,7 +256,10 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     animationFrameIsDue,
     animationSettingsSnapshot,
     appStatusAreaSnapshot,
+    autoHiddenColumnSnapshot,
     bitmapFontSnapshot,
+    checkboxAnimationSnapshot,
+    choiceControlLayoutSnapshot,
     contentRowLayoutSnapshot,
     equalizerAnimationSnapshot,
     framebufferShadeSnapshot,
@@ -268,6 +271,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     selectionBandSnapshot,
     spacingReadoutLayoutSnapshot,
     screenTransitionSnapshot,
+    volumeControlSnapshot,
   } = await import('../Sources/ViewBoy/Resources/yoga-app.js');
   const standardFont = bitmapFontSnapshot('STANDARD');
   const microFont = bitmapFontSnapshot('MICRO');
@@ -348,12 +352,14 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(toolbarTargets.filter((target) => target.statusReadout).length, 0,
     'the sidebar and playlist contain no pane-specific footer readouts');
   const globalStatus = appStatusAreaSnapshot();
-  assert.deepEqual(globalStatus.map(({ field }) => field), ['location'],
-    'the redesigned app footer uses one quiet file-location readout');
+  assert.deepEqual(globalStatus.map(({ field }) => field), ['location', 'clock'],
+    'the app footer aligns the active file and playback clock in one row');
   assert.equal(globalStatus[0].text, '/music/a.spc',
     'the footer identifies the selected library file by path and filename');
   assert.equal(globalStatus[0].box.height, bitmapFontSnapshot('MICRO').height,
     'the compact file-location strip occupies one glyph row');
+  assert.equal(globalStatus[1].textAlign, 'right',
+    'the elapsed, song, and playlist clock is right-aligned');
   const transportTargets = ['PREVIOUS', 'PLAY', 'NEXT', 'STOP']
     .map((name) => toolbarTargets.find((target) => target.name === name));
   const modeTargets = ['LONG PLAY', 'REPEAT ONE', 'PLAYLIST RANDOM', 'LIBRARY RANDOM']
@@ -560,8 +566,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(hitTargetSnapshot().filter((target) => target.statusReadout).length, 0,
     'Options has no status footers attached to either pane');
-  assert.deepEqual(appStatusAreaSnapshot().map(({ field }) => field), ['location'],
-    'the same app-wide file-location strip remains below Options');
+  assert.deepEqual(appStatusAreaSnapshot().map(({ field }) => field), ['location', 'clock'],
+    'the file and clock footer remains shared below Options');
   const rollingOptionsPixels = pixelChecksum(canvas.image.data);
   assert.notEqual(rollingOptionsPixels, libraryPixels,
     'Options rolls down over the source screen instead of swapping immediately');
@@ -798,6 +804,12 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the ink control persists the brighter silver high-contrast setting');
   clickPage('QUEUE');
   assert.notEqual(pixelChecksum(canvas.image.data), nightBoyPixels, 'Options sub-pages navigate inside the LCD');
+  const segmentedControls = choiceControlLayoutSnapshot().filter((item) => ['REPEAT', 'RANDOM']
+    .includes(item.title));
+  assert.ok(segmentedControls.length === 2 && segmentedControls.every(({ row, controls }) =>
+    Math.abs(controls.width / row.width - 2 / 3) < 0.02
+      && row.x + row.width - controls.x - controls.width <= 1),
+  'segmented switch groups share a right-aligned two-thirds wrapper');
   globalThis.ViewBoy.dispatch('optionsPage:QUEUE');
   clickTarget('REPEAT ONE');
   await tick();
@@ -808,11 +820,20 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(savedPreferences.at(-1).randomMode, 'off',
     'the frontend-owned Queue page random buttons save their selected mode');
   clickPage('PLAYBACK');
+  const checkedLongPlay = hitTargetSnapshot().find((target) => target.name === 'LONG PLAY');
+  const checkedLongPlayShade = framebufferShadeSnapshot(
+    checkedLongPlay.optionCheckboxBox.x + 2, checkedLongPlay.optionCheckboxBox.y + 2);
   const checkedRowPixels = pixelChecksum(canvas.image.data);
   clickTarget('LONG PLAY');
   await tick();
   assert.equal(savedPreferences.at(-1).longPlayEnabled, false,
     'the VGMBoy Playback page checkbox updates native playback preferences');
+  const uncheckedLongPlay = hitTargetSnapshot().find((target) => target.name === 'LONG PLAY');
+  assert.equal(uncheckedLongPlay.optionCheckboxChecked, false,
+    'the Long Play square now represents the disabled setting');
+  assert.notEqual(framebufferShadeSnapshot(uncheckedLongPlay.optionCheckboxBox.x + 2,
+    uncheckedLongPlay.optionCheckboxBox.y + 2), checkedLongPlayShade,
+  'the square fill changes from on to off in the rendered framebuffer');
   assert.notEqual(pixelChecksum(canvas.image.data), checkedRowPixels,
     'the LCD checkbox square visibly changes when its selected state is toggled');
   clickPage('DIAGNOSTICS');
@@ -896,6 +917,16 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(savedPreferences.at(-1).appVolume, 0.9,
     'the Audio page volume button updates native audio preferences');
+  const volumeControl = volumeControlSnapshot();
+  assert.equal(volumeControl.value, 0.9,
+    'the volume gauge reads the same ten-step output setting');
+  assert.ok(volumeControl.gaugeBox && volumeControl.valueBox
+    && volumeControl.gaugeBox.x < volumeControl.valueBox.x,
+  'the EQ-style volume gauge keeps a separate percentage readout box');
+  assert.equal(volumeControl.tickXs.length, 11,
+    'the volume meter uses evenly divided tick fins like the EQ meters');
+  assert.equal(framebufferShadeSnapshot(volumeControl.valueBox.x, volumeControl.valueBox.y), 1,
+    'the volume percentage uses the standard thin LCD outline');
   clickTarget('EQUALIZER');
   await tick();
   assert.equal(savedPreferences.at(-1).equalizerEnabled, true,
@@ -933,6 +964,21 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(fullBand.gain, 12);
   assert.equal(fullBand.fillWidth, fullBand.maximumFillWidth,
     'the +12 dB endpoint fills the entire tick-aligned range');
+  nextFrameAdvanceMs = 40;
+  clickTarget('EQ 31 HZ', 0, 0.74);
+  await tick();
+  const clickReduction = equalizerAnimationSnapshot(performance.now() + 80)
+    .find((band) => band.index === 0);
+  assert.ok(clickReduction.target < 12 && clickReduction.gain < clickReduction.from
+    && clickReduction.fillWidth < fullBand.fillWidth,
+  'clicking within the filled section animates backward toward its snapped value');
+  await tick();
+  await tick();
+  nextFrameAdvanceMs = 40;
+  clickTarget('EQ 31 HZ', 0, 0.99);
+  await tick();
+  await tick();
+  await tick();
   nextFrameAdvanceMs = 100;
   clickTarget('EQ 31 HZ -');
   await tick();
@@ -1054,7 +1100,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the single duration setting keeps native legacy animation fields synchronized');
   clickTarget('ANIMATION DURATION -');
   await tick();
-  clickTarget('ANIMATION FPS 90');
+  clickTarget('ANIMATION FPS +');
   await tick();
   assert.equal(animationSettingsSnapshot().framesPerSecond, 90,
     'the global animation FPS option is applied');
@@ -1066,8 +1112,22 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the frame gate waits for a 90 FPS interval');
   assert.equal(animationFrameIsDue(ninetyHzGate, 12), true,
     'the frame gate accepts the next 90 FPS update');
-  clickTarget('ANIMATION FPS 60');
+  for (let step = 0; step < 5; step += 1) {
+    clickTarget('ANIMATION FPS +');
+    await tick();
+  }
+  assert.equal(animationSettingsSnapshot().framesPerSecond, 240,
+    'the FPS ticker reaches its 240 FPS ceiling in 30 FPS increments');
+  clickTarget('ANIMATION FPS +');
   await tick();
+  assert.equal(animationSettingsSnapshot().framesPerSecond, 240,
+    'the FPS ticker stays within its ceiling');
+  for (let step = 0; step < 6; step += 1) {
+    clickTarget('ANIMATION FPS -');
+    await tick();
+  }
+  assert.equal(animationSettingsSnapshot().framesPerSecond, 60,
+    'the FPS ticker returns to the standard 60 FPS setting');
   clickTarget('ANIMATIONS');
   await tick();
   assert.equal(animationSettingsSnapshot().enabled, false,
@@ -1139,9 +1199,41 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   globalThis.ViewBoy.dispatch('optionsPage:LIBRARY');
   const playlistColumnChecks = hitTargetSnapshot().filter((target) => target.optionChecklistItem);
   assert.deepEqual(playlistColumnChecks.map((target) => target.name).sort(),
-    ['ARTIST', 'DATE/TIME', 'FILE', 'GAME', 'PATH', 'SIZE'],
-    'Playlist Columns is a plain checkbox list');
-  const fileColumnCheck = playlistColumnChecks.find((target) => target.name === 'FILE');
+    ['ARTIST', 'AUTO-HIDE EMPTY COLUMNS', 'DATE/TIME', 'FILE', 'GAME', 'PATH', 'SIZE'],
+    'Playlist Columns and automatic hiding are plain checkbox rows');
+  const autoHideOption = playlistColumnChecks.find((target) => target.name === 'AUTO-HIDE EMPTY COLUMNS');
+  assert.ok(autoHideOption?.optionCheckboxChecked,
+    'empty metadata columns are automatically hidden by default');
+  clickTargetBox(autoHideOption);
+  const checkboxFlip = checkboxAnimationSnapshot(performance.now() + 100)
+    .find((item) => item.key === 'LIBRARY:AUTO-HIDE EMPTY COLUMNS');
+  assert.ok(checkboxFlip && checkboxFlip.horizontalScale < 0.15,
+    'checkboxes rotate edge-on at the midpoint of the shared-duration flip');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).autoHideEmptyColumns, false,
+    'the automatic empty-column visibility setting persists locally');
+  globalThis.ViewBoy.dispatch('library');
+  await tick();
+  assert.deepEqual(autoHiddenColumnSnapshot(), [],
+    'disabling auto-hide restores every column with no content');
+  globalThis.ViewBoy.dispatch('settings');
+  await tick();
+  clickPage('LIBRARY');
+  clickTarget('AUTO-HIDE EMPTY COLUMNS');
+  const checkedFlip = checkboxAnimationSnapshot(performance.now() + 100)
+    .find((item) => item.key === 'LIBRARY:AUTO-HIDE EMPTY COLUMNS');
+  assert.ok(checkedFlip?.faceChecked && checkedFlip.horizontalScale < 0.15,
+    'the reverse face turns toward the filled square on the return half of the flip');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).autoHideEmptyColumns, true,
+    'auto-hide can be restored from the same checkbox row');
+  globalThis.ViewBoy.dispatch('library');
+  await tick();
+  assert.ok(autoHiddenColumnSnapshot().includes('artist'),
+    'auto-hide removes metadata columns whose values are empty in the active playlist');
+  globalThis.ViewBoy.dispatch('settings');
+  await tick();
+  clickPage('LIBRARY');
+  const fileColumnCheck = hitTargetSnapshot().find((target) => target.name === 'FILE'
+    && target.optionChecklistItem);
   assert.ok(fileColumnCheck, 'the File checkbox is directly selectable as a list row');
   const fileCheckbox = fileColumnCheck.optionCheckboxBox;
   assert.ok(fileColumnCheck.optionCheckboxChecked && fileCheckbox,
@@ -1206,6 +1298,24 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the libgme speed adjuster advances in 1/32 steps');
   assert.equal(reconfigureCalls.at(-1).tempo, 33 / 32,
     'a speed change updates the active native decoder immediately');
+  const libgmeRateInput = hitTargetSnapshot().find((target) => target.name === 'LIBGME RATE INPUT');
+  assert.equal(libgmeRateInput?.editableRateBackend, 'libgme',
+    'the decoder rate appears in an editable framed input');
+  clickTarget('LIBGME RATE INPUT');
+  for (const key of ['1', '5', '/', '1', '6', 'Enter']) typeSearchKey(key);
+  await tick();
+  assert.equal(savedPreferences.at(-1).playbackSpeed.numerator, 15,
+    'a musical fractional tempo accepts a numerator');
+  assert.equal(savedPreferences.at(-1).playbackSpeed.denominator, 16,
+    'a musical fractional tempo accepts and stores its reduced denominator');
+  assert.equal(reconfigureCalls.at(-1).tempo, 15 / 16,
+    'the entered fractional value reaches VGMBoy as the same playback multiplier');
+  globalThis.ViewBoy.dispatch('library');
+  await tick();
+  globalThis.ViewBoy.dispatch('settings');
+  await tick();
+  clickPage('LIBRARY');
+  clickTarget('AUTO-HIDE EMPTY COLUMNS');
   globalThis.ViewBoy.dispatch('library');
   await tick();
   screenWidth = 1400;
@@ -1521,19 +1631,21 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'VIEWBOY', 'VIEWBOY', 'VIEWBOY', 'VIEWBOY', 'VIEWBOY', 'VIEWBOY',
     'VGMBoy', 'VGMBoy', 'VGMBoy', 'VGMBoy',
   ], 'every Options page is visibly assigned to its owning frontend or VGMBoy');
-  assert.deepEqual(optionsStyleSnapshot().filter((item) => item.kind === 'owner')
-    .map((item) => item.name), ['VIEWBOY', 'VGMBoy'],
-  'the dialog presents separate ViewBoy and VGMBoy option groups');
+  assert.deepEqual(optionsStyleSnapshot().filter((item) => item.kind === 'title'
+    && item.name.startsWith('OPTIONS -')).map((item) => item.name),
+  ['OPTIONS - VIEWBOY', 'OPTIONS - VGMBoy'],
+  'the table of contents uses shaded headers for both settings owners');
   clickPage('DISPLAY');
   const optionStyles = optionsStyleSnapshot();
-  const optionsHeading = optionStyles.find((item) => item.kind === 'title' && item.name === 'OPTIONS');
+  const optionsHeading = optionStyles.find((item) => item.kind === 'title'
+    && item.name === 'OPTIONS - VIEWBOY');
   const displayHeading = optionStyles.find((item) => item.kind === 'title' && item.name === 'DISPLAY');
   const screenProfile = optionStyles.find((item) => item.kind === 'group' && item.name === 'SCREEN PROFILE');
   assert.ok(optionsHeading && displayHeading && screenProfile,
     'Options retains the dialog headings and grouped section structure');
-  assert.equal(framebufferShadeSnapshot(displayHeading.box.x + displayHeading.box.width - 2,
-    displayHeading.box.y + 1), 2,
-  'the Options page title keeps its filled LCD heading bar');
+  assert.equal(framebufferShadeSnapshot(optionsHeading.box.x + optionsHeading.box.width - 2,
+    optionsHeading.box.y + 1), 2,
+  'the ViewBoy owner title keeps its filled LCD heading bar');
   assert.equal(framebufferShadeSnapshot(screenProfile.box.x + 1,
     screenProfile.box.y + screenProfile.box.height - 1), 1,
   'Options groups retain their thin enclosing frame');
