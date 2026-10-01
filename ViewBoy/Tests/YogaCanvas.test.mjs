@@ -1720,6 +1720,29 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   });
   assert.ok(optionsContentSnapshot().scrollOffset > 0,
     'wheel input scrolls long Options content inside the framed page');
+  screenWidth = 760;
+  screenHeight = 500;
+  windowListeners.get('resize')();
+  await tick();
+  clickPage('AUDIO');
+  const compactOptions = optionsContentSnapshot();
+  const compactFrames = optionsPaneSnapshot();
+  const compactContentFrame = compactFrames.find((pane) => pane.frame === 'content').box;
+  assert.ok(compactFrames.every(({ box }) => box.x >= 0 && box.y >= 0
+    && box.x + box.width <= compactOptions.screen.width
+    && box.y + box.height <= compactOptions.screen.height),
+  'Options dialog frames stay within a narrower window instead of expanding past the LCD');
+  assert.ok(compactOptions.viewport.x >= compactContentFrame.x
+    && compactOptions.viewport.x + compactOptions.viewport.width
+      <= compactContentFrame.x + compactContentFrame.width
+    && compactOptions.viewport.y >= compactContentFrame.y
+    && compactOptions.viewport.y + compactOptions.viewport.height
+      <= compactContentFrame.y + compactContentFrame.height,
+  'the Options page scroll viewport stays inside its pane after a narrow resize');
+  assert.ok(appStatusAreaSnapshot().every(({ box }) =>
+    box.y >= 0 && box.y + box.height <= compactOptions.screen.height),
+  'the global footer remains on screen after a narrow Options resize');
+  screenWidth = 1400;
   screenHeight = 800;
   windowListeners.get('resize')();
   await tick();

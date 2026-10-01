@@ -3261,6 +3261,9 @@ function addOptionsContent(parent) {
   const toc = makeWidget(parent, {
     direction: FlexDirection.Column,
     width: navigationWidth,
+    flexShrink: 1,
+    minWidth: 0,
+    minHeight: 0,
     gap: uiGap(),
     padding: uiOptionsInsetDots() / STYLE_SCALE,
   }, {
@@ -3286,6 +3289,9 @@ function addOptionsContent(parent) {
   const panel = makeWidget(parent, {
     direction: FlexDirection.Column,
     flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    minHeight: 0,
     gap: uiGap(),
     padding: uiOptionsInsetDots() / STYLE_SCALE,
   }, {
@@ -3298,6 +3304,7 @@ function addOptionsContent(parent) {
     flexGrow: 1,
     flexShrink: 1,
     flexBasis: 0,
+    minWidth: 0,
     minHeight: 0,
     overflow: Overflow.Hidden,
   }, {
@@ -3308,6 +3315,7 @@ function addOptionsContent(parent) {
   const content = makeWidget(viewport, {
     direction: FlexDirection.Column,
     gap: uiSectionGap(),
+    minWidth: 0,
   }, { optionContentBody: true, translateY: -state.optionsScrollOffset });
   state.optionsContentViewportWidget = viewport;
   state.optionsContentBodyWidget = content;
@@ -3413,6 +3421,10 @@ function buildTree() {
   const content = makeWidget(root, {
     direction: FlexDirection.Row,
     flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    minHeight: 0,
     gap: uiGap(),
     alignItems: Align.Stretch,
   });
