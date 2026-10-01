@@ -31,6 +31,16 @@ status report.
   package-level **Source .rsn Hashes** list. Repeat that exact four-item list
   on every track extracted from the RSN, so each track carries a positive
   source identity.
+- **Informational documents** — Preserve source `info.txt` and any additional
+  TXT/HTM documents as package-level UAC assets, byte-for-byte. They are
+  historical source material, not SPC tracks. Do not omit them when rebuilding
+  a package.
+- **Document-derived metadata** — Inspect informational documents and report
+  recurring key/value fields before proposing UAC tags. Do not generically
+  promote colon-delimited lines, overwrite SPC-native tags, or create blank
+  fields. Any Songbase ingestion must preserve the source document/member
+  identity and its checksum; ingest only fields shown to be uniform and useful.
+  Record findings and tag proposals in the per-set dashboard report, not here.
 - **SPC hashes** — Record the same four hashes for each complete, unchanged
   `.spc` under `uac-playable-payload-v1`; UACMan presents these as Stream
   Hashes.
