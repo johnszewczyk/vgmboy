@@ -5,6 +5,11 @@ Set profiles define collection identity and source provenance. Apply the
 package's source format. Format procedures define which native fields are
 recognized and how selected facts map to UAC.
 
+These rules govern the UAC package layer only. AudioMan owns ROM/game-set
+membership, canonical matching, and completeness. Keep actual package tag
+coverage and package review results in AudioMan's separate per-set UAC
+dashboard; do not use this folder as a live status report.
+
 ## Profile Template and Profiles
 
 Copy [`SET-PROFILE-TEMPLATE.md`](SET-PROFILE-TEMPLATE.md) when adding a set

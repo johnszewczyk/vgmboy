@@ -6,9 +6,11 @@ linkage, hash scopes, and identity enrichment.
 
 This document defines input rules for processing SNESMusic.org source data.
 Record actual package coverage, completed tag changes, exceptions, and
-verification results in AudioMan's SNESMusic.org per-set dashboard report;
-use the per-set ledger for operation history. Do not treat this profile as a
-status report.
+verification results in AudioMan's per-set UAC dashboard report; use the
+per-set ledger for operation history. AudioMan owns source-set membership,
+No-Intro matching, and ROM/set completeness. This profile defines only how
+confirmed source and identity values are represented in UAC packages; it is
+not a status report.
 
 ## Scope
 
@@ -19,11 +21,11 @@ status report.
 
 ## Source Authority
 
-- **Package fields** — **Set Name** `SNESMusic.org` and **Set URL**
-  `https://snesmusic.org/v2/torrent.php`. Do not add **Set Collection**.
-- **First-pass eligibility** — This completeness-targeted set may use an
-  ID-confirmed-only batch. Keep unmatched source items in AudioMan's set
-  report until a later identity pass; do not infer exclusion from missing ID.
+- **Package fields** — For confirmed SNESMusic.org-source packages, use **Set
+  Name** `SNESMusic.org` and **Set URL** `https://snesmusic.org/v2/torrent.php`.
+  Keep the physical working set together for this pass; package-level
+  Set Name/Set URL may identify a different confirmed source class. Do not add
+  **Set Collection**.
 - **Source archive** — The original `.rsn`; it contains SPC entries but is not
   itself a UAC member.
 - **Archive hashes** — Keep BLAKE3-256, CRC32/ISO-HDLC, SHA-1, and MD5 for
@@ -41,6 +43,18 @@ status report.
   fields. Any Songbase ingestion must preserve the source document/member
   identity and its checksum; ingest only fields shown to be uniform and useful.
   Record findings and tag proposals in the per-set dashboard report, not here.
+- **Dumper and tagger fields** — Map info-document `Dumped by` to package-level
+  **Dumper**, and `ID666 tags by` to package-level **Taggers**, preserving each
+  exact source value. Keep SPC member-level **Dumper** tags unchanged; the
+  package and member fields have different scopes. Surface mismatches in the
+  AudioMan per-set UAC dashboard for review.
+- **Set source fields** — Normalize URL aliases to the canonical **Set Name**
+  and **Set URL** only after the URL is confirmed as the archive source. A
+  `Downloaded from` claim is evidence, not proof that a site hosted the SPC
+  distribution. Keep the original claim in the bundled info document; do not
+  add a redundant `Downloaded From` tag when Set Name/Set URL represent the
+  reviewed source class. The `modz.lalula.de/snesamp` claims remain a proposed
+  second source class pending confirmation that the site supplied SPC files.
 - **SPC hashes** — Record the same four hashes for each complete, unchanged
   `.spc` under `uac-playable-payload-v1`; UACMan presents these as Stream
   Hashes.
@@ -48,8 +62,9 @@ status report.
   retain **OST Title** separately when present. Record each member's actual
   sub-container version in **Format** (for example, `SPC v.30` or `SPC v.10`).
 - **No-Intro identity** — Keep a positively matched **Game ID** separately
-  from source **Album**. Do not normalize or reconcile source title values in
-  this source-tag pass; leave list-valued or varying cases in the review path.
+  from source **Album**. Copy the ID only after AudioMan has established a
+  positive canonical match; this profile does not define No-Intro matching or
+  set completeness. Leave list-valued and varying source titles for review.
 - **Database enrichment** — Once a package has one positive **Game ID** and
   title conflicts are resolved, apply the database's aggregated metadata to
   its UAC tracks, preserving source-native facts and provenance. Keep unresolved
@@ -74,4 +89,5 @@ status report.
 - **Hash verification** — Verify each source RSN's scoped hashes and its SPC
   member relationships.
 - **Collection report** — Keep counts and exceptions in dated reports under
-  `Reports/`.
+  AudioMan's per-set UAC dashboard, separate from the ROM/set completeness
+  report.

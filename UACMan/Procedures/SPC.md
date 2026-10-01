@@ -63,5 +63,6 @@ sub-container and version together, such as `SPC v.30` or `SPC v.10`.
   member.
 - **Package integrity** — Run `uacman inspect --verify`, then unpack and
   compare member paths, sizes, and source-byte identity.
-- **Collection findings** — Keep counts and exceptions in dated reports under
-  `Reports/`.
+- **Report ownership** — Keep reusable SPC reader/fixture findings in UACMan
+  procedures. Record live set counts, applied tags, and exceptions in
+  AudioMan's per-set UAC dashboard, separate from ROM/set completeness.

@@ -1,11 +1,19 @@
 # Source format to UAC tag procedures
 
-This directory documents source-format-to-UAC mapping. The UACMan GUI reads
-and edits `.uac` manifests only. The UACMan tool can use MetaManCore during
-explicit package creation to read source formats. Apply the shared
+This directory documents source-format-to-UAC mapping and UAC packaging rules.
+The UACMan GUI reads and edits `.uac` manifests only. The UACMan tool can use
+MetaManCore during explicit package creation to read source formats. Apply the shared
 [`BASE-UAC-PROFILE.md`](BASE-UAC-PROFILE.md); each format profile records only
 its reader, field mapping, format-specific exceptions, and required checks.
-Dated set audits belong in `Reports/`.
+
+These profiles are input rules for constructing and reviewing UAC packages;
+they are not ROM-set inventory or completeness protocols. AudioMan owns
+source-set membership, No-Intro matching, source-tree locations, and ROM/game
+set reports. For each conversion, actual UAC tag coverage, package counts,
+exceptions, and completed changes belong in AudioMan's per-set UAC dashboard.
+Keep `Procedures/Reports/` focused on reusable format or field-mapping
+investigations and proposed-tag previews; do not use it as a duplicate status
+report for a live UAC set.
 
 Platform identity uses one canonical package-level value. Apply the approved
 names and source-label mappings in [`PLATFORMS.md`](PLATFORMS.md).
@@ -36,7 +44,7 @@ been reviewed.
 | `psf-family` | Profile pending | Document PSF, PSF2, SSF, USF, and 2SF tags and dependencies. |
 | `gsf` | Profile pending | Document tags, PSFLib dependencies, and GBA header facts. |
 | `qsf` | Profile pending | Document tags, QSound blocks, and QSFLib dependencies. |
-| `spc` | Procedure complete | See [`SPC.md`](SPC.md) and the SNESMusic.org audit report. |
+| `spc` | Procedure complete | See [`SPC.md`](SPC.md); live set coverage and tag outcomes are reported by AudioMan per set. |
 | `sid` | Profile pending | Document PSID/RSID header and raw-header retention. |
 | `ape` | Profile pending | Document APEv2/ID3 tags, seek table, and sample-count duration. |
 | `adx` | Profile pending | Document ADX header and loop timing. |
@@ -79,10 +87,11 @@ been reviewed.
 4. Copy [`Sets/SET-PROFILE-TEMPLATE.md`](Sets/SET-PROFILE-TEMPLATE.md) for a
    new set profile. Use its standard headings and keep set-specific identity
    and provenance rules out of format field tables.
-5. For each collection conversion, write a dated report under `Reports/` with
-   package/member counts, field coverage, diagnostics, version inventory,
-   identity/hash checks, review findings, and validation evidence. Do not put
-   collection-specific counts in an evergreen format procedure.
+5. For each collection conversion, refresh the AudioMan per-set UAC dashboard
+   with package/member counts, field coverage, diagnostics, identity/hash
+   checks, review findings, and validation evidence. Do not put live-set
+   output counts in an evergreen format procedure or duplicate them as a
+   UACMan status report.
 6. Promote a register row from pending only after its profile describes the
    complete reader-to-UAC mapping and has a verified collection report or
    an explicit format fixture report.

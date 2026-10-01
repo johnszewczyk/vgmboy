@@ -6,9 +6,10 @@ linkage, hash scopes, and identity enrichment.
 
 This document defines input rules for processing SNESMusic.org source data.
 Record actual package coverage, completed tag changes, exceptions, and
-verification results in AudioMan's SNESMusic.org per-set dashboard report;
-use the per-set ledger for operation history. Do not treat this profile as a
-status report.
+verification results in AudioMan's per-set UAC dashboard report; use the
+per-set ledger for operation history. AudioMan's ROM/set report remains the
+authority for source membership, No-Intro identity, and completeness. This
+profile defines only how confirmed values are represented in UAC packages.
 
 ## Scope
 
@@ -20,10 +21,10 @@ status report.
 ## Source Authority
 
 - **Package fields** — **Set Name** `SNESMusic.org` and **Set URL**
-  `https://snesmusic.org/v2/torrent.php`. Do not add **Set Collection**.
-- **First-pass eligibility** — This completeness-targeted set may use an
-  ID-confirmed-only batch. Keep unmatched source items in AudioMan's set
-  report until a later identity pass; do not infer exclusion from missing ID.
+  `https://snesmusic.org/v2/torrent.php` for confirmed SNESMusic.org-source
+  packages. Keep the physical working set together for this pass; package-level
+  Set Name/Set URL may identify a different confirmed source class. Do not add
+  **Set Collection**.
 - **Source archive** — The original `.rsn`; it contains SPC entries but is not
   itself a UAC member.
 - **Archive hashes** — Keep BLAKE3-256, CRC32/ISO-HDLC, SHA-1, and MD5 for
@@ -34,25 +35,28 @@ status report.
 - **SPC hashes** — Record the same four hashes for each complete, unchanged
   `.spc` under `uac-playable-payload-v1`; UACMan presents these as Stream
   Hashes.
+- **Informational document fields** — Keep each source `info.txt` as a
+  byte-preserved package asset. Map `Dumped by` to package-level **Dumper** and
+  `ID666 tags by` to package-level **Taggers**, retaining the exact values.
+  Keep member-level SPC **Dumper** tags unchanged; the two scopes may differ.
+  Do not retain external metadata sidecars once their useful structured values
+  have been surfaced in the UAC; the bundled source document remains evidence.
+- **Source URL claims** — Treat `Downloaded from` as a claim about acquisition,
+  not proof of which archive set supplied the files. Canonicalize aliases to
+  **Set Name** and **Set URL** only after the source class is confirmed. Keep
+  the exact original claim in `info.txt`; do not add a redundant
+  **Downloaded From** tag.
 - **Track fields** — Map each SPC source **Game** name to track **Album**;
   retain **OST Title** separately when present. Record each member's actual
   sub-container version in **Format** (for example, `SPC v.30` or `SPC v.10`).
-- **No-Intro identity** — Keep a positively matched **Game ID** separately
-  from source **Album**. Do not normalize or reconcile source title values in
-  this source-tag pass; leave list-valued or varying cases in the review path.
+- **Game ID field** — Copy **Game ID** only after AudioMan's ROM/set process
+  establishes a positive canonical match. The package profile does not define
+  No-Intro matching, source-set membership, or completeness rules. Keep
+  **Game ID** separate from source **Album**.
 - **Database enrichment** — Once a package has one positive **Game ID** and
-  title conflicts are resolved, apply the database's aggregated metadata to
-  its UAC tracks, preserving source-native facts and provenance. Keep unresolved
-  or conflicting work out of the completed queue until reviewed. After the
-  completed UAC is verified, its derived working item may move to `_done`;
-  this does not authorize retiring the original RSN or its source-state record.
-
-## Identity Enrichment
-
-- **Identity source** — Use the AudioMan canonical-game database populated
-  from the No-Intro SNES DAT.
-- **Match rule** — Apply its result only after a positive, unique match under
-  the Base Set Profile. Keep unresolved releases unresolved.
+  title conflicts are resolved, apply the approved aggregate metadata to UAC
+  tracks while preserving source-native facts and provenance. Identity matching
+  and review-queue decisions remain in AudioMan.
 
 ## Set Procedures
 
@@ -63,5 +67,6 @@ status report.
 
 - **Hash verification** — Verify each source RSN's scoped hashes and its SPC
   member relationships.
-- **Collection report** — Keep counts and exceptions in dated reports under
-  `Reports/`.
+- **UAC output report** — Record actual UAC tag coverage and exceptions in
+  AudioMan's per-set UAC dashboard, separate from the ROM/set completeness
+  report.

@@ -70,5 +70,7 @@ Store the canonical platform once as structural
 - **Package verification** — Run `uacman inspect --verify`; check roles,
   paths, sizes, field coverage, CUE identity, playlist order, and positive
   loop objects.
-- **Collection report** — Record counts and unresolved mappings in a dated
-  report under `Reports/`.
+- **Report ownership** — Keep reusable CD-XA/Red Book reader and fixture
+  findings in UACMan procedures. Record live UAC package counts and unresolved
+  mappings in AudioMan's per-set UAC dashboard, separate from ROM/set
+  completeness.
