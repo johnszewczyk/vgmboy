@@ -40,6 +40,12 @@ status report.
 - **No-Intro identity** — Keep a positively matched **Game ID** separately
   from source **Album**. Do not normalize or reconcile source title values in
   this source-tag pass; leave list-valued or varying cases in the review path.
+- **Database enrichment** — Once a package has one positive **Game ID** and
+  title conflicts are resolved, apply the database's aggregated metadata to
+  its UAC tracks, preserving source-native facts and provenance. Keep unresolved
+  or conflicting work out of the completed queue until reviewed. After the
+  completed UAC is verified, its derived working item may move to `_done`;
+  this does not authorize retiring the original RSN or its source-state record.
 
 ## Identity Enrichment
 
