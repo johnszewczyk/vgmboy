@@ -107,6 +107,8 @@ const standardGlyphs = {
   ")": ["01000", "00100", "00010", "00010", "00010", "00100", "01000"],
   "<": ["00010", "00100", "01000", "10000", "01000", "00100", "00010"],
   ">": ["01000", "00100", "00010", "00001", "00010", "00100", "01000"],
+  "←": ["00100", "01000", "11111", "01000", "00100", "00000", "00000"],
+  "→": ["00100", "00010", "11111", "00010", "00100", "00000", "00000"],
   "|": ["00100", "00100", "00100", "00100", "00100", "00100", "00100"],
   "=": ["00000", "11111", "00000", "11111", "00000", "00000", "00000"],
   "#": ["01010", "01010", "11111", "01010", "11111", "01010", "01010"],
@@ -172,6 +174,8 @@ const microGlyphs = {
   "|": ["010", "010", "010", "010", "010"],
   "↑": ["010", "101", "010", "010", "010"],
   "↓": ["010", "010", "010", "101", "010"],
+  "←": ["010", "100", "111", "100", "010"],
+  "→": ["010", "001", "111", "001", "010"],
   "=": ["000", "111", "000", "111", "000"],
   "#": ["101", "111", "101", "111", "101"],
   "•": ["000", "000", "010", "000", "000"],
@@ -1204,13 +1208,13 @@ function oneDot() {
 
 function libraryToolbarItems() {
   return [
-    { title: "LIB", view: "LIBRARY", onClick: () => { void setSidebarMode("consoles"); selectSidebarView("LIBRARY"); } },
-    { title: "PATH", view: "PATHS", onClick: () => { void setSidebarMode("paths"); selectSidebarView("LIBRARY"); } },
-    { title: "Q", view: "QUEUE", onClick: () => selectSidebarView("QUEUE") },
+    { title: "LIB", view: "LIBRARY", onClick: () => { void setSidebarMode("consoles"); } },
+    { title: "PATH", view: "PATHS", onClick: () => { void setSidebarMode("paths"); } },
+    { title: "QUEUE", view: "QUEUE", onClick: () => selectSidebarView("QUEUE") },
     { title: "FAV", view: "FAVORITES", onClick: () => selectSidebarView("FAVORITES") },
     { title: "HIST", view: "HISTORY", controlTitle: "HISTORY", onClick: () => { void showPlaybackHistory(); } },
-    { title: "OPEN", onClick: () => openLocalPath() },
-    { title: "SYNC", onClick: () => loadCatalog() },
+    { title: "OPEN…", controlTitle: "OPEN LOCAL PATH", onClick: () => openLocalPath() },
+    { title: "RELOAD", controlTitle: "RELOAD CATALOG", onClick: () => loadCatalog() },
     { title: "OPT", controlTitle: "OPTIONS", onClick: () => openOptionsScreen() },
   ];
 }
@@ -3360,13 +3364,11 @@ function buildTree() {
       direction: FlexDirection.Row,
       alignItems: Align.Stretch,
     });
-    makeWidget(toolbarStage, { flexGrow: 1, minWidth: 0 });
     const toolbarGroup = makeWidget(toolbarStage, {
       direction: FlexDirection.Column,
       width: toolbarWidth,
       gap: uiGap(),
     });
-    makeWidget(toolbarStage, { flexGrow: 1, minWidth: 0 });
 
     const fillButton = (parent, text, onClick, style = {}) => pixelButton(parent, text, onClick, {
       width: 0,
@@ -3378,16 +3380,16 @@ function buildTree() {
     });
     const transport = controlRow(toolbarGroup, { height: toolbarHeight, gap: uiGap() });
     const transportLabels = state.transportSymbols
-      ? { previous: "<<", play: state.playing ? "||" : ">", next: ">>", stop: "[]" }
-      : { previous: "PREV", play: state.playing ? "PAUSE" : "PLAY", next: "NEXT", stop: "STOP" };
+      ? { previous: "←", stop: "[]", play: state.playing ? "||" : ">", next: "→" }
+      : { previous: "PREV", stop: "STOP", play: state.playing ? "PAUSE" : "PLAY", next: "NEXT" };
     fillButton(transport, transportLabels.previous, () => selectPrevious(), {
       controlTitle: "PREVIOUS",
     });
+    fillButton(transport, transportLabels.stop, () => stopPlayback(), { controlTitle: "STOP" });
     fillButton(transport, transportLabels.play, () => togglePlaying(), {
       controlTitle: state.playing ? "PAUSE" : "PLAY",
     });
     fillButton(transport, transportLabels.next, () => selectNext(), { controlTitle: "NEXT" });
-    fillButton(transport, transportLabels.stop, () => stopPlayback(), { controlTitle: "STOP" });
 
     const playbackModes = controlRow(toolbarGroup, { height: toolbarHeight, gap: uiGap() });
     fillButton(playbackModes, "LP", () => toggleLongPlay(), {
@@ -5433,8 +5435,8 @@ window.ViewBoy = Object.freeze({
       case "closePlaylistTab": closePlaylistTab(); break;
       case "openPath": openLocalPath(); break;
       case "settings": toggleOptionsScreen(); break;
-      case "sidebarPaths": void setSidebarMode("paths").then(() => selectSidebarView("LIBRARY")); break;
-      case "sidebarConsoles": void setSidebarMode("consoles").then(() => selectSidebarView("LIBRARY")); break;
+      case "sidebarPaths": void setSidebarMode("paths"); break;
+      case "sidebarConsoles": void setSidebarMode("consoles"); break;
       case "sidebarDiskPath": openLocalPath(); break;
       case "favoritesPlaylist": selectSidebarView("FAVORITES"); break;
       case "playbackHistory": void showPlaybackHistory(); break;

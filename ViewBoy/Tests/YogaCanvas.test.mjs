@@ -362,7 +362,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the compact file-location strip occupies one glyph row');
   assert.equal(globalStatus[1].textAlign, 'right',
     'the elapsed, song, and playlist clock is right-aligned');
-  const transportTargets = ['PREVIOUS', 'PLAY', 'NEXT', 'STOP']
+  const transportTargets = ['PREVIOUS', 'STOP', 'PLAY', 'NEXT']
     .map((name) => toolbarTargets.find((target) => target.name === name));
   const modeTargets = ['LONG PLAY', 'REPEAT ONE', 'PLAYLIST RANDOM', 'LIBRARY RANDOM']
     .map((name) => toolbarTargets.find((target) => target.name === name));
@@ -377,11 +377,19 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     - Math.min(...modeTargets.map((target) => target.box.width)) <= 1,
     'playback methods share their toolbar width evenly');
   assert.ok(Math.abs(transportTargets[0].box.x - modeTargets[0].box.x) <= 1,
-    'the centered half-width wrapper aligns both toolbar rows');
+    'the left-aligned half-width wrapper aligns both toolbar rows');
+  assert.ok(transportTargets[0].box.x < canvas.width / dotsPerCell() / 4,
+    'transport starts at the left app inset instead of being centered');
   assert.ok(toolbarTargets.some((target) => target.name === 'OPTIONS'),
     'Options remains reachable from the sidebar controls');
   assert.ok(toolbarTargets.some((target) => target.name === 'HISTORY'),
     'the sidebar exposes the shared Playback History view alongside Library and Queue');
+  assert.ok(toolbarTargets.some((target) => target.name === 'QUEUE'),
+    'the queue action uses its full label');
+  assert.ok(toolbarTargets.some((target) => target.name === 'OPEN LOCAL PATH'),
+  'the local path picker action is clearly named');
+  assert.ok(toolbarTargets.some((target) => target.name === 'RELOAD CATALOG'),
+  'the catalog reload action is clearly named');
   const defaultHeader = toolbarTargets.find((target) => target.columnHeader && target.name === '#');
   assert.ok(defaultHeader, 'the numbered playlist heading is visible');
   const firstPlaylistBody = toolbarTargets.find((target) => target.trackIndex === 0
@@ -1776,11 +1784,24 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(databaseReloadCount, 1, 'Reload Library requests a fresh native catalog projection');
 
-  globalThis.ViewBoy.dispatch('sidebarPaths');
+  canvas.listeners.get('keydown')({
+    key: 'ArrowDown', code: 'ArrowDown', metaKey: false, ctrlKey: false,
+    altKey: false, shiftKey: false, preventDefault() {},
+  });
+  const selectionBeforePathMode = selectionBandSnapshot();
+  const selectedTrackBeforePathMode = hitTargetSnapshot().find((target) =>
+    Number.isInteger(target.trackIndex) && target.box.y === selectionBeforePathMode.y + 1)?.trackIndex;
+  assert.equal(selectedTrackBeforePathMode, 1, 'the playlist cursor is moved off its first row before switching sidebar mode');
+  clickTarget('PATH');
   await tick();
   await tick();
   assert.ok(hitTargetSnapshot().some((target) => target.name === 'SUB'),
-    'the Path View action switches the sidebar to its catalog Path view');
+    'the Paths button switches the sidebar to its catalog Path view');
+  const selectionAfterPathMode = selectionBandSnapshot();
+  const selectedTrackAfterPathMode = hitTargetSnapshot().find((target) =>
+    Number.isInteger(target.trackIndex) && target.box.y === selectionAfterPathMode.y + 1)?.trackIndex;
+  assert.equal(selectedTrackAfterPathMode, selectedTrackBeforePathMode,
+    'switching the sidebar to Paths preserves the playlist cursor');
   const musicRow = hitTargetSnapshot().find((target) => target.name === 'music');
   const subRow = hitTargetSnapshot().find((target) => target.name === 'SUB');
   assert.ok(musicRow && subRow, 'the Path root and its first folder are visible');
