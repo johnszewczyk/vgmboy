@@ -2599,7 +2599,25 @@
       renderMembers();
     }
   });
+  function submitEditableRowOnEnter(event) {
+    const field = event.target;
+    if (!(field instanceof HTMLInputElement) || field.type !== "text" || field.disabled || field.readOnly) return false;
+    if (event.key !== "Enter" || event.isComposing || event.keyCode === 229 || event.repeat || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return false;
+    const row = field.closest("[data-tag-row], [data-file-tag-row], [data-multiple-entry], [data-tag-analyzer-match], [data-new-tag-row]");
+    if (!row) return false;
+    const action = row.matches("[data-tag-row]") ? "commitTagRow"
+      : row.matches("[data-file-tag-row]") ? "commitFileTag"
+      : row.matches("[data-multiple-entry]") ? "commitMultipleValueRow"
+      : row.matches("[data-tag-analyzer-match]") ? "commitTagAnalyzerMatch"
+      : "createPackageTag";
+    const submit = row.querySelector(`[data-action="${action}"]`);
+    if (!submit || submit.disabled) return false;
+    event.preventDefault();
+    submit.click();
+    return true;
+  }
   document.addEventListener("keydown", event => {
+    if (submitEditableRowOnEnter(event)) return;
     if (event.key === "Escape") {
       if (trackContextMenu) { closeTrackContextMenu(); return; }
       const popup = $("[data-multiple-values-popup]:not([hidden])");

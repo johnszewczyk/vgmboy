@@ -146,9 +146,11 @@ without rewriting them.
 
 Pack Tags edits use canonical table rows; its final draft row adds a
 package-level string tag, and existing rows can be renamed, edited, submitted,
-or deleted. The **New Tag** page adds one string tag to a chosen package or
-track scope; selected-track mode requires at least one selected track. With a
-collection open, selected-package mode edits only the package metadata map in
+or deleted. Press **Enter** in a single-line editable field to submit that
+row; multiline JSON editors keep Enter for line breaks. The **New Tag** page
+adds one string tag to a chosen package or track scope; selected-track mode
+requires at least one selected track. With a collection open, selected-package
+mode edits only the package metadata map in
 each selected `.uac` manifest. **Set value** adds or replaces the named field,
 **Fill missing** preserves existing non-empty values, and **Remove** deletes
 that package field. These changes share the normal Save/Revert controls; saving
