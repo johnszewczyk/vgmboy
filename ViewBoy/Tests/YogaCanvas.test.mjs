@@ -24,7 +24,8 @@ const canvas = {
 };
 const status = { textContent: '' };
 let screenWidth = 800;
-const screen = { getBoundingClientRect() { return { width: screenWidth, height: 800 }; } };
+let screenHeight = 800;
+const screen = { getBoundingClientRect() { return { width: screenWidth, height: screenHeight }; } };
 const windowListeners = new Map();
 const calls = [];
 const audioConfigCalls = [];
@@ -266,6 +267,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     hitTargetSnapshot,
     lcdDotSizeSnapshot,
     optionsPaneSnapshot,
+    optionsContentSnapshot,
     optionsStyleSnapshot,
     reorderAnimationSnapshot,
     selectionBandSnapshot,
@@ -401,6 +403,14 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(selectionBand.height, selectedPlaylistRow.box.height + 2,
     'the playlist selection bar extends one LCD dot above and below its text row');
   const selectedSidebarRow = toolbarTargets.find((target) => target.sidebarSelection);
+  const searchField = toolbarTargets.find((target) => target.searchField);
+  assert.equal(searchField?.textShade, 2,
+    'the inactive Search Library placeholder uses the lightest visible Game Boy tone');
+  const firstSearchRow = microFont.glyphs.S.findIndex((row) => row.includes('1'));
+  const firstSearchColumn = microFont.glyphs.S[firstSearchRow].indexOf('1');
+  assert.equal(framebufferShadeSnapshot(searchField.box.x + searchField.textInset + firstSearchColumn,
+    searchField.box.y + Math.floor((searchField.box.height - microFont.height) / 2) + firstSearchRow), 2,
+  'the placeholder glyph pixels are painted with the selected muted LCD tone');
   assert.ok(selectedSidebarRow, 'the selected library row has an LCD selection bar');
   const sidebarBarX = selectedSidebarRow.box.x + selectedSidebarRow.box.width - 2;
   assert.equal(framebufferShadeSnapshot(sidebarBarX, selectedSidebarRow.box.y - 1), 2,
@@ -1649,6 +1659,60 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(framebufferShadeSnapshot(screenProfile.box.x + 1,
     screenProfile.box.y + screenProfile.box.height - 1), 1,
   'Options groups retain their thin enclosing frame');
+  clickPage('INTERFACE');
+  const currentChromeGap = JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiChromeGapDots;
+  for (let step = currentChromeGap; step < 8; step += 1) {
+    clickTarget('UI CHROME GAP +');
+    await tick();
+  }
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiChromeGapDots, 8,
+    'the Options sizing check uses the largest shared UI Gap');
+  screenHeight = 620;
+  windowListeners.get('resize')();
+  await tick();
+  clickPage('AUDIO');
+  const shortAudioViewport = optionsContentSnapshot();
+  const shortPanes = optionsPaneSnapshot();
+  const shortContentFrame = shortPanes.find((pane) => pane.frame === 'content').box;
+  const shortTocFrame = shortPanes.find((pane) => pane.frame === 'toc').box;
+  assert.ok(shortPanes.every(({ box }) => box.x >= 0 && box.y >= 0
+    && box.x + box.width <= shortAudioViewport.screen.width
+    && box.y + box.height <= shortAudioViewport.screen.height),
+  'both Options dialog frames stay within the LCD at the default app-window height and maximum UI Gap');
+  assert.ok(hitTargetSnapshot().filter((target) => target.optionPage).every((target) =>
+    target.box.y >= shortTocFrame.y && target.box.y + target.box.height <= shortTocFrame.y + shortTocFrame.height),
+  'the Options table of contents stays within its frame at the maximum UI Gap');
+  assert.ok(shortAudioViewport.viewport
+    && shortAudioViewport.viewport.y >= shortContentFrame.y
+    && shortAudioViewport.viewport.y + shortAudioViewport.viewport.height
+      <= shortContentFrame.y + shortContentFrame.height,
+  'the Options page body stays constrained inside its dialog frame at the default window height');
+  assert.ok(shortAudioViewport.scrollMaximum > 0,
+    'tall Options pages scroll within the available viewport rather than stretching the app off screen');
+  assert.ok(appStatusAreaSnapshot().every(({ box }) =>
+    box.y >= 0 && box.y + box.height <= shortAudioViewport.screen.height),
+  'the app footer remains visible below the Options dialog while page content scrolls');
+  const resizeRect = canvas.getBoundingClientRect();
+  canvas.listeners.get('wheel')({
+    clientX: resizeRect.width * (shortAudioViewport.viewport.x + shortAudioViewport.viewport.width / 2)
+      / shortAudioViewport.screen.width,
+    clientY: resizeRect.height * (shortAudioViewport.viewport.y + shortAudioViewport.viewport.height / 2)
+      / shortAudioViewport.screen.height,
+    deltaX: 0,
+    deltaY: 80,
+    deltaMode: 0,
+    preventDefault() { this.defaultPrevented = true; },
+  });
+  assert.ok(optionsContentSnapshot().scrollOffset > 0,
+    'wheel input scrolls long Options content inside the framed page');
+  screenHeight = 800;
+  windowListeners.get('resize')();
+  await tick();
+  clickPage('INTERFACE');
+  for (let step = 0; step < 4; step += 1) {
+    clickTarget('UI CHROME GAP -');
+    await tick();
+  }
   clickPage('LIBRARY');
   assert.ok(optionsStyleSnapshot().some((item) => item.kind === 'checklist'),
     'Playlist Columns stays a plain checkbox list inside the restored dialog');

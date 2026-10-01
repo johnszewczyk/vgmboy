@@ -305,6 +305,11 @@ const state = {
     : Number(savedDisplayOptions.animationFPS) === 144 ? 150 : DEFAULT_ANIMATION_FPS,
   searchQuery: "",
   searchFocused: false,
+  optionsScrollOffset: 0,
+  optionsScrollMaximum: 0,
+  optionsContentViewportBox: null,
+  optionsContentViewportWidget: null,
+  optionsContentBodyWidget: null,
   transportSymbols: savedDisplayOptions.transportSymbols === true,
   optionsPage: "DISPLAY",
   transport: "stopped",
@@ -773,6 +778,7 @@ export function hitTargetSnapshot() {
     trackIndex: Number.isInteger(widget.meta.trackIndex) ? widget.meta.trackIndex : null,
     searchField: widget.meta.searchField === true,
     searchText: widget.meta.searchField ? searchFieldText(box) : null,
+    textShade: widget.meta.searchField ? widget.meta.textShade ?? 0 : null,
     playlistTabTitle: widget.meta.playlistTabTitle === true,
     playlistTabClose: widget.meta.playlistTabClose === true,
     activePlaylistTab: widget.meta.activePlaylistTab === true,
@@ -1064,6 +1070,7 @@ function makeWidget(parent, style = {}, meta = {}) {
   if (style.width !== undefined) yoga.setWidth(style.width * STYLE_SCALE);
   if (style.widthPercent !== undefined) yoga.setWidthPercent(style.widthPercent);
   if (style.minWidth !== undefined) yoga.setMinWidth(style.minWidth * STYLE_SCALE);
+  if (style.minHeight !== undefined) yoga.setMinHeight(style.minHeight * STYLE_SCALE);
   if (style.minWidthPercent !== undefined) yoga.setMinWidthPercent(style.minWidthPercent);
   if (style.maxWidth !== undefined) yoga.setMaxWidth(style.maxWidth * STYLE_SCALE);
   if (style.maxWidthPercent !== undefined) yoga.setMaxWidthPercent(style.maxWidthPercent);
@@ -1847,6 +1854,18 @@ export function optionsPaneSnapshot() {
     .map(({ widget, box }) => ({ frame: widget.meta.optionFrame, box: { ...box } }));
 }
 
+export function optionsContentSnapshot() {
+  const viewport = layoutEntries.find(({ widget }) => widget.meta.optionContentViewport)?.box;
+  const body = layoutEntries.find(({ widget }) => widget.meta.optionContentBody)?.box;
+  return {
+    viewport: viewport ? { ...viewport } : null,
+    body: body ? { ...body } : null,
+    scrollOffset: state.optionsScrollOffset,
+    scrollMaximum: state.optionsScrollMaximum,
+    screen: { width: WIDTH, height: HEIGHT },
+  };
+}
+
 export function optionsStyleSnapshot() {
   return layoutEntries.flatMap(({ widget, box }) => {
     if (widget.meta.optionPanelTitle) {
@@ -2191,7 +2210,8 @@ function addLibraryPane(parent) {
   label(library, "SEARCH LIBRARY", {
     height: buttonStandardHeight(),
   }, {
-    textShade: 0,
+    textShade: state.searchQuery || state.searchFocused
+      ? 0 : state.theme === "GAMEBOY" ? 2 : 1,
     inset: controlPaddingDots(),
     border: 1,
     fill: state.searchFocused ? 2 : undefined,
@@ -3220,6 +3240,7 @@ function addDatabaseOptions(parent) {
 
 function selectOptionsPage(page) {
   state.optionsPage = page;
+  state.optionsScrollOffset = 0;
   render();
   if (page === "DATABASE") void refreshDatabaseOptions();
   if (page === "DIAGNOSTICS" && bridge?.nativePlaybackState) {
@@ -3267,11 +3288,24 @@ function addOptionsContent(parent) {
     paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
   panelTitle(panel, state.optionsPage);
-  const content = makeWidget(panel, {
+  const viewport = makeWidget(panel, {
     direction: FlexDirection.Column,
     flexGrow: 1,
-    gap: uiSectionGap(),
+    flexShrink: 1,
+    flexBasis: 0,
+    minHeight: 0,
+    overflow: Overflow.Hidden,
+  }, {
+    id: "options-content-viewport",
+    clipChildren: true,
+    optionContentViewport: true,
   });
+  const content = makeWidget(viewport, {
+    direction: FlexDirection.Column,
+    gap: uiSectionGap(),
+  }, { optionContentBody: true, translateY: -state.optionsScrollOffset });
+  state.optionsContentViewportWidget = viewport;
+  state.optionsContentBodyWidget = content;
   const pref = state.preferences;
   if (state.optionsPage === "DATABASE") addDatabaseOptions(content);
   else if (state.optionsPage === "THEME") addThemeOptions(content);
@@ -3291,6 +3325,10 @@ function buildTree() {
   state.tableScrollbarBox = null;
   state.tableScrollbarThumb = null;
   state.libraryViewportWidget = null;
+  state.optionsContentViewportWidget = null;
+  state.optionsContentBodyWidget = null;
+  state.optionsScrollMaximum = 0;
+  state.optionsContentViewportBox = null;
   const toolbarHeight = buttonStandardHeight();
   const root = makeWidget(null, {
     direction: FlexDirection.Column,
@@ -3400,6 +3438,13 @@ function buildTree() {
     state.libraryViewportHeight = state.libraryViewportWidget.yoga.getComputedLayout().height;
     const maxLibraryScroll = Math.max(0, state.libraryContentHeight - state.libraryViewportHeight);
     state.libraryScrollOffset = Math.max(0, Math.min(maxLibraryScroll, state.libraryScrollOffset));
+  }
+  if (state.optionsContentViewportWidget && state.optionsContentBodyWidget) {
+    const viewportHeight = state.optionsContentViewportWidget.yoga.getComputedLayout().height;
+    const contentHeight = state.optionsContentBodyWidget.yoga.getComputedLayout().height;
+    state.optionsScrollMaximum = Math.max(0, contentHeight - viewportHeight);
+    state.optionsScrollOffset = Math.max(0, Math.min(state.optionsScrollMaximum, state.optionsScrollOffset));
+    state.optionsContentBodyWidget.meta.translateY = -state.optionsScrollOffset;
   }
   return root;
 }
@@ -3645,6 +3690,7 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
   }
   layoutEntries = collect(widgetTree);
   state.tableViewportBox = boxesById.get("catalog-horizontal-viewport") ?? null;
+  state.optionsContentViewportBox = boxesById.get("options-content-viewport") ?? null;
   paintTree(widgetTree, { x: 0, y: 0, width: WIDTH, height: HEIGHT });
   basePixels = pixels.slice();
   selectionRows = layoutEntries.filter((entry) => Number.isInteger(entry.widget.meta.trackIndex));
@@ -5130,9 +5176,23 @@ canvas.addEventListener("click", (event) => {
 });
 
 canvas.addEventListener("wheel", (event) => {
-  if (state.tab === "SETTINGS") return;
-  event.preventDefault();
   const point = logicalPoint(event);
+  if (state.tab === "SETTINGS") {
+    const viewport = state.optionsContentViewportBox;
+    const withinOptions = viewport && point.x >= viewport.x && point.x < viewport.x + viewport.width
+      && point.y >= viewport.y && point.y < viewport.y + viewport.height;
+    if (!withinOptions || state.optionsScrollMaximum <= 0) return;
+    event.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const cssDelta = event.deltaMode === 1 ? event.deltaY * 16
+      : event.deltaMode === 2 ? event.deltaY * rect.height : event.deltaY;
+    const dotDelta = cssDelta * HEIGHT / Math.max(1, rect.height);
+    state.optionsScrollOffset = Math.max(0,
+      Math.min(state.optionsScrollMaximum, state.optionsScrollOffset + dotDelta));
+    render();
+    return;
+  }
+  event.preventDefault();
   const viewport = state.tableViewportBox;
   const overTable = viewport && point.x >= viewport.x && point.x < viewport.x + viewport.width
     && point.y >= viewport.y && point.y < viewport.y + viewport.height;
