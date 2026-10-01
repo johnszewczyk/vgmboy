@@ -52,10 +52,20 @@ profile defines only how confirmed values are represented in UAC packages.
 - **Track fields** — Map each SPC source **Game** name to track **Album**;
   retain **OST Title** separately when present. Record each member's actual
   sub-container version in **Format** (for example, `SPC v.30` or `SPC v.10`).
-- **Game ID field** — Copy **Game ID** only after AudioMan's ROM/set process
-  establishes a positive canonical match. The package profile does not define
-  No-Intro matching, source-set membership, or completeness rules. Keep
-  **Game ID** separate from source **Album**.
+- **Game title and region** — Identify a game at the canonical No-Intro root
+  title when the SNESMusic.org package title resolves to that one game, even
+  when the source does not identify a regional release. Use the canonical game
+  title in the package filename and **Region** `--` when region is unknown
+  (filename suffix `(--).uac`).
+  Only record a specific region when existing source metadata isolates it; do
+  not infer one from a candidate No-Intro release. Keep source **Album** values
+  unchanged while title/Album conflicts are reviewed.
+- **Game ID field** — Copy a No-Intro **Game ID** only when existing evidence
+  identifies one release ID. A canonical game-root title is sufficient to
+  identify the game for naming and review, but does not justify choosing one
+  regional/revision Game ID from several candidates. The package profile does
+  not define No-Intro matching, source-set membership, or completeness rules.
+  Keep **Game ID** separate from source **Album**.
 - **Database enrichment** — Once a package has one positive **Game ID** and
   title conflicts are resolved, apply the approved aggregate metadata to UAC
   tracks while preserving source-native facts and provenance. Identity matching
