@@ -1340,7 +1340,7 @@ function pixelButton(parent, text, onClick, style = {}) {
     flexBasis: style.flexBasis,
   }, {
     border: 1,
-    fill: style.selected ? 2 : undefined,
+    fill: style.optionPage ? undefined : style.selected ? 2 : undefined,
     textShade: 0,
     inset: controlPaddingDots(),
     align: "center",
@@ -1904,8 +1904,22 @@ export function optionsStyleSnapshot() {
 }
 
 export function selectionBandSnapshot() {
-  return selectionBand ? { x: selectionBand.x, y: selectionBand.y,
-    width: selectionBand.width, height: selectionBand.height } : null;
+  if (!selectionBand) return null;
+  const time = performance.now();
+  const y = selectionYAt(time);
+  const progress = selectionAnimation
+    ? Math.max(0, Math.min(1, (time - selectionAnimation.startedAt) / selectionAnimation.duration))
+    : 1;
+  return {
+    kind: selectionBand.kind,
+    x: selectionBand.x,
+    y: selectionBand.y,
+    animatedY: y,
+    targetY: selectionAnimation?.toY ?? selectionBand.y,
+    animationProgress: progress,
+    width: selectionBand.width,
+    height: selectionBand.height,
+  };
 }
 
 export function reorderAnimationSnapshot(time = performance.now()) {
@@ -3526,9 +3540,13 @@ function paintSelectionBandPixels(y) {
     fillRect(selectionBand.x, bandTop, selectionBand.width, selectionBand.height, 2);
     for (const row of selectionRows) {
       if (row.box.y >= bandTop + selectionBand.height || row.box.y + row.box.height <= bandTop) continue;
-      for (const child of row.widget.children) {
-        const entry = layoutEntries.find((candidate) => candidate.widget === child);
-        if (entry?.widget.meta.paint) entry.widget.meta.paint(entry.box);
+      if (row.widget.meta.optionPage) {
+        row.widget.meta.paint?.(row.box);
+      } else {
+        for (const child of row.widget.children) {
+          const entry = layoutEntries.find((candidate) => candidate.widget === child);
+          if (entry?.widget.meta.paint) entry.widget.meta.paint(entry.box);
+        }
       }
     }
     paintClip = priorClip;
@@ -3708,12 +3726,21 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
   state.optionsContentViewportBox = boxesById.get("options-content-viewport") ?? null;
   paintTree(widgetTree, { x: 0, y: 0, width: WIDTH, height: HEIGHT });
   basePixels = pixels.slice();
-  selectionRows = layoutEntries.filter((entry) => Number.isInteger(entry.widget.meta.trackIndex));
-  const selectedRow = selectionRows.find((entry) => entry.widget.meta.trackIndex === state.selectedTrack);
+  const isOptions = state.tab === "SETTINGS";
+  selectionRows = isOptions
+    ? layoutEntries.filter((entry) => entry.widget.meta.optionPage)
+    : layoutEntries.filter((entry) => Number.isInteger(entry.widget.meta.trackIndex));
+  const selectedRow = isOptions
+    ? selectionRows.find((entry) => entry.widget.meta.controlTitle === state.optionsPage)
+    : selectionRows.find((entry) => entry.widget.meta.trackIndex === state.selectedTrack);
+  const optionsSidebar = isOptions
+    ? layoutEntries.find((entry) => entry.widget.meta.optionFrame === "toc")?.box
+    : null;
   const nextBand = selectedRow ? {
     ...selectedRow.box,
-    y: selectedRow.box.y - 1,
-    height: selectedRow.box.height + 2,
+    kind: isOptions ? "options-page" : "track",
+    ...(isOptions ? {} : { y: selectedRow.box.y - 1, height: selectedRow.box.height + 2 }),
+    ...(optionsSidebar ? { clip: optionsSidebar } : {}),
     ...(selectedRow.clip ? {
       x: selectedRow.clip.x,
       width: selectedRow.clip.width,
@@ -3721,8 +3748,10 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
     } : {}),
   } : null;
   const selectionDuration = animationDurationMilliseconds();
-  const canSlide = animateSelection && animationEnabled() && selectionDuration > 0
+  const canSlide = (animateSelection || nextBand?.kind === "options-page")
+    && animationEnabled() && selectionDuration > 0
     && priorBand && nextBand
+    && priorBand.kind === nextBand.kind
     && priorBand.x === nextBand.x && priorBand.width === nextBand.width
     && priorBand.height === nextBand.height && Math.abs(priorY - nextBand.y) > 0.5;
   selectionBand = nextBand;

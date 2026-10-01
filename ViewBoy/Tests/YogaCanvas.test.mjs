@@ -821,6 +821,13 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'HIGH_CONTRAST',
     'the ink control persists the brighter silver high-contrast setting');
   clickPage('QUEUE');
+  const optionsSelection = selectionBandSnapshot();
+  assert.equal(optionsSelection?.kind, 'options-page',
+    'the Options sidebar uses the shared LCD selection band');
+  assert.notEqual(optionsSelection?.animatedY, optionsSelection?.targetY,
+    'the Options page highlight begins sliding from its previous button');
+  assert.ok(optionsSelection?.animationProgress < 1,
+    'the Options page highlight follows the canonical timed animation');
   assert.notEqual(pixelChecksum(canvas.image.data), nightBoyPixels, 'Options sub-pages navigate inside the LCD');
   const segmentedControls = choiceControlLayoutSnapshot().filter((item) => ['REPEAT', 'RANDOM']
     .includes(item.title));
