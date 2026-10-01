@@ -267,6 +267,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     autoHiddenColumnSnapshot,
     bitmapFontSnapshot,
     checkboxAnimationSnapshot,
+    columnResizePerformanceSnapshot,
     choiceControlLayoutSnapshot,
     contentRowLayoutSnapshot,
     equalizerAnimationSnapshot,
@@ -1406,6 +1407,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     filename: 'INITIAL_FILENAME.SPC-WITH-A-LONG-TAIL-THAT-MUST-FIT-THE-COLUMN.SPC',
   } : track);
   canvas.presentations.length = 0;
+  const reusedColumnTreesBefore = columnResizePerformanceSnapshot().reusedTreeFrames;
   await catalogReloaded();
   await tick();
   await tick();
@@ -1413,7 +1415,15 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the File column expands beyond its default width to fit the longest catalog value');
   assert.ok(canvas.presentations.some((region) => region.width < canvas.image.width
     && region.height < canvas.image.height),
-  'automatic column resize presents only the playlist viewport during its animation frames');
+  'automatic column resize presents only the catalog pane during its animation frames');
+  assert.ok(columnResizePerformanceSnapshot().reusedTreeFrames > reusedColumnTreesBefore,
+    'automatic column resize updates the retained Yoga tree instead of rebuilding it per frame');
+  await new Promise((resolve) => setTimeout(resolve,
+    animationSettingsSnapshot().durationMilliseconds + 80));
+  const optimizedResizePixels = pixelChecksum(canvas.image.data);
+  windowListeners.get('resize')();
+  assert.equal(pixelChecksum(canvas.image.data), optimizedResizePixels,
+    'a clean full render matches the retained resize endpoint without stale moved glyphs');
 
   rows = rows.map((track) => ({ ...track, filename: 'INITIAL_FILENAME.SPC' }));
   await catalogReloaded();

@@ -281,6 +281,7 @@ let suppressFramePresentation = false;
 let optionsReturnTab = "LIBRARY";
 let columnLayoutAnimation = null;
 let lastColumnWidths = null;
+let columnAnimationTreeReusedFrames = 0;
 let tabLayoutAnimation = null;
 let reorderAnimation = null;
 let reorderPreview = null;
@@ -374,6 +375,7 @@ const state = {
   tableScrollbarThumb: null,
   tableViewportWidget: null,
   tableContentWidget: null,
+  catalogPaneWidget: null,
   tableContentMinimumWidth: 0,
   activeGameKey: null,
   expandedSystems: new Set(),
@@ -2036,6 +2038,10 @@ export function reorderAnimationSnapshot(time = performance.now()) {
   };
 }
 
+export function columnResizePerformanceSnapshot() {
+  return { reusedTreeFrames: columnAnimationTreeReusedFrames };
+}
+
 export function framebufferShadeSnapshot(x, y) {
   const column = Math.floor(x);
   const row = Math.floor(y);
@@ -2110,6 +2116,7 @@ function createQueueRow(parent, index, track, columns) {
         width: column.width,
         height: rowHeightValue,
       }, {
+        columnKey: column.key,
         trackIndex: index,
         controlTitle: "FAVORITE",
         onClick: () => {
@@ -2134,6 +2141,7 @@ function createQueueRow(parent, index, track, columns) {
       textShade: 0,
       inset: controlPaddingDots(),
       align: column.rowAlign ?? column.align ?? "left",
+      columnKey: column.key,
       trackIndex: index,
     });
   });
@@ -2469,10 +2477,12 @@ function addCatalogPane(parent) {
     gap: 0,
     padding: uiGapDots(),
   }, {
+    id: "catalog-pane",
     paint(box) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
     },
   });
+  state.catalogPaneWidget = panel;
   {
     const tabRow = controlRow(panel, { gap: uiGap() });
     const tabList = makeWidget(tabRow, {
@@ -3503,6 +3513,7 @@ function addOptionsContent(parent) {
 function buildTree() {
   state.tableViewportWidget = null;
   state.tableContentWidget = null;
+  state.catalogPaneWidget = null;
   state.tableScrollbarBox = null;
   state.tableScrollbarThumb = null;
   state.libraryViewportWidget = null;
@@ -3707,11 +3718,42 @@ function paintSelectionBandPixels(y) {
   }
 }
 
-function paintSelectionAt(y, startY = 0, endY = HEIGHT, time = performance.now(), startX = 0, endX = WIDTH) {
-  pixels.set(basePixels);
+function paintSelectionAt(
+  y,
+  startY = 0,
+  endY = HEIGHT,
+  time = performance.now(),
+  startX = 0,
+  endX = WIDTH,
+  restoreBase = true,
+) {
+  if (restoreBase) pixels.set(basePixels);
   paintSelectionBandPixels(y);
   paintCheckboxAnimationsAt(time);
   present(startY, endY, startX, endX);
+}
+
+function copyFramebufferRegion(destination, source, box) {
+  const left = Math.max(0, Math.floor(box.x));
+  const right = Math.min(WIDTH, Math.ceil(box.x + box.width));
+  const top = Math.max(0, Math.floor(box.y));
+  const bottom = Math.min(HEIGHT, Math.ceil(box.y + box.height));
+  if (right <= left || bottom <= top) return;
+  for (let y = top; y < bottom; y += 1) {
+    const start = y * WIDTH + left;
+    destination.set(source.subarray(start, y * WIDTH + right), start);
+  }
+}
+
+function fillFramebufferRegion(destination, shade, box) {
+  const left = Math.max(0, Math.floor(box.x));
+  const right = Math.min(WIDTH, Math.ceil(box.x + box.width));
+  const top = Math.max(0, Math.floor(box.y));
+  const bottom = Math.min(HEIGHT, Math.ceil(box.y + box.height));
+  if (right <= left || bottom <= top) return;
+  for (let y = top; y < bottom; y += 1) {
+    destination.fill(shade, y * WIDTH + left, y * WIDTH + right);
+  }
 }
 
 function paintCheckboxAnimationsAt(time) {
@@ -3779,12 +3821,92 @@ function animateSelectionFrame(time) {
   }
 }
 
+function repaintColumnLayoutFrame(time) {
+  if (!widgetTree || !state.catalogPaneWidget || !state.tableViewportWidget || !state.tableContentWidget) {
+    return false;
+  }
+
+  currentRenderTime = time;
+  const columns = resolveTableColumns(tableColumns(visibleTracks()), time);
+  const currentHeaderKeys = layoutEntries.filter((entry) => entry.widget.meta.columnHeader)
+    .map((entry) => entry.widget.meta.columnKey);
+  const nextHeaderKeys = columns.map((column) => column.key);
+  if (currentHeaderKeys.length !== nextHeaderKeys.length
+    || currentHeaderKeys.some((key, index) => key !== nextHeaderKeys[index])) return false;
+
+  const columnsByKey = new Map(columns.map((column) => [column.key, column]));
+  const columnCells = layoutEntries.filter((entry) => entry.widget.meta.columnKey);
+  if (!columnCells.length || columnCells.some((entry) => !columnsByKey.has(entry.widget.meta.columnKey))) {
+    return false;
+  }
+  columnCells.forEach((entry) => {
+    const column = columnsByKey.get(entry.widget.meta.columnKey);
+    entry.widget.yoga.setWidth(column.width * STYLE_SCALE);
+  });
+
+  const tableGap = Math.max(0, columns.length - 1) * playlistColumnGap();
+  state.tableContentMinimumWidth = columns.reduce((sum, column) => sum + column.width, 0) + tableGap;
+  const viewportWidth = state.tableViewportWidget.yoga.getComputedLayout().width;
+  state.tableContentWidget.yoga.setWidth(Math.max(
+    state.tableContentMinimumWidth * STYLE_SCALE,
+    viewportWidth,
+  ));
+  widgetTree.yoga.calculateLayout(WIDTH, HEIGHT, Direction.LTR);
+
+  const viewportLayout = state.tableViewportWidget.yoga.getComputedLayout();
+  const contentLayout = state.tableContentWidget.yoga.getComputedLayout();
+  state.tableViewportWidth = Math.floor(viewportLayout.width);
+  state.tableContentWidth = Math.floor(contentLayout.width);
+  state.tableHorizontalMax = Math.max(0, state.tableContentWidth - state.tableViewportWidth);
+  state.tableHorizontalScroll = Math.max(0, Math.min(state.tableHorizontalMax, state.tableHorizontalScroll));
+  state.tableContentWidget.meta.translateX = -state.tableHorizontalScroll;
+
+  boxesById = new Map();
+  hitTargets = [];
+  layoutEntries = collect(widgetTree);
+  state.tableViewportBox = boxesById.get("catalog-horizontal-viewport") ?? null;
+  const paneBox = boxesById.get("catalog-pane");
+  if (!paneBox) return false;
+
+  // The scene background is shade 3. Start clean so shrinking/moving glyphs
+  // cannot leave trails from the previous animation frame.
+  fillFramebufferRegion(pixels, 3, paneBox);
+  const previousClip = paintClip;
+  paintClip = null;
+  paintTree(state.catalogPaneWidget, paneBox, paneBox);
+  paintClip = previousClip;
+  copyFramebufferRegion(basePixels, pixels, paneBox);
+
+  selectionRows = layoutEntries.filter((entry) => Number.isInteger(entry.widget.meta.trackIndex));
+  const selectedTrack = visibleTracks()[state.selectedTrack];
+  const selectedRow = selectedTrack && state.selectedTrackIDs.has(trackID(selectedTrack))
+    ? selectionRows.find((entry) => entry.widget.meta.trackIndex === state.selectedTrack) : null;
+  selectionBand = selectedRow ? {
+    ...selectedRow.box,
+    kind: "track",
+    y: selectedRow.box.y - 1,
+    height: selectedRow.box.height + 2,
+    ...(selectedRow.clip ? {
+      x: selectedRow.clip.x,
+      width: selectedRow.clip.width,
+      clip: selectedRow.clip,
+    } : {}),
+  } : null;
+  paintClip = paneBox;
+  paintSelectionAt(selectionYAt(time), paneBox.y, paneBox.y + paneBox.height,
+    time, paneBox.x, paneBox.x + paneBox.width, false);
+  paintClip = previousClip;
+  columnAnimationTreeReusedFrames += 1;
+  return true;
+}
+
 function animateColumnLayoutFrame(time) {
   columnAnimationFrame = 0;
   const isDragging = pointerInteraction?.kind === "reorder" && pointerInteraction.dragging;
   if (!columnLayoutAnimation && !tabLayoutAnimation && !reorderAnimation && !isDragging) return;
   const resizeOnlyFrame = Boolean(columnLayoutAnimation
-    && !tabLayoutAnimation && !reorderAnimation && !isDragging);
+    && !tabLayoutAnimation && !reorderAnimation && !isDragging
+    && !spacingAnimation && !state.sidebarTransition && !screenTransition);
   const timing = columnLayoutAnimation || tabLayoutAnimation || reorderAnimation || pointerInteraction;
   if (!animationFrameIsDue(timing, time)) {
     columnAnimationFrame = requestAnimationFrame(animateColumnLayoutFrame);
@@ -3799,10 +3921,11 @@ function animateColumnLayoutFrame(time) {
     && time - reorderAnimation.startedAt >= reorderAnimation.duration) reorderAnimation = null;
   if (tabLayoutAnimation
     && time - tabLayoutAnimation.startedAt >= tabLayoutAnimation.duration) tabLayoutAnimation = null;
-  // Only the playlist viewport changes during an automatic column resize.
-  // Preserve the rest of the visible LCD and avoid expanding/blitting those
-  // unchanged pixels on every animation frame.
-  render(false, true, time, resizeOnlyFrame ? "playlist" : null);
+  // Reuse the Yoga tree and repaint only the catalog pane when column widths
+  // are the sole animated property. Other concurrent transitions keep the
+  // general renderer so their separate regions remain synchronized.
+  const reusedTree = resizeOnlyFrame && repaintColumnLayoutFrame(time);
+  if (!reusedTree) render(false, true, time, resizeOnlyFrame ? "playlist" : null);
   if ((columnLayoutAnimation || tabLayoutAnimation || reorderAnimation || isDragging)
     && !columnAnimationFrame) {
     columnAnimationFrame = requestAnimationFrame(animateColumnLayoutFrame);
@@ -3883,7 +4006,7 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
   layoutEntries = collect(widgetTree);
   state.tableViewportBox = boxesById.get("catalog-horizontal-viewport") ?? null;
   state.optionsContentViewportBox = boxesById.get("options-content-viewport") ?? null;
-  const partialBox = partialPresentation === "playlist" ? state.tableViewportBox : null;
+  const partialBox = partialPresentation === "playlist" ? boxesById.get("catalog-pane") : null;
   const presentX = partialBox?.x ?? 0;
   const presentY = partialBox?.y ?? 0;
   const presentEndX = partialBox ? partialBox.x + partialBox.width : WIDTH;
