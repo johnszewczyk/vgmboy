@@ -3749,9 +3749,14 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
   const nextBand = selectedRow ? {
     ...selectedRow.box,
     kind: isOptions ? "options-page" : "track",
-    ...(isOptions ? {} : { y: selectedRow.box.y - 1, height: selectedRow.box.height + 2 }),
+    ...(isOptions ? {
+      x: selectedRow.box.x + 1,
+      y: selectedRow.box.y + 1,
+      width: Math.max(0, selectedRow.box.width - 2),
+      height: Math.max(0, selectedRow.box.height - 2),
+    } : { y: selectedRow.box.y - 1, height: selectedRow.box.height + 2 }),
     ...(optionsSidebar ? { clip: optionsSidebar } : {}),
-    ...(selectedRow.clip ? {
+    ...(selectedRow.clip && !isOptions ? {
       x: selectedRow.clip.x,
       width: selectedRow.clip.width,
       clip: selectedRow.clip,

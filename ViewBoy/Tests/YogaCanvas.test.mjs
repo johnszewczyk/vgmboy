@@ -830,6 +830,19 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the Options page highlight begins sliding from its previous button');
   assert.ok(optionsSelection?.animationProgress < 1,
     'the Options page highlight follows the canonical timed animation');
+  const queuePageButton = hitTargetSnapshot().find((target) =>
+    target.optionPage && target.name === 'QUEUE');
+  assert.deepEqual([
+    optionsSelection.x,
+    optionsSelection.y,
+    optionsSelection.width,
+    optionsSelection.height,
+  ], [
+    queuePageButton.box.x + 1,
+    queuePageButton.box.y + 1,
+    queuePageButton.box.width - 2,
+    queuePageButton.box.height - 2,
+  ], 'the moving Options fill stays inside the button border by exactly one LCD pixel');
   assert.notEqual(pixelChecksum(canvas.image.data), nightBoyPixels, 'Options sub-pages navigate inside the LCD');
   const segmentedControls = choiceControlLayoutSnapshot().filter((item) => ['REPEAT', 'RANDOM']
     .includes(item.title));
