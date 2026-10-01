@@ -26,6 +26,7 @@ const SPACING_DOTS_MIN = 1;
 const SPACING_DOTS_MAX = 8;
 const EQ_BAR_MIN_DOTS = 100;
 const EQ_BAR_INSET_DOTS = 2;
+const REORDER_ENTRY_THRESHOLD_DOTS = 2;
 const EQ_GAIN_MIN_DB = 0;
 const EQ_GAIN_MAX_DB = 12;
 const EQ_GAIN_STEP_DB = 0.5;
@@ -4977,15 +4978,20 @@ function captureReorderPositions(kind) {
   return positions;
 }
 
-function orderWithDraggedItem(keys, sourceKey, targetKey, targetBox, draggedCenter) {
+function orderWithDraggedItem(keys, sourceKey, targetKey, targetBox, pointerX, dragDirection) {
   if (!sourceKey || !targetKey || sourceKey === targetKey) return keys;
   const next = [...keys];
   const sourceIndex = next.indexOf(sourceKey);
   const targetIndex = next.indexOf(targetKey);
   if (sourceIndex < 0 || targetIndex < 0) return keys;
   next.splice(sourceIndex, 1);
-  let insertionIndex = targetIndex
-    + (draggedCenter >= targetBox.x + targetBox.width / 2 ? 1 : 0);
+  const threshold = Math.min(REORDER_ENTRY_THRESHOLD_DOTS, Math.max(1, targetBox.width * 0.05));
+  const insertAfter = dragDirection > 0
+    ? pointerX >= targetBox.x + threshold
+    : dragDirection < 0
+      ? pointerX >= targetBox.x + targetBox.width - threshold
+      : pointerX >= targetBox.x + targetBox.width / 2;
+  let insertionIndex = targetIndex + (insertAfter ? 1 : 0);
   if (sourceIndex < insertionIndex) insertionIndex -= 1;
   next.splice(Math.max(0, Math.min(next.length, insertionIndex)), 0, sourceKey);
   return next;
@@ -5065,11 +5071,11 @@ canvas.addEventListener("pointerdown", (event) => {
       sourceKey,
       originalOrder: currentReorderOrder(itemKind),
       grabOffset: point.x - draggable.box.x,
-      draggedWidth: draggable.box.width,
       startX: point.x,
       startY: point.y,
       lastPointX: point.x,
       pointX: point.x,
+      dragDirection: 0,
       dragging: false,
     };
     canvas.setPointerCapture?.(event.pointerId);
@@ -5086,6 +5092,8 @@ canvas.addEventListener("pointermove", (event) => {
   }
   if (pointerInteraction?.kind === "reorder") {
     const distance = Math.hypot(point.x - pointerInteraction.startX, point.y - pointerInteraction.startY);
+    const horizontalDelta = point.x - pointerInteraction.pointX;
+    if (horizontalDelta !== 0) pointerInteraction.dragDirection = Math.sign(horizontalDelta);
     pointerInteraction.lastPointX = point.x;
     pointerInteraction.pointX = point.x;
     if (distance >= 1) {
@@ -5102,7 +5110,8 @@ canvas.addEventListener("pointermove", (event) => {
           pointerInteraction.sourceKey,
           targetKey,
           dropTarget.box,
-          point.x - pointerInteraction.grabOffset + pointerInteraction.draggedWidth / 2,
+          point.x,
+          pointerInteraction.dragDirection,
         );
         if (!sameOrder(nextOrder, currentReorderOrder(pointerInteraction.itemKind))) {
           const fromX = captureReorderPositions(pointerInteraction.itemKind);

@@ -1453,7 +1453,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   };
   const fileHeader = headerCenter('FILE');
   const titleHeader = headerCenter('TITLE');
-  const titleRightSide = (titleHeader.box.x + titleHeader.box.width * 0.525) / (canvas.width / dotsPerCell());
+  const reorderLogicalWidth = canvas.width / dotsPerCell();
+  const titleRightSide = (titleHeader.box.x + titleHeader.box.width * 0.08) / reorderLogicalWidth;
   sendPointer('pointerdown', fileHeader.x, fileHeader.y);
   nextFrameAdvanceMs = 16;
   sendPointer('pointermove', titleRightSide, titleHeader.y);
@@ -1469,8 +1470,10 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.ok(firstColumnPush.animation.progress < 1
     && firstColumnPush.preview.keys.indexOf('filename') > firstColumnPush.preview.keys.indexOf('title'),
   'a column crossing immediately retargets a live eased push');
-  const titleLeftSide = (pushedTitleHeader.box.x + pushedTitleHeader.box.width * 0.2)
-    / (canvas.width / dotsPerCell());
+  const titleLeftSide = Math.min(titleRightSide * reorderLogicalWidth - 1,
+    pushedTitleHeader.box.x + pushedTitleHeader.box.width - 4) / reorderLogicalWidth;
+  assert.ok(titleLeftSide * reorderLogicalWidth >= pushedTitleHeader.box.x,
+    'the reverse threshold is tested while the pointer remains over the shifted neighbor');
   nextFrameAdvanceMs = 16;
   sendPointer('pointermove', titleLeftSide, pushedTitleHeader.y);
   await advanceAnimationFrames(4);
@@ -1482,15 +1485,17 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   if (!columnReversalSucceeded) sendPointer('pointerup', titleLeftSide, pushedTitleHeader.y);
   assert.ok(columnReversalSucceeded,
     'a live column drag smoothly reverses its push when crossing back over the threshold');
-  const titleRightSideAgain = (easingTitleBack.box.x + easingTitleBack.box.width * 0.8)
-    / (canvas.width / dotsPerCell());
+  const titleRightSideAgain = Math.max(titleLeftSide * reorderLogicalWidth + 1,
+    easingTitleBack.box.x + 3) / reorderLogicalWidth;
   nextFrameAdvanceMs = 16;
   sendPointer('pointermove', titleRightSideAgain, easingTitleBack.y);
   await advanceAnimationFrames(4);
   const columnPushedAgain = reorderAnimationSnapshot();
-  assert.ok(columnPushedAgain.animation?.fromX.title === easingTitleBack.box.x
+  const columnRepushSucceeded = columnPushedAgain.animation?.fromX.title === easingTitleBack.box.x
     && columnPushedAgain.dragging && columnPushedAgain.animation?.progress < 1
-    && columnPushedAgain.preview.keys.indexOf('filename') > columnPushedAgain.preview.keys.indexOf('title'),
+    && columnPushedAgain.preview.keys.indexOf('filename') > columnPushedAgain.preview.keys.indexOf('title');
+  if (!columnRepushSucceeded) sendPointer('pointerup', titleRightSideAgain, easingTitleBack.y);
+  assert.ok(columnRepushSucceeded,
   're-crossing a column threshold smoothly re-targets the push animation');
   sendPointer('pointerup', titleRightSideAgain, easingTitleBack.y);
   const savedColumnOrder = JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).columnOrder;
@@ -1521,7 +1526,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   sendPointer('pointerdown', (sourceTitle.box.x + Math.min(3, sourceTitle.box.width / 3)) / (canvas.width / dotsPerCell()),
     (sourceTitle.box.y + sourceTitle.box.height / 2) / (canvas.height / dotsPerCell()));
   nextFrameAdvanceMs = 16;
-  sendPointer('pointermove', (destinationTab.box.x + destinationTab.box.width * 0.85) / (canvas.width / dotsPerCell()),
+  sendPointer('pointermove', (destinationTab.box.x + destinationTab.box.width * 0.08) / (canvas.width / dotsPerCell()),
     (destinationTab.box.y + destinationTab.box.height / 2) / (canvas.height / dotsPerCell()));
   await tick();
   const shiftedNeighborAfter = tabTitles().find((target) => target.playlistTabId === shiftedNeighborID);
@@ -1534,7 +1539,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.deepEqual(firstTabPush.preview.keys, [...tabIDsBeforeDrag.slice(1), tabIDsBeforeDrag[0]],
     'crossing a tab moves it in the live preview before release');
   const shiftedNeighborFrame = tabFrames().find((target) => target.reorderKey === shiftedNeighborID);
-  const shiftedNeighborLeft = (shiftedNeighborFrame.box.x + 1)
+  const shiftedNeighborLeft = (shiftedNeighborFrame.box.x + shiftedNeighborFrame.box.width * 0.92)
     / (canvas.width / dotsPerCell());
   const neighborY = (shiftedNeighborFrame.box.y + shiftedNeighborFrame.box.height / 2)
     / (canvas.height / dotsPerCell());
@@ -1563,8 +1568,10 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   sendPointer('pointermove', destinationRight, destinationY);
   await advanceAnimationFrames(4);
   const tabPushedAgain = reorderAnimationSnapshot();
-  assert.ok(tabPushedAgain.animation?.fromX[shiftedNeighborID] === easingNeighborBack.box.x
-    && tabPushedAgain.dragging && tabPushedAgain.animation?.progress < 1,
+  const tabRepushSucceeded = tabPushedAgain.animation?.fromX[shiftedNeighborID] === easingNeighborBack.box.x
+    && tabPushedAgain.dragging && tabPushedAgain.animation?.progress < 1;
+  if (!tabRepushSucceeded) sendPointer('pointerup', destinationRight, destinationY);
+  assert.ok(tabRepushSucceeded,
   're-crossing a tab threshold smoothly re-targets the push animation');
   sendPointer('pointerup', destinationRight, destinationY);
   clickScreen(destinationRight, destinationY);
