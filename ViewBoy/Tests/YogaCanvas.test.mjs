@@ -270,6 +270,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     optionsPaneSnapshot,
     optionsContentSnapshot,
     optionsStyleSnapshot,
+    playlistSelectionSnapshot,
     reorderAnimationSnapshot,
     selectionBandSnapshot,
     spacingReadoutLayoutSnapshot,
@@ -598,7 +599,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     const rect = canvas.getBoundingClientRect();
     canvas.listeners.get('click')({ clientX: rect.width * x, clientY: rect.height * y, detail });
   };
-  const clickEntry = (target) => {
+  const clickEntry = (target, modifiers = {}) => {
     const rect = canvas.getBoundingClientRect();
     const logicalWidth = canvas.width / dotsPerCell();
     const logicalHeight = canvas.height / dotsPerCell();
@@ -606,7 +607,20 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
       clientX: rect.width * (target.box.x + target.box.width / 2) / logicalWidth,
       clientY: rect.height * (target.box.y + target.box.height / 2) / logicalHeight,
       detail: 1,
+      ...modifiers,
     });
+  };
+  const contextMenuEntry = (target) => {
+    const rect = canvas.getBoundingClientRect();
+    const logicalWidth = canvas.width / dotsPerCell();
+    const logicalHeight = canvas.height / dotsPerCell();
+    let prevented = false;
+    canvas.listeners.get('contextmenu')({
+      clientX: rect.width * (target.box.x + target.box.width / 2) / logicalWidth,
+      clientY: rect.height * (target.box.y + target.box.height / 2) / logicalHeight,
+      preventDefault() { prevented = true; },
+    });
+    assert.equal(prevented, true, `right-clicking ${target.name} opens its ViewBoy menu`);
   };
   const clickTarget = (name, occurrence = 0, xFraction = 0.5, yFraction = 0.5, detail = 1) => {
     const target = hitTargetSnapshot().filter((entry) => entry.name === name)[occurrence];
@@ -1842,6 +1856,24 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   clickTarget('BACK');
   await tick();
 
+  selectTabWithCommandNumber(1);
+  const firstSelectionRow = hitTargetSnapshot().find((target) => target.playlistRow && target.trackIndex === 0);
+  const thirdSelectionRow = hitTargetSnapshot().find((target) => target.playlistRow && target.trackIndex === 2);
+  assert.ok(firstSelectionRow && thirdSelectionRow,
+    `the active playlist exposes multiple rows for standard range selection (${hitTargetSnapshot().filter((target) => Number.isInteger(target.trackIndex)).map((target) => `${target.trackIndex}:${target.name}:${target.playlistRow}`).join(', ')})`);
+  clickEntry(firstSelectionRow);
+  clickEntry(thirdSelectionRow, { shiftKey: true });
+  assert.deepEqual(playlistSelectionSnapshot().selectedIndices, [0, 1, 2],
+    'Shift-click selects the inclusive range from the anchor row');
+  const middleSelectionRow = hitTargetSnapshot().find((target) => target.playlistRow && target.trackIndex === 1);
+  clickEntry(middleSelectionRow, { metaKey: true });
+  assert.deepEqual(playlistSelectionSnapshot().selectedIndices, [0, 2],
+    'Command-click toggles an individual row without clearing the rest');
+  canvas.listeners.get('keydown')({ code: 'Escape', key: 'Escape', preventDefault() {} });
+  assert.deepEqual(playlistSelectionSnapshot().selectedIndices, [],
+    'Escape deselects the playlist rows');
+  clickEntry(hitTargetSnapshot().find((target) => target.playlistRow && target.trackIndex === 0));
+
   canvas.listeners.get('keydown')({
     key: 'ArrowDown', code: 'ArrowDown', metaKey: false, ctrlKey: false,
     altKey: false, shiftKey: false, preventDefault() {},
@@ -1964,4 +1996,38 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(selectionBandSnapshot()?.kind, 'track',
     'Back returns to the updated playlist after Options stayed open');
+
+  globalThis.ViewBoy.dispatch('sidebarConsoles');
+  await tick();
+  let systemRow = hitTargetSnapshot().find((target) => target.name === 'SCROLL'
+    && target.sidebarContextKind === 'system');
+  assert.ok(systemRow, 'the Console sidebar exposes a context action on its system rows');
+  contextMenuEntry(systemRow);
+  assert.ok(hitTargetSnapshot().some((target) => target.name === 'PLAY NOW' && target.columnMenuItem)
+    && hitTargetSnapshot().some((target) => target.name === 'ENQUEUE' && target.columnMenuItem),
+  'the sidebar context menu offers Play Now and Enqueue');
+  clickEntry(hitTargetSnapshot().find((target) => target.name === 'PLAY NOW' && target.columnMenuItem));
+  await tick();
+  await tick();
+  assert.equal(calls.filter(([name]) => name === 'start').at(-1)[1].path, '/music/a.spc',
+    'Play Now replaces the active playlist and begins with the system first track');
+
+  clickTarget('PATH');
+  await tick();
+  let subPathRow = hitTargetSnapshot().find((target) => target.name === 'SUB');
+  if (!hitTargetSnapshot().some((target) => target.name === 'path.spc')) {
+    clickEntry(subPathRow);
+    await tick();
+    await tick();
+  }
+  const filePathRow = hitTargetSnapshot().find((target) => target.name === 'path.spc'
+    && target.sidebarContextKind === 'path');
+  assert.ok(filePathRow, 'the Paths sidebar exposes file context actions');
+  contextMenuEntry(filePathRow);
+  clickEntry(hitTargetSnapshot().find((target) => target.name === 'ENQUEUE' && target.columnMenuItem));
+  await tick();
+  const activeSavedTab = savedPlaylistTabs.at(-1).tabs.find((tab) =>
+    tab.id === savedPlaylistTabs.at(-1).activeID);
+  assert.deepEqual(activeSavedTab.playlist.map((track) => track.playlistId), ['a', 'b', 'c', 'path-track'],
+    'Enqueue appends the selected system tracks to the active playlist while playback continues');
 });

@@ -8,7 +8,7 @@ The injected `window.viewBoy` bridge supplies read-only CatalogReader projection
 
 Catalog and favorite state belongs to the native/shared cores. JavaScript owns the visible tree, current view, table layout, sorting, font and contrast preferences, and hit testing. It must not scan source paths or write the catalog. Track activation sends the native playback fields supplied by the bridge, including archive path and entry.
 
-JavaScript owns the in-memory playlist-tab projection; native `playlistTabsLoad` and `playlistTabsSave` store snapshots under a dedicated UserDefaults key. Snapshots contain up to 64 tabs, each with its title, catalog key or Path source key, track projections, selection, and scroll position. Saving validates the tab count, list size, and encoded payload before persistence. Loading restored snapshots must not overwrite them while the initial catalog view is being hydrated.
+JavaScript owns the in-memory playlist-tab projection; native `playlistTabsLoad` and `playlistTabsSave` store snapshots under a dedicated UserDefaults key. Snapshots contain up to 64 tabs, each with its title, catalog key or Path source key, track projections, primary row index, selected track IDs, range anchor, and scroll position. Saving validates the tab count, list size, and encoded payload before persistence. Loading restored snapshots must not overwrite them while the initial catalog view is being hydrated. Canvas row selection uses stable playlist IDs; the renderer paints secondary selected rows into the base framebuffer and animates the primary selection band independently.
 
 ## Rendering and Lifecycle
 
