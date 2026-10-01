@@ -36,6 +36,7 @@ const savedPreferences = [];
 const savedPlaylistTabs = [];
 let frontendSettingsChanged;
 let catalogReloaded;
+let librarySnapshotReceived;
 let archiveCache = {
   enabled: true,
   limitBytes: 2 * 1024 ** 3,
@@ -207,7 +208,7 @@ const bridge = {
   onNativePlaybackEnded(callback) { ended = callback; },
   onFrontendSettingsChanged(callback) { frontendSettingsChanged = callback; },
   onCatalogReloaded(callback) { catalogReloaded = callback; },
-  onLibrarySnapshot() {},
+  onLibrarySnapshot(callback) { librarySnapshotReceived = callback; },
 };
 globalThis.window = globalThis;
 globalThis.innerWidth = 420;
@@ -820,6 +821,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   clickTarget('INK BRIGHT');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'HIGH_CONTRAST',
     'the ink control persists the brighter silver high-contrast setting');
+  await tick();
   clickPage('QUEUE');
   const optionsSelection = selectionBandSnapshot();
   assert.equal(optionsSelection?.kind, 'options-page',
@@ -1230,8 +1232,11 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.ok(autoHideOption?.optionCheckboxChecked,
     'empty metadata columns are automatically hidden by default');
   clickTargetBox(autoHideOption);
-  const checkboxFlip = checkboxAnimationSnapshot(performance.now() + 100)
+  const checkboxAnimation = checkboxAnimationSnapshot()
     .find((item) => item.key === 'LIBRARY:AUTO-HIDE EMPTY COLUMNS');
+  const checkboxFlip = checkboxAnimation && checkboxAnimationSnapshot(
+    checkboxAnimation.startedAt + checkboxAnimation.duration / 2,
+  ).find((item) => item.key === 'LIBRARY:AUTO-HIDE EMPTY COLUMNS');
   assert.ok(checkboxFlip && checkboxFlip.horizontalScale < 0.15,
     'checkboxes rotate edge-on at the midpoint of the shared-duration flip');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).autoHideEmptyColumns, false,
@@ -1244,8 +1249,11 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   clickPage('LIBRARY');
   clickTarget('AUTO-HIDE EMPTY COLUMNS');
-  const checkedFlip = checkboxAnimationSnapshot(performance.now() + 100)
+  const checkedAnimation = checkboxAnimationSnapshot()
     .find((item) => item.key === 'LIBRARY:AUTO-HIDE EMPTY COLUMNS');
+  const checkedFlip = checkedAnimation && checkboxAnimationSnapshot(
+    checkedAnimation.startedAt + checkedAnimation.duration / 2,
+  ).find((item) => item.key === 'LIBRARY:AUTO-HIDE EMPTY COLUMNS');
   assert.ok(checkedFlip?.faceChecked && checkedFlip.horizontalScale < 0.15,
     'the reverse face turns toward the filled square on the return half of the flip');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).autoHideEmptyColumns, true,
@@ -1657,6 +1665,9 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.ok(visibleOptionPageTargets().every((target) =>
     target.box.y >= optionToc.y && target.box.y + target.box.height <= optionToc.y + optionToc.height),
   'both ownership groups and all Options pages fit inside the navigation pane');
+  assert.ok(visibleOptionPageTargets().every((target) =>
+    target.box.x >= optionToc.x && target.box.x + target.box.width <= optionToc.x + optionToc.width),
+  'Options page buttons stay within the TOC frame and do not overlap the content pane');
   assert.deepEqual(visibleOptionPages(), pages,
     'Options groups app pages before VGMBoy pages and alphabetizes each group');
   assert.deepEqual(visibleOptionPageTargets().map((target) => target.optionOwner), [
@@ -1813,6 +1824,10 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   await tick();
   assert.equal(databaseReloadCount, 1, 'Reload Library requests a fresh native catalog projection');
+  assert.equal(selectionBandSnapshot()?.kind, 'options-page',
+    'finishing a catalog reload leaves the user on the open Options page');
+  clickTarget('BACK');
+  await tick();
 
   canvas.listeners.get('keydown')({
     key: 'ArrowDown', code: 'ArrowDown', metaKey: false, ctrlKey: false,
@@ -1924,4 +1939,16 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     assert.equal(active?.reorderKey, numberedTabIDs[number - 1],
       `Command-${number} selects its corresponding playlist tab`);
   }
+
+  globalThis.ViewBoy.dispatch('settings');
+  await tick();
+  librarySnapshotReceived({ playlist: [rows[0]] });
+  assert.equal(selectionBandSnapshot()?.kind, 'options-page',
+    'an incoming playlist snapshot does not dismiss an open Options screen');
+  assert.equal(optionsPaneSnapshot().length, 2,
+    'Options remains rendered while an app switch updates the active playlist');
+  clickTarget('BACK');
+  await tick();
+  assert.equal(selectionBandSnapshot()?.kind, 'track',
+    'Back returns to the updated playlist after Options stayed open');
 });

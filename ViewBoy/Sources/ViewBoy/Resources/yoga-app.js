@@ -568,7 +568,14 @@ function tabLayoutWeightAt(id, time = currentRenderTime) {
   return animation.from[id] + (animation.to[id] - animation.from[id]) * eased;
 }
 
-function createPlaylistTab({ duplicateActive = true, title = null, playlist = null, gameKey = null } = {}) {
+function createPlaylistTab({
+  duplicateActive = true,
+  title = null,
+  playlist = null,
+  gameKey = null,
+  preserveOptions = false,
+} = {}) {
+  const keepOptionsOpen = preserveOptions && state.tab === "SETTINGS";
   const priorWidths = state.tab !== "SETTINGS" ? captureTabWidths() : null;
   syncActivePlaylistTab();
   if (state.playlistTabs.length >= 64) return null;
@@ -590,7 +597,7 @@ function createPlaylistTab({ duplicateActive = true, title = null, playlist = nu
   state.activeGameKey = next.gameKey;
   state.selectedTrack = Math.min(next.selectedTrack, Math.max(0, next.playlist.length - 1));
   state.queueScroll = next.scroll;
-  state.tab = "QUEUE";
+  state.tab = keepOptionsOpen ? "SETTINGS" : "QUEUE";
   state.tableHorizontalScroll = 0;
   render();
   persistPlaylistTabs();
@@ -749,6 +756,8 @@ export function checkboxAnimationSnapshot(time = performance.now()) {
       angle,
       horizontalScale: Math.abs(Math.cos(angle)),
       faceChecked: angle >= Math.PI / 2,
+      startedAt: animation.startedAt,
+      duration: animation.duration,
     };
   });
 }
@@ -1333,7 +1342,8 @@ function pixelButton(parent, text, onClick, style = {}) {
     alignItems: Align.Center,
     justifyContent: Justify.Center,
     height: buttonStandardHeight(),
-    width: style.width ?? buttonWidth(text),
+    width: style.widthPercent !== undefined ? undefined : style.width ?? buttonWidth(text),
+    widthPercent: style.widthPercent,
     minWidth: style.minWidth,
     flexGrow: style.flexGrow ?? 0,
     flexShrink: style.flexShrink,
@@ -3282,16 +3292,16 @@ function addOptionsContent(parent) {
     padding: uiOptionsInsetDots() / STYLE_SCALE,
   }, {
     optionFrame: "toc",
+    clipChildren: true,
     paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
-  const pageButtonWidth = navigationWidth - 2 * uiOptionsInsetDots() / STYLE_SCALE;
   [
     { title: "VIEWBOY", pages: ["DATABASE", "DISPLAY", "INTERFACE", "LIBRARY", "QUEUE", "THEME"] },
     { title: "VGMBoy", pages: ["AUDIO", "DIAGNOSTICS", "METHODS", "PLAYBACK"] },
   ].forEach(({ title, pages }) => {
     panelTitle(toc, `OPTIONS - ${title}`);
     pages.forEach((page) => pixelButton(toc, page, () => selectOptionsPage(page), {
-      width: pageButtonWidth,
+      widthPercent: 100,
       selected: state.optionsPage === page,
       controlTitle: page,
       optionOwner: title,
@@ -4460,7 +4470,7 @@ async function loadGame(game) {
       state.activePlaylistTabId = tab.id;
     }
     if (!state.currentTrackId) state.activeQueue = [...tracks];
-    state.tab = "LIBRARY";
+    if (state.tab !== "SETTINGS") state.tab = "LIBRARY";
     persistPlaylistTabs();
     render();
   } catch (error) {
@@ -5515,8 +5525,10 @@ pendingCommands.splice(0).forEach((command) => window.ViewBoy.dispatch(command))
   bridge.onCatalogReloaded?.(() => loadCatalog());
   bridge.onLibrarySnapshot?.((snapshot) => {
     if (Array.isArray(snapshot?.playlist)) {
-      createPlaylistTab({ duplicateActive: false, title: "QUEUE", playlist: snapshot.playlist });
-      state.tab = "QUEUE";
+      const optionsOpen = state.tab === "SETTINGS";
+      createPlaylistTab({ duplicateActive: false, title: "QUEUE", playlist: snapshot.playlist,
+        preserveOptions: optionsOpen });
+      if (optionsOpen) optionsReturnTab = "QUEUE";
       persistPlaylistTabs();
       render();
     }
