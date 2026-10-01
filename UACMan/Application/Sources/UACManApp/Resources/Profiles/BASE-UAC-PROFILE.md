@@ -4,6 +4,15 @@ Shared rules for every source-format profile. Each format profile documents
 only reader-supported facts, useful fields, format-specific procedures, and
 required checks.
 
+These profiles are human-readable working notes for people and agents. They
+are not a mechanical UACMan configuration, automatic tag mapper, or validator;
+apply the documented rules explicitly and record evidence in the set report.
+They define **input rules** for how source information should be interpreted
+and promoted into UAC metadata. They are not output reports: observed coverage,
+actual changes, exceptions, and verification results belong in AudioMan's
+dashboard reports, preferably in the affected set's per-console report, with
+the per-set ledger recording operations and checkpoints.
+
 ## Metadata Rules
 
 - **Single metadata record** — The UAC manifest is authoritative. Metadata maps
@@ -13,9 +22,10 @@ required checks.
   `playlists[].entries[]`. Subsong `title` and `artist` are first-class fields;
   other direct track fields belong in `extraFields`. `pack.meta` and
   `track.meta` are not current manifest fields.
-- **Album** — Use for a source game/album title. Do not create a Game Title
-  tag. Required package identity belongs in structural `game.title`; omit a
-  duplicate Album unless a consumer specifically needs it.
+- **Album** — Use the source-format profile's mapping for game or release
+  names. For SPC, the source **Game** field maps to track **Album**; keep
+  package identity in structural `game.title` and any confirmed **Game ID**
+  separately.
 - **Artist scope** — Store a package-wide artist as **Album Artist** in
   `game.metadata`. Store a track-specific performer, artist, author, or
   composer as **Artist** on that logical track. Do not repeat a shared album
@@ -32,18 +42,19 @@ required checks.
   Use **Date** for a full date and **Year** when only a year is known. Omit
   **Disc Number** for a single-disc release; keep Date and Year together only
   when they represent distinct facts.
-- **Format** — Store one package-level **Format** field for the playable
-  content. A UAC package has one playable format; do not mix playable formats
-  in one package. Per-member storage extensions remain structural details and
-  do not replace this field. The packer must reject mixed-format packages.
+- **Format** — A UAC package has one playable format; do not mix playable
+  formats in one package. Where the source format profile calls for a surfaced
+  format/version, store it as track **Format** (for example, `SPC v.30`). Do
+  not add a redundant package-level generic **Format** tag.
 - **Format check** — Confirm all playable members belong to the package's
-  declared **Format**; reject a package that mixes formats.
+  structural format; reject a package that mixes formats.
 - **Playback data** — Use wrapper-defined loop objects and playlist-entry
   timing fields, not descriptive tags. Follow the shared
-  [hash and timing policy](README.md#hash-and-timing-scope); do not duplicate
-  provenance or wrapper hashes as metadata tags.
+  [hash and timing policy](README.md#hash-and-timing-scope). Source-archive
+  hashes may be surfaced on tracks when a set profile says they identify the
+  distribution source; member **Stream Hashes** identify each playable file.
 - **Set identity** — When source evidence identifies one set, surface **Set
-  Collection**, **Set Name**, and **Set URL** once at package scope. Add
+  Name** and **Set URL** once at package scope. Add
   **Set Legacy URL**, **Set Archive URL**, or **Set Date** when applicable.
   These direct fields help users compare and group packages; `sources[]`
   remains the detailed provenance authority. Omit a projection when sources

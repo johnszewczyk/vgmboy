@@ -1,6 +1,6 @@
 # SNESMusic.org Album / Game Title discrepancy report
 
-**Status: source-tag rules clarified; value reconciliation deferred.** The 130 packages with list-valued or varying **Game Title** entries have been routed to `Review/Game Title Conflicts/Nintendo SNES/` without flattening or promotion. This report records the manifest and reader/projection differences; the later title edit pass remains deferred. Counts are from indexed manifests; this audit did not rescan or re-hash SPC payloads.
+**Historical audit; current mapping decision recorded 2026-10-01.** Map each source game name from **Game Title** to track **Album**, preserving the exact scalar/list values and order. Keep the 130 packages with list-valued or varying values in `Review/Game Title Conflicts/Nintendo SNES/` for later value reconciliation; do not flatten or promote a value. The current execution proposal is [SNESMusicOrg SPC Tag Cleanup Preview 2026-10-01](SNESMusicOrg-SPC-Tag-Cleanup-Preview-2026-10-01.md). Counts below are from indexed manifests; this audit did not rescan or re-hash SPC payloads.
 
 ## Findings in the current indexed set
 
@@ -32,16 +32,16 @@ These values describe at least two different concepts: game identity and soundtr
 
 The visible **Album** column is a generic UACMan convenience field. The track table reads `member.album`; the Tag Analyzer's package Album context searches package/member metadata for a literal `Album` key. Neither creates a source tag. Since current SNESMusic.org manifests have no literal `Album` key, an empty Album column does not mean `OST Title` was lost or converted. The source tag remains visible as **OST Title** where present.
 
-## Open mapping questions
+## Decisions and remaining review
 
 1. **Resolved:** preserve xID6 **OST Title** under its source name. Keep a distinct source **Album** separately when one exists; do not derive Album from OST Title.
-2. **Resolved for source surfacing:** preserve track **Game Title** values as stored and add a separate package-level **Game ID** only for a unique, high-confidence No-Intro match. Reconcile package title, Game ID, Game Title, Album, and OST Title in the later edit pass.
-3. **Resolved for now:** route the 130 list-valued or varying Game Title packages to review. Keep each stored list and value intact; do not select a representative value.
+2. **Resolved:** rename the source game-name tag to track **Album**, preserving values exactly; keep a separate package-level **Game ID** only for a unique, high-confidence No-Intro match. Reconcile package title, Game ID, Album, and OST Title values in the later edit pass.
+3. **Resolved for now:** keep the 130 list-valued or varying game-name packages in review. Retain each stored list and value intact; do not select a representative value.
 4. **Resolved:** UACMan's Album column is a generic convenience field backed by `member.album`; it is not proof that a literal Album tag exists in the manifest. The Tag Analyzer's Album value is likewise derived only from an actual `Album` metadata key.
 
-## Handling until resolved
+## Handling during source-tag cleanup
 
-- Preserve the current **Game Title** and **OST Title** values as distinct evidence. The list-valued or varying Game Title packages are in the review path recorded in the [source-tag surfacing preview](SNESMusicOrg-Source-Tag-Surfacing-Preview-2026-09-24.md); do not rename, deduplicate, flatten, or discard their tags.
+- Preserve **OST Title** separately. Rename **Game Title** to **Album** as specified above, retaining the source values and arrays; the list-valued or varying packages remain in the review path recorded in the [source-tag surfacing preview](SNESMusicOrg-Source-Tag-Surfacing-Preview-2026-09-24.md).
 - Do not infer the canonical game title from `OST Title`, and do not use an unresolved package title to overwrite the SPC's embedded **Game Title**.
 - Keep original SPC ID666/xID6 bytes unchanged. Record exact per-track disagreements in the eventual before/after proposal, grouped by package and source value.
-- Update the **Album** / **Game Title** SPC-to-UAC mapping rule only after these discrepancies and the UI source have been reviewed.
+- Resolve title values separately from this key rename; do not rewrite source SPC ID666/xID6 bytes.

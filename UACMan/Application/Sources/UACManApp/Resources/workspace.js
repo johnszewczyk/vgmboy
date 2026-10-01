@@ -1750,7 +1750,7 @@
     const document = selected
       ? `<article class="profile-document"><div class="profile-markdown">${renderProfileMarkdown(selected.markdown)}</div></article>`
       : '<div class="profile-document profile-empty">No profile documents are bundled.</div>';
-    return `<section class="data-page profile-page" aria-label="UAC tag profiles"><div class="data-page-heading"><div><div class="tag-analyzer-heading-line"><h2>Profiles</h2><span class="beta-badge">Beta</span></div><p>Read the source-format profiles to see which metadata UAC packages should carry.</p></div><span class="data-page-count">${profiles.length} profile(s)</span></div><div class="profile-browser"><nav class="profile-list" aria-label="Format profiles">${list}</nav>${document}</div></section>`;
+    return `<section class="data-page profile-page" aria-label="UAC tag profiles"><div class="data-page-heading"><div><div class="tag-analyzer-heading-line"><h2>Profiles</h2><span class="beta-badge">Beta</span></div><p>Human-readable input rules for agents; profiles do not configure UACMan or apply or validate tags. Record actual results in AudioMan's per-set dashboard reports.</p></div><span class="data-page-count">${profiles.length} profile(s)</span></div><div class="profile-browser"><nav class="profile-list" aria-label="Format profiles">${list}</nav>${document}</div></section>`;
   }
 
   function scopeToAction(scope) {

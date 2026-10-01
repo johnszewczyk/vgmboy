@@ -1,5 +1,10 @@
 # SNESMusic.org SPC tag cleanup preview
 
+**Historical preview superseded:** see
+[the October 1 preview](SNESMusicOrg-SPC-Tag-Cleanup-Preview-2026-10-01.md)
+for the current Game-to-Album mapping, per-track RSN hash placement, and
+remaining proposed cleanup.
+
 **Status: cleanup proposals remain under review.** The separate source-tag surfacing pass applied the **OST Disc** → **Disc Number** mapping; its [execution report](SNESMusicOrg-Source-Tag-Surfacing-Execution-2026-09-24.md) records that change. Other cleanup proposals in this report have not been applied. No SPC or RSN source bytes were changed.
 
 ## Audit scope
