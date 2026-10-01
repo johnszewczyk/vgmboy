@@ -303,6 +303,7 @@ const state = {
   transportSymbols: savedDisplayOptions.transportSymbols === true,
   optionsPage: "DISPLAY",
   transport: "stopped",
+  nativePlaybackStatus: null,
   currentTrackId: null,
   activeQueue: [],
   playbackQueue: [],
@@ -741,6 +742,10 @@ export function hitTargetSnapshot() {
     columnMenuItem: widget.meta.columnMenuItem === true,
     columnHeader: widget.meta.columnHeader === true,
     optionChecklistItem: widget.meta.optionChecklistItem === true,
+    optionPage: widget.meta.optionPage === true,
+    optionOwner: widget.meta.optionOwner ?? null,
+    optionCheckboxChecked: widget.meta.optionCheckboxChecked ?? null,
+    optionCheckboxBox: widget.meta.optionCheckboxBox ? { ...widget.meta.optionCheckboxBox } : null,
     trackIndex: Number.isInteger(widget.meta.trackIndex) ? widget.meta.trackIndex : null,
     searchField: widget.meta.searchField === true,
     searchText: widget.meta.searchField ? searchFieldText(box) : null,
@@ -1226,6 +1231,8 @@ function pixelButton(parent, text, onClick, style = {}) {
     inset: controlPaddingDots(),
     align: "center",
     controlTitle: style.controlTitle,
+    optionOwner: style.optionOwner,
+    optionPage: style.optionPage === true,
     onClick,
   });
 }
@@ -1245,38 +1252,34 @@ function optionSection(parent, title) {
 }
 
 function optionToggle(parent, title, checked, onClick, extraMeta = {}) {
-  const height = buttonStandardHeight();
-  const row = makeWidget(parent, {
-    direction: FlexDirection.Row,
-    alignItems: Align.Stretch,
-    height,
-    gap: uiGap(),
-  }, {
-    onClick,
-    controlTitle: title,
-    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
-    ...extraMeta,
-  });
-  const marker = checked ? "[x]" : "[ ]";
-  label(row, marker, {
-    width: textLayoutWidth(marker),
-    height,
-  }, { textShade: 0, align: "center", inset: controlPaddingDots() });
-  label(row, title, { flexGrow: 1, height }, { textShade: 0, inset: controlPaddingDots() });
-  return row;
+  return optionChecklistRow(parent, title, checked, onClick, extraMeta);
 }
 
-function optionChecklistRow(parent, title, checked, onClick) {
+function optionChecklistRow(parent, title, checked, onClick, extraMeta = {}) {
   const height = buttonStandardHeight();
-  const marker = checked ? "[x]" : "[ ]";
+  const checkboxSize = fontProfile().height;
+  const rowMeta = {
+    onClick,
+    controlTitle: title,
+    optionChecklistItem: true,
+    optionCheckboxChecked: checked === true,
+    ...extraMeta,
+  };
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
     height,
     gap: uiGap(),
-  }, { onClick, controlTitle: title, optionChecklistItem: true });
-  label(row, marker, { width: textLayoutWidth(marker), height }, {
-    textShade: 0, inset: controlPaddingDots(),
+    paddingHorizontal: controlPaddingDots() / STYLE_SCALE,
+  }, rowMeta);
+  makeWidget(row, { width: checkboxSize / STYLE_SCALE, height: checkboxSize / STYLE_SCALE }, {
+    paint(box) {
+      rowMeta.optionCheckboxBox = { ...box };
+      strokeRect(box.x, box.y, box.width, box.height, 0);
+      if (checked && checkboxSize > 2) {
+        fillRect(box.x + 1, box.y + 1, box.width - 2, box.height - 2, 0);
+      }
+    },
   });
   label(row, title, { flexGrow: 1, height }, {
     textShade: 0, inset: controlPaddingDots(),
@@ -1607,11 +1610,28 @@ export function optionsStyleSnapshot() {
     if (widget.meta.optionPanelTitle) {
       return [{ kind: "title", name: widget.meta.optionPanelTitle, box: { ...box } }];
     }
+    if (widget.meta.optionOwnerTitle) {
+      return [{ kind: "owner", name: widget.meta.optionOwnerTitle, box: { ...box } }];
+    }
     if (widget.meta.optionGroupTitle) {
       return [{ kind: "group", name: widget.meta.optionGroupTitle, box: { ...box } }];
     }
     if (widget.meta.optionChecklistItem) {
-      return [{ kind: "checklist", name: widget.meta.controlTitle, box: { ...box } }];
+      return [{
+        kind: "checklist",
+        name: widget.meta.controlTitle,
+        checked: widget.meta.optionCheckboxChecked === true,
+        checkboxBox: widget.meta.optionCheckboxBox ? { ...widget.meta.optionCheckboxBox } : null,
+        box: { ...box },
+      }];
+    }
+    if (widget.meta.optionDiagnosticValue) {
+      return [{
+        kind: "diagnostic",
+        name: widget.meta.optionDiagnosticValue,
+        value: widget.meta.text,
+        box: { ...box },
+      }];
     }
     return [];
   });
@@ -2184,7 +2204,9 @@ function addColumnContextMenu(parent) {
   const height = (configurableColumns.length + 2) * buttonStandardHeight()
     + (configurableColumns.length + 1) * uiGap()
     + 2 * uiGroupInsetDots() / STYLE_SCALE + 2 / STYLE_SCALE;
-  const contentWidth = textLayoutWidth("[x]") + uiGap() + textLayoutWidth("ARTIST");
+  const checkboxWidth = (fontProfile().height + controlPaddingDots() * 2) / STYLE_SCALE;
+  const contentWidth = checkboxWidth + uiGap() + textLayoutWidth("ARTIST")
+    + 2 * controlPaddingDots() / STYLE_SCALE;
   const width = Math.min(WIDTH / STYLE_SCALE - 16,
     Math.max(68, contentWidth + 2 * uiGroupInsetDots() / STYLE_SCALE + 2 / STYLE_SCALE));
   const widthPixels = width * STYLE_SCALE;
@@ -2257,9 +2279,18 @@ function optionGroup(parent, title) {
   return group;
 }
 
+function optionOwnerHeading(parent, title) {
+  return label(parent, title, { height: rowHeight(1) }, {
+    optionOwnerTitle: title,
+    textShade: 0,
+    inset: 0,
+    bottomLine: 1,
+  });
+}
+
 function optionsTocWidth() {
   const available = WIDTH / STYLE_SCALE;
-  const labelWidth = framedTextWidth("TRANSPORT") + uiOptionsInsetDots() / STYLE_SCALE * 2;
+  const labelWidth = framedTextWidth("DIAGNOSTICS") + uiOptionsInsetDots() / STYLE_SCALE * 2;
   return Math.min(available * 0.34, Math.max(labelWidth, Math.min(220, available * 0.20)));
 }
 
@@ -2288,14 +2319,6 @@ function addThemeOptions(parent) {
   ]);
   const tones = optionGroup(parent, "FOUR LCD TONES");
   addPalettePreview(tones);
-}
-
-function addTransportOptions(parent) {
-  const controls = optionGroup(parent, "TRANSPORT CONTROLS");
-  optionChoice(controls, "BUTTONS", [
-    { title: "WORDS", selected: !state.transportSymbols, onClick: () => setTransportSymbols(false) },
-    { title: "SYMBOLS", selected: state.transportSymbols, onClick: () => setTransportSymbols(true) },
-  ]);
 }
 
 function optionDuration(seconds, allowOpen = false) {
@@ -2386,11 +2409,18 @@ function playbackTempoForTrack(track, preferences = state.preferences) {
 }
 
 function addPlaybackOptions(parent, pref) {
-  const behavior = optionGroup(parent, "PLAYBACK BEHAVIOR");
-  optionToggle(behavior, "LONG PLAY", pref.longPlayEnabled === true,
+  const timing = optionGroup(parent, "PLAYBACK TIMING");
+  optionToggle(timing, "LONG PLAY", pref.longPlayEnabled === true,
     () => setPreference("longPlayEnabled", pref.longPlayEnabled !== true));
-  optionToggle(behavior, "END FADE", pref.fadeEnabled !== false,
+  optionToggle(timing, "END FADE", pref.fadeEnabled !== false,
     () => setPreference("fadeEnabled", pref.fadeEnabled === false));
+  optionDurationAdjuster(timing, "LONG PLAY TIME", "manualPlayTimeSeconds", 0, 3600, 180, 30, true);
+  optionDurationAdjuster(timing, "UNKNOWN LENGTH", "unknownDurationSeconds", 30, 3600, 150, 30);
+  optionDurationAdjuster(timing, "FADE LENGTH", "spcFadeSeconds", 0, 60, 6, 1);
+}
+
+function addQueueOptions(parent, pref) {
+  const behavior = optionGroup(parent, "QUEUE BEHAVIOR");
   optionChoice(behavior, "REPEAT", [
     { title: "OFF", selected: (pref.repeatMode || "off") === "off", onClick: () => setPreference("repeatMode", "off") },
     { title: "ALL", selected: pref.repeatMode === "all", onClick: () => setPreference("repeatMode", "all") },
@@ -2401,11 +2431,60 @@ function addPlaybackOptions(parent, pref) {
     { title: "PLAYLIST", selected: pref.randomMode === "playlist", onClick: () => setRandomMode("playlist") },
     { title: "LIBRARY", selected: pref.randomMode === "library", onClick: () => setRandomMode("library") },
   ]);
+}
 
-  const timing = optionGroup(parent, "TRACK TIMING");
-  optionDurationAdjuster(timing, "LONG PLAY TIME", "manualPlayTimeSeconds", 0, 3600, 180, 30, true);
-  optionDurationAdjuster(timing, "UNKNOWN LENGTH", "unknownDurationSeconds", 30, 3600, 150, 30);
-  optionDurationAdjuster(timing, "FADE LENGTH", "spcFadeSeconds", 0, 60, 6, 1);
+function diagnosticText(snapshot, key, suffix = "") {
+  const value = snapshot?.[key];
+  if (value === null || value === undefined || value === "") return "—";
+  const number = Number(value);
+  if (Number.isFinite(number)) return `${Math.trunc(number)}${suffix}`;
+  return `${String(value)}${suffix}`;
+}
+
+function diagnosticRate(snapshot, key) {
+  const rate = Number(snapshot?.[key]);
+  return Number.isFinite(rate) && rate > 0 ? `${Math.trunc(rate)} HZ` : "—";
+}
+
+function optionDiagnosticRow(parent, title, value) {
+  const height = rowHeight();
+  const row = makeWidget(parent, {
+    direction: FlexDirection.Row,
+    alignItems: Align.Center,
+    height,
+    gap: uiGap(),
+  }, { optionDiagnosticRow: title });
+  label(row, title, { width: textLayoutWidth(title, 0), height }, {
+    textShade: 0,
+    inset: 0,
+  });
+  label(row, value, { flexGrow: 1, height }, {
+    optionDiagnosticValue: title,
+    textShade: 0,
+    inset: 0,
+    align: "right",
+  });
+}
+
+function addDiagnosticsOptions(parent) {
+  const snapshot = state.nativePlaybackStatus || {};
+  const hasStatus = Object.keys(snapshot).length > 0;
+  const output = optionGroup(parent, "AUDIO OUTPUT");
+  optionDiagnosticRow(output, "STATE", hasStatus ? snapshot.output_state || "—" : "—");
+  optionDiagnosticRow(output, "BUFFER", hasStatus
+    ? `${diagnosticText(snapshot, "buffered_frames")} / ${diagnosticText(snapshot, "ring_buffer_frames")} FRAMES`
+    : "—");
+  optionDiagnosticRow(output, "UNDERRUNS", diagnosticText(snapshot, "underrun_count"));
+  optionDiagnosticRow(output, "OUTPUT RATE", diagnosticRate(snapshot, "output_sample_rate"));
+
+  const decoder = optionGroup(parent, "DECODER");
+  optionDiagnosticRow(decoder, "FAMILY", snapshot.decoder_family || "—");
+  optionDiagnosticRow(decoder, "SAMPLE RATE", diagnosticRate(snapshot, "decoder_sample_rate"));
+  optionDiagnosticRow(decoder, "TEMPO", snapshot.track_loaded === true && Number.isFinite(Number(snapshot.tempo))
+    ? `${Number(snapshot.tempo).toFixed(2)}X` : "—");
+  optionDiagnosticRow(decoder, "FRAMES REQUESTED", diagnosticText(snapshot, "frames_requested"));
+  optionDiagnosticRow(decoder, "FRAMES SUPPLIED", diagnosticText(snapshot, "frames_supplied"));
+  optionDiagnosticRow(decoder, "DECODE ERROR", snapshot.decode_error === true ? "YES" : hasStatus ? "NO" : "—");
 }
 
 function addMethodOptions(parent, pref) {
@@ -2609,6 +2688,11 @@ function addAudioOptions(parent, pref) {
 }
 
 function addInterfaceOptions(parent, pref) {
+  const transport = optionGroup(parent, "TRANSPORT LABELS");
+  optionChoice(transport, "BUTTONS", [
+    { title: "WORDS", selected: !state.transportSymbols, onClick: () => setTransportSymbols(false) },
+    { title: "SYMBOLS", selected: state.transportSymbols, onClick: () => setTransportSymbols(true) },
+  ]);
   const layout = optionGroup(parent, "PLAYLIST LAYOUT");
   optionToggle(layout, "AUTO-SIZE COLUMNS", pref.columnAutoSize !== false,
     () => setPreference("columnAutoSize", pref.columnAutoSize === false));
@@ -2782,6 +2866,12 @@ function selectOptionsPage(page) {
   state.optionsPage = page;
   render();
   if (page === "DATABASE") void refreshDatabaseOptions();
+  if (page === "DIAGNOSTICS" && bridge?.nativePlaybackState) {
+    void bridge.nativePlaybackState().then((snapshot) => {
+      applyNativeStatus(snapshot);
+      if (state.tab === "SETTINGS" && state.optionsPage === "DIAGNOSTICS") render();
+    }).catch(() => {});
+  }
 }
 
 function addOptionsContent(parent) {
@@ -2797,11 +2887,18 @@ function addOptionsContent(parent) {
   });
   panelTitle(toc, "OPTIONS");
   const pageButtonWidth = navigationWidth - 2 * uiOptionsInsetDots() / STYLE_SCALE;
-  ["AUDIO", "DATABASE", "DISPLAY", "INTERFACE", "LIBRARY", "METHODS", "PLAYBACK", "THEME", "TRANSPORT"]
-    .forEach((page) => {
-      pixelButton(toc, page, () => selectOptionsPage(page), {
-        width: pageButtonWidth, selected: state.optionsPage === page,
-      });
+  [
+    { title: "VIEWBOY", pages: ["DATABASE", "DISPLAY", "INTERFACE", "LIBRARY", "QUEUE", "THEME"] },
+    { title: "VGMBoy", pages: ["AUDIO", "DIAGNOSTICS", "METHODS", "PLAYBACK"] },
+  ].forEach(({ title, pages }) => {
+    optionOwnerHeading(toc, title);
+    pages.forEach((page) => pixelButton(toc, page, () => selectOptionsPage(page), {
+      width: pageButtonWidth,
+      selected: state.optionsPage === page,
+      controlTitle: page,
+      optionOwner: title,
+      optionPage: true,
+    }));
   });
   makeWidget(toc, { flexGrow: 1 });
 
@@ -2823,10 +2920,11 @@ function addOptionsContent(parent) {
   const pref = state.preferences;
   if (state.optionsPage === "DATABASE") addDatabaseOptions(content);
   else if (state.optionsPage === "THEME") addThemeOptions(content);
-  else if (state.optionsPage === "TRANSPORT") addTransportOptions(content);
+  else if (state.optionsPage === "QUEUE") addQueueOptions(content, pref);
   else if (state.optionsPage === "PLAYBACK") addPlaybackOptions(content, pref);
   else if (state.optionsPage === "METHODS") addMethodOptions(content, pref);
   else if (state.optionsPage === "AUDIO") addAudioOptions(content, pref);
+  else if (state.optionsPage === "DIAGNOSTICS") addDiagnosticsOptions(content);
   else if (state.optionsPage === "INTERFACE") addInterfaceOptions(content, pref);
   else if (state.optionsPage === "LIBRARY") addLibraryOptions(content, pref);
   else addDisplayOptions(content);
@@ -3877,6 +3975,7 @@ function applyNativeStatus(snapshot) {
   if (generation && generation < state.nativeGeneration) return;
   state.statusSequence = sequence || state.statusSequence;
   state.nativeGeneration = generation || state.nativeGeneration;
+  state.nativePlaybackStatus = { ...snapshot };
   const nextTransport = snapshot.transport_state || "stopped";
   const priorTransport = state.transport;
   const priorSecond = Math.floor((state.positionMs || 0) / 1000);
@@ -4842,10 +4941,12 @@ window.ViewBoy = Object.freeze({
       case "queue": selectSidebarView("QUEUE"); break;
       case "optionsPage:DISPLAY": openOptionsScreen("DISPLAY"); break;
       case "optionsPage:THEME": openOptionsScreen("THEME"); break;
-      case "optionsPage:TRANSPORT": openOptionsScreen("TRANSPORT"); break;
+      case "optionsPage:TRANSPORT": openOptionsScreen("INTERFACE"); break;
       case "optionsPage:PLAYBACK": openOptionsScreen("PLAYBACK"); break;
       case "optionsPage:METHODS": openOptionsScreen("METHODS"); break;
       case "optionsPage:AUDIO": openOptionsScreen("AUDIO"); break;
+      case "optionsPage:DIAGNOSTICS": openOptionsScreen("DIAGNOSTICS"); break;
+      case "optionsPage:QUEUE": openOptionsScreen("QUEUE"); break;
       case "optionsPage:INTERFACE": openOptionsScreen("INTERFACE"); break;
       case "optionsPage:LIBRARY": openOptionsScreen("LIBRARY"); break;
       case "optionsPage:DATABASE": openOptionsScreen("DATABASE"); break;

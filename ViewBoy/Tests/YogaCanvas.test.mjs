@@ -167,14 +167,36 @@ const bridge = {
     };
   },
   nativePlaybackInit: async () => {},
-  nativePlaybackState: async () => ({ transport_state: generation ? 'playing' : 'stopped', generation }),
+  nativePlaybackState: async () => ({
+    transport_state: generation ? 'playing' : 'stopped',
+    generation,
+    output_state: generation ? 'running' : 'idle',
+    track_loaded: Boolean(generation),
+    buffered_frames: 512,
+    ring_buffer_frames: 4096,
+    underrun_count: 2,
+    frames_requested: 8192,
+    frames_supplied: 8192,
+    decoder_family: generation ? 'libgme' : null,
+    decoder_sample_rate: generation ? 32000 : 0,
+    output_sample_rate: 44100,
+    tempo: 1,
+    decode_error: false,
+  }),
   nativePlaybackReconfigure: async (request) => {
     reconfigureCalls.push(request);
     return { transport_state: 'playing', generation };
   },
   nativePlaybackStart: async (request) => {
     calls.push(['start', request]);
-    return { transport_state: 'playing', generation: ++generation, status_sequence: generation };
+    return {
+      transport_state: 'playing', generation: ++generation, status_sequence: generation,
+      output_state: 'running', track_loaded: true,
+      buffered_frames: 512, ring_buffer_frames: 4096, underrun_count: 2,
+      frames_requested: 8192, frames_supplied: 8192,
+      decoder_family: 'libgme', decoder_sample_rate: 32000,
+      output_sample_rate: 44100, tempo: 1, decode_error: false,
+    };
   },
   playbackCompletionRetire: async (request) => {
     calls.push(['retire', request]);
@@ -581,7 +603,10 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     shiftKey: false,
     preventDefault() {},
   });
-  const pages = ['AUDIO', 'DATABASE', 'DISPLAY', 'INTERFACE', 'LIBRARY', 'METHODS', 'PLAYBACK', 'THEME', 'TRANSPORT'];
+  const pages = [
+    'DATABASE', 'DISPLAY', 'INTERFACE', 'LIBRARY', 'QUEUE', 'THEME',
+    'AUDIO', 'DIAGNOSTICS', 'METHODS', 'PLAYBACK',
+  ];
   const clickPage = (page) => clickTarget(page);
   globalThis.ViewBoy.dispatch('library');
   await tick();
@@ -771,24 +796,34 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   clickTarget('INK BRIGHT');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'HIGH_CONTRAST',
     'the ink control persists the brighter silver high-contrast setting');
-  clickPage('PLAYBACK');
+  clickPage('QUEUE');
   assert.notEqual(pixelChecksum(canvas.image.data), nightBoyPixels, 'Options sub-pages navigate inside the LCD');
-  globalThis.ViewBoy.dispatch('optionsPage:PLAYBACK');
+  globalThis.ViewBoy.dispatch('optionsPage:QUEUE');
   clickTarget('REPEAT ONE');
   await tick();
   assert.equal(savedPreferences.at(-1).repeatMode, 'one',
-    'the Playback page repeat buttons save their selected mode');
+    'the frontend-owned Queue page repeat buttons save their selected mode');
   clickTarget('RANDOM OFF');
   await tick();
   assert.equal(savedPreferences.at(-1).randomMode, 'off',
-    'the Playback page random buttons save their selected mode');
+    'the frontend-owned Queue page random buttons save their selected mode');
+  clickPage('PLAYBACK');
   const checkedRowPixels = pixelChecksum(canvas.image.data);
   clickTarget('LONG PLAY');
   await tick();
   assert.equal(savedPreferences.at(-1).longPlayEnabled, false,
-    'the Playback page checkbox updates the native playback preferences');
+    'the VGMBoy Playback page checkbox updates native playback preferences');
   assert.notEqual(pixelChecksum(canvas.image.data), checkedRowPixels,
-    'the bitmap checkbox marker visibly changes with the saved value');
+    'the LCD checkbox square visibly changes when its selected state is toggled');
+  clickPage('DIAGNOSTICS');
+  await tick();
+  const diagnostics = optionsStyleSnapshot().filter((item) => item.kind === 'diagnostic');
+  assert.equal(diagnostics.find((item) => item.name === 'STATE')?.value, 'running',
+    'VGMBoy Diagnostics reflects the native output state');
+  assert.equal(diagnostics.find((item) => item.name === 'FAMILY')?.value, 'libgme',
+    'VGMBoy Diagnostics reflects the active decoder family');
+  assert.equal(diagnostics.find((item) => item.name === 'UNDERRUNS')?.value, '2',
+    'VGMBoy Diagnostics exposes the shared underrun counter');
   clickPage('AUDIO');
   globalThis.ViewBoy.dispatch('optionsPage:AUDIO');
   const equalizerBands = hitTargetSnapshot().filter((target) => /^EQ \d/.test(target.name)
@@ -1108,10 +1143,28 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'Playlist Columns is a plain checkbox list');
   const fileColumnCheck = playlistColumnChecks.find((target) => target.name === 'FILE');
   assert.ok(fileColumnCheck, 'the File checkbox is directly selectable as a list row');
+  const fileCheckbox = fileColumnCheck.optionCheckboxBox;
+  assert.ok(fileColumnCheck.optionCheckboxChecked && fileCheckbox,
+    'checked options use a drawn square instead of bracket text');
+  assert.equal(fileCheckbox.width, bitmapFontSnapshot('MICRO').height,
+    'the checkbox square uses one bitmap glyph cell of width');
+  assert.equal(fileCheckbox.height, bitmapFontSnapshot('MICRO').height,
+    'the checkbox square uses one bitmap glyph cell of height');
+  assert.equal(fileCheckbox.y, fileColumnCheck.box.y
+    + Math.floor((fileColumnCheck.box.height - fileCheckbox.height) / 2),
+  'the checkbox square is centered vertically in its text row');
+  assert.equal(framebufferShadeSnapshot(fileCheckbox.x + 2, fileCheckbox.y + 2), 0,
+    'a selected checkbox fills its interior with the darkest LCD tone');
   clickTargetBox(fileColumnCheck);
   await tick();
   assert.equal(savedPreferences.at(-1).columnVisibility.filename, false,
     'the Library page checkbox persists field visibility');
+  const uncheckedFileColumn = hitTargetSnapshot().find((target) => target.name === 'FILE');
+  assert.ok(uncheckedFileColumn && !uncheckedFileColumn.optionCheckboxChecked,
+    'the same plain list row exposes its unchecked state');
+  assert.equal(framebufferShadeSnapshot(uncheckedFileColumn.optionCheckboxBox.x + 2,
+    uncheckedFileColumn.optionCheckboxBox.y + 2), 3,
+  'an unchecked checkbox leaves its interior as the LCD background tone');
   clickPage('INTERFACE');
   globalThis.ViewBoy.dispatch('optionsPage:INTERFACE');
   clickTarget('AUTO-SIZE COLUMNS');
@@ -1124,16 +1177,16 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the palette selector returns to the authentic Game Boy theme');
   clickTarget('INK LCD GREEN');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'STANDARD');
-  clickPage('TRANSPORT');
+  clickPage('INTERFACE');
   clickTarget('BUTTONS SYMBOLS');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).transportSymbols, true,
-    'the Transport page persists its Words/Symbols control setting');
+    'the Interface page persists its Words/Symbols control setting');
   globalThis.ViewBoy.dispatch('library');
   await tick();
   const symbolTransportPixels = pixelChecksum(canvas.image.data);
   globalThis.ViewBoy.dispatch('settings');
   await tick();
-  clickPage('TRANSPORT');
+  clickPage('INTERFACE');
   clickTarget('BUTTONS WORDS');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).transportSymbols, false);
   globalThis.ViewBoy.dispatch('library');
@@ -1457,10 +1510,20 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.ok(optionToc.width > 0 && optionContent.width > 0
     && optionContent.x >= optionToc.x + optionToc.width,
   'the Options dialog retains adjacent navigation and content panes');
-  const visibleOptionPages = () => hitTargetSnapshot()
-    .map((target) => target.name).filter((name) => pages.includes(name));
+  const visibleOptionPageTargets = () => hitTargetSnapshot().filter((target) => target.optionPage);
+  const visibleOptionPages = () => visibleOptionPageTargets().map((target) => target.name);
+  assert.ok(visibleOptionPageTargets().every((target) =>
+    target.box.y >= optionToc.y && target.box.y + target.box.height <= optionToc.y + optionToc.height),
+  'both ownership groups and all Options pages fit inside the navigation pane');
   assert.deepEqual(visibleOptionPages(), pages,
-    'the Options table of contents stays alphabetized');
+    'Options groups app pages before VGMBoy pages and alphabetizes each group');
+  assert.deepEqual(visibleOptionPageTargets().map((target) => target.optionOwner), [
+    'VIEWBOY', 'VIEWBOY', 'VIEWBOY', 'VIEWBOY', 'VIEWBOY', 'VIEWBOY',
+    'VGMBoy', 'VGMBoy', 'VGMBoy', 'VGMBoy',
+  ], 'every Options page is visibly assigned to its owning frontend or VGMBoy');
+  assert.deepEqual(optionsStyleSnapshot().filter((item) => item.kind === 'owner')
+    .map((item) => item.name), ['VIEWBOY', 'VGMBoy'],
+  'the dialog presents separate ViewBoy and VGMBoy option groups');
   clickPage('DISPLAY');
   const optionStyles = optionsStyleSnapshot();
   const optionsHeading = optionStyles.find((item) => item.kind === 'title' && item.name === 'OPTIONS');
