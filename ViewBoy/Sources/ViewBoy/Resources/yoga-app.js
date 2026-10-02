@@ -260,6 +260,9 @@ let basePixels = new Uint8Array(WIDTH * HEIGHT);
 let selectionBand = null;
 let selectionAnimation = null;
 let selectionAnimationFrame = 0;
+let sidebarSelectionBand = null;
+let sidebarSelectionRows = [];
+let sidebarSelectionAnimation = null;
 let sidebarAnimationFrame = 0;
 let columnAnimationFrame = 0;
 let equalizerAnimationFrame = 0;
@@ -886,6 +889,8 @@ export function hitTargetSnapshot() {
     sidebarContextKind: widget.meta.sidebarContext?.kind || null,
     disclosureProgress: widget.meta.sidebarDisclosure ? widget.meta.disclosureProgress : null,
     sidebarSelection: widget.meta.sidebarSelection === true,
+    sidebarSelectionKey: widget.meta.sidebarSelectionKey ?? null,
+    sidebarSelectionDepth: widget.meta.sidebarSelectionDepth ?? null,
     box: { ...box },
     equalizerValueBox: Number.isInteger(widget.meta.equalizerBar)
       ? { ...state.equalizerValueBoxes[widget.meta.equalizerBar] } : null,
@@ -975,6 +980,14 @@ function selectionYAt(time = performance.now()) {
   const eased = easeSelection(progress);
   return selectionAnimation.fromY
     + (selectionAnimation.toY - selectionAnimation.fromY) * eased;
+}
+
+function sidebarSelectionYAt(time = performance.now()) {
+  if (!sidebarSelectionAnimation) return sidebarSelectionBand?.y ?? null;
+  const progress = Math.max(0, Math.min(1,
+    (time - sidebarSelectionAnimation.startedAt) / sidebarSelectionAnimation.duration));
+  return sidebarSelectionAnimation.fromY
+    + (sidebarSelectionAnimation.toY - sidebarSelectionAnimation.fromY) * easeSelection(progress);
 }
 
 function floor(value) {
@@ -2023,6 +2036,24 @@ export function selectionBandSnapshot() {
   };
 }
 
+export function sidebarSelectionBandSnapshot() {
+  if (!sidebarSelectionBand) return null;
+  const time = performance.now();
+  return {
+    key: sidebarSelectionBand.key,
+    y: sidebarSelectionBand.y,
+    animatedY: sidebarSelectionYAt(time),
+    targetY: sidebarSelectionAnimation?.toY ?? sidebarSelectionBand.y,
+    animationProgress: sidebarSelectionAnimation
+      ? Math.max(0, Math.min(1,
+        (time - sidebarSelectionAnimation.startedAt) / sidebarSelectionAnimation.duration)) : 1,
+    animating: Boolean(sidebarSelectionAnimation),
+    x: sidebarSelectionBand.x,
+    width: sidebarSelectionBand.width,
+    height: sidebarSelectionBand.height,
+  };
+}
+
 export function reorderAnimationSnapshot(time = performance.now()) {
   const animation = reorderAnimation ? {
     kind: reorderAnimation.kind,
@@ -2088,6 +2119,7 @@ function createTableHeader(parent, columns) {
 function createQueueRow(parent, index, track, columns) {
   const rowHeightValue = rowHeight();
   const selected = state.selectedTrackIDs.has(trackID(track));
+  const primarySelected = selected && index === state.selectedTrack;
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
@@ -2105,7 +2137,7 @@ function createQueueRow(parent, index, track, columns) {
     playlistRow: true,
     contentRowKind: "playlist",
     paint(box) {
-      if (selected) fillRect(box.x, box.y, box.width, box.height, 2);
+      if (selected && !primarySelected) fillRect(box.x, box.y, box.width, box.height, 2);
     },
   });
   columns.forEach((column) => {
@@ -2200,13 +2232,14 @@ function createLibraryRow(parent, text, options = {}) {
     onClick: options.onClick,
     sidebarDisclosure: options.disclosure === true,
     sidebarSelection: selected,
+    sidebarSelectionKey: options.selectionKey ?? null,
+    sidebarSelectionDepth: options.selectionDepth ?? 0,
     contentRowKind: "sidebar",
     sidebarContext: options.context || null,
     disclosureProgress: options.disclosureProgress ?? 0,
     disclosureIndent: options.disclosureIndent ?? controlPaddingDots(),
     inset: options.indent ?? (options.disclosure ? controlPaddingDots() + 2 * fontProfile().advance : 0),
     paint(box) {
-      if (selected) fillRect(box.x, box.y - 1, box.width, box.height + 2, 2);
       if (options.disclosure) paintChevron(box, options.disclosureProgress ?? 0,
         options.disclosureIndent ?? controlPaddingDots());
     },
@@ -2418,6 +2451,10 @@ function addLibraryPane(parent) {
     createLibraryRow(parent, row.text, {
       selected: row.node ? row.node.path === state.selectedPathKey
         : row.game && gameKey(row.game) === state.selectedGameKey,
+      selectionKey: row.node ? `path:${row.node.path}`
+        : row.game ? `game:${gameKey(row.game)}`
+          : row.system ? `system:${row.system}` : null,
+      selectionDepth: row.node || row.game ? 2 : row.system ? 1 : 0,
       indent: row.indent,
       disclosure: row.group,
       disclosureProgress: row.disclosureProgress,
@@ -3718,6 +3755,25 @@ function paintSelectionBandPixels(y) {
   }
 }
 
+function paintSidebarSelectionBandPixels(y) {
+  if (!sidebarSelectionBand || y === null) return;
+  const bandTop = floor(y);
+  const priorClip = paintClip;
+  paintClip = intersectBoxes(paintClip, sidebarSelectionBand.clip);
+  fillRect(sidebarSelectionBand.x, bandTop,
+    sidebarSelectionBand.width, sidebarSelectionBand.height, 2);
+  for (const row of sidebarSelectionRows) {
+    if (row.box.y >= bandTop + sidebarSelectionBand.height
+      || row.box.y + row.box.height <= bandTop) continue;
+    const rowClip = intersectBoxes(paintClip, row.clip);
+    if (!rowClip) continue;
+    paintClip = rowClip;
+    row.widget.meta.paint?.(row.box);
+    paintClip = intersectBoxes(priorClip, sidebarSelectionBand.clip);
+  }
+  paintClip = priorClip;
+}
+
 function paintSelectionAt(
   y,
   startY = 0,
@@ -3729,6 +3785,7 @@ function paintSelectionAt(
 ) {
   if (restoreBase) pixels.set(basePixels);
   paintSelectionBandPixels(y);
+  paintSidebarSelectionBandPixels(sidebarSelectionYAt(time));
   paintCheckboxAnimationsAt(time);
   present(startY, endY, startX, endX);
 }
@@ -3790,6 +3847,7 @@ function animateCheckboxFrame(time) {
   const animatedKeys = new Set(checkboxAnimations.keys());
   pixels.set(basePixels);
   paintSelectionBandPixels(selectionYAt(time));
+  paintSidebarSelectionBandPixels(sidebarSelectionYAt(time));
   paintCheckboxAnimationsAt(time);
   const paintedKeys = new Set();
   for (const { key, box } of state.checkboxBoxes) {
@@ -3802,22 +3860,56 @@ function animateCheckboxFrame(time) {
 
 function animateSelectionFrame(time) {
   selectionAnimationFrame = 0;
-  if (!selectionAnimation) return;
-  const complete = time - selectionAnimation.startedAt >= selectionAnimation.duration;
-  if (!complete && !animationFrameIsDue(selectionAnimation, time)) {
+  const playlistAnimation = selectionAnimation;
+  const treeAnimation = sidebarSelectionAnimation;
+  if (!playlistAnimation && !treeAnimation) return;
+  const playlistComplete = !playlistAnimation
+    || time - playlistAnimation.startedAt >= playlistAnimation.duration;
+  const sidebarComplete = !treeAnimation
+    || time - treeAnimation.startedAt >= treeAnimation.duration;
+  const timing = playlistAnimation || treeAnimation;
+  if ((!playlistComplete || !sidebarComplete) && !animationFrameIsDue(timing, time)) {
     selectionAnimationFrame = requestAnimationFrame(animateSelectionFrame);
     return;
   }
-  const priorY = selectionAnimation.lastY;
-  const y = selectionYAt(time);
-  const extent = selectionBand?.height ?? 0;
-  paintSelectionAt(y, Math.min(priorY, y) - 1, Math.max(priorY, y) + extent + 1, time);
-  selectionAnimation.lastY = y;
-  if (!complete) {
-    selectionAnimationFrame = requestAnimationFrame(animateSelectionFrame);
-  } else {
-    selectionBand.y = selectionAnimation.toY;
+  const dirtyBands = [];
+  if (playlistAnimation) {
+    const y = selectionYAt(time);
+    dirtyBands.push({
+      x: selectionBand?.x ?? 0,
+      right: (selectionBand?.x ?? 0) + (selectionBand?.width ?? WIDTH),
+      top: Math.min(playlistAnimation.lastY, y) - 1,
+      bottom: Math.max(playlistAnimation.lastY, y) + (selectionBand?.height ?? 0) + 1,
+    });
+    playlistAnimation.lastY = y;
+  }
+  if (treeAnimation) {
+    const y = sidebarSelectionYAt(time);
+    dirtyBands.push({
+      x: sidebarSelectionBand?.x ?? 0,
+      right: (sidebarSelectionBand?.x ?? 0) + (sidebarSelectionBand?.width ?? WIDTH),
+      top: Math.min(treeAnimation.lastY, y) - 1,
+      bottom: Math.max(treeAnimation.lastY, y) + (sidebarSelectionBand?.height ?? 0) + 1,
+    });
+    treeAnimation.lastY = y;
+  }
+  const dirty = dirtyBands.reduce((bounds, band) => ({
+    x: Math.min(bounds.x, band.x),
+    right: Math.max(bounds.right, band.right),
+    top: Math.min(bounds.top, band.top),
+    bottom: Math.max(bounds.bottom, band.bottom),
+  }), { x: WIDTH, right: 0, top: HEIGHT, bottom: 0 });
+  paintSelectionAt(selectionYAt(time), dirty.top, dirty.bottom, time, dirty.x, dirty.right);
+  if (playlistComplete && playlistAnimation) {
+    selectionBand.y = playlistAnimation.toY;
     selectionAnimation = null;
+  }
+  if (sidebarComplete && treeAnimation) {
+    sidebarSelectionBand.y = treeAnimation.toY;
+    sidebarSelectionAnimation = null;
+  }
+  if (selectionAnimation || sidebarSelectionAnimation) {
+    selectionAnimationFrame = requestAnimationFrame(animateSelectionFrame);
   }
 }
 
@@ -3976,6 +4068,9 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
   const priorBand = selectionBand;
   const priorY = selectionYAt(frameTime);
   const priorSelectionAnimation = selectionAnimation;
+  const priorSidebarBand = sidebarSelectionBand;
+  const priorSidebarY = sidebarSelectionYAt(frameTime);
+  const priorSidebarSelectionAnimation = sidebarSelectionAnimation;
   if (selectionAnimationFrame && !preserveAnimations) {
     cancelAnimationFrame(selectionAnimationFrame);
     selectionAnimationFrame = 0;
@@ -4017,6 +4112,21 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
   selectionRows = isOptions
     ? layoutEntries.filter((entry) => entry.widget.meta.optionPage)
     : layoutEntries.filter((entry) => Number.isInteger(entry.widget.meta.trackIndex));
+  sidebarSelectionRows = isOptions ? [] : layoutEntries.filter((entry) =>
+    entry.widget.meta.contentRowKind === "sidebar" && entry.widget.meta.sidebarSelectionKey);
+  const selectedSidebarRow = sidebarSelectionRows
+    .filter((entry) => entry.widget.meta.sidebarSelection)
+    .sort((first, second) => second.widget.meta.sidebarSelectionDepth
+      - first.widget.meta.sidebarSelectionDepth)[0] || null;
+  const nextSidebarBand = selectedSidebarRow ? {
+    ...selectedSidebarRow.box,
+    kind: "sidebar",
+    key: selectedSidebarRow.widget.meta.sidebarSelectionKey,
+    mode: state.sidebarMode,
+    y: selectedSidebarRow.box.y - 1,
+    height: selectedSidebarRow.box.height + 2,
+    ...(selectedSidebarRow.clip ? { clip: selectedSidebarRow.clip } : {}),
+  } : null;
   const selectedRow = isOptions
     ? selectionRows.find((entry) => entry.widget.meta.controlTitle === state.optionsPage)
     : state.selectedTrackIDs.has(trackID(visibleTracks()[state.selectedTrack]))
@@ -4027,6 +4137,8 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
   const nextBand = selectedRow ? {
     ...selectedRow.box,
     kind: isOptions ? "options-page" : "track",
+    key: isOptions ? `options:${state.optionsPage}`
+      : trackID(visibleTracks()[state.selectedTrack]),
     ...(isOptions ? {
       x: selectedRow.box.x + 1,
       y: selectedRow.box.y + 1,
@@ -4045,9 +4157,50 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
     && animationEnabled() && selectionDuration > 0
     && priorBand && nextBand
     && priorBand.kind === nextBand.kind
+    && priorBand.key !== nextBand.key
     && priorBand.x === nextBand.x && priorBand.width === nextBand.width
     && priorBand.height === nextBand.height && Math.abs(priorY - nextBand.y) > 0.5;
+  const sidebarCanSlide = animationEnabled() && selectionDuration > 0
+    && priorSidebarBand && nextSidebarBand
+    && priorSidebarBand.key !== nextSidebarBand.key
+    && priorSidebarBand.mode === nextSidebarBand.mode
+    && priorSidebarBand.x === nextSidebarBand.x
+    && priorSidebarBand.width === nextSidebarBand.width
+    && priorSidebarBand.height === nextSidebarBand.height
+    && Math.abs(priorSidebarY - nextSidebarBand.y) > 0.5;
+  const canContinueSelection = priorSelectionAnimation && priorBand && nextBand
+    && priorBand.key === nextBand.key
+    && priorSelectionAnimation.toY === nextBand.y
+    && priorBand.x === nextBand.x && priorBand.width === nextBand.width
+    && priorBand.height === nextBand.height;
+  const canContinueSidebarSelection = priorSidebarSelectionAnimation
+    && priorSidebarBand && nextSidebarBand
+    && priorSidebarBand.key === nextSidebarBand.key
+    && priorSidebarSelectionAnimation.toY === nextSidebarBand.y
+    && priorSidebarBand.x === nextSidebarBand.x
+    && priorSidebarBand.width === nextSidebarBand.width
+    && priorSidebarBand.height === nextSidebarBand.height;
   selectionBand = nextBand;
+  sidebarSelectionBand = nextSidebarBand;
+  if (sidebarCanSlide) {
+    sidebarSelectionAnimation = {
+      key: nextSidebarBand.key,
+      fromY: priorSidebarY,
+      toY: nextSidebarBand.y,
+      startedAt: frameTime,
+      duration: selectionDuration,
+      lastY: priorSidebarY,
+    };
+  } else if ((preserveAnimations || canContinueSidebarSelection)
+    && priorSidebarSelectionAnimation && nextSidebarBand
+    && priorSidebarSelectionAnimation.key === nextSidebarBand.key) {
+    sidebarSelectionAnimation = {
+      ...priorSidebarSelectionAnimation,
+      toY: nextSidebarBand.y,
+    };
+  } else {
+    sidebarSelectionAnimation = null;
+  }
   if (canSlide) {
     selectionAnimation = {
       fromY: priorY,
@@ -4057,13 +4210,18 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
       lastY: priorY,
     };
     paintSelectionAt(priorY, presentY, presentEndY, frameTime, presentX, presentEndX);
-    selectionAnimationFrame = requestAnimationFrame(animateSelectionFrame);
-  } else if (preserveAnimations && priorSelectionAnimation && nextBand) {
+  } else if ((preserveAnimations || canContinueSelection)
+    && priorSelectionAnimation && nextBand
+    && priorBand?.key === nextBand.key
+    && priorSelectionAnimation.toY === nextBand.y) {
     selectionAnimation = priorSelectionAnimation;
     paintSelectionAt(selectionYAt(frameTime), presentY, presentEndY, frameTime, presentX, presentEndX);
   } else {
     selectionAnimation = null;
     paintSelectionAt(nextBand?.y ?? null, presentY, presentEndY, frameTime, presentX, presentEndX);
+  }
+  if ((selectionAnimation || sidebarSelectionAnimation) && !selectionAnimationFrame) {
+    selectionAnimationFrame = requestAnimationFrame(animateSelectionFrame);
   }
   const isDragging = pointerInteraction?.kind === "reorder" && pointerInteraction.dragging;
   if ((columnLayoutAnimation || tabLayoutAnimation || reorderAnimation || isDragging)
@@ -4115,6 +4273,7 @@ function cancelScreenLocalAnimations() {
   libraryScrollFrame = 0;
   spacingAnimationFrame = 0;
   selectionAnimation = null;
+  sidebarSelectionAnimation = null;
   state.sidebarTransition = null;
   columnLayoutAnimation = null;
   tabLayoutAnimation = null;
@@ -5205,32 +5364,42 @@ async function stopPlayback() {
 function selectTrack(index, wrap = true, modifiers = {}) {
   const shownTracks = visibleTracks();
   if (!shownTracks.length) return;
-  state.selectedTrack = wrap ? (index + shownTracks.length) % shownTracks.length
+  const previousIndex = state.selectedTrack;
+  const previousAnchorID = state.selectionAnchorID;
+  const nextIndex = wrap ? (index + shownTracks.length) % shownTracks.length
     : Math.max(0, Math.min(shownTracks.length - 1, index));
-  const targetID = trackID(shownTracks[state.selectedTrack]);
+  const targetID = trackID(shownTracks[nextIndex]);
   let nextIDs;
   let primaryID = targetID;
+  let nextAnchorID = targetID;
   if (modifiers.range) {
     const anchorIndex = shownTracks.findIndex((track) => trackID(track) === state.selectionAnchorID);
-    const start = Math.min(anchorIndex < 0 ? state.selectedTrack : anchorIndex, state.selectedTrack);
-    const end = Math.max(anchorIndex < 0 ? state.selectedTrack : anchorIndex, state.selectedTrack);
+    const start = Math.min(anchorIndex < 0 ? nextIndex : anchorIndex, nextIndex);
+    const end = Math.max(anchorIndex < 0 ? nextIndex : anchorIndex, nextIndex);
     nextIDs = shownTracks.slice(start, end + 1).map(trackID);
-    if (!state.selectionAnchorID || anchorIndex < 0) state.selectionAnchorID = targetID;
+    nextAnchorID = !state.selectionAnchorID || anchorIndex < 0 ? targetID : state.selectionAnchorID;
   } else if (modifiers.extend) {
     nextIDs = [...state.selectedTrackIDs];
     if (nextIDs.includes(targetID)) nextIDs = nextIDs.filter((id) => id !== targetID);
     else nextIDs.push(targetID);
     primaryID = nextIDs.includes(targetID) ? targetID : nextIDs.at(-1) || null;
-    state.selectionAnchorID = targetID;
+    nextAnchorID = targetID;
   } else {
     nextIDs = [targetID];
-    state.selectionAnchorID = targetID;
+    nextAnchorID = targetID;
   }
+  state.selectedTrack = nextIndex;
   state.selectedTrackIDs = new Set(nextIDs);
+  state.selectionAnchorID = nextAnchorID;
   if (primaryID) {
     const primaryIndex = shownTracks.findIndex((track) => trackID(track) === primaryID);
     if (primaryIndex >= 0) state.selectedTrack = primaryIndex;
   }
+  const unchanged = previousIndex === state.selectedTrack
+    && previousAnchorID === state.selectionAnchorID
+    && nextIDs.length === state.selectedTrackIDs.size
+    && nextIDs.every((id) => state.selectedTrackIDs.has(id));
+  if (unchanged) return;
   const tab = activePlaylistTab();
   if (tab) {
     tab.selectedTrack = state.selectedTrack;
@@ -5415,6 +5584,25 @@ function findTargetEntry(point, predicate = () => true) {
       || point.y < clip.y || point.y >= clip.y + clip.height))) continue;
     if (point.x >= box.x && point.x < box.x + box.width
       && point.y >= box.y && point.y < box.y + box.height) return entry;
+  }
+  const viewport = state.tableViewportBox;
+  if (!viewport || point.x < viewport.x || point.x >= viewport.x + viewport.width
+    || point.y < viewport.y || point.y >= viewport.y + viewport.height) return null;
+  const rows = hitTargets.filter(({ widget, clip }) => widget.meta.playlistRow
+    && predicate(widget)
+    && (!clip || (point.x >= clip.x && point.x < clip.x + clip.width
+      && point.y >= clip.y && point.y < clip.y + clip.height)))
+    .sort((first, second) => first.box.y - second.box.y);
+  for (let index = 0; index < rows.length - 1; index += 1) {
+    const previous = rows[index];
+    const next = rows[index + 1];
+    const gapStart = previous.box.y + previous.box.height;
+    const gapEnd = next.box.y;
+    if (point.y < gapStart || point.y >= gapEnd) continue;
+    const pointCenter = point.y + 0.5;
+    const previousDistance = pointCenter - gapStart;
+    const nextDistance = gapEnd - pointCenter;
+    return previousDistance <= nextDistance ? previous : next;
   }
   return null;
 }

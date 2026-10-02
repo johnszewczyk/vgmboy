@@ -87,6 +87,9 @@ const otherRow = { playlistId: 'other', path: '/music/other.spc', title: 'Other 
 let ended;
 let generation = 0;
 let nextFrameAdvanceMs = 250;
+let nextAnimationFrameID = 1;
+let animationFrameFlushScheduled = false;
+const animationFrameCallbacks = new Map();
 const bridge = {
   closeMainWindow: async () => { closeWindowRequests += 1; },
   playbackBackends: [{ id: 'libgme', supportsTempo: true, extensions: ['spc'] }],
@@ -221,12 +224,24 @@ globalThis.innerWidth = 420;
 globalThis.innerHeight = 300;
 globalThis.devicePixelRatio = 2;
 globalThis.addEventListener = (name, callback) => windowListeners.set(name, callback);
-globalThis.requestAnimationFrame = (callback) => setImmediate(() => {
-  const advance = nextFrameAdvanceMs;
-  nextFrameAdvanceMs = 250;
-  callback(performance.now() + advance);
-});
-globalThis.cancelAnimationFrame = (frame) => clearImmediate(frame);
+globalThis.requestAnimationFrame = (callback) => {
+  const id = nextAnimationFrameID++;
+  animationFrameCallbacks.set(id, callback);
+  if (!animationFrameFlushScheduled) {
+    animationFrameFlushScheduled = true;
+    setImmediate(() => {
+      animationFrameFlushScheduled = false;
+      const advance = nextFrameAdvanceMs;
+      nextFrameAdvanceMs = 250;
+      const time = performance.now() + advance;
+      const callbacks = [...animationFrameCallbacks.values()];
+      animationFrameCallbacks.clear();
+      callbacks.forEach((frame) => frame(time));
+    });
+  }
+  return id;
+};
+globalThis.cancelAnimationFrame = (frame) => animationFrameCallbacks.delete(frame);
 globalThis.document = { documentElement: { dataset: {} }, querySelector(selector) {
   if (selector === '#lcd') return canvas;
   if (selector === '#screen-window') return screen;
@@ -282,6 +297,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     selectionBandSnapshot,
     spacingReadoutLayoutSnapshot,
     screenTransitionSnapshot,
+    sidebarSelectionBandSnapshot,
     volumeControlSnapshot,
   } = await import('../Sources/ViewBoy/Resources/yoga-app.js');
   const standardFont = bitmapFontSnapshot('STANDARD');
@@ -613,6 +629,17 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     canvas.listeners.get('click')({
       clientX: rect.width * (target.box.x + target.box.width / 2) / logicalWidth,
       clientY: rect.height * (target.box.y + target.box.height / 2) / logicalHeight,
+      detail: 1,
+      ...modifiers,
+    });
+  };
+  const clickLogicalPoint = (x, y, modifiers = {}) => {
+    const rect = canvas.getBoundingClientRect();
+    const logicalWidth = canvas.width / dotsPerCell();
+    const logicalHeight = canvas.height / dotsPerCell();
+    canvas.listeners.get('click')({
+      clientX: rect.width * x / logicalWidth,
+      clientY: rect.height * y / logicalHeight,
       detail: 1,
       ...modifiers,
     });
@@ -1899,9 +1926,57 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     altKey: false, shiftKey: false, preventDefault() {},
   });
   const selectionBeforePathMode = selectionBandSnapshot();
-  const selectedTrackBeforePathMode = hitTargetSnapshot().find((target) =>
+  const nextSelectionRow = hitTargetSnapshot().find((target) => target.playlistRow
+    && target.trackIndex === 1);
+  assert.equal(selectionBeforePathMode.targetY, nextSelectionRow.box.y - 1,
+    'the selection band targets the newly selected playlist row');
+  assert.ok(Math.abs(selectionBeforePathMode.animatedY - selectionBeforePathMode.targetY) > 0.5,
+    'the selection band is visibly in flight instead of jumping directly to its target');
+  let selectedTrackBeforePathMode = hitTargetSnapshot().find((target) =>
     Number.isInteger(target.trackIndex) && target.box.y === selectionBeforePathMode.y + 1)?.trackIndex;
   assert.equal(selectedTrackBeforePathMode, 1, 'the playlist cursor is moved off its first row before switching sidebar mode');
+  const movingRows = hitTargetSnapshot().filter((target) => target.playlistRow)
+    .sort((first, second) => first.trackIndex - second.trackIndex);
+  const sampleX = movingRows[0].box.x + movingRows[0].box.width - 4;
+  nextFrameAdvanceMs = 30;
+  await tick();
+  const movingShadeRows = () => {
+    const firstY = movingRows[0].box.y - 3;
+    const lastY = movingRows[1].box.y + movingRows[1].box.height + 3;
+    const shades = Array.from({ length: lastY - firstY }, (_, index) =>
+      framebufferShadeSnapshot(sampleX, firstY + index) === 2);
+    let runs = 0;
+    for (let index = 0; index < shades.length; index += 1) {
+      if (shades[index] && (index === 0 || !shades[index - 1])) runs += 1;
+    }
+    return runs;
+  };
+  assert.equal(movingShadeRows(), 1,
+    'the traveling playlist cursor is one continuous bar with no second shaded row behind it');
+  await tick();
+  canvas.listeners.get('keydown')({
+    key: 'ArrowUp', code: 'ArrowUp', metaKey: false, ctrlKey: false,
+    altKey: false, shiftKey: false, preventDefault() {},
+  });
+  const upwardSelection = selectionBandSnapshot();
+  assert.equal(upwardSelection.targetY, movingRows[0].box.y - 1,
+    'ArrowUp retargets the same cursor upward to the preceding row');
+  assert.ok(upwardSelection.animationProgress < 1,
+    'ArrowUp starts the canonical cursor animation instead of jumping to the row');
+  const repeatedBoundarySelection = selectionBandSnapshot();
+  canvas.listeners.get('keydown')({
+    key: 'ArrowUp', code: 'ArrowUp', metaKey: false, ctrlKey: false,
+    altKey: false, shiftKey: false, preventDefault() {},
+  });
+  assert.equal(selectionBandSnapshot().targetY, repeatedBoundarySelection.targetY,
+    'holding ArrowUp at the first row does not restart or displace the cursor animation');
+  const secondPlaylistRow = movingRows[1];
+  clickEntry(hitTargetSnapshot().find((target) => target.playlistRow && target.trackIndex === 2));
+  clickLogicalPoint(secondPlaylistRow.box.x + 8,
+    secondPlaylistRow.box.y - 1);
+  assert.deepEqual(playlistSelectionSnapshot().selectedIndices, [0],
+    'clicking the one-dot line gap selects its nearest row, breaking an exact tie toward the preceding row');
+  selectedTrackBeforePathMode = playlistSelectionSnapshot().primaryIndex;
   clickTarget('PATH');
   await tick();
   await tick();
@@ -1938,7 +2013,16 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   clickTarget('SUB', 0, 0.5, 0.5, 2);
   await tick();
   assert.equal(pathFolderCalls.length, 1, 'double-clicking a catalog folder loads its indexed tracks');
+  nextFrameAdvanceMs = 30;
   clickTarget('path.spc');
+  const sidebarCursorMotion = sidebarSelectionBandSnapshot();
+  assert.equal(sidebarCursorMotion?.key, 'path:catalog-file:1:/music/sub/path.spc',
+    'the sidebar selection band follows the newly selected file row');
+  assert.equal(sidebarCursorMotion?.animating, true,
+    'sidebar row changes use the same animated cursor as the playlist');
+  assert.equal(sidebarCursorMotion?.targetY,
+    hitTargetSnapshot().find((target) => target.name === 'path.spc').box.y - 1,
+    'the sidebar selection band targets the file row with the same one-dot inset');
   await tick();
   assert.equal(pathFileCalls.length, 1, 'selecting a catalog file loads its indexed tracks');
   assert.equal(pathFileCalls[0][0].path, '/music/sub/path.spc');
