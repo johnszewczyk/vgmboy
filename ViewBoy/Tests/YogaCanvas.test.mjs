@@ -342,8 +342,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   for (const [theme, contrast, firstColor, lastColor] of [
     ['GAMEBOY', 'STANDARD', '#0C300C', '#9BBC0F'],
     ['GAMEBOY', 'HIGH_CONTRAST', '#333333', '#9BBC0F'],
-    ['NIGHTBOY', 'STANDARD', '#D8D6DF', '#050308'],
-    ['NIGHTBOY', 'HIGH_CONTRAST', '#F0EFF4', '#050308'],
+    ['NIGHTBOY', 'STANDARD', '#D8D6DF', '#000000'],
+    ['NIGHTBOY', 'HIGH_CONTRAST', '#F0EFF4', '#000000'],
   ]) {
     const tones = lcdPaletteSnapshot(theme, contrast);
     assert.equal(tones.length, 4, `${theme} ${contrast} supplies exactly four LCD tones`);

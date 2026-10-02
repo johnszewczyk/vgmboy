@@ -47,8 +47,8 @@ const PALETTE_ENDPOINTS = {
     HIGH_CONTRAST: { ink: "#333333", surface: "#9BBC0F" },
   },
   NIGHTBOY: {
-    STANDARD: { ink: "#D8D6DF", surface: "#050308" },
-    HIGH_CONTRAST: { ink: "#F0EFF4", surface: "#050308" },
+    STANDARD: { ink: "#D8D6DF", surface: "#000000" },
+    HIGH_CONTRAST: { ink: "#F0EFF4", surface: "#000000" },
   },
 };
 function hexToRGB(color) {

@@ -61,7 +61,7 @@ body {
   --membrane-outer: #c7c5cf;
   --membrane-middle: #77747f;
   --membrane-inner: #3c3844;
-  --screen-surface: #050308;
+  --screen-surface: #000000;
 }
 
 :root[data-theme="NIGHTBOY"] body {
