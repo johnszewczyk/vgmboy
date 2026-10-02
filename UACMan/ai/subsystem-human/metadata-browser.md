@@ -9,8 +9,8 @@ and path live in the left side of the universal status bar.
 
 Choose **Open Collection** and select a folder. UACMan recursively lists
 regular `.uac` files beneath it, ordered by the package title in each manifest.
-The filter above the collection list searches title, system, package ID, and
-relative path. Each row shows its system, playable-member and total-member
+The filter above the collection list searches title, platform, package ID, and
+relative path. Each row shows its platform, playable-member and total-member
 counts, and path. Unreadable package manifests
 remain visible in an error disclosure with the path and reader error.
 
@@ -117,12 +117,12 @@ current filename filter. It asks for confirmation, reports progress, and
 rewrites each affected package manifest once; package-level fields are not
 targets.
 
-When a field value is a JSON array or object, its **Tag Value** cell opens the
-same nested canonical table pattern. A string containing a JSON array or
-object opens the same way and remains a string when saved. Each level can
-contain scalars, arrays, and objects, with no designed nesting-depth limit.
-Structured values show their item or field count with the same plus/minus fold
-control used by the outer analyzer tables.
+When a field value is a JSON array or object, its **Tag Value** cell shows
+`[Nested Tags]` and opens the same nested canonical table pattern. A string
+containing a JSON array or object opens the same way and remains a string when
+saved. Each level can contain scalars, arrays, and objects, with no designed
+nesting-depth limit. The expanded title shows the full path and child count;
+the parent cell keeps the `[Nested Tags]` label and the standard fold control.
 Use **＋** to add a string,
 **123** to add a JSON scalar, **{}** to add an object, **[]** to add an array,
 and **×** to remove an entry.
@@ -146,8 +146,11 @@ without rewriting them.
 
 Pack Tags edits use canonical table rows; its final draft row adds a
 package-level string tag, and existing rows can be renamed, edited, submitted,
-or deleted. Press **Enter** in a single-line editable field to submit that
-row; multiline JSON editors keep Enter for line breaks. The **New Tag** page
+or deleted. Press **Enter** in a single-line editable text field to invoke
+that row's normal **✓** action. This applies to editable tag rows, file-tag
+rows, nested-value rows, Tag Analyzer matches, and the New Tag draft. Disabled
+and read-only fields do not submit; multiline JSON editors keep Enter for line
+breaks. The **New Tag** page
 adds one string tag to a chosen package or track scope; selected-track mode
 requires at least one selected track. With a collection open, selected-package
 mode edits only the package metadata map in

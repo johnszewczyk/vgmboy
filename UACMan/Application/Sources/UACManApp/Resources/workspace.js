@@ -841,7 +841,7 @@
       const title = entry.title || entry.relativePath.split("/").pop().replace(/\.uac$/i, "");
       const selected = state.selectedCollectionPackagePath === entry.relativePath;
       const checked = (state.selectedCollectionPackagePaths || []).includes(entry.relativePath);
-      return `<div class="collection-item ${selected ? "selected" : ""}" data-package="${esc(entry.relativePath)}" title="${esc(entry.packageID)} · ${bytes(entry.fileByteCount)}"><button class="collection-package-select" type="button" data-action="toggleCollectionPackageSelection" data-package-path="${esc(entry.relativePath)}" role="checkbox" aria-checked="${checked}" aria-label="${checked ? "Remove" : "Add"} ${esc(title)} ${checked ? "from" : "to"} batch selection">${checked ? "✓" : "−"}</button><div class="collection-item-copy"><div class="collection-title">${esc(title)}</div><div class="collection-meta">${esc(entry.console || "Unknown system")} · ${entry.playableMemberCount} playable · ${entry.totalMemberCount} members</div><div class="collection-path">${esc(entry.relativePath)}</div></div></div>`;
+      return `<div class="collection-item ${selected ? "selected" : ""}" data-package="${esc(entry.relativePath)}" title="${esc(entry.packageID)} · ${bytes(entry.fileByteCount)}"><button class="collection-package-select" type="button" data-action="toggleCollectionPackageSelection" data-package-path="${esc(entry.relativePath)}" role="checkbox" aria-checked="${checked}" aria-label="${checked ? "Remove" : "Add"} ${esc(title)} ${checked ? "from" : "to"} batch selection">${checked ? "✓" : "−"}</button><div class="collection-item-copy"><div class="collection-title">${esc(title)}</div><div class="collection-meta">${esc(entry.console || "Unknown platform")} · ${entry.playableMemberCount} playable · ${entry.totalMemberCount} members</div><div class="collection-path">${esc(entry.relativePath)}</div></div></div>`;
     }).join("");
     if (entries.length === 0) $("#collection-list").innerHTML = `<div class="empty-note">${state.collectionEntries.length ? "No packages match this filter." : "Choose Collection to scan a folder of UAC packages."}</div>`;
   }
@@ -1527,7 +1527,7 @@
       : deleting
         ? state.tagAnalyzerStatusMessage || "Deleting matching track fields…"
       : state.tagAnalyzerStatusMessage || (state.tagAnalyzerRootPath
-        ? "Choose Analyze to inventory this folder’s UAC tag names."
+        ? ""
         : "Browse for a folder to inventory its UAC tag names.");
     const rows = visibleTags.map(({ tag, matchedPackCount, trackCount, trackArchives }, index) => {
       const foldID = tagAnalyzerFoldID(tag.name);
