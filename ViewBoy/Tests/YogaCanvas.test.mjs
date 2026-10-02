@@ -2134,4 +2134,37 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     tab.id === savedPlaylistTabs.at(-1).activeID);
   assert.deepEqual(activeSavedTab.playlist.map((track) => track.playlistId), ['a', 'b', 'c', 'path-track'],
     'Enqueue appends the selected system tracks to the active playlist while playback continues');
+
+  const pressEnter = () => canvas.listeners.get('keydown')({
+    key: 'Enter', code: 'Enter', preventDefault() {},
+  });
+  const secondTrack = hitTargetSnapshot().find((target) => target.trackIndex === 1);
+  assert.ok(secondTrack, 'the playlist exposes a second selectable track');
+  clickEntry(secondTrack);
+  pressEnter();
+  await tick();
+  await tick();
+  assert.equal(calls.filter(([name]) => name === 'start').at(-1)[1].path, '/music/b.spc',
+    'Enter starts the selected playlist track');
+
+  clickTarget('PATH');
+  await tick();
+  if (!hitTargetSnapshot().some((target) => target.name === 'path.spc')) {
+    const pathFolder = hitTargetSnapshot().find((target) => target.name === 'SUB');
+    assert.ok(pathFolder, 'the Path sidebar exposes its folder row');
+    clickEntry(pathFolder);
+    await tick();
+    await tick();
+  }
+  const enterPathRow = hitTargetSnapshot().find((target) => target.name === 'path.spc'
+    && target.sidebarContextKind === 'path');
+  assert.ok(enterPathRow, 'the Path sidebar exposes its selected file row');
+  clickEntry(enterPathRow);
+  await tick();
+  await tick();
+  pressEnter();
+  await tick();
+  await tick();
+  assert.equal(calls.filter(([name]) => name === 'start').at(-1)[1].path, '/music/sub/path.spc',
+    'Enter runs Play Now for the selected sidebar item and starts its first track');
 });

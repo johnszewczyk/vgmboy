@@ -301,6 +301,8 @@ const state = {
   selectedTrack: 0,
   selectedTrackIDs: new Set(),
   selectionAnchorID: null,
+  enterSelection: "playlist",
+  sidebarEnterContext: null,
   playing: false,
   font: savedDisplayOptions.font === "STANDARD" ? "STANDARD" : "MICRO",
   contrast: savedDisplayOptions.contrast === "HIGH_CONTRAST" ? "HIGH_CONTRAST" : "STANDARD",
@@ -570,6 +572,8 @@ function restorePlaylistTabs(value) {
 function activatePlaylistTab(id) {
   const tab = state.playlistTabs.find((entry) => entry.id === id);
   if (!tab) return false;
+  state.enterSelection = "playlist";
+  state.sidebarEnterContext = null;
   const leavingOptions = state.tab === "SETTINGS";
   if (tab.id !== state.activePlaylistTabId) syncActivePlaylistTab();
   else if (state.tab !== "SETTINGS") return false;
@@ -2448,6 +2452,9 @@ function addLibraryPane(parent) {
       createLibraryRow(parent, "", { spacer: true });
       return;
     }
+    const context = row.node ? { kind: "path", node: row.node }
+      : row.game ? { kind: "game", game: row.game }
+        : row.system ? { kind: "system", system: row.system } : null;
     createLibraryRow(parent, row.text, {
       selected: row.node ? row.node.path === state.selectedPathKey
         : row.game && gameKey(row.game) === state.selectedGameKey,
@@ -2459,10 +2466,12 @@ function addLibraryPane(parent) {
       disclosure: row.group,
       disclosureProgress: row.disclosureProgress,
       disclosureIndent: row.disclosureIndent,
-      context: row.node ? { kind: "path", node: row.node }
-        : row.game ? { kind: "game", game: row.game }
-          : row.system ? { kind: "system", system: row.system } : null,
+      context,
       onClick: (event) => {
+        if (context) {
+          state.enterSelection = "sidebar";
+          state.sidebarEnterContext = context;
+        }
         if (row.node) {
           if (row.node.kind === "folder" && row.node.children?.length) {
             if (event.detail >= 2) void loadPathNode(row.node);
@@ -4498,6 +4507,8 @@ async function toggleFavorite(track) {
 }
 
 function openProjectionPlaylist(sourceKey, title, playlist) {
+  state.enterSelection = "playlist";
+  state.sidebarEnterContext = null;
   const leavingOptions = state.tab === "SETTINGS";
   const priorWidths = leavingOptions ? null : captureTabWidths();
   if (!leavingOptions) syncActivePlaylistTab();
@@ -4618,12 +4629,20 @@ async function showPlaybackHistory() {
 
 function selectSidebarView(view) {
   if (view === "FAVORITES") {
+    state.enterSelection = "playlist";
+    state.sidebarEnterContext = null;
     void showFavoritesPlaylist();
     return;
   }
   if (view === "HISTORY") {
+    state.enterSelection = "playlist";
+    state.sidebarEnterContext = null;
     void showPlaybackHistory();
     return;
+  }
+  if (view === "QUEUE") {
+    state.enterSelection = "playlist";
+    state.sidebarEnterContext = null;
   }
   const leavingOptions = state.tab === "SETTINGS";
   if (view === "QUEUE") {
@@ -4803,6 +4822,8 @@ async function tracksForSidebarContext(context) {
 function replaceActivePlaylistForSidebar(playlist, title) {
   const tab = activePlaylistTab();
   if (!tab) return null;
+  state.enterSelection = "playlist";
+  state.sidebarEnterContext = null;
   tab.playlist = [...playlist];
   tab.title = title || tab.title || "PLAYLIST";
   tab.gameKey = null;
@@ -4827,6 +4848,8 @@ function replaceActivePlaylistForSidebar(playlist, title) {
 function enqueueSidebarTracks(additions, title) {
   const tab = activePlaylistTab();
   if (!tab || !additions.length) return [];
+  state.enterSelection = "playlist";
+  state.sidebarEnterContext = null;
   const current = [...tab.playlist];
   const existing = new Set(current.map(trackID));
   const unique = additions.filter((track) => !existing.has(trackID(track)));
@@ -5362,6 +5385,8 @@ async function stopPlayback() {
 }
 
 function selectTrack(index, wrap = true, modifiers = {}) {
+  state.enterSelection = "playlist";
+  state.sidebarEnterContext = null;
   const shownTracks = visibleTracks();
   if (!shownTracks.length) return;
   const previousIndex = state.selectedTrack;
@@ -5416,6 +5441,8 @@ function selectTrack(index, wrap = true, modifiers = {}) {
 }
 
 function clearPlaylistSelection() {
+  state.enterSelection = "playlist";
+  state.sidebarEnterContext = null;
   state.selectedTrackIDs = new Set();
   state.selectionAnchorID = null;
   const tab = activePlaylistTab();
@@ -5849,6 +5876,8 @@ canvas.addEventListener("contextmenu", (event) => {
   const context = sidebarRow?.widget.meta.sidebarContext;
   if (!context) return;
   event.preventDefault();
+  state.enterSelection = "sidebar";
+  state.sidebarEnterContext = context;
   if (context.kind === "path") state.selectedPathKey = context.node.path;
   else if (context.kind === "game") state.selectedGameKey = gameKey(context.game);
   else if (context.kind === "system") state.selectedSystem = context.system;
@@ -6004,6 +6033,8 @@ canvas.addEventListener("keydown", (event) => {
   } else if (commandKey && !event.shiftKey && !event.altKey
       && event.key.toLowerCase() === "a" && state.tab !== "SETTINGS" && !state.searchFocused) {
     event.preventDefault();
+    state.enterSelection = "playlist";
+    state.sidebarEnterContext = null;
     const shown = visibleTracks();
     const ids = shown.map(trackID);
     setPlaylistSelection(ids, ids[0] || null, ids.at(-1) || null);
@@ -6069,8 +6100,12 @@ canvas.addEventListener("keydown", (event) => {
     selectTrack(state.selectedTrack - 1, false, { range: event.shiftKey });
   } else if (event.code === "Enter") {
     event.preventDefault();
-    const selected = visibleTracks()[state.selectedTrack];
-    if (selected && state.selectedTrackIDs.has(trackID(selected))) startTrack(selected);
+    if (state.enterSelection === "sidebar" && state.sidebarEnterContext) {
+      void playNowSidebarContext(state.sidebarEnterContext);
+    } else {
+      const selected = visibleTracks()[state.selectedTrack];
+      if (selected && state.selectedTrackIDs.has(trackID(selected))) startTrack(selected);
+    }
   } else if (event.code === "PageDown" || event.code === "PageUp") {
     event.preventDefault();
     selectTrack(state.selectedTrack + (event.code === "PageDown" ? 1 : -1) * visibleRowCount(), false,
