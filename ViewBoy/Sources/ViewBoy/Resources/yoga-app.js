@@ -229,6 +229,7 @@ function saveDisplayOptions() {
       columnOrder: state.columnOrder,
       autoHideEmptyColumns: state.autoHideEmptyColumns,
       expandedPathNodes: [...state.expandedPathNodes],
+      pathExpansionInitialized: state.pathExpansionInitialized,
     }));
   }
   catch { /* Display remains usable when browser storage is unavailable. */ }
@@ -341,14 +342,17 @@ const state = {
   equalizerValueBoxes: [],
   libraryRandomToken: 0,
   games: [],
+  consoleSystems: [],
   favoriteTracks: [],
   favoriteIDs: new Set(),
   historyTracks: [],
   databaseFiles: [],
+  databaseFileFolders: [],
   databaseFilesReady: false,
   databaseFilesLoading: false,
   expandedPathNodes: new Set(Array.isArray(savedDisplayOptions.expandedPathNodes)
     ? savedDisplayOptions.expandedPathNodes : []),
+  pathExpansionInitialized: savedDisplayOptions.pathExpansionInitialized === true,
   selectedPathKey: null,
   sidebarMode: "consoles",
   databaseLocation: null,
@@ -890,6 +894,7 @@ export function hitTargetSnapshot() {
     statusReadout: widget.meta.statusReadout === true,
     textAlign: widget.meta.align ?? "left",
     sidebarDisclosure: widget.meta.sidebarDisclosure === true,
+    sidebarBulkAction: widget.meta.sidebarBulkAction === true,
     sidebarContextKind: widget.meta.sidebarContext?.kind || null,
     disclosureProgress: widget.meta.sidebarDisclosure ? widget.meta.disclosureProgress : null,
     sidebarSelection: widget.meta.sidebarSelection === true,
@@ -1465,6 +1470,7 @@ function pixelButton(parent, text, onClick, style = {}) {
     optionOwner: style.optionOwner,
     optionPage: style.optionPage === true,
     columnMenuItem: style.columnMenuItem === true,
+    sidebarBulkAction: style.sidebarBulkAction === true,
     onClick,
   });
 }
@@ -2260,7 +2266,8 @@ function visibleRowCount() {
 function visibleLibraryRowCount() {
   const rootChrome = 2 * APP_BORDER_GAP_DOTS + 2 * buttonStandardHeight() + 3 * uiGap()
     + rowHeight(4);
-  const sidebarChrome = 2 * buttonStandardHeight() + 4 * uiGap();
+  const bulkChrome = sidebarBulkAction() ? buttonStandardHeight() + uiGap() : 0;
+  const sidebarChrome = 2 * buttonStandardHeight() + 4 * uiGap() + bulkChrome;
   return Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - rootChrome - sidebarChrome)
     / contentRowStride("sidebar")));
 }
@@ -2268,6 +2275,30 @@ function visibleLibraryRowCount() {
 function libraryRowPixelHeight(row) {
   if (row.spacer) return spacingValue("textLineGapDots") * (row.revealProgress ?? 1);
   return rowHeight() * STYLE_SCALE * (row.revealProgress ?? 1);
+}
+
+function pathFolderNodes(nodes = state.databaseFiles, folders = []) {
+  for (const node of nodes) {
+    const children = Array.isArray(node.children) ? node.children : [];
+    if (node.path && children.length) folders.push(node);
+    if (children.length) pathFolderNodes(children, folders);
+  }
+  return folders;
+}
+
+function consoleSystemNames() {
+  return state.consoleSystems;
+}
+
+function sidebarBulkAction() {
+  if (normalizedText(state.searchQuery).trim()) return null;
+  const keys = state.sidebarMode === "paths"
+    ? state.databaseFileFolders.map((node) => node.path)
+    : consoleSystemNames();
+  if (!keys.length) return null;
+  const expanded = state.sidebarMode === "paths" ? state.expandedPathNodes : state.expandedSystems;
+  const allExpanded = keys.every((key) => expanded.has(key));
+  return { title: allExpanded ? "FOLD ALL" : "UNFOLD ALL" };
 }
 
 function libraryRowsWithLineGaps(rows) {
@@ -2304,9 +2335,11 @@ function libraryRows() {
   for (const system of [...groups.keys()].sort()) {
     const searching = Boolean(query);
     const expanded = searching || state.expandedSystems.has(system);
-    const isTransitioning = transition?.system === system;
-    const showChildren = expanded || (isTransitioning && transition.progress > 0);
-    const disclosureProgress = isTransitioning ? transition.progress : Number(expanded);
+    const groupTransition = transition?.systems?.get(system);
+    const isTransitioning = Boolean(groupTransition);
+    const progress = groupTransition?.progress ?? Number(expanded);
+    const showChildren = expanded || (isTransitioning && progress > 0);
+    const disclosureProgress = progress;
     rows.push({ text: system, system, group: true, disclosureProgress });
     if (showChildren) {
       for (const game of groups.get(system)) {
@@ -2314,7 +2347,7 @@ function libraryRows() {
           text: game.displayName || game.name,
           game,
           indent: controlPaddingDots() + 2 * fontProfile().advance,
-          revealProgress: isTransitioning ? transition.progress : undefined,
+          revealProgress: isTransitioning ? progress : undefined,
         });
       }
     }
@@ -2326,14 +2359,15 @@ function pathRows() {
   const query = normalizedText(state.searchQuery).trim();
   const rows = [];
   const transition = state.sidebarTransition;
-  function append(node, depth, isRoot = false, revealProgress) {
+  function append(node, depth, revealProgress) {
     const children = Array.isArray(node.children) ? node.children : [];
     const directMatch = !query || normalizedText(`${node.name || ""} ${node.path || ""}`).includes(query);
     const matchingChildren = query ? children.filter((child) => pathSubtreeMatches(child, query)) : children;
     if (query && !directMatch && matchingChildren.length === 0) return false;
-    const expanded = isRoot || Boolean(query) || state.expandedPathNodes.has(node.path);
-    const inTransition = transition?.path === node.path;
-    const progress = inTransition ? transition.progress : Number(expanded);
+    const expanded = Boolean(query) || state.expandedPathNodes.has(node.path);
+    const nodeTransition = transition?.paths?.get(node.path);
+    const inTransition = Boolean(nodeTransition);
+    const progress = nodeTransition?.progress ?? Number(expanded);
     rows.push({
       text: node.name || node.path || "PATH",
       node,
@@ -2345,14 +2379,14 @@ function pathRows() {
       revealProgress,
     });
     if (children.length && (expanded || (inTransition && progress > 0))) {
-      const childRevealProgress = inTransition ? transition.progress : revealProgress;
+      const childRevealProgress = inTransition ? progress : revealProgress;
       for (const child of matchingChildren) {
-        append(child, depth + 1, false, childRevealProgress);
+        append(child, depth + 1, childRevealProgress);
       }
     }
     return true;
   }
-  for (const root of state.databaseFiles) append(root, 0, true);
+  for (const root of state.databaseFiles) append(root, 0);
   if (!rows.length) rows.push({ text: state.databaseFilesLoading ? "LOADING PATHS" : "NO CATALOG PATHS" });
   return rows;
 }
@@ -2414,6 +2448,20 @@ function addLibraryPane(parent) {
             : item.view === state.tab && state.sidebarMode !== "paths",
     controlTitle: item.controlTitle,
   }));
+  const bulkAction = sidebarBulkAction();
+  if (bulkAction) {
+    makeWidget(library, { height: uiGap() });
+    const bulkActionRow = controlRow(library, { gap: 0 });
+    pixelButton(bulkActionRow, bulkAction.title, () => toggleAllSidebarGroups(), {
+      width: 0,
+      minWidth: 0,
+      flexGrow: 1,
+      flexShrink: 1,
+      flexBasis: 0,
+      controlTitle: bulkAction.title,
+      sidebarBulkAction: true,
+    });
+  }
   makeWidget(library, { height: uiGap() });
   const rows = libraryRowsWithLineGaps(libraryRows());
   const count = visibleLibraryRowCount();
@@ -4685,10 +4733,14 @@ async function loadDatabaseFiles() {
     const tree = await bridge.databaseFileTree();
     if (tree?.stale) return false;
     state.databaseFiles = Array.isArray(tree) ? tree : [];
+    state.databaseFileFolders = pathFolderNodes();
     state.databaseFilesReady = true;
-    state.databaseFiles.forEach((node) => {
-      if (node.kind === "folder" && node.path) state.expandedPathNodes.add(node.path);
-    });
+    if (!state.pathExpansionInitialized) {
+      state.databaseFiles.forEach((node) => {
+        if (node.kind === "folder" && node.path) state.expandedPathNodes.add(node.path);
+      });
+      state.pathExpansionInitialized = true;
+    }
     saveDisplayOptions();
     state.status = state.databaseFiles.length ? "PATH INDEX READY" : "NO CATALOG PATHS";
     return true;
@@ -4711,34 +4763,95 @@ async function setSidebarMode(mode) {
   return true;
 }
 
-function togglePathNode(node) {
-  if (!node?.path || !node.children?.length) return;
-  const expanded = state.expandedPathNodes.has(node.path);
-  const currentProgress = state.sidebarTransition?.path === node.path
-    ? state.sidebarTransition.progress : Number(expanded);
-  const targetProgress = expanded ? 0 : 1;
-  if (expanded) state.expandedPathNodes.delete(node.path);
-  else state.expandedPathNodes.add(node.path);
-  saveDisplayOptions();
+function activeSidebarTransitionEntries(kind) {
+  const active = state.sidebarTransition?.[kind];
+  if (!(active instanceof Map)) return new Map();
+  return new Map([...active].map(([key, entry]) => [key, {
+    fromProgress: entry.progress,
+    toProgress: entry.toProgress,
+    progress: entry.progress,
+  }]));
+}
+
+function startSidebarDisclosureTransition(kind, entries) {
   if (sidebarAnimationFrame) cancelAnimationFrame(sidebarAnimationFrame);
   sidebarAnimationFrame = 0;
-  const duration = animationDurationMilliseconds()
-    * Math.abs(targetProgress - currentProgress);
-  if (!animationEnabled() || duration <= 0) {
+  const active = new Map([...entries].filter(([, entry]) =>
+    Math.abs(entry.toProgress - entry.fromProgress) > 0.0001));
+  const distance = Math.max(0, ...[...active.values()].map((entry) =>
+    Math.abs(entry.toProgress - entry.fromProgress)));
+  const duration = animationDurationMilliseconds() * distance;
+  if (!active.size || !animationEnabled() || duration <= 0) {
     state.sidebarTransition = null;
     render();
     return;
   }
   state.sidebarTransition = {
-    path: node.path,
-    fromProgress: currentProgress,
-    toProgress: targetProgress,
-    progress: currentProgress,
+    [kind]: active,
+    progress: 0,
     startedAt: performance.now(),
     duration,
   };
   render();
   sidebarAnimationFrame = requestAnimationFrame(animateSidebarFrame);
+}
+
+function transitionProgress(kind, key, fallback) {
+  return state.sidebarTransition?.[kind]?.get(key)?.progress ?? Number(fallback);
+}
+
+function togglePathNode(node) {
+  if (!node?.path || !node.children?.length) return;
+  const expanded = state.expandedPathNodes.has(node.path);
+  const currentProgress = transitionProgress("paths", node.path, expanded);
+  const targetProgress = expanded ? 0 : 1;
+  if (expanded) state.expandedPathNodes.delete(node.path);
+  else state.expandedPathNodes.add(node.path);
+  state.pathExpansionInitialized = true;
+  saveDisplayOptions();
+  const entries = activeSidebarTransitionEntries("paths");
+  entries.set(node.path, {
+    fromProgress: currentProgress,
+    toProgress: targetProgress,
+    progress: currentProgress,
+  });
+  startSidebarDisclosureTransition("paths", entries);
+}
+
+function setAllPathFoldersExpanded(expanded) {
+  const folders = state.databaseFileFolders;
+  if (!folders.length) return;
+  const entries = activeSidebarTransitionEntries("paths");
+  const targetProgress = Number(expanded);
+  for (const node of folders) {
+    const wasExpanded = state.expandedPathNodes.has(node.path);
+    const currentProgress = transitionProgress("paths", node.path, wasExpanded);
+    if (expanded) state.expandedPathNodes.add(node.path);
+    else state.expandedPathNodes.delete(node.path);
+    entries.set(node.path, {
+      fromProgress: currentProgress,
+      toProgress: targetProgress,
+      progress: currentProgress,
+    });
+  }
+  state.pathExpansionInitialized = true;
+  saveDisplayOptions();
+  startSidebarDisclosureTransition("paths", entries);
+}
+
+function toggleAllSidebarGroups() {
+  if (normalizedText(state.searchQuery).trim()) return;
+  if (state.sidebarMode === "paths") {
+    const folders = pathFolderNodes();
+    const allExpanded = folders.length > 0
+      && folders.every((node) => state.expandedPathNodes.has(node.path));
+    setAllPathFoldersExpanded(!allExpanded);
+    return;
+  }
+  const systems = consoleSystemNames();
+  const allExpanded = systems.length > 0
+    && systems.every((system) => state.expandedSystems.has(system));
+  void setAllSystemsExpanded(!allExpanded, systems);
 }
 
 async function loadPathNode(node) {
@@ -4928,10 +5041,16 @@ function animateSidebarFrame(time) {
     sidebarAnimationFrame = requestAnimationFrame(animateSidebarFrame);
     return;
   }
-  const progress = Math.max(0, Math.min(1,
+  const frameProgress = Math.max(0, Math.min(1,
     (time - transition.startedAt) / transition.duration));
-  transition.progress = transition.fromProgress
-    + (transition.toProgress - transition.fromProgress) * easeSelection(progress);
+  const easedProgress = easeSelection(frameProgress);
+  transition.progress = frameProgress;
+  for (const kind of ["paths", "systems"]) {
+    for (const entry of transition[kind]?.values() || []) {
+      entry.progress = entry.fromProgress
+        + (entry.toProgress - entry.fromProgress) * easedProgress;
+    }
+  }
   render(false, true, time);
   if (!complete) {
     sidebarAnimationFrame = requestAnimationFrame(animateSidebarFrame);
@@ -4943,31 +5062,52 @@ function animateSidebarFrame(time) {
 
 async function toggleSystem(system) {
   const wasExpanded = state.expandedSystems.has(system);
-  const currentProgress = state.sidebarTransition?.system === system
-    ? state.sidebarTransition.progress : (wasExpanded ? 1 : 0);
+  const currentProgress = transitionProgress("systems", system, wasExpanded);
   const targetProgress = wasExpanded ? 0 : 1;
-  if (sidebarAnimationFrame) cancelAnimationFrame(sidebarAnimationFrame);
-  sidebarAnimationFrame = 0;
   try {
     if (await reduceDatabaseGroupState("toggle", system)) {
-      const duration = animationDurationMilliseconds()
-        * Math.abs(targetProgress - currentProgress);
-      if (!animationEnabled() || duration <= 0) {
-        state.sidebarTransition = null;
-        render();
-        return;
-      }
-      state.sidebarTransition = {
-        system,
+      const entries = activeSidebarTransitionEntries("systems");
+      entries.set(system, {
         fromProgress: currentProgress,
         toProgress: targetProgress,
         progress: currentProgress,
-        startedAt: performance.now(),
-        duration,
-      };
-      render();
-      sidebarAnimationFrame = requestAnimationFrame(animateSidebarFrame);
+      });
+      startSidebarDisclosureTransition("systems", entries);
     }
+  } catch (error) {
+    state.status = `SIDEBAR ERROR: ${error.message}`;
+    render();
+  }
+}
+
+async function setAllSystemsExpanded(expanded, systems) {
+  if (!systems.length || !bridge?.databaseGroupState) return;
+  const previous = new Set(state.expandedSystems);
+  const entries = activeSidebarTransitionEntries("systems");
+  const token = ++state.groupTransitionToken;
+  try {
+    const next = await bridge.databaseGroupState({
+      expandedGroupNames: [...state.expandedSystems],
+      selectedGroupName: state.selectedSystem,
+      selectedGameID: state.selectedGameKey,
+      collapsed: !expanded,
+      knownGroupNames: systems,
+    }, "allCollapsed");
+    if (token !== state.groupTransitionToken || !next) return;
+    state.expandedSystems = new Set(Array.isArray(next.expandedGroupNames)
+      ? next.expandedGroupNames : []);
+    state.selectedSystem = next.selectedGroupName || null;
+    state.selectedGameKey = next.selectedGameID || null;
+    const targetProgress = Number(expanded);
+    for (const system of systems) {
+      const currentProgress = entries.get(system)?.progress ?? Number(previous.has(system));
+      entries.set(system, {
+        fromProgress: currentProgress,
+        toProgress: targetProgress,
+        progress: currentProgress,
+      });
+    }
+    startSidebarDisclosureTransition("systems", entries);
   } catch (error) {
     state.status = `SIDEBAR ERROR: ${error.message}`;
     render();
@@ -4989,6 +5129,7 @@ async function loadCatalog() {
     state.games = Array.isArray(games) ? games : [];
     state.games.sort((a, b) => (a.system || "").localeCompare(b.system || "")
       || (a.displayName || a.name || "").localeCompare(b.displayName || b.name || ""));
+    state.consoleSystems = [...new Set(state.games.map((game) => game.system || "OTHER"))].sort();
     state.status = state.games.length ? "READY" : "CATALOG EMPTY";
     if (state.games.length) {
       const game = state.games.find((item) => gameKey(item) === state.activeGameKey) || state.games[0];

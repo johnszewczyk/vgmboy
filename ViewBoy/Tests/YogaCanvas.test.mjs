@@ -171,6 +171,12 @@ const bridge = {
     groupStateCalls.push([action, groupName, gameID]);
     const expanded = new Set(current.expandedGroupNames);
     if (action === 'toggle') expanded.has(groupName) ? expanded.delete(groupName) : expanded.add(groupName);
+    if (action === 'allCollapsed') {
+      for (const system of current.knownGroupNames || []) {
+        if (current.collapsed) expanded.delete(system);
+        else expanded.add(system);
+      }
+    }
     return {
       expandedGroupNames: [...expanded],
       selectedGroupName: action === 'selectGame' ? groupName : current.selectedGroupName,
@@ -1992,6 +1998,18 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.ok(musicRow && subRow, 'the Path root and its first folder are visible');
   assert.equal(subRow.box.y - (musicRow.box.y + musicRow.box.height), 1,
     'Path roots and child folders use the one-dot Sidebar Line Gap');
+  nextFrameAdvanceMs = 80;
+  clickEntry(musicRow);
+  await tick();
+  assert.ok(hitTargetSnapshot().find((target) => target.name === 'SUB')?.box.height > 0,
+    'the root path contents remain visible while its close animation is in flight');
+  await tick();
+  assert.equal(hitTargetSnapshot().some((target) => target.name === 'SUB'), false,
+    'a top-level Path folder stays folded after its animation completes');
+  clickEntry(hitTargetSnapshot().find((target) => target.name === 'music'));
+  await tick();
+  assert.ok(hitTargetSnapshot().some((target) => target.name === 'SUB'),
+    'the top-level Path folder opens again after being fully folded');
   clickTarget('SUB');
   nextFrameAdvanceMs = 30;
   await tick();
@@ -2043,9 +2061,46 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(hitTargetSnapshot().some((target) => target.name === 'path.spc'), false,
     'folding clips the full-size path rows away when the animation completes');
+  let bulkAction = hitTargetSnapshot().find((target) => target.sidebarBulkAction);
+  assert.equal(bulkAction?.name, 'UNFOLD ALL',
+    'a partly folded Path tree offers an unfold-all action');
+  clickEntry(bulkAction);
+  assert.equal(hitTargetSnapshot().find((target) => target.sidebarBulkAction)?.name, 'FOLD ALL',
+    'the Path bulk action records all folders as expanded');
+  await tick();
+  await tick();
+  assert.ok(hitTargetSnapshot().some((target) => target.name === 'path.spc'),
+    'Unfold All reveals the complete nested Path tree');
+  bulkAction = hitTargetSnapshot().find((target) => target.sidebarBulkAction);
+  assert.equal(bulkAction?.name, 'FOLD ALL', 'the bulk action switches to Fold All when every folder is open');
+  clickEntry(bulkAction);
+  await tick();
+  await tick();
+  assert.equal(hitTargetSnapshot().some((target) => target.name === 'SUB'), false,
+    'Fold All closes top-level and nested Path folders');
+  bulkAction = hitTargetSnapshot().find((target) => target.sidebarBulkAction);
+  clickEntry(bulkAction);
+  await tick();
+  await tick();
+  assert.ok(hitTargetSnapshot().some((target) => target.name === 'path.spc'),
+    'Unfold All restores the nested tree after a full fold');
 
   globalThis.ViewBoy.dispatch('sidebarConsoles');
   await tick();
+  bulkAction = hitTargetSnapshot().find((target) => target.sidebarBulkAction);
+  assert.ok(bulkAction, 'the Console sidebar also exposes the fold/unfold-all action');
+  const bulkActionBefore = bulkAction.name;
+  clickEntry(bulkAction);
+  await tick();
+  await tick();
+  assert.notEqual(hitTargetSnapshot().find((target) => target.sidebarBulkAction)?.name, bulkActionBefore,
+    'the Console bulk action folds or unfolds every system group');
+  if (!hitTargetSnapshot().some((target) => target.name === 'Scroll Game 00')) {
+    clickEntry(hitTargetSnapshot().find((target) => target.name === 'SCROLL'
+      && target.sidebarContextKind === 'system'));
+    await tick();
+    await tick();
+  }
   assert.ok(hitTargetSnapshot().some((target) => target.name === 'Scroll Game 00'),
     'the Console View action restores the shared Console view');
   globalThis.ViewBoy.dispatch('sidebarDiskPath');
