@@ -35,23 +35,89 @@ const FAVORITES_TAB_SOURCE = "viewboy:special:favorites";
 const HISTORY_TAB_SOURCE = "viewboy:special:history";
 const DEFAULT_ANIMATION_FPS = 60;
 const ANIMATION_FPS_OPTIONS = [30, 60, 90, 120, 150, 180, 210, 240];
-const PALETTES = {
+// The DMG defines four ordered logical LCD tones, not fixed RGB values or
+// numeric luminance intervals. ViewBoy keeps each theme's ink and screen
+// colors, then derives the two middle tones at equal CIELAB L* intervals.
+// Endpoint order follows the UI palette contract: active ink, two middle
+// tones, then the LCD surface (dark-to-light in GameBoy, light-to-dark in
+// NightBoy).
+const PALETTE_ENDPOINTS = {
   GAMEBOY: {
-    STANDARD: ["#0C300C", "#285428", "#78940D", "#9BBC0F"],
-    HIGH_CONTRAST: ["#333333", "#285428", "#78940D", "#9BBC0F"],
+    STANDARD: { ink: "#0C300C", surface: "#9BBC0F" },
+    HIGH_CONTRAST: { ink: "#333333", surface: "#9BBC0F" },
   },
   NIGHTBOY: {
-    STANDARD: ["#D8D6DF", "#A5A2AF", "#51495E", "#211A2B"],
-    HIGH_CONTRAST: ["#F0EFF4", "#A5A2AF", "#51495E", "#211A2B"],
+    STANDARD: { ink: "#D8D6DF", surface: "#050308" },
+    HIGH_CONTRAST: { ink: "#F0EFF4", surface: "#050308" },
   },
 };
-function paletteRGB(palette) {
-  return palette.map((color) => {
-    const value = Number.parseInt(color.slice(1), 16);
-    return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+function hexToRGB(color) {
+  const value = Number.parseInt(color.slice(1), 16);
+  return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+}
+function srgbToLinear(channel) {
+  const value = channel / 255;
+  return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+}
+function linearToSRGB(channel) {
+  const value = Math.max(0, Math.min(1, channel));
+  return Math.round(255 * (value <= 0.0031308
+    ? value * 12.92
+    : 1.055 * value ** (1 / 2.4) - 0.055));
+}
+function rgbToLab([red, green, blue]) {
+  const r = srgbToLinear(red);
+  const g = srgbToLinear(green);
+  const b = srgbToLinear(blue);
+  const x = (r * 0.4124564 + g * 0.3575761 + b * 0.1804375) / 0.95047;
+  const y = r * 0.2126729 + g * 0.7151522 + b * 0.072175;
+  const z = (r * 0.0193339 + g * 0.119192 + b * 0.9503041) / 1.08883;
+  const f = (value) => value > 0.008856451679
+    ? Math.cbrt(value)
+    : (903.296296296 * value + 16) / 116;
+  const fx = f(x);
+  const fy = f(y);
+  const fz = f(z);
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+function labToRGB([lightness, a, b]) {
+  const fy = (lightness + 16) / 116;
+  const fx = fy + a / 500;
+  const fz = fy - b / 200;
+  const inverse = (value) => value ** 3 > 0.008856451679
+    ? value ** 3
+    : (116 * value - 16) / 903.296296296;
+  const x = 0.95047 * inverse(fx);
+  const y = inverse(fy);
+  const z = 1.08883 * inverse(fz);
+  return [
+    linearToSRGB(x * 3.2404542 + y * -1.5371385 + z * -0.4985314),
+    linearToSRGB(x * -0.969266 + y * 1.8760108 + z * 0.041556),
+    linearToSRGB(x * 0.0556434 + y * -0.2040259 + z * 1.0572252),
+  ];
+}
+function rgbToHex([red, green, blue]) {
+  return `#${[red, green, blue].map((channel) => channel.toString(16).padStart(2, "0")).join("")}`
+    .toUpperCase();
+}
+function paletteTones(theme, contrast) {
+  const endpoints = PALETTE_ENDPOINTS[theme]?.[contrast]
+    || PALETTE_ENDPOINTS.GAMEBOY.STANDARD;
+  const inkLab = rgbToLab(hexToRGB(endpoints.ink));
+  const surfaceLab = rgbToLab(hexToRGB(endpoints.surface));
+  return Array.from({ length: 4 }, (_, index) => {
+    if (index === 0) return endpoints.ink;
+    if (index === 3) return endpoints.surface;
+    const amount = index / 3;
+    const lab = inkLab.map((value, channel) =>
+      value + (surfaceLab[channel] - value) * amount);
+    return rgbToHex(labToRGB(lab));
   });
 }
-let RGB = paletteRGB(PALETTES.GAMEBOY.STANDARD);
+function paletteRGB(palette) {
+  return palette.map(hexToRGB);
+}
+let RGB = paletteRGB(paletteTones("GAMEBOY", "STANDARD"));
 function packedPalette(palette) {
   return Uint32Array.from(palette, ([red, green, blue]) =>
     ((255 << 24) | (blue << 16) | (green << 8) | red) >>> 0);
@@ -217,8 +283,8 @@ function storedSpacing(value, fallback) {
   return Math.max(SPACING_DOTS_MIN, Math.min(SPACING_DOTS_MAX,
     Number.isFinite(number) ? Math.round(number) : fallback));
 }
-function displayPalette() {
-  return PALETTES[state.theme][state.contrast];
+function displayPalette(theme = state.theme, contrast = state.contrast) {
+  return paletteTones(theme, contrast);
 }
 function saveDisplayOptions() {
   try {
@@ -819,6 +885,13 @@ export function lcdDotSizeSnapshot() {
     framebufferWidth: WIDTH,
     framebufferHeight: HEIGHT,
   };
+}
+
+export function lcdPaletteSnapshot(theme = state.theme, contrast = state.contrast) {
+  return displayPalette(theme, contrast).map((color) => ({
+    color,
+    lightness: rgbToLab(hexToRGB(color))[0],
+  }));
 }
 
 export function equalizerAnimationSnapshot(time = performance.now()) {
@@ -2854,6 +2927,7 @@ function addDisplayOptions(parent) {
   optionAdjuster(profile, "LCD DOT SIZE", `${state.lcdDotSize} PX`,
     () => setLCDDotSize(state.lcdDotSize - 1),
     () => setLCDDotSize(state.lcdDotSize + 1));
+  addThemeOptions(parent);
 }
 
 function addThemeOptions(parent) {
@@ -3547,7 +3621,7 @@ function addOptionsContent(parent) {
     paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
   [
-    { title: "VIEWBOY", pages: ["DATABASE", "DISPLAY", "INTERFACE", "LIBRARY", "QUEUE", "THEME"] },
+    { title: "VIEWBOY", pages: ["DATABASE", "DISPLAY", "INTERFACE", "LIBRARY", "QUEUE"] },
     { title: "VGMBoy", pages: ["AUDIO", "DIAGNOSTICS", "METHODS", "PLAYBACK"] },
   ].forEach(({ title, pages }) => {
     panelTitle(toc, `OPTIONS - ${title}`);
@@ -3596,7 +3670,6 @@ function addOptionsContent(parent) {
   state.optionsContentBodyWidget = content;
   const pref = state.preferences;
   if (state.optionsPage === "DATABASE") addDatabaseOptions(content);
-  else if (state.optionsPage === "THEME") addThemeOptions(content);
   else if (state.optionsPage === "QUEUE") addQueueOptions(content, pref);
   else if (state.optionsPage === "PLAYBACK") addPlaybackOptions(content, pref);
   else if (state.optionsPage === "METHODS") addMethodOptions(content, pref);
@@ -6359,7 +6432,7 @@ window.ViewBoy = Object.freeze({
       case "library": selectSidebarView("LIBRARY"); break;
       case "queue": selectSidebarView("QUEUE"); break;
       case "optionsPage:DISPLAY": openOptionsScreen("DISPLAY"); break;
-      case "optionsPage:THEME": openOptionsScreen("THEME"); break;
+      case "optionsPage:THEME": openOptionsScreen("DISPLAY"); break;
       case "optionsPage:TRANSPORT": openOptionsScreen("INTERFACE"); break;
       case "optionsPage:PLAYBACK": openOptionsScreen("PLAYBACK"); break;
       case "optionsPage:METHODS": openOptionsScreen("METHODS"); break;

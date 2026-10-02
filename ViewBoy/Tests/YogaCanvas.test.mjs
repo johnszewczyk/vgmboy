@@ -299,6 +299,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     framebufferShadeSnapshot,
     hitTargetSnapshot,
     lcdDotSizeSnapshot,
+    lcdPaletteSnapshot,
     optionsPaneSnapshot,
     optionsContentSnapshot,
     optionsStyleSnapshot,
@@ -338,6 +339,25 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     durationMilliseconds: 200,
     framesPerSecond: 60,
   }, 'all UI animation starts on the shared 200 ms duration and 60 FPS profile');
+  for (const [theme, contrast, firstColor, lastColor] of [
+    ['GAMEBOY', 'STANDARD', '#0C300C', '#9BBC0F'],
+    ['GAMEBOY', 'HIGH_CONTRAST', '#333333', '#9BBC0F'],
+    ['NIGHTBOY', 'STANDARD', '#D8D6DF', '#050308'],
+    ['NIGHTBOY', 'HIGH_CONTRAST', '#F0EFF4', '#050308'],
+  ]) {
+    const tones = lcdPaletteSnapshot(theme, contrast);
+    assert.equal(tones.length, 4, `${theme} ${contrast} supplies exactly four LCD tones`);
+    assert.equal(tones[0].color, firstColor, `${theme} ${contrast} preserves its active-pixel endpoint`);
+    assert.equal(tones[3].color, lastColor, `${theme} ${contrast} preserves its screen endpoint`);
+    const steps = tones.slice(0, -1).map((tone, index) =>
+      Math.abs(tones[index + 1].lightness - tone.lightness));
+    assert.ok(steps.every((step) => Math.abs(step - steps[0]) < 0.7),
+      `${theme} ${contrast} tones use equally spaced CIELAB lightness steps`);
+    const direction = Math.sign(tones[1].lightness - tones[0].lightness);
+    assert.ok(tones.slice(1).every((tone, index) =>
+      Math.sign(tone.lightness - tones[index].lightness) === direction),
+    `${theme} ${contrast} tone order stays consistent from ink to screen`);
+  }
   const clickTargetBox = (target) => {
     const rect = canvas.getBoundingClientRect();
     const logicalWidth = canvas.width / dotsPerCell();
@@ -707,7 +727,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     preventDefault() {},
   });
   const pages = [
-    'DATABASE', 'DISPLAY', 'INTERFACE', 'LIBRARY', 'QUEUE', 'THEME',
+    'DATABASE', 'DISPLAY', 'INTERFACE', 'LIBRARY', 'QUEUE',
     'AUDIO', 'DIAGNOSTICS', 'METHODS', 'PLAYBACK',
   ];
   const clickPage = (page) => clickTarget(page);
@@ -922,7 +942,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     shiftKey: modifiers.shiftKey === true,
     preventDefault() {},
   });
-  clickPage('THEME');
+  clickPage('DISPLAY');
   clickTarget('THEME NIGHTBOY');
   const nightBoyPixels = pixelChecksum(canvas.image.data);
   assert.notEqual(nightBoyPixels, gameBoyPixels, 'NightBoy repaints the same four-tone pixel screen with its dark-purple palette');
@@ -1420,7 +1440,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(savedPreferences.at(-1).columnAutoSize, true,
     'the Interface page checkbox can restore automatic sizing');
-  clickPage('THEME');
+  clickPage('DISPLAY');
   clickTarget('THEME GAMEBOY');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'GAMEBOY',
     'the palette selector returns to the authentic Game Boy theme');
@@ -1811,7 +1831,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.deepEqual(visibleOptionPages(), pages,
     'Options groups app pages before VGMBoy pages and alphabetizes each group');
   assert.deepEqual(visibleOptionPageTargets().map((target) => target.optionOwner), [
-    'VIEWBOY', 'VIEWBOY', 'VIEWBOY', 'VIEWBOY', 'VIEWBOY', 'VIEWBOY',
+    'VIEWBOY', 'VIEWBOY', 'VIEWBOY', 'VIEWBOY', 'VIEWBOY',
     'VGMBoy', 'VGMBoy', 'VGMBoy', 'VGMBoy',
   ], 'every Options page is visibly assigned to its owning frontend or VGMBoy');
   assert.deepEqual(optionsStyleSnapshot().filter((item) => item.kind === 'title'
@@ -1824,8 +1844,10 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     && item.name === 'OPTIONS - VIEWBOY');
   const displayHeading = optionStyles.find((item) => item.kind === 'title' && item.name === 'DISPLAY');
   const screenProfile = optionStyles.find((item) => item.kind === 'group' && item.name === 'SCREEN PROFILE');
-  assert.ok(optionsHeading && displayHeading && screenProfile,
-    'Options retains the dialog headings and grouped section structure');
+  const colorTheme = optionStyles.find((item) => item.kind === 'group' && item.name === 'COLOR THEME');
+  const lcdTones = optionStyles.find((item) => item.kind === 'group' && item.name === 'FOUR LCD TONES');
+  assert.ok(optionsHeading && displayHeading && screenProfile && colorTheme && lcdTones,
+    'Display combines screen profile and theme controls inside the existing grouped Options dialog');
   assert.equal(framebufferShadeSnapshot(optionsHeading.box.x + optionsHeading.box.width - 2,
     optionsHeading.box.y + 1), 2,
   'the ViewBoy owner title keeps its filled LCD heading bar');
