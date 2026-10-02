@@ -53,6 +53,7 @@ let archiveCacheConfigurationCalls = [];
 let archiveCacheClearCount = 0;
 let archiveCacheFinderCalls = 0;
 let databaseFinderCalls = 0;
+let databaseGamesCalls = 0;
 let historyRecords = [];
 let historyRecordCalls = [];
 let favoriteTracks = [];
@@ -98,10 +99,13 @@ const bridge = {
   playlistTabsLoad: async () => null,
   playlistTabsSave: async (settings) => { savedPlaylistTabs.push(structuredClone(settings)); },
   nativePlaybackAudioConfig: async (...args) => { audioConfigCalls.push(args); },
-  databaseGames: async () => [
-    { rootId: 1, name: 'Sample', displayName: 'Sample', system: 'SNES', trackCount: 3 },
-    { rootId: 2, name: 'Other', displayName: 'Other', system: 'ZZZ', trackCount: 1 },
-  ],
+  databaseGames: async () => {
+    databaseGamesCalls += 1;
+    return [
+      { rootId: 1, name: 'Sample', displayName: 'Sample', system: 'SNES', trackCount: 3 },
+      { rootId: 2, name: 'Other', displayName: 'Other', system: 'ZZZ', trackCount: 1 },
+    ];
+  },
   databaseLocation: async () => ({
     path: '/tmp/ViewBoy.sqlite', catalog: { schemaVersion: 24, trackCount: 99 },
   }),
@@ -319,6 +323,16 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     assert.ok(glyph.every((row) => /^[01]{5}$/.test(row)),
       `uppercase ${character} is authored as five LCD dots per row`);
   }
+  for (const [name, font, symbol] of [
+    ['Standard 5x7', standardFont, '☰'], ['Standard 5x7', standardFont, '♥'],
+    ['Standard 5x7', standardFont, '◷'], ['Micro 3x5', microFont, '☰'],
+    ['Micro 3x5', microFont, '♥'], ['Micro 3x5', microFont, '◷'],
+  ]) {
+    const glyph = font.glyphs[symbol];
+    assert.equal(glyph?.length, font.height, `${name} includes the ${symbol} toolbar symbol`);
+    assert.ok(glyph.every((row) => row.length === font.width && /^[01]+$/.test(row)),
+      `${name} ${symbol} is rendered from the bitmap font`);
+  }
   assert.deepEqual(animationSettingsSnapshot(), {
     enabled: true,
     durationMilliseconds: 200,
@@ -415,12 +429,22 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'Options remains reachable from the sidebar controls');
   assert.ok(toolbarTargets.some((target) => target.name === 'HISTORY'),
     'the sidebar exposes the shared Playback History view alongside Library and Queue');
+  assert.ok(toolbarTargets.some((target) => target.name === 'FAVORITES' && target.displayText === '♥'),
+    'Favorites uses its own bitmap heart glyph');
+  assert.ok(toolbarTargets.some((target) => target.name === 'HISTORY' && target.displayText === '◷'),
+    'History uses its own bitmap clock glyph');
   assert.ok(toolbarTargets.some((target) => target.name === 'QUEUE'),
     'the queue action uses its full label');
-  assert.ok(toolbarTargets.some((target) => target.name === 'OPEN LOCAL PATH'),
-  'the local path picker action is clearly named');
+  assert.equal(toolbarTargets.some((target) => target.name === 'OPEN LOCAL PATH'), false,
+    'the local path picker stays in the native File menu instead of duplicating the sidebar toolbar');
   assert.ok(toolbarTargets.some((target) => target.name === 'RELOAD CATALOG'),
-  'the catalog reload action is clearly named');
+    'the catalog reload action is clearly named');
+  const toolbarControls = toolbarTargets.filter((target) => ['QUEUE', 'FAVORITES', 'HISTORY',
+    'FOLD ALL', 'RELOAD CATALOG'].includes(target.name));
+  assert.ok(toolbarControls.every((target) => target.box.y === toolbarControls[0].box.y),
+    'Queue, Favorites, History, Fold All, and Reload share the sidebar navigation row');
+  assert.ok(toolbarTargets.some((target) => target.sidebarBulkAction && target.displayText === '☰'),
+    'Fold All uses a three-line bitmap symbol in the sidebar toolbar');
   const defaultHeader = toolbarTargets.find((target) => target.columnHeader && target.name === '#');
   assert.ok(defaultHeader, 'the numbered playlist heading is visible');
   const firstPlaylistBody = toolbarTargets.find((target) => target.trackIndex === 0
@@ -691,6 +715,37 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.ok(hitTargetSnapshot().some((target) => target.searchField && target.name === 'SEARCH LIBRARY'),
     'the sidebar begins with a pixel-rendered search field');
+  const queueControlBefore = hitTargetSnapshot().find((target) => target.name === 'QUEUE');
+  const queuePixelsBefore = pixelChecksumForBox(queueControlBefore.box);
+  clickTarget('QUEUE');
+  await tick();
+  const queueControlAfter = hitTargetSnapshot().find((target) => target.name === 'QUEUE');
+  assert.notEqual(pixelChecksumForBox(queueControlAfter.box), queuePixelsBefore,
+    'Queue visibly selects its active playback-list view when invoked');
+  const databaseGamesBeforeReload = bridge.databaseGames;
+  let finishCatalogReload;
+  bridge.databaseGames = async () => {
+    databaseGamesCalls += 1;
+    return new Promise((resolve) => { finishCatalogReload = resolve; });
+  };
+  const databaseReloadsBefore = databaseReloadCount;
+  const catalogQueriesBefore = databaseGamesCalls;
+  clickTarget('RELOAD CATALOG');
+  await tick();
+  await tick();
+  assert.equal(databaseReloadCount, databaseReloadsBefore + 1,
+    'the sidebar Reload action asks the shared database to refresh its catalog');
+  assert.equal(databaseGamesCalls, catalogQueriesBefore + 1,
+    'the sidebar Reload action queries the refreshed catalog projection');
+  assert.equal(appStatusAreaSnapshot()[0].text, 'RELOADING CATALOG',
+    'the footer shows visible reload feedback instead of hiding it behind the active file path');
+  finishCatalogReload([
+    { rootId: 1, name: 'Sample', displayName: 'Sample', system: 'SNES', trackCount: 3 },
+    { rootId: 2, name: 'Other', displayName: 'Other', system: 'ZZZ', trackCount: 1 },
+  ]);
+  bridge.databaseGames = databaseGamesBeforeReload;
+  await tick();
+  await tick();
   const idleSearchPixels = pixelChecksum(canvas.image.data);
   clickTarget('SEARCH LIBRARY');
   const highlightedCursor = pixelChecksum(canvas.image.data);
@@ -708,6 +763,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const searchTargets = filteredSidebar.map((target) => target.name);
   assert.ok(searchTargets.includes('Sample'), 'typing filters the sidebar tree to matching catalog games');
   assert.equal(searchTargets.includes('Other'), false, 'nonmatching games are hidden by the sidebar search');
+  assert.ok(filteredSidebar.some((target) => target.sidebarBulkAction && target.displayText === '☰'),
+    'Fold All stays in the sidebar toolbar while Search filters the tree');
   const parentSystemRow = filteredSidebar.find((target) => target.name.endsWith('SNES'));
   const childGameRow = filteredSidebar.find((target) => target.name === 'Sample');
   assert.ok(parentSystemRow && childGameRow, 'the filtered system disclosure and game row are both visible');
@@ -1700,13 +1757,16 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(tabFrames().some((target) => target.reorderKey === closingTabID), false,
     'the closed tab leaves the strip when its width animation finishes');
 
-  bridge.databaseGames = async () => Array.from({ length: 80 }, (_, index) => ({
-    rootId: 1000 + index,
-    name: `Scroll Game ${String(index).padStart(2, '0')}`,
-    displayName: `Scroll Game ${String(index).padStart(2, '0')}`,
-    system: 'SCROLL',
-    trackCount: 1,
-  }));
+  bridge.databaseGames = async () => {
+    databaseGamesCalls += 1;
+    return Array.from({ length: 80 }, (_, index) => ({
+      rootId: 1000 + index,
+      name: `Scroll Game ${String(index).padStart(2, '0')}`,
+      displayName: `Scroll Game ${String(index).padStart(2, '0')}`,
+      system: 'SCROLL',
+      trackCount: 1,
+    }));
+  };
   await catalogReloaded();
   const sidebarGames = () => hitTargetSnapshot().filter((target) => target.name.startsWith('Scroll Game '));
   const scrollGameBefore = sidebarGames().find((target) => target.name === 'Scroll Game 00');
@@ -1900,10 +1960,12 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(databaseFinderCalls, 1, 'the database path opens its location in Finder');
   assert.equal(archiveCacheFinderCalls, 1, 'the archive-cache path opens its location in Finder');
+  const databaseReloadsBeforeOptions = databaseReloadCount;
   clickTarget('RELOAD LIBRARY');
   await tick();
   await tick();
-  assert.equal(databaseReloadCount, 1, 'Reload Library requests a fresh native catalog projection');
+  assert.equal(databaseReloadCount, databaseReloadsBeforeOptions + 1,
+    'Reload Library requests a fresh native catalog projection');
   assert.equal(selectionBandSnapshot()?.kind, 'options-page',
     'finishing a catalog reload leaves the user on the open Options page');
   clickTarget('BACK');

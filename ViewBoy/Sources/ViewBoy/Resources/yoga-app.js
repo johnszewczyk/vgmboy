@@ -113,6 +113,9 @@ const standardGlyphs = {
   "=": ["00000", "11111", "00000", "11111", "00000", "00000", "00000"],
   "#": ["01010", "01010", "11111", "01010", "11111", "01010", "01010"],
   "•": ["00000", "00000", "00100", "00000", "00000", "00000", "00000"],
+  "☰": ["11111", "00000", "11111", "00000", "11111", "00000", "00000"],
+  "♥": ["01010", "11111", "11111", "11111", "01110", "00100", "00000"],
+  "◷": ["01110", "10001", "10101", "10111", "10001", "10001", "01110"],
   "%": ["11001", "11010", "00100", "01000", "10110", "00110", "00000"],
   "?": ["01110", "10001", "00001", "00010", "00100", "00000", "00100"],
   "!": ["00100", "00100", "00100", "00100", "00100", "00000", "00100"],
@@ -179,6 +182,9 @@ const microGlyphs = {
   "=": ["000", "111", "000", "111", "000"],
   "#": ["101", "111", "101", "111", "101"],
   "•": ["000", "000", "010", "000", "000"],
+  "☰": ["111", "000", "111", "000", "111"],
+  "♥": ["101", "111", "111", "010", "000"],
+  "◷": ["010", "101", "111", "101", "010"],
   "*": ["010", "101", "111", "101", "010"],
   "%": ["101", "001", "010", "100", "101"],
   "?": ["110", "001", "010", "000", "010"],
@@ -395,6 +401,7 @@ const state = {
   libraryViewportWidget: null,
   queueScroll: 0,
   status: "LOADING CATALOG",
+  catalogLoading: false,
   preferences: {},
   nativeGeneration: 0,
   playbackGeneration: 0,
@@ -866,6 +873,7 @@ export function hitTargetSnapshot() {
     name: widget.meta.controlTitle || widget.meta.text
       || (widget.meta.playlistRow ? `TRACK ${widget.meta.trackIndex + 1}` : "")
       || (Number.isInteger(widget.meta.equalizerBar) ? `EQ BAND ${widget.meta.equalizerBar + 1}` : ""),
+    displayText: typeof widget.meta.text === "string" ? widget.meta.text : null,
     columnMenuItem: widget.meta.columnMenuItem === true,
     columnHeader: widget.meta.columnHeader === true,
     optionChecklistItem: widget.meta.optionChecklistItem === true,
@@ -1328,14 +1336,20 @@ function oneDot() {
 }
 
 function libraryToolbarItems() {
+  const bulkAction = sidebarBulkAction();
   return [
     { title: "LIB", view: "LIBRARY", onClick: () => { void setSidebarMode("consoles"); } },
     { title: "PATH", view: "PATHS", onClick: () => { void setSidebarMode("paths"); } },
-    { title: "QUEUE", view: "QUEUE", onClick: () => selectSidebarView("QUEUE") },
-    { title: "FAV", view: "FAVORITES", onClick: () => selectSidebarView("FAVORITES") },
-    { title: "HIST", view: "HISTORY", controlTitle: "HISTORY", onClick: () => { void showPlaybackHistory(); } },
-    { title: "OPEN…", controlTitle: "OPEN LOCAL PATH", onClick: () => openLocalPath() },
-    { title: "RELOAD", controlTitle: "RELOAD CATALOG", onClick: () => loadCatalog() },
+    { title: "QUEUE", view: "QUEUE", controlTitle: "QUEUE", onClick: () => selectSidebarView("QUEUE") },
+    { title: "♥", view: "FAVORITES", controlTitle: "FAVORITES", onClick: () => selectSidebarView("FAVORITES") },
+    { title: "◷", view: "HISTORY", controlTitle: "HISTORY", onClick: () => { void showPlaybackHistory(); } },
+    {
+      title: "☰",
+      controlTitle: bulkAction.title,
+      sidebarBulkAction: true,
+      onClick: () => toggleAllSidebarGroups(),
+    },
+    { title: "RELOAD", controlTitle: "RELOAD CATALOG", onClick: () => { void reloadDatabase(); } },
     { title: "OPT", controlTitle: "OPTIONS", onClick: () => openOptionsScreen() },
   ];
 }
@@ -1364,10 +1378,12 @@ function appStatusDetails() {
   const clock = track
     ? `${formatTime(playing ? state.positionMs : 0)} / ${songDuration > 0 ? formatTime(songDuration) : "OPEN"} / ${playlistIsOpen ? "OPEN" : formatTime(playlistDuration)}`
     : `0:00 / OPEN / ${playlistIsOpen ? "OPEN" : formatTime(playlistDuration)}`;
+  const visibleStatus = state.catalogLoading ? "RELOADING CATALOG"
+    : /^CATALOG ERROR:/.test(state.status) ? state.status : null;
   return {
-    location: track
+    location: visibleStatus || (track
       ? [sourcePath, archiveEntry].filter(Boolean).join(" :: ") || "FILE PATH UNAVAILABLE"
-      : state.status || "NO FILE SELECTED",
+      : state.status || "NO FILE SELECTED"),
     clock,
   };
 }
@@ -2266,8 +2282,7 @@ function visibleRowCount() {
 function visibleLibraryRowCount() {
   const rootChrome = 2 * APP_BORDER_GAP_DOTS + 2 * buttonStandardHeight() + 3 * uiGap()
     + rowHeight(4);
-  const bulkChrome = sidebarBulkAction() ? buttonStandardHeight() + uiGap() : 0;
-  const sidebarChrome = 2 * buttonStandardHeight() + 4 * uiGap() + bulkChrome;
+  const sidebarChrome = 2 * buttonStandardHeight() + 4 * uiGap();
   return Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - rootChrome - sidebarChrome)
     / contentRowStride("sidebar")));
 }
@@ -2291,11 +2306,10 @@ function consoleSystemNames() {
 }
 
 function sidebarBulkAction() {
-  if (normalizedText(state.searchQuery).trim()) return null;
   const keys = state.sidebarMode === "paths"
     ? state.databaseFileFolders.map((node) => node.path)
     : consoleSystemNames();
-  if (!keys.length) return null;
+  if (!keys.length) return { title: "FOLD ALL" };
   const expanded = state.sidebarMode === "paths" ? state.expandedPathNodes : state.expandedSystems;
   const allExpanded = keys.every((key) => expanded.has(key));
   return { title: allExpanded ? "FOLD ALL" : "UNFOLD ALL" };
@@ -2434,11 +2448,7 @@ function addLibraryPane(parent) {
   makeWidget(library, { height: uiGap() });
   const navigation = controlRow(library, { gap: uiGap() });
   libraryToolbarItems().forEach((item) => pixelButton(navigation, item.title, item.onClick, {
-    width: 0,
-    minWidth: 0,
-    flexBasis: 0,
-    flexGrow: 1,
-    flexShrink: 1,
+    flexShrink: 0,
     selected: item.view === "PATHS" ? state.sidebarMode === "paths"
       : item.view === "FAVORITES" ? activePlaylistTab()?.sourceKey === FAVORITES_TAB_SOURCE
         : item.view === "HISTORY" ? activePlaylistTab()?.sourceKey === HISTORY_TAB_SOURCE
@@ -2447,21 +2457,8 @@ function addLibraryPane(parent) {
             && activePlaylistTab()?.sourceKey !== HISTORY_TAB_SOURCE
             : item.view === state.tab && state.sidebarMode !== "paths",
     controlTitle: item.controlTitle,
+    sidebarBulkAction: item.sidebarBulkAction,
   }));
-  const bulkAction = sidebarBulkAction();
-  if (bulkAction) {
-    makeWidget(library, { height: uiGap() });
-    const bulkActionRow = controlRow(library, { gap: 0 });
-    pixelButton(bulkActionRow, bulkAction.title, () => toggleAllSidebarGroups(), {
-      width: 0,
-      minWidth: 0,
-      flexGrow: 1,
-      flexShrink: 1,
-      flexBasis: 0,
-      controlTitle: bulkAction.title,
-      sidebarBulkAction: true,
-    });
-  }
   makeWidget(library, { height: uiGap() });
   const rows = libraryRowsWithLineGaps(libraryRows());
   const count = visibleLibraryRowCount();
@@ -3443,15 +3440,21 @@ async function clearArchiveCache() {
 }
 
 async function reloadDatabase() {
+  state.catalogLoading = true;
+  state.status = "RELOADING CATALOG";
+  render();
   try {
     state.databaseLocation = await bridge?.reloadDatabaseLibrary?.() || state.databaseLocation;
     state.databaseOptionsStatus = "LIBRARY RELOADED";
+    state.catalogLoading = false;
     await loadCatalog();
     if (state.sidebarMode === "paths") {
       state.databaseFilesReady = false;
       await loadDatabaseFiles();
     }
   } catch (error) {
+    state.catalogLoading = false;
+    state.status = `DATABASE ERROR: ${error.message}`;
     state.databaseOptionsStatus = `DATABASE ERROR: ${error.message}`;
     render();
   }
@@ -4840,7 +4843,6 @@ function setAllPathFoldersExpanded(expanded) {
 }
 
 function toggleAllSidebarGroups() {
-  if (normalizedText(state.searchQuery).trim()) return;
   if (state.sidebarMode === "paths") {
     const folders = pathFolderNodes();
     const allExpanded = folders.length > 0
@@ -5117,20 +5119,29 @@ async function setAllSystemsExpanded(expanded, systems) {
 async function loadCatalog() {
   if (!bridge?.databaseGames) {
     state.status = "NATIVE BRIDGE UNAVAILABLE";
+    state.catalogLoading = false;
     render();
     return;
   }
   state.status = "LOADING CATALOG";
+  state.catalogLoading = true;
   const token = ++state.catalogToken;
   render();
   try {
     const games = await bridge.databaseGames();
-    if (token !== state.catalogToken || games?.stale) return;
+    if (token !== state.catalogToken) return;
+    if (games?.stale) {
+      state.catalogLoading = false;
+      render();
+      return;
+    }
     state.games = Array.isArray(games) ? games : [];
     state.games.sort((a, b) => (a.system || "").localeCompare(b.system || "")
       || (a.displayName || a.name || "").localeCompare(b.displayName || b.name || ""));
     state.consoleSystems = [...new Set(state.games.map((game) => game.system || "OTHER"))].sort();
     state.status = state.games.length ? "READY" : "CATALOG EMPTY";
+    state.catalogLoading = false;
+    render();
     if (state.games.length) {
       const game = state.games.find((item) => gameKey(item) === state.activeGameKey) || state.games[0];
       const system = game.system || "OTHER";
@@ -5143,6 +5154,7 @@ async function loadCatalog() {
     }
   } catch (error) {
     if (token !== state.catalogToken) return;
+    state.catalogLoading = false;
     state.status = `CATALOG ERROR: ${error.message}`;
     render();
   }
