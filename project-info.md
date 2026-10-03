@@ -16,6 +16,11 @@ history live in this repository.
 
 ## Task Routing
 
+Select the smallest owner that matches the request and read only its route.
+For a component task, do not inspect sibling components or scan the family
+repository by default. Add another component route only when the requested work
+crosses that ownership boundary.
+
 | Work | Owner and route |
 | --- | --- |
 | Format admission, decoding, timing, transport, and audio output | [VGMBoy/AGENTS.md](VGMBoy/AGENTS.md) |
@@ -30,19 +35,22 @@ history live in this repository.
 | Published Markdown library and native documentation viewer | [VGMManDocs/AGENTS.md](VGMManDocs/AGENTS.md) |
 | Legacy Electron recovery material | [LocalRecovery/README.md](LocalRecovery/README.md) |
 
-For a component task, follow its `AGENTS.md` → `ai/AGENTS.md` →
-`ai/project-info.md` → focused-note route. See `README.md` for the family
-index.
+For a component task, follow that owner's `AGENTS.md` → `ai/AGENTS.md` →
+`ai/project-info.md` → focused-note route. `README.md` is a family index, not
+default intake.
 
-- Shared ownership and remaining cross-app gates:
+Family-level references are conditional routes, not required reading for a
+component task:
+
+- Cross-component ownership or priorities:
   [ai/plans/family-priorities.md](ai/plans/family-priorities.md).
-- Frontend parity and open user-boundary checks:
+- Player frontend comparison or parity:
   [ai/reports/frontend-parity.md](ai/reports/frontend-parity.md).
-- Clean checkout, build, and evidence procedure:
+- Family-wide clean checkout or build evidence:
   [ai/verification/family.md](ai/verification/family.md).
-- Git ownership and recovery boundaries:
+- Repository recovery or Git ownership:
   [ai/subsystem-agent/repository-recovery.md](ai/subsystem-agent/repository-recovery.md).
-- Workspace-wide agent intake and build method, when DocMan is a sibling:
+- Workspace-wide intake/build method, when relevant:
   [DocMan](../DocMan/AGENTS.md) and
   [agent-onboarding-and-builds.md](../DocMan/docs-agent/agent-onboarding-and-builds.md).
 
