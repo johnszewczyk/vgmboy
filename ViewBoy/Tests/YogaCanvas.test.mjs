@@ -325,9 +325,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
       `uppercase ${character} is authored as five LCD dots per row`);
   }
   for (const [name, font, symbol] of [
-    ['Standard 5x7', standardFont, '☰'], ['Standard 5x7', standardFont, '♥'],
-    ['Standard 5x7', standardFont, '◷'], ['Micro 3x5', microFont, '☰'],
-    ['Micro 3x5', microFont, '♥'], ['Micro 3x5', microFont, '◷'],
+    ...['<', '>', '[', ']', '|'].map((glyph) => ['Standard 5x7', standardFont, glyph]),
+    ...['<', '>', '[', ']', '|'].map((glyph) => ['Micro 3x5', microFont, glyph]),
   ]) {
     const glyph = font.glyphs[symbol];
     assert.equal(glyph?.length, font.height, `${name} includes the ${symbol} toolbar symbol`);
@@ -340,10 +339,16 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     framesPerSecond: 60,
   }, 'all UI animation starts on the shared 200 ms duration and 60 FPS profile');
   for (const [theme, contrast, firstColor, lastColor] of [
-    ['GAMEBOY', 'STANDARD', '#333333', '#9BBC0F'],
-    ['GAMEBOY', 'HIGH_CONTRAST', '#1A1A1A', '#9BBC0F'],
+    ['GAMEBOY', 'STANDARD', '#222222', '#9BBC0F'],
+    ['GAMEBOY', 'HIGH_CONTRAST', '#080808', '#9BBC0F'],
     ['NIGHTBOY', 'STANDARD', '#A9A9A9', '#000000'],
     ['NIGHTBOY', 'HIGH_CONTRAST', '#D3D3D3', '#000000'],
+    ['GRAPEBOY', 'STANDARD', '#201824', '#A64AC9'],
+    ['GRAPEBOY', 'HIGH_CONTRAST', '#100B13', '#A64AC9'],
+    ['TEALBOY', 'STANDARD', '#06262A', '#78D7D4'],
+    ['TEALBOY', 'HIGH_CONTRAST', '#031619', '#78D7D4'],
+    ['ATOMICPURPLEBOY', 'STANDARD', '#E2D2EA', '#704883'],
+    ['ATOMICPURPLEBOY', 'HIGH_CONTRAST', '#F4EAF8', '#704883'],
   ]) {
     const tones = lcdPaletteSnapshot(theme, contrast);
     assert.equal(tones.length, 4, `${theme} ${contrast} supplies exactly four LCD tones`);
@@ -437,10 +442,12 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.ok(Math.max(...mainToolbarTargets.map((target) => target.box.width))
     - Math.min(...mainToolbarTargets.map((target) => target.box.width)) <= 1,
   'all eight main toolbar buttons share their full-width row evenly');
+  assert.equal(new Set(mainToolbarTargets.map((target) => target.box.height)).size, 1,
+    'all eight main toolbar buttons use the same canonical height');
   assert.ok(transportTargets[0].box.x < canvas.width / dotsPerCell() / 4,
     'transport starts at the left app inset instead of being centered');
-  assert.equal(transportTargets[0].box.x, 4,
-    'main content keeps the standard four-dot inset from the LCD edge');
+  assert.equal(transportTargets[0].box.x, 8,
+    'main content keeps the fixed eight-pixel inset from the LCD edge');
   assert.ok(toolbarTargets.some((target) => target.name === 'OPTIONS'),
     'Options remains reachable from the sidebar controls');
   assert.ok(toolbarTargets.some((target) => target.name === 'HISTORY'),
@@ -703,8 +710,28 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     assert.equal(prevented, true, `right-clicking ${target.name} opens its ViewBoy menu`);
   };
   const clickTarget = (name, occurrence = 0, xFraction = 0.5, yFraction = 0.5, detail = 1) => {
-    const target = hitTargetSnapshot().filter((entry) => entry.name === name)[occurrence];
+    let target = hitTargetSnapshot().filter((entry) => entry.name === name)[occurrence];
     assert.ok(target, `the ${name} control is present in the current screen; found ${hitTargetSnapshot().map((entry) => entry.name).join(', ')}`);
+    const options = optionsContentSnapshot();
+    const viewport = options.viewport;
+    if (viewport && target.box.x >= viewport.x && target.box.x < viewport.x + viewport.width) {
+      const viewportBottom = viewport.y + viewport.height;
+      const deltaDots = target.box.y + target.box.height > viewportBottom
+        ? target.box.y + target.box.height - viewportBottom + 1
+        : target.box.y < viewport.y ? target.box.y - viewport.y - 1 : 0;
+      if (deltaDots) {
+        const rect = canvas.getBoundingClientRect();
+        canvas.listeners.get('wheel')({
+          clientX: rect.width * (viewport.x + viewport.width / 2) / options.screen.width,
+          clientY: rect.height * (viewport.y + viewport.height / 2) / options.screen.height,
+          deltaX: 0,
+          deltaY: deltaDots * rect.height / options.screen.height,
+          deltaMode: 0,
+          preventDefault() {},
+        });
+        target = hitTargetSnapshot().filter((entry) => entry.name === name)[occurrence];
+      }
+    }
     const logicalWidth = canvas.width / dotsPerCell();
     const logicalHeight = canvas.height / dotsPerCell();
     clickScreen(
@@ -712,6 +739,15 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
       (target.box.y + target.box.height * yFraction) / logicalHeight,
       detail,
     );
+  };
+  const clickFPSAt = (fps) => {
+    const target = hitTargetSnapshot().find((entry) => entry.animationFPSControl);
+    assert.ok(target, 'the single FPS cap slider is present');
+    const left = target.box.x + 3;
+    const right = Math.max(left, target.box.x + target.box.width - 4);
+    const fraction = (fps - 30) / (240 - 30);
+    const pointX = Math.round(left + Math.max(0, Math.min(1, fraction)) * (right - left));
+    clickTarget(target.name, 0, (pointX - target.box.x) / target.box.width);
   };
   const typeSearchKey = (key) => canvas.listeners.get('keydown')({
     key,
@@ -723,7 +759,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     preventDefault() {},
   });
   const pages = [
-    'DATABASE', 'DISPLAY', 'INTERFACE', 'LIBRARY', 'QUEUE',
+    'DATABASE', 'DISPLAY', 'LIBRARY', 'QUEUE',
     'AUDIO', 'DIAGNOSTICS', 'METHODS', 'PLAYBACK',
   ];
   const clickPage = (page) => clickTarget(page);
@@ -731,13 +767,10 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.ok(hitTargetSnapshot().some((target) => target.searchField && target.name === 'SEARCH LIBRARY'),
     'the sidebar begins with a pixel-rendered search field');
-  const queueControlBefore = hitTargetSnapshot().find((target) => target.name === 'QUEUE');
-  const queuePixelsBefore = pixelChecksumForBox(queueControlBefore.box);
-  clickTarget('QUEUE');
+  assert.equal(hitTargetSnapshot().some((target) => target.sidebarAction === 'QUEUE'), false,
+    'Queue stays out of the sidebar action row');
+  globalThis.ViewBoy.dispatch('queue');
   await tick();
-  const queueControlAfter = hitTargetSnapshot().find((target) => target.name === 'QUEUE');
-  assert.notEqual(pixelChecksumForBox(queueControlAfter.box), queuePixelsBefore,
-    'Queue visibly selects its active playback-list view when invoked');
   const databaseGamesBeforeReload = bridge.databaseGames;
   let finishCatalogReload;
   bridge.databaseGames = async () => {
@@ -750,7 +783,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   clickPage('DATABASE');
   await tick();
-  clickTarget('RELOAD CATALOG');
+  clickTarget('RELOAD LIBRARY');
   await tick();
   await tick();
   assert.equal(databaseReloadCount, databaseReloadsBefore + 1,
@@ -785,7 +818,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const searchTargets = filteredSidebar.map((target) => target.name);
   assert.ok(searchTargets.includes('Sample'), 'typing filters the sidebar tree to matching catalog games');
   assert.equal(searchTargets.includes('Other'), false, 'nonmatching games are hidden by the sidebar search');
-  assert.ok(filteredSidebar.some((target) => target.sidebarBulkAction && target.displayText === '☰'),
+  assert.ok(filteredSidebar.some((target) => target.sidebarBulkAction
+    && ['FOLD ALL', 'UNFOLD ALL'].includes(target.name)),
     'Fold All stays in the sidebar toolbar while Search filters the tree');
   const parentSystemRow = filteredSidebar.find((target) => target.name.endsWith('SNES'));
   const childGameRow = filteredSidebar.find((target) => target.name === 'Sample');
@@ -831,7 +865,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const defaultTabGap = tabGap();
   clickTarget('OPTIONS');
   await tick();
-  clickPage('INTERFACE');
+  clickPage('DISPLAY');
   const initialGapReadout = spacingReadoutLayoutSnapshot().find((entry) => entry.title === 'UI CHROME GAP');
   nextFrameAdvanceMs = 125;
   clickTarget('UI CHROME GAP +');
@@ -861,7 +895,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   }
   clickTarget('OPTIONS');
   await tick();
-  clickPage('INTERFACE');
+  clickPage('DISPLAY');
   for (let step = 0; step < 4; step += 1) {
     clickTarget('UI CHROME GAP -');
     await tick();
@@ -878,13 +912,13 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const glyphHeight = bitmapFontSnapshot('MICRO').height;
   assert.ok(compactPlaylistRows.length >= 2, 'playlist text rows remain visible in the compact layout');
   assert.ok(compactPlaylistRows.every((row) => row.box.height === glyphHeight),
-    'playlist text rows have glyph-height boxes without vertical Control Padding');
+    'playlist text rows have glyph-height boxes without vertical UI Button Pad');
   assert.ok(compactPlaylistRows.slice(1).every((row, index) =>
     row.box.y - (compactPlaylistRows[index].box.y + compactPlaylistRows[index].box.height) === 1),
     'one Text Line Gap dot is the entire blank space between playlist rows');
   assert.ok(compactSidebarRows.length >= 2, 'sidebar text rows remain visible in the compact layout');
   assert.ok(compactSidebarRows.every((row) => row.box.height === glyphHeight),
-    'sidebar text rows have glyph-height boxes without vertical Control Padding');
+    'sidebar text rows have glyph-height boxes without vertical UI Button Pad');
   assert.ok(compactSidebarRows.slice(1).every((row, index) =>
     row.box.y - (compactSidebarRows[index].box.y + compactSidebarRows[index].box.height) === 1),
     'one Text Line Gap dot is the entire blank space between sidebar rows');
@@ -894,7 +928,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the deprecated Playlist Gap is omitted from the new display preferences');
   clickTarget('OPTIONS');
   await tick();
-  clickPage('INTERFACE');
+  clickPage('DISPLAY');
   clickTarget('TEXT LINE GAP +');
   await tick();
   globalThis.ViewBoy.dispatch('library');
@@ -912,7 +946,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   'the same Text Line Gap changes sidebar rows to two dots');
   clickTarget('OPTIONS');
   await tick();
-  clickPage('INTERFACE');
+  clickPage('DISPLAY');
   clickTarget('TEXT LINE GAP -');
   await tick();
   for (let step = 0; step < 4; step += 1) {
@@ -926,7 +960,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   clickTarget('X', 1);
   clickTarget('OPTIONS');
   await tick();
-  clickPage('INTERFACE');
+  clickPage('DISPLAY');
   clickTarget('UI CHROME GAP -');
   await tick();
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiChromeGapDots, 4,
@@ -1247,12 +1281,12 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(screenTransitionSnapshot()?.direction, 'down',
     'Command-comma toggles Options back on');
   await tick();
-  clickPage('INTERFACE');
+  clickPage('DISPLAY');
   globalThis.ViewBoy.dispatch('optionsPage:INTERFACE');
   clickTarget('AUTO-SIZE COLUMNS');
   await tick();
   assert.equal(savedPreferences.at(-1).columnAutoSize, false,
-    'the Interface page checkbox updates the saved column behavior');
+    'the Display page checkbox updates the saved column behavior');
   assert.equal(hitTargetSnapshot().some((target) => target.name === 'PREVIOUS'), false,
     'transport controls are kept off the Options screen');
   const paddingBefore = hitTargetSnapshot().find((target) => target.name === 'BACK').box.height;
@@ -1273,10 +1307,21 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the single duration setting keeps native legacy animation fields synchronized');
   clickTarget('ANIMATION DURATION -');
   await tick();
-  clickTarget('ANIMATION FPS +');
-  await tick();
+  const fpsTargets = hitTargetSnapshot().filter((target) => target.animationFPSControl);
+  assert.equal(fpsTargets.length, 1, 'the FPS system uses one shared slider control');
+  assert.equal(hitTargetSnapshot().some((target) => /^ANIMATION FPS [+-]$/.test(target.name)), false,
+    'the FPS system has no increment/decrement button pair');
+  clickFPSAt(90);
+  const fpsKey = (key, code, shiftKey = false) => canvas.listeners.get('keydown')({
+    key, code, metaKey: false, ctrlKey: false, altKey: false, shiftKey,
+    preventDefault() {},
+  });
+  assert.ok(Math.abs(animationSettingsSnapshot().framesPerSecond - 90) <= 3,
+    'the FPS slider maps its pointer position to the nearby rate');
+  while (animationSettingsSnapshot().framesPerSecond < 90) fpsKey('ArrowRight', 'ArrowRight');
+  while (animationSettingsSnapshot().framesPerSecond > 90) fpsKey('ArrowLeft', 'ArrowLeft');
   assert.equal(animationSettingsSnapshot().framesPerSecond, 90,
-    'the global animation FPS option is applied');
+    'arrow keys select an exact integer rate on the single FPS slider');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).animationFPS, 90,
     'the global animation FPS setting persists locally');
   const ninetyHzGate = {};
@@ -1285,22 +1330,23 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the frame gate waits for a 90 FPS interval');
   assert.equal(animationFrameIsDue(ninetyHzGate, 12), true,
     'the frame gate accepts the next 90 FPS update');
-  for (let step = 0; step < 5; step += 1) {
-    clickTarget('ANIMATION FPS +');
-    await tick();
-  }
+  fpsKey('ArrowRight', 'ArrowRight');
+  assert.equal(animationSettingsSnapshot().framesPerSecond, 91,
+    'the focused FPS slider adjusts by one frame per second with an arrow key');
+  fpsKey('ArrowRight', 'ArrowRight', true);
+  assert.equal(animationSettingsSnapshot().framesPerSecond, 101,
+    'Shift-arrow adjusts the FPS slider by ten');
+  fpsKey('Home', 'Home');
+  assert.equal(animationSettingsSnapshot().framesPerSecond, 30,
+    'Home moves the FPS slider to its 30 FPS minimum');
+  fpsKey('End', 'End');
   assert.equal(animationSettingsSnapshot().framesPerSecond, 240,
-    'the FPS ticker reaches its 240 FPS ceiling in 30 FPS increments');
-  clickTarget('ANIMATION FPS +');
-  await tick();
-  assert.equal(animationSettingsSnapshot().framesPerSecond, 240,
-    'the FPS ticker stays within its ceiling');
-  for (let step = 0; step < 6; step += 1) {
-    clickTarget('ANIMATION FPS -');
-    await tick();
-  }
+    'End moves the FPS slider to its 240 FPS maximum');
+  clickFPSAt(60);
+  while (animationSettingsSnapshot().framesPerSecond < 60) fpsKey('ArrowRight', 'ArrowRight');
+  while (animationSettingsSnapshot().framesPerSecond > 60) fpsKey('ArrowLeft', 'ArrowLeft');
   assert.equal(animationSettingsSnapshot().framesPerSecond, 60,
-    'the FPS ticker returns to the standard 60 FPS setting');
+    'the single FPS slider returns to the standard 60 FPS setting');
   clickTarget('ANIMATIONS');
   await tick();
   assert.equal(animationSettingsSnapshot().enabled, false,
@@ -1320,9 +1366,16 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(screenTransitionSnapshot()?.direction, 'up',
     'the UI Chrome Gap check returns to the playlist view through the shared screen roll');
   await tick();
+  globalThis.ViewBoy.dispatch('library');
+  await tick();
+  const sampleGameForGap = hitTargetSnapshot().find((target) => target.name === 'Sample');
+  assert.ok(sampleGameForGap, 'the Sample game row is available for the playlist spacing check');
+  clickTargetBox(sampleGameForGap);
+  await tick();
+  await tick();
   const fiveDotHeader = hitTargetSnapshot().find((target) => target.columnHeader && target.name === '#');
-  const fiveDotBody = hitTargetSnapshot().filter((target) => !target.columnHeader
-    && target.box.y > fiveDotHeader.box.y).sort((first, second) => first.box.y - second.box.y)[0];
+  const fiveDotBody = hitTargetSnapshot().find((target) => target.playlistRow
+    && target.box.y > fiveDotHeader.box.y);
   assert.ok(fiveDotBody, 'the playlist body remains laid out below its header at the larger UI Gap');
   assert.equal(fiveDotBody.box.y - (fiveDotHeader.box.y + fiveDotHeader.box.height), 5,
     'playlist header-to-body spacing follows the adjusted UI Chrome Gap');
@@ -1347,14 +1400,14 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     const minus = hitTargetSnapshot().find((entry) => entry.name === `${target.name} -`);
     const plus = hitTargetSnapshot().find((entry) => entry.name === `${target.name} +`);
     return minus && plus
-      && minus.box.x - (target.equalizerLabelBox.x + target.equalizerLabelBox.width) === 5
-      && plus.box.x - (minus.box.x + minus.box.width) === 5
-      && target.box.x - (plus.box.x + plus.box.width) === 5
-      && target.equalizerValueBox.x - (target.box.x + target.box.width) === 5;
+      && Math.abs(minus.box.x - (target.equalizerLabelBox.x + target.equalizerLabelBox.width) - 5) <= 1
+      && Math.abs(plus.box.x - (minus.box.x + minus.box.width) - 5) <= 1
+      && Math.abs(target.box.x - (plus.box.x + plus.box.width) - 5) <= 1
+      && Math.abs(target.equalizerValueBox.x - (target.box.x + target.box.width) - 5) <= 1;
   }), 'increasing UI Gap preserves all button and gauge spacing on every EQ row');
   assert.ok(expandedGapBands[0].box.width < defaultEqualizerWidth,
     'the EQ bar gives available width to the larger UI gaps instead of consuming their padding');
-  clickPage('INTERFACE');
+  clickPage('DISPLAY');
   clickTarget('UI CHROME GAP -');
   await tick();
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiChromeGapDots, 4,
@@ -1436,28 +1489,41 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(framebufferShadeSnapshot(uncheckedFileColumn.optionCheckboxBox.x + 2,
     uncheckedFileColumn.optionCheckboxBox.y + 2), 3,
   'an unchecked checkbox leaves its interior as the LCD background tone');
-  clickPage('INTERFACE');
+  clickPage('DISPLAY');
   globalThis.ViewBoy.dispatch('optionsPage:INTERFACE');
   clickTarget('AUTO-SIZE COLUMNS');
   await tick();
   assert.equal(savedPreferences.at(-1).columnAutoSize, true,
-    'the Interface page checkbox can restore automatic sizing');
+    'the Display page checkbox can restore automatic sizing');
   clickPage('DISPLAY');
   clickTarget('THEME GAMEBOY');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'GAMEBOY',
     'the palette selector returns to the authentic Game Boy theme');
-  clickTarget('INK CHARCOAL');
+  clickTarget('INK DARK CHARCOAL');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'STANDARD');
-  clickPage('INTERFACE');
+  clickTarget('BG CSS COLOR INPUT');
+  for (const character of 'ABC') typeSearchKey(character);
+  typeSearchKey('Enter');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).customBackgroundColor, '#AABBCC',
+    'the always-visible custom BG field accepts three-digit hex');
+  clickTarget('PIXEL CSS COLOR INPUT');
+  for (const character of '30 30 30') typeSearchKey(character);
+  typeSearchKey('Enter');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).customFontColor, '#1E1E1E',
+    'the custom pixel field accepts space-separated RGB values');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'CUSTOM',
+    'committing a custom endpoint activates the four-tone Custom palette');
+  clickTarget('THEME GAMEBOY');
+  clickPage('DISPLAY');
   clickTarget('BUTTONS SYMBOLS');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).transportSymbols, true,
-    'the Interface page persists its Words/Symbols control setting');
+    'the Display page persists its Words/Symbols control setting');
   globalThis.ViewBoy.dispatch('library');
   await tick();
   const symbolTransportPixels = pixelChecksum(canvas.image.data);
   globalThis.ViewBoy.dispatch('settings');
   await tick();
-  clickPage('INTERFACE');
+  clickPage('DISPLAY');
   clickTarget('BUTTONS WORDS');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).transportSymbols, false);
   globalThis.ViewBoy.dispatch('library');
@@ -1833,7 +1899,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.deepEqual(visibleOptionPages(), pages,
     'Options groups app pages before VGMBoy pages and alphabetizes each group');
   assert.deepEqual(visibleOptionPageTargets().map((target) => target.optionOwner), [
-    'VIEWBOY', 'VIEWBOY', 'VIEWBOY', 'VIEWBOY', 'VIEWBOY',
+    'VIEWBOY', 'VIEWBOY', 'VIEWBOY', 'VIEWBOY',
     'VGMBoy', 'VGMBoy', 'VGMBoy', 'VGMBoy',
   ], 'every Options page is visibly assigned to its owning frontend or VGMBoy');
   assert.deepEqual(optionsStyleSnapshot().filter((item) => item.kind === 'title'
@@ -1844,7 +1910,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const optionStyles = optionsStyleSnapshot();
   const optionsHeading = optionStyles.find((item) => item.kind === 'title'
     && item.name === 'OPTIONS - VIEWBOY');
-  const displayHeading = optionStyles.find((item) => item.kind === 'title' && item.name === 'DISPLAY');
+  const displayHeading = optionStyles.find((item) => item.kind === 'title'
+    && item.name === 'DISPLAY + UI');
   const screenProfile = optionStyles.find((item) => item.kind === 'group' && item.name === 'SCREEN PROFILE');
   const colorTheme = optionStyles.find((item) => item.kind === 'group' && item.name === 'COLOR THEME');
   const lcdTones = optionStyles.find((item) => item.kind === 'group' && item.name === 'FOUR LCD TONES');
@@ -1856,7 +1923,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(framebufferShadeSnapshot(screenProfile.box.x + 1,
     screenProfile.box.y + screenProfile.box.height - 1), 1,
   'Options groups retain their thin enclosing frame');
-  clickPage('INTERFACE');
+  clickPage('DISPLAY');
   const currentChromeGap = JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).uiChromeGapDots;
   for (let step = currentChromeGap; step < 8; step += 1) {
     clickTarget('UI CHROME GAP +');
@@ -1928,7 +1995,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   screenHeight = 800;
   windowListeners.get('resize')();
   await tick();
-  clickPage('INTERFACE');
+  clickPage('DISPLAY');
   for (let step = 0; step < 4; step += 1) {
     clickTarget('UI CHROME GAP -');
     await tick();

@@ -14,6 +14,7 @@ import Yoga, {
 // A one-pixel edge remains unlit so the matrix stays visible at every size.
 const DEFAULT_LCD_DOT_SIZE = 3;
 const LCD_DOT_SIZE_OPTIONS = [2, 3, 4, 5, 6];
+const APP_EDGE_PADDING_PX = 8;
 let DEVICE_PIXELS_PER_LCD_DOT = DEFAULT_LCD_DOT_SIZE;
 const BASELINE_LAYOUT_UNIT_CSS_PIXELS = 2.5;
 const RANDOM_HISTORY_LIMIT = 256;
@@ -72,26 +73,35 @@ const ANIMATION_FPS_TICKS = [30, 60, 90, 120, 150, 180, 210, 240];
 // custom palettes follow the two user-entered endpoints.
 const PALETTE_ENDPOINTS = {
   GAMEBOY: {
-    STANDARD: { ink: "#333333", surface: "#9BBC0F" },
-    HIGH_CONTRAST: { ink: "#1A1A1A", surface: "#9BBC0F" },
+    STANDARD: { ink: "#222222", surface: "#9BBC0F" },
+    HIGH_CONTRAST: { ink: "#080808", surface: "#9BBC0F" },
   },
   NIGHTBOY: {
     STANDARD: { ink: "#A9A9A9", surface: "#000000" },
     HIGH_CONTRAST: { ink: "#D3D3D3", surface: "#000000" },
   },
-  PURPLEBOY: {
-    STANDARD: { ink: "#A64AC9", surface: "#29252E" },
-    HIGH_CONTRAST: { ink: "#CF65ED", surface: "#29252E" },
+  GRAPEBOY: {
+    STANDARD: { ink: "#201824", surface: "#A64AC9" },
+    HIGH_CONTRAST: { ink: "#100B13", surface: "#A64AC9" },
   },
-  IDIGLOWBOY: {
-    STANDARD: { ink: "#123C43", surface: "#78D7D4" },
-    HIGH_CONTRAST: { ink: "#062C35", surface: "#78D7D4" },
+  TEALBOY: {
+    STANDARD: { ink: "#06262A", surface: "#78D7D4" },
+    HIGH_CONTRAST: { ink: "#031619", surface: "#78D7D4" },
   },
-  DARKPURPLEBOY: {
+  ATOMICPURPLEBOY: {
     STANDARD: { ink: "#E2D2EA", surface: "#704883" },
     HIGH_CONTRAST: { ink: "#F4EAF8", surface: "#704883" },
   },
 };
+const THEME_ALIASES = {
+  PURPLEBOY: "GRAPEBOY",
+  IDIGLOWBOY: "TEALBOY",
+  DARKPURPLEBOY: "ATOMICPURPLEBOY",
+};
+function normalizeThemeName(theme) {
+  const name = String(theme || "").toUpperCase();
+  return THEME_ALIASES[name] || name;
+}
 const COLOR_THEMES = new Set([...Object.keys(PALETTE_ENDPOINTS), "CUSTOM"]);
 function hexToRGB(color) {
   const value = Number.parseInt(color.slice(1), 16);
@@ -464,7 +474,8 @@ const state = {
   playing: false,
   font: savedDisplayOptions.font === "STANDARD" ? "STANDARD" : "MICRO",
   contrast: savedDisplayOptions.contrast === "HIGH_CONTRAST" ? "HIGH_CONTRAST" : "STANDARD",
-  theme: COLOR_THEMES.has(savedDisplayOptions.theme) ? savedDisplayOptions.theme : "GAMEBOY",
+  theme: COLOR_THEMES.has(normalizeThemeName(savedDisplayOptions.theme))
+    ? normalizeThemeName(savedDisplayOptions.theme) : "GAMEBOY",
   customBackgroundColor: colorInputToHex(savedDisplayOptions.customBackgroundColor) || "#9BBC0F",
   customFontColor: colorInputToHex(savedDisplayOptions.customFontColor) || "#333333",
   customColorsInitialized: savedDisplayOptions.customColorsInitialized === true,
@@ -3153,7 +3164,7 @@ function optionsTocWidth() {
   return Math.min(available * 0.34, Math.max(labelWidth, Math.min(220, available * 0.20)));
 }
 
-function addDisplayOptions(parent) {
+function addDisplayOptions(parent, pref) {
   const profile = optionGroup(parent, "SCREEN PROFILE");
   optionChoice(profile, "FONT", [
     { title: "MICRO 3X5", selected: state.font === "MICRO", onClick: () => setFontProfile("MICRO") },
@@ -3163,9 +3174,17 @@ function addDisplayOptions(parent) {
     () => setLCDDotSize(state.lcdDotSize - 1),
     () => setLCDDotSize(state.lcdDotSize + 1));
   addThemeOptions(parent);
+  addInterfaceOptions(parent, pref);
 }
 
 function beginColorEdit(endpoint) {
+  if (!state.customColorsInitialized) {
+    const endpoints = PALETTE_ENDPOINTS[state.theme]?.[state.contrast]
+      || PALETTE_ENDPOINTS.GAMEBOY.STANDARD;
+    state.customBackgroundColor = endpoints.surface;
+    state.customFontColor = endpoints.ink;
+    state.customColorsInitialized = true;
+  }
   state.editingColorEndpoint = endpoint;
   state.colorDraft = "";
   state.colorInputError = null;
@@ -3197,7 +3216,11 @@ function finishColorEdit(commit) {
 
 function customColorInput(parent, endpoint, title) {
   const editing = state.editingColorEndpoint === endpoint;
-  const value = endpoint === "background" ? state.customBackgroundColor : state.customFontColor;
+  const defaults = state.customColorsInitialized ? null
+    : PALETTE_ENDPOINTS[state.theme]?.[state.contrast] || PALETTE_ENDPOINTS.GAMEBOY.STANDARD;
+  const value = endpoint === "background"
+    ? defaults?.surface || state.customBackgroundColor
+    : defaults?.ink || state.customFontColor;
   const row = controlRow(parent, { gap: 0 }, { optionChoiceRow: `${title} COLOR` });
   label(row, title, { widthPercent: 33.3333, height: buttonStandardHeight() }, {
     textShade: 0,
@@ -3223,23 +3246,23 @@ function addThemeOptions(parent) {
     { title: "GAMEBOY", selected: state.theme === "GAMEBOY", onClick: () => setTheme("GAMEBOY") },
     { title: "NIGHTBOY", selected: state.theme === "NIGHTBOY", onClick: () => setTheme("NIGHTBOY") },
   ]);
-  optionChoice(profile, "NEW THEMES", [
-    { title: "PURPLEBOY", selected: state.theme === "PURPLEBOY", onClick: () => setTheme("PURPLEBOY") },
-    { title: "IDIGLOWBOY", selected: state.theme === "IDIGLOWBOY", onClick: () => setTheme("IDIGLOWBOY") },
+  optionChoice(profile, "GAME BOY COLOR", [
+    { title: "GRAPEBOY", selected: state.theme === "GRAPEBOY", onClick: () => setTheme("GRAPEBOY") },
+    { title: "TEALBOY", selected: state.theme === "TEALBOY", onClick: () => setTheme("TEALBOY") },
   ]);
-  optionChoice(profile, "POCKET PURPLE", [
-    { title: "DARKPURPLEBOY", selected: state.theme === "DARKPURPLEBOY", onClick: () => setTheme("DARKPURPLEBOY") },
+  optionChoice(profile, "TRANSLUCENT PURPLE", [
+    { title: "ATOMIC PURPLE", selected: state.theme === "ATOMICPURPLEBOY", onClick: () => setTheme("ATOMICPURPLEBOY") },
   ]);
-  optionChoice(profile, "CUSTOM", [
-    { title: "COLORS", selected: state.theme === "CUSTOM", onClick: () => setTheme("CUSTOM") },
+  optionChoice(profile, "CUSTOM THEME", [
+    { title: "CUSTOM", selected: state.theme === "CUSTOM", onClick: () => setTheme("CUSTOM") },
   ]);
   if (state.theme !== "CUSTOM") {
     const inkLabels = {
-      GAMEBOY: ["CHARCOAL", "NEAR BLACK"],
+      GAMEBOY: ["DARK CHARCOAL", "NEAR BLACK"],
       NIGHTBOY: ["DARKGRAY", "LIGHT GRAY"],
-      PURPLEBOY: ["RICH PURPLE", "BRIGHT PURPLE"],
-      IDIGLOWBOY: ["DEEP AQUA", "DARK AQUA"],
-      DARKPURPLEBOY: ["LIGHT LAVENDER", "PALE LAVENDER"],
+      GRAPEBOY: ["CHARCOAL", "NEAR BLACK"],
+      TEALBOY: ["DEEP CHARCOAL", "NEAR BLACK"],
+      ATOMICPURPLEBOY: ["LIGHT LAVENDER", "PALE LAVENDER"],
     }[state.theme];
     optionChoice(profile, "INK", [
       { title: inkLabels[0], selected: state.contrast === "STANDARD",
@@ -3247,17 +3270,16 @@ function addThemeOptions(parent) {
       { title: inkLabels[1], selected: state.contrast === "HIGH_CONTRAST",
         onClick: () => setContrastProfile("HIGH_CONTRAST") },
     ]);
-  } else {
-    const colors = optionGroup(parent, "CUSTOM COLORS");
-    customColorInput(colors, "background", "BG");
-    customColorInput(colors, "font", "FONT");
-    label(colors, state.colorInputError ? "INVALID CSS COLOR" : "ENTER TO APPLY", {
-      height: rowHeight(),
-    }, {
-      textShade: 0,
-      inset: controlPaddingDots(),
-    });
   }
+  const colors = optionGroup(parent, "CUSTOM LCD COLORS");
+  customColorInput(colors, "background", "BG");
+  customColorInput(colors, "font", "PIXEL");
+  label(colors, state.colorInputError ? "INVALID CSS COLOR" : "ENTER TO APPLY / ESC TO CANCEL", {
+    height: rowHeight(),
+  }, {
+    textShade: 0,
+    inset: controlPaddingDots(),
+  });
   const tones = optionGroup(parent, "FOUR LCD TONES");
   addPalettePreview(tones);
 }
@@ -3905,7 +3927,7 @@ function addDatabaseOptions(parent) {
 }
 
 function selectOptionsPage(page) {
-  state.optionsPage = page;
+  state.optionsPage = page === "INTERFACE" ? "DISPLAY" : page;
   state.optionsScrollOffset = 0;
   render();
   if (page === "DATABASE") void refreshDatabaseOptions();
@@ -3933,7 +3955,7 @@ function addOptionsContent(parent) {
     paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
   [
-    { title: "VIEWBOY", pages: ["DATABASE", "DISPLAY", "INTERFACE", "LIBRARY", "QUEUE"] },
+    { title: "VIEWBOY", pages: ["DATABASE", "DISPLAY", "LIBRARY", "QUEUE"] },
     { title: "VGMBoy", pages: ["AUDIO", "DIAGNOSTICS", "METHODS", "PLAYBACK"] },
   ].forEach(({ title, pages }) => {
     panelTitle(toc, `OPTIONS - ${title}`);
@@ -3959,7 +3981,7 @@ function addOptionsContent(parent) {
     optionFrame: "content",
     paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
-  panelTitle(panel, state.optionsPage);
+  panelTitle(panel, state.optionsPage === "DISPLAY" ? "DISPLAY + UI" : state.optionsPage);
   const viewport = makeWidget(panel, {
     direction: FlexDirection.Column,
     flexGrow: 1,
@@ -3987,9 +4009,8 @@ function addOptionsContent(parent) {
   else if (state.optionsPage === "METHODS") addMethodOptions(content, pref);
   else if (state.optionsPage === "AUDIO") addAudioOptions(content, pref);
   else if (state.optionsPage === "DIAGNOSTICS") addDiagnosticsOptions(content);
-  else if (state.optionsPage === "INTERFACE") addInterfaceOptions(content, pref);
   else if (state.optionsPage === "LIBRARY") addLibraryOptions(content, pref);
-  else addDisplayOptions(content);
+  else addDisplayOptions(content, pref);
 }
 
 function buildTree() {
@@ -4009,7 +4030,7 @@ function buildTree() {
     width: WIDTH / STYLE_SCALE,
     height: HEIGHT / STYLE_SCALE,
     positionType: PositionType.Relative,
-    padding: controlPaddingDots() / STYLE_SCALE,
+    padding: APP_EDGE_PADDING_PX / STYLE_SCALE,
     gap: uiGap(),
     alignItems: Align.Stretch,
   }, {
@@ -4039,6 +4060,10 @@ function buildTree() {
       flexBasis: 0,
       flexGrow: 1,
       flexShrink: 1,
+      height: toolbarHeight,
+      border: BUTTON_BORDER_DOTS,
+      inset: controlPaddingDots(),
+      align: "center",
       ...style,
     });
     const toolbar = controlRow(root, { height: toolbarHeight, gap: uiGap() });
@@ -4048,7 +4073,7 @@ function buildTree() {
     fillButton(toolbar, transportLabels.previous, () => selectPrevious(), {
       controlTitle: "PREVIOUS",
       align: state.transportSymbols ? "left" : "center",
-      inset: state.transportSymbols ? 1 : controlPaddingDots(),
+      inset: state.transportSymbols ? BUTTON_BORDER_DOTS : controlPaddingDots(),
     });
     fillButton(toolbar, transportLabels.stop, () => stopPlayback(), { controlTitle: "STOP" });
     fillButton(toolbar, transportLabels.play, () => togglePlaying(), {
@@ -4726,10 +4751,13 @@ function cancelScreenLocalAnimations() {
 }
 
 function navigateAppTab(tab, optionsPage = null) {
+  const selectedOptionsPage = optionsPage === "INTERFACE" ? "DISPLAY" : optionsPage;
   const previousTab = state.tab;
   if (previousTab === tab) {
-    if (optionsPage && state.optionsPage !== optionsPage) state.optionsPage = optionsPage;
-    if (optionsPage) render();
+    if (selectedOptionsPage && state.optionsPage !== selectedOptionsPage) {
+      state.optionsPage = selectedOptionsPage;
+    }
+    if (selectedOptionsPage) render();
     return;
   }
   const crossesOptions = (previousTab === "SETTINGS") !== (tab === "SETTINGS");
@@ -4740,7 +4768,7 @@ function navigateAppTab(tab, optionsPage = null) {
   screenTransition = null;
   cancelScreenLocalAnimations();
   state.tab = tab;
-  if (optionsPage) state.optionsPage = optionsPage;
+  if (selectedOptionsPage) state.optionsPage = selectedOptionsPage;
   if (tab === "SETTINGS") setSearchFocused(false);
 
   const duration = animationDurationMilliseconds();
@@ -4826,7 +4854,8 @@ function setContrastProfile(contrast) {
 }
 
 function setTheme(theme) {
-  const selectedTheme = COLOR_THEMES.has(theme) ? theme : "GAMEBOY";
+  const normalizedTheme = normalizeThemeName(theme);
+  const selectedTheme = COLOR_THEMES.has(normalizedTheme) ? normalizedTheme : "GAMEBOY";
   if (selectedTheme === "CUSTOM" && !state.customColorsInitialized) {
     const endpoints = PALETTE_ENDPOINTS[state.theme]?.[state.contrast]
       || PALETTE_ENDPOINTS.GAMEBOY.STANDARD;
@@ -6822,13 +6851,13 @@ window.ViewBoy = Object.freeze({
       case "queue": selectSidebarView("QUEUE"); break;
       case "optionsPage:DISPLAY": openOptionsScreen("DISPLAY"); break;
       case "optionsPage:THEME": openOptionsScreen("DISPLAY"); break;
-      case "optionsPage:TRANSPORT": openOptionsScreen("INTERFACE"); break;
+      case "optionsPage:TRANSPORT": openOptionsScreen("DISPLAY"); break;
       case "optionsPage:PLAYBACK": openOptionsScreen("PLAYBACK"); break;
       case "optionsPage:METHODS": openOptionsScreen("METHODS"); break;
       case "optionsPage:AUDIO": openOptionsScreen("AUDIO"); break;
       case "optionsPage:DIAGNOSTICS": openOptionsScreen("DIAGNOSTICS"); break;
       case "optionsPage:QUEUE": openOptionsScreen("QUEUE"); break;
-      case "optionsPage:INTERFACE": openOptionsScreen("INTERFACE"); break;
+      case "optionsPage:INTERFACE": openOptionsScreen("DISPLAY"); break;
       case "optionsPage:LIBRARY": openOptionsScreen("LIBRARY"); break;
       case "optionsPage:DATABASE": openOptionsScreen("DATABASE"); break;
       case "closeWindow": closePlaylistTab(); break;

@@ -5,6 +5,7 @@ ViewBoy is the VGMMan family's native macOS player with a screen-first Yoga LCD 
 ## Routes
 
 - Display and pixel scale: `subsystem-human/display.md`.
+- Published theme and layout specification: [ViewBoy UI Design](../../VGMManDocs/Docs/md/ViewBoy/ui-design.md).
 - In-screen settings: `subsystem-human/options.md`.
 - Playback: `subsystem-human/playback.md`.
 - Requested history playlist handoff: `reports/new-feature-report.md`.

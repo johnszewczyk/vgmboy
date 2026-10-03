@@ -11,12 +11,18 @@
         const surfaces = {
           GAMEBOY: "#9BBC0F",
           NIGHTBOY: "#000000",
-          PURPLEBOY: "#29252E",
-          IDIGLOWBOY: "#78D7D4",
-          DARKPURPLEBOY: "#704883",
+          GRAPEBOY: "#A64AC9",
+          TEALBOY: "#78D7D4",
+          ATOMICPURPLEBOY: "#704883",
         };
-        const theme = Object.hasOwn(surfaces, options.theme) || options.theme === "CUSTOM"
-          ? options.theme : "GAMEBOY";
+        const aliases = {
+          PURPLEBOY: "GRAPEBOY",
+          IDIGLOWBOY: "TEALBOY",
+          DARKPURPLEBOY: "ATOMICPURPLEBOY",
+        };
+        const savedTheme = aliases[options.theme] || options.theme;
+        const theme = Object.hasOwn(surfaces, savedTheme) || savedTheme === "CUSTOM"
+          ? savedTheme : "GAMEBOY";
         document.documentElement.dataset.theme = theme;
         document.documentElement.style.setProperty("--screen-surface",
           theme === "CUSTOM" && CSS.supports("color", options.customBackgroundColor)
