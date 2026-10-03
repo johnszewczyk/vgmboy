@@ -30,8 +30,8 @@ const SIDEBAR_ICON_ART = {
     "100000001", "100000001", "111111111", "000000000",
   ],
   heart: [
-    "011101110", "111111111", "111111111", "011111110", "001111100",
-    "000111000", "000010000", "000000000", "000000000",
+    "001001000", "011111100", "111111110", "111111110", "011111100",
+    "001111000", "000110000", "000010000", "000000000",
   ],
   clock: [
     "001111100", "011000110", "110000011", "110110011", "110111011",
@@ -72,8 +72,8 @@ const ANIMATION_FPS_TICKS = [30, 60, 90, 120, 150, 180, 210, 240];
 // custom palettes follow the two user-entered endpoints.
 const PALETTE_ENDPOINTS = {
   GAMEBOY: {
-    STANDARD: { ink: "#0C300C", surface: "#9BBC0F" },
-    HIGH_CONTRAST: { ink: "#333333", surface: "#9BBC0F" },
+    STANDARD: { ink: "#333333", surface: "#9BBC0F" },
+    HIGH_CONTRAST: { ink: "#1A1A1A", surface: "#9BBC0F" },
   },
   NIGHTBOY: {
     STANDARD: { ink: "#A9A9A9", surface: "#000000" },
@@ -86,6 +86,10 @@ const PALETTE_ENDPOINTS = {
   IDIGLOWBOY: {
     STANDARD: { ink: "#123C43", surface: "#78D7D4" },
     HIGH_CONTRAST: { ink: "#062C35", surface: "#78D7D4" },
+  },
+  DARKPURPLEBOY: {
+    STANDARD: { ink: "#E2D2EA", surface: "#704883" },
+    HIGH_CONTRAST: { ink: "#F4EAF8", surface: "#704883" },
   },
 };
 const COLOR_THEMES = new Set([...Object.keys(PALETTE_ENDPOINTS), "CUSTOM"]);
@@ -462,7 +466,7 @@ const state = {
   contrast: savedDisplayOptions.contrast === "HIGH_CONTRAST" ? "HIGH_CONTRAST" : "STANDARD",
   theme: COLOR_THEMES.has(savedDisplayOptions.theme) ? savedDisplayOptions.theme : "GAMEBOY",
   customBackgroundColor: colorInputToHex(savedDisplayOptions.customBackgroundColor) || "#9BBC0F",
-  customFontColor: colorInputToHex(savedDisplayOptions.customFontColor) || "#0C300C",
+  customFontColor: colorInputToHex(savedDisplayOptions.customFontColor) || "#333333",
   customColorsInitialized: savedDisplayOptions.customColorsInitialized === true,
   editingColorEndpoint: null,
   colorDraft: "",
@@ -3223,15 +3227,19 @@ function addThemeOptions(parent) {
     { title: "PURPLEBOY", selected: state.theme === "PURPLEBOY", onClick: () => setTheme("PURPLEBOY") },
     { title: "IDIGLOWBOY", selected: state.theme === "IDIGLOWBOY", onClick: () => setTheme("IDIGLOWBOY") },
   ]);
+  optionChoice(profile, "POCKET PURPLE", [
+    { title: "DARKPURPLEBOY", selected: state.theme === "DARKPURPLEBOY", onClick: () => setTheme("DARKPURPLEBOY") },
+  ]);
   optionChoice(profile, "CUSTOM", [
     { title: "COLORS", selected: state.theme === "CUSTOM", onClick: () => setTheme("CUSTOM") },
   ]);
   if (state.theme !== "CUSTOM") {
     const inkLabels = {
-      GAMEBOY: ["LCD GREEN", "CHARCOAL"],
+      GAMEBOY: ["CHARCOAL", "NEAR BLACK"],
       NIGHTBOY: ["DARKGRAY", "LIGHT GRAY"],
       PURPLEBOY: ["RICH PURPLE", "BRIGHT PURPLE"],
       IDIGLOWBOY: ["DEEP AQUA", "DARK AQUA"],
+      DARKPURPLEBOY: ["LIGHT LAVENDER", "PALE LAVENDER"],
     }[state.theme];
     optionChoice(profile, "INK", [
       { title: inkLabels[0], selected: state.contrast === "STANDARD",
@@ -4001,7 +4009,7 @@ function buildTree() {
     width: WIDTH / STYLE_SCALE,
     height: HEIGHT / STYLE_SCALE,
     positionType: PositionType.Relative,
-    padding: 0,
+    padding: controlPaddingDots() / STYLE_SCALE,
     gap: uiGap(),
     alignItems: Align.Stretch,
   }, {
@@ -4025,17 +4033,6 @@ function buildTree() {
       inset: 1,
     });
   } else {
-    const toolbarWidth = (WIDTH / STYLE_SCALE) / 2;
-    const toolbarStage = makeWidget(root, {
-      direction: FlexDirection.Row,
-      alignItems: Align.Stretch,
-    });
-    const toolbarGroup = makeWidget(toolbarStage, {
-      direction: FlexDirection.Column,
-      width: toolbarWidth,
-      gap: uiGap(),
-    });
-
     const fillButton = (parent, text, onClick, style = {}) => pixelButton(parent, text, onClick, {
       width: 0,
       minWidth: 0,
@@ -4044,35 +4041,33 @@ function buildTree() {
       flexShrink: 1,
       ...style,
     });
-    const transport = controlRow(toolbarGroup, { height: toolbarHeight, gap: uiGap() });
+    const toolbar = controlRow(root, { height: toolbarHeight, gap: uiGap() });
     const transportLabels = state.transportSymbols
       ? { previous: "<<", stop: "[]", play: state.playing ? "||" : ">", next: ">>" }
       : { previous: "PREV", stop: "STOP", play: state.playing ? "PAUSE" : "PLAY", next: "NEXT" };
-    fillButton(transport, transportLabels.previous, () => selectPrevious(), {
+    fillButton(toolbar, transportLabels.previous, () => selectPrevious(), {
       controlTitle: "PREVIOUS",
       align: state.transportSymbols ? "left" : "center",
       inset: state.transportSymbols ? 1 : controlPaddingDots(),
     });
-    fillButton(transport, transportLabels.stop, () => stopPlayback(), { controlTitle: "STOP" });
-    fillButton(transport, transportLabels.play, () => togglePlaying(), {
+    fillButton(toolbar, transportLabels.stop, () => stopPlayback(), { controlTitle: "STOP" });
+    fillButton(toolbar, transportLabels.play, () => togglePlaying(), {
       controlTitle: state.playing ? "PAUSE" : "PLAY",
     });
-    fillButton(transport, transportLabels.next, () => selectNext(), { controlTitle: "NEXT" });
-
-    const playbackModes = controlRow(toolbarGroup, { height: toolbarHeight, gap: uiGap() });
-    fillButton(playbackModes, "LP", () => toggleLongPlay(), {
+    fillButton(toolbar, transportLabels.next, () => selectNext(), { controlTitle: "NEXT" });
+    fillButton(toolbar, "LP", () => toggleLongPlay(), {
       selected: state.preferences.longPlayEnabled === true,
       controlTitle: "LONG PLAY",
     });
-    fillButton(playbackModes, "R1", () => toggleRepeatOne(), {
+    fillButton(toolbar, "R1", () => toggleRepeatOne(), {
       selected: state.preferences.repeatMode === "one",
       controlTitle: "REPEAT ONE",
     });
-    fillButton(playbackModes, "P-RND", () => toggleRandomMode("playlist"), {
+    fillButton(toolbar, "P-RND", () => toggleRandomMode("playlist"), {
       selected: state.preferences.randomMode === "playlist",
       controlTitle: "PLAYLIST RANDOM",
     });
-    fillButton(playbackModes, "L-RND", () => toggleRandomMode("library"), {
+    fillButton(toolbar, "L-RND", () => toggleRandomMode("library"), {
       selected: state.preferences.randomMode === "library",
       controlTitle: "LIBRARY RANDOM",
     });

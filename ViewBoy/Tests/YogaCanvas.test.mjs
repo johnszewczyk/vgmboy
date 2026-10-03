@@ -340,8 +340,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     framesPerSecond: 60,
   }, 'all UI animation starts on the shared 200 ms duration and 60 FPS profile');
   for (const [theme, contrast, firstColor, lastColor] of [
-    ['GAMEBOY', 'STANDARD', '#0C300C', '#9BBC0F'],
-    ['GAMEBOY', 'HIGH_CONTRAST', '#333333', '#9BBC0F'],
+    ['GAMEBOY', 'STANDARD', '#333333', '#9BBC0F'],
+    ['GAMEBOY', 'HIGH_CONTRAST', '#1A1A1A', '#9BBC0F'],
     ['NIGHTBOY', 'STANDARD', '#A9A9A9', '#000000'],
     ['NIGHTBOY', 'HIGH_CONTRAST', '#D3D3D3', '#000000'],
   ]) {
@@ -431,40 +431,36 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     .map((name) => toolbarTargets.find((target) => target.name === name));
   const modeTargets = ['LONG PLAY', 'REPEAT ONE', 'PLAYLIST RANDOM', 'LIBRARY RANDOM']
     .map((name) => toolbarTargets.find((target) => target.name === name));
-  assert.ok(transportTargets.every((target) => target && target.box.y === transportTargets[0].box.y),
-    'core transport buttons share one toolbar row');
-  assert.ok(modeTargets.every((target) => target && target.box.y === modeTargets[0].box.y),
-    'playback methods share a second toolbar row');
-  assert.ok(Math.max(...transportTargets.map((target) => target.box.width))
-    - Math.min(...transportTargets.map((target) => target.box.width)) <= 1,
-  'core transport buttons share their toolbar width evenly');
-  assert.ok(Math.max(...modeTargets.map((target) => target.box.width))
-    - Math.min(...modeTargets.map((target) => target.box.width)) <= 1,
-    'playback methods share their toolbar width evenly');
-  assert.ok(Math.abs(transportTargets[0].box.x - modeTargets[0].box.x) <= 1,
-    'the left-aligned half-width wrapper aligns both toolbar rows');
+  const mainToolbarTargets = [...transportTargets, ...modeTargets];
+  assert.ok(mainToolbarTargets.every((target) => target && target.box.y === mainToolbarTargets[0].box.y),
+    'transport and playback methods share one toolbar row');
+  assert.ok(Math.max(...mainToolbarTargets.map((target) => target.box.width))
+    - Math.min(...mainToolbarTargets.map((target) => target.box.width)) <= 1,
+  'all eight main toolbar buttons share their full-width row evenly');
   assert.ok(transportTargets[0].box.x < canvas.width / dotsPerCell() / 4,
     'transport starts at the left app inset instead of being centered');
+  assert.equal(transportTargets[0].box.x, 4,
+    'main content keeps the standard four-dot inset from the LCD edge');
   assert.ok(toolbarTargets.some((target) => target.name === 'OPTIONS'),
     'Options remains reachable from the sidebar controls');
   assert.ok(toolbarTargets.some((target) => target.name === 'HISTORY'),
-    'the sidebar exposes the shared Playback History view alongside Library and Queue');
-  assert.ok(toolbarTargets.some((target) => target.name === 'FAVORITES' && target.displayText === '♥'),
-    'Favorites uses its own bitmap heart glyph');
-  assert.ok(toolbarTargets.some((target) => target.name === 'HISTORY' && target.displayText === '◷'),
-    'History uses its own bitmap clock glyph');
-  assert.ok(toolbarTargets.some((target) => target.name === 'QUEUE'),
-    'the queue action uses its full label');
-  assert.equal(toolbarTargets.some((target) => target.name === 'OPEN LOCAL PATH'), false,
-    'the local path picker stays in the native File menu instead of duplicating the sidebar toolbar');
-  assert.ok(toolbarTargets.some((target) => target.name === 'RELOAD CATALOG'),
-    'the catalog reload action is clearly named');
-  const toolbarControls = toolbarTargets.filter((target) => ['QUEUE', 'FAVORITES', 'HISTORY',
-    'FOLD ALL', 'RELOAD CATALOG'].includes(target.name));
-  assert.ok(toolbarControls.every((target) => target.box.y === toolbarControls[0].box.y),
-    'Queue, Favorites, History, Fold All, and Reload share the sidebar navigation row');
-  assert.ok(toolbarTargets.some((target) => target.sidebarBulkAction && target.displayText === '☰'),
-    'Fold All uses a three-line bitmap symbol in the sidebar toolbar');
+    'the sidebar exposes the shared Playback History view');
+  const sidebarActions = toolbarTargets.filter((target) => target.sidebarAction);
+  assert.deepEqual(sidebarActions.map((target) => target.sidebarAction),
+    ['library', 'paths', 'favorites', 'history', 'tree', 'options'],
+  'the sidebar exposes only its six consistent icon actions');
+  assert.ok(sidebarActions.every((target) => target.box.y === sidebarActions[0].box.y
+    && target.box.width === sidebarActions[0].box.width
+    && target.box.height === sidebarActions[0].box.height),
+  'sidebar icon hit areas have consistent horizontal and vertical alignment');
+  assert.ok(sidebarActions.some((target) => target.sidebarIcon === 'heart'),
+    'Favorites uses its authored pixel heart');
+  assert.ok(sidebarActions.some((target) => target.sidebarIcon === 'tree' && target.sidebarBulkAction),
+    'Fold/Unfold uses the simple file-tree glyph');
+  assert.ok(sidebarActions.some((target) => target.sidebarIcon === 'gear'),
+    'Options uses the gear glyph');
+  assert.equal(sidebarActions.some((target) => ['queue', 'reload'].includes(target.sidebarAction)), false,
+    'Queue and Reload are not sidebar buttons');
   const defaultHeader = toolbarTargets.find((target) => target.columnHeader && target.name === '#');
   assert.ok(defaultHeader, 'the numbered playlist heading is visible');
   const firstPlaylistBody = toolbarTargets.find((target) => target.trackIndex === 0
@@ -750,13 +746,17 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   };
   const databaseReloadsBefore = databaseReloadCount;
   const catalogQueriesBefore = databaseGamesCalls;
+  clickTarget('OPTIONS');
+  await tick();
+  clickPage('DATABASE');
+  await tick();
   clickTarget('RELOAD CATALOG');
   await tick();
   await tick();
   assert.equal(databaseReloadCount, databaseReloadsBefore + 1,
-    'the sidebar Reload action asks the shared database to refresh its catalog');
+    'Options > Database asks the shared database to refresh its catalog');
   assert.equal(databaseGamesCalls, catalogQueriesBefore + 1,
-    'the sidebar Reload action queries the refreshed catalog projection');
+    'the Database reload action queries the refreshed catalog projection');
   assert.equal(appStatusAreaSnapshot()[0].text, 'RELOADING CATALOG',
     'the footer shows visible reload feedback instead of hiding it behind the active file path');
   finishCatalogReload([
@@ -765,6 +765,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   ]);
   bridge.databaseGames = databaseGamesBeforeReload;
   await tick();
+  await tick();
+  clickTarget('BACK');
   await tick();
   const idleSearchPixels = pixelChecksum(canvas.image.data);
   clickTarget('SEARCH LIBRARY');
@@ -1444,7 +1446,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   clickTarget('THEME GAMEBOY');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'GAMEBOY',
     'the palette selector returns to the authentic Game Boy theme');
-  clickTarget('INK LCD GREEN');
+  clickTarget('INK CHARCOAL');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'STANDARD');
   clickPage('INTERFACE');
   clickTarget('BUTTONS SYMBOLS');
@@ -2203,6 +2205,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   commandKey('d', { shiftKey: true });
   await tick();
   assert.match(status.textContent, /FAVORITES/i, 'Command-Shift-D opens the Favorites playlist');
+  assert.deepEqual(playlistSelectionSnapshot().selectedIndices, [],
+    'opening Favorites starts with no playlist rows selected');
   assert.ok(hitTargetSnapshot().some((target) => target.playlistTabTitle && target.name === 'TAB FAVORITES')
     && hitTargetSnapshot().some((target) => target.playlistTabClose),
   'Favorites opens as an ordinary closable playlist tab');
