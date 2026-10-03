@@ -42,7 +42,7 @@ final paths with `verifiedPayload=true`. The field-removal ledger is
   with payload verification. Its payload BLAKE3 is
   `ab00de485fff619c3ce27ff55a8dfa32ebb8810505ed145ba865a98d7b466910`.
 
-The format rules are in [`../../../VGMManDocs/Docs/md/UACMan/Procedures/PSX-CDXA.md`](../../../VGMManDocs/Docs/md/UACMan/Procedures/PSX-CDXA.md) and
+The format rules are in [`../../../VGMManDocs/Docs/md/UACMan/Profiles/PSX-CDXA.md`](../../../VGMManDocs/Docs/md/UACMan/Profiles/PSX-CDXA.md) and
 [`../../../VGMManDocs/Docs/md/UACMan/protocols/PSX-CDXA.protocol.md`](../../../VGMManDocs/Docs/md/UACMan/protocols/PSX-CDXA.protocol.md).
 The per-field before/after values are in the JSONL ledger so removals are
 auditable rather than inferred from the final packages.

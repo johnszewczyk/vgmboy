@@ -659,7 +659,6 @@
   let lastDocumentPath = "";
   let tagAnalyzerMatchesByName = new Map();
   let tagAnalyzerMatchesRootPath = "";
-  let activeProfileID = "";
   const uiMotionDuration = 250;
   let skinPreferences = null;
   const colorProperties = ["bg", "panel", "panel-2", "line", "text", "muted", "soft", "table-title-bg", "accent", "accent-soft", "hover", "selected", "green", "red"];
@@ -756,7 +755,7 @@
     retainTagAnalyzerMatches(state);
     if (state.documentPath !== lastDocumentPath) {
       lastDocumentPath = state.documentPath || "";
-      if (!["tagAnalyzer", "profiles"].includes(mainView)) mainView = "members";
+      if (mainView !== "tagAnalyzer") mainView = "members";
       trackBrowserPath = "";
       selectedTagTrackPaths = new Set();
       dirtyTrackPaths = new Set();
@@ -1641,10 +1640,6 @@
       inspector.innerHTML = renderTagAnalyzerPage();
       return;
     }
-    if (mainView === "profiles") {
-      inspector.innerHTML = renderProfilesPage();
-      return;
-    }
     const canBatchEditPackages = (state.selectedCollectionPackagePaths || []).length > 0;
     if (!hasPackage && !(mainView === "newTag" && canBatchEditPackages)) {
       inspector.innerHTML = `<div class="metadata-empty"><div class="empty-icon">⌁</div><h3>Open a package to edit metadata</h3><p>Choose a collection entry or open a UAC file.</p></div>`;
@@ -1657,100 +1652,6 @@
     else if (mainView === "newTag") html += renderNewTagPage();
     inspector.innerHTML = html;
     if (mainView === "newTag") updateNewTagSubmitState();
-  }
-
-  function profileInlineMarkdown(value) {
-    return esc(value)
-      .replace(/`([^`]+)`/g, "<code>$1</code>")
-      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*([^*]+)\*/g, "<em>$1</em>")
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<span class="profile-reference" title="$2">$1</span>');
-  }
-
-  function renderProfileMarkdown(markdown) {
-    const lines = String(markdown || "").replace(/\r/g, "").split("\n");
-    const output = [];
-    const isBlockStart = line => /^\s*(?:#{1,6}\s|```|\|.*\|\s*$|(?:[-*+]\s+|\d+\.\s+)|>\s?|(?:-{3,}|\*{3,}|_{3,})\s*$)/.test(line);
-    const tableCells = line => line.trim().replace(/^\||\|$/g, "").split("|").map(cell => cell.trim());
-    let index = 0;
-    while (index < lines.length) {
-      const line = lines[index];
-      if (!line.trim()) { index++; continue; }
-      if (/^\s*```/.test(line)) {
-        index++;
-        const code = [];
-        while (index < lines.length && !/^\s*```/.test(lines[index])) code.push(lines[index++]);
-        if (index < lines.length) index++;
-        output.push(`<pre class="profile-code"><code>${esc(code.join("\n"))}</code></pre>`);
-        continue;
-      }
-      const heading = line.match(/^\s*(#{1,6})\s+(.+?)\s*#*\s*$/);
-      if (heading) {
-        const level = Math.min(heading[1].length + 1, 6);
-        output.push(`<h${level}>${profileInlineMarkdown(heading[2])}</h${level}>`);
-        index++;
-        continue;
-      }
-      if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
-        output.push("<hr>"); index++; continue;
-      }
-      if (line.includes("|") && index + 1 < lines.length && /^\s*\|?\s*:?-{3,}/.test(lines[index + 1])) {
-        const headers = tableCells(line);
-        index += 2;
-        const rows = [];
-        while (index < lines.length && lines[index].includes("|") && lines[index].trim()) {
-          rows.push(tableCells(lines[index++]));
-        }
-        output.push(`<div class="profile-table-wrap"><table><thead><tr>${headers.map(cell => `<th>${profileInlineMarkdown(cell)}</th>`).join("")}</tr></thead><tbody>${rows.map(row => `<tr>${headers.map((_, cellIndex) => `<td>${profileInlineMarkdown(row[cellIndex] || "")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`);
-        continue;
-      }
-      if (/^\s*(?:[-*+]\s+|\d+\.\s+)/.test(line)) {
-        const ordered = /^\s*\d+\.\s+/.test(line);
-        const tag = ordered ? "ol" : "ul";
-        const items = [];
-        while (index < lines.length && /^\s*(?:[-*+]\s+|\d+\.\s+)/.test(lines[index])) {
-          const item = [lines[index++].replace(/^\s*(?:[-*+]\s+|\d+\.\s+)/, "")];
-          while (index < lines.length && /^\s{2,}\S/.test(lines[index]) && !isBlockStart(lines[index])) {
-            item.push(lines[index++].trim());
-          }
-          items.push(item.join(" "));
-        }
-        output.push(`<${tag}>${items.map(item => `<li>${profileInlineMarkdown(item)}</li>`).join("")}</${tag}>`);
-        continue;
-      }
-      if (/^\s*>/.test(line)) {
-        const quote = [];
-        while (index < lines.length && /^\s*>/.test(lines[index])) quote.push(lines[index++].replace(/^\s*>\s?/, ""));
-        output.push(`<blockquote>${quote.map(item => `<p>${profileInlineMarkdown(item)}</p>`).join("")}</blockquote>`);
-        continue;
-      }
-      const paragraph = [line.trim()];
-      index++;
-      while (index < lines.length && lines[index].trim() && !isBlockStart(lines[index])) paragraph.push(lines[index++].trim());
-      output.push(`<p>${paragraph.map(profileInlineMarkdown).join(" ")}</p>`);
-    }
-    return output.join("");
-  }
-
-  function renderProfilesPage() {
-    const profiles = Array.isArray(state.profiles) ? state.profiles : [];
-    if (!profiles.some(profile => profile.id === activeProfileID)) activeProfileID = profiles[0]?.id || "";
-    const selected = profiles.find(profile => profile.id === activeProfileID);
-    const groups = [];
-    profiles.forEach(profile => {
-      const category = profile.category || "Profiles";
-      let group = groups.find(item => item.category === category);
-      if (!group) {
-        group = { category, profiles: [] };
-        groups.push(group);
-      }
-      group.profiles.push(profile);
-    });
-    const list = groups.map(group => `<section class="profile-group"><h3>${esc(group.category)}</h3>${group.profiles.map(profile => `<button class="profile-choice${profile.id === activeProfileID ? " active" : ""}" type="button" data-action="selectProfile" data-profile-id="${esc(profile.id)}">${esc(profile.title)}</button>`).join("")}</section>`).join("");
-    const document = selected
-      ? `<article class="profile-document"><div class="profile-markdown">${renderProfileMarkdown(selected.markdown)}</div></article>`
-      : '<div class="profile-document profile-empty">No profile documents are bundled.</div>';
-    return `<section class="data-page profile-page" aria-label="UAC tag profiles"><div class="data-page-heading"><div><div class="tag-analyzer-heading-line"><h2>Profiles</h2><span class="beta-badge">Beta</span></div><p>Human-readable input rules for agents; profiles do not configure UACMan or apply or validate tags. Record actual results in AudioMan's per-set dashboard reports.</p></div><span class="data-page-count">${profiles.length} profile(s)</span></div><div class="profile-browser"><nav class="profile-list" aria-label="Format profiles">${list}</nav>${document}</div></section>`;
   }
 
   function scopeToAction(scope) {
@@ -2510,10 +2411,6 @@
       }
     }
     else if (action === "dismissError") bridge("dismissError");
-    else if (action === "selectProfile") {
-      activeProfileID = event.target.closest("[data-profile-id]")?.dataset.profileId || "";
-      render(state);
-    }
     else if (action === "mainView") {
       mainView = event.target.closest("[data-view]").dataset.view;
       if (mainView !== "tagAnalyzer") CanonicalTable.clearFoldPrefix("tag-analyzer/");

@@ -30,12 +30,12 @@ runtime dependency.
 - Manifest editing and save invariants: `subsystem-agent/uac-editor.md`.
 - Wrapper binary contract and reader/writer: `subsystem-agent/uac-wrapper-format.md`.
 - Player and scanner consumer boundaries: `subsystem-agent/player-integration.md`.
-- Format conversion procedures:
-  [README.md](../../VGMManDocs/Docs/md/UACMan/Procedures/README.md).
+- UAC conversion profiles:
+  [README.md](../../VGMManDocs/Docs/md/UACMan/Profiles/README.md).
 - Per-collection identity, naming, and source-state rules:
-  [Sets/README.md](../../VGMManDocs/Docs/md/UACMan/Procedures/Sets/README.md).
+  [Sets/README.md](../../VGMManDocs/Docs/md/UACMan/Profiles/Sets/README.md).
 - SNESMusic.org SPC metadata and four-hash profile:
-  [SPC.md](../../VGMManDocs/Docs/md/UACMan/Procedures/SPC.md).
+  [SPC.md](../../VGMManDocs/Docs/md/UACMan/Profiles/SPC.md).
 - PlayStation CD-XA preservation profile:
   [PSX-CDXA.protocol.md](../../VGMManDocs/Docs/md/UACMan/protocols/PSX-CDXA.protocol.md).
 - Closed SPC engineering boundary:

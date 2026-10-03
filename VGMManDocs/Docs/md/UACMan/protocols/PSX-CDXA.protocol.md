@@ -3,7 +3,7 @@
 This protocol covers XA extraction and game-specific loop research for
 PlayStation Redump discs. It does not define the visible PSX track-tag
 vocabulary or require a UAC package for every soundtrack; those decisions live
-in the [PSX disc-audio profile](../Procedures/PSX-CDXA.md). Treat the sector and
+in the [PSX disc-audio profile](../Profiles/PSX-CDXA.md). Treat the sector and
 loop details here as operational source evidence, not as a list of music tags.
 The original Redump BIN/CUE remains the source of record.
 

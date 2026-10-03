@@ -35,12 +35,22 @@ profile defines only how confirmed values are represented in UAC packages.
 - **SPC hashes** — Record the same four hashes for each complete, unchanged
   `.spc` under `uac-playable-payload-v1`; UACMan presents these as Stream
   Hashes.
-- **Informational document fields** — Keep each source `info.txt` as a
-  byte-preserved package asset. Map `Dumped by` to package-level **Dumper** and
-  `ID666 tags by` to package-level **Taggers**, retaining the exact values.
-  Keep member-level SPC **Dumper** tags unchanged; the two scopes may differ.
-  Do not retain external metadata sidecars once their useful structured values
-  have been surfaced in the UAC; the bundled source document remains evidence.
+- **Informational documents** — Keep source `info.txt` and other source TXT/HTM
+  documents that carry historical or technical evidence as byte-preserved
+  package assets. They are not SPC tracks; preserve them when rebuilding a
+  package. Do not retain separate external metadata sidecars after useful
+  structured values have been surfaced in the UAC; bundled source documents
+  remain the evidence.
+- **Document-derived metadata** — Inspect informational documents and report
+  recurring key/value fields before proposing UAC tags. Do not generically
+  promote colon-delimited lines, overwrite SPC-native tags, or create blank
+  fields. Any AudioMan database ingestion must preserve source-document/member
+  identity and checksums, and ingest only fields shown to be uniform and useful.
+  Record findings and tag proposals in the per-set dashboard, not here.
+- **Informational document fields** — Map `Dumped by` to package-level
+  **Dumper** and `ID666 tags by` to package-level **Taggers**, retaining the
+  exact values. Keep member-level SPC **Dumper** tags unchanged; the two scopes
+  may differ.
 - **Credit comparison** — Treat source `Dumped by` and SPC member `Dumper` as
   different scopes. Name-string comparisons flag candidates, not proven
   conflicts; manually review mismatches and likely aliases before changing any

@@ -130,7 +130,7 @@ and the published format-specific
 and [PSX-CDXA protocol](../VGMManDocs/Docs/md/UACMan/protocols/PSX-CDXA.protocol.md)
 for editing, format, and consumer contracts.
 Format conversion procedures are indexed in the published
-[UACMan documentation library](../VGMManDocs/Docs/md/UACMan/Procedures/README.md).
+[UACMan documentation library](../VGMManDocs/Docs/md/UACMan/Profiles/README.md).
 Dated field reports are retained under `ai/reports/`.
 
 The Python pack/inspect/unpack CLI is `Wrapper/python/uacman.py`; its tests and

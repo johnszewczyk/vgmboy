@@ -82,11 +82,11 @@ the user-facing need before creating it.
 
 ## Profile revision
 
-The shared [UAC Base Profile](../../../VGMManDocs/Docs/md/UACMan/Procedures/BASE-UAC-PROFILE.md) now holds the rules for
+The shared [UAC Base Profile](../../../VGMManDocs/Docs/md/UACMan/Profiles/BASE-UAC-PROFILE.md) now holds the rules for
 direct fields, Title Case, omissions, date precision, system identity, and
 wrapper structures. The format template and PSX profile now keep only their
-mechanical mapping and PSX-specific exceptions. The Profiles Beta page includes
-the shared base profile.
+mechanical mapping and PSX-specific exceptions. At the time of this review,
+the former Profiles Beta page also showed the shared base profile.
 
 No package manifest or source member was changed in this pass. Proposed next
 edits are limited to removing the two **Platform** aliases, canonicalizing

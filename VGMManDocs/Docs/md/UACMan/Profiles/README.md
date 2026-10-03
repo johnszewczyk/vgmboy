@@ -1,6 +1,6 @@
-# Source format to UAC tag procedures
+# UACMan Conversion Profiles
 
-This directory documents source-format-to-UAC mapping and UAC packaging rules.
+This directory is the canonical, editable source for UACMan conversion profiles. It documents source-format-to-UAC mappings and UAC packaging rules; VGMManDocs renders these Markdown files and saves edits back to this tree.
 The UACMan GUI reads and edits `.uac` manifests only. The UACMan tool can use
 MetaManCore during explicit package creation to read source formats. Apply the shared
 [`BASE-UAC-PROFILE.md`](BASE-UAC-PROFILE.md); each format profile records only
@@ -131,11 +131,11 @@ MetaManCore's reader interface, not a UAC tag format. Source provenance belongs
 in `sources[]`; profile a direct metadata field only when it is useful to UAC
 users.
 
-## Set-Based Procedures
+## Set-Based Profiles
 
-Procedures based on one source set live in [`Sets/`](Sets/README.md). A format
-procedure describes reader-to-UAC behavior; a set-based procedure records the
-set's source authority, identity, naming, and review rules. Never infer a
+Set-specific profiles live in [`Sets/`](Sets/README.md). A format profile
+describes reader-to-UAC behavior; a set profile records the source authority,
+identity, naming, and review rules for that set. Never infer a
 source relationship between collections from title or content overlap alone.
 
 ## Wrapper and ownership references

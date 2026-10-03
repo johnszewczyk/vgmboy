@@ -33,10 +33,11 @@ structured values show a stable `[Nested Tags]` placeholder and open as plain
 text in a popup. Aggregate rows with different structured values remain
 read-only until a single value is unambiguous.
 
-The workspace has seven explicit pages in this order: **Files**, **Pack Tags**,
-**Tracks**, **Track Tags**, **New Tag**, **Tag Analyzer**, and **Profiles**.
-**Profiles** (Beta) is a read-only viewer for the bundled UAC source-format
-field profiles and their shared rules; it works without an open package.
+The workspace has six explicit pages in this order: **Files**, **Pack Tags**,
+**Tracks**, **Track Tags**, **New Tag**, and **Tag Analyzer**. UAC conversion
+profiles are published and edited in the VGMManDocs [UACMan Profiles]
+(../../../VGMManDocs/Docs/md/UACMan/Profiles/README.md); they are not part of
+the package editor.
 **Tracks**
 is the wide canonical giga-table: every header and value is a boxed field, and
 its horizontal scroll belongs to the workspace surface rather than a nested

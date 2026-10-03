@@ -3,7 +3,7 @@
 - **Collection:** SNESMusic.org SPC Soundtrack Archive
 - **Source URL:** <https://snesmusic.org/v2/torrent.php>
 - **Audit date:** 2026-09-23
-- **Format procedure:** [`../../../VGMManDocs/Docs/md/UACMan/Procedures/SPC.md`](../../../VGMManDocs/Docs/md/UACMan/Procedures/SPC.md)
+- **Format procedure:** [`../../../VGMManDocs/Docs/md/UACMan/Profiles/SPC.md`](../../../VGMManDocs/Docs/md/UACMan/Profiles/SPC.md)
 
 ## Corrected hash projection and database refresh
 
@@ -78,7 +78,7 @@ are occurrences and can include duplicate ID666/xID6 representations.
 | `date` | 242 |
 
 The complete normalized map and fields retained as source-only evidence are in
-[`../../../VGMManDocs/Docs/md/UACMan/Procedures/SPC.md`](../../../VGMManDocs/Docs/md/UACMan/Procedures/SPC.md). Native tags preserved in member metadata include
+[`../../../VGMManDocs/Docs/md/UACMan/Profiles/SPC.md`](../../../VGMManDocs/Docs/md/UACMan/Profiles/SPC.md). Native tags preserved in member metadata include
 Song, Game, Dumper, Comment, Date, Length (seconds), Fade (milliseconds),
 Artist, Copyright Year, Publisher, Intro/Loop/End/Fade Length, OST Title, OST
 Disc, OST Track, Loop Count, Muted Voices, and other recognized tags. Repeated

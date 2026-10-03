@@ -166,13 +166,6 @@ struct UACMemberRow: Identifiable {
     }
 }
 
-private struct UACProfileDocument: Sendable {
-    let id: String
-    let title: String
-    let category: String
-    let markdown: String
-}
-
 @MainActor
 @Observable
 final class UACManModel {
@@ -181,41 +174,6 @@ final class UACManModel {
         static let lastCollectionPath = "UACMan.lastCollectionPath"
         static let lastTagAnalyzerPath = "UACMan.lastTagAnalyzerPath"
         static let skinPreferences = "UACMan.skinPreferences"
-    }
-
-    private static let profileDocuments = loadProfileDocuments()
-
-    private static func loadProfileDocuments() -> [UACProfileDocument] {
-        let definitions: [(id: String, title: String, category: String, file: String)] = [
-            ("base-uac", "UAC Base Profile", "Shared Rules", "BASE-UAC-PROFILE"),
-            ("platforms", "Platforms", "Shared Rules", "PLATFORMS"),
-            ("pre-disc", "Pre-Disc Native Procedure", "Format Procedures", "PRE-DISC-NATIVE"),
-            ("spc", "Nintendo SNES", "Format Procedures", "SPC"),
-            ("gbs", "Nintendo Game Boy", "Format Procedures", "GBS"),
-            ("nsf-nsfe", "Nintendo NES", "Format Procedures", "NSF-NSFE"),
-            ("hes", "NEC TurboGrafx-16", "Format Procedures", "HES"),
-            ("kss", "KSS", "Format Procedures", "KSS"),
-            ("vgm-vgz", "VGM / VGZ", "Format Procedures", "VGM"),
-            ("psx-cdxa", "Sony PlayStation", "Format Procedures", "PSX-CDXA"),
-            ("base-set", "Base Set Profile", "Set-Based Procedures", "BASE-SET-PROFILE"),
-            ("snesmusicorg", "SNESMusic.org · RSN", "Set-Based Procedures", "SNESMUSICORG"),
-            ("project2612", "Project 2612 · VGM", "Set-Based Procedures", "PROJECT2612")
-        ]
-        return definitions.map { definition in
-            let url = Bundle.module.url(
-                forResource: definition.file,
-                withExtension: "md",
-                subdirectory: "Profiles"
-            ) ?? Bundle.module.url(forResource: definition.file, withExtension: "md")
-            let markdown = url.flatMap { try? String(contentsOf: $0, encoding: .utf8) }
-                ?? "Profile document could not be loaded from the application bundle."
-            return UACProfileDocument(
-                id: definition.id,
-                title: definition.title,
-                category: definition.category,
-                markdown: markdown
-            )
-        }
     }
 
     var documentURL: URL?
@@ -421,14 +379,6 @@ final class UACManModel {
             "filePreviewError": filePreviewError ?? NSNull(),
             "variantCount": loadedContainer?.manifest.variants.count ?? 0,
             "members": members.map(Self.webMemberSnapshot),
-            "profiles": Self.profileDocuments.map { profile in
-                [
-                    "id": profile.id,
-                    "title": profile.title,
-                    "category": profile.category,
-                    "markdown": profile.markdown
-                ] as [String: Any]
-            },
             "collectionRoot": collectionRootURL?.path ?? "",
             "collectionStatus": collectionStatusMessage,
             "collectionEntries": collectionEntries.map { entry in
