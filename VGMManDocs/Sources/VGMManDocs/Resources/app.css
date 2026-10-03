@@ -76,7 +76,7 @@ kbd { flex: none; border: 1px solid #343944; border-radius: 4px; padding: 0 4px;
 .document-content h2 { margin-top: 2.2em; margin-bottom: .7em; padding-bottom: .35em; border-bottom: 1px solid #30343e; color: #e4e8ef; font-size: 23px; letter-spacing: -.025em; }
 .document-content h3 { margin-top: 1.8em; margin-bottom: .65em; color: #d6dce6; font-size: 17px; }
 .document-content h4, .document-content h5, .document-content h6 { margin-top: 1.6em; color: #d6dce6; }
-.document-content p, .document-content ul, .document-content ol, .document-content blockquote, .document-content table, .document-content pre, .document-content hr, .document-content figure { margin-top: 0; margin-bottom: 1.15em; }
+.document-content p, .document-content ul, .document-content ol, .document-content blockquote, .document-content .table-scroll, .document-content pre, .document-content hr, .document-content figure { margin-top: 0; margin-bottom: 1.15em; }
 .document-content p, .document-content li { color: #c0c6d1; font-size: 14px; line-height: 1.82; }
 .document-content li + li { margin-top: 3px; }
 .document-content ul, .document-content ol { padding-left: 1.45em; }
@@ -90,8 +90,10 @@ kbd { flex: none; border: 1px solid #343944; border-radius: 4px; padding: 0 4px;
 .document-content pre code { padding: 0; border: 0; background: transparent; color: #c5cbd5; font-size: 12px; line-height: 1.7; }
 .document-content blockquote { padding: 5px 0 5px 17px; border-left: 3px solid #7193c8; color: #aeb8c8; }
 .document-content blockquote p { color: #aeb8c8; }
-.document-content table { display: block; overflow-x: auto; border: 1px solid #30343e; border-radius: 8px; border-spacing: 0; background: #171a20; }
-.document-content th, .document-content td { min-width: 100px; padding: 9px 12px; border-right: 1px solid #2b3039; border-bottom: 1px solid #2b3039; color: #c0c6d1; text-align: left; vertical-align: top; font-size: 12px; line-height: 1.6; }
+.document-content .table-scroll { max-width: 100%; overflow-x: auto; border: 1px solid #30343e; border-radius: 8px; background: #171a20; scrollbar-color: #444955 transparent; scrollbar-width: thin; overscroll-behavior-inline: contain; }
+.document-content table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; }
+.document-content th, .document-content td { min-width: 100px; max-width: 420px; padding: 9px 12px; border-right: 1px solid #2b3039; border-bottom: 1px solid #2b3039; color: #c0c6d1; vertical-align: top; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.document-content th:not([align]), .document-content td:not([align]) { text-align: left; }
 .document-content th { background: #20242c; color: #e2e6ee; font-weight: 650; }
 .document-content tr:last-child td { border-bottom: 0; }
 .document-content th:last-child, .document-content td:last-child { border-right: 0; }

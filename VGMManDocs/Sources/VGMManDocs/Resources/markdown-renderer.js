@@ -17,6 +17,10 @@
 
   let current = { documentFileURL: "", markdownRootURL: "", projectRootURL: "" };
   const renderer = new marked.Renderer();
+  const renderTable = renderer.table;
+  renderer.table = function (token) {
+    return `<div class="table-scroll" role="region" tabindex="0" aria-label="Scrollable table">\n${renderTable.call(this, token)}</div>\n`;
+  };
   renderer.html = ({ text }) => `<pre class="raw-html"><code>${escapeHTML(text)}</code></pre>\n`;
   renderer.heading = (token) => {
     const inner = marked.parseInline(token.text);
