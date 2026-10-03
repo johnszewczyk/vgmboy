@@ -40,6 +40,11 @@ so SPCBoy keeps its rendering style; native Swift owns persistence and window
 levels. The sizing value crosses the typed settings snapshot rather than
 becoming a second per-column policy in JavaScript.
 
+The content grid has two tracks when the tabs strip is hidden and three when
+multiple playlist tabs are shown. Keep that track count synchronized with tab
+visibility so the playlist remains flexible and the position bar stays at the
+bottom of the pane.
+
 The accent color is a persisted CSS color in the typed settings projection.
 `app-ui.js` applies it as the root `--accent` value, and both the sidebar and
 playlist use the same moving accent capsule. Selected-row backgrounds remain

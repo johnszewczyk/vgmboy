@@ -346,10 +346,14 @@ body.options-window .tool-button:hover {
 
 .content {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   min-height: 0;
   overflow: hidden;
   background: var(--bg-panel);
+}
+
+.content.has-playlist-tabs {
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .transport-toolbar {

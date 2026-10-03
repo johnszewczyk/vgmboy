@@ -121,7 +121,9 @@ function ensurePlaylistTab() {
 
 function renderPlaylistTabs() {
   const tabs = Array.isArray(state.playlistTabs) ? state.playlistTabs : [];
-  refs.playlistTabsToolbar?.classList.toggle("is-hidden", tabs.length <= 1);
+  const hasTabs = tabs.length > 1;
+  refs.playlistTabsToolbar?.classList.toggle("is-hidden", !hasTabs);
+  refs.playlistTabsToolbar?.closest(".content")?.classList.toggle("has-playlist-tabs", hasTabs);
   if (!refs.playlistTabs) return;
   refs.playlistTabs.replaceChildren();
   if (tabs.length <= 1) return;
