@@ -342,8 +342,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   for (const [theme, contrast, firstColor, lastColor] of [
     ['GAMEBOY', 'STANDARD', '#0C300C', '#9BBC0F'],
     ['GAMEBOY', 'HIGH_CONTRAST', '#333333', '#9BBC0F'],
-    ['NIGHTBOY', 'STANDARD', '#D8D6DF', '#000000'],
-    ['NIGHTBOY', 'HIGH_CONTRAST', '#F0EFF4', '#000000'],
+    ['NIGHTBOY', 'STANDARD', '#A9A9A9', '#000000'],
+    ['NIGHTBOY', 'HIGH_CONTRAST', '#D3D3D3', '#000000'],
   ]) {
     const tones = lcdPaletteSnapshot(theme, contrast);
     assert.equal(tones.length, 4, `${theme} ${contrast} supplies exactly four LCD tones`);
@@ -945,13 +945,13 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   clickPage('DISPLAY');
   clickTarget('THEME NIGHTBOY');
   const nightBoyPixels = pixelChecksum(canvas.image.data);
-  assert.notEqual(nightBoyPixels, gameBoyPixels, 'NightBoy repaints the same four-tone pixel screen with its dark-purple palette');
+  assert.notEqual(nightBoyPixels, gameBoyPixels, 'NightBoy repaints the same four-tone pixel screen with its dark-gray palette');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'NIGHTBOY');
   assert.equal(document.documentElement.dataset.theme, 'NIGHTBOY',
     'the selected LCD theme also updates the surrounding shell');
-  clickTarget('INK BRIGHT');
+  clickTarget('INK LIGHT GRAY');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'HIGH_CONTRAST',
-    'the ink control persists the brighter silver high-contrast setting');
+    'the ink control persists the lighter gray high-contrast setting');
   await tick();
   clickPage('QUEUE');
   const optionsSelection = selectionBandSnapshot();

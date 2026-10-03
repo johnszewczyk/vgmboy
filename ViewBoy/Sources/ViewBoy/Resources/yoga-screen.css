@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  background: #9bbc0f;
+  background: var(--screen-surface, #9bbc0f);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   --screen-surface: #9bbc0f;
 }
@@ -25,15 +25,6 @@ body {
   height: 100%;
   overflow: hidden;
   background: var(--screen-surface);
-}
-
-:root[data-theme="NIGHTBOY"] {
-  background: #000000;
-  --screen-surface: #000000;
-}
-
-:root[data-theme="NIGHTBOY"] body {
-  background: #000000;
 }
 
 #lcd {

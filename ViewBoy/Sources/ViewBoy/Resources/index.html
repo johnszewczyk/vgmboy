@@ -7,9 +7,19 @@
     <title>ViewBoy</title>
     <script>
       try {
-        if (JSON.parse(localStorage.getItem("ViewBoy.displayOptions") || "{}").theme === "NIGHTBOY") {
-          document.documentElement.dataset.theme = "NIGHTBOY";
-        }
+        const options = JSON.parse(localStorage.getItem("ViewBoy.displayOptions") || "{}");
+        const surfaces = {
+          GAMEBOY: "#9BBC0F",
+          NIGHTBOY: "#000000",
+          PURPLEBOY: "#29252E",
+          IDIGLOWBOY: "#78D7D4",
+        };
+        const theme = Object.hasOwn(surfaces, options.theme) || options.theme === "CUSTOM"
+          ? options.theme : "GAMEBOY";
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.setProperty("--screen-surface",
+          theme === "CUSTOM" && CSS.supports("color", options.customBackgroundColor)
+            ? options.customBackgroundColor : surfaces[theme] || "#9BBC0F");
       } catch {}
     </script>
     <link rel="stylesheet" href="./yoga-screen.css" />

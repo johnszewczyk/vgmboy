@@ -22,8 +22,8 @@ const SIDEBAR_ICON_SIZE_DOTS = 9;
 const SIDEBAR_BUTTON_SIZE_DOTS = 13;
 const SIDEBAR_ICON_ART = {
   library: [
-    "001111100", "011111110", "010101010", "010101010", "011111110",
-    "010101010", "010101010", "011111110", "000000000",
+    "000000000", "011111110", "000000000", "011111110", "000000000",
+    "011111110", "000000000", "000000000", "000000000",
   ],
   folder: [
     "001110000", "011111110", "111111111", "100000001", "100000001",
@@ -41,9 +41,9 @@ const SIDEBAR_ICON_ART = {
     "011100000", "111110000", "001000000", "001111110", "001000010",
     "001000000", "001111110", "001000010", "001000000",
   ],
-  menu: [
-    "000000000", "111111111", "000000000", "111111111", "000000000",
-    "111111111", "000000000", "000000000", "000000000",
+  gear: [
+    "000100000", "001110000", "011111100", "111001110", "011001100",
+    "111001110", "011111100", "001110000", "000100000",
   ],
 };
 const DEFAULT_CONTROL_PADDING_DOTS = 4;
@@ -68,18 +68,27 @@ const ANIMATION_FPS_TICKS = [30, 60, 90, 120, 150, 180, 210, 240];
 // numeric luminance intervals. ViewBoy keeps each theme's ink and screen
 // colors, then derives the two middle tones at equal CIELAB L* intervals.
 // Endpoint order follows the UI palette contract: active ink, two middle
-// tones, then the LCD surface (dark-to-light in GameBoy, light-to-dark in
-// NightBoy).
+// tones, then the LCD surface. Presets retain their own direction and tint;
+// custom palettes follow the two user-entered endpoints.
 const PALETTE_ENDPOINTS = {
   GAMEBOY: {
     STANDARD: { ink: "#0C300C", surface: "#9BBC0F" },
     HIGH_CONTRAST: { ink: "#333333", surface: "#9BBC0F" },
   },
   NIGHTBOY: {
-    STANDARD: { ink: "#D8D6DF", surface: "#000000" },
-    HIGH_CONTRAST: { ink: "#F0EFF4", surface: "#000000" },
+    STANDARD: { ink: "#A9A9A9", surface: "#000000" },
+    HIGH_CONTRAST: { ink: "#D3D3D3", surface: "#000000" },
+  },
+  PURPLEBOY: {
+    STANDARD: { ink: "#A64AC9", surface: "#29252E" },
+    HIGH_CONTRAST: { ink: "#CF65ED", surface: "#29252E" },
+  },
+  IDIGLOWBOY: {
+    STANDARD: { ink: "#123C43", surface: "#78D7D4" },
+    HIGH_CONTRAST: { ink: "#062C35", surface: "#78D7D4" },
   },
 };
+const COLOR_THEMES = new Set([...Object.keys(PALETTE_ENDPOINTS), "CUSTOM"]);
 function hexToRGB(color) {
   const value = Number.parseInt(color.slice(1), 16);
   return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
@@ -129,9 +138,10 @@ function rgbToHex([red, green, blue]) {
   return `#${[red, green, blue].map((channel) => channel.toString(16).padStart(2, "0")).join("")}`
     .toUpperCase();
 }
-function paletteTones(theme, contrast) {
-  const endpoints = PALETTE_ENDPOINTS[theme]?.[contrast]
-    || PALETTE_ENDPOINTS.GAMEBOY.STANDARD;
+function paletteTones(theme, contrast, custom = null) {
+  const endpoints = theme === "CUSTOM" && custom
+    ? { ink: custom.font, surface: custom.background }
+    : PALETTE_ENDPOINTS[theme]?.[contrast] || PALETTE_ENDPOINTS.GAMEBOY.STANDARD;
   const inkLab = rgbToLab(hexToRGB(endpoints.ink));
   const surfaceLab = rgbToLab(hexToRGB(endpoints.surface));
   return Array.from({ length: 4 }, (_, index) => {
@@ -142,6 +152,35 @@ function paletteTones(theme, contrast) {
       value + (surfaceLab[channel] - value) * amount);
     return rgbToHex(labToRGB(lab));
   });
+}
+function colorInputToHex(input) {
+  const value = String(input ?? "").trim();
+  if (!value) return null;
+  const bareHex = value.replace(/^#/, "");
+  if (/^[\da-f]{3}$/i.test(bareHex)) {
+    return rgbToHex([...bareHex].map((digit) => Number.parseInt(`${digit}${digit}`, 16)));
+  }
+  if (/^[\da-f]{6}$/i.test(bareHex)) {
+    return `#${bareHex.toUpperCase()}`;
+  }
+  const channels = value.match(/^(\d{1,3})[\s,]+(\d{1,3})[\s,]+(\d{1,3})$/);
+  if (channels) {
+    const rgb = channels.slice(1).map(Number);
+    if (rgb.every((channel) => channel >= 0 && channel <= 255)) return rgbToHex(rgb);
+    return null;
+  }
+  if (!globalThis.CSS?.supports?.("color", value) || !document?.createElement) return null;
+  const probe = document.createElement("canvas");
+  probe.width = 1;
+  probe.height = 1;
+  const probeContext = probe.getContext("2d", { willReadFrequently: true });
+  if (!probeContext) return null;
+  probeContext.clearRect(0, 0, 1, 1);
+  probeContext.fillStyle = value;
+  probeContext.fillRect(0, 0, 1, 1);
+  const [red, green, blue, alpha] = probeContext.getImageData(0, 0, 1, 1).data;
+  const opacity = alpha / 255;
+  return rgbToHex([red, green, blue].map((channel) => Math.round(channel * opacity)));
 }
 function paletteRGB(palette) {
   return palette.map(hexToRGB);
@@ -312,7 +351,18 @@ function storedSpacing(value, fallback) {
     Number.isFinite(number) ? Math.round(number) : fallback));
 }
 function displayPalette(theme = state.theme, contrast = state.contrast) {
-  return paletteTones(theme, contrast);
+  return paletteTones(theme, contrast, {
+    background: state.customBackgroundColor,
+    font: state.customFontColor,
+  });
+}
+function updateThemeSurface() {
+  const root = document.documentElement;
+  if (!root) return;
+  root.dataset.theme = state.theme;
+  const surface = state.theme === "CUSTOM"
+    ? state.customBackgroundColor : PALETTE_ENDPOINTS[state.theme][state.contrast].surface;
+  root.style?.setProperty?.("--screen-surface", surface);
 }
 function saveDisplayOptions() {
   try {
@@ -320,6 +370,9 @@ function saveDisplayOptions() {
       font: state.font,
       contrast: state.contrast,
       theme: state.theme,
+      customBackgroundColor: state.customBackgroundColor,
+      customFontColor: state.customFontColor,
+      customColorsInitialized: state.customColorsInitialized,
       lcdDotSize: state.lcdDotSize,
       uiButtonPadDots: state.controlPaddingDots,
       uiChromeGapDots: state.uiChromeGapDots,
@@ -407,7 +460,13 @@ const state = {
   playing: false,
   font: savedDisplayOptions.font === "STANDARD" ? "STANDARD" : "MICRO",
   contrast: savedDisplayOptions.contrast === "HIGH_CONTRAST" ? "HIGH_CONTRAST" : "STANDARD",
-  theme: savedDisplayOptions.theme === "NIGHTBOY" ? "NIGHTBOY" : "GAMEBOY",
+  theme: COLOR_THEMES.has(savedDisplayOptions.theme) ? savedDisplayOptions.theme : "GAMEBOY",
+  customBackgroundColor: colorInputToHex(savedDisplayOptions.customBackgroundColor) || "#9BBC0F",
+  customFontColor: colorInputToHex(savedDisplayOptions.customFontColor) || "#0C300C",
+  customColorsInitialized: savedDisplayOptions.customColorsInitialized === true,
+  editingColorEndpoint: null,
+  colorDraft: "",
+  colorInputError: null,
   lcdDotSize: LCD_DOT_SIZE_OPTIONS.includes(Number(savedDisplayOptions.lcdDotSize))
     ? Number(savedDisplayOptions.lcdDotSize) : DEFAULT_LCD_DOT_SIZE,
   controlPaddingDots: storedSpacing(savedDisplayOptions.uiButtonPadDots
@@ -510,7 +569,7 @@ const state = {
 DEVICE_PIXELS_PER_LCD_DOT = state.lcdDotSize;
 RGB = paletteRGB(displayPalette());
 packedRGB = packedPalette(RGB);
-if (document.documentElement) document.documentElement.dataset.theme = state.theme;
+updateThemeSurface();
 
 let tracks = [];
 
@@ -562,6 +621,7 @@ function selectionIDsForTab(tab) {
   const ids = Array.isArray(tab?.selectedTrackIDs)
     ? tab.selectedTrackIDs.filter((id) => validIDs.has(id)) : [];
   if (ids.length) return ids;
+  if (tab?.sourceKey === FAVORITES_TAB_SOURCE) return [];
   const fallback = tab?.playlist?.[Math.max(0, Number(tab?.selectedTrack) || 0)];
   return fallback ? [trackID(fallback)] : [];
 }
@@ -641,7 +701,8 @@ function restorePlaylistTabs(value) {
     const selectedTrack = Math.max(0, Number(tab.selectedTrack) || 0);
     const selectedTrackIDs = Array.isArray(tab.selectedTrackIDs)
       ? tab.selectedTrackIDs.filter((id) => playlist.some((track) => trackID(track) === id)) : [];
-    if (!selectedTrackIDs.length && playlist[selectedTrack]) {
+    if (!selectedTrackIDs.length && playlist[selectedTrack]
+      && tab.sourceKey !== FAVORITES_TAB_SOURCE) {
       selectedTrackIDs.push(trackID(playlist[selectedTrack]));
     }
     return {
@@ -1505,7 +1566,7 @@ function libraryToolbarItems() {
     {
       id: "options",
       title: "OPTIONS",
-      icon: "menu",
+      icon: "gear",
       view: "OPTIONS",
       onClick: () => openOptionsScreen(),
     },
@@ -3100,18 +3161,95 @@ function addDisplayOptions(parent) {
   addThemeOptions(parent);
 }
 
+function beginColorEdit(endpoint) {
+  state.editingColorEndpoint = endpoint;
+  state.colorDraft = "";
+  state.colorInputError = null;
+  render();
+}
+
+function finishColorEdit(commit) {
+  const endpoint = state.editingColorEndpoint;
+  const draft = state.colorDraft;
+  state.editingColorEndpoint = null;
+  state.colorDraft = "";
+  state.colorInputError = null;
+  if (commit && endpoint) {
+    const color = colorInputToHex(draft);
+    if (!color) state.colorInputError = endpoint;
+    else if (endpoint === "background") state.customBackgroundColor = color;
+    else state.customFontColor = color;
+    if (color) {
+      state.customColorsInitialized = true;
+      state.theme = "CUSTOM";
+      updateThemeSurface();
+      RGB = paletteRGB(displayPalette());
+      packedRGB = packedPalette(RGB);
+      saveDisplayOptions();
+    }
+  }
+  render();
+}
+
+function customColorInput(parent, endpoint, title) {
+  const editing = state.editingColorEndpoint === endpoint;
+  const value = endpoint === "background" ? state.customBackgroundColor : state.customFontColor;
+  const row = controlRow(parent, { gap: 0 }, { optionChoiceRow: `${title} COLOR` });
+  label(row, title, { widthPercent: 33.3333, height: buttonStandardHeight() }, {
+    textShade: 0,
+    inset: controlPaddingDots(),
+  });
+  label(row, editing ? `${state.colorDraft}|` : value, {
+    widthPercent: 66.6667,
+    height: buttonStandardHeight(),
+  }, {
+    border: BUTTON_BORDER_DOTS,
+    fill: editing ? 2 : undefined,
+    textShade: 0,
+    inset: controlPaddingDots(),
+    clipToBox: true,
+    controlTitle: `${title} CSS COLOR INPUT`,
+    onClick: () => beginColorEdit(endpoint),
+  });
+}
+
 function addThemeOptions(parent) {
   const profile = optionGroup(parent, "COLOR THEME");
   optionChoice(profile, "THEME", [
     { title: "GAMEBOY", selected: state.theme === "GAMEBOY", onClick: () => setTheme("GAMEBOY") },
     { title: "NIGHTBOY", selected: state.theme === "NIGHTBOY", onClick: () => setTheme("NIGHTBOY") },
   ]);
-  optionChoice(profile, "INK", [
-    { title: state.theme === "GAMEBOY" ? "LCD GREEN" : "SILVER", selected: state.contrast === "STANDARD",
-      onClick: () => setContrastProfile("STANDARD") },
-    { title: state.theme === "GAMEBOY" ? "CHARCOAL" : "BRIGHT", selected: state.contrast === "HIGH_CONTRAST",
-      onClick: () => setContrastProfile("HIGH_CONTRAST") },
+  optionChoice(profile, "NEW THEMES", [
+    { title: "PURPLEBOY", selected: state.theme === "PURPLEBOY", onClick: () => setTheme("PURPLEBOY") },
+    { title: "IDIGLOWBOY", selected: state.theme === "IDIGLOWBOY", onClick: () => setTheme("IDIGLOWBOY") },
   ]);
+  optionChoice(profile, "CUSTOM", [
+    { title: "COLORS", selected: state.theme === "CUSTOM", onClick: () => setTheme("CUSTOM") },
+  ]);
+  if (state.theme !== "CUSTOM") {
+    const inkLabels = {
+      GAMEBOY: ["LCD GREEN", "CHARCOAL"],
+      NIGHTBOY: ["DARKGRAY", "LIGHT GRAY"],
+      PURPLEBOY: ["RICH PURPLE", "BRIGHT PURPLE"],
+      IDIGLOWBOY: ["DEEP AQUA", "DARK AQUA"],
+    }[state.theme];
+    optionChoice(profile, "INK", [
+      { title: inkLabels[0], selected: state.contrast === "STANDARD",
+        onClick: () => setContrastProfile("STANDARD") },
+      { title: inkLabels[1], selected: state.contrast === "HIGH_CONTRAST",
+        onClick: () => setContrastProfile("HIGH_CONTRAST") },
+    ]);
+  } else {
+    const colors = optionGroup(parent, "CUSTOM COLORS");
+    customColorInput(colors, "background", "BG");
+    customColorInput(colors, "font", "FONT");
+    label(colors, state.colorInputError ? "INVALID CSS COLOR" : "ENTER TO APPLY", {
+      height: rowHeight(),
+    }, {
+      textShade: 0,
+      inset: controlPaddingDots(),
+    });
+  }
   const tones = optionGroup(parent, "FOUR LCD TONES");
   addPalettePreview(tones);
 }
@@ -3908,7 +4046,7 @@ function buildTree() {
     });
     const transport = controlRow(toolbarGroup, { height: toolbarHeight, gap: uiGap() });
     const transportLabels = state.transportSymbols
-      ? { previous: "←", stop: "[]", play: state.playing ? "||" : ">", next: "→" }
+      ? { previous: "<<", stop: "[]", play: state.playing ? "||" : ">", next: ">>" }
       : { previous: "PREV", stop: "STOP", play: state.playing ? "PAUSE" : "PLAY", next: "NEXT" };
     fillButton(transport, transportLabels.previous, () => selectPrevious(), {
       controlTitle: "PREVIOUS",
@@ -4685,6 +4823,7 @@ function toggleContrast() {
 
 function setContrastProfile(contrast) {
   state.contrast = contrast === "HIGH_CONTRAST" ? "HIGH_CONTRAST" : "STANDARD";
+  updateThemeSurface();
   RGB = paletteRGB(displayPalette());
   packedRGB = packedPalette(RGB);
   saveDisplayOptions();
@@ -4692,8 +4831,16 @@ function setContrastProfile(contrast) {
 }
 
 function setTheme(theme) {
-  state.theme = theme === "NIGHTBOY" ? "NIGHTBOY" : "GAMEBOY";
-  if (document.documentElement) document.documentElement.dataset.theme = state.theme;
+  const selectedTheme = COLOR_THEMES.has(theme) ? theme : "GAMEBOY";
+  if (selectedTheme === "CUSTOM" && !state.customColorsInitialized) {
+    const endpoints = PALETTE_ENDPOINTS[state.theme]?.[state.contrast]
+      || PALETTE_ENDPOINTS.GAMEBOY.STANDARD;
+    state.customBackgroundColor = endpoints.surface;
+    state.customFontColor = endpoints.ink;
+    state.customColorsInitialized = true;
+  }
+  state.theme = selectedTheme;
+  updateThemeSurface();
   RGB = paletteRGB(displayPalette());
   packedRGB = packedPalette(RGB);
   saveDisplayOptions();
@@ -4841,10 +4988,16 @@ function openProjectionPlaylist(sourceKey, title, playlist) {
   state.activeGameKey = null;
   state.selectedGameKey = null;
   tab.selectedTrack = 0;
-  tab.selectedTrackIDs = playlist[0] ? [trackID(playlist[0])] : [];
-  tab.selectionAnchorID = playlist[0] ? trackID(playlist[0]) : null;
+  const autoSelectFirst = sourceKey !== FAVORITES_TAB_SOURCE;
+  tab.selectedTrackIDs = autoSelectFirst && playlist[0] ? [trackID(playlist[0])] : [];
+  tab.selectionAnchorID = tab.selectedTrackIDs[0] || null;
   tab.scroll = 0;
-  resetPlaylistSelection(tab.playlist, tab);
+  if (autoSelectFirst) resetPlaylistSelection(tab.playlist, tab);
+  else {
+    state.selectedTrack = 0;
+    state.selectedTrackIDs = new Set();
+    state.selectionAnchorID = null;
+  }
   state.queueScroll = 0;
   state.tableHorizontalScroll = 0;
   if (sourceKey === HISTORY_TAB_SOURCE) {
@@ -6403,6 +6556,20 @@ canvas.addEventListener("wheel", (event) => {
 
 canvas.addEventListener("keydown", (event) => {
   const commandKey = event.metaKey || event.ctrlKey;
+  if (state.editingColorEndpoint) {
+    if (event.key === "Escape") finishColorEdit(false);
+    else if (event.key === "Enter" || event.key === "Tab") finishColorEdit(true);
+    else if (event.key === "Backspace") {
+      state.colorDraft = Array.from(state.colorDraft).slice(0, -1).join("");
+      render();
+    } else if (!commandKey && !event.altKey && event.key.length === 1
+      && state.colorDraft.length < 96) {
+      state.colorDraft += event.key;
+      render();
+    } else return;
+    event.preventDefault();
+    return;
+  }
   if (state.editingDurationKey) {
     if (event.key === "Escape") finishDurationEdit(false);
     else if (event.key === "Enter" || event.key === "Tab") finishDurationEdit(true);
