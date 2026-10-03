@@ -4,7 +4,7 @@ Apply the [UAC Base Profile](BASE-UAC-PROFILE.md) and
 [Pre-Disc Native Procedure](PRE-DISC-NATIVE.md). MetaManCore reads KSS and
 KSSX headers without interpreting or
 emulating the music payload. See
-[`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md).
+`VGMManDocs > MetaMan > format-layouts.md`.
 
 ## Scope
 

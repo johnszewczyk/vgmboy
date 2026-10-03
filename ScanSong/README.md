@@ -58,5 +58,6 @@ the native operation boundary is in
 [`ai/subsystem-agent/operation-presentation.md`](ai/subsystem-agent/operation-presentation.md);
 user-visible app behavior is in `ai/subsystem-human/`. The authoritative
 plugin/dependency matrix is
-[`../VGMBoy/Docs/plugin-catalog.md`](../VGMBoy/Docs/plugin-catalog.md), and the
-native metadata reader map is [`../MetaMan/FORMAT-LAYOUTS.md`](../MetaMan/FORMAT-LAYOUTS.md).
+the published [VGMBoy plugin catalog](../VGMManDocs/Docs/md/VGMBoy/plugin-catalog.md),
+and the native metadata reader map is the published
+[MetaMan format map](../VGMManDocs/Docs/md/MetaMan/format-layouts.md).

@@ -3,7 +3,7 @@
 Apply the [UAC Base Profile](BASE-UAC-PROFILE.md) and
 [Pre-Disc Native Procedure](PRE-DISC-NATIVE.md). MetaManCore reads `.vgm` and
 gzip-compressed `.vgz` members. See
-[`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md).
+`VGMManDocs > MetaMan > format-layouts.md`.
 
 ## Scope
 

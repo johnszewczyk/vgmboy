@@ -27,6 +27,7 @@ history live in this repository.
 | AppKit/SwiftUI presentation | [CocoaSpice/AGENTS.md](CocoaSpice/AGENTS.md) |
 | Native WebKit player and typed host bridge | [SPCBoyWK/AGENTS.md](SPCBoyWK/AGENTS.md) |
 | Screen-first Yoga LCD player | [ViewBoy/AGENTS.md](ViewBoy/AGENTS.md) |
+| Published Markdown library and native documentation viewer | [VGMManDocs/AGENTS.md](VGMManDocs/AGENTS.md) |
 | Legacy Electron recovery material | [LocalRecovery/README.md](LocalRecovery/README.md) |
 
 For a component task, follow its `AGENTS.md` → `ai/AGENTS.md` →
@@ -63,9 +64,11 @@ index.
 - Compilation is package evidence, not proof of packaged UI or audible output.
   Use `ai/verification/family.md` for current checks and evidence limits.
 
-## Human Docs
+## Documentation
 
-User-facing behavior lives under each app’s `ai/subsystem-human/`.
-`README.md` indexes the family; family plans, reports, verification, and
-repository constraints are routed to their owner-specific files under `ai/`.
-Shared decoder and dependency references live in `VGMBoy/Docs/`.
+Published VGMMan project documentation lives in
+[`VGMManDocs/Docs/md/`](VGMManDocs/Docs/md/), grouped by owning project name.
+The viewer reads these Markdown sources directly. Keep DocMan intake,
+engineering notes, plans, reports, and verification records in their required
+routed locations under each project's `ai/` tree. `README.md` remains the
+family entry point.

@@ -42,8 +42,8 @@ The version/revision values below are mirrored in the machine-readable
 entries are intentionally labeled when their inherited source does not retain
 an upstream revision; they are review items, not silently assumed releases.
 The full source, scanner, dependency, license, and format-boundary notes are in
-[`Docs/plugin-catalog.md`](Docs/plugin-catalog.md); this README keeps the
-repository-level summary readable.
+the published [plugin-catalog.md](../VGMManDocs/Docs/md/VGMBoy/plugin-catalog.md);
+this README keeps the repository-level summary readable.
 
 | Plugin | Current version or revision | Upstream repository or home | Formats routed here | VGMBoy integration |
 | --- | --- | --- | --- | --- |

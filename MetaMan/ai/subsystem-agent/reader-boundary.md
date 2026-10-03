@@ -3,7 +3,8 @@
 ## Scope
 
 The shared `MetaManCore` API and its integration boundary. The per-format
-facts and bounds are in [FORMAT-LAYOUTS.md](../../FORMAT-LAYOUTS.md).
+facts and bounds are in the published
+[format-layouts.md](../../../VGMManDocs/Docs/md/MetaMan/format-layouts.md).
 
 ## Ownership
 

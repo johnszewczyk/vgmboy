@@ -2,9 +2,9 @@
 
 Apply the [UAC Base Profile](BASE-UAC-PROFILE.md),
 [Pre-Disc Native Procedure](PRE-DISC-NATIVE.md), and, for set conversions, the
-applicable [Base Set Profile](Sets/BASE-SET-PROFILE.md). MetaManCore reads SPC
+applicable [Base Set Profile](BASE-SET-PROFILE.md). MetaManCore reads SPC
 ID666 and xID6 metadata without starting an emulator. See
-[`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md).
+`VGMManDocs > MetaMan > format-layouts.md`.
 
 ## Scope
 
@@ -64,4 +64,4 @@ sub-container and version together, such as `SPC v.30` or `SPC v.10`.
 - **Package integrity** — Run `uacman inspect --verify`, then unpack and
   compare member paths, sizes, and source-byte identity.
 - **Collection findings** — Keep counts and exceptions in dated reports under
-  `Reports/`.
+  `UACMan/ai/reports/`.

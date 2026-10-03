@@ -23,6 +23,8 @@ requirements.
 - Current catalog owner:
   [`../ScanSong/AGENTS.md`](../../ScanSong/AGENTS.md).
 - Current native frontend routes: [`../README.md`](../../README.md).
+- Archived-source investigation notes: [`ai/investigations/`](investigations/).
+- Archived historical reports: [archive index](reports/archive/README.md).
 
 No build or launch commands are advertised here. Use the archived source’s
 local Git history and license notices when an explicit recovery task requires

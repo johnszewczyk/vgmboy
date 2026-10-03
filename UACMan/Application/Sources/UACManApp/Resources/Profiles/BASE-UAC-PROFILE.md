@@ -49,9 +49,9 @@ the per-set ledger recording operations and checkpoints.
 - **Format check** — Confirm all playable members belong to the package's
   structural format; reject a package that mixes formats.
 - **Playback data** — Use wrapper-defined loop objects and playlist-entry
-  timing fields, not descriptive tags. Follow the shared
-  [hash and timing policy](README.md#hash-and-timing-scope). Source-archive
-  hashes may be surfaced on tracks when a set profile says they identify the
+  timing fields, not descriptive tags. Follow the shared policy documented at
+  `VGMManDocs > UACMan > Procedures > README.md > Hash and timing scope`.
+  Source-archive hashes may be surfaced on tracks when a set profile says they identify the
   distribution source; member **Stream Hashes** identify each playable file.
 - **Set identity** — When source evidence identifies one set, surface **Set
   Name** and **Set URL** once at package scope. Add

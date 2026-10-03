@@ -62,13 +62,15 @@ Engineering constraints:
 - User-facing behavior belongs in `subsystem-human/`; current engineering
   invariants belong in focused `subsystem-agent/` notes.
 
-## Human Docs
+## Published Docs
 
-`Docs/` holds reference material. The current Options control inventory is
-[`Docs/options-template.md`](../Docs/options-template.md).
+The current Options control inventory is published at
+[`options-template.md`](../../VGMManDocs/Docs/md/CocoaSpice/options-template.md).
 
-The unconfirmed MediaRemote heap-corruption incident evidence is retained at
-[`Docs/investigations/MediaRemote-heap-corruption.md`](../Docs/investigations/MediaRemote-heap-corruption.md).
-The playlist-activation faded-skip regression and its source-level resolution
-are recorded at
-[`Docs/investigations/faded-skip-playlist-activation.md`](../Docs/investigations/faded-skip-playlist-activation.md).
+## Investigation and Report Evidence
+
+- Unconfirmed MediaRemote heap-corruption incident:
+  [`MediaRemote-heap-corruption.md`](investigations/MediaRemote-heap-corruption.md).
+- Playlist-activation faded-skip regression and source-level resolution:
+  [`faded-skip-playlist-activation.md`](investigations/faded-skip-playlist-activation.md).
+- Historical COG comparison and source-set corruption report: `ai/reports/`.

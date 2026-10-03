@@ -19,9 +19,10 @@ ownership and preservation rules.
 | [CocoaSpice](CocoaSpice/README.md) | Native AppKit/SwiftUI player frontend. |
 | [SPCBoyWK](SPCBoyWK/README.md) | Native WebKit player frontend. |
 | [ViewBoy](ViewBoy/README.md) | Native player with a screen-first, four-shade Yoga LCD interface. |
+| [VGMManDocs](VGMManDocs/README.md) | Native viewer and editor for the family's published Markdown library. |
 
 The legacy Electron SPCBoy player is recovery-only. LaunchPad has separate
-entries for the maintained SPCBoyWK and ViewBoy apps. The verified Electron
+entries for SPCBoyWK, ViewBoy, and VGMManDocs. The verified Electron
 archive is listed in [`LocalRecovery/README.md`](LocalRecovery/README.md).
 LaunchPad remains a sibling workspace tool because it launches projects beyond
 this family.
@@ -45,11 +46,11 @@ Family plans and evidence:
   open user-boundary checks.
 - [`ai/verification/family.md`](ai/verification/family.md) — clean checkout procedure, package
   checks, and evidence limits.
-- [`VGMBoy/Docs/plugin-catalog.md`](VGMBoy/Docs/plugin-catalog.md) — decoder,
-  dependency, provenance, and scanner-product reference.
+- [`VGMManDocs/Docs/md/VGMBoy/plugin-catalog.md`](VGMManDocs/Docs/md/VGMBoy/plugin-catalog.md)
+  — decoder, dependency, provenance, and scanner-product reference.
 - [`ScanSong/ai/subsystem-agent/format-accommodations.md`](ScanSong/ai/subsystem-agent/format-accommodations.md)
   — scanner routes and inspection boundaries.
-- [`MetaMan/FORMAT-LAYOUTS.md`](MetaMan/FORMAT-LAYOUTS.md) — native metadata
-  layouts and bounded reader contracts.
-- [`UACMan/Container/README.md`](UACMan/Container/README.md) — closed native
-  SPC conversion decision and the supported wrapper boundary.
+- [`VGMManDocs/Docs/md/MetaMan/format-layouts.md`](VGMManDocs/Docs/md/MetaMan/format-layouts.md)
+  — native metadata layouts and bounded reader contracts.
+- [`UACMan/ai/subsystem-agent/container-boundary.md`](UACMan/ai/subsystem-agent/container-boundary.md)
+  — closed native SPC conversion decision and the supported wrapper boundary.

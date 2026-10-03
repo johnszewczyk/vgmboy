@@ -32,7 +32,11 @@
 - `project-info.md` project identity, major components, local rules, and task routing.
 - `subsystem-human/` protects sparse user-facing feature lists by component.
 - `subsystem-agent/` protects engineering notes by ownership and constraint boundary.
-- `Docs/` is the human-side folder. Not default intake.
+- Published CocoaSpice documents live in
+  `../../VGMManDocs/Docs/md/CocoaSpice/`.
+- Keep investigations under `ai/investigations/` and dated/historical reports
+  under `ai/reports/`; these are not current-state routing notes or published
+  user documentation.
 
 ### Subsystem Notes
 

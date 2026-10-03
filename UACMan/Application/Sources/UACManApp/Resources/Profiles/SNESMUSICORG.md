@@ -1,7 +1,7 @@
 # SNESMusic.org Set Profile
 
 Apply the [Base Set Profile](BASE-SET-PROFILE.md) and the
-[Nintendo SNES SPC profile](../SPC.md). These rules cover SNESMusic.org source
+[Nintendo SNES SPC profile](SPC.md). These rules cover SNESMusic.org source
 linkage, hash scopes, and identity enrichment.
 
 This document defines input rules for processing SNESMusic.org source data.

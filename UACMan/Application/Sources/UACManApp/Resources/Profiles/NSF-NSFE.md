@@ -3,7 +3,7 @@
 Apply the [UAC Base Profile](BASE-UAC-PROFILE.md) and
 [Pre-Disc Native Procedure](PRE-DISC-NATIVE.md). MetaManCore reads
 fixed-header NSF and chunk-based NSFE files. See
-[`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md).
+`VGMManDocs > MetaMan > format-layouts.md`.
 
 ## Scope
 

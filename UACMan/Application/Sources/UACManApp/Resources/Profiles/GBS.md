@@ -3,7 +3,7 @@
 Apply the [UAC Base Profile](BASE-UAC-PROFILE.md) and
 [Pre-Disc Native Procedure](PRE-DISC-NATIVE.md). MetaManCore reads GBS
 headers and optional NEZplug extended-M3U
-sidecars. See [`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md).
+sidecars. See `VGMManDocs > MetaMan > format-layouts.md`.
 
 ## Scope
 

@@ -19,7 +19,7 @@ runtime dependency.
   manifest scanner, and MetaManCore-backed directory metadata harvester.
 - `Wrapper/` is the supported Swift reader/writer package and Python
   pack/inspect/unpack CLI for the reversible TAR+seekable-Zstandard envelope.
-- `Container/README.md` records the closed SPC successor decision. No native
+- `subsystem-agent/container-boundary.md` records the closed SPC successor decision. No native
   SPC conversion, playback, or ingestion package is supported.
 - `MetaManCore` owns native-format metadata reading. UACMan consumes its
   structured results and never rewrites native source-format tags.
@@ -30,12 +30,16 @@ runtime dependency.
 - Manifest editing and save invariants: `subsystem-agent/uac-editor.md`.
 - Wrapper binary contract and reader/writer: `subsystem-agent/uac-wrapper-format.md`.
 - Player and scanner consumer boundaries: `subsystem-agent/player-integration.md`.
-- Format conversion procedures and field reports: `../Procedures/README.md`.
+- Format conversion procedures:
+  [README.md](../../VGMManDocs/Docs/md/UACMan/Procedures/README.md).
 - Per-collection identity, naming, and source-state rules:
-  `../Procedures/Sets/README.md`.
-- SNESMusic.org SPC metadata and four-hash profile: `../Procedures/SPC.md`.
-- PlayStation CD-XA preservation profile: `../protocols/PSX-CDXA.protocol.md`.
-- Closed SPC research context: [Container/README.md](../Container/README.md).
+  [Sets/README.md](../../VGMManDocs/Docs/md/UACMan/Procedures/Sets/README.md).
+- SNESMusic.org SPC metadata and four-hash profile:
+  [SPC.md](../../VGMManDocs/Docs/md/UACMan/Procedures/SPC.md).
+- PlayStation CD-XA preservation profile:
+  [PSX-CDXA.protocol.md](../../VGMManDocs/Docs/md/UACMan/protocols/PSX-CDXA.protocol.md).
+- Closed SPC engineering boundary:
+  [container-boundary.md](subsystem-agent/container-boundary.md).
 
 ## Local Rules
 
@@ -52,4 +56,6 @@ runtime dependency.
 
 ## Human Docs
 
-`README.md` describes the supported app surface and launch procedure.
+`README.md` describes the supported app surface and launch procedure. Published
+UAC guides, procedures, and protocols live in
+[`VGMManDocs/Docs/md/UACMan/`](../../VGMManDocs/Docs/md/UACMan/).

@@ -4,7 +4,7 @@ Apply the [UAC Base Profile](BASE-UAC-PROFILE.md). This profile covers one
 playable source format per UAC: XA streams or Red Book CD-DA tracks. Keep
 different playable formats in separate UAC packages. Extraction and
 game-specific loop evidence are defined in the
-[PSX preservation protocol](../protocols/PSX-CDXA.protocol.md).
+the PSX preservation protocol in the VGMManDocs UACMan library.
 
 ## Scope
 
@@ -71,4 +71,4 @@ Store the canonical platform once as structural
   paths, sizes, field coverage, CUE identity, playlist order, and positive
   loop objects.
 - **Collection report** — Record counts and unresolved mappings in a dated
-  report under `Reports/`.
+  report under `UACMan/ai/reports/`.

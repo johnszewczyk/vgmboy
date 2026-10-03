@@ -112,7 +112,8 @@ Compressed manifests currently use the installed `zstd` command-line tool;
 `UACWrapperCore` owns validation and payload-preserving metadata rewrites. The
 project is divided by responsibility: `Application/` contains the browser,
 editor, and metadata bridge; `Wrapper/` is an independently consumable Swift
-package for the current reversible format and CLI; `Container/README.md`
+package for the current reversible format and CLI;
+`ai/subsystem-agent/container-boundary.md`
 records the closed SPC successor decision. Native SPC conversion is not a
 supported package or development path.
 Within `UACWrapperCore`, container framing, manifest data models, and manifest
@@ -124,12 +125,13 @@ The current `.uac` remains a wrapper around original format members. See
 [`ai/subsystem-agent/uac-editor.md`](ai/subsystem-agent/uac-editor.md),
 [`ai/subsystem-agent/uac-wrapper-format.md`](ai/subsystem-agent/uac-wrapper-format.md),
 [`ai/subsystem-agent/player-integration.md`](ai/subsystem-agent/player-integration.md),
-and the format-specific
-[`protocols/SNES-SPC.protocol.md`](protocols/SNES-SPC.protocol.md) and
-[`protocols/PSX-CDXA.protocol.md`](protocols/PSX-CDXA.protocol.md)
+and the published format-specific
+[SNES-SPC protocol](../VGMManDocs/Docs/md/UACMan/protocols/SNES-SPC.protocol.md)
+and [PSX-CDXA protocol](../VGMManDocs/Docs/md/UACMan/protocols/PSX-CDXA.protocol.md)
 for editing, format, and consumer contracts.
-Format conversion procedures and dated field reports are indexed in
-[`Procedures/README.md`](Procedures/README.md).
+Format conversion procedures are indexed in the published
+[UACMan documentation library](../VGMManDocs/Docs/md/UACMan/Procedures/README.md).
+Dated field reports are retained under `ai/reports/`.
 
 The Python pack/inspect/unpack CLI is `Wrapper/python/uacman.py`; its tests and
 vendored BLAKE3 runtime are kept beside the wrapper.

@@ -15,8 +15,9 @@ Format coverage is explicit: the package reads the formats listed by
 to VGMBoy or ScanSong.
 
 The canonical format map documents complete-reader scope, byte layouts,
-bounds, retained source facts, and validation method in
-[`FORMAT-LAYOUTS.md`](FORMAT-LAYOUTS.md). It is the authority for format-level
+bounds, retained source facts, and validation method in the VGMManDocs
+[format-layouts.md](../VGMManDocs/Docs/md/MetaMan/format-layouts.md). It is
+the authority for format-level
 coverage; do not duplicate its table here.
 
 ## Build and test

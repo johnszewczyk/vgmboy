@@ -27,7 +27,7 @@ collection fixtures.
   and duplicate streams. A duplicate match alone does not authorize removing
   a valid alternate version.
 - **Package verification** — Apply the shared hash and timing rules in the
-  [Procedures README](README.md#hash-and-timing-scope), verify the written UAC,
+  `VGMManDocs > UACMan > Procedures > README.md > Hash and timing scope`, verify the written UAC,
   and compare member paths, sizes, and source-byte identity.
 - **Approval evidence** — Keep fixture and collection findings in dated
   reports. A profile stays draft until fixtures, package checks, and UACMan

@@ -4,7 +4,7 @@ Apply the [UAC Base Profile](BASE-UAC-PROFILE.md) and
 [Pre-Disc Native Procedure](PRE-DISC-NATIVE.md). MetaManCore reads the HES
 header and an optional companion M3U
 without emulating the PC Engine. See
-[`MetaMan/FORMAT-LAYOUTS.md`](../../MetaMan/FORMAT-LAYOUTS.md).
+`VGMManDocs > MetaMan > format-layouts.md`.
 
 ## Scope
 

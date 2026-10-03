@@ -23,10 +23,11 @@ alone does not prove packaged, visible, or audible behavior; use the family
 verification script and state any live-fixture gaps explicitly.
 
 `SPCBoy/` is archived Electron source, retained for recovery only. For native
-SPCBoy work, use `SPCBoyWK/`. LaunchPad has separate entries for SPCBoyWK and
-ViewBoy. The active player apps are CocoaSpice, SPCBoyWK, and ViewBoy. Keep
-them as separate presentation clients over the shared catalog, frontend, and
-playback packages; do not merge one skin into another.
+SPCBoy work, use `SPCBoyWK/`. LaunchPad has separate entries for SPCBoyWK,
+ViewBoy, and VGMManDocs. The active player apps are CocoaSpice, SPCBoyWK, and
+ViewBoy; VGMManDocs owns the published Markdown library and its viewer. Keep
+the players as separate presentation clients over the shared catalog,
+frontend, and playback packages; do not merge one skin into another.
 
 For a ViewBoy task, the active application and UI live in `ViewBoy/`; use its
 `README.md` and `AGENTS.md` route and launch with `ViewBoy/launch.sh`. `SPCBoyWK/`

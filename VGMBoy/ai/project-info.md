@@ -30,18 +30,19 @@ scanner-specific decoding remains necessary.
 ## Task Routing
 
 - Playback control protocol and host contract:
-  `ai/subsystem-agent/playback-control-v1.md`.
+  `subsystem-agent/playback-control-v1.md`.
 - Audio output, transport, de-click, and diagnostics:
-  `ai/subsystem-agent/audio-output-transport.md`.
+  `subsystem-agent/audio-output-transport.md`.
 - Format admission, decoder routes, and adding a playback core:
-  `ai/subsystem-agent/decoder-routing.md`.
+  `subsystem-agent/decoder-routing.md`.
 - Dependency and scanner-plugin builds:
-  `ai/subsystem-agent/build-integration.md`.
-- Family ownership: `Docs/app-family-boundary.md`.
+  `subsystem-agent/build-integration.md`.
+- Family ownership: `subsystem-agent/app-family-boundary.md`.
 - Imported source provenance: `vendor/PROVENANCE.md`.
-- User-visible playback behavior: `ai/subsystem-human/`.
+- User-visible playback behavior: `subsystem-human/`.
 - Decoder/dependency matrix and exact pins:
-  `Docs/plugin-catalog.md` and `Docs/plugin-versions.json`.
+  [plugin-catalog.md](../../VGMManDocs/Docs/md/VGMBoy/plugin-catalog.md) and
+  `../Docs/plugin-versions.json`.
 
 ## Local Rules
 
@@ -58,5 +59,6 @@ scanner-specific decoding remains necessary.
 ## Human Docs
 
 `README.md` lists instantiated decoder plugins and build prerequisites.
-`Docs/plugin-catalog.md` explains decoder, scanner, dependency, provenance, and
-format boundaries; exact pins remain in `Docs/plugin-versions.json`.
+The published [plugin catalog](../../VGMManDocs/Docs/md/VGMBoy/plugin-catalog.md)
+explains decoder, scanner, dependency, provenance, and format boundaries; exact
+pins remain in `../Docs/plugin-versions.json`.

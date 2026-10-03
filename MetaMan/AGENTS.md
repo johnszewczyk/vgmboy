@@ -19,6 +19,6 @@ identified there.
 - Decoder-based comparisons belong in test-only oracle tests. Record
   intentional correctness improvements separately; do not inherit a decoder
   defect merely to achieve byte-for-byte behavioral parity.
-- Keep format layouts, supported facts, and methodology in
-  `FORMAT-LAYOUTS.md`; keep the README as an entry point. GYM is not an
-  extraction target.
+- Keep the format map, supported facts, and methodology in the published
+  [MetaMan format-layouts document](../VGMManDocs/Docs/md/MetaMan/format-layouts.md);
+  keep the README as an entry point. GYM is not an extraction target.

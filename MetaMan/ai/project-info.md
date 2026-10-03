@@ -19,7 +19,7 @@ executable is a thin JSON inspection client.
 - Public result contract, source preservation, dependencies, and failure
   boundaries: [reader-boundary.md](subsystem-agent/reader-boundary.md).
 - Exact supported formats, layouts, and reader bounds:
-  [FORMAT-LAYOUTS.md](../FORMAT-LAYOUTS.md).
+  [format-layouts.md](../../VGMManDocs/Docs/md/MetaMan/format-layouts.md).
 - Command-line behavior: [inspection.md](subsystem-human/inspection.md).
 - ScanSong catalog projection and per-format routing:
   [format-accommodations.md](../../ScanSong/ai/subsystem-agent/format-accommodations.md).
@@ -38,4 +38,5 @@ executable is a thin JSON inspection client.
 ## Human Docs
 
 - [Inspection](subsystem-human/inspection.md) describes the CLI.
-- [FORMAT-LAYOUTS.md](../FORMAT-LAYOUTS.md) is the format fact map.
+- [format-layouts.md](../../VGMManDocs/Docs/md/MetaMan/format-layouts.md) is
+  the format fact map.
