@@ -1,10 +1,7 @@
 :root {
   color-scheme: dark;
-  background: #10130f;
+  background: #9bbc0f;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  --membrane-outer: #c3c6bc;
-  --membrane-middle: #7c8076;
-  --membrane-inner: #454941;
   --screen-surface: #9bbc0f;
 }
 
@@ -18,54 +15,25 @@ body {
 }
 
 body {
-  display: grid;
-  place-items: center;
   overflow: hidden;
-  padding: 8px;
-  background: #10130f;
-}
-
-.surround {
-  width: 100%;
-  height: 100%;
-  padding: 2px;
-  border: 1px solid var(--membrane-outer);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.bezel {
-  width: 100%;
-  height: 100%;
-  padding: 1px;
-  border: 1px solid var(--membrane-middle);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+  background: var(--screen-surface);
 }
 
 #screen-window {
-  display: grid;
+  display: block;
   width: 100%;
   height: 100%;
-  place-items: center;
   overflow: hidden;
-  border: 1px solid var(--membrane-inner);
-  border-radius: 0;
   background: var(--screen-surface);
 }
 
 :root[data-theme="NIGHTBOY"] {
-  background: #100c18;
-  --membrane-outer: #c7c5cf;
-  --membrane-middle: #77747f;
-  --membrane-inner: #3c3844;
+  background: #000000;
   --screen-surface: #000000;
 }
 
 :root[data-theme="NIGHTBOY"] body {
-  background: #100c18;
+  background: #000000;
 }
 
 #lcd {

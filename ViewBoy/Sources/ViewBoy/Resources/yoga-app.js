@@ -17,8 +17,35 @@ const LCD_DOT_SIZE_OPTIONS = [2, 3, 4, 5, 6];
 let DEVICE_PIXELS_PER_LCD_DOT = DEFAULT_LCD_DOT_SIZE;
 const BASELINE_LAYOUT_UNIT_CSS_PIXELS = 2.5;
 const RANDOM_HISTORY_LIMIT = 256;
-const APP_BORDER_GAP_DOTS = 8;
 const BUTTON_BORDER_DOTS = 1;
+const SIDEBAR_ICON_SIZE_DOTS = 9;
+const SIDEBAR_BUTTON_SIZE_DOTS = 13;
+const SIDEBAR_ICON_ART = {
+  library: [
+    "001111100", "011111110", "010101010", "010101010", "011111110",
+    "010101010", "010101010", "011111110", "000000000",
+  ],
+  folder: [
+    "001110000", "011111110", "111111111", "100000001", "100000001",
+    "100000001", "100000001", "111111111", "000000000",
+  ],
+  heart: [
+    "011101110", "111111111", "111111111", "011111110", "001111100",
+    "000111000", "000010000", "000000000", "000000000",
+  ],
+  clock: [
+    "001111100", "011000110", "110000011", "110110011", "110111011",
+    "110001011", "011000110", "001111100", "000000000",
+  ],
+  tree: [
+    "011100000", "111110000", "001000000", "001111110", "001000010",
+    "001000000", "001111110", "001000010", "001000000",
+  ],
+  menu: [
+    "000000000", "111111111", "000000000", "111111111", "000000000",
+    "111111111", "000000000", "000000000", "000000000",
+  ],
+};
 const DEFAULT_CONTROL_PADDING_DOTS = 4;
 const DEFAULT_UI_GAP_DOTS = 4;
 const DEFAULT_TEXT_LINE_GAP_DOTS = 1;
@@ -34,7 +61,9 @@ const EQ_GAIN_STEPS = (EQ_GAIN_MAX_DB - EQ_GAIN_MIN_DB) / EQ_GAIN_STEP_DB;
 const FAVORITES_TAB_SOURCE = "viewboy:special:favorites";
 const HISTORY_TAB_SOURCE = "viewboy:special:history";
 const DEFAULT_ANIMATION_FPS = 60;
-const ANIMATION_FPS_OPTIONS = [30, 60, 90, 120, 150, 180, 210, 240];
+const ANIMATION_FPS_MIN = 30;
+const ANIMATION_FPS_MAX = 240;
+const ANIMATION_FPS_TICKS = [30, 60, 90, 120, 150, 180, 210, 240];
 // The DMG defines four ordered logical LCD tones, not fixed RGB values or
 // numeric luminance intervals. ViewBoy keeps each theme's ink and screen
 // colors, then derives the two middle tones at equal CIELAB L* intervals.
@@ -179,9 +208,6 @@ const standardGlyphs = {
   "=": ["00000", "11111", "00000", "11111", "00000", "00000", "00000"],
   "#": ["01010", "01010", "11111", "01010", "11111", "01010", "01010"],
   "•": ["00000", "00000", "00100", "00000", "00000", "00000", "00000"],
-  "☰": ["11111", "00000", "11111", "00000", "11111", "00000", "00000"],
-  "♥": ["01010", "11111", "11111", "11111", "01110", "00100", "00000"],
-  "◷": ["01110", "10001", "10101", "10111", "10001", "10001", "01110"],
   "%": ["11001", "11010", "00100", "01000", "10110", "00110", "00000"],
   "?": ["01110", "10001", "00001", "00010", "00100", "00000", "00100"],
   "!": ["00100", "00100", "00100", "00100", "00100", "00000", "00100"],
@@ -248,9 +274,6 @@ const microGlyphs = {
   "=": ["000", "111", "000", "111", "000"],
   "#": ["101", "111", "101", "111", "101"],
   "•": ["000", "000", "010", "000", "000"],
-  "☰": ["111", "000", "111", "000", "111"],
-  "♥": ["101", "111", "111", "010", "000"],
-  "◷": ["010", "101", "111", "101", "010"],
   "*": ["010", "101", "111", "101", "010"],
   "%": ["101", "001", "010", "100", "101"],
   "?": ["110", "001", "010", "000", "010"],
@@ -268,6 +291,11 @@ const DISPLAY_OPTIONS_KEY = "ViewBoy.displayOptions";
 function storedDisplayOptions() {
   try { return JSON.parse(localStorage.getItem(DISPLAY_OPTIONS_KEY) || "{}"); }
   catch { return {}; }
+}
+function storedAnimationFPS(value) {
+  const fps = Number(value);
+  if (value == null || !Number.isFinite(fps)) return DEFAULT_ANIMATION_FPS;
+  return Math.max(ANIMATION_FPS_MIN, Math.min(ANIMATION_FPS_MAX, Math.round(fps)));
 }
 const savedDisplayOptions = storedDisplayOptions();
 const legacyTextLineGapDots = Math.max(
@@ -386,9 +414,7 @@ const state = {
     ?? savedDisplayOptions.controlPaddingDots, DEFAULT_CONTROL_PADDING_DOTS),
   uiChromeGapDots: storedSpacing(savedDisplayOptions.uiChromeGapDots, legacyChromeGapDots),
   textLineGapDots: storedSpacing(savedDisplayOptions.textLineGapDots, legacyTextLineGapDots),
-  animationFPS: ANIMATION_FPS_OPTIONS.includes(Number(savedDisplayOptions.animationFPS))
-    ? Number(savedDisplayOptions.animationFPS)
-    : Number(savedDisplayOptions.animationFPS) === 144 ? 150 : DEFAULT_ANIMATION_FPS,
+  animationFPS: storedAnimationFPS(savedDisplayOptions.animationFPS),
   searchQuery: "",
   searchFocused: false,
   optionsScrollOffset: 0,
@@ -447,6 +473,7 @@ const state = {
   checkboxBoxes: [],
   editingRateBackend: null,
   rateDraft: "",
+  animationFPSFocused: false,
   tableHorizontalScroll: 0,
   tableHorizontalMax: 0,
   tableViewportWidth: 0,
@@ -972,6 +999,9 @@ export function hitTargetSnapshot() {
     glyphAdvance: fontProfile().advance,
     reorderKind: widget.meta.reorderKind ?? null,
     reorderKey: widget.meta.reorderKey ?? null,
+    sidebarAction: widget.meta.sidebarAction ?? null,
+    sidebarIcon: widget.meta.sidebarIcon ?? null,
+    animationFPSControl: widget.meta.animationFPSControl === true,
     statusReadout: widget.meta.statusReadout === true,
     textAlign: widget.meta.align ?? "left",
     sidebarDisclosure: widget.meta.sidebarDisclosure === true,
@@ -1408,30 +1438,86 @@ function oneDot() {
   return 1 / STYLE_SCALE;
 }
 
+function paintSidebarIcon(name, box) {
+  const art = SIDEBAR_ICON_ART[name];
+  if (!art) return;
+  let minX = SIDEBAR_ICON_SIZE_DOTS;
+  let minY = SIDEBAR_ICON_SIZE_DOTS;
+  let maxX = -1;
+  let maxY = -1;
+  art.forEach((row, y) => {
+    for (let x = 0; x < row.length; x += 1) {
+      if (row[x] !== "1") continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  });
+  if (maxX < minX || maxY < minY) return;
+  const left = Math.round(box.x + box.width / 2 - (minX + maxX + 1) / 2);
+  const top = Math.round(box.y + box.height / 2 - (minY + maxY + 1) / 2);
+  art.forEach((row, y) => {
+    for (let x = 0; x < row.length; x += 1) {
+      if (row[x] === "1") fillRect(left + x, top + y, 1, 1, 0);
+    }
+  });
+}
+
 function libraryToolbarItems() {
   const bulkAction = sidebarBulkAction();
   return [
-    { title: "LIB", view: "LIBRARY", onClick: () => { void setSidebarMode("consoles"); } },
-    { title: "PATH", view: "PATHS", onClick: () => { void setSidebarMode("paths"); } },
-    { title: "QUEUE", view: "QUEUE", controlTitle: "QUEUE", onClick: () => selectSidebarView("QUEUE") },
-    { title: "♥", view: "FAVORITES", controlTitle: "FAVORITES", onClick: () => selectSidebarView("FAVORITES") },
-    { title: "◷", view: "HISTORY", controlTitle: "HISTORY", onClick: () => { void showPlaybackHistory(); } },
     {
-      title: "☰",
-      controlTitle: bulkAction.title,
+      id: "library",
+      title: "LIBRARY",
+      icon: "library",
+      view: "LIBRARY",
+      onClick: () => { void setSidebarMode("consoles"); },
+    },
+    {
+      id: "paths",
+      title: "PATH",
+      icon: "folder",
+      view: "PATHS",
+      onClick: () => { void setSidebarMode("paths"); },
+    },
+    {
+      id: "favorites",
+      title: "FAVORITES",
+      icon: "heart",
+      view: "FAVORITES",
+      onClick: () => selectSidebarView("FAVORITES"),
+    },
+    {
+      id: "history",
+      title: "HISTORY",
+      icon: "clock",
+      view: "HISTORY",
+      onClick: () => { void showPlaybackHistory(); },
+    },
+    {
+      id: "tree",
+      title: bulkAction.title,
+      icon: "tree",
       sidebarBulkAction: true,
       onClick: () => toggleAllSidebarGroups(),
     },
-    { title: "RELOAD", controlTitle: "RELOAD CATALOG", onClick: () => { void reloadDatabase(); } },
-    { title: "OPT", controlTitle: "OPTIONS", onClick: () => openOptionsScreen() },
+    {
+      id: "options",
+      title: "OPTIONS",
+      icon: "menu",
+      view: "OPTIONS",
+      onClick: () => openOptionsScreen(),
+    },
   ];
 }
 
 function libraryPaneWidth() {
   const items = libraryToolbarItems();
-  const buttonsWidth = items.reduce((sum, item) => sum + buttonWidth(item.title), 0);
-  return Math.max(WIDTH < 420 ? 94 : 128,
-    buttonsWidth + Math.max(0, items.length - 1) * uiGap() + 4);
+  const toolbarWidth = items.length * SIDEBAR_BUTTON_SIZE_DOTS
+    + Math.max(0, items.length - 1) * uiGapDots()
+    + 2 * uiGapDots();
+  return Math.max(94, toolbarWidth / STYLE_SCALE);
 }
 
 function appStatusDetails() {
@@ -1542,7 +1628,7 @@ function pixelButton(parent, text, onClick, style = {}) {
     direction: FlexDirection.Row,
     alignItems: Align.Center,
     justifyContent: Justify.Center,
-    height: buttonStandardHeight(),
+    height: style.height ?? buttonStandardHeight(),
     width: style.widthPercent !== undefined ? undefined : style.width ?? buttonWidth(text),
     widthPercent: style.widthPercent,
     minWidth: style.minWidth,
@@ -1553,13 +1639,17 @@ function pixelButton(parent, text, onClick, style = {}) {
     border: 1,
     fill: style.optionPage ? undefined : style.selected ? 2 : undefined,
     textShade: 0,
-    inset: controlPaddingDots(),
-    align: "center",
+    inset: style.inset ?? controlPaddingDots(),
+    align: style.align ?? "center",
     controlTitle: style.controlTitle,
     optionOwner: style.optionOwner,
     optionPage: style.optionPage === true,
     columnMenuItem: style.columnMenuItem === true,
     sidebarBulkAction: style.sidebarBulkAction === true,
+    sidebarAction: style.sidebarAction,
+    sidebarIcon: style.sidebarIcon,
+    animationFPSControl: style.animationFPSControl === true,
+    paint: style.icon ? (box) => paintSidebarIcon(style.icon, box) : style.paint,
     onClick,
   });
 }
@@ -1779,6 +1869,78 @@ function optionAdjuster(parent, title, value, onDecrease, onIncrease) {
     align: "center",
     inset: controlPaddingDots(),
     spacingReadout: title,
+  });
+  return row;
+}
+
+function animationFPSTrack(box) {
+  return {
+    left: Math.floor(box.x + 3),
+    right: Math.max(Math.floor(box.x + 3), Math.floor(box.x + box.width - 4)),
+    y: Math.floor(box.y + box.height / 2),
+  };
+}
+
+function animationFPSX(box, fps) {
+  const track = animationFPSTrack(box);
+  const fraction = (fps - ANIMATION_FPS_MIN) / (ANIMATION_FPS_MAX - ANIMATION_FPS_MIN);
+  return Math.round(track.left + Math.max(0, Math.min(1, fraction)) * (track.right - track.left));
+}
+
+function paintAnimationFPSControl(box) {
+  const track = animationFPSTrack(box);
+  const thumbX = animationFPSX(box, state.animationFPS);
+  fillRect(track.left, track.y, track.right - track.left + 1, 1, 1);
+  fillRect(track.left, track.y, thumbX - track.left + 1, 1, 2);
+  ANIMATION_FPS_TICKS.forEach((fps) => {
+    const x = animationFPSX(box, fps);
+    fillRect(x, track.y - 2, 1, 5, 0);
+  });
+  fillRect(thumbX - 2, track.y - 3, 5, 7, 0);
+  if (state.animationFPSFocused) strokeRect(box.x, box.y, box.width, box.height, 0);
+}
+
+function setAnimationFPSFromPointer(pointerX, box, persist = false) {
+  const track = animationFPSTrack(box);
+  const fraction = Math.max(0, Math.min(1,
+    (pointerX - track.left) / Math.max(1, track.right - track.left)));
+  setAnimationFPS(ANIMATION_FPS_MIN
+    + fraction * (ANIMATION_FPS_MAX - ANIMATION_FPS_MIN), persist);
+}
+
+function addAnimationFPSControl(parent) {
+  const height = buttonStandardHeight();
+  const row = controlRow(parent, { height }, {
+    paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
+  });
+  label(row, "ANIMATION FPS", { widthPercent: 33.3333, height }, {
+    textShade: 0,
+    inset: controlPaddingDots(),
+  });
+  makeWidget(row, {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    height,
+  }, {
+    controlTitle: "ANIMATION FPS CAP",
+    animationFPSControl: true,
+    paint: paintAnimationFPSControl,
+    onClick(event) {
+      const point = logicalPoint(event);
+      const entry = findTargetEntry(point, (widget) => widget.meta.animationFPSControl);
+      if (entry) setAnimationFPSFromPointer(point.x, entry.box, true);
+    },
+  });
+  label(row, `${state.animationFPS} FPS`, {
+    width: framedTextWidth("240 FPS"),
+    height,
+  }, {
+    border: BUTTON_BORDER_DOTS,
+    textShade: 0,
+    align: "center",
+    inset: controlPaddingDots(),
   });
   return row;
 }
@@ -2353,9 +2515,10 @@ function visibleRowCount() {
 }
 
 function visibleLibraryRowCount() {
-  const rootChrome = 2 * APP_BORDER_GAP_DOTS + 2 * buttonStandardHeight() + 3 * uiGap()
+  const rootChrome = 2 * buttonStandardHeight() + 3 * uiGap()
     + rowHeight(4);
-  const sidebarChrome = 2 * buttonStandardHeight() + 4 * uiGap();
+  const sidebarChrome = buttonStandardHeight()
+    + SIDEBAR_BUTTON_SIZE_DOTS / STYLE_SCALE + 4 * uiGap();
   return Math.max(1, Math.floor((HEIGHT / STYLE_SCALE - rootChrome - sidebarChrome)
     / contentRowStride("sidebar")));
 }
@@ -2519,17 +2682,24 @@ function addLibraryPane(parent) {
     },
   });
   makeWidget(library, { height: uiGap() });
-  const navigation = controlRow(library, { gap: uiGap() });
-  libraryToolbarItems().forEach((item) => pixelButton(navigation, item.title, item.onClick, {
+  const sidebarButtonSize = SIDEBAR_BUTTON_SIZE_DOTS / STYLE_SCALE;
+  const navigation = controlRow(library, {
+    height: sidebarButtonSize,
+    gap: uiGap(),
+  });
+  libraryToolbarItems().forEach((item) => pixelButton(navigation, "", item.onClick, {
+    width: sidebarButtonSize,
+    height: sidebarButtonSize,
     flexShrink: 0,
     selected: item.view === "PATHS" ? state.sidebarMode === "paths"
       : item.view === "FAVORITES" ? activePlaylistTab()?.sourceKey === FAVORITES_TAB_SOURCE
         : item.view === "HISTORY" ? activePlaylistTab()?.sourceKey === HISTORY_TAB_SOURCE
-          : item.view === "QUEUE" ? state.tab === "QUEUE"
-            && activePlaylistTab()?.sourceKey !== FAVORITES_TAB_SOURCE
-            && activePlaylistTab()?.sourceKey !== HISTORY_TAB_SOURCE
-            : item.view === state.tab && state.sidebarMode !== "paths",
-    controlTitle: item.controlTitle,
+          : item.view === "OPTIONS" ? state.tab === "SETTINGS"
+            : item.view === "LIBRARY" && state.sidebarMode !== "paths",
+    controlTitle: item.title,
+    icon: item.icon,
+    sidebarAction: item.id,
+    sidebarIcon: item.icon,
     sidebarBulkAction: item.sidebarBulkAction,
   }));
   makeWidget(library, { height: uiGap() });
@@ -3433,9 +3603,7 @@ function addInterfaceOptions(parent, pref) {
     `${animationDurationMilliseconds()} MS`,
     () => adjustAnimationTime(-50),
     () => adjustAnimationTime(50));
-  optionAdjuster(motion, "ANIMATION FPS", `${state.animationFPS} FPS`,
-    () => setAnimationFPS(Math.max(30, state.animationFPS - 30)),
-    () => setAnimationFPS(Math.min(240, state.animationFPS + 30)));
+  addAnimationFPSControl(motion);
 }
 
 function setAutoHideEmptyColumns(enabled) {
@@ -3456,8 +3624,6 @@ function addLibraryOptions(parent, pref) {
         [key]: state.preferences.columnVisibility?.[key] === false,
       }));
   });
-  const catalog = optionGroup(parent, "CATALOG");
-  pixelButton(catalog, "RELOAD LIBRARY", () => loadCatalog());
 }
 
 function cacheByteLabel(bytes) {
@@ -3697,7 +3863,7 @@ function buildTree() {
     width: WIDTH / STYLE_SCALE,
     height: HEIGHT / STYLE_SCALE,
     positionType: PositionType.Relative,
-    padding: APP_BORDER_GAP_DOTS,
+    padding: 0,
     gap: uiGap(),
     alignItems: Align.Stretch,
   }, {
@@ -3710,13 +3876,18 @@ function buildTree() {
   if (state.tab === "SETTINGS") {
     const navigation = controlRow(root, {
       height: toolbarHeight,
-      justifyContent: Justify.FlexEnd,
+      justifyContent: Justify.FlexStart,
     });
-    pixelButton(navigation, "BACK", () => {
+    pixelButton(navigation, "←", () => {
       closeOptionsScreen();
-    }, { width: buttonWidth("BACK") });
+    }, {
+      width: buttonWidth("←"),
+      controlTitle: "BACK",
+      align: "left",
+      inset: 1,
+    });
   } else {
-    const toolbarWidth = (WIDTH / STYLE_SCALE - 2 * APP_BORDER_GAP_DOTS) / 2;
+    const toolbarWidth = (WIDTH / STYLE_SCALE) / 2;
     const toolbarStage = makeWidget(root, {
       direction: FlexDirection.Row,
       alignItems: Align.Stretch,
@@ -3741,6 +3912,8 @@ function buildTree() {
       : { previous: "PREV", stop: "STOP", play: state.playing ? "PAUSE" : "PLAY", next: "NEXT" };
     fillButton(transport, transportLabels.previous, () => selectPrevious(), {
       controlTitle: "PREVIOUS",
+      align: state.transportSymbols ? "left" : "center",
+      inset: state.transportSymbols ? 1 : controlPaddingDots(),
     });
     fillButton(transport, transportLabels.stop, () => stopPlayback(), { controlTitle: "STOP" });
     fillButton(transport, transportLabels.play, () => togglePlaying(), {
@@ -4568,11 +4741,14 @@ function adjustAnimationTime(delta) {
     Math.min(1000, animationDurationMilliseconds() + delta)));
 }
 
-function setAnimationFPS(value) {
-  const fps = Number(value);
-  if (!ANIMATION_FPS_OPTIONS.includes(fps) || state.animationFPS === fps) return;
+function setAnimationFPS(value, persist = true) {
+  const requestedFPS = Number(value);
+  if (!Number.isFinite(requestedFPS)) return;
+  const fps = Math.max(ANIMATION_FPS_MIN,
+    Math.min(ANIMATION_FPS_MAX, Math.round(requestedFPS)));
+  if (state.animationFPS === fps) return;
   state.animationFPS = fps;
-  saveDisplayOptions();
+  if (persist) saveDisplayOptions();
   [selectionAnimation, screenTransition, spacingAnimation, columnLayoutAnimation,
     tabLayoutAnimation, reorderAnimation, pointerInteraction, state.sidebarTransition]
     .filter(Boolean).forEach((animation) => { animation.lastFrameAt = Number.NaN; });
@@ -5981,7 +6157,20 @@ canvas.addEventListener("pointerdown", (event) => {
   const point = logicalPoint(event);
   const entry = findTargetEntry(point);
   const target = entry?.widget;
-  if (target?.meta.horizontalScrollbar) {
+  if (target?.meta.animationFPSControl && (event.button ?? 0) === 0) {
+    state.animationFPSFocused = true;
+    pointerInteraction = {
+      kind: "animation-fps",
+      pointerId: event.pointerId,
+      box: { ...entry.box },
+      initialFPS: state.animationFPS,
+    };
+    canvas.setPointerCapture?.(event.pointerId);
+    suppressNextClick = true;
+    setAnimationFPSFromPointer(point.x, entry.box);
+    render(false, true);
+    event.preventDefault?.();
+  } else if (target?.meta.horizontalScrollbar) {
     const thumb = state.tableScrollbarThumb;
     const localX = point.x - (thumb?.x ?? point.x);
     const thumbOffset = thumb && localX >= 0 && localX < thumb.width
@@ -6019,6 +6208,10 @@ canvas.addEventListener("pointerdown", (event) => {
 
 canvas.addEventListener("pointermove", (event) => {
   const point = logicalPoint(event);
+  if (pointerInteraction?.kind === "animation-fps") {
+    setAnimationFPSFromPointer(point.x, pointerInteraction.box);
+    return;
+  }
   if (pointerInteraction?.kind === "scrollbar") {
     if (Math.abs(point.x - pointerInteraction.startX) >= 1) suppressNextClick = true;
     pointerInteraction.startX = point.x;
@@ -6066,7 +6259,11 @@ canvas.addEventListener("pointerup", (event) => {
   if (!pointerInteraction || (pointerInteraction.pointerId !== undefined
     && event.pointerId !== undefined && pointerInteraction.pointerId !== event.pointerId)) return;
   const interaction = pointerInteraction;
-  if (interaction.kind === "reorder") {
+  if (interaction.kind === "animation-fps") {
+    setAnimationFPSFromPointer(logicalPoint(event).x, interaction.box);
+    pointerInteraction = null;
+    if (state.animationFPS !== interaction.initialFPS) saveDisplayOptions();
+  } else if (interaction.kind === "reorder") {
     if (interaction.dragging) {
       const point = logicalPoint(event);
       interaction.lastPointX = point.x;
@@ -6082,7 +6279,14 @@ canvas.addEventListener("pointerup", (event) => {
 });
 
 canvas.addEventListener("pointercancel", () => {
-  if (pointerInteraction?.kind === "reorder" && pointerInteraction.dragging) {
+  if (pointerInteraction?.kind === "animation-fps") {
+    const initialFPS = pointerInteraction.initialFPS;
+    pointerInteraction = null;
+    suppressNextClick = false;
+    state.animationFPSFocused = false;
+    setAnimationFPS(initialFPS, false);
+    render(false, true);
+  } else if (pointerInteraction?.kind === "reorder" && pointerInteraction.dragging) {
     finishReorderInteraction(pointerInteraction, false);
   } else {
     pointerInteraction = null;
@@ -6127,6 +6331,7 @@ canvas.addEventListener("click", (event) => {
   }
   if (screenTransition) return;
   const target = findTarget(logicalPoint(event));
+  state.animationFPSFocused = target?.meta.animationFPSControl === true;
   if (state.searchFocused && !target?.meta.searchField) {
     setSearchFocused(false);
     if (!target?.meta.onClick) render();
@@ -6177,7 +6382,7 @@ canvas.addEventListener("wheel", (event) => {
     render();
     return;
   }
-  const sidebarWidth = libraryPaneWidth() * STYLE_SCALE + 8 * STYLE_SCALE;
+  const sidebarWidth = libraryPaneWidth() * STYLE_SCALE;
   const library = point.x < sidebarWidth;
   if (library) {
     const rect = canvas.getBoundingClientRect();
@@ -6224,6 +6429,28 @@ canvas.addEventListener("keydown", (event) => {
     } else return;
     event.preventDefault();
     return;
+  }
+  if (state.animationFPSFocused && !commandKey && !event.altKey) {
+    let nextFPS = null;
+    if (event.code === "ArrowLeft" || event.code === "ArrowDown") {
+      nextFPS = state.animationFPS - (event.shiftKey ? 10 : 1);
+    } else if (event.code === "ArrowRight" || event.code === "ArrowUp") {
+      nextFPS = state.animationFPS + (event.shiftKey ? 10 : 1);
+    } else if (event.code === "Home") {
+      nextFPS = ANIMATION_FPS_MIN;
+    } else if (event.code === "End") {
+      nextFPS = ANIMATION_FPS_MAX;
+    } else if (event.code === "Escape") {
+      state.animationFPSFocused = false;
+      render(false, true);
+      event.preventDefault();
+      return;
+    }
+    if (nextFPS !== null) {
+      event.preventDefault();
+      setAnimationFPS(nextFPS);
+      return;
+    }
   }
   if (commandKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "w") {
     event.preventDefault();
@@ -6342,8 +6569,8 @@ canvas.addEventListener("keydown", (event) => {
 function fitCanvas() {
   const screenRect = screenWindow?.getBoundingClientRect();
   if (screenWindow && (!screenRect || screenRect.width <= 0 || screenRect.height <= 0)) return;
-  const availableWidth = Math.max(1, (screenRect?.width || window.innerWidth) - 10);
-  const availableHeight = Math.max(1, (screenRect?.height || window.innerHeight) - 10);
+  const availableWidth = Math.max(1, screenRect?.width || window.innerWidth);
+  const availableHeight = Math.max(1, screenRect?.height || window.innerHeight);
   const ratio = Math.max(1, window.devicePixelRatio || 1);
   const dotCssSize = DEVICE_PIXELS_PER_LCD_DOT / ratio;
   // Keep widget sizing stable while the shared screen-dot grid gets finer.

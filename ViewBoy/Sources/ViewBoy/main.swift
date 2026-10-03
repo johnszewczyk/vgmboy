@@ -165,6 +165,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         viewMenu.addItem(menuItem("Path View", action: #selector(sidebarPaths(_:))))
         viewMenu.addItem(menuItem("Console View", action: #selector(sidebarConsoles(_:))))
         viewMenu.addItem(menuItem("Disk Path…", action: #selector(sidebarDiskPath(_:))))
+        let playbackQueueItem = NSMenuItem(
+            title: "Playback Queue",
+            action: #selector(playbackQueue(_:)),
+            keyEquivalent: ""
+        )
+        playbackQueueItem.target = self
+        viewMenu.addItem(playbackQueueItem)
         viewMenu.addItem(.separator())
         viewMenu.addItem(menuItem("Favorites Playlist", command: .favoritesPlaylist, action: #selector(favoritesPlaylist(_:))))
         viewMenu.addItem(menuItem("Playback History", command: .playbackHistory, action: #selector(playbackHistory(_:))))
@@ -257,6 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc private func sidebarPaths(_ sender: Any?) { dispatch(.sidebarPaths) }
     @objc private func sidebarConsoles(_ sender: Any?) { dispatch(.sidebarConsoles) }
     @objc private func sidebarDiskPath(_ sender: Any?) { dispatch(.sidebarDiskPath) }
+    @objc private func playbackQueue(_ sender: Any?) { dispatchCustom("queue") }
     @objc private func favoritesPlaylist(_ sender: Any?) { dispatch(.favoritesPlaylist) }
     @objc private func playbackHistory(_ sender: Any?) { dispatch(.playbackHistory) }
     @objc private func minimizeWindow(_ sender: Any?) { (NSApp.keyWindow ?? window)?.performMiniaturize(sender) }
