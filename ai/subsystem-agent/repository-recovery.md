@@ -12,10 +12,8 @@ family.
   repositories or submodules. Run Git commands from the family root.
 - Cross-package changes belong in one family-root commit so the checked-in
   package combination stays reviewable.
-- `SPCBoy/` is retained Electron recovery source, not the active player target.
-  Native SPCBoy work belongs in `SPCBoyWK/`; LaunchPad has separate entries
-  for SPCBoyWK and ViewBoy. CocoaSpice, SPCBoyWK, and ViewBoy remain separate
-  app packages with independent identities and presentation.
+- SPCBoyWK is the maintained SPCBoy player. CocoaSpice, SPCBoyWK, and ViewBoy
+  remain separate app packages with independent identities and presentation.
 - Vendored decoder snapshots under `VGMBoy/vendor/` are ordinary tracked files,
   not submodules. Their upstream pins and provenance are documented beside the
   vendor tree.
@@ -27,8 +25,8 @@ family.
 - Do not initialize child repositories, add package submodules, or push to
   retired component remotes.
 - Generated build products, app bundles, local archives, and fixtures are not
-  family source. Preserve the ignored local recovery payloads; do not remove
-  them during ordinary source cleanup.
+  family source. Preserve ignored local recovery payloads during ordinary
+  source cleanup.
 - The former standalone component remotes remain untouched. Check for outside
   consumers and links before changing or retiring any of them.
 

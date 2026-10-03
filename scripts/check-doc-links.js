@@ -11,7 +11,6 @@ const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclud
   cwd: root,
   encoding: "utf8",
 }).split("\0").filter(Boolean).filter((file) =>
-  !file.startsWith("SPCBoy/") &&
   !file.startsWith("LocalRecovery/") &&
   !file.includes("/vendor/") &&
   !file.includes("/Docs/archive/")

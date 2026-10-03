@@ -14,8 +14,6 @@ for the active VGMMan player frontends: CocoaSpice, SPCBoyWK, and ViewBoy.
   and deterministic presentation data.
 - `FrontendCommandCore`: shared semantic shortcut definitions for native and
   WebKit hosts.
-- `CatalogReaderElectronBridge`: recovery-only command bridge for the archived
-  Electron player; it is not used by maintained frontends.
 
 ## Task Routing
 

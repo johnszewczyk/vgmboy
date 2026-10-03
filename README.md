@@ -21,9 +21,6 @@ ownership and preservation rules.
 | [ViewBoy](ViewBoy/README.md) | Native player with a screen-first, four-shade Yoga LCD interface. |
 | [VGMManDocs](VGMManDocs/README.md) | Native viewer and editor for the family's published Markdown library. |
 
-The legacy Electron SPCBoy player is recovery-only. LaunchPad has separate
-entries for SPCBoyWK, ViewBoy, and VGMManDocs. The verified Electron
-archive is listed in [`LocalRecovery/README.md`](LocalRecovery/README.md).
 LaunchPad remains a sibling workspace tool because it launches projects beyond
 this family.
 

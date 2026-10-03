@@ -6,8 +6,7 @@ playlist presentation values, read sessions, and frontend command contracts.
 ScanSong remains the only catalog writer.
 
 The package contains no player UI, archive extraction, decoder, or write path.
-Native frontends render its snapshots; a narrow Electron compatibility bridge
-remains for recovery of the archived player and is not a LaunchPad target.
+Native frontends render its snapshots.
 
 ## Build and test
 

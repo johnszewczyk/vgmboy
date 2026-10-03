@@ -7,16 +7,14 @@ transport, and the macOS audio device for the VGMMan family. It is a shared
 in-process kit, not a daemon or catalog service.
 
 CocoaSpice, SPCBoyWK, and ViewBoy are maintained player clients. Each bundles
-the shared playback core behind its own host adapter. The Electron SPCBoy tree
-and its compatibility bridge are recovery-only; neither is used by maintained
-frontends. ScanSong consumes VGMBoy-built inspection helpers, but does not link
-the playback kit or invoke a player app.
+the shared playback core behind its own host adapter. ScanSong consumes
+VGMBoy-built inspection helpers, but does not link the playback kit or invoke
+a player app.
 
 ## Major Components
 
 - `Sources/VGMBoyKit/` — playback core, decoder boundaries, and timing.
 - `Sources/VGMBoyEndpointCore/` — versioned endpoint and capability map.
-- `Sources/VGMBoyElectronBridge/` — recovery-only Electron compatibility path.
 - `Sources/VGMBoyMDXInspect/` and `Sources/VGMBoyAmigaInspect/` — focused
   scanner inspection boundaries.
 - `Sources/vgmboy/` and `Sources/VGMBoyApp/` — CLI and native test clients.

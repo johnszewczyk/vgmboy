@@ -9,9 +9,8 @@ inspection builds for the CocoaSpice, SPCBoyWK, ViewBoy, and ScanSong products.
 
 - CocoaSpice is the native SwiftUI playlist frontend. It reads the ScanSong catalog and links
   `VGMBoyKit` in-process.
-- SPCBoy WK is the active native WebKit frontend. It reads the ScanSong catalog and links the
-  shared VGMBoy core through its native endpoint bridge. The original Electron SPCBoy is archived
-  and is not an active consumer of VGMBoy changes.
+- SPCBoyWK is the active native WebKit frontend. It reads the ScanSong catalog and links the
+  shared VGMBoy core through its native endpoint bridge.
 - ViewBoy is a separate active WebKit frontend with its own bundle identity and phosphor display
   layer. It reads the same catalog and links the shared core through its native bridge.
 - ScanSong is the native catalog-management app and the sole schema-24 catalog writer. It bundles

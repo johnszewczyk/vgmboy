@@ -33,7 +33,6 @@ crosses that ownership boundary.
 | Native WebKit player and typed host bridge | [SPCBoyWK/AGENTS.md](SPCBoyWK/AGENTS.md) |
 | Screen-first Yoga LCD player | [ViewBoy/AGENTS.md](ViewBoy/AGENTS.md) |
 | Published Markdown library and native documentation viewer | [VGMManDocs/AGENTS.md](VGMManDocs/AGENTS.md) |
-| Legacy Electron recovery material | [LocalRecovery/README.md](LocalRecovery/README.md) |
 
 For a component task, follow that owner's `AGENTS.md` → `ai/AGENTS.md` →
 `ai/project-info.md` → focused-note route. `README.md` is a family index, not

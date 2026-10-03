@@ -8,8 +8,7 @@ MetaMan, UACMan, UACMan/Wrapper, ScanSong, CocoaSpice, SPCBoyWK, and ViewBoy.
 It also checks current documentation links and canonical project-info routing,
 UACWrapper's Python CLI, every
 active WebKit renderer JavaScript source file, and each renderer's `*.test.js`
-suite. Archived Electron source under `SPCBoy/` is recovery-only and excluded
-from routine checks.
+suite.
 
 The checker records branch and dirty state, Git archive refs, toolchain and
 external-library versions, commands, durations, and full logs. It allocates

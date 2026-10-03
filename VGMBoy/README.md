@@ -12,8 +12,7 @@ the typed `PlaybackControlProtocol` remains the native Swift payload contract.
 
 VGMBoy is intentionally database-free. ScanSong remains the sole schema-24
 catalog writer. The maintained player apps bundle `VGMBoyKit` in-process
-through host-specific adapters. The Electron SPCBoy bridge exists only for
-recovery of the archived player. ScanSong bundles VGMBoy-built inspection
+through host-specific adapters. ScanSong bundles VGMBoy-built inspection
 executables where a direct MetaMan reader is not sufficient.
 
 ## How the app family works

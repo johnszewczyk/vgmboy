@@ -10,7 +10,7 @@
 - Windows has independent Always on Top switches for Main Window and Options Window; both default off. Main keeps the main window on top of other apps; Options keeps the options window on top of the main window.
 - Archive Cache uses the shared 2 GB default and 2, 4, 8, or 16 GB choices. Usage counts retained archive-cache files whether Cache is enabled or disabled. Clear Cache stops playback and removes cached, disposable, and older archive-cache material.
 - AAC Export exposes a destination folder and a playlist context-menu action. New installs default to Downloads, matching CocoaSpice. SPCBoy supplies the selected path, timing plan, and destination; VGMBoyKit performs the offline conversion, including archive-member materialization through the native bridge. Only one export runs at a time. Folder chooser controls use the shared folder glyph.
-- Settings persistence is a typed native Swift snapshot. Electron/WebKit localStorage and the retired favorites migration payload are no longer read or written.
+- Settings persistence is a typed native Swift snapshot. The retired browser-localStorage favorites migration payload is no longer read or written.
 - Windows and Routing use the same page framing as Audio: their page titles sit outside the headed content cards, with each headed group retaining its own card.
 
 ## Window

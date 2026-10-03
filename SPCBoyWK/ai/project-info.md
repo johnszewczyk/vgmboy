@@ -4,8 +4,7 @@
 
 `SPCBoyWK` is a maintained, independent native macOS WebKit player in the
 VGMMan family. It is a separate product from the phosphor-skinned ViewBoy
-frontend. The Electron SPCBoy code is historical recovery material, not a
-LaunchPad app or an active implementation target.
+frontend.
 
 ## Major Components
 

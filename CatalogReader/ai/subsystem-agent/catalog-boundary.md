@@ -48,4 +48,3 @@ row models, queue publication, and UI.
 - `../../Sources/CatalogReader/CatalogReader.swift`
 - `../../Tests/CatalogReaderTests/CatalogReaderTests.swift`
 - `../../Sources/CatalogPlaylistCore/CatalogPlaylistCore.swift`
-- `../../Sources/CatalogReaderElectronBridge/main.swift` (recovery-only adapter)

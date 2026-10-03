@@ -7,8 +7,7 @@ routed by the task.
 VGMBoy owns playback admission, decoder integration, timing, native transport,
 and the macOS audio device. The three maintained player frontends—CocoaSpice,
 SPCBoyWK, and ViewBoy—are clients of the shared kit and family service
-packages; cross-app behavior belongs with its shared owner. `SPCBoy/` is
-recovery-only Electron source; LaunchPad's SPCBoy target is SPCBoyWK.
+packages; cross-app behavior belongs with its shared owner.
 
 Do not fork upstream decoders or duplicate a complete MetaMan reader in a
 playback/scanner adapter. Keep public APIs narrow, fail explicitly on

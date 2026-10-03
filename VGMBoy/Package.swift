@@ -40,7 +40,6 @@ let package = Package(
         .library(name: "VGMBoyLibVGMOracle", targets: ["VGMBoyCLibVGM"]),
         .library(name: "VGMBoyEndpointCore", targets: ["VGMBoyEndpointCore"]),
         .executable(name: "vgmboy-cli", targets: ["vgmboy"]),
-        .executable(name: "vgmboy-electron-bridge", targets: ["VGMBoyElectronBridge"]),
         .executable(name: "vgmboy-mdx-inspect", targets: ["VGMBoyMDXInspect"]),
         .executable(name: "vgmboy-amiga-inspect", targets: ["VGMBoyAmigaInspect"]),
         .executable(name: "VGMBoy", targets: ["VGMBoyApp"])
@@ -322,10 +321,6 @@ let package = Package(
         ),
         .executableTarget(
             name: "vgmboy",
-            dependencies: ["VGMBoyKit"]
-        ),
-        .executableTarget(
-            name: "VGMBoyElectronBridge",
             dependencies: ["VGMBoyKit"]
         ),
         .executableTarget(

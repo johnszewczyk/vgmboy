@@ -15,8 +15,7 @@ VGMBoyKit through a host adapter.
   policy.
 - VGMBoy owns format admission, decoding, timing, and audio output.
 - MetaMan owns native-format metadata. UACMan owns the UAC package contract.
-- SPCBoyWK and ViewBoy are distinct active frontend siblings. Archived Electron
-  SPCBoy is not a current feature target.
+- SPCBoyWK and ViewBoy are distinct active frontend siblings.
 
 ## Task Routing
 

@@ -16,8 +16,7 @@ catalog writes; VGMBoy owns decoding, timing, transport, and audio output.
 | VGMBoy | Playback admission, decoding, timing, and audio output. |
 | CocoaSpice | Native presentation, local UI state, and host adapters. |
 
-SPCBoyWK and ViewBoy are separate WebKit frontends in this same family. The
-legacy Electron SPCBoy is recovery material and is not an active app target.
+SPCBoyWK and ViewBoy are separate WebKit frontends in this same family.
 
 ## Build and run
 
