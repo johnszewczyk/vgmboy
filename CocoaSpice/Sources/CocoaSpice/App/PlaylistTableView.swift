@@ -108,7 +108,6 @@ struct PlaylistTableView: NSViewRepresentable {
             case path
             case timestamp
             case length
-            case fileSize
 
             var title: String {
                 switch self {
@@ -123,7 +122,6 @@ struct PlaylistTableView: NSViewRepresentable {
                 case .path: "Path"
                 case .timestamp: "Date/Time"
                 case .length: "Length"
-                case .fileSize: "Size"
                 }
             }
 
@@ -431,8 +429,6 @@ struct PlaylistTableView: NSViewRepresentable {
                     )
                 case .length:
                     return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.lengthText(for: track), isCurrentTrack: model.currentTrack?.id == track.id, monospace: true)
-                case .fileSize:
-                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: value(for: column, track: track), isCurrentTrack: model.currentTrack?.id == track.id, monospace: true)
                 }
             }
         }
@@ -661,7 +657,7 @@ struct PlaylistTableView: NSViewRepresentable {
                 return switch column {
                 case .title, .game, .author, .system, .length:
                     index
-                case .favorite, .index, .trackNumber, .file, .path, .timestamp, .fileSize:
+                case .favorite, .index, .trackNumber, .file, .path, .timestamp:
                     nil
                 }
             })
@@ -870,10 +866,6 @@ struct PlaylistTableView: NSViewRepresentable {
             switch column {
             case .favorite, .index, .file, .path:
                 return true
-            case .fileSize:
-                // CocoaSpice deliberately does not stat source files during
-                // table rendering, so the placeholder is not content.
-                return false
             case .trackNumber:
                 return model.visiblePlaylist.contains { track in
                     hasMeaningfulContent(value(for: column, track: track))
@@ -1183,8 +1175,6 @@ struct PlaylistTableView: NSViewRepresentable {
                 nil
             case .length:
                 hints.lengthText
-            case .fileSize:
-                nil
             }
         }
 
@@ -1212,18 +1202,7 @@ struct PlaylistTableView: NSViewRepresentable {
                 track.historyTimestampMilliseconds.map { PlaybackHistoryRecord.timestampText(for: $0) } ?? ""
             case .length:
                 model.lengthText(for: track)
-            case .fileSize:
-                fileSizeText(for: track)
             }
-        }
-
-        private func fileSizeText(for track: TrackItem) -> String {
-            // Queue publication is a catalogue snapshot. Never synchronously
-            // stat source files from AppKit cell rendering or column sizing:
-            // one large selection otherwise turns a database read into
-            // hundreds of blocking filesystem operations on the main actor.
-            _ = track
-            return "—"
         }
 
         private func textWidth(_ text: String, font: NSFont) -> CGFloat {

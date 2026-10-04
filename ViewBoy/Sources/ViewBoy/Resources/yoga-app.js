@@ -2079,13 +2079,6 @@ function optionDurationAdjuster(parent, title, key, minimum, maximum, fallback, 
   return row;
 }
 
-function formatSize(bytes) {
-  const value = Number(bytes);
-  if (!Number.isFinite(value) || value <= 0) return "";
-  if (value < 1024 * 1024) return `${Math.round(value / 1024)}K`;
-  return `${(value / (1024 * 1024)).toFixed(1)}M`;
-}
-
 function tableValue(track, key, rowIndex = 0) {
   switch (key) {
     case "favorite": return "";
@@ -2100,7 +2093,6 @@ function tableValue(track, key, rowIndex = 0) {
       : track.path || track.archivePath || "";
     case "length": return track.lengthLabel || (Number(track.playLengthMs) > 0
       ? formatTime(track.playLengthMs) : "");
-    case "size": return formatSize(track.fileSize);
     case "timestamp": return track.timestamp || "";
     default: return track[key] || "";
   }
@@ -2111,7 +2103,6 @@ const configurableColumns = [
   { key: "game", title: "GAME" },
   { key: "artist", title: "ARTIST" },
   { key: "path", title: "PATH" },
-  { key: "size", title: "SIZE" },
   { key: "timestamp", title: "DATE/TIME" },
 ];
 const tableContentLengthCache = new WeakMap();
@@ -2183,7 +2174,6 @@ function tableColumns(items = activeTracks()) {
     { key: "system", title: "SYSTEM", width: 28, mandatory: true },
     { key: "path", title: "PATH", width: 58 },
     { key: "length", title: "LENGTH", width: 32, align: "right", mandatory: true },
-    { key: "size", title: "SIZE", width: 28 },
   ];
   if (items.some((track) => Number.isFinite(Number(track.timestampMilliseconds)))) {
     columns.push({ key: "timestamp", title: "DATE/TIME", width: 80, align: "center" });

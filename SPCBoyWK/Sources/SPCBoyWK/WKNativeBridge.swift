@@ -943,10 +943,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "archiveEntry": archiveEntry ?? NSNull(),
             "trackIndex": track.trackIndex,
             "trackCount": track.trackCount,
-            // Catalog-backed rows already carry their metadata. Do not stat
-            // every source path during playlist hydration; archives and
-            // external roots can make that synchronous bridge work very slow.
-            "fileSize": 0,
+            // Catalog-backed rows hydrate without source-file stats.
             "modifiedAt": 0,
             "sourceSignature": NSNull(),
             "scanVersion": 0,
@@ -1053,7 +1050,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 "trackCount": identity.trackCount,
                 "archivePath": identity.archiveEntry == nil ? NSNull() : identity.sourcePath,
                 "archiveEntry": identity.archiveEntry ?? NSNull(),
-                "fileSize": 0,
                 "modifiedAt": 0,
                 "sourceSignature": NSNull(),
                 "scanVersion": 0,

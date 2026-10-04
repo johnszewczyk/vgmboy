@@ -88,8 +88,7 @@ final class PlayerViewModel {
         .init(id: "system"),
         .init(id: "path"),
         .init(id: "timestamp"),
-        .init(id: "length"),
-        .init(id: "fileSize", isSortable: false)
+        .init(id: "length")
     ])
     enum RepeatMode: String, CaseIterable, Identifiable {
         case off, playlist, song

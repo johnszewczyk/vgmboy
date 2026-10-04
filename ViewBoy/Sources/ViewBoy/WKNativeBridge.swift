@@ -914,10 +914,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "archiveEntry": track.archiveEntry ?? NSNull(),
             "trackIndex": track.trackIndex,
             "trackCount": track.trackCount,
-            // Catalog-backed rows already carry their metadata. Do not stat
-            // every source path during playlist hydration; archives and
-            // external roots can make that synchronous bridge work very slow.
-            "fileSize": 0,
             "modifiedAt": 0,
             "sourceSignature": NSNull(),
             "scanVersion": 0,
@@ -956,7 +952,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "archiveEntry": archiveEntry ?? NSNull(),
             "trackIndex": track.trackIndex,
             "trackCount": track.trackCount,
-            "fileSize": 0,
             "modifiedAt": 0,
             "sourceSignature": NSNull(),
             "scanVersion": 0,
@@ -1064,7 +1059,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         let structure = try? PlaybackStructureReader.read(path: url.path)
         let trackStructures = structure?.tracks ?? [.init(index: 0, naturalPlayMilliseconds: 0, fadeMilliseconds: 0)]
         let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
-        let fileSize = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
         let modifiedAt = ((attributes?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0) * 1_000
         let filename = url.lastPathComponent
         let basename = url.deletingPathExtension().lastPathComponent
@@ -1087,7 +1081,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 "archiveEntry": NSNull(),
                 "trackIndex": item.index,
                 "trackCount": trackStructures.count,
-                "fileSize": fileSize,
                 "modifiedAt": modifiedAt,
                 "sourceSignature": NSNull(),
                 "scanVersion": 0,
@@ -1189,7 +1182,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 "trackCount": identity.trackCount,
                 "archivePath": identity.archiveEntry == nil ? NSNull() : identity.sourcePath,
                 "archiveEntry": identity.archiveEntry ?? NSNull(),
-                "fileSize": 0,
                 "modifiedAt": 0,
                 "sourceSignature": NSNull(),
                 "scanVersion": 0,

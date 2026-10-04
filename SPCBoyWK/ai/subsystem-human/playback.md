@@ -15,6 +15,10 @@ track is playing, and the frontend renders those updates; it does not poll the d
 completion is delivered as a native end event. Playback timing remains owned by VGMBoy; SPCBoy
 owns queue order and presentation.
 
+Standalone Zstandard-compressed media (`.zst` and `.zstd`) is supported as one
+file. TAR+Zstandard archive names (`.tar.zst`, `.tar.zstd`, and `.tzst`) are
+unsupported.
+
 Natural completion retires the finished native session and advances to the next
 queue target when one exists. The completion path waits for that replacement
 start, so a finished track does not leave the frontend stopped between songs.

@@ -14,6 +14,9 @@ are maintained in [VGMBoy's README](../../../VGMBoy/README.md).
 
 ## Archives
 
+- Standalone files compressed with Zstandard (`.zst` or `.zstd`) are decoded as
+  one media file. TAR+Zstandard archive names (`.tar.zst`, `.tar.zstd`, and
+  `.tzst`) are unsupported.
 - ZIP, 7z, LHA, RSN, and UAC (`.uac`) containers can contribute playable
   members to a queue. UAC reads raw or compressed manifests. Seekable SPC
   members are read by indexed Zstandard frame and supplied to libgme from

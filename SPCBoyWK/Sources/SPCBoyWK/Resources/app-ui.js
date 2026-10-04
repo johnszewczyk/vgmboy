@@ -1573,7 +1573,6 @@ function databaseRowsToPlaylistTracks(response, { adoptProjection = true } = {})
     trackCount: Math.max(1, Number(row.trackCount) || 1),
     archivePath: row.archivePath || null,
     archiveEntry: row.archiveEntry || null,
-    fileSize: Number(row.fileSize) || 0,
     modifiedAt: Number(row.modifiedAt) || 0,
     sourceSignature: row.sourceSignature || null,
     scanVersion: Number(row.scanVersion) || 0,

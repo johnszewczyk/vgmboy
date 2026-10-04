@@ -5,7 +5,6 @@
 - Display: file metadata in a headed table.
 - Columns: favorite, index, file, title, game, author, system, path, and length. The favorite glyph is immediately before #; its filled state uses the configured playlist text color.
 - Columns: missing metadata falls back to useful file or folder text.
-- Columns: includes a user-configurable Size column for direct files; archive entries show an unavailable marker until archive-entry sizing is modeled separately.
 - Metadata: catalog-backed queues display only the fields published in the selected catalog; incomplete fields remain incomplete until ScanSong republishes them.
 - Directly opened files have no catalog metadata. Their title and game cells use filename and folder display fallbacks; author, system, and duration remain unknown.
 - Columns: there is no row-level Play/Stop column; playback uses row activation and the main transport controls.
