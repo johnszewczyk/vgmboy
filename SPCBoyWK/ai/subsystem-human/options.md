@@ -1,11 +1,13 @@
 # Options
 
-- SPCBoy-owned pages mirror CocoaSpice organizationally: Database, Interface, and Windows, while VGMBoy pages provide Audio, Diagnostics, Playback, and Routing in the same WebKit settings window.
-- Interface > Animations exposes checkbox-enabled Auto-Resize and Selection Bar timings; both default on at 200 ms and accept 0–1000 ms. Disabling one uses an effective 0 ms duration while retaining the configured value.
+- SPCBoy-owned pages mirror CocoaSpice organizationally: Database, Interface Chrome, Interface Fonts, and Windows, while VGMBoy pages provide Audio, Diagnostics, Playback, and Routing in the same WebKit settings window.
+- Interface Chrome contains the palette, sidebar sizing, playlist layout, selection treatment, and animation timing controls. Hover and Divider color fields are removed because they did not change the rendered interface.
+- Interface Fonts contains separate UI Chrome and content font sizes, content color and monospace settings, and the playlist header font color and weight.
+- Interface Chrome > Animations exposes checkbox-enabled Auto-Resize and Selection Bar timings; both default on at 200 ms and accept 0–1000 ms. Disabling one uses an effective 0 ms duration while retaining the configured value. Playlist tab selection uses the same Selection Bar timing and easing.
 - Playlist Options exposes Column Auto-size, enabled by default, with the description “Automatically resize columns for content width on selection.” Playlist headers also have a separate default text color.
-- Interface Style combines font size, font color, and monospace controls for the database sidebar and playlist; the single setting is applied to both surfaces.
+- The 24 rem sidebar minimum is enforced in the main window; its width preference remains percentage-based above that minimum.
 - CSS color text inputs are 18 characters wide. Playlist header text color is independent of the sidebar and playlist row text color.
-- Interface exposes the UI Chrome Color through the same CSS color text field used by Accent Color and Font Color.
+- Interface Chrome exposes Primary, Secondary, and Pane Background colors. Option fields use Primary as their background.
 - The Selection Bar uses the chosen accent color without changing sidebar or playlist text color. The playlist and database sidebar capsules use the same mode: outlined by default, or filled with the accent color when Solid Selection Bar is enabled.
 - Windows has independent Always on Top switches for Main Window and Options Window; both default off. Main keeps the main window on top of other apps; Options keeps the options window on top of the main window.
 - Archive Cache uses the shared 2 GB default and 2, 4, 8, or 16 GB choices. Usage counts retained archive-cache files whether Cache is enabled or disabled. Clear Cache stops playback and removes cached, disposable, and older archive-cache material.
@@ -21,7 +23,7 @@ remains independent while Settings is open.
 ## Components
 
 Settings groups app-owned controls above VGMBoy playback controls in the same compact sidebar used
-by the current renderer skin. App controls cover Interface, Windows, and database location.
+by the current renderer skin. App controls cover Interface Chrome, Interface Fonts, Windows, and database location.
 VGMBoy controls cover playback, routing, tempo, fade, volume, mono, equalizer, and archive-cache behavior.
 Diagnostics is its own VGMBoy page and reports live transport, buffer, output, decode, and underrun values.
 Its page title is page-level content; Transport, Buffer, and Decoder are separate sibling panels.

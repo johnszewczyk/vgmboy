@@ -291,9 +291,7 @@ refs.accentColorInput.addEventListener("blur", (event) => {
 for (const [input, role] of [
   [refs.uiChromePrimaryColorInput, "primary"],
   [refs.uiChromeSecondaryColorInput, "secondary"],
-  [refs.uiChromePaneColorInput, "pane"],
-  [refs.uiChromeHoverColorInput, "hover"],
-  [refs.uiChromeDividerColorInput, "divider"]
+  [refs.uiChromePaneColorInput, "pane"]
 ]) {
   input.addEventListener("change", (event) => app.ui.setUIChromePaletteColor(role, event.target.value));
   input.addEventListener("blur", (event) => app.ui.setUIChromePaletteColor(role, event.target.value));
@@ -378,6 +376,11 @@ refs.optionsCloseButton.addEventListener("click", () => {
 
 refs.optionsThemeTab.addEventListener("click", () => {
   state.optionsSection = "theme";
+  app.ui.renderAll();
+});
+
+refs.optionsFontsTab.addEventListener("click", () => {
+  state.optionsSection = "fonts";
   app.ui.renderAll();
 });
 

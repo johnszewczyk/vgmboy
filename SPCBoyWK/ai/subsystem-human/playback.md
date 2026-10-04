@@ -8,8 +8,13 @@ wider pointer target for resizing.
 Transport controls are ordered Previous, Stop, Play/Pause, and Next; Stop is a
 filled square button. When Faded Skip is enabled, direct playlist activation
 uses the same queued fade as Previous and Next.
-Transport, search, tabs, table headers, and the position bar share one toolbar
-height token derived from the interface font size.
+Transport buttons fill equal widths across the sidebar's topmost toolbar. The
+sidebar enforces a 24 rem minimum width. Transport, search, tabs, table headers,
+and the position bar share one toolbar height token derived from the interface
+font size.
+Playlist tabs do not allow text selection. Their selected background fades
+with the shared selection duration and easing, and covers the title and close
+control as one tab surface.
 
 SPCBoy WK obtains transport state, elapsed position, decoder statistics, and reached-end state
 from the in-process VGMBoy bridge. The native transport pushes bounded status updates while a

@@ -111,7 +111,8 @@
             <div class="options-nav-group" aria-labelledby="options-native-heading">
               <div id="options-native-heading" class="options-nav-group-title">SPCBoy</div>
               <button id="options-database-tab" data-app-option-section="database" class="options-nav-item is-selected" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-database"></use></svg><span>Database</span></button>
-              <button id="options-theme-tab" data-app-option-section="interface" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"></use></svg><span>Interface</span></button>
+              <button id="options-theme-tab" data-app-option-section="interface" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"></use></svg><span>Interface Chrome</span></button>
+              <button id="options-fonts-tab" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-scroll-text"></use></svg><span>Interface Fonts</span></button>
               <button id="options-windows-tab" data-app-option-section="windows" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sidebar-views"></use></svg><span>Windows</span></button>
             </div>
             <div class="options-nav-group" aria-labelledby="options-extension-heading">
@@ -125,25 +126,16 @@
 
           <div class="options-content">
             <div id="options-theme-section" class="options-page options-theme-page is-hidden">
-              <div class="options-page-title">SPCBoy / Interface</div>
+              <div class="options-page-title">SPCBoy / Interface Chrome</div>
               <div class="options-subpanel">
-                <div class="options-subpanel-title">Application</div>
+                <div class="options-subpanel-title">Palette</div>
                 <div class="options-help-text">Colors accept CSS values, bare hex such as 333 or 999AAA, and channels such as 30 30 30 or 30 30 30 .5.</div>
                 <label class="options-field"><span>Accent Color</span><span class="options-inline-trailing"><input id="accent-color-input" class="options-input options-color-text-input" type="text" value="lightskyblue" placeholder="lightskyblue, #87cefa, rgb(...), oklch(...)" aria-label="Accent color CSS value" /></span></label>
                 <label class="options-field"><span>Primary</span><span class="options-inline-trailing"><input id="ui-chrome-primary-color-input" class="options-input options-color-text-input" type="text" value="rgb(30 30 30)" placeholder="rgb(30 30 30), #1e1e1e, color name" aria-label="Primary UI chrome color CSS value" /></span></label>
                 <label class="options-field"><span>Secondary</span><span class="options-inline-trailing"><input id="ui-chrome-secondary-color-input" class="options-input options-color-text-input" type="text" value="rgb(40 40 40)" aria-label="Secondary UI chrome color CSS value" /></span></label>
                 <label class="options-field"><span>Pane Background</span><span class="options-inline-trailing"><input id="ui-chrome-pane-color-input" class="options-input options-color-text-input" type="text" value="rgb(20 20 20)" aria-label="Pane background UI chrome color CSS value" /></span></label>
-                <label class="options-field"><span>Hover</span><span class="options-inline-trailing"><input id="ui-chrome-hover-color-input" class="options-input options-color-text-input" type="text" value="rgb(50 50 50)" aria-label="Hover UI chrome color CSS value" /></span></label>
-                <label class="options-field"><span>Divider</span><span class="options-inline-trailing"><input id="ui-chrome-divider-color-input" class="options-input options-color-text-input" type="text" value="rgb(40 40 40)" aria-label="Divider UI chrome color CSS value" /></span></label>
               </div>
               <div class="options-subpanel">
-                <div class="options-subpanel-title">Interface Style</div>
-                <div class="options-help-text">Chrome controls and content can use separate type settings.</div>
-                <label class="options-field"><span class="options-field-copy"><span>UI Chrome Font Size</span><small>Toolbar and option chrome size in points.</small></span><span class="options-inline-trailing"><input id="ui-chrome-font-size-input" class="options-input" type="text" inputmode="decimal" value="10" aria-label="UI chrome font size in points" /></span></label>
-                <label class="options-field"><span class="options-field-copy"><span>Sidebar + Playlist Font Size</span><small>Database and playlist content size in points.</small></span><span class="options-inline-trailing"><input id="sidebar-font-size-input" class="options-input" type="text" inputmode="decimal" value="10" aria-label="Sidebar and playlist font size in points" /></span></label>
-                <label class="options-field"><span>Font Color</span><span class="options-inline-trailing"><input id="sidebar-text-color-input" class="options-input options-color-text-input" type="text" value="#a9a9a9" placeholder="#a9a9a9, rgb(...), red" aria-label="Sidebar font color CSS value" /></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="ui-chrome-monospace-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>UI Chrome Monospace</span><small>Use a monospace face for toolbars and option chrome.</small></span></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="application-monospace-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Sidebar + Playlist Monospace</span><small>Use a monospace face for database and playlist content.</small></span></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="solid-selection-bar-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Solid Selection Bar</span><small>Fill the selected row with the accent color instead of using an outline.</small></span></span></label>
               </div>
               <div class="options-subpanel">
@@ -154,14 +146,30 @@
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Playlist Options</div>
                 <label class="options-field"><span class="options-field-copy"><span>Item Spacing</span><small>Row spacing in rems (for example, 0.2rem).</small></span><span class="options-inline-trailing"><input id="ui-item-spacing-input" class="options-input" type="text" inputmode="decimal" value=".2" aria-label="Item spacing in rems" /></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="playlist-header-bold-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Bold Headers</span><small>Use a heavier font for playlist column headers.</small></span></span></label>
-                <label class="options-field"><span>Header Text Color</span><span class="options-inline-trailing"><input id="playlist-header-text-color-input" class="options-input options-color-text-input" type="text" value="gray" aria-label="Playlist header default text color CSS value" /></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="column-auto-size-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Column Auto-size</span><small>Automatically resize columns for content width on selection.</small></span></span></label>
               </div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Animations</div>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="auto-resize-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Auto-Resize</span><small>Duration for automatic playlist column resizing (ms).</small></span></span><span class="options-inline-trailing"><input id="auto-resize-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Auto-resize animation milliseconds" /></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="selection-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Selection Bar</span><small>Duration for playlist and sidebar selection movement (ms).</small></span></span><span class="options-inline-trailing"><input id="selection-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Selection bar animation milliseconds" /></span></label>
+              </div>
+            </div>
+
+            <div id="options-fonts-section" class="options-page options-theme-page options-fonts-page is-hidden">
+              <div class="options-page-title">SPCBoy / Interface Fonts</div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Interface Text</div>
+                <div class="options-help-text">Set typography for controls separately from library and playlist text.</div>
+                <label class="options-field"><span class="options-field-copy"><span>UI Chrome Font Size</span><small>Toolbar and option chrome size in points.</small></span><span class="options-inline-trailing"><input id="ui-chrome-font-size-input" class="options-input" type="text" inputmode="decimal" value="10" aria-label="UI chrome font size in points" /></span></label>
+                <label class="options-field"><span class="options-field-copy"><span>Sidebar + Playlist Font Size</span><small>Database and playlist content size in points.</small></span><span class="options-inline-trailing"><input id="sidebar-font-size-input" class="options-input" type="text" inputmode="decimal" value="10" aria-label="Sidebar and playlist font size in points" /></span></label>
+                <label class="options-field"><span>Sidebar + Playlist Font Color</span><span class="options-inline-trailing"><input id="sidebar-text-color-input" class="options-input options-color-text-input" type="text" value="#a9a9a9" placeholder="#a9a9a9, rgb(...), red" aria-label="Sidebar and playlist font color CSS value" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="ui-chrome-monospace-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>UI Chrome Monospace</span><small>Use a monospace face for toolbars and option chrome.</small></span></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="application-monospace-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Sidebar + Playlist Monospace</span><small>Use a monospace face for database and playlist content.</small></span></span></label>
+              </div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Playlist Headers</div>
+                <label class="options-field"><span>Playlist Header Font Color</span><span class="options-inline-trailing"><input id="playlist-header-text-color-input" class="options-input options-color-text-input" type="text" value="gray" aria-label="Playlist header font color CSS value" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="playlist-header-bold-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Bold Headers</span><small>Use a heavier font for playlist column headers.</small></span></span></label>
               </div>
             </div>
 

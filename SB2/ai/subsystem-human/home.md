@@ -12,5 +12,8 @@
   remains its writer.
 - Options open in the playlist pane as a subpage and leave the title and footer
   visible. A separate Options window uses the same chrome.
+- Playlist tab selection fades with the shared selection timing and easing;
+  its active surface includes the close control and prevents text selection.
 - Dense catalog rows keep zero vertical item padding with a 1px row gap. The
-  toolbar, playlist header, and search strip share deliberate heights.
+  pane divider is 1px, and toolbar action buttons share one compact size. The
+  search field keeps a taller input surface inside the shared toolbar strip.

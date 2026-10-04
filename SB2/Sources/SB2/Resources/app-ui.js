@@ -137,38 +137,59 @@ function renderPlaylistTabs() {
   refs.playlistTabsToolbar?.classList.toggle("is-hidden", !hasTabs);
   refs.playlistTabsToolbar?.closest(".content")?.classList.toggle("has-playlist-tabs", hasTabs);
   if (!refs.playlistTabs) return;
-  refs.playlistTabs.replaceChildren();
-  if (tabs.length <= 1) return;
+  if (tabs.length <= 1) {
+    refs.playlistTabs.replaceChildren();
+    return;
+  }
 
-  for (const tab of tabs) {
+  const remainingItems = new Map([...refs.playlistTabs.children].map((item) => [item.dataset.playlistTabId, item]));
+
+  for (const [index, tab] of tabs.entries()) {
     const active = tab.id === state.activePlaylistTabId;
-    const item = document.createElement("div");
-    item.className = "playlist-tab";
+    let item = remainingItems.get(tab.id);
+    if (!item) {
+      item = document.createElement("div");
+      item.className = "playlist-tab";
+      item.dataset.playlistTabId = tab.id;
+      item.addEventListener("click", (event) => {
+        if (!event.target.closest(".playlist-tab-close")) activatePlaylistTab(tab.id);
+      });
 
-    const select = document.createElement("button");
-    select.type = "button";
-    select.className = `playlist-tab-select${active ? " is-active" : ""}`;
-    select.setAttribute("role", "tab");
+      const select = document.createElement("button");
+      select.type = "button";
+      select.className = "playlist-tab-select";
+      select.setAttribute("role", "tab");
+      item.appendChild(select);
+
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "playlist-tab-close";
+      close.textContent = "×";
+      close.addEventListener("click", (event) => {
+        event.stopPropagation();
+        closePlaylistTab(tab.id);
+      });
+      item.appendChild(close);
+    }
+
+    const select = item.querySelector(".playlist-tab-select");
+    const close = item.querySelector(".playlist-tab-close");
+    const title = String(tab.title || "Playlist");
+    item.classList.toggle("is-active", active);
+    select.classList.toggle("is-active", active);
     select.setAttribute("aria-selected", String(active));
     select.tabIndex = active ? 0 : -1;
-    select.title = String(tab.title || "Playlist");
-    select.textContent = String(tab.title || "Playlist");
-    select.addEventListener("click", () => activatePlaylistTab(tab.id));
+    select.title = title;
+    select.textContent = title;
+    close.title = `Close ${title}`;
+    close.setAttribute("aria-label", `Close ${title}`);
 
-    const close = document.createElement("button");
-    close.type = "button";
-    close.className = "playlist-tab-close";
-    close.textContent = "×";
-    close.title = `Close ${tab.title || "Playlist"}`;
-    close.setAttribute("aria-label", `Close ${tab.title || "Playlist"}`);
-    close.addEventListener("click", (event) => {
-      event.stopPropagation();
-      closePlaylistTab(tab.id);
-    });
-
-    item.append(select, close);
-    refs.playlistTabs.appendChild(item);
+    remainingItems.delete(tab.id);
+    const currentAtIndex = refs.playlistTabs.children[index];
+    if (currentAtIndex !== item) refs.playlistTabs.insertBefore(item, currentAtIndex || null);
   }
+
+  for (const item of remainingItems.values()) item.remove();
 }
 
 function activatePlaylistTab(tabID, { syncOutgoing = true } = {}) {
@@ -2699,6 +2720,7 @@ function renderAll() {
   const diagnosticsSelected = state.optionsSection === "diagnostics";
   const audioSelected = state.optionsSection === "audio";
   const themeSelected = state.optionsSection === "theme";
+  const fontsSelected = state.optionsSection === "fonts";
   const windowsSelected = state.optionsSection === "windows";
   refs.optionsDatabaseTab.classList.toggle("is-selected", databaseSelected);
   refs.optionsRoutingTab.classList.toggle("is-selected", routingSelected);
@@ -2706,8 +2728,10 @@ function renderAll() {
   refs.optionsDiagnosticsTab.classList.toggle("is-selected", diagnosticsSelected);
   refs.optionsAudioTab.classList.toggle("is-selected", audioSelected);
   refs.optionsThemeTab.classList.toggle("is-selected", themeSelected);
+  refs.optionsFontsTab.classList.toggle("is-selected", fontsSelected);
   refs.optionsWindowsTab.classList.toggle("is-selected", windowsSelected);
   refs.optionsThemeSection.classList.toggle("is-hidden", !themeSelected);
+  refs.optionsFontsSection.classList.toggle("is-hidden", !fontsSelected);
   refs.optionsWindowsSection.classList.toggle("is-hidden", !windowsSelected);
   refs.optionsDatabaseSection.classList.toggle("is-hidden", !databaseSelected);
   refs.optionsRoutingSection.classList.toggle("is-hidden", !routingSelected);
@@ -2726,8 +2750,6 @@ function renderAll() {
   if (refs.uiChromePrimaryColorInput && document.activeElement !== refs.uiChromePrimaryColorInput) refs.uiChromePrimaryColorInput.value = state.uiChromePrimaryColor;
   if (refs.uiChromeSecondaryColorInput && document.activeElement !== refs.uiChromeSecondaryColorInput) refs.uiChromeSecondaryColorInput.value = state.uiChromeSecondaryColor;
   if (refs.uiChromePaneColorInput && document.activeElement !== refs.uiChromePaneColorInput) refs.uiChromePaneColorInput.value = state.uiChromePaneColor;
-  if (refs.uiChromeHoverColorInput && document.activeElement !== refs.uiChromeHoverColorInput) refs.uiChromeHoverColorInput.value = state.uiChromeHoverColor;
-  if (refs.uiChromeDividerColorInput && document.activeElement !== refs.uiChromeDividerColorInput) refs.uiChromeDividerColorInput.value = state.uiChromeDividerColor;
   refs.solidSelectionBarCheckbox.checked = state.solidSelectionBar;
   if (refs.uiChromeMonospaceCheckbox) refs.uiChromeMonospaceCheckbox.checked = state.uiChromeMonospace;
   refs.applicationMonospaceCheckbox.checked = state.contentMonospace;

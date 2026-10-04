@@ -46,6 +46,7 @@
   --top-toolbar-height: calc(var(--top-toolbar-control-height) + (2 * var(--top-toolbar-inset)));
   --column-resize-duration: 200ms;
   --selection-animation-duration: 200ms;
+  --selection-animation-easing: cubic-bezier(0.2, 0, 0, 1);
   --column-resize-easing: ease;
   --control-glyph-size: 0.33rem;
   --status-clean: limegreen;
@@ -471,6 +472,9 @@ body.options-window .tool-button:hover {
   color: var(--muted);
   font: inherit;
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: color var(--selection-animation-duration) var(--selection-animation-easing);
 }
 
 .playlist-tab-close:hover { background: var(--bg-hover); color: var(--text); }
@@ -864,7 +868,7 @@ body.options-window .tool-button:hover {
   opacity: 0;
   transform: translate3d(0, 0, 0);
   will-change: transform;
-  transition: transform var(--selection-animation-duration) cubic-bezier(0.2, 0, 0, 1);
+  transition: transform var(--selection-animation-duration) var(--selection-animation-easing);
 }
 
 .list-selection-indicator.is-solid {
@@ -1748,8 +1752,8 @@ body.sb2-frontend {
   --sb-titlebar-height: 2.75rem;
   --sb-statusbar-height: 2.25rem;
   --sb-toolbar-height: 2.5rem;
-  --sb-control-size: 1.35rem;
-  --sb-divider-size: .1rem;
+  --sb-control-size: 1.5rem;
+  --sb-divider-size: 1px;
   --sb-list-font-size: .78rem;
   --bg-sidebar: #090b0f;
   --bg-chrome: #111419;
@@ -1898,10 +1902,10 @@ body.sb2-frontend .sidebar-search-input {
 body.sb2-frontend .sidebar-search-actions { flex: 0 0 auto; gap: var(--sb-space-010); margin-left: auto; }
 body.sb2-frontend .sidebar-fold-actions { gap: var(--sb-space-010); }
 body.sb2-frontend .sidebar-mode-button {
-  flex: 0 0 2rem;
-  width: 2rem;
-  min-width: 2rem;
-  height: 2rem;
+  flex: 0 0 var(--sb-control-size);
+  width: var(--sb-control-size);
+  min-width: var(--sb-control-size);
+  height: var(--sb-control-size);
   padding: 0;
   border: 0;
   border-radius: var(--sb-space-020);
@@ -1943,9 +1947,12 @@ body.sb2-frontend .playlist-bottom-toolbar { display: none; }
 body.sb2-frontend .playlist-tabs-toolbar { height: var(--sb-toolbar-height); padding: var(--sb-space-025); }
 body.sb2-frontend .playlist-tabs { height: calc(var(--sb-toolbar-height) - (2 * var(--sb-space-025))); }
 body.sb2-frontend .playlist-tab { height: 100%; border: 0; border-radius: var(--sb-space-020); background: #15191f; }
+body.sb2-frontend .playlist-tab::before { background: #102333; }
+body.sb2-frontend .playlist-tab.is-active .playlist-tab-close { color: #8fd1ff; }
 body.sb2-frontend .playlist-tab-select,
-body.sb2-frontend .playlist-tab-close { height: 100%; border-radius: var(--sb-space-020); font-size: var(--sb-list-font-size); }
-body.sb2-frontend .playlist-tab-close { flex-basis: 2rem; width: 2rem; }
+body.sb2-frontend .playlist-tab-select { height: var(--sb-control-size); align-self: center; border-radius: var(--sb-space-020); font-size: var(--sb-list-font-size); }
+body.sb2-frontend .playlist-tab-close { height: var(--sb-control-size); align-self: center; border-radius: var(--sb-space-020); font-size: var(--sb-list-font-size); }
+body.sb2-frontend .playlist-tab-close { flex-basis: var(--sb-control-size); width: var(--sb-control-size); }
 body.sb2-frontend .playlist-wrap { padding: 0 var(--sb-space-025) var(--sb-space-025); }
 body.sb2-frontend .playlist-scroll-wrap { row-gap: 1px; background: #090b0f; }
 body.sb2-frontend .playlist-header-wrap,
@@ -2009,10 +2016,10 @@ body.sb2-frontend .options-header {
 }
 body.sb2-frontend .options-header .tool-button {
   position: static;
-  width: 2rem;
-  min-width: 2rem;
-  height: 2rem;
-  min-height: 2rem;
+  width: var(--sb-control-size);
+  min-width: var(--sb-control-size);
+  height: var(--sb-control-size);
+  min-height: var(--sb-control-size);
   margin-left: auto;
   transform: none;
   border: 0;
@@ -2031,10 +2038,10 @@ body.sb2-frontend .options-nav-item:hover { background: #11151b; color: #d0d4e5;
 body.sb2-frontend .options-nav-item .ui-icon { width: 1rem; height: 1rem; }
 body.sb2-frontend .options-nav-item.is-selected { background: #102333; color: #8fd1ff; }
 body.sb2-frontend .options-content { padding: var(--sb-space-050) var(--sb-space-100) var(--sb-space-100) 0; border: 0; border-radius: 0; scrollbar-color: #3a4050 #090b0f; }
-body.sb2-frontend .options-page { gap: 1.5rem; min-height: 100%; padding: 0; border-radius: 0; background: transparent; }
+body.sb2-frontend .options-page { gap: var(--sb-space-100); min-height: 100%; padding: 0; border-radius: 0; background: transparent; }
 body.sb2-frontend .options-page-title { padding: 0 0 var(--sb-space-050); color: #e0e1eb; font-size: 1.25rem; font-weight: 500; letter-spacing: 0; }
-body.sb2-frontend .options-subpanel { gap: 1rem; padding: var(--sb-space-050) 0 var(--sb-space-075); border: 0; border-radius: 0; background: transparent; }
-body.sb2-frontend .options-subpanel-title { color: #73c5ff; font-size: .9rem; font-weight: 500; }
+body.sb2-frontend .options-subpanel { gap: var(--sb-space-050); padding: var(--sb-space-075) 0 var(--sb-space-025); border: 0; border-top: 1px solid #29303a; border-radius: 0; background: transparent; }
+body.sb2-frontend .options-subpanel-title { padding-bottom: var(--sb-space-050); border-bottom: 1px solid #1d222b; color: #73c5ff; font-size: .9rem; font-weight: 600; }
 body.sb2-frontend .options-field { min-height: 2.75rem; gap: 1.5rem; padding: var(--sb-space-025) 0; border: 0; color: #c4c8d9; font-size: var(--sb-space-090); }
 body.sb2-frontend .options-field-copy { gap: var(--sb-space-020); }
 body.sb2-frontend .options-field-copy small,
@@ -2067,7 +2074,15 @@ body.sb2-frontend .database-stats-panel,
 body.sb2-frontend .library-cache-row,
 body.sb2-frontend .library-root-row { padding: var(--sb-space-050) 0; border: 0; border-radius: 0; background: transparent; }
 body.sb2-frontend .options-panel-actions { gap: var(--sb-space-050); }
-body.sb2-frontend .options-panel-actions .tool-button { min-height: 2.25rem; padding: 0 var(--sb-space-075); }
+body.sb2-frontend .options-panel-actions .tool-button { min-height: var(--sb-control-size); padding: 0 var(--sb-space-075); }
+
+/* Keep the dense shell's action controls on one compact height. Labeled
+   buttons keep their natural width; icon controls use the shared square. */
+body.sb2-frontend .tool-button { height: var(--sb-control-size); min-height: var(--sb-control-size); }
+body.sb2-frontend .glyph-button { width: var(--sb-control-size); min-width: var(--sb-control-size); padding: 0; }
+body.sb2-frontend .sidebar-search-input { height: 2rem; padding-inline: var(--sb-space-075); }
+body.sb2-frontend .options-nav-item { min-height: var(--sb-control-size); }
+body.sb2-frontend .options-subpanel .tool-button { min-height: var(--sb-control-size); }
 
 body.sb2-frontend.options-window .app-shell { grid-template-rows: var(--sb-titlebar-height) minmax(0, 1fr) var(--sb-statusbar-height); }
 body.sb2-frontend.options-window .workspace { display: none; }
