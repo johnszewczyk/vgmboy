@@ -47,7 +47,13 @@ the procedure for each package's source format.
   package Region.
 - **Reviewed unknown region** — Use `Region: --` when review confirms the
   region is unknown. `--` records known uncertainty; it is not a region code
-  or release identifier.
+  or release identifier. Never put `--` in a package filename.
+- **Filename region** — Use the canonical base title as the filename when it
+  is unique within the set. Add a known region suffix only to distinguish
+  packages that would otherwise have the same filename. A set profile may
+  explicitly keep region suffixes throughout a collection with many parallel
+  regional releases; state that exception in the set profile. Keep the Region
+  tag even when the filename does not show it.
 - **Candidate releases** — A title or region match alone does not establish a
   release ID. Do not add a candidate ID or ID-based filename suffix until one
   unique release is confirmed; otherwise use the known title and

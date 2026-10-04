@@ -65,8 +65,9 @@ profile defines only how confirmed values are represented in UAC packages.
 - **Game title and region** — Identify a game at the canonical No-Intro root
   title when the SNESMusic.org package title resolves to that one game, even
   when the source does not identify a regional release. Use the canonical game
-  title in the package filename and **Region** `--` when region is unknown
-  (filename suffix `(--).uac`).
+  title in the package filename and **Region** `--` when region is unknown.
+  Follow the Base Set Profile's collision-driven filename rule; never add an
+  unknown-region marker to the filename.
   Only record a specific region when existing source metadata isolates it; do
   not infer one from a candidate No-Intro release. Keep source **Album** values
   unchanged while title/Album conflicts are reviewed.
