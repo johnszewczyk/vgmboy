@@ -8,25 +8,11 @@
     <script>
       try {
         const options = JSON.parse(localStorage.getItem("ViewBoy.displayOptions") || "{}");
-        const surfaces = {
-          GAMEBOY: "#9BBC0F",
-          NIGHTBOY: "#000000",
-          GRAPEBOY: "#A64AC9",
-          TEALBOY: "#78D7D4",
-          ATOMICPURPLEBOY: "#704883",
-        };
-        const aliases = {
-          PURPLEBOY: "GRAPEBOY",
-          IDIGLOWBOY: "TEALBOY",
-          DARKPURPLEBOY: "ATOMICPURPLEBOY",
-        };
-        const savedTheme = aliases[options.theme] || options.theme;
-        const theme = Object.hasOwn(surfaces, savedTheme) || savedTheme === "CUSTOM"
-          ? savedTheme : "GAMEBOY";
-        document.documentElement.dataset.theme = theme;
-        document.documentElement.style.setProperty("--screen-surface",
-          theme === "CUSTOM" && CSS.supports("color", options.customBackgroundColor)
-            ? options.customBackgroundColor : surfaces[theme] || "#9BBC0F");
+        const hasCustomPalette = options.customPaletteConfigured === true
+          || options.customColorsInitialized === true;
+        const background = hasCustomPalette && CSS.supports("color", options.customBackgroundColor)
+          ? options.customBackgroundColor : "#9BBC0F";
+        document.documentElement.style.setProperty("--screen-surface", background);
       } catch {}
     </script>
     <link rel="stylesheet" href="./yoga-screen.css" />

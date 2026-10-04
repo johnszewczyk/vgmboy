@@ -363,31 +363,14 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'LCD framebuffer dots default to full ink coverage');
   assert.equal(new Set(lcdDeviceDotSnapshot(0).flat()).size, 1,
     'a gapless device-pixel cell preserves the exact palette ink over the whole dot');
-  for (const [theme, contrast, firstColor, lastColor] of [
-    ['GAMEBOY', 'STANDARD', '#222222', '#9BBC0F'],
-    ['GAMEBOY', 'HIGH_CONTRAST', '#080808', '#9BBC0F'],
-    ['NIGHTBOY', 'STANDARD', '#A9A9A9', '#000000'],
-    ['NIGHTBOY', 'HIGH_CONTRAST', '#D3D3D3', '#000000'],
-    ['GRAPEBOY', 'STANDARD', '#201824', '#A64AC9'],
-    ['GRAPEBOY', 'HIGH_CONTRAST', '#100B13', '#A64AC9'],
-    ['TEALBOY', 'STANDARD', '#06262A', '#78D7D4'],
-    ['TEALBOY', 'HIGH_CONTRAST', '#031619', '#78D7D4'],
-    ['ATOMICPURPLEBOY', 'STANDARD', '#E2D2EA', '#704883'],
-    ['ATOMICPURPLEBOY', 'HIGH_CONTRAST', '#F4EAF8', '#704883'],
-  ]) {
-    const tones = lcdPaletteSnapshot(theme, contrast);
-    assert.equal(tones.length, 4, `${theme} ${contrast} supplies exactly four LCD tones`);
-    assert.equal(tones[0].color, firstColor, `${theme} ${contrast} preserves its active-pixel endpoint`);
-    assert.equal(tones[3].color, lastColor, `${theme} ${contrast} preserves its screen endpoint`);
-    const steps = tones.slice(0, -1).map((tone, index) =>
-      Math.abs(tones[index + 1].lightness - tone.lightness));
-    assert.ok(steps.every((step) => Math.abs(step - steps[0]) < 0.7),
-      `${theme} ${contrast} tones use equally spaced CIELAB lightness steps`);
-    const direction = Math.sign(tones[1].lightness - tones[0].lightness);
-    assert.ok(tones.slice(1).every((tone, index) =>
-      Math.sign(tone.lightness - tones[index].lightness) === direction),
-    `${theme} ${contrast} tone order stays consistent from ink to screen`);
-  }
+  const defaultPalette = lcdPaletteSnapshot();
+  assert.equal(defaultPalette.length, 4, 'the Game Boy palette has exactly four LCD tones');
+  assert.equal(defaultPalette[0].color, '#222222', 'the default darkest tone uses the pixel endpoint');
+  assert.equal(defaultPalette[3].color, '#9BBC0F', 'the default lightest tone uses the yellow-green LCD endpoint');
+  const defaultSteps = defaultPalette.slice(0, -1).map((tone, index) =>
+    Math.abs(defaultPalette[index + 1].lightness - tone.lightness));
+  assert.ok(defaultSteps.every((step) => Math.abs(step - defaultSteps[0]) < 0.7),
+    'the default four tones use equally spaced CIELAB lightness steps');
   const clickTargetBox = (target) => {
     const rect = canvas.getBoundingClientRect();
     const logicalWidth = canvas.width / dotsPerCell();
@@ -697,7 +680,6 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.notEqual(pixelChecksum(canvas.image.data), rollingOptionsPixels,
     'the roll-down reaches the fully settled Options screen');
-  const gameBoyPixels = pixelChecksum(canvas.image.data);
   const clickScreen = (x, y, detail = 1) => {
     const rect = canvas.getBoundingClientRect();
     canvas.listeners.get('click')({ clientX: rect.width * x, clientY: rect.height * y, detail });
@@ -1006,19 +988,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     preventDefault() {},
   });
   clickPage('DISPLAY');
-  clickTarget('THEME SELECTOR');
-  clickTarget('THEME NIGHTBOY');
-  const nightBoyPixels = pixelChecksum(canvas.image.data);
-  assert.notEqual(nightBoyPixels, gameBoyPixels, 'NightBoy repaints the same four-tone pixel screen with its dark-gray palette');
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'NIGHTBOY');
-  assert.equal(document.documentElement.dataset.theme, 'NIGHTBOY',
-    'the selected LCD theme also updates the surrounding shell');
-  clickTarget('HIGH CONTRAST');
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'HIGH_CONTRAST',
-    'the single High Contrast checkbox persists the lighter gray pixel endpoint');
-  await tick();
-  clickTarget('HIGH CONTRAST');
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'STANDARD');
+  const displayPagePixels = pixelChecksum(canvas.image.data);
   clickPage('QUEUE');
   const optionsSelection = selectionBandSnapshot();
   assert.equal(optionsSelection?.kind, 'options-page',
@@ -1040,7 +1010,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     queuePageButton.box.width - 2,
     queuePageButton.box.height - 2,
   ], 'the moving Options fill stays inside the button border by exactly one LCD pixel');
-  assert.notEqual(pixelChecksum(canvas.image.data), nightBoyPixels, 'Options sub-pages navigate inside the LCD');
+  assert.notEqual(pixelChecksum(canvas.image.data), displayPagePixels, 'Options sub-pages navigate inside the LCD');
   const segmentedControls = choiceControlLayoutSnapshot().filter((item) => ['REPEAT', 'RANDOM']
     .includes(item.title));
   assert.ok(segmentedControls.length === 2 && segmentedControls.every(({ row, controls }) =>
@@ -1526,15 +1496,6 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(savedPreferences.at(-1).columnAutoSize, true,
     'the Display page checkbox can restore automatic sizing');
   clickPage('DISPLAY');
-  clickTarget('THEME SELECTOR');
-  clickTarget('THEME GAMEBOY');
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'GAMEBOY',
-    'the single theme dropdown returns to the Game Boy preset');
-  clickTarget('HIGH CONTRAST');
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'HIGH_CONTRAST',
-    'one checkbox enables the alternate high-contrast ink endpoint');
-  clickTarget('HIGH CONTRAST');
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'STANDARD');
   clickTarget('PIXEL MATRIX GAPS');
   const separatedDot = lcdDeviceDotSnapshot(0);
   assert.equal(lcdDotSizeSnapshot().pixelGaps, true,
@@ -1560,8 +1521,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'the custom pixel field accepts space-separated RGB values');
   assert.equal(displayOptions.customFontInput, '30 30 30',
     'the custom pixel field keeps the original RGB channel text');
-  assert.equal(displayOptions.theme, 'CUSTOM',
-    'committing a custom endpoint activates the four-tone Custom palette');
+  assert.equal(displayOptions.customPaletteConfigured, true,
+    'committing a custom endpoint enables persistent custom LCD colors');
   clickTarget('BG CSS COLOR INPUT');
   for (const character of 'rebeccapurple') typeSearchKey(character);
   typeSearchKey('Enter');
@@ -1578,8 +1539,12 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'three-digit zero input reaches the exact black palette endpoint');
   assert.ok(lcdDeviceDotSnapshot(0).flat().every((color) => color === '#000000'),
     'gapless dots render the custom zero endpoint without a background gutter');
-  clickTarget('THEME SELECTOR');
-  clickTarget('THEME GAMEBOY');
+  clickTarget('BG CSS COLOR INPUT');
+  for (const character of '9BBC0F') typeSearchKey(character);
+  typeSearchKey('Enter');
+  clickTarget('PIXEL CSS COLOR INPUT');
+  for (const character of '222222') typeSearchKey(character);
+  typeSearchKey('Enter');
   clickPage('DISPLAY');
   clickTarget('BUTTONS SYMBOLS');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).transportSymbols, true,
@@ -2002,10 +1967,10 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const displayHeading = optionStyles.find((item) => item.kind === 'title'
     && item.name === 'DISPLAY + UI');
   const screenProfile = optionStyles.find((item) => item.kind === 'group' && item.name === 'SCREEN PROFILE');
-  const colorTheme = optionStyles.find((item) => item.kind === 'group' && item.name === 'COLOR THEME');
+  const lcdColors = optionStyles.find((item) => item.kind === 'group' && item.name === 'LCD COLORS');
   const lcdTones = optionStyles.find((item) => item.kind === 'group' && item.name === 'FOUR LCD TONES');
-  assert.ok(optionsHeading && displayHeading && screenProfile && colorTheme && lcdTones,
-    'Display combines screen profile and theme controls inside the existing grouped Options dialog');
+  assert.ok(optionsHeading && displayHeading && screenProfile && lcdColors && lcdTones,
+    'Display combines screen profile and editable LCD colors inside the shared Options dialog');
   assert.equal(framebufferShadeSnapshot(optionsHeading.box.x + optionsHeading.box.width - 2,
     optionsHeading.box.y + 1), 2,
   'the ViewBoy owner title keeps its filled LCD heading bar');

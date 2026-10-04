@@ -8,12 +8,13 @@ inset keeps controls and panes clear of the frame without adding a bezel.
 ## One Display Page
 
 ViewBoy's Options table of contents has one **Display** page for screen profile,
-themes, custom colors, transport labels, playlist sizing, spacing, window
-behavior, and motion. There is no separate Interface page.
+LCD colors, transport labels, playlist sizing, spacing, window behavior, and
+motion. There is no separate Interface page.
 
-All six color choices live in one **Theme** dropdown. Presets share one
-**High Contrast** checkbox. The custom BG and PIXEL fields remain visible and
-editing either one switches to Custom.
+Every Options page uses the same two-pane frame. Its alphabetized sidebar is
+220 logical dots wide, capped at 34% of the available width, and does not
+shrink based on page contents. The content pane fills the remaining width and
+scrolls inside its frame.
 
 The main toolbar contains eight equal-width buttons in this order: Previous,
 Stop, Play/Pause, Next, Long Play, Repeat One, Playlist Random, and Library
@@ -23,26 +24,19 @@ border; other labels are centered. The Next symbol remains `>>`.
 The four mode controls use the same darker selected fill while active. This
 state tint is the expected visual difference from an inactive button.
 
-## Palette Rules
+## LCD Colors
 
-Each preset has a pixel endpoint and a background endpoint. ViewBoy renders
-exactly four tones: pixel, two intermediate tones, and background. It derives
-the middle tones at one-third and two-thirds of the endpoint distance in
-CIELAB L*, with a* and b* interpolated at the same fractions. High Contrast
-changes the pixel endpoint and keeps the same four-step rule.
+The default endpoints are the traditional Game Boy yellow-green background
+(`BG #9BBC0F`) and dark pixel color (`PIXEL #222222`). ViewBoy renders exactly
+four tones: PIXEL, two intermediate tones, and BG. It derives the middle tones
+at one-third and two-thirds of the endpoint distance in CIELAB L*, with a* and
+b* interpolated at the same fractions.
 
-| Theme | LCD background | Standard pixels | High Contrast pixels |
-| --- | --- | --- | --- |
-| GameBoy | `#9BBC0F` | `#222222` | `#080808` |
-| NightBoy | `#000000` | `darkgrey` (`#A9A9A9`) | `#D3D3D3` |
-| GrapeBoy | `#A64AC9` | `#201824` | `#100B13` |
-| TealBoy | `#78D7D4` | `#06262A` | `#031619` |
-| Atomic Purple | `#704883` | `#E2D2EA` | `#F4EAF8` |
-
-The Game Boy Color presets use the shell color names Grape, Teal, and Atomic
-Purple. Grape and Teal use dark pixels over their lighter shells. Atomic Purple
-uses lighter pixels over its darker translucent shell shade. These are digital
-screen approximations; shell colors are not display calibration data.
+BG and PIXEL are the only color controls. Inputs accept three- or six-digit hex with or without `#`, space- or
+comma-separated RGB channel values, CSS color names, and supported CSS color
+functions. ViewBoy preserves the entered text (including names such as
+`rebeccapurple`) and stores the resolved RGB value separately for rendering.
+Enter applies a valid value and Escape cancels.
 
 ## Grid and Fidelity
 
