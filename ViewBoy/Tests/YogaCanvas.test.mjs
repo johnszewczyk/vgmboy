@@ -252,11 +252,31 @@ globalThis.requestAnimationFrame = (callback) => {
   return id;
 };
 globalThis.cancelAnimationFrame = (frame) => animationFrameCallbacks.delete(frame);
-globalThis.document = { documentElement: { dataset: {} }, querySelector(selector) {
-  if (selector === '#lcd') return canvas;
-  if (selector === '#screen-window') return screen;
-  return status;
-} };
+const namedCSSColors = new Map([['rebeccapurple', [102, 51, 153, 255]]]);
+globalThis.CSS = { supports: (kind, value) => kind === 'color'
+  && namedCSSColors.has(String(value).trim().toLowerCase()) };
+globalThis.document = {
+  documentElement: { dataset: {} },
+  createElement(name) {
+    assert.equal(name, 'canvas');
+    let fillStyle = '';
+    return { width: 0, height: 0, getContext() {
+      return {
+        clearRect() {},
+        set fillStyle(value) { fillStyle = value; },
+        fillRect() {},
+        getImageData() {
+          return { data: namedCSSColors.get(fillStyle.toLowerCase()) || [0, 0, 0, 0] };
+        },
+      };
+    } };
+  },
+  querySelector(selector) {
+    if (selector === '#lcd') return canvas;
+    if (selector === '#screen-window') return screen;
+    return status;
+  },
+};
 globalThis.viewBoy = bridge;
 const displayOptionsStore = new Map();
 globalThis.localStorage = {
@@ -298,6 +318,7 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     equalizerAnimationSnapshot,
     framebufferShadeSnapshot,
     hitTargetSnapshot,
+    lcdDeviceDotSnapshot,
     lcdDotSizeSnapshot,
     lcdPaletteSnapshot,
     optionsPaneSnapshot,
@@ -338,6 +359,10 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     durationMilliseconds: 200,
     framesPerSecond: 60,
   }, 'all UI animation starts on the shared 200 ms duration and 60 FPS profile');
+  assert.equal(lcdDotSizeSnapshot().pixelGaps, false,
+    'LCD framebuffer dots default to full ink coverage');
+  assert.equal(new Set(lcdDeviceDotSnapshot(0).flat()).size, 1,
+    'a gapless device-pixel cell preserves the exact palette ink over the whole dot');
   for (const [theme, contrast, firstColor, lastColor] of [
     ['GAMEBOY', 'STANDARD', '#222222', '#9BBC0F'],
     ['GAMEBOY', 'HIGH_CONTRAST', '#080808', '#9BBC0F'],
@@ -444,6 +469,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   'all eight main toolbar buttons share their full-width row evenly');
   assert.equal(new Set(mainToolbarTargets.map((target) => target.box.height)).size, 1,
     'all eight main toolbar buttons use the same canonical height');
+  assert.ok(mainToolbarTargets.every((target) => target.interactive),
+    'all eight controls share a real click handler');
   assert.ok(transportTargets[0].box.x < canvas.width / dotsPerCell() / 4,
     'transport starts at the left app inset instead of being centered');
   assert.equal(transportTargets[0].box.x, 8,
@@ -979,16 +1006,19 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     preventDefault() {},
   });
   clickPage('DISPLAY');
+  clickTarget('THEME SELECTOR');
   clickTarget('THEME NIGHTBOY');
   const nightBoyPixels = pixelChecksum(canvas.image.data);
   assert.notEqual(nightBoyPixels, gameBoyPixels, 'NightBoy repaints the same four-tone pixel screen with its dark-gray palette');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'NIGHTBOY');
   assert.equal(document.documentElement.dataset.theme, 'NIGHTBOY',
     'the selected LCD theme also updates the surrounding shell');
-  clickTarget('INK LIGHT GRAY');
+  clickTarget('HIGH CONTRAST');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'HIGH_CONTRAST',
-    'the ink control persists the lighter gray high-contrast setting');
+    'the single High Contrast checkbox persists the lighter gray pixel endpoint');
   await tick();
+  clickTarget('HIGH CONTRAST');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'STANDARD');
   clickPage('QUEUE');
   const optionsSelection = selectionBandSnapshot();
   assert.equal(optionsSelection?.kind, 'options-page',
@@ -1425,8 +1455,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   globalThis.ViewBoy.dispatch('optionsPage:LIBRARY');
   const playlistColumnChecks = hitTargetSnapshot().filter((target) => target.optionChecklistItem);
   assert.deepEqual(playlistColumnChecks.map((target) => target.name).sort(),
-    ['ARTIST', 'AUTO-HIDE EMPTY COLUMNS', 'DATE/TIME', 'FILE', 'GAME', 'PATH', 'SIZE'],
-    'Playlist Columns and automatic hiding are plain checkbox rows');
+    ['ARTIST', 'AUTO-HIDE EMPTY COLUMNS', 'DATE/TIME', 'FILE', 'GAME', 'PATH'],
+    'Playlist Columns and automatic hiding are plain checkbox rows without the retired Size column');
   const autoHideOption = playlistColumnChecks.find((target) => target.name === 'AUTO-HIDE EMPTY COLUMNS');
   assert.ok(autoHideOption?.optionCheckboxChecked,
     'empty metadata columns are automatically hidden by default');
@@ -1496,23 +1526,59 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   assert.equal(savedPreferences.at(-1).columnAutoSize, true,
     'the Display page checkbox can restore automatic sizing');
   clickPage('DISPLAY');
+  clickTarget('THEME SELECTOR');
   clickTarget('THEME GAMEBOY');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'GAMEBOY',
-    'the palette selector returns to the authentic Game Boy theme');
-  clickTarget('INK DARK CHARCOAL');
+    'the single theme dropdown returns to the Game Boy preset');
+  clickTarget('HIGH CONTRAST');
+  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'HIGH_CONTRAST',
+    'one checkbox enables the alternate high-contrast ink endpoint');
+  clickTarget('HIGH CONTRAST');
   assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).contrast, 'STANDARD');
+  clickTarget('PIXEL MATRIX GAPS');
+  const separatedDot = lcdDeviceDotSnapshot(0);
+  assert.equal(lcdDotSizeSnapshot().pixelGaps, true,
+    'the pixel-matrix checkbox enables the optional device-pixel gutters');
+  assert.equal(separatedDot.flat().filter((color) => color === '#222222').length, 4,
+    'the old 3px matrix mode paints four dark pixels in a nine-pixel cell');
+  clickTarget('PIXEL MATRIX GAPS');
+  assert.equal(lcdDeviceDotSnapshot(0).flat().filter((color) => color === '#222222').length, 9,
+    'turning matrix gaps off paints the full 3px cell with the exact dark ink');
   clickTarget('BG CSS COLOR INPUT');
   for (const character of 'ABC') typeSearchKey(character);
   typeSearchKey('Enter');
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).customBackgroundColor, '#AABBCC',
+  let displayOptions = JSON.parse(localStorage.getItem('ViewBoy.displayOptions'));
+  assert.equal(displayOptions.customBackgroundColor, '#AABBCC',
     'the always-visible custom BG field accepts three-digit hex');
+  assert.equal(displayOptions.customBackgroundInput, 'ABC',
+    'the custom BG field keeps the original shorthand input');
   clickTarget('PIXEL CSS COLOR INPUT');
   for (const character of '30 30 30') typeSearchKey(character);
   typeSearchKey('Enter');
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).customFontColor, '#1E1E1E',
+  displayOptions = JSON.parse(localStorage.getItem('ViewBoy.displayOptions'));
+  assert.equal(displayOptions.customFontColor, '#1E1E1E',
     'the custom pixel field accepts space-separated RGB values');
-  assert.equal(JSON.parse(localStorage.getItem('ViewBoy.displayOptions')).theme, 'CUSTOM',
+  assert.equal(displayOptions.customFontInput, '30 30 30',
+    'the custom pixel field keeps the original RGB channel text');
+  assert.equal(displayOptions.theme, 'CUSTOM',
     'committing a custom endpoint activates the four-tone Custom palette');
+  clickTarget('BG CSS COLOR INPUT');
+  for (const character of 'rebeccapurple') typeSearchKey(character);
+  typeSearchKey('Enter');
+  displayOptions = JSON.parse(localStorage.getItem('ViewBoy.displayOptions'));
+  assert.equal(displayOptions.customBackgroundColor, '#663399',
+    'a CSS named color is converted for framebuffer use');
+  assert.equal(displayOptions.customBackgroundInput, 'rebeccapurple',
+    'a CSS named color remains visible as the original input after commit');
+  clickTarget('PIXEL CSS COLOR INPUT');
+  for (const character of '000') typeSearchKey(character);
+  typeSearchKey('Enter');
+  displayOptions = JSON.parse(localStorage.getItem('ViewBoy.displayOptions'));
+  assert.equal(displayOptions.customFontColor, '#000000',
+    'three-digit zero input reaches the exact black palette endpoint');
+  assert.ok(lcdDeviceDotSnapshot(0).flat().every((color) => color === '#000000'),
+    'gapless dots render the custom zero endpoint without a background gutter');
+  clickTarget('THEME SELECTOR');
   clickTarget('THEME GAMEBOY');
   clickPage('DISPLAY');
   clickTarget('BUTTONS SYMBOLS');
@@ -1530,6 +1596,29 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.notEqual(pixelChecksum(canvas.image.data), symbolTransportPixels,
     'symbol mode replaces word labels while keeping equal-width toolbar controls');
+  clickTarget('LONG PLAY');
+  await tick();
+  assert.equal(savedPreferences.at(-1).longPlayEnabled, true,
+    'the main Long Play toolbar button updates shared playback preferences');
+  clickTarget('REPEAT ONE');
+  await tick();
+  assert.equal(savedPreferences.at(-1).repeatMode, 'off',
+    'the main Repeat One toolbar button toggles the repeat mode off');
+  clickTarget('PLAYLIST RANDOM');
+  await tick();
+  assert.equal(savedPreferences.at(-1).randomMode, 'playlist',
+    'the main Playlist Random toolbar button selects playlist shuffle');
+  clickTarget('LIBRARY RANDOM');
+  await tick();
+  assert.equal(savedPreferences.at(-1).randomMode, 'library',
+    'the main Library Random toolbar button switches to library shuffle');
+  const modeButtonStates = hitTargetSnapshot();
+  assert.equal(modeButtonStates.find((target) => target.name === 'LONG PLAY')?.fillShade, 2,
+    'active Long Play uses the shared selected-button fill');
+  assert.equal(modeButtonStates.find((target) => target.name === 'LIBRARY RANDOM')?.fillShade, 2,
+    'active Library Random uses the same selected-button fill');
+  assert.equal(modeButtonStates.find((target) => target.name === 'PLAYLIST RANDOM')?.fillShade, null,
+    'inactive Playlist Random keeps the standard toolbar fill');
   globalThis.ViewBoy.dispatch('settings');
   await tick();
   clickPage('METHODS');

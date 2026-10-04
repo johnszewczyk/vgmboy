@@ -11,11 +11,17 @@ ViewBoy's Options table of contents has one **Display** page for screen profile,
 themes, custom colors, transport labels, playlist sizing, spacing, window
 behavior, and motion. There is no separate Interface page.
 
+All six color choices live in one **Theme** dropdown. Presets share one
+**High Contrast** checkbox. The custom BG and PIXEL fields remain visible and
+editing either one switches to Custom.
+
 The main toolbar contains eight equal-width buttons in this order: Previous,
 Stop, Play/Pause, Next, Long Play, Repeat One, Playlist Random, and Library
 Random. All eight use the same template for width, height, border, and default
 text inset. The symbol Previous label `<<` is left-aligned just inside its
 border; other labels are centered. The Next symbol remains `>>`.
+The four mode controls use the same darker selected fill while active. This
+state tint is the expected visual difference from an inactive button.
 
 ## Palette Rules
 
@@ -38,12 +44,33 @@ Purple. Grape and Teal use dark pixels over their lighter shells. Atomic Purple
 uses lighter pixels over its darker translucent shell shade. These are digital
 screen approximations; shell colors are not display calibration data.
 
+## Grid and Fidelity
+
+The canvas grid scales with the window and is not the Game Boy's fixed 160×144
+panel. **LCD Dot Size** selects 2–6 device pixels per logical cell; smaller
+values give the same canvas a finer grid. **Pixel Matrix Gaps** is off by
+default, so every device pixel in a cell uses its framebuffer tone. When on,
+the cell's right and bottom device-pixel edges use the LCD background tone.
+With gaps off, a custom `000` PIXEL endpoint renders as full black throughout
+each ink cell.
+
+This reproduces a four-tone palette and visible pixel grid, not the original
+STN panel. The middle colors follow equal CIELAB L* intervals; they do not
+approximate a measured LCD voltage curve. The renderer does not model
+reflectance, viewing-angle response, row/column crosstalk, liquid-crystal
+transition time, or panel aging. Nintendo lists the classic screen as a
+160×144 STN dot-matrix LCD with four shades and a contrast controller; the
+Game Boy Color uses a TFT screen. [Nintendo Game Boy specifications](https://www.nintendo.com/en-gb/Hardware/Nintendo-History/Game-Boy/Game-Boy-627031.html),
+[Nintendo technical data](https://www.nintendo.com/en-gb/Support/Legacy-system/Technical-data-619585.html).
+
 The **Custom LCD Colors** group is always visible on the Display page. It has
 separate **BG** and **PIXEL** fields. Inputs accept three- or six-digit hex
 (`333`, `ABC`, `1122FF`, with or without `#`), three RGB channels separated by
 spaces or commas (`30 30 30`), CSS color names, and colors accepted by native
 CSS color parsing. The two entered endpoints feed the same automatic four-tone
-stepper. Enter applies a valid color; Escape cancels the edit.
+stepper. The field preserves the entered text (for example, `rebeccapurple`)
+and stores the resolved RGB value separately for rendering. Enter applies a
+valid color; Escape cancels the edit.
 
 ## Spacing Map
 
