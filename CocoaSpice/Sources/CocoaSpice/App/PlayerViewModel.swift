@@ -187,6 +187,8 @@ final class PlayerViewModel {
     }
     /// Space between a Files-mode disclosure triangle and its label, in points.
     var databaseSidebarDisclosureGapPoints: CGFloat = 6
+    /// Additional vertical space between adjacent Database sidebar rows, in points.
+    var databaseSidebarLineGapPoints: CGFloat = 0
     /// Extra hierarchy offset applied for each Files-mode child depth, in points.
     var databaseSidebarChildIndentPoints: CGFloat = 8
     var databaseSidebarHidesFileExtensions = false
@@ -194,6 +196,8 @@ final class PlayerViewModel {
         get { interfaceFontSize }
         set { interfaceFontSize = newValue }
     }
+    /// Additional vertical space between adjacent playlist rows, in points.
+    var playlistLineGapPoints: CGFloat = 0
     var playlistTextColor: DatabaseSidebarTextColor {
         get { interfaceTextColor }
         set { interfaceTextColor = newValue }
@@ -1389,9 +1393,11 @@ final class PlayerViewModel {
             databaseSidebarTextColor: databaseSidebarTextColor.rawValue,
             databaseSidebarMonospaceFont: databaseSidebarMonospaceFont,
             databaseSidebarDisclosureGapPoints: databaseSidebarDisclosureGapPoints,
+            databaseSidebarLineGapPoints: databaseSidebarLineGapPoints,
             databaseSidebarChildIndentPoints: databaseSidebarChildIndentPoints,
             databaseSidebarHidesFileExtensions: databaseSidebarHidesFileExtensions,
             playlistFontSize: playlistFontSize,
+            playlistLineGapPoints: playlistLineGapPoints,
             playlistTextColor: playlistTextColor.rawValue,
             playlistMonospaceFont: playlistMonospaceFont,
             sidebarSystemMode: sidebarSystemMode,
@@ -1510,6 +1516,11 @@ final class PlayerViewModel {
         savePreferencesNow()
     }
 
+    func setDatabaseSidebarLineGapPoints(_ gap: CGFloat) {
+        databaseSidebarLineGapPoints = min(max(gap.rounded(), 0), 16)
+        savePreferencesNow()
+    }
+
     func setDatabaseSidebarChildIndentPoints(_ indent: CGFloat) {
         databaseSidebarChildIndentPoints = min(max(indent.rounded(), 0), 32)
         savePreferencesNow()
@@ -1522,6 +1533,11 @@ final class PlayerViewModel {
 
     func setPlaylistFontSize(_ size: CGFloat) {
         setDatabaseSidebarFontSize(size)
+    }
+
+    func setPlaylistLineGapPoints(_ gap: CGFloat) {
+        playlistLineGapPoints = min(max(gap.rounded(), 0), 16)
+        savePreferencesNow()
     }
 
     func setPlaylistTextColor(_ color: DatabaseSidebarTextColor) {
@@ -3065,10 +3081,16 @@ final class PlayerViewModel {
             // Preserve its visual distance once, then persist future edits in points.
             databaseSidebarDisclosureGapPoints = min(max(CGFloat(legacyEmGap) * databaseSidebarFontSize, 0), 16)
         }
+        if let storedSidebarLineGapPoints = preferences.databaseSidebarLineGapPoints {
+            databaseSidebarLineGapPoints = min(max(CGFloat(storedSidebarLineGapPoints).rounded(), 0), 16)
+        }
         if let storedSidebarChildIndentPoints = preferences.databaseSidebarChildIndentPoints {
             databaseSidebarChildIndentPoints = min(max(CGFloat(storedSidebarChildIndentPoints).rounded(), 0), 32)
         }
         databaseSidebarHidesFileExtensions = preferences.databaseSidebarHidesFileExtensions
+        if let storedPlaylistLineGapPoints = preferences.playlistLineGapPoints {
+            playlistLineGapPoints = min(max(CGFloat(storedPlaylistLineGapPoints).rounded(), 0), 16)
+        }
         sidebarSystemMode = preferences.sidebarSystemMode
         preferEmbeddedConsoleTags = preferences.preferEmbeddedConsoleTags
         sidebarBrowserMode = SidebarBrowserMode(rawValue: preferences.sidebarBrowserModeRawValue ?? "games") ?? .games

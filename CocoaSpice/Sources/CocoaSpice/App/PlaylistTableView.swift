@@ -29,7 +29,7 @@ struct PlaylistTableView: NSViewRepresentable {
         tableView.allowsMultipleSelection = true
         tableView.allowsEmptySelection = true
         tableView.rowHeight = 17
-        tableView.intercellSpacing = NSSize(width: 0, height: 0)
+        tableView.intercellSpacing = NSSize(width: 0, height: model.playlistLineGapPoints)
         tableView.focusRingType = .none
         tableView.style = .fullWidth
         tableView.selectionHighlightStyle = .none
@@ -226,6 +226,11 @@ struct PlaylistTableView: NSViewRepresentable {
             let metadataTokenChanged = model.playlistMetadataLoadToken != lastAppliedMetadataLoadToken
             let rowsChanged = playlistContentRevision != lastPlaylistContentRevision
             let favoritesChanged = model.favoriteRevision != lastFavoriteRevision
+            let rowGap = min(max(model.playlistLineGapPoints.rounded(), 0), 16)
+            let rowGapChanged = tableView.intercellSpacing.height != rowGap
+            if rowGapChanged {
+                tableView.intercellSpacing = NSSize(width: 0, height: rowGap)
+            }
             let playbackStateChanged = currentTrackID != lastCurrentTrackID || isPlaying != lastIsPlaying
             let sortChanged = sortColumn != lastSortColumn || sortDirection != lastSortDirection
             let fontChanged = model.playlistFontSize != lastFontSize
@@ -236,7 +241,7 @@ struct PlaylistTableView: NSViewRepresentable {
                 tableView.rowHeight = rowHeight
             }
 
-            if rowsChanged || favoritesChanged || sortChanged || fontChanged {
+            if rowsChanged || favoritesChanged || sortChanged || fontChanged || rowGapChanged {
                 let reloadStartedAt = ContinuousClock.now
                 tableView.reloadData()
                 let reloadElapsed = reloadStartedAt.duration(to: .now)
@@ -257,7 +262,7 @@ struct PlaylistTableView: NSViewRepresentable {
 
             if rowsChanged || selectedTrackIDs != lastSelectedTrackIDs || primarySelectedTrackID != lastPrimarySelectedTrackID {
                 syncSelection(in: tableView)
-            } else if rowsChanged || sortChanged {
+            } else if rowsChanged || sortChanged || rowGapChanged {
                 tableView.layoutSubtreeIfNeeded()
                 updateSelectionHighlight(in: tableView, animated: false)
             }

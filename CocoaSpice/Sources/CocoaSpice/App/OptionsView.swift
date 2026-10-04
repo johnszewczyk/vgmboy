@@ -448,6 +448,27 @@ struct OptionsView: View {
                     }
                 }
                 .toggleStyle(.checkbox)
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Playlist Line Gap")
+                        Text("Extra space between track rows, in points. Set to 0 for no added gap.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 16)
+                    TextField(
+                        "0",
+                        value: Binding(
+                            get: { Double(model.playlistLineGapPoints) },
+                            set: { model.setPlaylistLineGapPoints(CGFloat($0)) }
+                        ),
+                        format: .number.precision(.fractionLength(0))
+                    )
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 56)
+                    .accessibilityLabel("Playlist line gap in points")
+                }
             }
 
             sectionCard(title: "Sidebar Options") {
@@ -463,6 +484,27 @@ struct OptionsView: View {
                     }
                 }
                 .toggleStyle(.checkbox)
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Sidebar Line Gap")
+                        Text("Extra space between Games and Files rows, in points. Set to 0 for no added gap.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 16)
+                    TextField(
+                        "0",
+                        value: Binding(
+                            get: { Double(model.databaseSidebarLineGapPoints) },
+                            set: { model.setDatabaseSidebarLineGapPoints(CGFloat($0)) }
+                        ),
+                        format: .number.precision(.fractionLength(0))
+                    )
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 56)
+                    .accessibilityLabel("Sidebar line gap in points")
+                }
 
                 Toggle(isOn: Binding(
                     get: { model.preferFoldersOverMetadata },

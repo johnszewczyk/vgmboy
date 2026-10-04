@@ -151,7 +151,8 @@ struct MainView: View {
                                 model: model,
                                 sidebarFontSize: model.databaseSidebarFontSize,
                                 sidebarTextColor: model.databaseSidebarTextColor,
-                                sidebarMonospace: model.databaseSidebarMonospaceFont
+                                sidebarMonospace: model.databaseSidebarMonospaceFont,
+                                sidebarLineGap: model.databaseSidebarLineGapPoints
                             )
                             .opacity(model.effectiveSidebarBrowserMode == .games ? 1 : 0)
                             .allowsHitTesting(model.effectiveSidebarBrowserMode == .games)
@@ -163,6 +164,7 @@ struct MainView: View {
                                 sidebarMonospace: model.databaseSidebarMonospaceFont,
                                 sidebarDisclosureGap: model.databaseSidebarDisclosureGapPoints,
                                 sidebarChildIndent: model.databaseSidebarChildIndentPoints,
+                                sidebarLineGap: model.databaseSidebarLineGapPoints,
                                 hideFileExtensions: model.databaseSidebarHidesFileExtensions
                             )
                             .opacity(model.effectiveSidebarBrowserMode == .files ? 1 : 0)
@@ -235,6 +237,7 @@ private struct MainWindowLevelConfigurator: NSViewRepresentable {
 private enum DatabaseSidebarTableChrome {
     static func makeTableView(
         rowHeight: CGFloat,
+        rowGap: CGFloat,
         columnIdentifier: String,
         coordinator: NSObject & NSTableViewDataSource & NSTableViewDelegate,
         doubleAction: Selector,
@@ -246,7 +249,7 @@ private enum DatabaseSidebarTableChrome {
         let tableView = DatabaseSidebarNativeTableView(frame: .zero)
         tableView.headerView = nil
         tableView.rowHeight = rowHeight
-        tableView.intercellSpacing = NSSize(width: 0, height: 0)
+        tableView.intercellSpacing = NSSize(width: 0, height: rowGap)
         tableView.focusRingType = .none
         // Match the playlist's chrome. The automatic/source-list style keeps
         // drawing its own selection behind the shared capsule overlay.
@@ -351,19 +354,22 @@ private struct DatabaseGameListView: NSViewRepresentable {
     let sidebarFontSize: CGFloat
     let sidebarTextColor: PlayerViewModel.DatabaseSidebarTextColor
     let sidebarMonospace: Bool
+    let sidebarLineGap: CGFloat
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             model: model,
             sidebarFontSize: sidebarFontSize,
             sidebarTextColor: sidebarTextColor,
-            sidebarMonospace: sidebarMonospace
+            sidebarMonospace: sidebarMonospace,
+            sidebarLineGap: sidebarLineGap
         )
     }
 
     func makeNSView(context: Context) -> NSScrollView {
         let chrome = DatabaseSidebarTableChrome.makeTableView(
             rowHeight: model.databaseSidebarFontSize + 5,
+            rowGap: sidebarLineGap,
             columnIdentifier: "Game",
             coordinator: context.coordinator,
             doubleAction: #selector(Coordinator.handleDoubleAction(_:)),
@@ -385,6 +391,7 @@ private struct DatabaseGameListView: NSViewRepresentable {
         context.coordinator.sidebarFontSize = sidebarFontSize
         context.coordinator.sidebarTextColor = sidebarTextColor
         context.coordinator.sidebarMonospace = sidebarMonospace
+        context.coordinator.sidebarLineGap = sidebarLineGap
         context.coordinator.reload()
     }
 
@@ -404,6 +411,7 @@ private struct DatabaseGameListView: NSViewRepresentable {
         var sidebarFontSize: CGFloat
         var sidebarTextColor: PlayerViewModel.DatabaseSidebarTextColor
         var sidebarMonospace: Bool
+        var sidebarLineGap: CGFloat
         private weak var tableView: DatabaseSidebarNativeTableView?
         private var reloadScheduled = false
         private var isSynchronizingTableSelection = false
@@ -415,6 +423,7 @@ private struct DatabaseGameListView: NSViewRepresentable {
         private var lastFontSize: CGFloat?
         private var lastTextColor: PlayerViewModel.DatabaseSidebarTextColor?
         private var lastMonospace: Bool?
+        private var lastLineGap: CGFloat?
 
         func setSelectionColor(_ color: NSColor) {
             tableView?.selectionHighlightView?.selectionColor = color
@@ -424,12 +433,14 @@ private struct DatabaseGameListView: NSViewRepresentable {
             model: PlayerViewModel,
             sidebarFontSize: CGFloat,
             sidebarTextColor: PlayerViewModel.DatabaseSidebarTextColor,
-            sidebarMonospace: Bool
+            sidebarMonospace: Bool,
+            sidebarLineGap: CGFloat
         ) {
             self._model = Bindable(model)
             self.sidebarFontSize = sidebarFontSize
             self.sidebarTextColor = sidebarTextColor
             self.sidebarMonospace = sidebarMonospace
+            self.sidebarLineGap = sidebarLineGap
         }
 
         func attach(tableView: DatabaseSidebarNativeTableView) {
@@ -438,6 +449,9 @@ private struct DatabaseGameListView: NSViewRepresentable {
 
         func reload() {
             guard let tableView else { return }
+            if tableView.intercellSpacing.height != sidebarLineGap {
+                tableView.intercellSpacing = NSSize(width: 0, height: sidebarLineGap)
+            }
             let sidebarContentRevision = model.databaseSidebar.contentRevision
             let expandedSystems = model.expandedDatabaseSystems
             let sidebarDataChanged = sidebarContentRevision != lastSidebarContentRevision
@@ -447,6 +461,7 @@ private struct DatabaseGameListView: NSViewRepresentable {
                 || sidebarFontSize != lastFontSize
                 || sidebarTextColor != lastTextColor
                 || sidebarMonospace != lastMonospace
+                || sidebarLineGap != lastLineGap
             let selectionChanged = model.selectedDatabaseGameIDs != lastSelectionIDs
             guard needsContentReload || selectionChanged else { return }
 
@@ -454,6 +469,7 @@ private struct DatabaseGameListView: NSViewRepresentable {
             lastFontSize = sidebarFontSize
             lastTextColor = sidebarTextColor
             lastMonospace = sidebarMonospace
+            lastLineGap = sidebarLineGap
 
             if sidebarDataChanged {
                 cachedSidebarRows = makeSidebarRows()
@@ -667,6 +683,7 @@ private struct DatabaseFileListView: NSViewRepresentable {
     let sidebarMonospace: Bool
     let sidebarDisclosureGap: CGFloat
     let sidebarChildIndent: CGFloat
+    let sidebarLineGap: CGFloat
     let hideFileExtensions: Bool
 
     func makeCoordinator() -> Coordinator {
@@ -677,6 +694,7 @@ private struct DatabaseFileListView: NSViewRepresentable {
             sidebarMonospace: sidebarMonospace,
             sidebarDisclosureGap: sidebarDisclosureGap,
             sidebarChildIndent: sidebarChildIndent,
+            sidebarLineGap: sidebarLineGap,
             hideFileExtensions: hideFileExtensions
         )
     }
@@ -684,6 +702,7 @@ private struct DatabaseFileListView: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
         let chrome = DatabaseSidebarTableChrome.makeTableView(
             rowHeight: model.databaseSidebarFontSize + 5,
+            rowGap: sidebarLineGap,
             columnIdentifier: "File",
             coordinator: context.coordinator,
             doubleAction: #selector(Coordinator.handleDoubleAction(_:)),
@@ -711,6 +730,7 @@ private struct DatabaseFileListView: NSViewRepresentable {
         context.coordinator.sidebarMonospace = sidebarMonospace
         context.coordinator.sidebarDisclosureGap = sidebarDisclosureGap
         context.coordinator.sidebarChildIndent = sidebarChildIndent
+        context.coordinator.sidebarLineGap = sidebarLineGap
         context.coordinator.hideFileExtensions = hideFileExtensions
         context.coordinator.reload()
     }
@@ -723,6 +743,7 @@ private struct DatabaseFileListView: NSViewRepresentable {
         var sidebarMonospace: Bool
         var sidebarDisclosureGap: CGFloat
         var sidebarChildIndent: CGFloat
+        var sidebarLineGap: CGFloat
         var hideFileExtensions: Bool
         private weak var tableView: DatabaseSidebarNativeTableView?
         private var reloadScheduled = false
@@ -737,6 +758,7 @@ private struct DatabaseFileListView: NSViewRepresentable {
         private var lastMonospace: Bool?
         private var lastDisclosureGap: CGFloat?
         private var lastChildIndent: CGFloat?
+        private var lastLineGap: CGFloat?
         private var lastHideFileExtensions: Bool?
 
         func setSelectionColor(_ color: NSColor) {
@@ -758,6 +780,7 @@ private struct DatabaseFileListView: NSViewRepresentable {
             sidebarMonospace: Bool,
             sidebarDisclosureGap: CGFloat,
             sidebarChildIndent: CGFloat,
+            sidebarLineGap: CGFloat,
             hideFileExtensions: Bool
         ) {
             self._model = Bindable(model)
@@ -766,6 +789,7 @@ private struct DatabaseFileListView: NSViewRepresentable {
             self.sidebarMonospace = sidebarMonospace
             self.sidebarDisclosureGap = sidebarDisclosureGap
             self.sidebarChildIndent = sidebarChildIndent
+            self.sidebarLineGap = sidebarLineGap
             self.hideFileExtensions = hideFileExtensions
         }
 
@@ -783,6 +807,9 @@ private struct DatabaseFileListView: NSViewRepresentable {
 
         func reload() {
             guard let tableView else { return }
+            if tableView.intercellSpacing.height != sidebarLineGap {
+                tableView.intercellSpacing = NSSize(width: 0, height: sidebarLineGap)
+            }
             let contentRevision = model.databaseFileSidebar.contentRevision
             let expandedFolderIDs = model.databaseFileSidebar.expandedFolderIDs
             let treeChanged = contentRevision != lastContentRevision || expandedFolderIDs != lastExpandedFolderIDs
@@ -792,6 +819,7 @@ private struct DatabaseFileListView: NSViewRepresentable {
                 || sidebarMonospace != lastMonospace
                 || sidebarDisclosureGap != lastDisclosureGap
                 || sidebarChildIndent != lastChildIndent
+                || sidebarLineGap != lastLineGap
                 || hideFileExtensions != lastHideFileExtensions
             let selectionChanged = model.selectedDatabaseFileIDs != lastSelectionIDs
                 || model.selectedDatabaseFileFolders != lastSelectedFolders
@@ -804,6 +832,7 @@ private struct DatabaseFileListView: NSViewRepresentable {
             lastMonospace = sidebarMonospace
             lastDisclosureGap = sidebarDisclosureGap
             lastChildIndent = sidebarChildIndent
+            lastLineGap = sidebarLineGap
             lastHideFileExtensions = hideFileExtensions
             if treeChanged {
                 cachedRows = model.databaseFileSidebar.rows()

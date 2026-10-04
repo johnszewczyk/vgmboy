@@ -36,9 +36,11 @@ enum AppDefaultsKey {
     static let databaseSidebarMonospaceFont = "CocoaSpice.databaseSidebarMonospaceFont"
     static let databaseSidebarDisclosureGap = "CocoaSpice.databaseSidebarDisclosureGap"
     static let databaseSidebarDisclosureGapPoints = "CocoaSpice.databaseSidebarDisclosureGapPoints"
+    static let databaseSidebarLineGapPoints = "CocoaSpice.databaseSidebarLineGapPoints"
     static let databaseSidebarChildIndentPoints = "CocoaSpice.databaseSidebarChildIndentPoints"
     static let databaseSidebarHidesFileExtensions = "CocoaSpice.databaseSidebarHidesFileExtensions"
     static let playlistFontSize = "CocoaSpice.playlistFontSize"
+    static let playlistLineGapPoints = "CocoaSpice.playlistLineGapPoints"
     static let playlistTextColor = "CocoaSpice.playlistTextColor"
     static let playlistMonospaceFont = "CocoaSpice.playlistMonospaceFont"
     static let sidebarSystemMode = "CocoaSpice.sidebarSystemMode"
@@ -85,9 +87,11 @@ struct RestoredPlaybackPreferences {
     let databaseSidebarMonospaceFont: Bool
     let databaseSidebarDisclosureGap: Double?
     let databaseSidebarDisclosureGapPoints: Double?
+    let databaseSidebarLineGapPoints: Double?
     let databaseSidebarChildIndentPoints: Double?
     let databaseSidebarHidesFileExtensions: Bool
     let playlistFontSize: Double?
+    let playlistLineGapPoints: Double?
     let playlistTextColor: String?
     let playlistMonospaceFont: Bool
     let sidebarSystemMode: Bool
@@ -189,9 +193,11 @@ enum AppSessionPersistence {
             databaseSidebarMonospaceFont: defaults.object(forKey: AppDefaultsKey.databaseSidebarMonospaceFont) as? Bool ?? false,
             databaseSidebarDisclosureGap: defaults.object(forKey: AppDefaultsKey.databaseSidebarDisclosureGap) as? Double,
             databaseSidebarDisclosureGapPoints: defaults.object(forKey: AppDefaultsKey.databaseSidebarDisclosureGapPoints) as? Double,
+            databaseSidebarLineGapPoints: defaults.object(forKey: AppDefaultsKey.databaseSidebarLineGapPoints) as? Double,
             databaseSidebarChildIndentPoints: defaults.object(forKey: AppDefaultsKey.databaseSidebarChildIndentPoints) as? Double,
             databaseSidebarHidesFileExtensions: defaults.object(forKey: AppDefaultsKey.databaseSidebarHidesFileExtensions) as? Bool ?? false,
             playlistFontSize: defaults.object(forKey: AppDefaultsKey.playlistFontSize) as? Double,
+            playlistLineGapPoints: defaults.object(forKey: AppDefaultsKey.playlistLineGapPoints) as? Double,
             playlistTextColor: defaults.string(forKey: AppDefaultsKey.playlistTextColor),
             playlistMonospaceFont: defaults.object(forKey: AppDefaultsKey.playlistMonospaceFont) as? Bool ?? false,
             sidebarSystemMode: defaults.object(forKey: AppDefaultsKey.sidebarSystemMode) as? Bool ?? false,
@@ -244,9 +250,11 @@ enum AppSessionPersistence {
         databaseSidebarTextColor: String,
         databaseSidebarMonospaceFont: Bool,
         databaseSidebarDisclosureGapPoints: CGFloat,
+        databaseSidebarLineGapPoints: CGFloat,
         databaseSidebarChildIndentPoints: CGFloat,
         databaseSidebarHidesFileExtensions: Bool,
         playlistFontSize: CGFloat,
+        playlistLineGapPoints: CGFloat,
         playlistTextColor: String,
         playlistMonospaceFont: Bool,
         sidebarSystemMode: Bool,
@@ -292,9 +300,11 @@ enum AppSessionPersistence {
         defaults.set(databaseSidebarTextColor, forKey: AppDefaultsKey.databaseSidebarTextColor)
         defaults.set(databaseSidebarMonospaceFont, forKey: AppDefaultsKey.databaseSidebarMonospaceFont)
         defaults.set(Double(databaseSidebarDisclosureGapPoints), forKey: AppDefaultsKey.databaseSidebarDisclosureGapPoints)
+        defaults.set(Double(databaseSidebarLineGapPoints), forKey: AppDefaultsKey.databaseSidebarLineGapPoints)
         defaults.set(Double(databaseSidebarChildIndentPoints), forKey: AppDefaultsKey.databaseSidebarChildIndentPoints)
         defaults.set(databaseSidebarHidesFileExtensions, forKey: AppDefaultsKey.databaseSidebarHidesFileExtensions)
         defaults.set(Double(playlistFontSize), forKey: AppDefaultsKey.playlistFontSize)
+        defaults.set(Double(playlistLineGapPoints), forKey: AppDefaultsKey.playlistLineGapPoints)
         defaults.set(playlistTextColor, forKey: AppDefaultsKey.playlistTextColor)
         defaults.set(playlistMonospaceFont, forKey: AppDefaultsKey.playlistMonospaceFont)
         defaults.set(sidebarSystemMode, forKey: AppDefaultsKey.sidebarSystemMode)

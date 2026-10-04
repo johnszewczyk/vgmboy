@@ -41,6 +41,7 @@
 - Interface Style: font size, text color, and monospace settings apply consistently to both the database sidebar and playlist. Selection highlights use `NSColor.controlAccentColor`, so CocoaSpice follows the user's macOS accent and has no app-specific accent-color preference. CocoaSpice's standard macOS buttons and labels keep their native system styling.
 - Each appearance card Reset restores its own default primary 12pt appearance.
 - Sidebar Options: Group by Console sorts the Database game list into consoles. Prefer Folders over Metadatas chooses the scanned archive or file's parent console folder before embedded console metadata; disabling it reverses that preference. It is a read-only sidebar reload, not a scan or database rewrite. Files Disclosure Gap sets 0–16 pt spacing between folder triangles and names in Files view. Files Child Indent is a numeric 0–32 pt field that offsets every Files-view child level; its default 8 pt is about one character at the default font size. Hide File Extensions changes only Files-view labels, never filenames stored by the database or passed to playback.
+- Playlist Line Gap and Sidebar Line Gap independently add 0–16 pt between playlist rows and Database sidebar rows. Both default to 0 pt, which adds no space.
 - Library Behavior belongs to Interface: Playlist Follows Cursor applies to the
   Games browser. In Files view, multi-track sources and archives populate the
   playlist on selection; single-track files queue only on double-click or

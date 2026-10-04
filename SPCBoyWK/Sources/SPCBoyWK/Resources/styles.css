@@ -145,7 +145,7 @@ body.is-file-drag-over::after {
 
 .workspace {
   display: grid;
-  grid-template-columns: calc(var(--sidebar-width-percent) * 1%) 0.2rem minmax(0, 1fr);
+  grid-template-columns: calc(var(--sidebar-width-percent) * 1%) 1px minmax(0, 1fr);
   min-height: 0;
   height: 100vh;
   background: var(--bg-chrome);
@@ -154,8 +154,8 @@ body.is-file-drag-over::after {
 .sidebar-resize-handle {
   position: relative;
   z-index: 10;
-  width: 0.2rem;
-  min-width: 0.2rem;
+  width: 1px;
+  min-width: 1px;
   height: 100%;
   background: transparent;
   cursor: col-resize;
@@ -373,12 +373,6 @@ body.options-window .tool-button:hover {
   margin-left: 0;
 }
 
-.transport-toolbar .timing-readout {
-  justify-content: flex-start;
-  min-width: 0;
-  width: 100%;
-}
-
 .playlist-bottom-toolbar {
   display: flex;
   align-items: center;
@@ -392,8 +386,28 @@ body.options-window .tool-button:hover {
 }
 
 .playlist-bottom-toolbar .progress-slider-shell {
-  width: 100%;
-  min-width: 0;
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 4rem;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.playlist-bottom-toolbar .timing-readout {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  min-width: max-content;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.playlist-bottom-toolbar .time-label {
+  min-width: 3.5ch;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .playlist-tabs-toolbar {
@@ -948,16 +962,17 @@ body.options-window .tool-button:hover {
 }
 
 .progress-slider-shell {
-  --slider-track-height: 1px;
-  --slider-thumb-size: var(--control-glyph-size);
+  --slider-track-height: 2px;
+  --slider-thumb-size: 0.45rem;
   position: relative;
   flex: 1 1 auto;
   width: auto;
   min-width: 8rem;
   height: var(--control-height);
   padding: 0 var(--control-padding-x);
-  border-radius: var(--control-radius);
-  background: var(--button-bg);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .progress-slider-rail {
@@ -967,7 +982,8 @@ body.options-window .tool-button:hover {
   top: 50%;
   height: var(--slider-track-height);
   transform: translateY(-50%);
-  background: rgb(30 30 30);
+  border-radius: 999px;
+  background: var(--line);
   overflow: visible;
 }
 
@@ -986,6 +1002,8 @@ body.options-window .tool-button:hover {
   left: var(--progress-percent);
   width: var(--slider-thumb-size);
   height: var(--slider-thumb-size);
+  border: 1px solid var(--bg-panel);
+  border-radius: 50%;
   background: var(--accent);
   transform: translate(-50%, -50%);
 }

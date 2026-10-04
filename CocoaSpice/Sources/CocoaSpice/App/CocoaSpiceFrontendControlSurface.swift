@@ -57,7 +57,9 @@ struct CocoaSpiceOptionsSnapshot: Codable, Equatable, Sendable {
     let preferFoldersOverMetadata: Bool
     let sidebarHidesFileExtensions: Bool
     let sidebarDisclosureGapPoints: Double
+    let sidebarLineGapPoints: Double
     let sidebarChildIndentPoints: Double
+    let playlistLineGapPoints: Double
     let catalogPath: String
     let catalogStatus: String?
     let cacheEnabled: Bool
@@ -103,7 +105,9 @@ enum CocoaSpiceOptionsCommand: Codable, Equatable, Sendable {
     case setPreferFoldersOverMetadata(Bool)
     case setSidebarHidesFileExtensions(Bool)
     case setSidebarDisclosureGapPoints(Double)
+    case setSidebarLineGapPoints(Double)
     case setSidebarChildIndentPoints(Double)
+    case setPlaylistLineGapPoints(Double)
     case setLibGmeTempo(PlaybackTempo)
     case setLibGmeTempoEnabled(Bool)
     case setLibVgmTempo(PlaybackTempo)
@@ -154,7 +158,9 @@ final class CocoaSpiceOptionsControlSurface {
             preferFoldersOverMetadata: model.preferFoldersOverMetadata,
             sidebarHidesFileExtensions: model.databaseSidebarHidesFileExtensions,
             sidebarDisclosureGapPoints: Double(model.databaseSidebarDisclosureGapPoints),
+            sidebarLineGapPoints: Double(model.databaseSidebarLineGapPoints),
             sidebarChildIndentPoints: Double(model.databaseSidebarChildIndentPoints),
+            playlistLineGapPoints: Double(model.playlistLineGapPoints),
             catalogPath: model.configuredLibraryDatabasePath,
             catalogStatus: model.libraryDatabaseLocationStatus,
             cacheEnabled: model.archiveCachePolicy.isEnabled,
@@ -231,8 +237,12 @@ final class CocoaSpiceOptionsControlSurface {
             model.setDatabaseSidebarHidesFileExtensions(enabled)
         case .setSidebarDisclosureGapPoints(let points):
             model.setDatabaseSidebarDisclosureGapPoints(CGFloat(points))
+        case .setSidebarLineGapPoints(let points):
+            model.setDatabaseSidebarLineGapPoints(CGFloat(points))
         case .setSidebarChildIndentPoints(let points):
             model.setDatabaseSidebarChildIndentPoints(CGFloat(points))
+        case .setPlaylistLineGapPoints(let points):
+            model.setPlaylistLineGapPoints(CGFloat(points))
         case .setLibGmeTempo(let tempo):
             model.setLibGmeTempo(tempo)
         case .setLibGmeTempoEnabled(let enabled):

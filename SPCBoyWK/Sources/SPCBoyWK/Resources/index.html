@@ -42,13 +42,6 @@
               <button id="long-play-button" class="tool-button glyph-button ui-control" type="button" title="Toggle Long Play" aria-label="Toggle Long Play"><svg class="ui-icon" aria-hidden="true"><use href="#icon-infinity"></use></svg></button>
               <button id="repeat-button" class="tool-button glyph-button ui-control" type="button" title="Repeat off" aria-label="Repeat off"><svg class="ui-icon" aria-hidden="true"><use href="#icon-repeat-2"></use></svg></button>
             </div>
-            <div class="ui-control toolbar-control timing-readout">
-              <span id="elapsed-label" class="time-label">0:00</span>
-              <span class="time-separator">/</span>
-              <span id="song-length-label" class="time-label">0:00</span>
-              <span class="time-separator">/</span>
-              <span id="playlist-total-label" class="time-label">0:00</span>
-            </div>
           </div>
           <div class="sidebar-search-wrap toolbar">
               <input id="sidebar-search-input" class="sidebar-search-input" type="search" placeholder="Search" />
@@ -87,12 +80,19 @@
             </div>
           </div>
           <div class="playlist-bottom-toolbar toolbar" aria-label="Playback position">
-            <div id="progress-slider-shell" class="tool-button ui-control toolbar-control progress-slider-shell">
+            <div id="progress-slider-shell" class="ui-control toolbar-control progress-slider-shell">
               <div class="progress-slider-rail">
                 <div class="progress-slider-fill"></div>
                 <div class="progress-slider-thumb"></div>
               </div>
               <input id="progress-slider" type="range" min="0" max="1" step="0.1" value="0" aria-label="Playback position" />
+            </div>
+            <div class="ui-control toolbar-control timing-readout" aria-label="Elapsed time / track length / playlist length">
+              <span id="elapsed-label" class="time-label">0:00</span>
+              <span class="time-separator">/</span>
+              <span id="song-length-label" class="time-label">0:00</span>
+              <span class="time-separator">/</span>
+              <span id="playlist-total-label" class="time-label">0:00</span>
             </div>
           </div>
         </section>
