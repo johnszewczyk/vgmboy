@@ -54,6 +54,14 @@ the procedure for each package's source format.
   explicitly keep region suffixes throughout a collection with many parallel
   regional releases; state that exception in the set profile. Keep the Region
   tag even when the filename does not show it.
+- **Filename detail** — When multiple identified packages share the same base
+  title, append the shortest source-supported distinguishing detail, such as
+  subtitle, sequel number, prototype, edition, or revision. Keep the plain
+  base title for the package that has no such detail. Use region only when it
+  is known. If the source does not provide enough detail to make the names
+  unique, use the preserved source-package name only when that distinguishes
+  the source states; otherwise leave the packages in review rather than
+  inventing qualifiers.
 - **Candidate releases** — A title or region match alone does not establish a
   release ID. Do not add a candidate ID or ID-based filename suffix until one
   unique release is confirmed; otherwise use the known title and
