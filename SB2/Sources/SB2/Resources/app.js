@@ -2,6 +2,14 @@
 const app = window.SB2App;
 const { state, refs } = app;
 
+document.querySelectorAll("[data-window-action]").forEach((button) => {
+  button.addEventListener("click", () => {
+    window.spcBoySB2?.windowAction?.(button.dataset.windowAction)?.catch((error) => {
+      console.error("[SPCBOY SB2] window action failed", error);
+    });
+  });
+});
+
 let resizingSidebar = false;
 let resizePointerId = null;
 refs.sidebarResizeHandle?.addEventListener("pointerdown", (event) => {
@@ -659,6 +667,11 @@ window.addEventListener("pagehide", () => {
 
 app.ui.bootstrap().catch((error) => {
   console.error(error);
+  if (!window.spcBoySB2?.isOptionsWindow) {
+    state.databaseSidebarLoading = false;
+    state.databaseSidebarError = `Catalog startup failed: ${error?.message || error}`;
+    app.ui.renderAll();
+  }
 });
 
 window.addEventListener("focus", () => {

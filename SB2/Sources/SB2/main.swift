@@ -33,6 +33,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let nativeBridge = WKNativeBridge()
         nativeBridge.onOpenOptionsWindow = { [weak self] in self?.showOptionsWindow() }
         nativeBridge.onCloseMainWindow = { [weak self] in self?.window?.performClose(nil) }
+        nativeBridge.onWindowAction = { [weak self] action in
+            guard let self else { return }
+            self.performWindowAction(action, on: self.window)
+        }
         nativeBridge.onChooseAACExportDirectory = { [weak self] in self?.chooseDirectory(title: "Choose AAC Export Folder") }
         nativeBridge.onAppearanceSettingsChanged = { [weak self] settings in
             self?.broadcastAppearanceSettings(settings)
@@ -63,10 +67,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 980, height: 640),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
+        configureIntegratedTitlebar(on: window)
         window.title = "SPCBOY SB2"
         window.tabbingMode = .disallowed
         window.contentView = webView
@@ -195,6 +200,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
         let bridge = WKNativeBridge(isOptionsWindow: true)
         bridge.onCloseOptionsWindow = { [weak self] in self?.closeOptionsWindow() }
+        bridge.onWindowAction = { [weak self] action in
+            guard let self else { return }
+            self.performWindowAction(action, on: self.optionsWindow)
+        }
         bridge.onChooseAACExportDirectory = { [weak self] in self?.chooseDirectory(title: "Choose AAC Export Folder") }
         bridge.onAppearanceSettingsChanged = { [weak self] settings in
             self?.broadcastAppearanceSettings(settings)
@@ -212,10 +221,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
         let optionsWindow = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 820, height: 720),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
+        configureIntegratedTitlebar(on: optionsWindow)
         optionsWindow.title = "SPCBOY SB2 Settings"
         optionsWindow.tabbingMode = .disallowed
         optionsWindow.contentView = optionsWebView
@@ -233,6 +243,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     private func closeOptionsWindow() {
         optionsWindow?.close()
+    }
+
+    private func configureIntegratedTitlebar(on window: NSWindow) {
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.isMovableByWindowBackground = true
+        window.standardWindowButton(.closeButton)?.isHidden = true
+        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        window.standardWindowButton(.zoomButton)?.isHidden = true
+    }
+
+    private func performWindowAction(_ action: String, on window: NSWindow?) {
+        guard let window else { return }
+        switch action {
+        case "close": window.performClose(nil)
+        case "minimize": window.performMiniaturize(nil)
+        case "zoom": window.performZoom(nil)
+        default: break
+        }
     }
 
     private func broadcastAppearanceSettings(_ settings: [String: Any]) {

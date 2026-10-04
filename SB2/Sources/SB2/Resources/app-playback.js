@@ -449,7 +449,7 @@ function updatePlaybackReadout() {
   updateElapsedReadout();
   const playlistTotalSeconds = state.playlist.reduce((sum, entry) => sum + currentOutputBasePlaybackSeconds(entry), 0);
   refs.playlistTotalLabel.textContent = formatTime(playlistTotalSeconds);
-  uiApp.ui?.updateSB2Titlebar?.();
+  playbackApp.ui?.updateSB2Titlebar?.();
   refs.playButton.querySelector("use")?.setAttribute("href", state.isPlaying ? "#icon-pause" : "#icon-play");
   refs.stopButton.disabled = !state.currentTrackId && !state.currentTrackInfo;
   syncMediaSessionState();

@@ -34,7 +34,12 @@
     </svg>
     <div class="app-shell">
       <header class="sb-titlebar" aria-label="SPCBOY SB2 status">
-        <strong>SPCBOY</strong><span class="sb-mark">SB2</span>
+        <div class="sb-window-controls" role="group" aria-label="Window controls">
+          <button class="sb-window-control is-close" type="button" data-window-action="close" title="Close window" aria-label="Close window"><span aria-hidden="true"></span></button>
+          <button class="sb-window-control is-minimize" type="button" data-window-action="minimize" title="Minimize window" aria-label="Minimize window"><span aria-hidden="true"></span></button>
+          <button class="sb-window-control is-zoom" type="button" data-window-action="zoom" title="Zoom window" aria-label="Zoom window"><span aria-hidden="true"></span></button>
+        </div>
+        <strong>SPCBOY</strong>
         <span id="sb2-console-label" class="sb-console">—</span>
         <span id="sb2-album-label" class="sb-album">NO PLAYLIST</span>
         <span class="sb-cpu"><small>CPU</small><i class="sb-cpu-meter"><b id="sb2-cpu-fill"></b></i><strong id="sb2-cpu-value">—%</strong></span>

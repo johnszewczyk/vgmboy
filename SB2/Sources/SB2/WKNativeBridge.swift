@@ -84,6 +84,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     var onOpenOptionsWindow: (() -> Void)?
     var onCloseOptionsWindow: (() -> Void)?
     var onCloseMainWindow: (() -> Void)?
+    var onWindowAction: ((String) -> Void)?
     var onChooseAACExportDirectory: (() -> String?)?
     var onAppearanceSettingsChanged: (([String: Any]) -> Void)?
     var onFrontendSettingsChanged: ((SB2PreferencesSnapshot) -> Void)?
@@ -240,6 +241,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             openOptionsWindow: () => request("openOptionsWindow"),
             closeOptionsWindow: () => request("closeOptionsWindow"),
             closeMainWindow: () => request("closeMainWindow"),
+            windowAction: (...args) => request("windowAction", args),
             showInFinder: (...args) => request("showInFinder", args),
             nativePlaybackInit: (...args) => request("nativePlaybackInit", args),
             nativePlaybackAudioConfig: (...args) => request("nativePlaybackAudioConfig", args),
@@ -296,6 +298,20 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             default: handler = onCloseMainWindow
             }
             Task { @MainActor in handler?() }
+            Task {
+                await Self.reply(to: message.webView, id: id, success: true, valueJSON: "null")
+            }
+            return
+        }
+
+        if method == "windowAction" {
+            guard let action = args.first as? String,
+                  ["close", "minimize", "zoom"].contains(action) else {
+                Task { await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": BridgeError.invalidArguments.localizedDescription])) }
+                return
+            }
+            let handler = onWindowAction
+            Task { @MainActor in handler?(action) }
             Task {
                 await Self.reply(to: message.webView, id: id, success: true, valueJSON: "null")
             }
