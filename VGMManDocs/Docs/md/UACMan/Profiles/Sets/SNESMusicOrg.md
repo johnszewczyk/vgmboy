@@ -68,9 +68,22 @@ profile defines only how confirmed values are represented in UAC packages.
   title in the package filename and **Region** `--` when region is unknown.
   Follow the Base Set Profile's collision-driven filename rule; never add an
   unknown-region marker to the filename.
-  Only record a specific region when existing source metadata isolates it; do
-  not infer one from a candidate No-Intro release. Keep source **Album** values
-  unchanged while title/Album conflicts are reviewed.
+  When a package or track set uses only the game's Japanese title, treat that
+  as evidence for **Region** `JP`; do not leave it unknown merely because the
+  source omits a region code. A Japanese title is not enough to choose among
+  multiple revisions or dumps of that JP release, so assign **Game ID** only
+  when one No-Intro ID remains supported.
+  Keep source **Album** values unchanged while title/Album conflicts are
+  reviewed.
+- **Regional merges** — Check track-level **Game Title** values, their track
+  membership, and stored stream identities for signs that one RSN combined
+  tracks from multiple regional releases. SPC **Format** versions are checked
+  per track as separate evidence for mixed rips; a shared SPC version does not
+  rule out a regional merge. When distinct regional groups are clear, split
+  them into separate UAC packages, preserve original member bytes, all four
+  stream hashes, source-RSN hash claims, and bundled source documents in each
+  derived package. Assign a region only where the group identifies one; route
+  unresolved region/revision groups to review rather than merging them back.
 - **Game ID field** — Copy a No-Intro **Game ID** only when existing evidence
   identifies one release ID. A canonical game-root title is sufficient to
   identify the game for naming and review, but does not justify choosing one
