@@ -1,5 +1,5 @@
 (() => {
-const app = window.SPCBoyApp;
+const app = window.SB2App;
 const { state, persistSettings } = app;
 
 function renderAll() {
@@ -11,8 +11,8 @@ function refreshDatabaseGamesForVisibleRoots() {
 }
 
 async function refreshLibraryRoots() {
-  if (!window.spcBoyWK?.databaseRoots) return;
-  state.libraryRoots = await window.spcBoyWK.databaseRoots();
+  if (!window.spcBoySB2?.databaseRoots) return;
+  state.libraryRoots = await window.spcBoySB2.databaseRoots();
   renderAll();
 }
 
@@ -34,10 +34,10 @@ async function handleLibraryRootsChanged(roots) {
 }
 
 async function refreshArchiveCacheSummary() {
-  if (!window.spcBoyWK?.archiveCacheSummary) return;
+  if (!window.spcBoySB2?.archiveCacheSummary) return;
   try {
-    state.archiveCacheLocation = await window.spcBoyWK.archiveCacheLocation?.() || "";
-    state.archiveCacheSummary = await window.spcBoyWK.archiveCacheSummary();
+    state.archiveCacheLocation = await window.spcBoySB2.archiveCacheLocation?.() || "";
+    state.archiveCacheSummary = await window.spcBoySB2.archiveCacheSummary();
   } catch (error) {
     state.archiveCacheSummary = null;
     state.databaseLocationStatus = `Archive cache status unavailable • ${error.message}`;
@@ -46,8 +46,8 @@ async function refreshArchiveCacheSummary() {
 }
 
 async function refreshDatabaseLocation() {
-  if (!window.spcBoyWK?.databaseLocation) return;
-  state.databaseLocation = await window.spcBoyWK.databaseLocation();
+  if (!window.spcBoySB2?.databaseLocation) return;
+  state.databaseLocation = await window.spcBoySB2.databaseLocation();
   state.databaseLocationStatus = state.databaseLocation.requiresRestart
     ? "Restart SPCBoy to use the selected database."
     : "The shared ScanSong catalog is active and opened read-only.";
@@ -55,7 +55,7 @@ async function refreshDatabaseLocation() {
 }
 
 async function chooseDatabaseLocation() {
-  const result = await window.spcBoyWK?.chooseDatabaseLocation?.();
+  const result = await window.spcBoySB2?.chooseDatabaseLocation?.();
   if (!result) return;
   state.databaseLocation = result;
   state.databaseLocationStatus = `Validated ${Number(result.catalog?.trackCount || 0).toLocaleString()} tracks. Restart SPCBoy to use this database.`;
@@ -63,7 +63,7 @@ async function chooseDatabaseLocation() {
 }
 
 async function useDefaultDatabaseLocation() {
-  state.databaseLocation = await window.spcBoyWK?.useDefaultDatabaseLocation?.();
+  state.databaseLocation = await window.spcBoySB2?.useDefaultDatabaseLocation?.();
   state.databaseLocationStatus = state.databaseLocation?.requiresRestart
     ? "Restart SPCBoy to use the default CocoaSpice database."
     : "The default CocoaSpice database is already active.";
@@ -71,34 +71,26 @@ async function useDefaultDatabaseLocation() {
 }
 
 async function handleCatalogReloaded(result) {
-  state.databaseLocation = result || await window.spcBoyWK?.databaseLocation?.() || null;
+  state.databaseLocation = result || await window.spcBoySB2?.databaseLocation?.() || null;
   state.databaseLocationStatus = state.databaseLocation?.reloaded
     ? "Library reloaded. SPCBoy is reading the latest ScanSong catalog."
     : state.databaseLocation?.requiresRestart
       ? "Restart SPCBoy to use the selected database."
       : "The shared ScanSong catalog is active and opened read-only.";
-  if (!window.spcBoyWK?.isOptionsWindow && window.spcBoyWK?.databaseRoots) {
-    state.libraryRoots = await window.spcBoyWK.databaseRoots();
+  if (!window.spcBoySB2?.isOptionsWindow && window.spcBoySB2?.databaseRoots) {
+    state.libraryRoots = await window.spcBoySB2.databaseRoots();
     await handleLibraryRootsChanged(state.libraryRoots);
-    // Keep the inactive Path View snapshot current too. Otherwise reloading
-    // while Console View is active leaves the cached file tree stale until a
-    // later manual refresh.
-    if (state.sidebarMode !== "paths") await app.ui.loadDatabaseFiles();
   }
   renderAll();
 }
 
 async function reloadDatabaseLibrary() {
-  if (!window.spcBoyWK?.reloadDatabaseLibrary) return;
+  if (!window.spcBoySB2?.reloadDatabaseLibrary) return;
   state.databaseReloading = true;
   state.databaseLocationStatus = "Reloading the latest ScanSong catalog…";
   renderAll();
   try {
-    await handleCatalogReloaded(await window.spcBoyWK.reloadDatabaseLibrary());
-  } catch (error) {
-    state.databaseLocationStatus = `Library reload failed • ${error.message}`;
-    renderAll();
-    throw error;
+    await handleCatalogReloaded(await window.spcBoySB2.reloadDatabaseLibrary());
   } finally {
     state.databaseReloading = false;
     renderAll();
@@ -106,9 +98,9 @@ async function reloadDatabaseLibrary() {
 }
 
 async function clearLibraryArchiveCache() {
-  if (!window.spcBoyWK?.clearArchiveCache) return;
+  if (!window.spcBoySB2?.clearArchiveCache) return;
   try {
-    await window.spcBoyWK.clearArchiveCache();
+    await window.spcBoySB2.clearArchiveCache();
   } finally {
     await refreshArchiveCacheSummary();
   }
@@ -116,7 +108,7 @@ async function clearLibraryArchiveCache() {
 }
 
 async function showLibraryArchiveCacheInFinder() {
-  await window.spcBoyWK?.showArchiveCacheInFinder?.();
+  await window.spcBoySB2?.showArchiveCacheInFinder?.();
 }
 
 Object.assign(app.ui, {

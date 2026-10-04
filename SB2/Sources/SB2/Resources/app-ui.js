@@ -1,6 +1,17 @@
 (() => {
-const uiApp = window.SPCBoyApp;
+const uiApp = window.SB2App;
 const { state, refs, persistSettings, loadSettings, targetPlaybackSeconds, COLUMN_DEFS } = uiApp;
+if (document.body.classList.contains("sb2-frontend")) {
+  const searchWrap = document.querySelector(".sidebar-search-wrap");
+  const searchSlot = document.querySelector(".sb-status-sidebar");
+  const functionButtons = document.querySelector(".sidebar-search-actions");
+  const transport = document.querySelector(".transport-toolbar .transport");
+  const optionsOverlay = refs.optionsOverlay;
+  const content = document.querySelector(".content");
+  if (searchWrap && searchSlot) searchSlot.append(searchWrap);
+  if (functionButtons && transport) transport.append(functionButtons);
+  if (optionsOverlay && content) content.append(optionsOverlay);
+}
 const expandedFolders = new Set();
 let draggedColumnId = null;
 let metadataRefreshFrame = 0;
@@ -53,7 +64,7 @@ function syncActivePlaylistTab() {
 }
 
 function persistPlaylistTabs() {
-  if (window.spcBoyWK?.isOptionsWindow || !window.spcBoyWK?.playlistTabsSave) return;
+  if (window.spcBoySB2?.isOptionsWindow || !window.spcBoySB2?.playlistTabsSave) return;
   syncActivePlaylistTab();
   window.clearTimeout(playlistTabsSaveTimer);
   playlistTabsSaveTimer = window.setTimeout(() => {
@@ -73,7 +84,7 @@ function persistPlaylistTabs() {
     };
     playlistTabsSaveChain = playlistTabsSaveChain
       .catch(() => {})
-      .then(() => window.spcBoyWK.playlistTabsSave(payload))
+      .then(() => window.spcBoySB2.playlistTabsSave(payload))
       .catch((error) => console.error("[SPCBoy] playlist tabs could not be saved", error));
   }, 500);
 }
@@ -120,6 +131,7 @@ function ensurePlaylistTab() {
 }
 
 function renderPlaylistTabs() {
+  updateSB2Titlebar();
   const tabs = Array.isArray(state.playlistTabs) ? state.playlistTabs : [];
   const hasTabs = tabs.length > 1;
   refs.playlistTabsToolbar?.classList.toggle("is-hidden", !hasTabs);
@@ -204,7 +216,7 @@ function createPlaylistTab({ duplicateActive = true, title = null } = {}) {
 function closePlaylistTab(tabID = state.activePlaylistTabId) {
   const tabs = state.playlistTabs || [];
   if (tabs.length <= 1) {
-    window.spcBoyWK?.closeMainWindow?.().catch((error) => console.error("[SPCBoy] close window failed", error));
+    window.spcBoySB2?.closeMainWindow?.().catch((error) => console.error("[SPCBoy] close window failed", error));
     return false;
   }
   const closingIndex = tabs.findIndex((tab) => tab.id === tabID);
@@ -306,13 +318,13 @@ function isFavoritePresentation(track) {
 }
 
 async function refreshFavorites() {
-  const favorites = await window.spcBoyWK.favoritesList(state.favoriteSortOrder);
+  const favorites = await window.spcBoySB2.favoritesList(state.favoriteSortOrder);
   applyFavoriteSnapshot(favorites);
   return state.favorites;
 }
 
 async function toggleFavorites(tracks) {
-  applyFavoriteSnapshot(await window.spcBoyWK.favoritesToggle(tracks, state.favoriteSortOrder));
+  applyFavoriteSnapshot(await window.spcBoySB2.favoritesToggle(tracks, state.favoriteSortOrder));
 }
 
 function playVisibleTrack(trackId, startSeconds = 0) {
@@ -674,19 +686,19 @@ async function loadBrowserChildren(node) {
 }
 
 async function invalidatePlaylistCatalogSession() {
-  await window.spcBoyWK.catalogSessionInvalidate("playlist");
+  await window.spcBoySB2.catalogSessionInvalidate("playlist");
 }
 
 async function loadBrowserSelection(node) {
   if (node.catalogFile) {
     return catalogPlaylistSelection(
-      await window.spcBoyWK.databaseFileTracks([node.catalogFile]),
+      await window.spcBoySB2.databaseFileTracks([node.catalogFile]),
       node.catalogFile.path
     );
   }
   if (node.catalogFolder) {
     return catalogPlaylistSelection(
-      await window.spcBoyWK.databaseFolderTracks([node.catalogFolder]),
+      await window.spcBoySB2.databaseFolderTracks([node.catalogFolder]),
       node.catalogFolder.folderPath
     );
   }
@@ -744,7 +756,7 @@ function showSidebarContextMenu(node, event) {
       const tab = createPlaylistTab({ duplicateActive: false, title: node.name || "Playlist" });
       if (tab) await activateBrowserNode(node, { playNow: false });
     }],
-    ["Show in Finder", async () => window.spcBoyWK.showInFinder(finderPath)],
+    ["Show in Finder", async () => window.spcBoySB2.showInFinder(finderPath)],
     ["Play Now", async () => activateBrowserNode(node)],
     ["Queue", async () => queueBrowserNode(node)]
   ]);
@@ -987,12 +999,14 @@ function renderTree() {
       : "No database tree is available.";
     refs.treeRoot.appendChild(empty);
     scheduleSelectionIndicators();
+    syncSidebarFoldButton();
     return;
   }
 
   ensureExpandedToSelection(visibleTree);
   visibleTree.forEach((node) => renderTreeNode(node, refs.treeRoot));
   scheduleSelectionIndicators();
+  syncSidebarFoldButton();
 }
 
 function databaseGameKey(game) {
@@ -1082,7 +1096,7 @@ function databaseGroupStateSnapshot() {
 async function applySharedDatabaseGroupAction(action, groupName = null, gameID = null, { collapsed = false } = {}) {
   const generation = ++databaseGroupTransitionGeneration;
   const knownGroupNames = databaseConsoleGroups.map(({ consoleName }) => consoleName);
-  const next = await window.spcBoyWK.databaseGroupState(
+  const next = await window.spcBoySB2.databaseGroupState(
     {
       state: databaseGroupStateSnapshot(),
       action: {
@@ -1176,10 +1190,10 @@ function makeDatabaseGameButton(game) {
         if (tab) await loadDatabaseGame(game);
       }],
       ["Show in Finder", async () => {
-        const rows = await window.spcBoyWK.databaseGameTracks([game]);
+        const rows = await window.spcBoySB2.databaseGameTracks([game]);
         if (rows?.stale === true) return;
         const row = rows.rows[0];
-        if (row) await window.spcBoyWK.showInFinder(row.archivePath || row.path);
+        if (row) await window.spcBoySB2.showInFinder(row.archivePath || row.path);
       }],
       ["Play Now", async () => {
         const loaded = await loadDatabaseGame(game);
@@ -1187,7 +1201,7 @@ function makeDatabaseGameButton(game) {
         if (targetID) await playVisibleTrack(targetID, 0);
       }],
       ["Queue", async () => {
-        const rows = await window.spcBoyWK.databaseGameTracks([game]);
+        const rows = await window.spcBoySB2.databaseGameTracks([game]);
         if (rows?.stale === true) return;
         appendPlaylistTracks(databaseRowsToPlaylistTracks(rows, { adoptProjection: false }));
       }]
@@ -1343,6 +1357,7 @@ function renderDatabaseGames() {
     ? "No database games match this search."
     : "Use ScanSong to populate the selected database.");
   scheduleSelectionIndicators();
+  syncSidebarFoldButton();
 }
 
 async function setAllDatabaseConsolesCollapsed(collapsed) {
@@ -1390,7 +1405,7 @@ async function loadDatabaseFiles() {
   state.databaseSidebarError = "";
   renderAll();
   try {
-    const fileTree = await window.spcBoyWK.databaseFileTree();
+    const fileTree = await window.spcBoySB2.databaseFileTree();
     if (fileTree?.stale === true) return false;
     state.databaseFileTree = Array.isArray(fileTree) ? fileTree : [];
     state.databaseFiles = state.databaseFileTree;
@@ -1489,7 +1504,7 @@ function historyRecordToPlaylistTrack(record) {
 
 async function showPlaybackHistory() {
   const renderGeneration = playlistRenderGeneration;
-  const records = await window.spcBoyWK.playbackHistoryList();
+  const records = await window.spcBoySB2.playbackHistoryList();
   if (renderGeneration !== playlistRenderGeneration) return false;
   await invalidatePlaylistCatalogSession();
   state.playlist = (Array.isArray(records) ? records : [])
@@ -1515,7 +1530,7 @@ async function showPlaybackHistory() {
 async function refreshDatabaseGamesForVisibleRoots() {
   const previousSelection = state.selectedDatabaseGameKey;
   try {
-    const projection = await window.spcBoyWK.databaseGames();
+    const projection = await window.spcBoySB2.databaseGames();
     if (projection?.stale === true) return false;
     state.databaseGames = Array.isArray(projection?.games) ? projection.games : [];
     state.databaseGameGroups = Array.isArray(projection?.groups) ? projection.groups : [];
@@ -1571,7 +1586,7 @@ async function toggleSelectedFavorites() {
       ? visibleDatabaseGames().filter((game) => databaseConsoleName(game) === state.selectedDatabaseConsoleName)
       : [];
   if (!games.length) return;
-  const rows = await window.spcBoyWK.databaseGameTracks(games);
+  const rows = await window.spcBoySB2.databaseGameTracks(games);
   if (rows?.stale === true) return;
   await toggleFavorites(databaseRowsToPlaylistTracks(rows, { adoptProjection: false }));
   renderSidebar();
@@ -1624,7 +1639,7 @@ async function loadDatabaseGamesIntoPlaylist(games, { title = null } = {}) {
   const targetTabID = state.activePlaylistTabId;
   await invalidatePlaylistCatalogSession();
   if (targetTabID !== state.activePlaylistTabId) return false;
-  const rows = await window.spcBoyWK.databaseGameTracks(games);
+  const rows = await window.spcBoySB2.databaseGameTracks(games);
   if (rows?.stale === true || targetTabID !== state.activePlaylistTabId) return false;
   state.databaseSidebarError = "";
   state.selectedDatabaseGameKey = games.length === 1 ? databaseGameKey(games[0]) : null;
@@ -1840,7 +1855,7 @@ async function applyCatalogPlaylistSort() {
       || !state.catalogPlaylistSortSessionId) return false;
   const generation = ++catalogPlaylistSortGeneration;
   const originalIDs = state.playlist.map((track) => track.id);
-  const orderedIDs = await window.spcBoyWK.databasePlaylistSort({
+  const orderedIDs = await window.spcBoySB2.databasePlaylistSort({
     sessionId: state.catalogPlaylistSortSessionId,
     column: state.sortColumn,
     direction: state.sortDirection,
@@ -1881,7 +1896,7 @@ async function applyProjectionPlaylistSort() {
   if (!state.playlistSortEnabled || isCatalogPlaylistProjection()) return false;
   const generation = ++projectionPlaylistSortGeneration;
   const originalIDs = state.playlist.map((track) => track.id);
-  const orderedIDs = await window.spcBoyWK.playlistProjectionSort({
+  const orderedIDs = await window.spcBoySB2.playlistProjectionSort({
     records: playlistSortRecords(),
     frontendColumn: state.sortColumn,
     direction: state.sortDirection
@@ -2257,7 +2272,7 @@ function selectPlaylistTrack(trackId, { focus = false, extend = false, range = f
   const track = state.playlist.find((entry) => entry.id === trackId);
   if (!track) return null;
 
-  const selection = window.SPCBoyPlaylistController.reduceSelection({
+  const selection = window.SB2PlaylistController.reduceSelection({
     playlist: state.playlist,
     selectedIds: state.selectedTrackIds,
     anchorId: state.playlistSelectionAnchorId
@@ -2623,7 +2638,7 @@ function appearanceSettings() {
 }
 
 function broadcastAppearanceSettings() {
-  window.spcBoyWK?.setAppearanceSettings?.(appearanceSettings());
+  window.spcBoySB2?.setAppearanceSettings?.(appearanceSettings());
 }
 
 function formatArchiveCacheSummary(summary) {
@@ -2636,7 +2651,7 @@ function formatArchiveCacheSummary(summary) {
 }
 
 function renderRoutingConflicts() {
-  const conflicts = window.SPCBoyPlaybackBackends?.conflicts || [];
+  const conflicts = window.SB2PlaybackBackends?.conflicts || [];
   if (!conflicts.length) {
     refs.routingConflictsList.innerHTML = '<div class="options-help-text">No overlapping decoder extensions are registered. New plugins that overlap an existing format will appear here before their routing policy is applied.</div>';
     return;
@@ -2652,14 +2667,14 @@ function renderRoutingConflicts() {
 }
 
 function setRoutingPreference(extension, backendId) {
-  const candidates = window.SPCBoyPlaybackBackends?.candidatesForPath?.(`route${extension}`) || [];
+  const candidates = window.SB2PlaybackBackends?.candidatesForPath?.(`route${extension}`) || [];
   if (!candidates.some((backend) => backend.id === backendId)) return;
   const nextPreferences = { ...state.routingPreferences };
   if (backendId === candidates[0]?.id) delete nextPreferences[extension];
   else nextPreferences[extension] = backendId;
   state.routingPreferences = nextPreferences;
   persistSettings();
-  window.spcBoyWK?.setRoutingPreferences?.(nextPreferences).then((normalizedPreferences) => {
+  window.spcBoySB2?.setRoutingPreferences?.(nextPreferences).then((normalizedPreferences) => {
     state.routingPreferences = { ...normalizedPreferences };
     persistSettings();
     renderAll();
@@ -2675,6 +2690,7 @@ function applyRoutingPreferences(preferences) {
 
 function renderAll() {
   applyUISettings();
+  updateSB2Titlebar();
   refs.optionsOverlay.classList.toggle("is-hidden", !state.optionsOpen);
   refs.optionsOverlay.setAttribute("aria-hidden", state.optionsOpen ? "false" : "true");
   const databaseSelected = state.optionsSection === "database";
@@ -2842,7 +2858,7 @@ function setPlayTime(nextSeconds) {
   state.manualPlayTimeSeconds = uiApp.normalizeLongPlayTime(nextSeconds);
   persistSettings();
   renderAll();
-  if (state.longPlayEnabled && !window.spcBoyWK?.isOptionsWindow && state.manualPlayTimeSeconds !== previousSeconds) {
+  if (state.longPlayEnabled && !window.spcBoySB2?.isOptionsWindow && state.manualPlayTimeSeconds !== previousSeconds) {
     uiApp.playback.refreshPlaybackForTimingChange().catch((error) => console.error(error));
   }
 }
@@ -2852,7 +2868,7 @@ function setSpcForceManualTime(nextEnabled) {
   state.longPlayEnabled = Boolean(nextEnabled);
   persistSettings();
   renderAll();
-  if (previousEnabled !== state.longPlayEnabled && !window.spcBoyWK?.isOptionsWindow) {
+  if (previousEnabled !== state.longPlayEnabled && !window.spcBoySB2?.isOptionsWindow) {
     uiApp.playback.refreshPlaybackForTimingChange().catch((error) => console.error(error));
   }
 }
@@ -2894,7 +2910,7 @@ async function applyArchiveCacheSettings() {
     limitBytes: state.archiveCacheLimitBytes
   };
   persistSettings();
-  const configured = await window.spcBoyWK?.configureArchiveCache?.(settings);
+  const configured = await window.spcBoySB2?.configureArchiveCache?.(settings);
   if (configured?.summary) {
     state.archiveCacheSummary = { ...configured.summary, enabled: configured.enabled, limitBytes: configured.limitBytes };
   }
@@ -2918,14 +2934,14 @@ function setArchiveCacheLimit(value) {
 }
 
 function sendEqualizerSettings() {
-  window.spcBoyWK?.nativePlaybackSetEqualizer?.({
+  window.spcBoySB2?.nativePlaybackSetEqualizer?.({
     enabled: state.equalizerEnabled,
     bandGains: [...state.equalizerBandGains]
   }).catch?.(() => {});
 }
 
 function persistEqualizerSettings() {
-  window.spcBoyWK?.frontendEqualizerSettingsSave?.({
+  window.spcBoySB2?.frontendEqualizerSettingsSave?.({
     equalizerEnabled: state.equalizerEnabled,
     equalizerBandGains: [...state.equalizerBandGains]
   }).catch?.((error) => console.error("[SPCBoy] native equalizer settings save failed", error));
@@ -2968,14 +2984,14 @@ function resetEqualizer() {
 function setAppVolume(volume) {
   state.appVolume = uiApp.normalizeAppVolume(volume);
   persistSettings();
-  window.spcBoyWK?.nativePlaybackSetVolume?.({ outputVolume: state.appVolume }).catch?.(() => {});
+  window.spcBoySB2?.nativePlaybackSetVolume?.({ outputVolume: state.appVolume }).catch?.(() => {});
   renderAll();
 }
 
 function setMonoEnabled(enabled) {
   state.monoEnabled = Boolean(enabled);
   persistSettings();
-  window.spcBoyWK?.nativePlaybackSetMono?.({ enabled: state.monoEnabled }).catch?.(() => {});
+  window.spcBoySB2?.nativePlaybackSetMono?.({ enabled: state.monoEnabled }).catch?.(() => {});
   renderAll();
 }
 
@@ -2988,7 +3004,7 @@ function commitSpcLengthInput(rawValue) {
   const previousSeconds = state.manualPlayTimeSeconds;
   state.manualPlayTimeSeconds = uiApp.normalizeLongPlayTime(parsedSeconds ?? state.manualPlayTimeSeconds);
   persistSettings();
-  if (state.longPlayEnabled && !window.spcBoyWK?.isOptionsWindow && state.manualPlayTimeSeconds !== previousSeconds) {
+  if (state.longPlayEnabled && !window.spcBoySB2?.isOptionsWindow && state.manualPlayTimeSeconds !== previousSeconds) {
     uiApp.playback.refreshPlaybackForTimingChange().catch((error) => console.error(error));
   }
 }
@@ -3171,7 +3187,7 @@ function setColumnAutoSize(enabled) {
 }
 
 function setAnimationTiming(key, value) {
-  window.SPCBoyOptionsController.setAnimation(state, uiApp.normalizeAnimationMilliseconds, key, value);
+  window.SB2OptionsController.setAnimation(state, uiApp.normalizeAnimationMilliseconds, key, value);
   persistSettings();
   renderAll();
 }
@@ -3183,7 +3199,7 @@ function setAnimationEnabled(key, enabled) {
 }
 
 function setWindowAlwaysOnTop(key, enabled) {
-  window.SPCBoyOptionsController.setWindowLevel(state, key, enabled);
+  window.SB2OptionsController.setWindowLevel(state, key, enabled);
   persistSettings();
   renderAll();
 }
@@ -3293,12 +3309,8 @@ function commitSidebarWidthInput(rawValue) {
 }
 
 function setOptionsOpen(nextOpen) {
-  if (nextOpen && !window.spcBoyWK?.isOptionsWindow) {
-    window.spcBoyWK.openOptionsWindow().catch((error) => console.error("[SPCBoy] open options failed", error));
-    return;
-  }
-  if (!nextOpen && window.spcBoyWK?.isOptionsWindow) {
-    window.spcBoyWK.closeOptionsWindow();
+  if (!nextOpen && window.spcBoySB2?.isOptionsWindow) {
+    window.spcBoySB2.closeOptionsWindow();
     return;
   }
   state.optionsOpen = nextOpen;
@@ -3310,52 +3322,112 @@ function setOptionsOpen(nextOpen) {
   renderAll();
 }
 
+function updateSB2Titlebar() {
+  const track = uiApp.currentTrack() || state.currentTrackInfo || uiApp.selectedTrack();
+  if (refs.sb2ConsoleLabel) refs.sb2ConsoleLabel.textContent = String(track?.system || "—").toLocaleUpperCase();
+  if (refs.sb2AlbumLabel) {
+    refs.sb2AlbumLabel.textContent = String(track?.game || state.playlistTitle || "NO PLAYLIST").toLocaleUpperCase();
+  }
+}
+
+async function sampleSB2CPU() {
+  if (!refs.sb2CPUValue || !window.spcBoySB2?.processCPUTimeMilliseconds) return;
+  let previousCPU = null;
+  let previousWall = null;
+  const sample = async () => {
+    try {
+      const cpuMilliseconds = Number(await window.spcBoySB2.processCPUTimeMilliseconds());
+      const wallMilliseconds = performance.now();
+      if (Number.isFinite(cpuMilliseconds) && previousCPU !== null && previousWall !== null) {
+        const processorCount = Math.max(1, Number(navigator.hardwareConcurrency) || 1);
+        const percent = Math.max(0, Math.min(100, Math.round(
+          ((cpuMilliseconds - previousCPU) / Math.max(1, wallMilliseconds - previousWall)) * 100 / processorCount
+        )));
+        refs.sb2CPUValue.textContent = `${String(percent).padStart(2, "0")}%`;
+        refs.sb2CPUFill.style.width = `${percent}%`;
+      }
+      previousCPU = cpuMilliseconds;
+      previousWall = wallMilliseconds;
+    } catch (error) {
+      console.error("[SPCBOY SB2] CPU sample failed", error);
+    }
+  };
+  await sample();
+  window.setInterval(sample, 1_000);
+}
+
+async function toggleAllSidebarNodes() {
+  const allExpanded = sidebarAllGroupsExpanded();
+  await setAllSidebarNodesCollapsed(allExpanded);
+}
+
+function sidebarAllGroupsExpanded() {
+  if (currentSidebarView().contentMode === "database") {
+    return databaseConsoleGroups.length > 0
+      && databaseConsoleGroups.every(({ consoleName }) => !collapsedDatabaseConsoles.has(consoleName));
+  }
+  const folders = [...refs.treeRoot.querySelectorAll(".tree-node:not(.tree-file)")];
+  return folders.length > 0 && folders.every((button) => button.getAttribute("aria-expanded") === "true");
+}
+
+function syncSidebarFoldButton() {
+  const button = refs.databaseCollapseAllButton;
+  const use = button?.querySelector("use");
+  const allExpanded = sidebarAllGroupsExpanded();
+  use?.setAttribute("href", allExpanded ? "#icon-list-collapse" : "#icon-list-expand");
+  if (button) {
+    button.title = allExpanded ? "Collapse all" : "Expand all";
+    button.setAttribute("aria-label", button.title);
+  }
+}
+
 
 async function bootstrap() {
   // Load persisted appearance before the first Options-window paint. The
   // window is native-sized and immediately visible; deferring this until
   // after catalog/cache requests produces a distracting default-style flash.
-  window.SPCBoyOptionsController.applyManifest(await window.spcBoyWK.frontendOptionsManifest());
+  window.SB2OptionsController.applyManifest(await window.spcBoySB2.frontendOptionsManifest());
   await loadSettings();
   await syncSidebarView();
   let savedPlaylistTabs = null;
-  if (!window.spcBoyWK?.isOptionsWindow && window.spcBoyWK?.playlistTabsLoad) {
+  if (!window.spcBoySB2?.isOptionsWindow && window.spcBoySB2?.playlistTabsLoad) {
     try {
-      savedPlaylistTabs = await window.spcBoyWK.playlistTabsLoad();
+      savedPlaylistTabs = await window.spcBoySB2.playlistTabsLoad();
     } catch (error) {
       console.error("[SPCBoy] saved playlist tabs could not be loaded", error);
     }
   }
-  if (!window.spcBoyWK?.isOptionsWindow) await refreshFavorites();
-  if (window.spcBoyWK?.isOptionsWindow) {
+  if (!window.spcBoySB2?.isOptionsWindow) await refreshFavorites();
+  if (window.spcBoySB2?.isOptionsWindow) {
     document.body.classList.add("options-window");
     state.optionsOpen = true;
     // Paint the native Settings window before any catalog/cache request can
     // delay or reject. The controls remain usable while those values load.
     renderAll();
   }
-  if (!window.spcBoyWK?.bootstrap) {
-    const message = "SPCBoy WK native bridge is unavailable. Database loading is unavailable.";
+  if (!window.spcBoySB2?.bootstrap) {
+    const message = "SPCBOY SB2 native bridge is unavailable. Database loading is unavailable.";
     showStartupFailure(message);
     throw new Error(message);
   }
+  void sampleSB2CPU();
 
   collapsedDatabaseConsoles = new Set(state.collapsedConsoleNames);
-  state.databaseLocation = await window.spcBoyWK?.databaseLocation?.() || null;
+  state.databaseLocation = await window.spcBoySB2?.databaseLocation?.() || null;
   state.databaseLocationStatus = state.databaseLocation?.requiresRestart
     ? "Restart SPCBoy to use the selected database."
     : "The shared ScanSong catalog is active and opened read-only.";
-  await window.spcBoyWK?.configureArchiveCache?.({
+  await window.spcBoySB2?.configureArchiveCache?.({
     enabled: state.archiveCacheEnabled,
     limitBytes: state.archiveCacheLimitBytes
   });
   await uiApp.ui.refreshArchiveCacheSummary();
-  if (window.spcBoyWK?.setRoutingPreferences) {
-    state.routingPreferences = { ...(await window.spcBoyWK.setRoutingPreferences(state.routingPreferences)) };
+  if (window.spcBoySB2?.setRoutingPreferences) {
+    state.routingPreferences = { ...(await window.spcBoySB2.setRoutingPreferences(state.routingPreferences)) };
     persistSettings();
   }
   let snapshot;
-  if (window.spcBoyWK?.isOptionsWindow) {
+  if (window.spcBoySB2?.isOptionsWindow) {
     // Options owns settings/library controls, not the raw browser. Do not
     // enumerate the persisted JoshW root just to paint this window.
     snapshot = {
@@ -3366,7 +3438,7 @@ async function bootstrap() {
       playlist: []
     };
   } else {
-    snapshot = await window.spcBoyWK.bootstrap();
+    snapshot = await window.spcBoySB2.bootstrap();
   }
 
   if (snapshot?.stale === true) return;
@@ -3385,12 +3457,12 @@ async function bootstrap() {
   clearPlaylistSelection();
   state.totalSeconds = targetPlaybackSeconds();
   persistSettings();
-  if (!window.spcBoyWK?.isOptionsWindow && window.spcBoyWK?.databaseRoots) {
-    state.libraryRoots = await window.spcBoyWK.databaseRoots();
+  if (!window.spcBoySB2?.isOptionsWindow && window.spcBoySB2?.databaseRoots) {
+    state.libraryRoots = await window.spcBoySB2.databaseRoots();
     await uiApp.ui.handleLibraryRootsChanged(state.libraryRoots);
   }
-  const restoredPlaylistTabs = !window.spcBoyWK?.isOptionsWindow && restorePlaylistTabs(savedPlaylistTabs);
-  if (!restoredPlaylistTabs && !window.spcBoyWK?.isOptionsWindow) ensurePlaylistTab();
+  const restoredPlaylistTabs = !window.spcBoySB2?.isOptionsWindow && restorePlaylistTabs(savedPlaylistTabs);
+  if (!restoredPlaylistTabs && !window.spcBoySB2?.isOptionsWindow) ensurePlaylistTab();
   renderAll();
   if (!restoredPlaylistTabs && state.sidebarMode === "consoles") {
     const selectedGame = state.databaseGames.find((game) => databaseGameKey(game) === state.selectedDatabaseGameKey);
@@ -3400,7 +3472,7 @@ async function bootstrap() {
   }
   syncTreeSelection();
   scrollSelectedTrackIntoView();
-  if (!window.spcBoyWK?.isOptionsWindow) persistPlaylistTabs();
+  if (!window.spcBoySB2?.isOptionsWindow) persistPlaylistTabs();
 }
 
 function selectedPathTitle(path) {
@@ -3504,6 +3576,8 @@ uiApp.ui = {
   applyRoutingPreferences,
   commitSidebarWidthInput,
   setOptionsOpen,
+  updateSB2Titlebar,
+  toggleAllSidebarNodes,
   setAllDatabaseConsolesCollapsed,
   setAllSidebarNodesCollapsed,
   refreshDatabaseGamesForVisibleRoots,

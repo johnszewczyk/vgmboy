@@ -22,11 +22,13 @@ Preserve component ownership, provenance, and release boundaries. Compilation
 alone does not prove packaged, visible, or audible behavior; use the family
 verification script and state any live-fixture gaps explicitly.
 
-SPCBoyWK is the maintained SPCBoy player. LaunchPad has separate entries for
-SPCBoyWK, ViewBoy, and VGMManDocs. The active player apps are CocoaSpice,
-SPCBoyWK, and ViewBoy; VGMManDocs owns the published Markdown library and its
-viewer. Keep the players as separate presentation clients over the shared
-catalog, frontend, and playback packages; do not merge one skin into another.
+SPCBoyWK is the maintained SPCBoy player. SPCBOY SB2 is a fourth frontend under
+development with its own package and release boundary. LaunchPad has separate
+entries for SPCBoyWK, ViewBoy, and VGMManDocs. The active player apps are
+CocoaSpice, SPCBoyWK, and ViewBoy; VGMManDocs owns the published Markdown
+library and its viewer. Keep each frontend as a separate presentation client
+over the shared catalog, frontend, and playback packages; do not merge one
+skin into another.
 
 For a ViewBoy task, the active application and UI live in `ViewBoy/`; use its
 `README.md` and `AGENTS.md` route and launch with `ViewBoy/launch.sh`. `SPCBoyWK/`

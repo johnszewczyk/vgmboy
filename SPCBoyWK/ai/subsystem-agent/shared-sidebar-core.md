@@ -35,6 +35,11 @@ and persistence. This project owns only the typed native adapter and WebKit rend
   outline mode keeps a transparent fill and layers above playing-row
   decorations; solid mode stays behind row content and fills with the accent.
   Selected row backgrounds stay transparent to reveal the capsule.
+- The sidebar marker target is derived from the selected path, game key, or
+  console in frontend state, then the matching row's selected class is
+  reasserted. Keep the last measured marker visible across a render frame where
+  the selected row has not mounted or has no layout box, so selection does not
+  flash off during refresh.
 - Large catalog playlists are rendered through a fixed-height visible window;
   the database result remains fully selectable without creating one WebKit DOM
   row per catalog track. Replace each visible window in one render turn so

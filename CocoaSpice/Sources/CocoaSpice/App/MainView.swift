@@ -579,9 +579,9 @@ private struct DatabaseGameListView: NSViewRepresentable {
             guard let item = cachedSidebarRows[row].game else { return }
             switch model.sidebarDoubleClickAction {
             case .playNow:
-                model.activateDatabaseGame(item, replace: true)
+                model.activateDatabaseGame(item, replace: true, autoplay: true)
             case .enqueue:
-                model.activateDatabaseGame(item, replace: false)
+                model.activateDatabaseGame(item, replace: false, autoplay: true)
             }
         }
 
@@ -621,7 +621,7 @@ private struct DatabaseGameListView: NSViewRepresentable {
         @objc private func handlePlayNow(_ sender: NSMenuItem) {
             guard let id = sender.representedObject as? String,
                   let item = model.databaseGameItems.first(where: { $0.id == id }) else { return }
-            model.activateDatabaseGame(item, replace: true)
+            model.activateDatabaseGame(item, replace: true, autoplay: true)
         }
 
         @objc private func handleEnqueue(_ sender: NSMenuItem) {

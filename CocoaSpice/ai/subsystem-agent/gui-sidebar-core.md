@@ -39,6 +39,13 @@
   runtime state.
 - Folder/leaf click, disclosure, repeated-click, and activation intent comes
   from `CatalogBrowserCore.SidebarRowInteraction`; SwiftUI still owns visuals.
+- Return and double-click activation pass an explicit autoplay intent through
+  the database queue loader. Enqueue appends tracks before starting the first
+  track from the activated game, including when those tracks were already in
+  the playlist.
+- The shared capsule selection view must keep an in-flight movement animation
+  when a nonanimated SwiftUI refresh syncs the same model destination; geometry
+  changes still replace the animation target.
 - Keep the two-view catalog command vocabulary shared while keeping SwiftUI row
   rendering and favorite storage native to this skin. Favorites playlist
   projection is a queue action, not a sidebar action.

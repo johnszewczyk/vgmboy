@@ -18,6 +18,7 @@ ownership and preservation rules.
 | [FrontendCore](FrontendCore/README.md) | Shared archive, preference, queue, and transport policy. |
 | [CocoaSpice](CocoaSpice/README.md) | Native AppKit/SwiftUI player frontend. |
 | [SPCBoyWK](SPCBoyWK/README.md) | Native WebKit player frontend. |
+| [SPCBOY SB2](SB2/README.md) | Fourth, pixel-style WebKit frontend under development. |
 | [ViewBoy](ViewBoy/README.md) | Native player with a screen-first, four-shade Yoga LCD interface. |
 | [VGMManDocs](VGMManDocs/README.md) | Native viewer and editor for the family's published Markdown library. |
 

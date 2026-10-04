@@ -43,8 +43,10 @@
 
 ## Activation
 
-- Rows: double-click follows the configured activation behavior.
-- Rows: Return loads the selected game or games into the playlist.
+- Rows: double-click follows the configured activation behavior. The Play Now
+  action replaces the playlist and starts the first loaded track; Enqueue
+  appends the tracks and starts the activated game's first track.
+- Rows: Return uses the same activation behavior for selected games.
 - Files: double-clicking a folder replaces the playlist with all indexed descendant files. Double-clicking selected file rows or pressing Return replaces the playlist with those files.
 - Repeated activation of scanned games or files loads their stored playlist rows directly from the database without rescanning or archive extraction.
 

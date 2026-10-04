@@ -897,8 +897,8 @@ final class PlayerViewModel {
         }
     }
 
-    func activateDatabaseGame(_ item: DatabaseGameItem, replace: Bool) {
-        activateDatabaseGames([item], replace: replace)
+    func activateDatabaseGame(_ item: DatabaseGameItem, replace: Bool, autoplay: Bool = false) {
+        activateDatabaseGames([item], replace: replace, autoplay: autoplay)
     }
 
     func selectDatabaseFiles(ids: [String], primaryID: String?) {
@@ -948,16 +948,16 @@ final class PlayerViewModel {
         guard !selectedItems.isEmpty else { return }
 
         if selectedItems.count > 1 {
-            activateDatabaseGames(selectedItems, replace: true)
+            activateDatabaseGames(selectedItems, replace: true, autoplay: true)
             return
         }
 
         let item = selectedItems[0]
         switch sidebarDoubleClickAction {
         case .playNow:
-            activateDatabaseGames([item], replace: true)
+            activateDatabaseGames([item], replace: true, autoplay: true)
         case .enqueue:
-            activateDatabaseGames([item], replace: false)
+            activateDatabaseGames([item], replace: false, autoplay: true)
         }
     }
 
@@ -977,7 +977,7 @@ final class PlayerViewModel {
         activateDatabaseFileSidebarSelection(fileItems: [], folders: [folder], replace: true, autoplay: true)
     }
 
-    private func activateDatabaseGames(_ items: [DatabaseGameItem], replace: Bool) {
+    private func activateDatabaseGames(_ items: [DatabaseGameItem], replace: Bool, autoplay: Bool = false) {
         guard !items.isEmpty else { return }
         let selectedIDs = items.map(\.id)
         selectedDatabaseGameIDs = Set(selectedIDs)
@@ -987,7 +987,8 @@ final class PlayerViewModel {
             request: .games(items),
             label: label,
             sourceURL: URL(fileURLWithPath: label, isDirectory: true),
-            replace: replace
+            replace: replace,
+            autoplay: autoplay
         )
     }
 
@@ -1207,7 +1208,8 @@ final class PlayerViewModel {
                 tracks,
                 status: "Queued \(tracks.count) tracks from \(folderURL.lastPathComponent)",
                 seedMetadataCache: seedMetadataCache,
-                widthHints: widthHints
+                widthHints: widthHints,
+                autoplay: autoplay
             )
             return
         }
@@ -1224,12 +1226,18 @@ final class PlayerViewModel {
         _ tracks: [TrackItem],
         status: String,
         seedMetadataCache: [String: TrackMetadata] = [:],
-        widthHints: PlaylistColumnWidthHints? = nil
+        widthHints: PlaylistColumnWidthHints? = nil,
+        autoplay: Bool = false
     ) {
         var existing = Set(playlist.map(\.id))
         let uniqueTracks = tracks.filter { existing.insert($0.id).inserted }
         guard !uniqueTracks.isEmpty else {
             statusText = status
+            if autoplay,
+               let trackID = tracks.first?.id,
+               let existingTrack = playlist.first(where: { $0.id == trackID }) {
+                requestPlayback(for: existingTrack)
+            }
             return
         }
         metadataCache.merge(seedMetadataCache) { current, _ in current }
@@ -1248,6 +1256,9 @@ final class PlayerViewModel {
         refreshPlaylistMetadata()
         statusText = status
         updateRemoteTransportState()
+        if autoplay, let firstTrack = uniqueTracks.first {
+            requestPlayback(for: firstTrack)
+        }
     }
 
     func handleTrackSelection(_ trackID: String?) {

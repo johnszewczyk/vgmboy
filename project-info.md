@@ -12,7 +12,8 @@ history live in this repository.
 - ScanSong writes the catalog; CatalogReader and FrontendCore provide shared
   read and frontend policy boundaries.
 - UACMan owns its package format and editor. CocoaSpice, SPCBoyWK, and ViewBoy
-  are separate player apps.
+  are active separate player apps; SPCBOY SB2 is a fourth frontend under
+  development.
 
 ## Task Routing
 
@@ -31,6 +32,7 @@ crosses that ownership boundary.
 | Shared archive/cache, preferences, queue, and transport policy | [FrontendCore/AGENTS.md](FrontendCore/AGENTS.md) |
 | AppKit/SwiftUI presentation | [CocoaSpice/AGENTS.md](CocoaSpice/AGENTS.md) |
 | Native WebKit player and typed host bridge | [SPCBoyWK/AGENTS.md](SPCBoyWK/AGENTS.md) |
+| SPCBOY SB2 pixel-style WebKit frontend | [SB2/AGENTS.md](SB2/AGENTS.md) |
 | Screen-first Yoga LCD player | [ViewBoy/AGENTS.md](ViewBoy/AGENTS.md) |
 | Published Markdown library and native documentation viewer | [VGMManDocs/AGENTS.md](VGMManDocs/AGENTS.md) |
 

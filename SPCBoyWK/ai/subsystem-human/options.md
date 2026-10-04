@@ -42,8 +42,8 @@ path bar. Archive Cache uses the identical empty placeholder readout and uses Us
 and Show in Finder, with Show in Finder last.
 
 Reload Library shows its in-progress state, reopens the active read-only catalog, and refreshes the
-main window's visible database roots and current sidebar view. A failed reload leaves an error in the
-Database page status.
+main window's database roots, game projection, and file-tree projection. A failed reload leaves an
+error in the Database page status.
 
 Audio controls are ordered AAC Export, Equalizer, Mono, and Volume. Volume and each equalizer band use animated range bars with live values. The transport
 seek bar remains a transport control, not a settings input.

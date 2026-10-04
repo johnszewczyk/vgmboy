@@ -1267,6 +1267,10 @@ final class AnimatedCapsuleSelectionHighlightView: NSView {
         let targetPath = capsulePath(in: targetBounds)
         let wasVisible = !primarySelectionLayer.isHidden
         let startPosition = primarySelectionLayer.presentation()?.position ?? primarySelectionLayer.position
+        let destinationAlreadyAnimating = !animated
+            && animationDuration > 0
+            && primarySelectionLayer.animation(forKey: "playlistSelectionMovement") != nil
+            && primarySelectionLayer.position == targetPosition
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -1275,6 +1279,12 @@ final class AnimatedCapsuleSelectionHighlightView: NSView {
         primarySelectionLayer.path = targetPath
         primarySelectionLayer.isHidden = false
         CATransaction.commit()
+
+        // SwiftUI can refresh a sidebar table while a user selection is
+        // gliding. A nonanimated refresh to the same destination is only a
+        // geometry/color sync; cancelling the in-flight animation here made
+        // the capsule flash at the selected row instead of completing.
+        if destinationAlreadyAnimating { return }
 
         primarySelectionLayer.removeAllAnimations()
         guard animated, wasVisible, startPosition != targetPosition else { return }
