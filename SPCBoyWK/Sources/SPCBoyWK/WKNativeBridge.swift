@@ -87,6 +87,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     var onAppearanceSettingsChanged: (([String: Any]) -> Void)?
     var onFrontendSettingsChanged: ((SPCBoyPreferencesSnapshot) -> Void)?
     var onFrontendEqualizerSettingsChanged: ((SPCBoyEqualizerPreferencesPatch) -> Void)?
+    var onCatalogReloaded: (@MainActor (String) -> Void)?
     var onPlaybackEvent: (@MainActor (String, [String: Any]) -> Void)?
     var onNowPlayingInfoChanged: (@MainActor (RemoteTransportNowPlaying?) -> Void)?
 
@@ -423,6 +424,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 }
             }
             await Self.reply(to: webView, id: id, success: success, valueJSON: valueJSON)
+            if requestMethod == "reloadDatabaseLibrary",
+               success,
+               let onCatalogReloaded = self.onCatalogReloaded {
+                onCatalogReloaded(valueJSON)
+            }
         }
     }
 

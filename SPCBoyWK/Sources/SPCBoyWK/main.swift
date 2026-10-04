@@ -203,6 +203,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         bridge.onFrontendEqualizerSettingsChanged = { [weak self] settings in
             self?.broadcastFrontendEqualizerSettings(settings)
         }
+        bridge.onCatalogReloaded = { [weak self] location in
+            self?.broadcastCatalogReloadedToMainWindow(location)
+        }
         let optionsWebView = makeWebView(bridge: bridge, includeCommandDispatcher: false)
         guard let page = Bundle.module.url(forResource: "index", withExtension: "html") else { return }
         optionsWebView.loadFileURL(page, allowingReadAccessTo: page.deletingLastPathComponent())
@@ -255,6 +258,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let script = "window.__spcBoyWKEvent('frontendSettingsChanged', \(json));"
         webView?.evaluateJavaScript(script, completionHandler: nil)
         optionsWebView?.evaluateJavaScript(script, completionHandler: nil)
+    }
+
+    private func broadcastCatalogReloadedToMainWindow(_ locationJSON: String) {
+        let script = "window.__spcBoyWKEvent('catalogReloaded', \(locationJSON));"
+        webView?.evaluateJavaScript(script, completionHandler: nil)
     }
 
     private func broadcastPlaybackEvent(name: String, payload: [String: Any]) {

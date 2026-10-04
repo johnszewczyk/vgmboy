@@ -143,6 +143,7 @@ const state = {
   archiveCacheLocation: "",
   databaseLocation: null,
   databaseLocationStatus: "",
+  databaseReloading: false,
   nativePlayback: {
     transportState: "stopped",
     outputState: "idle",

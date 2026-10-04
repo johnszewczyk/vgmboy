@@ -86,7 +86,15 @@ async function handleCatalogReloaded(result) {
 
 async function reloadDatabaseLibrary() {
   if (!window.spcBoyWK?.reloadDatabaseLibrary) return;
-  await handleCatalogReloaded(await window.spcBoyWK.reloadDatabaseLibrary());
+  state.databaseReloading = true;
+  state.databaseLocationStatus = "Reloading the latest ScanSong catalog…";
+  renderAll();
+  try {
+    await handleCatalogReloaded(await window.spcBoyWK.reloadDatabaseLibrary());
+  } finally {
+    state.databaseReloading = false;
+    renderAll();
+  }
 }
 
 async function clearLibraryArchiveCache() {

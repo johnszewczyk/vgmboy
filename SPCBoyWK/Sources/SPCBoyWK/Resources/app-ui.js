@@ -2727,7 +2727,9 @@ function renderAll() {
     refs.libraryCachePath.title = archiveCachePath;
   }
   refs.libraryDatabaseLocationStatus.textContent = state.databaseLocationStatus || "SPCBoy reads this schema-24 catalog. ScanSong owns scan paths, scanning, link checks, and cleanup.";
-  refs.libraryDatabaseReloadButton.disabled = Boolean(state.databaseLocation?.requiresRestart);
+  refs.libraryDatabaseReloadButton.disabled = Boolean(state.databaseLocation?.requiresRestart || state.databaseReloading);
+  refs.libraryDatabaseReloadButton.textContent = state.databaseReloading ? "Reloading…" : "Reload Library";
+  refs.libraryDatabaseReloadButton.setAttribute("aria-busy", state.databaseReloading ? "true" : "false");
   refs.libraryClearCacheButton.disabled = false;
   refs.databaseCacheSummary.textContent = state.archiveCacheSummary ? formatArchiveCacheSummary(state.archiveCacheSummary) : "—";
   syncEqualizerControls();

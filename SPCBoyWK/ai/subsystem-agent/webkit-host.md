@@ -57,6 +57,11 @@ use the same accent surface.
 organization through the bridge. `options-controller.js` applies that manifest
 and `playlist-controller.js` reduces selection. `app-ui.js` remains the
 renderer and event wiring layer rather than the owner of those policies.
+The separate Options WebView owns the Reload Library button. After a successful
+read-only catalog reopen, its bridge sends the catalog-location result to the
+AppKit host, which broadcasts `catalogReloaded` to the main WebView. The main
+renderer then refreshes roots and its visible database sidebar projection; the
+Options WebView does not build a second library tree.
 Database Console → Game group disclosure and selection also pass through the
 shared `CatalogBrowserGroupState` reducer through its direct
 `CatalogBrowserGroupStateRequest` codec. The Swift bridge publishes the
