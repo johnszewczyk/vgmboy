@@ -8,7 +8,7 @@ const root = path.resolve(__dirname, "..");
 const required = ["Product", "Major Components", "Task Routing", "Local Rules", "Human Docs"];
 const components = [
   "CatalogReader", "VGMBoy", "FrontendCore", "MetaMan", "UACMan",
-  "ScanSong", "CocoaSpice", "SPCBoyWK", "ViewBoy",
+  "ScanSong", "CocoaSpice", "SPCBoyWK", "SB2", "ViewBoy",
 ];
 const paths = ["project-info.md", ...components.map((name) => path.join(name, "ai", "project-info.md"))];
 

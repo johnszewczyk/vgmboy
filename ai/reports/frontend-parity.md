@@ -3,7 +3,7 @@
 ## Rule
 
 Equivalent player behavior should use the same shared policy and VGMBoy command
-contract. CocoaSpice, SPCBoyWK, and ViewBoy retain separate renderers, app
+contract. CocoaSpice, SPCBoyWK, SB2, and ViewBoy retain separate renderers, app
 identities, persistence keys, and host adapters; a shared contract does not
 promise pixel-identical UI.
 
@@ -14,9 +14,11 @@ promise pixel-identical UI.
 | Shared policy | FrontendCore and CatalogReader package suites pass in the clean checkout recorded in `../verification/family.md`. | VGMBoy's AAC and live-output checks need working host audio services. |
 | CocoaSpice | Package tests pass. | Launch the current bundle with a schema-24 catalog and exercise selection, queue, and playback through the visible UI. |
 | SPCBoyWK | Package build and renderer tests pass. | Repeat the same catalog and archive fixture through the packaged WebKit player. |
+| SPCBOY SB2 | Release app bundle built during SB2 bring-up; own bundle and preference identity are configured. | Launch the packaged app, then repeat the same catalog and archive fixture through its pixel-style WebKit player. |
 | ViewBoy | Production bundle builds and renderer tests pass. | Select the same catalog and exercise a live playback fixture in the packaged app. |
 
-No current three-app, same-fixture parity run is recorded. Compare the exact
+No current four-app, same-fixture parity run is recorded. SB2's packaged UI and
+live audio boundary also remain unverified. Compare the exact
 catalog revision, selected source/member/subtrack, queue action, and observed
 transport result before closing a shared-behavior gate. A package test or a
 window that merely opens does not establish audio parity.
