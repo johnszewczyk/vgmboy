@@ -73,6 +73,7 @@ struct CocoaSpiceOptionsSnapshot: Codable, Equatable, Sendable {
     let libvgmTempo: PlaybackTempo
     let libvgmTempoEnabled: Bool
     let columnAutoSize: Bool
+    let glassSelectorEnabled: Bool
 }
 
 /// Typed mutations accepted by the Options contract. A skin supplies a file
@@ -83,6 +84,7 @@ enum CocoaSpiceOptionsCommand: Codable, Equatable, Sendable {
     case setAutoResizeAnimationMilliseconds(Int)
     case setSelectionAnimationEnabled(Bool)
     case setSelectionAnimationMilliseconds(Int)
+    case setGlassSelectorEnabled(Bool)
     case setColumnAutoSize(Bool)
     case setWindowAlwaysOnTop(role: FrontendWindowRole, enabled: Bool)
     case setLongPlayEnabled(Bool)
@@ -173,7 +175,8 @@ final class CocoaSpiceOptionsControlSurface {
             libgmeTempoEnabled: model.libgmeTempoEnabled,
             libvgmTempo: model.libvgmTempo,
             libvgmTempoEnabled: model.libvgmTempoEnabled,
-            columnAutoSize: model.columnAutoSizeEnabled
+            columnAutoSize: model.columnAutoSizeEnabled,
+            glassSelectorEnabled: model.glassSelectorEnabled
         )
     }
 
@@ -187,6 +190,8 @@ final class CocoaSpiceOptionsControlSurface {
             model.setSelectionAnimationEnabled(enabled)
         case .setSelectionAnimationMilliseconds(let milliseconds):
             model.setSelectionAnimationMilliseconds(milliseconds)
+        case .setGlassSelectorEnabled(let enabled):
+            model.setGlassSelectorEnabled(enabled)
         case .setColumnAutoSize(let enabled):
             model.setColumnAutoSizeEnabled(enabled)
         case .setWindowAlwaysOnTop(let role, let enabled):

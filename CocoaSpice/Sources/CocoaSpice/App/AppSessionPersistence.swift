@@ -51,6 +51,7 @@ enum AppDefaultsKey {
     static let selectionAnimationMilliseconds = "CocoaSpice.selectionAnimationMilliseconds"
     static let autoResizeAnimationEnabled = "CocoaSpice.autoResizeAnimationEnabled"
     static let selectionAnimationEnabled = "CocoaSpice.selectionAnimationEnabled"
+    static let glassSelectorEnabled = "CocoaSpice.glassSelectorEnabled"
     static let columnAutoSize = "CocoaSpice.columnAutoSize"
     static let mainWindowAlwaysOnTop = "CocoaSpice.mainWindowAlwaysOnTop"
     static let settingsWindowAlwaysOnTop = "CocoaSpice.settingsWindowAlwaysOnTop"

@@ -20,7 +20,7 @@
 
 - Selection: standard Shift and Command multi-selection.
 - Selection: selected rows can be dragged together.
-- Selection: the primary single-row highlight uses macOS Liquid Glass in the existing capsule size, with a subtle accent tint; it glides between rows using the Interface animation duration (200 ms by default). Multi-selection remains immediate.
+- Selection: the primary single-row highlight is an accent capsule by default. The Interface > Animations > Glass Selector option switches the playlist highlight to untinted macOS Liquid Glass, which glides over the row text using the Selection Bar duration (200 ms by default). Sidebar and multi-selection highlights remain solid accent capsules.
 
 ## Activation
 

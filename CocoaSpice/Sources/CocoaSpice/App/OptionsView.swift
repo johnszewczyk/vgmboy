@@ -965,6 +965,18 @@ private struct CocoaSpiceAnimationOptionsCard: View {
                 get: { model.selectionAnimationMilliseconds },
                 set: { model.setSelectionAnimationMilliseconds($0) }
             ))
+            Toggle(isOn: Binding(
+                get: { model.glassSelectorEnabled },
+                set: { model.setGlassSelectorEnabled($0) }
+            )) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Glass Selector")
+                    Text("Use the untinted macOS Liquid Glass effect for the playlist selection bar.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.checkbox)
         }
     }
 

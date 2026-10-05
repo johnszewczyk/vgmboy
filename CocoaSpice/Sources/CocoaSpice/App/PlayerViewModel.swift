@@ -161,6 +161,7 @@ final class PlayerViewModel {
     var interfaceTextColor: DatabaseSidebarTextColor = .primary
     var interfaceMonospaceFont = false
     let frontendPreferences = FrontendPreferencesCoordinator(keys: .cocoaSpice)
+    private(set) var glassSelectorEnabled = UserDefaults.standard.bool(forKey: AppDefaultsKey.glassSelectorEnabled)
     var autoResizeAnimationEnabled: Bool { frontendPreferences.value.animations.autoResizeEnabled }
     var selectionAnimationEnabled: Bool { frontendPreferences.value.animations.selectionEnabled }
     var autoResizeAnimationMilliseconds: Int { frontendPreferences.value.animations.autoResizeMilliseconds }
@@ -948,6 +949,12 @@ final class PlayerViewModel {
 
     func setSelectionAnimationEnabled(_ enabled: Bool) {
         frontendPreferences.setSelectionEnabled(enabled)
+    }
+
+    func setGlassSelectorEnabled(_ enabled: Bool) {
+        guard glassSelectorEnabled != enabled else { return }
+        glassSelectorEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: AppDefaultsKey.glassSelectorEnabled)
     }
 
     func setColumnAutoSizeEnabled(_ enabled: Bool) {

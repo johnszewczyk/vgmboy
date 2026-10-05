@@ -31,6 +31,8 @@ knowledge.
 - `CocoaSpiceOptionsSnapshot` includes the shared `FrontendOptionsManifest`,
   typed interface/window preferences, every current CocoaSpice preference,
   catalog/cache presentation value, and read-only playback diagnostic value.
+- The Glass Selector flag is a CocoaSpice playlist presentation setting; only
+  the AppKit frontend renders its native `NSGlassEffectView` effect.
 - `CocoaSpiceOptionsCommand` changes those options and performs each
   non-window-specific Options action. It does not accept catalog rows,
   decoder metadata, playback paths, or scanner work.

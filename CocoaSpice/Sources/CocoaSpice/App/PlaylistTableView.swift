@@ -1,6 +1,7 @@
 import AppKit
 import CatalogPlaylistPresentationCore
 import FrontendPreferencesCore
+import Observation
 import OSLog
 import PlaybackHistoryCore
 import SwiftUI
@@ -56,7 +57,7 @@ struct PlaylistTableView: NSViewRepresentable {
 
         let selectionHighlightView = AnimatedCapsuleSelectionHighlightView(frame: tableView.bounds)
         selectionHighlightView.selectionColor = NSColor.controlAccentColor
-        selectionHighlightView.usesSystemLiquidGlass = true
+        selectionHighlightView.usesSystemLiquidGlass = model.glassSelectorEnabled
         selectionHighlightView.autoresizingMask = [.width, .height]
         tableView.addSubview(selectionHighlightView, positioned: .below, relativeTo: nil)
 
@@ -185,6 +186,19 @@ struct PlaylistTableView: NSViewRepresentable {
         ) {
             self.tableView = tableView
             self.selectionHighlightView = selectionHighlightView
+            observeGlassSelectorPreference()
+        }
+
+        private func observeGlassSelectorPreference() {
+            withObservationTracking {
+                _ = model.glassSelectorEnabled
+            } onChange: { [weak self] in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    self.reload()
+                    self.observeGlassSelectorPreference()
+                }
+            }
         }
 
         func installColumns() {
@@ -213,6 +227,8 @@ struct PlaylistTableView: NSViewRepresentable {
             guard let tableView else { return }
             selectionHighlightView?.selectionColor = NSColor.controlAccentColor
             selectionHighlightView?.animationDuration = Double(model.effectiveSelectionAnimationMilliseconds) / 1_000
+            let selectorStyleChanged = selectionHighlightView?.usesSystemLiquidGlass != model.glassSelectorEnabled
+            selectionHighlightView?.usesSystemLiquidGlass = model.glassSelectorEnabled
 
             applyVisibility(to: tableView)
             updateAutomaticContentVisibility(in: tableView)
@@ -265,6 +281,8 @@ struct PlaylistTableView: NSViewRepresentable {
                 syncSelection(in: tableView)
             } else if rowsChanged || sortChanged || rowGapChanged {
                 tableView.layoutSubtreeIfNeeded()
+                updateSelectionHighlight(in: tableView, animated: false)
+            } else if selectorStyleChanged {
                 updateSelectionHighlight(in: tableView, animated: false)
             }
 
@@ -1230,6 +1248,7 @@ final class AnimatedCapsuleSelectionHighlightView: NSView {
     private let primarySelectionGlassView = NSGlassEffectView(frame: .zero)
     private let primarySelectionGlassContentView = NSView(frame: .zero)
     private let horizontalInset: CGFloat = 4
+    private var isAboveRowContent = false
     var animationDuration: TimeInterval = 0.2
     var selectionColor: NSColor = .selectedContentBackgroundColor
     var usesSystemLiquidGlass = false
@@ -1245,8 +1264,6 @@ final class AnimatedCapsuleSelectionHighlightView: NSView {
         layer?.addSublayer(primarySelectionLayer)
         layer?.addSublayer(multipleSelectionLayer)
 
-        primarySelectionGlassView.wantsLayer = true
-        primarySelectionGlassView.layer?.isGeometryFlipped = true
         primarySelectionGlassView.style = .regular
         primarySelectionGlassContentView.autoresizingMask = [.width, .height]
         primarySelectionGlassView.contentView = primarySelectionGlassContentView
@@ -1268,9 +1285,10 @@ final class AnimatedCapsuleSelectionHighlightView: NSView {
         multipleSelectionLayer.fillColor = fillColor
 
         guard let primaryRect, selectionRects.count == 1 else {
+            updateRowContentOrdering(showGlassOverText: false)
             primarySelectionLayer.removeAllAnimations()
             primarySelectionLayer.isHidden = true
-            primarySelectionGlassView.layer?.removeAllAnimations()
+            stopGlassMovement()
             primarySelectionGlassView.isHidden = true
             multipleSelectionLayer.path = selectionPath(for: selectionRects)
             multipleSelectionLayer.isHidden = selectionRects.isEmpty
@@ -1281,20 +1299,22 @@ final class AnimatedCapsuleSelectionHighlightView: NSView {
         multipleSelectionLayer.path = nil
 
         let targetRect = capsuleRect(for: primaryRect)
+        if usesSystemLiquidGlass {
+            updateRowContentOrdering(showGlassOverText: true)
+            primarySelectionLayer.removeAllAnimations()
+            primarySelectionLayer.isHidden = true
+            updateGlassFrame(to: targetRect, animated: animated)
+            return
+        }
+
+        updateRowContentOrdering(showGlassOverText: false)
+        stopGlassMovement()
+        primarySelectionGlassView.isHidden = true
         let targetBounds = CGRect(origin: .zero, size: targetRect.size)
         let targetPosition = CGPoint(x: targetRect.midX, y: targetRect.midY)
-        let selectionLayer: CALayer
-        let wasVisible: Bool
-        let startPosition: CGPoint
-        if usesSystemLiquidGlass, let glassLayer = primarySelectionGlassView.layer {
-            selectionLayer = glassLayer
-            wasVisible = !primarySelectionGlassView.isHidden
-            startPosition = glassLayer.presentation()?.position ?? glassLayer.position
-        } else {
-            selectionLayer = primarySelectionLayer
-            wasVisible = !primarySelectionLayer.isHidden
-            startPosition = primarySelectionLayer.presentation()?.position ?? primarySelectionLayer.position
-        }
+        let selectionLayer = primarySelectionLayer
+        let wasVisible = !primarySelectionLayer.isHidden
+        let startPosition = primarySelectionLayer.presentation()?.position ?? primarySelectionLayer.position
         let destinationAlreadyAnimating = !animated
             && animationDuration > 0
             && selectionLayer.animation(forKey: "playlistSelectionMovement") != nil
@@ -1302,20 +1322,10 @@ final class AnimatedCapsuleSelectionHighlightView: NSView {
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        if usesSystemLiquidGlass {
-            primarySelectionLayer.isHidden = true
-            primarySelectionGlassView.frame = targetRect
-            primarySelectionGlassContentView.frame = primarySelectionGlassView.bounds
-            primarySelectionGlassView.cornerRadius = min(targetRect.height / 2, targetRect.width / 2)
-            primarySelectionGlassView.tintColor = selectionColor.withAlphaComponent(0.38)
-            primarySelectionGlassView.isHidden = false
-        } else {
-            primarySelectionGlassView.isHidden = true
-            primarySelectionLayer.bounds = targetBounds
-            primarySelectionLayer.position = targetPosition
-            primarySelectionLayer.path = capsulePath(in: targetBounds)
-            primarySelectionLayer.isHidden = false
-        }
+        primarySelectionLayer.bounds = targetBounds
+        primarySelectionLayer.position = targetPosition
+        primarySelectionLayer.path = capsulePath(in: targetBounds)
+        primarySelectionLayer.isHidden = false
         CATransaction.commit()
 
         // SwiftUI can refresh a sidebar table while a user selection is
@@ -1333,6 +1343,66 @@ final class AnimatedCapsuleSelectionHighlightView: NSView {
         movement.duration = animationDuration
         movement.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         selectionLayer.add(movement, forKey: "playlistSelectionMovement")
+    }
+
+    private func updateRowContentOrdering(showGlassOverText: Bool) {
+        guard isAboveRowContent != showGlassOverText, let tableView = superview else { return }
+        tableView.addSubview(self, positioned: showGlassOverText ? .above : .below, relativeTo: nil)
+        isAboveRowContent = showGlassOverText
+    }
+
+    private func stopGlassMovement() {
+        guard let glassLayer = primarySelectionGlassView.layer,
+              glassLayer.animation(forKey: "position") != nil else { return }
+        let visibleFrame = glassLayer.presentation()?.frame ?? primarySelectionGlassView.frame
+        glassLayer.removeAnimation(forKey: "position")
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        primarySelectionGlassView.frame = visibleFrame
+        CATransaction.commit()
+    }
+
+    private func updateGlassFrame(to targetRect: NSRect, animated: Bool) {
+        let glassLayer = primarySelectionGlassView.layer
+        let wasVisible = !primarySelectionGlassView.isHidden
+        let hasMovementAnimation = glassLayer?.animation(forKey: "position") != nil
+        let modelOrigin = primarySelectionGlassView.frame.origin
+        let presentationFrame = glassLayer?.presentation()?.frame ?? primarySelectionGlassView.frame
+        let startOrigin = hasMovementAnimation ? presentationFrame.origin : modelOrigin
+        let targetOrigin = targetRect.origin
+        let destinationAlreadyAnimating = !animated
+            && hasMovementAnimation
+            && modelOrigin == targetOrigin
+            && primarySelectionGlassView.frame.size == targetRect.size
+
+        if destinationAlreadyAnimating { return }
+
+        if hasMovementAnimation {
+            glassLayer?.removeAnimation(forKey: "position")
+        }
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        primarySelectionGlassView.frame = NSRect(origin: startOrigin, size: targetRect.size)
+        primarySelectionGlassContentView.frame = primarySelectionGlassView.bounds
+        primarySelectionGlassView.cornerRadius = min(targetRect.height / 2, targetRect.width / 2)
+        primarySelectionGlassView.tintColor = nil
+        primarySelectionGlassView.isHidden = false
+        CATransaction.commit()
+
+        guard animated, wasVisible, startOrigin != targetOrigin else {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            primarySelectionGlassView.frame = targetRect
+            CATransaction.commit()
+            return
+        }
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = animationDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            primarySelectionGlassView.animator().setFrameOrigin(targetOrigin)
+        }
     }
 
     private func selectionPath(for rects: [NSRect]) -> CGPath? {
