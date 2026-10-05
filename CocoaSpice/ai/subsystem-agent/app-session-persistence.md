@@ -18,6 +18,7 @@
 - The current database sidebar persists its last selected library folder path independently from queued playlist state.
 - Sidebar double-click behavior, `Playlist Follows Cursor`, `Group by Console`, the Games/Files selection, and `Prefer Folders over Metadatas` persist in `UserDefaults`. A non-empty search temporarily displays Games results without rewriting the stored Games/Files selection.
 - Sidebar and playlist monospace-font preferences persist in the shared playback preference bundle.
+- Solid Playlist Selection Bar persists as a CocoaSpice UserDefaults preference and defaults to the outlined playlist capsule.
 - Playlist sort state persists independently from broader playback preferences.
 - Playlist column order, visibility, and widths restore through the shared persistence helper rather than direct view-level `UserDefaults` reads.
 - Catalog roots are loaded read-only from SQLite rather than `UserDefaults`.

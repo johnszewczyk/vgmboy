@@ -51,6 +51,7 @@ enum AppDefaultsKey {
     static let selectionAnimationMilliseconds = "CocoaSpice.selectionAnimationMilliseconds"
     static let autoResizeAnimationEnabled = "CocoaSpice.autoResizeAnimationEnabled"
     static let selectionAnimationEnabled = "CocoaSpice.selectionAnimationEnabled"
+    static let solidPlaylistSelectionBar = "CocoaSpice.solidPlaylistSelectionBar"
     static let columnAutoSize = "CocoaSpice.columnAutoSize"
     static let mainWindowAlwaysOnTop = "CocoaSpice.mainWindowAlwaysOnTop"
     static let settingsWindowAlwaysOnTop = "CocoaSpice.settingsWindowAlwaysOnTop"
@@ -94,6 +95,7 @@ struct RestoredPlaybackPreferences {
     let playlistLineGapPoints: Double?
     let playlistTextColor: String?
     let playlistMonospaceFont: Bool
+    let solidPlaylistSelectionBar: Bool
     let sidebarSystemMode: Bool
     let preferEmbeddedConsoleTags: Bool
     let sidebarBrowserModeRawValue: String?
@@ -200,6 +202,7 @@ enum AppSessionPersistence {
             playlistLineGapPoints: defaults.object(forKey: AppDefaultsKey.playlistLineGapPoints) as? Double,
             playlistTextColor: defaults.string(forKey: AppDefaultsKey.playlistTextColor),
             playlistMonospaceFont: defaults.object(forKey: AppDefaultsKey.playlistMonospaceFont) as? Bool ?? false,
+            solidPlaylistSelectionBar: defaults.object(forKey: AppDefaultsKey.solidPlaylistSelectionBar) as? Bool ?? false,
             sidebarSystemMode: defaults.object(forKey: AppDefaultsKey.sidebarSystemMode) as? Bool ?? false,
             preferEmbeddedConsoleTags: defaults.object(forKey: AppDefaultsKey.preferEmbeddedConsoleTags) as? Bool ?? false,
             sidebarBrowserModeRawValue: defaults.string(forKey: AppDefaultsKey.sidebarBrowserMode),

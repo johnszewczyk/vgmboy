@@ -208,6 +208,12 @@
 
 ### Animations
 
+**Control:** [ ] `Solid Playlist Selection Bar`
+
+> Fill the moving playlist selection capsule; turn off to show its outline.
+
+**Default:** off.
+
 **Control:** [x] `Auto-Resize`
 
 > Duration for automatic playlist column resizing.

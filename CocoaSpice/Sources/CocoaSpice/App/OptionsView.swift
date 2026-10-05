@@ -951,6 +951,19 @@ private struct CocoaSpiceAnimationOptionsCard: View {
 
     var body: some View {
         optionsCard(title: "Animations") {
+            Toggle(isOn: Binding(
+                get: { model.solidPlaylistSelectionBar },
+                set: { model.setSolidPlaylistSelectionBar($0) }
+            )) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Solid Playlist Selection Bar")
+                    Text("Fill the moving selection capsule; turn off to show its outline.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.checkbox)
+
             timingRow(title: "Auto-Resize", detail: "Duration for automatic playlist column resizing (ms).", enabled: Binding(
                 get: { model.autoResizeAnimationEnabled },
                 set: { model.setAutoResizeAnimationEnabled($0) }

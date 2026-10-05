@@ -160,6 +160,7 @@ final class PlayerViewModel {
     var interfaceFontSize: CGFloat = 12
     var interfaceTextColor: DatabaseSidebarTextColor = .primary
     var interfaceMonospaceFont = false
+    var solidPlaylistSelectionBar = false
     let frontendPreferences = FrontendPreferencesCoordinator(keys: .cocoaSpice)
     var autoResizeAnimationEnabled: Bool { frontendPreferences.value.animations.autoResizeEnabled }
     var selectionAnimationEnabled: Bool { frontendPreferences.value.animations.selectionEnabled }
@@ -948,6 +949,11 @@ final class PlayerViewModel {
 
     func setSelectionAnimationEnabled(_ enabled: Bool) {
         frontendPreferences.setSelectionEnabled(enabled)
+    }
+
+    func setSolidPlaylistSelectionBar(_ enabled: Bool) {
+        solidPlaylistSelectionBar = enabled
+        UserDefaults.standard.set(enabled, forKey: AppDefaultsKey.solidPlaylistSelectionBar)
     }
 
     func setColumnAutoSizeEnabled(_ enabled: Bool) {
@@ -3313,6 +3319,7 @@ final class PlayerViewModel {
             interfaceTextColor = storedInterfaceTextColor
         }
         interfaceMonospaceFont = preferences.databaseSidebarMonospaceFont || preferences.playlistMonospaceFont
+        solidPlaylistSelectionBar = preferences.solidPlaylistSelectionBar
         if let storedSidebarDisclosureGapPoints = preferences.databaseSidebarDisclosureGapPoints {
             databaseSidebarDisclosureGapPoints = min(max(CGFloat(storedSidebarDisclosureGapPoints), 0), 16)
         } else if let legacyEmGap = preferences.databaseSidebarDisclosureGap {

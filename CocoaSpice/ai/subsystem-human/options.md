@@ -38,7 +38,7 @@
 
 - Random playback: the main toolbar cycles between Off, Library random, and current Playlist-view random modes.
 - About: the macOS application menu opens the external-component inventory with source and license links.
-- Interface Style: font size, text color, and monospace settings apply consistently to both the database sidebar and playlist. Selection highlights use `NSColor.controlAccentColor`, so CocoaSpice follows the user's macOS accent and has no app-specific accent-color preference. CocoaSpice's standard macOS buttons and labels keep their native system styling.
+- Interface Style: font size, text color, and monospace settings apply consistently to both the database sidebar and playlist. Selection highlights use `NSColor.controlAccentColor`, so CocoaSpice follows the user's macOS accent and has no app-specific accent-color preference. The playlist's single-row selection capsule is an outline by default; Solid Playlist Selection Bar fills it. Sidebar selection remains filled. CocoaSpice's standard macOS buttons and labels keep their native system styling.
 - Each appearance card Reset restores its own default primary 12pt appearance.
 - Sidebar Options: Group by Console sorts the Database game list into consoles. Prefer Folders over Metadatas chooses the scanned archive or file's parent console folder before embedded console metadata; disabling it reverses that preference. It is a read-only sidebar reload, not a scan or database rewrite. Files Disclosure Gap sets 0–16 pt spacing between folder triangles and names in Files view. Files Child Indent is a numeric 0–32 pt field that offsets every Files-view child level; its default 8 pt is about one character at the default font size. Hide File Extensions changes only Files-view labels, never filenames stored by the database or passed to playback.
 - Playlist Line Gap and Sidebar Line Gap independently add 0–16 pt between playlist rows and Database sidebar rows. Both default to 0 pt, which adds no space.
@@ -48,7 +48,7 @@
   Return. Double-Click Enqueues remains a browser behavior control for Games.
 - Every Options panel places a horizontal rule below its heading. Checkbox options use a leading checkbox with any explanatory text aligned beneath its label.
 - Playlist Options: Column Auto-size defaults on and automatically resizes columns for content width on selection.
-- Animations: Auto-Resize and Selection Bar are independently checkbox-enabled (both default on) and retain their configured 0–1000 ms values when disabled; disabling one makes its effective duration 0 ms.
+- Animations: Solid Playlist Selection Bar is off by default, showing an outlined capsule; enabling it fills the capsule. Auto-Resize and Selection Bar are independently checkbox-enabled (both default on) and retain their configured 0–1000 ms values when disabled; disabling one makes its effective duration 0 ms.
 - Shared ownership: preference persistence and cache policy come from FrontendCore; playback timing and AAC conversion come from VGMBoyKit. CocoaSpice supplies only its native controls, destination-folder choice, and archive materialization adapter.
 
 ## Window
@@ -57,6 +57,7 @@
 - The window initially opens at 800pt wide and 600pt tall, can be freely resized down to 320pt by 240pt, and remembers its last size and position.
 - Windows Reset restores the default size and centered position for the main, Options, and About windows.
 - Interface > Animations exposes checkbox-enabled auto-resize and playlist/sidebar selection-bar durations. Both default on at 200 ms and accept 0–1000 ms.
+- Interface > Animations includes Solid Playlist Selection Bar, off by default. It switches only the playlist's single-row capsule between an outline and a fill.
 - The Options sidebar is alphabetized within two groups: CocoaSpice contains Database, Interface, and Windows; VGMBoy contains Audio, Diagnostics, and Playback.
 - The former Plugins inventory page is not part of Options. Component ownership and licenses remain documented in VGMBoy.
 

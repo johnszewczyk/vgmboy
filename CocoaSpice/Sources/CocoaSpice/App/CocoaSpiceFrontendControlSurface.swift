@@ -53,6 +53,7 @@ struct CocoaSpiceOptionsSnapshot: Codable, Equatable, Sendable {
     let interfaceFontSize: Double
     let interfaceTextColor: String
     let interfaceMonospaceFont: Bool
+    let solidPlaylistSelectionBar: Bool
     let sidebarSystemMode: Bool
     let preferFoldersOverMetadata: Bool
     let sidebarHidesFileExtensions: Bool
@@ -83,6 +84,7 @@ enum CocoaSpiceOptionsCommand: Codable, Equatable, Sendable {
     case setAutoResizeAnimationMilliseconds(Int)
     case setSelectionAnimationEnabled(Bool)
     case setSelectionAnimationMilliseconds(Int)
+    case setSolidPlaylistSelectionBar(Bool)
     case setColumnAutoSize(Bool)
     case setWindowAlwaysOnTop(role: FrontendWindowRole, enabled: Bool)
     case setLongPlayEnabled(Bool)
@@ -154,6 +156,7 @@ final class CocoaSpiceOptionsControlSurface {
             interfaceFontSize: Double(model.interfaceFontSize),
             interfaceTextColor: model.interfaceTextColor.rawValue,
             interfaceMonospaceFont: model.interfaceMonospaceFont,
+            solidPlaylistSelectionBar: model.solidPlaylistSelectionBar,
             sidebarSystemMode: model.sidebarSystemMode,
             preferFoldersOverMetadata: model.preferFoldersOverMetadata,
             sidebarHidesFileExtensions: model.databaseSidebarHidesFileExtensions,
@@ -187,6 +190,8 @@ final class CocoaSpiceOptionsControlSurface {
             model.setSelectionAnimationEnabled(enabled)
         case .setSelectionAnimationMilliseconds(let milliseconds):
             model.setSelectionAnimationMilliseconds(milliseconds)
+        case .setSolidPlaylistSelectionBar(let enabled):
+            model.setSolidPlaylistSelectionBar(enabled)
         case .setColumnAutoSize(let enabled):
             model.setColumnAutoSizeEnabled(enabled)
         case .setWindowAlwaysOnTop(let role, let enabled):

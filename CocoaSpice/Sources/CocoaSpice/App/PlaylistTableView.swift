@@ -212,6 +212,7 @@ struct PlaylistTableView: NSViewRepresentable {
             guard let tableView else { return }
             selectionHighlightView?.selectionColor = NSColor.controlAccentColor
             selectionHighlightView?.animationDuration = Double(model.effectiveSelectionAnimationMilliseconds) / 1_000
+            selectionHighlightView?.isPrimarySelectionSolid = model.solidPlaylistSelectionBar
 
             applyVisibility(to: tableView)
             updateAutomaticContentVisibility(in: tableView)
@@ -1227,8 +1228,15 @@ final class AnimatedCapsuleSelectionHighlightView: NSView {
     private let primarySelectionLayer = CAShapeLayer()
     private let multipleSelectionLayer = CAShapeLayer()
     private let horizontalInset: CGFloat = 4
+    private let outlineLineWidth: CGFloat = 1.5
+    private var primarySelectionBounds: CGRect?
     var animationDuration: TimeInterval = 0.2
-    var selectionColor: NSColor = .selectedContentBackgroundColor
+    var selectionColor: NSColor = .selectedContentBackgroundColor {
+        didSet { applySelectionStyle() }
+    }
+    var isPrimarySelectionSolid = true {
+        didSet { applySelectionStyle() }
+    }
 
     override var isFlipped: Bool { true }
 
@@ -1240,6 +1248,7 @@ final class AnimatedCapsuleSelectionHighlightView: NSView {
         multipleSelectionLayer.isHidden = true
         layer?.addSublayer(primarySelectionLayer)
         layer?.addSublayer(multipleSelectionLayer)
+        applySelectionStyle()
     }
 
     required init?(coder: NSCoder) {
@@ -1251,13 +1260,10 @@ final class AnimatedCapsuleSelectionHighlightView: NSView {
     }
 
     func update(selectionRects: [NSRect], primaryRect: NSRect?, animated: Bool) {
-        let fillColor = selectionColor.withAlphaComponent(0.9).cgColor
-        primarySelectionLayer.fillColor = fillColor
-        multipleSelectionLayer.fillColor = fillColor
-
         guard let primaryRect, selectionRects.count == 1 else {
             primarySelectionLayer.removeAllAnimations()
             primarySelectionLayer.isHidden = true
+            primarySelectionBounds = nil
             multipleSelectionLayer.path = selectionPath(for: selectionRects)
             multipleSelectionLayer.isHidden = selectionRects.isEmpty
             return
@@ -1269,7 +1275,8 @@ final class AnimatedCapsuleSelectionHighlightView: NSView {
         let targetRect = capsuleRect(for: primaryRect)
         let targetBounds = CGRect(origin: .zero, size: targetRect.size)
         let targetPosition = CGPoint(x: targetRect.midX, y: targetRect.midY)
-        let targetPath = capsulePath(in: targetBounds)
+        primarySelectionBounds = targetBounds
+        let targetPath = primarySelectionPath(in: targetBounds)
         let wasVisible = !primarySelectionLayer.isHidden
         let startPosition = primarySelectionLayer.presentation()?.position ?? primarySelectionLayer.position
         let destinationAlreadyAnimating = !animated
@@ -1300,6 +1307,25 @@ final class AnimatedCapsuleSelectionHighlightView: NSView {
         movement.duration = animationDuration
         movement.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         primarySelectionLayer.add(movement, forKey: "playlistSelectionMovement")
+    }
+
+    private func applySelectionStyle() {
+        let color = selectionColor.withAlphaComponent(0.9).cgColor
+        primarySelectionLayer.fillColor = isPrimarySelectionSolid ? color : NSColor.clear.cgColor
+        primarySelectionLayer.strokeColor = isPrimarySelectionSolid ? nil : color
+        primarySelectionLayer.lineWidth = isPrimarySelectionSolid ? 0 : outlineLineWidth
+        if let primarySelectionBounds {
+            primarySelectionLayer.path = primarySelectionPath(in: primarySelectionBounds)
+        }
+        multipleSelectionLayer.fillColor = color
+        multipleSelectionLayer.strokeColor = nil
+    }
+
+    private func primarySelectionPath(in bounds: CGRect) -> CGPath {
+        let shapeBounds = isPrimarySelectionSolid
+            ? bounds
+            : bounds.insetBy(dx: outlineLineWidth / 2, dy: outlineLineWidth / 2)
+        return capsulePath(in: shapeBounds)
     }
 
     private func selectionPath(for rects: [NSRect]) -> CGPath? {
