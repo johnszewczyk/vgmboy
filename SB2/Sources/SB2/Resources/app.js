@@ -682,6 +682,7 @@ window.addEventListener("pagehide", () => {
 
 app.ui.bootstrap().catch((error) => {
   console.error(error);
+  app.ui.failStartup(error?.message || error);
   if (!window.spcBoySB2?.isOptionsWindow) {
     state.databaseSidebarLoading = false;
     state.databaseSidebarError = `Catalog startup failed: ${error?.message || error}`;

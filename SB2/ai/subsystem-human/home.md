@@ -10,6 +10,10 @@
   and playlist length at right.
 - Startup reads the shared CocoaSpice catalog through CatalogReader; ScanSong
   remains its writer.
+- If startup lasts beyond a short reveal delay, a compact status card shows
+  workspace restore, library connection, sidebar preparation, playlist restore,
+  and elapsed time. It briefly confirms readiness or remains visible with the
+  startup error.
 - Options open in the playlist pane as a subpage and leave the title and footer
   visible. A separate Options window uses the same chrome.
 - Playlist tab selection fades with the shared selection timing and easing;

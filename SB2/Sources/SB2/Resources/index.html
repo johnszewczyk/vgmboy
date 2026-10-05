@@ -76,6 +76,20 @@
         <div id="sidebar-resize-handle" class="sidebar-resize-handle" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" aria-valuemin="12" aria-valuemax="50" aria-valuenow="20" tabindex="0"></div>
 
         <section class="content">
+          <div id="sb2-startup-notice" class="sb2-startup-notice is-hidden" role="status" aria-live="polite" aria-atomic="true" aria-busy="true">
+            <section class="sb2-startup-card" aria-labelledby="sb2-startup-title">
+              <div class="sb2-startup-kicker"><span class="sb2-startup-pulse" aria-hidden="true"></span><span>SPCBOY SB2 / STARTUP</span><span id="sb2-startup-elapsed" class="sb2-startup-elapsed">Starting…</span></div>
+              <h1 id="sb2-startup-title">Restoring SPCBOY SB2</h1>
+              <p id="sb2-startup-detail">Loading your display settings and last session.</p>
+              <div class="sb2-startup-progress" role="progressbar" aria-label="Startup progress" aria-valuetext="In progress"><span></span></div>
+              <ol class="sb2-startup-steps" aria-label="Startup steps">
+                <li data-sb2-startup-step="0"><span class="sb2-startup-step-mark">1</span><span>Restore workspace</span></li>
+                <li data-sb2-startup-step="1"><span class="sb2-startup-step-mark">2</span><span>Connect library</span></li>
+                <li data-sb2-startup-step="2"><span class="sb2-startup-step-mark">3</span><span>Prepare sidebar</span></li>
+                <li data-sb2-startup-step="3"><span class="sb2-startup-step-mark">4</span><span>Restore playlists</span></li>
+              </ol>
+            </section>
+          </div>
           <div id="playlist-tabs-toolbar" class="playlist-tabs-toolbar is-hidden" aria-label="Playlist tabs">
             <div id="playlist-tabs" class="playlist-tabs" role="tablist" aria-label="Playlists"></div>
           </div>
@@ -108,7 +122,7 @@
       <footer class="sb-status" aria-label="Playback status">
         <div class="sb-status-sidebar"></div><div class="sb-status-divider"></div>
         <div class="sb-status-content">
-          <span class="sb-status-state"><i></i><span>READY</span></span>
+          <span class="sb-status-state" data-startup-state="ready"><i></i><span id="sb2-app-status-label">READY</span></span>
           <div class="sb-times timing-readout toolbar-control">
             <span id="elapsed-label" class="time-label">0:00</span><span class="time-separator">/</span>
             <span id="song-length-label" class="time-label">0:00</span><span class="time-separator">/</span>

@@ -40,6 +40,11 @@ let catalogPlaylistSortGeneration = 0;
 let projectionPlaylistSortGeneration = 0;
 let playlistTabsSaveTimer = 0;
 let playlistTabsSaveChain = Promise.resolve();
+let startupStartedAt = 0;
+let startupRevealTimer = 0;
+let startupElapsedTimer = 0;
+let startupDismissTimer = 0;
+let startupHasAppeared = false;
 
 function makePlaylistTabID() {
   return globalThis.crypto?.randomUUID?.()
@@ -644,6 +649,7 @@ function clearPlaylistSelection() {
 }
 
 function showStartupFailure(message) {
+  failStartup(message);
   refs.treeRoot.innerHTML = "";
   const empty = document.createElement("div");
   empty.className = "empty sidebar-empty";
@@ -654,6 +660,121 @@ function showStartupFailure(message) {
   const row = document.createElement("tr");
   row.innerHTML = `<td colspan="7" class="empty-row">${message}</td>`;
   refs.playlistBody.appendChild(row);
+}
+
+const SB2_STARTUP_STEPS = Object.freeze([
+  { title: "Restoring SPCBOY SB2", detail: "Applying saved interface settings and reopening your last session." },
+  { title: "Connecting to the library", detail: "Opening the shared ScanSong catalog and checking its library roots." },
+  { title: "Preparing the sidebar", detail: "Indexing library sources for the sidebar and its search results." },
+  { title: "Restoring playlists", detail: "Reopening saved playlists and preparing playback controls." }
+]);
+
+function setStartupStage(index, detail = null) {
+  if (window.spcBoySB2?.isOptionsWindow) return;
+  setStartupStatus("STARTING");
+  const notice = document.getElementById("sb2-startup-notice");
+  if (!notice) return;
+  const step = Math.max(0, Math.min(SB2_STARTUP_STEPS.length - 1, Number(index) || 0));
+  const message = SB2_STARTUP_STEPS[step];
+  const heading = document.getElementById("sb2-startup-title");
+  const description = document.getElementById("sb2-startup-detail");
+  if (heading) heading.textContent = message.title;
+  if (description) description.textContent = String(detail || message.detail);
+  notice.querySelectorAll("[data-sb2-startup-step]").forEach((item) => {
+    const itemIndex = Number(item.dataset.sb2StartupStep);
+    const state = itemIndex < step ? "done" : itemIndex === step ? "active" : "pending";
+    item.dataset.state = state;
+    const mark = item.querySelector(".sb2-startup-step-mark");
+    if (mark) mark.textContent = state === "done" ? "✓" : String(itemIndex + 1);
+  });
+  notice.classList.remove("is-error", "is-ready");
+  notice.setAttribute("aria-busy", "true");
+  notice.querySelector("[role='progressbar']")?.setAttribute("aria-valuetext", "In progress");
+}
+
+function setStartupStatus(status) {
+  const indicator = document.querySelector(".sb-status-state");
+  const label = document.getElementById("sb2-app-status-label");
+  if (!indicator || !label) return;
+  label.textContent = status;
+  indicator.dataset.startupState = status.toLowerCase();
+}
+
+function beginStartup() {
+  if (window.spcBoySB2?.isOptionsWindow) return;
+  startupStartedAt = performance.now();
+  startupHasAppeared = false;
+  window.clearTimeout(startupDismissTimer);
+  setStartupStage(0);
+  const notice = document.getElementById("sb2-startup-notice");
+  if (!notice) return;
+  window.clearTimeout(startupRevealTimer);
+  startupRevealTimer = window.setTimeout(() => {
+    startupRevealTimer = 0;
+    startupHasAppeared = true;
+    notice.classList.remove("is-hidden");
+    const elapsed = document.getElementById("sb2-startup-elapsed");
+    const updateElapsed = () => {
+      if (elapsed) elapsed.textContent = `Working ${Math.max(1, Math.floor((performance.now() - startupStartedAt) / 1000))}s`;
+    };
+    updateElapsed();
+    window.clearInterval(startupElapsedTimer);
+    startupElapsedTimer = window.setInterval(updateElapsed, 1000);
+  }, 350);
+}
+
+function finishStartup() {
+  if (window.spcBoySB2?.isOptionsWindow) return;
+  setStartupStatus("READY");
+  const notice = document.getElementById("sb2-startup-notice");
+  if (!notice) return;
+  window.clearTimeout(startupRevealTimer);
+  startupRevealTimer = 0;
+  window.clearInterval(startupElapsedTimer);
+  startupElapsedTimer = 0;
+  if (!startupHasAppeared) {
+    notice.classList.add("is-hidden");
+    return;
+  }
+  notice.querySelectorAll("[data-sb2-startup-step]").forEach((item) => {
+    item.dataset.state = "done";
+    const mark = item.querySelector(".sb2-startup-step-mark");
+    if (mark) mark.textContent = "✓";
+  });
+  const heading = document.getElementById("sb2-startup-title");
+  const description = document.getElementById("sb2-startup-detail");
+  const elapsed = document.getElementById("sb2-startup-elapsed");
+  if (heading) heading.textContent = "SPCBOY SB2 is ready";
+  if (description) description.textContent = "Your library and saved playlists are ready.";
+  if (elapsed) elapsed.textContent = "Ready";
+  notice.classList.add("is-ready");
+  notice.setAttribute("aria-busy", "false");
+  notice.querySelector("[role='progressbar']")?.setAttribute("aria-valuetext", "Ready");
+  window.clearTimeout(startupDismissTimer);
+  startupDismissTimer = window.setTimeout(() => notice.classList.add("is-hidden"), 650);
+}
+
+function failStartup(message) {
+  if (window.spcBoySB2?.isOptionsWindow) return;
+  setStartupStatus("ERROR");
+  const notice = document.getElementById("sb2-startup-notice");
+  if (!notice) return;
+  window.clearTimeout(startupRevealTimer);
+  startupRevealTimer = 0;
+  window.clearInterval(startupElapsedTimer);
+  startupElapsedTimer = 0;
+  window.clearTimeout(startupDismissTimer);
+  startupHasAppeared = true;
+  notice.classList.remove("is-hidden", "is-ready");
+  notice.classList.add("is-error");
+  notice.setAttribute("aria-busy", "false");
+  notice.querySelector("[role='progressbar']")?.setAttribute("aria-valuetext", "Startup paused");
+  const heading = document.getElementById("sb2-startup-title");
+  const description = document.getElementById("sb2-startup-detail");
+  const elapsed = document.getElementById("sb2-startup-elapsed");
+  if (heading) heading.textContent = "SPCBOY SB2 could not finish starting";
+  if (description) description.textContent = String(message || "The library could not be opened.");
+  if (elapsed) elapsed.textContent = "Startup paused";
 }
 
 function pathToNode(nodes, targetPath, lineage = []) {
@@ -3481,10 +3602,12 @@ function syncSidebarFoldButton() {
 
 
 async function bootstrap() {
+  beginStartup();
   // Load persisted appearance before the first Options-window paint. The
   // window is native-sized and immediately visible; deferring this until
   // after catalog/cache requests produces a distracting default-style flash.
   window.SB2OptionsController.applyManifest(await window.spcBoySB2.frontendOptionsManifest());
+  setStartupStage(0, "Applying saved interface settings and reopening your last session.");
   await loadSettings();
   await syncSidebarView();
   let savedPlaylistTabs = null;
@@ -3510,6 +3633,7 @@ async function bootstrap() {
   }
   void sampleSB2CPU();
 
+  setStartupStage(1, "Opening the shared ScanSong catalog and checking the configured library roots.");
   collapsedDatabaseConsoles = new Set(state.collapsedConsoleNames);
   state.databaseLocation = await window.spcBoySB2?.databaseLocation?.() || null;
   state.databaseLocationStatus = state.databaseLocation?.requiresRestart
@@ -3539,7 +3663,10 @@ async function bootstrap() {
     snapshot = await window.spcBoySB2.bootstrap();
   }
 
-  if (snapshot?.stale === true) return;
+  if (snapshot?.stale === true) {
+    failStartup("The library changed while SPCBOY SB2 was opening. Close and reopen the app to load the latest catalog.");
+    return;
+  }
 
   Object.assign(state, snapshot);
   state.rootPath = null;
@@ -3556,9 +3683,11 @@ async function bootstrap() {
   state.totalSeconds = targetPlaybackSeconds();
   persistSettings();
   if (!window.spcBoySB2?.isOptionsWindow && window.spcBoySB2?.databaseRoots) {
+    setStartupStage(2, "Indexing library sources for the sidebar and its search results.");
     state.libraryRoots = await window.spcBoySB2.databaseRoots();
     await uiApp.ui.handleLibraryRootsChanged(state.libraryRoots);
   }
+  setStartupStage(3, "Reopening saved playlists and preparing playback controls.");
   const restoredPlaylistTabs = !window.spcBoySB2?.isOptionsWindow && restorePlaylistTabs(savedPlaylistTabs);
   if (!restoredPlaylistTabs && !window.spcBoySB2?.isOptionsWindow) ensurePlaylistTab();
   renderAll();
@@ -3571,6 +3700,7 @@ async function bootstrap() {
   syncTreeSelection();
   scrollSelectedTrackIntoView();
   if (!window.spcBoySB2?.isOptionsWindow) persistPlaylistTabs();
+  finishStartup();
 }
 
 function selectedPathTitle(path) {
@@ -3696,6 +3826,7 @@ uiApp.ui = {
   activateFocusedItem,
   renderSidebar,
   syncAnimatedRanges,
+  failStartup,
   bootstrap
 };
 })();
