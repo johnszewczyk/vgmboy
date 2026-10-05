@@ -11,7 +11,7 @@ import Yoga, {
 } from "./yoga-layout.js";
 
 // The framebuffer expands each LCD dot to a configurable device-pixel cell.
-// Optional matrix gaps leave one device-pixel edge in a palette tone.
+// Optional matrix gaps leave one background-colored corner pixel per cell.
 const DEFAULT_LCD_DOT_SIZE = 3;
 const LCD_DOT_SIZE_OPTIONS = [2, 3, 4, 5, 6];
 const APP_EDGE_PADDING_PX = 8;
@@ -1039,11 +1039,10 @@ export function lcdDeviceDotSnapshot(shade = 0) {
   const shadeIndex = Math.max(0, Math.min(3, Math.round(Number(shade) || 0)));
   const ink = shadeIndex < 2 ? state.customFontColor : state.customBackgroundColor;
   const gap = state.customBackgroundColor;
-  const faceSize = Math.max(1, DEVICE_PIXELS_PER_LCD_DOT
-    - (state.lcdPixelGaps ? 1 : 0));
+  const gapIndex = DEVICE_PIXELS_PER_LCD_DOT - 1;
   return Array.from({ length: DEVICE_PIXELS_PER_LCD_DOT }, (_, y) =>
     Array.from({ length: DEVICE_PIXELS_PER_LCD_DOT }, (_, x) =>
-      x < faceSize && y < faceSize ? ink : gap));
+      state.lcdPixelGaps && x === gapIndex && y === gapIndex ? gap : ink));
 }
 
 export function lcdPaletteSnapshot() {
@@ -1376,8 +1375,7 @@ function presentPixels(startY = 0, endY = HEIGHT, startX = 0, endX = WIDTH) {
   const firstColumn = Math.max(0, Math.floor(startX));
   const lastColumn = Math.min(WIDTH, Math.ceil(endX));
   if (lastRow <= firstRow || lastColumn <= firstColumn) return;
-  const faceSize = Math.max(1, DEVICE_PIXELS_PER_LCD_DOT
-    - (state.lcdPixelGaps ? 1 : 0));
+  const pixelMatrixGaps = state.lcdPixelGaps;
   for (let y = firstRow; y < lastRow; y += 1) {
     const sourceRow = y * WIDTH;
     const topRow = y * DEVICE_PIXELS_PER_LCD_DOT * outputWidth;
@@ -1389,7 +1387,10 @@ function presentPixels(startY = 0, endY = HEIGHT, startX = 0, endX = WIDTH) {
       for (let dotY = 0; dotY < DEVICE_PIXELS_PER_LCD_DOT; dotY += 1) {
         const row = topRow + dotY * outputWidth + outputX;
         for (let dotX = 0; dotX < DEVICE_PIXELS_PER_LCD_DOT; dotX += 1) {
-          imageWords[row + dotX] = dotX < faceSize && dotY < faceSize ? face : gap;
+          const isMatrixGap = pixelMatrixGaps
+            && dotX === DEVICE_PIXELS_PER_LCD_DOT - 1
+            && dotY === DEVICE_PIXELS_PER_LCD_DOT - 1;
+          imageWords[row + dotX] = isMatrixGap ? gap : face;
         }
       }
     }

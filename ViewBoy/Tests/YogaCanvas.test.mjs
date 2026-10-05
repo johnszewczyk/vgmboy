@@ -1500,8 +1500,10 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   const separatedDot = lcdDeviceDotSnapshot(0);
   assert.equal(lcdDotSizeSnapshot().pixelGaps, true,
     'the pixel-matrix checkbox enables the optional device-pixel gutters');
-  assert.equal(separatedDot.flat().filter((color) => color === '#222222').length, 4,
-    'the old 3px matrix mode paints four dark pixels in a nine-pixel cell');
+  assert.equal(separatedDot.flat().filter((color) => color === '#222222').length, 8,
+    '3px matrix gaps retain eight exact dark pixels and leave one background notch');
+  assert.equal(separatedDot[2][2], lcdPaletteSnapshot()[3].color,
+    'the single matrix gap occupies the bottom-right device pixel');
   clickTarget('PIXEL MATRIX GAPS');
   assert.equal(lcdDeviceDotSnapshot(0).flat().filter((color) => color === '#222222').length, 9,
     'turning matrix gaps off paints the full 3px cell with the exact dark ink');
