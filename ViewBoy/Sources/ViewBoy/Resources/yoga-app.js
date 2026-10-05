@@ -986,7 +986,7 @@ export function lcdDeviceDotSnapshot(shade = 0) {
   const ink = RGB[Math.max(0, Math.min(3, Math.round(Number(shade) || 0)))];
   const surface = RGB[3];
   const faceSize = Math.max(1, DEVICE_PIXELS_PER_LCD_DOT
-    - (state.lcdPixelGaps && !state.rawPixelContrast ? 1 : 0));
+    - (state.lcdPixelGaps ? 1 : 0));
   return Array.from({ length: DEVICE_PIXELS_PER_LCD_DOT }, (_, y) =>
     Array.from({ length: DEVICE_PIXELS_PER_LCD_DOT }, (_, x) =>
       rgbToHex(x < faceSize && y < faceSize ? ink : surface)));
@@ -1324,7 +1324,7 @@ function presentPixels(startY = 0, endY = HEIGHT, startX = 0, endX = WIDTH) {
   if (lastRow <= firstRow || lastColumn <= firstColumn) return;
   const background = packedRGB[3];
   const faceSize = Math.max(1, DEVICE_PIXELS_PER_LCD_DOT
-    - (state.lcdPixelGaps && !state.rawPixelContrast ? 1 : 0));
+    - (state.lcdPixelGaps ? 1 : 0));
   for (let y = firstRow; y < lastRow; y += 1) {
     const sourceRow = y * WIDTH;
     const topRow = y * DEVICE_PIXELS_PER_LCD_DOT * outputWidth;

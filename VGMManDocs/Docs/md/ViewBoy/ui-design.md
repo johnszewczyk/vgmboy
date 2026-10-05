@@ -40,9 +40,10 @@ four tones: PIXEL, two intermediate tones, and BG. It derives the middle tones
 at one-third and two-thirds of the endpoint distance in CIELAB L*, with a* and
 b* interpolated at the same fractions. **Raw Pixels** is the high-contrast
 two-tone mode: shades 0–2 use the exact PIXEL endpoint and shade 3 uses BG.
-Pixel Matrix Gaps are bypassed. Selected controls reverse their label to BG,
-and moving row selection uses a pixel outline. This keeps dark custom pixels
-such as `000` at full strength while retaining clear selection feedback.
+It changes shade mapping only. Pixel Matrix Gaps remain active when enabled,
+so the device-cell pattern stays visible while dark custom pixels such as
+`000` render at full strength. Selected controls reverse their label to BG,
+and moving row selection uses a pixel outline.
 
 BG and PIXEL are the only color controls. Inputs accept three- or six-digit hex with or without `#`, space- or
 comma-separated RGB channel values, CSS color names, and supported CSS color
@@ -58,8 +59,9 @@ values give the same canvas a finer grid. **Pixel Matrix Gaps** is off by
 default, so every device pixel in a cell uses its framebuffer tone. When on,
 the cell's right and bottom device-pixel edges use the LCD background tone.
 With gaps off, a custom `000` PIXEL endpoint renders as full black throughout
-each ink cell. Raw Pixels fills the complete device cell with the exact PIXEL
-or BG endpoint, even when Matrix Gaps are enabled.
+each ink cell. Raw Pixels fills each cell's ink area with the exact PIXEL or BG
+endpoint and preserves the one-device-pixel LCD-background edge when Matrix
+Gaps are enabled.
 
 Standard mode reproduces a four-tone palette and visible pixel grid, not the
 original STN panel. Raw Pixels uses two exact endpoint colors for readability.
