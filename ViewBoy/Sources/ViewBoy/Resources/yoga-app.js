@@ -126,22 +126,19 @@ function rgbToHex([red, green, blue]) {
 }
 function paletteTones(fontColor = DEFAULT_LCD_PIXEL, backgroundColor = DEFAULT_LCD_BACKGROUND,
   highContrast = false) {
+  if (highContrast) {
+    // Direct-color mode removes the LCD tone shader: dark framebuffer shades
+    // use the exact PIXEL endpoint and light shades use the exact BG endpoint.
+    return [fontColor, fontColor, backgroundColor, backgroundColor];
+  }
   const inkRGB = hexToRGB(fontColor);
   const surfaceRGB = hexToRGB(backgroundColor);
-  const inkLab = highContrast ? null : rgbToLab(inkRGB);
-  const surfaceLab = highContrast ? null : rgbToLab(surfaceRGB);
-  // High Contrast keeps both endpoints and weights both intermediate shades
-  // toward PIXEL. Blend the configured RGB channels directly so the selected
-  // color stays chromatic instead of passing through the perceptual gray fade.
-  const positions = highContrast ? [0, 0.12, 0.42, 1] : [0, 1 / 3, 2 / 3, 1];
+  const inkLab = rgbToLab(inkRGB);
+  const surfaceLab = rgbToLab(surfaceRGB);
+  const positions = [0, 1 / 3, 2 / 3, 1];
   return positions.map((amount, index) => {
     if (index === 0) return fontColor;
     if (index === 3) return backgroundColor;
-    if (highContrast) {
-      return rgbToHex(inkRGB.map((channel, channelIndex) => Math.round(
-        channel + (surfaceRGB[channelIndex] - channel) * amount,
-      )));
-    }
     const lab = inkLab.map((value, channel) =>
       value + (surfaceLab[channel] - value) * amount);
     return rgbToHex(labToRGB(lab));
@@ -374,6 +371,7 @@ function updateScreenSurface() {
   root.style?.setProperty?.("--screen-surface", state.customBackgroundColor);
 }
 function inactiveSearchTextShade() {
+  if (state.highContrastDisplay) return 0;
   const pixelLightness = rgbToLab(hexToRGB(state.customFontColor))[0];
   const backgroundLightness = rgbToLab(hexToRGB(state.customBackgroundColor))[0];
   return backgroundLightness > pixelLightness ? 2 : 1;
@@ -1526,6 +1524,10 @@ function label(parent, text, style = {}, meta = {}) {
         fillRect(box.x, box.y, box.width, box.height, meta.fill);
       }
       if (meta.border !== undefined) strokeRect(box.x, box.y, box.width, box.height, meta.border);
+      if (state.highContrastDisplay && meta.selectedControl === true
+          && box.width > 4 && box.height > 4) {
+        strokeRect(box.x + 2, box.y + 2, box.width - 4, box.height - 4, 0);
+      }
       if (meta.bottomLine !== undefined) {
         line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, meta.bottomLine);
       }
@@ -1870,6 +1872,7 @@ function pixelButton(parent, text, onClick, style = {}) {
     border: 1,
     fill: style.optionPage ? undefined : style.selected ? 2 : undefined,
     textShade: 0,
+    selectedControl: style.selected === true,
     inset: style.inset ?? controlPaddingDots(),
     align: style.align ?? "center",
     controlTitle: style.controlTitle,
@@ -2123,8 +2126,10 @@ function animationFPSX(box, fps) {
 function paintAnimationFPSControl(box) {
   const track = animationFPSTrack(box);
   const thumbX = animationFPSX(box, state.animationFPS);
-  fillRect(track.left, track.y, track.right - track.left + 1, 1, 1);
-  fillRect(track.left, track.y, thumbX - track.left + 1, 1, 2);
+  fillRect(track.left, track.y, track.right - track.left + 1, 1,
+    state.highContrastDisplay ? 3 : 1);
+  fillRect(track.left, track.y, thumbX - track.left + 1, 1,
+    state.highContrastDisplay ? 0 : 2);
   ANIMATION_FPS_TICKS.forEach((fps) => {
     const x = animationFPSX(box, fps);
     fillRect(x, track.y - 2, 1, 5, 0);
@@ -2622,7 +2627,8 @@ function createQueueRow(parent, index, track, columns) {
     contentRowKind: "playlist",
     paint(box) {
       if (selected && !primarySelected) {
-        fillRect(box.x, box.y, box.width, box.height, 2);
+        if (state.highContrastDisplay) strokeRect(box.x, box.y, box.width, box.height, 0);
+        else fillRect(box.x, box.y, box.width, box.height, 2);
       }
     },
   });
@@ -3073,7 +3079,11 @@ function addCatalogPane(parent) {
         controlTitle: `TAB ${tab.title}`,
         paint(box) {
           if (tab.id === state.activePlaylistTabId) {
-            fillRect(box.x, box.y, box.width, box.height, 2);
+            if (state.highContrastDisplay && box.width > 4 && box.height > 4) {
+              strokeRect(box.x + 2, box.y + 2, box.width - 4, box.height - 4, 0);
+            } else {
+              fillRect(box.x, box.y, box.width, box.height, 2);
+            }
           }
           strokeRect(box.x, box.y, box.width, box.height, 1);
         },
@@ -3749,9 +3759,19 @@ function paintGaugeBar(box, fraction, steps) {
   const { left, right } = linearTrackBounds(box, steps);
   const centerY = box.y + Math.floor(box.height / 2);
   const fillWidth = Math.round((right - left) * Math.max(0, Math.min(1, fraction)));
-  fillRect(left, box.y + 1, fillWidth, Math.max(1, box.height - 2), 1);
+  if (state.highContrastDisplay) {
+    fillRect(left, box.y + 1, right - left + 1, Math.max(1, box.height - 2), 3);
+    fillRect(left, box.y + 1, fillWidth, Math.max(1, box.height - 2), 0);
+  } else {
+    fillRect(left, box.y + 1, fillWidth, Math.max(1, box.height - 2), 1);
+  }
   const tickTop = centerY - 1;
-  for (const x of linearTickPositions(box, steps)) fillRect(x, tickTop, 1, 3, 2);
+  for (const x of linearTickPositions(box, steps)) {
+    const tickShade = state.highContrastDisplay
+      ? (x < left + fillWidth ? 3 : 0)
+      : 2;
+    fillRect(x, tickTop, 1, 3, tickShade);
+  }
 }
 
 function equalizerBand(parent, title, index) {
@@ -4480,7 +4500,11 @@ function paintSelectionBandPixels(y) {
     const bandTop = floor(y);
     const priorClip = paintClip;
     paintClip = intersectBoxes(paintClip, selectionBand.clip);
-    fillRect(selectionBand.x, bandTop, selectionBand.width, selectionBand.height, 2);
+    if (state.highContrastDisplay) {
+      strokeRect(selectionBand.x, bandTop, selectionBand.width, selectionBand.height, 0);
+    } else {
+      fillRect(selectionBand.x, bandTop, selectionBand.width, selectionBand.height, 2);
+    }
     for (const row of selectionRows) {
       if (row.box.y >= bandTop + selectionBand.height || row.box.y + row.box.height <= bandTop) continue;
       if (row.widget.meta.optionPage) {
@@ -4501,8 +4525,13 @@ function paintSidebarSelectionBandPixels(y) {
   const bandTop = floor(y);
   const priorClip = paintClip;
   paintClip = intersectBoxes(paintClip, sidebarSelectionBand.clip);
-  fillRect(sidebarSelectionBand.x, bandTop,
-    sidebarSelectionBand.width, sidebarSelectionBand.height, 2);
+  if (state.highContrastDisplay) {
+    strokeRect(sidebarSelectionBand.x, bandTop,
+      sidebarSelectionBand.width, sidebarSelectionBand.height, 0);
+  } else {
+    fillRect(sidebarSelectionBand.x, bandTop,
+      sidebarSelectionBand.width, sidebarSelectionBand.height, 2);
+  }
   for (const row of sidebarSelectionRows) {
     if (row.box.y >= bandTop + sidebarSelectionBand.height
       || row.box.y + row.box.height <= bandTop) continue;

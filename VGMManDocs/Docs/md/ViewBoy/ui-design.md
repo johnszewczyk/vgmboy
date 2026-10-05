@@ -38,12 +38,11 @@ The default endpoints are the traditional Game Boy yellow-green background
 (`BG #9BBC0F`) and dark pixel color (`PIXEL #222222`). Standard mode renders
 four tones: PIXEL, two intermediate tones, and BG. It derives the middle tones
 at one-third and two-thirds of the endpoint distance in CIELAB L*, with a* and
-b* interpolated at the same fractions. **High Contrast** keeps both exact
-endpoints and derives its intermediate tones with direct per-channel sRGB
-steps at 12% and 42% from PIXEL toward BG. These dark-biased tones preserve the
-configured pixel color rather than using the standard perceptual fade. Pixel
-Matrix Gaps use BG-colored edges in both modes; High Contrast does not tint
-cell edges or change the grid, spacing, or presence of pixels.
+b* interpolated at the same fractions. **High Contrast** is a direct two-color
+mode: framebuffer shades 0–1 use the exact PIXEL input, and shades 2–3 use the
+exact BG input. It removes intermediate LCD tone shading. Pixel Matrix Gaps
+use BG-colored edges in both modes; High Contrast does not change cell edges,
+grid, spacing, or the presence of pixels.
 
 BG and PIXEL are the only color controls. Inputs accept three- or six-digit hex with or without `#`, space- or
 comma-separated RGB channel values, CSS color names, and supported CSS color
@@ -59,30 +58,33 @@ values give the same canvas a finer grid. **Pixel Matrix Gaps** is off by
 default, so every device pixel in a cell uses its framebuffer tone. When on,
 the cell's right and bottom device-pixel edges use the LCD background tone.
 With gaps off, a custom `000` PIXEL endpoint renders as full black throughout
-each ink cell. High Contrast keeps the exact PIXEL endpoint at shade 0 and
-changes only the two intermediate palette tones. It preserves the selected dot
-size, gap setting, cell geometry, and presence of every framebuffer pixel.
+each ink cell. High Contrast maps dark framebuffer values to exact PIXEL and
+light values to exact BG, while preserving the selected dot size, gap setting,
+cell geometry, and presence of every framebuffer pixel.
 
 Standard mode reproduces a four-tone palette and visible pixel grid, not the
-original STN panel. High Contrast moves both intermediate tones toward PIXEL
-for a stronger dark range; it does not alter device-cell geometry or claim to
-reproduce measured panel response. The Standard palette follows equal CIELAB
-L* intervals; High Contrast uses sRGB channel interpolation. Neither mode
-approximates a measured LCD voltage curve. The renderer does not model
+original STN panel. High Contrast intentionally reduces color fidelity to
+exact two-color rendering for readability; it does not alter device-cell
+geometry or claim to reproduce measured panel response. Standard mode follows
+equal CIELAB L* intervals. Neither mode approximates a measured LCD voltage
+curve. The renderer does not model
 reflectance, viewing-angle response, row/column crosstalk, liquid-crystal
 transition time, or panel aging. Nintendo lists the classic screen as a
 160×144 STN dot-matrix LCD with four shades and a contrast controller; the
 Game Boy Color uses a TFT screen. [Nintendo Game Boy specifications](https://www.nintendo.com/en-gb/Hardware/Nintendo-History/Game-Boy/Game-Boy-627031.html),
 [Nintendo technical data](https://www.nintendo.com/en-gb/Support/Legacy-system/Technical-data-619585.html).
 
-The **Custom LCD Colors** group is always visible on the Display page. It has
-separate **BG** and **PIXEL** fields. Inputs accept three- or six-digit hex
+The **Custom LCD Colors** group is always visible on the Display page and
+contains separate **BG** and **PIXEL** fields. Its four-slot preview shows the
+current mapping, with High Contrast displaying the two exact endpoints twice.
+Inputs accept three- or six-digit hex
 (`333`, `ABC`, `1122FF`, with or without `#`), three RGB channels separated by
 spaces or commas (`30 30 30`), CSS color names, and colors accepted by native
-CSS color parsing. The two entered endpoints feed the same automatic four-tone
-stepper. The field preserves the entered text (for example, `rebeccapurple`)
-and stores the resolved RGB value separately for rendering. Enter applies a
-valid color; Escape cancels the edit.
+CSS color parsing. Standard mode derives its four-tone palette from these
+endpoints. High Contrast maps dark framebuffer shades directly to PIXEL and
+light shades directly to BG. The field preserves the entered text (for
+example, `rebeccapurple`) and stores the resolved RGB value separately for
+rendering. Enter applies a valid color; Escape cancels the edit.
 
 ## Spacing Map
 
