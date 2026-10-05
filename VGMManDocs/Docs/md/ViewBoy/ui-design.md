@@ -38,12 +38,11 @@ The default endpoints are the traditional Game Boy yellow-green background
 (`BG #9BBC0F`) and dark pixel color (`PIXEL #222222`). Standard mode renders
 four tones: PIXEL, two intermediate tones, and BG. It derives the middle tones
 at one-third and two-thirds of the endpoint distance in CIELAB L*, with a* and
-b* interpolated at the same fractions. **Raw Pixels** is the high-contrast
-two-tone mode: shades 0–2 use the exact PIXEL endpoint and shade 3 uses BG.
-It changes shade mapping only. Pixel Matrix Gaps remain active when enabled,
-so the device-cell pattern stays visible while dark custom pixels such as
-`000` render at full strength. Selected controls reverse their label to BG,
-and moving row selection uses a pixel outline.
+b* interpolated at the same fractions. **High Contrast** keeps four distinct shades and both exact endpoints, with
+its middle tones at 15% and 85% of the CIELAB path from PIXEL to BG. Shade 0
+remains the exact PIXEL input. Pixel Matrix Gaps use BG-colored edges in both
+modes; High Contrast does not tint cell edges or change the grid, spacing, or
+presence of pixels.
 
 BG and PIXEL are the only color controls. Inputs accept three- or six-digit hex with or without `#`, space- or
 comma-separated RGB channel values, CSS color names, and supported CSS color
@@ -59,12 +58,14 @@ values give the same canvas a finer grid. **Pixel Matrix Gaps** is off by
 default, so every device pixel in a cell uses its framebuffer tone. When on,
 the cell's right and bottom device-pixel edges use the LCD background tone.
 With gaps off, a custom `000` PIXEL endpoint renders as full black throughout
-each ink cell. Raw Pixels fills each cell's ink area with the exact PIXEL or BG
-endpoint and preserves the one-device-pixel LCD-background edge when Matrix
-Gaps are enabled.
+each ink cell. High Contrast keeps the exact PIXEL endpoint at shade 0 and
+changes only the two intermediate palette tones. It preserves the selected dot
+size, gap setting, cell geometry, and presence of every framebuffer pixel.
 
 Standard mode reproduces a four-tone palette and visible pixel grid, not the
-original STN panel. Raw Pixels uses two exact endpoint colors for readability.
+original STN panel. High Contrast moves the two intermediate tones toward
+PIXEL for a stronger dark range; it does not alter device-cell geometry or
+claim to reproduce measured panel response.
 The middle colors follow equal CIELAB L* intervals; they do not
 approximate a measured LCD voltage curve. The renderer does not model
 reflectance, viewing-angle response, row/column crosstalk, liquid-crystal

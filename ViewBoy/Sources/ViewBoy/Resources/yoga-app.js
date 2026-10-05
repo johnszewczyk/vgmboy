@@ -11,7 +11,7 @@ import Yoga, {
 } from "./yoga-layout.js";
 
 // The framebuffer expands each LCD dot to a configurable device-pixel cell.
-// Optional matrix gaps leave one device-pixel edge in the screen-surface tone.
+// Optional matrix gaps leave one device-pixel edge in a palette tone.
 const DEFAULT_LCD_DOT_SIZE = 3;
 const LCD_DOT_SIZE_OPTIONS = [2, 3, 4, 5, 6];
 const APP_EDGE_PADDING_PX = 8;
@@ -124,13 +124,14 @@ function rgbToHex([red, green, blue]) {
   return `#${[red, green, blue].map((channel) => channel.toString(16).padStart(2, "0")).join("")}`
     .toUpperCase();
 }
-function paletteTones(fontColor = DEFAULT_LCD_PIXEL, backgroundColor = DEFAULT_LCD_BACKGROUND) {
+function paletteTones(fontColor = DEFAULT_LCD_PIXEL, backgroundColor = DEFAULT_LCD_BACKGROUND,
+  highContrast = false) {
   const inkLab = rgbToLab(hexToRGB(fontColor));
   const surfaceLab = rgbToLab(hexToRGB(backgroundColor));
-  return Array.from({ length: 4 }, (_, index) => {
+  const positions = highContrast ? [0, 0.15, 0.85, 1] : [0, 1 / 3, 2 / 3, 1];
+  return positions.map((amount, index) => {
     if (index === 0) return fontColor;
     if (index === 3) return backgroundColor;
-    const amount = index / 3;
     const lab = inkLab.map((value, channel) =>
       value + (surfaceLab[channel] - value) * amount);
     return rgbToHex(labToRGB(lab));
@@ -326,6 +327,8 @@ function storedAnimationFPS(value) {
   return Math.max(ANIMATION_FPS_MIN, Math.min(ANIMATION_FPS_MAX, Math.round(fps)));
 }
 const savedDisplayOptions = storedDisplayOptions();
+const savedHighContrastDisplay = savedDisplayOptions.highContrastDisplay === true
+  || savedDisplayOptions.rawPixelContrast === true;
 const savedCustomPaletteConfigured = savedDisplayOptions.customPaletteConfigured === true
   || savedDisplayOptions.customColorsInitialized === true;
 const savedCustomBackgroundInput = storedColorInput(
@@ -352,11 +355,8 @@ function storedSpacing(value, fallback) {
     Number.isFinite(number) ? Math.round(number) : fallback));
 }
 function displayPalette() {
-  if (state.rawPixelContrast) {
-    return [state.customFontColor, state.customFontColor,
-      state.customFontColor, state.customBackgroundColor];
-  }
-  return paletteTones(state.customFontColor, state.customBackgroundColor);
+  return paletteTones(state.customFontColor, state.customBackgroundColor,
+    state.highContrastDisplay);
 }
 function updateScreenSurface() {
   const root = document.documentElement;
@@ -377,7 +377,7 @@ function saveDisplayOptions() {
       customBackgroundInput: state.customBackgroundInput,
       customFontInput: state.customFontInput,
       customPaletteConfigured: state.customPaletteConfigured,
-      rawPixelContrast: state.rawPixelContrast,
+      highContrastDisplay: state.highContrastDisplay,
       lcdDotSize: state.lcdDotSize,
       lcdPixelGaps: state.lcdPixelGaps,
       uiButtonPadDots: state.controlPaddingDots,
@@ -472,7 +472,7 @@ const state = {
   customBackgroundInput: savedCustomBackgroundInput,
   customFontInput: savedCustomFontInput,
   customPaletteConfigured: savedCustomPaletteConfigured,
-  rawPixelContrast: savedDisplayOptions.rawPixelContrast === true,
+  highContrastDisplay: savedHighContrastDisplay,
   editingColorEndpoint: null,
   colorDraft: "",
   colorInputError: null,
@@ -599,6 +599,7 @@ const STARTUP_TIMING = bridge?.startupTiming || {
 function beginStartupExperience() {
   window.clearTimeout(startupRevealTimer);
   window.clearTimeout(startupDismissTimer);
+  const dismissedByNavigation = state.startup.dismissedByNavigation === true;
   state.startup = {
     phase: "starting",
     stageIndex: 0,
@@ -606,16 +607,20 @@ function beginStartupExperience() {
     error: null,
     startedAt: performance.now(),
     visible: false,
+    dismissedByNavigation,
   };
   const status = document.querySelector("#screen-reader-status");
   if (status) status.textContent = "ViewBoy startup: restoring workspace.";
-  startupRevealTimer = window.setTimeout(() => {
-    startupRevealTimer = 0;
-    if (state.startup.phase === "starting" || state.startup.phase === "failed") {
-      state.startup.visible = true;
-      render();
-    }
-  }, STARTUP_TIMING.revealDelayMilliseconds);
+  if (!dismissedByNavigation) {
+    startupRevealTimer = window.setTimeout(() => {
+      startupRevealTimer = 0;
+      if (!state.startup.dismissedByNavigation
+        && (state.startup.phase === "starting" || state.startup.phase === "failed")) {
+        state.startup.visible = true;
+        render();
+      }
+    }, STARTUP_TIMING.revealDelayMilliseconds);
+  }
 }
 
 function setStartupStage(index, detail = null) {
@@ -652,7 +657,7 @@ function failStartupExperience(message) {
   state.startup.phase = "failed";
   state.startup.error = String(message || "The library could not be opened.");
   state.startup.detail = state.startup.error;
-  state.startup.visible = true;
+  state.startup.visible = !state.startup.dismissedByNavigation;
   const status = document.querySelector("#screen-reader-status");
   if (status) status.textContent = `ViewBoy startup failed. ${state.startup.error}`;
   window.clearTimeout(startupRevealTimer);
@@ -817,7 +822,7 @@ function restorePlaylistTabs(value) {
   state.selectedTrackIDs = new Set(selectionIDsForTab(active));
   state.selectionAnchorID = active.selectionAnchorID || [...state.selectedTrackIDs].at(-1) || null;
   state.queueScroll = active.scroll;
-  state.tab = "LIBRARY";
+  if (state.tab !== "SETTINGS") state.tab = "LIBRARY";
   return true;
 }
 
@@ -1064,13 +1069,14 @@ export function lcdDotSizeSnapshot() {
 }
 
 export function lcdDeviceDotSnapshot(shade = 0) {
-  const ink = RGB[Math.max(0, Math.min(3, Math.round(Number(shade) || 0)))];
-  const surface = RGB[3];
+  const shadeIndex = Math.max(0, Math.min(3, Math.round(Number(shade) || 0)));
+  const ink = RGB[shadeIndex];
+  const gap = RGB[3];
   const faceSize = Math.max(1, DEVICE_PIXELS_PER_LCD_DOT
     - (state.lcdPixelGaps ? 1 : 0));
   return Array.from({ length: DEVICE_PIXELS_PER_LCD_DOT }, (_, y) =>
     Array.from({ length: DEVICE_PIXELS_PER_LCD_DOT }, (_, x) =>
-      rgbToHex(x < faceSize && y < faceSize ? ink : surface)));
+      rgbToHex(x < faceSize && y < faceSize ? ink : gap)));
 }
 
 export function lcdPaletteSnapshot() {
@@ -1403,19 +1409,20 @@ function presentPixels(startY = 0, endY = HEIGHT, startX = 0, endX = WIDTH) {
   const firstColumn = Math.max(0, Math.floor(startX));
   const lastColumn = Math.min(WIDTH, Math.ceil(endX));
   if (lastRow <= firstRow || lastColumn <= firstColumn) return;
-  const background = packedRGB[3];
   const faceSize = Math.max(1, DEVICE_PIXELS_PER_LCD_DOT
     - (state.lcdPixelGaps ? 1 : 0));
   for (let y = firstRow; y < lastRow; y += 1) {
     const sourceRow = y * WIDTH;
     const topRow = y * DEVICE_PIXELS_PER_LCD_DOT * outputWidth;
     for (let x = firstColumn; x < lastColumn; x += 1) {
-      const face = packedRGB[pixels[sourceRow + x]];
+      const shade = pixels[sourceRow + x];
+      const face = packedRGB[shade];
+      const gap = packedRGB[3];
       const outputX = x * DEVICE_PIXELS_PER_LCD_DOT;
       for (let dotY = 0; dotY < DEVICE_PIXELS_PER_LCD_DOT; dotY += 1) {
         const row = topRow + dotY * outputWidth + outputX;
         for (let dotX = 0; dotX < DEVICE_PIXELS_PER_LCD_DOT; dotX += 1) {
-          imageWords[row + dotX] = dotX < faceSize && dotY < faceSize ? face : background;
+          imageWords[row + dotX] = dotX < faceSize && dotY < faceSize ? face : gap;
         }
       }
     }
@@ -1506,8 +1513,7 @@ function label(parent, text, style = {}, meta = {}) {
       const previousClip = paintClip;
       if (meta.clipToBox) paintClip = intersectBoxes(paintClip, box);
       if (meta.fill !== undefined) {
-        const fillShade = state.rawPixelContrast && meta.fill === 2 ? 0 : meta.fill;
-        fillRect(box.x, box.y, box.width, box.height, fillShade);
+        fillRect(box.x, box.y, box.width, box.height, meta.fill);
       }
       if (meta.border !== undefined) strokeRect(box.x, box.y, box.width, box.height, meta.border);
       if (meta.bottomLine !== undefined) {
@@ -1517,8 +1523,7 @@ function label(parent, text, style = {}, meta = {}) {
       const textY = meta.revealProgress !== undefined
         ? box.y : box.y + Math.floor((box.height - fontProfile().height) / 2);
       const displayText = typeof meta.textValue === "function" ? meta.textValue(box) : text;
-      const textShade = state.rawPixelContrast && (meta.rawInverseText || meta.fill === 2)
-        ? 3 : meta.textShade ?? 0;
+      const textShade = meta.textShade ?? 0;
       drawText(displayText, box.x + (meta.inset ?? controlPaddingDots()), textY,
         box.width - (meta.inset ?? controlPaddingDots()) * 2,
         textShade, meta.align ?? "left");
@@ -1791,9 +1796,9 @@ function panelTitle(parent, text) {
     height: titleHeight,
     alignItems: Align.Center,
   }, {
-    fill: state.rawPixelContrast ? 3 : 2,
+    fill: 2,
     optionPanelTitle: text,
-    paint(box) { fillRect(box.x, box.y, box.width, box.height, state.rawPixelContrast ? 3 : 2); },
+    paint(box) { fillRect(box.x, box.y, box.width, box.height, 2); },
   });
   label(row, text, { flexGrow: 1, height: titleHeight }, {
     textShade: 0,
@@ -1853,12 +1858,10 @@ function pixelButton(parent, text, onClick, style = {}) {
     flexBasis: style.flexBasis,
   }, {
     border: 1,
-    fill: style.optionPage ? undefined : style.selected
-      ? state.rawPixelContrast && !style.icon ? 0 : 2 : undefined,
-    textShade: state.rawPixelContrast && style.selected && !style.icon ? 3 : 0,
+    fill: style.optionPage ? undefined : style.selected ? 2 : undefined,
+    textShade: 0,
     inset: style.inset ?? controlPaddingDots(),
     align: style.align ?? "center",
-    rawInverseText: state.rawPixelContrast && style.selected && !style.icon,
     controlTitle: style.controlTitle,
     optionOwner: style.optionOwner,
     optionPage: style.optionPage === true,
@@ -1868,8 +1871,7 @@ function pixelButton(parent, text, onClick, style = {}) {
     sidebarIcon: style.sidebarIcon,
     optionExit: style.optionExit === true,
     animationFPSControl: style.animationFPSControl === true,
-    paint: style.icon ? (box) => paintSidebarIcon(style.icon, box,
-      state.rawPixelContrast && style.selected ? 3 : 0) : style.paint,
+    paint: style.icon ? (box) => paintSidebarIcon(style.icon, box, 0) : style.paint,
     onClick,
   });
 }
@@ -2610,8 +2612,7 @@ function createQueueRow(parent, index, track, columns) {
     contentRowKind: "playlist",
     paint(box) {
       if (selected && !primarySelected) {
-        if (state.rawPixelContrast) strokeRect(box.x, box.y, box.width, box.height, 0);
-        else fillRect(box.x, box.y, box.width, box.height, 2);
+        fillRect(box.x, box.y, box.width, box.height, 2);
       }
     },
   });
@@ -3062,7 +3063,7 @@ function addCatalogPane(parent) {
         controlTitle: `TAB ${tab.title}`,
         paint(box) {
           if (tab.id === state.activePlaylistTabId) {
-            fillRect(box.x, box.y, box.width, box.height, state.rawPixelContrast ? 0 : 2);
+            fillRect(box.x, box.y, box.width, box.height, 2);
           }
           strokeRect(box.x, box.y, box.width, box.height, 1);
         },
@@ -3079,7 +3080,6 @@ function addCatalogPane(parent) {
         align: "left",
         playlistTabTitle: true,
         playlistTabId: tab.id,
-        rawInverseText: state.rawPixelContrast && tab.id === state.activePlaylistTabId,
         reorderKey: tab.id,
         controlTitle: `TAB ${tab.title}`,
         onClick: isExiting ? undefined : () => activatePlaylistTab(tab.id),
@@ -3094,7 +3094,6 @@ function addCatalogPane(parent) {
         align: "center",
         playlistTabClose: true,
         playlistTabId: tab.id,
-        rawInverseText: state.rawPixelContrast && tab.id === state.activePlaylistTabId,
         controlTitle: "X",
         onClick: isExiting ? undefined : () => closePlaylistTab(tab.id),
       });
@@ -3171,7 +3170,7 @@ function addColumnContextMenu(parent) {
       padding: uiGroupInsetDots() / STYLE_SCALE,
     }, {
       paint(box) {
-        fillRect(box.x, box.y, box.width, box.height, state.rawPixelContrast ? 3 : 2);
+        fillRect(box.x, box.y, box.width, box.height, 2);
         strokeRect(box.x, box.y, box.width, box.height, 0);
       },
     });
@@ -3223,7 +3222,7 @@ function addColumnContextMenu(parent) {
     padding: uiGroupInsetDots() / STYLE_SCALE,
   }, {
     paint(box) {
-      fillRect(box.x, box.y, box.width, box.height, state.rawPixelContrast ? 3 : 2);
+      fillRect(box.x, box.y, box.width, box.height, 2);
       strokeRect(box.x, box.y, box.width, box.height, 0);
     },
   });
@@ -3258,7 +3257,7 @@ function addPalettePreview(parent) {
       fillRect(box.x + 1, box.y + 1, box.width - 2, box.height - 2, shade);
       drawText(String(shade), box.x + 2, box.y + Math.floor((box.height - fontProfile().height) / 2),
         box.width - 4,
-        state.rawPixelContrast ? (shade < 3 ? 3 : 0) : shade < 2 ? 3 : 0,
+        shade < 2 ? 3 : 0,
         "center");
     },
   }));
@@ -3418,8 +3417,8 @@ function addLCDColorOptions(parent) {
   addPalettePreview(colors);
   customColorInput(colors, "background", "BG");
   customColorInput(colors, "font", "PIXEL");
-  optionToggle(colors, "RAW PIXELS", state.rawPixelContrast,
-    () => setRawPixelContrast(!state.rawPixelContrast));
+  optionToggle(colors, "HIGH CONTRAST", state.highContrastDisplay,
+    () => setHighContrastDisplay(!state.highContrastDisplay));
   label(colors, state.colorInputError ? "INVALID COLOR" : "ENTER APPLY", {
     height: rowHeight(),
   }, {
@@ -4177,7 +4176,7 @@ function buildTree() {
     },
   });
 
-  if (state.startup.visible) {
+  if (state.startup.visible && !state.startup.dismissedByNavigation) {
     const screen = makeWidget(root, {
       direction: FlexDirection.Column,
       flexGrow: 1,
@@ -4188,7 +4187,7 @@ function buildTree() {
       justifyContent: Justify.Center,
       alignItems: Align.Center,
     });
-    const cardWidth = Math.max(100, Math.min(360, WIDTH / STYLE_SCALE - 24));
+    const cardWidth = Math.max(100, Math.min(180, WIDTH / STYLE_SCALE - 24));
     const card = makeWidget(screen, {
       direction: FlexDirection.Column,
       width: cardWidth,
@@ -4246,14 +4245,35 @@ function buildTree() {
       inset,
       bottomLine: 1,
     });
-    label(card, state.startup.detail || "Preparing the library and saved playlists.", {
-      height: lineHeight,
-    }, { textShade: 0, inset });
+    const detail = state.startup.detail || "Preparing the library and saved playlists.";
+    const detailCharacterLimit = Math.max(12,
+      Math.floor((cardWidth - inset * 2) / fontProfile().advance));
+    const detailLines = [];
+    let detailLine = "";
+    for (const word of String(detail).split(/\s+/)) {
+      const candidate = detailLine ? `${detailLine} ${word}` : word;
+      if (detailLine && Array.from(candidate).length > detailCharacterLimit) {
+        detailLines.push(detailLine);
+        detailLine = word;
+      } else {
+        detailLine = candidate;
+      }
+    }
+    if (detailLine) detailLines.push(detailLine);
+    if (detailLines.length > 2) {
+      detailLines.length = 2;
+      const finalLine = Array.from(detailLines[1]);
+      detailLines[1] = `${finalLine.slice(0, detailCharacterLimit - 1).join("")}…`;
+    }
+    detailLines.forEach((lineText) => label(card, lineText, { height: lineHeight }, {
+      textShade: 0,
+      inset,
+    }));
     STARTUP_STAGES.forEach((stage, index) => {
       const current = state.startup.phase === "starting" && index === state.startup.stageIndex;
       const complete = state.startup.phase === "ready" || index < state.startup.stageIndex;
       const failed = state.startup.phase === "failed" && index === state.startup.stageIndex;
-      const marker = failed ? "!" : complete ? "*" : current ? ">" : String(index + 1);
+      const marker = failed ? "!" : complete ? "+" : current ? ">" : String(index + 1);
       label(card, `${marker} ${stage.label}`, { height: lineHeight }, {
         textShade: complete ? 1 : 0,
         inset,
@@ -4450,11 +4470,7 @@ function paintSelectionBandPixels(y) {
     const bandTop = floor(y);
     const priorClip = paintClip;
     paintClip = intersectBoxes(paintClip, selectionBand.clip);
-    if (state.rawPixelContrast) {
-      strokeRect(selectionBand.x, bandTop, selectionBand.width, selectionBand.height, 0);
-    } else {
-      fillRect(selectionBand.x, bandTop, selectionBand.width, selectionBand.height, 2);
-    }
+    fillRect(selectionBand.x, bandTop, selectionBand.width, selectionBand.height, 2);
     for (const row of selectionRows) {
       if (row.box.y >= bandTop + selectionBand.height || row.box.y + row.box.height <= bandTop) continue;
       if (row.widget.meta.optionPage) {
@@ -4475,13 +4491,8 @@ function paintSidebarSelectionBandPixels(y) {
   const bandTop = floor(y);
   const priorClip = paintClip;
   paintClip = intersectBoxes(paintClip, sidebarSelectionBand.clip);
-  if (state.rawPixelContrast) {
-    strokeRect(sidebarSelectionBand.x, bandTop,
-      sidebarSelectionBand.width, sidebarSelectionBand.height, 0);
-  } else {
-    fillRect(sidebarSelectionBand.x, bandTop,
-      sidebarSelectionBand.width, sidebarSelectionBand.height, 2);
-  }
+  fillRect(sidebarSelectionBand.x, bandTop,
+    sidebarSelectionBand.width, sidebarSelectionBand.height, 2);
   for (const row of sidebarSelectionRows) {
     if (row.box.y >= bandTop + sidebarSelectionBand.height
       || row.box.y + row.box.height <= bandTop) continue;
@@ -5055,6 +5066,12 @@ function navigateAppTab(tab, optionsPage = null) {
 }
 
 function openOptionsScreen(page = null) {
+  state.startup.dismissedByNavigation = true;
+  state.startup.visible = false;
+  window.clearTimeout(startupRevealTimer);
+  window.clearTimeout(startupDismissTimer);
+  startupRevealTimer = 0;
+  startupDismissTimer = 0;
   navigateAppTab("SETTINGS", page);
   if (page === "DATABASE") void refreshDatabaseOptions();
 }
@@ -5104,8 +5121,8 @@ function setLCDPixelGaps(enabled) {
   render();
 }
 
-function setRawPixelContrast(enabled) {
-  state.rawPixelContrast = enabled === true;
+function setHighContrastDisplay(enabled) {
+  state.highContrastDisplay = enabled === true;
   RGB = paletteRGB(displayPalette());
   packedRGB = packedPalette(RGB);
   saveDisplayOptions();
@@ -6826,7 +6843,8 @@ canvas.addEventListener("wheel", (event) => {
 
 canvas.addEventListener("keydown", (event) => {
   const commandKey = event.metaKey || event.ctrlKey;
-  if (state.startup.visible) {
+  const opensOptionsShortcut = commandKey && event.key === ",";
+  if (state.startup.visible && !state.startup.dismissedByNavigation && !opensOptionsShortcut) {
     event.preventDefault();
     return;
   }
@@ -7079,7 +7097,8 @@ fitCanvas();
 const pendingCommands = window.__viewBoyCommandQueue || [];
 window.ViewBoy = Object.freeze({
   dispatch(command) {
-    if (state.startup.visible) return;
+    if (state.startup.visible && !state.startup.dismissedByNavigation
+      && command !== "settings" && !String(command).startsWith("optionsPage:")) return;
     if (String(command).startsWith("selectPlaylistTab:")) {
       const tab = state.playlistTabs[Number(String(command).split(":").at(-1)) - 1];
       if (tab) activatePlaylistTab(tab.id);
