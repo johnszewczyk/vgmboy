@@ -4,11 +4,14 @@
 - SPCBOY owns Database, UI Chrome, UI Fonts, and Windows settings. VGMBoy owns Playback,
   Routing, Audio, and Diagnostics settings; the navigation keeps these groups
   separate.
-- Options pages use a webpage layout capped at 65 characters, with quiet headed
-  panels and the shared rem spacing scale. UI Chrome and UI Fonts are separate
-  alphabetized SPCBoy pages. Sidebar folders and console groups open and close
-  immediately. UI Fonts exposes playlist-header styling and the titlebar font
-  color and bold setting. The same subpage and title/footer chrome appear in
-  the optional standalone Options window.
+- The options sidebar groups SPCBOY-owned frontend settings separately from
+  VGMBoy-owned playback-core settings. Keep that ownership split when adding
+  settings.
+- Option pages use a readable system font, a 65-character content width, and
+  underlined section headings with separated setting rows. UI Chrome and UI
+  Fonts are separate SPCBOY pages. UI Fonts exposes playlist-header styling
+  and the titlebar font color and bold setting. The same page layout and
+  title/footer chrome appear in the optional standalone Options window.
+- Sidebar folders and console groups open and close immediately.
 - Reload Library refreshes the read-only catalog projections used by the
   sidebar. ScanSong remains the catalog writer.
