@@ -126,12 +126,22 @@ function rgbToHex([red, green, blue]) {
 }
 function paletteTones(fontColor = DEFAULT_LCD_PIXEL, backgroundColor = DEFAULT_LCD_BACKGROUND,
   highContrast = false) {
-  const inkLab = rgbToLab(hexToRGB(fontColor));
-  const surfaceLab = rgbToLab(hexToRGB(backgroundColor));
-  const positions = highContrast ? [0, 0.15, 0.85, 1] : [0, 1 / 3, 2 / 3, 1];
+  const inkRGB = hexToRGB(fontColor);
+  const surfaceRGB = hexToRGB(backgroundColor);
+  const inkLab = highContrast ? null : rgbToLab(inkRGB);
+  const surfaceLab = highContrast ? null : rgbToLab(surfaceRGB);
+  // High Contrast keeps both endpoints and weights both intermediate shades
+  // toward PIXEL. Blend the configured RGB channels directly so the selected
+  // color stays chromatic instead of passing through the perceptual gray fade.
+  const positions = highContrast ? [0, 0.12, 0.42, 1] : [0, 1 / 3, 2 / 3, 1];
   return positions.map((amount, index) => {
     if (index === 0) return fontColor;
     if (index === 3) return backgroundColor;
+    if (highContrast) {
+      return rgbToHex(inkRGB.map((channel, channelIndex) => Math.round(
+        channel + (surfaceRGB[channelIndex] - channel) * amount,
+      )));
+    }
     const lab = inkLab.map((value, channel) =>
       value + (surfaceLab[channel] - value) * amount);
     return rgbToHex(labToRGB(lab));

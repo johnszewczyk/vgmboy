@@ -38,11 +38,12 @@ The default endpoints are the traditional Game Boy yellow-green background
 (`BG #9BBC0F`) and dark pixel color (`PIXEL #222222`). Standard mode renders
 four tones: PIXEL, two intermediate tones, and BG. It derives the middle tones
 at one-third and two-thirds of the endpoint distance in CIELAB L*, with a* and
-b* interpolated at the same fractions. **High Contrast** keeps four distinct shades and both exact endpoints, with
-its middle tones at 15% and 85% of the CIELAB path from PIXEL to BG. Shade 0
-remains the exact PIXEL input. Pixel Matrix Gaps use BG-colored edges in both
-modes; High Contrast does not tint cell edges or change the grid, spacing, or
-presence of pixels.
+b* interpolated at the same fractions. **High Contrast** keeps both exact
+endpoints and derives its intermediate tones with direct per-channel sRGB
+steps at 12% and 42% from PIXEL toward BG. These dark-biased tones preserve the
+configured pixel color rather than using the standard perceptual fade. Pixel
+Matrix Gaps use BG-colored edges in both modes; High Contrast does not tint
+cell edges or change the grid, spacing, or presence of pixels.
 
 BG and PIXEL are the only color controls. Inputs accept three- or six-digit hex with or without `#`, space- or
 comma-separated RGB channel values, CSS color names, and supported CSS color
@@ -63,11 +64,11 @@ changes only the two intermediate palette tones. It preserves the selected dot
 size, gap setting, cell geometry, and presence of every framebuffer pixel.
 
 Standard mode reproduces a four-tone palette and visible pixel grid, not the
-original STN panel. High Contrast moves the two intermediate tones toward
-PIXEL for a stronger dark range; it does not alter device-cell geometry or
-claim to reproduce measured panel response.
-The middle colors follow equal CIELAB L* intervals; they do not
-approximate a measured LCD voltage curve. The renderer does not model
+original STN panel. High Contrast moves both intermediate tones toward PIXEL
+for a stronger dark range; it does not alter device-cell geometry or claim to
+reproduce measured panel response. The Standard palette follows equal CIELAB
+L* intervals; High Contrast uses sRGB channel interpolation. Neither mode
+approximates a measured LCD voltage curve. The renderer does not model
 reflectance, viewing-angle response, row/column crosstalk, liquid-crystal
 transition time, or panel aging. Nintendo lists the classic screen as a
 160×144 STN dot-matrix LCD with four shades and a contrast controller; the
