@@ -228,12 +228,6 @@
 **Enabled when:** `Selection Bar` is on  
 **Default:** enabled, `200` ms
 
-**Control:** [ ] `Glass Selector`
-
-> Use the untinted macOS Liquid Glass effect for the primary playlist selection bar.
-
-**Default:** off. When enabled, the system glass effect slides over playlist row text; sidebar and multi-selection highlights remain solid accent capsules.
-
 ### Sidebar Options
 
 **Control:** [ ] `Group by Console`
