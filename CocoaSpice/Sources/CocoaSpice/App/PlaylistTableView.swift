@@ -219,7 +219,7 @@ struct PlaylistTableView: NSViewRepresentable {
             let playlistContentRevision = model.playlistContentRevision
             let selectedTrackIDs = model.selectedTrackIDs
             let primarySelectedTrackID = model.selectedTrackID
-            let currentTrackID = model.currentTrack?.id
+            let currentTrackID = model.isCurrentTrackVisible ? model.currentTrack?.id : nil
             let isPlaying = model.isPlaying
             let sortColumn = model.playlistSortColumn
             let sortDirection = model.playlistSortDirection
@@ -408,32 +408,32 @@ struct PlaylistTableView: NSViewRepresentable {
                     }
                     return cell
                 case .index:
-                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.indexText(for: track), isCurrentTrack: model.currentTrack?.id == track.id, monospace: true)
+                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.indexText(for: track), isCurrentTrack: model.isTrackPlayingInVisibleTab(track.id), monospace: true)
                 case .trackNumber:
-                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.trackNumberText(for: track), isCurrentTrack: model.currentTrack?.id == track.id, monospace: true)
+                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.trackNumberText(for: track), isCurrentTrack: model.isTrackPlayingInVisibleTab(track.id), monospace: true)
                 case .file:
-                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: track.filename, isCurrentTrack: model.currentTrack?.id == track.id)
+                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: track.filename, isCurrentTrack: model.isTrackPlayingInVisibleTab(track.id))
                 case .title:
-                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.titleText(for: track), isCurrentTrack: model.currentTrack?.id == track.id)
+                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.titleText(for: track), isCurrentTrack: model.isTrackPlayingInVisibleTab(track.id))
                 case .game:
-                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.gameText(for: track), isCurrentTrack: model.currentTrack?.id == track.id)
+                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.gameText(for: track), isCurrentTrack: model.isTrackPlayingInVisibleTab(track.id))
                 case .author:
-                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.authorText(for: track), isCurrentTrack: model.currentTrack?.id == track.id)
+                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.authorText(for: track), isCurrentTrack: model.isTrackPlayingInVisibleTab(track.id))
                 case .system:
-                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.systemText(for: track), isCurrentTrack: model.currentTrack?.id == track.id)
+                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.systemText(for: track), isCurrentTrack: model.isTrackPlayingInVisibleTab(track.id))
                 case .path:
-                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.pathText(for: track), isCurrentTrack: model.currentTrack?.id == track.id)
+                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.pathText(for: track), isCurrentTrack: model.isTrackPlayingInVisibleTab(track.id))
                 case .timestamp:
                     return configuredTextCell(
                         in: tableView,
                         row: row,
                         identifier: column.rawValue,
                         text: value(for: column, track: track),
-                        isCurrentTrack: model.currentTrack?.id == track.id,
+                        isCurrentTrack: model.isTrackPlayingInVisibleTab(track.id),
                         monospace: true
                     )
                 case .length:
-                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.lengthText(for: track), isCurrentTrack: model.currentTrack?.id == track.id, monospace: true)
+                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.lengthText(for: track), isCurrentTrack: model.isTrackPlayingInVisibleTab(track.id), monospace: true)
                 }
             }
         }

@@ -176,6 +176,8 @@ struct MainView: View {
             .navigationSplitViewColumnWidth(ideal: 220, max: 500)
         } detail: {
             VStack(spacing: 0) {
+                playlistTabStrip
+
                 ZStack {
                     PlaylistTableView(model: model)
 
@@ -190,6 +192,68 @@ struct MainView: View {
             }
             .frame(minWidth: 320, minHeight: 240)
         }
+    }
+
+    private var playlistTabStrip: some View {
+        HStack(spacing: 4) {
+            ScrollView(.horizontal) {
+                HStack(spacing: 4) {
+                    ForEach(model.playlistTabs) { tab in
+                        HStack(spacing: 5) {
+                            Button(tab.title) {
+                                model.activatePlaylistTab(tab.id)
+                            }
+                            .buttonStyle(.plain)
+                            .lineLimit(1)
+                            .help(tab.title)
+
+                            Button {
+                                model.closePlaylistTab(tab.id)
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .frame(width: 14, height: 14)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Close tab")
+                        }
+                        .font(.system(size: 11))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(
+                            model.activePlaylistTabID == tab.id
+                                ? Color.accentColor.opacity(0.2)
+                                : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 5)
+                        )
+                        .overlay(alignment: .bottom) {
+                            if model.activePlaylistTabID == tab.id {
+                                Rectangle()
+                                    .fill(Color.accentColor)
+                                    .frame(height: 1)
+                            }
+                        }
+                        .accessibilityElement(children: .contain)
+                    }
+                }
+                .padding(.horizontal, 8)
+            }
+            .scrollIndicators(.hidden)
+
+            Button {
+                model.createPlaylistTab(duplicateActive: false)
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 11, weight: .medium))
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.plain)
+            .help("New Playlist Tab")
+            .padding(.trailing, 8)
+        }
+        .frame(height: 30)
+        .background(.bar)
+        .overlay(alignment: .bottom) { Divider() }
     }
 
     private var statusBar: some View {

@@ -140,6 +140,11 @@ private struct CocoaSpiceCommands: Commands {
         }
 
         CommandGroup(after: .newItem) {
+            Button("New Playlist Tab") {
+                model.createPlaylistTab(duplicateActive: false)
+            }
+            .keyboardShortcut("t", modifiers: .command)
+
             Button("Open Playlist...") {
                 model.loadPlaylistM3U()
             }
@@ -193,12 +198,12 @@ private struct CocoaSpiceCommands: Commands {
             Button(FrontendSidebarView.consoles.title) {
                 model.setSidebarBrowserMode(.games)
             }
-            .keyboardShortcut("2", modifiers: .command)
+            .keyboardShortcut("2", modifiers: [.command, .option])
 
             Button(FrontendSidebarView.paths.title) {
                 model.setSidebarBrowserMode(.files)
             }
-            .keyboardShortcut("1", modifiers: .command)
+            .keyboardShortcut("1", modifiers: [.command, .option])
 
             Button("Favorites Playlist") {
                 model.showFavoritesPlaylist()
@@ -210,6 +215,22 @@ private struct CocoaSpiceCommands: Commands {
             }
             .keyboardShortcut("h", modifiers: [.command, .shift])
 
+        }
+
+        CommandMenu("Playlist Tabs") {
+            Button("Close Current Tab") {
+                model.closePlaylistTab(model.activePlaylistTabID)
+            }
+            .keyboardShortcut("w", modifiers: .command)
+
+            Divider()
+
+            ForEach(0..<min(model.playlistTabs.count, 9), id: \.self) { index in
+                Button(model.playlistTabs[index].title) {
+                    model.activatePlaylistTab(at: index)
+                }
+                .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
+            }
         }
 
         CommandGroup(replacing: .appSettings) {

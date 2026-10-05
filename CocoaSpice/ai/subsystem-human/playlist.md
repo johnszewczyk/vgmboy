@@ -40,10 +40,14 @@
 
 ## Persistence
 
+- Tabs: playlist tabs restore their queues, names, and selections on next launch.
+- Tabs: `Command-T` opens an empty tab; `Command-W` closes the current tab; `Command-1` through `Command-9` select a tab.
+- Tabs: the plus button opens an empty tab and each tab has its own close button. Closing the final tab leaves one empty Playlist tab.
 - Playlists: save and load as `.m3u`.
 - Playlists: preserve multi-track identity.
 
 ## Files
 
 - [PlaylistTableView.swift](../../Sources/CocoaSpice/App/PlaylistTableView.swift)
+- [PlaylistTabs.swift](../../Sources/CocoaSpice/App/PlaylistTabs.swift)
 - [PlayerViewModel.swift](../../Sources/CocoaSpice/App/PlayerViewModel.swift)

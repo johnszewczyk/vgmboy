@@ -288,11 +288,17 @@ final class PlayerViewModel {
     let queue = PlaylistQueueCoordinator()
     var selectedTrackID: TrackItem.ID? {
         get { queue.primarySelection }
-        set { queue.primarySelection = newValue }
+        set {
+            queue.primarySelection = newValue
+            if !isRestoringPlaylistTabs { syncActivePlaylistTab() }
+        }
     }
     var selectedTrackIDs: Set<TrackItem.ID> {
         get { queue.selection }
-        set { queue.selection = newValue }
+        set {
+            queue.selection = newValue
+            if !isRestoringPlaylistTabs { syncActivePlaylistTab() }
+        }
     }
     var playlist: [TrackItem] {
         get { queue.tracks }
@@ -301,8 +307,129 @@ final class PlayerViewModel {
             if !isRestoringPersistedPlaylist {
                 deferredPersistedPlaylistValues = []
             }
+            if !isRestoringPlaylistTabs {
+                syncActivePlaylistTab()
+                if playbackTabID == activePlaylistTabID {
+                    playbackPlaylistSnapshot = newValue
+                }
+            }
             refreshPlaylistTotalDurationReadout()
         }
+    }
+    var playlistTabs: [CocoaSpicePlaylistTab] = []
+    var activePlaylistTabID = ""
+    var activePlaylistTitle = "Playlist"
+    private var isRestoringPlaylistTabs = false
+    private var playlistTabsSaveWorkItem: DispatchWorkItem?
+    private var playbackTabID: String?
+    private var playbackPlaylistSnapshot: [TrackItem] = []
+    var isCurrentTrackVisible: Bool {
+        playbackTabID == activePlaylistTabID
+    }
+
+    func createPlaylistTab(duplicateActive: Bool = true, title: String? = nil) {
+        guard playlistTabs.count < 64 else {
+            statusText = "Playlist tab limit reached."
+            return
+        }
+        syncActivePlaylistTab()
+        let source = activePlaylistTab
+        let tab = CocoaSpicePlaylistTab(
+            title: title ?? (duplicateActive ? "\(source?.title ?? "Playlist") Copy" : "Playlist"),
+            tracks: duplicateActive ? (source?.tracks ?? playlist) : [],
+            selectedTrackID: duplicateActive ? (source?.selectedTrackID ?? selectedTrackID) : nil,
+            selectedTrackIDs: duplicateActive ? (source?.selectedTrackIDs ?? selectedTrackIDs) : []
+        )
+        playlistTabs.append(tab)
+        activatePlaylistTab(tab.id)
+    }
+
+    func activatePlaylistTab(_ tabID: String) {
+        guard tabID != activePlaylistTabID,
+              let tab = playlistTabs.first(where: { $0.id == tabID }) else { return }
+        syncActivePlaylistTab()
+        isRestoringPlaylistTabs = true
+        activePlaylistTabID = tab.id
+        activePlaylistTitle = tab.title
+        playlist = tab.tracks
+        selectedTrackID = tab.selectedTrackID.flatMap { id in tab.tracks.contains(where: { $0.id == id }) ? id : nil }
+        selectedTrackIDs = Set(tab.selectedTrackIDs.filter { id in tab.tracks.contains(where: { $0.id == id }) })
+        isRestoringPlaylistTabs = false
+        if let selectedTrackID, !selectedTrackIDs.contains(selectedTrackID) {
+            selectedTrackIDs.insert(selectedTrackID)
+        }
+        syncActivePlaylistTab()
+        metadataCache = metadataCache.filter { id, _ in tab.tracks.contains(where: { $0.id == id }) }
+        syncManualPlaylistOrder()
+        refreshPlaylistTotalDurationReadout()
+        refreshPlaylistMetadata()
+        updateRemoteTransportState()
+        schedulePlaylistTabsSave()
+    }
+
+    func activatePlaylistTab(at index: Int) {
+        guard playlistTabs.indices.contains(index) else { return }
+        activatePlaylistTab(playlistTabs[index].id)
+    }
+
+    func closePlaylistTab(_ tabID: String) {
+        guard let index = playlistTabs.firstIndex(where: { $0.id == tabID }) else { return }
+        if playlistTabs.count == 1 {
+            activePlaylistTitle = "Playlist"
+            playlist = []
+            selectedTrackID = nil
+            selectedTrackIDs = []
+            playlistColumnWidthHints = nil
+            schedulePlaylistTabsSave()
+            return
+        }
+        let wasActive = tabID == activePlaylistTabID
+        playlistTabs.remove(at: index)
+        if playbackTabID == tabID {
+            playbackTabID = nil
+            playbackPlaylistSnapshot = currentTrack.map { [$0] } ?? []
+        }
+        if wasActive {
+            let nextIndex = min(index, playlistTabs.count - 1)
+            activePlaylistTabID = ""
+            activatePlaylistTab(playlistTabs[nextIndex].id)
+        } else {
+            schedulePlaylistTabsSave()
+        }
+    }
+
+    func setActivePlaylistTitle(_ title: String) {
+        activePlaylistTitle = String(title.prefix(120))
+        syncActivePlaylistTab()
+    }
+
+    func isTrackPlayingInVisibleTab(_ trackID: TrackItem.ID) -> Bool {
+        isCurrentTrackVisible && currentTrack?.id == trackID
+    }
+
+    private var activePlaylistTab: CocoaSpicePlaylistTab? {
+        playlistTabs.first(where: { $0.id == activePlaylistTabID })
+    }
+
+    private func syncActivePlaylistTab() {
+        guard !isRestoringPlaylistTabs,
+              let index = playlistTabs.firstIndex(where: { $0.id == activePlaylistTabID }) else { return }
+        playlistTabs[index].title = activePlaylistTitle
+        playlistTabs[index].tracks = playlist
+        playlistTabs[index].selectedTrackID = selectedTrackID
+        playlistTabs[index].selectedTrackIDs = selectedTrackIDs
+        schedulePlaylistTabsSave()
+    }
+
+    private func schedulePlaylistTabsSave() {
+        guard !isRestoringPlaylistTabs, !activePlaylistTabID.isEmpty else { return }
+        playlistTabsSaveWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            CocoaSpicePlaylistTabsStore.save(.init(tabs: self.playlistTabs, activeTabID: self.activePlaylistTabID))
+        }
+        playlistTabsSaveWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: workItem)
     }
     let favorites = FavoritesCoordinator()
     var favoriteRecords: [FavoriteTrackSnapshot] { favorites.records }
@@ -733,6 +860,7 @@ final class PlayerViewModel {
         reloadCatalogRoots()
         reloadDatabaseSidebar()
         restorePersistedPlaylist(restoredState.sessionState)
+        restorePlaylistTabs()
         restorePlaylistColumnState(restoredState.playlistColumnState)
         sidebarSearchText = restoredState.sidebarSearchText
         startPlaybackTimer()
@@ -1199,9 +1327,10 @@ final class PlayerViewModel {
                 }
             }
             playlist = Self.deduplicatedTracks(tracks)
+            setActivePlaylistTitle(folderURL.lastPathComponent)
             syncManualPlaylistOrder()
             reapplyPlaylistSortIfNeeded()
-            let replacementState = playbackQueueState.replacing(
+            let replacementState = activePlaylistQueueState.replacing(
                 playlistIDs: playlist.map(\.id),
                 preservePlayback: preservePlayback
             )
@@ -1580,6 +1709,7 @@ final class PlayerViewModel {
     /// not a third catalog browser.
     func showFavoritesPlaylist() {
         playlist = favoriteTracks
+        setActivePlaylistTitle("Favorites")
         applyFavoriteMetadata()
         selectedTrackID = playlist.first?.id
         selectedTrackIDs = selectedTrackID.map { [$0] } ?? []
@@ -1631,6 +1761,7 @@ final class PlayerViewModel {
                 }
                 self.playlistMetadataTaskOwner.cancel()
                 self.playlist = rows.map(\.0)
+                self.setActivePlaylistTitle("History")
                 self.metadataCache = Dictionary(uniqueKeysWithValues: rows.map { ($0.0.id, $0.1) })
                 self.syncManualPlaylistOrder()
                 self.playlistSortColumn = .timestamp
@@ -2048,7 +2179,7 @@ final class PlayerViewModel {
             requestFadedTrackChange(randomTrack)
             return
         }
-        guard let nextTrackID = playbackQueueState.adjacentTargetID(
+        guard let nextTrackID = activePlaylistQueueState.adjacentTargetID(
             playlistIDs: playlist.map(\.id),
             direction: .next,
             wraps: true
@@ -2072,8 +2203,8 @@ final class PlayerViewModel {
         savePreferencesNow()
     }
 
-    private func randomPlaybackTarget() -> TrackItem? {
-        let candidates = randomPlaybackScope == .library ? randomLibraryTracks : visiblePlaylist
+    private func randomPlaybackTarget(using queue: [TrackItem]? = nil) -> TrackItem? {
+        let candidates = queue ?? (randomPlaybackScope == .library ? randomLibraryTracks : visiblePlaylist)
         guard !candidates.isEmpty else { return nil }
         let eligible = candidates.filter { $0.id != currentTrack?.id }
         return (eligible.isEmpty ? candidates : eligible).randomElement()
@@ -2171,7 +2302,7 @@ final class PlayerViewModel {
     }
 
     func playPrevious() {
-        guard let previousTrackID = playbackQueueState.adjacentTargetID(
+        guard let previousTrackID = activePlaylistQueueState.adjacentTargetID(
             playlistIDs: playlist.map(\.id),
             direction: .previous,
             wraps: true
@@ -2346,10 +2477,28 @@ final class PlayerViewModel {
         }
     }
 
-    private func requestPlayback(for track: TrackItem, afterCompletion: Bool = false) {
+    private func requestPlayback(
+        for track: TrackItem,
+        afterCompletion: Bool = false,
+        queueSnapshot: [TrackItem]? = nil,
+        queueTabID: String? = nil
+    ) {
         cancelFadedSkip()
         if isLoading, currentTrack?.id == track.id {
             return
+        }
+
+        if !afterCompletion {
+            if let queueSnapshot {
+                playbackTabID = queueTabID
+                playbackPlaylistSnapshot = queueSnapshot.isEmpty ? [track] : queueSnapshot
+            } else if playlist.contains(where: { $0.id == track.id }), !activePlaylistTabID.isEmpty {
+                playbackTabID = activePlaylistTabID
+                playbackPlaylistSnapshot = playlist
+            } else {
+                playbackTabID = nil
+                playbackPlaylistSnapshot = [track]
+            }
         }
 
         playlistMetadataTaskOwner.cancel()
@@ -2400,7 +2549,7 @@ final class PlayerViewModel {
             if afterCompletion {
                 let decision = try await playback.continueAfterCompletion(
                     state: playbackQueueState,
-                    playlistIDs: playlist.map(\.id),
+                    playlistIDs: playbackPlaylistSnapshot.map(\.id),
                     repeatMode: PlaybackRepeatMode(rawValue: repeatMode.rawValue) ?? .off,
                     track: track,
                     plan: plan,
@@ -2636,16 +2785,28 @@ final class PlayerViewModel {
     private var playbackQueueState: PlaybackQueueState {
         PlaybackQueueState(
             currentTrackID: currentTrack?.id,
-            selectedTrackID: selectedTrackID,
+            selectedTrackID: playbackTabID == activePlaylistTabID ? selectedTrackID : currentTrack?.id,
             pendingTrackID: pendingPlaybackTrack?.id
         )
     }
 
     private var transportPlaybackTarget: TrackItem? {
-        guard let targetID = playbackQueueState.transportTargetID(
+        guard let targetID = activePlaylistQueueState.transportTargetID(
             playlistIDs: playlist.map(\.id)
         ) else { return nil }
         return playlist.first(where: { $0.id == targetID })
+    }
+
+    private var activePlaylistQueueState: PlaybackQueueState {
+        PlaybackQueueState(
+            currentTrackID: currentTrack?.id,
+            selectedTrackID: selectedTrackID,
+            pendingTrackID: pendingPlaybackTrack?.id
+        )
+    }
+
+    private var playbackQueueTracks: [TrackItem] {
+        playbackPlaylistSnapshot.isEmpty ? (currentTrack.map { [$0] } ?? playlist) : playbackPlaylistSnapshot
     }
 
     private func playbackPlan(for metadata: TrackMetadata?, trackPathExtension: String? = nil) -> PlaybackPlan {
@@ -2694,7 +2855,7 @@ final class PlayerViewModel {
               !isPlaying,
               !didAutoAdvanceForCurrentTrack,
               currentTrack != nil,
-              !playlist.isEmpty else {
+              !playbackQueueTracks.isEmpty else {
             return
         }
 
@@ -2707,15 +2868,21 @@ final class PlayerViewModel {
             playRandomLibraryTrackWhenReady()
             return
         }
-        if randomPlaybackScope == .playlist, let randomTrack = randomPlaybackTarget() {
+        let playbackQueue = playbackQueueTracks
+        if randomPlaybackScope == .playlist,
+           let randomTrack = randomPlaybackTarget(using: playbackQueue) {
             didAutoAdvanceForCurrentTrack = true
-            requestPlayback(for: randomTrack)
+            requestPlayback(
+                for: randomTrack,
+                queueSnapshot: playbackQueue,
+                queueTabID: playbackTabID
+            )
             return
         }
         guard let sharedRepeatMode = PlaybackRepeatMode(rawValue: repeatMode.rawValue) else { return }
         let queueState = playbackQueueState
         let decision = queueState.completionDecision(
-            playlistIDs: playlist.map(\.id),
+            playlistIDs: playbackQueueTracks.map(\.id),
             repeatMode: sharedRepeatMode
         )
         let playback = self.playback
@@ -2723,12 +2890,12 @@ final class PlayerViewModel {
         case .stop:
             guard playback.retireCompletedPlayback(
                 state: queueState,
-                playlistIDs: playlist.map(\.id),
+                playlistIDs: playbackQueueTracks.map(\.id),
                 repeatMode: sharedRepeatMode
             ) != nil else { return }
             didAutoAdvanceForCurrentTrack = true
         case let .play(nextTrackID):
-            guard let nextTrack = playlist.first(where: { $0.id == nextTrackID }) else { return }
+            guard let nextTrack = playbackQueueTracks.first(where: { $0.id == nextTrackID }) else { return }
             didAutoAdvanceForCurrentTrack = true
             requestPlayback(for: nextTrack, afterCompletion: true)
         }
@@ -3110,6 +3277,12 @@ final class PlayerViewModel {
     }
 
     func saveSessionStateNow() {
+        syncActivePlaylistTab()
+        playlistTabsSaveWorkItem?.cancel()
+        playlistTabsSaveWorkItem = nil
+        if !activePlaylistTabID.isEmpty {
+            CocoaSpicePlaylistTabsStore.save(.init(tabs: playlistTabs, activeTabID: activePlaylistTabID))
+        }
         sidebarSearchPersistenceWorkItem?.cancel()
         sidebarSearchPersistenceWorkItem = nil
         AppSessionPersistence.saveSessionState(
@@ -3252,6 +3425,43 @@ final class PlayerViewModel {
         }
     }
 
+    private func restorePlaylistTabs() {
+        if let snapshot = CocoaSpicePlaylistTabsStore.load(
+            supportedExtensions: PlaybackFormatRegistry.supportedExtensions
+        ) {
+            playlistTabs = snapshot.tabs
+            activePlaylistTabID = snapshot.activeTabID
+            guard let tab = activePlaylistTab else { return }
+            isRestoringPlaylistTabs = true
+            activePlaylistTitle = tab.title
+            playlist = tab.tracks
+            selectedTrackID = tab.selectedTrackID
+            selectedTrackIDs = tab.selectedTrackIDs
+            isRestoringPlaylistTabs = false
+        } else {
+            activePlaylistTabID = UUID().uuidString
+            playlistTabs = [CocoaSpicePlaylistTab(
+                id: activePlaylistTabID,
+                title: activePlaylistTitle,
+                tracks: playlist,
+                selectedTrackID: selectedTrackID,
+                selectedTrackIDs: selectedTrackIDs
+            )]
+            schedulePlaylistTabsSave()
+        }
+        if let currentTrack,
+           let playingTab = playlistTabs.first(where: { $0.tracks.contains(where: { $0.id == currentTrack.id }) }) {
+            playbackTabID = playingTab.id
+            playbackPlaylistSnapshot = playingTab.tracks
+        } else {
+            playbackTabID = nil
+            playbackPlaylistSnapshot = []
+        }
+        syncManualPlaylistOrder()
+        refreshPlaylistTotalDurationReadout()
+        refreshPlaylistMetadata()
+    }
+
     private func hydrateRestoredPlaylistMetadata() {
         guard let databaseURL = libraryDatabaseURL,
               !playlist.isEmpty else { return }
@@ -3370,6 +3580,7 @@ final class PlayerViewModel {
         playbackElapsedSeconds = 0
         seekPreviewSeconds = 0
         playlist = tracks
+        setActivePlaylistTitle(url.deletingPathExtension().lastPathComponent)
         syncManualPlaylistOrder()
         reapplyPlaylistSortIfNeeded()
         selectedTrackID = tracks.first?.id

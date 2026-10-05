@@ -5,6 +5,7 @@
 - Main window: two-pane layout.
 - Left pane: database browser.
 - Right pane: editable playlist.
+- Playlist tabs: sit above the playlist table; each tab owns its queue and selection.
 - Main-window navigation toolbar: individual Console View, Path View,
   Favorites, plus a fold/unfold-all
   item beside the native sidebar disclosure control. These remain individual
