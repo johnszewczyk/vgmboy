@@ -1535,6 +1535,17 @@ function paintSidebarIcon(name, box) {
   });
 }
 
+function paintBackArrow(box) {
+  const centerY = box.y + Math.floor(box.height / 2);
+  const left = box.x + Math.floor((box.width - 7) / 2);
+  fillRect(left + 3, centerY, 4, 1, 0);
+  fillRect(left + 1, centerY, 2, 1, 0);
+  fillRect(left + 2, centerY - 1, 1, 1, 0);
+  fillRect(left + 3, centerY - 2, 1, 1, 0);
+  fillRect(left + 2, centerY + 1, 1, 1, 0);
+  fillRect(left + 3, centerY + 2, 1, 1, 0);
+}
+
 function libraryToolbarItems() {
   const bulkAction = sidebarBulkAction();
   return [
@@ -1755,6 +1766,7 @@ function pixelButton(parent, text, onClick, style = {}) {
     sidebarBulkAction: style.sidebarBulkAction === true,
     sidebarAction: style.sidebarAction,
     sidebarIcon: style.sidebarIcon,
+    optionExit: style.optionExit === true,
     animationFPSControl: style.animationFPSControl === true,
     paint: style.icon ? (box) => paintSidebarIcon(style.icon, box) : style.paint,
     onClick,
@@ -2541,11 +2553,9 @@ function createQueueRow(parent, index, track, columns) {
 function disclosureSquare(box, indent = controlPaddingDots()) {
   const font = fontProfile();
   const size = font.height;
-  const centerX = box.x + indent + font.advance / 2;
-  const centerY = box.y + Math.floor(box.height / 2);
   return {
-    x: Math.floor(centerX - size / 2),
-    y: Math.floor(centerY - size / 2),
+    x: Math.floor(box.x + indent + font.advance / 2 - size / 2),
+    y: box.y + Math.floor((box.height - size) / 2),
     width: size,
     height: size,
   };
@@ -2719,8 +2729,7 @@ function pathRows() {
       text: node.name || node.path || "PATH",
       node,
       group: children.length > 0,
-      indent: controlPaddingDots() + depth * 2 * fontProfile().advance
-        + (children.length ? 2 * fontProfile().advance : 0),
+      indent: controlPaddingDots() + (depth + 1) * 2 * fontProfile().advance,
       disclosureIndent: controlPaddingDots() + depth * 2 * fontProfile().advance,
       disclosureProgress: progress,
       revealProgress,
@@ -3176,31 +3185,23 @@ function addPalettePreview(parent) {
   }));
 }
 
-function optionGroup(parent, title) {
-  const group = makeWidget(parent, {
-    direction: FlexDirection.Column,
-    gap: uiGap(),
-    padding: uiGroupInsetDots() / STYLE_SCALE,
-  }, {
-    optionGroupTitle: title,
-    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
-  });
-  optionSection(group, title);
-  return group;
-}
-
-function openOptionGroup(parent, title, contentHeights = []) {
+function optionGroup(parent, title, contentHeights = null) {
   const padding = uiGroupInsetDots() / STYLE_SCALE;
-  const height = padding * 2
-    + buttonStandardHeight()
-    + contentHeights.reduce((sum, rowHeightValue) => sum + rowHeightValue, 0)
-    + uiGap() * contentHeights.length;
-  const group = makeWidget(parent, {
+  const style = {
     direction: FlexDirection.Column,
     gap: uiGap(),
     padding,
-    minHeight: height,
-  }, { optionGroupTitle: title });
+  };
+  if (Array.isArray(contentHeights)) {
+    style.minHeight = padding * 2
+      + buttonStandardHeight()
+      + contentHeights.reduce((sum, rowHeightValue) => sum + rowHeightValue, 0)
+      + uiGap() * (contentHeights.length + 1);
+  }
+  const group = makeWidget(parent, style, {
+    optionGroupTitle: title,
+    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
+  });
   optionSection(group, title);
   return group;
 }
@@ -3253,8 +3254,8 @@ function addDisplayOptions(parent, pref) {
     gap: uiSectionGap() * 3,
   });
 
-  addLCDColorOptions(screenColumn, openOptionGroup);
-  const profile = openOptionGroup(screenColumn, "SCREEN PROFILE", [
+  addLCDColorOptions(screenColumn);
+  const profile = optionGroup(screenColumn, "SCREEN PROFILE", [
     buttonStandardHeight(), buttonStandardHeight(), buttonStandardHeight(),
   ]);
   optionChoice(profile, "FONT", [
@@ -3266,7 +3267,7 @@ function addDisplayOptions(parent, pref) {
     () => setLCDDotSize(state.lcdDotSize + 1));
   optionToggle(profile, "PIXEL MATRIX GAPS", state.lcdPixelGaps,
     () => setLCDPixelGaps(!state.lcdPixelGaps));
-  addInterfaceOptions(interfaceColumn, pref, openOptionGroup);
+  addInterfaceOptions(interfaceColumn, pref);
 }
 
 function beginColorEdit(endpoint) {
@@ -3328,8 +3329,8 @@ function customColorInput(parent, endpoint, title) {
   });
 }
 
-function addLCDColorOptions(parent, groupFactory = optionGroup) {
-  const colors = groupFactory(parent, "LCD PALETTE", [
+function addLCDColorOptions(parent) {
+  const colors = optionGroup(parent, "LCD PALETTE", [
     rowHeight(8), buttonStandardHeight(), buttonStandardHeight(), rowHeight(),
   ]);
   addPalettePreview(colors);
@@ -3802,17 +3803,17 @@ function addAudioOptions(parent, pref) {
   equalizerBands.forEach((title, index) => equalizerBand(equalizer, title, index));
 }
 
-function addInterfaceOptions(parent, pref, groupFactory = optionGroup) {
+function addInterfaceOptions(parent, pref) {
   const rowHeightValue = buttonStandardHeight();
-  const transport = groupFactory(parent, "TRANSPORT LABELS", [rowHeightValue]);
+  const transport = optionGroup(parent, "TRANSPORT LABELS", [rowHeightValue]);
   optionChoice(transport, "BUTTONS", [
     { title: "WORDS", selected: !state.transportSymbols, onClick: () => setTransportSymbols(false) },
     { title: "SYMBOLS", selected: state.transportSymbols, onClick: () => setTransportSymbols(true) },
   ]);
-  const layout = groupFactory(parent, "PLAYLIST LAYOUT", [rowHeightValue]);
+  const layout = optionGroup(parent, "PLAYLIST LAYOUT", [rowHeightValue]);
   optionToggle(layout, "AUTO-SIZE COLUMNS", pref.columnAutoSize !== false,
     () => setPreference("columnAutoSize", pref.columnAutoSize === false));
-  const spacing = groupFactory(parent, "LAYOUT SPACING", [
+  const spacing = optionGroup(parent, "LAYOUT SPACING", [
     rowHeightValue, rowHeightValue, rowHeightValue,
   ]);
   optionAdjuster(spacing, "UI BUTTON PAD", spacingReadout("controlPaddingDots"),
@@ -3824,10 +3825,10 @@ function addInterfaceOptions(parent, pref, groupFactory = optionGroup) {
   optionAdjuster(spacing, "TEXT LINE GAP", spacingReadout("textLineGapDots"),
     () => adjustDisplaySpacing("textLineGapDots", -1),
     () => adjustDisplaySpacing("textLineGapDots", 1));
-  const window = groupFactory(parent, "WINDOW", [rowHeightValue]);
+  const window = optionGroup(parent, "WINDOW", [rowHeightValue]);
   optionToggle(window, "MAIN WINDOW ON TOP", pref.mainWindowAlwaysOnTop === true,
     () => setPreference("mainWindowAlwaysOnTop", pref.mainWindowAlwaysOnTop !== true));
-  const motion = groupFactory(parent, "MOTION", [rowHeightValue, rowHeightValue]);
+  const motion = optionGroup(parent, "MOTION", [rowHeightValue, rowHeightValue]);
   optionToggleAdjuster(motion, "ANIMATIONS", "ANIMATION DURATION", animationEnabled(),
     () => setPreference("animationsEnabled", !animationEnabled()),
     `${animationDurationMilliseconds()} MS`,
@@ -4091,13 +4092,14 @@ function buildTree() {
       height: toolbarHeight,
       justifyContent: Justify.FlexStart,
     });
-    pixelButton(navigation, "←", () => {
+    pixelButton(navigation, "", () => {
       closeOptionsScreen();
     }, {
-      width: buttonWidth("←"),
+      width: buttonStandardHeight(),
+      height: toolbarHeight,
       controlTitle: "BACK",
-      align: "left",
-      inset: 1,
+      optionExit: true,
+      paint: paintBackArrow,
     });
     label(navigation, "OPTIONS", { height: toolbarHeight, flexGrow: 1 }, {
       textShade: 0,
@@ -5005,12 +5007,11 @@ async function toggleFavorite(track) {
   }
 }
 
-function openProjectionPlaylist(sourceKey, title, playlist) {
-  state.enterSelection = "playlist";
-  state.sidebarEnterContext = null;
-  const leavingOptions = state.tab === "SETTINGS";
-  const priorWidths = leavingOptions ? null : captureTabWidths();
-  if (!leavingOptions) syncActivePlaylistTab();
+function openProjectionPlaylist(sourceKey, title, playlist, preserveOptionsIfOpen = false) {
+  const keepOptionsOpen = state.tab === "SETTINGS" && preserveOptionsIfOpen;
+  const leavingOptions = state.tab === "SETTINGS" && !keepOptionsOpen;
+  const priorWidths = state.tab === "SETTINGS" ? null : captureTabWidths();
+  if (!leavingOptions && !keepOptionsOpen) syncActivePlaylistTab();
   let tab = playlistTabForSource(sourceKey);
   if (!tab) {
     if (state.playlistTabs.length >= 64) {
@@ -5034,6 +5035,14 @@ function openProjectionPlaylist(sourceKey, title, playlist) {
     tab.playlist = [...playlist];
   }
 
+  if (keepOptionsOpen) {
+    persistPlaylistTabs();
+    render();
+    return true;
+  }
+
+  state.enterSelection = "playlist";
+  state.sidebarEnterContext = null;
   state.activePlaylistTabId = tab.id;
   tracks = [...tab.playlist];
   state.activeQueue = [...tab.playlist];
@@ -5071,12 +5080,13 @@ function openProjectionPlaylist(sourceKey, title, playlist) {
 
 async function showFavoritesPlaylist() {
   if (!bridge?.favoritesList) return;
+  const preserveOptionsIfOpen = state.tab !== "SETTINGS";
   try {
     const favorites = await bridge.favoritesList("historical");
     if (!Array.isArray(favorites)) return;
     state.favoriteTracks = favorites;
     state.favoriteIDs = new Set(favorites.map(favoriteID));
-    openProjectionPlaylist(FAVORITES_TAB_SOURCE, "FAVORITES", favorites);
+    openProjectionPlaylist(FAVORITES_TAB_SOURCE, "FAVORITES", favorites, preserveOptionsIfOpen);
   } catch (error) {
     state.status = `FAVORITES ERROR: ${error.message}`;
     render();
@@ -5093,6 +5103,7 @@ function historyTimestamp(milliseconds) {
 
 async function showPlaybackHistory() {
   if (!bridge?.playbackHistoryList) return;
+  const preserveOptionsIfOpen = state.tab !== "SETTINGS";
   try {
     const records = await bridge.playbackHistoryList();
     state.historyTracks = (Array.isArray(records) ? records : []).map((record) => {
@@ -5125,7 +5136,7 @@ async function showPlaybackHistory() {
         timestamp: historyTimestamp(timestampMilliseconds),
       };
     }).filter(Boolean);
-    openProjectionPlaylist(HISTORY_TAB_SOURCE, "HISTORY", state.historyTracks);
+    openProjectionPlaylist(HISTORY_TAB_SOURCE, "HISTORY", state.historyTracks, preserveOptionsIfOpen);
   } catch (error) {
     state.status = `HISTORY ERROR: ${error.message}`;
     render();
@@ -5324,7 +5335,9 @@ async function loadPathNode(node) {
         ? await bridge.databaseFolderTracks([node.catalogFolder])
         : [];
     if (token !== state.catalogToken || rows?.stale) return false;
-    tracks = Array.isArray(rows) ? rows : [];
+    const pathTracks = Array.isArray(rows) ? rows : [];
+    const keepOptionsOpen = state.tab === "SETTINGS";
+    if (!keepOptionsOpen) tracks = pathTracks;
     let tab = state.playlistTabs.find((entry) => entry.sourceKey === key);
     if (!tab && state.playlistTabs.length < 64) {
       const priorWidths = state.tab === "SETTINGS" ? null : captureTabWidths();
@@ -5333,7 +5346,7 @@ async function loadPathNode(node) {
         title: node.name || "PATH",
         gameKey: null,
         sourceKey: key,
-        playlist: [...tracks],
+        playlist: [...pathTracks],
         selectedTrack: 0,
         scroll: 0,
       };
@@ -5343,21 +5356,27 @@ async function loadPathNode(node) {
     if (tab) {
       tab.title = node.name || tab.title;
       tab.sourceKey = key;
-      tab.playlist = [...tracks];
+      tab.playlist = [...pathTracks];
       tab.selectedTrack = 0;
-      tab.selectedTrackIDs = tracks[0] ? [trackID(tracks[0])] : [];
-      tab.selectionAnchorID = tracks[0] ? trackID(tracks[0]) : null;
+      tab.selectedTrackIDs = pathTracks[0] ? [trackID(pathTracks[0])] : [];
+      tab.selectionAnchorID = pathTracks[0] ? trackID(pathTracks[0]) : null;
       tab.scroll = 0;
-      state.activePlaylistTabId = tab.id;
-      state.activeGameKey = null;
+      if (!keepOptionsOpen) {
+        state.activePlaylistTabId = tab.id;
+        state.activeGameKey = null;
+      }
     }
-    state.selectedGameKey = null;
-    resetPlaylistSelection(tracks, tab);
-    state.queueScroll = 0;
-    state.tableHorizontalScroll = 0;
-    if (!state.currentTrackId) state.activeQueue = [...tracks];
-    state.status = tracks.length ? `${node.name} / ${tracks.length} TRACKS` : "NO TRACKS AT PATH";
-    state.tab = "LIBRARY";
+    if (!keepOptionsOpen) {
+      state.selectedGameKey = null;
+      resetPlaylistSelection(pathTracks, tab);
+      state.queueScroll = 0;
+      state.tableHorizontalScroll = 0;
+      if (!state.currentTrackId) state.activeQueue = [...pathTracks];
+    }
+    state.status = pathTracks.length
+      ? `${node.name} / ${pathTracks.length} TRACKS`
+      : "NO TRACKS AT PATH";
+    if (!keepOptionsOpen) state.tab = "LIBRARY";
     persistPlaylistTabs();
     render();
     return true;
@@ -6528,6 +6547,23 @@ canvas.addEventListener("contextmenu", (event) => {
   render();
 });
 
+function invokeHitTarget(target, event) {
+  const preserveOptions = state.tab === "SETTINGS" && !target.meta.optionExit;
+  const optionsPage = state.optionsPage;
+  const returnTab = optionsReturnTab;
+  target.meta.onClick(event);
+  if (preserveOptions && state.tab !== "SETTINGS") {
+    if (screenTransitionFrame) cancelAnimationFrame(screenTransitionFrame);
+    screenTransitionFrame = 0;
+    screenTransition = null;
+    suppressFramePresentation = false;
+    state.tab = "SETTINGS";
+    state.optionsPage = optionsPage;
+    optionsReturnTab = returnTab;
+    render();
+  }
+}
+
 canvas.addEventListener("click", (event) => {
   canvas.focus({ preventScroll: true });
   if (suppressNextClick) {
@@ -6543,11 +6579,11 @@ canvas.addEventListener("click", (event) => {
   }
   if (state.columnMenu && !target?.meta.columnMenuItem) {
     state.columnMenu = null;
-    if (target?.meta.onClick) target.meta.onClick(event);
+    if (target?.meta.onClick) invokeHitTarget(target, event);
     else render();
     return;
   }
-  if (target?.meta.onClick) target.meta.onClick(event);
+  if (target?.meta.onClick) invokeHitTarget(target, event);
   else if (state.tab !== "SETTINGS") {
     const point = logicalPoint(event);
     const viewport = state.tableViewportBox;

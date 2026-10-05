@@ -11,13 +11,17 @@ ViewBoy's Options table of contents has one **Display** page for screen profile,
 LCD colors, transport labels, playlist sizing, spacing, window behavior, and
 motion. There is no separate Interface page.
 
-Every Options page uses one alphabetized navigation rail and one open content
-area. The rail is capped at 176 logical dots or 24% of the available width; a
-single LCD divider separates it from the content. Display uses two open
-columns: the live LCD palette preview and screen profile sit at left, while
-transport, layout, window, and motion controls sit at right. Shared filled title bars divide
-sections without enclosing cards. Longer pages scroll within the content
-area.
+Every Options page uses one alphabetized navigation rail and one content area.
+The rail is capped at 176 logical dots or 24% of the available width; a single
+LCD divider separates it from the content. Display uses two columns: the live
+LCD palette preview and screen profile sit at left, while transport, layout,
+window, and motion controls sit at right. Each Display section uses a full card
+with a shared filled title bar and enclosing outline. Longer pages scroll
+within the content area.
+
+In the Path sidebar, folder disclosures occupy a fixed leading gutter. Folder
+and file labels line up in the same text column at each depth, and chevrons
+share the row text's vertical alignment.
 
 The main toolbar contains eight equal-width buttons in this order: Previous,
 Stop, Play/Pause, Next, Long Play, Repeat One, Playlist Random, and Library
