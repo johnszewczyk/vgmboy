@@ -284,7 +284,8 @@ refs.accentColorInput.addEventListener("blur", (event) => {
 for (const [input, role] of [
   [refs.uiChromePrimaryColorInput, "primary"],
   [refs.uiChromeSecondaryColorInput, "secondary"],
-  [refs.uiChromePaneColorInput, "pane"]
+  [refs.uiChromePaneColorInput, "pane"],
+  [refs.uiChromeHoverColorInput, "hover"]
 ]) {
   input.addEventListener("change", (event) => app.ui.setUIChromePaletteColor(role, event.target.value));
   input.addEventListener("blur", (event) => app.ui.setUIChromePaletteColor(role, event.target.value));

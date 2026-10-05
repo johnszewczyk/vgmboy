@@ -1,7 +1,7 @@
 # Options
 
 - SPCBoy-owned pages mirror CocoaSpice organizationally: Database, UI Chrome, UI Fonts, and Windows, while VGMBoy pages provide Audio, Diagnostics, Playback, and Routing in the same WebKit settings window.
-- UI Chrome contains the palette, sidebar sizing, playlist layout, selection treatment, and animation controls. Hover and Divider color fields are removed because they did not change the rendered interface.
+- UI Chrome contains the palette, sidebar sizing, playlist layout, selection treatment, and animation controls. Hover color sets the interface hover fill. Divider color remains removed because it did not change the rendered interface.
 - UI Fonts contains separate UI Chrome and content font sizes, content color and monospace settings, and the playlist header font color and weight.
 - UI Chrome > Animations exposes checkbox-enabled Auto-Resize, Selection Bar, and Sidebar Folds. Sidebar folders and console groups use the vanilla 200 ms eased slide when enabled; the setting defaults on. Auto-Resize and Selection Bar timings default on at 200 ms and accept 0–1000 ms. Playlist tab selection uses the same Selection Bar timing and easing.
 - Playlist Options exposes Column Auto-size, enabled by default, with the description “Automatically resize columns for content width on selection.” Playlist headers also have a separate default text color.
