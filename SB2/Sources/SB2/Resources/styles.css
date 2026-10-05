@@ -1340,8 +1340,8 @@ body.options-window .tool-button:hover {
 }
 
 .options-path-control .tool-button {
-  width: 2rem;
-  min-width: 2rem;
+  width: var(--sb-control-size, 2rem);
+  min-width: var(--sb-control-size, 2rem);
   padding: 0;
 }
 
@@ -1713,7 +1713,7 @@ body.scan-log-window .scan-log-panel {
   pointer-events: none;
 }
 
-/* SB2 has two deliberate scales: dense catalog rows and open settings pages. */
+/* SB2 keeps catalog rows dense and sizes bars, controls, and settings from shared tokens. */
 body.sb2-frontend {
   --sb-space-010: .1rem;
   --sb-space-020: .2rem;
@@ -1724,12 +1724,12 @@ body.sb2-frontend {
   --sb-space-075: .75rem;
   --sb-space-090: .9rem;
   --sb-space-100: 1rem;
-  --sb-titlebar-height: 2.75rem;
-  --sb-statusbar-height: 2.25rem;
   --sb-toolbar-height: 2.5rem;
+  --sb-titlebar-height: var(--sb-toolbar-height);
+  --sb-statusbar-height: var(--sb-toolbar-height);
   --sb-control-size: 1.5rem;
   --sb-control-icon-size: 1rem;
-  --sb-options-control-height: 2.5rem;
+  --sb-options-control-height: var(--sb-toolbar-height);
   --sb-options-control-width: 24ch;
   --app-easing: cubic-bezier(0.2, 0, 0, 1);
   --sb-divider-size: 1px;
@@ -2105,7 +2105,7 @@ body.sb2-frontend .options-overlay {
 body.sb2-frontend .options-overlay.is-hidden { display: none; }
 body.sb2-frontend .options-panel {
   display: grid;
-  grid-template-rows: 2.5rem minmax(0, 1fr);
+  grid-template-rows: var(--sb-toolbar-height) minmax(0, 1fr);
   gap: 1.5rem;
   width: 100%;
   height: 100%;
@@ -2119,7 +2119,7 @@ body.sb2-frontend .options-header {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  height: 2.5rem;
+  height: var(--sb-toolbar-height);
   margin: 0;
   padding: 0;
   color: #e0e1eb;
@@ -2129,10 +2129,10 @@ body.sb2-frontend .options-header {
 }
 body.sb2-frontend .options-header .tool-button {
   position: static;
-  width: 2rem;
-  min-width: 2rem;
-  height: 2rem;
-  min-height: 2rem;
+  width: var(--sb-control-size);
+  min-width: var(--sb-control-size);
+  height: var(--sb-control-size);
+  min-height: var(--sb-control-size);
   margin-left: auto;
   transform: none;
   border: 0;
@@ -2146,17 +2146,16 @@ body.sb2-frontend .options-nav { gap: 1.25rem; padding: var(--sb-space-050) 0; }
 body.sb2-frontend .options-nav-group { gap: var(--sb-space-010); padding: 0; border: 0; border-radius: 0; background: transparent; }
 body.sb2-frontend .options-nav-group + .options-nav-group { border: 0; }
 body.sb2-frontend .options-nav-group-title { padding: 0 var(--sb-space-050) var(--sb-space-020); color: #777f9c; font-size: var(--sb-space-066); font-weight: 500; letter-spacing: .08em; }
-body.sb2-frontend .options-nav-item { min-height: 2.5rem; gap: var(--sb-space-066); padding: 0 var(--sb-space-075); border: 0; border-radius: var(--sb-space-020); background: transparent; color: #9299b5; font-size: var(--sb-space-090); font-weight: 400; }
+body.sb2-frontend .options-nav-item { min-height: var(--sb-control-size); gap: var(--sb-space-066); padding: 0 var(--sb-space-075); border: 0; border-radius: var(--sb-space-020); background: transparent; color: #9299b5; font-size: var(--sb-space-090); font-weight: 400; }
 body.sb2-frontend .options-nav-item:hover { background: #11151b; color: #d0d4e5; }
 body.sb2-frontend .options-nav-item .ui-icon { width: 1rem; height: 1rem; }
 body.sb2-frontend .options-nav-item.is-selected { background: #102333; color: #8fd1ff; }
 body.sb2-frontend .options-content { padding: 1rem 2rem 2rem; border: 0; border-radius: 0; font-family: var(--ui-font-family); font-size: 1rem; line-height: 1.5; scrollbar-color: #3a4050 #090b0f; }
 body.sb2-frontend .options-page { width: min(100%, 65ch); gap: 2rem; min-height: 100%; margin-inline: auto; padding: 0 0 2rem; border-radius: 0; background: transparent; }
 body.sb2-frontend .options-page-title { margin: 0; padding: 0 0 .75rem; border-bottom: 1px solid #343a48; color: #e0e1eb; font-size: 1.5rem; line-height: 1.3; font-weight: 600; letter-spacing: 0; }
-body.sb2-frontend .options-subpanel { gap: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
-body.sb2-frontend .options-subpanel-title { margin: 0 0 .75rem; padding: 0 0 .5rem; border-bottom: 1px solid #2c3340; color: #b9dfff; font-size: 1.1rem; line-height: 1.4; font-weight: 600; }
-body.sb2-frontend .options-field { min-height: 3.75rem; gap: 1.5rem; padding: .75rem .25rem; border-bottom: 1px solid #1d222c; color: #d8dced; font-size: 1rem; line-height: 1.5; }
-body.sb2-frontend .options-field:last-child { border-bottom: 0; }
+body.sb2-frontend .options-subpanel { gap: var(--sb-space-050); padding: 0; border: 0; border-radius: 0; background: transparent; }
+body.sb2-frontend .options-subpanel-title { margin: 0; padding: 0 0 .5rem; border-bottom: 1px solid #2c3340; color: #b9dfff; font-size: 1.1rem; line-height: 1.4; font-weight: 600; }
+body.sb2-frontend .options-field { min-height: 3.75rem; gap: 1.5rem; padding: .75rem .25rem; color: #d8dced; font-size: 1rem; line-height: 1.5; }
 body.sb2-frontend .options-field-copy { gap: .35rem; }
 body.sb2-frontend .options-field-copy small,
 body.sb2-frontend .options-checkbox-copy small { color: #9299ad; font-size: .9rem; line-height: 1.45; }
@@ -2194,15 +2193,15 @@ body.sb2-frontend .options-subpanel p { margin: 1rem 0 .5rem; color: #a5abc0; fo
 body.sb2-frontend .options-subpanel p strong { color: #d8dced; }
 body.sb2-frontend .options-path-control { padding: .5rem .66rem; border: 1px solid #2c3340; border-radius: .25rem; background: #0f1218; }
 body.sb2-frontend .options-path-control .options-path-readout { width: 100%; max-width: none; height: var(--sb-options-control-height); min-height: var(--sb-options-control-height); padding: .33rem .5rem; border: 0; background: transparent; color: #aeb5ca; font-family: var(--mono-font-family); font-size: .9rem; }
+body.sb2-frontend .options-path-control .tool-button { width: var(--sb-control-size); min-width: var(--sb-control-size); height: var(--sb-control-size); min-height: var(--sb-control-size); align-self: center; }
 body.sb2-frontend .options-library-toolbar { gap: .75rem; margin-top: 1rem; }
 body.sb2-frontend .options-library-toolbar .tool-button { height: var(--sb-options-control-height); min-height: var(--sb-options-control-height); background: #15191f; }
 body.sb2-frontend .options-library-toolbar .tool-button:hover { background: #202633; }
-body.sb2-frontend .diagnostics-list { gap: 0; }
-body.sb2-frontend .diagnostics-row { min-height: 3rem; padding: .66rem .25rem; border-bottom: 1px solid #1d222c; color: #c9cfe0; font-size: 1rem; }
-body.sb2-frontend .diagnostics-row:last-child { border-bottom: 0; }
+body.sb2-frontend .diagnostics-list { gap: var(--sb-space-050); }
+body.sb2-frontend .diagnostics-row { min-height: 3rem; padding: .66rem .25rem; color: #c9cfe0; font-size: 1rem; }
 body.sb2-frontend .diagnostics-row strong { color: #e0e1eb; font-family: var(--mono-font-family); font-size: .9rem; }
-body.sb2-frontend .routing-conflicts-list { gap: 0; }
-body.sb2-frontend .routing-conflict { min-height: 3rem; padding: .66rem .25rem; border-bottom: 1px solid #1d222c; font-size: 1rem; }
+body.sb2-frontend .routing-conflicts-list { gap: var(--sb-space-050); }
+body.sb2-frontend .routing-conflict { min-height: 3rem; padding: .66rem .25rem; font-size: 1rem; }
 body.sb2-frontend .equalizer-bands { gap: .33rem; }
 body.sb2-frontend .equalizer-band { min-height: 3rem; gap: .75rem; font-size: 1rem; }
 body.sb2-frontend .database-info-panel,
@@ -2217,7 +2216,6 @@ body.sb2-frontend .options-panel-actions .tool-button { height: var(--sb-options
 body.sb2-frontend .tool-button { height: var(--sb-control-size); min-height: var(--sb-control-size); }
 body.sb2-frontend .glyph-button { width: var(--sb-control-size); min-width: var(--sb-control-size); padding: 0; }
 body.sb2-frontend .sidebar-search-input { height: var(--sb-control-size); min-height: var(--sb-control-size); padding-inline: var(--sb-space-075); }
-body.sb2-frontend .options-nav-item { min-height: var(--sb-control-size); }
 
 body.sb2-frontend.options-window .app-shell { grid-template-rows: var(--sb-titlebar-height) minmax(0, 1fr) var(--sb-statusbar-height); }
 body.sb2-frontend.options-window .workspace { display: none; }

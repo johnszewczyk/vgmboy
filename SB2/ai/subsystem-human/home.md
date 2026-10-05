@@ -25,6 +25,6 @@
 - Sidebar selection remains available to navigation and activation but has no
   selected-row marker. Folder and console disclosure updates immediately.
 - Dense catalog rows keep zero vertical item padding with a 1px row gap. The
-  pane divider is 1px. Toolbar buttons share a 1.5rem square and icons share a
-  1rem size; the search field uses the same 1.5rem control height. Playlist tab
-  controls fill their header row, with a matching 1.5rem close control.
+  pane divider is 1px. The title strip, status strip, and toolbars share one
+  2.5rem row height. Main action controls use a 1.5rem square and 1rem icons;
+  the search field and playlist close control use the same 1.5rem control size.

@@ -7,11 +7,12 @@
 - The options sidebar groups SPCBOY-owned frontend settings separately from
   VGMBoy-owned playback-core settings. Keep that ownership split when adding
   settings.
-- Option pages use a readable system font, a 65-character content width, and
-  underlined section headings with separated setting rows. UI Chrome and UI
-  Fonts are separate SPCBOY pages. UI Fonts exposes playlist-header styling
-  and the titlebar font color and bold setting. The same page layout and
-  title/footer chrome appear in the optional standalone Options window.
+- Option pages use a readable system font and a 65-character content width.
+  Section headings are underlined; setting rows use whitespace without
+  divider lines. UI Chrome and UI Fonts are separate SPCBOY pages. UI Fonts
+  exposes playlist-header styling and titlebar font color and bold controls.
+  The same page layout and title/footer chrome appear in the optional
+  standalone Options window.
 - Setting fields share one 2.5rem control height and 24ch width, with the width
   scaling together on narrow windows. Database path readouts keep the same
   height and use the available row width.
