@@ -12,6 +12,12 @@ Transport buttons fill equal widths across the sidebar's topmost toolbar. The
 sidebar enforces a 24 rem minimum width. Transport, search, tabs, table headers,
 and the position bar share one toolbar height token derived from the interface
 font size.
+If startup takes longer than a brief display threshold, a compact status card
+shows which stage is running: restoring the workspace, opening the shared
+catalog, indexing the sidebar, or restoring playlists. It remains visible with
+the error message if startup cannot finish. Sidebar search filters the loaded
+catalog locally and updates the results on the next display frame, without a
+database request or input debounce.
 Playlist tabs do not allow text selection. Their selected background fades
 with the shared selection duration and easing, and covers the title and close
 control as one tab surface.

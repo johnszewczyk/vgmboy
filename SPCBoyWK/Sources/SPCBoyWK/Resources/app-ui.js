@@ -30,6 +30,13 @@ let catalogPlaylistSortGeneration = 0;
 let projectionPlaylistSortGeneration = 0;
 let playlistTabsSaveTimer = 0;
 let playlistTabsSaveChain = Promise.resolve();
+let sidebarRenderFrame = 0;
+const treeSearchText = new WeakMap();
+let startupStartedAt = 0;
+let startupRevealTimer = 0;
+let startupElapsedTimer = 0;
+let startupDismissTimer = 0;
+let startupHasAppeared = false;
 
 function makePlaylistTabID() {
   return globalThis.crypto?.randomUUID?.()
@@ -664,7 +671,108 @@ function showPlaylistLoadError(message) {
   uiApp.playback.updateTimingSummary();
 }
 
+const STARTUP_STEPS = Object.freeze([
+  { title: "Restoring SPCBoy", detail: "Applying your saved interface settings and reopening your last session." },
+  { title: "Connecting to your library", detail: "Opening the shared ScanSong catalog and checking its library roots." },
+  { title: "Preparing the sidebar", detail: "Building the searchable library tree and console index." },
+  { title: "Restoring playlists", detail: "Reopening your current playlists and preparing playback controls." }
+]);
+
+function setStartupStage(index, detail = null) {
+  if (window.spcBoyWK?.isOptionsWindow) return;
+  const notice = document.getElementById("startup-notice");
+  if (!notice) return;
+  const step = Math.max(0, Math.min(STARTUP_STEPS.length - 1, Number(index) || 0));
+  const message = STARTUP_STEPS[step];
+  const heading = document.getElementById("startup-title");
+  const description = document.getElementById("startup-detail");
+  if (heading) heading.textContent = message.title;
+  if (description) description.textContent = String(detail || message.detail);
+  notice.querySelectorAll("[data-startup-step]").forEach((item) => {
+    const itemIndex = Number(item.dataset.startupStep);
+    const state = itemIndex < step ? "done" : itemIndex === step ? "active" : "pending";
+    item.dataset.state = state;
+    const mark = item.querySelector(".startup-step-mark");
+    if (mark) mark.textContent = state === "done" ? "✓" : String(itemIndex + 1);
+  });
+  notice.classList.remove("is-error", "is-ready");
+  notice.setAttribute("aria-busy", "true");
+}
+
+function beginStartup() {
+  if (window.spcBoyWK?.isOptionsWindow) return;
+  startupStartedAt = performance.now();
+  startupHasAppeared = false;
+  window.clearTimeout(startupDismissTimer);
+  setStartupStage(0);
+  const notice = document.getElementById("startup-notice");
+  if (!notice) return;
+  window.clearTimeout(startupRevealTimer);
+  startupRevealTimer = window.setTimeout(() => {
+    startupRevealTimer = 0;
+    startupHasAppeared = true;
+    notice.classList.remove("is-hidden");
+    const elapsed = document.getElementById("startup-elapsed");
+    const updateElapsed = () => {
+      if (elapsed) elapsed.textContent = `Working ${Math.max(1, Math.floor((performance.now() - startupStartedAt) / 1000))}s`;
+    };
+    updateElapsed();
+    window.clearInterval(startupElapsedTimer);
+    startupElapsedTimer = window.setInterval(updateElapsed, 1000);
+  }, 350);
+}
+
+function finishStartup() {
+  if (window.spcBoyWK?.isOptionsWindow) return;
+  const notice = document.getElementById("startup-notice");
+  if (!notice) return;
+  window.clearTimeout(startupRevealTimer);
+  startupRevealTimer = 0;
+  window.clearInterval(startupElapsedTimer);
+  startupElapsedTimer = 0;
+  if (!startupHasAppeared) {
+    notice.classList.add("is-hidden");
+    return;
+  }
+  notice.querySelectorAll("[data-startup-step]").forEach((item) => {
+    item.dataset.state = "done";
+    const mark = item.querySelector(".startup-step-mark");
+    if (mark) mark.textContent = "✓";
+  });
+  const heading = document.getElementById("startup-title");
+  const description = document.getElementById("startup-detail");
+  const elapsed = document.getElementById("startup-elapsed");
+  if (heading) heading.textContent = "SPCBoy is ready";
+  if (description) description.textContent = "Your library and saved playlists are ready.";
+  if (elapsed) elapsed.textContent = "Ready";
+  notice.classList.add("is-ready");
+  notice.setAttribute("aria-busy", "false");
+  window.clearTimeout(startupDismissTimer);
+  startupDismissTimer = window.setTimeout(() => notice.classList.add("is-hidden"), 650);
+}
+
+function failStartup(message) {
+  if (window.spcBoyWK?.isOptionsWindow) return;
+  const notice = document.getElementById("startup-notice");
+  if (!notice) return;
+  window.clearTimeout(startupRevealTimer);
+  startupRevealTimer = 0;
+  window.clearInterval(startupElapsedTimer);
+  startupElapsedTimer = 0;
+  window.clearTimeout(startupDismissTimer);
+  notice.classList.remove("is-hidden", "is-ready");
+  notice.classList.add("is-error");
+  notice.setAttribute("aria-busy", "false");
+  const heading = document.getElementById("startup-title");
+  const description = document.getElementById("startup-detail");
+  const elapsed = document.getElementById("startup-elapsed");
+  if (heading) heading.textContent = "SPCBoy could not finish starting";
+  if (description) description.textContent = String(message || "The library could not be opened.");
+  if (elapsed) elapsed.textContent = "Startup paused";
+}
+
 function showStartupFailure(message) {
+  failStartup(message);
   refs.treeRoot.innerHTML = "";
   const empty = document.createElement("div");
   empty.className = "empty sidebar-empty";
@@ -1049,6 +1157,7 @@ function renderTreeNode(node, container) {
   const button = document.createElement("button");
   const expanded = isNodeExpanded(node);
   button.dataset.browserPath = node.path;
+  button.type = "button";
   button.className = `tree-node${state.selectedBrowserPath === node.path ? " is-selected" : ""}`;
   button.setAttribute("aria-selected", String(state.selectedBrowserPath === node.path));
   if (state.selectedBrowserPath === node.path) selectedBrowserButton = button;
@@ -1058,9 +1167,12 @@ function renderTreeNode(node, container) {
     <span class="tree-disclosure">${node.kind === "folder" ? (expanded ? "▾" : "▸") : "·"}</span><span class="tree-label">${escapeHtml(node.name)}</span>
   `;
   button.addEventListener("click", (event) => {
+    event.preventDefault();
     window.clearTimeout(browserClickTimer);
+    // Keep this rendered node paired with its button. Catalog paths can
+    // contain punctuation and control separators, so resolving a later click
+    // by serializing the path is less reliable than retaining the node itself.
     selectBrowserNode(node, { focus: true, previewLeaf: false, button });
-    if (event.detail > 1) return;
     browserClickTimer = window.setTimeout(() => void handleBrowserPrimaryClick(node), 220);
   });
   button.addEventListener("dblclick", (event) => {
@@ -1109,10 +1221,19 @@ function filteredTree() {
     return currentSidebarView().contentMode === "tree" ? state.databaseFileTree : state.tree;
   }
 
+  function ownSearchText(node) {
+    const cached = treeSearchText.get(node);
+    if (cached !== undefined) return cached;
+    const searchable = `${node.name || ""} ${node.path || ""}`.toLowerCase();
+    treeSearchText.set(node, searchable);
+    return searchable;
+  }
+
   function filterNode(node) {
-    const filteredChildren = node.children.map(filterNode).filter(Boolean);
-    const searchableText = `${node.name || ""} ${node.path || ""}`.toLowerCase();
-    if (terms.every((term) => searchableText.includes(term)) || filteredChildren.length > 0) {
+    const matches = terms.every((term) => ownSearchText(node).includes(term));
+    const children = node.children || [];
+    const filteredChildren = children.length ? children.map(filterNode).filter(Boolean) : [];
+    if (matches || filteredChildren.length > 0) {
       return {
         ...node,
         children: filteredChildren
@@ -1145,8 +1266,18 @@ function renderTree() {
   }
 
   ensureExpandedToSelection(visibleTree);
-  visibleTree.forEach((node) => renderTreeNode(node, refs.treeRoot));
+  const fragment = document.createDocumentFragment();
+  visibleTree.forEach((node) => renderTreeNode(node, fragment));
+  refs.treeRoot.appendChild(fragment);
   scheduleSelectionIndicators();
+}
+
+function scheduleSidebarRender() {
+  if (sidebarRenderFrame) return;
+  sidebarRenderFrame = window.requestAnimationFrame(() => {
+    sidebarRenderFrame = 0;
+    renderSidebar();
+  });
 }
 
 function databaseGameKey(game) {
@@ -1293,8 +1424,7 @@ function makeDatabaseGameButton(game) {
   button.dataset.databaseGameKey = databaseGameKey(game);
   button.dataset.searchText = `${game.name} ${game.rootName || ""}`.toLowerCase();
   button.innerHTML = `<span class="database-disclosure">·</span><span class="database-game-name">${escapeHtml(game.displayName || game.name)}</span>${state.sidebarPathCounts ? `<span class="database-game-meta">${game.trackCount}</span>` : ""}`;
-  button.addEventListener("click", (event) => {
-    if (event.detail > 1) return;
+  button.addEventListener("click", () => {
     selectDatabaseSidebarRow(button, { focus: true, preview: true });
   });
   button.addEventListener("keydown", (event) => {
@@ -1722,14 +1852,17 @@ async function updateSidebarSearch(query) {
   if (nextQuery !== state.sidebarQuery) searchCollapsedFolders.clear();
   state.sidebarQuery = nextQuery;
   state.databaseSidebarError = "";
-  state.databaseSearchGames = state.sidebarQuery.trim()
+  state.databaseSearchGames = state.sidebarMode === "consoles" && state.sidebarQuery.trim()
     ? localDatabaseSearch(state.sidebarQuery)
     : null;
   // Search is a view-policy projection, not a catalog read. Keeping this
   // synchronous removes the bridge round-trip and debounce from every keypress
   // while preserving CatalogBrowserCore's query semantics locally.
   state.sidebarView = Object.freeze(localSidebarView(state.sidebarMode, state.sidebarQuery));
-  renderSidebar();
+  // Keep the input on the main thread and collapse bursts of key events into
+  // one tree projection per frame. Results update at the next paint without
+  // delaying the user's next keystroke behind a full sidebar rebuild.
+  scheduleSidebarRender();
 }
 
 async function loadDatabaseGame(game, options = {}) {
@@ -3522,10 +3655,12 @@ function setOptionsOpen(nextOpen) {
 
 
 async function bootstrap() {
+  beginStartup();
   // Load persisted appearance before the first Options-window paint. The
   // window is native-sized and immediately visible; deferring this until
   // after catalog/cache requests produces a distracting default-style flash.
   window.SPCBoyOptionsController.applyManifest(await window.spcBoyWK.frontendOptionsManifest());
+  setStartupStage(0, "Applying saved interface settings and reopening your last session.");
   await loadSettings();
   await syncSidebarView();
   let savedPlaylistTabs = null;
@@ -3550,6 +3685,7 @@ async function bootstrap() {
     throw new Error(message);
   }
 
+  setStartupStage(1, "Opening the shared catalog and checking the configured library roots.");
   collapsedDatabaseConsoles = new Set(state.collapsedConsoleNames);
   state.databaseLocation = await window.spcBoyWK?.databaseLocation?.() || null;
   state.databaseLocationStatus = state.databaseLocation?.requiresRestart
@@ -3579,7 +3715,10 @@ async function bootstrap() {
     snapshot = await window.spcBoyWK.bootstrap();
   }
 
-  if (snapshot?.stale === true) return;
+  if (snapshot?.stale === true) {
+    failStartup("The library changed while SPCBoy was opening. Close and reopen the app to load the latest catalog.");
+    return;
+  }
 
   Object.assign(state, snapshot);
   state.rootPath = null;
@@ -3596,9 +3735,11 @@ async function bootstrap() {
   state.totalSeconds = targetPlaybackSeconds();
   persistSettings();
   if (!window.spcBoyWK?.isOptionsWindow && window.spcBoyWK?.databaseRoots) {
+    setStartupStage(2, "Indexing library sources for the sidebar and its search results.");
     state.libraryRoots = await window.spcBoyWK.databaseRoots();
     await uiApp.ui.handleLibraryRootsChanged(state.libraryRoots);
   }
+  setStartupStage(3, "Restoring the selected playlist and preparing playback controls.");
   const restoredPlaylistTabs = !window.spcBoyWK?.isOptionsWindow && restorePlaylistTabs(savedPlaylistTabs);
   if (!restoredPlaylistTabs && !window.spcBoyWK?.isOptionsWindow) ensurePlaylistTab();
   renderAll();
@@ -3611,6 +3752,7 @@ async function bootstrap() {
   syncTreeSelection();
   scrollSelectedTrackIntoView();
   if (!window.spcBoyWK?.isOptionsWindow) persistPlaylistTabs();
+  finishStartup();
 }
 
 function selectedPathTitle(path) {
@@ -3650,6 +3792,8 @@ async function applyFolderSelection(selection, targetTabID = state.activePlaylis
 }
 
 uiApp.ui = {
+  setStartupStage,
+  failStartup,
   renderTree,
   syncTreeSelection,
   renderPlaylist,

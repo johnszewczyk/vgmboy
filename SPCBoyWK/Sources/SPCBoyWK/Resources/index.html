@@ -61,6 +61,20 @@
         <div id="sidebar-resize-handle" class="sidebar-resize-handle" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" aria-valuemin="12" aria-valuemax="50" aria-valuenow="20" tabindex="0"></div>
 
         <section class="content">
+          <div id="startup-notice" class="startup-notice is-hidden" role="status" aria-live="polite" aria-atomic="true" aria-busy="true">
+            <section class="startup-card" aria-labelledby="startup-title">
+              <div class="startup-kicker"><span class="startup-pulse" aria-hidden="true"></span><span>SPCBOY STARTUP</span><span id="startup-elapsed" class="startup-elapsed">Starting…</span></div>
+              <h1 id="startup-title">Restoring SPCBoy</h1>
+              <p id="startup-detail">Loading your display settings and last session.</p>
+              <div class="startup-progress" role="progressbar" aria-label="Startup progress" aria-valuetext="In progress"><span></span></div>
+              <ol class="startup-steps" aria-label="Startup steps">
+                <li data-startup-step="0"><span class="startup-step-mark">1</span><span>Restore workspace</span></li>
+                <li data-startup-step="1"><span class="startup-step-mark">2</span><span>Connect library</span></li>
+                <li data-startup-step="2"><span class="startup-step-mark">3</span><span>Prepare sidebar</span></li>
+                <li data-startup-step="3"><span class="startup-step-mark">4</span><span>Restore playlists</span></li>
+              </ol>
+            </section>
+          </div>
           <div id="playlist-tabs-toolbar" class="playlist-tabs-toolbar is-hidden" aria-label="Playlist tabs">
             <div id="playlist-tabs" class="playlist-tabs" role="tablist" aria-label="Playlists"></div>
           </div>

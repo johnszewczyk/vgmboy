@@ -663,6 +663,7 @@ window.addEventListener("pagehide", () => {
 });
 
 app.ui.bootstrap().catch((error) => {
+  app.ui.failStartup(error?.message || error);
   console.error(error);
 });
 

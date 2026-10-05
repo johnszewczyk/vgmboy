@@ -17,6 +17,7 @@ async function refreshLibraryRoots() {
 }
 
 async function handleLibraryRootsChanged(roots) {
+  app.ui.setStartupStage?.(2, "Indexing library sources for the sidebar and its search results.");
   state.libraryRoots = Array.isArray(roots) ? roots : [];
   state.databaseSidebarLoading = true;
   state.databaseSidebarError = "";
