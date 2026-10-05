@@ -71,8 +71,7 @@ const DEFAULT_ANIMATION_FPS = 60;
 const ANIMATION_FPS_MIN = 30;
 const ANIMATION_FPS_MAX = 240;
 const ANIMATION_FPS_TICKS = [30, 60, 90, 120, 150, 180, 210, 240];
-// Four digital LCD tones begin with the traditional Game Boy palette. The
-// user may replace either endpoint; the middle tones are derived below.
+// The framebuffer retains four logical labels, mapped to these two endpoints.
 const DEFAULT_LCD_BACKGROUND = "#9BBC0F";
 const DEFAULT_LCD_PIXEL = "#222222";
 function hexToRGB(color) {
@@ -82,12 +81,6 @@ function hexToRGB(color) {
 function srgbToLinear(channel) {
   const value = channel / 255;
   return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-}
-function linearToSRGB(channel) {
-  const value = Math.max(0, Math.min(1, channel));
-  return Math.round(255 * (value <= 0.0031308
-    ? value * 12.92
-    : 1.055 * value ** (1 / 2.4) - 0.055));
 }
 function rgbToLab([red, green, blue]) {
   const r = srgbToLinear(red);
@@ -104,45 +97,14 @@ function rgbToLab([red, green, blue]) {
   const fz = f(z);
   return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
 }
-function labToRGB([lightness, a, b]) {
-  const fy = (lightness + 16) / 116;
-  const fx = fy + a / 500;
-  const fz = fy - b / 200;
-  const inverse = (value) => value ** 3 > 0.008856451679
-    ? value ** 3
-    : (116 * value - 16) / 903.296296296;
-  const x = 0.95047 * inverse(fx);
-  const y = inverse(fy);
-  const z = 1.08883 * inverse(fz);
-  return [
-    linearToSRGB(x * 3.2404542 + y * -1.5371385 + z * -0.4985314),
-    linearToSRGB(x * -0.969266 + y * 1.8760108 + z * 0.041556),
-    linearToSRGB(x * 0.0556434 + y * -0.2040259 + z * 1.0572252),
-  ];
-}
 function rgbToHex([red, green, blue]) {
   return `#${[red, green, blue].map((channel) => channel.toString(16).padStart(2, "0")).join("")}`
     .toUpperCase();
 }
-function paletteTones(fontColor = DEFAULT_LCD_PIXEL, backgroundColor = DEFAULT_LCD_BACKGROUND,
-  highContrast = false) {
-  if (highContrast) {
-    // Direct-color mode removes the LCD tone shader: dark framebuffer shades
-    // use the exact PIXEL endpoint and light shades use the exact BG endpoint.
-    return [fontColor, fontColor, backgroundColor, backgroundColor];
-  }
-  const inkRGB = hexToRGB(fontColor);
-  const surfaceRGB = hexToRGB(backgroundColor);
-  const inkLab = rgbToLab(inkRGB);
-  const surfaceLab = rgbToLab(surfaceRGB);
-  const positions = [0, 1 / 3, 2 / 3, 1];
-  return positions.map((amount, index) => {
-    if (index === 0) return fontColor;
-    if (index === 3) return backgroundColor;
-    const lab = inkLab.map((value, channel) =>
-      value + (surfaceLab[channel] - value) * amount);
-    return rgbToHex(labToRGB(lab));
-  });
+function paletteTones(fontColor = DEFAULT_LCD_PIXEL, backgroundColor = DEFAULT_LCD_BACKGROUND) {
+  // Preserve the four framebuffer labels for existing UI drawing code, but
+  // collapse them to two exact endpoints. There is no interpolated pixel tone.
+  return [fontColor, fontColor, backgroundColor, backgroundColor];
 }
 function colorInputToHex(input) {
   const value = String(input ?? "").trim();
@@ -187,7 +149,13 @@ function packedPalette(palette) {
   return Uint32Array.from(palette, ([red, green, blue]) =>
     ((255 << 24) | (blue << 16) | (green << 8) | red) >>> 0);
 }
-let packedRGB = packedPalette(RGB);
+let packedDirectInk = packedPalette([hexToRGB(DEFAULT_LCD_PIXEL)])[0];
+let packedDirectBackground = packedPalette([hexToRGB(DEFAULT_LCD_BACKGROUND)])[0];
+function refreshDisplayPalette() {
+  RGB = paletteRGB(displayPalette());
+  packedDirectInk = packedPalette([hexToRGB(state.customFontColor)])[0];
+  packedDirectBackground = packedPalette([hexToRGB(state.customBackgroundColor)])[0];
+}
 const standardGlyphs = {
   A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
   B: ["11110", "10001", "10001", "11110", "10001", "10001", "11110"],
@@ -334,8 +302,6 @@ function storedAnimationFPS(value) {
   return Math.max(ANIMATION_FPS_MIN, Math.min(ANIMATION_FPS_MAX, Math.round(fps)));
 }
 const savedDisplayOptions = storedDisplayOptions();
-const savedHighContrastDisplay = savedDisplayOptions.highContrastDisplay === true
-  || savedDisplayOptions.rawPixelContrast === true;
 const savedCustomPaletteConfigured = savedDisplayOptions.customPaletteConfigured === true
   || savedDisplayOptions.customColorsInitialized === true;
 const savedCustomBackgroundInput = storedColorInput(
@@ -362,8 +328,7 @@ function storedSpacing(value, fallback) {
     Number.isFinite(number) ? Math.round(number) : fallback));
 }
 function displayPalette() {
-  return paletteTones(state.customFontColor, state.customBackgroundColor,
-    state.highContrastDisplay);
+  return paletteTones(state.customFontColor, state.customBackgroundColor);
 }
 function updateScreenSurface() {
   const root = document.documentElement;
@@ -371,10 +336,7 @@ function updateScreenSurface() {
   root.style?.setProperty?.("--screen-surface", state.customBackgroundColor);
 }
 function inactiveSearchTextShade() {
-  if (state.highContrastDisplay) return 0;
-  const pixelLightness = rgbToLab(hexToRGB(state.customFontColor))[0];
-  const backgroundLightness = rgbToLab(hexToRGB(state.customBackgroundColor))[0];
-  return backgroundLightness > pixelLightness ? 2 : 1;
+  return 0;
 }
 function saveDisplayOptions() {
   try {
@@ -385,7 +347,6 @@ function saveDisplayOptions() {
       customBackgroundInput: state.customBackgroundInput,
       customFontInput: state.customFontInput,
       customPaletteConfigured: state.customPaletteConfigured,
-      highContrastDisplay: state.highContrastDisplay,
       lcdDotSize: state.lcdDotSize,
       lcdPixelGaps: state.lcdPixelGaps,
       uiButtonPadDots: state.controlPaddingDots,
@@ -480,7 +441,6 @@ const state = {
   customBackgroundInput: savedCustomBackgroundInput,
   customFontInput: savedCustomFontInput,
   customPaletteConfigured: savedCustomPaletteConfigured,
-  highContrastDisplay: savedHighContrastDisplay,
   editingColorEndpoint: null,
   colorDraft: "",
   colorInputError: null,
@@ -591,8 +551,7 @@ const state = {
   columnMenu: null,
 };
 DEVICE_PIXELS_PER_LCD_DOT = state.lcdDotSize;
-RGB = paletteRGB(displayPalette());
-packedRGB = packedPalette(RGB);
+refreshDisplayPalette();
 updateScreenSurface();
 
 let tracks = [];
@@ -1078,13 +1037,13 @@ export function lcdDotSizeSnapshot() {
 
 export function lcdDeviceDotSnapshot(shade = 0) {
   const shadeIndex = Math.max(0, Math.min(3, Math.round(Number(shade) || 0)));
-  const ink = RGB[shadeIndex];
-  const gap = RGB[3];
+  const ink = shadeIndex < 2 ? state.customFontColor : state.customBackgroundColor;
+  const gap = state.customBackgroundColor;
   const faceSize = Math.max(1, DEVICE_PIXELS_PER_LCD_DOT
     - (state.lcdPixelGaps ? 1 : 0));
   return Array.from({ length: DEVICE_PIXELS_PER_LCD_DOT }, (_, y) =>
     Array.from({ length: DEVICE_PIXELS_PER_LCD_DOT }, (_, x) =>
-      rgbToHex(x < faceSize && y < faceSize ? ink : gap)));
+      x < faceSize && y < faceSize ? ink : gap));
 }
 
 export function lcdPaletteSnapshot() {
@@ -1424,8 +1383,8 @@ function presentPixels(startY = 0, endY = HEIGHT, startX = 0, endX = WIDTH) {
     const topRow = y * DEVICE_PIXELS_PER_LCD_DOT * outputWidth;
     for (let x = firstColumn; x < lastColumn; x += 1) {
       const shade = pixels[sourceRow + x];
-      const face = packedRGB[shade];
-      const gap = packedRGB[3];
+      const face = shade < 2 ? packedDirectInk : packedDirectBackground;
+      const gap = packedDirectBackground;
       const outputX = x * DEVICE_PIXELS_PER_LCD_DOT;
       for (let dotY = 0; dotY < DEVICE_PIXELS_PER_LCD_DOT; dotY += 1) {
         const row = topRow + dotY * outputWidth + outputX;
@@ -1524,8 +1483,7 @@ function label(parent, text, style = {}, meta = {}) {
         fillRect(box.x, box.y, box.width, box.height, meta.fill);
       }
       if (meta.border !== undefined) strokeRect(box.x, box.y, box.width, box.height, meta.border);
-      if (state.highContrastDisplay && meta.selectedControl === true
-          && box.width > 4 && box.height > 4) {
+      if (meta.selectedControl === true && box.width > 4 && box.height > 4) {
         strokeRect(box.x + 2, box.y + 2, box.width - 4, box.height - 4, 0);
       }
       if (meta.bottomLine !== undefined) {
@@ -2126,10 +2084,8 @@ function animationFPSX(box, fps) {
 function paintAnimationFPSControl(box) {
   const track = animationFPSTrack(box);
   const thumbX = animationFPSX(box, state.animationFPS);
-  fillRect(track.left, track.y, track.right - track.left + 1, 1,
-    state.highContrastDisplay ? 3 : 1);
-  fillRect(track.left, track.y, thumbX - track.left + 1, 1,
-    state.highContrastDisplay ? 0 : 2);
+  fillRect(track.left, track.y, track.right - track.left + 1, 1, 3);
+  fillRect(track.left, track.y, thumbX - track.left + 1, 1, 0);
   ANIMATION_FPS_TICKS.forEach((fps) => {
     const x = animationFPSX(box, fps);
     fillRect(x, track.y - 2, 1, 5, 0);
@@ -2627,8 +2583,7 @@ function createQueueRow(parent, index, track, columns) {
     contentRowKind: "playlist",
     paint(box) {
       if (selected && !primarySelected) {
-        if (state.highContrastDisplay) strokeRect(box.x, box.y, box.width, box.height, 0);
-        else fillRect(box.x, box.y, box.width, box.height, 2);
+        strokeRect(box.x, box.y, box.width, box.height, 0);
       }
     },
   });
@@ -3079,10 +3034,8 @@ function addCatalogPane(parent) {
         controlTitle: `TAB ${tab.title}`,
         paint(box) {
           if (tab.id === state.activePlaylistTabId) {
-            if (state.highContrastDisplay && box.width > 4 && box.height > 4) {
+            if (box.width > 4 && box.height > 4) {
               strokeRect(box.x + 2, box.y + 2, box.width - 4, box.height - 4, 0);
-            } else {
-              fillRect(box.x, box.y, box.width, box.height, 2);
             }
           }
           strokeRect(box.x, box.y, box.width, box.height, 1);
@@ -3397,8 +3350,7 @@ function finishColorEdit(commit) {
     if (color) {
       state.customPaletteConfigured = true;
       updateScreenSurface();
-      RGB = paletteRGB(displayPalette());
-      packedRGB = packedPalette(RGB);
+      refreshDisplayPalette();
       saveDisplayOptions();
     }
   }
@@ -3437,8 +3389,6 @@ function addLCDColorOptions(parent) {
   addPalettePreview(colors);
   customColorInput(colors, "background", "BG");
   customColorInput(colors, "font", "PIXEL");
-  optionToggle(colors, "HIGH CONTRAST", state.highContrastDisplay,
-    () => setHighContrastDisplay(!state.highContrastDisplay));
   label(colors, state.colorInputError ? "INVALID COLOR" : "ENTER APPLY", {
     height: rowHeight(),
   }, {
@@ -3759,17 +3709,11 @@ function paintGaugeBar(box, fraction, steps) {
   const { left, right } = linearTrackBounds(box, steps);
   const centerY = box.y + Math.floor(box.height / 2);
   const fillWidth = Math.round((right - left) * Math.max(0, Math.min(1, fraction)));
-  if (state.highContrastDisplay) {
-    fillRect(left, box.y + 1, right - left + 1, Math.max(1, box.height - 2), 3);
-    fillRect(left, box.y + 1, fillWidth, Math.max(1, box.height - 2), 0);
-  } else {
-    fillRect(left, box.y + 1, fillWidth, Math.max(1, box.height - 2), 1);
-  }
+  fillRect(left, box.y + 1, right - left + 1, Math.max(1, box.height - 2), 3);
+  fillRect(left, box.y + 1, fillWidth, Math.max(1, box.height - 2), 0);
   const tickTop = centerY - 1;
   for (const x of linearTickPositions(box, steps)) {
-    const tickShade = state.highContrastDisplay
-      ? (x < left + fillWidth ? 3 : 0)
-      : 2;
+    const tickShade = x < left + fillWidth ? 3 : 0;
     fillRect(x, tickTop, 1, 3, tickShade);
   }
 }
@@ -4500,11 +4444,7 @@ function paintSelectionBandPixels(y) {
     const bandTop = floor(y);
     const priorClip = paintClip;
     paintClip = intersectBoxes(paintClip, selectionBand.clip);
-    if (state.highContrastDisplay) {
-      strokeRect(selectionBand.x, bandTop, selectionBand.width, selectionBand.height, 0);
-    } else {
-      fillRect(selectionBand.x, bandTop, selectionBand.width, selectionBand.height, 2);
-    }
+    strokeRect(selectionBand.x, bandTop, selectionBand.width, selectionBand.height, 0);
     for (const row of selectionRows) {
       if (row.box.y >= bandTop + selectionBand.height || row.box.y + row.box.height <= bandTop) continue;
       if (row.widget.meta.optionPage) {
@@ -4525,13 +4465,8 @@ function paintSidebarSelectionBandPixels(y) {
   const bandTop = floor(y);
   const priorClip = paintClip;
   paintClip = intersectBoxes(paintClip, sidebarSelectionBand.clip);
-  if (state.highContrastDisplay) {
-    strokeRect(sidebarSelectionBand.x, bandTop,
-      sidebarSelectionBand.width, sidebarSelectionBand.height, 0);
-  } else {
-    fillRect(sidebarSelectionBand.x, bandTop,
-      sidebarSelectionBand.width, sidebarSelectionBand.height, 2);
-  }
+  strokeRect(sidebarSelectionBand.x, bandTop,
+    sidebarSelectionBand.width, sidebarSelectionBand.height, 0);
   for (const row of sidebarSelectionRows) {
     if (row.box.y >= bandTop + sidebarSelectionBand.height
       || row.box.y + row.box.height <= bandTop) continue;
@@ -5156,14 +5091,6 @@ function setLCDPixelGaps(enabled) {
   const value = enabled === true;
   if (state.lcdPixelGaps === value) return;
   state.lcdPixelGaps = value;
-  saveDisplayOptions();
-  render();
-}
-
-function setHighContrastDisplay(enabled) {
-  state.highContrastDisplay = enabled === true;
-  RGB = paletteRGB(displayPalette());
-  packedRGB = packedPalette(RGB);
   saveDisplayOptions();
   render();
 }

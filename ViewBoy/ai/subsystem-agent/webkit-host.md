@@ -6,4 +6,4 @@
 
 The Window menu owns Command-W. Its AppKit action closes the main `NSWindow` directly so the shortcut cannot be interpreted as a playlist-tab action or lost in a WebKit round trip. Command-Q remains the application quit command. The canvas handles Command-W as a native-close fallback before search keystrokes; closing a playlist tab remains an explicit `X` action.
 
-`index.html` loads only `yoga-screen.css` and `yoga-app.js`. The HTML and CSS provide one edge-to-edge canvas with no outer surround. All screen text, controls, borders, and selection treatment are framebuffer pixels. The four-shade LCD renderer runs in WebKit.
+`index.html` loads only `yoga-screen.css` and `yoga-app.js`. The HTML and CSS provide one edge-to-edge canvas with no outer surround. All screen text, controls, borders, and selection treatment are framebuffer pixels. The two-color pixel-grid renderer runs in WebKit and writes exact BG/PIXEL endpoint colors without shade blending.

@@ -1,9 +1,11 @@
 # ViewBoy UI Design
 
 This page is the published Markdown specification for ViewBoy's screen colors,
-spacing, and shared controls. The app renders its content in one four-tone LCD
-canvas. The LCD surface reaches every window edge; the eight-pixel content
-inset keeps controls and panes clear of the frame without adding a bezel.
+spacing, and shared controls. The app renders its content in one two-color LCD
+pixel grid. Every lit framebuffer pixel uses the exact PIXEL input; empty cells
+and configured gaps use the exact BG input. The LCD surface reaches every
+window edge; the eight-pixel content inset keeps controls and panes clear of
+the frame without adding a bezel.
 
 ## One Display Page
 
@@ -35,14 +37,12 @@ state tint is the expected visual difference from an inactive button.
 ## LCD Colors
 
 The default endpoints are the traditional Game Boy yellow-green background
-(`BG #9BBC0F`) and dark pixel color (`PIXEL #222222`). Standard mode renders
-four tones: PIXEL, two intermediate tones, and BG. It derives the middle tones
-at one-third and two-thirds of the endpoint distance in CIELAB L*, with a* and
-b* interpolated at the same fractions. **High Contrast** is a direct two-color
-mode: framebuffer shades 0–1 use the exact PIXEL input, and shades 2–3 use the
-exact BG input. It removes intermediate LCD tone shading. Pixel Matrix Gaps
-use BG-colored edges in both modes; High Contrast does not change cell edges,
-grid, spacing, or the presence of pixels.
+(`BG #9BBC0F`) and dark pixel color (`PIXEL #222222`). The renderer keeps its
+four framebuffer labels for layout but maps shades 0–1 directly to PIXEL and
+shades 2–3 directly to BG. The final device-pixel write bypasses tone palettes
+and blending: each lit cell face uses the exact PIXEL input. Configured matrix
+gaps use exact BG. This two-color rendering is always on and preserves the
+same cell mask, gap dimensions, grid, and spacing.
 
 BG and PIXEL are the only color controls. Inputs accept three- or six-digit hex with or without `#`, space- or
 comma-separated RGB channel values, CSS color names, and supported CSS color
@@ -55,19 +55,15 @@ Enter applies a valid value and Escape cancels.
 The canvas grid scales with the window and is not the Game Boy's fixed 160×144
 panel. **LCD Dot Size** selects 2–6 device pixels per logical cell; smaller
 values give the same canvas a finer grid. **Pixel Matrix Gaps** is off by
-default, so every device pixel in a cell uses its framebuffer tone. When on,
+default, so every device pixel in a cell uses its endpoint color. When on,
 the cell's right and bottom device-pixel edges use the LCD background tone.
 With gaps off, a custom `000` PIXEL endpoint renders as full black throughout
-each ink cell. High Contrast maps dark framebuffer values to exact PIXEL and
-light values to exact BG, while preserving the selected dot size, gap setting,
-cell geometry, and presence of every framebuffer pixel.
+each ink cell. Color interpolation and pixel shading are disabled; the
+selected dot size, gap setting, cell geometry, and presence of every
+framebuffer pixel remain.
 
-Standard mode reproduces a four-tone palette and visible pixel grid, not the
-original STN panel. High Contrast intentionally reduces color fidelity to
-exact two-color rendering for readability; it does not alter device-cell
-geometry or claim to reproduce measured panel response. Standard mode follows
-equal CIELAB L* intervals. Neither mode approximates a measured LCD voltage
-curve. The renderer does not model
+The renderer shows a direct two-color grid, not a four-tone STN panel. It does
+not claim to reproduce measured panel response. It does not model
 reflectance, viewing-angle response, row/column crosstalk, liquid-crystal
 transition time, or panel aging. Nintendo lists the classic screen as a
 160×144 STN dot-matrix LCD with four shades and a contrast controller; the
@@ -76,13 +72,11 @@ Game Boy Color uses a TFT screen. [Nintendo Game Boy specifications](https://www
 
 The **Custom LCD Colors** group is always visible on the Display page and
 contains separate **BG** and **PIXEL** fields. Its four-slot preview shows the
-current mapping, with High Contrast displaying the two exact endpoints twice.
-Inputs accept three- or six-digit hex
+two exact endpoints twice. Inputs accept three- or six-digit hex
 (`333`, `ABC`, `1122FF`, with or without `#`), three RGB channels separated by
 spaces or commas (`30 30 30`), CSS color names, and colors accepted by native
-CSS color parsing. Standard mode derives its four-tone palette from these
-endpoints. High Contrast maps dark framebuffer shades directly to PIXEL and
-light shades directly to BG. The field preserves the entered text (for
+CSS color parsing. The renderer uses these endpoints directly, without tone
+shading. The field preserves the entered text (for
 example, `rebeccapurple`) and stores the resolved RGB value separately for
 rendering. Enter applies a valid color; Escape cancels the edit.
 

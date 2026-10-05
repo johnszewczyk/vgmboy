@@ -1,6 +1,6 @@
 # Project Info
 
-ViewBoy is the VGMMan family's native macOS player with a screen-first Yoga LCD front end. AppKit hosts one WKWebView. The web view paints a four-shade framebuffer into a canvas; native Swift retains the catalog, preferences, archive, and VGMBoy playback bridge.
+ViewBoy is the VGMMan family's native macOS player with a screen-first Yoga pixel-grid front end. AppKit hosts one WKWebView. The web view paints a framebuffer into a two-color canvas with exact BG/PIXEL endpoints; native Swift retains the catalog, preferences, archive, and VGMBoy playback bridge.
 
 ## Routes
 
