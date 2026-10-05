@@ -274,12 +274,10 @@ body.is-file-drag-over::after {
 .sidebar-context-menu button:focus-visible { background: var(--accent); color: rgb(20 20 20); outline: 0; }
 
 .database-game-row { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%; padding: var(--list-item-padding-y) 0.5rem; border: 0; border-radius: 999px; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
-.database-game-row.is-selected { box-shadow: none; }
 .database-game-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .database-game-meta { flex: 0 0 auto; color: var(--muted); font-variant-numeric: tabular-nums; }
 .database-console-group { position: relative; z-index: 1; }
 .database-console-row { display: flex; align-items: center; gap: 0; width: 100%; padding: var(--list-item-padding-y) 0.5rem; border: 0; border-radius: 999px; background: transparent; color: var(--text); font: inherit; font-weight: 400; text-align: left; cursor: pointer; }
-.database-console-row.is-selected { box-shadow: none; }
 .database-console-games { display: flex; flex-direction: column; min-width: 0; overflow: hidden; padding-left: 1rem; }
 .database-disclosure { flex: 0 0 1rem; width: 1rem; color: var(--muted); text-align: center; }
 .database-console-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -345,27 +343,7 @@ body.options-window .tool-button:hover {
   user-select: none;
 }
 
-.tree-node.is-selected,
-.database-game-row.is-selected,
-.database-console-row.is-selected {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  box-shadow: inset 0.14rem 0 0 var(--accent);
-  color: var(--accent);
-  transition:
-    background-color var(--selection-animation-duration) var(--selection-animation-easing),
-    color var(--selection-animation-duration) var(--selection-animation-easing);
-}
-
-.tree-root.has-solid-selection .tree-node.is-selected,
-.tree-root.has-solid-selection .database-game-row.is-selected,
-.tree-root.has-solid-selection .database-console-row.is-selected {
-  background: var(--accent);
-  box-shadow: none;
-  color: var(--accent-ink);
-}
-
-
-.tree-node.tree-file:not(.is-selected) { color: var(--sidebar-text-color); }
+.tree-node.tree-file { color: var(--sidebar-text-color); }
 
 .tree-disclosure {
   flex: 0 0 1rem;
@@ -1066,7 +1044,7 @@ body.options-window .tool-button:hover {
 .favorite-toggle .ui-icon { fill: none; }
 .favorite-toggle.is-favorite .ui-icon { fill: currentColor; }
 
-/* Solid stays behind row content; the hollow outline clears playing-row decorations. */
+/* The playlist selection surface stays behind row content in solid mode. */
 .list-selection-indicator {
   position: absolute;
   z-index: 0;

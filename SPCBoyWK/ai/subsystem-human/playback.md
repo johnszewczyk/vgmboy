@@ -82,8 +82,10 @@ with an adjacent PDX bank as dependency data; PDX is not a playlist track.
 
 Selecting a catalog game fills the playlist directly from indexed catalog rows;
 it does not rescan the source folders or wait for a second metadata pass.
-Changing the sidebar source leaves that new playlist unselected; the moving
-selection bar appears only after selecting a playlist row.
+Sidebar selection remains available for keyboard navigation and activation but
+has no selected-row marker. Folder and console disclosure keeps its eased
+slide animation. Playlist row and tab selection retain their own accent marker
+and transition timing.
 
 The sidebar supports Up/Down navigation and Enter activation in both Path and
 Console views. Console View moves through visible console headings and expanded

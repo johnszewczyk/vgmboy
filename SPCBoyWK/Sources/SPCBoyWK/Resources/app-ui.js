@@ -16,7 +16,6 @@ let databaseEmptyState = null;
 let databaseConsoleGroups = [];
 let collapsedDatabaseConsoles = new Set();
 let databaseRowRenderGeneration = 0;
-let databaseRowsRenderPending = false;
 let browserClickTimer = 0;
 let databaseGameClickTimer = 0;
 let databaseGameSearchRecords = [];
@@ -364,7 +363,10 @@ function playVisibleTrack(trackId, startSeconds = 0) {
 let browserSelectionGeneration = 0;
 let databasePlaylistSelectionGeneration = 0;
 let selectedBrowserButton = null;
-let selectedDatabaseGameButton = null;
+let selectedDatabaseSidebarButton = null;
+let renderedBrowserNodes = [];
+let renderedBrowserNodesByPath = new Map();
+let renderedBrowserNodeIndexByPath = new Map();
 const playlistRowsByTrackId = new Map();
 let selectedPlaylistRow = null;
 let currentPlaylistRow = null;
@@ -482,7 +484,7 @@ function reconcilePlaylistVirtualRows(startIndex, endIndex) {
     if (state.activePlaylistTabId === state.playbackTabId && state.currentTrackId === track.id) currentPlaylistRow = row;
   }
   if (bottomSpacer && bottomSpacer !== body.lastElementChild) body.appendChild(bottomSpacer);
-  scheduleSelectionIndicators();
+  schedulePlaylistSelectionIndicator();
 }
 
 refs.playlistBodyWrap?.addEventListener("scroll", schedulePlaylistViewportRender, { passive: true });
@@ -505,40 +507,19 @@ function setSelectionIndicatorSolid(indicator, solid) {
   else indicator.classList.remove("is-solid");
 }
 
-function ensureSidebarSelectionIndicator() {
-  let indicator = refs.treeRoot.querySelector(".list-selection-indicator");
-  if (indicator) {
-    setSelectionIndicatorSolid(indicator, Boolean(state.solidSelectionBar));
-    return indicator;
-  }
-  indicator = document.createElement("div");
-  indicator.className = "list-selection-indicator is-hidden";
-  indicator.setAttribute("aria-hidden", "true");
-  setSelectionIndicatorSolid(indicator, Boolean(state.solidSelectionBar));
-  refs.treeRoot.prepend(indicator);
-  return indicator;
-}
-
 function syncSelectionIndicatorStyle() {
   const solid = Boolean(state.solidSelectionBar);
-  refs.treeRoot.classList.toggle("has-solid-selection", solid);
-  [refs.playlistSelectionIndicator, ensureSidebarSelectionIndicator()]
-    .filter(Boolean)
-    .forEach((indicator) => setSelectionIndicatorSolid(indicator, solid));
+  setSelectionIndicatorSolid(refs.playlistSelectionIndicator, solid);
 }
 
 function resetSidebarContent() {
-  // Keep the single selection surface in the DOM across sidebar renders.
-  // Detaching it with replaceChildren() resets WebKit's transform transition,
-  // so an indented selection jump snaps instead of travelling.
   databaseRowRenderGeneration += 1;
-  databaseRowsRenderPending = false;
-  const indicator = ensureSidebarSelectionIndicator();
-  for (const child of [...refs.treeRoot.children]) {
-    if (child !== indicator) child.remove();
-  }
-  if (refs.treeRoot.firstElementChild !== indicator) refs.treeRoot.prepend(indicator);
-  return indicator;
+  refs.treeRoot.replaceChildren();
+  selectedBrowserButton = null;
+  selectedDatabaseSidebarButton = null;
+  renderedBrowserNodes = [];
+  renderedBrowserNodesByPath = new Map();
+  renderedBrowserNodeIndexByPath = new Map();
 }
 
 function hideSelectionIndicator(indicator) {
@@ -599,30 +580,21 @@ function sidebarSelectionTarget() {
 }
 
 function syncSidebarSelectionRowClass(target = sidebarSelectionTarget()) {
-  refs.treeRoot.querySelectorAll(".tree-node.is-selected, .database-game-row.is-selected, .database-console-row.is-selected")
-    .forEach((row) => row.classList.toggle("is-selected", row === target));
-  refs.treeRoot.querySelectorAll(".tree-node, .database-game-row, .database-console-row")
-    .forEach((row) => row.setAttribute("aria-selected", String(row === target)));
+  for (const previous of [selectedBrowserButton, selectedDatabaseSidebarButton]) {
+    if (!previous || previous === target) continue;
+    previous.classList.remove("is-selected");
+    if (previous.hasAttribute("aria-selected")) previous.setAttribute("aria-selected", "false");
+  }
   target?.classList.add("is-selected");
+  if (target?.hasAttribute("aria-selected")) target.setAttribute("aria-selected", "true");
   selectedBrowserButton = target?.classList.contains("tree-node") ? target : null;
-  selectedDatabaseGameButton = target?.classList.contains("database-game-row") ? target : null;
+  selectedDatabaseSidebarButton = target?.classList.contains("database-game-row")
+    || target?.classList.contains("database-console-row") ? target : null;
   return target;
 }
 
-function syncSelectionIndicators() {
+function syncPlaylistSelectionIndicator() {
   selectionIndicatorFrame = 0;
-  const sidebarTarget = syncSidebarSelectionRowClass();
-  const sidebarIndicator = ensureSidebarSelectionIndicator();
-  if (sidebarTarget) positionSelectionIndicator(refs.treeRoot, sidebarIndicator, sidebarTarget);
-  const selectedDatabaseGameIsPending = databaseRowsRenderPending
-    && state.sidebarView?.contentMode === "database"
-    && state.selectedDatabaseGameKey
-    && visibleDatabaseGames().some((game) => databaseGameKey(game) === state.selectedDatabaseGameKey);
-  // Keep the last measured capsule while a selected row is being mounted or
-  // temporarily has no layout box. Hiding it for one animation frame caused
-  // the sidebar marker to blink out during tree and database refreshes.
-  if (!sidebarTarget && !selectedDatabaseGameIsPending) hideSelectionIndicator(sidebarIndicator);
-
   const hasPlaylistSelection = Boolean(state.selectedTrackId || state.selectedTrackIds?.length);
   const playlistTargetIsMounted = selectedPlaylistRow && selectedPlaylistRow.isConnected !== false;
   if (playlistTargetIsMounted) {
@@ -632,18 +604,9 @@ function syncSelectionIndicators() {
   }
 }
 
-function scheduleSelectionIndicators() {
+function schedulePlaylistSelectionIndicator() {
   if (selectionIndicatorFrame) return;
-  selectionIndicatorFrame = window.requestAnimationFrame(syncSelectionIndicators);
-}
-
-function findBrowserNode(nodes, targetPath) {
-  for (const node of nodes) {
-    if (node.path === targetPath) return node;
-    const child = findBrowserNode(node.children || [], targetPath);
-    if (child) return child;
-  }
-  return null;
+  selectionIndicatorFrame = window.requestAnimationFrame(syncPlaylistSelectionIndicator);
 }
 
 function clearPlaylistSelection() {
@@ -655,7 +618,7 @@ function clearPlaylistSelection() {
   state.playlistSelectionAnchorId = null;
   selectedPlaylistRow = null;
   lastPlaylistSelectionID = null;
-  scheduleSelectionIndicators();
+  schedulePlaylistSelectionIndicator();
 }
 
 function showPlaylistLoadError(message) {
@@ -899,9 +862,6 @@ function showContextMenu(event, actions) {
 
 function showSidebarContextMenu(node, event) {
   state.selectedBrowserPath = node.path;
-  selectedBrowserButton = event.currentTarget?.classList?.contains("tree-node")
-    ? event.currentTarget
-    : browserButtonForPath(node.path);
   persistSettings();
   syncTreeSelection();
   const finderPath = node.catalogFile?.path || node.catalogFolder?.folderPath || node.path;
@@ -1017,9 +977,10 @@ function selectBrowserNode(node, { focus = false, previewLeaf = true, button = n
     browserSelectionGeneration += 1;
   }
   state.selectedBrowserPath = node.path;
-  selectedBrowserButton = button?.classList?.contains("tree-node")
+  const targetButton = button?.classList?.contains("tree-node")
     ? button
     : browserButtonForPath(node.path);
+  syncSidebarSelectionRowClass(targetButton);
   persistSettings();
   syncTreeSelection();
   if (focus) (selectedBrowserButton || browserButtonForPath(node.path))?.focus();
@@ -1027,15 +988,13 @@ function selectBrowserNode(node, { focus = false, previewLeaf = true, button = n
 }
 
 function visibleBrowserNodes() {
-  return [...refs.treeRoot.querySelectorAll(".tree-node")]
-    .map((button) => findBrowserNode(filteredTree(), button.dataset.browserPath))
-    .filter(Boolean);
+  return renderedBrowserNodes;
 }
 
 function moveBrowserSelection(delta) {
   const nodes = visibleBrowserNodes();
   if (!nodes.length) return;
-  const currentIndex = nodes.findIndex((node) => node.path === state.selectedBrowserPath);
+  const currentIndex = renderedBrowserNodeIndexByPath.get(state.selectedBrowserPath) ?? -1;
   const nextIndex = currentIndex < 0
     ? (delta >= 0 ? 0 : nodes.length - 1)
     : Math.max(0, Math.min(nodes.length - 1, currentIndex + delta));
@@ -1152,6 +1111,9 @@ async function toggleBrowserNode(node) {
 }
 
 function renderTreeNode(node, container) {
+  renderedBrowserNodeIndexByPath.set(node.path, renderedBrowserNodes.length);
+  renderedBrowserNodes.push(node);
+  renderedBrowserNodesByPath.set(node.path, node);
   const wrapper = document.createElement("div");
   wrapper.className = "tree-item";
   const button = document.createElement("button");
@@ -1261,7 +1223,6 @@ function renderTree() {
       ? "No catalog paths match this view."
       : "No database tree is available.";
     refs.treeRoot.appendChild(empty);
-    scheduleSelectionIndicators();
     return;
   }
 
@@ -1269,7 +1230,6 @@ function renderTree() {
   const fragment = document.createDocumentFragment();
   visibleTree.forEach((node) => renderTreeNode(node, fragment));
   refs.treeRoot.appendChild(fragment);
-  scheduleSelectionIndicators();
 }
 
 function scheduleSidebarRender() {
@@ -1319,13 +1279,9 @@ function selectDatabaseSidebarRow(button, { focus = true, preview = false } = {}
       .catch((error) => reportDatabaseSidebarError("select the database console", error));
   }
 
-  refs.treeRoot.querySelectorAll(".database-game-row.is-selected, .database-console-row.is-selected")
-    .forEach((row) => row.classList.remove("is-selected"));
-  button.classList.add("is-selected");
-  selectedDatabaseGameButton = gameID ? button : null;
+  syncSidebarSelectionRowClass(button);
   if (focus) button.focus();
   persistSettings();
-  scheduleSelectionIndicators();
 
   if (gameID && preview) {
     const game = visibleDatabaseGames().find((entry) => databaseGameKey(entry) === gameID);
@@ -1391,7 +1347,6 @@ async function applySharedDatabaseGroupAction(action, groupName = null, gameID =
   state.selectedDatabaseGameKey = next.selectedGameID || null;
   syncCollapsedConsolePersistence();
   syncSidebarSelectionRowClass();
-  scheduleSelectionIndicators();
   return true;
 }
 
@@ -1420,7 +1375,7 @@ function makeDatabaseGameButton(game) {
   button.type = "button";
   const isSelected = state.selectedDatabaseGameKey === databaseGameKey(game);
   button.className = `database-game-row${isSelected ? " is-selected" : ""}`;
-  if (isSelected) selectedDatabaseGameButton = button;
+  if (isSelected) selectedDatabaseSidebarButton = button;
   button.dataset.databaseGameKey = databaseGameKey(game);
   button.dataset.searchText = `${game.name} ${game.rootName || ""}`.toLowerCase();
   button.innerHTML = `<span class="database-disclosure">·</span><span class="database-game-name">${escapeHtml(game.displayName || game.name)}</span>${state.sidebarPathCounts ? `<span class="database-game-meta">${game.trackCount}</span>` : ""}`;
@@ -1487,7 +1442,6 @@ function appendDatabaseGameRowsInBatches() {
   const pendingRows = databaseConsoleGroups.flatMap(({ games, gameItems }) =>
     gameItems.map((game) => ({ games, game }))
   );
-  databaseRowsRenderPending = pendingRows.length > 0;
   let offset = 0;
 
   const appendBatch = () => {
@@ -1501,9 +1455,6 @@ function appendDatabaseGameRowsInBatches() {
     }
     if (offset < pendingRows.length) {
       window.requestAnimationFrame(appendBatch);
-    } else {
-      databaseRowsRenderPending = false;
-      scheduleSelectionIndicators();
     }
   };
 
@@ -1513,18 +1464,16 @@ function appendDatabaseGameRowsInBatches() {
 function renderDatabaseGames() {
   if (state.databaseSidebarLoading) {
     renderedDatabaseGames = null;
-    const indicator = resetSidebarContent();
+    resetSidebarContent();
     const loading = document.createElement("div");
     loading.className = "empty sidebar-empty sidebar-loading";
     loading.textContent = "Loading catalog…";
     refs.treeRoot.appendChild(loading);
-    positionSelectionIndicator(refs.treeRoot, indicator, null);
     return;
   }
   const gamesForView = visibleDatabaseGames();
   if (renderedDatabaseGames !== gamesForView) {
     resetSidebarContent();
-    selectedDatabaseGameButton = null;
     databaseConsoleGroups = [];
     const groupsForView = visibleDatabaseGameGroups();
     databaseGameButtons = [];
@@ -1534,6 +1483,7 @@ function renderDatabaseGames() {
       const heading = document.createElement("button");
       heading.type = "button";
       heading.className = `database-console-row${state.selectedDatabaseConsoleName === consoleName && !state.selectedDatabaseGameKey ? " is-selected" : ""}`;
+      if (heading.classList.contains("is-selected")) selectedDatabaseSidebarButton = heading;
       heading.dataset.databaseConsoleName = consoleName;
       heading.tabIndex = 0;
       const expanded = !collapsedDatabaseConsoles.has(consoleName);
@@ -1618,7 +1568,6 @@ function renderDatabaseGames() {
   for (const button of databaseGameButtons) {
     button.classList.remove("is-hidden");
     button.classList.toggle("is-selected", state.selectedDatabaseGameKey === button.dataset.databaseGameKey);
-    if (state.selectedDatabaseGameKey === button.dataset.databaseGameKey) selectedDatabaseGameButton = button;
   }
 
   for (const { group, games, consoleName } of databaseConsoleGroups) {
@@ -1635,7 +1584,6 @@ function renderDatabaseGames() {
   databaseEmptyState.textContent = state.databaseSidebarError || (state.databaseGames.length
     ? "No database games match this search."
     : "Use ScanSong to populate the selected database.");
-  scheduleSelectionIndicators();
 }
 
 async function setAllDatabaseConsolesCollapsed(collapsed) {
@@ -2024,7 +1972,7 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
 
   const browserButton = focused?.closest?.(".tree-node");
   if (browserButton?.dataset.browserPath) {
-    const node = findBrowserNode(filteredTree(), browserButton.dataset.browserPath);
+    const node = renderedBrowserNodesByPath.get(browserButton.dataset.browserPath);
     if (node) {
       await activateBrowserNode(node);
       return true;
@@ -2064,12 +2012,11 @@ function renderSidebar() {
     if (icon) icon.setAttribute("href", modeIcons[view.storedMode] || "#icon-sidebar-views");
   }
   if (state.databaseSidebarLoading) {
-    const indicator = resetSidebarContent();
+    resetSidebarContent();
     const loading = document.createElement("div");
     loading.className = "empty sidebar-empty sidebar-loading";
     loading.textContent = "Loading catalog…";
     refs.treeRoot.appendChild(loading);
-    positionSelectionIndicator(refs.treeRoot, indicator, null);
     return;
   }
   if (view.contentMode === "database") renderDatabaseGames();
@@ -2091,7 +2038,6 @@ function syncAnimatedRanges() {
 function syncTreeSelection() {
   syncSidebarSelectionRowClass();
   scrollSelectedBrowserItemIntoView();
-  scheduleSelectionIndicators();
 }
 
 function allColumns() {
@@ -2615,7 +2561,7 @@ function selectPlaylistTrack(trackId, { focus = false, extend = false, range = f
   const primaryRow = selection.primaryId ? playlistRowsByTrackId.get(selection.primaryId) || null : null;
   const clickedRow = playlistRowsByTrackId.get(track.id) || null;
   selectedPlaylistRow = primaryRow;
-  scheduleSelectionIndicators();
+  schedulePlaylistSelectionIndicator();
   if (focus) clickedRow?.focus({ preventScroll: true });
   return track;
 }
@@ -2777,7 +2723,7 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
       window.requestAnimationFrame(appendBatch);
     } else {
       if (spacers?.bottom > 0) refs.playlistBody.appendChild(makePlaylistVirtualSpacer(spacers.bottom, "bottom"));
-      scheduleSelectionIndicators();
+      schedulePlaylistSelectionIndicator();
       measurePlaylistRowHeight();
     }
   };
@@ -2826,7 +2772,7 @@ function renderPlaylist({ sort = true, persistTab = true, virtualScrollTop = nul
     const row = document.createElement("tr");
     row.innerHTML = `<td colspan="${Math.max(1, orderedColumns().length)}" class="empty-row">${escapeHtml(state.playlistEmptyMessage || "")}</td>`;
     refs.playlistBody.appendChild(row);
-    scheduleSelectionIndicators();
+    schedulePlaylistSelectionIndicator();
     return;
   }
 
@@ -3147,7 +3093,7 @@ function selectAllPlaylistTracks() {
   state.playlistSelectionAnchorId = state.selectedTrackId;
   persistSettings();
   refreshPlaylistPlaybackState();
-  scheduleSelectionIndicators();
+  schedulePlaylistSelectionIndicator();
 }
 
 function playSelectedTrack() {

@@ -46,12 +46,10 @@ visibility so the playlist remains flexible and the position bar stays at the
 bottom of the pane.
 
 The accent color is a persisted CSS color in the typed settings projection.
-`app-ui.js` applies it as the root `--accent` value, and both the sidebar and
-playlist use the same moving accent capsule. Selected-row backgrounds remain
-transparent so a second instantaneous paint cannot flash over the capsule.
-Selection never changes sidebar or playlist text color: users choose accent
-and text colors with the contrast they want. Active toolbar and option controls
-use the same accent surface.
+`app-ui.js` applies it as the root `--accent` value. Playlist rows and tabs use
+the animated playlist selection surface; sidebar selection remains semantic
+for navigation and activation but has no selected-row marker. Active toolbar
+and option controls use the same accent surface.
 
 `FrontendOptionsManifest` provides the common Database, Interface, and Windows
 organization through the bridge. `options-controller.js` applies that manifest

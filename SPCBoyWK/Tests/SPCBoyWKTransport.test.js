@@ -643,7 +643,8 @@ test("SPCBoyWK ignores delayed native status events", () => {
 test("SPCBoyWK selection capsule leaves playlist text colors unchanged", () => {
   assert.match(stylesSource, /\.list-selection-indicator\s*\{[\s\S]*?background: transparent;/);
   assert.match(stylesSource, /\.list-selection-indicator\.is-solid\s*\{[\s\S]*?background: var\(--accent\);/);
-  assert.match(uiSource, /function syncSelectionIndicatorStyle\(\)[\s\S]*?refs\.playlistSelectionIndicator[\s\S]*?ensureSidebarSelectionIndicator\(\)[\s\S]*?setSelectionIndicatorSolid\(indicator, solid\)/);
+  assert.match(uiSource, /function syncSelectionIndicatorStyle\(\)[\s\S]*?setSelectionIndicatorSolid\(refs\.playlistSelectionIndicator, solid\)/);
+  assert.doesNotMatch(uiSource, /ensureSidebarSelectionIndicator|positionSelectionIndicator\(refs\.treeRoot/);
   assert.match(stylesSource, /\.list-selection-indicator\s*\{[^}]*transition: transform var\(--selection-animation-duration\)/);
   assert.doesNotMatch(stylesSource, /\.list-selection-indicator\s*\{[^}]*transition:[^}]*opacity/);
   assert.doesNotMatch(stylesSource, /\.list-selection-indicator\s*\{[^}]*transition:[^}]*,\s*(?:width|height)\s+var\(--selection-animation-duration\)/);
@@ -655,7 +656,8 @@ test("SPCBoyWK selection capsule leaves playlist text colors unchanged", () => {
   assert.match(stylesSource, /\.playlist-wrap \+ \.playlist-bottom-toolbar\s*\{\s*margin-top: calc\(-1 \* var\(--toolbar-stack-overlap\)\);/);
   assert.match(stylesSource, /\.playlist-row\.is-current:not\(\.is-selected\) td\s*\{\s*color: var\(--accent\);\s*\}/);
   assert.doesNotMatch(stylesSource, /\.playlist-row\.is-selected[^{}]*\{[^}]*\bcolor\s*:/);
-  assert.match(stylesSource, /button:is\(\.tree-node, \.database-game-row, \.database-console-row\)\.is-selected\s*\{[^}]*background: transparent;[^}]*box-shadow: none;/);
+  assert.doesNotMatch(stylesSource, /\.tree-node\.is-selected|\.database-game-row\.is-selected|\.database-console-row\.is-selected/);
+  assert.doesNotMatch(stylesSource, /\.tree-root\.has-solid-selection/);
   assert.doesNotMatch(stylesSource, /\.database-game-row\s*\{[^}]*transition:\s*color/);
   assert.doesNotMatch(stylesSource, /\.database-console-row\s*\{[^}]*transition:\s*color/);
   assert.doesNotMatch(stylesSource, /\.tree-node\s*\{[^}]*transition:\s*color/);
@@ -665,15 +667,15 @@ test("SPCBoyWK selection capsule leaves playlist text colors unchanged", () => {
   assert.doesNotMatch(stylesSource, /button:not\([^\n]*\):is\([^\n]*\.is-selected/);
 });
 
-test("SPCBoyWK preserves sidebar selection while database rows render in batches", () => {
-  assert.match(uiSource, /let databaseRowsRenderPending = false;/);
-  assert.match(uiSource, /function resetSidebarContent\(\)[\s\S]*?databaseRowRenderGeneration \+= 1;\s*databaseRowsRenderPending = false;/);
-  assert.match(uiSource, /function syncSelectionIndicators\(\)[\s\S]*?const sidebarPositioned = sidebarTarget[\s\S]*?const selectedDatabaseGameIsPending = databaseRowsRenderPending[\s\S]*?state\.selectedDatabaseGameKey[\s\S]*?visibleDatabaseGames\(\)\.some\([\s\S]*?if \(!sidebarPositioned && !selectedDatabaseGameIsPending\) hideSelectionIndicator\(sidebarIndicator\);/);
-  assert.match(uiSource, /function makeDatabaseGameButton\(game\)[\s\S]*?const isSelected = state\.selectedDatabaseGameKey === databaseGameKey\(game\);\s*button\.className = `database-game-row\$\{isSelected \? " is-selected" : ""\}`;\s*if \(isSelected\) selectedDatabaseGameButton = button;/);
-  assert.match(uiSource, /function appendDatabaseGameRowsInBatches\(\)[\s\S]*?databaseRowsRenderPending = pendingRows\.length > 0;[\s\S]*?databaseRowsRenderPending = false;\s*scheduleSelectionIndicators\(\);/);
+test("SPCBoyWK batches database sidebar rows without selection-marker work", () => {
+  assert.match(uiSource, /function resetSidebarContent\(\)[\s\S]*?databaseRowRenderGeneration \+= 1;[\s\S]*?refs\.treeRoot\.replaceChildren\(\)/);
+  assert.doesNotMatch(uiSource, /function syncSelectionIndicators\(|ensureSidebarSelectionIndicator|positionSelectionIndicator\(refs\.treeRoot/);
+  assert.match(uiSource, /function makeDatabaseGameButton\(game\)[\s\S]*?const isSelected = state\.selectedDatabaseGameKey === databaseGameKey\(game\);\s*button\.className = `database-game-row\$\{isSelected \? " is-selected" : ""\}`;\s*if \(isSelected\) selectedDatabaseSidebarButton = button;/);
+  assert.match(uiSource, /function appendDatabaseGameRowsInBatches\(\)[\s\S]*?pendingRows = databaseConsoleGroups\.flatMap[\s\S]*?performance\.now\(\) - startedAt < 8[\s\S]*?requestAnimationFrame\(appendBatch\)/);
+  assert.doesNotMatch(uiSource, /databaseRowsRenderPending/);
 });
 
-test("SPCBoyWK keeps arrow navigation and the selection indicator in the database sidebar", async () => {
+test("SPCBoyWK keeps database sidebar arrow navigation without a selection marker", async () => {
   const { app, window, loadUI } = makeHarness();
   const games = [
     { id: "game-1", consoleGroupName: "NES" },
@@ -695,6 +697,7 @@ test("SPCBoyWK keeps arrow navigation and the selection indicator in the databas
         remove(name) { classes.delete(name); },
         contains(name) { return classes.has(name); }
       },
+      hasAttribute() { return false; },
       focus() { focused.current = this; }
     };
   };
@@ -705,11 +708,11 @@ test("SPCBoyWK keeps arrow navigation and the selection indicator in the databas
   app.refs.treeRoot = {
     querySelectorAll(selector) {
       if (selector.startsWith(".database-console-row, .database-console-games")) return rows;
-      if (selector === ".database-game-row.is-selected, .database-console-row.is-selected") {
-        return rows.filter((row) => row.classList.contains("is-selected"));
-      }
+      if (selector === ".database-game-row") return rows.filter((row) => row.classList.contains("database-game-row"));
+      if (selector === ".database-console-row") return rows.filter((row) => row.classList.contains("database-console-row"));
       return [];
-    }
+    },
+    replaceChildren() {}
   };
   window.spcBoyWK.databaseGroupState = async ({ state, action }) => ({
     expandedGroupNames: state.expandedGroupNames,
@@ -738,6 +741,7 @@ test("SPCBoyWK keeps arrow navigation and the selection indicator in the databas
   assert.equal(app.ui.moveDatabaseSidebarSelection(secondGame, 1), true);
   assert.equal(focused.current, secondGame, "navigation at the end stays focused in the sidebar");
   assert.match(uiSource, /if \(event\.key === "ArrowDown" \|\| event\.key === "ArrowUp"\) \{\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*moveDatabaseSidebarSelection/);
+  assert.doesNotMatch(uiSource, /ensureSidebarSelectionIndicator|positionSelectionIndicator\(refs\.treeRoot/);
   assert.match(uiSource, /selectDatabaseSidebarRow\(button, \{ focus: true \}\);\s*loadDatabaseGame\(game\)\.then\(\(loaded\) => \{[\s\S]*?playVisibleTrack\(targetID, 0\)/);
 });
 
@@ -751,13 +755,6 @@ test("SPCBoyWK keeps the playlist capsule stable through missing row frames and 
       contains(name) { return name === "is-hidden" && indicator.hidden; }
     },
     style: { opacity: "1" }
-  };
-  const sidebarIndicator = {
-    classList: { add() {}, remove() {}, contains() { return true; } },
-    style: { opacity: "0" }
-  };
-  app.refs.treeRoot = {
-    querySelector(selector) { return selector === ".list-selection-indicator" ? sidebarIndicator : null; }
   };
   app.refs.playlistSelectionIndicator = indicator;
   app.refs.playlistBodyWrap = { scrollTop: 0, addEventListener() {} };
@@ -1076,15 +1073,15 @@ test("SPCBoyWK auto-fit animates table expansion and preserves header column tra
   assert.match(stylesSource, /\.playlist-table th,\s*\.playlist-table td\s*\{[^}]*transition: width var\(--column-resize-duration\)/);
 });
 
-test("SPCBoyWK keeps the sidebar selection indicator mounted during tree rebuilds", () => {
+test("SPCBoyWK clears sidebar rows without retaining a selection indicator", () => {
   const resetStart = uiSource.indexOf("function resetSidebarContent()");
   const resetEnd = uiSource.indexOf("function hideSelectionIndicator", resetStart);
   const resetSource = uiSource.slice(resetStart, resetEnd);
 
   assert.ok(resetStart >= 0 && resetEnd > resetStart);
-  assert.match(resetSource, /for \(const child of \[\.\.\.refs\.treeRoot\.children\]\)/);
-  assert.match(resetSource, /child !== indicator\) child\.remove\(\)/);
-  assert.doesNotMatch(resetSource, /replaceChildren\(indicator\)/);
+  assert.match(resetSource, /refs\.treeRoot\.replaceChildren\(\)/);
+  assert.match(resetSource, /renderedBrowserNodesByPath = new Map\(\)/);
+  assert.doesNotMatch(resetSource, /list-selection-indicator|indicator/);
 });
 
 test("SPCBoyWK auto-fits virtualized playlists and refits restored tabs", () => {
