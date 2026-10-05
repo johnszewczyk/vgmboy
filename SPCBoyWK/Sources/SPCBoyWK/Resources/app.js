@@ -252,9 +252,6 @@ refs.selectionAnimationInput.addEventListener("change", (event) => {
 refs.selectionAnimationEnabledCheckbox.addEventListener("change", (event) => {
   app.ui.setAnimationEnabled("selectionAnimationEnabled", event.target.checked);
 });
-refs.sidebarFoldAnimationEnabledCheckbox.addEventListener("change", (event) => {
-  app.ui.setSidebarFoldAnimationEnabled(event.target.checked);
-});
 refs.mainWindowAlwaysOnTopCheckbox.addEventListener("change", (event) => {
   app.ui.setWindowAlwaysOnTop("mainWindowAlwaysOnTop", event.target.checked);
 });

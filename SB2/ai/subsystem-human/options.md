@@ -6,8 +6,8 @@
   separate.
 - Options pages use a webpage layout capped at 65 characters, with quiet headed
   panels and the shared rem spacing scale. UI Chrome and UI Fonts are separate
-  alphabetized SPCBoy pages. Sidebar Folds uses the vanilla 200 ms ease and can
-  be disabled. UI Fonts exposes playlist-header styling and the titlebar font
+  alphabetized SPCBoy pages. Sidebar folders and console groups open and close
+  immediately. UI Fonts exposes playlist-header styling and the titlebar font
   color and bold setting. The same subpage and title/footer chrome appear in
   the optional standalone Options window.
 - Reload Library refreshes the read-only catalog projections used by the

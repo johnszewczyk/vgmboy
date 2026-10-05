@@ -32,7 +32,6 @@ let databaseGameSearchRecords = [];
 let columnResizePointerId = null;
 const PLAYLIST_VIRTUALIZATION_THRESHOLD = 200;
 const PLAYLIST_VIRTUAL_OVERSCAN = 12;
-const SIDEBAR_FOLD_ANIMATION_MS = 200;
 let playlistVirtualRowHeight = 28;
 let playlistViewportFrame = 0;
 let catalogPlaylistSortGeneration = 0;
@@ -1011,33 +1010,11 @@ async function queueBrowserNode(node) {
   appendPlaylistTracks(Array.isArray(selection.playlist) ? selection.playlist : [], node.path);
 }
 
-async function animateSidebarDisclosure(element, expanding) {
-  if (!element) return;
-  element.getAnimations?.().forEach((animation) => animation.cancel());
-  if (!state.sidebarFoldAnimationEnabled
-      || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-      || typeof element.animate !== "function") return;
-  if (expanding) element.classList.remove("is-hidden");
-  const startHeight = expanding ? 0 : element.getBoundingClientRect().height;
-  const endHeight = expanding ? element.scrollHeight : 0;
-  if (expanding && endHeight <= 0) return;
-  const animation = element.animate([
-    { height: `${startHeight}px`, opacity: expanding ? 0 : 1 },
-    { height: `${endHeight}px`, opacity: expanding ? 1 : 0 }
-  ], {
-    duration: SIDEBAR_FOLD_ANIMATION_MS,
-    easing: "cubic-bezier(0.2, 0, 0, 1)"
-  });
-  try { await animation.finished; } catch {}
-}
-
 async function toggleBrowserNode(node) {
   if (node.kind !== "folder") return;
   if (node.path === state.rootPath) return;
   const expanded = expandedFolders.has(node.path);
-  const currentGroup = refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(node.path)}"]`)?.closest(".tree-item")?.querySelector(":scope > .tree-group");
   if (expanded) {
-    await animateSidebarDisclosure(currentGroup, false);
     expandedFolders.delete(node.path);
   } else {
     expandedFolders.add(node.path);
@@ -1045,10 +1022,6 @@ async function toggleBrowserNode(node) {
   }
   renderTree();
   syncTreeSelection();
-  if (!expanded) {
-    const nextGroup = refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(node.path)}"]`)?.closest(".tree-item")?.querySelector(":scope > .tree-group");
-    await animateSidebarDisclosure(nextGroup, true);
-  }
   refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(node.path)}"]`)?.focus();
 }
 
@@ -1423,16 +1396,9 @@ function renderDatabaseGames() {
       games.classList.toggle("is-hidden", !expanded);
       heading.addEventListener("click", async () => {
         const preserveFocus = document.activeElement === heading;
-        const expanding = collapsedDatabaseConsoles.has(consoleName);
-        const currentGames = group.querySelector(":scope > .database-console-games");
         try {
-          if (!expanding) await animateSidebarDisclosure(currentGames, false);
           await applySharedDatabaseGroupAction("toggle", consoleName);
           renderDatabaseGames();
-          if (expanding) {
-            const nextGames = refs.treeRoot.querySelector(`[data-database-console-name="${CSS.escape(consoleName)}"]`)?.closest(".database-console-group")?.querySelector(":scope > .database-console-games");
-            await animateSidebarDisclosure(nextGames, true);
-          }
           if (preserveFocus) {
             refs.treeRoot.querySelector(`[data-database-console-name="${CSS.escape(consoleName)}"]`)?.focus();
           }
@@ -1518,11 +1484,8 @@ function renderDatabaseGames() {
 }
 
 async function setAllDatabaseConsolesCollapsed(collapsed) {
-  const groups = databaseConsoleGroups.map(({ games }) => games);
-  if (collapsed) await Promise.all(groups.map((group) => animateSidebarDisclosure(group, false)));
   await applySharedDatabaseGroupAction("allCollapsed", null, null, { collapsed });
   renderDatabaseGames();
-  if (!collapsed) await Promise.all(databaseConsoleGroups.map(({ games }) => animateSidebarDisclosure(games, true)));
 }
 
 async function setAllSidebarNodesCollapsed(collapsed) {
@@ -1531,8 +1494,6 @@ async function setAllSidebarNodesCollapsed(collapsed) {
     return;
   }
   if (collapsed) {
-    await Promise.all([...refs.treeRoot.querySelectorAll(":scope > .tree-item > .tree-group")]
-      .map((group) => animateSidebarDisclosure(group, false)));
     expandedFolders.clear();
     state.selectedBrowserPath = state.databaseFileTree[0]?.path || null;
     persistSettings();
@@ -1540,16 +1501,17 @@ async function setAllSidebarNodesCollapsed(collapsed) {
     syncTreeSelection();
     return;
   }
-  async function expandFolder(node) {
-    if (node.kind !== "folder") return;
+  const pendingFolders = [...state.databaseFileTree];
+  while (pendingFolders.length > 0) {
+    const node = pendingFolders.pop();
+    if (node.kind !== "folder") continue;
     expandedFolders.add(node.path);
-    await Promise.all((node.children || []).filter((child) => child.kind === "folder").map(expandFolder));
+    for (const child of node.children || []) {
+      if (child.kind === "folder") pendingFolders.push(child);
+    }
   }
-  await Promise.all(state.databaseFileTree.map(expandFolder));
   renderTree();
   syncTreeSelection();
-  await Promise.all([...refs.treeRoot.querySelectorAll(":scope > .tree-item > .tree-group")]
-    .map((group) => animateSidebarDisclosure(group, true)));
 }
 
 async function loadDatabaseGames() {
@@ -2771,7 +2733,6 @@ function applyUISettings() {
   rootStyle.setProperty("--item-spacing-rem", String(state.uiItemSpacingRem));
   rootStyle.setProperty("--column-resize-duration", `${state.autoResizeAnimationEnabled ? state.autoResizeAnimationMilliseconds : 0}ms`);
   rootStyle.setProperty("--selection-animation-duration", `${state.selectionAnimationEnabled ? state.selectionAnimationMilliseconds : 0}ms`);
-  rootStyle.setProperty("--sidebar-fold-duration", state.sidebarFoldAnimationEnabled ? "200ms" : "0ms");
   rootStyle.setProperty("--titlebar-text-color", state.titlebarTextColor);
   rootStyle.setProperty("--titlebar-font-weight", state.titlebarBold ? "700" : "400");
 }
@@ -2796,7 +2757,6 @@ function appearanceSettings() {
     playlistHeaderBold: state.playlistHeaderBold,
     titlebarTextColor: state.titlebarTextColor,
     titlebarBold: state.titlebarBold,
-    sidebarFoldAnimationEnabled: state.sidebarFoldAnimationEnabled,
     accentColor: state.accentColor,
     uiChromeColor: state.uiChromeColor,
     uiChromePrimaryColor: state.uiChromePrimaryColor,
@@ -2915,7 +2875,6 @@ function renderAll() {
   refs.selectionAnimationEnabledCheckbox.checked = state.selectionAnimationEnabled;
   refs.selectionAnimationInput.value = String(state.selectionAnimationMilliseconds);
   refs.selectionAnimationInput.disabled = !state.selectionAnimationEnabled;
-  refs.sidebarFoldAnimationEnabledCheckbox.checked = state.sidebarFoldAnimationEnabled;
   if (document.activeElement !== refs.titlebarTextColorInput) refs.titlebarTextColorInput.value = state.titlebarTextColor;
   refs.titlebarBoldCheckbox.checked = state.titlebarBold;
   refs.mainWindowAlwaysOnTopCheckbox.checked = state.mainWindowAlwaysOnTop;
@@ -3353,13 +3312,6 @@ function setPlaylistHeaderBold(enabled) {
   renderAll();
 }
 
-function setSidebarFoldAnimationEnabled(enabled) {
-  state.sidebarFoldAnimationEnabled = Boolean(enabled);
-  persistSettings();
-  broadcastAppearanceSettings();
-  renderAll();
-}
-
 function setTitlebarTextColor(color) {
   state.titlebarTextColor = uiApp.normalizeFontColor(color);
   persistSettings();
@@ -3439,7 +3391,6 @@ function applyAppearanceSettings(settings) {
   if (settings.playlistHeaderBold !== undefined) state.playlistHeaderBold = Boolean(settings.playlistHeaderBold);
   if (settings.titlebarTextColor !== undefined) state.titlebarTextColor = uiApp.normalizeFontColor(settings.titlebarTextColor);
   if (settings.titlebarBold !== undefined) state.titlebarBold = Boolean(settings.titlebarBold);
-  if (settings.sidebarFoldAnimationEnabled !== undefined) state.sidebarFoldAnimationEnabled = Boolean(settings.sidebarFoldAnimationEnabled);
   if (settings.accentColor !== undefined) state.accentColor = uiApp.normalizeAccentColor(settings.accentColor);
   if (settings.uiChromeColor !== undefined || settings.uiChromePrimaryColor !== undefined) {
     state.uiChromePrimaryColor = uiApp.normalizeUIColor(settings.uiChromePrimaryColor ?? settings.uiChromeColor, "rgb(30 30 30)");
@@ -3775,7 +3726,6 @@ uiApp.ui = {
   setApplicationMonospace,
   setUIChromeMonospace,
   setPlaylistHeaderBold,
-  setSidebarFoldAnimationEnabled,
   setTitlebarTextColor,
   setTitlebarBold,
   setColumnAutoSize,

@@ -21,7 +21,7 @@
 - Playlist tab selection fades with the shared selection timing and easing;
   its active surface includes the close control and prevents text selection.
 - Sidebar selection remains available to navigation and activation but has no
-  selected-row marker. Folder and console disclosure keep the eased slide.
+  selected-row marker. Folder and console disclosure updates immediately.
 - Dense catalog rows keep zero vertical item padding with a 1px row gap. The
   pane divider is 1px, and toolbar action buttons share one compact size. The
   search field keeps a taller input surface inside the shared toolbar strip.

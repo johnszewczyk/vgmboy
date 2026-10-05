@@ -134,9 +134,6 @@ body.is-file-drag-over::after {
   box-shadow: 0 0.5rem 1.25rem rgb(0 0 0 / 35%);
 }
 
-.tree-group,
-.database-console-games { overflow: hidden; }
-
 .time-label,
 .empty,
 .empty-row {

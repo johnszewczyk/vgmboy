@@ -31,8 +31,8 @@ and persistence. This project owns only the typed native adapter and WebKit rend
   persistence.
 - Database game selection updates the playlist directly; it must not invoke a full sidebar redraw or deferred metadata pass when catalog rows already contain metadata.
 - Sidebar selection is retained for keyboard navigation and activation but has
-  no selected-row marker. Folder and console disclosure uses the optional eased
-  slide; playlist selection presentation is independent.
+  no selected-row marker. Folder and console disclosure updates immediately;
+  playlist selection presentation is independent.
 - Playlist selection updates must not query or measure sidebar rows. Path-tree
   keyboard navigation reuses the visible nodes from the current render rather
   than rebuilding the filtered tree once per row.

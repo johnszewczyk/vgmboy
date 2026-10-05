@@ -2198,8 +2198,6 @@ body.sb2-frontend .options-panel-actions .tool-button { min-height: var(--sb-con
 body.sb2-frontend .tool-button { height: var(--sb-control-size); min-height: var(--sb-control-size); }
 body.sb2-frontend .glyph-button { width: var(--sb-control-size); min-width: var(--sb-control-size); padding: 0; }
 body.sb2-frontend .sidebar-search-input { height: 2rem; padding-inline: var(--sb-space-075); }
-body.sb2-frontend .tree-group,
-body.sb2-frontend .database-console-games { overflow: hidden; }
 body.sb2-frontend .options-nav-item { min-height: var(--sb-control-size); }
 body.sb2-frontend .options-subpanel .tool-button { min-height: var(--sb-control-size); }
 
