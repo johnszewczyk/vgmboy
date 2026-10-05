@@ -89,7 +89,7 @@ as CocoaSpice. JSON is only the bridge transport; it does not define a second
 playlist query implementation. Catalog rows keep their natural shared order unless the user
 explicitly sorts a display column; length analysis for presentation never reorders the playlist.
 
-In Path View, a single click selects a file or folder and previews its catalog rows in the playlist without starting playback. Enter or a double-click activates the selected source and starts its first track. Folder disclosure uses the shared eased slide when enabled. Rapid selection changes discard older catalog replies so an earlier source cannot replace the current selection.
+In Path View, a single click selects a folder and toggles its disclosure; it does not query every track below that folder. A single click on a file previews its catalog rows in the playlist without starting playback. Enter or a double-click activates the selected source and starts its first track; the context menu's Queue action appends its tracks to the current playlist. Folder disclosure uses the shared eased slide when enabled. Rapid selection changes discard older catalog replies so an earlier source cannot replace the current selection.
 
 Command-Shift-D replaces the current playlist with a snapshot of shared Favorites;
 it does not change the sidebar mode or trigger a catalog reload.

@@ -345,13 +345,27 @@ body.options-window .tool-button:hover {
   user-select: none;
 }
 
-.tree-node.is-selected {
-  background: transparent;
+.tree-node.is-selected,
+.database-game-row.is-selected,
+.database-console-row.is-selected {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: inset 0.14rem 0 0 var(--accent);
+  color: var(--accent);
+  transition:
+    background-color var(--selection-animation-duration) var(--selection-animation-easing),
+    color var(--selection-animation-duration) var(--selection-animation-easing);
+}
+
+.tree-root.has-solid-selection .tree-node.is-selected,
+.tree-root.has-solid-selection .database-game-row.is-selected,
+.tree-root.has-solid-selection .database-console-row.is-selected {
+  background: var(--accent);
   box-shadow: none;
+  color: var(--accent-ink);
 }
 
 
-.tree-node.tree-file { color: var(--sidebar-text-color); }
+.tree-node.tree-file:not(.is-selected) { color: var(--sidebar-text-color); }
 
 .tree-disclosure {
   flex: 0 0 1rem;
@@ -1451,14 +1465,6 @@ button:not(.favorite-toggle):not(.tree-node):not(.database-game-row):not(.databa
 
 button:not(.favorite-toggle):not(.tree-node):not(.database-game-row):not(.database-console-row):is(:active, [aria-pressed="true"]) .ui-icon {
   color: inherit;
-}
-
-/* List selection is painted by the moving capsule above. Do not put a second
-   background on the row itself: that flashes during a selection change and
-   hides the animation. */
-button:is(.tree-node, .database-game-row, .database-console-row).is-selected {
-  background: transparent;
-  box-shadow: none;
 }
 
 .favorite-toggle.is-favorite { background: transparent; color: var(--accent); }

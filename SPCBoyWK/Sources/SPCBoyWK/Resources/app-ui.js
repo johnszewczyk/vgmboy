@@ -2,6 +2,7 @@
 const uiApp = window.SPCBoyApp;
 const { state, refs, persistSettings, loadSettings, targetPlaybackSeconds, COLUMN_DEFS } = uiApp;
 const expandedFolders = new Set();
+const searchCollapsedFolders = new Set();
 let draggedColumnId = null;
 let metadataRefreshFrame = 0;
 const metadataRefreshTrackIds = new Set();
@@ -284,6 +285,17 @@ function currentSidebarView() {
   return state.sidebarView;
 }
 
+function findDataElement(container, selector, dataKey, value) {
+  if (!container || value === null || value === undefined) return null;
+  const expected = String(value);
+  return [...container.querySelectorAll(selector)]
+    .find((element) => element.dataset[dataKey] === expected) || null;
+}
+
+function browserButtonForPath(path) {
+  return findDataElement(refs.treeRoot, ".tree-node", "browserPath", path);
+}
+
 function localSidebarView(mode, query) {
   const normalizedQuery = String(query || "").trim();
   const view = normalizedQuery ? "search" : mode;
@@ -502,6 +514,7 @@ function ensureSidebarSelectionIndicator() {
 
 function syncSelectionIndicatorStyle() {
   const solid = Boolean(state.solidSelectionBar);
+  refs.treeRoot.classList.toggle("has-solid-selection", solid);
   [refs.playlistSelectionIndicator, ensureSidebarSelectionIndicator()]
     .filter(Boolean)
     .forEach((indicator) => setSelectionIndicatorSolid(indicator, solid));
@@ -563,15 +576,17 @@ function positionSelectionIndicator(container, indicator, target) {
 function sidebarSelectionTarget() {
   const view = currentSidebarView();
   if (view.contentMode === "tree") {
-    return state.selectedBrowserPath
-      ? refs.treeRoot.querySelector(`.tree-node[data-browser-path="${CSS.escape(state.selectedBrowserPath)}"]`)
-      : null;
+    if (selectedBrowserButton?.isConnected
+        && selectedBrowserButton.dataset.browserPath === state.selectedBrowserPath) {
+      return selectedBrowserButton;
+    }
+    return browserButtonForPath(state.selectedBrowserPath);
   }
   if (state.selectedDatabaseGameKey) {
-    return refs.treeRoot.querySelector(`.database-game-row[data-database-game-key="${CSS.escape(state.selectedDatabaseGameKey)}"]`);
+    return findDataElement(refs.treeRoot, ".database-game-row", "databaseGameKey", state.selectedDatabaseGameKey);
   }
   if (state.selectedDatabaseConsoleName) {
-    return refs.treeRoot.querySelector(`.database-console-row[data-database-console-name="${CSS.escape(state.selectedDatabaseConsoleName)}"]`);
+    return findDataElement(refs.treeRoot, ".database-console-row", "databaseConsoleName", state.selectedDatabaseConsoleName);
   }
   return null;
 }
@@ -579,6 +594,8 @@ function sidebarSelectionTarget() {
 function syncSidebarSelectionRowClass(target = sidebarSelectionTarget()) {
   refs.treeRoot.querySelectorAll(".tree-node.is-selected, .database-game-row.is-selected, .database-console-row.is-selected")
     .forEach((row) => row.classList.toggle("is-selected", row === target));
+  refs.treeRoot.querySelectorAll(".tree-node, .database-game-row, .database-console-row")
+    .forEach((row) => row.setAttribute("aria-selected", String(row === target)));
   target?.classList.add("is-selected");
   selectedBrowserButton = target?.classList.contains("tree-node") ? target : null;
   selectedDatabaseGameButton = target?.classList.contains("database-game-row") ? target : null;
@@ -691,7 +708,7 @@ function isNodeExpanded(node) {
   // expanded so folding descendants can never make the browser disappear.
   if (node.path === state.rootPath || node.alwaysExpanded) return true;
   if (state.sidebarQuery.trim()) {
-    return true;
+    return !searchCollapsedFolders.has(node.path);
   }
 
   if (!node.children.length) {
@@ -703,8 +720,7 @@ function isNodeExpanded(node) {
 
 function scrollSelectedBrowserItemIntoView() {
   if (!state.selectedBrowserPath) return;
-  const button = refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(state.selectedBrowserPath)}"]`);
-  button?.scrollIntoView({ block: "nearest" });
+  browserButtonForPath(state.selectedBrowserPath)?.scrollIntoView({ block: "nearest" });
 }
 
 async function loadBrowserChildren(node) {
@@ -775,6 +791,9 @@ function showContextMenu(event, actions) {
 
 function showSidebarContextMenu(node, event) {
   state.selectedBrowserPath = node.path;
+  selectedBrowserButton = event.currentTarget?.classList?.contains("tree-node")
+    ? event.currentTarget
+    : browserButtonForPath(node.path);
   persistSettings();
   syncTreeSelection();
   const finderPath = node.catalogFile?.path || node.catalogFolder?.folderPath || node.path;
@@ -792,6 +811,7 @@ function showSidebarContextMenu(node, event) {
 async function activateBrowserNode(node, { playNow = true } = {}) {
   const generation = ++browserSelectionGeneration;
   databasePlaylistSelectionGeneration += 1;
+  let loadingPlaylist = true;
   try {
     state.selectedBrowserPath = node.path;
     persistSettings();
@@ -802,7 +822,7 @@ async function activateBrowserNode(node, { playNow = true } = {}) {
         await loadBrowserChildren(node);
         if (generation !== browserSelectionGeneration || state.selectedBrowserPath !== node.path) return;
         renderTree();
-        const group = refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(node.path)}"]`)
+        const group = browserButtonForPath(node.path)
           ?.closest(".tree-item")?.querySelector(":scope > .tree-group");
         await animateSidebarDisclosure(group, true);
       }
@@ -816,12 +836,14 @@ async function activateBrowserNode(node, { playNow = true } = {}) {
       }
       return;
     }
-    await applyFolderSelection(selection, state.activePlaylistTabId, node.name, generation);
+    const applied = await applyFolderSelection(selection, state.activePlaylistTabId, node.name, generation);
+    if (!applied) return;
+    loadingPlaylist = false;
     const target = selection.playlist?.[0];
     if (playNow && target) await playVisibleTrack(target.id, 0);
   } catch (error) {
     console.error(error);
-    if (generation === browserSelectionGeneration && state.selectedBrowserPath === node.path) {
+    if (loadingPlaylist && generation === browserSelectionGeneration && state.selectedBrowserPath === node.path) {
       showPlaylistLoadError(`Could not load ${node.name || "the selected source"}: ${error.message || error}`);
     }
   }
@@ -836,7 +858,7 @@ async function previewBrowserLeaf(node) {
       await loadBrowserChildren(node);
       if (generation !== browserSelectionGeneration || state.selectedBrowserPath !== node.path) return;
       renderTree();
-      const group = refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(node.path)}"]`)
+      const group = browserButtonForPath(node.path)
         ?.closest(".tree-item")?.querySelector(":scope > .tree-group");
       await animateSidebarDisclosure(group, true);
     }
@@ -857,12 +879,12 @@ async function previewBrowserLeaf(node) {
   }
 }
 
-async function handleBrowserPrimaryClick(node, wasSelected) {
-  await handleBrowserGesture(node, "primaryClick", wasSelected);
+async function handleBrowserPrimaryClick(node) {
+  await handleBrowserGesture(node, "primaryClick");
 }
 
-async function handleBrowserGesture(node, gesture, wasSelected = false) {
-  if (gesture === "disclosureClick" || (gesture === "primaryClick" && node.kind === "folder" && wasSelected)) {
+async function handleBrowserGesture(node, gesture) {
+  if (gesture === "disclosureClick" || (gesture === "primaryClick" && node.kind === "folder")) {
     await toggleBrowserNode(node);
     return true;
   }
@@ -881,15 +903,18 @@ async function handleBrowserGesture(node, gesture, wasSelected = false) {
   return false;
 }
 
-function selectBrowserNode(node, { focus = false, previewLeaf = true } = {}) {
+function selectBrowserNode(node, { focus = false, previewLeaf = true, button = null } = {}) {
   lastPlaylistSelectionID = null;
   if (state.selectedBrowserPath !== node.path) {
     browserSelectionGeneration += 1;
   }
   state.selectedBrowserPath = node.path;
+  selectedBrowserButton = button?.classList?.contains("tree-node")
+    ? button
+    : browserButtonForPath(node.path);
   persistSettings();
   syncTreeSelection();
-  if (focus) refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(node.path)}"]`)?.focus();
+  if (focus) (selectedBrowserButton || browserButtonForPath(node.path))?.focus();
   if (previewLeaf && node.kind === "file") void previewBrowserLeaf(node);
 }
 
@@ -933,10 +958,10 @@ function jumpFocusedListToEdge(toEnd, focused = document.activeElement) {
 function appendPlaylistTracks(additions, selectedBrowserPath = state.selectedBrowserPath) {
   browserSelectionGeneration += 1;
   databasePlaylistSelectionGeneration += 1;
-  if (!additions.length) return;
+  if (!additions.length) return 0;
   const existingIds = new Set(state.playlist.map((track) => track.id));
   const uniqueAdditions = additions.filter((track) => !existingIds.has(track.id));
-  if (!uniqueAdditions.length) return;
+  if (!uniqueAdditions.length) return 0;
   state.selectedBrowserPath = selectedBrowserPath;
   state.playlist = [...state.playlist, ...uniqueAdditions];
   state.playlistEmptyMessage = "";
@@ -949,6 +974,7 @@ function appendPlaylistTracks(additions, selectedBrowserPath = state.selectedBro
   syncTreeSelection();
   renderPlaylist();
   uiApp.playback.updateTimingSummary();
+  return uniqueAdditions.length;
 }
 
 async function queueBrowserNode(node) {
@@ -958,14 +984,17 @@ async function queueBrowserNode(node) {
     const selection = await loadBrowserSelection(node);
     if (generation !== browserSelectionGeneration) return;
     if (!selection) {
-      showPlaylistLoadError("The selected catalog source changed while it was loading. Select it again.");
+      uiApp.playback.showError("The selected catalog source changed while it was loading. Select it again.", "Queue failed");
       return;
     }
-    appendPlaylistTracks(Array.isArray(selection.playlist) ? selection.playlist : [], node.path);
+    const queued = appendPlaylistTracks(Array.isArray(selection.playlist) ? selection.playlist : [], node.path);
+    if (!queued) {
+      uiApp.playback.showError(`No new playable tracks were found in ${node.name || "the selected source"}.`, "Queue unchanged");
+    }
   } catch (error) {
     console.error(error);
     if (generation === browserSelectionGeneration) {
-      showPlaylistLoadError(`Could not queue ${node.name || "the selected source"}: ${error.message || error}`);
+      uiApp.playback.showError(`Could not queue ${node.name || "the selected source"}: ${error.message || error}`, "Queue failed");
     }
   }
 }
@@ -993,22 +1022,25 @@ async function animateSidebarDisclosure(element, expanding) {
 async function toggleBrowserNode(node) {
   if (node.kind !== "folder") return;
   if (node.path === state.rootPath) return;
-  const expanded = expandedFolders.has(node.path);
-  const currentGroup = refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(node.path)}"]`)?.closest(".tree-item")?.querySelector(":scope > .tree-group");
+  const filtering = Boolean(state.sidebarQuery.trim());
+  const expanded = isNodeExpanded(node);
+  const currentGroup = browserButtonForPath(node.path)?.closest(".tree-item")?.querySelector(":scope > .tree-group");
   if (expanded) {
     await animateSidebarDisclosure(currentGroup, false);
-    expandedFolders.delete(node.path);
+    if (filtering) searchCollapsedFolders.add(node.path);
+    else expandedFolders.delete(node.path);
   } else {
-    expandedFolders.add(node.path);
+    if (filtering) searchCollapsedFolders.delete(node.path);
+    else expandedFolders.add(node.path);
     await loadBrowserChildren(node);
   }
   renderTree();
   syncTreeSelection();
   if (!expanded) {
-    const nextGroup = refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(node.path)}"]`)?.closest(".tree-item")?.querySelector(":scope > .tree-group");
+    const nextGroup = browserButtonForPath(node.path)?.closest(".tree-item")?.querySelector(":scope > .tree-group");
     await animateSidebarDisclosure(nextGroup, true);
   }
-  refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(node.path)}"]`)?.focus();
+  browserButtonForPath(node.path)?.focus();
 }
 
 function renderTreeNode(node, container) {
@@ -1018,24 +1050,24 @@ function renderTreeNode(node, container) {
   const expanded = isNodeExpanded(node);
   button.dataset.browserPath = node.path;
   button.className = `tree-node${state.selectedBrowserPath === node.path ? " is-selected" : ""}`;
+  button.setAttribute("aria-selected", String(state.selectedBrowserPath === node.path));
   if (state.selectedBrowserPath === node.path) selectedBrowserButton = button;
   button.classList.toggle("tree-file", node.kind === "file");
-  button.setAttribute("aria-expanded", node.kind === "folder" ? String(expanded) : "false");
+  if (node.kind === "folder") button.setAttribute("aria-expanded", String(expanded));
   button.innerHTML = `
     <span class="tree-disclosure">${node.kind === "folder" ? (expanded ? "▾" : "▸") : "·"}</span><span class="tree-label">${escapeHtml(node.name)}</span>
   `;
   button.addEventListener("click", (event) => {
     window.clearTimeout(browserClickTimer);
-    const wasSelected = state.selectedBrowserPath === node.path;
-    selectBrowserNode(node, { focus: true, previewLeaf: false });
+    selectBrowserNode(node, { focus: true, previewLeaf: false, button });
     if (event.detail > 1) return;
-    browserClickTimer = window.setTimeout(() => void handleBrowserPrimaryClick(node, wasSelected), 220);
+    browserClickTimer = window.setTimeout(() => void handleBrowserPrimaryClick(node), 220);
   });
   button.addEventListener("dblclick", (event) => {
     event.preventDefault();
     event.stopPropagation();
     window.clearTimeout(browserClickTimer);
-    void handleBrowserGesture(node, "activate", true);
+    void handleBrowserGesture(node, "activate");
   });
   button.addEventListener("contextmenu", (event) => showSidebarContextMenu(node, event));
   button.addEventListener("keydown", (event) => {
@@ -1048,8 +1080,8 @@ function renderTreeNode(node, container) {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
     event.stopPropagation();
-    if (event.key === "Enter") void handleBrowserGesture(node, "activate", true);
-    else if (node.kind === "folder") void handleBrowserGesture(node, "disclosureClick", true);
+    if (event.key === "Enter") void handleBrowserGesture(node, "activate");
+    else if (node.kind === "folder") void handleBrowserGesture(node, "disclosureClick");
   });
 
   wrapper.appendChild(button);
@@ -1388,11 +1420,11 @@ function renderDatabaseGames() {
           await applySharedDatabaseGroupAction("toggle", consoleName);
           renderDatabaseGames();
           if (expanding) {
-            const nextGames = refs.treeRoot.querySelector(`[data-database-console-name="${CSS.escape(consoleName)}"]`)?.closest(".database-console-group")?.querySelector(":scope > .database-console-games");
+            const nextGames = findDataElement(refs.treeRoot, ".database-console-row", "databaseConsoleName", consoleName)?.closest(".database-console-group")?.querySelector(":scope > .database-console-games");
             await animateSidebarDisclosure(nextGames, true);
           }
           if (preserveFocus) {
-            refs.treeRoot.querySelector(`[data-database-console-name="${CSS.escape(consoleName)}"]`)?.focus();
+            findDataElement(refs.treeRoot, ".database-console-row", "databaseConsoleName", consoleName)?.focus();
           }
         } catch (error) {
           reportDatabaseSidebarError("toggle the database console", error);
@@ -1488,6 +1520,16 @@ async function setAllSidebarNodesCollapsed(collapsed) {
   if (currentSidebarView().contentMode === "database") {
     void setAllDatabaseConsolesCollapsed(collapsed).catch((error) => reportDatabaseSidebarError("change database console disclosure", error));
     return;
+  }
+  searchCollapsedFolders.clear();
+  if (state.sidebarQuery.trim() && collapsed) {
+    const collectFolders = (nodes) => {
+      for (const node of nodes) {
+        if (node.kind === "folder" && node.path !== state.rootPath) searchCollapsedFolders.add(node.path);
+        collectFolders(node.children || []);
+      }
+    };
+    collectFolders(filteredTree());
   }
   if (collapsed) {
     await Promise.all([...refs.treeRoot.querySelectorAll(":scope > .tree-item > .tree-group")]
@@ -1676,7 +1718,9 @@ async function refreshDatabaseGamesForVisibleRoots() {
 }
 
 async function updateSidebarSearch(query) {
-  state.sidebarQuery = String(query || "");
+  const nextQuery = String(query || "");
+  if (nextQuery !== state.sidebarQuery) searchCollapsedFolders.clear();
+  state.sidebarQuery = nextQuery;
   state.databaseSidebarError = "";
   state.databaseSearchGames = state.sidebarQuery.trim()
     ? localDatabaseSearch(state.sidebarQuery)
@@ -1834,7 +1878,7 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
   const focused = focusTarget?.closest?.(".playlist-row, .tree-node, .database-game-row, .database-console-row") || document.activeElement;
   const playlistRow = focused?.closest?.(".playlist-row")
     || (refs.playlistBody.contains(focusTarget) && state.selectedTrackId
-      ? refs.playlistBody.querySelector(`[data-track-id="${CSS.escape(state.selectedTrackId)}"]`)
+      ? findDataElement(refs.playlistBody, ".playlist-row", "trackId", state.selectedTrackId)
       : null);
   if (playlistRow?.dataset.trackId) {
     // Enter on a playlist row activates that row. Never substitute the
@@ -1912,13 +1956,7 @@ function syncAnimatedRanges() {
 }
 
 function syncTreeSelection() {
-  if (selectedBrowserButton?.dataset.browserPath !== state.selectedBrowserPath) {
-    selectedBrowserButton?.classList.remove("is-selected");
-    selectedBrowserButton = state.selectedBrowserPath
-      ? refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(state.selectedBrowserPath)}"]`)
-      : null;
-    selectedBrowserButton?.classList.add("is-selected");
-  }
+  syncSidebarSelectionRowClass();
   scrollSelectedBrowserItemIntoView();
   scheduleSelectionIndicators();
 }
@@ -2947,7 +2985,7 @@ function scrollSelectedTrackIntoView() {
     return;
   }
 
-  const row = refs.playlistBody.querySelector(`[data-track-id="${CSS.escape(state.selectedTrackId)}"]`);
+  const row = findDataElement(refs.playlistBody, ".playlist-row", "trackId", state.selectedTrackId);
   row?.scrollIntoView({ block: "nearest" });
 }
 
@@ -3600,7 +3638,7 @@ async function applyFolderSelection(selection, targetTabID = state.activePlaylis
   renderTree();
   syncTreeSelection();
   if (preserveBrowserFocus && state.selectedBrowserPath) {
-    refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(state.selectedBrowserPath)}"]`)?.focus();
+    browserButtonForPath(state.selectedBrowserPath)?.focus();
   }
   renderPlaylist();
   renderPlaylistTabs();
@@ -3608,6 +3646,7 @@ async function applyFolderSelection(selection, targetTabID = state.activePlaylis
   uiApp.playback.updateTimingSummary();
   uiApp.playback.updatePlaybackReadout();
   scrollSelectedTrackIntoView();
+  return true;
 }
 
 uiApp.ui = {

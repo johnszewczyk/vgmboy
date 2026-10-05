@@ -31,10 +31,10 @@ function clearPlaybackError() {
   if (refs.playbackErrorToast) refs.playbackErrorToast.textContent = "";
 }
 
-function showPlaybackError(error) {
+function showPlaybackError(error, label = "Playback failed") {
   if (!refs.playbackErrorToast) return;
   const message = String(error?.message || error || "Unable to play this file.").trim();
-  refs.playbackErrorToast.textContent = `Playback failed: ${message}`;
+  refs.playbackErrorToast.textContent = `${label}: ${message}`;
   refs.playbackErrorToast.classList.remove("is-hidden");
   window.clearTimeout(playbackErrorTimer);
   playbackErrorTimer = window.setTimeout(clearPlaybackError, 8000);
@@ -1254,6 +1254,7 @@ async function refreshPlaybackForSpeedChange(backendId) {
 }
 
 playbackApp.playback = {
+  showError: showPlaybackError,
   updateTimingSummary,
   updatePlaybackReadout,
   updateNativeDiagnostics,
