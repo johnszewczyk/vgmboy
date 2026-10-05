@@ -20,7 +20,7 @@
 
 - Selection: standard Shift and Command multi-selection.
 - Selection: selected rows can be dragged together.
-- Selection: moving a single selected row glides its background using the Interface animation duration (200 ms by default); multi-selection remains immediate.
+- Selection: the primary single-row highlight uses macOS Liquid Glass in the existing capsule size, with a subtle accent tint; it glides between rows using the Interface animation duration (200 ms by default). Multi-selection remains immediate.
 
 ## Activation
 
