@@ -84,7 +84,6 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
     var uiChromePaneColor: String?
     var uiChromeHoverColor: String?
     var uiChromeDividerColor: String?
-    var solidSelectionBar: Bool?
     var aacExportDirectory: String?
     var routingPreferences: [String: String]?
     var archiveCacheEnabled: Bool?

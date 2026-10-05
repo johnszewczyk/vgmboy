@@ -99,7 +99,6 @@ const state = {
   uiChromePaneColor: "#090b0f",
   uiChromeHoverColor: "#202633",
   uiChromeDividerColor: "#292f39",
-  solidSelectionBar: false,
   routingPreferences: {},
   archiveCacheEnabled: true,
   archiveCacheLimitBytes: DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES,
@@ -258,7 +257,6 @@ const refs = {
   uiChromePrimaryColorInput: document.getElementById("ui-chrome-primary-color-input"),
   uiChromeSecondaryColorInput: document.getElementById("ui-chrome-secondary-color-input"),
   uiChromePaneColorInput: document.getElementById("ui-chrome-pane-color-input"),
-  solidSelectionBarCheckbox: document.getElementById("solid-selection-bar-checkbox"),
   uiItemSpacingInput: document.getElementById("ui-item-spacing-input"),
   spcForceLengthCheckbox: document.getElementById("spc-force-length-checkbox"),
   queuedSkipsCheckbox: document.getElementById("queued-skips-checkbox"),
@@ -376,7 +374,6 @@ async function loadSettings() {
     state.uiChromeHoverColor = normalizeUIColor(parsed.uiChromeHoverColor, "#202633");
     state.uiChromeDividerColor = normalizeUIColor(parsed.uiChromeDividerColor, "#292f39");
     state.uiChromeColor = state.uiChromePrimaryColor;
-    state.solidSelectionBar = Boolean(parsed.solidSelectionBar);
     state.routingPreferences = parsed.routingPreferences && typeof parsed.routingPreferences === "object" ? { ...parsed.routingPreferences } : {};
     state.archiveCacheEnabled = parsed.archiveCacheEnabled !== false;
     state.archiveCacheLimitBytes = normalizeArchiveCacheLimit(parsed.archiveCacheLimitBytes);
@@ -462,7 +459,6 @@ function persistSettings() {
     uiChromePaneColor: state.uiChromePaneColor,
     uiChromeHoverColor: state.uiChromeHoverColor,
     uiChromeDividerColor: state.uiChromeDividerColor,
-    solidSelectionBar: state.solidSelectionBar,
     routingPreferences: state.routingPreferences,
     archiveCacheEnabled: state.archiveCacheEnabled,
     archiveCacheLimitBytes: state.archiveCacheLimitBytes,

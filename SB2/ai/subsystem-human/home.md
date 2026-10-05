@@ -20,10 +20,11 @@
   visible. A separate Options window uses the same chrome.
 - Playlist tab selection fades with the shared selection timing and easing;
   its active surface includes the close control and prevents text selection.
+- Playlist row selection uses one animated, one-pixel underline at the row
+  bottom. The previous solid-versus-outline selection option is retired.
 - Sidebar selection remains available to navigation and activation but has no
   selected-row marker. Folder and console disclosure updates immediately.
 - Dense catalog rows keep zero vertical item padding with a 1px row gap. The
-  pane divider is 1px, and toolbar action buttons share one compact size. The
-  search field keeps a taller input surface inside the shared toolbar strip.
-- Transport and sidebar icons use the existing icon symbols at a shared 1rem
-  size; playlist tab controls fill their header row and keep the 2rem close cell.
+  pane divider is 1px. Toolbar buttons share a 1.5rem square and icons share a
+  1rem size; the search field uses the same 1.5rem control height. Playlist tab
+  controls fill their header row, with a matching 1.5rem close control.

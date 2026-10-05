@@ -503,17 +503,6 @@ function escapeHtml(value) {
   }[character]));
 }
 
-function setSelectionIndicatorSolid(indicator, solid) {
-  if (!indicator?.classList) return;
-  if (solid) indicator.classList.add("is-solid");
-  else indicator.classList.remove("is-solid");
-}
-
-function syncSelectionIndicatorStyle() {
-  const solid = Boolean(state.solidSelectionBar);
-  setSelectionIndicatorSolid(refs.playlistSelectionIndicator, solid);
-}
-
 function resetSidebarContent() {
   databaseRowRenderGeneration += 1;
   refs.treeRoot.replaceChildren();
@@ -535,13 +524,11 @@ function positionSelectionIndicator(container, indicator, target) {
   const containerBounds = container.getBoundingClientRect();
   const targetBounds = target.getBoundingClientRect();
   // A row can briefly have no layout box while a virtualized viewport is
-  // rebuilding. Keep the last capsule frame until the new target is measurable.
+  // rebuilding. Keep the last underline frame until the new target is measurable.
   if (!targetBounds.width || !targetBounds.height) return false;
   const left = targetBounds.left - containerBounds.left + container.scrollLeft;
-  const top = targetBounds.top - containerBounds.top + container.scrollTop;
-  // Let the capsule fall one CSS pixel below the row baseline so it sits
-  // between rows instead of visually stopping high against the text.
-  const height = targetBounds.height + 1;
+  const top = targetBounds.bottom - containerBounds.top + container.scrollTop - 1;
+  const height = 1;
   const transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
   if (indicator.classList.contains("is-hidden")) {
     // First appearance after an explicit clear/source change should land at
@@ -2728,8 +2715,6 @@ function applyUISettings() {
   rootStyle.setProperty("--bg-sidebar", state.uiChromePaneColor ?? "rgb(20 20 20)");
   rootStyle.setProperty("--bg-hover", state.uiChromeHoverColor ?? "rgb(50 50 50)");
   rootStyle.setProperty("--line", state.uiChromeDividerColor ?? "rgb(40 40 40)");
-  rootStyle.setProperty("--selection-bar-background", state.solidSelectionBar ? state.accentColor : "transparent");
-  syncSelectionIndicatorStyle();
   rootStyle.setProperty("--item-spacing-rem", String(state.uiItemSpacingRem));
   rootStyle.setProperty("--column-resize-duration", `${state.autoResizeAnimationEnabled ? state.autoResizeAnimationMilliseconds : 0}ms`);
   rootStyle.setProperty("--selection-animation-duration", `${state.selectionAnimationEnabled ? state.selectionAnimationMilliseconds : 0}ms`);
@@ -2763,8 +2748,7 @@ function appearanceSettings() {
     uiChromeSecondaryColor: state.uiChromeSecondaryColor,
     uiChromePaneColor: state.uiChromePaneColor,
     uiChromeHoverColor: state.uiChromeHoverColor,
-    uiChromeDividerColor: state.uiChromeDividerColor,
-    solidSelectionBar: state.solidSelectionBar
+    uiChromeDividerColor: state.uiChromeDividerColor
   };
 }
 
@@ -2860,7 +2844,6 @@ function renderAll() {
   if (refs.uiChromePrimaryColorInput && document.activeElement !== refs.uiChromePrimaryColorInput) refs.uiChromePrimaryColorInput.value = state.uiChromePrimaryColor;
   if (refs.uiChromeSecondaryColorInput && document.activeElement !== refs.uiChromeSecondaryColorInput) refs.uiChromeSecondaryColorInput.value = state.uiChromeSecondaryColor;
   if (refs.uiChromePaneColorInput && document.activeElement !== refs.uiChromePaneColorInput) refs.uiChromePaneColorInput.value = state.uiChromePaneColor;
-  refs.solidSelectionBarCheckbox.checked = state.solidSelectionBar;
   if (refs.uiChromeMonospaceCheckbox) refs.uiChromeMonospaceCheckbox.checked = state.uiChromeMonospace;
   refs.applicationMonospaceCheckbox.checked = state.contentMonospace;
   if (refs.aacExportDirectoryPath) refs.aacExportDirectoryPath.value = state.aacExportDirectory || "";
@@ -3408,7 +3391,6 @@ function applyAppearanceSettings(settings) {
   })) {
     if (settings[key] !== undefined) state[key] = uiApp.normalizeUIColor(settings[key], fallback);
   }
-  if (settings.solidSelectionBar !== undefined) state.solidSelectionBar = Boolean(settings.solidSelectionBar);
   persistSettings();
   renderAll();
 }
@@ -3437,13 +3419,6 @@ function setUIChromePaletteColor(role, color) {
   if (!Object.hasOwn(fallbacks, role)) return;
   state[key] = uiApp.normalizeUIColor(color, fallbacks[role]);
   if (role === "primary") state.uiChromeColor = state[key];
-  persistSettings();
-  broadcastAppearanceSettings();
-  renderAll();
-}
-
-function setSolidSelectionBar(enabled) {
-  state.solidSelectionBar = Boolean(enabled);
   persistSettings();
   broadcastAppearanceSettings();
   renderAll();
@@ -3713,7 +3688,6 @@ uiApp.ui = {
   setAccentColor,
   setUIChromeColor,
   setUIChromePaletteColor,
-  setSolidSelectionBar,
   commitFontSizeInput,
   commitSidebarFontSizeInput,
   setSidebarTextColor,

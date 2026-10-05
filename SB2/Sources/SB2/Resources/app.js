@@ -305,10 +305,6 @@ for (const [input, role] of [
   input.addEventListener("change", (event) => app.ui.setUIChromePaletteColor(role, event.target.value));
   input.addEventListener("blur", (event) => app.ui.setUIChromePaletteColor(role, event.target.value));
 }
-refs.solidSelectionBarCheckbox.addEventListener("change", (event) => {
-  app.ui.setSolidSelectionBar(event.target.checked);
-});
-
 if (window.spcBoySB2?.onAppearanceSettingsChanged) {
   window.spcBoySB2.onAppearanceSettingsChanged((settings) => {
     app.ui.applyAppearanceSettings(settings);
