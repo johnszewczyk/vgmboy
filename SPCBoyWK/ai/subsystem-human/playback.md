@@ -26,6 +26,9 @@ Standalone Zstandard-compressed media (`.zst` and `.zstd`) is supported as one
 file. TAR+Zstandard archive names (`.tar.zst`, `.tar.zstd`, and `.tzst`) are
 unsupported.
 
+Native start failures appear in a transient on-screen message as well as the
+diagnostics boundary, so unsupported archive members are not silent.
+
 Natural completion retires the finished native session and advances to the next
 queue target when one exists. The completion path waits for that replacement
 start, so a finished track does not leave the frontend stopped between songs.

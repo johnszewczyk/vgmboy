@@ -17,3 +17,5 @@
 - Dense catalog rows keep zero vertical item padding with a 1px row gap. The
   pane divider is 1px, and toolbar action buttons share one compact size. The
   search field keeps a taller input surface inside the shared toolbar strip.
+- Transport and sidebar icons use the existing icon symbols at a shared 1rem
+  size; playlist tab controls fill their header row and keep the 2rem close cell.

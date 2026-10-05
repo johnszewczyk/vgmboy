@@ -116,6 +116,7 @@
           </div>
         </div>
       </footer>
+      <div id="playback-error-toast" class="playback-error-toast is-hidden" role="alert" aria-live="assertive"></div>
     </div>
 
     <div id="options-overlay" class="options-overlay is-hidden" aria-hidden="true">
@@ -130,8 +131,8 @@
             <div class="options-nav-group" aria-labelledby="options-native-heading">
               <div id="options-native-heading" class="options-nav-group-title">SPCBoy</div>
               <button id="options-database-tab" data-app-option-section="database" class="options-nav-item is-selected" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-database"></use></svg><span>Database</span></button>
-              <button id="options-theme-tab" data-app-option-section="interface" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"></use></svg><span>Interface Chrome</span></button>
-              <button id="options-fonts-tab" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-scroll-text"></use></svg><span>Interface Fonts</span></button>
+              <button id="options-theme-tab" data-app-option-section="interface" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"></use></svg><span>UI Chrome</span></button>
+              <button id="options-fonts-tab" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-scroll-text"></use></svg><span>UI Fonts</span></button>
               <button id="options-windows-tab" data-app-option-section="windows" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sidebar-views"></use></svg><span>Windows</span></button>
             </div>
             <div class="options-nav-group" aria-labelledby="options-extension-heading">
@@ -145,7 +146,7 @@
 
           <div class="options-content">
             <div id="options-theme-section" class="options-page options-theme-page is-hidden">
-              <div class="options-page-title">SPCBoy / Interface Chrome</div>
+              <div class="options-page-title">SPCBoy / UI Chrome</div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Palette</div>
                 <div class="options-help-text">Colors accept CSS values, bare hex such as 333 or 999AAA, and channels such as 30 30 30 or 30 30 30 .5.</div>
@@ -171,11 +172,12 @@
                 <div class="options-subpanel-title">Animations</div>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="auto-resize-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Auto-Resize</span><small>Duration for automatic playlist column resizing (ms).</small></span></span><span class="options-inline-trailing"><input id="auto-resize-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Auto-resize animation milliseconds" /></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="selection-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Selection Bar</span><small>Duration for playlist and sidebar selection movement (ms).</small></span></span><span class="options-inline-trailing"><input id="selection-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Selection bar animation milliseconds" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="sidebar-fold-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Sidebar Folds</span><small>Slide folders and console groups open and closed.</small></span></span></label>
               </div>
             </div>
 
             <div id="options-fonts-section" class="options-page options-theme-page options-fonts-page is-hidden">
-              <div class="options-page-title">SPCBoy / Interface Fonts</div>
+              <div class="options-page-title">SPCBoy / UI Fonts</div>
               <div class="options-subpanel">
                 <div class="options-subpanel-title">Interface Text</div>
                 <div class="options-help-text">Set typography for controls separately from library and playlist text.</div>
@@ -189,6 +191,11 @@
                 <div class="options-subpanel-title">Playlist Headers</div>
                 <label class="options-field"><span>Playlist Header Font Color</span><span class="options-inline-trailing"><input id="playlist-header-text-color-input" class="options-input options-color-text-input" type="text" value="gray" aria-label="Playlist header font color CSS value" /></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="playlist-header-bold-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Bold Headers</span><small>Use a heavier font for playlist column headers.</small></span></span></label>
+              </div>
+              <div class="options-subpanel">
+                <div class="options-subpanel-title">Titlebar</div>
+                <label class="options-field"><span>Titlebar Font Color</span><span class="options-inline-trailing"><input id="titlebar-text-color-input" class="options-input options-color-text-input" type="text" value="#e0e1eb" aria-label="Titlebar font color CSS value" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="titlebar-bold-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Bold Titlebar</span><small>Use a heavier font for the app title, console, and playlist labels.</small></span></span></label>
               </div>
             </div>
 

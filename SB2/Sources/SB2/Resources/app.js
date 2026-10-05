@@ -245,6 +245,15 @@ refs.aacExportCancelButton?.addEventListener("click", () => {
 refs.playlistHeaderBoldCheckbox.addEventListener("change", (event) => {
   app.ui.setPlaylistHeaderBold(event.target.checked);
 });
+refs.titlebarTextColorInput.addEventListener("change", (event) => {
+  app.ui.setTitlebarTextColor(event.target.value);
+});
+refs.titlebarTextColorInput.addEventListener("blur", (event) => {
+  app.ui.setTitlebarTextColor(event.target.value);
+});
+refs.titlebarBoldCheckbox.addEventListener("change", (event) => {
+  app.ui.setTitlebarBold(event.target.checked);
+});
 
 refs.columnAutoSizeCheckbox.addEventListener("change", (event) => {
   app.ui.setColumnAutoSize(event.target.checked);
@@ -261,6 +270,9 @@ refs.selectionAnimationInput.addEventListener("change", (event) => {
 });
 refs.selectionAnimationEnabledCheckbox.addEventListener("change", (event) => {
   app.ui.setAnimationEnabled("selectionAnimationEnabled", event.target.checked);
+});
+refs.sidebarFoldAnimationEnabledCheckbox.addEventListener("change", (event) => {
+  app.ui.setSidebarFoldAnimationEnabled(event.target.checked);
 });
 refs.mainWindowAlwaysOnTopCheckbox.addEventListener("change", (event) => {
   app.ui.setWindowAlwaysOnTop("mainWindowAlwaysOnTop", event.target.checked);

@@ -13,6 +13,7 @@
   --accent-ink: rgb(20 20 20);
   --selection-bar-background: transparent;
   --line: rgb(40 40 40);
+  --app-easing: cubic-bezier(0.2, 0, 0, 1);
   --ui-font-size-pt: 10;
   --sidebar-width-percent: 20;
   --item-spacing-rem: 0.2;
@@ -112,8 +113,29 @@ body.is-file-drag-over::after {
 }
 
 .app-shell {
+  position: relative;
   height: 100vh;
 }
+
+.playback-error-toast {
+  position: absolute;
+  z-index: 30;
+  top: calc(var(--top-toolbar-height) + 0.5rem);
+  right: 0.5rem;
+  max-width: min(40rem, calc(100% - 1rem));
+  padding: 0.66rem 0.9rem;
+  border: 1px solid #744b50;
+  border-left: 0.2rem solid #ef7c84;
+  border-radius: 0.25rem;
+  background: #211518;
+  color: #ffdadd;
+  font: 0.8rem/1.4 var(--ui-font-family);
+  overflow-wrap: anywhere;
+  box-shadow: 0 0.5rem 1.25rem rgb(0 0 0 / 35%);
+}
+
+.tree-group,
+.database-console-games { overflow: hidden; }
 
 .time-label,
 .empty,
@@ -1017,7 +1039,7 @@ body.options-window .tool-button:hover {
   height: var(--slider-track-height);
   transform: translateY(-50%);
   border-radius: 999px;
-  background: var(--line);
+  background: color-mix(in srgb, var(--accent) 38%, transparent);
   overflow: visible;
 }
 

@@ -74,6 +74,9 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
     var uiChromeMonospace: Bool?
     var contentMonospace: Bool?
     var playlistHeaderBold: Bool?
+    var titlebarTextColor: String?
+    var titlebarBold: Bool?
+    var sidebarFoldAnimationEnabled: Bool?
     var sidebarWidthPercent: Double?
     var accentColor: String?
     var uiChromeColor: String?
@@ -133,6 +136,9 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
         selectionAnimationMilliseconds = FrontendAnimationTimings.defaultDurationMilliseconds
         autoResizeAnimationEnabled = true
         selectionAnimationEnabled = true
+        sidebarFoldAnimationEnabled = true
+        titlebarTextColor = "#e0e1eb"
+        titlebarBold = false
         playlistColumnSizing = FrontendPlaylistColumnSizing()
         playlistSortEnabled = false
         mainWindowAlwaysOnTop = false
@@ -194,6 +200,9 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
         )
         autoResizeAnimationEnabled = autoResizeAnimationEnabled ?? true
         selectionAnimationEnabled = selectionAnimationEnabled ?? true
+        sidebarFoldAnimationEnabled = sidebarFoldAnimationEnabled ?? true
+        titlebarTextColor = titlebarTextColor ?? "#e0e1eb"
+        titlebarBold = titlebarBold ?? false
         playlistColumnSizing = FrontendPlaylistColumnSizing(
             horizontalPaddingPerSide: playlistColumnSizing?.horizontalPaddingPerSide
                 ?? FrontendPlaylistColumnSizing.defaultHorizontalPaddingPerSide

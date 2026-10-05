@@ -17,11 +17,28 @@ let mediaSessionHandlersBound = false;
 const playbackBackends = window.SB2PlaybackBackends;
 let queuedSkipRequest = null;
 let queuedSkipTimer = 0;
+let playbackErrorTimer = 0;
 let playbackWindow = null;
 let playbackClockHandle = 0;
 let playbackClockUsesAnimationFrame = false;
 let nativeClockAnchor = null;
 const timingPlans = new Map();
+
+function clearPlaybackError() {
+  window.clearTimeout(playbackErrorTimer);
+  playbackErrorTimer = 0;
+  refs.playbackErrorToast?.classList.add("is-hidden");
+  if (refs.playbackErrorToast) refs.playbackErrorToast.textContent = "";
+}
+
+function showPlaybackError(error) {
+  if (!refs.playbackErrorToast) return;
+  const message = String(error?.message || error || "Unable to play this file.").trim();
+  refs.playbackErrorToast.textContent = `Playback failed: ${message}`;
+  refs.playbackErrorToast.classList.remove("is-hidden");
+  window.clearTimeout(playbackErrorTimer);
+  playbackErrorTimer = window.setTimeout(clearPlaybackError, 8000);
+}
 // Settings writes are separate from playback replacement, but their native
 // replies are still asynchronous. Keep only the newest timing/tempo result
 // for the current renderer generation.
@@ -916,6 +933,7 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
 }
 
 function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playbackOptions = null) {
+  clearPlaybackError();
   const replacingQueuedSkip = !preserveQueuedSkip && Boolean(queuedSkipRequest);
   if (!preserveQueuedSkip) {
     queuedSkipRequest = null;
@@ -926,13 +944,19 @@ function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playba
     state.playingPlaylist = [...state.playlist];
     state.playbackTabId = state.activePlaylistTabId || null;
   }
+  let request;
   if (!preserveQueuedSkip
       && !replacingQueuedSkip
       && state.currentTrackId
       && state.isPlaying) {
-    return playTrackWithFadedSkip(trackId, startSeconds, playbackOptions);
+    request = playTrackWithFadedSkip(trackId, startSeconds, playbackOptions);
+  } else {
+    request = playTrackNow(trackId, startSeconds, playbackOptions);
   }
-  return playTrackNow(trackId, startSeconds, playbackOptions);
+  return Promise.resolve(request).catch((error) => {
+    showPlaybackError(error);
+    throw error;
+  });
 }
 
 async function playTrackWithFadedSkip(trackId, startSeconds = 0, playbackOptions = null) {

@@ -134,6 +134,9 @@ const state = {
   selectionAnimationMilliseconds: 200,
   autoResizeAnimationEnabled: true,
   selectionAnimationEnabled: true,
+  sidebarFoldAnimationEnabled: true,
+  titlebarTextColor: "#e0e1eb",
+  titlebarBold: false,
   mainWindowAlwaysOnTop: false,
   settingsWindowAlwaysOnTop: false,
   optionsOpen: false,
@@ -241,6 +244,9 @@ const refs = {
   aacExportStatus: document.getElementById("aac-export-status"),
   aacExportCancelButton: document.getElementById("aac-export-cancel-button"),
   playlistHeaderBoldCheckbox: document.getElementById("playlist-header-bold-checkbox"),
+  sidebarFoldAnimationEnabledCheckbox: document.getElementById("sidebar-fold-animation-enabled-checkbox"),
+  titlebarTextColorInput: document.getElementById("titlebar-text-color-input"),
+  titlebarBoldCheckbox: document.getElementById("titlebar-bold-checkbox"),
   columnAutoSizeCheckbox: document.getElementById("column-auto-size-checkbox"),
   autoResizeAnimationEnabledCheckbox: document.getElementById("auto-resize-animation-enabled-checkbox"),
   autoResizeAnimationInput: document.getElementById("auto-resize-animation-input"),
@@ -303,7 +309,8 @@ const refs = {
   sb2ConsoleLabel: document.getElementById("sb2-console-label"),
   sb2AlbumLabel: document.getElementById("sb2-album-label"),
   sb2CPUValue: document.getElementById("sb2-cpu-value"),
-  sb2CPUFill: document.getElementById("sb2-cpu-fill")
+  sb2CPUFill: document.getElementById("sb2-cpu-fill"),
+  playbackErrorToast: document.getElementById("playback-error-toast")
 };
 
 async function loadSettings() {
@@ -359,6 +366,8 @@ async function loadSettings() {
     state.uiChromeMonospace = chromeMonospace;
     state.applicationMonospace = chromeMonospace;
     state.playlistHeaderBold = Boolean(parsed.playlistHeaderBold);
+    state.titlebarTextColor = normalizeFontColor(parsed.titlebarTextColor ?? "#e0e1eb");
+    state.titlebarBold = Boolean(parsed.titlebarBold);
     state.sidebarWidthPercent = normalizeSidebarWidth(parsed.sidebarWidthPercent ?? 31);
     state.accentColor = normalizeAccentColor(parsed.accentColor ?? "#38aaff");
     state.uiChromePrimaryColor = normalizeUIColor(parsed.uiChromePrimaryColor ?? parsed.uiChromeColor, "#111419");
@@ -396,6 +405,7 @@ async function loadSettings() {
     state.selectionAnimationMilliseconds = normalizeAnimationMilliseconds(parsed.selectionAnimationMilliseconds);
     state.autoResizeAnimationEnabled = parsed.autoResizeAnimationEnabled !== false;
     state.selectionAnimationEnabled = parsed.selectionAnimationEnabled !== false;
+    state.sidebarFoldAnimationEnabled = parsed.sidebarFoldAnimationEnabled !== false;
     state.mainWindowAlwaysOnTop = Boolean(parsed.mainWindowAlwaysOnTop);
     state.settingsWindowAlwaysOnTop = Boolean(parsed.settingsWindowAlwaysOnTop);
   } catch {
@@ -445,6 +455,8 @@ function persistSettings() {
     uiChromeMonospace: state.uiChromeMonospace,
     contentMonospace: state.contentMonospace,
     playlistHeaderBold: state.playlistHeaderBold,
+    titlebarTextColor: state.titlebarTextColor,
+    titlebarBold: state.titlebarBold,
     sidebarWidthPercent: state.sidebarWidthPercent,
     accentColor: state.accentColor,
     uiChromeColor: state.uiChromeColor,
@@ -469,6 +481,7 @@ function persistSettings() {
     selectionAnimationMilliseconds: state.selectionAnimationMilliseconds,
     autoResizeAnimationEnabled: state.autoResizeAnimationEnabled,
     selectionAnimationEnabled: state.selectionAnimationEnabled,
+    sidebarFoldAnimationEnabled: state.sidebarFoldAnimationEnabled,
     mainWindowAlwaysOnTop: state.mainWindowAlwaysOnTop,
     settingsWindowAlwaysOnTop: state.settingsWindowAlwaysOnTop
   };

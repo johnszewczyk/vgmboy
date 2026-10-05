@@ -74,6 +74,7 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
     var uiChromeMonospace: Bool?
     var contentMonospace: Bool?
     var playlistHeaderBold: Bool?
+    var sidebarFoldAnimationEnabled: Bool?
     var sidebarWidthPercent: Double?
     var accentColor: String?
     var uiChromeColor: String?
@@ -194,6 +195,7 @@ struct SPCBoyPreferencesSnapshot: Codable, Sendable {
         )
         autoResizeAnimationEnabled = autoResizeAnimationEnabled ?? true
         selectionAnimationEnabled = selectionAnimationEnabled ?? true
+        sidebarFoldAnimationEnabled = sidebarFoldAnimationEnabled ?? true
         playlistColumnSizing = FrontendPlaylistColumnSizing(
             horizontalPaddingPerSide: playlistColumnSizing?.horizontalPaddingPerSide
                 ?? FrontendPlaylistColumnSizing.defaultHorizontalPaddingPerSide
