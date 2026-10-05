@@ -149,6 +149,15 @@ private struct CocoaSpiceCommands: Commands {
                 model.loadPlaylistM3U()
             }
             .keyboardShortcut("o", modifiers: [.command, .shift])
+        }
+
+        CommandGroup(replacing: .saveItem) {
+            Button("Close Current Playlist Tab") {
+                model.closePlaylistTab(model.activePlaylistTabID)
+            }
+            .keyboardShortcut("w", modifiers: .command)
+
+            Divider()
 
             Button("Save Playlist...") {
                 model.savePlaylistM3U()
@@ -218,13 +227,6 @@ private struct CocoaSpiceCommands: Commands {
         }
 
         CommandMenu("Playlist Tabs") {
-            Button("Close Current Tab") {
-                model.closePlaylistTab(model.activePlaylistTabID)
-            }
-            .keyboardShortcut("w", modifiers: .command)
-
-            Divider()
-
             ForEach(0..<min(model.playlistTabs.count, 9), id: \.self) { index in
                 Button(model.playlistTabs[index].title) {
                     model.activatePlaylistTab(at: index)

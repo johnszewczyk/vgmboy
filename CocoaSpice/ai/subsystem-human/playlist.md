@@ -41,8 +41,8 @@
 ## Persistence
 
 - Tabs: playlist tabs restore their queues, names, and selections on next launch.
-- Tabs: `Command-T` opens an empty tab; `Command-W` closes the current tab; `Command-1` through `Command-9` select a tab.
-- Tabs: the plus button opens an empty tab and each tab has its own close button. Closing the final tab leaves one empty Playlist tab.
+- Tabs: `Command-T` opens an empty tab; File > Close Current Playlist Tab (`Command-W`) closes the current tab; `Command-1` through `Command-9` select a tab.
+- Tabs: the plus button opens an empty tab and each tab has its own close button. Closing the final tab leaves one empty Playlist tab and keeps the app window open.
 - Playlists: save and load as `.m3u`.
 - Playlists: preserve multi-track identity.
 
