@@ -34,6 +34,7 @@ let package = Package(
                 .product(name: "PlaybackRequestCore", package: "FrontendCore"),
                 .product(name: "PlaybackQueueCore", package: "FrontendCore"),
                 .product(name: "PlaybackTransportCore", package: "FrontendCore"),
+                .product(name: "FrontendStartupCore", package: "FrontendCore"),
                 .product(name: "ArchiveCacheCore", package: "FrontendCore"),
                 .product(name: "ArchiveMaterializationCore", package: "FrontendCore"),
                 .product(name: "UACWrapperCore", package: "UACWrapper"),

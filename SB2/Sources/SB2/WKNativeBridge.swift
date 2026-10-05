@@ -8,6 +8,7 @@ import CatalogSessionCore
 import Darwin
 import FavoriteStoreCore
 import FavoriteTrackCore
+import FrontendStartupCore
 import FrontendPreferencesCore
 import Foundation
 import PlaybackQueueCore
@@ -198,6 +199,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
           const api = {
             isOptionsWindow: \(optionsWindowFlag),
             playbackBackends: \(Self.json(Self.playbackBackendManifest)),
+            startupStages: \(Self.json(FrontendStartupStage.allCases.map(\.manifest))),
+            startupTiming: {
+              revealDelayMilliseconds: \(FrontendStartupTiming.revealDelayMilliseconds),
+              readyConfirmationMilliseconds: \(FrontendStartupTiming.readyConfirmationMilliseconds)
+            },
             processCPUTimeMilliseconds: () => request("processCPUTimeMilliseconds"),
             bootstrap: (...args) => request("bootstrap", args),
             playlistTabsLoad: () => request("playlistTabsLoad"),

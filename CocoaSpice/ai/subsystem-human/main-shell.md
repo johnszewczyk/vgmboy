@@ -12,7 +12,8 @@
   native toolbar items rather than a grouped capsule.
 - Main transport toolbar order: Previous, Stop, Play/Pause, Next, then Long Play, repeat, random playback, and Equalizer on/off. Stop uses a square glyph; the infinity button turns Long Play on or off.
 - The sidebar begins with search and list content.
-- Sidebar: shows a loading indicator while its current database view loads, keeping the main window interactive at launch. Games load first; the potentially large Files tree loads only after Files is opened.
+- Startup: if loading lasts beyond a short reveal delay, a four-step screen shows workspace restore, library connection, sidebar preparation, and playlist restore, with elapsed time. It briefly confirms readiness and stays visible with the error if startup fails.
+- Sidebar: shows a loading indicator while its current database view loads after startup. Games load first; the potentially large Files tree loads only after Files is opened.
 - Status bar: elapsed time / current-track total / playlist total duration. A plus suffix means some queued tracks do not yet have a known duration.
 
 ## Options

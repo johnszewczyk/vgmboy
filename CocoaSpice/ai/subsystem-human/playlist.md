@@ -9,7 +9,7 @@
 - Directly opened files have no catalog metadata. Their title and game cells use filename and folder display fallbacks; author, system, and duration remain unknown.
 - Columns: there is no row-level Play/Stop column; playback uses row activation and the main transport controls.
 - Columns: visible columns auto-size after queue publication without changing the current row selection.
-- History: Command-Shift-H opens the shared playback history, newest play first. Its sortable Date/Time column displays local time as `YYYY.MM.DD-HH.MM.SS.MS` and auto-hides when rows have no history timestamp.
+- History: Command-Shift-H opens or switches to the History tab, newest play first. Its sortable Date/Time column displays local time as `YYYY.MM.DD-HH.MM.SS.MS` and auto-hides when rows have no history timestamp.
 - Columns: drag-and-drop resize.
 - Columns: double-click a divider to auto-size to current content.
 - Columns: the header menu can auto-size one column or all visible columns.
@@ -27,7 +27,7 @@
 - Rows: double-click starts playback.
 - Rows: Return starts playback of the primary selected row.
 - Favorites: Command-D toggles the selected track; the favorite glyph toggles the clicked track directly.
-- Favorites: Command-Shift-D replaces the playlist with a snapshot of shared Favorites without changing the sidebar view.
+- Favorites: Command-Shift-F opens or switches to the Favorites tab without changing the sidebar view.
 - Queue: cut, paste, delete, move, and drag-reorder.
 - Context menu: `Export AAC` renders the clicked playlist track through bundled VGMBoy into the
   configured AAC Export Folder. It uses the active Long Play/end-fade timing and does not interrupt
@@ -41,6 +41,7 @@
 ## Persistence
 
 - Tabs: playlist tabs restore their queues, names, and selections on next launch.
+- Tabs: drag a tab across its neighbors to reorder it; surrounding tabs ease into the new positions and the order persists for the next launch.
 - Tabs: `Command-T` opens an empty tab; File > Close Current Playlist Tab (`Command-W`) closes the current tab; `Command-1` through `Command-9` select a tab.
 - Tabs: the plus button opens an empty tab and each tab has its own close button. Closing the final tab leaves one empty Playlist tab and keeps the app window open.
 - Playlists: save and load as `.m3u`.

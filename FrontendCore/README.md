@@ -2,9 +2,9 @@
 
 `FrontendCore` contains UI-neutral services shared by CocoaSpice, SPCBoyWK, and
 ViewBoy. Its modules own bounded archive materialization/cache behavior,
-preferences, favorites and playlist identity, playback queues, and native
-transport coordination. The package does not read or write the catalog, decode
-audio, or render a frontend.
+preferences, favorites and playlist identity, shared startup progress, playback
+queues, and native transport coordination. The package does not read or write
+the catalog, decode audio, or render a frontend.
 
 Archive listing and playback preparation receive tool execution from their
 hosts; `ArchiveMaterializationCore` and `ArchiveCacheCore` own the shared

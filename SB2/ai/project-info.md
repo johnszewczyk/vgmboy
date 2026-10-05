@@ -11,8 +11,8 @@ preference namespace, archive cache, and renderer distinct.
 - The pixel-style home, playlist tabs, WebKit renderer, native host adapter,
   and app-local presentation state belong to SB2.
 - CatalogReader owns read-only library access and browser projections.
-- FrontendCore owns shared archive, favorite, preference, queue, and transport
-  policies.
+- FrontendCore owns shared archive, favorite, preference, queue, transport,
+  and startup-progress policies.
 - VGMBoy owns format admission, decoding, timing, and audio output.
 - ScanSong remains the only catalog writer.
 
@@ -20,6 +20,7 @@ preference namespace, archive cache, and renderer distinct.
 
 - Home and playlist behavior: `subsystem-human/home.md`
 - Options behavior: `subsystem-human/options.md`
+- Startup progress ownership: `subsystem-agent/startup-experience.md`
 - Swift package and app bundle: `Package.swift`, `Sources/SB2/`
 - WebKit presentation and host adaptation: `Sources/SB2/Resources/`, `Sources/SB2/`
 

@@ -41,8 +41,8 @@ and persistence. This project owns only the typed native adapter and WebKit rend
   row per catalog track. Replace each visible window in one render turn so
   scrolling never exposes an empty playlist or a stale row focus target.
 - Native playback and playlist commands use the shared `FrontendCommandCore`
-  command contract. `Favorites Playlist` uses Command-Shift-D and changes only the queue snapshot,
-  never the sidebar mode.
+  command contract. `Favorites Playlist` uses Command-Shift-F to open or switch
+  to the named Favorites tab; this never changes the sidebar mode.
 - Catalog-backed playlist rows must not stat source paths during hydration. CatalogReader supplies
   the metadata required for the playlist; decoder inspection and duration authority belong to
   VGMBoy through the native playback bridge, not to JavaScript hydration workers.

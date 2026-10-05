@@ -15,9 +15,8 @@
 - The primary sidebar view is a dense native list of database game rows. Options can enable `Group by Console`, stored internally as `sidebarSystemMode`, which renders expandable console rows with game leaves underneath.
 - Sidebar search filters the database list instead of switching to a separate legacy result view.
 - Right-clicking a sidebar row opens its context menu without changing sidebar selection.
-- Favorites is not a sidebar mode. Command-Shift-D replaces the playlist with a
-  snapshot of shared Favorites while leaving the current catalog/sidebar view
-  and its selection context unchanged.
+- Favorites is not a sidebar mode. Command-Shift-F opens or switches to its
+  playlist tab without changing the current catalog/sidebar view or its selection.
 - Individual native navigation-toolbar items own the library-mode and
   fold/unfold controls beside the native sidebar disclosure button. They use
   the same regular toolbar-item sizing and borderless treatment as the native
@@ -26,7 +25,7 @@
   place library controls in the sidebar column toolbar or transport group.
   The library-mode control cycles exactly `Console View` and `Path View`; it is
   not a dropdown.
-- The View menu exposes those exact two library commands through `FrontendCommandCore`. The Favorites Playlist command uses Command-Shift-D and does not change the sidebar.
+- The View menu exposes those exact two library commands through `FrontendCommandCore`. The Favorites Playlist command uses Command-Shift-F and does not change the sidebar.
 
 ## Rules
 

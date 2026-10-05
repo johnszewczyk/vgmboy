@@ -60,7 +60,7 @@ public enum FrontendShortcutCatalog {
         .init(command: .sidebarPaths, key: "1", modifiers: [.command]),
         .init(command: .sidebarConsoles, key: "2", modifiers: [.command]),
         .init(command: .sidebarDiskPath, key: "3", modifiers: [.command]),
-        .init(command: .favoritesPlaylist, key: "d", modifiers: [.command, .shift]),
+        .init(command: .favoritesPlaylist, key: "f", modifiers: [.command, .shift]),
         .init(command: .playbackHistory, key: "h", modifiers: [.command, .shift]),
         .init(command: .settings, key: ",", modifiers: [.command]),
         .init(command: .previous, key: "F7"),

@@ -13,6 +13,7 @@ CocoaSpice, SPCBoyWK, and ViewBoy frontends.
 - Local-file browser, favorite identity/store, playback-history store, and
   playlist identity cores.
 - Typed frontend preference validation and storage coordination.
+- Shared startup stages, progress state, and presentation timing.
 - Playback request, queue, and native transport coordination.
 
 ## Task Routing
@@ -21,6 +22,8 @@ CocoaSpice, SPCBoyWK, and ViewBoy frontends.
   [archive-services.md](subsystem-agent/archive-services.md)
 - Favorites, playlist identity, preferences, requests, queues, and transport:
   [frontend-policy.md](subsystem-agent/frontend-policy.md)
+- Cross-frontend startup stage and progress contract:
+  [startup-experience.md](subsystem-agent/startup-experience.md)
 
 ## Local Rules
 

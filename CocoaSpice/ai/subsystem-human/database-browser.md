@@ -3,10 +3,10 @@
 ## Display
 
 - Database: scanned game-music library in the left pane.
-- Favorites: Command-Shift-D replaces the playlist with a snapshot of shared
-  Favorites without changing the current sidebar view. Command-D toggles the
-  selected track or selected game/group. Options > Database > Favorites chooses
-  Historical (added order) or Alphabetical display for the next snapshot.
+- Favorites: Command-Shift-F opens or switches to the Favorites tab without
+  changing the sidebar view. Command-D toggles the selected track or selected
+  game/group. Options > Database > Favorites chooses Historical (added order)
+  or Alphabetical display for the next snapshot.
 - Direct files and supported archives can be dropped onto the playlist for immediate playback. The sidebar remains database-only and does not browse arbitrary disk paths.
 - Rows: dense list of scanned games by default.
 - Options > Interface > Sidebar Line Gap controls added vertical spacing between Database sidebar rows from 0–16 pt; 0 pt adds no spacing.

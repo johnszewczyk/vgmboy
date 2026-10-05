@@ -2,8 +2,8 @@
 
 ## Scope
 
-UI-neutral identity, persistence, preferences, request, queue, and transport
-contracts shared by CocoaSpice and SPCBoyWK.
+UI-neutral identity, persistence, preferences, request, queue, transport, and
+startup contracts shared by the VGMMan player frontends.
 
 ## Ownership
 
@@ -26,6 +26,9 @@ contracts shared by CocoaSpice and SPCBoyWK.
 - `PlaybackTransportCore` owns serialized native commands, invalidation, timing
   reconfiguration, monotonic status ordering, completion retirement, and the
   shared faded-track-change eligibility and duration policy.
+- `FrontendStartupCore` owns the shared four-stage startup sequence, progress
+  state transitions, and reveal/ready timing policy. Frontends own startup
+  rendering and app-specific loading operations.
 
 ## Invariants
 
@@ -76,6 +79,8 @@ contracts shared by CocoaSpice and SPCBoyWK.
   padding contract. It is a presentation setting carried through the WebKit
   snapshot, not a per-column rule or a second pixel-geometry implementation.
 - App-specific UserDefaults keys and presentation state remain in the frontend.
+- Startup progress is value-only UI state. The shared package does not start
+  catalog reads, restore app sessions, or decide frontend-specific errors.
 - History entries use event IDs rather than song IDs so repeated plays remain
   distinct rows. Persist absolute Unix milliseconds and source/member identity;
   display formatting and queue selection remain frontend concerns.
@@ -91,4 +96,5 @@ contracts shared by CocoaSpice and SPCBoyWK.
 - `Sources/PlaybackRequestCore/`
 - `Sources/PlaybackQueueCore/`
 - `Sources/PlaybackTransportCore/`
+- `Sources/FrontendStartupCore/`
 - corresponding directories under `Tests/`

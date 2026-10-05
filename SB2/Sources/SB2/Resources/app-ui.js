@@ -240,6 +240,13 @@ function createPlaylistTab({ duplicateActive = true, title = null } = {}) {
   return tab;
 }
 
+function activateOrCreateProjectionTab(title) {
+  if (findActivePlaylistTab()?.title === title) return true;
+  const existing = state.playlistTabs?.find((tab) => tab.title === title);
+  if (existing) return activatePlaylistTab(existing.id);
+  return Boolean(createPlaylistTab({ duplicateActive: false, title }));
+}
+
 function closePlaylistTab(tabID = state.activePlaylistTabId) {
   const tabs = state.playlistTabs || [];
   if (tabs.length <= 1) {
@@ -628,12 +635,11 @@ function showStartupFailure(message) {
   refs.playlistBody.appendChild(row);
 }
 
-const SB2_STARTUP_STEPS = Object.freeze([
-  { title: "Restoring SPCBOY SB2", detail: "Applying saved interface settings and reopening your last session." },
-  { title: "Connecting to the library", detail: "Opening the shared ScanSong catalog and checking its library roots." },
-  { title: "Preparing the sidebar", detail: "Indexing library sources for the sidebar and its search results." },
-  { title: "Restoring playlists", detail: "Reopening saved playlists and preparing playback controls." }
-]);
+const SB2_STARTUP_STEPS = window.spcBoySB2?.startupStages || [];
+const SB2_STARTUP_TIMING = window.spcBoySB2?.startupTiming || {
+  revealDelayMilliseconds: 350,
+  readyConfirmationMilliseconds: 650,
+};
 
 function setStartupStage(index, detail = null) {
   if (window.spcBoySB2?.isOptionsWindow) return;
@@ -644,8 +650,8 @@ function setStartupStage(index, detail = null) {
   const message = SB2_STARTUP_STEPS[step];
   const heading = document.getElementById("sb2-startup-title");
   const description = document.getElementById("sb2-startup-detail");
-  if (heading) heading.textContent = message.title;
-  if (description) description.textContent = String(detail || message.detail);
+  if (heading) heading.textContent = message?.heading || "Restoring SPCBOY SB2";
+  if (description) description.textContent = String(detail || message?.detail || "Preparing your library and saved playlists.");
   notice.querySelectorAll("[data-sb2-startup-step]").forEach((item) => {
     const itemIndex = Number(item.dataset.sb2StartupStep);
     const state = itemIndex < step ? "done" : itemIndex === step ? "active" : "pending";
@@ -671,6 +677,12 @@ function beginStartup() {
   startupStartedAt = performance.now();
   startupHasAppeared = false;
   window.clearTimeout(startupDismissTimer);
+  document.querySelectorAll("[data-sb2-startup-step]").forEach((item) => {
+    const index = Number(item.dataset.sb2StartupStep);
+    const stage = SB2_STARTUP_STEPS[index];
+    const label = item.querySelector(".sb2-startup-step-label");
+    if (label && stage?.label) label.textContent = stage.label;
+  });
   setStartupStage(0);
   const notice = document.getElementById("sb2-startup-notice");
   if (!notice) return;
@@ -686,7 +698,7 @@ function beginStartup() {
     updateElapsed();
     window.clearInterval(startupElapsedTimer);
     startupElapsedTimer = window.setInterval(updateElapsed, 1000);
-  }, 350);
+  }, SB2_STARTUP_TIMING.revealDelayMilliseconds);
 }
 
 function finishStartup() {
@@ -717,7 +729,10 @@ function finishStartup() {
   notice.setAttribute("aria-busy", "false");
   notice.querySelector("[role='progressbar']")?.setAttribute("aria-valuetext", "Ready");
   window.clearTimeout(startupDismissTimer);
-  startupDismissTimer = window.setTimeout(() => notice.classList.add("is-hidden"), 650);
+  startupDismissTimer = window.setTimeout(
+    () => notice.classList.add("is-hidden"),
+    SB2_STARTUP_TIMING.readyConfirmationMilliseconds
+  );
 }
 
 function failStartup(message) {
@@ -1595,6 +1610,7 @@ async function cycleSidebarMode() {
 
 async function showFavoritesPlaylist() {
   await refreshFavorites();
+  if (!activateOrCreateProjectionTab("Favorites")) return false;
   await invalidatePlaylistCatalogSession();
   state.playlist = [...state.favorites];
   state.playlistTitle = "Favorites";
@@ -1602,6 +1618,7 @@ async function showFavoritesPlaylist() {
   state.catalogPlaylistSortSessionId = null;
   clearPlaylistSelection();
   persistSettings();
+  persistPlaylistTabs();
   renderPlaylistTabs();
   renderPlaylist();
   renderSidebar();
@@ -1655,6 +1672,7 @@ async function showPlaybackHistory() {
   const renderGeneration = playlistRenderGeneration;
   const records = await window.spcBoySB2.playbackHistoryList();
   if (renderGeneration !== playlistRenderGeneration) return false;
+  if (!activateOrCreateProjectionTab("History")) return false;
   await invalidatePlaylistCatalogSession();
   state.playlist = (Array.isArray(records) ? records : [])
     .map(historyRecordToPlaylistTrack)
@@ -1670,6 +1688,7 @@ async function showPlaybackHistory() {
   state.selectedTrackIds = state.selectedTrackId ? [state.selectedTrackId] : [];
   state.playlistSelectionAnchorId = state.selectedTrackId;
   persistSettings();
+  persistPlaylistTabs();
   renderPlaylistTabs();
   renderPlaylist();
   renderSidebar();

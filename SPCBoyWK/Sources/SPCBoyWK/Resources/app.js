@@ -562,7 +562,7 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (event.metaKey && event.shiftKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === "d" && !state.optionsOpen) {
+  if (event.metaKey && event.shiftKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === "f" && !state.optionsOpen) {
     event.preventDefault();
     app.ui.showFavoritesPlaylist().catch((error) => console.error("[SPCBoy] favorites playlist failed", error));
     return;

@@ -6,6 +6,7 @@ import CatalogBrowserCore
 import CatalogSessionCore
 import FavoriteStoreCore
 import FavoriteTrackCore
+import FrontendStartupCore
 import FrontendPreferencesCore
 import Foundation
 import LocalFileBrowserCore
@@ -138,6 +139,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
           const api = {
             playbackBackends: \(Self.json(Self.playbackBackendManifest)),
+            startupStages: \(Self.json(FrontendStartupStage.allCases.map(\.manifest))),
+            startupTiming: {
+              revealDelayMilliseconds: \(FrontendStartupTiming.revealDelayMilliseconds),
+              readyConfirmationMilliseconds: \(FrontendStartupTiming.readyConfirmationMilliseconds)
+            },
             bootstrap: (...args) => request("bootstrap", args),
             refreshTree: (...args) => request("refreshTree", args),
             databaseLocation: (...args) => request("databaseLocation", args),

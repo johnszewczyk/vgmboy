@@ -232,6 +232,13 @@ function createPlaylistTab({ duplicateActive = true, title = null } = {}) {
   return tab;
 }
 
+function activateOrCreateProjectionTab(title) {
+  if (findActivePlaylistTab()?.title === title) return true;
+  const existing = state.playlistTabs?.find((tab) => tab.title === title);
+  if (existing) return activatePlaylistTab(existing.id);
+  return Boolean(createPlaylistTab({ duplicateActive: false, title }));
+}
+
 function closePlaylistTab(tabID = state.activePlaylistTabId) {
   const tabs = state.playlistTabs || [];
   if (tabs.length <= 1) {
@@ -1689,6 +1696,7 @@ async function cycleSidebarMode() {
 
 async function showFavoritesPlaylist() {
   await refreshFavorites();
+  if (!activateOrCreateProjectionTab("Favorites")) return false;
   await invalidatePlaylistCatalogSession();
   state.playlist = [...state.favorites];
   state.playlistTitle = "Favorites";
@@ -1696,6 +1704,7 @@ async function showFavoritesPlaylist() {
   state.catalogPlaylistSortSessionId = null;
   clearPlaylistSelection();
   persistSettings();
+  persistPlaylistTabs();
   renderPlaylistTabs();
   renderPlaylist();
   renderSidebar();
@@ -1749,6 +1758,7 @@ async function showPlaybackHistory() {
   const renderGeneration = playlistRenderGeneration;
   const records = await window.spcBoyWK.playbackHistoryList();
   if (renderGeneration !== playlistRenderGeneration) return false;
+  if (!activateOrCreateProjectionTab("History")) return false;
   await invalidatePlaylistCatalogSession();
   state.playlist = (Array.isArray(records) ? records : [])
     .map(historyRecordToPlaylistTrack)
@@ -1764,6 +1774,7 @@ async function showPlaybackHistory() {
   state.selectedTrackIds = state.selectedTrackId ? [state.selectedTrackId] : [];
   state.playlistSelectionAnchorId = state.selectedTrackId;
   persistSettings();
+  persistPlaylistTabs();
   renderPlaylistTabs();
   renderPlaylist();
   renderSidebar();

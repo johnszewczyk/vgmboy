@@ -14,6 +14,8 @@
   workspace restore, library connection, sidebar preparation, playlist restore,
   and elapsed time. It briefly confirms readiness or remains visible with the
   startup error.
+- Command-Shift-F opens or switches to Favorites; Command-Shift-H opens or
+  switches to Playback History.
 - Options open in the playlist pane as a subpage and leave the title and footer
   visible. A separate Options window uses the same chrome.
 - Playlist tab selection fades with the shared selection timing and easing;

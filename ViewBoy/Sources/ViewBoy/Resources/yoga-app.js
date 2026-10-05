@@ -434,6 +434,8 @@ let pendingLibraryScrollDelta = 0;
 const libraryScrollFrameTiming = { lastFrameAt: Number.NaN };
 let searchCursorTimer = 0;
 let searchCursorVisible = false;
+let startupRevealTimer = 0;
+let startupDismissTimer = 0;
 let equalizerFrameTiming = { lastFrameAt: Number.NaN };
 let equalizerAnimations = new Map();
 let checkboxFrameTiming = { lastFrameAt: Number.NaN };
@@ -559,6 +561,14 @@ const state = {
   libraryViewportWidget: null,
   queueScroll: 0,
   status: "LOADING CATALOG",
+  startup: {
+    phase: "idle",
+    stageIndex: 0,
+    detail: "",
+    error: null,
+    startedAt: 0,
+    visible: false,
+  },
   catalogLoading: false,
   preferences: {},
   nativeGeneration: 0,
@@ -580,6 +590,77 @@ updateScreenSurface();
 let tracks = [];
 
 const bridge = window.viewBoy;
+const STARTUP_STAGES = bridge?.startupStages || [];
+const STARTUP_TIMING = bridge?.startupTiming || {
+  revealDelayMilliseconds: 350,
+  readyConfirmationMilliseconds: 650,
+};
+
+function beginStartupExperience() {
+  window.clearTimeout(startupRevealTimer);
+  window.clearTimeout(startupDismissTimer);
+  state.startup = {
+    phase: "starting",
+    stageIndex: 0,
+    detail: STARTUP_STAGES[0]?.detail || "Applying saved settings and restoring your last session.",
+    error: null,
+    startedAt: performance.now(),
+    visible: false,
+  };
+  const status = document.querySelector("#screen-reader-status");
+  if (status) status.textContent = "ViewBoy startup: restoring workspace.";
+  startupRevealTimer = window.setTimeout(() => {
+    startupRevealTimer = 0;
+    if (state.startup.phase === "starting" || state.startup.phase === "failed") {
+      state.startup.visible = true;
+      render();
+    }
+  }, STARTUP_TIMING.revealDelayMilliseconds);
+}
+
+function setStartupStage(index, detail = null) {
+  if (state.startup.phase !== "starting") return;
+  const stageIndex = Math.max(0, Math.min(STARTUP_STAGES.length - 1, Number(index) || 0));
+  const stage = STARTUP_STAGES[stageIndex];
+  state.startup.stageIndex = stageIndex;
+  state.startup.detail = String(detail || stage?.detail || "Preparing the library and saved playlists.");
+  const status = document.querySelector("#screen-reader-status");
+  if (status) status.textContent = `ViewBoy startup: ${stage?.label || "working"}. ${state.startup.detail}`;
+  if (state.startup.visible) render();
+}
+
+function finishStartupExperience() {
+  if (state.startup.phase !== "starting") return;
+  state.startup.phase = "ready";
+  state.startup.error = null;
+  const status = document.querySelector("#screen-reader-status");
+  if (status) status.textContent = "ViewBoy startup complete. Your library and saved playlists are ready.";
+  window.clearTimeout(startupRevealTimer);
+  startupRevealTimer = 0;
+  if (!state.startup.visible) return;
+  render();
+  window.clearTimeout(startupDismissTimer);
+  startupDismissTimer = window.setTimeout(() => {
+    startupDismissTimer = 0;
+    state.startup.visible = false;
+    render();
+  }, STARTUP_TIMING.readyConfirmationMilliseconds);
+}
+
+function failStartupExperience(message) {
+  if (state.startup.phase !== "starting") return;
+  state.startup.phase = "failed";
+  state.startup.error = String(message || "The library could not be opened.");
+  state.startup.detail = state.startup.error;
+  state.startup.visible = true;
+  const status = document.querySelector("#screen-reader-status");
+  if (status) status.textContent = `ViewBoy startup failed. ${state.startup.error}`;
+  window.clearTimeout(startupRevealTimer);
+  window.clearTimeout(startupDismissTimer);
+  startupRevealTimer = 0;
+  startupDismissTimer = 0;
+  render();
+}
 
 function trackID(track) {
   return track?.playlistId || `${track?.path || ""}:${track?.trackIndex || 0}`;
@@ -4096,6 +4177,109 @@ function buildTree() {
     },
   });
 
+  if (state.startup.visible) {
+    const screen = makeWidget(root, {
+      direction: FlexDirection.Column,
+      flexGrow: 1,
+      flexShrink: 1,
+      flexBasis: 0,
+      minWidth: 0,
+      minHeight: 0,
+      justifyContent: Justify.Center,
+      alignItems: Align.Center,
+    });
+    const cardWidth = Math.max(100, Math.min(360, WIDTH / STYLE_SCALE - 24));
+    const card = makeWidget(screen, {
+      direction: FlexDirection.Column,
+      width: cardWidth,
+      padding: 9 / STYLE_SCALE,
+      gap: 5 / STYLE_SCALE,
+      alignItems: Align.Stretch,
+    }, {
+      paint(box) {
+        strokeRect(box.x, box.y, box.width, box.height, 0);
+      },
+    });
+    const lineHeight = rowHeight();
+    const inset = 2 / STYLE_SCALE;
+    const masthead = makeWidget(card, {
+      direction: FlexDirection.Row,
+      height: 22 / STYLE_SCALE,
+      gap: 6 / STYLE_SCALE,
+      alignItems: Align.Center,
+    });
+    makeWidget(masthead, {
+      width: 22 / STYLE_SCALE,
+      height: 22 / STYLE_SCALE,
+      flexShrink: 0,
+    }, {
+      paint(box) {
+        strokeRect(box.x, box.y, box.width, box.height, 1);
+        const mark = ["11110", "10001", "10001", "11110", "10001", "10001", "11110"];
+        const dotSize = 2;
+        const markX = box.x + Math.floor((box.width - mark[0].length * dotSize) / 2);
+        const markY = box.y + Math.floor((box.height - mark.length * dotSize) / 2);
+        mark.forEach((row, rowIndex) => [...row].forEach((pixel, columnIndex) => {
+          if (pixel === "1") {
+            fillRect(markX + columnIndex * dotSize, markY + rowIndex * dotSize,
+              dotSize, dotSize, 0);
+          }
+        }));
+      },
+    });
+    label(masthead, "VIEWBOY", { flexGrow: 1, height: lineHeight }, {
+      textShade: 0,
+      inset: 0,
+    });
+    label(masthead, "PLAYER", { height: lineHeight }, {
+      textShade: 1,
+      inset: 0,
+      align: "right",
+    });
+    const activeStage = STARTUP_STAGES[state.startup.stageIndex];
+    const heading = state.startup.phase === "ready"
+      ? "READY"
+      : state.startup.phase === "failed" ? "STARTUP PAUSED"
+        : activeStage?.heading || "RESTORING WORKSPACE";
+    label(card, heading, { height: lineHeight }, {
+      textShade: 1,
+      inset,
+      bottomLine: 1,
+    });
+    label(card, state.startup.detail || "Preparing the library and saved playlists.", {
+      height: lineHeight,
+    }, { textShade: 0, inset });
+    STARTUP_STAGES.forEach((stage, index) => {
+      const current = state.startup.phase === "starting" && index === state.startup.stageIndex;
+      const complete = state.startup.phase === "ready" || index < state.startup.stageIndex;
+      const failed = state.startup.phase === "failed" && index === state.startup.stageIndex;
+      const marker = failed ? "!" : complete ? "*" : current ? ">" : String(index + 1);
+      label(card, `${marker} ${stage.label}`, { height: lineHeight }, {
+        textShade: complete ? 1 : 0,
+        inset,
+      });
+    });
+    makeWidget(card, { height: 6 / STYLE_SCALE }, {
+      paint(box) {
+        fillRect(box.x, box.y, box.width, box.height, 3);
+        strokeRect(box.x, box.y, box.width, box.height, 0);
+        const count = Math.max(1, STARTUP_STAGES.length);
+        const fraction = state.startup.phase === "ready" ? 1
+          : Math.max(0.08, Math.min(1, (state.startup.stageIndex + 0.35) / count));
+        fillRect(box.x + 1, box.y + 1,
+          Math.floor((box.width - 2) * fraction), Math.max(0, box.height - 2),
+          0);
+      },
+    });
+    const elapsed = state.startup.phase === "ready"
+      ? "READY"
+      : state.startup.phase === "failed" ? "STARTUP PAUSED"
+        : `WORKING ${Math.max(0, Math.floor((performance.now() - state.startup.startedAt) / 1000))}S`;
+    label(card, elapsed, { height: lineHeight }, { textShade: 1, inset });
+    root.yoga.calculateLayout(WIDTH, HEIGHT, Direction.LTR);
+    return root;
+  }
+
   const buttonWidth = (text) => framedTextWidth(text);
   if (state.tab === "SETTINGS") {
     const navigation = controlRow(root, {
@@ -5621,7 +5805,7 @@ async function loadCatalog() {
     state.status = "NATIVE BRIDGE UNAVAILABLE";
     state.catalogLoading = false;
     render();
-    return;
+    return false;
   }
   state.status = "LOADING CATALOG";
   state.catalogLoading = true;
@@ -5633,7 +5817,7 @@ async function loadCatalog() {
     if (games?.stale) {
       state.catalogLoading = false;
       render();
-      return;
+      return false;
     }
     state.games = Array.isArray(games) ? games : [];
     state.games.sort((a, b) => (a.system || "").localeCompare(b.system || "")
@@ -5652,11 +5836,13 @@ async function loadCatalog() {
       state.selectedTrack = 0;
       render();
     }
+    return true;
   } catch (error) {
     if (token !== state.catalogToken) return;
     state.catalogLoading = false;
     state.status = `CATALOG ERROR: ${error.message}`;
     render();
+    return false;
   }
 }
 
@@ -6640,6 +6826,10 @@ canvas.addEventListener("wheel", (event) => {
 
 canvas.addEventListener("keydown", (event) => {
   const commandKey = event.metaKey || event.ctrlKey;
+  if (state.startup.visible) {
+    event.preventDefault();
+    return;
+  }
   if (state.editingColorEndpoint) {
     if (event.key === "Escape") finishColorEdit(false);
     else if (event.key === "Enter" || event.key === "Tab") finishColorEdit(true);
@@ -6710,7 +6900,7 @@ canvas.addEventListener("keydown", (event) => {
   } else if (commandKey && !event.altKey && !event.shiftKey && event.key === ",") {
     event.preventDefault();
     toggleOptionsScreen();
-  } else if (commandKey && event.shiftKey && event.key.toLowerCase() === "d") {
+  } else if (commandKey && event.shiftKey && event.key.toLowerCase() === "f") {
     event.preventDefault();
     selectSidebarView("FAVORITES");
   } else if (commandKey && event.shiftKey && event.key.toLowerCase() === "h") {
@@ -6870,7 +7060,11 @@ window.addEventListener("pagehide", () => {
   if (screenTransitionFrame) cancelAnimationFrame(screenTransitionFrame);
   if (spacingAnimationFrame) cancelAnimationFrame(spacingAnimationFrame);
   if (searchCursorTimer) clearTimeout(searchCursorTimer);
+  if (startupRevealTimer) clearTimeout(startupRevealTimer);
+  if (startupDismissTimer) clearTimeout(startupDismissTimer);
   searchCursorTimer = 0;
+  startupRevealTimer = 0;
+  startupDismissTimer = 0;
   screenTransitionFrame = 0;
   spacingAnimationFrame = 0;
   screenTransition = null;
@@ -6885,6 +7079,7 @@ fitCanvas();
 const pendingCommands = window.__viewBoyCommandQueue || [];
 window.ViewBoy = Object.freeze({
   dispatch(command) {
+    if (state.startup.visible) return;
     if (String(command).startsWith("selectPlaylistTab:")) {
       const tab = state.playlistTabs[Number(String(command).split(":").at(-1)) - 1];
       if (tab) activatePlaylistTab(tab.id);
@@ -6948,20 +7143,33 @@ pendingCommands.splice(0).forEach((command) => window.ViewBoy.dispatch(command))
       render();
     }
   });
+  beginStartupExperience();
+  setStartupStage(0);
   (async () => {
     let restoredTabs = false;
     try {
       state.preferences = await bridge.frontendSettingsLoad();
       state.sidebarMode = state.preferences.sidebarMode === "paths" ? "paths" : "consoles";
-      if (state.sidebarMode === "paths") await loadDatabaseFiles();
       await configureAudio();
       await loadFavorites();
       restoredTabs = restorePlaylistTabs(await bridge.playlistTabsLoad?.());
     } catch (error) {
       state.status = `OPTION ERROR: ${error.message}`;
+      failStartupExperience(state.status);
       render();
+      return;
     }
-    await loadCatalog();
+    setStartupStage(1);
+    if (!await loadCatalog()) {
+      failStartupExperience(state.status || "The library catalog could not be opened.");
+      return;
+    }
+    setStartupStage(2);
+    if (state.sidebarMode === "paths" && !await loadDatabaseFiles()) {
+      failStartupExperience(state.status || "The library path index could not be opened.");
+      return;
+    }
+    setStartupStage(3);
     if (restoredTabs) restorePlaylistTabs(await bridge.playlistTabsLoad?.());
     if (!state.playlistTabs.length) {
       state.playlistTabs = [{
@@ -6973,5 +7181,6 @@ pendingCommands.splice(0).forEach((command) => window.ViewBoy.dispatch(command))
     persistPlaylistTabs();
     render();
     try { applyNativeStatus(await bridge.nativePlaybackState()); } catch (_) { /* No active transport. */ }
+    finishStartupExperience();
   })();
 }

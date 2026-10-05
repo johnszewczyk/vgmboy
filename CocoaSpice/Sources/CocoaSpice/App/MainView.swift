@@ -2,12 +2,16 @@ import AppKit
 import CatalogBrowserCore
 import FavoriteStoreCore
 import FrontendCommandCore
+import FrontendStartupCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 let databaseFileSidebarDragType = NSPasteboard.PasteboardType("com.cocoaspice.database-file-sidebar-items")
 
 struct MainView: View {
     @Bindable var model: PlayerViewModel
+    @State private var draggedPlaylistTabID: String?
+    @State private var startupCardVisible = false
 
     var body: some View {
         liveMainView
@@ -61,6 +65,46 @@ struct MainView: View {
                 .help(model.equalizerEnabled ? "Equalizer: On" : "Equalizer: Off")
             }
         }
+        .overlay {
+            if startupCardVisible {
+                ZStack {
+                    Color.black.opacity(0.22)
+                        .ignoresSafeArea()
+                        .contentShape(Rectangle())
+                    StartupExperienceView(appName: "CocoaSpice", progress: model.startupProgress)
+                        .padding(24)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: startupCardVisible)
+        .task { await presentStartupProgressIfNeeded() }
+    }
+
+    @MainActor
+    private func presentStartupProgressIfNeeded() async {
+        do {
+            try await Task.sleep(for: .milliseconds(FrontendStartupTiming.revealDelayMilliseconds))
+        } catch {
+            return
+        }
+        guard !Task.isCancelled, model.startupProgress.phase != .ready else { return }
+        startupCardVisible = true
+        while model.startupProgress.phase == .starting {
+            do {
+                try await Task.sleep(for: .milliseconds(50))
+            } catch {
+                return
+            }
+        }
+        guard model.startupProgress.phase == .ready, !Task.isCancelled else { return }
+        do {
+            try await Task.sleep(for: .milliseconds(FrontendStartupTiming.readyConfirmationMilliseconds))
+        } catch {
+            return
+        }
+        startupCardVisible = false
     }
 
     private func sidebarToolbarButton(_ mode: SidebarBrowserMode) -> some View {
@@ -234,6 +278,16 @@ struct MainView: View {
                             }
                         }
                         .accessibilityElement(children: .contain)
+                        .onDrag {
+                            draggedPlaylistTabID = tab.id
+                            return NSItemProvider(object: tab.id as NSString)
+                        }
+                        .onDrop(of: [UTType.plainText], delegate: PlaylistTabReorderDropDelegate(
+                            destinationTabID: tab.id,
+                            draggedTabID: $draggedPlaylistTabID,
+                            model: model,
+                            animationDuration: Double(model.effectiveAutoResizeAnimationMilliseconds) / 1_000
+                        ))
                     }
                 }
                 .padding(.horizontal, 8)

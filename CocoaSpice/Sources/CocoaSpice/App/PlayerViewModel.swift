@@ -8,6 +8,7 @@ import CatalogSessionCore
 import Foundation
 import FavoriteStoreCore
 import FavoriteTrackCore
+import FrontendStartupCore
 import OSLog
 import Observation
 import PlaybackHistoryCore
@@ -320,6 +321,7 @@ final class PlayerViewModel {
     var activePlaylistTabID = ""
     var activePlaylistTitle = "Playlist"
     private var isRestoringPlaylistTabs = false
+    private var startupRestorationCompleted = false
     private var playlistTabsSaveWorkItem: DispatchWorkItem?
     private var playbackTabID: String?
     private var playbackPlaylistSnapshot: [TrackItem] = []
@@ -342,6 +344,17 @@ final class PlayerViewModel {
         )
         playlistTabs.append(tab)
         activatePlaylistTab(tab.id)
+    }
+
+    func movePlaylistTab(_ tabID: String, toIndex targetIndex: Int) {
+        guard let sourceIndex = playlistTabs.firstIndex(where: { $0.id == tabID }),
+              playlistTabs.count > 1 else { return }
+        let destinationIndex = min(max(targetIndex, 0), playlistTabs.count - 1)
+        guard sourceIndex != destinationIndex else { return }
+        syncActivePlaylistTab()
+        let tab = playlistTabs.remove(at: sourceIndex)
+        playlistTabs.insert(tab, at: min(destinationIndex, playlistTabs.count))
+        schedulePlaylistTabsSave()
     }
 
     func activatePlaylistTab(_ tabID: String) {
@@ -401,6 +414,21 @@ final class PlayerViewModel {
     func setActivePlaylistTitle(_ title: String) {
         activePlaylistTitle = String(title.prefix(120))
         syncActivePlaylistTab()
+    }
+
+    @discardableResult
+    private func activateOrCreatePlaylistTab(titled title: String) -> Bool {
+        if activePlaylistTitle == title { return true }
+        if let tab = playlistTabs.first(where: { $0.title == title }) {
+            activatePlaylistTab(tab.id)
+            return true
+        }
+        guard playlistTabs.count < 64 else {
+            statusText = "Playlist tab limit reached."
+            return false
+        }
+        createPlaylistTab(duplicateActive: false, title: title)
+        return activePlaylistTitle == title
     }
 
     func isTrackPlayingInVisibleTab(_ trackID: TrackItem.ID) -> Bool {
@@ -533,6 +561,7 @@ final class PlayerViewModel {
     private var fadedSkipTask: Task<Void, Never>?
     private var fadedSkipToken: UUID?
     var statusText: String = "Choose a music folder to begin."
+    var startupProgress = FrontendStartupProgress()
     var isLoading = false
     var isPlaying = false
     var playbackElapsedSeconds: TimeInterval = 0
@@ -838,8 +867,18 @@ final class PlayerViewModel {
     }
 
     init() {
+        var initialStartupProgress = FrontendStartupProgress()
+        initialStartupProgress.begin()
+        initialStartupProgress.advance(
+            to: .restoreWorkspace,
+            detail: "Applying saved settings and restoring your last session."
+        )
         let restoredState = AppSessionPersistence.restoreStartupState(
             supportedExtensions: PlaybackFormatRegistry.supportedExtensions
+        )
+        initialStartupProgress.advance(
+            to: .connectLibrary,
+            detail: "Opening the shared ScanSong catalog read-only."
         )
         do {
             libraryDatabase = try LibraryDatabase()
@@ -847,6 +886,7 @@ final class PlayerViewModel {
             libraryDatabase = nil
             libraryDatabaseLocationStatus = "Library database unavailable: \(error.localizedDescription)"
         }
+        startupProgress = initialStartupProgress
         restorePlaybackPreferences(restoredState.playbackPreferences)
         restoreLibraryPreferences()
         restoreFavorites()
@@ -857,8 +897,16 @@ final class PlayerViewModel {
             guard recovery.rootCount > 0 else { return }
             self?.statusText = "Recovered \(recovery.rootCount) abandoned CocoaSpice cache items (\(ByteCountFormatter.string(fromByteCount: recovery.byteCount, countStyle: .file)))."
         }
+        startupProgress.advance(
+            to: .prepareSidebar,
+            detail: "Loading catalog entries for the library sidebar."
+        )
         reloadCatalogRoots()
         reloadDatabaseSidebar()
+        startupProgress.advance(
+            to: .restorePlaylists,
+            detail: "Restoring saved playlists and playback controls."
+        )
         restorePersistedPlaylist(restoredState.sessionState)
         restorePlaylistTabs()
         restorePlaylistColumnState(restoredState.playlistColumnState)
@@ -869,6 +917,14 @@ final class PlayerViewModel {
             lastLibrarySelectedFolderPath: restoredState.lastLibrarySelectedFolderPath
         )
         updateRemoteTransportState()
+        startupRestorationCompleted = true
+        if libraryDatabase == nil {
+            startupProgress.fail(libraryDatabaseLocationStatus ?? "The library catalog is unavailable.")
+        } else if enabledCatalogRootURLs.isEmpty {
+            startupProgress.finish()
+        } else {
+            finishStartupIfReady()
+        }
     }
 
     private func restoreLibraryPreferences() {
@@ -1708,6 +1764,7 @@ final class PlayerViewModel {
     /// changing the catalog/sidebar mode. Favorites are a playlist projection,
     /// not a third catalog browser.
     func showFavoritesPlaylist() {
+        guard activateOrCreatePlaylistTab(titled: "Favorites") else { return }
         playlist = favoriteTracks
         setActivePlaylistTitle("Favorites")
         applyFavoriteMetadata()
@@ -1759,6 +1816,7 @@ final class PlayerViewModel {
                     )
                     return (track, metadata)
                 }
+                guard self.activateOrCreatePlaylistTab(titled: "History") else { return }
                 self.playlistMetadataTaskOwner.cancel()
                 self.playlist = rows.map(\.0)
                 self.setActivePlaylistTitle("History")
@@ -3109,7 +3167,8 @@ final class PlayerViewModel {
             mode: effectiveSidebarBrowserMode,
             preferFoldersOverMetadata: preferFoldersOverMetadata,
             didLoadGames: { [weak self] in self?.databaseGamesDidLoad() },
-            didLoadFiles: { [weak self] in self?.databaseFilesDidLoad() }
+            didLoadFiles: { [weak self] in self?.databaseFilesDidLoad() },
+            didFail: { [weak self] message in self?.startupProgress.fail(message) }
         )
     }
 
@@ -3124,6 +3183,7 @@ final class PlayerViewModel {
     }
 
     private func databaseGamesDidLoad() {
+        finishStartupIfReady()
         finishLibraryReloadIfNeeded()
         if sidebarSystemMode,
            !sidebarSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -3137,6 +3197,7 @@ final class PlayerViewModel {
     }
 
     private func databaseFilesDidLoad() {
+        finishStartupIfReady()
         finishLibraryReloadIfNeeded()
         applyDatabaseFileSidebarSearch()
     }
@@ -3144,6 +3205,17 @@ final class PlayerViewModel {
     private func finishLibraryReloadIfNeeded() {
         guard libraryDatabaseLocationStatus?.hasPrefix("Reloading the current ScanSong catalog") == true else { return }
         libraryDatabaseLocationStatus = "Library reloaded from the current ScanSong catalog."
+    }
+
+    private func finishStartupIfReady() {
+        guard startupRestorationCompleted, startupProgress.phase == .starting else { return }
+        if let error = databaseSidebarLoadError {
+            startupProgress.fail(error)
+        } else if enabledCatalogRootURLs.isEmpty
+                    || databaseSidebarLoader.hasLoadedGames
+                    || databaseSidebarLoader.hasLoadedFiles {
+            startupProgress.finish()
+        }
     }
 
     private func syncActiveRootToCatalogRoots(preferredRoot: URL? = nil) {

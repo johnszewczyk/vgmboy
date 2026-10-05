@@ -2323,9 +2323,9 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   commandKey('d');
   await tick();
   assert.ok(favoriteToggleCalls.length > 0, 'Command-D toggles the selected track in shared Favorites');
-  commandKey('d', { shiftKey: true });
+  commandKey('f', { shiftKey: true });
   await tick();
-  assert.match(status.textContent, /FAVORITES/i, 'Command-Shift-D opens the Favorites playlist');
+  assert.match(status.textContent, /FAVORITES/i, 'Command-Shift-F opens the Favorites playlist');
   assert.deepEqual(playlistSelectionSnapshot().selectedIndices, [],
     'opening Favorites starts with no playlist rows selected');
   assert.ok(hitTargetSnapshot().some((target) => target.playlistTabTitle && target.name === 'TAB FAVORITES')

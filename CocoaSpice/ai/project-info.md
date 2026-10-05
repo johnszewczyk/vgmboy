@@ -11,8 +11,8 @@ VGMBoyKit through a host adapter.
 - CocoaSpice owns native presentation, local UI state, and host adaptation.
 - ScanSong is the only catalog writer; CatalogReader owns shared read-only
   access and browser projections.
-- FrontendCore owns shared archive/cache, preference, queue, and transport
-  policy.
+- FrontendCore owns shared archive/cache, preference, queue, transport, and
+  startup-progress policy.
 - VGMBoy owns format admission, decoding, timing, and audio output.
 - MetaMan owns native-format metadata. UACMan owns the UAC package contract.
 - SPCBoyWK and ViewBoy are distinct active frontend siblings.
@@ -48,6 +48,10 @@ Engineering constraints:
 - Session persistence and asynchronous work:
   [app-session-persistence.md](subsystem-agent/app-session-persistence.md),
   [async-task-ownership.md](subsystem-agent/async-task-ownership.md)
+- Startup progress presentation:
+  [startup-experience.md](subsystem-agent/startup-experience.md)
+- Playlist-tab ordering and persistence:
+  [playlist-tabs.md](subsystem-agent/playlist-tabs.md)
 
 ## Local Rules
 

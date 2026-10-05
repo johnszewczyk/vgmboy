@@ -14,8 +14,9 @@ Playlist” in the sidebar opens that source in its own tab. Command-1 through
 Command-9 selects the matching tab from left to right. Command-W or a tab's
 close button closes it; closing the final tab closes the main window.
 
-Command-Shift-H replaces the current playlist with the shared playback history,
-newest play first. The sortable Date/Time column shows local timestamps as
+Command-Shift-F opens or switches to the shared Favorites tab. Command-Shift-H
+opens or switches to the shared playback History tab, newest play first. The
+sortable Date/Time column shows local timestamps as
 `YYYY.MM.DD-HH.MM.SS.MS` and automatically hides when the displayed rows have no
 history timestamp.
 

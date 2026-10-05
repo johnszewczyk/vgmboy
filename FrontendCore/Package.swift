@@ -16,7 +16,8 @@ let package = Package(
         .library(name: "FrontendPreferencesCore", targets: ["FrontendPreferencesCore"]),
         .library(name: "PlaybackRequestCore", targets: ["PlaybackRequestCore"]),
         .library(name: "PlaybackQueueCore", targets: ["PlaybackQueueCore"]),
-        .library(name: "PlaybackTransportCore", targets: ["PlaybackTransportCore"])
+        .library(name: "PlaybackTransportCore", targets: ["PlaybackTransportCore"]),
+        .library(name: "FrontendStartupCore", targets: ["FrontendStartupCore"])
     ],
     dependencies: [
         .package(path: "../VGMBoy"),
@@ -44,6 +45,7 @@ let package = Package(
         .target(name: "FrontendPreferencesCore"),
         .target(name: "PlaybackRequestCore"),
         .target(name: "PlaybackQueueCore", dependencies: ["PlaybackRequestCore"]),
+        .target(name: "FrontendStartupCore"),
         .target(
             name: "PlaybackTransportCore",
             dependencies: [

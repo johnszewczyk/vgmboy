@@ -57,9 +57,9 @@ seconds; Faded Skip is an option within that panel and does not have a separate 
 
 Faded Skip is presented inline in the Play Time panel with End Fade behavior; it has no separate panel. SPCBoy WK's toolbar is rendered by WKWebView HTML. It uses the shared native playback command boundary, but it is not the same native SwiftUI macOS toolbar view used by CocoaSpice.
 
-Favorites is a playlist projection, not a library/sidebar view. Command-Shift-D
-replaces the playlist with a snapshot of shared Favorites without changing the
-sidebar. Command-D toggles the selected track or selected database game/group.
+Favorites is a playlist projection, not a library/sidebar view. Command-Shift-F
+opens or switches to its playlist tab without changing the sidebar. Command-D
+toggles the selected track or selected database game/group.
 Both playlist headers use a visible star for the favorite column. Command-click and Shift-click select
 multiple playlist rows. Favorites are shared with CocoaSpice through VGMMan's application-support data
 store and remain separate from the read-only schema-24 scan catalog.

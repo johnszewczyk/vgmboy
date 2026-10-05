@@ -33,6 +33,7 @@ let package = Package(
                 .product(name: "PlaybackRequestCore", package: "FrontendCore"),
                 .product(name: "PlaybackQueueCore", package: "FrontendCore"),
                 .product(name: "PlaybackTransportCore", package: "FrontendCore"),
+                .product(name: "FrontendStartupCore", package: "FrontendCore"),
                 .product(name: "VGMBoyFormatCore", package: "VGMBoy"),
                 .product(name: "VGMBoyKit", package: "VGMBoy"),
                 .product(name: "VGMBoyEndpointCore", package: "VGMBoy")

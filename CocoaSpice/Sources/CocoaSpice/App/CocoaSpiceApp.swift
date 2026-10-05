@@ -217,7 +217,7 @@ private struct CocoaSpiceCommands: Commands {
             Button("Favorites Playlist") {
                 model.showFavoritesPlaylist()
             }
-            .keyboardShortcut("d", modifiers: [.command, .shift])
+            .keyboardShortcut("f", modifiers: [.command, .shift])
 
             Button("Playback History") {
                 model.showPlaybackHistory()
