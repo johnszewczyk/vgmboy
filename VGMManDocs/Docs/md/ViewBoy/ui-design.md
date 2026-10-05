@@ -56,9 +56,8 @@ The canvas grid scales with the window and is not the Game Boy's fixed 160×144
 panel. **LCD Dot Size** selects 2–6 device pixels per logical cell; smaller
 values give the same canvas a finer grid. **Pixel Matrix Gaps** is off by
 default, so every device pixel in a cell uses its endpoint color. When on,
-only the cell's bottom-right device pixel uses the LCD background tone. The
-other device pixels retain the exact endpoint color, preserving dark ink while
-keeping a visible pixel grid.
+the cell's right and bottom device-pixel edges use the LCD background tone;
+this reduces ink coverage while each lit face remains the exact PIXEL color.
 With gaps off, a custom `000` PIXEL endpoint renders as full black throughout
 each ink cell. Color interpolation and pixel shading are disabled; the
 selected dot size, gap setting, cell geometry, and presence of every
