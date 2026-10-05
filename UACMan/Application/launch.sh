@@ -38,6 +38,7 @@ cp "$SWIFTPM_DIR/release/UACManApp" "$APP_DIR/Contents/MacOS/UACManApp"
 cp "$APPLICATION_DIR/Resources/Info.plist" "$APP_DIR/Contents/Info.plist"
 cp "$APPLICATION_DIR/Resources/PkgInfo" "$APP_DIR/Contents/PkgInfo"
 cp "$APPLICATION_DIR/AppIcon/UACManAppIcon.icns" "$APP_DIR/Contents/Resources/UACManAppIcon.icns"
+cp "$APPLICATION_DIR/AppIcon/UACManAppIcon.png" "$PROJECT_DIR/app-icon.png"
 RESOURCE_BUNDLE="$SWIFTPM_DIR/release/UACMan_UACManApp.bundle"
 [[ -d "$RESOURCE_BUNDLE" ]] || { echo "Missing WKWebView workspace resources: $RESOURCE_BUNDLE" >&2; exit 1; }
 ditto "$RESOURCE_BUNDLE" "$APP_DIR/Contents/Resources/UACMan_UACManApp.bundle"
