@@ -957,7 +957,7 @@ private struct CocoaSpiceAnimationOptionsCard: View {
             )) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Solid Playlist Selection Bar")
-                    Text("Fill the moving selection capsule; turn off to show its outline.")
+                    Text("Fill single-row playlist and sidebar capsules; multi-selection stays filled.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }

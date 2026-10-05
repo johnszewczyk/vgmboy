@@ -60,7 +60,7 @@
   selected file or folder rather than changing disclosure. Single-track files
   remain selection-only until double-click or Return.
 - Files disclosure geometry uses persisted point gap and child-indent values from Sidebar Options. The triangle glyph follows Sidebar Style font size while the user-selected triangle-to-label space and hierarchy offset stay exact. Child-indent changes reload visible native rows only.
-- Database sidebar tables and the playlist use one non-interactive capsule-selection overlay on full-width table chrome. A single selection glides between rows with the standard ease-in/ease-out curve; multi-selections update as individual capsules. A user-driven sidebar selection must not be immediately re-synced before that transition begins. The overlay must remain below row content and never alter native selection semantics.
+- Database sidebar tables and the playlist use one non-interactive capsule-selection overlay on full-width table chrome. A single selection glides between rows with the standard ease-in/ease-out curve and follows the shared Solid Playlist Selection Bar outline/fill option; multi-selections update as filled individual capsules. A user-driven sidebar selection must not be immediately re-synced before that transition begins. The overlay must remain below row content and never alter native selection semantics.
 - Catalog snapshot loading remains a native session contract: Games and Files
   use independent `LatestTaskOwner` generations, publish only complete
   snapshots, and retain the previous snapshot on read failure. Do not replace

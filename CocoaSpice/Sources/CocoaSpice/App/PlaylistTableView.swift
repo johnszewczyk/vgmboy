@@ -1235,7 +1235,10 @@ final class AnimatedCapsuleSelectionHighlightView: NSView {
         didSet { applySelectionStyle() }
     }
     var isPrimarySelectionSolid = true {
-        didSet { applySelectionStyle() }
+        didSet {
+            guard oldValue != isPrimarySelectionSolid else { return }
+            applySelectionStyle()
+        }
     }
 
     override var isFlipped: Bool { true }

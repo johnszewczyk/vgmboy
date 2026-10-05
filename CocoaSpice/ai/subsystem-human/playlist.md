@@ -20,7 +20,7 @@
 
 - Selection: standard Shift and Command multi-selection.
 - Selection: selected rows can be dragged together.
-- Selection: moving a single selected row glides its capsule using the Interface animation duration (200 ms by default). Solid Playlist Selection Bar fills that capsule; when off, the capsule is an outline. Multi-selection remains immediate and filled.
+- Selection: moving a single selected row glides its capsule using the Interface animation duration (200 ms by default). Solid Playlist Selection Bar sets the same fill or outline style for the playlist and sidebar single-row capsules. Multi-selection remains immediate and filled.
 
 ## Activation
 

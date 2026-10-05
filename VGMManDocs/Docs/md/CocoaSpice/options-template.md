@@ -210,7 +210,7 @@
 
 **Control:** [ ] `Solid Playlist Selection Bar`
 
-> Fill the moving playlist selection capsule; turn off to show its outline.
+> Fill single-row playlist and sidebar capsules; multi-selection stays filled.
 
 **Default:** off.
 

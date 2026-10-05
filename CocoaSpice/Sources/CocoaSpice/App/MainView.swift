@@ -196,7 +196,8 @@ struct MainView: View {
                                 sidebarFontSize: model.databaseSidebarFontSize,
                                 sidebarTextColor: model.databaseSidebarTextColor,
                                 sidebarMonospace: model.databaseSidebarMonospaceFont,
-                                sidebarLineGap: model.databaseSidebarLineGapPoints
+                                sidebarLineGap: model.databaseSidebarLineGapPoints,
+                                primarySelectionSolid: model.solidPlaylistSelectionBar
                             )
                             .opacity(model.effectiveSidebarBrowserMode == .games ? 1 : 0)
                             .allowsHitTesting(model.effectiveSidebarBrowserMode == .games)
@@ -209,7 +210,8 @@ struct MainView: View {
                                 sidebarDisclosureGap: model.databaseSidebarDisclosureGapPoints,
                                 sidebarChildIndent: model.databaseSidebarChildIndentPoints,
                                 sidebarLineGap: model.databaseSidebarLineGapPoints,
-                                hideFileExtensions: model.databaseSidebarHidesFileExtensions
+                                hideFileExtensions: model.databaseSidebarHidesFileExtensions,
+                                primarySelectionSolid: model.solidPlaylistSelectionBar
                             )
                             .opacity(model.effectiveSidebarBrowserMode == .files ? 1 : 0)
                             .allowsHitTesting(model.effectiveSidebarBrowserMode == .files)
@@ -362,6 +364,7 @@ private enum DatabaseSidebarTableChrome {
         activationHandler: @escaping () -> Void,
         rowMenuProvider: @escaping (Int) -> NSMenu?,
         selectionColor: NSColor,
+        primarySelectionSolid: Bool,
         supportsDragging: Bool = false
     ) -> (scrollView: NSScrollView, tableView: DatabaseSidebarNativeTableView) {
         let tableView = DatabaseSidebarNativeTableView(frame: .zero)
@@ -394,6 +397,7 @@ private enum DatabaseSidebarTableChrome {
 
         let selectionHighlightView = AnimatedCapsuleSelectionHighlightView(frame: tableView.bounds)
         selectionHighlightView.selectionColor = selectionColor
+        selectionHighlightView.isPrimarySelectionSolid = primarySelectionSolid
         selectionHighlightView.autoresizingMask = [.width, .height]
         tableView.addSubview(selectionHighlightView, positioned: .below, relativeTo: nil)
         tableView.selectionHighlightView = selectionHighlightView
@@ -473,6 +477,7 @@ private struct DatabaseGameListView: NSViewRepresentable {
     let sidebarTextColor: PlayerViewModel.DatabaseSidebarTextColor
     let sidebarMonospace: Bool
     let sidebarLineGap: CGFloat
+    let primarySelectionSolid: Bool
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -497,7 +502,8 @@ private struct DatabaseGameListView: NSViewRepresentable {
             rowMenuProvider: { [weak coordinator = context.coordinator] row in
                 coordinator?.makeRowMenu(clickedRow: row)
             },
-            selectionColor: NSColor.controlAccentColor
+            selectionColor: NSColor.controlAccentColor,
+            primarySelectionSolid: primarySelectionSolid
         )
         context.coordinator.attach(tableView: chrome.tableView)
         return chrome.scrollView
@@ -506,6 +512,7 @@ private struct DatabaseGameListView: NSViewRepresentable {
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         context.coordinator.model = model
         context.coordinator.setSelectionColor(NSColor.controlAccentColor)
+        context.coordinator.setPrimarySelectionSolid(primarySelectionSolid)
         context.coordinator.sidebarFontSize = sidebarFontSize
         context.coordinator.sidebarTextColor = sidebarTextColor
         context.coordinator.sidebarMonospace = sidebarMonospace
@@ -545,6 +552,10 @@ private struct DatabaseGameListView: NSViewRepresentable {
 
         func setSelectionColor(_ color: NSColor) {
             tableView?.selectionHighlightView?.selectionColor = color
+        }
+
+        func setPrimarySelectionSolid(_ solid: Bool) {
+            tableView?.selectionHighlightView?.isPrimarySelectionSolid = solid
         }
 
         init(
@@ -803,6 +814,7 @@ private struct DatabaseFileListView: NSViewRepresentable {
     let sidebarChildIndent: CGFloat
     let sidebarLineGap: CGFloat
     let hideFileExtensions: Bool
+    let primarySelectionSolid: Bool
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -831,6 +843,7 @@ private struct DatabaseFileListView: NSViewRepresentable {
                 coordinator?.makeRowMenu(clickedRow: row)
             },
             selectionColor: NSColor.controlAccentColor,
+            primarySelectionSolid: primarySelectionSolid,
             supportsDragging: true
         )
         context.coordinator.attach(tableView: chrome.tableView)
@@ -843,6 +856,7 @@ private struct DatabaseFileListView: NSViewRepresentable {
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         context.coordinator.model = model
         context.coordinator.setSelectionColor(NSColor.controlAccentColor)
+        context.coordinator.setPrimarySelectionSolid(primarySelectionSolid)
         context.coordinator.sidebarFontSize = sidebarFontSize
         context.coordinator.sidebarTextColor = sidebarTextColor
         context.coordinator.sidebarMonospace = sidebarMonospace
@@ -881,6 +895,10 @@ private struct DatabaseFileListView: NSViewRepresentable {
 
         func setSelectionColor(_ color: NSColor) {
             tableView?.selectionHighlightView?.selectionColor = color
+        }
+
+        func setPrimarySelectionSolid(_ solid: Bool) {
+            tableView?.selectionHighlightView?.isPrimarySelectionSolid = solid
         }
 
         private final class ContextMenuAction: NSObject {

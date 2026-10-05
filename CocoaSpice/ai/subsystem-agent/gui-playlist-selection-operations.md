@@ -13,7 +13,7 @@
 - Right-click rows open queue-action menus.
 - Drag reorder is supported for selected rows.
 - One primary selected row and a multiselect set can both exist.
-- Playlist and sidebar single-row selection share one configurable standard ease-in/ease-out capsule transition, defaulting to 200 ms. The playlist capsule can be outlined or filled through the persisted Solid Playlist Selection Bar option; sidebar selection stays filled. Multi-selection and programmatic selection synchronization update immediately.
+- Playlist and sidebar single-row selection share one configurable standard ease-in/ease-out capsule transition, defaulting to 200 ms, and the persisted Solid Playlist Selection Bar style. Multi-selection and programmatic selection synchronization update immediately; multi-selection stays filled.
 - The browsing selection remains stable while playback starts, completes, or moves through previous/next media commands; the playing row is represented independently by current transport state.
 
 ## Rules
