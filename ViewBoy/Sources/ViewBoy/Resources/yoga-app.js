@@ -17,8 +17,8 @@ const LCD_DOT_SIZE_OPTIONS = [2, 3, 4, 5, 6];
 const APP_EDGE_PADDING_PX = 8;
 let DEVICE_PIXELS_PER_LCD_DOT = DEFAULT_LCD_DOT_SIZE;
 const BASELINE_LAYOUT_UNIT_CSS_PIXELS = 2.5;
-const OPTIONS_TOC_WIDTH_DOTS = 220;
-const OPTIONS_TOC_MAX_WIDTH_RATIO = 0.34;
+const OPTIONS_TOC_WIDTH_DOTS = 176;
+const OPTIONS_TOC_MAX_WIDTH_RATIO = 0.24;
 const RANDOM_HISTORY_LIMIT = 256;
 const BUTTON_BORDER_DOTS = 1;
 const SIDEBAR_ICON_SIZE_DOTS = 9;
@@ -1694,6 +1694,42 @@ function panelTitle(parent, text) {
   return row;
 }
 
+function openPageTitle(parent, text) {
+  const titleHeight = buttonStandardHeight();
+  const row = makeWidget(parent, {
+    direction: FlexDirection.Row,
+    height: titleHeight,
+    alignItems: Align.Center,
+  }, {
+    optionPanelTitle: text,
+    paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 1); },
+  });
+  label(row, text, { flexGrow: 1, height: titleHeight }, {
+    textShade: 0,
+    inset: 0,
+    align: "left",
+  });
+  return row;
+}
+
+function optionsRailHeading(parent, text) {
+  const titleHeight = buttonStandardHeight();
+  const row = makeWidget(parent, {
+    direction: FlexDirection.Row,
+    height: titleHeight,
+    alignItems: Align.Center,
+  }, {
+    optionOwnerTitle: text,
+    paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 1); },
+  });
+  label(row, text, { flexGrow: 1, height: titleHeight }, {
+    textShade: 0,
+    inset: 0,
+    align: "left",
+  });
+  return row;
+}
+
 function pixelButton(parent, text, onClick, style = {}) {
   return label(parent, text, {
     direction: FlexDirection.Row,
@@ -3123,7 +3159,6 @@ function addColumnContextMenu(parent) {
 function addPalettePreview(parent) {
   const preview = makeWidget(parent, {
     direction: FlexDirection.Row,
-    flexGrow: 1,
     gap: uiGap(),
     paddingHorizontal: uiGroupInsetDots() / STYLE_SCALE,
     paddingVertical: uiGapDots() / STYLE_SCALE,
@@ -3154,6 +3189,22 @@ function optionGroup(parent, title) {
   return group;
 }
 
+function openOptionGroup(parent, title, contentHeights = []) {
+  const padding = uiGroupInsetDots() / STYLE_SCALE;
+  const height = padding * 2
+    + buttonStandardHeight()
+    + contentHeights.reduce((sum, rowHeightValue) => sum + rowHeightValue, 0)
+    + uiGap() * contentHeights.length;
+  const group = makeWidget(parent, {
+    direction: FlexDirection.Column,
+    gap: uiGap(),
+    padding,
+    minHeight: height,
+  }, { optionGroupTitle: title });
+  optionSection(group, title);
+  return group;
+}
+
 function optionsTocWidth() {
   const available = WIDTH / STYLE_SCALE;
   return Math.min(available * OPTIONS_TOC_MAX_WIDTH_RATIO, OPTIONS_TOC_WIDTH_DOTS);
@@ -3175,12 +3226,37 @@ function optionsPane(parent, frame, tocWidth = 0) {
   }, {
     optionFrame: frame,
     clipChildren: isTOC,
-    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
 }
 
 function addDisplayOptions(parent, pref) {
-  const profile = optionGroup(parent, "SCREEN PROFILE");
+  const columns = makeWidget(parent, {
+    direction: FlexDirection.Row,
+    flexGrow: 1,
+    flexShrink: 0,
+    flexBasis: 0,
+    minWidth: 0,
+    gap: uiSectionGap() * 3,
+  });
+  const screenColumn = makeWidget(columns, {
+    direction: FlexDirection.Column,
+    flexGrow: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    gap: uiSectionGap() * 3,
+  });
+  const interfaceColumn = makeWidget(columns, {
+    direction: FlexDirection.Column,
+    flexGrow: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    gap: uiSectionGap() * 3,
+  });
+
+  addLCDColorOptions(screenColumn, openOptionGroup);
+  const profile = openOptionGroup(screenColumn, "SCREEN PROFILE", [
+    buttonStandardHeight(), buttonStandardHeight(), buttonStandardHeight(),
+  ]);
   optionChoice(profile, "FONT", [
     { title: "MICRO 3X5", selected: state.font === "MICRO", onClick: () => setFontProfile("MICRO") },
     { title: "STANDARD 5X7", selected: state.font === "STANDARD", onClick: () => setFontProfile("STANDARD") },
@@ -3190,8 +3266,7 @@ function addDisplayOptions(parent, pref) {
     () => setLCDDotSize(state.lcdDotSize + 1));
   optionToggle(profile, "PIXEL MATRIX GAPS", state.lcdPixelGaps,
     () => setLCDPixelGaps(!state.lcdPixelGaps));
-  addLCDColorOptions(parent);
-  addInterfaceOptions(parent, pref);
+  addInterfaceOptions(interfaceColumn, pref, openOptionGroup);
 }
 
 function beginColorEdit(endpoint) {
@@ -3253,8 +3328,11 @@ function customColorInput(parent, endpoint, title) {
   });
 }
 
-function addLCDColorOptions(parent) {
-  const colors = optionGroup(parent, "LCD COLORS");
+function addLCDColorOptions(parent, groupFactory = optionGroup) {
+  const colors = groupFactory(parent, "LCD PALETTE", [
+    rowHeight(8), buttonStandardHeight(), buttonStandardHeight(), rowHeight(),
+  ]);
+  addPalettePreview(colors);
   customColorInput(colors, "background", "BG");
   customColorInput(colors, "font", "PIXEL");
   label(colors, state.colorInputError ? "INVALID CSS COLOR" : "ENTER TO APPLY / ESC TO CANCEL", {
@@ -3263,8 +3341,6 @@ function addLCDColorOptions(parent) {
     textShade: 0,
     inset: controlPaddingDots(),
   });
-  const tones = optionGroup(parent, "FOUR LCD TONES");
-  addPalettePreview(tones);
 }
 
 function optionDuration(seconds, allowOpen = false) {
@@ -3726,16 +3802,19 @@ function addAudioOptions(parent, pref) {
   equalizerBands.forEach((title, index) => equalizerBand(equalizer, title, index));
 }
 
-function addInterfaceOptions(parent, pref) {
-  const transport = optionGroup(parent, "TRANSPORT LABELS");
+function addInterfaceOptions(parent, pref, groupFactory = optionGroup) {
+  const rowHeightValue = buttonStandardHeight();
+  const transport = groupFactory(parent, "TRANSPORT LABELS", [rowHeightValue]);
   optionChoice(transport, "BUTTONS", [
     { title: "WORDS", selected: !state.transportSymbols, onClick: () => setTransportSymbols(false) },
     { title: "SYMBOLS", selected: state.transportSymbols, onClick: () => setTransportSymbols(true) },
   ]);
-  const layout = optionGroup(parent, "PLAYLIST LAYOUT");
+  const layout = groupFactory(parent, "PLAYLIST LAYOUT", [rowHeightValue]);
   optionToggle(layout, "AUTO-SIZE COLUMNS", pref.columnAutoSize !== false,
     () => setPreference("columnAutoSize", pref.columnAutoSize === false));
-  const spacing = optionGroup(parent, "LAYOUT SPACING");
+  const spacing = groupFactory(parent, "LAYOUT SPACING", [
+    rowHeightValue, rowHeightValue, rowHeightValue,
+  ]);
   optionAdjuster(spacing, "UI BUTTON PAD", spacingReadout("controlPaddingDots"),
     () => adjustDisplaySpacing("controlPaddingDots", -1),
     () => adjustDisplaySpacing("controlPaddingDots", 1));
@@ -3745,10 +3824,10 @@ function addInterfaceOptions(parent, pref) {
   optionAdjuster(spacing, "TEXT LINE GAP", spacingReadout("textLineGapDots"),
     () => adjustDisplaySpacing("textLineGapDots", -1),
     () => adjustDisplaySpacing("textLineGapDots", 1));
-  const window = optionGroup(parent, "WINDOW");
+  const window = groupFactory(parent, "WINDOW", [rowHeightValue]);
   optionToggle(window, "MAIN WINDOW ON TOP", pref.mainWindowAlwaysOnTop === true,
     () => setPreference("mainWindowAlwaysOnTop", pref.mainWindowAlwaysOnTop !== true));
-  const motion = optionGroup(parent, "MOTION");
+  const motion = groupFactory(parent, "MOTION", [rowHeightValue, rowHeightValue]);
   optionToggleAdjuster(motion, "ANIMATIONS", "ANIMATION DURATION", animationEnabled(),
     () => setPreference("animationsEnabled", !animationEnabled()),
     `${animationDurationMilliseconds()} MS`,
@@ -3929,7 +4008,7 @@ function addOptionsContent(parent) {
     { title: "VIEWBOY", pages: ["DATABASE", "DISPLAY", "LIBRARY", "QUEUE"] },
     { title: "VGMBoy", pages: ["AUDIO", "DIAGNOSTICS", "METHODS", "PLAYBACK"] },
   ].forEach(({ title, pages }) => {
-    panelTitle(toc, `OPTIONS - ${title}`);
+    optionsRailHeading(toc, title);
     pages.forEach((page) => pixelButton(toc, page, () => selectOptionsPage(page), {
       widthPercent: 100,
       selected: state.optionsPage === page,
@@ -3939,9 +4018,16 @@ function addOptionsContent(parent) {
     }));
   });
   makeWidget(toc, { flexGrow: 1 });
+  makeWidget(parent, {
+    width: 1,
+    flexShrink: 0,
+    marginVertical: uiOptionsInsetDots() / STYLE_SCALE,
+  }, {
+    paint(box) { fillRect(box.x, box.y, box.width, box.height, 1); },
+  });
 
   const panel = optionsPane(parent, "content");
-  panelTitle(panel, state.optionsPage === "DISPLAY" ? "DISPLAY + UI" : state.optionsPage);
+  openPageTitle(panel, state.optionsPage === "DISPLAY" ? "DISPLAY + UI" : state.optionsPage);
   const viewport = makeWidget(panel, {
     direction: FlexDirection.Column,
     flexGrow: 1,
@@ -4012,6 +4098,11 @@ function buildTree() {
       controlTitle: "BACK",
       align: "left",
       inset: 1,
+    });
+    label(navigation, "OPTIONS", { height: toolbarHeight, flexGrow: 1 }, {
+      textShade: 0,
+      inset: controlPaddingDots(),
+      align: "left",
     });
   } else {
     const fillButton = (parent, text, onClick, style = {}) => pixelButton(parent, text, onClick, {
