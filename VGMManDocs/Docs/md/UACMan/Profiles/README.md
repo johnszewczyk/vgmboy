@@ -11,8 +11,8 @@ they are not ROM-set inventory or completeness protocols. AudioMan owns
 source-set membership, No-Intro matching, source-tree locations, and ROM/game
 set reports. For each conversion, actual UAC tag coverage, package counts,
 exceptions, and completed changes belong in AudioMan's per-set UAC dashboard.
-Dated field evidence belongs in `UACMan/ai/reports/`; published procedure
-pages carry reusable method guidance. Do not use reports as duplicate status
+Dated field evidence belongs in `UACMan/ai/reports/`; published profile
+pages carry reusable format mappings. Do not use reports as duplicate status
 for a live UAC set.
 
 Platform identity uses one canonical package-level value. Apply the approved
@@ -26,7 +26,7 @@ authoritative native-layout inventory is
 supported does not by itself mean that a format-specific UAC projection has
 been reviewed.
 
-| MetaManCore reader ID | UAC procedure status | Notes |
+| MetaManCore reader ID | UAC profile status | Notes |
 | --- | --- | --- |
 | `ay` | Profile pending | AY subtune and timing behavior needs UAC mapping. |
 | `sap` | Profile pending | SAP header directives, songs, and timings need UAC mapping. |
@@ -44,7 +44,7 @@ been reviewed.
 | `psf-family` | Profile pending | Document PSF, PSF2, SSF, USF, and 2SF tags and dependencies. |
 | `gsf` | Profile pending | Document tags, PSFLib dependencies, and GBA header facts. |
 | `qsf` | Profile pending | Document tags, QSound blocks, and QSFLib dependencies. |
-| `spc` | Procedure complete | See [`SPC.md`](SPC.md); live set coverage and tag outcomes are reported by AudioMan per set. |
+| `spc` | Profile complete | See [`SPC.md`](SPC.md); live set coverage and tag outcomes are reported by AudioMan per set. |
 | `sid` | Profile pending | Document PSID/RSID header and raw-header retention. |
 | `ape` | Profile pending | Document APEv2/ID3 tags, seek table, and sample-count duration. |
 | `adx` | Profile pending | Document ADX header and loop timing. |
@@ -60,7 +60,7 @@ been reviewed.
 | `txth-ima-adp` | Profile pending | Document TXTH-specified IMA ADPCM source requirements. |
 | `ahx` | Profile pending | Document AHX header, version, and timing fields. |
 | `dvi` | Profile pending | Document DVI/IMA block facts and timing. |
-| `xa` | Procedure complete | See [`PSX-CDXA.md`](PSX-CDXA.md); the PSX-specific workflow is also defined in the [protocol](../protocols/PSX-CDXA.protocol.md). |
+| `xa` | Profile complete | See [`PSX-CDXA.md`](PSX-CDXA.md); the PSX-specific workflow is also defined in the [protocol](../protocols/PSX-CDXA.protocol.md). |
 | `nds-strm` | Profile pending | Document Nintendo DS STRM header and channel facts. |
 | `nds-strm-ffta2` | Profile pending | Document the FFTA2-specific STRM extension. |
 | `ngc-dsp-standard` | Profile pending | Document Nintendo DSP header and loop/sample fields. |
