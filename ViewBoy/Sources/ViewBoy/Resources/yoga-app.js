@@ -73,7 +73,7 @@ const ANIMATION_FPS_MAX = 240;
 const ANIMATION_FPS_TICKS = [30, 60, 90, 120, 150, 180, 210, 240];
 // The framebuffer retains four logical labels, mapped to these two endpoints.
 const DEFAULT_LCD_BACKGROUND = "#9BBC0F";
-const DEFAULT_LCD_PIXEL = "#222222";
+const DEFAULT_LCD_PIXEL = "#000000";
 function hexToRGB(color) {
   const value = Number.parseInt(color.slice(1), 16);
   return [(value >> 16) & 255, (value >> 8) & 255, value & 255];

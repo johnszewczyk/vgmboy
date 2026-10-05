@@ -36,19 +36,19 @@ state tint is the expected visual difference from an inactive button.
 
 ## LCD Colors
 
-The default endpoints are the traditional Game Boy yellow-green background
-(`BG #9BBC0F`) and dark pixel color (`PIXEL #222222`). The renderer keeps its
-four framebuffer labels for layout but maps shades 0–1 directly to PIXEL and
-shades 2–3 directly to BG. The final device-pixel write bypasses tone palettes
-and blending: each lit cell face uses the exact PIXEL input. Configured matrix
-gaps use exact BG. This two-color rendering is always on and preserves the
-same cell mask, gap dimensions, grid, and spacing.
+For the current contrast test, the default endpoints are a yellow-green
+background (`BG #9BBC0F`) and black pixels (`PIXEL #000000`). The renderer
+keeps its four framebuffer labels for layout and maps shades 0–1 directly to
+PIXEL and shades 2–3 directly to BG. Each lit cell face receives the exact
+PIXEL input; configured matrix gaps receive exact BG. This two-color rendering
+is always on and bypasses tone palettes and blending while preserving the cell
+mask, gap dimensions, grid, and spacing.
 
-BG and PIXEL are the only color controls. Inputs accept three- or six-digit hex with or without `#`, space- or
-comma-separated RGB channel values, CSS color names, and supported CSS color
-functions. ViewBoy preserves the entered text (including names such as
-`rebeccapurple`) and stores the resolved RGB value separately for rendering.
-Enter applies a valid value and Escape cancels.
+BG and PIXEL are the only color controls. Inputs accept three- or six-digit hex
+with or without `#`, space- or comma-separated RGB channel values, CSS color
+names, and supported CSS color functions. ViewBoy preserves the entered text,
+including names such as `rebeccapurple`, and stores the resolved RGB value
+separately for rendering. Enter applies a valid value and Escape cancels.
 
 ## Grid and Fidelity
 
@@ -56,7 +56,8 @@ The canvas grid scales with the window and is not the Game Boy's fixed 160×144
 panel. **LCD Dot Size** selects 2–6 device pixels per logical cell; smaller
 values give the same canvas a finer grid. **Pixel Matrix Gaps** is off by
 default, so every device pixel in a cell uses its endpoint color. When on,
-the cell's right and bottom device-pixel edges use the LCD background tone.
+the cell's right and bottom device-pixel edges use the LCD background tone;
+this reduces ink coverage while each lit face remains the exact PIXEL color.
 With gaps off, a custom `000` PIXEL endpoint renders as full black throughout
 each ink cell. Color interpolation and pixel shading are disabled; the
 selected dot size, gap setting, cell geometry, and presence of every
