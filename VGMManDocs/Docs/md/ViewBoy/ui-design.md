@@ -19,9 +19,10 @@ window, and motion controls sit at right. Each Display section uses a full card
 with a shared filled title bar and enclosing outline. Longer pages scroll
 within the content area.
 
-In the Path sidebar, folder disclosures occupy a fixed leading gutter. Folder
-and file labels line up in the same text column at each depth, and chevrons
-share the row text's vertical alignment.
+In the Path sidebar, root chevron ink shares the leading edge of the search and
+toolbar controls. Nested disclosures move inward by two bitmap glyph advances
+per depth; folder and file labels share a column at each depth. Chevrons align
+vertically with row text.
 
 The main toolbar contains eight equal-width buttons in this order: Previous,
 Stop, Play/Pause, Next, Long Play, Repeat One, Playlist Random, and Library
@@ -34,10 +35,14 @@ state tint is the expected visual difference from an inactive button.
 ## LCD Colors
 
 The default endpoints are the traditional Game Boy yellow-green background
-(`BG #9BBC0F`) and dark pixel color (`PIXEL #222222`). ViewBoy renders exactly
+(`BG #9BBC0F`) and dark pixel color (`PIXEL #222222`). Standard mode renders
 four tones: PIXEL, two intermediate tones, and BG. It derives the middle tones
 at one-third and two-thirds of the endpoint distance in CIELAB L*, with a* and
-b* interpolated at the same fractions.
+b* interpolated at the same fractions. **Raw Pixels** is the high-contrast
+two-tone mode: shades 0–2 use the exact PIXEL endpoint and shade 3 uses BG.
+Pixel Matrix Gaps are bypassed. Selected controls reverse their label to BG,
+and moving row selection uses a pixel outline. This keeps dark custom pixels
+such as `000` at full strength while retaining clear selection feedback.
 
 BG and PIXEL are the only color controls. Inputs accept three- or six-digit hex with or without `#`, space- or
 comma-separated RGB channel values, CSS color names, and supported CSS color
@@ -53,10 +58,12 @@ values give the same canvas a finer grid. **Pixel Matrix Gaps** is off by
 default, so every device pixel in a cell uses its framebuffer tone. When on,
 the cell's right and bottom device-pixel edges use the LCD background tone.
 With gaps off, a custom `000` PIXEL endpoint renders as full black throughout
-each ink cell.
+each ink cell. Raw Pixels fills the complete device cell with the exact PIXEL
+or BG endpoint, even when Matrix Gaps are enabled.
 
-This reproduces a four-tone palette and visible pixel grid, not the original
-STN panel. The middle colors follow equal CIELAB L* intervals; they do not
+Standard mode reproduces a four-tone palette and visible pixel grid, not the
+original STN panel. Raw Pixels uses two exact endpoint colors for readability.
+The middle colors follow equal CIELAB L* intervals; they do not
 approximate a measured LCD voltage curve. The renderer does not model
 reflectance, viewing-angle response, row/column crosstalk, liquid-crystal
 transition time, or panel aging. Nintendo lists the classic screen as a
@@ -81,16 +88,18 @@ the three adjustable controls have distinct jobs:
 | Measure | Value | Applies to | Does not control |
 | --- | --- | --- | --- |
 | App-edge inset | Fixed 8 px on all four sides | Gap between the LCD edge and the outermost toolbar, pane, or footer content | Control text padding or gaps between sibling elements |
-| UI Button Pad | 1–8 px; default 4 | Text inset inside controls and standard control height | App-edge inset or playlist/sidebar text-row height |
-| UI Chrome Gap | 1–8 px; default 4 | Separation between controls, groups, panes, tabs, headings, and playlist columns; Options pane inset is twice this value | Blank space between playlist/sidebar text rows |
+| UI Button Pad | 1–8 px; default 4 | Main-screen control text inset and standard control height | Options grid, app-edge inset, or playlist/sidebar text-row height |
+| UI Chrome Gap | 1–8 px; default 4 | Main-screen separation between controls, panes, tabs, headings, and playlist columns | Options grid or blank space between playlist/sidebar text rows |
 | Text Line Gap | 1–8 px; default 1 | Blank vertical space between playlist and sidebar text rows | Control height, pane inset, or other chrome gaps |
+| Options grid | Fixed: 8 px pane inset, 4 px card inset, 4 px gaps, 4 px control padding | Shared spacing inside every Options page | Main-screen adjustable spacing |
 
 ### Padding, Gaps, and Margins
 
-- **Padding** is space inside a component: UI Button Pad insets control text;
-  UI Chrome Gap also insets the framed Options panes and setting groups.
+- **Padding** is space inside a component: UI Button Pad insets main-screen
+  control text. Options uses fixed grid values so saved main-screen spacing
+  cannot shrink settings controls or clip labels.
 - **Gaps** separate sibling controls or sections. UI Chrome Gap is the shared
-  gap; Text Line Gap is reserved for the two text lists.
+  main-screen gap; Text Line Gap is reserved for the two text lists.
 - **Margins** are local corrections for one widget relationship, such as the
   one-pixel separation before a boxed gauge value. Margins do not define the
   app grid or replace the shared gap settings.

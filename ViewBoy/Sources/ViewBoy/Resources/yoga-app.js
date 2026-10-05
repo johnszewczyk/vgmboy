@@ -15,6 +15,10 @@ import Yoga, {
 const DEFAULT_LCD_DOT_SIZE = 3;
 const LCD_DOT_SIZE_OPTIONS = [2, 3, 4, 5, 6];
 const APP_EDGE_PADDING_PX = 8;
+const OPTIONS_PANE_INSET_DOTS = 8;
+const OPTIONS_CARD_INSET_DOTS = 4;
+const OPTIONS_GAP_DOTS = 4;
+const OPTIONS_CONTROL_PAD_DOTS = 4;
 let DEVICE_PIXELS_PER_LCD_DOT = DEFAULT_LCD_DOT_SIZE;
 const BASELINE_LAYOUT_UNIT_CSS_PIXELS = 2.5;
 const OPTIONS_TOC_WIDTH_DOTS = 176;
@@ -348,6 +352,10 @@ function storedSpacing(value, fallback) {
     Number.isFinite(number) ? Math.round(number) : fallback));
 }
 function displayPalette() {
+  if (state.rawPixelContrast) {
+    return [state.customFontColor, state.customFontColor,
+      state.customFontColor, state.customBackgroundColor];
+  }
   return paletteTones(state.customFontColor, state.customBackgroundColor);
 }
 function updateScreenSurface() {
@@ -369,6 +377,7 @@ function saveDisplayOptions() {
       customBackgroundInput: state.customBackgroundInput,
       customFontInput: state.customFontInput,
       customPaletteConfigured: state.customPaletteConfigured,
+      rawPixelContrast: state.rawPixelContrast,
       lcdDotSize: state.lcdDotSize,
       lcdPixelGaps: state.lcdPixelGaps,
       uiButtonPadDots: state.controlPaddingDots,
@@ -461,6 +470,7 @@ const state = {
   customBackgroundInput: savedCustomBackgroundInput,
   customFontInput: savedCustomFontInput,
   customPaletteConfigured: savedCustomPaletteConfigured,
+  rawPixelContrast: savedDisplayOptions.rawPixelContrast === true,
   editingColorEndpoint: null,
   colorDraft: "",
   colorInputError: null,
@@ -536,8 +546,6 @@ const state = {
   tableViewportWidth: 0,
   tableViewportBox: null,
   tableContentWidth: 0,
-  tableScrollbarBox: null,
-  tableScrollbarThumb: null,
   tableViewportWidget: null,
   tableContentWidget: null,
   catalogPaneWidget: null,
@@ -977,7 +985,8 @@ export function lcdDotSizeSnapshot() {
 export function lcdDeviceDotSnapshot(shade = 0) {
   const ink = RGB[Math.max(0, Math.min(3, Math.round(Number(shade) || 0)))];
   const surface = RGB[3];
-  const faceSize = Math.max(1, DEVICE_PIXELS_PER_LCD_DOT - (state.lcdPixelGaps ? 1 : 0));
+  const faceSize = Math.max(1, DEVICE_PIXELS_PER_LCD_DOT
+    - (state.lcdPixelGaps && !state.rawPixelContrast ? 1 : 0));
   return Array.from({ length: DEVICE_PIXELS_PER_LCD_DOT }, (_, y) =>
     Array.from({ length: DEVICE_PIXELS_PER_LCD_DOT }, (_, x) =>
       rgbToHex(x < faceSize && y < faceSize ? ink : surface)));
@@ -1314,7 +1323,8 @@ function presentPixels(startY = 0, endY = HEIGHT, startX = 0, endX = WIDTH) {
   const lastColumn = Math.min(WIDTH, Math.ceil(endX));
   if (lastRow <= firstRow || lastColumn <= firstColumn) return;
   const background = packedRGB[3];
-  const faceSize = Math.max(1, DEVICE_PIXELS_PER_LCD_DOT - (state.lcdPixelGaps ? 1 : 0));
+  const faceSize = Math.max(1, DEVICE_PIXELS_PER_LCD_DOT
+    - (state.lcdPixelGaps && !state.rawPixelContrast ? 1 : 0));
   for (let y = firstRow; y < lastRow; y += 1) {
     const sourceRow = y * WIDTH;
     const topRow = y * DEVICE_PIXELS_PER_LCD_DOT * outputWidth;
@@ -1414,7 +1424,10 @@ function label(parent, text, style = {}, meta = {}) {
     paint(box) {
       const previousClip = paintClip;
       if (meta.clipToBox) paintClip = intersectBoxes(paintClip, box);
-      if (meta.fill !== undefined) fillRect(box.x, box.y, box.width, box.height, meta.fill);
+      if (meta.fill !== undefined) {
+        const fillShade = state.rawPixelContrast && meta.fill === 2 ? 0 : meta.fill;
+        fillRect(box.x, box.y, box.width, box.height, fillShade);
+      }
       if (meta.border !== undefined) strokeRect(box.x, box.y, box.width, box.height, meta.border);
       if (meta.bottomLine !== undefined) {
         line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, meta.bottomLine);
@@ -1423,9 +1436,11 @@ function label(parent, text, style = {}, meta = {}) {
       const textY = meta.revealProgress !== undefined
         ? box.y : box.y + Math.floor((box.height - fontProfile().height) / 2);
       const displayText = typeof meta.textValue === "function" ? meta.textValue(box) : text;
+      const textShade = state.rawPixelContrast && (meta.rawInverseText || meta.fill === 2)
+        ? 3 : meta.textShade ?? 0;
       drawText(displayText, box.x + (meta.inset ?? controlPaddingDots()), textY,
         box.width - (meta.inset ?? controlPaddingDots()) * 2,
-        meta.textShade ?? 0, meta.align ?? "left");
+        textShade, meta.align ?? "left");
       paintClip = previousClip;
     },
   });
@@ -1448,7 +1463,9 @@ function spacingValue(key, time = currentRenderTime) {
 }
 
 function controlPaddingDots() {
-  return spacingValue("controlPaddingDots");
+  return state.tab === "SETTINGS"
+    ? OPTIONS_CONTROL_PAD_DOTS
+    : spacingValue("controlPaddingDots");
 }
 
 function uiGapDots() {
@@ -1456,11 +1473,11 @@ function uiGapDots() {
 }
 
 function uiGroupInsetDots() {
-  return uiGapDots();
+  return state.tab === "SETTINGS" ? OPTIONS_CARD_INSET_DOTS : uiGapDots();
 }
 
 function uiOptionsInsetDots() {
-  return uiGapDots() * 2;
+  return OPTIONS_PANE_INSET_DOTS;
 }
 
 function buttonStandardHeight() {
@@ -1468,7 +1485,7 @@ function buttonStandardHeight() {
 }
 
 function uiGap() {
-  return uiGapDots() / STYLE_SCALE;
+  return (state.tab === "SETTINGS" ? OPTIONS_GAP_DOTS : uiGapDots()) / STYLE_SCALE;
 }
 
 function spacingReadout(key) {
@@ -1509,7 +1526,7 @@ function oneDot() {
   return 1 / STYLE_SCALE;
 }
 
-function paintSidebarIcon(name, box) {
+function paintSidebarIcon(name, box, shade = 0) {
   const art = SIDEBAR_ICON_ART[name];
   if (!art) return;
   let minX = SIDEBAR_ICON_SIZE_DOTS;
@@ -1530,7 +1547,7 @@ function paintSidebarIcon(name, box) {
   const top = Math.round(box.y + box.height / 2 - (minY + maxY + 1) / 2);
   art.forEach((row, y) => {
     for (let x = 0; x < row.length; x += 1) {
-      if (row[x] === "1") fillRect(left + x, top + y, 1, 1, 0);
+      if (row[x] === "1") fillRect(left + x, top + y, 1, 1, shade);
     }
   });
 }
@@ -1693,9 +1710,9 @@ function panelTitle(parent, text) {
     height: titleHeight,
     alignItems: Align.Center,
   }, {
-    fill: 2,
+    fill: state.rawPixelContrast ? 3 : 2,
     optionPanelTitle: text,
-    paint(box) { fillRect(box.x, box.y, box.width, box.height, 2); },
+    paint(box) { fillRect(box.x, box.y, box.width, box.height, state.rawPixelContrast ? 3 : 2); },
   });
   label(row, text, { flexGrow: 1, height: titleHeight }, {
     textShade: 0,
@@ -1755,10 +1772,12 @@ function pixelButton(parent, text, onClick, style = {}) {
     flexBasis: style.flexBasis,
   }, {
     border: 1,
-    fill: style.optionPage ? undefined : style.selected ? 2 : undefined,
-    textShade: 0,
+    fill: style.optionPage ? undefined : style.selected
+      ? state.rawPixelContrast && !style.icon ? 0 : 2 : undefined,
+    textShade: state.rawPixelContrast && style.selected && !style.icon ? 3 : 0,
     inset: style.inset ?? controlPaddingDots(),
     align: style.align ?? "center",
+    rawInverseText: state.rawPixelContrast && style.selected && !style.icon,
     controlTitle: style.controlTitle,
     optionOwner: style.optionOwner,
     optionPage: style.optionPage === true,
@@ -1768,7 +1787,8 @@ function pixelButton(parent, text, onClick, style = {}) {
     sidebarIcon: style.sidebarIcon,
     optionExit: style.optionExit === true,
     animationFPSControl: style.animationFPSControl === true,
-    paint: style.icon ? (box) => paintSidebarIcon(style.icon, box) : style.paint,
+    paint: style.icon ? (box) => paintSidebarIcon(style.icon, box,
+      state.rawPixelContrast && style.selected ? 3 : 0) : style.paint,
     onClick,
   });
 }
@@ -1849,12 +1869,13 @@ function startCheckboxAnimation(key, checked) {
 function optionChecklistRow(parent, title, checked, onClick, extraMeta = {}) {
   const height = buttonStandardHeight();
   const checkboxKey = extraMeta.optionCheckboxKey || `${state.optionsPage}:${title}`;
+  const visibleTitle = extraMeta.visibleTitle ?? title;
   const rowMeta = {
     onClick: () => {
       startCheckboxAnimation(checkboxKey, checked === true);
       onClick();
     },
-    controlTitle: title,
+    controlTitle: extraMeta.controlTitle ?? title,
     optionChecklistItem: true,
     optionCheckboxChecked: checked === true,
     optionCheckboxKey: checkboxKey,
@@ -1868,7 +1889,7 @@ function optionChecklistRow(parent, title, checked, onClick, extraMeta = {}) {
     paddingHorizontal: controlPaddingDots() / STYLE_SCALE,
   }, rowMeta);
   appendOptionCheckboxGlyph(row, checkboxKey, checked, rowMeta);
-  label(row, title, { flexGrow: 1, height }, {
+  label(row, visibleTitle, { flexGrow: 1, height }, {
     textShade: 0, inset: controlPaddingDots(),
   });
   return row;
@@ -1909,7 +1930,7 @@ function optionToggleDuration(parent, title, controlPrefix, checked, onClick, ke
 }
 
 function optionToggleAdjuster(parent, title, controlPrefix, checked, onClick,
-  value, onDecrease, onIncrease) {
+  value, onDecrease, onIncrease, accessibleTitle = title) {
   const height = buttonStandardHeight();
   const checkboxKey = `${state.optionsPage}:${title}`;
   const rowMeta = {
@@ -1917,7 +1938,7 @@ function optionToggleAdjuster(parent, title, controlPrefix, checked, onClick,
       startCheckboxAnimation(checkboxKey, checked === true);
       onClick();
     },
-    controlTitle: title,
+    controlTitle: accessibleTitle,
     optionChecklistItem: true,
     optionCheckboxChecked: checked === true,
     optionCheckboxKey: checkboxKey,
@@ -1966,12 +1987,12 @@ function optionChoice(parent, title, choices) {
     flexBasis: 0,
     minWidth: 0,
     selected: choice.selected,
-    controlTitle: `${title} ${choice.title}`,
+    controlTitle: `${title} ${choice.accessibilityTitle ?? choice.title}`,
   }));
   return row;
 }
 
-function optionAdjuster(parent, title, value, onDecrease, onIncrease) {
+function optionAdjuster(parent, title, value, onDecrease, onIncrease, accessibleTitle = title) {
   const height = buttonStandardHeight();
   const row = controlRow(parent, { height }, {
     paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
@@ -1980,14 +2001,14 @@ function optionAdjuster(parent, title, value, onDecrease, onIncrease) {
     textShade: 0, inset: controlPaddingDots(),
   });
   const controlHeight = buttonStandardHeight();
-  pixelButton(row, "[-]", onDecrease, { controlTitle: `${title} -` });
-  pixelButton(row, "[+]", onIncrease, { controlTitle: `${title} +` });
+  pixelButton(row, "[-]", onDecrease, { controlTitle: `${accessibleTitle} -` });
+  pixelButton(row, "[+]", onIncrease, { controlTitle: `${accessibleTitle} +` });
   label(row, value, { width: framedTextWidth(value), height: controlHeight }, {
     border: 1,
     textShade: 0,
     align: "center",
     inset: controlPaddingDots(),
-    spacingReadout: title,
+    spacingReadout: accessibleTitle,
   });
   return row;
 }
@@ -2032,7 +2053,7 @@ function addAnimationFPSControl(parent) {
   const row = controlRow(parent, { height }, {
     paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
   });
-  label(row, "ANIMATION FPS", { widthPercent: 33.3333, height }, {
+  label(row, "FPS CAP", { widthPercent: 33.3333, height }, {
     textShade: 0,
     inset: controlPaddingDots(),
   });
@@ -2507,7 +2528,10 @@ function createQueueRow(parent, index, track, columns) {
     playlistRow: true,
     contentRowKind: "playlist",
     paint(box) {
-      if (selected && !primarySelected) fillRect(box.x, box.y, box.width, box.height, 2);
+      if (selected && !primarySelected) {
+        if (state.rawPixelContrast) strokeRect(box.x, box.y, box.width, box.height, 0);
+        else fillRect(box.x, box.y, box.width, box.height, 2);
+      }
     },
   });
   columns.forEach((column) => {
@@ -2550,7 +2574,7 @@ function createQueueRow(parent, index, track, columns) {
   return row;
 }
 
-function disclosureSquare(box, indent = controlPaddingDots()) {
+function disclosureSquare(box, indent = 0) {
   const font = fontProfile();
   const size = font.height;
   return {
@@ -2561,7 +2585,7 @@ function disclosureSquare(box, indent = controlPaddingDots()) {
   };
 }
 
-function paintChevron(box, progress, indent = controlPaddingDots()) {
+function paintChevron(box, progress, indent = 0) {
   const font = fontProfile();
   const square = disclosureSquare(box, indent);
   const glyph = font.glyphs[">"];
@@ -2605,11 +2629,11 @@ function createLibraryRow(parent, text, options = {}) {
     contentRowKind: "sidebar",
     sidebarContext: options.context || null,
     disclosureProgress: options.disclosureProgress ?? 0,
-    disclosureIndent: options.disclosureIndent ?? controlPaddingDots(),
+    disclosureIndent: options.disclosureIndent ?? 0,
     inset: options.indent ?? (options.disclosure ? controlPaddingDots() + 2 * fontProfile().advance : 0),
     paint(box) {
       if (options.disclosure) paintChevron(box, options.disclosureProgress ?? 0,
-        options.disclosureIndent ?? controlPaddingDots());
+        options.disclosureIndent ?? 0);
     },
   });
 }
@@ -2730,7 +2754,7 @@ function pathRows() {
       node,
       group: children.length > 0,
       indent: controlPaddingDots() + (depth + 1) * 2 * fontProfile().advance,
-      disclosureIndent: controlPaddingDots() + depth * 2 * fontProfile().advance,
+      disclosureIndent: depth * 2 * fontProfile().advance,
       disclosureProgress: progress,
       revealProgress,
     });
@@ -2952,11 +2976,13 @@ function addCatalogPane(parent) {
     reorderContainer: !isExiting && !tabLayoutAnimation,
     reorderKind: "tab",
     reorderKey: tab.id,
-    activePlaylistTab: tab.id === state.activePlaylistTabId,
+        activePlaylistTab: tab.id === state.activePlaylistTabId,
         onClick: isExiting ? undefined : () => activatePlaylistTab(tab.id),
         controlTitle: `TAB ${tab.title}`,
         paint(box) {
-          if (tab.id === state.activePlaylistTabId) fillRect(box.x, box.y, box.width, box.height, 2);
+          if (tab.id === state.activePlaylistTabId) {
+            fillRect(box.x, box.y, box.width, box.height, state.rawPixelContrast ? 0 : 2);
+          }
           strokeRect(box.x, box.y, box.width, box.height, 1);
         },
       });
@@ -2972,6 +2998,7 @@ function addCatalogPane(parent) {
         align: "left",
         playlistTabTitle: true,
         playlistTabId: tab.id,
+        rawInverseText: state.rawPixelContrast && tab.id === state.activePlaylistTabId,
         reorderKey: tab.id,
         controlTitle: `TAB ${tab.title}`,
         onClick: isExiting ? undefined : () => activatePlaylistTab(tab.id),
@@ -2986,6 +3013,7 @@ function addCatalogPane(parent) {
         align: "center",
         playlistTabClose: true,
         playlistTabId: tab.id,
+        rawInverseText: state.rawPixelContrast && tab.id === state.activePlaylistTabId,
         controlTitle: "X",
         onClick: isExiting ? undefined : () => closePlaylistTab(tab.id),
       });
@@ -3029,38 +3057,6 @@ function addCatalogPane(parent) {
   if (!viewTracks.length) label(tableRows, state.status, { height: rowHeight() }, {
     textShade: 0, inset: controlPaddingDots(),
   });
-  makeWidget(panel, {
-    height: rowHeight(4),
-  }, {
-    horizontalScrollbar: true,
-    onClick(event) {
-      if (state.tableHorizontalMax <= 0) return;
-      const point = logicalPoint(event);
-      const box = state.tableScrollbarBox;
-      if (!box) return;
-      const trackWidth = Math.max(1, box.width - 2);
-      state.tableHorizontalScroll = Math.max(0, Math.min(state.tableHorizontalMax,
-        ((point.x - box.x - 1) / trackWidth) * state.tableHorizontalMax));
-      render();
-    },
-    paint(box) {
-      state.tableScrollbarBox = box;
-      const trackLeft = box.x + 1;
-      const trackWidth = Math.max(1, box.width - 2);
-      const centerY = box.y + Math.floor(box.height / 2);
-      line(trackLeft, centerY, trackLeft + trackWidth, centerY, 2);
-      const contentWidth = Math.max(trackWidth, state.tableContentWidth);
-      const viewportWidth = Math.min(contentWidth, state.tableViewportWidth || contentWidth);
-      const thumbWidth = state.tableHorizontalMax > 0
-        ? Math.max(6, Math.min(trackWidth, Math.floor(trackWidth * viewportWidth / contentWidth)))
-        : trackWidth;
-      const thumbTravel = Math.max(0, trackWidth - thumbWidth);
-      const thumbLeft = trackLeft + (state.tableHorizontalMax > 0
-        ? Math.round(thumbTravel * state.tableHorizontalScroll / state.tableHorizontalMax) : 0);
-      fillRect(thumbLeft, centerY, thumbWidth, 1, 0);
-      state.tableScrollbarThumb = { x: thumbLeft, y: centerY, width: thumbWidth, height: 1 };
-    },
-  });
   return panel;
 }
 
@@ -3094,7 +3090,7 @@ function addColumnContextMenu(parent) {
       padding: uiGroupInsetDots() / STYLE_SCALE,
     }, {
       paint(box) {
-        fillRect(box.x, box.y, box.width, box.height, 2);
+        fillRect(box.x, box.y, box.width, box.height, state.rawPixelContrast ? 3 : 2);
         strokeRect(box.x, box.y, box.width, box.height, 0);
       },
     });
@@ -3146,7 +3142,7 @@ function addColumnContextMenu(parent) {
     padding: uiGroupInsetDots() / STYLE_SCALE,
   }, {
     paint(box) {
-      fillRect(box.x, box.y, box.width, box.height, 2);
+      fillRect(box.x, box.y, box.width, box.height, state.rawPixelContrast ? 3 : 2);
       strokeRect(box.x, box.y, box.width, box.height, 0);
     },
   });
@@ -3180,7 +3176,9 @@ function addPalettePreview(parent) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
       fillRect(box.x + 1, box.y + 1, box.width - 2, box.height - 2, shade);
       drawText(String(shade), box.x + 2, box.y + Math.floor((box.height - fontProfile().height) / 2),
-        box.width - 4, shade < 2 ? 3 : 0, "center");
+        box.width - 4,
+        state.rawPixelContrast ? (shade < 3 ? 3 : 0) : shade < 2 ? 3 : 0,
+        "center");
     },
   }));
 }
@@ -3259,10 +3257,12 @@ function addDisplayOptions(parent, pref) {
     buttonStandardHeight(), buttonStandardHeight(), buttonStandardHeight(),
   ]);
   optionChoice(profile, "FONT", [
-    { title: "MICRO 3X5", selected: state.font === "MICRO", onClick: () => setFontProfile("MICRO") },
-    { title: "STANDARD 5X7", selected: state.font === "STANDARD", onClick: () => setFontProfile("STANDARD") },
+    { title: "MICRO", accessibilityTitle: "MICRO 3X5", selected: state.font === "MICRO",
+      onClick: () => setFontProfile("MICRO") },
+    { title: "STD", accessibilityTitle: "STANDARD 5X7", selected: state.font === "STANDARD",
+      onClick: () => setFontProfile("STANDARD") },
   ]);
-  optionAdjuster(profile, "LCD DOT SIZE", `${state.lcdDotSize} PX`,
+  optionAdjuster(profile, "DOT SIZE", `${state.lcdDotSize} PX`,
     () => setLCDDotSize(state.lcdDotSize - 1),
     () => setLCDDotSize(state.lcdDotSize + 1));
   optionToggle(profile, "PIXEL MATRIX GAPS", state.lcdPixelGaps,
@@ -3331,14 +3331,21 @@ function customColorInput(parent, endpoint, title) {
 
 function addLCDColorOptions(parent) {
   const colors = optionGroup(parent, "LCD PALETTE", [
-    rowHeight(8), buttonStandardHeight(), buttonStandardHeight(), rowHeight(),
+    rowHeight(8), buttonStandardHeight(), buttonStandardHeight(),
+    buttonStandardHeight(), rowHeight(), rowHeight(4),
   ]);
   addPalettePreview(colors);
   customColorInput(colors, "background", "BG");
   customColorInput(colors, "font", "PIXEL");
-  label(colors, state.colorInputError ? "INVALID CSS COLOR" : "ENTER TO APPLY / ESC TO CANCEL", {
+  optionToggle(colors, "RAW PIXELS", state.rawPixelContrast,
+    () => setRawPixelContrast(!state.rawPixelContrast));
+  label(colors, state.colorInputError ? "INVALID COLOR" : "ENTER APPLY", {
     height: rowHeight(),
   }, {
+    textShade: 0,
+    inset: controlPaddingDots(),
+  });
+  label(colors, "ESC CANCEL", { height: rowHeight() }, {
     textShade: 0,
     inset: controlPaddingDots(),
   });
@@ -3808,32 +3815,37 @@ function addInterfaceOptions(parent, pref) {
   const transport = optionGroup(parent, "TRANSPORT LABELS", [rowHeightValue]);
   optionChoice(transport, "BUTTONS", [
     { title: "WORDS", selected: !state.transportSymbols, onClick: () => setTransportSymbols(false) },
-    { title: "SYMBOLS", selected: state.transportSymbols, onClick: () => setTransportSymbols(true) },
+    { title: "SYMS", accessibilityTitle: "SYMBOLS", selected: state.transportSymbols,
+      onClick: () => setTransportSymbols(true) },
   ]);
   const layout = optionGroup(parent, "PLAYLIST LAYOUT", [rowHeightValue]);
   optionToggle(layout, "AUTO-SIZE COLUMNS", pref.columnAutoSize !== false,
-    () => setPreference("columnAutoSize", pref.columnAutoSize === false));
+    () => setPreference("columnAutoSize", pref.columnAutoSize === false), {
+      visibleTitle: "AUTO SIZE",
+    });
   const spacing = optionGroup(parent, "LAYOUT SPACING", [
     rowHeightValue, rowHeightValue, rowHeightValue,
   ]);
-  optionAdjuster(spacing, "UI BUTTON PAD", spacingReadout("controlPaddingDots"),
+  optionAdjuster(spacing, "BUTTON", spacingReadout("controlPaddingDots"),
     () => adjustDisplaySpacing("controlPaddingDots", -1),
-    () => adjustDisplaySpacing("controlPaddingDots", 1));
-  optionAdjuster(spacing, "UI CHROME GAP", spacingReadout("uiChromeGapDots"),
+    () => adjustDisplaySpacing("controlPaddingDots", 1), "UI BUTTON PAD");
+  optionAdjuster(spacing, "CHROME", spacingReadout("uiChromeGapDots"),
     () => adjustDisplaySpacing("uiChromeGapDots", -1),
-    () => adjustDisplaySpacing("uiChromeGapDots", 1));
-  optionAdjuster(spacing, "TEXT LINE GAP", spacingReadout("textLineGapDots"),
+    () => adjustDisplaySpacing("uiChromeGapDots", 1), "UI CHROME GAP");
+  optionAdjuster(spacing, "LINE", spacingReadout("textLineGapDots"),
     () => adjustDisplaySpacing("textLineGapDots", -1),
-    () => adjustDisplaySpacing("textLineGapDots", 1));
+    () => adjustDisplaySpacing("textLineGapDots", 1), "TEXT LINE GAP");
   const window = optionGroup(parent, "WINDOW", [rowHeightValue]);
   optionToggle(window, "MAIN WINDOW ON TOP", pref.mainWindowAlwaysOnTop === true,
-    () => setPreference("mainWindowAlwaysOnTop", pref.mainWindowAlwaysOnTop !== true));
+    () => setPreference("mainWindowAlwaysOnTop", pref.mainWindowAlwaysOnTop !== true), {
+      visibleTitle: "ON TOP",
+    });
   const motion = optionGroup(parent, "MOTION", [rowHeightValue, rowHeightValue]);
-  optionToggleAdjuster(motion, "ANIMATIONS", "ANIMATION DURATION", animationEnabled(),
+  optionToggleAdjuster(motion, "ANIM", "ANIMATION DURATION", animationEnabled(),
     () => setPreference("animationsEnabled", !animationEnabled()),
     `${animationDurationMilliseconds()} MS`,
     () => adjustAnimationTime(-50),
-    () => adjustAnimationTime(50));
+    () => adjustAnimationTime(50), "ANIMATIONS");
   addAnimationFPSControl(motion);
 }
 
@@ -4064,8 +4076,6 @@ function buildTree() {
   state.tableViewportWidget = null;
   state.tableContentWidget = null;
   state.catalogPaneWidget = null;
-  state.tableScrollbarBox = null;
-  state.tableScrollbarThumb = null;
   state.libraryViewportWidget = null;
   state.optionsContentViewportWidget = null;
   state.optionsContentBodyWidget = null;
@@ -4256,7 +4266,11 @@ function paintSelectionBandPixels(y) {
     const bandTop = floor(y);
     const priorClip = paintClip;
     paintClip = intersectBoxes(paintClip, selectionBand.clip);
-    fillRect(selectionBand.x, bandTop, selectionBand.width, selectionBand.height, 2);
+    if (state.rawPixelContrast) {
+      strokeRect(selectionBand.x, bandTop, selectionBand.width, selectionBand.height, 0);
+    } else {
+      fillRect(selectionBand.x, bandTop, selectionBand.width, selectionBand.height, 2);
+    }
     for (const row of selectionRows) {
       if (row.box.y >= bandTop + selectionBand.height || row.box.y + row.box.height <= bandTop) continue;
       if (row.widget.meta.optionPage) {
@@ -4277,8 +4291,13 @@ function paintSidebarSelectionBandPixels(y) {
   const bandTop = floor(y);
   const priorClip = paintClip;
   paintClip = intersectBoxes(paintClip, sidebarSelectionBand.clip);
-  fillRect(sidebarSelectionBand.x, bandTop,
-    sidebarSelectionBand.width, sidebarSelectionBand.height, 2);
+  if (state.rawPixelContrast) {
+    strokeRect(sidebarSelectionBand.x, bandTop,
+      sidebarSelectionBand.width, sidebarSelectionBand.height, 0);
+  } else {
+    fillRect(sidebarSelectionBand.x, bandTop,
+      sidebarSelectionBand.width, sidebarSelectionBand.height, 2);
+  }
   for (const row of sidebarSelectionRows) {
     if (row.box.y >= bandTop + sidebarSelectionBand.height
       || row.box.y + row.box.height <= bandTop) continue;
@@ -4897,6 +4916,14 @@ function setLCDPixelGaps(enabled) {
   const value = enabled === true;
   if (state.lcdPixelGaps === value) return;
   state.lcdPixelGaps = value;
+  saveDisplayOptions();
+  render();
+}
+
+function setRawPixelContrast(enabled) {
+  state.rawPixelContrast = enabled === true;
+  RGB = paletteRGB(displayPalette());
+  packedRGB = packedPalette(RGB);
   saveDisplayOptions();
   render();
 }
@@ -6264,19 +6291,6 @@ function findTarget(point) {
   return findTargetEntry(point)?.widget ?? null;
 }
 
-function setHorizontalScrollFromThumb(pointerX, thumbOffset) {
-  const box = state.tableScrollbarBox;
-  const thumb = state.tableScrollbarThumb;
-  if (!box || !thumb || state.tableHorizontalMax <= 0) return;
-  const trackLeft = box.x + 1;
-  const trackWidth = Math.max(1, box.width - 2);
-  const travel = Math.max(0, trackWidth - thumb.width);
-  if (travel <= 0) return;
-  const thumbLeft = Math.max(trackLeft, Math.min(trackLeft + travel, pointerX - thumbOffset));
-  state.tableHorizontalScroll = (thumbLeft - trackLeft) / travel * state.tableHorizontalMax;
-  render();
-}
-
 function currentReorderOrder(kind) {
   if (reorderPreview?.kind === kind) return [...reorderPreview.keys];
   if (kind === "column") {
@@ -6394,15 +6408,6 @@ canvas.addEventListener("pointerdown", (event) => {
     setAnimationFPSFromPointer(point.x, entry.box);
     render(false, true);
     event.preventDefault?.();
-  } else if (target?.meta.horizontalScrollbar) {
-    const thumb = state.tableScrollbarThumb;
-    const localX = point.x - (thumb?.x ?? point.x);
-    const thumbOffset = thumb && localX >= 0 && localX < thumb.width
-      ? localX : Math.floor((thumb?.width ?? 1) / 2);
-    pointerInteraction = { kind: "scrollbar", pointerId: event.pointerId, thumbOffset, startX: point.x };
-    canvas.setPointerCapture?.(event.pointerId);
-    setHorizontalScrollFromThumb(point.x, thumbOffset);
-    event.preventDefault?.();
   } else {
     const columnEntry = findTargetEntry(point,
       (widget) => widget.meta.columnHeader && widget.meta.reorderable);
@@ -6434,12 +6439,6 @@ canvas.addEventListener("pointermove", (event) => {
   const point = logicalPoint(event);
   if (pointerInteraction?.kind === "animation-fps") {
     setAnimationFPSFromPointer(point.x, pointerInteraction.box);
-    return;
-  }
-  if (pointerInteraction?.kind === "scrollbar") {
-    if (Math.abs(point.x - pointerInteraction.startX) >= 1) suppressNextClick = true;
-    pointerInteraction.startX = point.x;
-    setHorizontalScrollFromThumb(point.x, pointerInteraction.thumbOffset);
     return;
   }
   if (pointerInteraction?.kind === "reorder") {
@@ -6496,9 +6495,6 @@ canvas.addEventListener("pointerup", (event) => {
     } else {
       pointerInteraction = null;
     }
-  } else if (interaction.kind === "scrollbar") {
-    pointerInteraction = null;
-    suppressNextClick = true;
   }
 });
 
