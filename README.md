@@ -20,6 +20,7 @@ ownership and preservation rules.
 | [SPCBoyWK](SPCBoyWK/README.md) | Native WebKit player frontend. |
 | [SPCBOY SB2](SB2/README.md) | Fourth, pixel-style WebKit frontend under development. |
 | [ViewBoy](ViewBoy/README.md) | Native player with a screen-first, four-shade Yoga LCD interface. |
+| [LineBoy](LineBoy/README.md) | Monochrome DOS-style line-grid display experiment. |
 | [VGMManDocs](VGMManDocs/README.md) | Native viewer and editor for the family's published Markdown library. |
 
 LaunchPad remains a sibling workspace tool because it launches projects beyond

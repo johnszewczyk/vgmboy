@@ -35,3 +35,8 @@ For a ViewBoy task, the active application and UI live in `ViewBoy/`; use its
 is a separate product, and `LocalRecovery/ViewBoy/` contains historical
 archives only. ViewBoy's implementation and launch script are in `ViewBoy/`
 regardless of historical bridge names.
+
+For a LineBoy task, use the standalone family subproject at `LineBoy/`, follow
+its `AGENTS.md` route, and build/launch with `LineBoy/build.sh` and
+`LineBoy/launch.sh`. LineBoy is a separate monochrome line-grid experiment; it
+does not use ViewBoy's native host or playback bridge.

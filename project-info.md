@@ -14,6 +14,8 @@ history live in this repository.
 - UACMan owns its package format and editor. CocoaSpice, SPCBoyWK, and ViewBoy
   are active separate player apps; SPCBOY SB2 is a fourth frontend under
   development.
+- LineBoy is a standalone monochrome line-grid display experiment in its own
+  family subfolder; it is not yet connected to the shared catalog or player.
 
 ## Task Routing
 
@@ -34,6 +36,7 @@ crosses that ownership boundary.
 | Native WebKit player and typed host bridge | [SPCBoyWK/AGENTS.md](SPCBoyWK/AGENTS.md) |
 | SPCBOY SB2 pixel-style WebKit frontend | [SB2/AGENTS.md](SB2/AGENTS.md) |
 | Screen-first Yoga LCD player | [ViewBoy/AGENTS.md](ViewBoy/AGENTS.md) |
+| Monochrome DOS-style line-grid display experiment | [LineBoy/AGENTS.md](LineBoy/AGENTS.md) |
 | Published Markdown library and native documentation viewer | [VGMManDocs/AGENTS.md](VGMManDocs/AGENTS.md) |
 
 For a component task, follow that owner's `AGENTS.md` → `ai/AGENTS.md` →

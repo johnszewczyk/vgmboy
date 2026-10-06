@@ -1,0 +1,1032 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080808">
+  <title>LineBoy — monochrome line-grid player</title>
+  <style>
+    @font-face {
+      font-family: "Modern DOS";
+      src: url("./assets/ModernDOS8x16.ttf") format("truetype");
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+    }
+
+    :root {
+      color-scheme: dark;
+      --black: #080808;
+      --well: #141414;
+      --gray: #bdbdbd;
+      --white: #eeeeee;
+      --dim: #888888;
+      --mono: "Modern DOS", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-width: 320px; min-height: 100%; margin: 0; }
+    body {
+      background: var(--black);
+      color: var(--gray);
+      font: 16px/16px var(--mono);
+      letter-spacing: 0;
+      -webkit-font-smoothing: none;
+      text-rendering: optimizeSpeed;
+    }
+    button { margin: 0; font: inherit; letter-spacing: inherit; }
+
+    .crt {
+      min-height: 100vh;
+      padding: 8px;
+      display: grid;
+      place-items: safe center;
+      overflow: auto;
+      background: radial-gradient(ellipse at center, transparent 74%, #0006 100%), var(--black);
+    }
+
+    .terminal {
+      --columns: 40;
+      --line-rows: 15;
+      --footer-row: 15;
+      --workspace-lines: 11;
+      --grid-rows: repeat(15, 16px);
+      width: 320px;
+      height: 240px;
+      padding-block: 0;
+      display: grid;
+      grid-template-columns: repeat(var(--columns), 8px);
+      grid-template-rows: var(--grid-rows);
+      position: relative;
+      isolation: isolate;
+      background: #0b0b0b;
+      color: var(--gray);
+      zoom: 1;
+    }
+
+    .terminal > header,
+    .terminal > .resolutionline,
+    .terminal > nav,
+    .terminal > main,
+    .terminal > footer { min-width: 0; opacity: 0; }
+
+    .terminal[data-renderer="dom"] > header,
+    .terminal[data-renderer="dom"] > .resolutionline,
+    .terminal[data-renderer="dom"] > nav,
+    .terminal[data-renderer="dom"] > main,
+    .terminal[data-renderer="dom"] > footer { opacity: 1; }
+
+    .terminal[data-renderer="webgl2"] > header,
+    .terminal[data-renderer="webgl2"] > .resolutionline,
+    .terminal[data-renderer="webgl2"] > nav,
+    .terminal[data-renderer="webgl2"] > main,
+    .terminal[data-renderer="webgl2"] > footer { opacity: 0; }
+
+    .beam-screen {
+      position: absolute;
+      z-index: 2;
+      inset: 0;
+      display: none;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      pointer-events: none;
+    }
+    .terminal[data-renderer="webgl2"] .beam-screen { display: block; }
+
+    .topline,
+    .resolutionline,
+    .toolrow,
+    .workspace,
+    .statusline { grid-column: 1 / -1; min-width: 0; }
+
+    .topline {
+      grid-row: 1;
+      display: grid;
+      grid-template-columns: repeat(var(--columns), 8px);
+      align-items: center;
+      position: relative;
+      background: var(--black);
+      color: var(--white);
+      text-transform: uppercase;
+    }
+    .brand {
+      grid-column: 1 / 9;
+      grid-row: 1;
+      white-space: nowrap;
+    }
+    .statbits {
+      grid-column: 1 / -1;
+      grid-row: 1;
+      justify-self: end;
+      display: flex;
+      align-items: center;
+      gap: 1ch;
+      color: var(--dim);
+      white-space: nowrap;
+    }
+
+    .resolutionline {
+      grid-row: 2;
+      display: grid;
+      grid-template-columns: 4ch minmax(0, 1fr);
+      column-gap: 1ch;
+      align-items: center;
+      background: var(--black);
+    }
+    .resolution-label { color: var(--dim); text-align: left; }
+    .resolution-options {
+      display: grid;
+      grid-template-columns: repeat(4, 5ch) 6ch;
+      gap: 1ch;
+      align-items: center;
+    }
+    .resolution-choice {
+      width: 100%;
+      height: 16px;
+      padding: 0;
+      border: 0;
+      background: var(--gray);
+      color: var(--black);
+      line-height: 16px;
+      text-align: center;
+      cursor: pointer;
+    }
+    .resolution-choice:hover,
+    .resolution-choice:focus-visible,
+    .resolution-choice[aria-pressed="true"] {
+      background: var(--white);
+      color: var(--black);
+      outline: none;
+    }
+
+    .toolrow {
+      grid-row: 3;
+      display: grid;
+      grid-template-columns: 5ch 5ch 5ch 4ch 5ch minmax(0, 1fr) 3ch 5ch 3ch;
+      gap: 0;
+      align-items: stretch;
+      background: var(--black);
+    }
+    .nav-button {
+      min-width: 0;
+      width: 100%;
+      height: 16px;
+      padding: 0;
+      border: 0;
+      background: var(--gray);
+      color: var(--black);
+      line-height: 16px;
+      text-align: center;
+      text-transform: uppercase;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .nav-button:hover,
+    .nav-button:focus-visible,
+    .nav-button[aria-pressed="true"] {
+      background: var(--white);
+      color: var(--black);
+      outline: none;
+    }
+    .tool-spacer { grid-column: 6; }
+
+    .workspace {
+      --workspace-rows: repeat(var(--workspace-lines), 16px);
+      grid-row: 4 / var(--footer-row);
+      display: grid;
+      grid-template-columns: 128px 8px minmax(0, 1fr);
+      grid-template-rows: var(--workspace-rows);
+      min-height: 0;
+    }
+    .panel {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: var(--workspace-rows);
+      background: transparent;
+    }
+    .library-panel { grid-column: 1; grid-row: 1 / -1; }
+    .listpanel { grid-column: 3; grid-row: 1 / -1; }
+    .panel-title {
+      min-width: 0;
+      height: 16px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 1ch;
+      padding: 0 1ch;
+      overflow: hidden;
+      background: var(--gray);
+      color: var(--black);
+      text-align: left;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .panel-title > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .panel-title .count { text-align: right; }
+
+    .tree {
+      grid-row: 2 / -1;
+      min-height: 0;
+      display: grid;
+      grid-auto-rows: 16px;
+      align-content: start;
+      overflow-x: hidden;
+      overflow-y: auto;
+      scrollbar-width: none;
+      scroll-snap-type: y mandatory;
+    }
+    .tree::-webkit-scrollbar, .songs::-webkit-scrollbar { display: none; }
+    .tree-row {
+      min-width: 0;
+      width: 100%;
+      height: 16px;
+      display: grid;
+      grid-template-columns: 2ch minmax(0, 1fr) 3ch;
+      align-items: center;
+      gap: 0;
+      padding: 0;
+      border: 0;
+      background: var(--well);
+      color: var(--gray);
+      line-height: 16px;
+      text-align: left;
+      white-space: nowrap;
+      cursor: pointer;
+      scroll-snap-align: start;
+    }
+    .tree-row[hidden] { display: none; }
+    .tree-row .chev { text-align: center; color: var(--dim); }
+    .tree-row .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .tree-row .count { color: var(--dim); text-align: right; }
+    .tree-row.indent { padding-left: 1ch; }
+    .tree-row:hover,
+    .tree-row:focus-visible,
+    .tree-row[aria-selected="true"] {
+      background: var(--gray);
+      color: var(--black);
+      outline: none;
+    }
+    .tree-row:hover .chev,
+    .tree-row:focus-visible .chev,
+    .tree-row[aria-selected="true"] .chev,
+    .tree-row:hover .count,
+    .tree-row:focus-visible .count,
+    .tree-row[aria-selected="true"] .count { color: #454545; }
+
+    .divider {
+      grid-column: 2;
+      grid-row: 1 / -1;
+      display: grid;
+      grid-template-rows: var(--workspace-rows);
+      color: #777777;
+      text-align: center;
+      pointer-events: none;
+    }
+    .divider span { height: 16px; line-height: 16px; }
+
+    .listpanel .panel-title { grid-row: 1; }
+    .list-head {
+      grid-row: 2;
+      min-width: 0;
+      height: 16px;
+      display: grid;
+      grid-template-columns: 2ch minmax(0, 1fr) 5ch;
+      gap: 1ch;
+      align-items: center;
+      padding: 0 1ch;
+      background: #414141;
+      color: var(--black);
+      text-transform: uppercase;
+    }
+    .list-head span:first-child { text-align: left; }
+    .list-head span:nth-child(2) { text-align: left; }
+    .list-head span:last-child { text-align: right; }
+    .songs {
+      grid-row: 3 / -1;
+      min-height: 0;
+      display: grid;
+      grid-auto-rows: 16px;
+      align-content: start;
+      overflow-x: hidden;
+      overflow-y: auto;
+      scrollbar-width: none;
+      scroll-snap-type: y mandatory;
+    }
+    .song {
+      min-width: 0;
+      width: 100%;
+      height: 16px;
+      display: grid;
+      grid-template-columns: 2ch minmax(0, 1fr) 5ch;
+      gap: 1ch;
+      align-items: center;
+      padding: 0 1ch;
+      border: 0;
+      background: var(--well);
+      color: var(--gray);
+      line-height: 16px;
+      text-align: left;
+      white-space: nowrap;
+      cursor: pointer;
+      scroll-snap-align: start;
+    }
+    .song[hidden] { display: none; }
+    .song .num { color: var(--dim); }
+    .song .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .song .length { color: var(--dim); text-align: right; }
+    .song:hover,
+    .song:focus-visible,
+    .song[aria-selected="true"] {
+      background: var(--gray);
+      color: var(--black);
+      outline: none;
+    }
+    .song:hover .num,
+    .song:focus-visible .num,
+    .song[aria-selected="true"] .num,
+    .song:hover .length,
+    .song:focus-visible .length,
+    .song[aria-selected="true"] .length { color: #454545; }
+
+    .statusline {
+      grid-row: var(--footer-row);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 1ch;
+      padding: 0 1ch;
+      overflow: hidden;
+      background: var(--well);
+      color: var(--gray);
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .statusline > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .statusline > span:last-child { color: var(--white); text-align: right; }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .resolution-choice, .nav-button, .tree-row, .song {
+        transition: background-color 70ms linear, color 70ms linear;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="crt">
+    <div class="terminal" data-renderer="dom" role="application" aria-label="LineBoy monochrome line-grid player">
+      <canvas class="beam-screen" aria-hidden="true"></canvas>
+
+      <header class="topline">
+        <div class="brand">LINEBOY</div>
+        <div class="statbits"><span id="grid-size">40X15</span><span id="resolution-size">320X240</span><span id="clock">00:00:00</span></div>
+      </header>
+
+      <section class="resolutionline" aria-label="Display resolution">
+        <span class="resolution-label">RES:</span>
+        <div class="resolution-options" role="group" aria-label="Choose raster size">
+          <button class="resolution-choice" type="button" data-resolution="320X240" aria-label="320 by 240 raster" aria-pressed="true">320</button>
+          <button class="resolution-choice" type="button" data-resolution="512X384" aria-label="512 by 384 raster" aria-pressed="false">512</button>
+          <button class="resolution-choice" type="button" data-resolution="640X480" aria-label="640 by 480 raster" aria-pressed="false">640</button>
+          <button class="resolution-choice" type="button" data-resolution="800X600" aria-label="800 by 600 raster" aria-pressed="false">800</button>
+          <button class="resolution-choice" type="button" data-resolution="1024X768" aria-label="1024 by 768 raster" aria-pressed="false">1024</button>
+        </div>
+      </section>
+
+      <nav class="toolrow" aria-label="Commands and transport">
+        <button class="nav-button" type="button" data-action="OPEN" aria-pressed="false">FILE</button>
+        <button class="nav-button" type="button" data-action="TREE" aria-pressed="false">TREE</button>
+        <button class="nav-button" type="button" data-action="LIST" aria-pressed="true">LIST</button>
+        <button class="nav-button" type="button" data-action="FAVORITES" aria-pressed="false">FAV</button>
+        <button class="nav-button" type="button" data-action="OPTIONS" aria-pressed="false">OPTS</button>
+        <span class="tool-spacer" aria-hidden="true"></span>
+        <button class="nav-button" type="button" data-action="PREV" aria-label="Previous track">&lt;&lt;</button>
+        <button class="nav-button" type="button" data-action="PLAY" aria-pressed="false">PLAY</button>
+        <button class="nav-button" type="button" data-action="NEXT" aria-label="Next track">&gt;&gt;</button>
+      </nav>
+
+      <main class="workspace" aria-label="Library and playlist">
+        <aside class="panel library-panel" aria-label="Library">
+          <div class="panel-title"><span>LIBRARY</span><span class="count" id="library-count">12/64</span></div>
+          <div class="tree" id="library-tree" role="tree" aria-label="Systems and demo folders">
+            <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-selected="false" tabindex="-1"><span class="chev"></span><span class="label">AMIGA</span><span class="count">38</span></button>
+            <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-selected="false" tabindex="-1"><span class="chev"></span><span class="label">ARCADE</span><span class="count">54</span></button>
+            <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-selected="false" tabindex="-1"><span class="chev"></span><span class="label">ATARI ST</span><span class="count">21</span></button>
+            <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-selected="false" tabindex="-1"><span class="chev"></span><span class="label">C64</span><span class="count">17</span></button>
+            <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-expanded="true" aria-selected="false" tabindex="-1" data-folder="SNES"><span class="chev">−</span><span class="label">SNES</span><span class="count">143</span></button>
+            <button class="tree-row indent" type="button" role="treeitem" aria-level="2" aria-selected="true" tabindex="0" data-parent="SNES" data-game="CHRONO"><span class="chev">›</span><span class="label">CHRONO TRG</span><span class="count">27</span></button>
+            <button class="tree-row indent" type="button" role="treeitem" aria-level="2" aria-selected="false" tabindex="-1" data-parent="SNES" data-game="METROID"><span class="chev">›</span><span class="label">SUPER MET</span><span class="count">8</span></button>
+            <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-selected="false" tabindex="-1"><span class="chev"></span><span class="label">GENESIS</span><span class="count">72</span></button>
+            <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-selected="false" tabindex="-1"><span class="chev"></span><span class="label">PSX</span><span class="count">29</span></button>
+          </div>
+        </aside>
+
+        <div class="divider" id="column-divider" aria-hidden="true"></div>
+
+        <section class="panel listpanel" aria-label="Playlist">
+          <div class="panel-title"><span id="game-title">CHRONO TRIGGER</span><span class="count" id="track-count">27 TRK</span></div>
+          <div class="list-head" role="row"><span>#</span><span>TRACK</span><span>TIME</span></div>
+          <div class="songs" id="song-list" role="listbox" aria-label="Playlist tracks"></div>
+        </section>
+      </main>
+
+      <footer class="statusline"><span id="status">SNES/CHRONO/08-BLACKBIRD.SPC</span><span id="now">STOPPED</span></footer>
+    </div>
+  </div>
+
+  <script>
+    const RASTERS = [
+      { id: "320X240", width: 320, height: 240, deviceScales: [6, 4, 2] },
+      { id: "512X384", width: 512, height: 384, deviceScales: [4, 3, 2, 1] },
+      { id: "640X480", width: 640, height: 480, deviceScales: [3, 2, 1] },
+      { id: "800X600", width: 800, height: 600, deviceScales: [2, 1] },
+      { id: "1024X768", width: 1024, height: 768, deviceScales: [2, 1] },
+    ];
+
+    const GAMES = {
+      CHRONO: {
+        title: "CHRONO TRIGGER",
+        system: "SNES",
+        tracks: [
+          ["01", "At the Bottom of Night", "2:13", true],
+          ["02", "Ayla's Theme", "1:08", false],
+          ["03", "Battle 1", "1:30", true],
+          ["04", "Battle 2", "1:13", false],
+          ["05", "Bike Chase", "0:52", false],
+          ["06", "Black Omen", "2:45", false],
+          ["07", "Blackbird (Inside)", "0:11", false],
+          ["08", "Blackbird (Outside)", "0:10", true],
+          ["09", "Boss Battle 1", "1:08", false],
+          ["10", "Boss Battle 2", "2:24", false],
+          ["11", "Corridors of Time", "2:43", true],
+          ["12", "Frog's Theme", "1:01", false],
+          ["13", "Guardia Castle", "2:00", false],
+          ["14", "Magus' Theme", "2:11", false],
+          ["15", "Peaceful Days", "1:13", false],
+          ["16", "Robo's Theme", "1:37", false],
+          ["17", "Schala's Theme", "1:10", false],
+          ["18", "Secret of the Forest", "1:27", false],
+          ["19", "The Black Omen", "2:45", false],
+          ["20", "Wind Scene", "2:23", false],
+          ["21", "Battle with Magus", "2:10", false],
+          ["22", "Burn! Bobonga!", "1:05", false],
+          ["23", "Crono and Marle", "1:38", false],
+          ["24", "Fanfare 1", "0:07", false],
+          ["25", "Fanfare 2", "0:08", false],
+          ["26", "Lavos' Theme", "2:17", false],
+          ["27", "Ocean Palace", "2:09", false],
+        ],
+      },
+      METROID: {
+        title: "SUPER METROID",
+        system: "SNES",
+        tracks: [
+          ["01", "Opening", "1:21", true],
+          ["02", "Theme of Samus Aran", "1:15", true],
+          ["03", "Brinstar", "1:14", false],
+          ["04", "Green Brinstar", "1:03", false],
+          ["05", "Norfair", "1:34", true],
+          ["06", "Lower Norfair", "1:28", false],
+          ["07", "Maridia", "1:18", false],
+          ["08", "Escape", "0:48", false],
+        ],
+      },
+    };
+
+    const terminal = document.querySelector(".terminal");
+    const display = document.querySelector(".beam-screen");
+    const workspace = document.querySelector(".workspace");
+    const divider = document.querySelector("#column-divider");
+    const gridSize = document.querySelector("#grid-size");
+    const resolutionSize = document.querySelector("#resolution-size");
+    const resolutionButtons = [...document.querySelectorAll(".resolution-choice")];
+    const resolutionById = new Map(RASTERS.map((raster) => [raster.id, raster]));
+    const treeRows = [...document.querySelectorAll(".tree-row")];
+    const songList = document.querySelector("#song-list");
+    const gameTitle = document.querySelector("#game-title");
+    const trackCount = document.querySelector("#track-count");
+    const status = document.querySelector("#status");
+    const now = document.querySelector("#now");
+    const clock = document.querySelector("#clock");
+    const navButtons = [...document.querySelectorAll(".nav-button")];
+    let activeRaster = null;
+    let requestedRaster = "320X240";
+    let activeGame = GAMES.CHRONO;
+    let favoritesOnly = false;
+    let playing = false;
+    let seconds = 0;
+    let activeScanPitchCss = 1;
+    let screenOriginY = 0;
+    let screenOriginX = 0;
+
+    function updateRaster() {
+      const raster = resolutionById.get(requestedRaster);
+      const deviceRatio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+      const availableWidth = Math.max(1, window.innerWidth - 16) * deviceRatio;
+      const availableHeight = Math.max(1, window.innerHeight - 16) * deviceRatio;
+      const deviceScale = raster.deviceScales.find((scale) =>
+        raster.width * scale <= availableWidth && raster.height * scale <= availableHeight
+      ) || raster.deviceScales.at(-1);
+      const scale = deviceScale / deviceRatio;
+      const columns = raster.width / 8;
+      const textRows = Math.floor(raster.height / 16);
+      const halfLineInset = (raster.height - textRows * 16) / 2;
+      const workspaceLines = textRows - 4;
+      const sidebarColumns = Math.max(16, Math.min(24, Math.round(columns * 0.2)));
+
+      activeRaster = { ...raster, deviceScale, scale, columns, textRows, workspaceLines };
+      terminal.style.width = `${raster.width}px`;
+      terminal.style.height = `${raster.height}px`;
+      terminal.style.zoom = String(scale);
+      terminal.style.paddingBlock = `${halfLineInset}px`;
+      terminal.style.gridTemplateColumns = `repeat(${columns}, 8px)`;
+      terminal.style.gridTemplateRows = `repeat(${textRows}, 16px)`;
+      terminal.style.setProperty("--columns", columns);
+      terminal.style.setProperty("--line-rows", textRows);
+      terminal.style.setProperty("--footer-row", textRows);
+      terminal.style.setProperty("--workspace-lines", workspaceLines);
+      terminal.style.setProperty("--grid-rows", `repeat(${textRows}, 16px)`);
+      workspace.style.gridTemplateColumns = `${sidebarColumns * 8}px 8px minmax(0, 1fr)`;
+      workspace.style.gridTemplateRows = `repeat(${workspaceLines}, 16px)`;
+      workspace.style.setProperty("--workspace-rows", `repeat(${workspaceLines}, 16px)`);
+      divider.replaceChildren(...Array.from({ length: workspaceLines }, () => {
+        const line = document.createElement("span");
+        line.textContent = "│";
+        return line;
+      }));
+      gridSize.textContent = `${columns}X${raster.height / 16}`;
+      resolutionSize.textContent = raster.id;
+      terminal.dataset.raster = raster.id.toLowerCase();
+      terminal.dataset.videoMode = raster.width === 320 ? "standard" : "high";
+      resolutionButtons.forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.resolution === requestedRaster));
+      });
+      return true;
+    }
+
+    function selectRaster(id) {
+      if (!resolutionById.has(id)) return;
+      requestedRaster = id;
+      updateRaster();
+      scheduleRender();
+    }
+
+    resolutionButtons.forEach((button) => button.addEventListener("click", () => {
+      selectRaster(button.dataset.resolution);
+    }));
+
+    function visibleTreeRows() { return treeRows.filter((row) => !row.hidden); }
+
+    function selectTreeRow(row, moveFocus = false) {
+      treeRows.forEach((entry) => {
+        const selected = entry === row;
+        entry.setAttribute("aria-selected", String(selected));
+        entry.tabIndex = selected ? 0 : -1;
+      });
+      if (moveFocus) row.focus();
+    }
+
+    function setFolderExpanded(row, expanded) {
+      const folder = row.dataset.folder;
+      if (!folder) return;
+      row.setAttribute("aria-expanded", String(expanded));
+      row.querySelector(".chev").textContent = expanded ? "−" : "+";
+      const children = treeRows.filter((entry) => entry.dataset.parent === folder);
+      children.forEach((child) => { child.hidden = !expanded; });
+      if (!expanded && children.some((child) => child.getAttribute("aria-selected") === "true")) {
+        selectTreeRow(row, true);
+      }
+    }
+
+    function renderSongs(game, preferredTrack = "01") {
+      activeGame = game;
+      gameTitle.textContent = game.title;
+      trackCount.textContent = `${game.tracks.length} TRK`;
+      songList.replaceChildren();
+      const rows = game.tracks.map(([id, title, length, favorite]) => {
+        const song = document.createElement("button");
+        song.type = "button";
+        song.className = "song";
+        song.setAttribute("role", "option");
+        song.setAttribute("aria-selected", "false");
+        song.tabIndex = -1;
+        song.dataset.trackId = id;
+        song.dataset.title = title;
+        song.dataset.favorite = String(favorite);
+        song.dataset.length = length;
+
+        const number = document.createElement("span");
+        number.className = "num";
+        number.textContent = id;
+        const name = document.createElement("span");
+        name.className = "title";
+        name.textContent = title;
+        const time = document.createElement("span");
+        time.className = "length";
+        time.textContent = length;
+        song.append(number, name, time);
+        song.addEventListener("click", () => selectSong(song, true));
+        song.addEventListener("keydown", (event) => handleSongKeydown(event, song));
+        return song;
+      });
+      songList.append(...rows);
+      applyFavoriteFilter(preferredTrack);
+    }
+
+    function visibleSongs() { return [...songList.querySelectorAll(".song:not([hidden])")]; }
+
+    function updateTrackPath(song) {
+      const slug = song.dataset.title.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "");
+      status.textContent = `${activeGame.system}/${activeGame.title.replaceAll(" ", "-")}/${song.dataset.trackId}-${slug}.SPC`;
+    }
+
+    function selectSong(song, moveFocus = false) {
+      const rows = [...songList.querySelectorAll(".song")];
+      rows.forEach((row) => {
+        const selected = row === song;
+        row.setAttribute("aria-selected", String(selected));
+        row.tabIndex = selected ? 0 : -1;
+      });
+      if (moveFocus) song.focus();
+      song.scrollIntoView({ block: "nearest" });
+      playing = false;
+      now.textContent = "STOPPED";
+      document.querySelector('[data-action="PLAY"]').textContent = "PLAY";
+      document.querySelector('[data-action="PLAY"]').setAttribute("aria-pressed", "false");
+      updateTrackPath(song);
+    }
+
+    function applyFavoriteFilter(preferredTrack) {
+      const rows = [...songList.querySelectorAll(".song")];
+      rows.forEach((song) => {
+        song.hidden = favoritesOnly && song.dataset.favorite !== "true";
+      });
+      let selected = rows.find((song) => song.dataset.trackId === preferredTrack && !song.hidden);
+      if (!selected) selected = rows.find((song) => song.getAttribute("aria-selected") === "true" && !song.hidden);
+      if (!selected) selected = rows.find((song) => !song.hidden);
+      if (selected) selectSong(selected);
+    }
+
+    function handleSongKeydown(event, song) {
+      const rows = visibleSongs();
+      const index = rows.indexOf(song);
+      let next = index;
+      if (event.key === "ArrowDown") next = Math.min(index + 1, rows.length - 1);
+      else if (event.key === "ArrowUp") next = Math.max(index - 1, 0);
+      else if (event.key === "Home") next = 0;
+      else if (event.key === "End") next = rows.length - 1;
+      else return;
+      event.preventDefault();
+      if (rows[next]) selectSong(rows[next], true);
+    }
+
+    treeRows.forEach((row) => {
+      row.addEventListener("click", () => {
+        selectTreeRow(row);
+        if (row.dataset.folder) {
+          setFolderExpanded(row, row.getAttribute("aria-expanded") !== "true");
+          status.textContent = `SYSTEM/${row.dataset.folder}`;
+        } else if (row.dataset.game) {
+          const game = GAMES[row.dataset.game];
+          renderSongs(game);
+          status.textContent = `${game.system}/${game.title.replaceAll(" ", "-")}`;
+        } else {
+          status.textContent = `SYSTEM/${row.querySelector(".label").textContent}`;
+        }
+      });
+      row.addEventListener("keydown", (event) => {
+        const visible = visibleTreeRows();
+        const index = visible.indexOf(row);
+        let target = null;
+        if (event.key === "ArrowDown") target = visible[Math.min(index + 1, visible.length - 1)];
+        else if (event.key === "ArrowUp") target = visible[Math.max(index - 1, 0)];
+        else if (event.key === "Home") target = visible[0];
+        else if (event.key === "End") target = visible.at(-1);
+        else if (event.key === "ArrowRight" && row.dataset.folder) {
+          if (row.getAttribute("aria-expanded") !== "true") setFolderExpanded(row, true);
+          else target = visible.find((entry) => entry.dataset.parent === row.dataset.folder);
+        } else if (event.key === "ArrowLeft") {
+          if (row.dataset.folder && row.getAttribute("aria-expanded") === "true") setFolderExpanded(row, false);
+          else if (row.dataset.parent) target = treeRows.find((entry) => entry.dataset.folder === row.dataset.parent);
+        } else return;
+        event.preventDefault();
+        if (target) {
+          selectTreeRow(target, true);
+          target.scrollIntoView({ block: "nearest" });
+        }
+      });
+    });
+
+    function setNavSelection(action) {
+      navButtons.forEach((button) => {
+        const selected = button.dataset.action === action;
+        if (["OPEN", "TREE", "LIST", "FAVORITES", "OPTIONS"].includes(button.dataset.action)) {
+          button.setAttribute("aria-pressed", String(selected));
+        }
+      });
+    }
+
+    function cycleSong(delta) {
+      const rows = visibleSongs();
+      if (!rows.length) return;
+      const selectedIndex = rows.findIndex((song) => song.getAttribute("aria-selected") === "true");
+      const nextIndex = (selectedIndex + delta + rows.length) % rows.length;
+      selectSong(rows[nextIndex]);
+    }
+
+    navButtons.forEach((button) => button.addEventListener("click", () => {
+      const action = button.dataset.action;
+      if (action === "PREV") return cycleSong(-1);
+      if (action === "NEXT") return cycleSong(1);
+      if (action === "PLAY") {
+        playing = !playing;
+        now.textContent = playing ? "PLAYING" : "STOPPED";
+        button.textContent = playing ? "PAUSE" : "PLAY";
+        button.setAttribute("aria-pressed", String(playing));
+        return;
+      }
+
+      if (action === "FAVORITES") {
+        favoritesOnly = !favoritesOnly;
+        setNavSelection(favoritesOnly ? "FAVORITES" : "LIST");
+        applyFavoriteFilter();
+        status.textContent = favoritesOnly ? "VIEW/FAVORITES" : "VIEW/PLAYLIST";
+      } else if (action === "TREE") {
+        setNavSelection(action);
+        (treeRows.find((row) => row.getAttribute("aria-selected") === "true") || treeRows[0]).focus();
+        status.textContent = "VIEW/LIBRARY";
+      } else if (action === "LIST") {
+        favoritesOnly = false;
+        setNavSelection(action);
+        applyFavoriteFilter();
+        songList.querySelector('[aria-selected="true"]')?.focus();
+        status.textContent = "VIEW/PLAYLIST";
+      } else if (action === "OPTIONS") {
+        setNavSelection(action);
+        resolutionButtons.find((entry) => entry.dataset.resolution === requestedRaster)?.focus();
+        status.textContent = `GRID/${gridSize.textContent}/${resolutionSize.textContent}`;
+      } else {
+        setNavSelection(action);
+        status.textContent = "DEMO/FILE OPEN NOT CONNECTED";
+      }
+    }));
+
+    const gl = display.getContext("webgl2", {
+      alpha: false,
+      antialias: false,
+      depth: false,
+      stencil: false,
+      preserveDrawingBuffer: true,
+    });
+
+    const vertexSource = `#version 300 es
+      in vec2 a_position;
+      out vec2 v_uv;
+      void main() {
+        v_uv = a_position * 0.5 + 0.5;
+        gl_Position = vec4(a_position, 0.0, 1.0);
+      }
+    `;
+
+    const fragmentSource = `#version 300 es
+      precision highp float;
+      uniform sampler2D u_frame;
+      uniform vec2 u_resolution;
+      uniform float u_scan_pitch;
+      in vec2 v_uv;
+      out vec4 out_color;
+
+      void main() {
+        vec3 source = texture(u_frame, v_uv).rgb;
+        vec3 linear_source = pow(max(source, vec3(0.0)), vec3(2.2));
+        float level = dot(linear_source, vec3(0.2126, 0.7152, 0.0722));
+        float screen_y = u_resolution.y - gl_FragCoord.y;
+        float center_offset = (u_scan_pitch - 1.0) * 0.5;
+        float phase = mod(screen_y - center_offset + u_scan_pitch * 0.5, u_scan_pitch)
+          - u_scan_pitch * 0.5;
+        float max_beam_fraction = u_scan_pitch > 2.5 ? 0.30 : 0.34;
+        float beam_radius = u_scan_pitch * mix(0.27, max_beam_fraction, sqrt(level));
+        float edge = u_scan_pitch * 0.018;
+        float distance_from_center = abs(phase);
+        float coverage = 1.0 - smoothstep(beam_radius - edge, beam_radius + edge, distance_from_center);
+        float spot = exp(-0.5 * pow(distance_from_center / (beam_radius * 0.72), 2.0));
+        if (coverage <= 0.0) {
+          out_color = vec4(0.0, 0.0, 0.0, 1.0);
+          return;
+        }
+        vec3 emitted = linear_source * spot * coverage;
+        vec3 encoded = pow(clamp(emitted, 0.0, 1.0), vec3(1.0 / 2.2));
+        out_color = vec4(encoded, 1.0);
+      }
+    `;
+
+    const compileShader = (type, source) => {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        const detail = gl.getShaderInfoLog(shader);
+        gl.deleteShader(shader);
+        throw new Error(detail || "Unable to compile the scanline renderer");
+      }
+      return shader;
+    };
+
+    let program = null;
+    let texture = null;
+    let frameRequest = 0;
+    let renderVersion = 0;
+    const framebuffer = document.createElement("canvas");
+    const framebufferContext = framebuffer.getContext("2d", { alpha: false });
+
+    if (gl) {
+      try {
+        const vertexShader = compileShader(gl.VERTEX_SHADER, vertexSource);
+        const fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragmentSource);
+        program = gl.createProgram();
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
+        gl.linkProgram(program);
+        gl.deleteShader(vertexShader);
+        gl.deleteShader(fragmentShader);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+          throw new Error(gl.getProgramInfoLog(program) || "Unable to link the scanline renderer");
+        }
+
+        const vertexBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+        gl.useProgram(program);
+        const position = gl.getAttribLocation(program, "a_position");
+        gl.enableVertexAttribArray(position);
+        gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+        texture = gl.createTexture();
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.uniform1i(gl.getUniformLocation(program, "u_frame"), 0);
+      } catch (error) {
+        console.error("LineBoy scanline renderer unavailable:", error);
+        terminal.dataset.renderer = "dom";
+      }
+    } else {
+      terminal.dataset.renderer = "dom";
+    }
+
+    function scheduleRender() {
+      if (!gl || !program || frameRequest) return;
+      frameRequest = requestAnimationFrame(() => {
+        frameRequest = 0;
+        renderFrame();
+      });
+    }
+
+    function renderFrame() {
+      const version = ++renderVersion;
+      const rect = terminal.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) return;
+      const deviceRatio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+      const scanPitch = activeRaster.deviceScale;
+      activeScanPitchCss = scanPitch / deviceRatio;
+      screenOriginX = Math.round(rect.left * deviceRatio) / deviceRatio;
+      screenOriginY = Math.round(rect.top * deviceRatio) / deviceRatio;
+      const width = Math.max(1, Math.round(rect.width * deviceRatio));
+      const height = Math.max(1, Math.round(rect.height * deviceRatio));
+      display.width = width;
+      display.height = height;
+      if (!framebufferContext) {
+        terminal.dataset.renderer = "dom";
+        return;
+      }
+
+      framebuffer.width = width;
+      framebuffer.height = height;
+      framebufferContext.setTransform(deviceRatio, 0, 0, deviceRatio,
+        -rect.left * deviceRatio, -rect.top * deviceRatio);
+      drawElement(terminal);
+      if (version !== renderVersion || !gl || !program) return;
+
+      try {
+        gl.viewport(0, 0, width, height);
+        gl.useProgram(program);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, framebuffer);
+        gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), width, height);
+        gl.uniform1f(gl.getUniformLocation(program, "u_scan_pitch"), scanPitch);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        terminal.dataset.renderer = "webgl2";
+      } catch (error) {
+        console.error("LineBoy scanline frame failed:", error);
+        terminal.dataset.renderer = "dom";
+      }
+    }
+
+    function drawElement(element) {
+      if (!(element instanceof Element) || element === display) return;
+      const style = getComputedStyle(element);
+      if (style.display === "none" || style.visibility === "hidden") return;
+      const bounds = element.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0) return;
+      const ctx = framebufferContext;
+      const x = bounds.left;
+      const y = bounds.top;
+      ctx.save();
+      const opacity = element.parentElement === terminal ? 1 : Number(style.opacity);
+      ctx.globalAlpha *= Number.isFinite(opacity) ? opacity : 1;
+
+      if (style.backgroundColor !== "rgba(0, 0, 0, 0)" && style.backgroundColor !== "transparent") {
+        ctx.fillStyle = style.backgroundColor;
+        ctx.fillRect(x, y, bounds.width, bounds.height);
+      }
+
+      if (element !== terminal && /(auto|scroll|hidden|clip)/.test(`${style.overflowX} ${style.overflowY}`)) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x, y, bounds.width, bounds.height);
+        ctx.clip();
+      }
+
+      for (const child of element.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) drawText(child);
+        else if (child.nodeType === Node.ELEMENT_NODE) drawElement(child);
+      }
+      if (element !== terminal && /(auto|scroll|hidden|clip)/.test(`${style.overflowX} ${style.overflowY}`)) ctx.restore();
+      ctx.restore();
+    }
+
+    function drawText(node) {
+      const raw = node.textContent || "";
+      if (!raw.trim() || !node.parentElement) return;
+      const style = getComputedStyle(node.parentElement);
+      if (style.visibility === "hidden" || style.display === "none") return;
+      const text = style.textTransform === "uppercase" ? raw.toUpperCase()
+        : style.textTransform === "lowercase" ? raw.toLowerCase()
+        : raw;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const boxes = [...range.getClientRects()];
+      if (!boxes.length) return;
+      const ctx = framebufferContext;
+      ctx.save();
+      ctx.fillStyle = style.color;
+      const fontSize = Number.parseFloat(style.fontSize) * activeRaster.scale;
+      ctx.font = `${style.fontWeight} ${fontSize}px ${style.fontFamily}`;
+      ctx.textBaseline = "alphabetic";
+      if ("letterSpacing" in ctx) {
+        const letterSpacing = Number.parseFloat(style.letterSpacing);
+        ctx.letterSpacing = `${Number.isFinite(letterSpacing) ? letterSpacing * activeRaster.scale : 0}px`;
+      }
+      for (const box of boxes) {
+        const metrics = ctx.measureText(text);
+        const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.8;
+        const descent = metrics.actualBoundingBoxDescent || fontSize * 0.2;
+        const measuredBaseline = box.top + box.height / 2 + (ascent - descent) / 2;
+        const glyphTop = measuredBaseline - ascent;
+        const snappedGlyphTop = screenOriginY
+          + Math.round((glyphTop - screenOriginY) / activeScanPitchCss) * activeScanPitchCss;
+        const baseline = snappedGlyphTop + ascent;
+        const x = screenOriginX + (box.left - terminal.getBoundingClientRect().left);
+        ctx.fillText(text, x, baseline);
+      }
+      ctx.restore();
+    }
+
+    updateRaster();
+    renderSongs(GAMES.CHRONO, "08");
+
+    document.fonts.ready.then(scheduleRender);
+    new ResizeObserver(() => {
+      updateRaster();
+      scheduleRender();
+    }).observe(terminal);
+    window.addEventListener("resize", () => {
+      updateRaster();
+      scheduleRender();
+    });
+    document.addEventListener("scroll", scheduleRender, true);
+    terminal.addEventListener("pointerover", scheduleRender);
+    terminal.addEventListener("pointerout", scheduleRender);
+    terminal.addEventListener("focusin", scheduleRender);
+    terminal.addEventListener("focusout", scheduleRender);
+    new MutationObserver(scheduleRender).observe(terminal, {
+      attributes: true,
+      attributeFilter: ["aria-selected", "aria-pressed", "aria-expanded", "hidden", "data-raster", "data-video-mode"],
+      characterData: true,
+      childList: true,
+      subtree: true,
+    });
+    setInterval(() => {
+      seconds += 1;
+      clock.textContent = new Date(seconds * 1000).toISOString().slice(11, 19);
+      scheduleRender();
+    }, 1000);
+  </script>
+</body>
+</html>
