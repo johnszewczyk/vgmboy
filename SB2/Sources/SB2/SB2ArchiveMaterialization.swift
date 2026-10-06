@@ -29,6 +29,72 @@ enum SB2ArchiveMaterialization {
         cacheRootURL: cacheRootURL,
         preferenceKeys: cacheKeys
     )
+    private static let artworkMaterializer = ArchivePlaybackMaterializer(
+        cacheRootURL: cacheRootURL,
+        preferenceKeys: cacheKeys
+    )
+    private static let artworkMaterializationLock = NSLock()
+
+    static func titleSnapDataURL(sourcePath: String, titleSnap: String) throws -> String {
+        let sourceURL = URL(fileURLWithPath: sourcePath).standardizedFileURL
+        guard !sourcePath.isEmpty, !titleSnap.isEmpty,
+              FileManager.default.fileExists(atPath: sourceURL.path) else {
+            throw ArchiveMaterializationError.missingSource(sourceURL.path)
+        }
+
+        let archivePrefix = "archive-member:"
+        let memberPath: String?
+        let imageURL: URL?
+        if titleSnap.hasPrefix(archivePrefix) {
+            memberPath = String(titleSnap.dropFirst(archivePrefix.count))
+            imageURL = nil
+        } else if let parsed = URL(string: titleSnap), parsed.isFileURL {
+            memberPath = nil
+            imageURL = parsed.standardizedFileURL
+        } else if titleSnap.hasPrefix("/") {
+            memberPath = nil
+            imageURL = URL(fileURLWithPath: titleSnap).standardizedFileURL
+        } else if URL(fileURLWithPath: titleSnap).pathExtension.lowercased() == "png" {
+            memberPath = titleSnap
+            imageURL = nil
+        } else {
+            throw ArchiveMaterializationError.invalidEntry
+        }
+
+        let imageData: Data
+        if let memberPath {
+            guard URL(fileURLWithPath: memberPath).pathExtension.lowercased() == "png" else {
+                throw ArchiveMaterializationError.invalidEntry
+            }
+            artworkMaterializationLock.lock()
+            defer {
+                artworkMaterializer.release()
+                artworkMaterializationLock.unlock()
+            }
+            let materializedURL = try artworkMaterializer.materialize(
+                archiveURL: sourceURL,
+                entryPath: memberPath,
+                requirement: .selectedEntry
+            )
+            imageData = try Data(contentsOf: materializedURL, options: .mappedIfSafe)
+        } else if let imageURL {
+            guard imageURL.pathExtension.lowercased() == "png",
+                  imageURL.deletingLastPathComponent() == sourceURL.deletingLastPathComponent(),
+                  let values = try? imageURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+                  values.isRegularFile == true, values.isSymbolicLink != true else {
+                throw ArchiveMaterializationError.invalidEntry
+            }
+            imageData = try Data(contentsOf: imageURL, options: .mappedIfSafe)
+        } else {
+            throw ArchiveMaterializationError.invalidEntry
+        }
+
+        let pngSignature = Data([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+        guard imageData.count <= 32 * 1_024 * 1_024, imageData.starts(with: pngSignature) else {
+            throw ArchiveMaterializationError.emptyOutput
+        }
+        return "data:image/png;base64,\(imageData.base64EncodedString())"
+    }
 
     static func materialize(
         archivePath: String,

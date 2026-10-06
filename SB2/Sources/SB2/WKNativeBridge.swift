@@ -126,7 +126,12 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     }
 
     static var defaultCatalogURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser
+        if let override = ProcessInfo.processInfo.environment["SPCBOY_SB2_CATALOG_PATH"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !override.isEmpty {
+            return URL(fileURLWithPath: override).standardizedFileURL
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/CocoaSpice/Library.sqlite")
     }
 
@@ -211,6 +216,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             databaseLocation: (...args) => request("databaseLocation", args),
             databaseRoots: (...args) => request("databaseRoots", args),
             databaseGames: (...args) => request("databaseGames", args),
+            databaseGalleryGames: (...args) => request("databaseGalleryGames", args),
+            galleryArtworkRead: (...args) => request("galleryArtworkRead", args),
             databaseFiles: (...args) => request("databaseFiles", args),
             databaseFileTree: (...args) => request("databaseFileTree", args),
             databaseSearchGames: (...args) => request("databaseSearchGames", args),
@@ -557,6 +564,15 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             return try roots(catalogURL: catalogURL)
         case "databaseGames":
             return try games(catalogURL: catalogURL)
+        case "databaseGalleryGames":
+            return try galleryGames(catalogURL: catalogURL)
+        case "galleryArtworkRead":
+            guard args.count >= 2,
+                  let sourcePath = args[0] as? String,
+                  let titleSnap = args[1] as? String else {
+                throw BridgeError.invalidArguments
+            }
+            return try SB2ArchiveMaterialization.titleSnapDataURL(sourcePath: sourcePath, titleSnap: titleSnap)
         case "databaseFiles":
             return try files(catalogURL: catalogURL)
         case "databaseFileTree":
@@ -763,6 +779,23 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 ]
             }
         ]
+    }
+
+    nonisolated private static func galleryGames(catalogURL: URL) throws -> [[String: Any]] {
+        try CatalogSidebarReader.titleSnapGalleryGames(databaseURL: catalogURL).map { game in
+            [
+                "id": game.id,
+                "rootId": game.rootID,
+                "rootPath": game.rootPath,
+                "rootName": URL(fileURLWithPath: game.rootPath).lastPathComponent,
+                "name": game.game,
+                "displayName": game.game,
+                "system": game.system,
+                "consoleGroupName": game.system,
+                "sourcePath": game.sourcePath,
+                "titleSnap": game.titleSnap
+            ]
+        }
     }
 
     nonisolated private static func files(catalogURL: URL) throws -> [[String: Any]] {

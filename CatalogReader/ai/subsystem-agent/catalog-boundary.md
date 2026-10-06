@@ -2,7 +2,7 @@
 
 ## Scope
 
-`CatalogReader` opens ScanSong's schema-24 catalog read-only and publishes
+`CatalogReader` opens ScanSong's schema-24/25 catalog read-only and publishes
 canonical roots, aggregated sidebar buckets, and track records. It also owns
 the exact source, folder, and path projections used to hydrate a selected
 playlist. The exact Games playlist query recovered from CocoaSpice lives in
@@ -42,6 +42,10 @@ row models, queue publication, and UI.
   `CatalogReader` derives that projection from visible tracks until ScanSong
   republishes the materialized buckets. This keeps CocoaSpice and SPCBoyWK
   consistent without duplicating scanner-write logic in either frontend.
+- `ReadOnlyCatalog.titleSnapGalleryGames()` reads the schema-25 ordered tag
+  table for `TITLE SNAP`, returning one stable source locator for each visible
+  game/system bucket. It remains query-only and returns no Gallery rows for
+  schema 24 catalogs, which do not have the tag table.
 
 ## Files
 

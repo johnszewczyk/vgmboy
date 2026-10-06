@@ -20,19 +20,24 @@ struct ArchiveMemberEnumerator {
         registry: ScannerPluginRegistry,
         ignoredFileExtensions: Set<String>,
         dependencyPaths: Set<String>
-    ) throws -> (members: [ExtractedScanArchive.Member], skipped: [ExtractedScanArchive.SkippedMember]) {
+    ) throws -> (
+        members: [ExtractedScanArchive.Member],
+        skipped: [ExtractedScanArchive.SkippedMember],
+        artworkEntryPath: String?
+    ) {
         let keys: Set<URLResourceKey> = [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey]
         guard let enumerator = fileManager.enumerator(
             at: payloadURL,
             includingPropertiesForKeys: Array(keys),
             options: [.skipsHiddenFiles]
-        ) else { return ([], []) }
+        ) else { return ([], [], nil) }
 
         let canonicalRoot = payloadURL.resolvingSymlinksInPath().standardizedFileURL.path + "/"
         var totalBytes: Int64 = 0
         var fileCount = 0
         var members: [ExtractedScanArchive.Member] = []
         var skipped: [ExtractedScanArchive.SkippedMember] = []
+        var artworkEntries: [String] = []
         for case let fileURL as URL in enumerator {
             try Task.checkCancellation()
             let values = try fileURL.resourceValues(forKeys: keys)
@@ -59,6 +64,10 @@ struct ArchiveMemberEnumerator {
             let entry = String(standardizedPath.dropFirst(canonicalRoot.count))
             guard StandaloneArchiveExtractor.isSafeRelativePath(entry) else {
                 throw StandaloneArchiveError.unsafeEntry(entry)
+            }
+            if ScannerFormatPolicy.normalize(fileURL.pathExtension) == "png" {
+                artworkEntries.append(entry)
+                continue
             }
             if dependencyPaths.contains(standardizedPath) { continue }
             let extensionName = ScannerFormatPolicy.normalize(fileURL.pathExtension)
@@ -91,7 +100,8 @@ struct ArchiveMemberEnumerator {
         }
         return (
             members.sorted { $0.entryPath.localizedStandardCompare($1.entryPath) == .orderedAscending },
-            skipped.sorted { $0.entryPath.localizedStandardCompare($1.entryPath) == .orderedAscending }
+            skipped.sorted { $0.entryPath.localizedStandardCompare($1.entryPath) == .orderedAscending },
+            artworkEntries.sorted { $0.localizedStandardCompare($1) == .orderedAscending }.first
         )
     }
 }

@@ -30,6 +30,8 @@ public struct ExtractedScanArchive: Sendable {
     public let scratchURL: URL
     public let members: [Member]
     public let skippedMembers: [SkippedMember]
+    /// The first safe PNG member found in the archive, when present.
+    public let artworkEntryPath: String?
 }
 
 public enum StandaloneArchiveError: LocalizedError {
@@ -154,7 +156,8 @@ public struct StandaloneArchiveExtractor: Sendable {
                 archiveURL: archiveURL,
                 scratchURL: root,
                 members: listing.members,
-                skippedMembers: listing.skipped
+                skippedMembers: listing.skipped,
+                artworkEntryPath: listing.artworkEntryPath
             )
         } catch {
             try? fileManager.removeItem(at: root)

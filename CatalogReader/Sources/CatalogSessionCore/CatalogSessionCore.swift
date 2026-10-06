@@ -94,7 +94,7 @@ public enum CatalogSessionScope: String, CaseIterable, Codable, Sendable {
 public extension CatalogSessionScope {
     static func scope(for method: String) -> Self? {
         switch method {
-        case "databaseGames": return .games
+        case "databaseGames", "databaseGalleryGames": return .games
         case "databaseFiles", "databaseFileTree": return .files
         case "databaseGameTracks", "databaseFileTracks", "databaseFolderTracks",
              "refreshTree", "openPath", "selectFolder", "selectFile": return .playlist
@@ -159,5 +159,9 @@ public enum CatalogSidebarReader {
 
     public static func fileBuckets(databaseURL: URL) throws -> [CatalogFileBucket] {
         try ReadOnlyCatalog(databaseURL: databaseURL).fileBuckets()
+    }
+
+    public static func titleSnapGalleryGames(databaseURL: URL) throws -> [CatalogGalleryGame] {
+        try ReadOnlyCatalog(databaseURL: databaseURL).titleSnapGalleryGames()
     }
 }

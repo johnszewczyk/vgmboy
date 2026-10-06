@@ -44,6 +44,50 @@ let startupRevealTimer = 0;
 let startupElapsedTimer = 0;
 let startupDismissTimer = 0;
 let startupHasAppeared = false;
+let galleryLoadPromise = null;
+let galleryRenderSignature = null;
+let galleryArtworkObserver = null;
+let galleryArtworkInFlight = 0;
+const galleryArtworkQueue = [];
+const galleryArtworkCache = new Map();
+const gallerySpacingTokens = [0, 0.1, 0.2, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 1];
+
+function isGalleryActive() {
+  return state.activePlaylistTabKind === "gallery";
+}
+
+function applyGallerySettings() {
+  const root = document.documentElement;
+  root.style.setProperty("--sb-gallery-size-scale", String(state.gallerySizeScale));
+  root.style.setProperty("--sb-gallery-gap", `${state.galleryGapRem}rem`);
+  root.style.setProperty("--sb-gallery-radius", `${state.galleryRadiusRem}rem`);
+  if (refs.gallerySizeInput) refs.gallerySizeInput.value = String(state.gallerySizeScale);
+  if (refs.galleryGapInput) refs.galleryGapInput.value = String(state.galleryGapRem);
+  if (refs.galleryRadiusInput) refs.galleryRadiusInput.value = String(state.galleryRadiusRem);
+  if (refs.gallerySizeValue) refs.gallerySizeValue.value = `${state.gallerySizeScale.toFixed(2)}×`;
+  if (refs.galleryGapValue) refs.galleryGapValue.value = `${Number(state.galleryGapRem.toFixed(2))}rem`;
+  if (refs.galleryRadiusValue) refs.galleryRadiusValue.value = `${Number(state.galleryRadiusRem.toFixed(2))}rem`;
+}
+
+function bindGallerySetting(input, key, minimum, maximum) {
+  if (!input) return;
+  input.addEventListener("input", () => {
+    const value = Number(input.value);
+    const bounded = Math.max(minimum, Math.min(maximum, Number.isFinite(value) ? value : minimum));
+    state[key] = key === "galleryGapRem" || key === "galleryRadiusRem"
+      ? gallerySpacingTokens.reduce((closest, token) => Math.abs(token - bounded) < Math.abs(closest - bounded) ? token : closest, gallerySpacingTokens[0])
+      : bounded;
+    applyGallerySettings();
+  });
+  input.addEventListener("change", () => {
+    persistSettings();
+  });
+}
+
+bindGallerySetting(refs.gallerySizeInput, "gallerySizeScale", 0.65, 1.6);
+bindGallerySetting(refs.galleryGapInput, "galleryGapRem", 0, 1);
+bindGallerySetting(refs.galleryRadiusInput, "galleryRadiusRem", 0, 1);
+applyGallerySettings();
 
 function makePlaylistTabID() {
   return globalThis.crypto?.randomUUID?.()
@@ -58,6 +102,7 @@ function syncActivePlaylistTab() {
   const tab = findActivePlaylistTab();
   if (!tab) return null;
   tab.title = String(state.playlistTitle || "Playlist");
+  tab.kind = state.activePlaylistTabKind === "gallery" ? "gallery" : "playlist";
   tab.playlist = state.playlist;
   tab.selectedTrackId = state.selectedTrackId || null;
   tab.selectedTrackIds = [...(state.selectedTrackIds || [])];
@@ -80,6 +125,7 @@ function persistPlaylistTabs() {
       tabs: (state.playlistTabs || []).map((tab) => ({
         id: tab.id,
         title: tab.title,
+        kind: tab.kind === "gallery" ? "gallery" : "playlist",
         playlist: tab.playlist || [],
         selectedTrackId: tab.selectedTrackId || null,
         selectedTrackIds: tab.selectedTrackIds || [],
@@ -96,6 +142,7 @@ function persistPlaylistTabs() {
 
 function restorePlaylistTabView(tab) {
   state.activePlaylistTabId = tab.id;
+  state.activePlaylistTabKind = tab.kind === "gallery" ? "gallery" : "playlist";
   state.playlistTitle = String(tab.title || "Playlist");
   state.playlist = Array.isArray(tab.playlist) ? [...tab.playlist] : [];
   state.selectedTrackId = tab.selectedTrackId || null;
@@ -110,6 +157,8 @@ function restorePlaylistTabView(tab) {
   if (refs.playlistBodyWrap) refs.playlistBodyWrap.scrollTop = Math.max(0, Number(tab.scrollTop) || 0);
   renderPlaylistTabs();
   renderPlaylist();
+  renderSidebar();
+  if (state.activePlaylistTabKind === "gallery") void loadGalleryGames();
   uiApp.playback.updateTimingSummary();
   uiApp.playback.updatePlaybackReadout();
 }
@@ -121,6 +170,7 @@ function ensurePlaylistTab() {
   active = {
     id: makePlaylistTabID(),
     title: state.playlistTitle || "Playlist",
+    kind: "playlist",
     playlist: state.playlist || [],
     selectedTrackId: state.selectedTrackId || null,
     selectedTrackIds: [...(state.selectedTrackIds || [])],
@@ -224,6 +274,7 @@ function createPlaylistTab({ duplicateActive = true, title = null } = {}) {
   const tab = {
     id: makePlaylistTabID(),
     title: String(title || (duplicateActive ? source.title : "Playlist")),
+    kind: "playlist",
     playlist: duplicateActive ? [...source.playlist] : [],
     selectedTrackId: duplicateActive ? source.selectedTrackId : null,
     selectedTrackIds: duplicateActive ? [...source.selectedTrackIds] : [],
@@ -277,6 +328,7 @@ function restorePlaylistTabs(value) {
   }).map((tab) => ({
     id: tab.id,
     title: typeof tab.title === "string" ? tab.title : "Playlist",
+    kind: tab.kind === "gallery" ? "gallery" : "playlist",
     playlist: Array.isArray(tab.playlist) ? tab.playlist : [],
     selectedTrackId: typeof tab.selectedTrackId === "string" ? tab.selectedTrackId : null,
     selectedTrackIds: Array.isArray(tab.selectedTrackIds) ? tab.selectedTrackIds.filter((id) => typeof id === "string") : [],
@@ -1076,9 +1128,28 @@ document.addEventListener("keydown", (event) => {
 
 function filteredTree() {
   const terms = state.sidebarQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  if (!terms.length) {
-    return currentSidebarView().contentMode === "tree" ? state.databaseFileTree : state.tree;
+  const isCatalogPathView = currentSidebarView().contentMode === "tree";
+  let sourceTree = isCatalogPathView ? state.databaseFileTree : state.tree;
+
+  if (isGalleryActive() && isCatalogPathView) {
+    if (!state.galleryGamesLoaded) {
+      sourceTree = [];
+    } else {
+      const artworkPaths = new Set(state.galleryGames.map((game) => game.sourcePath));
+      const keepArtworkSources = (node) => {
+        const children = Array.isArray(node.children) ? node.children : [];
+        if (children.length || node.kind === "folder") {
+          const filteredChildren = children.map(keepArtworkSources).filter(Boolean);
+          return filteredChildren.length ? { ...node, children: filteredChildren } : null;
+        }
+        const sourcePath = node.catalogFile?.path || node.path;
+        return artworkPaths.has(sourcePath) ? node : null;
+      };
+      sourceTree = sourceTree.map(keepArtworkSources).filter(Boolean);
+    }
   }
+
+  if (!terms.length) return sourceTree;
 
   function ownSearchText(node) {
     const cached = treeSearchText.get(node);
@@ -1101,7 +1172,6 @@ function filteredTree() {
     return null;
   }
 
-  const sourceTree = currentSidebarView().contentMode === "tree" ? state.databaseFileTree : state.tree;
   return sourceTree.map(filterNode).filter(Boolean);
 }
 
@@ -1116,9 +1186,15 @@ function renderTree() {
   if (visibleTree.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty sidebar-empty";
-    empty.textContent = currentSidebarView().contentMode === "tree"
-      ? "No catalog paths match this view."
-      : "No database tree is available.";
+    empty.textContent = isGalleryActive() && !state.galleryGamesLoaded
+      ? "Loading artwork index…"
+      : isGalleryActive() && state.galleryGamesError
+        ? state.galleryGamesError
+        : isGalleryActive() && !state.galleryGames.length
+          ? "No Title Snap artwork is indexed. Scan the library with ScanSong."
+          : currentSidebarView().contentMode === "tree"
+            ? "No artwork paths match this view."
+            : "No database tree is available.";
     refs.treeRoot.appendChild(empty);
     syncSidebarFoldButton();
     return;
@@ -1238,7 +1314,11 @@ async function applySharedDatabaseGroupAction(action, groupName = null, gameID =
 }
 
 function visibleDatabaseGames() {
-  return Array.isArray(state.databaseSearchGames) ? state.databaseSearchGames : state.databaseGames;
+  const games = Array.isArray(state.databaseSearchGames) ? state.databaseSearchGames : state.databaseGames;
+  if (!isGalleryActive()) return games;
+  if (!state.galleryGamesLoaded) return [];
+  const galleryIDs = new Set(state.galleryGames.map((game) => game.id));
+  return games.filter((game) => galleryIDs.has(databaseGameKey(game)));
 }
 
 function visibleDatabaseGameGroups() {
@@ -1464,9 +1544,15 @@ function renderDatabaseGames() {
   }
 
   databaseEmptyState.classList.toggle("is-hidden", !state.databaseSidebarError && gamesForView.length > 0);
-  databaseEmptyState.textContent = state.databaseSidebarError || (state.databaseGames.length
-    ? "No database games match this search."
-    : "Use ScanSong to populate the selected database.");
+  databaseEmptyState.textContent = state.databaseSidebarError || (isGalleryActive()
+    ? !state.galleryGamesLoaded
+      ? "Loading artwork index…"
+      : state.galleryGamesError || (state.galleryGames.length
+        ? "No artwork titles match this search."
+        : "No Title Snap artwork is indexed. Scan the library with ScanSong.")
+    : state.databaseGames.length
+      ? "No database games match this search."
+      : "Use ScanSong to populate the selected database.");
   syncSidebarFoldButton();
 }
 
@@ -1644,8 +1730,210 @@ async function showPlaybackHistory() {
   return true;
 }
 
+async function openGalleryGame(game) {
+  const title = String(game.displayName || game.name || "Playlist");
+  const tab = createPlaylistTab({ duplicateActive: false, title });
+  if (!tab) return false;
+  const loaded = await loadDatabaseGame(game);
+  const targetID = loaded ? databaseLoadedSelectionID() : null;
+  if (targetID) await playVisibleTrack(targetID, 0);
+  return Boolean(targetID);
+}
+
+function cacheGalleryArtwork(key, value) {
+  galleryArtworkCache.delete(key);
+  galleryArtworkCache.set(key, value);
+  while (galleryArtworkCache.size > 48) {
+    galleryArtworkCache.delete(galleryArtworkCache.keys().next().value);
+  }
+}
+
+function pumpGalleryArtworkQueue() {
+  while (galleryArtworkInFlight < 3 && galleryArtworkQueue.length) {
+    const { image, sourcePath, titleSnap, cacheKey } = galleryArtworkQueue.shift();
+    if (!image.isConnected) continue;
+    galleryArtworkInFlight += 1;
+    Promise.resolve(window.spcBoySB2?.galleryArtworkRead?.(sourcePath, titleSnap))
+      .then((dataURL) => {
+        if (typeof dataURL !== "string" || !dataURL.startsWith("data:image/png;base64,")) {
+          throw new Error("No PNG preview was returned.");
+        }
+        cacheGalleryArtwork(cacheKey, dataURL);
+        if (image.isConnected) {
+          image.src = dataURL;
+          image.parentElement?.classList.add("has-art");
+        }
+      })
+      .catch(() => {
+        if (image.isConnected) {
+          image.parentElement?.classList.add("is-missing");
+          image.remove();
+        }
+      })
+      .finally(() => {
+        galleryArtworkInFlight -= 1;
+        pumpGalleryArtworkQueue();
+      });
+  }
+}
+
+function requestGalleryArtwork(image) {
+  const sourcePath = image.dataset.sourcePath || "";
+  const titleSnap = image.dataset.titleSnap || "";
+  const cacheKey = `${sourcePath}\u0000${titleSnap}`;
+  const cached = galleryArtworkCache.get(cacheKey);
+  if (cached) {
+    image.src = cached;
+    image.parentElement?.classList.add("has-art");
+    return;
+  }
+  galleryArtworkQueue.push({ image, sourcePath, titleSnap, cacheKey });
+  pumpGalleryArtworkQueue();
+}
+
+function renderGalleryView() {
+  if (!refs.galleryGrid) return;
+  if (!state.galleryGamesLoaded) {
+    galleryRenderSignature = "loading";
+    refs.galleryGrid.replaceChildren();
+    const loading = document.createElement("div");
+    loading.className = "gallery-empty";
+    loading.textContent = "Reading the artwork index…";
+    refs.galleryGrid.appendChild(loading);
+    void loadGalleryGames();
+    return;
+  }
+
+  const records = Array.isArray(state.galleryGames) ? state.galleryGames : [];
+  const signature = JSON.stringify([
+    state.galleryGamesError,
+    records.map(({ id, sourcePath, titleSnap }) => [id, sourcePath, titleSnap])
+  ]);
+  if (galleryRenderSignature === signature) return;
+  galleryRenderSignature = signature;
+  galleryArtworkObserver?.disconnect();
+  galleryArtworkObserver = null;
+  galleryArtworkQueue.length = 0;
+  refs.galleryGrid.replaceChildren();
+
+  if (!records.length) {
+    const empty = document.createElement("div");
+    empty.className = "gallery-empty";
+    empty.textContent = state.galleryGamesError
+      || "No Title Snap artwork is indexed. Scan the library with ScanSong to add covers.";
+    refs.galleryGrid.appendChild(empty);
+    return;
+  }
+
+  if (typeof IntersectionObserver === "function") {
+    galleryArtworkObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        galleryArtworkObserver?.unobserve(entry.target);
+        const image = entry.target.querySelector(".gallery-artwork-image");
+        if (image) requestGalleryArtwork(image);
+      }
+    }, { root: refs.galleryView, rootMargin: "180px" });
+  }
+
+  const databaseGamesByID = new Map(state.databaseGames.map((game) => [databaseGameKey(game), game]));
+  for (const artwork of records) {
+    const game = { ...artwork, ...(databaseGamesByID.get(artwork.id) || {}) };
+    const card = document.createElement("article");
+    card.className = "gallery-card";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "gallery-card-button";
+    button.setAttribute("aria-label", `Open ${game.displayName || game.name}`);
+    button.title = `${game.displayName || game.name}${game.system ? ` · ${game.system}` : ""}`;
+    button.addEventListener("click", (event) => {
+      if (event.detail === 0) {
+        void openGalleryGame(game).catch((error) => reportDatabaseSidebarError("open the gallery title", error));
+        return;
+      }
+      if (event.detail > 1) return;
+      refs.galleryGrid.querySelector(".gallery-card-button.is-selected")?.classList.remove("is-selected");
+      button.classList.add("is-selected");
+      state.selectedDatabaseGameKey = databaseGameKey(game);
+      state.selectedDatabaseConsoleName = databaseConsoleName(game);
+      renderSidebar();
+    });
+    button.addEventListener("dblclick", (event) => {
+      event.preventDefault();
+      void openGalleryGame(game).catch((error) => reportDatabaseSidebarError("open the gallery title", error));
+    });
+
+    const artworkFrame = document.createElement("span");
+    artworkFrame.className = "gallery-artwork-frame is-missing";
+    const placeholder = document.createElement("span");
+    placeholder.className = "gallery-artwork-placeholder";
+    placeholder.textContent = "NO PREVIEW";
+    const image = document.createElement("img");
+    image.className = "gallery-artwork-image";
+    image.alt = "";
+    image.loading = "lazy";
+    image.decoding = "async";
+    image.dataset.sourcePath = artwork.sourcePath;
+    image.dataset.titleSnap = artwork.titleSnap;
+    image.addEventListener("load", () => artworkFrame.classList.add("has-art"), { once: true });
+    artworkFrame.append(placeholder, image);
+
+    const title = document.createElement("span");
+    title.className = "gallery-card-title";
+    title.textContent = String(game.displayName || game.name || "Untitled");
+    const system = document.createElement("span");
+    system.className = "gallery-card-system";
+    system.textContent = String(game.system || game.rootName || "");
+    button.append(artworkFrame, title, system);
+    card.appendChild(button);
+    refs.galleryGrid.appendChild(card);
+
+    if (galleryArtworkObserver) galleryArtworkObserver.observe(artworkFrame);
+    else requestGalleryArtwork(image);
+  }
+}
+
+async function showGalleryPlaylist() {
+  let tab = state.playlistTabs?.find((entry) => entry.kind === "gallery");
+  if (!tab) {
+    tab = createPlaylistTab({ duplicateActive: false, title: "Gallery" });
+    if (!tab) return false;
+  } else if (tab.id !== state.activePlaylistTabId) {
+    activatePlaylistTab(tab.id);
+  }
+
+  tab.kind = "gallery";
+  state.activePlaylistTabKind = "gallery";
+  state.playlistTitle = "Gallery";
+  state.playlist = [];
+  state.selectedTrackId = null;
+  state.selectedTrackIds = [];
+  state.playlistSelectionAnchorId = null;
+  state.catalogPlaylistColumnContentHints = null;
+  state.catalogPlaylistSortSessionId = null;
+  state.sidebarQuery = "";
+  refs.sidebarSearchInput.value = "";
+  await invalidatePlaylistCatalogSession();
+  if (state.sidebarMode === "paths" && !state.databaseFileTree.length) {
+    void loadDatabaseFiles().catch((error) => reportDatabaseSidebarError("read Gallery paths", error));
+  }
+  galleryRenderSignature = null;
+  renderPlaylistTabs();
+  persistPlaylistTabs();
+  renderPlaylist();
+  renderSidebar();
+  uiApp.playback.updateTimingSummary();
+  uiApp.playback.updatePlaybackReadout();
+  void loadGalleryGames();
+  return true;
+}
+
 async function refreshDatabaseGamesForVisibleRoots() {
   const previousSelection = state.selectedDatabaseGameKey;
+  state.galleryGames = [];
+  state.galleryGamesLoaded = false;
+  state.galleryGamesError = "";
+  galleryRenderSignature = null;
   try {
     const projection = await window.spcBoySB2.databaseGames();
     if (projection?.stale === true) return false;
@@ -1666,7 +1954,49 @@ async function refreshDatabaseGamesForVisibleRoots() {
     clearPlaylistSelection();
     persistSettings();
   }
+  if (isGalleryActive()) await loadGalleryGames();
   return true;
+}
+
+async function loadGalleryGames({ force = false } = {}) {
+  if (!force && state.galleryGamesLoaded) return state.galleryGames;
+  if (galleryLoadPromise) return galleryLoadPromise;
+  if (typeof window.spcBoySB2?.databaseGalleryGames !== "function") {
+    state.galleryGames = [];
+    state.galleryGamesLoaded = true;
+    state.galleryGamesError = "Artwork indexing is unavailable in this build.";
+    galleryRenderSignature = null;
+    if (isGalleryActive()) {
+      renderGalleryView();
+      renderSidebar();
+    }
+    return [];
+  }
+
+  galleryLoadPromise = (async () => {
+    try {
+      const projection = await window.spcBoySB2.databaseGalleryGames();
+      if (projection?.stale === true) return false;
+      state.galleryGames = Array.isArray(projection) ? projection : [];
+      state.galleryGamesError = "";
+      state.galleryGamesLoaded = true;
+      galleryRenderSignature = null;
+      return state.galleryGames;
+    } catch (error) {
+      state.galleryGames = [];
+      state.galleryGamesError = `Artwork index unavailable · ${error.message}`;
+      state.galleryGamesLoaded = true;
+      galleryRenderSignature = null;
+      return [];
+    } finally {
+      galleryLoadPromise = null;
+      if (isGalleryActive()) {
+        renderGalleryView();
+        renderSidebar();
+      }
+    }
+  })();
+  return galleryLoadPromise;
 }
 
 async function updateSidebarSearch(query) {
@@ -1851,6 +2181,7 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
 
 function renderSidebar() {
   const view = currentSidebarView();
+  refs.gallerySidebarToolbar?.classList.toggle("is-hidden", !isGalleryActive());
   const modeLabels = { consoles: "Console View", paths: "Path View" };
   const modeIcons = { consoles: "#icon-database", paths: "#icon-folder-tree" };
   if (refs.sidebarViewToggleButton) {
@@ -2586,6 +2917,16 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
 }
 
 function renderPlaylist({ sort = true, persistTab = true, virtualScrollTop = null, preserveVirtualRows = false } = {}) {
+  if (isGalleryActive()) {
+    refs.playlistScrollWrap?.classList.add("is-hidden");
+    refs.galleryView?.classList.remove("is-hidden");
+    if (persistTab && findActivePlaylistTab()) persistPlaylistTabs();
+    updateSB2Titlebar();
+    renderGalleryView();
+    return;
+  }
+  refs.galleryView?.classList.add("is-hidden");
+  refs.playlistScrollWrap?.classList.remove("is-hidden");
   // Capture before clearing the table: WebKit clamps scrollTop to zero while
   // its tbody is empty, so reading it after replacement loses the user's row.
   const preservedScrollTop = Math.max(0, Number(refs.playlistBodyWrap?.scrollTop) || 0);
@@ -3725,6 +4066,7 @@ uiApp.ui = {
   refreshFavorites,
   showFavoritesPlaylist,
   showPlaybackHistory,
+  showGalleryPlaylist,
   activateDatabaseSelection,
   activateFocusedItem,
   renderSidebar,
