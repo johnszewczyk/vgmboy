@@ -101,24 +101,6 @@
       pointer-events: none;
     }
     .terminal[data-renderer="webgl2"] .beam-screen { display: block; }
-    .phosphor-trail {
-      position: absolute;
-      z-index: 3;
-      inset: 0;
-      display: none;
-      width: 100%;
-      height: 100%;
-      image-rendering: pixelated;
-      mix-blend-mode: screen;
-      opacity: 0;
-      pointer-events: none;
-    }
-    .terminal[data-renderer="webgl2"] .phosphor-trail { display: block; }
-    @keyframes phosphor-decay {
-      from { opacity: 0.18; }
-      to { opacity: 0; }
-    }
-
     .topline,
     .resolutionline,
     .toolrow,
@@ -260,7 +242,7 @@
       overflow-x: hidden;
       overflow-y: auto;
       scrollbar-width: none;
-      scroll-snap-type: y mandatory;
+      scroll-snap-type: y proximity;
     }
     .tree::-webkit-scrollbar, .songs::-webkit-scrollbar { display: none; }
     .tree-row {
@@ -337,7 +319,7 @@
       overflow-x: hidden;
       overflow-y: auto;
       scrollbar-width: none;
-      scroll-snap-type: y mandatory;
+      scroll-snap-type: y proximity;
     }
     .song {
       min-width: 0;
@@ -396,16 +378,12 @@
         transition: background-color 70ms linear, color 70ms linear;
       }
     }
-    @media (prefers-reduced-motion: reduce) {
-      .phosphor-trail { display: none !important; }
-    }
   </style>
 </head>
 <body>
   <div class="crt">
     <div class="terminal" data-renderer="dom" role="application" aria-label="LineBoy monochrome line-grid player">
       <canvas class="beam-screen" aria-hidden="true"></canvas>
-      <canvas class="phosphor-trail" aria-hidden="true"></canvas>
 
       <header class="topline">
         <div class="brand">LINEBOY</div>
@@ -532,8 +510,6 @@
 
     const terminal = document.querySelector(".terminal");
     const display = document.querySelector(".beam-screen");
-    const phosphorTrail = document.querySelector(".phosphor-trail");
-    const phosphorContext = phosphorTrail.getContext("2d");
     const workspace = document.querySelector(".workspace");
     const divider = document.querySelector("#column-divider");
     const gridSize = document.querySelector("#grid-size");
@@ -555,6 +531,10 @@
     const nativeRequests = new Map();
     const nativeTracks = new Map();
     const nativeGames = new Map();
+    const nativeGroups = new Map();
+    const nativeDisplayNames = new Map();
+    const folderChildren = new Map();
+    let selectedTreeRow = treeRows.find((row) => row.getAttribute("aria-selected") === "true") || null;
     let nativeRequestID = 0;
     let catalogRequestVersion = 0;
     let nativeFavoriteIDs = new Set();
@@ -614,10 +594,13 @@
       const availableWidth = Math.max(1, window.innerWidth - 16) * deviceRatio;
       const availableHeight = Math.max(1, window.innerHeight - 16) * deviceRatio;
       const referenceRaster = resolutionById.get("320X240");
-      const referenceScale = Math.max(1, Math.floor(Math.min(
+      const maxWholeScale = Math.floor(Math.min(
         availableWidth / referenceRaster.width,
         availableHeight / referenceRaster.height
-      )));
+      ));
+      const referenceScale = maxWholeScale >= 2
+        ? maxWholeScale - (maxWholeScale % 2)
+        : Math.max(1, maxWholeScale);
       const coreWidth = referenceRaster.width * referenceScale;
       const coreHeight = referenceRaster.height * referenceScale;
       const deviceScale = Math.min(coreWidth / raster.width, coreHeight / raster.height);
@@ -644,11 +627,13 @@
       workspace.style.gridTemplateColumns = `${sidebarColumns * 8}px 8px minmax(0, 1fr)`;
       workspace.style.gridTemplateRows = `repeat(${workspaceLines}, 16px)`;
       workspace.style.setProperty("--workspace-rows", `repeat(${workspaceLines}, 16px)`);
-      divider.replaceChildren(...Array.from({ length: workspaceLines }, () => {
-        const line = document.createElement("span");
-        line.textContent = "│";
-        return line;
-      }));
+      if (divider.childElementCount !== workspaceLines) {
+        divider.replaceChildren(...Array.from({ length: workspaceLines }, () => {
+          const line = document.createElement("span");
+          line.textContent = "│";
+          return line;
+        }));
+      }
       gridSize.textContent = `${columns}X${textRows}`;
       resolutionSize.textContent = raster.id;
       pixelScale.textContent = `${deviceScale.toFixed(2).replace(/\.?0+$/, "")}X`;
@@ -674,24 +659,76 @@
     function visibleTreeRows() { return treeRows.filter((row) => !row.hidden); }
 
     function selectTreeRow(row, moveFocus = false) {
-      treeRows.forEach((entry) => {
-        const selected = entry === row;
-        entry.setAttribute("aria-selected", String(selected));
-        entry.tabIndex = selected ? 0 : -1;
-      });
+      if (selectedTreeRow !== row) {
+        if (selectedTreeRow?.isConnected) {
+          selectedTreeRow.setAttribute("aria-selected", "false");
+          selectedTreeRow.tabIndex = -1;
+        }
+        row.setAttribute("aria-selected", "true");
+        row.tabIndex = 0;
+        selectedTreeRow = row;
+      }
       if (moveFocus) row.focus();
     }
 
-    function setFolderExpanded(row, expanded) {
+    async function setFolderExpanded(row, expanded) {
       const folder = row.dataset.folder;
-      if (!folder) return;
+      if (!folder) return null;
       row.setAttribute("aria-expanded", String(expanded));
       row.querySelector(".chev").textContent = expanded ? "−" : "+";
+      if (nativeGroups.has(folder)) {
+        if (!expanded) {
+          if (selectedTreeRow?.dataset.parent === folder) selectTreeRow(row, true);
+          if (folderChildren.has(folder)) {
+            const children = folderChildren.get(folder);
+            children.forEach((child) => {
+              nativeGames.delete(child.dataset.game);
+              child.remove();
+            });
+            folderChildren.delete(folder);
+            const childSet = new Set(children);
+            treeRows = treeRows.filter((entry) => !childSet.has(entry));
+          }
+          return null;
+        }
+        const group = nativeGroups.get(folder);
+        if (folderChildren.has(folder)) return folderChildren.get(folder)[0] || null;
+        try {
+          if (!group.games) {
+            if (!group.promise) {
+              group.promise = nativeRequest("catalogGroup", { system: group.system })
+                .then((payload) => (payload.games || []).map((game) => {
+                  const identity = `${game.rootId}\u001f${game.game}\u001f${game.system}`;
+                  const displayName = nativeDisplayNames.get(identity);
+                  return displayName ? { ...game, displayName } : game;
+                }))
+                .finally(() => { group.promise = null; });
+            }
+            group.games = await group.promise;
+          }
+          if (row.getAttribute("aria-expanded") !== "true" || !row.isConnected) return null;
+          if (folderChildren.has(folder)) return folderChildren.get(folder)[0] || null;
+          const children = group.games.map((game) => createNativeGameRow(game, folder));
+          const fragment = document.createDocumentFragment();
+          children.forEach((child) => fragment.append(child));
+          row.after(fragment);
+          folderChildren.set(folder, children);
+          const rowIndex = treeRows.indexOf(row);
+          treeRows.splice(rowIndex + 1, 0, ...children);
+          return children[0] || null;
+        } catch (error) {
+          if (row.getAttribute("aria-expanded") === "true") {
+            row.setAttribute("aria-expanded", "false");
+            row.querySelector(".chev").textContent = "+";
+            status.textContent = `CATALOG/ERROR ${error.message}`;
+          }
+          return null;
+        }
+      }
       const children = treeRows.filter((entry) => entry.dataset.parent === folder);
       children.forEach((child) => { child.hidden = !expanded; });
-      if (!expanded && children.some((child) => child.getAttribute("aria-selected") === "true")) {
-        selectTreeRow(row, true);
-      }
+      if (!expanded && selectedTreeRow?.dataset.parent === folder) selectTreeRow(row, true);
+      return children[0] || null;
     }
 
     function formatTrackLength(milliseconds) {
@@ -868,50 +905,58 @@
       return `${game.rootId}|${game.system}|${game.game}`;
     }
 
+    function createNativeGameRow(game, folderID) {
+      const key = gameKey(game);
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "tree-row indent";
+      row.setAttribute("role", "treeitem");
+      row.setAttribute("aria-level", "2");
+      row.setAttribute("aria-selected", "false");
+      row.tabIndex = -1;
+      row.dataset.parent = folderID;
+      row.dataset.game = key;
+      nativeGames.set(key, game);
+      row.innerHTML = '<span class="chev">›</span><span class="label"></span><span class="count"></span>';
+      row.querySelector(".label").textContent = game.game.toUpperCase();
+      row.title = game.displayName;
+      row.querySelector(".count").textContent = String(game.trackCount);
+      return row;
+    }
+
     function renderNativeLibrary(payload) {
       nativeGames.clear();
+      nativeGroups.clear();
+      nativeDisplayNames.clear();
+      Object.entries(payload.displayNames || {}).forEach(([identity, displayName]) => {
+        nativeDisplayNames.set(identity, displayName);
+      });
+      folderChildren.clear();
+      selectedTreeRow = null;
       libraryTree.replaceChildren();
       const groups = payload.groups || [];
-      const allGames = groups.flatMap((group) => group.games || []);
-      libraryCount.textContent = formatCatalogCount(allGames.length);
-      let firstGameRow = null;
+      libraryCount.textContent = formatCatalogCount(payload.gameCount || 0);
+      let firstGroupRow = null;
+      const treeRowsFragment = document.createDocumentFragment();
       groups.forEach((group, groupIndex) => {
         const folderID = `catalog-folder-${groupIndex}`;
-        const games = group.games || [];
+        const gameCount = Number(group.gameCount) || 0;
+        nativeGroups.set(folderID, { system: group.system || "", games: null, promise: null });
         const folder = document.createElement("button");
         folder.type = "button";
         folder.className = "tree-row";
         folder.setAttribute("role", "treeitem");
         folder.setAttribute("aria-level", "1");
-        folder.setAttribute("aria-expanded", String(groupIndex === 0));
+        folder.setAttribute("aria-expanded", String(groupIndex === 0 && gameCount > 0));
         folder.setAttribute("aria-selected", "false");
         folder.tabIndex = -1;
         folder.dataset.folder = folderID;
         folder.dataset.system = group.name;
-        folder.innerHTML = `<span class="chev">${groupIndex === 0 ? "−" : "+"}</span><span class="label"></span><span class="count"></span>`;
+        folder.innerHTML = `<span class="chev">${groupIndex === 0 && gameCount ? "−" : "+"}</span><span class="label"></span><span class="count"></span>`;
         folder.querySelector(".label").textContent = group.name.toUpperCase();
-        folder.querySelector(".count").textContent = String(games.length);
-        libraryTree.append(folder);
-        games.forEach((game) => {
-          const key = gameKey(game);
-          nativeGames.set(key, game);
-          const row = document.createElement("button");
-          row.type = "button";
-          row.className = "tree-row indent";
-          row.setAttribute("role", "treeitem");
-          row.setAttribute("aria-level", "2");
-          row.setAttribute("aria-selected", "false");
-          row.tabIndex = -1;
-          row.dataset.parent = folderID;
-          row.dataset.game = key;
-          row.innerHTML = '<span class="chev">›</span><span class="label"></span><span class="count"></span>';
-          row.querySelector(".label").textContent = game.game.toUpperCase();
-          row.title = game.displayName;
-          row.querySelector(".count").textContent = String(game.trackCount);
-          row.hidden = groupIndex !== 0;
-          libraryTree.append(row);
-          if (!firstGameRow) firstGameRow = row;
-        });
+        folder.querySelector(".count").textContent = String(gameCount);
+        treeRowsFragment.append(folder);
+        if (groupIndex === 0) firstGroupRow = folder;
       });
       if (!groups.length) {
         const empty = document.createElement("button");
@@ -919,10 +964,11 @@
         empty.className = "tree-row";
         empty.disabled = true;
         empty.innerHTML = '<span class="chev"></span><span class="label">NO GAMES FOUND</span><span class="count"></span>';
-        libraryTree.append(empty);
+        treeRowsFragment.append(empty);
       }
+      libraryTree.append(treeRowsFragment);
       refreshTreeRows();
-      return firstGameRow;
+      return firstGroupRow;
     }
 
     async function loadNativeGame(game, row) {
@@ -952,12 +998,12 @@
       try {
         const payload = await nativeRequest("catalogBootstrap");
         nativeFavoriteIDs = new Set(payload.favoriteIds || []);
-        const firstGameRow = renderNativeLibrary(payload);
+        const firstGroupRow = renderNativeLibrary(payload);
         status.textContent = `CATALOG ${formatCatalogCount(payload.gameCount)}G / ${formatCatalogCount(payload.trackCount)}T`;
-        if (firstGameRow) {
-          const firstGroup = treeRows.find((entry) => entry.dataset.folder);
-          if (firstGroup) selectTreeRow(firstGroup);
-          handleTreeClick(firstGameRow);
+        if (firstGroupRow) {
+          selectTreeRow(firstGroupRow);
+          const firstGameRow = await setFolderExpanded(firstGroupRow, true);
+          if (firstGameRow) handleTreeClick(firstGameRow);
         } else {
           songList.replaceChildren();
           gameTitle.textContent = "NO CATALOG GAMES";
@@ -1155,7 +1201,8 @@
     let texture = null;
     let frameRequest = 0;
     let renderVersion = 0;
-    let hasRenderedFrame = false;
+    let nativeScrollLive = false;
+    let scrollResumeTimer = 0;
     const framebuffer = document.createElement("canvas");
     const framebufferContext = framebuffer.getContext("2d", { alpha: false });
 
@@ -1197,11 +1244,25 @@
     }
 
     function scheduleRender() {
-      if (!gl || !program || frameRequest) return;
+      if (!gl || !program || frameRequest || nativeScrollLive) return;
       frameRequest = requestAnimationFrame(() => {
         frameRequest = 0;
         renderFrame();
       });
+    }
+
+    function keepNativeScrollResponsive() {
+      nativeScrollLive = true;
+      if (frameRequest) {
+        cancelAnimationFrame(frameRequest);
+        frameRequest = 0;
+      }
+      if (terminal.dataset.renderer !== "dom") terminal.dataset.renderer = "dom";
+      window.clearTimeout(scrollResumeTimer);
+      scrollResumeTimer = window.setTimeout(() => {
+        nativeScrollLive = false;
+        scheduleRender();
+      }, 160);
     }
 
     function renderFrame() {
@@ -1214,21 +1275,9 @@
       screenOriginY = Math.round(rect.top * deviceRatio) / deviceRatio;
       const width = Math.max(1, Math.round(rect.width * deviceRatio));
       const height = Math.max(1, Math.round(rect.height * deviceRatio));
-      const resized = display.width !== width || display.height !== height;
-      if (resized) {
+      if (display.width !== width || display.height !== height) {
         display.width = width;
         display.height = height;
-        phosphorTrail.width = width;
-        phosphorTrail.height = height;
-        hasRenderedFrame = false;
-      } else if (hasRenderedFrame && terminal.dataset.renderer === "webgl2" && phosphorContext) {
-        phosphorContext.clearRect(0, 0, width, height);
-        phosphorContext.drawImage(display, 0, 0, width, height);
-        phosphorTrail.style.animation = "none";
-        void phosphorTrail.offsetWidth;
-        if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
-          phosphorTrail.style.animation = "phosphor-decay 240ms linear forwards";
-        }
       }
       if (!framebufferContext) {
         terminal.dataset.renderer = "dom";
@@ -1256,19 +1305,20 @@
         gl.uniform1f(gl.getUniformLocation(program, "u_scan_pitch"), scanPitch);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         terminal.dataset.renderer = "webgl2";
-        hasRenderedFrame = true;
       } catch (error) {
         console.error("LineBoy scanline frame failed:", error);
         terminal.dataset.renderer = "dom";
       }
     }
 
-    function drawElement(element) {
-      if (!(element instanceof Element) || element === display || element === phosphorTrail) return;
-      const style = getComputedStyle(element);
-      if (style.display === "none" || style.visibility === "hidden") return;
+    function drawElement(element, clip = null) {
+      if (!(element instanceof Element) || element === display || element.hidden) return;
       const bounds = element.getBoundingClientRect();
       if (bounds.width <= 0 || bounds.height <= 0) return;
+      if (clip && (bounds.right <= clip.left || bounds.left >= clip.right
+        || bounds.bottom <= clip.top || bounds.top >= clip.bottom)) return;
+      const style = getComputedStyle(element);
+      if (style.display === "none" || style.visibility === "hidden") return;
       const ctx = framebufferContext;
       const x = bounds.left;
       const y = bounds.top;
@@ -1281,18 +1331,27 @@
         ctx.fillRect(x, y, bounds.width, bounds.height);
       }
 
-      if (element !== terminal && /(auto|scroll|hidden|clip)/.test(`${style.overflowX} ${style.overflowY}`)) {
+      const clipsChildren = element !== terminal
+        && /(auto|scroll|hidden|clip)/.test(`${style.overflowX} ${style.overflowY}`);
+      let childClip = clip;
+      if (clipsChildren) {
         ctx.save();
         ctx.beginPath();
         ctx.rect(x, y, bounds.width, bounds.height);
         ctx.clip();
+        childClip = clip ? {
+          left: Math.max(clip.left, bounds.left),
+          top: Math.max(clip.top, bounds.top),
+          right: Math.min(clip.right, bounds.right),
+          bottom: Math.min(clip.bottom, bounds.bottom),
+        } : bounds;
       }
 
       for (const child of element.childNodes) {
         if (child.nodeType === Node.TEXT_NODE) drawText(child);
-        else if (child.nodeType === Node.ELEMENT_NODE) drawElement(child);
+        else if (child.nodeType === Node.ELEMENT_NODE) drawElement(child, childClip);
       }
-      if (element !== terminal && /(auto|scroll|hidden|clip)/.test(`${style.overflowX} ${style.overflowY}`)) ctx.restore();
+      if (clipsChildren) ctx.restore();
       ctx.restore();
     }
 
@@ -1342,9 +1401,15 @@
       updateRaster();
       scheduleRender();
     });
-    document.addEventListener("scroll", scheduleRender, true);
-    terminal.addEventListener("pointerover", scheduleRender);
-    terminal.addEventListener("pointerout", scheduleRender);
+    libraryTree.addEventListener("scroll", keepNativeScrollResponsive, { passive: true });
+    songList.addEventListener("scroll", keepNativeScrollResponsive, { passive: true });
+    const hoverRegionSelector = ".resolution-choice, .nav-button, .tree-row, .song";
+    const hoverRegion = (target) => target instanceof Element ? target.closest(hoverRegionSelector) : null;
+    function renderWhenHoverRegionChanges(event) {
+      if (hoverRegion(event.target) !== hoverRegion(event.relatedTarget)) scheduleRender();
+    }
+    terminal.addEventListener("pointerover", renderWhenHoverRegionChanges);
+    terminal.addEventListener("pointerout", renderWhenHoverRegionChanges);
     terminal.addEventListener("focusin", scheduleRender);
     terminal.addEventListener("focusout", scheduleRender);
     new MutationObserver(scheduleRender).observe(terminal, {

@@ -250,10 +250,16 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
         }.sorted { Self.naturalCompare($0.path, $1.path) == .orderedAscending }
     }
 
-    public func gameBuckets(preferFoldersOverMetadata: Bool = true) throws -> [CatalogGameBucket] {
+    /// Optionally limits the projection to one resolved browser system. Pass
+    /// an empty string to select buckets without a system assignment.
+    public func gameBuckets(
+        preferFoldersOverMetadata: Bool = true,
+        system: String? = nil
+    ) throws -> [CatalogGameBucket] {
         let systemExpression = preferFoldersOverMetadata
             ? "COALESCE(NULLIF(t.browser_system, ''), NULLIF(m.system, ''), '')"
             : "COALESCE(NULLIF(m.system, ''), NULLIF(t.browser_system, ''), '')"
+        let systemFilter = system == nil ? "" : " AND \(systemExpression)=?"
         let sql: String
         if try gameSidebarBucketsAreCurrent() {
             sql = """
@@ -265,7 +271,7 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
                AND t.browser_game=b.browser_game
                AND t.browser_system=b.browser_system
             LEFT JOIN track_metadata m ON m.track_id=t.id
-            WHERE r.is_attached=1 AND r.is_enabled=1
+            WHERE r.is_attached=1 AND r.is_enabled=1\(systemFilter)
             GROUP BY b.root_id, r.path, b.browser_game, \(systemExpression)
             ORDER BY lower(b.browser_game), b.browser_game, lower(\(systemExpression)), \(systemExpression), lower(r.path), r.path;
             """
@@ -275,15 +281,13 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
             FROM tracks t
             INNER JOIN library_roots r ON r.id=t.root_id
             LEFT JOIN track_metadata m ON m.track_id=t.id
-            WHERE r.is_attached=1 AND r.is_enabled=1
+            WHERE r.is_attached=1 AND r.is_enabled=1\(systemFilter)
               AND NOT EXISTS (SELECT 1 FROM dead_sources d WHERE d.root_id=t.root_id AND d.path=t.path)
             GROUP BY t.root_id, r.path, t.browser_game, \(systemExpression)
             ORDER BY lower(t.browser_game), t.browser_game, lower(\(systemExpression)), \(systemExpression), lower(r.path), r.path;
             """
         }
-        return try query(
-            sql
-        ) { statement in
+        return try query(sql, textBindings: system.map { [$0] } ?? []) { statement in
             CatalogGameBucket(
                 rootID: sqlite3_column_int64(statement, 0),
                 rootPath: Self.string(statement, 1),
@@ -621,12 +625,21 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
         return Int(sqlite3_column_int64(statement, 0))
     }
 
-    private func query<T>(_ sql: String, map: (OpaquePointer) throws -> T) throws -> [T] {
+    private func query<T>(
+        _ sql: String,
+        textBindings: [String] = [],
+        map: (OpaquePointer) throws -> T
+    ) throws -> [T] {
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
             throw CatalogReaderError.sqlite(String(cString: sqlite3_errmsg(database)))
         }
         defer { sqlite3_finalize(statement) }
+        for (offset, value) in textBindings.enumerated() {
+            guard sqlite3_bind_text(statement, Int32(offset + 1), value, -1, SQLITE_TRANSIENT) == SQLITE_OK else {
+                throw CatalogReaderError.sqlite(String(cString: sqlite3_errmsg(database)))
+            }
+        }
         var values: [T] = []
         while sqlite3_step(statement) == SQLITE_ROW { values.append(try map(statement)) }
         guard sqlite3_errcode(database) == SQLITE_OK || sqlite3_errcode(database) == SQLITE_DONE else {

@@ -13,6 +13,64 @@ import VGMBoyFormatCore
 import VGMBoyKit
 import WebKit
 
+private struct LineBoyCatalogGame: Sendable {
+    let rootID: Int64
+    let game: String
+    let system: String
+    let displayName: String
+    let trackCount: Int
+}
+
+private struct LineBoyCatalogGroup: Sendable {
+    let name: String
+    let system: String
+    let gameCount: Int
+}
+
+private struct LineBoyCatalogBootstrap: Sendable {
+    let groups: [LineBoyCatalogGroup]
+    let displayNames: [String: String]
+    let gameCount: Int
+    let trackCount: Int
+    let favoriteIDs: [String]
+}
+
+private func readLineBoyCatalogBootstrap(at catalogURL: URL) throws -> LineBoyCatalogBootstrap {
+    let catalog = try ReadOnlyCatalog(databaseURL: catalogURL)
+    let games = CatalogBrowserProjection.games(from: try catalog.gameBuckets())
+    let groups = CatalogBrowserProjection.groups(from: games).map { group in
+        LineBoyCatalogGroup(
+            name: group.name,
+            system: group.games.first?.system ?? "",
+            gameCount: group.games.count
+        )
+    }
+    let favorites = Set(try FavoriteStore().snapshots().map(\.identity.id))
+    let displayNames = Dictionary(uniqueKeysWithValues: games.compactMap { game in
+        game.displayName == game.name ? nil : (game.id, game.displayName)
+    })
+    return LineBoyCatalogBootstrap(
+        groups: groups,
+        displayNames: displayNames,
+        gameCount: games.count,
+        trackCount: try catalog.activeTrackCount(),
+        favoriteIDs: Array(favorites)
+    )
+}
+
+private func readLineBoyCatalogGames(at catalogURL: URL, system: String) throws -> [LineBoyCatalogGame] {
+    let catalog = try ReadOnlyCatalog(databaseURL: catalogURL)
+    return CatalogBrowserProjection.games(from: try catalog.gameBuckets(system: system)).map { game in
+        LineBoyCatalogGame(
+            rootID: game.rootID,
+            game: game.name,
+            system: game.system,
+            displayName: game.displayName,
+            trackCount: game.trackCount
+        )
+    }
+}
+
 @MainActor
 final class LineBoyAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var window: NSWindow?
@@ -102,7 +160,26 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         do {
             switch method {
             case "catalogBootstrap":
-                reply(requestID, success: try catalogBootstrap())
+                Task { [weak self] in
+                    guard let self else { return }
+                    do {
+                        self.reply(requestID, success: try await self.catalogBootstrap())
+                    } catch {
+                        self.reply(requestID, failure: error.localizedDescription)
+                    }
+                }
+            case "catalogGroup":
+                guard let system = arguments["system"] as? String else {
+                    throw LineBoyBridgeError.invalidArguments
+                }
+                Task { [weak self] in
+                    guard let self else { return }
+                    do {
+                        self.reply(requestID, success: try await self.catalogGroup(system: system))
+                    } catch {
+                        self.reply(requestID, failure: error.localizedDescription)
+                    }
+                }
             case "gameTracks":
                 reply(requestID, success: try gameTracks(arguments))
             case "playTrack":
@@ -130,32 +207,43 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         }
     }
 
-    private func catalogBootstrap() throws -> [String: Any] {
+    private func catalogBootstrap() async throws -> [String: Any] {
         guard FileManager.default.fileExists(atPath: catalogURL.path) else {
             throw LineBoyBridgeError.catalogUnavailable(catalogURL.path)
         }
-        let catalog = try ReadOnlyCatalog(databaseURL: catalogURL)
-        let games = CatalogBrowserProjection.games(from: try catalog.gameBuckets())
-        let groups = CatalogBrowserProjection.groups(from: games)
-        let favorites = Set(try FavoriteStore().snapshots().map(\.identity.id))
+        let catalogURL = self.catalogURL
+        let snapshot = try await Task.detached(priority: .userInitiated) {
+            try readLineBoyCatalogBootstrap(at: catalogURL)
+        }.value
         return [
-            "groups": groups.map { group in
-                [
-                    "name": group.name,
-                    "games": group.games.map { game in
-                        [
-                            "rootId": game.rootID,
-                            "game": game.name,
-                            "system": game.system,
-                            "displayName": game.displayName,
-                            "trackCount": game.trackCount
-                        ] as [String: Any]
-                    }
-                ] as [String: Any]
+            "groups": snapshot.groups.map { group in
+                ["name": group.name, "system": group.system, "gameCount": group.gameCount] as [String: Any]
             },
-            "gameCount": games.count,
-            "trackCount": try catalog.activeTrackCount(),
-            "favoriteIds": Array(favorites)
+            "displayNames": snapshot.displayNames,
+            "gameCount": snapshot.gameCount,
+            "trackCount": snapshot.trackCount,
+            "favoriteIds": snapshot.favoriteIDs
+        ]
+    }
+
+    private func catalogGroup(system: String) async throws -> [String: Any] {
+        guard FileManager.default.fileExists(atPath: catalogURL.path) else {
+            throw LineBoyBridgeError.catalogUnavailable(catalogURL.path)
+        }
+        let catalogURL = self.catalogURL
+        let games = try await Task.detached(priority: .userInitiated) {
+            try readLineBoyCatalogGames(at: catalogURL, system: system)
+        }.value
+        return [
+            "games": games.map { game in
+                [
+                    "rootId": game.rootID,
+                    "game": game.game,
+                    "system": game.system,
+                    "displayName": game.displayName,
+                    "trackCount": game.trackCount
+                ] as [String: Any]
+            }
         ]
     }
 
