@@ -9,11 +9,11 @@ to the catalog or playback bridge.
 The screen is rasterized from the live interface into a framebuffer, then a
 WebGL2 fragment shader draws the image through 480 horizontal beam profiles.
 Each profile has a Gaussian phosphor spot whose width increases with brightness,
-so bright regions bloom slightly into the spaces between scan lines. The beam
-pass runs only after content, layout, scroll, or pointer state changes. This
-keeps the mockup responsive while giving the interface a hardware-shaped
-intensity pattern instead of painting a CSS stripe over finished pixels. It is
-a compact monochrome CRT model, not a complete analog display simulation: it
+and the shader emits black outside each spot, leaving actual empty scanline
+gaps instead of dimmed copies of the source image. The beam pass runs only after
+content, layout, scroll, or pointer state changes. This keeps the mockup
+responsive while making each visible row the product of a beam pass. It is a
+compact monochrome CRT model, not a complete analog display simulation: it
 does not add color phosphor masks, NTSC artifacts, curvature, or beam flicker.
 The browser keeps the semantic interface available as a fallback when WebGL2
 or framebuffer rendering is unavailable.

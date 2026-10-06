@@ -442,19 +442,23 @@
         vec3 linear_source = pow(max(source, vec3(0.0)), vec3(2.2));
         float level = dot(linear_source, vec3(0.2126, 0.7152, 0.0722));
 
-        // A focused horizontal electron beam leaves a narrower spot in dim
-        // areas and a wider spot in bright areas. Sum adjacent line profiles
-        // so the phosphor has a real beam-shaped response, not a tinted mask.
+        // Draw one focused beam spot per raster row. The hard coverage edge
+        // leaves a true black phosphor gap between rows; source pixels outside
+        // the beam spot do not leak through as gray.
         float screen_y = (u_resolution.y - gl_FragCoord.y) / u_scale;
         float phase = mod(screen_y + u_scan_pitch * 0.5, u_scan_pitch) - u_scan_pitch * 0.5;
-        float sigma = u_scan_pitch * mix(0.28, 0.38, sqrt(level));
-        float profile = exp(-0.5 * pow(phase / sigma, 2.0));
-        profile += exp(-0.5 * pow((phase - u_scan_pitch) / sigma, 2.0));
-        profile += exp(-0.5 * pow((phase + u_scan_pitch) / sigma, 2.0));
-        float peak = 1.0 + 2.0 * exp(-0.5 * pow(u_scan_pitch / sigma, 2.0));
-        float beam = profile / peak;
+        float beam_radius = u_scan_pitch * mix(0.27, 0.34, sqrt(level));
+        float edge = u_scan_pitch * 0.018;
+        float distance_from_center = abs(phase);
+        float coverage = 1.0 - smoothstep(beam_radius - edge, beam_radius + edge, distance_from_center);
+        float spot = exp(-0.5 * pow(distance_from_center / (beam_radius * 0.72), 2.0));
 
-        vec3 emitted = linear_source * beam;
+        if (coverage <= 0.0) {
+          out_color = vec4(0.0, 0.0, 0.0, 1.0);
+          return;
+        }
+
+        vec3 emitted = linear_source * spot * coverage;
         vec3 encoded = pow(clamp(emitted, 0.0, 1.0), vec3(1.0 / 2.2));
         out_color = vec4(encoded, 1.0);
       }
