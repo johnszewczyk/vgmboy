@@ -14,11 +14,18 @@ boxed button row. The CRT pass resolves each font-row pixel to a six-device-
 pixel beam interval at the normal high-DPI viewport, centered on the glyph
 raster with pure-black gaps between illuminated bands.
 
-The VIDEO control switches to a high-resolution mode, which selects XGA
-1024×768, SVGA 800×600, VGA 640×480, or EGA 512×384 according to available
-space. Its denser two-device-pixel beam cadence remains optional. Both modes
-keep nearest-neighbor source sampling and integer scale factors; text glyph
-tops snap to the same cadence as the beam.
+The resolution control in the top status row opens direct choices for 320×240,
+512×384, 640×480, 800×600, and 1024×768. The selected source raster remains
+fixed while its device scale steps down in integers to fit the available view.
+The standard 320×240 raster prefers six-device-pixel scan rows, then four or
+two; the larger rasters use two or one. Text glyph tops snap to the same cadence
+as the beam.
+
+Top command and transport controls share one reverse-video button style: a
+single glyph-row gray block with black text. Sidebar entries use full 16-pixel
+rows for hit targets and inverse-video hover, focus, and selection states. The
+library list supports single selection and Up/Down, Home, and End keyboard
+navigation.
 
 A WebGL2 fragment shader draws the framebuffer through a beam profile. Its
 spot width changes slightly with brightness; pixels outside each spot are
