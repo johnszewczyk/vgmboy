@@ -22,3 +22,5 @@ put source-field mappings in format profiles.
   set fields, RSN/SPC hash scopes, and identity enrichment.
 - **Project 2612** — [`Project2612.md`](Project2612.md) records package set
   fields and set-specific identity rules.
+- **VGMRIPS** — [`VGMRIPS.md`](VGMRIPS.md) records source-snapshot, platform
+  folder, filename, artwork, and Title Snap rules.
