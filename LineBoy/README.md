@@ -2,9 +2,10 @@
 
 LineBoy is a monochrome DOS-style player interface experiment. It lays every
 control, label, sidebar item, and track row onto an 8×16 character-cell grid,
-then paints the grid through a CRT beam pass. Its local sample library,
-favorites, tree, playlist, and transport controls are interactive mock data;
-catalog and audio playback are not connected.
+then paints the grid through a CRT beam pass. The native WebKit host reads the
+shared VGMMan catalog, persists favorites through FrontendCore, and routes
+playback through the shared transport and VGMBoy decoder. The browser build
+remains a sample-data preview without native services.
 
 ## Display grid
 
@@ -26,9 +27,15 @@ screen space.
 
 ## Build and launch
 
-Run `./build.sh` to assemble the static app under `.build/site`. Run
-`./launch.sh` to serve that build at `http://127.0.0.1:8765/`. Set
-`LINEBOY_PORT` to use a different loopback port.
+Run `./build.sh` to build the native app at `.build/LineBoy.app` and the static
+preview under `.build/site`. Run `./launch.sh` to rebuild, close any running
+LineBoy instance, and open a fresh native app. To inspect the sample-only
+browser preview, serve `.build/site` on loopback with Python's HTTP server.
+
+The native host owns catalog and transport adapters; the HTML owns the shared
+8×16 grid, keyboard interaction, and WebGL2 beam rendering. Both use the same
+interface, while only the native host has access to CatalogReader,
+FrontendCore, and VGMBoy.
 
 The font `assets/ModernDOS8x16.ttf` is Modern DOS 8×16 by Jayvee Enaguas,
 dedicated under CC0 1.0. The included `assets/CC0-1.0.txt` preserves its

@@ -444,6 +444,15 @@
       { id: "1024X768", width: 1024, height: 768, deviceScales: [2, 1] },
     ];
 
+    // ModernDOS8x16's em metrics are 12px ascender, 4px descender and 10px
+    // cap height. Center the visible cap ink inside the 16px cell, then keep
+    // every following row on the exact same 16px advance.
+    const FONT_ASCENT = 12;
+    const FONT_DESCENT = 4;
+    const FONT_CAP_HEIGHT = 10;
+    const FONT_BASELINE_OFFSET = (FONT_ASCENT - FONT_DESCENT) / 2
+      + (FONT_DESCENT - (FONT_ASCENT - FONT_CAP_HEIGHT)) / 2;
+
     const GAMES = {
       CHRONO: {
         title: "CHRONO TRIGGER",
@@ -502,7 +511,9 @@
     const resolutionSize = document.querySelector("#resolution-size");
     const resolutionButtons = [...document.querySelectorAll(".resolution-choice")];
     const resolutionById = new Map(RASTERS.map((raster) => [raster.id, raster]));
-    const treeRows = [...document.querySelectorAll(".tree-row")];
+    const libraryTree = document.querySelector("#library-tree");
+    const libraryCount = document.querySelector("#library-count");
+    let treeRows = [...document.querySelectorAll(".tree-row")];
     const songList = document.querySelector("#song-list");
     const gameTitle = document.querySelector("#game-title");
     const trackCount = document.querySelector("#track-count");
@@ -510,6 +521,15 @@
     const now = document.querySelector("#now");
     const clock = document.querySelector("#clock");
     const navButtons = [...document.querySelectorAll(".nav-button")];
+    const nativeHost = Boolean(window.webkit?.messageHandlers?.lineBoy);
+    const nativeRequests = new Map();
+    const nativeTracks = new Map();
+    const nativeGames = new Map();
+    let nativeRequestID = 0;
+    let catalogRequestVersion = 0;
+    let nativeFavoriteIDs = new Set();
+    let nativeTrackLoaded = false;
+    let nativeCurrentTrackID = null;
     let activeRaster = null;
     let requestedRaster = "320X240";
     let activeGame = GAMES.CHRONO;
@@ -519,6 +539,45 @@
     let activeScanPitchCss = 1;
     let screenOriginY = 0;
     let screenOriginX = 0;
+
+    window.__lineBoyNativeReply = (id, succeeded, value) => {
+      const pending = nativeRequests.get(String(id));
+      if (!pending) return;
+      nativeRequests.delete(String(id));
+      if (succeeded) pending.resolve(value);
+      else pending.reject(new Error(value?.message || "Native request failed."));
+    };
+
+    window.__lineBoyNativeEvent = (name, value) => {
+      if (name === "playbackStatus") applyNativePlaybackStatus(value);
+    };
+
+    function nativeRequest(method, args = {}) {
+      if (!nativeHost) return Promise.reject(new Error("Native services are unavailable in this browser preview."));
+      return new Promise((resolve, reject) => {
+        const id = String(++nativeRequestID);
+        nativeRequests.set(id, { resolve, reject });
+        window.webkit.messageHandlers.lineBoy.postMessage({ id, method, args });
+      });
+    }
+
+    function applyNativePlaybackStatus(value = {}) {
+      playing = Boolean(value.isPlaying);
+      nativeTrackLoaded = Boolean(value.trackLoaded);
+      nativeCurrentTrackID = value.currentTrackId || null;
+      now.textContent = playing ? "PLAYING" : value.trackLoaded ? "PAUSED" : "STOPPED";
+      const playButton = document.querySelector('[data-action="PLAY"]');
+      playButton.textContent = playing ? "PAUSE" : "PLAY";
+      playButton.setAttribute("aria-pressed", String(playing));
+      seconds = Math.max(0, Math.floor(value.elapsedSeconds || 0));
+      clock.textContent = `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+      if (value.currentTrackId) {
+        const current = [...songList.querySelectorAll(".song")]
+          .find((song) => song.dataset.trackId === value.currentTrackId);
+        if (current && current.getAttribute("aria-selected") !== "true") selectSong(current);
+      }
+      if (value.error) status.textContent = `PLAYBACK/ERROR ${value.error}`;
+    }
 
     function updateRaster() {
       const raster = resolutionById.get(requestedRaster);
@@ -599,12 +658,31 @@
       }
     }
 
+    function formatTrackLength(milliseconds) {
+      const totalSeconds = Math.max(0, Math.floor(Number(milliseconds || 0) / 1000));
+      if (!totalSeconds) return "--:--";
+      return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, "0")}`;
+    }
+
+    function formatCatalogCount(value) {
+      const count = Math.max(0, Number(value) || 0);
+      if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
+      if (count >= 10000) return `${(count / 1000).toFixed(1)}K`;
+      if (count >= 1000) return `${Math.round(count / 1000)}K`;
+      return String(count);
+    }
+
     function renderSongs(game, preferredTrack = "01") {
       activeGame = game;
       gameTitle.textContent = game.title;
       trackCount.textContent = `${game.tracks.length} TRK`;
       songList.replaceChildren();
-      const rows = game.tracks.map(([id, title, length, favorite]) => {
+      const rows = game.tracks.map((item, index) => {
+        const [id, numberText, title, length, favorite, displayPath] = Array.isArray(item)
+          ? [String(item[0]), String(item[0]), item[1], item[2], Boolean(item[3]), ""]
+          : [String(item.id), String(item.number || index + 1).padStart(2, "0"), item.title,
+            formatTrackLength(item.lengthMilliseconds),
+            nativeFavoriteIDs.has(String(item.id)) || Boolean(item.favorite), item.displayPath || ""];
         const song = document.createElement("button");
         song.type = "button";
         song.className = "song";
@@ -615,19 +693,22 @@
         song.dataset.title = title;
         song.dataset.favorite = String(favorite);
         song.dataset.length = length;
+        song.dataset.displayPath = displayPath || "";
+        song.dataset.index = String(index);
 
         const number = document.createElement("span");
         number.className = "num";
-        number.textContent = id;
+        number.textContent = numberText;
         const name = document.createElement("span");
         name.className = "title";
-        name.textContent = title;
+        name.textContent = `${favorite ? "*" : ""}${title}`;
         const time = document.createElement("span");
         time.className = "length";
         time.textContent = length;
         song.append(number, name, time);
         song.addEventListener("click", () => selectSong(song, true));
         song.addEventListener("keydown", (event) => handleSongKeydown(event, song));
+        song.addEventListener("dblclick", () => playSong(song));
         return song;
       });
       songList.append(...rows);
@@ -637,6 +718,10 @@
     function visibleSongs() { return [...songList.querySelectorAll(".song:not([hidden])")]; }
 
     function updateTrackPath(song) {
+      if (song.dataset.displayPath) {
+        status.textContent = `${activeGame.system || "FILE"}/${song.dataset.displayPath}`;
+        return;
+      }
       const slug = song.dataset.title.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "");
       status.textContent = `${activeGame.system}/${activeGame.title.replaceAll(" ", "-")}/${song.dataset.trackId}-${slug}.SPC`;
     }
@@ -650,10 +735,6 @@
       });
       if (moveFocus) song.focus();
       song.scrollIntoView({ block: "nearest" });
-      playing = false;
-      now.textContent = "STOPPED";
-      document.querySelector('[data-action="PLAY"]').textContent = "PLAY";
-      document.querySelector('[data-action="PLAY"]').setAttribute("aria-pressed", "false");
       updateTrackPath(song);
     }
 
@@ -669,6 +750,16 @@
     }
 
     function handleSongKeydown(event, song) {
+      if (event.key.toLowerCase() === "f" && nativeHost) {
+        event.preventDefault();
+        toggleFavorite(song);
+        return;
+      }
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        playSong(song);
+        return;
+      }
       const rows = visibleSongs();
       const index = rows.indexOf(song);
       let next = index;
@@ -681,21 +772,37 @@
       if (rows[next]) selectSong(rows[next], true);
     }
 
-    treeRows.forEach((row) => {
-      row.addEventListener("click", () => {
+    function refreshTreeRows() {
+      treeRows = [...libraryTree.querySelectorAll(".tree-row")];
+    }
+
+    function handleTreeClick(row) {
         selectTreeRow(row);
         if (row.dataset.folder) {
           setFolderExpanded(row, row.getAttribute("aria-expanded") !== "true");
-          status.textContent = `SYSTEM/${row.dataset.folder}`;
+          status.textContent = `SYSTEM/${row.dataset.system || row.dataset.folder}`;
         } else if (row.dataset.game) {
-          const game = GAMES[row.dataset.game];
-          renderSongs(game);
-          status.textContent = `${game.system}/${game.title.replaceAll(" ", "-")}`;
+          if (nativeHost && nativeGames.has(row.dataset.game)) {
+            loadNativeGame(nativeGames.get(row.dataset.game), row);
+          } else {
+            const game = GAMES[row.dataset.game];
+            if (!game) return;
+            renderSongs(game);
+            status.textContent = `${game.system}/${game.title.replaceAll(" ", "-")}`;
+          }
         } else {
           status.textContent = `SYSTEM/${row.querySelector(".label").textContent}`;
         }
-      });
-      row.addEventListener("keydown", (event) => {
+    }
+
+    libraryTree.addEventListener("click", (event) => {
+      const row = event.target.closest(".tree-row");
+      if (row) handleTreeClick(row);
+    });
+
+    libraryTree.addEventListener("keydown", (event) => {
+        const row = event.target.closest(".tree-row");
+        if (!row) return;
         const visible = visibleTreeRows();
         const index = visible.indexOf(row);
         let target = null;
@@ -709,14 +816,183 @@
         } else if (event.key === "ArrowLeft") {
           if (row.dataset.folder && row.getAttribute("aria-expanded") === "true") setFolderExpanded(row, false);
           else if (row.dataset.parent) target = treeRows.find((entry) => entry.dataset.folder === row.dataset.parent);
+        } else if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          handleTreeClick(row);
+          return;
         } else return;
         event.preventDefault();
         if (target) {
           selectTreeRow(target, true);
           target.scrollIntoView({ block: "nearest" });
         }
-      });
     });
+
+    function gameKey(game) {
+      return `${game.rootId}|${game.system}|${game.game}`;
+    }
+
+    function renderNativeLibrary(payload) {
+      nativeGames.clear();
+      libraryTree.replaceChildren();
+      const groups = payload.groups || [];
+      const allGames = groups.flatMap((group) => group.games || []);
+      libraryCount.textContent = formatCatalogCount(allGames.length);
+      let firstGameRow = null;
+      groups.forEach((group, groupIndex) => {
+        const folderID = `catalog-folder-${groupIndex}`;
+        const games = group.games || [];
+        const folder = document.createElement("button");
+        folder.type = "button";
+        folder.className = "tree-row";
+        folder.setAttribute("role", "treeitem");
+        folder.setAttribute("aria-level", "1");
+        folder.setAttribute("aria-expanded", String(groupIndex === 0));
+        folder.setAttribute("aria-selected", "false");
+        folder.tabIndex = -1;
+        folder.dataset.folder = folderID;
+        folder.dataset.system = group.name;
+        folder.innerHTML = `<span class="chev">${groupIndex === 0 ? "−" : "+"}</span><span class="label"></span><span class="count"></span>`;
+        folder.querySelector(".label").textContent = group.name.toUpperCase();
+        folder.querySelector(".count").textContent = String(games.length);
+        libraryTree.append(folder);
+        games.forEach((game) => {
+          const key = gameKey(game);
+          nativeGames.set(key, game);
+          const row = document.createElement("button");
+          row.type = "button";
+          row.className = "tree-row indent";
+          row.setAttribute("role", "treeitem");
+          row.setAttribute("aria-level", "2");
+          row.setAttribute("aria-selected", "false");
+          row.tabIndex = -1;
+          row.dataset.parent = folderID;
+          row.dataset.game = key;
+          row.innerHTML = '<span class="chev">›</span><span class="label"></span><span class="count"></span>';
+          row.querySelector(".label").textContent = game.game.toUpperCase();
+          row.title = game.displayName;
+          row.querySelector(".count").textContent = String(game.trackCount);
+          row.hidden = groupIndex !== 0;
+          libraryTree.append(row);
+          if (!firstGameRow) firstGameRow = row;
+        });
+      });
+      if (!groups.length) {
+        const empty = document.createElement("button");
+        empty.type = "button";
+        empty.className = "tree-row";
+        empty.disabled = true;
+        empty.innerHTML = '<span class="chev"></span><span class="label">NO GAMES FOUND</span><span class="count"></span>';
+        libraryTree.append(empty);
+      }
+      refreshTreeRows();
+      return firstGameRow;
+    }
+
+    async function loadNativeGame(game, row) {
+      const version = ++catalogRequestVersion;
+      activeGame = { title: game.displayName || game.game, system: game.system, tracks: [] };
+      gameTitle.textContent = activeGame.title;
+      trackCount.textContent = "…";
+      songList.replaceChildren();
+      status.textContent = `CATALOG/${game.system}/${game.game}`;
+      try {
+        const result = await nativeRequest("gameTracks", {
+          rootId: Number(game.rootId), game: game.game, system: game.system
+        });
+        if (version !== catalogRequestVersion) return;
+        activeGame = { ...activeGame, tracks: result.tracks || [] };
+        renderSongs(activeGame, "");
+        if (row) selectTreeRow(row);
+      } catch (error) {
+        if (version !== catalogRequestVersion) return;
+        trackCount.textContent = "ERROR";
+        status.textContent = `CATALOG/ERROR ${error.message}`;
+      }
+    }
+
+    async function bootstrapNativeCatalog() {
+      if (!nativeHost) return;
+      try {
+        const payload = await nativeRequest("catalogBootstrap");
+        nativeFavoriteIDs = new Set(payload.favoriteIds || []);
+        const firstGameRow = renderNativeLibrary(payload);
+        status.textContent = `CATALOG ${formatCatalogCount(payload.gameCount)}G / ${formatCatalogCount(payload.trackCount)}T`;
+        if (firstGameRow) {
+          const firstGroup = treeRows.find((entry) => entry.dataset.folder);
+          if (firstGroup) selectTreeRow(firstGroup);
+          handleTreeClick(firstGameRow);
+        } else {
+          songList.replaceChildren();
+          gameTitle.textContent = "NO CATALOG GAMES";
+          trackCount.textContent = "0 TRK";
+        }
+      } catch (error) {
+        libraryTree.replaceChildren();
+        refreshTreeRows();
+        libraryCount.textContent = "OFF";
+        gameTitle.textContent = "CATALOG UNAVAILABLE";
+        trackCount.textContent = "";
+        status.textContent = `CATALOG/ERROR ${error.message}`;
+      }
+    }
+
+    async function playSong(song = songList.querySelector('.song[aria-selected="true"]')) {
+      if (!song) return;
+      selectSong(song);
+      if (!nativeHost) {
+        playing = !playing;
+        now.textContent = playing ? "PLAYING" : "STOPPED";
+        const button = document.querySelector('[data-action="PLAY"]');
+        button.textContent = playing ? "PAUSE" : "PLAY";
+        button.setAttribute("aria-pressed", String(playing));
+        return;
+      }
+      try {
+        await nativeRequest("playTrack", { trackId: song.dataset.trackId });
+        applyNativePlaybackStatus(await nativeRequest("playbackStatus"));
+      } catch (error) {
+        status.textContent = `PLAYBACK/ERROR ${error.message}`;
+      }
+    }
+
+    async function toggleFavorite(song = songList.querySelector('.song[aria-selected="true"]')) {
+      if (!nativeHost || !song) return;
+      try {
+        const result = await nativeRequest("toggleFavorite", { trackId: song.dataset.trackId });
+        const isFavorite = Boolean(result.favorite);
+        song.dataset.favorite = String(isFavorite);
+        nativeFavoriteIDs[isFavorite ? "add" : "delete"](song.dataset.trackId);
+        song.querySelector(".title").textContent = `${isFavorite ? "*" : ""}${song.dataset.title}`;
+        if (favoritesOnly && !isFavorite) applyFavoriteFilter();
+        status.textContent = isFavorite ? "FAVORITE/ADDED" : "FAVORITE/REMOVED";
+      } catch (error) {
+        status.textContent = `FAVORITE/ERROR ${error.message}`;
+      }
+    }
+
+    async function moveTrack(direction) {
+      const rows = visibleSongs();
+      if (!rows.length) return;
+      const selected = rows.find((song) => song.getAttribute("aria-selected") === "true") || rows[0];
+      if (!nativeHost) {
+        const selectedIndex = rows.indexOf(selected);
+        const nextIndex = (selectedIndex + (direction === "next" ? 1 : -1) + rows.length) % rows.length;
+        selectSong(rows[nextIndex]);
+        return;
+      }
+      try {
+        const result = await nativeRequest("adjacentTrack", {
+          trackIds: rows.map((song) => song.dataset.trackId),
+          selectedTrackId: selected.dataset.trackId,
+          direction
+        });
+        const next = rows.find((song) => song.dataset.trackId === result.trackId);
+        if (next) await playSong(next);
+      } catch (error) {
+        status.textContent = `PLAYBACK/ERROR ${error.message}`;
+      }
+    }
 
     function setNavSelection(action) {
       navButtons.forEach((button) => {
@@ -727,23 +1003,18 @@
       });
     }
 
-    function cycleSong(delta) {
-      const rows = visibleSongs();
-      if (!rows.length) return;
-      const selectedIndex = rows.findIndex((song) => song.getAttribute("aria-selected") === "true");
-      const nextIndex = (selectedIndex + delta + rows.length) % rows.length;
-      selectSong(rows[nextIndex]);
-    }
-
-    navButtons.forEach((button) => button.addEventListener("click", () => {
+    navButtons.forEach((button) => button.addEventListener("click", async () => {
       const action = button.dataset.action;
-      if (action === "PREV") return cycleSong(-1);
-      if (action === "NEXT") return cycleSong(1);
+      if (action === "PREV") return moveTrack("previous");
+      if (action === "NEXT") return moveTrack("next");
       if (action === "PLAY") {
-        playing = !playing;
-        now.textContent = playing ? "PLAYING" : "STOPPED";
-        button.textContent = playing ? "PAUSE" : "PLAY";
-        button.setAttribute("aria-pressed", String(playing));
+        const selected = songList.querySelector('.song[aria-selected="true"]');
+        if (!nativeHost || !nativeTrackLoaded || selected?.dataset.trackId !== nativeCurrentTrackID) return playSong(selected);
+        try {
+          applyNativePlaybackStatus(await nativeRequest("playPause"));
+        } catch (error) {
+          status.textContent = `PLAYBACK/ERROR ${error.message}`;
+        }
         return;
       }
 
@@ -766,9 +1037,20 @@
         setNavSelection(action);
         resolutionButtons.find((entry) => entry.dataset.resolution === requestedRaster)?.focus();
         status.textContent = `GRID/${gridSize.textContent}/${resolutionSize.textContent}`;
+      } else if (action === "OPEN" && nativeHost) {
+        try {
+          const track = await nativeRequest("chooseFile");
+          if (track.cancelled) return;
+          activeGame = { title: "OPEN FILE", system: "FILE", tracks: [track] };
+          renderSongs(activeGame, track.id);
+          setNavSelection("LIST");
+          status.textContent = `FILE/${track.displayPath}`;
+        } catch (error) {
+          status.textContent = `FILE/ERROR ${error.message}`;
+        }
       } else {
         setNavSelection(action);
-        status.textContent = "DEMO/FILE OPEN NOT CONNECTED";
+        status.textContent = nativeHost ? "LINEBOY/READY" : "DEMO/FILE OPEN NOT CONNECTED";
       }
     }));
 
@@ -984,12 +1266,8 @@
         ctx.letterSpacing = `${Number.isFinite(letterSpacing) ? letterSpacing * activeRaster.scale : 0}px`;
       }
       for (const box of boxes) {
-        const metrics = ctx.measureText(text);
-        // Use the font's shared cell metrics, not each string's ink bounds:
-        // descenders must not shift a highlighted row relative to other rows.
-        const ascent = metrics.fontBoundingBoxAscent || fontSize * 0.8;
-        const descent = metrics.fontBoundingBoxDescent || fontSize * 0.2;
-        const measuredBaseline = box.top + box.height / 2 + (ascent - descent) / 2;
+        const measuredBaseline = box.top + box.height / 2
+          + FONT_BASELINE_OFFSET * activeRaster.scale;
         const baseline = screenOriginY
           + Math.round((measuredBaseline - screenOriginY) / activeScanPitchCss) * activeScanPitchCss;
         const x = screenOriginX + (box.left - terminal.getBoundingClientRect().left);
@@ -1000,6 +1278,7 @@
 
     updateRaster();
     renderSongs(GAMES.CHRONO, "08");
+    if (nativeHost) bootstrapNativeCatalog();
 
     document.fonts.ready.then(scheduleRender);
     new ResizeObserver(() => {
@@ -1023,8 +1302,12 @@
       subtree: true,
     });
     setInterval(() => {
-      seconds += 1;
-      clock.textContent = new Date(seconds * 1000).toISOString().slice(11, 19);
+      if (!nativeHost) {
+        seconds += 1;
+        clock.textContent = new Date(seconds * 1000).toISOString().slice(11, 19);
+      } else {
+        nativeRequest("playbackStatus").then(applyNativePlaybackStatus).catch(() => {});
+      }
       scheduleRender();
     }, 1000);
   </script>

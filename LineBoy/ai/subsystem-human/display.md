@@ -19,8 +19,10 @@ Labels and controls center within their row; the beam renderer snaps glyph
 baselines to the same 16-pixel cadence. The library and playlist scroll one
 text row at a time.
 
-The sample library supports folder disclosure and selection. Selecting the
-Chrono Trigger or Super Metroid entry loads that game's sample track list. The
-Favorites control filters the current sample list; track selection, previous,
-next, and play/pause update the local status display. File open remains a demo
-placeholder and does not load audio.
+In the native app, the library tree is populated from the shared catalog.
+Selecting a game loads its tracks, F on a selected track toggles shared
+Favorites, and FAV filters the current playlist. Previous and next use the
+shared queue rules and start the adjacent track. PLAY pauses or resumes;
+double-clicking a row starts it. FILE opens a supported local file through the
+native picker. The browser preview keeps its sample library and local-only
+transport behavior.
