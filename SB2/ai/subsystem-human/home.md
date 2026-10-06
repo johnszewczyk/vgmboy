@@ -35,3 +35,6 @@
   pane divider is 1px. The title strip, status strip, and toolbars share one
   2.5rem row height. Main action controls use a 1.5rem square and 1rem icons;
   the search field and playlist close control use the same 1.5rem control size.
+- Playlist column headers use the same 1.5rem height, dark button surface, and
+  corner size as the main action controls, with the header strip kept visually
+  quiet around them.
