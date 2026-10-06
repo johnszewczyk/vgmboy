@@ -985,13 +985,13 @@
       }
       for (const box of boxes) {
         const metrics = ctx.measureText(text);
-        const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.8;
-        const descent = metrics.actualBoundingBoxDescent || fontSize * 0.2;
+        // Use the font's shared cell metrics, not each string's ink bounds:
+        // descenders must not shift a highlighted row relative to other rows.
+        const ascent = metrics.fontBoundingBoxAscent || fontSize * 0.8;
+        const descent = metrics.fontBoundingBoxDescent || fontSize * 0.2;
         const measuredBaseline = box.top + box.height / 2 + (ascent - descent) / 2;
-        const glyphTop = measuredBaseline - ascent;
-        const snappedGlyphTop = screenOriginY
-          + Math.round((glyphTop - screenOriginY) / activeScanPitchCss) * activeScanPitchCss;
-        const baseline = snappedGlyphTop + ascent;
+        const baseline = screenOriginY
+          + Math.round((measuredBaseline - screenOriginY) / activeScanPitchCss) * activeScanPitchCss;
         const x = screenOriginX + (box.left - terminal.getBoundingClientRect().left);
         ctx.fillText(text, x, baseline);
       }
