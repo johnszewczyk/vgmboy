@@ -63,6 +63,14 @@
       color: var(--gray);
       zoom: 1;
     }
+    .terminal::after {
+      content: "";
+      position: absolute;
+      z-index: 4;
+      inset: 0;
+      border: var(--frame-width, 1px) solid #555;
+      pointer-events: none;
+    }
 
     .terminal > header,
     .terminal > .resolutionline,
@@ -93,6 +101,23 @@
       pointer-events: none;
     }
     .terminal[data-renderer="webgl2"] .beam-screen { display: block; }
+    .phosphor-trail {
+      position: absolute;
+      z-index: 3;
+      inset: 0;
+      display: none;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      mix-blend-mode: screen;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .terminal[data-renderer="webgl2"] .phosphor-trail { display: block; }
+    @keyframes phosphor-decay {
+      from { opacity: 0.18; }
+      to { opacity: 0; }
+    }
 
     .topline,
     .resolutionline,
@@ -371,16 +396,20 @@
         transition: background-color 70ms linear, color 70ms linear;
       }
     }
+    @media (prefers-reduced-motion: reduce) {
+      .phosphor-trail { display: none !important; }
+    }
   </style>
 </head>
 <body>
   <div class="crt">
     <div class="terminal" data-renderer="dom" role="application" aria-label="LineBoy monochrome line-grid player">
       <canvas class="beam-screen" aria-hidden="true"></canvas>
+      <canvas class="phosphor-trail" aria-hidden="true"></canvas>
 
       <header class="topline">
         <div class="brand">LINEBOY</div>
-        <div class="statbits"><span id="grid-size">40X15</span><span id="resolution-size">320X240</span><span id="clock">00:00:00</span></div>
+        <div class="statbits"><span id="grid-size">40X15</span><span id="resolution-size">320X240</span><span id="pixel-scale">6X</span><span id="clock">00:00:00</span></div>
       </header>
 
       <section class="resolutionline" aria-label="Display resolution">
@@ -437,11 +466,11 @@
 
   <script>
     const RASTERS = [
-      { id: "320X240", width: 320, height: 240, deviceScales: [6, 4, 2] },
-      { id: "512X384", width: 512, height: 384, deviceScales: [4, 3, 2, 1] },
-      { id: "640X480", width: 640, height: 480, deviceScales: [3, 2, 1] },
-      { id: "800X600", width: 800, height: 600, deviceScales: [2, 1] },
-      { id: "1024X768", width: 1024, height: 768, deviceScales: [2, 1] },
+      { id: "320X240", width: 320, height: 240 },
+      { id: "512X384", width: 512, height: 384 },
+      { id: "640X480", width: 640, height: 480 },
+      { id: "800X600", width: 800, height: 600 },
+      { id: "1024X768", width: 1024, height: 768 },
     ];
 
     // The DOS font has a 10px capital height in a 16px cell. Center that ink
@@ -503,10 +532,13 @@
 
     const terminal = document.querySelector(".terminal");
     const display = document.querySelector(".beam-screen");
+    const phosphorTrail = document.querySelector(".phosphor-trail");
+    const phosphorContext = phosphorTrail.getContext("2d");
     const workspace = document.querySelector(".workspace");
     const divider = document.querySelector("#column-divider");
     const gridSize = document.querySelector("#grid-size");
     const resolutionSize = document.querySelector("#resolution-size");
+    const pixelScale = document.querySelector("#pixel-scale");
     const resolutionButtons = [...document.querySelectorAll(".resolution-choice")];
     const resolutionById = new Map(RASTERS.map((raster) => [raster.id, raster]));
     const libraryTree = document.querySelector("#library-tree");
@@ -534,7 +566,6 @@
     let favoritesOnly = false;
     let playing = false;
     let seconds = 0;
-    let activeScanPitchCss = 1;
     let screenOriginY = 0;
     let screenOriginX = 0;
 
@@ -582,9 +613,14 @@
       const deviceRatio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
       const availableWidth = Math.max(1, window.innerWidth - 16) * deviceRatio;
       const availableHeight = Math.max(1, window.innerHeight - 16) * deviceRatio;
-      const deviceScale = raster.deviceScales.find((scale) =>
-        raster.width * scale <= availableWidth && raster.height * scale <= availableHeight
-      ) || raster.deviceScales.at(-1);
+      const referenceRaster = resolutionById.get("320X240");
+      const referenceScale = Math.max(1, Math.floor(Math.min(
+        availableWidth / referenceRaster.width,
+        availableHeight / referenceRaster.height
+      )));
+      const coreWidth = referenceRaster.width * referenceScale;
+      const coreHeight = referenceRaster.height * referenceScale;
+      const deviceScale = Math.min(coreWidth / raster.width, coreHeight / raster.height);
       const scale = deviceScale / deviceRatio;
       const columns = raster.width / 8;
       const textRows = Math.floor(raster.height / 16);
@@ -592,10 +628,11 @@
       const workspaceLines = textRows - 4;
       const sidebarColumns = Math.max(16, Math.min(24, Math.round(columns * 0.2)));
 
-      activeRaster = { ...raster, deviceScale, scale, columns, textRows, workspaceLines };
+      activeRaster = { ...raster, deviceRatio, deviceScale, scale, columns, textRows, workspaceLines };
       terminal.style.width = `${raster.width}px`;
       terminal.style.height = `${raster.height}px`;
       terminal.style.zoom = String(scale);
+      terminal.style.setProperty("--frame-width", `${1 / (scale * deviceRatio)}px`);
       terminal.style.paddingBlock = `${halfLineInset}px`;
       terminal.style.gridTemplateColumns = `repeat(${columns}, 8px)`;
       terminal.style.gridTemplateRows = `repeat(${textRows}, 16px)`;
@@ -612,8 +649,9 @@
         line.textContent = "│";
         return line;
       }));
-      gridSize.textContent = `${columns}X${raster.height / 16}`;
+      gridSize.textContent = `${columns}X${textRows}`;
       resolutionSize.textContent = raster.id;
+      pixelScale.textContent = `${deviceScale.toFixed(2).replace(/\.?0+$/, "")}X`;
       terminal.dataset.raster = raster.id.toLowerCase();
       terminal.dataset.videoMode = raster.width === 320 ? "standard" : "high";
       resolutionButtons.forEach((button) => {
@@ -1087,7 +1125,7 @@
           - u_scan_pitch * 0.5;
         float max_beam_fraction = u_scan_pitch > 2.5 ? 0.30 : 0.34;
         float beam_radius = u_scan_pitch * mix(0.27, max_beam_fraction, sqrt(level));
-        float edge = u_scan_pitch * 0.018;
+        float edge = max(u_scan_pitch * 0.018, fwidth(screen_y) * 0.30);
         float distance_from_center = abs(phase);
         float coverage = 1.0 - smoothstep(beam_radius - edge, beam_radius + edge, distance_from_center);
         float spot = exp(-0.5 * pow(distance_from_center / (beam_radius * 0.72), 2.0));
@@ -1117,6 +1155,7 @@
     let texture = null;
     let frameRequest = 0;
     let renderVersion = 0;
+    let hasRenderedFrame = false;
     const framebuffer = document.createElement("canvas");
     const framebufferContext = framebuffer.getContext("2d", { alpha: false });
 
@@ -1171,20 +1210,35 @@
       if (rect.width < 1 || rect.height < 1) return;
       const deviceRatio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
       const scanPitch = activeRaster.deviceScale;
-      activeScanPitchCss = scanPitch / deviceRatio;
       screenOriginX = Math.round(rect.left * deviceRatio) / deviceRatio;
       screenOriginY = Math.round(rect.top * deviceRatio) / deviceRatio;
       const width = Math.max(1, Math.round(rect.width * deviceRatio));
       const height = Math.max(1, Math.round(rect.height * deviceRatio));
-      display.width = width;
-      display.height = height;
+      const resized = display.width !== width || display.height !== height;
+      if (resized) {
+        display.width = width;
+        display.height = height;
+        phosphorTrail.width = width;
+        phosphorTrail.height = height;
+        hasRenderedFrame = false;
+      } else if (hasRenderedFrame && terminal.dataset.renderer === "webgl2" && phosphorContext) {
+        phosphorContext.clearRect(0, 0, width, height);
+        phosphorContext.drawImage(display, 0, 0, width, height);
+        phosphorTrail.style.animation = "none";
+        void phosphorTrail.offsetWidth;
+        if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          phosphorTrail.style.animation = "phosphor-decay 240ms linear forwards";
+        }
+      }
       if (!framebufferContext) {
         terminal.dataset.renderer = "dom";
         return;
       }
 
-      framebuffer.width = width;
-      framebuffer.height = height;
+      if (framebuffer.width !== width || framebuffer.height !== height) {
+        framebuffer.width = width;
+        framebuffer.height = height;
+      }
       framebufferContext.setTransform(deviceRatio, 0, 0, deviceRatio,
         -rect.left * deviceRatio, -rect.top * deviceRatio);
       drawElement(terminal);
@@ -1202,6 +1256,7 @@
         gl.uniform1f(gl.getUniformLocation(program, "u_scan_pitch"), scanPitch);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         terminal.dataset.renderer = "webgl2";
+        hasRenderedFrame = true;
       } catch (error) {
         console.error("LineBoy scanline frame failed:", error);
         terminal.dataset.renderer = "dom";
@@ -1209,7 +1264,7 @@
     }
 
     function drawElement(element) {
-      if (!(element instanceof Element) || element === display) return;
+      if (!(element instanceof Element) || element === display || element === phosphorTrail) return;
       const style = getComputedStyle(element);
       if (style.display === "none" || style.visibility === "hidden") return;
       const bounds = element.getBoundingClientRect();
@@ -1267,7 +1322,7 @@
       for (const box of boxes) {
         const measuredBaseline = cellTop + FONT_BASELINE_OFFSET * activeRaster.scale;
         const baseline = screenOriginY
-          + Math.round((measuredBaseline - screenOriginY) / activeScanPitchCss) * activeScanPitchCss;
+          + Math.round((measuredBaseline - screenOriginY) * activeRaster.deviceRatio) / activeRaster.deviceRatio;
         const x = screenOriginX + (box.left - terminal.getBoundingClientRect().left);
         ctx.fillText(text, x, baseline);
       }
