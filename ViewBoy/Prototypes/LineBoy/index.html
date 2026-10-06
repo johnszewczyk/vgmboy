@@ -6,6 +6,14 @@
   <meta name="theme-color" content="#080808">
   <title>LineBoy — monochrome player mockup</title>
   <style>
+    @font-face {
+      font-family: "Modern DOS";
+      src: url("./assets/ModernDOS8x16.ttf") format("truetype");
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+    }
+
     :root {
       color-scheme: dark;
       --black: #080808;
@@ -17,7 +25,7 @@
       --white: #e8e8e8;
       --dim: #898989;
       --faint: #5e5e5e;
-      --mono: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --mono: "Modern DOS", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     }
 
     * { box-sizing: border-box; }
@@ -27,10 +35,10 @@
     body {
       background: var(--black);
       color: var(--gray);
-      font: 14px/1.35 var(--mono);
-      letter-spacing: .025em;
+      font: 12px/1.25 var(--mono);
+      letter-spacing: 0;
       -webkit-font-smoothing: none;
-      text-rendering: geometricPrecision;
+      text-rendering: optimizeSpeed;
     }
 
     button { font: inherit; letter-spacing: inherit; }
@@ -38,28 +46,9 @@
     .crt {
       min-height: 100vh;
       padding: 8px;
-      position: relative;
-      isolation: isolate;
       background:
-        radial-gradient(ellipse at center, transparent 50%, #0008 100%),
+        radial-gradient(ellipse at center, transparent 72%, #0005 100%),
         var(--black);
-    }
-
-    .crt::after {
-      content: "";
-      position: fixed;
-      z-index: 10;
-      inset: 0;
-      pointer-events: none;
-      opacity: .14;
-      background: repeating-linear-gradient(
-        to bottom,
-        transparent 0,
-        transparent 2px,
-        #000 3px,
-        #000 4px
-      );
-      image-rendering: pixelated;
     }
 
     .terminal {
@@ -69,8 +58,26 @@
       padding: 8px;
       display: grid;
       grid-template-rows: auto auto minmax(0, 1fr) auto;
-      gap: 9px;
+      gap: 7px;
+      position: relative;
+      isolation: isolate;
       background: #0b0b0b;
+    }
+
+    .terminal::after {
+      content: "";
+      position: absolute;
+      z-index: 10;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent 2px,
+        #000 2px,
+        #000 3px
+      );
+      opacity: .28;
     }
 
     .topline, .toolrow, .statusline, .panel-title, .tabs, .playerline {
@@ -79,40 +86,40 @@
     }
 
     .topline {
-      min-height: 38px;
+      min-height: 32px;
       justify-content: space-between;
       gap: 16px;
       border-bottom: 1px solid var(--line);
-      padding: 0 2px 8px;
+      padding: 0 2px 6px;
       text-transform: uppercase;
     }
 
     .brand-lockup, .sysinfo, .statbits { display: flex; align-items: center; gap: 14px; }
-    .brand { color: var(--white); font-size: 19px; font-weight: 800; letter-spacing: .11em; }
-    .brand span { color: var(--dim); font-size: 11px; font-weight: 500; letter-spacing: .04em; }
+    .brand { color: var(--white); font-size: 16px; font-weight: 800; letter-spacing: .06em; }
+    .brand span { color: var(--dim); font-size: 10px; font-weight: 500; letter-spacing: 0; }
     .lamp { display: inline-block; width: 7px; height: 7px; margin-right: 7px; background: var(--gray); }
-    .sysinfo, .statbits { color: var(--dim); font-size: 11px; }
+    .sysinfo, .statbits { color: var(--dim); font-size: 10px; }
     .statbits strong { color: var(--gray); font-weight: 600; }
 
-    .toolrow { gap: 5px; flex-wrap: wrap; }
+    .toolrow { gap: 4px; flex-wrap: wrap; }
 
     .key {
-      min-height: 32px;
+      min-height: 27px;
       display: inline-flex;
       align-items: center;
-      gap: 10px;
-      padding: 4px 10px;
+      gap: 7px;
+      padding: 3px 8px;
       border: 1px solid var(--line-bright);
       background: var(--gray);
       color: var(--black);
       text-transform: uppercase;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       cursor: pointer;
       box-shadow: inset 0 1px #eee, inset 0 -1px #777;
     }
 
-    .key kbd { color: #454545; font: 10px var(--mono); }
+    .key kbd { color: #454545; font: 9px var(--mono); }
     .key:hover, .key[aria-pressed="true"] { background: var(--white); }
     .key.clear {
       background: transparent;
@@ -129,7 +136,7 @@
       min-height: 0;
       display: grid;
       grid-template-columns: minmax(220px, 25%) minmax(0, 1fr);
-      gap: 9px;
+      gap: 7px;
     }
 
     .panel {
@@ -141,43 +148,43 @@
     }
 
     .panel-title {
-      min-height: 30px;
+      min-height: 25px;
       justify-content: space-between;
       gap: 8px;
-      padding: 5px 8px;
+      padding: 3px 7px;
       background: var(--gray);
       color: var(--black);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 800;
       text-transform: uppercase;
     }
 
-    .panel-title small { color: #505050; font: 10px var(--mono); }
+    .panel-title small { color: #505050; font: 9px var(--mono); }
 
     .filterline {
-      padding: 9px 9px 7px;
+      padding: 6px 8px 5px;
       border-bottom: 1px solid #363636;
       color: var(--dim);
-      font-size: 11px;
+      font-size: 10px;
     }
     .filterline b { color: var(--white); font-weight: 600; }
 
     .tree {
       display: grid;
-      gap: 1px;
+      gap: 0;
       align-content: start;
-      padding: 7px;
+      padding: 5px;
       overflow: auto;
     }
 
     .tree-row {
       min-width: 0;
       display: grid;
-      grid-template-columns: 18px minmax(0, 1fr) auto;
+      grid-template-columns: 16px minmax(0, 1fr) auto;
       align-items: center;
-      gap: 4px;
-      min-height: 27px;
-      padding: 3px 5px;
+      gap: 3px;
+      min-height: 22px;
+      padding: 2px 4px;
       border: 1px solid transparent;
       background: transparent;
       color: var(--gray);
@@ -193,16 +200,16 @@
     }
     .tree-row[aria-selected="true"] .chev,
     .tree-row[aria-selected="true"] small { color: #444; }
-    .tree-row.indent { padding-left: 23px; }
+    .tree-row.indent { padding-left: 19px; }
 
     .listpanel { overflow: hidden; }
-    .tabs { min-height: 37px; gap: 5px; padding: 6px 7px; border-bottom: 1px solid #393939; }
+    .tabs { min-height: 30px; gap: 4px; padding: 4px 6px; border-bottom: 1px solid #393939; }
     .tab {
-      min-height: 24px;
-      padding: 4px 8px;
+      min-height: 20px;
+      padding: 3px 6px;
       border: 1px solid var(--line);
       color: var(--dim);
-      font-size: 10px;
+      font-size: 9px;
       text-transform: uppercase;
     }
     .tab.active { border-color: var(--gray); color: var(--white); }
@@ -217,23 +224,23 @@
     }
 
     .list-head {
-      min-height: 29px;
+      min-height: 23px;
       border-bottom: 1px solid var(--line);
       color: var(--dim);
-      font-size: 10px;
+      font-size: 9px;
       text-transform: uppercase;
     }
     .list-head span:last-child, .song span:last-child { text-align: right; }
 
-    .songs { min-height: 0; overflow: auto; padding: 3px 6px 10px; }
+    .songs { flex: 1; min-height: 0; overflow: auto; padding: 2px 4px 6px; }
     .song {
       width: 100%;
-      min-height: 30px;
+      min-height: 23px;
       border: 1px solid transparent;
       background: transparent;
       color: var(--gray);
       text-align: left;
-      font-size: 12px;
+      font-size: 11px;
       cursor: pointer;
     }
     .song .num, .song .album, .song .length { color: var(--dim); }
@@ -245,25 +252,25 @@
     .song span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .playerline {
-      min-height: 45px;
-      gap: 12px;
-      padding: 7px 9px;
+      min-height: 36px;
+      gap: 8px;
+      padding: 5px 7px;
       border-top: 1px solid var(--line);
       background: #0b0b0b;
     }
     .playerline .now { min-width: 170px; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--white); }
-    .playerline .time { color: var(--dim); font-size: 11px; }
+    .playerline .time { color: var(--dim); font-size: 10px; }
     .meter { width: min(160px, 20vw); height: 7px; border: 1px solid var(--line); background: #080808; }
     .meter i { display: block; width: 38%; height: 100%; background: var(--gray); }
 
     .statusline {
-      min-height: 27px;
+      min-height: 22px;
       justify-content: space-between;
       gap: 12px;
-      padding: 5px 2px 0;
+      padding: 4px 2px 0;
       border-top: 1px solid var(--line);
       color: var(--dim);
-      font-size: 10px;
+      font-size: 9px;
       text-transform: uppercase;
     }
     .statusline strong { color: var(--gray); font-weight: 600; }
@@ -297,7 +304,7 @@
         </div>
         <div class="sysinfo">
           <span><i class="lamp"></i>READY</span>
-          <span>MODE <b>80 COL</b></span>
+          <span>MODE <b>132 COL</b></span>
           <span>VIDEO <b>SCAN / 2</b></span>
           <span>BUF <b>64K</b></span>
         </div>
@@ -354,6 +361,21 @@
             <button class="song" role="option" aria-selected="false"><span class="num">10</span><span>Boss Battle 2</span><span class="album">CHRONO TRIGGER</span><span class="length">2:24</span><span>□</span></button>
             <button class="song" role="option" aria-selected="false"><span class="num">11</span><span>Corridors of Time</span><span class="album">CHRONO TRIGGER</span><span class="length">2:43</span><span>□</span></button>
             <button class="song" role="option" aria-selected="false"><span class="num">12</span><span>Frog's Theme</span><span class="album">CHRONO TRIGGER</span><span class="length">1:01</span><span>□</span></button>
+            <button class="song" role="option" aria-selected="false"><span class="num">13</span><span>Guardia Castle</span><span class="album">CHRONO TRIGGER</span><span class="length">2:00</span><span>□</span></button>
+            <button class="song" role="option" aria-selected="false"><span class="num">14</span><span>Magus' Theme</span><span class="album">CHRONO TRIGGER</span><span class="length">2:11</span><span>□</span></button>
+            <button class="song" role="option" aria-selected="false"><span class="num">15</span><span>Peaceful Days</span><span class="album">CHRONO TRIGGER</span><span class="length">1:13</span><span>□</span></button>
+            <button class="song" role="option" aria-selected="false"><span class="num">16</span><span>Robo's Theme</span><span class="album">CHRONO TRIGGER</span><span class="length">1:37</span><span>□</span></button>
+            <button class="song" role="option" aria-selected="false"><span class="num">17</span><span>Schala's Theme</span><span class="album">CHRONO TRIGGER</span><span class="length">1:10</span><span>□</span></button>
+            <button class="song" role="option" aria-selected="false"><span class="num">18</span><span>Secret of the Forest</span><span class="album">CHRONO TRIGGER</span><span class="length">1:27</span><span>□</span></button>
+            <button class="song" role="option" aria-selected="false"><span class="num">19</span><span>The Black Omen</span><span class="album">CHRONO TRIGGER</span><span class="length">2:45</span><span>□</span></button>
+            <button class="song" role="option" aria-selected="false"><span class="num">20</span><span>Wind Scene</span><span class="album">CHRONO TRIGGER</span><span class="length">2:23</span><span>□</span></button>
+            <button class="song" role="option" aria-selected="false"><span class="num">21</span><span>Battle with Magus</span><span class="album">CHRONO TRIGGER</span><span class="length">2:10</span><span>□</span></button>
+            <button class="song" role="option" aria-selected="false"><span class="num">22</span><span>Burn! Bobonga!</span><span class="album">CHRONO TRIGGER</span><span class="length">1:05</span><span>□</span></button>
+            <button class="song" role="option" aria-selected="false"><span class="num">23</span><span>Crono and Marle</span><span class="album">CHRONO TRIGGER</span><span class="length">1:38</span><span>□</span></button>
+            <button class="song" role="option" aria-selected="false"><span class="num">24</span><span>Fanfare 1</span><span class="album">CHRONO TRIGGER</span><span class="length">0:07</span><span>□</span></button>
+            <button class="song" role="option" aria-selected="false"><span class="num">25</span><span>Fanfare 2</span><span class="album">CHRONO TRIGGER</span><span class="length">0:08</span><span>□</span></button>
+            <button class="song" role="option" aria-selected="false"><span class="num">26</span><span>Lavos' Theme</span><span class="album">CHRONO TRIGGER</span><span class="length">2:17</span><span>□</span></button>
+            <button class="song" role="option" aria-selected="false"><span class="num">27</span><span>Ocean Palace</span><span class="album">CHRONO TRIGGER</span><span class="length">2:09</span><span>□</span></button>
           </div>
           <div class="playerline"><span class="now" id="now">STOPPED · BLACKBIRD (OUTSIDE)</span><span class="time">00:00</span><div class="meter" aria-label="Playback position"><i></i></div><span class="time">00:10</span></div>
         </section>
