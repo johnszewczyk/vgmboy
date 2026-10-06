@@ -35,3 +35,5 @@ For a ViewBoy task, the active application and UI live in `ViewBoy/`; use its
 is a separate product, and `LocalRecovery/ViewBoy/` contains historical
 archives only. ViewBoy's implementation and launch script are in `ViewBoy/`
 regardless of historical bridge names.
+
+does not use ViewBoy's native host or playback bridge.

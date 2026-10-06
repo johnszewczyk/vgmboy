@@ -14,6 +14,7 @@ history live in this repository.
 - UACMan owns its package format and editor. CocoaSpice, SPCBoyWK, and ViewBoy
   are active separate player apps; SPCBOY SB2 is a fourth frontend under
   development.
+  family subfolder; it is not yet connected to the shared catalog or player.
 
 ## Task Routing
 
