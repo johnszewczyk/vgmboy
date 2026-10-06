@@ -71,7 +71,8 @@ const DEFAULT_ANIMATION_FPS = 60;
 const ANIMATION_FPS_MIN = 30;
 const ANIMATION_FPS_MAX = 240;
 const ANIMATION_FPS_TICKS = [30, 60, 90, 120, 150, 180, 210, 240];
-// The framebuffer retains four logical labels, mapped to these two endpoints.
+const PIXEL_SHADE_MODES = { DIRECT: 0, GRAY8: 8, GRAY16: 16 };
+const RAW_GRAYSCALE_TONE_OFFSET = 16;
 const DEFAULT_LCD_BACKGROUND = "#9BBC0F";
 const DEFAULT_LCD_PIXEL = "#000000";
 function hexToRGB(color) {
@@ -81,6 +82,10 @@ function hexToRGB(color) {
 function srgbToLinear(channel) {
   const value = channel / 255;
   return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+}
+function linearToSrgb(value) {
+  const clamped = Math.max(0, Math.min(1, value));
+  return clamped <= 0.0031308 ? clamped * 12.92 : 1.055 * (clamped ** (1 / 2.4)) - 0.055;
 }
 function rgbToLab([red, green, blue]) {
   const r = srgbToLinear(red);
@@ -101,9 +106,37 @@ function rgbToHex([red, green, blue]) {
   return `#${[red, green, blue].map((channel) => channel.toString(16).padStart(2, "0")).join("")}`
     .toUpperCase();
 }
+function grayscaleLevels(mode) {
+  return PIXEL_SHADE_MODES[mode] || 0;
+}
+function grayscaleTone(index, levels) {
+  const last = Math.max(1, levels - 1);
+  const channel = Math.round(Math.max(0, Math.min(last, Number(index) || 0)) * 255 / last);
+  return rgbToHex([channel, channel, channel]);
+}
+function grayscaleToneIndex(color, levels) {
+  if (levels <= 1) return 0;
+  const [red, green, blue] = hexToRGB(color);
+  const luminance = 0.2126 * srgbToLinear(red)
+    + 0.7152 * srgbToLinear(green)
+    + 0.0722 * srgbToLinear(blue);
+  const grayChannel = Math.round(linearToSrgb(luminance) * 255);
+  return Math.max(0, Math.min(levels - 1, Math.round(grayChannel * (levels - 1) / 255)));
+}
+function activeGrayscaleTone(index, levels) {
+  if (levels <= 1) return 0;
+  return Math.round(storedToneIndex(index, 16, 0) * (levels - 1) / 15);
+}
+function storedToneIndex(value, levels, fallback) {
+  const number = Number(value);
+  return Math.max(0, Math.min(Math.max(0, levels - 1),
+    Number.isFinite(number) ? Math.round(number) : fallback));
+}
+function grayscalePalette(levels) {
+  return Array.from({ length: levels }, (_, index) => grayscaleTone(index, levels));
+}
 function paletteTones(fontColor = DEFAULT_LCD_PIXEL, backgroundColor = DEFAULT_LCD_BACKGROUND) {
-  // Preserve the four framebuffer labels for existing UI drawing code, but
-  // collapse them to two exact endpoints. There is no interpolated pixel tone.
+  // Direct mode preserves exact user-entered PIXEL and BG colors.
   return [fontColor, fontColor, backgroundColor, backgroundColor];
 }
 function colorInputToHex(input) {
@@ -151,10 +184,27 @@ function packedPalette(palette) {
 }
 let packedDirectInk = packedPalette([hexToRGB(DEFAULT_LCD_PIXEL)])[0];
 let packedDirectBackground = packedPalette([hexToRGB(DEFAULT_LCD_BACKGROUND)])[0];
+let packedDisplayPalette = packedPalette(paletteRGB(paletteTones()));
+let packedSemanticPalette = packedPalette(paletteRGB(paletteTones()));
+let packedDisplayBackground = packedDirectBackground;
 function refreshDisplayPalette() {
   RGB = paletteRGB(displayPalette());
   packedDirectInk = packedPalette([hexToRGB(state.customFontColor)])[0];
   packedDirectBackground = packedPalette([hexToRGB(state.customBackgroundColor)])[0];
+  packedDisplayPalette = packedPalette(RGB);
+  const levels = grayscaleLevels(state.pixelShadeMode);
+  if (levels) {
+    const inkTone = activeGrayscaleTone(state.pixelToneIndex, levels);
+    const backgroundTone = activeGrayscaleTone(state.backgroundToneIndex, levels);
+    const ink = packedDisplayPalette[inkTone];
+    packedDisplayBackground = packedDisplayPalette[backgroundTone];
+    packedSemanticPalette = Uint32Array.of(ink, ink, packedDisplayBackground, packedDisplayBackground);
+  } else {
+    packedDisplayBackground = packedDirectBackground;
+    packedSemanticPalette = Uint32Array.of(
+      packedDirectInk, packedDirectInk, packedDirectBackground, packedDirectBackground,
+    );
+  }
 }
 const standardGlyphs = {
   A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
@@ -328,7 +378,18 @@ function storedSpacing(value, fallback) {
     Number.isFinite(number) ? Math.round(number) : fallback));
 }
 function displayPalette() {
-  return paletteTones(state.customFontColor, state.customBackgroundColor);
+  const levels = grayscaleLevels(state.pixelShadeMode);
+  return levels ? grayscalePalette(levels)
+    : paletteTones(state.customFontColor, state.customBackgroundColor);
+}
+function displaySemanticColor(shade) {
+  const semantic = Math.max(0, Math.min(3, Math.round(Number(shade) || 0)));
+  const levels = grayscaleLevels(state.pixelShadeMode);
+  if (!levels) return semantic < 2 ? state.customFontColor : state.customBackgroundColor;
+  const index = semantic < 2
+    ? activeGrayscaleTone(state.pixelToneIndex, levels)
+    : activeGrayscaleTone(state.backgroundToneIndex, levels);
+  return grayscaleTone(index, levels);
 }
 function updateScreenSurface() {
   const root = document.documentElement;
@@ -347,6 +408,9 @@ function saveDisplayOptions() {
       customBackgroundInput: state.customBackgroundInput,
       customFontInput: state.customFontInput,
       customPaletteConfigured: state.customPaletteConfigured,
+      pixelShadeMode: state.pixelShadeMode,
+      pixelToneIndex: state.pixelToneIndex,
+      backgroundToneIndex: state.backgroundToneIndex,
       lcdDotSize: state.lcdDotSize,
       lcdPixelGaps: state.lcdPixelGaps,
       uiButtonPadDots: state.controlPaddingDots,
@@ -441,6 +505,14 @@ const state = {
   customBackgroundInput: savedCustomBackgroundInput,
   customFontInput: savedCustomFontInput,
   customPaletteConfigured: savedCustomPaletteConfigured,
+  pixelShadeMode: Object.hasOwn(PIXEL_SHADE_MODES, savedDisplayOptions.pixelShadeMode)
+    ? savedDisplayOptions.pixelShadeMode : "DIRECT",
+  pixelToneIndex: Number.isFinite(Number(savedDisplayOptions.pixelToneIndex))
+    ? storedToneIndex(savedDisplayOptions.pixelToneIndex, 16, 0)
+    : grayscaleToneIndex(colorInputToHex(savedCustomFontInput) || DEFAULT_LCD_PIXEL, 16),
+  backgroundToneIndex: Number.isFinite(Number(savedDisplayOptions.backgroundToneIndex))
+    ? storedToneIndex(savedDisplayOptions.backgroundToneIndex, 16, 0)
+    : grayscaleToneIndex(colorInputToHex(savedCustomBackgroundInput) || DEFAULT_LCD_BACKGROUND, 16),
   editingColorEndpoint: null,
   colorDraft: "",
   colorInputError: null,
@@ -1037,8 +1109,11 @@ export function lcdDotSizeSnapshot() {
 
 export function lcdDeviceDotSnapshot(shade = 0) {
   const shadeIndex = Math.max(0, Math.min(3, Math.round(Number(shade) || 0)));
-  const ink = shadeIndex < 2 ? state.customFontColor : state.customBackgroundColor;
-  const gap = state.customBackgroundColor;
+  const ink = displaySemanticColor(shadeIndex);
+  const gap = grayscaleLevels(state.pixelShadeMode)
+    ? grayscaleTone(activeGrayscaleTone(state.backgroundToneIndex, grayscaleLevels(state.pixelShadeMode)),
+      grayscaleLevels(state.pixelShadeMode))
+    : state.customBackgroundColor;
   const faceSize = Math.max(1, DEVICE_PIXELS_PER_LCD_DOT
     - (state.lcdPixelGaps ? 1 : 0));
   return Array.from({ length: DEVICE_PIXELS_PER_LCD_DOT }, (_, y) =>
@@ -1265,6 +1340,20 @@ function fillRect(x, y, width, height, shade) {
   }
 }
 
+function fillToneRect(x, y, width, height, tone) {
+  const levels = grayscaleLevels(state.pixelShadeMode);
+  if (!levels) return fillRect(x, y, width, height, tone);
+  fillRect(x, y, width, height,
+    RAW_GRAYSCALE_TONE_OFFSET + storedToneIndex(tone, levels, 0));
+}
+
+function strokeToneRect(x, y, width, height, tone) {
+  fillToneRect(x, y, width, 1, tone);
+  fillToneRect(x, y + height - 1, width, 1, tone);
+  fillToneRect(x, y, 1, height, tone);
+  fillToneRect(x + width - 1, y, 1, height, tone);
+}
+
 function strokeRect(x, y, width, height, shade) {
   fillRect(x, y, width, 1, shade);
   fillRect(x, y + height - 1, width, 1, shade);
@@ -1378,13 +1467,16 @@ function presentPixels(startY = 0, endY = HEIGHT, startX = 0, endX = WIDTH) {
   if (lastRow <= firstRow || lastColumn <= firstColumn) return;
   const faceSize = Math.max(1, DEVICE_PIXELS_PER_LCD_DOT
     - (state.lcdPixelGaps ? 1 : 0));
+  const levels = grayscaleLevels(state.pixelShadeMode);
   for (let y = firstRow; y < lastRow; y += 1) {
     const sourceRow = y * WIDTH;
     const topRow = y * DEVICE_PIXELS_PER_LCD_DOT * outputWidth;
     for (let x = firstColumn; x < lastColumn; x += 1) {
       const shade = pixels[sourceRow + x];
-      const face = shade < 2 ? packedDirectInk : packedDirectBackground;
-      const gap = packedDirectBackground;
+      const face = levels && shade >= RAW_GRAYSCALE_TONE_OFFSET
+        ? packedDisplayPalette[storedToneIndex(shade - RAW_GRAYSCALE_TONE_OFFSET, levels, 0)]
+        : packedSemanticPalette[Math.max(0, Math.min(3, shade))];
+      const gap = packedDisplayBackground;
       const outputX = x * DEVICE_PIXELS_PER_LCD_DOT;
       for (let dotY = 0; dotY < DEVICE_PIXELS_PER_LCD_DOT; dotY += 1) {
         const row = topRow + dotY * outputWidth + outputX;
@@ -3226,12 +3318,25 @@ function addPalettePreview(parent) {
     height: rowHeight(8),
   }, {
     paint(box) {
-      strokeRect(box.x, box.y, box.width, box.height, 1);
-      fillRect(box.x + 1, box.y + 1, box.width - 2, box.height - 2, shade);
-      drawText(String(shade), box.x + 2, box.y + Math.floor((box.height - fontProfile().height) / 2),
-        box.width - 4,
-        shade < 2 ? 3 : 0,
-        "center");
+      const levels = grayscaleLevels(state.pixelShadeMode);
+      if (levels) {
+        const edge = shade < levels / 2 ? levels - 1 : 0;
+        fillToneRect(box.x + 1, box.y + 1, box.width - 2, box.height - 2, shade);
+        strokeToneRect(box.x, box.y, box.width, box.height, edge);
+        if (shade === activeGrayscaleTone(state.pixelToneIndex, levels)) {
+          fillToneRect(box.x + 2, box.y + 2, box.width - 4, 2, edge);
+        }
+        if (shade === activeGrayscaleTone(state.backgroundToneIndex, levels)) {
+          fillToneRect(box.x + 2, box.y + box.height - 4, box.width - 4, 2, edge);
+        }
+      } else {
+        strokeRect(box.x, box.y, box.width, box.height, 1);
+        fillRect(box.x + 1, box.y + 1, box.width - 2, box.height - 2, shade);
+        drawText(String(shade), box.x + 2, box.y + Math.floor((box.height - fontProfile().height) / 2),
+          box.width - 4,
+          shade < 2 ? 3 : 0,
+          "center");
+      }
     },
   }));
 }
@@ -3323,6 +3428,27 @@ function addDisplayOptions(parent, pref) {
   addInterfaceOptions(interfaceColumn, pref);
 }
 
+function setPixelShadeMode(mode) {
+  if (!Object.hasOwn(PIXEL_SHADE_MODES, mode) || mode === state.pixelShadeMode) return;
+  state.pixelShadeMode = mode;
+  refreshDisplayPalette();
+  saveDisplayOptions();
+  render();
+}
+
+function adjustPixelTone(endpoint, amount) {
+  const levels = grayscaleLevels(state.pixelShadeMode);
+  if (!levels) return;
+  const key = endpoint === "background" ? "backgroundToneIndex" : "pixelToneIndex";
+  const current = activeGrayscaleTone(state[key], levels);
+  const next = storedToneIndex(current + amount, levels, current);
+  if (next === current) return;
+  state[key] = Math.round(next * 15 / (levels - 1));
+  refreshDisplayPalette();
+  saveDisplayOptions();
+  render();
+}
+
 function beginColorEdit(endpoint) {
   state.editingColorEndpoint = endpoint;
   state.colorDraft = "";
@@ -3343,9 +3469,11 @@ function finishColorEdit(commit) {
     else if (endpoint === "background") {
       state.customBackgroundColor = color;
       state.customBackgroundInput = originalInput;
+      state.backgroundToneIndex = grayscaleToneIndex(color, 16);
     } else {
       state.customFontColor = color;
       state.customFontInput = originalInput;
+      state.pixelToneIndex = grayscaleToneIndex(color, 16);
     }
     if (color) {
       state.customPaletteConfigured = true;
@@ -3382,13 +3510,32 @@ function customColorInput(parent, endpoint, title) {
 }
 
 function addLCDColorOptions(parent) {
-  const colors = optionGroup(parent, "LCD PALETTE", [
-    rowHeight(8), buttonStandardHeight(), buttonStandardHeight(),
-    buttonStandardHeight(), rowHeight(), rowHeight(4),
-  ]);
+  const levels = grayscaleLevels(state.pixelShadeMode);
+  const rowHeights = [rowHeight(8), buttonStandardHeight(), buttonStandardHeight(),
+    buttonStandardHeight(), ...(levels ? [buttonStandardHeight(), buttonStandardHeight()] : []),
+    rowHeight(), rowHeight()];
+  const colors = optionGroup(parent, "LCD PALETTE", rowHeights);
   addPalettePreview(colors);
+  optionChoice(colors, "PIXEL METHOD", [
+    { title: "DIRECT", selected: state.pixelShadeMode === "DIRECT",
+      onClick: () => setPixelShadeMode("DIRECT") },
+    { title: "8", accessibilityTitle: "8 SHADE", selected: state.pixelShadeMode === "GRAY8",
+      onClick: () => setPixelShadeMode("GRAY8") },
+    { title: "16", accessibilityTitle: "16 SHADE", selected: state.pixelShadeMode === "GRAY16",
+      onClick: () => setPixelShadeMode("GRAY16") },
+  ]);
   customColorInput(colors, "background", "BG");
   customColorInput(colors, "font", "PIXEL");
+  if (levels) {
+    optionAdjuster(colors, "TEXT SHADE",
+      `${String(activeGrayscaleTone(state.pixelToneIndex, levels) + 1).padStart(2, "0")}/${levels}`,
+      () => adjustPixelTone("pixel", -1),
+      () => adjustPixelTone("pixel", 1), "TEXT SHADE");
+    optionAdjuster(colors, "BG SHADE",
+      `${String(activeGrayscaleTone(state.backgroundToneIndex, levels) + 1).padStart(2, "0")}/${levels}`,
+      () => adjustPixelTone("background", -1),
+      () => adjustPixelTone("background", 1), "BG SHADE");
+  }
   label(colors, state.colorInputError ? "INVALID COLOR" : "ENTER APPLY", {
     height: rowHeight(),
   }, {

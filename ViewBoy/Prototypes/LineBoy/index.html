@@ -57,10 +57,12 @@
     .terminal {
       width: var(--video-width, 1024px);
       height: var(--video-height, 768px);
+      zoom: var(--video-scale, 1);
       min-height: 0;
       margin: 0 auto;
       padding: 8px;
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       grid-template-rows: auto auto minmax(0, 1fr) auto;
       gap: 8px;
       position: relative;
@@ -72,6 +74,7 @@
     .terminal > nav,
     .terminal > main,
     .terminal > footer {
+      min-width: 0;
       opacity: 0;
     }
 
@@ -114,29 +117,44 @@
     }
 
     .topline {
-      min-height: 32px;
-      justify-content: space-between;
-      gap: 16px;
+      min-height: 48px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-rows: 16px 16px;
+      align-content: start;
+      gap: 0 8px;
       border-bottom: 1px solid var(--line);
       padding: 0 2px 6px;
       text-transform: uppercase;
     }
 
-    .brand-lockup, .sysinfo, .statbits { display: flex; align-items: center; gap: 14px; }
-    .brand { color: var(--white); font-size: 16px; font-weight: 800; letter-spacing: .06em; }
+    .brand-lockup, .sysinfo, .statbits { display: flex; align-items: center; gap: 8px; }
+    .brand-lockup { grid-column: 1; grid-row: 1; }
+    .sysinfo { grid-column: 1 / -1; grid-row: 2; }
+    .statbits { grid-column: 2; grid-row: 1; }
+    .brand { color: var(--white); font-size: 16px; font-weight: 800; letter-spacing: .06em; white-space: nowrap; }
     .brand span { color: var(--dim); font-size: 16px; font-weight: 500; letter-spacing: 0; }
     .lamp { display: inline-block; width: 7px; height: 7px; margin-right: 7px; background: var(--gray); }
-    .sysinfo, .statbits { color: var(--dim); font-size: 16px; }
+    .sysinfo, .statbits { color: var(--dim); font-size: 16px; white-space: nowrap; }
     .statbits strong { color: var(--gray); font-weight: 600; }
+    .mode-switch {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--gray);
+      text-align: left;
+      cursor: pointer;
+    }
+    .mode-switch:hover, .mode-switch:focus-visible { color: var(--white); text-decoration: underline; }
 
-    .toolrow { gap: 4px; flex-wrap: wrap; }
+    .toolrow { gap: 2px; flex-wrap: wrap; }
 
     .key {
-      min-height: 28px;
+      min-height: 32px;
       display: inline-flex;
       align-items: center;
-      gap: 7px;
-      padding: 3px 8px;
+      gap: 3px;
+      padding: 2px 3px;
       border: 1px solid var(--line-bright);
       background: var(--gray);
       color: var(--black);
@@ -145,6 +163,7 @@
       font-weight: 700;
       cursor: pointer;
       box-shadow: inset 0 1px #eee, inset 0 -1px #777;
+      white-space: nowrap;
     }
 
     .key kbd { color: #454545; font: 16px/16px var(--mono); }
@@ -161,14 +180,17 @@
     }
 
     .workspace {
+      min-width: 0;
       min-height: 0;
       display: grid;
-      grid-template-columns: minmax(220px, 25%) minmax(0, 1fr);
-      gap: 7px;
+      grid-template-columns: minmax(150px, 26%) minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+      gap: 4px;
     }
 
     .panel {
       min-width: 0;
+      min-height: 0;
       display: flex;
       flex-direction: column;
       border: 1px solid var(--line);
@@ -176,24 +198,28 @@
     }
 
     .panel-title {
-      min-height: 24px;
+      min-height: 16px;
       justify-content: space-between;
       gap: 8px;
-      padding: 4px 7px;
+      padding: 0 4px;
       background: var(--gray);
       color: var(--black);
       font-size: 16px;
       font-weight: 800;
       text-transform: uppercase;
     }
+    .panel-title > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    .panel-title small { color: #505050; font: 16px/16px var(--mono); }
+    .panel-title small { color: #505050; font: 16px/16px var(--mono); white-space: nowrap; }
 
     .filterline {
-      padding: 6px 8px 5px;
+      min-height: 17px;
+      padding: 0 6px;
       border-bottom: 1px solid #363636;
       color: var(--dim);
       font-size: 16px;
+      overflow: hidden;
+      white-space: nowrap;
     }
     .filterline b { color: var(--white); font-weight: 600; }
 
@@ -201,7 +227,7 @@
       display: grid;
       gap: 0;
       align-content: start;
-      padding: 5px;
+      padding: 4px;
       overflow: auto;
     }
 
@@ -210,9 +236,9 @@
       display: grid;
       grid-template-columns: 16px minmax(0, 1fr) auto;
       align-items: center;
-      gap: 3px;
-      min-height: 22px;
-      padding: 2px 4px;
+      gap: 2px;
+      min-height: 16px;
+      padding: 0 2px;
       border: 1px solid transparent;
       background: transparent;
       color: var(--gray);
@@ -221,6 +247,7 @@
     }
     .tree-row .chev { color: var(--dim); }
     .tree-row small { color: var(--dim); font-size: 16px; }
+    .tree-row > span:nth-child(2) { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .tree-row:hover { border-color: var(--line); }
     .tree-row[aria-selected="true"] {
       background: var(--gray);
@@ -231,39 +258,43 @@
     .tree-row.indent { padding-left: 19px; }
 
     .listpanel { overflow: hidden; }
-    .tabs { min-height: 30px; gap: 4px; padding: 4px 6px; border-bottom: 1px solid #393939; }
+    .tabs { min-height: 24px; gap: 4px; padding: 2px 4px; border-bottom: 1px solid #393939; }
     .tab {
-      min-height: 24px;
-      padding: 3px 6px;
+      min-height: 20px;
+      padding: 1px 4px;
       border: 1px solid var(--line);
       color: var(--dim);
       font-size: 16px;
       text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .tab.active { border-color: var(--gray); color: var(--white); }
     .tab.add { margin-left: auto; color: var(--gray); }
 
     .list-head, .song {
       display: grid;
-      grid-template-columns: 34px minmax(150px, 1.8fr) minmax(90px, 1fr) 86px 72px;
+      grid-template-columns: 28px minmax(120px, 1.8fr) minmax(72px, 1fr) 64px 44px;
       align-items: center;
-      gap: 8px;
-      padding: 0 9px;
+      gap: 4px;
+      padding: 0 6px;
     }
 
     .list-head {
-      min-height: 24px;
+      min-height: 16px;
       border-bottom: 1px solid var(--line);
       color: var(--dim);
       font-size: 16px;
       text-transform: uppercase;
     }
+    .list-head span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .list-head span:last-child, .song span:last-child { text-align: right; }
 
     .songs { flex: 1; min-height: 0; overflow: auto; padding: 2px 4px 6px; }
     .song {
       width: 100%;
-      min-height: 24px;
+      min-height: 16px;
       border: 1px solid transparent;
       background: transparent;
       color: var(--gray);
@@ -279,7 +310,7 @@
     .song span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .playerline {
-      min-height: 36px;
+      min-height: 32px;
       gap: 8px;
       padding: 5px 7px;
       border-top: 1px solid var(--line);
@@ -291,7 +322,8 @@
     .meter i { display: block; width: 38%; height: 100%; background: var(--gray); }
 
     .statusline {
-      min-height: 22px;
+      min-width: 0;
+      min-height: 16px;
       justify-content: space-between;
       gap: 12px;
       padding: 4px 2px 0;
@@ -299,11 +331,21 @@
       color: var(--dim);
       font-size: 16px;
       text-transform: uppercase;
+      white-space: nowrap;
     }
     .statusline strong { color: var(--gray); font-weight: 600; }
+    .statusline > span:first-child,
+    .statusline > span:last-child { flex: 0 0 auto; }
+    .statusline #status { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+    .terminal[data-video-mode="standard"] .list-head,
+    .terminal[data-video-mode="standard"] .song {
+      grid-template-columns: 28px minmax(105px, 1.8fr) minmax(70px, 1fr) 54px 36px;
+      gap: 3px;
+      padding-inline: 4px;
+    }
 
     @media (max-width: 760px) {
-      .topline { align-items: flex-start; flex-direction: column; gap: 5px; }
       .sysinfo { gap: 8px; flex-wrap: wrap; }
       .workspace { grid-template-columns: 1fr; grid-template-rows: minmax(120px, 34%) minmax(0, 1fr); }
       .tree { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -320,7 +362,7 @@
 </head>
 <body>
   <div class="crt">
-    <div class="terminal" data-renderer="dom" role="application" aria-label="LineBoy monochrome music player mockup">
+    <div class="terminal" data-renderer="dom" data-video-mode="standard" role="application" aria-label="LineBoy monochrome music player mockup">
       <canvas class="beam-screen" aria-hidden="true"></canvas>
       <header class="topline">
         <div class="brand-lockup">
@@ -328,8 +370,8 @@
         </div>
         <div class="sysinfo">
           <span><i class="lamp"></i>READY</span>
-          <span>MODE <b id="column-mode">128 COL</b></span>
-          <span>VIDEO <b id="video-mode">XGA / 1024×768</b></span>
+          <span>MODE <b id="column-mode">80 COL</b></span>
+          <span>VIDEO <button class="mode-switch" id="video-mode" type="button" title="Switch between standard and high-resolution raster modes">VGA 640×480 @3PX</button></span>
           <span>BUF <b>64K</b></span>
         </div>
         <div class="statbits"><span>MEM <strong>602K</strong></span><span id="clock">00:00:00</span></div>
@@ -350,7 +392,7 @@
       <main class="workspace">
         <aside class="panel">
           <div class="panel-title"><span>Library / Path</span><small>F2</small></div>
-          <div class="filterline">FIND: <b>________________</b> <span>12/64</span></div>
+          <div class="filterline">FIND: <b>_______</b> <span>12/64</span></div>
           <div class="tree" role="listbox" aria-label="Library folders">
             <button class="tree-row" role="option" aria-selected="false"><span class="chev">+</span><span>AMIGA</span><small>38</small></button>
             <button class="tree-row" role="option" aria-selected="false"><span class="chev">+</span><span>ARCADE</span><small>54</small></button>
@@ -409,38 +451,62 @@
     </div>
   </div>
   <script>
-    const VIDEO_MODES = [
-      { name: "XGA", width: 1024, height: 768 },
-      { name: "SVGA", width: 800, height: 600 },
-      { name: "VGA", width: 640, height: 480 },
-    ];
+    const VIDEO_MODE_VARIANTS = {
+      STANDARD: [
+        { id: "STANDARD", name: "VGA", width: 640, height: 480, deviceScale: 3 },
+        { id: "STANDARD", name: "VGA", width: 640, height: 480, deviceScale: 2 },
+        { id: "STANDARD", name: "EGA", width: 512, height: 384, deviceScale: 2 },
+        { id: "STANDARD", name: "QVGA", width: 320, height: 240, deviceScale: 2 },
+      ],
+      HIGH: [
+        { id: "HIGH", name: "XGA", width: 1024, height: 768, deviceScale: 2 },
+        { id: "HIGH", name: "SVGA", width: 800, height: 600, deviceScale: 2 },
+        { id: "HIGH", name: "VGA", width: 640, height: 480, deviceScale: 2 },
+        { id: "HIGH", name: "EGA", width: 512, height: 384, deviceScale: 2 },
+      ],
+    };
     const terminal = document.querySelector(".terminal");
     const display = document.querySelector(".beam-screen");
     const videoModeLabel = document.querySelector("#video-mode");
     const columnModeLabel = document.querySelector("#column-mode");
     let activeVideoMode = null;
-    let activeScanPitchCss = 2;
+    let requestedVideoMode = "STANDARD";
+    let activeScanPitchCss = 1;
     let screenOriginY = 0;
 
     function updateVideoMode() {
-      const availableWidth = window.innerWidth - 16;
-      const availableHeight = window.innerHeight - 16;
-      const nextMode = VIDEO_MODES.find((mode) =>
-        mode.width <= availableWidth && mode.height <= availableHeight
-      ) || VIDEO_MODES[VIDEO_MODES.length - 1];
-      if (activeVideoMode?.width === nextMode.width && activeVideoMode?.height === nextMode.height) {
+      const deviceRatio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+      const availableWidth = (window.innerWidth - 16) * deviceRatio;
+      const availableHeight = (window.innerHeight - 16) * deviceRatio;
+      const nextMode = VIDEO_MODE_VARIANTS[requestedVideoMode].find((mode) =>
+        mode.width * mode.deviceScale <= availableWidth
+          && mode.height * mode.deviceScale <= availableHeight
+      ) || VIDEO_MODE_VARIANTS[requestedVideoMode].at(-1);
+      nextMode.scale = nextMode.deviceScale / deviceRatio;
+      if (activeVideoMode?.id === nextMode.id
+          && activeVideoMode?.width === nextMode.width
+          && activeVideoMode?.height === nextMode.height
+          && activeVideoMode?.deviceScale === nextMode.deviceScale
+          && activeVideoMode?.scale === nextMode.scale) {
         return false;
       }
 
       activeVideoMode = nextMode;
+      terminal.dataset.videoMode = nextMode.id.toLowerCase();
       terminal.style.setProperty("--video-width", `${nextMode.width}px`);
       terminal.style.setProperty("--video-height", `${nextMode.height}px`);
-      videoModeLabel.textContent = `${nextMode.name} / ${nextMode.width}×${nextMode.height}`;
+      terminal.style.setProperty("--video-scale", nextMode.scale);
+      videoModeLabel.textContent = `${nextMode.name} ${nextMode.width}×${nextMode.height} @${nextMode.deviceScale}PX`;
       columnModeLabel.textContent = `${Math.floor(nextMode.width / 8)} COL`;
       return true;
     }
 
     updateVideoMode();
+    videoModeLabel.addEventListener("click", () => {
+      requestedVideoMode = requestedVideoMode === "STANDARD" ? "HIGH" : "STANDARD";
+      updateVideoMode();
+      scheduleRender();
+    });
     const gl = display.getContext("webgl2", {
       alpha: false,
       antialias: false,
@@ -475,7 +541,7 @@
         // coverage edge leaves a true black phosphor gap; source pixels outside
         // the beam spot do not leak through as gray.
         float screen_y = u_resolution.y - gl_FragCoord.y;
-        float center_offset = u_scan_pitch > 2.5 && u_scan_pitch < 3.5 ? 0.5
+        float center_offset = u_scan_pitch > 2.5 && u_scan_pitch < 3.5 ? 1.0
           : u_scan_pitch < 2.5 ? 0.5 : 0.0;
         float phase = mod(screen_y - center_offset + u_scan_pitch * 0.5, u_scan_pitch)
           - u_scan_pitch * 0.5;
@@ -569,10 +635,9 @@
       if (rect.width < 1 || rect.height < 1) return;
 
       const scale = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
-      // At 2x output, each 8x16 font row occupies two raster pixels. Sweep
-      // once per font row so text stays intact instead of losing every other
-      // row under a slower, unrelated scan cadence.
-      const scanPitch = Math.max(1, Math.round(scale));
+      // Resolve each 8x16 font pixel row to an integer number of display pixels.
+      // Standard VGA uses three (two lit, one black); high mode keeps two.
+      const scanPitch = activeVideoMode.deviceScale;
       activeScanPitchCss = scanPitch / scale;
       screenOriginY = rect.top;
       const width = Math.max(1, Math.round(rect.width * scale));
@@ -618,6 +683,7 @@
       const ctx = framebufferContext;
       const x = bounds.left;
       const y = bounds.top;
+      const displayScale = activeVideoMode.scale;
       ctx.save();
       const opacity = element.parentElement === terminal ? 1 : Number(style.opacity);
       ctx.globalAlpha *= Number.isFinite(opacity) ? opacity : 1;
@@ -629,7 +695,7 @@
 
       const sides = ["Top", "Right", "Bottom", "Left"];
       for (const side of sides) {
-        const borderWidth = Number.parseFloat(style[`border${side}Width`]) || 0;
+        const borderWidth = (Number.parseFloat(style[`border${side}Width`]) || 0) * displayScale;
         if (!borderWidth || style[`border${side}Style`] === "none") continue;
         ctx.fillStyle = style[`border${side}Color`];
         if (side === "Top") ctx.fillRect(x, y, bounds.width, borderWidth);
@@ -640,15 +706,18 @@
 
       if (style.boxShadow.includes("inset 0 1px")) {
         ctx.fillStyle = "#eeeeee";
-        ctx.fillRect(x + 1, y + 1, Math.max(0, bounds.width - 2), 1);
+        ctx.fillRect(x + displayScale, y + displayScale,
+          Math.max(0, bounds.width - 2 * displayScale), displayScale);
         ctx.fillStyle = "#777777";
-        ctx.fillRect(x + 1, y + bounds.height - 2, Math.max(0, bounds.width - 2), 1);
+        ctx.fillRect(x + displayScale, y + bounds.height - 2 * displayScale,
+          Math.max(0, bounds.width - 2 * displayScale), displayScale);
       }
 
       ctx.save();
       if (element !== terminal && /(auto|scroll|hidden|clip)/.test(`${style.overflowX} ${style.overflowY}`)) {
         ctx.beginPath();
-        ctx.rect(x + element.clientLeft, y + element.clientTop, element.clientWidth, element.clientHeight);
+        ctx.rect(x + element.clientLeft * displayScale, y + element.clientTop * displayScale,
+          element.clientWidth * displayScale, element.clientHeight * displayScale);
         ctx.clip();
       }
 
@@ -676,13 +745,18 @@
       const ctx = framebufferContext;
       ctx.save();
       ctx.fillStyle = style.color;
-      ctx.font = style.font || `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      const fontSize = Number.parseFloat(style.fontSize) * activeVideoMode.scale;
+      ctx.font = `${style.fontWeight} ${fontSize}px ${style.fontFamily}`;
       ctx.textBaseline = "alphabetic";
-      if ("letterSpacing" in ctx) ctx.letterSpacing = style.letterSpacing;
+      if ("letterSpacing" in ctx) {
+        const letterSpacing = Number.parseFloat(style.letterSpacing);
+        ctx.letterSpacing = `${Number.isFinite(letterSpacing)
+          ? letterSpacing * activeVideoMode.scale : 0}px`;
+      }
       for (const box of boxes) {
         const metrics = ctx.measureText(text);
-        const ascent = metrics.actualBoundingBoxAscent || Number.parseFloat(style.fontSize) * 0.8;
-        const descent = metrics.actualBoundingBoxDescent || Number.parseFloat(style.fontSize) * 0.2;
+        const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.8;
+        const descent = metrics.actualBoundingBoxDescent || fontSize * 0.2;
         const measuredBaseline = box.top + box.height / 2 + (ascent - descent) / 2;
         const glyphTop = measuredBaseline - ascent;
         const snappedGlyphTop = screenOriginY

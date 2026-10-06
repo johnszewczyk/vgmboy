@@ -6,18 +6,23 @@ command blocks, and a simulated monochrome CRT raster. Track and toolbar
 controls are local presentation interactions only; this prototype is not wired
 to the catalog or playback bridge.
 
-The screen uses fixed 4:3 raster modes, selecting the largest mode that fits
-the viewport: XGA 1024×768, SVGA 800×600, or VGA 640×480. The interface is
-rasterized at the selected mode's dimensions and centered without stretching.
-A WebGL2 fragment shader draws the framebuffer through a beam profile on a
-fixed two-logical-pixel cadence, snapped to whole device pixels. The beam
-profile has a Gaussian spot whose width increases slightly with brightness;
-pixels outside each spot are emitted as pure black, leaving consistent empty
-scanline gaps. The framebuffer texture uses nearest-neighbor sampling so its
-source pixels do not blur together. The beam pass runs only after content,
-layout, scroll, or pointer state changes. This is a compact monochrome CRT
-model, not a complete analog display simulation: it does not add color
-phosphor masks, NTSC artifacts, curvature, or beam flicker. The browser keeps
+The UI uses one 8×16 Modern DOS font across toolbar, panels, lists, and status.
+The standard mode resolves its font rows to an integer device-pixel cadence:
+VGA 640×480 at three device pixels per source pixel when the viewport permits,
+then VGA/EGA/QVGA at two pixels per source pixel on smaller screens. Its beam
+draws two illuminated pixels followed by one pure-black scanline gap. High
+mode keeps a denser two-pixel cadence and selects XGA 1024×768, SVGA 800×600,
+VGA 640×480, or EGA 512×384 according to available space. The VIDEO control
+switches between these fixed-scale mode families. The interface is rasterized
+at the selected source dimensions and centered without fractional stretching.
+
+A WebGL2 fragment shader draws the framebuffer through a beam profile. Its
+spot width changes slightly with brightness; pixels outside each spot are
+emitted as pure black. Nearest-neighbor texture sampling keeps source pixels
+sharp, and text glyph tops snap to the same row cadence as the beam. The pass
+runs after content, layout, scroll, or pointer changes. This is a compact
+monochrome CRT model, not a complete analog display simulation: it omits color
+phosphor masks, NTSC artifacts, curvature, and beam flicker. The browser keeps
 the semantic interface available as a fallback when WebGL2 or framebuffer
 rendering is unavailable.
 

@@ -1,11 +1,12 @@
 # ViewBoy UI Design
 
 This page is the published Markdown specification for ViewBoy's screen colors,
-spacing, and shared controls. The app renders its content in one two-color LCD
-pixel grid. Every lit framebuffer pixel uses the exact PIXEL input; empty cells
-and configured gaps use the exact BG input. The LCD surface reaches every
-window edge; the eight-pixel content inset keeps controls and panes clear of
-the frame without adding a bezel.
+spacing, and shared controls. The app renders its content in one LCD pixel grid.
+Direct mode uses exact PIXEL and BG endpoint colors. Optional 8- and 16-shade
+methods use a stepped black-to-white grayscale ramp while preserving the same
+cell geometry and configured gaps. The LCD surface reaches every window edge;
+the eight-pixel content inset keeps controls and panes clear of the frame
+without adding a bezel.
 
 ## One Display Page
 
@@ -37,12 +38,14 @@ state tint is the expected visual difference from an inactive button.
 ## LCD Colors
 
 For the current contrast test, the default endpoints are a yellow-green
-background (`BG #9BBC0F`) and black pixels (`PIXEL #000000`). The renderer
-keeps its four framebuffer labels for layout and maps shades 0–1 directly to
-PIXEL and shades 2–3 directly to BG. Each lit cell face receives the exact
-PIXEL input; configured matrix gaps receive exact BG. This two-color rendering
-is always on and bypasses tone palettes and blending while preserving the cell
-mask, gap dimensions, grid, and spacing.
+background (`BG #9BBC0F`) and black pixels (`PIXEL #000000`). Direct mode keeps
+four framebuffer labels for layout and maps shades 0–1 directly to PIXEL and
+shades 2–3 directly to BG. Optional 8- and 16-shade methods expose evenly
+spaced sRGB gray values from black to white. The BG and PIXEL inputs seed their
+independent tone positions from relative luminance; **TEXT SHADE** and
+**BG SHADE** adjust those positions across the full ramp. Matrix gaps use the
+selected BG shade in grayscale modes. All methods preserve the same
+framebuffer cell mask, gap dimensions, grid, and spacing.
 
 BG and PIXEL are the only color controls. Inputs accept three- or six-digit hex
 with or without `#`, space- or comma-separated RGB channel values, CSS color
@@ -55,15 +58,13 @@ separately for rendering. Enter applies a valid value and Escape cancels.
 The canvas grid scales with the window and is not the Game Boy's fixed 160×144
 panel. **LCD Dot Size** selects 2–6 device pixels per logical cell; smaller
 values give the same canvas a finer grid. **Pixel Matrix Gaps** is off by
-default, so every device pixel in a cell uses its endpoint color. When on,
-the cell's right and bottom device-pixel edges use the LCD background tone;
-this reduces ink coverage while each lit face remains the exact PIXEL color.
-With gaps off, a custom `000` PIXEL endpoint renders as full black throughout
-each ink cell. Color interpolation and pixel shading are disabled; the
-selected dot size, gap setting, cell geometry, and presence of every
-framebuffer pixel remain.
+default. In Direct mode each device cell uses one of the two exact endpoints;
+when gaps are enabled, its right and bottom edges use exact BG. In grayscale
+modes, text cells use the selected TEXT SHADE and gaps use the selected BG
+SHADE. The method changes only the output color mapping; dot size, gap setting,
+cell geometry, and framebuffer pixels remain the same.
 
-The renderer shows a direct two-color grid, not a four-tone STN panel. It does
+Direct mode shows a two-color grid, not a four-tone STN panel. It does
 not claim to reproduce measured panel response. It does not model
 reflectance, viewing-angle response, row/column crosstalk, liquid-crystal
 transition time, or panel aging. Nintendo lists the classic screen as a
@@ -71,15 +72,19 @@ transition time, or panel aging. Nintendo lists the classic screen as a
 Game Boy Color uses a TFT screen. [Nintendo Game Boy specifications](https://www.nintendo.com/en-gb/Hardware/Nintendo-History/Game-Boy/Game-Boy-627031.html),
 [Nintendo technical data](https://www.nintendo.com/en-gb/Support/Legacy-system/Technical-data-619585.html).
 
-The **Custom LCD Colors** group is always visible on the Display page and
-contains separate **BG** and **PIXEL** fields. Its four-slot preview shows the
-two exact endpoints twice. Inputs accept three- or six-digit hex
+The **LCD PALETTE** group is always visible on the Display page.
+**PIXEL METHOD** selects Direct, 8 shades, or 16 shades. Its preview shows the
+two endpoints twice in Direct mode and every grayscale step in 8/16 mode, with
+markers for the active text and background shades. The separate **BG** and
+**PIXEL** fields accept three- or six-digit hex
 (`333`, `ABC`, `1122FF`, with or without `#`), three RGB channels separated by
 spaces or commas (`30 30 30`), CSS color names, and colors accepted by native
-CSS color parsing. The renderer uses these endpoints directly, without tone
-shading. The field preserves the entered text (for
-example, `rebeccapurple`) and stores the resolved RGB value separately for
-rendering. Enter applies a valid color; Escape cancels the edit.
+CSS color parsing. In Direct mode, the renderer uses these endpoint colors
+exactly. In grayscale modes, changing either input recalculates its initial
+tone position while preserving the original entered text (for example,
+`rebeccapurple`) and storing the resolved RGB value separately. Enter applies
+a valid color; Escape cancels the edit. Method and tone selections persist in
+display preferences.
 
 ## Spacing Map
 
