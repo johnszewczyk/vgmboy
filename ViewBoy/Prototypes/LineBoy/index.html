@@ -25,6 +25,7 @@
       --white: #e8e8e8;
       --dim: #898989;
       --faint: #5e5e5e;
+      --text-cell-height: 16px;
       --mono: "Modern DOS", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     }
 
@@ -35,7 +36,7 @@
     body {
       background: var(--black);
       color: var(--gray);
-      font: 12px/1.25 var(--mono);
+      font: 16px/var(--text-cell-height) var(--mono);
       letter-spacing: 0;
       -webkit-font-smoothing: none;
       text-rendering: optimizeSpeed;
@@ -61,7 +62,7 @@
       padding: 8px;
       display: grid;
       grid-template-rows: auto auto minmax(0, 1fr) auto;
-      gap: 7px;
+      gap: 8px;
       position: relative;
       isolation: isolate;
       background: #0b0b0b;
@@ -123,15 +124,15 @@
 
     .brand-lockup, .sysinfo, .statbits { display: flex; align-items: center; gap: 14px; }
     .brand { color: var(--white); font-size: 16px; font-weight: 800; letter-spacing: .06em; }
-    .brand span { color: var(--dim); font-size: 10px; font-weight: 500; letter-spacing: 0; }
+    .brand span { color: var(--dim); font-size: 16px; font-weight: 500; letter-spacing: 0; }
     .lamp { display: inline-block; width: 7px; height: 7px; margin-right: 7px; background: var(--gray); }
-    .sysinfo, .statbits { color: var(--dim); font-size: 10px; }
+    .sysinfo, .statbits { color: var(--dim); font-size: 16px; }
     .statbits strong { color: var(--gray); font-weight: 600; }
 
     .toolrow { gap: 4px; flex-wrap: wrap; }
 
     .key {
-      min-height: 27px;
+      min-height: 28px;
       display: inline-flex;
       align-items: center;
       gap: 7px;
@@ -140,13 +141,13 @@
       background: var(--gray);
       color: var(--black);
       text-transform: uppercase;
-      font-size: 10px;
+      font-size: 16px;
       font-weight: 700;
       cursor: pointer;
       box-shadow: inset 0 1px #eee, inset 0 -1px #777;
     }
 
-    .key kbd { color: #454545; font: 9px var(--mono); }
+    .key kbd { color: #454545; font: 16px/16px var(--mono); }
     .key:hover, .key[aria-pressed="true"] { background: var(--white); }
     .key.clear {
       background: transparent;
@@ -175,24 +176,24 @@
     }
 
     .panel-title {
-      min-height: 25px;
+      min-height: 24px;
       justify-content: space-between;
       gap: 8px;
-      padding: 3px 7px;
+      padding: 4px 7px;
       background: var(--gray);
       color: var(--black);
-      font-size: 10px;
+      font-size: 16px;
       font-weight: 800;
       text-transform: uppercase;
     }
 
-    .panel-title small { color: #505050; font: 9px var(--mono); }
+    .panel-title small { color: #505050; font: 16px/16px var(--mono); }
 
     .filterline {
       padding: 6px 8px 5px;
       border-bottom: 1px solid #363636;
       color: var(--dim);
-      font-size: 10px;
+      font-size: 16px;
     }
     .filterline b { color: var(--white); font-weight: 600; }
 
@@ -219,7 +220,7 @@
       cursor: pointer;
     }
     .tree-row .chev { color: var(--dim); }
-    .tree-row small { color: var(--dim); font-size: 10px; }
+    .tree-row small { color: var(--dim); font-size: 16px; }
     .tree-row:hover { border-color: var(--line); }
     .tree-row[aria-selected="true"] {
       background: var(--gray);
@@ -232,11 +233,11 @@
     .listpanel { overflow: hidden; }
     .tabs { min-height: 30px; gap: 4px; padding: 4px 6px; border-bottom: 1px solid #393939; }
     .tab {
-      min-height: 20px;
+      min-height: 24px;
       padding: 3px 6px;
       border: 1px solid var(--line);
       color: var(--dim);
-      font-size: 9px;
+      font-size: 16px;
       text-transform: uppercase;
     }
     .tab.active { border-color: var(--gray); color: var(--white); }
@@ -251,10 +252,10 @@
     }
 
     .list-head {
-      min-height: 23px;
+      min-height: 24px;
       border-bottom: 1px solid var(--line);
       color: var(--dim);
-      font-size: 9px;
+      font-size: 16px;
       text-transform: uppercase;
     }
     .list-head span:last-child, .song span:last-child { text-align: right; }
@@ -262,12 +263,11 @@
     .songs { flex: 1; min-height: 0; overflow: auto; padding: 2px 4px 6px; }
     .song {
       width: 100%;
-      min-height: 23px;
+      min-height: 24px;
       border: 1px solid transparent;
       background: transparent;
       color: var(--gray);
       text-align: left;
-      font-size: 11px;
       cursor: pointer;
     }
     .song .num, .song .album, .song .length { color: var(--dim); }
@@ -286,7 +286,7 @@
       background: #0b0b0b;
     }
     .playerline .now { min-width: 170px; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--white); }
-    .playerline .time { color: var(--dim); font-size: 10px; }
+    .playerline .time { color: var(--dim); font-size: 16px; }
     .meter { width: min(160px, 20vw); height: 7px; border: 1px solid var(--line); background: #080808; }
     .meter i { display: block; width: 38%; height: 100%; background: var(--gray); }
 
@@ -297,7 +297,7 @@
       padding: 4px 2px 0;
       border-top: 1px solid var(--line);
       color: var(--dim);
-      font-size: 9px;
+      font-size: 16px;
       text-transform: uppercase;
     }
     .statusline strong { color: var(--gray); font-weight: 600; }
@@ -328,7 +328,7 @@
         </div>
         <div class="sysinfo">
           <span><i class="lamp"></i>READY</span>
-          <span>MODE <b>132 COL</b></span>
+          <span>MODE <b id="column-mode">128 COL</b></span>
           <span>VIDEO <b id="video-mode">XGA / 1024×768</b></span>
           <span>BUF <b>64K</b></span>
         </div>
@@ -417,7 +417,10 @@
     const terminal = document.querySelector(".terminal");
     const display = document.querySelector(".beam-screen");
     const videoModeLabel = document.querySelector("#video-mode");
+    const columnModeLabel = document.querySelector("#column-mode");
     let activeVideoMode = null;
+    let activeScanPitchCss = 2;
+    let screenOriginY = 0;
 
     function updateVideoMode() {
       const availableWidth = window.innerWidth - 16;
@@ -433,6 +436,7 @@
       terminal.style.setProperty("--video-width", `${nextMode.width}px`);
       terminal.style.setProperty("--video-height", `${nextMode.height}px`);
       videoModeLabel.textContent = `${nextMode.name} / ${nextMode.width}×${nextMode.height}`;
+      columnModeLabel.textContent = `${Math.floor(nextMode.width / 8)} COL`;
       return true;
     }
 
@@ -565,6 +569,12 @@
       if (rect.width < 1 || rect.height < 1) return;
 
       const scale = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+      // At 2x output, each 8x16 font row occupies two raster pixels. Sweep
+      // once per font row so text stays intact instead of losing every other
+      // row under a slower, unrelated scan cadence.
+      const scanPitch = Math.max(1, Math.round(scale));
+      activeScanPitchCss = scanPitch / scale;
+      screenOriginY = rect.top;
       const width = Math.max(1, Math.round(rect.width * scale));
       const height = Math.max(1, Math.round(rect.height * scale));
       display.width = width;
@@ -589,7 +599,7 @@
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, framebuffer);
         gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), width, height);
-        gl.uniform1f(gl.getUniformLocation(program, "u_scan_pitch"), Math.max(2, Math.round(scale * 2)));
+        gl.uniform1f(gl.getUniformLocation(program, "u_scan_pitch"), scanPitch);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         terminal.dataset.renderer = "webgl2";
       } catch (error) {
@@ -673,7 +683,11 @@
         const metrics = ctx.measureText(text);
         const ascent = metrics.actualBoundingBoxAscent || Number.parseFloat(style.fontSize) * 0.8;
         const descent = metrics.actualBoundingBoxDescent || Number.parseFloat(style.fontSize) * 0.2;
-        const baseline = box.top + box.height / 2 + (ascent - descent) / 2;
+        const measuredBaseline = box.top + box.height / 2 + (ascent - descent) / 2;
+        const glyphTop = measuredBaseline - ascent;
+        const snappedGlyphTop = screenOriginY
+          + Math.round((glyphTop - screenOriginY) / activeScanPitchCss) * activeScanPitchCss;
+        const baseline = snappedGlyphTop + ascent;
         ctx.fillText(text, box.left, baseline);
       }
       ctx.restore();
