@@ -444,14 +444,12 @@
       { id: "1024X768", width: 1024, height: 768, deviceScales: [2, 1] },
     ];
 
-    // ModernDOS8x16's em metrics are 12px ascender, 4px descender and 10px
-    // cap height. Center the visible cap ink inside the 16px cell, then keep
-    // every following row on the exact same 16px advance.
-    const FONT_ASCENT = 12;
-    const FONT_DESCENT = 4;
+    // The DOS font has a 10px capital height in a 16px cell. Center that ink
+    // in the cell and put its baseline at source row 13. Anchor to the actual
+    // 16px DOM cell so browser text-range metrics cannot shift the ink upward.
+    const FONT_CELL_HEIGHT = 16;
     const FONT_CAP_HEIGHT = 10;
-    const FONT_BASELINE_OFFSET = (FONT_ASCENT - FONT_DESCENT) / 2
-      + (FONT_DESCENT - (FONT_ASCENT - FONT_CAP_HEIGHT)) / 2;
+    const FONT_BASELINE_OFFSET = (FONT_CELL_HEIGHT - FONT_CAP_HEIGHT) / 2 + FONT_CAP_HEIGHT;
 
     const GAMES = {
       CHRONO: {
@@ -1258,6 +1256,7 @@
       const ctx = framebufferContext;
       ctx.save();
       ctx.fillStyle = style.color;
+      const cellTop = node.parentElement.getBoundingClientRect().top;
       const fontSize = Number.parseFloat(style.fontSize) * activeRaster.scale;
       ctx.font = `${style.fontWeight} ${fontSize}px ${style.fontFamily}`;
       ctx.textBaseline = "alphabetic";
@@ -1266,8 +1265,7 @@
         ctx.letterSpacing = `${Number.isFinite(letterSpacing) ? letterSpacing * activeRaster.scale : 0}px`;
       }
       for (const box of boxes) {
-        const measuredBaseline = box.top + box.height / 2
-          + FONT_BASELINE_OFFSET * activeRaster.scale;
+        const measuredBaseline = cellTop + FONT_BASELINE_OFFSET * activeRaster.scale;
         const baseline = screenOriginY
           + Math.round((measuredBaseline - screenOriginY) / activeScanPitchCss) * activeScanPitchCss;
         const x = screenOriginX + (box.left - terminal.getBoundingClientRect().left);

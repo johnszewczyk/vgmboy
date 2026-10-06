@@ -15,8 +15,9 @@ splitting text across a fractional row.
 
 The layout uses 8-pixel columns and 16-pixel text rows. Its title, resolution
 choices, command bar, library, playlist, and status line occupy explicit rows.
-Labels and controls center within their row; the beam renderer snaps glyph
-baselines to the same 16-pixel cadence. The library and playlist scroll one
+Labels and controls use the same cell-top baseline: the 10px cap ink is centered
+inside its 16px row, with three raster pixels above and below. The beam renderer
+snaps that baseline to the same cadence. The library and playlist scroll one
 text row at a time.
 
 In the native app, the library tree is populated from the shared catalog.
