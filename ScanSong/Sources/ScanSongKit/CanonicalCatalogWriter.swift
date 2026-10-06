@@ -133,7 +133,7 @@ public struct CatalogTrackRecord: Sendable {
 }
 
 public final class CanonicalCatalogWriter: @unchecked Sendable {
-    public static let policyVersion = 1
+    public static let policyVersion = 2
 
     private let database: OpaquePointer
     private let writerLease: CatalogWriterLease

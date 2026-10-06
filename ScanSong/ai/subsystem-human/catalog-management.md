@@ -25,6 +25,11 @@
   count, and issue count.
 - Scan All scans enabled paths. An individual path can be scanned without
   enabling it.
+- Scans record a `Title Snap` locator when a source has a non-empty adjacent
+  PNG using the source stem (`Game.png` beside `Game.zip`), a full-filename
+  sidecar (`Track.vgm.png`), or a PNG inside an archive. In-archive art takes
+  precedence; the first safe PNG by member path ordering is recorded as
+  `archive-member:<member path>`. Readers materialize archive art on demand.
 
 ## Link Maintenance
 

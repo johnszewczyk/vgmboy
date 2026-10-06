@@ -175,6 +175,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                       case "sidebarConsoles": app.ui?.setSidebarMode?.("consoles"); break;
                       case "favoritesPlaylist": app.ui?.showFavoritesPlaylist?.(); break;
                       case "playbackHistory": app.ui?.showPlaybackHistory?.(); break;
+                      case "galleryPlaylist": app.ui?.showGalleryPlaylist?.(); break;
                       case "settings": app.ui?.setOptionsOpen?.(true); break;
                       default: break;
                     }
@@ -369,6 +370,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         viewMenu.addItem(.separator())
         viewMenu.addItem(menuItem("Favorites Playlist", command: .favoritesPlaylist, action: #selector(favoritesPlaylist(_:))))
         viewMenu.addItem(menuItem("Playback History", command: .playbackHistory, action: #selector(playbackHistory(_:))))
+        let galleryItem = NSMenuItem(title: "Gallery", action: #selector(galleryPlaylist(_:)), keyEquivalent: "g")
+        galleryItem.keyEquivalentModifierMask = [.command, .shift]
+        galleryItem.target = self
+        viewMenu.addItem(galleryItem)
         viewMenuItem.submenu = viewMenu
         mainMenu.addItem(viewMenuItem)
 
@@ -452,6 +457,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc private func minimizeWindow(_ sender: Any?) { (NSApp.keyWindow ?? window)?.performMiniaturize(sender) }
     @objc private func favoritesPlaylist(_ sender: Any?) { dispatch(.favoritesPlaylist) }
     @objc private func playbackHistory(_ sender: Any?) { dispatch(.playbackHistory) }
+    @objc private func galleryPlaylist(_ sender: Any?) { dispatchCustom("galleryPlaylist") }
     @objc private func sidebarPaths(_ sender: Any?) { dispatch(.sidebarPaths) }
     @objc private func sidebarConsoles(_ sender: Any?) { dispatch(.sidebarConsoles) }
     @objc private func settings(_ sender: Any?) {

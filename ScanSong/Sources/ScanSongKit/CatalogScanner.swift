@@ -86,6 +86,9 @@ public struct CatalogScanResult: Sendable {
 }
 
 public final class CatalogScanner: @unchecked Sendable {
+    private static let titleSnapTagName = "Title Snap"
+    private static let titleSnapArchiveMemberPrefix = "archive-member:"
+    private static let titleSnapScanSignature = "title-snap-scan-v2:"
     public typealias ProgressHandler = @Sendable (CatalogScanProgress) -> Void
 
     private let writer: CanonicalCatalogWriter
@@ -220,6 +223,8 @@ public final class CatalogScanner: @unchecked Sendable {
                     }
                 }
 
+                candidate = Self.withTitleSnapScanSignature(candidate)
+
                 if let completed = try writer.completedFingerprint(
                     stageID: stageID,
                     sourcePath: candidate.identity.path
@@ -232,7 +237,7 @@ public final class CatalogScanner: @unchecked Sendable {
                    let live = try writer.reusableLiveFingerprint(
                     rootID: root.id,
                     sourcePath: candidate.identity.path
-                   ), live.matches(candidate.fingerprint) {
+                   ), Self.titleSnapWasInspected(live.contentSignature), live.matches(candidate.fingerprint) {
                     try writer.reuseLiveSource(
                         rootID: root.id,
                         stageID: stageID,
@@ -565,6 +570,7 @@ public final class CatalogScanner: @unchecked Sendable {
             throw ScannerInspectionError.unsupportedRoute(candidate.sourceURL.pathExtension)
         }
         let inspection = try await inspect(fileURL: candidate.sourceURL, route: route)
+        let titleSnap = Self.looseTitleSnapURL(for: candidate.sourceURL)
         return inspection.tracks.map {
             CatalogTrackRecord(
                 sourcePath: candidate.identity.path,
@@ -574,7 +580,7 @@ public final class CatalogScanner: @unchecked Sendable {
                 trackIndex: $0.trackIndex,
                 trackCount: $0.trackCount,
                 metadata: $0.metadata,
-                tags: $0.tags
+                tags: Self.tags($0.tags, addingTitleSnap: titleSnap)
             )
         }
     }
@@ -600,6 +606,8 @@ public final class CatalogScanner: @unchecked Sendable {
             dependencySearchRoot: dependencySearchRoot
         )
         defer { archiveExtractor.discard(archive) }
+        let titleSnap = archive.artworkEntryPath.map { Self.titleSnapArchiveMemberPrefix + $0 }
+            ?? Self.looseTitleSnapURL(for: candidate.sourceURL)
         progress(.materialization, candidate.identityDescription, "Materialized \(archive.members.count) playable members", nil, nil)
 
         // Inspect members concurrently under a bounded permit pool. Subprocess
@@ -672,7 +680,7 @@ public final class CatalogScanner: @unchecked Sendable {
                         trackIndex: $0.trackIndex,
                         trackCount: $0.trackCount,
                         metadata: $0.metadata,
-                        tags: $0.tags
+                        tags: Self.tags($0.tags, addingTitleSnap: titleSnap)
                     )
                 })
             } else if let message = memberFailures[index] {
@@ -690,6 +698,59 @@ public final class CatalogScanner: @unchecked Sendable {
             }
         }
         return CandidateInspection(records: records, failures: failures, skipped: skipped)
+    }
+
+    private static func looseTitleSnapURL(for sourceURL: URL) -> String? {
+        for imageURL in titleSnapSidecarURLs(for: sourceURL) {
+            guard let values = try? imageURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]),
+                  values.isRegularFile == true,
+                  values.isSymbolicLink != true,
+                  (values.fileSize ?? 0) > 0 else {
+                continue
+            }
+            return imageURL.absoluteString
+        }
+        return nil
+    }
+
+    private static func titleSnapSidecarURLs(for sourceURL: URL) -> [URL] {
+        let sameStem = sourceURL.deletingPathExtension().appendingPathExtension("png").standardizedFileURL
+        let fullFilename = sourceURL.appendingPathExtension("png").standardizedFileURL
+        return sameStem.path == fullFilename.path ? [sameStem] : [sameStem, fullFilename]
+    }
+
+    private static func withTitleSnapScanSignature(_ candidate: ScanCandidate) -> ScanCandidate {
+        let signature = candidate.fingerprint.contentSignature
+        let sidecarSignature = titleSnapSidecarURLs(for: candidate.sourceURL).map { sidecar in
+            let values = try? sidecar.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey])
+            guard values?.isRegularFile == true, values?.isSymbolicLink != true else { return "missing" }
+            let modifiedAt = values?.contentModificationDate?.timeIntervalSince1970 ?? 0
+            return "\(values?.fileSize ?? 0):\(modifiedAt)"
+        }.joined(separator: ",")
+        let taggedSignature = "\(signature ?? "")|\(titleSnapScanSignature)\(sidecarSignature)"
+        return ScanCandidate(
+            identity: candidate.identity,
+            fingerprint: ScanFingerprint(
+                fileSize: candidate.fingerprint.fileSize,
+                modifiedAt: candidate.fingerprint.modifiedAt,
+                contentSignature: taggedSignature
+            ),
+            sourceURL: candidate.sourceURL,
+            route: candidate.route
+        )
+    }
+
+    private static func titleSnapWasInspected(_ signature: String?) -> Bool {
+        guard let signature else { return false }
+        return signature.contains("|\(titleSnapScanSignature)")
+    }
+
+    private static func tags(_ existing: [ScannerMetadataTag], addingTitleSnap value: String?) -> [ScannerMetadataTag] {
+        guard let value, !value.isEmpty,
+              !existing.contains(where: { $0.normalizedName == titleSnapTagName.uppercased() }) else {
+            return existing
+        }
+        return existing + [ScannerMetadataTag(name: titleSnapTagName, value: value)]
     }
 
     private func projectUACMetadata(
@@ -747,7 +808,10 @@ public final class CatalogScanner: @unchecked Sendable {
                 trackIndex: max(0, Int(document.technicalFacts["uac.trackIndex"] ?? "") ?? 0),
                 trackCount: max(1, Int(document.technicalFacts["uac.trackCount"] ?? "") ?? 1),
                 metadata: UACCatalogMetadataAdapter.project(document),
-                tags: ScanTrackMetadata.tags(from: document),
+                tags: Self.tags(
+                    ScanTrackMetadata.tags(from: document),
+                    addingTitleSnap: Self.looseTitleSnapURL(for: candidate.sourceURL)
+                ),
                 browserGameOverride: containerDocument.fields.title ?? "",
                 browserSystemOverride: containerDocument.fields.system ?? ""
             ))

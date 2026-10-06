@@ -63,6 +63,13 @@ const state = {
   playlistTitle: "Playlist",
   playlistTabs: [],
   activePlaylistTabId: null,
+  activePlaylistTabKind: "playlist",
+  galleryGames: [],
+  galleryGamesLoaded: false,
+  galleryGamesError: "",
+  gallerySizeScale: 1,
+  galleryGapRem: 0.75,
+  galleryRadiusRem: 0.25,
   playbackTabId: null,
   // The visible playlist is a browsing projection. Playback advances through
   // this separate queue so selecting another sidebar item cannot silently
@@ -183,6 +190,15 @@ const refs = {
   databaseCollapseAllButton: document.getElementById("database-collapse-all-button"),
   databaseExpandAllButton: document.getElementById("database-expand-all-button"),
   treeRoot: document.getElementById("tree-root"),
+  gallerySidebarToolbar: document.getElementById("gallery-sidebar-toolbar"),
+  gallerySizeInput: document.getElementById("gallery-size-input"),
+  galleryGapInput: document.getElementById("gallery-gap-input"),
+  galleryRadiusInput: document.getElementById("gallery-radius-input"),
+  gallerySizeValue: document.getElementById("gallery-size-value"),
+  galleryGapValue: document.getElementById("gallery-gap-value"),
+  galleryRadiusValue: document.getElementById("gallery-radius-value"),
+  galleryView: document.getElementById("gallery-view"),
+  galleryGrid: document.getElementById("gallery-grid"),
   sidebarResizeHandle: document.getElementById("sidebar-resize-handle"),
   workspace: document.querySelector(".workspace"),
   sidebarContextMenu: document.getElementById("sidebar-context-menu"),
@@ -338,6 +354,9 @@ async function loadSettings() {
     state.selectedFolderPath = null;
     state.selectedBrowserPath = null;
     state.sidebarMode = parsed.sidebarMode === "paths" ? "paths" : "consoles";
+    state.gallerySizeScale = Math.max(0.65, Math.min(1.6, Number(parsed.gallerySizeScale) || 1));
+    state.galleryGapRem = Math.max(0, Math.min(1, Number(parsed.galleryGapRem ?? 0.75)));
+    state.galleryRadiusRem = Math.max(0, Math.min(1, Number(parsed.galleryRadiusRem ?? 0.25)));
     state.favoriteSortOrder = parsed.favoriteSortOrder === "alphabetical" ? "alphabetical" : "historical";
     state.selectedDatabaseGameKey = parsed.selectedDatabaseGameKey || null;
     state.collapsedConsoleNames = Array.isArray(parsed.collapsedConsoleNames)
@@ -431,6 +450,9 @@ function persistSettings() {
     selectedFolderPath: null,
     selectedBrowserPath: null,
     sidebarMode: state.sidebarMode === "paths" ? "paths" : "consoles",
+    gallerySizeScale: state.gallerySizeScale,
+    galleryGapRem: state.galleryGapRem,
+    galleryRadiusRem: state.galleryRadiusRem,
     favoriteSortOrder: state.favoriteSortOrder,
     selectedDatabaseGameKey: state.selectedDatabaseGameKey,
     collapsedConsoleNames: state.collapsedConsoleNames,

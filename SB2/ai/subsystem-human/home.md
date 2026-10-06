@@ -10,12 +10,19 @@
   and playlist length at right.
 - Startup reads the shared CocoaSpice catalog through CatalogReader; ScanSong
   remains its writer.
+- Development runs can select an isolated catalog with
+  `SPCBOY_SB2_CATALOG_PATH`; normal launches keep using the shared default.
 - If startup lasts beyond a short reveal delay, a compact status card shows
   workspace restore, library connection, sidebar preparation, playlist restore,
   and elapsed time. It briefly confirms readiness or remains visible with the
   startup error.
 - Command-Shift-F opens or switches to Favorites; Command-Shift-H opens or
-  switches to Playback History.
+  switches to Playback History; Command-Shift-G or View > Gallery opens or
+  switches to Gallery.
+- Gallery is a playlist tab with an artwork-only grid. Its sidebar preserves
+  Console and Path views while filtering both to games/sources with a ScanSong
+  `Title Snap` value. The Gallery sidebar footer controls thumbnail scale, gap,
+  and corner radius.
 - Options open in the playlist pane as a subpage and leave the title and footer
   visible. A separate Options window uses the same chrome.
 - Playlist tab selection fades with the shared selection timing and easing;

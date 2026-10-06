@@ -51,6 +51,28 @@ public struct CatalogGameBucket: Identifiable, Equatable, Sendable {
     public var id: String { "\(rootID)\u{1F}\(game)\u{1F}\(system)" }
 }
 
+/// One game with a ScanSong Title Snap locator. The source path identifies
+/// the loose track or physical archive that owns an archive-member locator.
+public struct CatalogGalleryGame: Identifiable, Equatable, Sendable {
+    public let rootID: Int64
+    public let rootPath: String
+    public let game: String
+    public let system: String
+    public let sourcePath: String
+    public let titleSnap: String
+
+    public init(rootID: Int64, rootPath: String, game: String, system: String, sourcePath: String, titleSnap: String) {
+        self.rootID = rootID
+        self.rootPath = rootPath
+        self.game = game
+        self.system = system
+        self.sourcePath = sourcePath
+        self.titleSnap = titleSnap
+    }
+
+    public var id: String { "\(rootID)\u{1F}\(game)\u{1F}\(system)" }
+}
+
 /// One published Files-sidebar source leaf. This is intentionally a source
 /// projection, not one row per playable subtrack.
 public struct CatalogFileBucket: Identifiable, Equatable, Sendable {
@@ -273,6 +295,52 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
             Self.naturalCompare($0.game, $1.game) == .orderedAscending
                 || (Self.naturalCompare($0.game, $1.game) == .orderedSame && Self.naturalCompare($0.system, $1.system) == .orderedAscending)
                 || (Self.naturalCompare($0.game, $1.game) == .orderedSame && Self.naturalCompare($0.system, $1.system) == .orderedSame && Self.naturalCompare($0.rootPath, $1.rootPath) == .orderedAscending)
+        }
+    }
+
+    /// Returns one stable artwork source for each game/system bucket. Schema
+    /// 24 has no ordered tag table and therefore cannot expose Title Snap.
+    public func titleSnapGalleryGames(preferFoldersOverMetadata: Bool = true) throws -> [CatalogGalleryGame] {
+        guard try scalarInt("PRAGMA user_version;") >= 25 else { return [] }
+        let systemExpression = preferFoldersOverMetadata
+            ? "COALESCE(NULLIF(t.browser_system, ''), NULLIF(m.system, ''), '')"
+            : "COALESCE(NULLIF(m.system, ''), NULLIF(t.browser_system, ''), '')"
+        let sql = """
+        WITH tagged AS (
+            SELECT t.root_id, r.path AS root_path, t.browser_game AS game,
+                   \(systemExpression) AS system,
+                   COALESCE(t.archive_path, t.path) AS source_path,
+                   tags.value AS title_snap,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY t.root_id, t.browser_game, \(systemExpression)
+                       ORDER BY lower(t.path), t.path, COALESCE(t.archive_entry, ''), t.track_index
+                   ) AS artwork_order
+            FROM tracks t
+            INNER JOIN library_roots r ON r.id=t.root_id
+            LEFT JOIN track_metadata m ON m.track_id=t.id
+            INNER JOIN track_metadata_tags tags
+                ON tags.track_id=t.id AND tags.normalized_name='TITLE SNAP'
+            WHERE r.is_attached=1 AND r.is_enabled=1
+              AND trim(t.browser_game)<>'' AND trim(tags.value)<>''
+              AND NOT EXISTS (
+                  SELECT 1 FROM dead_sources d
+                  WHERE d.root_id=t.root_id AND d.path=COALESCE(t.archive_path, t.path)
+              )
+        )
+        SELECT root_id, root_path, game, system, source_path, title_snap
+        FROM tagged
+        WHERE artwork_order=1
+        ORDER BY lower(game), game, lower(system), system, lower(root_path), root_path;
+        """
+        return try query(sql) { statement in
+            CatalogGalleryGame(
+                rootID: sqlite3_column_int64(statement, 0),
+                rootPath: Self.string(statement, 1),
+                game: Self.string(statement, 2),
+                system: Self.string(statement, 3),
+                sourcePath: Self.string(statement, 4),
+                titleSnap: Self.string(statement, 5)
+            )
         }
     }
 

@@ -579,6 +579,12 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
+  if (event.metaKey && event.shiftKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === "g" && !state.optionsOpen) {
+    event.preventDefault();
+    app.ui.showGalleryPlaylist().catch((error) => console.error("[SPCBoy] gallery view failed", error));
+    return;
+  }
+
   if (event.metaKey && !event.shiftKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === "d" && !state.optionsOpen) {
     event.preventDefault();
     app.ui.toggleSelectedFavorites().catch((error) => console.error("[SPCBoy] favorite toggle failed", error));
