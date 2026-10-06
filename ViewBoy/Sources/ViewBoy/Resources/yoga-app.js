@@ -15,14 +15,11 @@ import Yoga, {
 const DEFAULT_LCD_DOT_SIZE = 3;
 const LCD_DOT_SIZE_OPTIONS = [2, 3, 4, 5, 6];
 const APP_EDGE_PADDING_PX = 8;
-const OPTIONS_PANE_INSET_DOTS = 8;
 const OPTIONS_CARD_INSET_DOTS = 4;
 const OPTIONS_GAP_DOTS = 4;
 const OPTIONS_CONTROL_PAD_DOTS = 4;
 let DEVICE_PIXELS_PER_LCD_DOT = DEFAULT_LCD_DOT_SIZE;
 const BASELINE_LAYOUT_UNIT_CSS_PIXELS = 2.5;
-const OPTIONS_TOC_WIDTH_DOTS = 176;
-const OPTIONS_TOC_MAX_WIDTH_RATIO = 0.24;
 const RANDOM_HISTORY_LIMIT = 256;
 const BUTTON_BORDER_DOTS = 1;
 const SIDEBAR_ICON_SIZE_DOTS = 9;
@@ -197,8 +194,15 @@ function refreshDisplayPalette() {
     const inkTone = activeGrayscaleTone(state.pixelToneIndex, levels);
     const backgroundTone = activeGrayscaleTone(state.backgroundToneIndex, levels);
     const ink = packedDisplayPalette[inkTone];
+    const mutedInkTone = Math.min(levels - 1,
+      inkTone + Math.max(1, Math.floor((backgroundTone - inkTone) / 3)));
+    const highlightTone = Math.min(levels - 1,
+      Math.max(backgroundTone + 1, levels - 2));
+    const highlight = packedDisplayPalette[highlightTone];
     packedDisplayBackground = packedDisplayPalette[backgroundTone];
-    packedSemanticPalette = Uint32Array.of(ink, ink, packedDisplayBackground, packedDisplayBackground);
+    packedSemanticPalette = Uint32Array.of(
+      ink, packedDisplayPalette[mutedInkTone], highlight, packedDisplayBackground,
+    );
   } else {
     packedDisplayBackground = packedDirectBackground;
     packedSemanticPalette = Uint32Array.of(
@@ -386,15 +390,19 @@ function displaySemanticColor(shade) {
   const semantic = Math.max(0, Math.min(3, Math.round(Number(shade) || 0)));
   const levels = grayscaleLevels(state.pixelShadeMode);
   if (!levels) return semantic < 2 ? state.customFontColor : state.customBackgroundColor;
-  const index = semantic < 2
-    ? activeGrayscaleTone(state.pixelToneIndex, levels)
-    : activeGrayscaleTone(state.backgroundToneIndex, levels);
+  const inkTone = activeGrayscaleTone(state.pixelToneIndex, levels);
+  const backgroundTone = activeGrayscaleTone(state.backgroundToneIndex, levels);
+  const mutedInkTone = Math.min(levels - 1,
+    inkTone + Math.max(1, Math.floor((backgroundTone - inkTone) / 3)));
+  const highlightTone = Math.min(levels - 1,
+    Math.max(backgroundTone + 1, levels - 2));
+  const index = [inkTone, mutedInkTone, highlightTone, backgroundTone][semantic];
   return grayscaleTone(index, levels);
 }
 function updateScreenSurface() {
   const root = document.documentElement;
   if (!root) return;
-  root.style?.setProperty?.("--screen-surface", state.customBackgroundColor);
+  root.style?.setProperty?.("--screen-surface", displaySemanticColor(3));
 }
 function inactiveSearchTextShade() {
   return 0;
@@ -506,7 +514,7 @@ const state = {
   customFontInput: savedCustomFontInput,
   customPaletteConfigured: savedCustomPaletteConfigured,
   pixelShadeMode: Object.hasOwn(PIXEL_SHADE_MODES, savedDisplayOptions.pixelShadeMode)
-    ? savedDisplayOptions.pixelShadeMode : "DIRECT",
+    ? savedDisplayOptions.pixelShadeMode : "GRAY16",
   pixelToneIndex: Number.isFinite(Number(savedDisplayOptions.pixelToneIndex))
     ? storedToneIndex(savedDisplayOptions.pixelToneIndex, 16, 0)
     : grayscaleToneIndex(colorInputToHex(savedCustomFontInput) || DEFAULT_LCD_PIXEL, 16),
@@ -1624,10 +1632,6 @@ function uiGroupInsetDots() {
   return state.tab === "SETTINGS" ? OPTIONS_CARD_INSET_DOTS : uiGapDots();
 }
 
-function uiOptionsInsetDots() {
-  return OPTIONS_PANE_INSET_DOTS;
-}
-
 function buttonStandardHeight() {
   return rowHeight(2 * controlPaddingDots() + 2 * BUTTON_BORDER_DOTS);
 }
@@ -1711,6 +1715,16 @@ function paintBackArrow(box) {
   fillRect(left + 3, centerY + 2, 1, 1, 0);
 }
 
+function routeSidebarAction(action, closesOptions = false) {
+  return () => {
+    if (state.tab === "SETTINGS") {
+      closeOptionsScreen();
+      if (closesOptions) return;
+    }
+    action();
+  };
+}
+
 function libraryToolbarItems() {
   const bulkAction = sidebarBulkAction();
   return [
@@ -1719,51 +1733,52 @@ function libraryToolbarItems() {
       title: "LIBRARY",
       icon: "library",
       view: "LIBRARY",
-      onClick: () => { void setSidebarMode("consoles"); },
+      onClick: routeSidebarAction(() => { void setSidebarMode("consoles"); }),
     },
     {
       id: "paths",
       title: "PATH",
       icon: "folder",
       view: "PATHS",
-      onClick: () => { void setSidebarMode("paths"); },
+      onClick: routeSidebarAction(() => { void setSidebarMode("paths"); }),
     },
     {
       id: "favorites",
       title: "FAVORITES",
       icon: "heart",
       view: "FAVORITES",
-      onClick: () => selectSidebarView("FAVORITES"),
+      onClick: routeSidebarAction(() => selectSidebarView("FAVORITES")),
     },
     {
       id: "history",
       title: "HISTORY",
       icon: "clock",
       view: "HISTORY",
-      onClick: () => { void showPlaybackHistory(); },
+      onClick: routeSidebarAction(() => { void showPlaybackHistory(); }),
     },
     {
       id: "tree",
       title: bulkAction.title,
       icon: "tree",
       sidebarBulkAction: true,
-      onClick: () => toggleAllSidebarGroups(),
+      onClick: routeSidebarAction(() => toggleAllSidebarGroups()),
     },
     {
       id: "options",
       title: "OPTIONS",
       icon: "gear",
       view: "OPTIONS",
-      onClick: () => openOptionsScreen(),
+      onClick: routeSidebarAction(() => openOptionsScreen(), true),
     },
   ];
 }
 
 function libraryPaneWidth() {
   const items = libraryToolbarItems();
+  const gapDots = state.tab === "SETTINGS" ? OPTIONS_GAP_DOTS : uiGapDots();
   const toolbarWidth = items.length * SIDEBAR_BUTTON_SIZE_DOTS
-    + Math.max(0, items.length - 1) * uiGapDots()
-    + 2 * uiGapDots();
+    + Math.max(0, items.length - 1) * gapDots
+    + 2 * gapDots;
   return Math.max(94, toolbarWidth / STYLE_SCALE);
 }
 
@@ -1878,24 +1893,6 @@ function openPageTitle(parent, text) {
     alignItems: Align.Center,
   }, {
     optionPanelTitle: text,
-    paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 1); },
-  });
-  label(row, text, { flexGrow: 1, height: titleHeight }, {
-    textShade: 0,
-    inset: 0,
-    align: "left",
-  });
-  return row;
-}
-
-function optionsRailHeading(parent, text) {
-  const titleHeight = buttonStandardHeight();
-  const row = makeWidget(parent, {
-    direction: FlexDirection.Row,
-    height: titleHeight,
-    alignItems: Align.Center,
-  }, {
-    optionOwnerTitle: text,
     paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 1); },
   });
   label(row, text, { flexGrow: 1, height: titleHeight }, {
@@ -2756,7 +2753,7 @@ function createLibraryRow(parent, text, options = {}) {
   const selected = options.selected ?? false;
   if (options.spacer) {
     return makeWidget(parent, {
-      height: spacingValue("textLineGapDots") / STYLE_SCALE,
+      height: (options.gapDots ?? spacingValue("textLineGapDots")) / STYLE_SCALE,
       flexShrink: 0,
     });
   }
@@ -2765,8 +2762,12 @@ function createLibraryRow(parent, text, options = {}) {
     height: rowHeightValue,
     paddingHorizontal: controlPaddingDots(),
   }, {
-    textShade: 0,
+    textShade: options.ownerHeading ? 1 : 0,
     onClick: options.onClick,
+    optionPage: options.optionPage === true,
+    optionOwnerHeading: options.optionOwnerHeading === true,
+    controlTitle: options.page,
+    bottomLine: options.ownerHeading ? 1 : undefined,
     sidebarDisclosure: options.disclosure === true,
     sidebarSelection: selected,
     sidebarSelectionKey: options.selectionKey ?? null,
@@ -2800,7 +2801,9 @@ function visibleLibraryRowCount() {
 }
 
 function libraryRowPixelHeight(row) {
-  if (row.spacer) return spacingValue("textLineGapDots") * (row.revealProgress ?? 1);
+  if (row.spacer) {
+    return (row.gapDots ?? spacingValue("textLineGapDots")) * (row.revealProgress ?? 1);
+  }
   return rowHeight() * STYLE_SCALE * (row.revealProgress ?? 1);
 }
 
@@ -2827,7 +2830,7 @@ function sidebarBulkAction() {
   return { title: allExpanded ? "FOLD ALL" : "UNFOLD ALL" };
 }
 
-function libraryRowsWithLineGaps(rows) {
+function libraryRowsWithLineGaps(rows, gapDots = spacingValue("textLineGapDots")) {
   const lines = rows.filter((row) => !row.spacer);
   const spaced = [];
   lines.forEach((row, index) => {
@@ -2837,11 +2840,25 @@ function libraryRowsWithLineGaps(rows) {
       spaced.push({
         spacer: true,
         revealProgress: Math.min(previousProgress, currentProgress),
+        gapDots,
       });
     }
     spaced.push(row);
   });
   return spaced;
+}
+
+function optionsNavigationRows() {
+  return libraryRowsWithLineGaps([
+    { text: "VIEWBOY", ownerHeading: true },
+    ...["DATABASE", "DISPLAY", "LIBRARY", "QUEUE"].map((page) => ({
+      text: page, page,
+    })),
+    { text: "VGMBoy", ownerHeading: true },
+    ...["AUDIO", "DIAGNOSTICS", "METHODS", "PLAYBACK"].map((page) => ({
+      text: page, page,
+    })),
+  ], OPTIONS_GAP_DOTS);
 }
 
 function libraryRows() {
@@ -2922,6 +2939,8 @@ function pathSubtreeMatches(node, query) {
 }
 
 function addLibraryPane(parent) {
+  const optionsOpen = state.tab === "SETTINGS";
+  const sidebarGapDots = optionsOpen ? OPTIONS_GAP_DOTS : uiGapDots();
   const paneWidth = libraryPaneWidth();
   const library = makeWidget(parent, {
     direction: FlexDirection.Column,
@@ -2932,24 +2951,24 @@ function addLibraryPane(parent) {
     flexGrow: 0,
     flexShrink: 0,
     gap: 0,
-    padding: uiGapDots(),
+    padding: sidebarGapDots,
   }, {
     paint(box) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
     },
   });
-  label(library, "SEARCH LIBRARY", {
+  label(library, optionsOpen ? "OPTION PAGES" : "SEARCH LIBRARY", {
     height: buttonStandardHeight(),
   }, {
-    textShade: state.searchQuery || state.searchFocused
+    textShade: optionsOpen ? 0 : state.searchQuery || state.searchFocused
       ? 0 : inactiveSearchTextShade(),
     inset: controlPaddingDots(),
     border: 1,
-    fill: state.searchFocused ? 2 : undefined,
-    searchField: true,
-    textValue: searchFieldText,
-    controlTitle: "SEARCH LIBRARY",
-    onClick: () => {
+    fill: !optionsOpen && state.searchFocused ? 2 : undefined,
+    searchField: !optionsOpen,
+    textValue: optionsOpen ? undefined : searchFieldText,
+    controlTitle: optionsOpen ? "OPTION PAGES" : "SEARCH LIBRARY",
+    onClick: optionsOpen ? undefined : () => {
       state.searchQuery = "";
       state.libraryScrollOffset = 0;
       setSearchFocused(true);
@@ -2976,23 +2995,28 @@ function addLibraryPane(parent) {
     sidebarAction: item.id,
     sidebarIcon: item.icon,
     sidebarBulkAction: item.sidebarBulkAction,
+    optionExit: optionsOpen,
   }));
   makeWidget(library, { height: uiGap() });
-  const rows = libraryRowsWithLineGaps(libraryRows());
+  const rows = optionsOpen ? optionsNavigationRows()
+    : libraryRowsWithLineGaps(libraryRows());
   const count = visibleLibraryRowCount();
   const rowHeightDots = contentRowStride("sidebar") * STYLE_SCALE;
   state.libraryContentHeight = rows.reduce((sum, row) => sum + libraryRowPixelHeight(row), 0);
   const estimatedViewportHeight = state.libraryViewportHeight || count * rowHeightDots;
   const maxScroll = Math.max(0, state.libraryContentHeight - estimatedViewportHeight);
-  state.libraryScrollOffset = Math.max(0, Math.min(maxScroll, state.libraryScrollOffset));
+  if (!optionsOpen) {
+    state.libraryScrollOffset = Math.max(0, Math.min(maxScroll, state.libraryScrollOffset));
+  }
+  const sidebarScrollOffset = optionsOpen ? 0 : state.libraryScrollOffset;
   let firstRow = 0;
   let rowTop = 0;
   while (firstRow < rows.length
-    && rowTop + libraryRowPixelHeight(rows[firstRow]) <= state.libraryScrollOffset) {
+    && rowTop + libraryRowPixelHeight(rows[firstRow]) <= sidebarScrollOffset) {
     rowTop += libraryRowPixelHeight(rows[firstRow]);
     firstRow += 1;
   }
-  const partialRowOffset = Math.max(0, state.libraryScrollOffset - rowTop);
+  const partialRowOffset = Math.max(0, sidebarScrollOffset - rowTop);
   const viewport = makeWidget(library, {
     flexGrow: 1,
     flexShrink: 1,
@@ -3003,6 +3027,7 @@ function addLibraryPane(parent) {
   }, {
     id: "sidebar-tree-viewport",
     clipChildren: true,
+    optionFrame: optionsOpen ? "settings-navigation" : undefined,
   });
   const content = makeWidget(viewport, {
     direction: FlexDirection.Column,
@@ -3012,7 +3037,20 @@ function addLibraryPane(parent) {
   const visibleRows = rows.slice(firstRow, lastRow);
   const appendRow = (parent, row) => {
     if (row.spacer) {
-      createLibraryRow(parent, "", { spacer: true });
+      createLibraryRow(parent, "", { spacer: true, gapDots: row.gapDots });
+      return;
+    }
+    if (row.ownerHeading) {
+      createLibraryRow(parent, row.text, { ownerHeading: true });
+      return;
+    }
+    if (row.page) {
+      createLibraryRow(parent, row.text, {
+        optionPage: true,
+        page: row.page,
+        selected: state.optionsPage === row.page,
+        onClick: () => selectOptionsPage(row.page),
+      });
       return;
     }
     const context = row.node ? { kind: "path", node: row.node }
@@ -3360,30 +3398,6 @@ function optionGroup(parent, title, contentHeights = null) {
   });
   optionSection(group, title);
   return group;
-}
-
-function optionsTocWidth() {
-  const available = WIDTH / STYLE_SCALE;
-  return Math.min(available * OPTIONS_TOC_MAX_WIDTH_RATIO, OPTIONS_TOC_WIDTH_DOTS);
-}
-
-function optionsPane(parent, frame, tocWidth = 0) {
-  const isTOC = frame === "toc";
-  const fixedWidth = isTOC ? tocWidth : 0;
-  return makeWidget(parent, {
-    direction: FlexDirection.Column,
-    width: isTOC ? fixedWidth : undefined,
-    flexBasis: isTOC ? fixedWidth : 0,
-    flexGrow: isTOC ? 0 : 1,
-    flexShrink: isTOC ? 0 : 1,
-    minWidth: 0,
-    minHeight: 0,
-    gap: uiGap(),
-    padding: uiOptionsInsetDots() / STYLE_SCALE,
-  }, {
-    optionFrame: frame,
-    clipChildren: isTOC,
-  });
 }
 
 function addDisplayOptions(parent, pref) {
@@ -4216,31 +4230,18 @@ function selectOptionsPage(page) {
 }
 
 function addOptionsContent(parent) {
-  const navigationWidth = optionsTocWidth();
-  const toc = optionsPane(parent, "toc", navigationWidth);
-  [
-    { title: "VIEWBOY", pages: ["DATABASE", "DISPLAY", "LIBRARY", "QUEUE"] },
-    { title: "VGMBoy", pages: ["AUDIO", "DIAGNOSTICS", "METHODS", "PLAYBACK"] },
-  ].forEach(({ title, pages }) => {
-    optionsRailHeading(toc, title);
-    pages.forEach((page) => pixelButton(toc, page, () => selectOptionsPage(page), {
-      widthPercent: 100,
-      selected: state.optionsPage === page,
-      controlTitle: page,
-      optionOwner: title,
-      optionPage: true,
-    }));
-  });
-  makeWidget(toc, { flexGrow: 1 });
-  makeWidget(parent, {
-    width: 1,
-    flexShrink: 0,
-    marginVertical: uiOptionsInsetDots() / STYLE_SCALE,
+  const panel = makeWidget(parent, {
+    direction: FlexDirection.Column,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    minHeight: 0,
+    gap: 0,
+    padding: OPTIONS_GAP_DOTS,
   }, {
-    paint(box) { fillRect(box.x, box.y, box.width, box.height, 1); },
+    id: "options-pane",
+    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
-
-  const panel = optionsPane(parent, "content");
   openPageTitle(panel, state.optionsPage === "DISPLAY" ? "DISPLAY + UI" : state.optionsPage);
   const viewport = makeWidget(panel, {
     direction: FlexDirection.Column,
@@ -4422,69 +4423,48 @@ function buildTree() {
   }
 
   const buttonWidth = (text) => framedTextWidth(text);
-  if (state.tab === "SETTINGS") {
-    const navigation = controlRow(root, {
-      height: toolbarHeight,
-      justifyContent: Justify.FlexStart,
-    });
-    pixelButton(navigation, "", () => {
-      closeOptionsScreen();
-    }, {
-      width: buttonStandardHeight(),
-      height: toolbarHeight,
-      controlTitle: "BACK",
-      optionExit: true,
-      paint: paintBackArrow,
-    });
-    label(navigation, "OPTIONS", { height: toolbarHeight, flexGrow: 1 }, {
-      textShade: 0,
-      inset: controlPaddingDots(),
-      align: "left",
-    });
-  } else {
-    const fillButton = (parent, text, onClick, style = {}) => pixelButton(parent, text, onClick, {
-      width: 0,
-      minWidth: 0,
-      flexBasis: 0,
-      flexGrow: 1,
-      flexShrink: 1,
-      height: toolbarHeight,
-      border: BUTTON_BORDER_DOTS,
-      inset: controlPaddingDots(),
-      align: "center",
-      ...style,
-    });
-    const toolbar = controlRow(root, { height: toolbarHeight, gap: uiGap() });
-    const transportLabels = state.transportSymbols
-      ? { previous: "<<", stop: "[]", play: state.playing ? "||" : ">", next: ">>" }
-      : { previous: "PREV", stop: "STOP", play: state.playing ? "PAUSE" : "PLAY", next: "NEXT" };
-    fillButton(toolbar, transportLabels.previous, () => selectPrevious(), {
-      controlTitle: "PREVIOUS",
-      align: state.transportSymbols ? "left" : "center",
-      inset: state.transportSymbols ? BUTTON_BORDER_DOTS : controlPaddingDots(),
-    });
-    fillButton(toolbar, transportLabels.stop, () => stopPlayback(), { controlTitle: "STOP" });
-    fillButton(toolbar, transportLabels.play, () => togglePlaying(), {
-      controlTitle: state.playing ? "PAUSE" : "PLAY",
-    });
-    fillButton(toolbar, transportLabels.next, () => selectNext(), { controlTitle: "NEXT" });
-    fillButton(toolbar, "LP", () => toggleLongPlay(), {
-      selected: state.preferences.longPlayEnabled === true,
-      controlTitle: "LONG PLAY",
-    });
-    fillButton(toolbar, "R1", () => toggleRepeatOne(), {
-      selected: state.preferences.repeatMode === "one",
-      controlTitle: "REPEAT ONE",
-    });
-    fillButton(toolbar, "P-RND", () => toggleRandomMode("playlist"), {
-      selected: state.preferences.randomMode === "playlist",
-      controlTitle: "PLAYLIST RANDOM",
-    });
-    fillButton(toolbar, "L-RND", () => toggleRandomMode("library"), {
-      selected: state.preferences.randomMode === "library",
-      controlTitle: "LIBRARY RANDOM",
-    });
-  }
+  const fillButton = (parent, text, onClick, style = {}) => pixelButton(parent, text, onClick, {
+    width: 0,
+    minWidth: 0,
+    flexBasis: 0,
+    flexGrow: 1,
+    flexShrink: 1,
+    height: toolbarHeight,
+    border: BUTTON_BORDER_DOTS,
+    inset: controlPaddingDots(),
+    align: "center",
+    ...style,
+  });
+  const toolbar = controlRow(root, { height: toolbarHeight, gap: uiGap() });
+  const transportLabels = state.transportSymbols
+    ? { previous: "<<", stop: "[]", play: state.playing ? "||" : ">", next: ">>" }
+    : { previous: "PREV", stop: "STOP", play: state.playing ? "PAUSE" : "PLAY", next: "NEXT" };
+  fillButton(toolbar, transportLabels.previous, () => selectPrevious(), {
+    controlTitle: "PREVIOUS",
+    align: state.transportSymbols ? "left" : "center",
+    inset: state.transportSymbols ? BUTTON_BORDER_DOTS : controlPaddingDots(),
+  });
+  fillButton(toolbar, transportLabels.stop, () => stopPlayback(), { controlTitle: "STOP" });
+  fillButton(toolbar, transportLabels.play, () => togglePlaying(), {
+    controlTitle: state.playing ? "PAUSE" : "PLAY",
+  });
+  fillButton(toolbar, transportLabels.next, () => selectNext(), { controlTitle: "NEXT" });
+  fillButton(toolbar, "LP", () => toggleLongPlay(), {
+    selected: state.preferences.longPlayEnabled === true,
+    controlTitle: "LONG PLAY",
+  });
+  fillButton(toolbar, "R1", () => toggleRepeatOne(), {
+    selected: state.preferences.repeatMode === "one",
+    controlTitle: "REPEAT ONE",
+  });
+  fillButton(toolbar, "P-RND", () => toggleRandomMode("playlist"), {
+    selected: state.preferences.randomMode === "playlist",
+    controlTitle: "PLAYLIST RANDOM",
+  });
+  fillButton(toolbar, "L-RND", () => toggleRandomMode("library"), {
+    selected: state.preferences.randomMode === "library",
+    controlTitle: "LIBRARY RANDOM",
+  });
 
   const content = makeWidget(root, {
     direction: FlexDirection.Row,
@@ -4496,12 +4476,9 @@ function buildTree() {
     gap: uiGap(),
     alignItems: Align.Stretch,
   });
-  if (state.tab === "SETTINGS") {
-    addOptionsContent(content);
-  } else {
-    addLibraryPane(content);
-    addCatalogPane(content);
-  }
+  addLibraryPane(content);
+  if (state.tab === "SETTINGS") addOptionsContent(content);
+  else addCatalogPane(content);
 
   appStatusArea(root);
 
@@ -4591,6 +4568,8 @@ function paintSelectionBandPixels(y) {
     const bandTop = floor(y);
     const priorClip = paintClip;
     paintClip = intersectBoxes(paintClip, selectionBand.clip);
+    fillRect(selectionBand.x + 1, bandTop,
+      Math.max(0, selectionBand.width - 2), selectionBand.height, 2);
     strokeRect(selectionBand.x, bandTop, selectionBand.width, selectionBand.height, 0);
     for (const row of selectionRows) {
       if (row.box.y >= bandTop + selectionBand.height || row.box.y + row.box.height <= bandTop) continue;
@@ -4612,6 +4591,8 @@ function paintSidebarSelectionBandPixels(y) {
   const bandTop = floor(y);
   const priorClip = paintClip;
   paintClip = intersectBoxes(paintClip, sidebarSelectionBand.clip);
+  fillRect(sidebarSelectionBand.x + 1, bandTop,
+    Math.max(0, sidebarSelectionBand.width - 2), sidebarSelectionBand.height, 2);
   strokeRect(sidebarSelectionBand.x, bandTop,
     sidebarSelectionBand.width, sidebarSelectionBand.height, 0);
   for (const row of sidebarSelectionRows) {
@@ -4984,7 +4965,7 @@ function render(animateSelection = false, preserveAnimations = false, frameTime 
     : state.selectedTrackIDs.has(trackID(visibleTracks()[state.selectedTrack]))
       ? selectionRows.find((entry) => entry.widget.meta.trackIndex === state.selectedTrack) : null;
   const optionsSidebar = isOptions
-    ? layoutEntries.find((entry) => entry.widget.meta.optionFrame === "toc")?.box
+    ? layoutEntries.find((entry) => entry.widget.meta.optionFrame === "settings-navigation")?.box
     : null;
   const nextBand = selectedRow ? {
     ...selectedRow.box,

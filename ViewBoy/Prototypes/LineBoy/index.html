@@ -358,6 +358,239 @@
     @media (prefers-reduced-motion: no-preference) {
       .key, .tree-row, .song { transition: background-color 90ms linear, color 90ms linear; }
     }
+
+    /* Standard LineBoy is a 40-column text raster with no fractional chrome. */
+    .terminal {
+      padding: 8px;
+      grid-template-rows: 16px 16px minmax(0, 1fr) 16px;
+      gap: 0;
+    }
+
+    .topline {
+      min-height: 16px;
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-rows: 16px;
+      align-content: center;
+      border-bottom: 1px solid var(--line);
+      padding: 0;
+      gap: 0;
+    }
+
+    .brand-lockup, .statbits { grid-row: 1; gap: 1ch; }
+    .brand-lockup { grid-column: 1; }
+    .statbits { grid-column: 2; justify-content: flex-end; }
+    .sysinfo, .lamp { display: none; }
+    .brand { font-size: 16px; letter-spacing: 0; }
+    .mode-switch { font: inherit; }
+
+    .toolrow {
+      min-height: 16px;
+      display: grid;
+      grid-template-columns: 5ch 5ch 5ch 4ch 5ch minmax(0, 1fr) 3ch 5ch 3ch;
+      gap: 0;
+      overflow: hidden;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .key {
+      min-width: 0;
+      min-height: 16px;
+      height: 16px;
+      justify-content: flex-start;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--gray);
+      box-shadow: none;
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 16px;
+      text-align: left;
+    }
+
+    .key kbd { display: none; }
+    .key:hover, .key[aria-pressed="true"] {
+      background: var(--gray);
+      color: var(--black);
+      text-decoration: none;
+    }
+
+    .workspace {
+      min-width: 0;
+      min-height: 0;
+      grid-template-columns: 14ch minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+      gap: 0;
+    }
+
+    .panel {
+      min-width: 0;
+      min-height: 0;
+      border: 0;
+      background: transparent;
+    }
+
+    .panel:first-child {
+      border-right: 1px solid var(--line);
+      padding-right: 1ch;
+    }
+
+    .listpanel { padding-left: 1ch; }
+
+    .panel-title {
+      min-height: 16px;
+      height: 16px;
+      justify-content: space-between;
+      gap: 1ch;
+      padding: 0;
+      border-bottom: 1px solid var(--line);
+      background: transparent;
+      color: var(--white);
+      font-size: 16px;
+      line-height: 16px;
+    }
+
+    .panel-title > span, .panel-title small {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .panel-title small { color: var(--dim); font: inherit; }
+
+    .filterline {
+      min-height: 16px;
+      height: 16px;
+      padding: 0;
+      border: 0;
+      color: var(--dim);
+      font-size: 16px;
+      line-height: 16px;
+    }
+
+    .tree {
+      min-height: 0;
+      gap: 0;
+      padding: 0;
+      grid-template-columns: minmax(0, 1fr);
+      overflow: hidden;
+    }
+
+    .tree-row {
+      min-width: 0;
+      min-height: 16px;
+      height: 16px;
+      grid-template-columns: 2ch minmax(0, 1fr) 3ch;
+      gap: 0;
+      padding: 0;
+      border: 0;
+      color: var(--gray);
+      font-size: 16px;
+      line-height: 16px;
+    }
+
+    .tree-row.indent { padding-left: 2ch; }
+    .tree-row small { font: inherit; color: var(--dim); text-align: right; }
+    .tree-row[aria-selected="true"] { background: var(--gray); color: var(--black); }
+    .tree-row[aria-selected="true"] .chev,
+    .tree-row[aria-selected="true"] small { color: #454545; }
+
+    .tabs {
+      min-height: 16px;
+      height: 16px;
+      gap: 0;
+      padding: 0;
+      border: 0;
+      overflow: hidden;
+    }
+
+    .tab {
+      min-width: 0;
+      min-height: 16px;
+      height: 16px;
+      padding: 0 1ch 0 0;
+      border: 0;
+      color: var(--dim);
+      font-size: 16px;
+      line-height: 16px;
+      white-space: nowrap;
+    }
+
+    .tab.active { background: var(--gray); color: var(--black); }
+    .tab.add { margin-left: auto; padding: 0; }
+
+    .list-head, .song {
+      grid-template-columns: 2ch minmax(0, 1fr) 5ch;
+      align-items: center;
+      gap: 1ch;
+      padding: 0 1ch;
+    }
+
+    .list-head {
+      min-height: 16px;
+      height: 16px;
+      border-bottom: 1px solid var(--line);
+      font-size: 16px;
+      line-height: 16px;
+    }
+
+    .song .album, .song span:last-child { display: none; }
+
+    .list-head span:nth-child(3), .song .length { grid-column: 3; }
+
+    .songs { min-height: 0; padding: 0; }
+
+    .song {
+      min-height: 16px;
+      height: 16px;
+      border: 0;
+      color: var(--gray);
+      font-size: 16px;
+      line-height: 16px;
+    }
+
+    .song .num, .song .length { color: var(--dim); }
+    .song[aria-selected="true"] { background: var(--gray); color: var(--black); }
+    .song[aria-selected="true"] .num, .song[aria-selected="true"] .length { color: #454545; }
+    .song:hover:not([aria-selected="true"]) { text-decoration: underline; }
+
+    .playerline { display: none; }
+
+    .statusline {
+      min-width: 0;
+      min-height: 16px;
+      height: 16px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 1ch;
+      padding: 0;
+      border-top: 1px solid var(--line);
+      font-size: 16px;
+      line-height: 16px;
+    }
+
+    .statusline > span:first-child,
+    .statusline > span:last-child { min-width: 0; }
+    .statusline #status { overflow: hidden; text-overflow: ellipsis; }
+
+    .terminal[data-video-mode="standard"] .workspace {
+      grid-template-columns: 14ch minmax(0, 1fr);
+    }
+
+    .terminal[data-video-mode="high"] .workspace {
+      grid-template-columns: 25% minmax(0, 1fr);
+      gap: 1ch;
+    }
+
+    @media (max-width: 760px) {
+      .terminal[data-video-mode="standard"] .workspace {
+        grid-template-columns: 14ch minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr);
+      }
+      .terminal[data-video-mode="standard"] .tree { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -365,40 +598,36 @@
     <div class="terminal" data-renderer="dom" data-video-mode="standard" role="application" aria-label="LineBoy monochrome music player mockup">
       <canvas class="beam-screen" aria-hidden="true"></canvas>
       <header class="topline">
-        <div class="brand-lockup">
-          <div class="brand">LINEBOY <span>// MONO PLAYER</span></div>
+        <div class="brand-lockup"><div class="brand">LINEBOY</div></div>
+        <div class="statbits">
+          <span id="column-mode">40 COL</span>
+          <button class="mode-switch" id="video-mode" type="button" title="Switch between the standard 320 by 240 raster and high-resolution raster modes">320X240</button>
+          <span id="clock">00:00:00</span>
         </div>
-        <div class="sysinfo">
-          <span><i class="lamp"></i>READY</span>
-          <span>MODE <b id="column-mode">80 COL</b></span>
-          <span>VIDEO <button class="mode-switch" id="video-mode" type="button" title="Switch between standard and high-resolution raster modes">VGA 640×480 @3PX</button></span>
-          <span>BUF <b>64K</b></span>
-        </div>
-        <div class="statbits"><span>MEM <strong>602K</strong></span><span id="clock">00:00:00</span></div>
       </header>
 
-      <nav class="toolrow" aria-label="Function key toolbar">
-        <button class="key" data-action="OPEN"><kbd>F1</kbd> FILE</button>
-        <button class="key clear" data-action="TREE"><kbd>F2</kbd> TREE</button>
-        <button class="key clear" data-action="PLAYLIST"><kbd>F3</kbd> LIST</button>
-        <button class="key clear" data-action="FAVORITES"><kbd>F4</kbd> FAV</button>
-        <button class="key clear" data-action="OPTIONS"><kbd>F5</kbd> SETUP</button>
-        <button class="key clear" data-action="FIND"><kbd>F6</kbd> FIND</button>
-        <button class="key clear" data-action="PREV"><kbd>F7</kbd> &lt;&lt;</button>
-        <button class="key" data-action="PLAY"><kbd>F8</kbd> PLAY</button>
-        <button class="key clear" data-action="NEXT"><kbd>F9</kbd> &gt;&gt;</button>
+      <nav class="toolrow" aria-label="Commands and transport">
+        <button class="key" data-action="OPEN">FILE</button>
+        <button class="key clear" data-action="TREE">TREE</button>
+        <button class="key clear" data-action="PLAYLIST">LIST</button>
+        <button class="key clear" data-action="FAVORITES">FAV</button>
+        <button class="key clear" data-action="OPTIONS">OPTS</button>
+        <span class="tool-spacer" aria-hidden="true"></span>
+        <button class="key clear" data-action="PREV">&lt;&lt;</button>
+        <button class="key" data-action="PLAY">PLAY</button>
+        <button class="key clear" data-action="NEXT">&gt;&gt;</button>
       </nav>
 
       <main class="workspace">
         <aside class="panel">
-          <div class="panel-title"><span>Library / Path</span><small>F2</small></div>
-          <div class="filterline">FIND: <b>_______</b> <span>12/64</span></div>
+          <div class="panel-title"><span>LIBRARY</span><small>12/64</small></div>
+          <div class="filterline">FIND ______</div>
           <div class="tree" role="listbox" aria-label="Library folders">
             <button class="tree-row" role="option" aria-selected="false"><span class="chev">+</span><span>AMIGA</span><small>38</small></button>
             <button class="tree-row" role="option" aria-selected="false"><span class="chev">+</span><span>ARCADE</span><small>54</small></button>
             <button class="tree-row" role="option" aria-selected="false"><span class="chev">+</span><span>ATARI ST</span><small>21</small></button>
-            <button class="tree-row" role="option" aria-selected="false"><span class="chev">+</span><span>COMMODORE 64</span><small>17</small></button>
-            <button class="tree-row" role="option" aria-selected="true"><span class="chev">−</span><span>NINTENDO SNES</span><small>143</small></button>
+            <button class="tree-row" role="option" aria-selected="false"><span class="chev">+</span><span>C64</span><small>17</small></button>
+            <button class="tree-row" role="option" aria-selected="true"><span class="chev">−</span><span>SNES</span><small>143</small></button>
             <button class="tree-row indent" role="option" aria-selected="false"><span class="chev">›</span><span>ACTRAISER</span><small>22</small></button>
             <button class="tree-row indent" role="option" aria-selected="false"><span class="chev">›</span><span>CASTLEVANIA IV</span><small>18</small></button>
             <button class="tree-row indent" role="option" aria-selected="true"><span class="chev">›</span><span>CHRONO TRIGGER</span><small>43</small></button>
@@ -411,9 +640,9 @@
         </aside>
 
         <section class="panel listpanel" aria-label="Playlist">
-          <div class="panel-title"><span>Playlist / Chrono Trigger</span><small>43 TRACKS</small></div>
-          <div class="tabs"><span class="tab active">CHRONO TRIGGER</span><span class="tab">FAVORITES</span><span class="tab">HISTORY</span><span class="tab add">[ + ]</span></div>
-          <div class="list-head"><span>#</span><span>Title</span><span>Album / Group</span><span>Length</span><span>Fav</span></div>
+          <div class="panel-title"><span>CHRONO TRIGGER</span><small>43 TRK</small></div>
+          <div class="tabs"><span class="tab active">CHRONO</span><span class="tab">FAV</span><span class="tab">HIST</span><span class="tab add">[+]</span></div>
+          <div class="list-head"><span>#</span><span>TRACK</span><span>TIME</span></div>
           <div class="songs" role="listbox" aria-label="Playlist tracks">
             <button class="song" role="option" aria-selected="false"><span class="num">01</span><span>At the Bottom of Night</span><span class="album">CHRONO TRIGGER</span><span class="length">2:13</span><span>□</span></button>
             <button class="song" role="option" aria-selected="false"><span class="num">02</span><span>Ayla's Theme</span><span class="album">CHRONO TRIGGER</span><span class="length">1:08</span><span>□</span></button>
@@ -447,16 +676,15 @@
         </section>
       </main>
 
-      <footer class="statusline"><span><strong>F1</strong> HELP&nbsp;&nbsp; <strong>ENTER</strong> PLAY&nbsp;&nbsp; <strong>SPACE</strong> PAUSE&nbsp;&nbsp; <strong>ESC</strong> BACK</span><span id="status">C:\MUSIC\SNES\CHRONO\BLACKBIRD.SPC</span><span><strong>VOL 80%</strong></span></footer>
+      <footer class="statusline"><span id="status">C:\SNES\CHRONO\BLACKBIRD.SPC</span><span id="now">STOPPED</span></footer>
     </div>
   </div>
   <script>
     const VIDEO_MODE_VARIANTS = {
       STANDARD: [
-        { id: "STANDARD", name: "VGA", width: 640, height: 480, deviceScale: 3 },
-        { id: "STANDARD", name: "VGA", width: 640, height: 480, deviceScale: 2 },
-        { id: "STANDARD", name: "EGA", width: 512, height: 384, deviceScale: 2 },
-        { id: "STANDARD", name: "QVGA", width: 320, height: 240, deviceScale: 2 },
+        { id: "STANDARD", name: "320X240", width: 320, height: 240, deviceScale: 6 },
+        { id: "STANDARD", name: "320X240", width: 320, height: 240, deviceScale: 4 },
+        { id: "STANDARD", name: "320X240", width: 320, height: 240, deviceScale: 2 },
       ],
       HIGH: [
         { id: "HIGH", name: "XGA", width: 1024, height: 768, deviceScale: 2 },
@@ -496,7 +724,9 @@
       terminal.style.setProperty("--video-width", `${nextMode.width}px`);
       terminal.style.setProperty("--video-height", `${nextMode.height}px`);
       terminal.style.setProperty("--video-scale", nextMode.scale);
-      videoModeLabel.textContent = `${nextMode.name} ${nextMode.width}×${nextMode.height} @${nextMode.deviceScale}PX`;
+      videoModeLabel.textContent = nextMode.name;
+      videoModeLabel.setAttribute("aria-label",
+        `${nextMode.width} by ${nextMode.height} ${requestedVideoMode.toLowerCase()} raster at ${nextMode.deviceScale} device pixels per source pixel`);
       columnModeLabel.textContent = `${Math.floor(nextMode.width / 8)} COL`;
       return true;
     }
@@ -541,11 +771,10 @@
         // coverage edge leaves a true black phosphor gap; source pixels outside
         // the beam spot do not leak through as gray.
         float screen_y = u_resolution.y - gl_FragCoord.y;
-        float center_offset = u_scan_pitch > 2.5 && u_scan_pitch < 3.5 ? 1.0
-          : u_scan_pitch < 2.5 ? 0.5 : 0.0;
+        float center_offset = (u_scan_pitch - 1.0) * 0.5;
         float phase = mod(screen_y - center_offset + u_scan_pitch * 0.5, u_scan_pitch)
           - u_scan_pitch * 0.5;
-        float max_beam_fraction = u_scan_pitch > 2.5 && u_scan_pitch < 3.5 ? 0.30 : 0.34;
+        float max_beam_fraction = u_scan_pitch > 2.5 ? 0.30 : 0.34;
         float beam_radius = u_scan_pitch * mix(0.27, max_beam_fraction, sqrt(level));
         float edge = u_scan_pitch * 0.018;
         float distance_from_center = abs(phase);
@@ -636,7 +865,8 @@
 
       const scale = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
       // Resolve each 8x16 font pixel row to an integer number of display pixels.
-      // Standard VGA uses three (two lit, one black); high mode keeps two.
+      // The 320x240 standard raster uses a six-pixel beam cadence; high mode
+      // keeps its two-pixel cadence while using a larger source raster.
       const scanPitch = activeVideoMode.deviceScale;
       activeScanPitchCss = scanPitch / scale;
       screenOriginY = rect.top;
@@ -803,8 +1033,8 @@
       songs.forEach((entry) => entry.setAttribute("aria-selected", "false"));
       song.setAttribute("aria-selected", "true");
       const title = song.children[1].textContent;
-      now.textContent = `STOPPED · ${title.toUpperCase()}`;
-      status.textContent = `C:\\MUSIC\\SNES\\CHRONO\\${title.toUpperCase().replaceAll(" ", "_")}.SPC`;
+      now.textContent = "STOPPED";
+      status.textContent = `C:\\SNES\\CHRONO\\${title.toUpperCase().replaceAll(" ", "_")}.SPC`;
     }));
 
     document.querySelectorAll(".tree-row").forEach((row) => row.addEventListener("click", () => {
@@ -816,17 +1046,15 @@
       document.querySelectorAll(".key").forEach((entry) => entry.setAttribute("aria-pressed", "false"));
       key.setAttribute("aria-pressed", "true");
       const action = key.dataset.action;
-      if (action === "PLAY") now.textContent = "PLAYING · BLACKBIRD (OUTSIDE)";
-      else if (action === "PREV") now.textContent = "PREVIOUS · BLACKBIRD (INSIDE)";
-      else if (action === "NEXT") now.textContent = "NEXT · BOSS BATTLE 1";
-      else status.textContent = `COMMAND ${action} · MOCKUP ONLY`;
+      if (action === "PLAY") now.textContent = "PLAYING";
+      else if (action === "PREV") {
+        now.textContent = "PREVIOUS";
+        status.textContent = "C:\\SNES\\CHRONO\\BLACKBIRD_INSIDE.SPC";
+      } else if (action === "NEXT") {
+        now.textContent = "NEXT";
+        status.textContent = "C:\\SNES\\CHRONO\\BOSS_BATTLE_1.SPC";
+      } else now.textContent = `MOCK ${action}`;
     }));
-
-    document.addEventListener("keydown", (event) => {
-      if (!/^F[1-9]$/.test(event.key)) return;
-      const index = Number(event.key.slice(1)) - 1;
-      document.querySelectorAll(".key")[index]?.click();
-    });
   </script>
 </body>
 </html>

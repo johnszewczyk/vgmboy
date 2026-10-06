@@ -14,13 +14,17 @@ ViewBoy's Options table of contents has one **Display** page for screen profile,
 LCD colors, transport labels, playlist sizing, spacing, window behavior, and
 motion. There is no separate Interface page.
 
-Every Options page uses one alphabetized navigation rail and one content area.
-The rail is capped at 176 logical dots or 24% of the available width; a single
-LCD divider separates it from the content. Display uses two columns: the live
-LCD palette preview and screen profile sit at left, while transport, layout,
-window, and motion controls sit at right. Each Display section uses a full card
-with a shared filled title bar and enclosing outline. Longer pages scroll
-within the content area.
+Options reuses the home screen shell. The transport toolbar, sidebar pane, and
+playback footer remain visible; the playlist area becomes the selected options
+page. The sidebar action row remains in place and its rows become grouped
+ViewBoy and VGMBoy page links. The adjacent content pane scrolls internally on
+long pages. Changing pages or controls keeps Options open; the gear, Escape, or
+Command-comma returns to the library using the shared roll transition. Display
+uses two columns: the live LCD palette preview and screen profile sit at left,
+while transport, layout, window, and motion controls sit at right. Each Display
+section uses a full card with a shared filled title bar and enclosing outline.
+Options pane insets, card insets, gaps, and control padding use a fixed four-dot
+grid, independent of the adjustable home-screen spacing.
 
 In the Path sidebar, root chevron ink shares the leading edge of the search and
 toolbar controls. Nested disclosures move inward by two bitmap glyph advances
@@ -37,13 +41,16 @@ state tint is the expected visual difference from an inactive button.
 
 ## LCD Colors
 
-For the current contrast test, the default endpoints are a yellow-green
-background (`BG #9BBC0F`) and black pixels (`PIXEL #000000`). Direct mode keeps
-four framebuffer labels for layout and maps shades 0–1 directly to PIXEL and
-shades 2–3 directly to BG. Optional 8- and 16-shade methods expose evenly
-spaced sRGB gray values from black to white. The BG and PIXEL inputs seed their
-independent tone positions from relative luminance; **TEXT SHADE** and
-**BG SHADE** adjust those positions across the full ramp. Matrix gaps use the
+For the current contrast setup, the endpoints are a yellow-green background
+(`BG #9BBC0F`) and black pixels (`PIXEL #000000`). New installations use the
+16-shade method, with TEXT SHADE at black and BG SHADE chosen independently for
+legibility. Direct mode keeps four framebuffer labels for layout and maps
+shades 0–1 directly to PIXEL and shades 2–3 directly to BG. Optional 8- and
+16-shade methods expose evenly stepped sRGB gray values from black to white.
+The BG and PIXEL inputs seed their independent tone positions from relative
+luminance; **TEXT SHADE** and **BG SHADE** adjust those positions across the
+full ramp. Selection bands and filled card title bars use a lighter semantic
+shade while their lettering retains the darkest ink. Matrix gaps use the
 selected BG shade in grayscale modes. All methods preserve the same
 framebuffer cell mask, gap dimensions, grid, and spacing.
 
@@ -97,7 +104,7 @@ the three adjustable controls have distinct jobs:
 | UI Button Pad | 1–8 px; default 4 | Main-screen control text inset and standard control height | Options grid, app-edge inset, or playlist/sidebar text-row height |
 | UI Chrome Gap | 1–8 px; default 4 | Main-screen separation between controls, panes, tabs, headings, and playlist columns | Options grid or blank space between playlist/sidebar text rows |
 | Text Line Gap | 1–8 px; default 1 | Blank vertical space between playlist and sidebar text rows | Control height, pane inset, or other chrome gaps |
-| Options grid | Fixed: 8 px pane inset, 4 px card inset, 4 px gaps, 4 px control padding | Shared spacing inside every Options page | Main-screen adjustable spacing |
+| Options grid | Fixed: 4 px pane inset, 4 px card inset, 4 px gaps, 4 px control padding | Shared spacing inside every Options page | Main-screen adjustable spacing |
 
 ### Padding, Gaps, and Margins
 

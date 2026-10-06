@@ -6,15 +6,19 @@ command blocks, and a simulated monochrome CRT raster. Track and toolbar
 controls are local presentation interactions only; this prototype is not wired
 to the catalog or playback bridge.
 
-The UI uses one 8×16 Modern DOS font across toolbar, panels, lists, and status.
-The standard mode resolves its font rows to an integer device-pixel cadence:
-VGA 640×480 at three device pixels per source pixel when the viewport permits,
-then VGA/EGA/QVGA at two pixels per source pixel on smaller screens. Its beam
-draws two illuminated pixels followed by one pure-black scanline gap. High
-mode keeps a denser two-pixel cadence and selects XGA 1024×768, SVGA 800×600,
-VGA 640×480, or EGA 512×384 according to available space. The VIDEO control
-switches between these fixed-scale mode families. The interface is rasterized
-at the selected source dimensions and centered without fractional stretching.
+The standard mode is a 320×240 source raster: 40 eight-pixel columns by 15
+sixteen-pixel rows. One 8×16 Modern DOS font drives every control and text
+line. Command names, tree entries, playlist rows, column starts, and separators
+use that same cell grid; the standard screen has no function-key labels or
+boxed button row. The CRT pass resolves each font-row pixel to a six-device-
+pixel beam interval at the normal high-DPI viewport, centered on the glyph
+raster with pure-black gaps between illuminated bands.
+
+The VIDEO control switches to a high-resolution mode, which selects XGA
+1024×768, SVGA 800×600, VGA 640×480, or EGA 512×384 according to available
+space. Its denser two-device-pixel beam cadence remains optional. Both modes
+keep nearest-neighbor source sampling and integer scale factors; text glyph
+tops snap to the same cadence as the beam.
 
 A WebGL2 fragment shader draws the framebuffer through a beam profile. Its
 spot width changes slightly with brightness; pixels outside each spot are
