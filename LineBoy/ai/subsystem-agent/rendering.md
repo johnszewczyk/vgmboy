@@ -45,9 +45,11 @@ terminal-level block beneath controls and above their backgrounds; position it
 from the target's measured bounds divided by the current terminal zoom. Move it
 between toolbar controls and option categories on pointer entry or focus, and
 respect the saved motion switch plus `prefers-reduced-motion`. Snap the
-resizable separator to 8px source columns, preserve at least 16 columns in the
-library and 20 in the content pane where the raster allows, and keep its
-keyboard arrow controls in one-column steps. SCANLINES off exposes the DOM
+resizable separator and DISPLAY width slider to the same 8px source-column
+bounds, preserve at least 10 columns in the library and 20 in the content pane
+where the raster allows, and default the library to one-third of the available
+columns. Keep keyboard arrows in one-column steps, Home at the one-third default,
+and End at the maximum width. SCANLINES off exposes the DOM
 without changing the grid. The resolution row and view toolbar must flex with
 the active column count so controls use available width at each profile.
 

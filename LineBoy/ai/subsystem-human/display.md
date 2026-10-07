@@ -42,12 +42,14 @@ between the command and transport groups. The resolution profile row remains a
 separate testing control row.
 
 One white selection block travels between the active top toolbar control and
-the option-category tabs. DISPLAY can turn that motion off. The draggable pane
-separator changes the library width in whole 8px character columns; arrow keys
-on the separator adjust one column at a time. Brightness runs from 60% to 140%
-and remaps the monochrome palette while leaving the pure-black scanline gaps
-unchanged. Brightness, selector motion, and pane width persist with the display
-preferences.
+the option-category tabs. DISPLAY can turn that motion off. The library starts
+at one-third of the available character columns and keeps at least 20 columns
+for its content pane. Its DISPLAY sidebar-width slider and draggable separator
+use the same 8px character-column bounds and saved value; arrow keys change one
+column at a time, Home restores the one-third default, and End sets the widest
+allowed library pane. Brightness runs from 60% to 140% and remaps the monochrome
+palette while leaving the pure-black scanline gaps unchanged. Brightness,
+selector motion, and pane width persist with the display preferences.
 
 Phosphor persistence is disabled to keep interaction responsive. OPTIONS opens
 a two-column terminal settings view. DISPLAY contains WIDTH MODE (FILL or

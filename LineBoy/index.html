@@ -638,7 +638,7 @@
         </aside>
 
         <div class="divider" id="column-divider" role="separator" aria-orientation="vertical"
-          aria-label="Resize library pane" aria-valuemin="16" aria-valuemax="19" aria-valuenow="16"
+          aria-label="Resize library pane" aria-valuemin="10" aria-valuemax="19" aria-valuenow="13"
           tabindex="0" title="Drag to resize; use arrow keys to snap by character cells"></div>
 
         <section class="panel listpanel" aria-label="Playlist">
@@ -660,6 +660,7 @@
           <div class="panel-title"><span id="options-page-title">DISPLAY</span><span class="count">SETUP</span></div>
           <div class="option-page" data-options-content="DISPLAY">
             <div class="option-row"><span>WIDTH</span><button class="option-value" id="width-mode" type="button" aria-pressed="true">FILL</button></div>
+            <div class="option-row"><span>SIDEBAR</span><div class="range-control"><input class="brightness-range" id="sidebar-width-range" type="range" min="10" max="19" step="1" value="13" aria-label="Library sidebar width"><output class="range-readout" id="sidebar-width-readout" for="sidebar-width-range">13CH</output></div></div>
             <div class="option-row"><span>SCANLINES</span><button class="option-value" id="scanline-mode" type="button" aria-pressed="true">ON</button></div>
             <div class="option-row"><span>BRIGHTNESS</span><div class="range-control"><input class="brightness-range" id="brightness-range" type="range" min="60" max="140" step="5" value="100" aria-label="Screen brightness"><output class="range-readout" id="brightness-readout" for="brightness-range">100%</output></div></div>
             <div class="option-row"><span>SELECTOR FLOW</span><button class="option-value" id="selector-flow-mode" type="button" aria-pressed="true">ON</button></div>
@@ -789,6 +790,7 @@
           brightnessPercent,
           selectorFlowEnabled,
           sidebarColumns,
+          sidebarWidthVersion: 2,
         }));
       } catch {}
     }
@@ -809,6 +811,8 @@
     const beamWidthModeButton = document.querySelector("#beam-width-mode");
     const brightnessRange = document.querySelector("#brightness-range");
     const brightnessReadout = document.querySelector("#brightness-readout");
+    const sidebarWidthRange = document.querySelector("#sidebar-width-range");
+    const sidebarWidthReadout = document.querySelector("#sidebar-width-readout");
     const selectorFlowModeButton = document.querySelector("#selector-flow-mode");
     const rasterReadout = document.querySelector("#option-raster");
     const pitchReadout = document.querySelector("#option-pitch");
@@ -862,7 +866,8 @@
     let brightnessPercent = Number.isFinite(Number(savedDisplayPreferences.brightnessPercent))
       ? Math.max(60, Math.min(140, Number(savedDisplayPreferences.brightnessPercent))) : 100;
     let selectorFlowEnabled = savedDisplayPreferences.selectorFlowEnabled !== false;
-    let sidebarColumns = Number.isInteger(savedDisplayPreferences.sidebarColumns)
+    let sidebarColumns = savedDisplayPreferences.sidebarWidthVersion === 2
+      && Number.isInteger(savedDisplayPreferences.sidebarColumns)
       ? savedDisplayPreferences.sidebarColumns : null;
     let optionsVisible = false;
     let selectedOptionsPage = "DISPLAY";
@@ -950,8 +955,19 @@
     }
 
     function sidebarBounds(columns = activeRaster?.columns || 40) {
-      const minimum = Math.min(16, Math.max(1, columns - 20));
+      const minimum = Math.min(10, Math.max(1, columns - 20));
       return { minimum, maximum: Math.max(minimum, columns - 21) };
+    }
+
+    function updateSidebarWidthControl() {
+      if (!activeRaster) return;
+      const { minimum, maximum } = sidebarBounds();
+      sidebarWidthRange.min = String(minimum);
+      sidebarWidthRange.max = String(maximum);
+      sidebarWidthRange.value = String(sidebarColumns);
+      sidebarWidthRange.setAttribute("aria-valuetext", `${sidebarColumns} character columns`);
+      sidebarWidthReadout.value = `${sidebarColumns}CH`;
+      sidebarWidthReadout.textContent = `${sidebarColumns}CH`;
     }
 
     function applySidebarColumnLayout() {
@@ -964,6 +980,7 @@
       divider.setAttribute("aria-valuemax", String(maximum));
       divider.setAttribute("aria-valuenow", String(sidebarColumns));
       divider.setAttribute("aria-valuetext", `${sidebarColumns} character columns`);
+      updateSidebarWidthControl();
     }
 
     function setSidebarColumns(value, persist = false) {
@@ -1005,11 +1022,11 @@
       const halfLineInset = (sourceHeight - textRows * 16) / 2;
       const workspaceLines = textRows - 4;
       const sidebarBoundsForRaster = {
-        minimum: Math.min(16, Math.max(1, columns - 20)),
-        maximum: Math.max(Math.min(16, Math.max(1, columns - 20)), columns - 21),
+        minimum: Math.min(10, Math.max(1, columns - 20)),
+        maximum: Math.max(Math.min(10, Math.max(1, columns - 20)), columns - 21),
       };
       const defaultSidebarColumns = Math.max(sidebarBoundsForRaster.minimum,
-        Math.min(sidebarBoundsForRaster.maximum, Math.round(columns * 0.2)));
+        Math.min(sidebarBoundsForRaster.maximum, Math.round((columns - 1) / 3)));
       sidebarColumns = Number.isInteger(sidebarColumns) ? sidebarColumns : defaultSidebarColumns;
 
       activeRaster = {
@@ -1172,6 +1189,10 @@
       saveDisplayPreferences();
     });
 
+    sidebarWidthRange.addEventListener("input", () => {
+      setSidebarColumns(Number(sidebarWidthRange.value), true);
+    });
+
     selectorFlowModeButton.addEventListener("click", () => {
       selectorFlowEnabled = !selectorFlowEnabled;
       applyBrightness();
@@ -1221,7 +1242,10 @@
           setSidebarColumns(sidebarColumns + (event.key === "ArrowRight" ? 1 : -1), true);
         } else if (event.key === "Home") {
           event.preventDefault();
-          setSidebarColumns(Math.round(activeRaster.columns * 0.2), true);
+          setSidebarColumns(Math.round((activeRaster.columns - 1) / 3), true);
+        } else if (event.key === "End") {
+          event.preventDefault();
+          setSidebarColumns(sidebarBounds().maximum, true);
         }
       });
     });

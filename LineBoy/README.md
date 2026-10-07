@@ -44,10 +44,12 @@ File, Edit, View, and Window menus, including Command+O, Command+F for library
 search, Command+comma, Control+Command+F, Command+W, and Command+Q. Filled
 toolbar actions have cell-sized gaps; transport is separated by a larger blank
 gap with no visible divider. A single animated selector block moves between
-toolbar actions and option categories. DISPLAY exposes palette brightness and
-selector motion. The library pane divider resizes in 8px character columns and
-remembers its width. Search replaces the sample tree temporarily and returns
-to its previous selection when cleared.
+toolbar actions and option categories. DISPLAY exposes palette brightness,
+selector motion, and sidebar width. The library starts at one-third of the
+available character columns; its divider can be dragged or its DISPLAY slider
+can resize it in 8px character columns. Both controls share the same bounds and
+saved width. Search replaces the sample tree temporarily and returns to its
+previous selection when cleared.
 
 The font `assets/ModernDOS8x16.ttf` is Modern DOS 8×16 by Jayvee Enaguas,
 dedicated under CC0 1.0. The included `assets/CC0-1.0.txt` preserves its
