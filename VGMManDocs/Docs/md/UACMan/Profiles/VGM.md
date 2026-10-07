@@ -13,6 +13,12 @@ gzip-compressed `.vgz` members. See
   `game_english`, `game_original`, `system_english`, `system_original`,
   `artist_english`, `artist_original`, `date`, `converted_by`, and `notes`.
 - **Status** — Draft; fixture validation pending.
+- **GD3 model** — GD3 v1.00 has eleven ordered UTF-16 string fields, not
+  arbitrary named key/value tags. MetaMan labels the English and original-
+  language game-name slots `game_english` and `game_original`; they are
+  language variants of one fact. Trailing strings are exposed as
+  `gd3_field_N`. UAC permits direct metadata keys, but only promote fields
+  according to the mappings below.
 
 ## Field Mapping
 
@@ -20,7 +26,7 @@ gzip-compressed `.vgz` members. See
 | --- | --- | --- | --- |
 | `system_english` / `system_original` | Platform | `game.console` | Prefer English, then original. VGM labels are exempt from the limited aliases in [Platforms](PLATFORMS.md). |
 | `title_english` / `title_original` | Title | `members[].metadata["Title"]` | Prefer English, then original; no filename fallback. |
-| `game_english` / `game_original` | Album | `game.metadata["Album"]` | Prefer English, then original; package-wide title. |
+| `game_english` / `game_original` | Album | `game.metadata["Album"]` | Project the one Game Name fact once: prefer English, then original. Do not also emit **Game** or **Game Title** aliases. |
 | `artist_english` / `artist_original` | Album Artist / Artist | `game.metadata["Album Artist"]` or `members[].metadata["Artist"]` | Use Album Artist for a shared credit and track Artist only for a track-specific credit. |
 | `date` | Date / Year | `game.metadata["Date"]` or `game.metadata["Year"]` | Use Date for a full date and Year when only a year is present. |
 | `converted_by` | Dumper | `game.metadata["Dumper"]` | Preserve the GD3 credit; do not rename it Encoded By. |
