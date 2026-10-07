@@ -32,6 +32,9 @@
       color: var(--gray);
       font: 16px/16px var(--mono);
       letter-spacing: 0;
+      font-kerning: none;
+      font-variant-ligatures: none;
+      font-synthesis: none;
       -webkit-font-smoothing: none;
       text-rendering: optimizeSpeed;
     }
@@ -80,9 +83,8 @@
       display: none;
       background: repeating-linear-gradient(
         to bottom,
-        #000 0 var(--scan-gap),
-        transparent var(--scan-gap) calc(var(--scan-gap) + var(--beam-width)),
-        #000 calc(var(--scan-gap) + var(--beam-width)) var(--scan-period)
+        transparent 0 var(--beam-width),
+        #000 var(--beam-width) var(--scan-period)
       );
       pointer-events: none;
     }
@@ -724,9 +726,9 @@
     let widthMode = savedDisplayPreferences.widthMode === "FRAME" ? "FRAME" : "FILL";
     let scanlinesEnabled = savedDisplayPreferences.scanlinesEnabled !== false;
     const beamWidthModes = [
-      { id: "THIN", radius: 0.24 },
-      { id: "NORMAL", radius: 0.30 },
-      { id: "WIDE", radius: 0.36 },
+      { id: "THIN", radius: 0.32 },
+      { id: "NORMAL", radius: 0.42 },
+      { id: "WIDE", radius: 0.48 },
     ];
     let beamWidthMode = beamWidthModes.some((mode) => mode.id === savedDisplayPreferences.beamWidthMode)
       ? savedDisplayPreferences.beamWidthMode : "NORMAL";
@@ -885,11 +887,12 @@
       crtPitchReadout.textContent = `${activeRaster.scanPitch}PX`;
       terminal.dataset.scanlines = scanlinesEnabled ? "on" : "off";
       const beam = beamWidthModes.find((mode) => mode.id === beamWidthMode) || beamWidthModes[1];
+      const beamRows = Math.min(activeRaster.scanPitch - 1,
+        Math.max(1, Math.round(activeRaster.scanPitch * beam.radius * 2)));
       const scanPeriod = activeRaster.scanPitch / activeRaster.deviceScale;
-      const beamWidth = scanPeriod * beam.radius * 2;
+      const beamWidth = beamRows / activeRaster.deviceScale;
       terminal.style.setProperty("--scan-period", `${scanPeriod}px`);
       terminal.style.setProperty("--beam-width", `${beamWidth}px`);
-      terminal.style.setProperty("--scan-gap", `${(scanPeriod - beamWidth) / 2}px`);
       widthNote.textContent = widthMode === "FILL"
         ? "FILL WIDTH USES 8PX CELLS."
         : "FRAME KEEPS THE BASE 4:3 WIDTH.";
@@ -1497,20 +1500,13 @@
       precision highp float;
       uniform vec2 u_resolution;
       uniform float u_scan_pitch;
-      uniform float u_beam_radius;
+      uniform float u_beam_rows;
       out vec4 out_color;
 
       void main() {
         float screen_y = u_resolution.y - gl_FragCoord.y;
-        float center_offset = (u_scan_pitch - 1.0) * 0.5;
-        float phase = mod(screen_y - center_offset + u_scan_pitch * 0.5, u_scan_pitch)
-          - u_scan_pitch * 0.5;
-        float beam_radius = u_scan_pitch * u_beam_radius;
-        float edge = max(u_scan_pitch * 0.018, fwidth(screen_y) * 0.30);
-        float distance_from_center = abs(phase);
-        float coverage = 1.0 - smoothstep(beam_radius - edge, beam_radius + edge, distance_from_center);
-        float spot = exp(-0.5 * pow(distance_from_center / (beam_radius * 0.72), 2.0));
-        float black_alpha = 1.0 - spot * coverage;
+        float row_in_pitch = mod(floor(screen_y), u_scan_pitch);
+        float black_alpha = step(u_beam_rows, row_in_pitch);
         out_color = vec4(0.0, 0.0, 0.0, black_alpha);
       }
     `;
@@ -1554,7 +1550,7 @@
         filterUniforms = {
           resolution: gl.getUniformLocation(program, "u_resolution"),
           scanPitch: gl.getUniformLocation(program, "u_scan_pitch"),
-          beamRadius: gl.getUniformLocation(program, "u_beam_radius"),
+          beamRows: gl.getUniformLocation(program, "u_beam_rows"),
         };
         gl.clearColor(0, 0, 0, 0);
         gl.disable(gl.BLEND);
@@ -1591,8 +1587,10 @@
         gl.useProgram(program);
         gl.uniform2f(filterUniforms.resolution, width, height);
         gl.uniform1f(filterUniforms.scanPitch, activeRaster.scanPitch);
-        gl.uniform1f(filterUniforms.beamRadius,
-          beamWidthModes.find((mode) => mode.id === beamWidthMode)?.radius || 0.30);
+        const mode = beamWidthModes.find((item) => item.id === beamWidthMode) || beamWidthModes[1];
+        const beamRows = Math.min(activeRaster.scanPitch - 1,
+          Math.max(1, Math.round(activeRaster.scanPitch * mode.radius * 2)));
+        gl.uniform1f(filterUniforms.beamRows, beamRows);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         terminal.dataset.filter = "webgl";
       } catch (error) {

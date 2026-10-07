@@ -2,10 +2,12 @@
 
 LineBoy is a monochrome DOS-style player interface experiment. It lays every
 control, label, sidebar item, and track row onto an 8×16 character-cell grid,
-then paints the grid through a CRT beam pass. The native WebKit host reads the
-shared VGMMan catalog, persists favorites through FrontendCore, and routes
-playback through the shared transport and VGMBoy decoder. The browser build
-remains a sample-data preview without native services.
+then paints it with full-intensity beam rows and crisp, integer-pixel black
+gaps. The filter preserves the font's fixed character advance. The native
+WebKit host reads the shared VGMMan catalog, persists favorites through
+FrontendCore, and routes playback through the shared transport and VGMBoy
+decoder. The browser build remains a sample-data preview without native
+services.
 
 ## Display grid
 

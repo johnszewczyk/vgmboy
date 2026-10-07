@@ -25,13 +25,16 @@ inside the native macOS title-bar area. The layout uses 8-pixel columns and
 library, playlist, and status line occupy explicit rows. The title row keeps
 only grid, beam pitch, and clock readouts so the controls have room.
 Labels and controls use the same cell-top baseline: the 10px cap ink is centered
-inside its 16px row, with three source pixels above and below. The baseline
+inside its 16px row, with three source pixels above and below. The fixed-width
+font keeps an 8px advance, with kerning and ligatures disabled. The baseline
 snaps to the output device grid. During tree or playlist scrolling, native
 WebKit scrolling stays live and row snapping is proximity-based. One fixed
 scanline mask stays above the live interface for the entire interaction: the
-WebGL overlay draws only transparent beam rows and black gaps, never a snapshot
-of the text. Scrolling moves continuously underneath the same filter. The CSS
-mask provides the same fixed-gap fallback when WebGL2 is unavailable.
+WebGL overlay draws fully transparent beam rows and integer device-pixel black
+gaps, never a snapshot of the text. It does not shade beam rows or glyph edges
+with a grayscale spot profile. Scrolling moves continuously underneath the
+same filter. The CSS mask provides the same fixed-gap fallback when WebGL2 is
+unavailable.
 
 Phosphor persistence is disabled to keep interaction responsive. OPTIONS opens
 a two-column terminal settings view. DISPLAY contains WIDTH MODE (FILL or

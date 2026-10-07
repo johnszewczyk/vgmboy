@@ -1,13 +1,14 @@
 # Renderer and build boundaries
 
 The HTML DOM owns all visible content, interaction, and native scrolling. A
-transparent WebGL2 overlay draws only the stationary scanline mask: beam centers
-stay clear, while beam edges and gaps darken the DOM beneath it. Never capture
-or redraw text into a framebuffer. Keep the mask above the DOM during scrolling
+transparent WebGL2 overlay draws only the stationary scanline mask: bright beam
+rows stay fully transparent and the remaining rows are pure black gaps. Never
+shade beam rows or glyphs with a grayscale spot profile, and never capture or
+redraw text into a framebuffer. Keep the mask above the DOM during scrolling
 and do not switch rendering paths when scroll starts or stops. When WebGL2 is
-unavailable, use the fixed CSS mask with the same pitch and beam width. The
-native WebKit host injects catalog and transport services through a narrow
-message bridge; the browser preview falls back to sample data.
+unavailable, use the fixed CSS mask with the same integer beam-row count and
+pitch. The native WebKit host injects catalog and transport services through a
+narrow message bridge; the browser preview falls back to sample data.
 
 The selected raster profile uses the 320×240 reference to choose its largest
 fitting even device-pixel multiple. Extend the viewport in whole 16-pixel text
@@ -15,8 +16,10 @@ rows at that scale; in FILL width mode, extend it in whole 8-pixel columns.
 FRAME keeps the selected profile's 4:3 width. Never stretch glyphs to cover
 remainder space. Map each text cell to an integer number of equal beam pitches;
 keep the shader pitch integral even when the source-to-output scale is
-fractional. Snap frame edges and glyph baselines to the beam grid; antialias
-the beam edge in WebGL.
+fractional. Snap frame edges and glyph baselines to the beam grid. Preserve the
+font's fixed 8px advance with kerning and ligatures disabled. Quantize each beam
+to an integer number of fully lit device rows and leave at least one pure-black
+device row per pitch; do not fade glyph edges or use partial-alpha beam shading.
 
 ModernDOS8x16 has a 10px cap height in a 16px cell. Keep every row on the exact
 16px source advance and center labels inside their existing DOM line boxes. Do
@@ -34,10 +37,10 @@ bootstrap, fetch game rows only when a group expands, and remove their DOM rows
 on collapse. Run catalog reads off the main actor.
 
 Persist the selected raster profile, fill/frame width mode, scanline visibility,
-and beam width in local display preferences. The WebGL beam-radius uniform and
-CSS fallback use the same THIN/NORMAL/WIDE setting. SCANLINES off exposes the
-DOM without changing the grid. The resolution row and view toolbar must flex
-with the active column count so controls use available width at each profile.
+and beam width in local display preferences. The WebGL beam-row uniform and CSS
+fallback use the same THIN/NORMAL/WIDE setting. SCANLINES off exposes the DOM
+without changing the grid. The resolution row and view toolbar must flex with
+the active column count so controls use available width at each profile.
 Route native fullscreen requests through the LineBoy bridge to the owning
 NSWindow; the browser preview uses the document fullscreen API.
 
