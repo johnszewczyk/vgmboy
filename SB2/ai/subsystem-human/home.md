@@ -21,8 +21,10 @@
   switches to Gallery.
 - Gallery is a playlist tab with an artwork-only grid. Its sidebar preserves
   Console and Path views while filtering both to games/sources with a ScanSong
-  `Title Snap` value. The Gallery sidebar footer controls thumbnail scale, gap,
-  and corner radius.
+  `Title Snap` value. Gallery tiles use square, centered cover crops and show
+  title and system as an image overlay. Zero gap and square corners create a
+  continuous tile grid by default; tile size, gap, and corner radius live in
+  Options > UI Chrome > Gallery Tiles.
 - Options open in the playlist pane as a subpage and leave the title and footer
   visible. A separate Options window uses the same chrome.
 - Playlist tab selection fades with the shared selection timing and easing;
