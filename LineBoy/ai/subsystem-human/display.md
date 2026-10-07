@@ -18,19 +18,24 @@ baselines snap to the beam grid. At 800×600, the base profile has 100 columns
 and 37 complete rows, with a centered four-pixel inset when no extra rows are
 needed.
 
-The layout uses 8-pixel columns and 16-pixel text rows. Its title, resolution
-choices, command bar, library, playlist, and status line occupy explicit rows.
+The window keeps an 8-pixel inset around the terminal, leaving a visible frame
+inside the native macOS title-bar area. The layout uses 8-pixel columns and
+16-pixel text rows. Its title, resolution choices, command bar, library,
+playlist, and status line occupy explicit rows.
 Labels and controls use the same cell-top baseline: the 10px cap ink is centered
 inside its 16px row, with three source pixels above and below. The baseline
 snaps to the output device grid. During tree or playlist scrolling, native
-WebKit scrolling stays live and row snapping is proximity-based; the scanline
-pass returns after 160ms without scroll input.
+WebKit scrolling stays live and row snapping is proximity-based. A fixed
+black-gap scan mask stays over the moving rows; the WebGL beam pass returns
+after 160ms without scroll input.
 
 Phosphor persistence is disabled to keep interaction responsive. OPTIONS opens
-a two-column terminal settings view with WIDTH MODE (FILL or FRAME), SCANLINES,
-the active beam pitch, and a native fullscreen toggle. FILL and FRAME, the
-scanline setting, and the selected raster profile are remembered. The window can
-also enter fullscreen from its standard window control.
+a two-column terminal settings view. DISPLAY contains WIDTH MODE (FILL or
+FRAME), SCANLINES, the active beam pitch, and a native fullscreen toggle. CRT
+contains a THIN/NORMAL/WIDE beam-width control and reports the active pitch.
+FILL and FRAME, scanline visibility, beam width, and the selected raster
+profile are remembered. The window can also enter fullscreen from its standard
+window control.
 
 In the native app, the library tree loads group counts from the shared catalog
 and fetches a group's game rows when it expands. Selecting a game loads its

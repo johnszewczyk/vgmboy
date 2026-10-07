@@ -23,7 +23,10 @@ highlighted cell and varies with inline layout. Keep every row on the exact
 source inset above and below; do not place text on a half-height row.
 
 Do not emulate phosphor persistence. During tree or playlist scrolling, expose
-the native DOM so WebKit can scroll with momentum; wait 160ms after the last
+the native DOM so WebKit can scroll with momentum, but keep the fixed CSS scan
+mask above the moving content whenever scanlines are enabled. Derive its pitch
+and active beam width from the current raster/device scale; hide it while the
+WebGL frame is visible to avoid double shading. Wait 160ms after the last
 scroll event, then capture and shade one settled frame. Keep row snapping at
 proximity rather than mandatory. Load catalog group summaries during bootstrap,
 fetch game rows only when a group expands, and remove their DOM rows on collapse.
@@ -31,10 +34,12 @@ Run catalog reads off the main actor. Cull off-viewport descendants before
 querying text geometry. Render on state changes; never run a permanent
 animation loop.
 
-Persist the selected raster profile, fill/frame width mode, and scanline
-visibility in local display preferences. SCANLINES off exposes the DOM without
-changing the grid. Route native fullscreen requests through the LineBoy bridge
-to the owning NSWindow; the browser preview uses the document fullscreen API.
+Persist the selected raster profile, fill/frame width mode, scanline visibility,
+and beam width in local display preferences. The WebGL beam-radius uniform and
+live-scroll CSS mask use the same THIN/NORMAL/WIDE setting. SCANLINES off exposes
+the DOM without changing the grid. Route native fullscreen requests through the
+LineBoy bridge to the owning NSWindow; the browser preview uses the document
+fullscreen API.
 
 `build.sh` copies the runtime HTML and licensed font into the ignored
 `.build/site` directory and packages `.build/LineBoy.app`. `launch.sh` builds,

@@ -72,6 +72,21 @@
       border: var(--frame-width, 1px) solid #555;
       pointer-events: none;
     }
+    .terminal::before {
+      content: "";
+      position: absolute;
+      z-index: 3;
+      inset: 0;
+      display: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        #000 0 var(--scan-gap),
+        transparent var(--scan-gap) calc(var(--scan-gap) + var(--beam-width)),
+        #000 calc(var(--scan-gap) + var(--beam-width)) var(--scan-period)
+      );
+      pointer-events: none;
+    }
+    .terminal[data-renderer="dom"][data-scanlines="on"]::before { display: block; }
 
     .terminal > header,
     .terminal > .resolutionline,
@@ -471,7 +486,7 @@
 </head>
 <body>
   <div class="crt">
-    <div class="terminal" data-renderer="dom" role="application" aria-label="LineBoy monochrome line-grid player">
+    <div class="terminal" data-renderer="dom" data-scanlines="on" role="application" aria-label="LineBoy monochrome line-grid player">
       <canvas class="beam-screen" aria-hidden="true"></canvas>
 
       <header class="topline">
@@ -530,6 +545,7 @@
           <div class="panel-title"><span>OPTIONS</span><span class="count">MENU</span></div>
           <div class="option-navigation" role="group" aria-label="Option categories">
             <button class="option-category" type="button" data-options-page="DISPLAY" aria-pressed="true">DISPLAY</button>
+            <button class="option-category" type="button" data-options-page="CRT" aria-pressed="false">CRT</button>
             <button class="option-category" type="button" data-options-page="KEYS" aria-pressed="false">KEYS</button>
           </div>
         </aside>
@@ -544,6 +560,12 @@
             <div class="option-note" id="width-note">FILL WIDTH USES 8PX CELLS.</div>
             <div class="option-row"><span>WINDOW</span><button class="option-value" id="fullscreen-toggle" type="button" aria-label="Toggle fullscreen">FULL</button></div>
             <div class="option-row"><span>DISPLAY</span><button class="option-value" id="reset-display" type="button">DEFAULTS</button></div>
+          </div>
+          <div class="option-page" data-options-content="CRT" hidden>
+            <div class="option-row"><span>BEAM WIDTH</span><button class="option-value" id="beam-width-mode" type="button">NORMAL</button></div>
+            <div class="option-row"><span>BEAM PITCH</span><span class="option-key" id="crt-pitch">6PX</span></div>
+            <div class="option-row"><span>SCROLL</span><span class="option-key">LIVE + MASK</span></div>
+            <div class="option-note">SCAN BANDS STAY VISIBLE DURING SCROLL.</div>
           </div>
           <div class="option-page" data-options-content="KEYS" hidden>
             <div class="option-row"><span>MOVE</span><span class="option-key">ARROWS</span></div>
@@ -648,6 +670,7 @@
           raster: requestedRaster,
           widthMode,
           scanlinesEnabled,
+          beamWidthMode,
         }));
       } catch {}
     }
@@ -663,8 +686,10 @@
     const optionPages = [...document.querySelectorAll(".option-page")];
     const widthModeButton = document.querySelector("#width-mode");
     const scanlineModeButton = document.querySelector("#scanline-mode");
+    const beamWidthModeButton = document.querySelector("#beam-width-mode");
     const rasterReadout = document.querySelector("#option-raster");
     const pitchReadout = document.querySelector("#option-pitch");
+    const crtPitchReadout = document.querySelector("#crt-pitch");
     const widthNote = document.querySelector("#width-note");
     const fullscreenToggle = document.querySelector("#fullscreen-toggle");
     const resetDisplay = document.querySelector("#reset-display");
@@ -694,6 +719,13 @@
       ? savedDisplayPreferences.raster : "320X240";
     let widthMode = savedDisplayPreferences.widthMode === "FRAME" ? "FRAME" : "FILL";
     let scanlinesEnabled = savedDisplayPreferences.scanlinesEnabled !== false;
+    const beamWidthModes = [
+      { id: "THIN", radius: 0.24 },
+      { id: "NORMAL", radius: 0.30 },
+      { id: "WIDE", radius: 0.36 },
+    ];
+    let beamWidthMode = beamWidthModes.some((mode) => mode.id === savedDisplayPreferences.beamWidthMode)
+      ? savedDisplayPreferences.beamWidthMode : "NORMAL";
     let optionsVisible = false;
     let selectedOptionsPage = "DISPLAY";
     let returnAction = "LIST";
@@ -842,8 +874,21 @@
       scanlineModeButton.setAttribute("aria-pressed", String(scanlinesEnabled));
       scanlineModeButton.setAttribute("aria-label",
         `Scanlines ${scanlinesEnabled ? "on" : "off"}. Activate to turn them ${scanlinesEnabled ? "off" : "on"}.`);
+      beamWidthModeButton.textContent = beamWidthMode;
+      const beamWidthIndex = beamWidthModes.findIndex((mode) => mode.id === beamWidthMode);
+      const nextBeamWidth = beamWidthModes[(beamWidthIndex + 1) % beamWidthModes.length];
+      beamWidthModeButton.setAttribute("aria-label",
+        `Beam width ${beamWidthMode.toLowerCase()}. Activate to set ${nextBeamWidth.id.toLowerCase()}.`);
       rasterReadout.textContent = activeRaster.id;
       pitchReadout.textContent = `${activeRaster.scanPitch}PX`;
+      crtPitchReadout.textContent = `${activeRaster.scanPitch}PX`;
+      terminal.dataset.scanlines = scanlinesEnabled ? "on" : "off";
+      const beam = beamWidthModes.find((mode) => mode.id === beamWidthMode) || beamWidthModes[1];
+      const scanPeriod = activeRaster.scanPitch / activeRaster.deviceScale;
+      const beamWidth = scanPeriod * beam.radius * 2;
+      terminal.style.setProperty("--scan-period", `${scanPeriod}px`);
+      terminal.style.setProperty("--beam-width", `${beamWidth}px`);
+      terminal.style.setProperty("--scan-gap", `${(scanPeriod - beamWidth) / 2}px`);
       widthNote.textContent = widthMode === "FILL"
         ? "FILL WIDTH USES 8PX CELLS."
         : "FRAME KEEPS THE BASE 4:3 WIDTH.";
@@ -857,7 +902,7 @@
       optionPages.forEach((section) => {
         section.hidden = section.dataset.optionsContent !== page;
       });
-      optionsPageTitle.textContent = page === "KEYS" ? "KEYS" : "DISPLAY";
+      optionsPageTitle.textContent = page;
       scheduleRender();
     }
 
@@ -897,6 +942,15 @@
       status.textContent = `DISPLAY/SCANLINES ${scanlinesEnabled ? "ON" : "OFF"}`;
     });
 
+    beamWidthModeButton.addEventListener("click", () => {
+      const currentIndex = beamWidthModes.findIndex((mode) => mode.id === beamWidthMode);
+      beamWidthMode = beamWidthModes[(currentIndex + 1) % beamWidthModes.length].id;
+      saveDisplayPreferences();
+      updateOptionReadouts();
+      status.textContent = `CRT/BEAM WIDTH ${beamWidthMode}`;
+      scheduleRender();
+    });
+
     fullscreenToggle.addEventListener("click", async () => {
       try {
         if (nativeHost) await nativeRequest("toggleFullScreen");
@@ -912,6 +966,7 @@
       requestedRaster = "320X240";
       widthMode = "FILL";
       scanlinesEnabled = true;
+      beamWidthMode = "NORMAL";
       saveDisplayPreferences();
       updateRaster();
       scheduleRender();
@@ -1446,6 +1501,7 @@
       uniform sampler2D u_frame;
       uniform vec2 u_resolution;
       uniform float u_scan_pitch;
+      uniform float u_beam_radius;
       in vec2 v_uv;
       out vec4 out_color;
 
@@ -1457,8 +1513,7 @@
         float center_offset = (u_scan_pitch - 1.0) * 0.5;
         float phase = mod(screen_y - center_offset + u_scan_pitch * 0.5, u_scan_pitch)
           - u_scan_pitch * 0.5;
-        float max_beam_fraction = u_scan_pitch > 2.5 ? 0.30 : 0.34;
-        float beam_radius = u_scan_pitch * mix(0.27, max_beam_fraction, sqrt(level));
+        float beam_radius = u_scan_pitch * mix(u_beam_radius * 0.9, u_beam_radius, sqrt(level));
         float edge = max(u_scan_pitch * 0.018, fwidth(screen_y) * 0.30);
         float distance_from_center = abs(phase);
         float coverage = 1.0 - smoothstep(beam_radius - edge, beam_radius + edge, distance_from_center);
@@ -1599,6 +1654,8 @@
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, framebuffer);
         gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), width, height);
         gl.uniform1f(gl.getUniformLocation(program, "u_scan_pitch"), scanPitch);
+        gl.uniform1f(gl.getUniformLocation(program, "u_beam_radius"),
+          beamWidthModes.find((mode) => mode.id === beamWidthMode)?.radius || 0.30);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         terminal.dataset.renderer = "webgl2";
       } catch (error) {
