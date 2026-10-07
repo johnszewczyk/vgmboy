@@ -33,8 +33,9 @@ LineBoy instance, and open a fresh native app. To inspect the sample-only
 browser preview, serve `.build/site` on loopback with Python's HTTP server.
 
 The native host owns catalog and transport adapters; the HTML owns the shared
-8×16 grid, keyboard interaction, and WebGL2 beam rendering. Both use the same
-interface, while only the native host has access to CatalogReader,
+8×16 grid, keyboard interaction, and a persistent WebGL2 scanline mask above
+the live DOM. Scrolling stays beneath that one fixed filter. Both hosts use the
+same interface, while only the native host has access to CatalogReader,
 FrontendCore, and VGMBoy. The native app also supplies standard macOS app,
 File, Edit, View, and Window menus, including Command+O, Command+comma,
 Control+Command+F, Command+W, and Command+Q.

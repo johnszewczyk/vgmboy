@@ -86,29 +86,11 @@
       );
       pointer-events: none;
     }
-    .terminal[data-renderer="dom"][data-scanlines="on"]::before { display: block; }
-
-    .terminal > header,
-    .terminal > .resolutionline,
-    .terminal > nav,
-    .terminal > main,
-    .terminal > footer { min-width: 0; opacity: 0; }
-
-    .terminal[data-renderer="dom"] > header,
-    .terminal[data-renderer="dom"] > .resolutionline,
-    .terminal[data-renderer="dom"] > nav,
-    .terminal[data-renderer="dom"] > main,
-    .terminal[data-renderer="dom"] > footer { opacity: 1; }
-
-    .terminal[data-renderer="webgl2"] > header,
-    .terminal[data-renderer="webgl2"] > .resolutionline,
-    .terminal[data-renderer="webgl2"] > nav,
-    .terminal[data-renderer="webgl2"] > main,
-    .terminal[data-renderer="webgl2"] > footer { opacity: 0; }
+    .terminal[data-filter="css"][data-scanlines="on"]::before { display: block; }
 
     .beam-screen {
       position: absolute;
-      z-index: 2;
+      z-index: 3;
       inset: 0;
       display: none;
       width: 100%;
@@ -116,7 +98,7 @@
       image-rendering: pixelated;
       pointer-events: none;
     }
-    .terminal[data-renderer="webgl2"] .beam-screen { display: block; }
+    .terminal[data-filter="webgl"][data-scanlines="on"] .beam-screen { display: block; }
     .topline,
     .resolutionline,
     .toolrow,
@@ -144,7 +126,7 @@
       justify-self: end;
       display: flex;
       align-items: center;
-      gap: 1ch;
+      gap: 2ch;
       color: var(--dim);
       white-space: nowrap;
     }
@@ -160,7 +142,7 @@
     .resolution-label { color: var(--dim); text-align: left; }
     .resolution-options {
       display: grid;
-      grid-template-columns: repeat(4, 5ch) 6ch;
+      grid-template-columns: repeat(5, minmax(5ch, 1fr));
       gap: 1ch;
       align-items: center;
     }
@@ -186,10 +168,24 @@
     .toolrow {
       grid-row: 3;
       display: grid;
-      grid-template-columns: 5ch 5ch 5ch 4ch 5ch minmax(0, 1fr) 3ch 5ch 3ch;
-      gap: 0;
+      grid-template-columns: minmax(0, 1fr) 1ch auto;
       align-items: stretch;
-      background: var(--black);
+      background: var(--well);
+    }
+    .nav-group {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(5ch, 1fr));
+    }
+    .toolbar-divider {
+      display: grid;
+      place-items: center;
+      color: var(--dim);
+      line-height: 16px;
+    }
+    .transport-group {
+      display: grid;
+      grid-template-columns: 3ch 5ch 3ch;
     }
     .nav-button {
       min-width: 0;
@@ -212,7 +208,6 @@
       color: var(--black);
       outline: none;
     }
-    .tool-spacer { grid-column: 6; }
 
     .workspace {
       --workspace-rows: repeat(var(--workspace-lines), 16px);
@@ -486,12 +481,12 @@
 </head>
 <body>
   <div class="crt">
-    <div class="terminal" data-renderer="dom" data-scanlines="on" role="application" aria-label="LineBoy monochrome line-grid player">
+    <div class="terminal" data-filter="css" data-scanlines="on" role="application" aria-label="LineBoy monochrome line-grid player">
       <canvas class="beam-screen" aria-hidden="true"></canvas>
 
       <header class="topline">
         <div class="brand">LINEBOY</div>
-        <div class="statbits"><span id="grid-size">40X15</span><span id="resolution-size">320X240</span><span id="pixel-scale">6X</span><span id="clock">00:00:00</span></div>
+        <div class="statbits"><span id="grid-size">40X15</span><span id="pixel-scale">6PX</span><span id="clock">00:00:00</span></div>
       </header>
 
       <section class="resolutionline" aria-label="Display resolution">
@@ -506,15 +501,19 @@
       </section>
 
       <nav class="toolrow" aria-label="Commands and transport">
-        <button class="nav-button" type="button" data-action="OPEN" aria-pressed="false">FILE</button>
-        <button class="nav-button" type="button" data-action="TREE" aria-pressed="false">TREE</button>
-        <button class="nav-button" type="button" data-action="LIST" aria-pressed="true">LIST</button>
-        <button class="nav-button" type="button" data-action="FAVORITES" aria-pressed="false">FAV</button>
-        <button class="nav-button" type="button" data-action="OPTIONS" aria-pressed="false">OPTS</button>
-        <span class="tool-spacer" aria-hidden="true"></span>
-        <button class="nav-button" type="button" data-action="PREV" aria-label="Previous track">&lt;&lt;</button>
-        <button class="nav-button" type="button" data-action="PLAY" aria-pressed="false">PLAY</button>
-        <button class="nav-button" type="button" data-action="NEXT" aria-label="Next track">&gt;&gt;</button>
+        <div class="nav-group" role="group" aria-label="Views">
+          <button class="nav-button" type="button" data-action="OPEN" aria-pressed="false">FILE</button>
+          <button class="nav-button" type="button" data-action="TREE" aria-pressed="false">TREE</button>
+          <button class="nav-button" type="button" data-action="LIST" aria-pressed="true">LIST</button>
+          <button class="nav-button" type="button" data-action="FAVORITES" aria-pressed="false">FAV</button>
+          <button class="nav-button" type="button" data-action="OPTIONS" aria-pressed="false">OPTS</button>
+        </div>
+        <span class="toolbar-divider" aria-hidden="true">│</span>
+        <div class="transport-group" role="group" aria-label="Transport">
+          <button class="nav-button" type="button" data-action="PREV" aria-label="Previous track">&lt;&lt;</button>
+          <button class="nav-button" type="button" data-action="PLAY" aria-pressed="false">PLAY</button>
+          <button class="nav-button" type="button" data-action="NEXT" aria-label="Next track">&gt;&gt;</button>
+        </div>
       </nav>
 
       <main class="workspace" aria-label="Library and playlist">
@@ -658,7 +657,6 @@
     const workspace = document.querySelector(".workspace");
     const divider = document.querySelector("#column-divider");
     const gridSize = document.querySelector("#grid-size");
-    const resolutionSize = document.querySelector("#resolution-size");
     const pixelScale = document.querySelector("#pixel-scale");
     const resolutionButtons = [...document.querySelectorAll(".resolution-choice")];
     const resolutionById = new Map(RASTERS.map((raster) => [raster.id, raster]));
@@ -739,8 +737,6 @@
     let favoritesOnly = false;
     let playing = false;
     let seconds = 0;
-    let screenOriginY = 0;
-    let screenOriginX = 0;
 
     window.__lineBoyNativeReply = (id, succeeded, value) => {
       const pending = nativeRequests.get(String(id));
@@ -849,7 +845,6 @@
         }));
       }
       gridSize.textContent = `${columns}X${textRows}`;
-      resolutionSize.textContent = raster.id;
       pixelScale.textContent = `${scanPitch}PX`;
       terminal.dataset.raster = `${sourceWidth}x${sourceHeight}`;
       terminal.dataset.videoMode = raster.width === 320 ? "standard" : "high";
@@ -909,7 +904,6 @@
         section.hidden = section.dataset.optionsContent !== page;
       });
       optionsPageTitle.textContent = page;
-      scheduleRender();
     }
 
     function setOptionsVisible(visible) {
@@ -920,7 +914,6 @@
       optionsContent.hidden = !visible;
       workspace.setAttribute("aria-label", visible ? "Options" : "Library and playlist");
       if (visible) setOptionsPage(selectedOptionsPage);
-      scheduleRender();
     }
 
     resolutionButtons.forEach((button) => button.addEventListener("click", () => {
@@ -944,7 +937,6 @@
       saveDisplayPreferences();
       updateOptionReadouts();
       if (scanlinesEnabled) scheduleRender();
-      else terminal.dataset.renderer = "dom";
       status.textContent = `DISPLAY/SCANLINES ${scanlinesEnabled ? "ON" : "OFF"}`;
     });
 
@@ -1486,51 +1478,40 @@
     }));
 
     const gl = display.getContext("webgl2", {
-      alpha: false,
+      alpha: true,
       antialias: false,
       depth: false,
       stencil: false,
       preserveDrawingBuffer: true,
+      premultipliedAlpha: true,
     });
 
     const vertexSource = `#version 300 es
       in vec2 a_position;
-      out vec2 v_uv;
       void main() {
-        v_uv = a_position * 0.5 + 0.5;
         gl_Position = vec4(a_position, 0.0, 1.0);
       }
     `;
 
     const fragmentSource = `#version 300 es
       precision highp float;
-      uniform sampler2D u_frame;
       uniform vec2 u_resolution;
       uniform float u_scan_pitch;
       uniform float u_beam_radius;
-      in vec2 v_uv;
       out vec4 out_color;
 
       void main() {
-        vec3 source = texture(u_frame, v_uv).rgb;
-        vec3 linear_source = pow(max(source, vec3(0.0)), vec3(2.2));
-        float level = dot(linear_source, vec3(0.2126, 0.7152, 0.0722));
         float screen_y = u_resolution.y - gl_FragCoord.y;
         float center_offset = (u_scan_pitch - 1.0) * 0.5;
         float phase = mod(screen_y - center_offset + u_scan_pitch * 0.5, u_scan_pitch)
           - u_scan_pitch * 0.5;
-        float beam_radius = u_scan_pitch * mix(u_beam_radius * 0.9, u_beam_radius, sqrt(level));
+        float beam_radius = u_scan_pitch * u_beam_radius;
         float edge = max(u_scan_pitch * 0.018, fwidth(screen_y) * 0.30);
         float distance_from_center = abs(phase);
         float coverage = 1.0 - smoothstep(beam_radius - edge, beam_radius + edge, distance_from_center);
         float spot = exp(-0.5 * pow(distance_from_center / (beam_radius * 0.72), 2.0));
-        if (coverage <= 0.0) {
-          out_color = vec4(0.0, 0.0, 0.0, 1.0);
-          return;
-        }
-        vec3 emitted = linear_source * spot * coverage;
-        vec3 encoded = pow(clamp(emitted, 0.0, 1.0), vec3(1.0 / 2.2));
-        out_color = vec4(encoded, 1.0);
+        float black_alpha = 1.0 - spot * coverage;
+        out_color = vec4(0.0, 0.0, 0.0, black_alpha);
       }
     `;
 
@@ -1541,20 +1522,14 @@
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
         const detail = gl.getShaderInfoLog(shader);
         gl.deleteShader(shader);
-        throw new Error(detail || "Unable to compile the scanline renderer");
+        throw new Error(detail || "Unable to compile the scanline filter");
       }
       return shader;
     };
 
     let program = null;
-    let texture = null;
+    let filterUniforms = null;
     let frameRequest = 0;
-    let renderVersion = 0;
-    let nativeScrollLive = false;
-    let scrollResumeTimer = 0;
-    const framebuffer = document.createElement("canvas");
-    const framebufferContext = framebuffer.getContext("2d", { alpha: false });
-
     if (gl) {
       try {
         const vertexShader = compileShader(gl.VERTEX_SHADER, vertexSource);
@@ -1566,7 +1541,7 @@
         gl.deleteShader(vertexShader);
         gl.deleteShader(fragmentShader);
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-          throw new Error(gl.getProgramInfoLog(program) || "Unable to link the scanline renderer");
+          throw new Error(gl.getProgramInfoLog(program) || "Unable to link the scanline filter");
         }
 
         const vertexBuffer = gl.createBuffer();
@@ -1576,183 +1551,61 @@
         const position = gl.getAttribLocation(program, "a_position");
         gl.enableVertexAttribArray(position);
         gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
-        texture = gl.createTexture();
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.uniform1i(gl.getUniformLocation(program, "u_frame"), 0);
+        filterUniforms = {
+          resolution: gl.getUniformLocation(program, "u_resolution"),
+          scanPitch: gl.getUniformLocation(program, "u_scan_pitch"),
+          beamRadius: gl.getUniformLocation(program, "u_beam_radius"),
+        };
+        gl.clearColor(0, 0, 0, 0);
+        gl.disable(gl.BLEND);
       } catch (error) {
-        console.error("LineBoy scanline renderer unavailable:", error);
-        terminal.dataset.renderer = "dom";
+        console.error("LineBoy scanline filter unavailable:", error);
+        program = null;
+        filterUniforms = null;
       }
-    } else {
-      terminal.dataset.renderer = "dom";
     }
 
     function scheduleRender() {
-      if (!scanlinesEnabled) {
-        terminal.dataset.renderer = "dom";
-        return;
-      }
-      if (!gl || !program || frameRequest || nativeScrollLive) return;
+      if (!scanlinesEnabled || !gl || !program || frameRequest) return;
       frameRequest = requestAnimationFrame(() => {
         frameRequest = 0;
-        renderFrame();
+        renderFilter();
       });
     }
 
-    function keepNativeScrollResponsive() {
-      nativeScrollLive = true;
-      if (frameRequest) {
-        cancelAnimationFrame(frameRequest);
-        frameRequest = 0;
-      }
-      if (terminal.dataset.renderer !== "dom") terminal.dataset.renderer = "dom";
-      window.clearTimeout(scrollResumeTimer);
-      scrollResumeTimer = window.setTimeout(() => {
-        nativeScrollLive = false;
-        scheduleRender();
-      }, 160);
-    }
-
-    function renderFrame() {
-      if (!scanlinesEnabled) {
-        terminal.dataset.renderer = "dom";
-        return;
-      }
-      const version = ++renderVersion;
+    function renderFilter() {
+      if (!scanlinesEnabled || !gl || !program || !activeRaster) return;
       const rect = terminal.getBoundingClientRect();
       if (rect.width < 1 || rect.height < 1) return;
       const deviceRatio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
-      const scanPitch = activeRaster.scanPitch;
-      screenOriginX = Math.round(rect.left * deviceRatio) / deviceRatio;
-      screenOriginY = Math.round(rect.top * deviceRatio) / deviceRatio;
       const width = Math.max(1, Math.round(rect.width * deviceRatio));
       const height = Math.max(1, Math.round(rect.height * deviceRatio));
       if (display.width !== width || display.height !== height) {
         display.width = width;
         display.height = height;
       }
-      if (!framebufferContext) {
-        terminal.dataset.renderer = "dom";
-        return;
-      }
-
-      if (framebuffer.width !== width || framebuffer.height !== height) {
-        framebuffer.width = width;
-        framebuffer.height = height;
-      }
-      framebufferContext.setTransform(deviceRatio, 0, 0, deviceRatio,
-        -rect.left * deviceRatio, -rect.top * deviceRatio);
-      drawElement(terminal);
-      if (version !== renderVersion || !gl || !program) return;
 
       try {
         gl.viewport(0, 0, width, height);
+        gl.clear(gl.COLOR_BUFFER_BIT);
         gl.useProgram(program);
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, framebuffer);
-        gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), width, height);
-        gl.uniform1f(gl.getUniformLocation(program, "u_scan_pitch"), scanPitch);
-        gl.uniform1f(gl.getUniformLocation(program, "u_beam_radius"),
+        gl.uniform2f(filterUniforms.resolution, width, height);
+        gl.uniform1f(filterUniforms.scanPitch, activeRaster.scanPitch);
+        gl.uniform1f(filterUniforms.beamRadius,
           beamWidthModes.find((mode) => mode.id === beamWidthMode)?.radius || 0.30);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
-        terminal.dataset.renderer = "webgl2";
+        terminal.dataset.filter = "webgl";
       } catch (error) {
-        console.error("LineBoy scanline frame failed:", error);
-        terminal.dataset.renderer = "dom";
+        console.error("LineBoy scanline filter failed:", error);
+        terminal.dataset.filter = "css";
       }
-    }
-
-    function drawElement(element, clip = null) {
-      if (!(element instanceof Element) || element === display || element.hidden) return;
-      const bounds = element.getBoundingClientRect();
-      if (bounds.width <= 0 || bounds.height <= 0) return;
-      if (clip && (bounds.right <= clip.left || bounds.left >= clip.right
-        || bounds.bottom <= clip.top || bounds.top >= clip.bottom)) return;
-      const style = getComputedStyle(element);
-      if (style.display === "none" || style.visibility === "hidden") return;
-      const ctx = framebufferContext;
-      const x = bounds.left;
-      const y = bounds.top;
-      ctx.save();
-      const opacity = element.parentElement === terminal ? 1 : Number(style.opacity);
-      ctx.globalAlpha *= Number.isFinite(opacity) ? opacity : 1;
-
-      if (style.backgroundColor !== "rgba(0, 0, 0, 0)" && style.backgroundColor !== "transparent") {
-        ctx.fillStyle = style.backgroundColor;
-        ctx.fillRect(x, y, bounds.width, bounds.height);
-      }
-
-      const clipsChildren = element !== terminal
-        && /(auto|scroll|hidden|clip)/.test(`${style.overflowX} ${style.overflowY}`);
-      let childClip = clip;
-      if (clipsChildren) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(x, y, bounds.width, bounds.height);
-        ctx.clip();
-        childClip = clip ? {
-          left: Math.max(clip.left, bounds.left),
-          top: Math.max(clip.top, bounds.top),
-          right: Math.min(clip.right, bounds.right),
-          bottom: Math.min(clip.bottom, bounds.bottom),
-        } : bounds;
-      }
-
-      for (const child of element.childNodes) {
-        if (child.nodeType === Node.TEXT_NODE) drawText(child);
-        else if (child.nodeType === Node.ELEMENT_NODE) drawElement(child, childClip);
-      }
-      if (clipsChildren) ctx.restore();
-      ctx.restore();
-    }
-
-    function drawText(node) {
-      const raw = node.textContent || "";
-      if (!raw.trim() || !node.parentElement) return;
-      const style = getComputedStyle(node.parentElement);
-      if (style.visibility === "hidden" || style.display === "none") return;
-      const text = style.textTransform === "uppercase" ? raw.toUpperCase()
-        : style.textTransform === "lowercase" ? raw.toLowerCase()
-        : raw;
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      const boxes = [...range.getClientRects()];
-      if (!boxes.length) return;
-      const ctx = framebufferContext;
-      ctx.save();
-      ctx.fillStyle = style.color;
-      const cellTop = node.parentElement.getBoundingClientRect().top;
-      const fontSize = Number.parseFloat(style.fontSize) * activeRaster.scale;
-      ctx.font = `${style.fontWeight} ${fontSize}px ${style.fontFamily}`;
-      ctx.textBaseline = "alphabetic";
-      if ("letterSpacing" in ctx) {
-        const letterSpacing = Number.parseFloat(style.letterSpacing);
-        ctx.letterSpacing = `${Number.isFinite(letterSpacing) ? letterSpacing * activeRaster.scale : 0}px`;
-      }
-      for (const box of boxes) {
-        const measuredBaseline = cellTop + FONT_BASELINE_OFFSET * activeRaster.scale;
-        const beamStep = activeRaster.scanPitch / activeRaster.deviceRatio;
-        const baseline = screenOriginY
-          + Math.round((measuredBaseline - screenOriginY) / beamStep) * beamStep;
-        const x = screenOriginX + (box.left - terminal.getBoundingClientRect().left);
-        ctx.fillText(text, x, baseline);
-      }
-      ctx.restore();
     }
 
     updateRaster();
     renderSongs(GAMES.CHRONO, "08");
     if (nativeHost) bootstrapNativeCatalog();
 
-    document.fonts.ready.then(scheduleRender);
+    scheduleRender();
     new ResizeObserver(() => {
       updateRaster();
       scheduleRender();
@@ -1761,24 +1614,6 @@
       updateRaster();
       scheduleRender();
     });
-    libraryTree.addEventListener("scroll", keepNativeScrollResponsive, { passive: true });
-    songList.addEventListener("scroll", keepNativeScrollResponsive, { passive: true });
-    const hoverRegionSelector = ".resolution-choice, .nav-button, .tree-row, .song, .option-category, .option-value";
-    const hoverRegion = (target) => target instanceof Element ? target.closest(hoverRegionSelector) : null;
-    function renderWhenHoverRegionChanges(event) {
-      if (hoverRegion(event.target) !== hoverRegion(event.relatedTarget)) scheduleRender();
-    }
-    terminal.addEventListener("pointerover", renderWhenHoverRegionChanges);
-    terminal.addEventListener("pointerout", renderWhenHoverRegionChanges);
-    terminal.addEventListener("focusin", scheduleRender);
-    terminal.addEventListener("focusout", scheduleRender);
-    new MutationObserver(scheduleRender).observe(terminal, {
-      attributes: true,
-      attributeFilter: ["aria-selected", "aria-pressed", "aria-expanded", "hidden", "data-raster", "data-video-mode"],
-      characterData: true,
-      childList: true,
-      subtree: true,
-    });
     setInterval(() => {
       if (!nativeHost) {
         seconds += 1;
@@ -1786,7 +1621,6 @@
       } else {
         nativeRequest("playbackStatus").then(applyNativePlaybackStatus).catch(() => {});
       }
-      scheduleRender();
     }, 1000);
   </script>
 </body>

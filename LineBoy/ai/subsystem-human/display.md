@@ -1,12 +1,13 @@
 # Display and controls
 
 The display offers direct choices for 320×240, 512×384, 640×480, 800×600, and
-1024×768. The selected profile sets text and scanline density. The grid extends
-to the available window height in whole 16-pixel rows; WIDTH MODE FILL also
-extends its width in whole 8-pixel columns. FRAME keeps the selected profile's
-4:3 width. Text is never stretched to fill unused space. The header shows the
-active grid, selected profile, and beam pitch. Resolution buttons stay in one
-text row.
+1024×768 on one adaptive 8×16 grid. The selected profile sets text and
+scanline density. The grid extends to the available window height in whole
+16-pixel rows; WIDTH MODE FILL also extends its width in whole 8-pixel
+columns. FRAME keeps the selected profile's 4:3 width. Text is never stretched
+to fill unused space. Resolution choices spread evenly across their row; the
+command toolbar expands its view blocks across the remaining width and keeps
+transport controls at the right.
 
 Each 8×16 glyph cell gives the raster its text capacity: columns are active
 width ÷ 8, and complete text rows are floor(height ÷ 16). The selected profile
@@ -20,14 +21,17 @@ needed.
 
 The window keeps an 8-pixel inset around the terminal, leaving a visible frame
 inside the native macOS title-bar area. The layout uses 8-pixel columns and
-16-pixel text rows. Its title, resolution choices, command bar, library,
-playlist, and status line occupy explicit rows.
+16-pixel text rows. Its title, resolution choices, curses-style command bar,
+library, playlist, and status line occupy explicit rows. The title row keeps
+only grid, beam pitch, and clock readouts so the controls have room.
 Labels and controls use the same cell-top baseline: the 10px cap ink is centered
 inside its 16px row, with three source pixels above and below. The baseline
 snaps to the output device grid. During tree or playlist scrolling, native
-WebKit scrolling stays live and row snapping is proximity-based. A fixed
-black-gap scan mask stays over the moving rows; the WebGL beam pass returns
-after 160ms without scroll input.
+WebKit scrolling stays live and row snapping is proximity-based. One fixed
+scanline mask stays above the live interface for the entire interaction: the
+WebGL overlay draws only transparent beam rows and black gaps, never a snapshot
+of the text. Scrolling moves continuously underneath the same filter. The CSS
+mask provides the same fixed-gap fallback when WebGL2 is unavailable.
 
 Phosphor persistence is disabled to keep interaction responsive. OPTIONS opens
 a two-column terminal settings view. DISPLAY contains WIDTH MODE (FILL or
