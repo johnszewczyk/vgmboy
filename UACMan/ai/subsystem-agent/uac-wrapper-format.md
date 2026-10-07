@@ -92,8 +92,9 @@ legacy manifests with `nativeMetadata` fields and preserve those fields during
 unrelated edits unless an explicit metadata cleanup removes them.
 
 Store new projected and authored tag names directly in Title Case, such as
-Title, Artist, Track Number, and Play Length (ms). Do not store a second
-lowercase or camelCase spelling for the same tag. UAC structural properties
+Title, Artist, Track Number, Play Length (ms), and Game Title (JP). Preserve
+established acronym casing inside punctuation such as `(JP)`. Do not store a
+second lowercase or camelCase spelling for the same tag. UAC structural properties
 such as game.title, game.console, attachment references, and playlist field
 names keep the exact spelling defined by this contract; those properties are
 not free-form tags. Readers continue to accept legacy lowercase tag names.
@@ -101,9 +102,11 @@ Editing the value of a legacy field alone preserves its stored name; a
 deliberate rename can normalize it to Title Case. The Tag Analyzer reports the
 exact stored name so legacy casing remains auditable.
 
-Use package metadata **Album** for a useful release or soundtrack title;
-`game.title` remains the required structural identity. Do not create a
-**Game Title** metadata tag. Store a shared package credit as **Album Artist**
+Use package metadata **Album** for a release or soundtrack title only when the
+source has that distinct field. `game.title` remains the required structural
+identity. A format profile may preserve a populated source game-name field as
+**Game Title** (and a source-language counterpart separately); do not invent
+Album or duplicate a field the source does not contain. Store a shared package credit as **Album Artist**
 in `game.metadata`; store a track-specific artist, author, performer, or
 composer as **Artist** on that logical track. Readers may project the package
 Album Artist as the track's display-artist fallback, but must not copy it into
@@ -125,13 +128,15 @@ before distributing newly packed files.
   list notes, text files, Markdown, and other documentation. These open JSON
   fields do not change member bytes. References should resolve to manifest
   member paths, and image/document payloads remain independently hashed members.
-  When source records establish one clear collection and set, new writers add
-  direct Title Case package tags `Set Collection`, `Set Name`, and `Set URL`,
-  with optional `Set Legacy URL`, `Set Archive URL`, and `Set Date`. Keep each
-  value once; the complete source records remain authoritative in `sources[]`.
+  When source records establish one clear set, new writers add direct Title
+  Case package tags `Set Name` and `Set URL`, with optional `Set Legacy URL`,
+  `Set Archive URL`, and `Set Date`. Do not add `Set Collection`; keep
+  collection identity in `sources[]`. Keep each projected value once; the
+  complete source records remain authoritative in `sources[]`.
   Omit the projection when sources conflict or no trustworthy URL is available.
   Existing nested `set` objects and lower camel case set fields are accepted as
-  legacy input; new recipes normalize them to the direct Title Case fields.
+  legacy input; new recipes normalize them to the direct Title Case fields and
+  omit any legacy collection label.
   Project2612 uses `Set URL` for the current VGMRips system listing, `Set Legacy
   URL` for the original `project2612.org` address, and `Set Archive URL` for its
   Wayback snapshot. Project2612 is defunct; the VGMRips directory link is not a
@@ -143,21 +148,15 @@ before distributing newly packed files.
   When a `redump-disc-archive` source is present, that record supplies the set
   projection; the Archive.org download URL must identify the same item as
   `setName`, and the projected URL is the item's `/details/<identifier>` page.
-  New writers add `game.metadata.containedContainerVersions` only when SPC or
-  VGM members are present. The inventory includes only those formats and their
-  version-count groups; it does not include a mixed-version flag. UACMan records
-  format facts but leaves mixed-version review to set-level consumers such as
-  AudioMan. SPC version is read from header byte `0x24`; the signature's textual
-  version is retained separately because source files may disagree between
-  those two facts. Each SPC member exposes
-  `metadata.spcVersion`, `metadata.spcVersionByte`, and
-  `metadata.spcHeaderVersion` for direct access. VGM detection reads `.vgm`
-  headers, including gzip-wrapped bytes when a caller supplies them under a
-  `.vgm` name. The generic pack boundary rejects `.vgz` members because the
-  nested gzip wrapper reduces the effectiveness of the outer Zstandard layer.
-  Set-specific consumers such as AudioMan may add required
-  `metadata.sub-container-version` tags and mixed-version critical flags; the
-  wrapper does not impose those project policies.
+  New SPC and VGM members receive one direct per-member `Format` tag derived
+  from their headers, such as `SPC v.30` or `VGM v.1.71`. The wrapper does not
+  write a redundant camelCase package-level version summary or extra SPC
+  signature/byte tags; AudioMan reports package-level version mixtures and
+  SPC header inconsistencies. The SPC version tag follows the revision byte
+  at `0x24`. VGM detection reads `.vgm` headers, including gzip-wrapped bytes
+  supplied under a `.vgm` name. The generic pack boundary rejects `.vgz`
+  members because the nested gzip wrapper reduces the effectiveness of the
+  outer Zstandard layer.
 - Each `variant` groups a version, alternate, regional release, or other
   distinction and may carry its own canonical release IDs and metadata. A
   variant is not an automatic ranking or deletion decision.
@@ -197,9 +196,12 @@ before distributing newly packed files.
   If an original M3U/M3U8 exists,
   `originalMemberPath` points to its ordinary TAR member; its original bytes
   remain unchanged for exact unpacking.
-- Each `source` records the source collection/set and original package identity
-  (including its BLAKE3 where known). A source URL is provenance; local absolute
-  file paths are not identity fields.
+- Each `source` records the source collection/set and original package identity.
+  When known, include `packageBlake3` and `packageByteSize` for the exact source
+  package bytes. `metadata.sourceRelativePath`, `sourceHashScope`, and
+  `sourceHashProfile` identify the source member and hash meaning for database
+  ingestion. A source URL is provenance; local absolute file paths are not
+  identity fields.
 - Each `transformation` is a per-game ledger entry: operation class, source
   member paths and raw/stream BLAKE3 inputs, output member paths and hashes,
   tool/version, timestamp, optional rationale, and extensible details. Common
@@ -235,9 +237,10 @@ before distributing newly packed files.
   the seek table.
 - `member.blake3` identifies exact stored member bytes. `streamBlake3` is a
   compatibility shortcut for a named playable-payload profile; it is not a
-  rendered-audio hash. The current `uac-playable-payload-v1` profile hashes
-  `.vgz` after gzip decompression; other playable formats hash their complete
-  native member bytes, including headers/tags. The older
+  rendered-audio hash. VGZ sources are normalized to raw VGM before packaging;
+  the current `uac-playable-payload-v1` profile hashes the complete stored VGM
+  member, including headers/tags. Other playable formats hash their complete
+  native member bytes. The older
   `audioman-playable-payload-v1` profile remains valid as a historical hash
   label on existing packages. No command-stream normalization or emulation
   render hash is generated. Hashes are grouped in `hashes[]` records with an
@@ -263,8 +266,8 @@ before distributing newly packed files.
   concept, and must not emit synonymous aliases. For example, the canonical
   system identity is `game.console`; do not also write the same value as
   `game.metadata.system` or `platform`. Package set facts use the direct Title
-  Case tags `Set Collection`, `Set Name`, `Set URL`, and optional `Set Legacy
-  URL`, `Set Archive URL`, or `Set Date`; source-specific identifiers remain in
+  Case tags `Set Name`, `Set URL`, and optional `Set Legacy URL`,
+  `Set Archive URL`, or `Set Date`; source-specific identifiers remain in
   their documented `sources[]` fields. Common attachment keys include
   `game.metadata.cover_front`, `cover_back`, `cue_sheet`, and `documents`.
   Format-specific and genuinely user-defined fields remain open-ended typed

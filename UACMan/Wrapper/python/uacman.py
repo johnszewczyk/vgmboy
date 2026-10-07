@@ -185,6 +185,8 @@ def normalize_authored_metadata_fields(
                 f"{owner} may not contain nativeMetadata; project selected tags directly and keep source bytes intact."
             )
         name = raw_name if raw_name in structural_fields else imported_metadata_tag_name(raw_name)
+        if owner == "Game" and name == "Set Collection":
+            raise UACError("Set Collection is not a UAC package tag; keep collection identity in sources[].")
         if name in normalized:
             if normalized[name] == value:
                 continue
@@ -201,7 +203,6 @@ def normalize_package_set_tags(metadata: dict) -> None:
     if not isinstance(nested, dict):
         raise UACError("Game metadata set must be an object when supplied.")
     fields = {
-        "collection": "Set Collection",
         "name": "Set Name",
         "url": "Set URL",
         "legacyUrl": "Set Legacy URL",
@@ -209,6 +210,8 @@ def normalize_package_set_tags(metadata: dict) -> None:
         "date": "Set Date",
     }
     for raw_name, value in nested.items():
+        if raw_name == "collection":
+            continue  # Retain set identity only in sources[]; never emit Set Collection.
         name = fields.get(raw_name)
         if name is None:
             raise UACError(f"Unknown field in game metadata set: {raw_name}")
@@ -287,6 +290,9 @@ def normalize_recipe(recipe: dict) -> dict:
         source_hash = source.get("packageBlake3")
         if source_hash is not None and (not isinstance(source_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", source_hash)):
             raise UACError(f"Source packageBlake3 must be a lowercase BLAKE3 digest: {source['id']}")
+        source_size = source.get("packageByteSize")
+        if source_size is not None and (not isinstance(source_size, int) or source_size < 0):
+            raise UACError(f"Source packageByteSize must be a nonnegative integer: {source['id']}")
         if source.get("sourceURL") is not None and not isinstance(source["sourceURL"], str):
             raise UACError(f"Source sourceURL must be a string: {source['id']}")
 
@@ -418,7 +424,7 @@ def source_set_metadata(sources: object) -> dict | None:
         if len(projections) != 1:
             return None
         collection, name, url = next(iter(projections))
-        return {"Set Collection": collection, "Set Name": name, "Set URL": url}
+        return {"Set Name": name, "Set URL": url}
 
     projections: set[tuple[str, str, str, str | None, str | None]] = set()
     for source in sources:
@@ -447,7 +453,7 @@ def source_set_metadata(sources: object) -> dict | None:
     if len(projections) != 1:
         return None
     collection, name, url, legacy_url, archive_url = next(iter(projections))
-    result = {"Set Collection": collection, "Set Name": name, "Set URL": url}
+    result = {"Set Name": name, "Set URL": url}
     if legacy_url is not None:
         result["Set Legacy URL"] = legacy_url
     if archive_url is not None:
@@ -487,13 +493,21 @@ def refresh_project2612_set_metadata(manifest: dict) -> bool:
         "Set Collection", metadata.get("setCollection")
     )
     url = existing.get("url") if legacy_nested else metadata.get("Set URL", metadata.get("setUrl"))
-    if collection != "Project2612" or url != SOURCE_ARCHIVE_URLS["Project2612"]:
+    source_collections = {
+        source.get("collection") for source in manifest.get("sources", [])
+        if isinstance(source, dict)
+    }
+    if (
+        (collection != "Project2612" and "Project2612" not in source_collections)
+        or url != SOURCE_ARCHIVE_URLS["Project2612"]
+    ):
         return False
     updated = source_set_metadata(manifest.get("sources"))
-    if updated is None or updated.get("Set Collection") != "Project2612":
+    if updated is None or updated.get("Set Name") != "Sega Genesis":
         return False
     if legacy_nested:
         metadata.pop("set", None)
+    metadata.pop("Set Collection", None)
     for legacy_key in ("setCollection", "setName", "setUrl", "setLegacyUrl", "setArchiveUrl"):
         metadata.pop(legacy_key, None)
     metadata.update(updated)
@@ -655,11 +669,7 @@ def scan_contained_container_versions(root: Path) -> tuple[dict, dict[str, dict]
             group["memberCount"] += 1
             group["headerVersions"][header_version] = group["headerVersions"].get(header_version, 0) + 1
             relative = path.relative_to(root).as_posix()
-            versioned_members[relative] = {
-                "spcVersion": version,
-                "spcVersionByte": version_byte,
-                "spcHeaderVersion": header_version,
-            }
+            versioned_members[relative] = {"Format": f"SPC v.{version_byte:02d}"}
             continue
         if suffix not in (".vgm", ".vgz"):
             continue
@@ -678,6 +688,7 @@ def scan_contained_container_versions(root: Path) -> tuple[dict, dict[str, dict]
             raise UACError(f"Invalid VGM container version in {path.name}: 0x{version:08X}")
         versions[version] = versions.get(version, 0) + 1
         relative = path.relative_to(root).as_posix()
+        versioned_members[relative] = {"Format": f"VGM v.{vgm_version_text(version)}"}
 
     spc_groups = [
         {
@@ -726,19 +737,14 @@ def contained_container_versions(root: Path) -> dict | None:
 
 def apply_contained_container_versions(root: Path, recipe: dict) -> None:
     reject_forbidden_vgm_members(root)
-    detected, versioned_members = scan_contained_container_versions(root)
+    _, versioned_members = scan_contained_container_versions(root)
     game_metadata = recipe["game"].setdefault("metadata", {})
     if not isinstance(game_metadata, dict):
         raise UACError("Game metadata must be a JSON object.")
-    authored = game_metadata.get("containedContainerVersions")
-    if detected is None:
-        if authored is not None:
-            raise UACError("Recipe containedContainerVersions has no matching SPC/VGM members.")
-        game_metadata.pop("containedContainerVersions", None)
-    else:
-        if authored is not None and authored != detected:
-            raise UACError("Recipe containedContainerVersions disagrees with detected SPC/VGM headers.")
-        game_metadata["containedContainerVersions"] = detected
+    if "containedContainerVersions" in game_metadata:
+        raise UACError(
+            "containedContainerVersions is deprecated; use one per-member Format tag."
+        )
 
     for path, fields in versioned_members.items():
         override = recipe["memberOverrides"].setdefault(path, {})
@@ -749,7 +755,7 @@ def apply_contained_container_versions(root: Path, recipe: dict) -> None:
             raise UACError(f"Member metadata override must be an object: {path}")
         for key, value in fields.items():
             if key in metadata and metadata[key] not in (None, "", value):
-                raise UACError(f"Recipe {key} disagrees with detected SPC header: {path}")
+                raise UACError(f"Recipe {key} disagrees with detected container header: {path}")
             metadata[key] = value
 
 def load_recipe(path: Path) -> dict:
@@ -903,11 +909,16 @@ def imported_metadata_tag_name(raw_name: object) -> str:
     acronyms = {word.lower() for word in re.findall(r"\b[A-Z0-9]{2,}\b", words)}
     result = []
     for word in words.split():
-        lower = word.lower()
-        if lower in _TAG_NAME_ACRONYMS or word.upper() in acronyms:
-            result.append(word.upper())
+        match = re.fullmatch(r"([^A-Za-z0-9]*)([A-Za-z0-9][A-Za-z0-9'-]*)([^A-Za-z0-9]*)", word)
+        if match is None:
+            result.append(word)
+            continue
+        prefix, core, suffix = match.groups()
+        token = re.sub(r"[^A-Za-z0-9]", "", core).lower()
+        if token in _TAG_NAME_ACRONYMS or token in acronyms:
+            result.append(f"{prefix}{core.upper()}{suffix}")
         else:
-            result.append(lower[:1].upper() + lower[1:])
+            result.append(f"{prefix}{core[:1].upper() + core[1:].lower()}{suffix}")
     return " ".join(result)
 
 

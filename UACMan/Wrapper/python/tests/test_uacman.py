@@ -73,7 +73,7 @@ class AuthoredTagNamingTests(unittest.TestCase):
         self.assertEqual(recipe["game"]["metadata"]["Play Length (ms)"], 1234)
         self.assertEqual(recipe["game"]["metadata"]["cue_sheet"], {"memberPath": "disc.cue"})
         self.assertNotIn("set", recipe["game"]["metadata"])
-        self.assertEqual(recipe["game"]["metadata"]["Set Collection"], "Fixture")
+        self.assertNotIn("Set Collection", recipe["game"]["metadata"])
         self.assertEqual(recipe["game"]["metadata"]["Set Name"], "Test Set")
         self.assertEqual(recipe["variants"][0]["metadata"]["Game Title"], "Source Title")
         self.assertEqual(recipe["memberOverrides"]["track.spc"]["metadata"]["Track Number"], "02")
@@ -620,23 +620,11 @@ class UACManRoundTripTests(unittest.TestCase):
             self.run_uacman("unpack", str(container), str(unpacked))
             manifest = json.loads((unpacked / "manifest.json").read_text(encoding="utf-8"))
 
-            self.assertEqual(
-                manifest["game"]["metadata"]["containedContainerVersions"],
-                {
-                    "schemaVersion": 1,
-                    "formatsScanned": ["vgm"],
-                    "versions": {
-                        "vgm": [
-                            {"version": "1.70", "versionRaw": "0x00000170", "memberCount": 1},
-                            {"version": "1.71", "versionRaw": "0x00000171", "memberCount": 1},
-                        ]
-                    },
-                },
-            )
+            self.assertNotIn("containedContainerVersions", manifest["game"]["metadata"])
             by_path = {member["path"]: member for member in manifest["members"]}
             self.assertNotIn("criticalFlags", manifest["game"]["metadata"])
-            self.assertNotIn("sub-container-version", by_path["01-old.vgm"]["metadata"])
-            self.assertNotIn("sub-container-version", by_path["02-new.vgm"]["metadata"])
+            self.assertEqual(by_path["01-old.vgm"]["metadata"]["Format"], "VGM v.1.70")
+            self.assertEqual(by_path["02-new.vgm"]["metadata"]["Format"], "VGM v.1.71")
             for name, contents in members.items():
                 self.assertEqual((unpacked / name).read_bytes(), contents)
                 expected_crc = f"{zlib.crc32(contents) & 0xFFFFFFFF:08X}"
@@ -696,10 +684,7 @@ class UACManRoundTripTests(unittest.TestCase):
             with gzip.open(wrapped_source / "track.vgm", "wb") as output:
                 output.write(minimal_vgm(0x171))
             uacman.apply_contained_container_versions(wrapped_source, recipe)
-            self.assertEqual(
-                recipe["game"]["metadata"]["containedContainerVersions"]["versions"]["vgm"][0]["version"],
-                "1.71",
-            )
+            self.assertEqual(recipe["memberOverrides"]["track.vgm"]["metadata"]["Format"], "VGM v.1.71")
 
     def test_package_records_spc_versions_and_per_member_metadata(self) -> None:
         with tempfile.TemporaryDirectory(prefix="uacman-spc-version-test-") as temporary:
@@ -725,30 +710,11 @@ class UACManRoundTripTests(unittest.TestCase):
             self.run_uacman("unpack", str(container), str(unpacked))
             manifest = json.loads((unpacked / "manifest.json").read_text(encoding="utf-8"))
 
-            inventory = manifest["game"]["metadata"]["containedContainerVersions"]
-            self.assertEqual(inventory["formatsScanned"], ["spc"])
-            self.assertNotIn("mixedVersionFormats", inventory)
-            self.assertEqual(inventory["versions"]["spc"], [
-                {
-                    "version": "0.10",
-                    "versionByte": 10,
-                    "memberCount": 2,
-                    "headerVersions": [
-                        {"version": "0.10", "memberCount": 1},
-                        {"version": "0.30", "memberCount": 1},
-                    ],
-                },
-                {
-                    "version": "0.30",
-                    "versionByte": 30,
-                    "memberCount": 1,
-                    "headerVersions": [{"version": "0.30", "memberCount": 1}],
-                },
-            ])
+            self.assertNotIn("containedContainerVersions", manifest["game"]["metadata"])
             by_name = {member["originalName"]: member for member in manifest["members"]}
-            self.assertEqual(by_name["old-header-current-byte.spc"]["metadata"]["spcVersion"], "0.10")
-            self.assertEqual(by_name["old-header-current-byte.spc"]["metadata"]["spcVersionByte"], 10)
-            self.assertEqual(by_name["old-header-current-byte.spc"]["metadata"]["spcHeaderVersion"], "0.30")
+            self.assertEqual(by_name["old-header-current-byte.spc"]["metadata"]["Format"], "SPC v.10")
+            self.assertEqual(by_name["old.spc"]["metadata"]["Format"], "SPC v.10")
+            self.assertEqual(by_name["current.spc"]["metadata"]["Format"], "SPC v.30")
             for name, contents in members.items():
                 self.assertEqual((unpacked / name).read_bytes(), contents)
 
@@ -848,7 +814,6 @@ class SetMetadataTests(unittest.TestCase):
                 "collection": "JoshW", "setName": "Nintendo SNES",
             }]),
             {
-                "Set Collection": "JoshW",
                 "Set Name": "Nintendo SNES",
                 "Set URL": "https://spc.joshw.info/",
             },
@@ -888,7 +853,6 @@ class SetMetadataTests(unittest.TestCase):
             },
         ]
         expected = {
-            "Set Collection": "Redump",
             "Set Name": "SNK - Neo Geo CD - (2019-10-16)",
             "Set URL": "https://archive.org/details/RedumpSnkNeoGeoCd16Oct2019",
         }
@@ -918,7 +882,7 @@ class SetMetadataTests(unittest.TestCase):
         self.assertTrue(uacman.refresh_project2612_set_metadata(manifest))
         metadata = manifest["game"]["metadata"]
         self.assertNotIn("set", metadata)
-        self.assertEqual(metadata["Set Collection"], "Project2612")
+        self.assertNotIn("Set Collection", metadata)
         self.assertEqual(metadata["Set Name"], "Sega Genesis")
         self.assertEqual(metadata["Set URL"], "https://vgmrips.net/packs/system/sega/mega-drive")
         self.assertFalse(uacman.refresh_project2612_set_metadata(manifest))
@@ -959,7 +923,7 @@ class SetMetadataTests(unittest.TestCase):
             ):
                 manifest["game"]["metadata"].pop(key, None)
             self.assertTrue(uacman.add_source_set_metadata(manifest))
-            self.assertEqual(manifest["game"]["metadata"]["Set Collection"], "Fixture")
+            self.assertNotIn("Set Collection", manifest["game"]["metadata"])
             self.assertEqual(manifest["game"]["metadata"]["Set Name"], "Test Set")
             self.assertEqual(manifest["game"]["metadata"]["Set URL"], "https://example.invalid/test-set")
 
