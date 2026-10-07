@@ -36,6 +36,11 @@ with a grayscale spot profile. Scrolling moves continuously underneath the
 same filter. The CSS mask provides the same fixed-gap fallback when WebGL2 is
 unavailable.
 
+Filled command buttons are separate blocks with one character cell between
+buttons and a two-cell blank gap before transport. There is no visible divider
+between the command and transport groups. The resolution profile row remains a
+separate testing control row.
+
 Phosphor persistence is disabled to keep interaction responsive. OPTIONS opens
 a two-column terminal settings view. DISPLAY contains WIDTH MODE (FILL or
 FRAME), SCANLINES, the active beam pitch, and a native fullscreen toggle. CRT
@@ -47,8 +52,15 @@ toggles fullscreen, Command+M minimizes, Command+W closes the window, and
 Command+Q quits. The Edit menu forwards standard text commands to WebKit.
 
 In the native app, the library tree loads group counts from the shared catalog
-and fetches a group's game rows when it expands. Selecting a game loads its
-tracks, F on a selected track toggles shared
+and fetches a group's game rows when it expands. The library search field sits
+under its header, aligned to the playlist column headings. Command+F focuses
+the field; entering a query temporarily replaces the tree with matching games
+from the shared CatalogBrowserCore search projection. At most 250 rows are
+rendered at once, with `+` on the count when more results match. Clearing the
+query restores the tree and its prior selection. Search results can be moved
+with the arrow keys; selecting one loads that game's tracks. The browser
+preview searches its sample games. Selecting a game loads its tracks, F on a
+selected track toggles shared
 Favorites, and FAV filters the current playlist. Previous and next use the
 shared queue rules and start the adjacent track. PLAY pauses or resumes;
 double-clicking a row starts it. FILE opens a supported local file through the

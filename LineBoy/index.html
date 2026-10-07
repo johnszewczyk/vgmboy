@@ -170,24 +170,21 @@
     .toolrow {
       grid-row: 3;
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 1ch auto;
+      grid-template-columns: minmax(0, 1fr) auto;
+      column-gap: 2ch;
       align-items: stretch;
-      background: var(--well);
+      background: transparent;
     }
     .nav-group {
       min-width: 0;
       display: grid;
-      grid-template-columns: repeat(5, minmax(5ch, 1fr));
-    }
-    .toolbar-divider {
-      display: grid;
-      place-items: center;
-      color: var(--dim);
-      line-height: 16px;
+      grid-template-columns: repeat(5, minmax(4ch, 1fr));
+      gap: 1ch;
     }
     .transport-group {
       display: grid;
-      grid-template-columns: 3ch 5ch 3ch;
+      grid-template-columns: 2ch 4ch 2ch;
+      gap: 1ch;
     }
     .nav-button {
       min-width: 0;
@@ -249,7 +246,36 @@
     .panel-title .count { text-align: right; }
 
     .tree {
-      grid-row: 2 / -1;
+      grid-row: 3 / -1;
+      min-height: 0;
+      display: grid;
+      grid-auto-rows: 16px;
+      align-content: start;
+      overflow-x: hidden;
+      overflow-y: auto;
+      scrollbar-width: none;
+      scroll-snap-type: y proximity;
+    }
+    .library-search {
+      grid-row: 2;
+      min-width: 0;
+      width: 100%;
+      height: 16px;
+      padding: 0 1ch;
+      border: 0;
+      border-radius: 0;
+      background: var(--well);
+      color: var(--gray);
+      font: inherit;
+      line-height: 16px;
+      letter-spacing: inherit;
+      appearance: none;
+    }
+    .library-search::placeholder { color: var(--dim); opacity: 1; }
+    .library-search:focus-visible { background: var(--gray); color: var(--black); outline: none; }
+    .library-search:focus-visible::placeholder { color: #454545; }
+    .library-results {
+      grid-row: 3 / -1;
       min-height: 0;
       display: grid;
       grid-auto-rows: 16px;
@@ -510,7 +536,6 @@
           <button class="nav-button" type="button" data-action="FAVORITES" aria-pressed="false">FAV</button>
           <button class="nav-button" type="button" data-action="OPTIONS" aria-pressed="false">OPTS</button>
         </div>
-        <span class="toolbar-divider" aria-hidden="true">│</span>
         <div class="transport-group" role="group" aria-label="Transport">
           <button class="nav-button" type="button" data-action="PREV" aria-label="Previous track">&lt;&lt;</button>
           <button class="nav-button" type="button" data-action="PLAY" aria-pressed="false">PLAY</button>
@@ -521,6 +546,8 @@
       <main class="workspace" aria-label="Library and playlist">
         <aside class="panel library-panel" aria-label="Library">
           <div class="panel-title"><span>LIBRARY</span><span class="count" id="library-count">12/64</span></div>
+          <input class="library-search" id="library-search" type="search" placeholder="Search library"
+            aria-label="Search library" aria-keyshortcuts="Meta+F" autocomplete="off" spellcheck="false">
           <div class="tree" id="library-tree" role="tree" aria-label="Systems and demo folders">
             <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-selected="false" tabindex="-1"><span class="chev"></span><span class="label">AMIGA</span><span class="count">38</span></button>
             <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-selected="false" tabindex="-1"><span class="chev"></span><span class="label">ARCADE</span><span class="count">54</span></button>
@@ -532,6 +559,7 @@
             <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-selected="false" tabindex="-1"><span class="chev"></span><span class="label">GENESIS</span><span class="count">72</span></button>
             <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-selected="false" tabindex="-1"><span class="chev"></span><span class="label">PSX</span><span class="count">29</span></button>
           </div>
+          <div class="library-results" id="library-results" role="tree" aria-label="Library search results" hidden></div>
         </aside>
 
         <div class="divider" id="column-divider" aria-hidden="true"></div>
@@ -570,6 +598,7 @@
           </div>
           <div class="option-page" data-options-content="KEYS" hidden>
             <div class="option-row"><span>MOVE</span><span class="option-key">ARROWS</span></div>
+            <div class="option-row"><span>SEARCH</span><span class="option-key">CMD+F</span></div>
             <div class="option-row"><span>OPEN/PLAY</span><span class="option-key">ENTER</span></div>
             <div class="option-row"><span>FAVORITE</span><span class="option-key">F</span></div>
             <div class="option-row"><span>BACK</span><span class="option-key">ESC</span></div>
@@ -682,6 +711,8 @@
     }
     const savedDisplayPreferences = readDisplayPreferences();
     const libraryTree = document.querySelector("#library-tree");
+    const librarySearch = document.querySelector("#library-search");
+    const libraryResults = document.querySelector("#library-results");
     const libraryCount = document.querySelector("#library-count");
     const libraryPanel = document.querySelector(".library-panel");
     const listPanel = document.querySelector(".listpanel");
@@ -700,6 +731,7 @@
     const fullscreenToggle = document.querySelector("#fullscreen-toggle");
     const resetDisplay = document.querySelector("#reset-display");
     let treeRows = [...document.querySelectorAll(".tree-row")];
+    let searchRows = [];
     const songList = document.querySelector("#song-list");
     const gameTitle = document.querySelector("#game-title");
     const trackCount = document.querySelector("#track-count");
@@ -715,6 +747,12 @@
     const nativeDisplayNames = new Map();
     const folderChildren = new Map();
     let selectedTreeRow = treeRows.find((row) => row.getAttribute("aria-selected") === "true") || null;
+    let treeSelectionBeforeSearch = null;
+    let librarySearchActive = false;
+    let librarySearchTimer = null;
+    let librarySearchVersion = 0;
+    let catalogGameCount = 0;
+    let catalogTrackCount = 0;
     let nativeRequestID = 0;
     let catalogRequestVersion = 0;
     let nativeFavoriteIDs = new Set();
@@ -919,6 +957,14 @@
       if (visible) setOptionsPage(selectedOptionsPage);
     }
 
+    window.__lineBoyFocusSearch = () => {
+      if (optionsVisible) {
+        setOptionsVisible(false);
+        setNavSelection("TREE");
+      }
+      librarySearch.focus();
+    };
+
     resolutionButtons.forEach((button) => button.addEventListener("click", () => {
       selectRaster(button.dataset.resolution);
     }));
@@ -974,7 +1020,10 @@
       status.textContent = "DISPLAY/DEFAULTS RESTORED";
     });
 
-    function visibleTreeRows() { return treeRows.filter((row) => !row.hidden); }
+    function visibleTreeRows() {
+      const rows = librarySearchActive ? searchRows : treeRows;
+      return rows.filter((row) => !row.hidden);
+    }
 
     function selectTreeRow(row, moveFocus = false) {
       if (selectedTreeRow !== row) {
@@ -1186,61 +1235,194 @@
         }
     }
 
-    libraryTree.addEventListener("click", (event) => {
+    function handleLibraryRowKeydown(event) {
       const row = event.target.closest(".tree-row");
-      if (row) handleTreeClick(row);
-    });
-
-    libraryTree.addEventListener("keydown", (event) => {
-        const row = event.target.closest(".tree-row");
-        if (!row) return;
-        const visible = visibleTreeRows();
-        const index = visible.indexOf(row);
-        let target = null;
-        if (event.key === "ArrowDown") target = visible[Math.min(index + 1, visible.length - 1)];
-        else if (event.key === "ArrowUp") target = visible[Math.max(index - 1, 0)];
-        else if (event.key === "Home") target = visible[0];
-        else if (event.key === "End") target = visible.at(-1);
-        else if (event.key === "ArrowRight" && row.dataset.folder) {
-          if (row.getAttribute("aria-expanded") !== "true") setFolderExpanded(row, true);
-          else target = visible.find((entry) => entry.dataset.parent === row.dataset.folder);
-        } else if (event.key === "ArrowLeft") {
-          if (row.dataset.folder && row.getAttribute("aria-expanded") === "true") setFolderExpanded(row, false);
-          else if (row.dataset.parent) target = treeRows.find((entry) => entry.dataset.folder === row.dataset.parent);
-        } else if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          handleTreeClick(row);
-          return;
-        } else return;
+      if (!row) return;
+      const visible = visibleTreeRows();
+      const index = visible.indexOf(row);
+      let target = null;
+      if (event.key === "ArrowDown") target = visible[Math.min(index + 1, visible.length - 1)];
+      else if (event.key === "ArrowUp") target = visible[Math.max(index - 1, 0)];
+      else if (event.key === "Home") target = visible[0];
+      else if (event.key === "End") target = visible.at(-1);
+      else if (event.key === "ArrowRight" && row.dataset.folder) {
+        if (row.getAttribute("aria-expanded") !== "true") setFolderExpanded(row, true);
+        else target = visible.find((entry) => entry.dataset.parent === row.dataset.folder);
+      } else if (event.key === "ArrowLeft") {
+        if (row.dataset.folder && row.getAttribute("aria-expanded") === "true") setFolderExpanded(row, false);
+        else if (row.dataset.parent) target = treeRows.find((entry) => entry.dataset.folder === row.dataset.parent);
+      } else if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        if (target) {
-          selectTreeRow(target, true);
-          target.scrollIntoView({ block: "nearest" });
-        }
+        handleTreeClick(row);
+        return;
+      } else return;
+      event.preventDefault();
+      if (target) {
+        selectTreeRow(target, true);
+        target.scrollIntoView({ block: "nearest" });
+      }
+    }
+
+    [libraryTree, libraryResults].forEach((container) => {
+      container.addEventListener("click", (event) => {
+        const row = event.target.closest(".tree-row");
+        if (row) handleTreeClick(row);
+      });
+      container.addEventListener("keydown", handleLibraryRowKeydown);
     });
 
     function gameKey(game) {
       return `${game.rootId}|${game.system}|${game.game}`;
     }
 
-    function createNativeGameRow(game, folderID) {
+    function createNativeGameRow(game, folderID, showDisplayName = false) {
       const key = gameKey(game);
       const row = document.createElement("button");
       row.type = "button";
-      row.className = "tree-row indent";
+      row.className = folderID ? "tree-row indent" : "tree-row";
       row.setAttribute("role", "treeitem");
-      row.setAttribute("aria-level", "2");
+      row.setAttribute("aria-level", folderID ? "2" : "1");
       row.setAttribute("aria-selected", "false");
       row.tabIndex = -1;
-      row.dataset.parent = folderID;
+      if (folderID) row.dataset.parent = folderID;
       row.dataset.game = key;
       nativeGames.set(key, game);
-      row.innerHTML = '<span class="chev">›</span><span class="label"></span><span class="count"></span>';
-      row.querySelector(".label").textContent = game.game.toUpperCase();
+      row.innerHTML = `<span class="chev">${folderID ? "›" : ""}</span><span class="label"></span><span class="count"></span>`;
+      row.querySelector(".label").textContent = (showDisplayName ? game.displayName : game.game).toUpperCase();
       row.title = game.displayName;
       row.querySelector(".count").textContent = String(game.trackCount);
       return row;
     }
+
+    function createSampleSearchRow(id, game) {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "tree-row";
+      row.setAttribute("role", "treeitem");
+      row.setAttribute("aria-level", "1");
+      row.setAttribute("aria-selected", "false");
+      row.tabIndex = -1;
+      row.dataset.game = id;
+      row.innerHTML = '<span class="chev"></span><span class="label"></span><span class="count"></span>';
+      row.querySelector(".label").textContent = game.title.toUpperCase();
+      row.querySelector(".count").textContent = String(game.tracks.length);
+      return row;
+    }
+
+    function setLibrarySearchMode(active) {
+      if (librarySearchActive === active) return;
+      librarySearchActive = active;
+      if (active) {
+        treeSelectionBeforeSearch = selectedTreeRow;
+        selectedTreeRow = null;
+        libraryTree.hidden = true;
+        libraryResults.hidden = false;
+      } else {
+        if (selectedTreeRow?.isConnected && libraryResults.contains(selectedTreeRow)) {
+          selectedTreeRow.setAttribute("aria-selected", "false");
+          selectedTreeRow.tabIndex = -1;
+        }
+        selectedTreeRow = treeSelectionBeforeSearch?.isConnected ? treeSelectionBeforeSearch : null;
+        if (selectedTreeRow) {
+          selectedTreeRow.setAttribute("aria-selected", "true");
+          selectedTreeRow.tabIndex = 0;
+        }
+        treeSelectionBeforeSearch = null;
+        libraryTree.hidden = false;
+        libraryResults.hidden = true;
+        libraryResults.replaceChildren();
+        searchRows = [];
+        libraryCount.textContent = formatCatalogCount(catalogGameCount || treeRows.length);
+      }
+    }
+
+    function showLibrarySearchResults(games, count, sample = false) {
+      if (selectedTreeRow?.isConnected && libraryResults.contains(selectedTreeRow)) {
+        selectedTreeRow.setAttribute("aria-selected", "false");
+        selectedTreeRow.tabIndex = -1;
+      }
+      selectedTreeRow = null;
+      const rows = sample
+        ? games.map(({ id, game }) => createSampleSearchRow(id, game))
+        : games.map((game) => createNativeGameRow(game, null, true));
+      if (!rows.length) {
+        const empty = document.createElement("button");
+        empty.type = "button";
+        empty.className = "tree-row";
+        empty.disabled = true;
+        empty.setAttribute("role", "treeitem");
+        empty.setAttribute("aria-level", "1");
+        empty.innerHTML = '<span class="chev"></span><span class="label">NO MATCHES</span><span class="count"></span>';
+        rows.push(empty);
+      }
+      searchRows = rows;
+      libraryResults.replaceChildren(...rows);
+      libraryResults.setAttribute("aria-busy", "false");
+      libraryCount.textContent = count > games.length ? `${games.length}+` : formatCatalogCount(count);
+    }
+
+    function sampleSearchMatches(query) {
+      const terms = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
+      const matches = Object.entries(GAMES).filter(([, game]) => {
+        const searchable = `${game.title} ${game.system}`.toLocaleLowerCase();
+        return terms.every((term) => searchable.includes(term));
+      }).map(([id, game]) => ({ id, game }));
+      return { count: matches.length, games: matches.slice(0, 250) };
+    }
+
+    async function runLibrarySearch(query, version) {
+      try {
+        const result = nativeHost
+          ? await nativeRequest("catalogSearch", { query })
+          : sampleSearchMatches(query);
+        if (version !== librarySearchVersion || !librarySearchActive) return;
+        showLibrarySearchResults(result.games || [], Number(result.count) || 0, !nativeHost);
+      } catch (error) {
+        if (version !== librarySearchVersion || !librarySearchActive) return;
+        showLibrarySearchResults([], 0);
+        status.textContent = `SEARCH/ERROR ${error.message}`;
+      }
+    }
+
+    function updateLibrarySearch() {
+      const query = librarySearch.value.trim();
+      const version = ++librarySearchVersion;
+      clearTimeout(librarySearchTimer);
+      if (!query) {
+        setLibrarySearchMode(false);
+        if (nativeHost) status.textContent = `CATALOG ${formatCatalogCount(catalogGameCount)}G / ${formatCatalogCount(catalogTrackCount)}T`;
+        return;
+      }
+      setLibrarySearchMode(true);
+      libraryResults.setAttribute("aria-busy", "true");
+      if (selectedTreeRow?.isConnected && libraryResults.contains(selectedTreeRow)) {
+        selectedTreeRow.setAttribute("aria-selected", "false");
+        selectedTreeRow.tabIndex = -1;
+      }
+      selectedTreeRow = null;
+      searchRows = [];
+      libraryResults.replaceChildren();
+      const loading = document.createElement("div");
+      loading.className = "tree-row";
+      loading.setAttribute("role", "status");
+      loading.textContent = "SEARCHING…";
+      libraryResults.append(loading);
+      libraryCount.textContent = "…";
+      librarySearchTimer = setTimeout(() => runLibrarySearch(query, version), 120);
+    }
+
+    librarySearch.addEventListener("input", updateLibrarySearch);
+    librarySearch.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        librarySearch.value = "";
+        updateLibrarySearch();
+        librarySearch.blur();
+      } else if (event.key === "ArrowDown" && searchRows.length) {
+        event.preventDefault();
+        selectTreeRow(searchRows[0], true);
+      }
+    });
 
     function renderNativeLibrary(payload) {
       nativeGames.clear();
@@ -1316,8 +1498,10 @@
       try {
         const payload = await nativeRequest("catalogBootstrap");
         nativeFavoriteIDs = new Set(payload.favoriteIds || []);
+        catalogGameCount = Number(payload.gameCount) || 0;
+        catalogTrackCount = Number(payload.trackCount) || 0;
         const firstGroupRow = renderNativeLibrary(payload);
-        status.textContent = `CATALOG ${formatCatalogCount(payload.gameCount)}G / ${formatCatalogCount(payload.trackCount)}T`;
+        status.textContent = `CATALOG ${formatCatalogCount(catalogGameCount)}G / ${formatCatalogCount(catalogTrackCount)}T`;
         if (firstGroupRow) {
           selectTreeRow(firstGroupRow);
           const firstGameRow = await setFolderExpanded(firstGroupRow, true);
@@ -1404,7 +1588,20 @@
     }
 
     terminal.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape" || !optionsVisible) return;
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        window.__lineBoyFocusSearch();
+        return;
+      }
+      if (event.key !== "Escape") return;
+      if (librarySearchActive) {
+        event.preventDefault();
+        librarySearch.value = "";
+        updateLibrarySearch();
+        librarySearch.focus();
+        return;
+      }
+      if (!optionsVisible) return;
       event.preventDefault();
       setOptionsVisible(false);
       setNavSelection(returnAction);
@@ -1436,7 +1633,8 @@
       } else if (action === "TREE") {
         setOptionsVisible(false);
         setNavSelection(action);
-        (treeRows.find((row) => row.getAttribute("aria-selected") === "true") || treeRows[0]).focus();
+        if (librarySearchActive) librarySearch.focus();
+        else (treeRows.find((row) => row.getAttribute("aria-selected") === "true") || treeRows[0]).focus();
         status.textContent = "VIEW/LIBRARY";
       } else if (action === "LIST") {
         setOptionsVisible(false);

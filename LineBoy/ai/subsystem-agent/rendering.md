@@ -41,6 +41,18 @@ and beam width in local display preferences. The WebGL beam-row uniform and CSS
 fallback use the same THIN/NORMAL/WIDE setting. SCANLINES off exposes the DOM
 without changing the grid. The resolution row and view toolbar must flex with
 the active column count so controls use available width at each profile.
+
+Keep the native library search on the shared `CatalogBrowserCore` game search
+projection. Build one `CatalogSearchIndex` from the bootstrap snapshot, retain
+it behind the native bridge, and query it off the WebKit event path; do not
+reopen SQLite for each keystroke or duplicate searchable-field normalization in
+JavaScript. Debounce query updates, cap rendered results at 250, and preserve
+the tree DOM and its selection while the separate results scroller is shown.
+The sample browser preview may search its local sample game records. Keep the
+search input on its own 16px row aligned to the playlist heading row. Toolbar
+blocks use a one-cell internal gap and a two-cell gap before transport; retain
+the test resolution row and do not add a visible group divider.
+
 Route native fullscreen requests through the LineBoy bridge to the owning
 NSWindow; the browser preview uses the document fullscreen API.
 

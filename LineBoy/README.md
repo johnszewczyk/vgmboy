@@ -6,7 +6,8 @@ then paints it with full-intensity beam rows and crisp, integer-pixel black
 gaps. The filter preserves the font's fixed character advance. The native
 WebKit host reads the shared VGMMan catalog, persists favorites through
 FrontendCore, and routes playback through the shared transport and VGMBoy
-decoder. The browser build remains a sample-data preview without native
+decoder. Its library search uses the shared CatalogBrowserCore projection and
+search index. The browser build remains a sample-data preview without native
 services.
 
 ## Display grid
@@ -39,8 +40,11 @@ The native host owns catalog and transport adapters; the HTML owns the shared
 the live DOM. Scrolling stays beneath that one fixed filter. Both hosts use the
 same interface, while only the native host has access to CatalogReader,
 FrontendCore, and VGMBoy. The native app also supplies standard macOS app,
-File, Edit, View, and Window menus, including Command+O, Command+comma,
-Control+Command+F, Command+W, and Command+Q.
+File, Edit, View, and Window menus, including Command+O, Command+F for library
+search, Command+comma, Control+Command+F, Command+W, and Command+Q. Filled
+toolbar actions have cell-sized gaps; transport is separated by a larger blank
+gap with no visible divider. Search replaces the library tree temporarily and
+returns to its previous selection when cleared.
 
 The font `assets/ModernDOS8x16.ttf` is Modern DOS 8×16 by Jayvee Enaguas,
 dedicated under CC0 1.0. The included `assets/CC0-1.0.txt` preserves its

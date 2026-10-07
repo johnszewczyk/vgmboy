@@ -19,6 +19,35 @@ private struct LineBoyCatalogGame: Sendable {
     let system: String
     let displayName: String
     let trackCount: Int
+    let searchText: String
+}
+
+private struct LineBoyCatalogSearchMatches: Sendable {
+    let count: Int
+    let games: [LineBoyCatalogGame]
+}
+
+private actor LineBoyCatalogSearch {
+    private let games: [LineBoyCatalogGame]
+    private var browserState = CatalogBrowserState(mode: .consoles)
+    private var index: CatalogSearchIndex
+
+    init(games: [LineBoyCatalogGame], index: CatalogSearchIndex) {
+        self.games = games
+        self.index = index
+    }
+
+    func search(_ query: String) -> LineBoyCatalogSearchMatches {
+        browserState.setQuery(query)
+        guard browserState.view == .search else {
+            return LineBoyCatalogSearchMatches(count: 0, games: [])
+        }
+        let matches = index.matchingIndices(query: browserState.query)
+        return LineBoyCatalogSearchMatches(
+            count: matches.count,
+            games: matches.prefix(250).map { games[$0] }
+        )
+    }
 }
 
 private struct LineBoyCatalogGroup: Sendable {
@@ -29,6 +58,8 @@ private struct LineBoyCatalogGroup: Sendable {
 
 private struct LineBoyCatalogBootstrap: Sendable {
     let groups: [LineBoyCatalogGroup]
+    let searchGames: [LineBoyCatalogGame]
+    let searchIndex: CatalogSearchIndex
     let displayNames: [String: String]
     let gameCount: Int
     let trackCount: Int
@@ -37,8 +68,10 @@ private struct LineBoyCatalogBootstrap: Sendable {
 
 private func readLineBoyCatalogBootstrap(at catalogURL: URL) throws -> LineBoyCatalogBootstrap {
     let catalog = try ReadOnlyCatalog(databaseURL: catalogURL)
-    let games = CatalogBrowserProjection.games(from: try catalog.gameBuckets())
-    let groups = CatalogBrowserProjection.groups(from: games).map { group in
+    let projection = CatalogBrowserProjection.games(from: try catalog.gameBuckets())
+    let searchGames = projection.map(lineBoyCatalogGame)
+    let searchIndex = CatalogSearchIndex(searchValues: searchGames.map(\.searchText))
+    let groups = CatalogBrowserProjection.groups(from: projection).map { group in
         LineBoyCatalogGroup(
             name: group.name,
             system: group.games.first?.system ?? "",
@@ -46,29 +79,34 @@ private func readLineBoyCatalogBootstrap(at catalogURL: URL) throws -> LineBoyCa
         )
     }
     let favorites = Set(try FavoriteStore().snapshots().map(\.identity.id))
-    let displayNames = Dictionary(uniqueKeysWithValues: games.compactMap { game in
+    let displayNames = Dictionary(uniqueKeysWithValues: projection.compactMap { game in
         game.displayName == game.name ? nil : (game.id, game.displayName)
     })
     return LineBoyCatalogBootstrap(
         groups: groups,
+        searchGames: searchGames,
+        searchIndex: searchIndex,
         displayNames: displayNames,
-        gameCount: games.count,
+        gameCount: projection.count,
         trackCount: try catalog.activeTrackCount(),
         favoriteIDs: Array(favorites)
     )
 }
 
+private func lineBoyCatalogGame(_ game: CatalogBrowserGame) -> LineBoyCatalogGame {
+    LineBoyCatalogGame(
+        rootID: game.rootID,
+        game: game.name,
+        system: game.system,
+        displayName: game.displayName,
+        trackCount: game.trackCount,
+        searchText: game.searchText
+    )
+}
+
 private func readLineBoyCatalogGames(at catalogURL: URL, system: String) throws -> [LineBoyCatalogGame] {
     let catalog = try ReadOnlyCatalog(databaseURL: catalogURL)
-    return CatalogBrowserProjection.games(from: try catalog.gameBuckets(system: system)).map { game in
-        LineBoyCatalogGame(
-            rootID: game.rootID,
-            game: game.name,
-            system: game.system,
-            displayName: game.displayName,
-            trackCount: game.trackCount
-        )
-    }
+    return CatalogBrowserProjection.games(from: try catalog.gameBuckets(system: system)).map(lineBoyCatalogGame)
 }
 
 @MainActor
@@ -152,6 +190,8 @@ final class LineBoyAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         let editMenuItem = NSMenuItem()
         let editMenu = NSMenu(title: "Edit")
         editMenuItem.title = "Edit"
+        editMenu.addItem(menuItem("Find in Library", action: #selector(findInLibrary(_:)), key: "f", target: self))
+        editMenu.addItem(.separator())
         editMenu.addItem(menuItem("Undo", action: NSSelectorFromString("undo:"), key: "z"))
         editMenu.addItem(menuItem("Redo", action: NSSelectorFromString("redo:"), key: "z", modifiers: [.command, .shift]))
         editMenu.addItem(.separator())
@@ -209,6 +249,11 @@ final class LineBoyAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         clickToolbarAction("OPEN")
     }
 
+    @objc private func findInLibrary(_ sender: Any?) {
+        guard let webView = window?.contentView as? WKWebView else { return }
+        webView.evaluateJavaScript("window.__lineBoyFocusSearch?.();")
+    }
+
     private func clickToolbarAction(_ action: String) {
         guard let webView = window?.contentView as? WKWebView,
               ["OPEN", "OPTIONS"].contains(action) else { return }
@@ -243,6 +288,7 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
     )
     private var catalogTracks: [String: CatalogTrack] = [:]
     private var localTracks: [String: LocalTrack] = [:]
+    private var catalogSearch: LineBoyCatalogSearch?
     private weak var webView: WKWebView?
     private weak var window: NSWindow?
 
@@ -292,6 +338,18 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
                         self.reply(requestID, failure: error.localizedDescription)
                     }
                 }
+            case "catalogSearch":
+                guard let query = arguments["query"] as? String else {
+                    throw LineBoyBridgeError.invalidArguments
+                }
+                Task { [weak self] in
+                    guard let self else { return }
+                    do {
+                        self.reply(requestID, success: try await self.searchCatalog(query: query))
+                    } catch {
+                        self.reply(requestID, failure: error.localizedDescription)
+                    }
+                }
             case "toggleFullScreen":
                 guard let window else { throw LineBoyBridgeError.windowUnavailable }
                 window.toggleFullScreen(nil)
@@ -331,6 +389,7 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         let snapshot = try await Task.detached(priority: .userInitiated) {
             try readLineBoyCatalogBootstrap(at: catalogURL)
         }.value
+        catalogSearch = LineBoyCatalogSearch(games: snapshot.searchGames, index: snapshot.searchIndex)
         return [
             "groups": snapshot.groups.map { group in
                 ["name": group.name, "system": group.system, "gameCount": group.gameCount] as [String: Any]
@@ -339,6 +398,23 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
             "gameCount": snapshot.gameCount,
             "trackCount": snapshot.trackCount,
             "favoriteIds": snapshot.favoriteIDs
+        ]
+    }
+
+    private func searchCatalog(query: String) async throws -> [String: Any] {
+        guard let catalogSearch else { throw LineBoyBridgeError.catalogUnavailable(catalogURL.path) }
+        let result = await catalogSearch.search(query)
+        return [
+            "count": result.count,
+            "games": result.games.map { game in
+                [
+                    "rootId": game.rootID,
+                    "game": game.game,
+                    "system": game.system,
+                    "displayName": game.displayName,
+                    "trackCount": game.trackCount
+                ] as [String: Any]
+            }
         ]
     }
 
