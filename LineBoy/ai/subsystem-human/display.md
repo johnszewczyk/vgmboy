@@ -1,19 +1,22 @@
 # Display and controls
 
 The display offers direct choices for 320×240, 512×384, 640×480, 800×600, and
-1024×768. The selected profile sets vertical text density; the active display
-width adapts in whole 8-pixel columns when WIDTH MODE is FILL. FRAME keeps the
-profile's 4:3 width. The header shows the active grid and raster dimensions.
-Resolution buttons remain visible in one text row.
+1024×768. The selected profile sets text and scanline density. The grid extends
+to the available window height in whole 16-pixel rows; WIDTH MODE FILL also
+extends its width in whole 8-pixel columns. FRAME keeps the selected profile's
+4:3 width. Text is never stretched to fill unused space. The header shows the
+active grid, selected profile, and beam pitch. Resolution buttons stay in one
+text row.
 
 Each 8×16 glyph cell gives the raster its text capacity: columns are active
-width ÷ 8, and complete text rows are floor(height ÷ 16). The 320×240 profile
-sets the physical frame height, scaled by the largest fitting even device-pixel
-multiple. Every text row is mapped to a whole number of equally spaced beam
-passes, so the scan pitch stays integral and line spacing does not band between
-profiles. Frame edges and glyph baselines snap to the beam grid. At 800×600,
-100 profile columns fit 37 complete rows, leaving a centered four-pixel source
-inset above and below.
+width ÷ 8, and complete text rows are floor(height ÷ 16). The selected profile
+sets its cell scale from the 320×240 reference and the largest fitting even
+device-pixel multiple. The viewport then adds whole glyph rows without changing
+that scale. Every text row maps to a whole number of equally spaced beam passes,
+so scan pitch remains integral as the window grows. Frame edges and glyph
+baselines snap to the beam grid. At 800×600, the base profile has 100 columns
+and 37 complete rows, with a centered four-pixel inset when no extra rows are
+needed.
 
 The layout uses 8-pixel columns and 16-pixel text rows. Its title, resolution
 choices, command bar, library, playlist, and status line occupy explicit rows.

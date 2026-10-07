@@ -541,7 +541,7 @@
             <div class="option-row"><span>SCANLINES</span><button class="option-value" id="scanline-mode" type="button" aria-pressed="true">ON</button></div>
             <div class="option-row"><span>RASTER</span><span class="option-key" id="option-raster">320X240</span></div>
             <div class="option-row"><span>PITCH</span><span class="option-key" id="option-pitch">6PX</span></div>
-            <div class="option-note" id="width-note">FILL ADDS WHOLE 8PX COLUMNS.</div>
+            <div class="option-note" id="width-note">FILL WIDTH USES 8PX CELLS.</div>
             <div class="option-row"><span>WINDOW</span><button class="option-value" id="fullscreen-toggle" type="button" aria-label="Toggle fullscreen">FULL</button></div>
             <div class="option-row"><span>DISPLAY</span><button class="option-value" id="reset-display" type="button">DEFAULTS</button></div>
           </div>
@@ -757,24 +757,28 @@
         ? maxWholeScale - (maxWholeScale % 2)
         : Math.max(1, maxWholeScale);
       const targetHeight = referenceRaster.height * referenceScale;
-      const textRows = Math.floor(raster.height / 16);
-      const targetCellHeight = targetHeight / textRows;
+      const profileRows = Math.floor(raster.height / 16);
+      const targetCellHeight = targetHeight / profileRows;
       const scanPitch = Math.max(3, Math.round(targetCellHeight / 16));
       const beamLinesPerCell = Math.max(1, Math.round(targetCellHeight / scanPitch));
       const cellHeight = scanPitch * beamLinesPerCell;
       const deviceScale = cellHeight / 16;
       const scale = deviceScale / deviceRatio;
+      const visibleRows = Math.floor((availableHeight / deviceScale) / 16);
+      const textRows = Math.max(profileRows, visibleRows);
+      const sourceHeight = Math.max(raster.height, textRows * 16);
       const sourceWidth = widthMode === "FILL"
         ? Math.max(320, Math.floor((availableWidth / deviceScale) / 8) * 8)
         : raster.width;
       const columns = sourceWidth / 8;
-      const halfLineInset = (raster.height - textRows * 16) / 2;
+      const halfLineInset = (sourceHeight - textRows * 16) / 2;
       const workspaceLines = textRows - 4;
       const sidebarColumns = Math.max(16, Math.min(24, Math.round(columns * 0.2)));
 
       activeRaster = {
         ...raster,
         width: sourceWidth,
+        height: sourceHeight,
         deviceRatio,
         deviceScale,
         scanPitch,
@@ -785,7 +789,7 @@
         workspaceLines,
       };
       terminal.style.width = `${sourceWidth}px`;
-      terminal.style.height = `${raster.height}px`;
+      terminal.style.height = `${sourceHeight}px`;
       terminal.style.zoom = String(scale);
       terminal.style.setProperty("--frame-width", `${1 / (scale * deviceRatio)}px`);
       terminal.style.paddingBlock = `${halfLineInset}px`;
@@ -807,9 +811,9 @@
         }));
       }
       gridSize.textContent = `${columns}X${textRows}`;
-      resolutionSize.textContent = `${sourceWidth}X${raster.height}`;
+      resolutionSize.textContent = raster.id;
       pixelScale.textContent = `${scanPitch}PX`;
-      terminal.dataset.raster = `${sourceWidth}x${raster.height}`;
+      terminal.dataset.raster = `${sourceWidth}x${sourceHeight}`;
       terminal.dataset.videoMode = raster.width === 320 ? "standard" : "high";
       resolutionButtons.forEach((button) => {
         button.setAttribute("aria-pressed", String(button.dataset.resolution === requestedRaster));
@@ -838,10 +842,10 @@
       scanlineModeButton.setAttribute("aria-pressed", String(scanlinesEnabled));
       scanlineModeButton.setAttribute("aria-label",
         `Scanlines ${scanlinesEnabled ? "on" : "off"}. Activate to turn them ${scanlinesEnabled ? "off" : "on"}.`);
-      rasterReadout.textContent = `${activeRaster.width}X${activeRaster.height}`;
+      rasterReadout.textContent = activeRaster.id;
       pitchReadout.textContent = `${activeRaster.scanPitch}PX`;
       widthNote.textContent = widthMode === "FILL"
-        ? "FILL ADDS WHOLE 8PX COLUMNS."
+        ? "FILL WIDTH USES 8PX CELLS."
         : "FRAME KEEPS THE BASE 4:3 WIDTH.";
     }
 

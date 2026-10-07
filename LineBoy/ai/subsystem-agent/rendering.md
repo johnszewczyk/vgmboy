@@ -6,14 +6,14 @@ gaps. When WebGL2 is unavailable, the visible DOM is the fallback. The native
 WebKit host injects catalog and transport services through a narrow message
 bridge; the browser preview falls back to sample data.
 
-The selected 320×240 profile defines the reference frame height. Choose its
-largest fitting even device-pixel multiple, then keep a comparable physical
-height across the raster profiles. Map each 16-pixel text cell to an integer
-number of equal beam pitches; keep the shader pitch integral even when the
-source-to-output scale is fractional. In FILL width mode, add or remove whole
-8-pixel columns to use the available width without stretching glyphs. FRAME
-keeps the selected profile's 4:3 width. Snap frame edges and glyph baselines to
-the beam grid; antialias the beam edge in WebGL.
+The selected raster profile uses the 320×240 reference to choose its largest
+fitting even device-pixel multiple. Extend the viewport in whole 16-pixel text
+rows at that scale; in FILL width mode, extend it in whole 8-pixel columns.
+FRAME keeps the selected profile's 4:3 width. Never stretch glyphs to cover
+remainder space. Map each text cell to an integer number of equal beam pitches;
+keep the shader pitch integral even when the source-to-output scale is
+fractional. Snap frame edges and glyph baselines to the beam grid; antialias
+the beam edge in WebGL.
 
 ModernDOS8x16 has a 10px cap height in a 16px cell. Anchor the baseline to each
 DOM cell's top at source row 13, then snap it to the output device grid. Do not
