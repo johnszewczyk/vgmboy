@@ -11,6 +11,7 @@ let package = Package(
         .library(name: "LocalFileBrowserCore", targets: ["LocalFileBrowserCore"]),
         .library(name: "FavoriteTrackCore", targets: ["FavoriteTrackCore"]),
         .library(name: "PlaylistIdentityCore", targets: ["PlaylistIdentityCore"]),
+        .library(name: "PlaylistTabsPersistenceCore", targets: ["PlaylistTabsPersistenceCore"]),
         .library(name: "FavoriteStoreCore", targets: ["FavoriteStoreCore"]),
         .library(name: "PlaybackHistoryCore", targets: ["PlaybackHistoryCore"]),
         .library(name: "FrontendPreferencesCore", targets: ["FrontendPreferencesCore"]),
@@ -36,6 +37,7 @@ let package = Package(
         .target(name: "LocalFileBrowserCore"),
         .target(name: "FavoriteTrackCore"),
         .target(name: "PlaylistIdentityCore"),
+        .target(name: "PlaylistTabsPersistenceCore"),
         .target(
             name: "FavoriteStoreCore",
             dependencies: ["FavoriteTrackCore"],

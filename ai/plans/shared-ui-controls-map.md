@@ -10,7 +10,7 @@ introduce a cross-renderer widget toolkit or change app behavior.
 
 | Feature | Shared foundation today | App-owned today | Current boundary |
 | --- | --- | --- | --- |
-| Tabs | `FrontendCore/PlaylistIdentityCore` defines stable playlist row IDs. | CocoaSpice owns its SwiftUI tab model/store; SPCBoyWK and SB2 own separate WebKit tab controllers and native stores; ViewBoy owns its Canvas UI behavior and bridge persistence. | Identity is shared. Tab lifecycle, snapshots, ordering, selection, persistence, and rendering are not yet one contract. LineBoy has no playlist-tab UI identified in its current source. |
+| Tabs | `FrontendCore/PlaylistIdentityCore` defines stable playlist row IDs. `PlaylistTabsPersistenceCore` now owns the common version-1 WebKit snapshot envelope, validation, and bounded atomic file I/O used by SPCBoyWK and SB2. | Apps still own tab lifecycle, ordering, selection restoration, rendering, and storage location. CocoaSpice has its own typed snapshot format; ViewBoy persists through UserDefaults. | WebKit persistence policy is shared between SPCBoyWK and SB2; the tab state transition contract remains app-specific. LineBoy has no playlist-tab UI identified in its current source. |
 | Views | `CatalogReader/CatalogBrowserCore` defines catalog modes/state, temporary search view, content/result source, projections, and sidebar row intent. `FrontendCommandCore` shares command and shortcut identifiers. | Each app owns its navigation surface, view composition, focus, geometry, and transitions. LineBoy lays out its own fixed-cell display. | Share view semantics and commands; keep view widgets and layout with each renderer. Favorites remains a playlist projection rather than a catalog view. |
 | Search | `CatalogBrowserCore` provides canonical game/file search text and search indexes; browser mode/query state is also defined there. | Apps own input controls, focus/clear behavior, result rendering, and adapters. WebKit clients locally filter bridge-published search projections. | The shared text projection and matching semantics exist. Some client-side filtering and state adaptation remain duplicated. |
 | Options | `FrontendCore/FrontendPreferencesCore` owns common preference values/store behavior, animation bounds, window roles, and `FrontendOptionsManifest`. The manifest currently describes Database, Interface, and Windows sections. | Each app owns its option schema, settings commands, page/dialog structure, and native/WebKit/Canvas/WebGL controls. | Shared preferences and categories are data contracts, not shared controls or a common option renderer. |
@@ -21,6 +21,8 @@ introduce a cross-renderer widget toolkit or change app behavior.
   file-tree policy, and catalog playlist presentation/sorting contracts.
 - **FrontendCore** owns frontend preferences plus stable playlist identity,
   startup, favorites/history, queue, archive/cache, and transport policy.
+- **PlaylistTabsPersistenceCore** owns shared WebKit tab snapshot validation and
+  file I/O; app targets provide their own storage URL and render/state adapter.
 - **FrontendCommandCore** owns renderer-neutral command and shortcut IDs.
 - **VGMBoy** owns playback admission, decoding, timing, and audio output.
 - **App targets** own their visual and interaction adapters: AppKit/SwiftUI in
@@ -39,12 +41,11 @@ lower priority than agreeing on tab state and option schemas.
 
 ## Recommended shared contracts
 
-1. **Tabs — next contract candidate.** Define a renderer-neutral tab snapshot
-   and reducer for create/duplicate, activate, close, reorder, restore, and
-   active-tab fallback. Put policy in FrontendCore; let each app keep its
-   storage key, host bridge, and visual tab component. First compare current
-   tab limits, empty-tab behavior, selection restoration, and save/migration
-   formats so the shared reducer does not silently change product behavior.
+1. **Tabs — next contract candidate.** The shared persistence envelope is in
+   place for SPCBoyWK and SB2. Define a renderer-neutral reducer for
+   create/duplicate, activate, close, reorder, restore, and active-tab fallback
+   only after comparing behavior with CocoaSpice and ViewBoy. Keep app storage
+   locations, host bridges, and visual tab components local.
 2. **Views — keep the existing CatalogBrowserCore boundary.** Treat the
    catalog mode, temporary search mode, and row intents as semantic state.
    Reconcile `FrontendSidebarView` with `CatalogBrowserMode` only if the
@@ -81,6 +82,7 @@ lower priority than agreeing on tab state and option schemas.
 - `CatalogReader/Sources/CatalogPlaylistPresentationCore/CatalogPlaylistPresentationCore.swift`
 - `FrontendCore/Sources/FrontendPreferencesCore/FrontendPreferencesCore.swift`
 - `FrontendCore/Sources/PlaylistIdentityCore/PlaylistIdentityCore.swift`
+- `FrontendCore/Sources/PlaylistTabsPersistenceCore/PlaylistTabsPersistenceCore.swift`
 - `CocoaSpice/Sources/CocoaSpice/App/PlaylistTabs.swift`
 - `SPCBoyWK/Sources/SPCBoyWK/PlaylistTabsStore.swift`
 - `SB2/Sources/SB2/PlaylistTabsStore.swift`
