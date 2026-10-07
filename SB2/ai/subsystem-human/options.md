@@ -24,5 +24,9 @@
   scaling together on narrow windows. Database path readouts keep the same
   height and use the available row width.
 - Sidebar folders and console groups open and close immediately.
+- UI Chrome > Animations controls the shared selector motion across interface
+  hovers, keyboard focus, and selected rows. Turning it off sets the transition
+  duration to zero; reduced-motion preferences also remove the motion. This
+  applies in the main window and the standalone Options window.
 - Reload Library refreshes the read-only catalog projections used by the
   sidebar. ScanSong remains the catalog writer.

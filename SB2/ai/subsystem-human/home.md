@@ -27,12 +27,20 @@
   Options > UI Chrome > Gallery Tiles.
 - Options open in the playlist pane as a subpage and leave the title and footer
   visible. A separate Options window uses the same chrome.
-- Playlist tab selection fades with the shared selection timing and easing;
-  its active surface includes the close control and prevents text selection.
+- One animated selector follows pointer hover and keyboard focus across the
+  title controls, transport and library toolbars, sidebar rows, playlist tabs
+  and rows, and controls on both Options presentations. Programmatic playlist
+  and sidebar selections move it too. The selector uses the configurable
+  selection duration; scrolling and resizing keep it attached to the visible
+  target.
+- Playlist tab selection retains its close control and prevents text
+  selection. Playlist row selection also retains its separate one-pixel
+  underline.
 - Playlist row selection uses one animated, one-pixel underline at the row
   bottom. The previous solid-versus-outline selection option is retired.
-- Sidebar selection remains available to navigation and activation but has no
-  selected-row marker. Folder and console disclosure updates immediately.
+- Sidebar selection remains available to navigation and activation. Hover,
+  focus, and current selection use the transient shared selector rather than a
+  pinned selected-row fill. Folder and console disclosure updates immediately.
 - Dense catalog rows keep zero vertical item padding with a 1px row gap. The
   pane divider is 1px. UI Chrome Font Size scales the title strip, status strip,
   toolbars, and option controls together: at 10pt, rows are 2.5rem high, main

@@ -33,6 +33,7 @@
       <symbol id="icon-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z" /></symbol>
     </svg>
     <div class="app-shell">
+      <div id="sb2-selection-indicator" class="sb2-selection-indicator is-hidden" aria-hidden="true"></div>
       <header class="sb-titlebar" aria-label="SPCBOY SB2 status">
         <div class="sb-window-controls" role="group" aria-label="Window controls">
           <button class="sb-window-control is-close" type="button" data-window-action="close" title="Close window" aria-label="Close window"><span aria-hidden="true"></span></button>
@@ -138,6 +139,7 @@
 
     <div id="options-overlay" class="options-overlay is-hidden" aria-hidden="true">
       <div class="options-panel" role="dialog" aria-modal="true" aria-label="Options">
+        <div class="sb2-selection-indicator sb2-options-selection-indicator is-hidden" aria-hidden="true"></div>
         <div class="options-header">
           <span>Options</span>
           <button id="options-close-button" class="tool-button glyph-button" title="Close" aria-label="Close">×</button>
@@ -185,7 +187,7 @@
               <div class="options-subpanel">
                 <h2 class="options-subpanel-title">Animations</h2>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="auto-resize-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Auto-Resize</span><small>Duration for automatic playlist column resizing (ms).</small></span></span><span class="options-inline-trailing"><input id="auto-resize-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Auto-resize animation milliseconds" /></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="selection-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Playlist Selection</span><small>Duration for selected playlist row and tab transitions (ms).</small></span></span><span class="options-inline-trailing"><input id="selection-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Playlist selection animation milliseconds" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="selection-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Selection + Hover</span><small>Duration for selector movement across controls, tabs, and selected playlist rows (ms).</small></span></span><span class="options-inline-trailing"><input id="selection-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Selection and hover animation milliseconds" /></span></label>
               </div>
               <div class="options-subpanel">
                 <h2 class="options-subpanel-title">Gallery Tiles</h2>

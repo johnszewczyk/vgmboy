@@ -19,6 +19,7 @@ preference namespace, archive cache, and renderer distinct.
 ## Task Routing
 
 - Home and playlist behavior: `subsystem-human/home.md`
+- Selection and hover motion: `subsystem-agent/selection-animation.md`
 - Options behavior: `subsystem-human/options.md`
 - Startup progress ownership: `subsystem-agent/startup-experience.md`
 - Swift package and app bundle: `Package.swift`, `Sources/SB2/`
