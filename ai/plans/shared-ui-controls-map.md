@@ -19,6 +19,8 @@ introduce a cross-renderer widget toolkit or change app behavior.
   file-tree policy, and catalog playlist presentation/sorting contracts.
 - **FrontendCore** owns frontend preferences plus stable playlist identity,
   startup, favorites/history, queue, archive/cache, and transport policy.
+- **PlaylistTabsPersistenceCore** owns shared WebKit tab snapshot validation and
+  file I/O; app targets provide their own storage URL and render/state adapter.
 - **FrontendCommandCore** owns renderer-neutral command and shortcut IDs.
 - **VGMBoy** owns playback admission, decoding, timing, and audio output.
 - **App targets** own their visual and interaction adapters: AppKit/SwiftUI in
@@ -35,12 +37,11 @@ lower priority than agreeing on tab state and option schemas.
 
 ## Recommended shared contracts
 
-1. **Tabs — next contract candidate.** Define a renderer-neutral tab snapshot
-   and reducer for create/duplicate, activate, close, reorder, restore, and
-   active-tab fallback. Put policy in FrontendCore; let each app keep its
-   storage key, host bridge, and visual tab component. First compare current
-   tab limits, empty-tab behavior, selection restoration, and save/migration
-   formats so the shared reducer does not silently change product behavior.
+1. **Tabs — next contract candidate.** The shared persistence envelope is in
+   place for SPCBoyWK and SB2. Define a renderer-neutral reducer for
+   create/duplicate, activate, close, reorder, restore, and active-tab fallback
+   only after comparing behavior with CocoaSpice and ViewBoy. Keep app storage
+   locations, host bridges, and visual tab components local.
 2. **Views — keep the existing CatalogBrowserCore boundary.** Treat the
    catalog mode, temporary search mode, and row intents as semantic state.
    Reconcile `FrontendSidebarView` with `CatalogBrowserMode` only if the
@@ -76,6 +77,7 @@ lower priority than agreeing on tab state and option schemas.
 - `CatalogReader/Sources/CatalogPlaylistPresentationCore/CatalogPlaylistPresentationCore.swift`
 - `FrontendCore/Sources/FrontendPreferencesCore/FrontendPreferencesCore.swift`
 - `FrontendCore/Sources/PlaylistIdentityCore/PlaylistIdentityCore.swift`
+- `FrontendCore/Sources/PlaylistTabsPersistenceCore/PlaylistTabsPersistenceCore.swift`
 - `CocoaSpice/Sources/CocoaSpice/App/PlaylistTabs.swift`
 - `SPCBoyWK/Sources/SPCBoyWK/PlaylistTabsStore.swift`
 - `SB2/Sources/SB2/PlaylistTabsStore.swift`

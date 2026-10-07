@@ -27,6 +27,7 @@ let package = Package(
                 .product(name: "ArchiveMaterializationCore", package: "FrontendCore"),
                 .product(name: "FavoriteTrackCore", package: "FrontendCore"),
                 .product(name: "PlaylistIdentityCore", package: "FrontendCore"),
+                .product(name: "PlaylistTabsPersistenceCore", package: "FrontendCore"),
                 .product(name: "FavoriteStoreCore", package: "FrontendCore"),
                 .product(name: "PlaybackHistoryCore", package: "FrontendCore"),
                 .product(name: "FrontendPreferencesCore", package: "FrontendCore"),
