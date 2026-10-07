@@ -227,7 +227,8 @@
     .nav-button[aria-pressed="true"] {
       outline: none;
     }
-    .nav-button.selector-current { background: transparent; color: var(--black); }
+    .nav-button.selector-current,
+    .playlist-tab-select.selector-current { background: transparent; color: var(--black); }
 
     .workspace {
       --workspace-rows: repeat(var(--workspace-lines), 16px);
@@ -371,8 +372,81 @@
     .workspace.is-resizing .divider::after { background: var(--dim); }
 
     .listpanel .panel-title { grid-row: 1; }
-    .list-head {
+    .playlist-tab-row {
       grid-row: 2;
+      min-width: 0;
+      height: 16px;
+      display: flex;
+      gap: 1ch;
+      padding: 0 1ch;
+      background: var(--well);
+    }
+    .playlist-tabs {
+      min-width: 0;
+      flex: 1 1 auto;
+      height: 16px;
+      display: flex;
+      align-items: stretch;
+      gap: 1ch;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
+    }
+    .playlist-tabs::-webkit-scrollbar { display: none; }
+    .playlist-tab {
+      min-width: 8ch;
+      max-width: 20ch;
+      flex: 0 1 18ch;
+      display: flex;
+      height: 16px;
+      background: transparent;
+    }
+    .playlist-tab-select,
+    .playlist-tab-close,
+    .playlist-tab-add {
+      height: 16px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--gray);
+      line-height: 16px;
+      cursor: pointer;
+    }
+    .playlist-tab-select {
+      min-width: 0;
+      flex: 1 1 auto;
+      padding: 0 1ch;
+      overflow: hidden;
+      text-align: left;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .playlist-tab-close { flex: 0 0 2ch; color: var(--dim); }
+    .playlist-tab-add {
+      flex: 0 0 3ch;
+      background: var(--well-highlight);
+      color: var(--black);
+      text-align: center;
+    }
+    .playlist-tab-select:hover,
+    .playlist-tab-select:focus-visible,
+    .playlist-tab[aria-selected="true"] .playlist-tab-select {
+      outline: none;
+      background: var(--gray);
+      color: var(--black);
+    }
+    .playlist-tab-close:hover,
+    .playlist-tab-close:focus-visible,
+    .playlist-tab-add:hover,
+    .playlist-tab-add:focus-visible {
+      outline: none;
+      background: var(--gray);
+      color: var(--black);
+    }
+    .playlist-tab-close:disabled { visibility: hidden; cursor: default; }
+    .list-head {
+      grid-row: 3;
       min-width: 0;
       height: 16px;
       display: grid;
@@ -388,7 +462,7 @@
     .list-head span:nth-child(2) { text-align: left; }
     .list-head span:last-child { text-align: right; }
     .songs {
-      grid-row: 3 / -1;
+      grid-row: 4 / -1;
       min-height: 0;
       display: grid;
       grid-auto-rows: 16px;
@@ -643,6 +717,11 @@
 
         <section class="panel listpanel" aria-label="Playlist">
           <div class="panel-title"><span id="game-title">CHRONO TRIGGER</span><span class="count" id="track-count">27 TRK</span></div>
+          <div class="playlist-tab-row">
+            <div class="playlist-tabs" id="playlist-tabs" role="tablist" aria-label="Playlist tabs"></div>
+            <button class="playlist-tab-add" id="playlist-tab-add" type="button"
+              aria-label="New playlist tab (Command+T)" title="New playlist tab (Command+T)">+</button>
+          </div>
           <div class="list-head" role="row"><span>#</span><span>TRACK</span><span>TIME</span></div>
           <div class="songs" id="song-list" role="listbox" aria-label="Playlist tracks"></div>
         </section>
@@ -683,6 +762,8 @@
             <div class="option-row"><span>FAVORITE</span><span class="option-key">F</span></div>
             <div class="option-row"><span>BACK</span><span class="option-key">ESC</span></div>
             <div class="option-row"><span>OPEN FILE</span><span class="option-key">CMD+O</span></div>
+            <div class="option-row"><span>NEW TAB</span><span class="option-key">CMD+T</span></div>
+            <div class="option-row"><span>SELECT TAB</span><span class="option-key">CMD+1…9</span></div>
             <div class="option-row"><span>OPTIONS</span><span class="option-key">CMD+,</span></div>
             <div class="option-row"><span>FULL SCREEN</span><span class="option-key">CTRL+CMD+F</span></div>
             <div class="option-row"><span>MINIMIZE</span><span class="option-key">CMD+M</span></div>
@@ -823,6 +904,8 @@
     let treeRows = [...document.querySelectorAll(".tree-row")];
     let searchRows = [];
     const songList = document.querySelector("#song-list");
+    const playlistTabsView = document.querySelector("#playlist-tabs");
+    const playlistTabAddButton = document.querySelector("#playlist-tab-add");
     const gameTitle = document.querySelector("#game-title");
     const trackCount = document.querySelector("#track-count");
     const status = document.querySelector("#status");
@@ -876,6 +959,13 @@
     let returnAction = "LIST";
     let activeGame = GAMES.CHRONO;
     let favoritesOnly = false;
+    let playlistTabs = [];
+    let activePlaylistTabID = null;
+    let playlistTabsReady = false;
+    let playlistTabsRestored = false;
+    let restoringPlaylistTab = false;
+    let playlistTabsSaveTimer = 0;
+    let playlistTabsSaveChain = Promise.resolve();
     let playing = false;
     let seconds = 0;
 
@@ -1087,6 +1177,8 @@
           : optionCategories.find((button) => button.dataset.optionsPage === selectedOptionsPage);
       }
       return navButtons.includes(lastSelectorTarget)
+        || playlistTabButtons().includes(lastSelectorTarget)
+        || lastSelectorTarget === playlistTabAddButton
         ? lastSelectorTarget
         : navButtons.find((button) => button.dataset.action === currentNavAction)
         || navButtons.find((button) => button.dataset.action === "LIST");
@@ -1402,12 +1494,17 @@
       gameTitle.textContent = game.title;
       trackCount.textContent = `${game.tracks.length} TRK`;
       songList.replaceChildren();
+      songList.scrollTop = 0;
       const rows = game.tracks.map((item, index) => {
-        const [id, numberText, title, length, favorite, displayPath] = Array.isArray(item)
-          ? [String(item[0]), String(item[0]), item[1], item[2], Boolean(item[3]), ""]
-          : [String(item.id), String(item.number || index + 1).padStart(2, "0"), item.title,
-            formatTrackLength(item.lengthMilliseconds),
-            nativeFavoriteIDs.has(String(item.id)) || Boolean(item.favorite), item.displayPath || ""];
+        const isSampleRow = Array.isArray(item);
+        const id = isSampleRow ? String(item[0]) : String(item.id);
+        const numberText = isSampleRow ? String(item[0]) : String(item.number || index + 1).padStart(2, "0");
+        const title = isSampleRow ? String(item[1]) : String(item.title || "TRACK");
+        const length = isSampleRow ? String(item[2] || "--:--")
+          : String(item.length || formatTrackLength(item.lengthMilliseconds));
+        const favorite = isSampleRow ? Boolean(item[3])
+          : nativeFavoriteIDs.has(id) || Boolean(item.favorite);
+        const displayPath = isSampleRow ? "" : String(item.displayPath || "");
         const song = document.createElement("button");
         song.type = "button";
         song.className = "song";
@@ -1419,7 +1516,8 @@
         song.dataset.favorite = String(favorite);
         song.dataset.length = length;
         song.dataset.displayPath = displayPath || "";
-        song.dataset.nativeTrack = String(!Array.isArray(item));
+        song.dataset.lengthMilliseconds = isSampleRow ? "" : String(item.lengthMilliseconds || "");
+        song.dataset.nativeTrack = String(!isSampleRow && item.native !== false);
         song.dataset.index = String(index);
 
         const number = document.createElement("span");
@@ -1439,7 +1537,317 @@
       });
       songList.append(...rows);
       applyFavoriteFilter(preferredTrack);
+      if (!restoringPlaylistTab) schedulePlaylistTabsSave();
     }
+
+    function makePlaylistTabID() {
+      return globalThis.crypto?.randomUUID?.()
+        || `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+
+    function capturePlaylistTracks() {
+      return [...songList.querySelectorAll(".song")].map((song) => {
+        const lengthMilliseconds = Number(song.dataset.lengthMilliseconds);
+        return {
+          id: song.dataset.trackId,
+          number: song.querySelector(".num")?.textContent || "",
+          title: song.dataset.title || "TRACK",
+          length: song.dataset.length || "--:--",
+          ...(Number.isFinite(lengthMilliseconds) && lengthMilliseconds > 0 ? { lengthMilliseconds } : {}),
+          favorite: song.dataset.favorite === "true",
+          displayPath: song.dataset.displayPath || "",
+          native: song.dataset.nativeTrack === "true",
+        };
+      });
+    }
+
+    function snapshotPlaylistTab(tab) {
+      return {
+        id: String(tab.id),
+        title: String(tab.title || "Playlist").slice(0, 500),
+        system: String(tab.system || "LOCAL").slice(0, 120),
+        rootId: Number.isSafeInteger(tab.rootId) ? tab.rootId : null,
+        game: typeof tab.game === "string" ? tab.game.slice(0, 500) : null,
+        playlist: Array.isArray(tab.playlist) ? tab.playlist.map((track) => ({
+          id: String(track.id || ""),
+          number: String(track.number || ""),
+          title: String(track.title || "TRACK").slice(0, 500),
+          length: String(track.length || formatTrackLength(track.lengthMilliseconds)),
+          ...(Number.isFinite(Number(track.lengthMilliseconds)) && Number(track.lengthMilliseconds) > 0
+            ? { lengthMilliseconds: Number(track.lengthMilliseconds) } : {}),
+          favorite: Boolean(track.favorite),
+          displayPath: String(track.displayPath || "").slice(0, 500),
+          native: track.native !== false,
+        })) : [],
+        selectedTrackId: typeof tab.selectedTrackId === "string" ? tab.selectedTrackId : null,
+        favoritesOnly: Boolean(tab.favoritesOnly),
+        scrollTop: Math.max(0, Number(tab.scrollTop) || 0),
+      };
+    }
+
+    function currentPlaylistTab() {
+      return playlistTabs.find((tab) => tab.id === activePlaylistTabID) || null;
+    }
+
+    function syncActivePlaylistTab() {
+      if (!playlistTabsReady || restoringPlaylistTab) return;
+      const tab = currentPlaylistTab();
+      if (!tab) return;
+      const title = String(activeGame.title || "Playlist");
+      const titleChanged = tab.title !== title;
+      tab.title = title;
+      tab.system = String(activeGame.system || "LOCAL");
+      tab.rootId = Number.isSafeInteger(activeGame.rootId) ? activeGame.rootId : null;
+      tab.game = typeof activeGame.game === "string" ? activeGame.game : null;
+      tab.playlist = capturePlaylistTracks();
+      tab.selectedTrackId = songList.querySelector('.song[aria-selected="true"]')?.dataset.trackId || null;
+      tab.favoritesOnly = favoritesOnly;
+      tab.scrollTop = Math.max(0, songList.scrollTop);
+      if (titleChanged) renderPlaylistTabs();
+    }
+
+    function schedulePlaylistTabsSave() {
+      if (!playlistTabsReady || restoringPlaylistTab) return;
+      syncActivePlaylistTab();
+      window.clearTimeout(playlistTabsSaveTimer);
+      playlistTabsSaveTimer = window.setTimeout(savePlaylistTabs, 160);
+    }
+
+    function savePlaylistTabs() {
+      if (!playlistTabsReady || restoringPlaylistTab || !playlistTabs.length) return;
+      syncActivePlaylistTab();
+      const snapshot = {
+        version: 1,
+        activeID: activePlaylistTabID,
+        tabs: playlistTabs.slice(0, 64).map(snapshotPlaylistTab),
+      };
+      if (!nativeHost) {
+        try { localStorage.setItem("LineBoy.playlistTabs", JSON.stringify(snapshot)); }
+        catch (error) { status.textContent = `PLAYLIST/SAVE ERROR ${error.message}`; }
+        return;
+      }
+      playlistTabsSaveChain = playlistTabsSaveChain.catch(() => {}).then(() =>
+        nativeRequest("playlistTabsSave", { snapshot })
+      ).catch((error) => {
+        status.textContent = `PLAYLIST/SAVE ERROR ${error.message}`;
+      });
+    }
+
+    function playlistTabButtons() {
+      return [...playlistTabsView.querySelectorAll(".playlist-tab-select")];
+    }
+
+    function renderPlaylistTabs() {
+      const selectorWasOnPlaylistTab = lastSelectorTarget?.matches(".playlist-tab-select") === true;
+      const selectorWasOnAddButton = lastSelectorTarget === playlistTabAddButton;
+      const fragment = document.createDocumentFragment();
+      playlistTabs.forEach((tab, index) => {
+        const item = document.createElement("div");
+        item.className = "playlist-tab";
+        item.setAttribute("role", "presentation");
+        item.setAttribute("aria-selected", String(tab.id === activePlaylistTabID));
+
+        const select = document.createElement("button");
+        select.type = "button";
+        select.className = "playlist-tab-select";
+        select.setAttribute("role", "tab");
+        select.setAttribute("aria-selected", String(tab.id === activePlaylistTabID));
+        select.setAttribute("aria-controls", "song-list");
+        select.setAttribute("aria-label", `${tab.title}, tab ${index + 1} of ${playlistTabs.length}`);
+        select.tabIndex = tab.id === activePlaylistTabID ? 0 : -1;
+        select.textContent = tab.title;
+        select.addEventListener("click", () => activatePlaylistTab(tab.id));
+        select.addEventListener("pointerenter", () => positionSelectionBlock(select));
+        select.addEventListener("focus", () => positionSelectionBlock(select));
+        select.addEventListener("keydown", (event) => {
+          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+          event.preventDefault();
+          const step = event.key === "ArrowRight" ? 1 : -1;
+          const next = playlistTabs[(index + step + playlistTabs.length) % playlistTabs.length];
+          activatePlaylistTab(next.id);
+          playlistTabButtons().find((button) => button.getAttribute("aria-selected") === "true")?.focus();
+        });
+
+        const close = document.createElement("button");
+        close.type = "button";
+        close.className = "playlist-tab-close";
+        close.textContent = "×";
+        close.disabled = playlistTabs.length < 2;
+        close.setAttribute("aria-label", `Close ${tab.title} tab`);
+        close.addEventListener("click", () => closePlaylistTab(tab.id));
+        item.append(select, close);
+        fragment.append(item);
+      });
+
+      playlistTabsView.replaceChildren(fragment);
+      if (selectorWasOnAddButton) {
+        positionSelectionBlock(playlistTabAddButton);
+      } else if (selectorWasOnPlaylistTab) {
+        positionSelectionBlock(playlistTabButtons().find((button) => button.getAttribute("aria-selected") === "true"));
+      }
+    }
+
+    function activatePlaylistTab(id) {
+      const tab = playlistTabs.find((entry) => entry.id === id);
+      if (!tab || tab.id === activePlaylistTabID) return false;
+      syncActivePlaylistTab();
+      activePlaylistTabID = tab.id;
+      favoritesOnly = Boolean(tab.favoritesOnly);
+      activeGame = {
+        title: tab.title,
+        system: tab.system || "LOCAL",
+        rootId: Number.isSafeInteger(tab.rootId) ? tab.rootId : null,
+        game: typeof tab.game === "string" ? tab.game : null,
+        tracks: Array.isArray(tab.playlist) ? tab.playlist : [],
+      };
+      restoringPlaylistTab = true;
+      renderSongs(activeGame, tab.selectedTrackId || "");
+      songList.scrollTop = Math.max(0, Number(tab.scrollTop) || 0);
+      restoringPlaylistTab = false;
+      renderPlaylistTabs();
+      status.textContent = `PLAYLIST/TAB ${playlistTabs.indexOf(tab) + 1}`;
+      schedulePlaylistTabsSave();
+      if (catalogHost && tab.rootId && tab.game) hydrateCatalogPlaylist(tab.id);
+      return true;
+    }
+
+    async function hydrateCatalogPlaylist(tabID) {
+      const tab = playlistTabs.find((entry) => entry.id === tabID);
+      if (!catalogHost || !tab?.rootId || !tab.game) return;
+      try {
+        const result = await nativeRequest("gameTracks", {
+          rootId: tab.rootId, game: tab.game, system: tab.system,
+        });
+        if (activePlaylistTabID !== tabID) return;
+        tab.playlist = result.tracks || [];
+        activeGame = { ...activeGame, tracks: tab.playlist };
+        restoringPlaylistTab = true;
+        renderSongs(activeGame, tab.selectedTrackId || "");
+        songList.scrollTop = Math.max(0, Number(tab.scrollTop) || 0);
+        restoringPlaylistTab = false;
+        schedulePlaylistTabsSave();
+      } catch (error) {
+        status.textContent = `PLAYLIST/RESTORE ERROR ${error.message}`;
+      }
+    }
+
+    function createPlaylistTab() {
+      syncActivePlaylistTab();
+      if (playlistTabs.length >= 64) {
+        status.textContent = "PLAYLIST/TAB LIMIT 64";
+        return;
+      }
+      const source = currentPlaylistTab();
+      const tab = source
+        ? { ...snapshotPlaylistTab(source), id: makePlaylistTabID(), playlist: source.playlist.map((track) => ({ ...track })) }
+        : {
+          id: makePlaylistTabID(), title: activeGame.title, system: activeGame.system,
+          rootId: activeGame.rootId || null, game: activeGame.game || null,
+          playlist: capturePlaylistTracks(), selectedTrackId: null, favoritesOnly: false, scrollTop: 0,
+        };
+      playlistTabs.push(tab);
+      activatePlaylistTab(tab.id);
+      renderPlaylistTabs();
+      schedulePlaylistTabsSave();
+    }
+
+    function closePlaylistTab(id) {
+      if (playlistTabs.length < 2) return;
+      const index = playlistTabs.findIndex((tab) => tab.id === id);
+      if (index < 0) return;
+      const wasActive = playlistTabs[index].id === activePlaylistTabID;
+      if (wasActive) syncActivePlaylistTab();
+      playlistTabs.splice(index, 1);
+      if (wasActive) {
+        const next = playlistTabs[Math.min(index, playlistTabs.length - 1)];
+        activePlaylistTabID = null;
+        activatePlaylistTab(next.id);
+      } else {
+        renderPlaylistTabs();
+      }
+      schedulePlaylistTabsSave();
+    }
+
+    function restorePlaylistTabs(value) {
+      if (value?.version !== 1 || !Array.isArray(value.tabs)) return false;
+      const seen = new Set();
+      playlistTabs = value.tabs.slice(0, 64).filter((tab) => {
+        if (!tab || typeof tab.id !== "string" || !tab.id || seen.has(tab.id) || !Array.isArray(tab.playlist)) return false;
+        seen.add(tab.id);
+        return true;
+      }).map((tab) => ({
+        id: tab.id,
+        title: String(tab.title || "Playlist").slice(0, 500),
+        system: String(tab.system || "LOCAL").slice(0, 120),
+        rootId: Number.isSafeInteger(tab.rootId) ? tab.rootId : null,
+        game: typeof tab.game === "string" ? tab.game.slice(0, 500) : null,
+        playlist: tab.playlist.filter((track) => track && typeof track === "object" && !Array.isArray(track))
+          .map((track) => ({ ...track })),
+        selectedTrackId: typeof tab.selectedTrackId === "string" ? tab.selectedTrackId : null,
+        favoritesOnly: Boolean(tab.favoritesOnly),
+        scrollTop: Math.max(0, Number(tab.scrollTop) || 0),
+      }));
+      if (!playlistTabs.length) return false;
+      activePlaylistTabID = playlistTabs.some((tab) => tab.id === value.activeID)
+        ? value.activeID : playlistTabs[0].id;
+      const active = currentPlaylistTab();
+      favoritesOnly = Boolean(active.favoritesOnly);
+      activeGame = {
+        title: active.title,
+        system: active.system,
+        rootId: active.rootId,
+        game: active.game,
+        tracks: active.playlist,
+      };
+      restoringPlaylistTab = true;
+      renderSongs(activeGame, active.selectedTrackId || "");
+      songList.scrollTop = active.scrollTop;
+      restoringPlaylistTab = false;
+      renderPlaylistTabs();
+      return true;
+    }
+
+    async function initializePlaylistTabs() {
+      let snapshot = null;
+      try {
+        snapshot = nativeHost
+          ? await nativeRequest("playlistTabsLoad")
+          : JSON.parse(localStorage.getItem("LineBoy.playlistTabs") || "null");
+      } catch (error) {
+        status.textContent = `PLAYLIST/RESTORE ERROR ${error.message}`;
+      }
+      playlistTabsRestored = restorePlaylistTabs(snapshot);
+      if (!playlistTabsRestored) {
+        const tab = {
+          id: makePlaylistTabID(),
+          title: activeGame.title,
+          system: activeGame.system,
+          rootId: activeGame.rootId || null,
+          game: activeGame.game || null,
+          playlist: capturePlaylistTracks(),
+          selectedTrackId: songList.querySelector('.song[aria-selected="true"]')?.dataset.trackId || null,
+          favoritesOnly: false,
+          scrollTop: 0,
+        };
+        playlistTabs = [tab];
+        activePlaylistTabID = tab.id;
+        renderPlaylistTabs();
+      }
+      playlistTabsReady = true;
+      schedulePlaylistTabsSave();
+      if (catalogHost && currentPlaylistTab()?.rootId && currentPlaylistTab()?.game) {
+        hydrateCatalogPlaylist(activePlaylistTabID);
+      }
+    }
+
+    window.__lineBoyCreatePlaylistTab = createPlaylistTab;
+    window.__lineBoySelectPlaylistTab = (number) => {
+      const tab = playlistTabs[Number(number) - 1];
+      return tab ? activatePlaylistTab(tab.id) : false;
+    };
+    playlistTabAddButton.addEventListener("click", createPlaylistTab);
+    playlistTabAddButton.addEventListener("pointerenter", () => positionSelectionBlock(playlistTabAddButton));
+    playlistTabAddButton.addEventListener("focus", () => positionSelectionBlock(playlistTabAddButton));
 
     function visibleSongs() { return [...songList.querySelectorAll(".song:not([hidden])")]; }
 
@@ -1462,6 +1870,7 @@
       if (moveFocus) song.focus();
       song.scrollIntoView({ block: "nearest" });
       updateTrackPath(song);
+      schedulePlaylistTabsSave();
     }
 
     function applyFavoriteFilter(preferredTrack) {
@@ -1556,6 +1965,8 @@
       });
       container.addEventListener("keydown", handleLibraryRowKeydown);
     });
+
+    songList.addEventListener("scroll", schedulePlaylistTabsSave, { passive: true });
 
     function gameKey(game) {
       return `${game.rootId}|${game.system}|${game.game}`;
@@ -1759,7 +2170,13 @@
 
     async function loadNativeGame(game, row) {
       const version = ++catalogRequestVersion;
-      activeGame = { title: game.displayName || game.game, system: game.system, tracks: [] };
+      activeGame = {
+        title: game.displayName || game.game,
+        system: game.system,
+        rootId: Number(game.rootId),
+        game: game.game,
+        tracks: [],
+      };
       gameTitle.textContent = activeGame.title;
       trackCount.textContent = "…";
       songList.replaceChildren();
@@ -1788,11 +2205,11 @@
         catalogTrackCount = Number(payload.trackCount) || 0;
         const firstGroupRow = renderNativeLibrary(payload);
         status.textContent = `CATALOG ${formatCatalogCount(catalogGameCount)}G / ${formatCatalogCount(catalogTrackCount)}T`;
-        if (firstGroupRow) {
+        if (firstGroupRow && !playlistTabsRestored) {
           selectTreeRow(firstGroupRow);
           const firstGameRow = await setFolderExpanded(firstGroupRow, true);
           if (firstGameRow) handleTreeClick(firstGameRow);
-        } else {
+        } else if (!firstGroupRow) {
           songList.replaceChildren();
           gameTitle.textContent = "NO CATALOG GAMES";
           trackCount.textContent = "0 TRK";
@@ -1828,12 +2245,13 @@
 
     async function toggleFavorite(song = songList.querySelector('.song[aria-selected="true"]')) {
       if (!song) return;
-      if (!nativeHost || song.dataset.nativeTrack !== "true") {
+      if (!nativeHost || song.dataset.nativeTrack !== "true" || song.dataset.trackId.startsWith("local:")) {
         const isFavorite = song.dataset.favorite !== "true";
         song.dataset.favorite = String(isFavorite);
         song.querySelector(".title").textContent = `${isFavorite ? "*" : ""}${song.dataset.title}`;
         if (favoritesOnly && !isFavorite) applyFavoriteFilter();
         status.textContent = isFavorite ? "FAVORITE/ADDED" : "FAVORITE/REMOVED";
+        schedulePlaylistTabsSave();
         return;
       }
       try {
@@ -1844,6 +2262,7 @@
         song.querySelector(".title").textContent = `${isFavorite ? "*" : ""}${song.dataset.title}`;
         if (favoritesOnly && !isFavorite) applyFavoriteFilter();
         status.textContent = isFavorite ? "FAVORITE/ADDED" : "FAVORITE/REMOVED";
+        schedulePlaylistTabsSave();
       } catch (error) {
         status.textContent = `FAVORITE/ERROR ${error.message}`;
       }
@@ -1885,11 +2304,27 @@
         : navButtons.find((button) => button.dataset.action === currentNavAction));
     }
 
-    terminal.addEventListener("keydown", (event) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
-        event.preventDefault();
-        window.__lineBoyFocusSearch();
-        return;
+    document.addEventListener("keydown", (event) => {
+      if (event.metaKey || event.ctrlKey) {
+        const key = event.key.toLowerCase();
+        if (key === "f") {
+          event.preventDefault();
+          window.__lineBoyFocusSearch();
+          return;
+        }
+        if (key === "t") {
+          event.preventDefault();
+          if (!nativeHost) createPlaylistTab();
+          return;
+        }
+        if (/^[1-9]$/.test(key)) {
+          const tab = playlistTabs[Number(key) - 1];
+          if (tab) {
+            event.preventDefault();
+            activatePlaylistTab(tab.id);
+          }
+          return;
+        }
       }
       if (event.key !== "Escape") return;
       if (librarySearchActive) {
@@ -1927,6 +2362,7 @@
         favoritesOnly = !favoritesOnly;
         setNavSelection(favoritesOnly ? "FAVORITES" : "LIST");
         applyFavoriteFilter();
+        schedulePlaylistTabsSave();
         status.textContent = favoritesOnly ? "VIEW/FAVORITES" : "VIEW/PLAYLIST";
       } else if (action === "TREE") {
         setOptionsVisible(false);
@@ -1939,6 +2375,7 @@
         favoritesOnly = false;
         setNavSelection(action);
         applyFavoriteFilter();
+        schedulePlaylistTabsSave();
         songList.querySelector('[aria-selected="true"]')?.focus();
         status.textContent = "VIEW/PLAYLIST";
       } else if (action === "OPTIONS") {
@@ -2097,7 +2534,9 @@
 
     updateRaster();
     renderSongs(GAMES.CHRONO, "08");
-    if (catalogHost) bootstrapNativeCatalog();
+    void initializePlaylistTabs().then(() => {
+      if (catalogHost) bootstrapNativeCatalog();
+    });
 
     scheduleRender();
     new ResizeObserver(() => {

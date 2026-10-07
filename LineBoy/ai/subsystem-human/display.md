@@ -41,6 +41,15 @@ buttons and a two-cell blank gap before transport. There is no visible divider
 between the command and transport groups. The resolution profile row remains a
 separate testing control row.
 
+The playlist has a horizontal tab strip above its track headings. Selecting a
+tab restores that playlist, its selected track, favorites filter, and scroll
+position. The plus control or Command+T creates a copy of the current playlist;
+each tab can be closed while at least one remains open. Command+1 through
+Command+9 selects one of the first nine tabs. Tab state persists between native
+app launches and in the browser preview's local storage. Native catalog rows
+are reloaded lazily when a saved catalog-backed tab is selected; the app still
+starts in sample mode without loading the full catalog.
+
 One white selection block travels between the active top toolbar control and
 the option-category tabs. DISPLAY can turn that motion off. The library starts
 at one-third of the available character columns and keeps at least 20 columns

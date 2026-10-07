@@ -51,6 +51,13 @@ can resize it in 8px character columns. Both controls share the same bounds and
 saved width. Search replaces the sample tree temporarily and returns to its
 previous selection when cleared.
 
+Playlist tabs keep separate track lists, selected tracks, favorites filters,
+and scroll positions. Use the plus button or Command+T to duplicate the current
+playlist, close tabs with their × controls, or switch among the first nine with
+Command+1 through Command+9. The native app stores tabs through the shared
+`PlaylistTabsPersistenceCore`; the sample-only browser preview uses local
+storage. Saved catalog tabs load their tracks lazily when opened.
+
 The font `assets/ModernDOS8x16.ttf` is Modern DOS 8×16 by Jayvee Enaguas,
 dedicated under CC0 1.0. The included `assets/CC0-1.0.txt` preserves its
 license.

@@ -14,5 +14,6 @@ the browser build retains sample data for renderer preview.
 - LineBoy owns its HTML, CSS, JavaScript, font asset, native host, sample
   content, app packaging, and browser preview scripts.
 - VGMMan is the Git root. LineBoy is a package folder, not a nested repository.
-- Catalog reads route through CatalogReader; favorites and queue rules route
-  through FrontendCore; decoding and audio transport route through VGMBoy.
+- Catalog reads route through CatalogReader; favorites, queue rules, and
+  playlist-tab persistence route through FrontendCore; decoding and audio
+  transport route through VGMBoy.

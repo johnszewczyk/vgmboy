@@ -10,6 +10,17 @@ unavailable, use the fixed CSS mask with the same integer beam-row count and
 pitch. The native WebKit host injects catalog and transport services through a
 narrow message bridge; the browser preview falls back to sample data.
 
+The playlist-tab strip and snapshot payload belong to LineBoy's HTML. Persist
+the version-1 `{version, activeID, tabs}` envelope through the shared
+`PlaylistTabsJSONFileStore` in native mode and `localStorage` in preview mode.
+Keep its tab-count and title limits aligned with the shared store. Snapshots
+store the active playlist rows, source identity, selected track, favorites
+filter, and scroll offset; do not include decoded audio or catalog databases.
+Local-file rows store their path as identity and must be revalidated by the
+native bridge before playback. Catalog-backed tabs retain root/system/game
+identity and fetch their rows only when needed. Keep the full catalog bootstrap
+disabled in normal visual testing.
+
 The selected raster profile uses the 320×240 reference to choose its largest
 fitting even device-pixel multiple. Extend the viewport in whole 16-pixel text
 rows at that scale; in FILL width mode, extend it in whole 8-pixel columns.

@@ -7,6 +7,7 @@ import CatalogReader
 import FavoriteStoreCore
 import FavoriteTrackCore
 import Foundation
+import PlaylistTabsPersistenceCore
 import PlaybackQueueCore
 import PlaybackTransportCore
 import VGMBoyFormatCore
@@ -182,6 +183,16 @@ final class LineBoyAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         let fileMenu = NSMenu(title: "File")
         fileMenuItem.title = "File"
         fileMenu.addItem(menuItem("Open…", action: #selector(openFile(_:)), key: "o", target: self))
+        fileMenu.addItem(menuItem("New Playlist Tab", action: #selector(newPlaylistTab(_:)), key: "t", target: self))
+        let tabSelectionItem = NSMenuItem(title: "Select Playlist Tab", action: nil, keyEquivalent: "")
+        let tabSelectionMenu = NSMenu(title: "Select Playlist Tab")
+        for number in 1...9 {
+            let item = menuItem("Tab \(number)", action: #selector(selectPlaylistTab(_:)), key: String(number), target: self)
+            item.tag = number
+            tabSelectionMenu.addItem(item)
+        }
+        tabSelectionItem.submenu = tabSelectionMenu
+        fileMenu.addItem(tabSelectionItem)
         fileMenu.addItem(.separator())
         fileMenu.addItem(menuItem("Close Window", action: #selector(NSWindow.performClose(_:)), key: "w"))
         fileMenuItem.submenu = fileMenu
@@ -249,6 +260,16 @@ final class LineBoyAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         clickToolbarAction("OPEN")
     }
 
+    @objc private func newPlaylistTab(_ sender: Any?) {
+        guard let webView = window?.contentView as? WKWebView else { return }
+        webView.evaluateJavaScript("window.__lineBoyCreatePlaylistTab?.();")
+    }
+
+    @objc private func selectPlaylistTab(_ sender: NSMenuItem) {
+        guard let webView = window?.contentView as? WKWebView else { return }
+        webView.evaluateJavaScript("window.__lineBoySelectPlaylistTab?.(\(sender.tag));")
+    }
+
     @objc private func findInLibrary(_ sender: Any?) {
         guard let webView = window?.contentView as? WKWebView else { return }
         webView.evaluateJavaScript("window.__lineBoyFocusSearch?.();")
@@ -285,6 +306,11 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
             modeKey: "LineBoy.archiveCacheMode",
             limitKey: "LineBoy.archiveCacheLimitBytes"
         )
+    )
+    private let playlistTabsStore = PlaylistTabsJSONFileStore(
+        fileURL: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("LineBoy", isDirectory: true)
+            .appendingPathComponent("playlist-tabs-v1.json")
     )
     private var catalogTracks: [String: CatalogTrack] = [:]
     private var localTracks: [String: LocalTrack] = [:]
@@ -350,6 +376,14 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
                         self.reply(requestID, failure: error.localizedDescription)
                     }
                 }
+            case "playlistTabsLoad":
+                reply(requestID, success: try loadPlaylistTabs())
+            case "playlistTabsSave":
+                guard let snapshot = arguments["snapshot"] else {
+                    throw LineBoyBridgeError.invalidArguments
+                }
+                try savePlaylistTabs(snapshot)
+                reply(requestID, success: ["saved": true])
             case "toggleFullScreen":
                 guard let window else { throw LineBoyBridgeError.windowUnavailable }
                 window.toggleFullScreen(nil)
@@ -416,6 +450,16 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
                 ] as [String: Any]
             }
         ]
+    }
+
+    private func loadPlaylistTabs() throws -> Any {
+        guard let data = try playlistTabsStore.load() else { return NSNull() }
+        return try JSONSerialization.jsonObject(with: data)
+    }
+
+    private func savePlaylistTabs(_ snapshot: Any) throws {
+        let data = try JSONSerialization.data(withJSONObject: snapshot, options: [.sortedKeys])
+        try playlistTabsStore.save(data)
     }
 
     private func catalogGroup(system: String) async throws -> [String: Any] {
@@ -502,6 +546,17 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         } else if let local = localTracks[id] {
             startRequest = PlaybackTransportStartRequest(trackID: id, sourcePath: local.path)
             resolvedPath = local.path
+        } else if id.hasPrefix("local:") {
+            let path = String(id.dropFirst("local:".count))
+            let url = URL(fileURLWithPath: path).standardizedFileURL
+            guard url.path == path,
+                  FileManager.default.fileExists(atPath: path),
+                  FormatRegistry.family(for: path) != nil else {
+                throw LineBoyBridgeError.localFileUnavailable(url.lastPathComponent)
+            }
+            localTracks[id] = LocalTrack(id: id, path: path, title: url.deletingPathExtension().lastPathComponent)
+            startRequest = PlaybackTransportStartRequest(trackID: id, sourcePath: path)
+            resolvedPath = path
         } else {
             throw LineBoyBridgeError.unknownTrack
         }
@@ -557,7 +612,7 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         guard FormatRegistry.family(for: path) != nil else {
             throw LineBoyBridgeError.unsupportedFile(url.lastPathComponent)
         }
-        let id = "local:\(UUID().uuidString)"
+        let id = "local:\(path)"
         let title = url.deletingPathExtension().lastPathComponent
         localTracks[id] = LocalTrack(id: id, path: path, title: title)
         return [
@@ -636,6 +691,7 @@ private enum LineBoyBridgeError: LocalizedError {
     case windowUnavailable
     case invalidArguments
     case unknownTrack
+    case localFileUnavailable(String)
     case unsupportedArchiveEntry(String)
     case unsupportedFile(String)
     case unsupportedMethod(String)
@@ -650,6 +706,8 @@ private enum LineBoyBridgeError: LocalizedError {
             return "LineBoy received an incomplete request."
         case .unknownTrack:
             return "The selected track is no longer in the current catalog view."
+        case .localFileUnavailable(let name):
+            return "The saved local track \(name) is unavailable or no longer supported."
         case .unsupportedArchiveEntry(let entry):
             return "VGMBoy cannot prepare archive member \(entry)."
         case .unsupportedFile(let name):
