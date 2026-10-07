@@ -8,6 +8,16 @@ APP_DIR="$BUILD_DIR/app/ScanSong.app"
 VGMBoy_DIR="$SCRIPT_DIR/../VGMBoy"
 VGMBoy_SCANNER_PLUGIN_BUILDER="$VGMBoy_DIR/scripts/build-scanner-plugins.sh"
 
+# SwiftUI app targets require Xcode's SwiftUIMacros plugin. Check before
+# removing the last packaged app so a Command Line Tools-only setup fails
+# clearly without leaving an empty bundle behind.
+if ! xcodebuild -version >/dev/null 2>&1; then
+    DEVELOPER_DIR_PATH="$(xcode-select -p 2>/dev/null || true)"
+    echo "ScanSong packaging requires full Xcode; the active developer directory is '${DEVELOPER_DIR_PATH:-unknown}'." >&2
+    echo "Install Xcode and select its Developer directory with xcode-select --switch." >&2
+    exit 1
+fi
+
 # Keep SwiftPM's derived objects for normal development builds. Rebuilding the
 # release product from an empty package directory costs about a minute here,
 # while the app bundle itself must still be recreated so removed resources or
