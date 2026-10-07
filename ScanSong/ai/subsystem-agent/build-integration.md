@@ -38,7 +38,9 @@ executables.
 - `build-app.sh` recreates the app bundle before each packaging run so stale
   scanner binaries or resources cannot survive. Normal builds retain SwiftPM's
   derived objects for incremental compilation; set `SCANSONG_CLEAN_BUILD=1` to
-  remove `.build` and force a clean release build.
+  remove `.build` and force a clean release build. It verifies that full Xcode
+  is selected before removing the previous app bundle because SwiftUI's macro
+  implementation is unavailable from Command Line Tools alone.
 - The VGMBoy scanner-plugin helper creates its destination before copying
   helpers, pins CMake to the active Xcode macOS SDK, and includes that SDK path
   in the build signature. This keeps CMake's compiler test on the same SDK as
