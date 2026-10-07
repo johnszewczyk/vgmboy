@@ -25,6 +25,7 @@
     }
 
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
     html, body { min-width: 320px; min-height: 100%; margin: 0; }
     body {
       background: var(--black);
@@ -215,6 +216,8 @@
     }
     .library-panel { grid-column: 1; grid-row: 1 / -1; }
     .listpanel { grid-column: 3; grid-row: 1 / -1; }
+    .options-sidebar { grid-column: 1; grid-row: 1 / -1; }
+    .options-content { grid-column: 3; grid-row: 1 / -1; }
     .panel-title {
       min-width: 0;
       height: 16px;
@@ -373,6 +376,92 @@
     .statusline > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .statusline > span:last-child { color: var(--white); text-align: right; }
 
+    .option-navigation {
+      grid-row: 2 / -1;
+      min-height: 0;
+      display: grid;
+      grid-auto-rows: 16px;
+      align-content: start;
+    }
+    .option-category {
+      width: 100%;
+      height: 16px;
+      padding: 0 1ch;
+      border: 0;
+      background: var(--well);
+      color: var(--gray);
+      line-height: 16px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .option-category:hover,
+    .option-category:focus-visible,
+    .option-category[aria-pressed="true"] {
+      background: var(--gray);
+      color: var(--black);
+      outline: none;
+    }
+    .option-page {
+      grid-row: 2 / -1;
+      min-height: 0;
+      overflow: auto;
+      scrollbar-width: none;
+    }
+    .option-page::-webkit-scrollbar { display: none; }
+    .option-row {
+      min-width: 0;
+      min-height: 16px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(8ch, 1fr);
+      align-items: center;
+      gap: 1ch;
+      padding: 0 1ch;
+      background: var(--well);
+      color: var(--gray);
+      line-height: 16px;
+    }
+    .option-row > span:first-child {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .option-value {
+      min-width: 0;
+      height: 16px;
+      padding: 0 1ch;
+      border: 0;
+      background: var(--gray);
+      color: var(--black);
+      line-height: 16px;
+      text-align: center;
+      text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+    }
+    .option-value:hover,
+    .option-value:focus-visible,
+    .option-value[aria-pressed="true"] {
+      background: var(--white);
+      color: var(--black);
+      outline: none;
+    }
+    .option-note {
+      min-height: 16px;
+      padding: 0 1ch;
+      overflow: hidden;
+      color: var(--dim);
+      line-height: 16px;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    .option-key {
+      color: var(--white);
+      text-align: right;
+    }
+
     @media (prefers-reduced-motion: no-preference) {
       .resolution-choice, .nav-button, .tree-row, .song {
         transition: background-color 70ms linear, color 70ms linear;
@@ -435,6 +524,34 @@
           <div class="panel-title"><span id="game-title">CHRONO TRIGGER</span><span class="count" id="track-count">27 TRK</span></div>
           <div class="list-head" role="row"><span>#</span><span>TRACK</span><span>TIME</span></div>
           <div class="songs" id="song-list" role="listbox" aria-label="Playlist tracks"></div>
+        </section>
+
+        <aside class="panel options-sidebar" id="options-sidebar" aria-label="Options navigation" hidden>
+          <div class="panel-title"><span>OPTIONS</span><span class="count">MENU</span></div>
+          <div class="option-navigation" role="group" aria-label="Option categories">
+            <button class="option-category" type="button" data-options-page="DISPLAY" aria-pressed="true">DISPLAY</button>
+            <button class="option-category" type="button" data-options-page="KEYS" aria-pressed="false">KEYS</button>
+          </div>
+        </aside>
+
+        <section class="panel options-content" id="options-content" aria-label="Options" hidden>
+          <div class="panel-title"><span id="options-page-title">DISPLAY</span><span class="count">SETUP</span></div>
+          <div class="option-page" data-options-content="DISPLAY">
+            <div class="option-row"><span>WIDTH</span><button class="option-value" id="width-mode" type="button" aria-pressed="true">FILL</button></div>
+            <div class="option-row"><span>SCANLINES</span><button class="option-value" id="scanline-mode" type="button" aria-pressed="true">ON</button></div>
+            <div class="option-row"><span>RASTER</span><span class="option-key" id="option-raster">320X240</span></div>
+            <div class="option-row"><span>PITCH</span><span class="option-key" id="option-pitch">6PX</span></div>
+            <div class="option-note" id="width-note">FILL ADDS WHOLE 8PX COLUMNS.</div>
+            <div class="option-row"><span>WINDOW</span><button class="option-value" id="fullscreen-toggle" type="button" aria-label="Toggle fullscreen">FULL</button></div>
+            <div class="option-row"><span>DISPLAY</span><button class="option-value" id="reset-display" type="button">DEFAULTS</button></div>
+          </div>
+          <div class="option-page" data-options-content="KEYS" hidden>
+            <div class="option-row"><span>MOVE</span><span class="option-key">ARROWS</span></div>
+            <div class="option-row"><span>OPEN/PLAY</span><span class="option-key">ENTER</span></div>
+            <div class="option-row"><span>FAVORITE</span><span class="option-key">F</span></div>
+            <div class="option-row"><span>BACK</span><span class="option-key">ESC</span></div>
+            <div class="option-note">TRANSPORT ACTIONS REMAIN IN THE TOP BAR.</div>
+          </div>
         </section>
       </main>
 
@@ -517,8 +634,40 @@
     const pixelScale = document.querySelector("#pixel-scale");
     const resolutionButtons = [...document.querySelectorAll(".resolution-choice")];
     const resolutionById = new Map(RASTERS.map((raster) => [raster.id, raster]));
+    function readDisplayPreferences() {
+      try {
+        const value = JSON.parse(localStorage.getItem("LineBoy.displayPreferences") || "{}");
+        return value && typeof value === "object" ? value : {};
+      } catch {
+        return {};
+      }
+    }
+    function saveDisplayPreferences() {
+      try {
+        localStorage.setItem("LineBoy.displayPreferences", JSON.stringify({
+          raster: requestedRaster,
+          widthMode,
+          scanlinesEnabled,
+        }));
+      } catch {}
+    }
+    const savedDisplayPreferences = readDisplayPreferences();
     const libraryTree = document.querySelector("#library-tree");
     const libraryCount = document.querySelector("#library-count");
+    const libraryPanel = document.querySelector(".library-panel");
+    const listPanel = document.querySelector(".listpanel");
+    const optionsSidebar = document.querySelector("#options-sidebar");
+    const optionsContent = document.querySelector("#options-content");
+    const optionsPageTitle = document.querySelector("#options-page-title");
+    const optionCategories = [...document.querySelectorAll(".option-category")];
+    const optionPages = [...document.querySelectorAll(".option-page")];
+    const widthModeButton = document.querySelector("#width-mode");
+    const scanlineModeButton = document.querySelector("#scanline-mode");
+    const rasterReadout = document.querySelector("#option-raster");
+    const pitchReadout = document.querySelector("#option-pitch");
+    const widthNote = document.querySelector("#width-note");
+    const fullscreenToggle = document.querySelector("#fullscreen-toggle");
+    const resetDisplay = document.querySelector("#reset-display");
     let treeRows = [...document.querySelectorAll(".tree-row")];
     const songList = document.querySelector("#song-list");
     const gameTitle = document.querySelector("#game-title");
@@ -541,7 +690,13 @@
     let nativeTrackLoaded = false;
     let nativeCurrentTrackID = null;
     let activeRaster = null;
-    let requestedRaster = "320X240";
+    let requestedRaster = resolutionById.has(savedDisplayPreferences.raster)
+      ? savedDisplayPreferences.raster : "320X240";
+    let widthMode = savedDisplayPreferences.widthMode === "FRAME" ? "FRAME" : "FILL";
+    let scanlinesEnabled = savedDisplayPreferences.scanlinesEnabled !== false;
+    let optionsVisible = false;
+    let selectedOptionsPage = "DISPLAY";
+    let returnAction = "LIST";
     let activeGame = GAMES.CHRONO;
     let favoritesOnly = false;
     let playing = false;
@@ -601,18 +756,35 @@
       const referenceScale = maxWholeScale >= 2
         ? maxWholeScale - (maxWholeScale % 2)
         : Math.max(1, maxWholeScale);
-      const coreWidth = referenceRaster.width * referenceScale;
-      const coreHeight = referenceRaster.height * referenceScale;
-      const deviceScale = Math.min(coreWidth / raster.width, coreHeight / raster.height);
-      const scale = deviceScale / deviceRatio;
-      const columns = raster.width / 8;
+      const targetHeight = referenceRaster.height * referenceScale;
       const textRows = Math.floor(raster.height / 16);
+      const targetCellHeight = targetHeight / textRows;
+      const scanPitch = Math.max(3, Math.round(targetCellHeight / 16));
+      const beamLinesPerCell = Math.max(1, Math.round(targetCellHeight / scanPitch));
+      const cellHeight = scanPitch * beamLinesPerCell;
+      const deviceScale = cellHeight / 16;
+      const scale = deviceScale / deviceRatio;
+      const sourceWidth = widthMode === "FILL"
+        ? Math.max(320, Math.floor((availableWidth / deviceScale) / 8) * 8)
+        : raster.width;
+      const columns = sourceWidth / 8;
       const halfLineInset = (raster.height - textRows * 16) / 2;
       const workspaceLines = textRows - 4;
       const sidebarColumns = Math.max(16, Math.min(24, Math.round(columns * 0.2)));
 
-      activeRaster = { ...raster, deviceRatio, deviceScale, scale, columns, textRows, workspaceLines };
-      terminal.style.width = `${raster.width}px`;
+      activeRaster = {
+        ...raster,
+        width: sourceWidth,
+        deviceRatio,
+        deviceScale,
+        scanPitch,
+        cellHeight,
+        scale,
+        columns,
+        textRows,
+        workspaceLines,
+      };
+      terminal.style.width = `${sourceWidth}px`;
       terminal.style.height = `${raster.height}px`;
       terminal.style.zoom = String(scale);
       terminal.style.setProperty("--frame-width", `${1 / (scale * deviceRatio)}px`);
@@ -635,26 +807,112 @@
         }));
       }
       gridSize.textContent = `${columns}X${textRows}`;
-      resolutionSize.textContent = raster.id;
-      pixelScale.textContent = `${deviceScale.toFixed(2).replace(/\.?0+$/, "")}X`;
-      terminal.dataset.raster = raster.id.toLowerCase();
+      resolutionSize.textContent = `${sourceWidth}X${raster.height}`;
+      pixelScale.textContent = `${scanPitch}PX`;
+      terminal.dataset.raster = `${sourceWidth}x${raster.height}`;
       terminal.dataset.videoMode = raster.width === 320 ? "standard" : "high";
       resolutionButtons.forEach((button) => {
         button.setAttribute("aria-pressed", String(button.dataset.resolution === requestedRaster));
+        const profile = resolutionById.get(button.dataset.resolution);
+        button.setAttribute("aria-label", `${profile.width} by ${profile.height} display profile`);
       });
+      updateOptionReadouts();
       return true;
     }
 
     function selectRaster(id) {
       if (!resolutionById.has(id)) return;
       requestedRaster = id;
+      saveDisplayPreferences();
       updateRaster();
+      scheduleRender();
+    }
+
+    function updateOptionReadouts() {
+      if (!activeRaster) return;
+      widthModeButton.textContent = widthMode;
+      widthModeButton.setAttribute("aria-pressed", String(widthMode === "FILL"));
+      widthModeButton.setAttribute("aria-label",
+        `Width mode: ${widthMode}. Activate to switch to ${widthMode === "FILL" ? "frame" : "fill"}.`);
+      scanlineModeButton.textContent = scanlinesEnabled ? "ON" : "OFF";
+      scanlineModeButton.setAttribute("aria-pressed", String(scanlinesEnabled));
+      scanlineModeButton.setAttribute("aria-label",
+        `Scanlines ${scanlinesEnabled ? "on" : "off"}. Activate to turn them ${scanlinesEnabled ? "off" : "on"}.`);
+      rasterReadout.textContent = `${activeRaster.width}X${activeRaster.height}`;
+      pitchReadout.textContent = `${activeRaster.scanPitch}PX`;
+      widthNote.textContent = widthMode === "FILL"
+        ? "FILL ADDS WHOLE 8PX COLUMNS."
+        : "FRAME KEEPS THE BASE 4:3 WIDTH.";
+    }
+
+    function setOptionsPage(page) {
+      selectedOptionsPage = page;
+      optionCategories.forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.optionsPage === page));
+      });
+      optionPages.forEach((section) => {
+        section.hidden = section.dataset.optionsContent !== page;
+      });
+      optionsPageTitle.textContent = page === "KEYS" ? "KEYS" : "DISPLAY";
+      scheduleRender();
+    }
+
+    function setOptionsVisible(visible) {
+      optionsVisible = visible;
+      libraryPanel.hidden = visible;
+      listPanel.hidden = visible;
+      optionsSidebar.hidden = !visible;
+      optionsContent.hidden = !visible;
+      workspace.setAttribute("aria-label", visible ? "Options" : "Library and playlist");
+      if (visible) setOptionsPage(selectedOptionsPage);
       scheduleRender();
     }
 
     resolutionButtons.forEach((button) => button.addEventListener("click", () => {
       selectRaster(button.dataset.resolution);
     }));
+
+    optionCategories.forEach((button) => button.addEventListener("click", () => {
+      setOptionsPage(button.dataset.optionsPage);
+    }));
+
+    widthModeButton.addEventListener("click", () => {
+      widthMode = widthMode === "FILL" ? "FRAME" : "FILL";
+      saveDisplayPreferences();
+      updateRaster();
+      status.textContent = `DISPLAY/WIDTH ${widthMode}`;
+      scheduleRender();
+    });
+
+    scanlineModeButton.addEventListener("click", () => {
+      scanlinesEnabled = !scanlinesEnabled;
+      saveDisplayPreferences();
+      updateOptionReadouts();
+      if (scanlinesEnabled) scheduleRender();
+      else terminal.dataset.renderer = "dom";
+      status.textContent = `DISPLAY/SCANLINES ${scanlinesEnabled ? "ON" : "OFF"}`;
+    });
+
+    fullscreenToggle.addEventListener("click", async () => {
+      try {
+        if (nativeHost) await nativeRequest("toggleFullScreen");
+        else if (document.fullscreenElement) await document.exitFullscreen();
+        else await document.documentElement.requestFullscreen();
+        status.textContent = "WINDOW/FULLSCREEN TOGGLED";
+      } catch (error) {
+        status.textContent = `WINDOW/ERROR ${error.message}`;
+      }
+    });
+
+    resetDisplay.addEventListener("click", () => {
+      requestedRaster = "320X240";
+      widthMode = "FILL";
+      scanlinesEnabled = true;
+      saveDisplayPreferences();
+      updateRaster();
+      scheduleRender();
+      status.textContent = "DISPLAY/DEFAULTS RESTORED";
+    });
 
     function visibleTreeRows() { return treeRows.filter((row) => !row.hidden); }
 
@@ -1085,6 +1343,15 @@
       });
     }
 
+    terminal.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || !optionsVisible) return;
+      event.preventDefault();
+      setOptionsVisible(false);
+      setNavSelection(returnAction);
+      navButtons.find((button) => button.dataset.action === returnAction)?.focus();
+      status.textContent = "VIEW/PLAYER";
+    });
+
     navButtons.forEach((button) => button.addEventListener("click", async () => {
       const action = button.dataset.action;
       if (action === "PREV") return moveTrack("previous");
@@ -1101,25 +1368,41 @@
       }
 
       if (action === "FAVORITES") {
+        setOptionsVisible(false);
         favoritesOnly = !favoritesOnly;
         setNavSelection(favoritesOnly ? "FAVORITES" : "LIST");
         applyFavoriteFilter();
         status.textContent = favoritesOnly ? "VIEW/FAVORITES" : "VIEW/PLAYLIST";
       } else if (action === "TREE") {
+        setOptionsVisible(false);
         setNavSelection(action);
         (treeRows.find((row) => row.getAttribute("aria-selected") === "true") || treeRows[0]).focus();
         status.textContent = "VIEW/LIBRARY";
       } else if (action === "LIST") {
+        setOptionsVisible(false);
         favoritesOnly = false;
         setNavSelection(action);
         applyFavoriteFilter();
         songList.querySelector('[aria-selected="true"]')?.focus();
         status.textContent = "VIEW/PLAYLIST";
       } else if (action === "OPTIONS") {
-        setNavSelection(action);
-        resolutionButtons.find((entry) => entry.dataset.resolution === requestedRaster)?.focus();
-        status.textContent = `GRID/${gridSize.textContent}/${resolutionSize.textContent}`;
+        if (optionsVisible) {
+          setOptionsVisible(false);
+          setNavSelection(returnAction);
+          status.textContent = "VIEW/PLAYER";
+        } else {
+          const selected = navButtons.find((entry) =>
+            ["TREE", "LIST", "FAVORITES"].includes(entry.dataset.action)
+            && entry.getAttribute("aria-pressed") === "true"
+          );
+          returnAction = selected?.dataset.action || "LIST";
+          setOptionsVisible(true);
+          setNavSelection(action);
+          optionCategories.find((entry) => entry.dataset.optionsPage === selectedOptionsPage)?.focus();
+          status.textContent = `OPTIONS/${selectedOptionsPage}`;
+        }
       } else if (action === "OPEN" && nativeHost) {
+        setOptionsVisible(false);
         try {
           const track = await nativeRequest("chooseFile");
           if (track.cancelled) return;
@@ -1131,6 +1414,7 @@
           status.textContent = `FILE/ERROR ${error.message}`;
         }
       } else {
+        setOptionsVisible(false);
         setNavSelection(action);
         status.textContent = nativeHost ? "LINEBOY/READY" : "DEMO/FILE OPEN NOT CONNECTED";
       }
@@ -1244,6 +1528,10 @@
     }
 
     function scheduleRender() {
+      if (!scanlinesEnabled) {
+        terminal.dataset.renderer = "dom";
+        return;
+      }
       if (!gl || !program || frameRequest || nativeScrollLive) return;
       frameRequest = requestAnimationFrame(() => {
         frameRequest = 0;
@@ -1266,11 +1554,15 @@
     }
 
     function renderFrame() {
+      if (!scanlinesEnabled) {
+        terminal.dataset.renderer = "dom";
+        return;
+      }
       const version = ++renderVersion;
       const rect = terminal.getBoundingClientRect();
       if (rect.width < 1 || rect.height < 1) return;
       const deviceRatio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
-      const scanPitch = activeRaster.deviceScale;
+      const scanPitch = activeRaster.scanPitch;
       screenOriginX = Math.round(rect.left * deviceRatio) / deviceRatio;
       screenOriginY = Math.round(rect.top * deviceRatio) / deviceRatio;
       const width = Math.max(1, Math.round(rect.width * deviceRatio));
@@ -1380,8 +1672,9 @@
       }
       for (const box of boxes) {
         const measuredBaseline = cellTop + FONT_BASELINE_OFFSET * activeRaster.scale;
+        const beamStep = activeRaster.scanPitch / activeRaster.deviceRatio;
         const baseline = screenOriginY
-          + Math.round((measuredBaseline - screenOriginY) * activeRaster.deviceRatio) / activeRaster.deviceRatio;
+          + Math.round((measuredBaseline - screenOriginY) / beamStep) * beamStep;
         const x = screenOriginX + (box.left - terminal.getBoundingClientRect().left);
         ctx.fillText(text, x, baseline);
       }
@@ -1403,7 +1696,7 @@
     });
     libraryTree.addEventListener("scroll", keepNativeScrollResponsive, { passive: true });
     songList.addEventListener("scroll", keepNativeScrollResponsive, { passive: true });
-    const hoverRegionSelector = ".resolution-choice, .nav-button, .tree-row, .song";
+    const hoverRegionSelector = ".resolution-choice, .nav-button, .tree-row, .song, .option-category, .option-value";
     const hoverRegion = (target) => target instanceof Element ? target.closest(hoverRegionSelector) : null;
     function renderWhenHoverRegionChanges(event) {
       if (hoverRegion(event.target) !== hoverRegion(event.relatedTarget)) scheduleRender();

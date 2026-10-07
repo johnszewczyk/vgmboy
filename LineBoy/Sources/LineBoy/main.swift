@@ -103,6 +103,7 @@ final class LineBoyAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         window.contentView = webView
         window.delegate = self
         window.center()
+        bridge.attach(window: window)
         window.makeKeyAndOrderFront(nil)
         self.window = window
         NSApp.activate(ignoringOtherApps: true)
@@ -137,12 +138,17 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
     private var catalogTracks: [String: CatalogTrack] = [:]
     private var localTracks: [String: LocalTrack] = [:]
     private weak var webView: WKWebView?
+    private weak var window: NSWindow?
 
     func attach(_ webView: WKWebView) {
         self.webView = webView
         transport.setStatusHandler { [weak self] status in
             Task { @MainActor [weak self] in self?.publishPlaybackStatus(status) }
         }
+    }
+
+    func attach(window: NSWindow) {
+        self.window = window
     }
 
     func shutdown() async {
@@ -180,6 +186,10 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
                         self.reply(requestID, failure: error.localizedDescription)
                     }
                 }
+            case "toggleFullScreen":
+                guard let window else { throw LineBoyBridgeError.windowUnavailable }
+                window.toggleFullScreen(nil)
+                reply(requestID, success: ["requested": true])
             case "gameTracks":
                 reply(requestID, success: try gameTracks(arguments))
             case "playTrack":
@@ -441,6 +451,7 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
 
 private enum LineBoyBridgeError: LocalizedError {
     case catalogUnavailable(String)
+    case windowUnavailable
     case invalidArguments
     case unknownTrack
     case unsupportedArchiveEntry(String)
@@ -451,6 +462,8 @@ private enum LineBoyBridgeError: LocalizedError {
         switch self {
         case .catalogUnavailable:
             return "The shared VGMMan catalog is unavailable. Use FILE to open a track."
+        case .windowUnavailable:
+            return "The LineBoy window is unavailable."
         case .invalidArguments:
             return "LineBoy received an incomplete request."
         case .unknownTrack:
