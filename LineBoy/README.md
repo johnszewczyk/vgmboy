@@ -35,7 +35,9 @@ browser preview, serve `.build/site` on loopback with Python's HTTP server.
 The native host owns catalog and transport adapters; the HTML owns the shared
 8×16 grid, keyboard interaction, and WebGL2 beam rendering. Both use the same
 interface, while only the native host has access to CatalogReader,
-FrontendCore, and VGMBoy.
+FrontendCore, and VGMBoy. The native app also supplies standard macOS app,
+File, Edit, View, and Window menus, including Command+O, Command+comma,
+Control+Command+F, Command+W, and Command+Q.
 
 The font `assets/ModernDOS8x16.ttf` is Modern DOS 8×16 by Jayvee Enaguas,
 dedicated under CC0 1.0. The included `assets/CC0-1.0.txt` preserves its

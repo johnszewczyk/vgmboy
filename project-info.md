@@ -14,8 +14,9 @@ history live in this repository.
 - UACMan owns its package format and editor. CocoaSpice, SPCBoyWK, and ViewBoy
   are active separate player apps; SPCBOY SB2 is a fourth frontend under
   development.
-- LineBoy is a standalone monochrome line-grid display experiment in its own
-  family subfolder; it is not yet connected to the shared catalog or player.
+- LineBoy is a standalone monochrome line-grid player experiment in its own
+  family subfolder. It uses CatalogReader for catalog access, FrontendCore for
+  favorites and queue policy, and VGMBoy for playback.
 
 ## Task Routing
 

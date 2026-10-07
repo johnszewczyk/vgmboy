@@ -78,6 +78,7 @@ final class LineBoyAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
+        installMainMenu()
         let bridge = LineBoyNativeBridge()
         self.bridge = bridge
 
@@ -107,6 +108,111 @@ final class LineBoyAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         window.makeKeyAndOrderFront(nil)
         self.window = window
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func installMainMenu() {
+        let mainMenu = NSMenu(title: "LineBoy")
+
+        let appMenuItem = NSMenuItem()
+        let appMenu = NSMenu(title: "LineBoy")
+        appMenuItem.title = "LineBoy"
+        appMenu.addItem(menuItem("About LineBoy", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), target: NSApp))
+        appMenu.addItem(.separator())
+        appMenu.addItem(menuItem("Options…", action: #selector(showOptions(_:)), key: ",", target: self))
+        appMenu.addItem(.separator())
+        let servicesMenu = NSMenu(title: "Services")
+        NSApp.servicesMenu = servicesMenu
+        let servicesItem = NSMenuItem(title: "Services", action: nil, keyEquivalent: "")
+        servicesItem.submenu = servicesMenu
+        appMenu.addItem(servicesItem)
+        appMenu.addItem(.separator())
+        appMenu.addItem(menuItem("Hide LineBoy", action: #selector(NSApplication.hide(_:)), key: "h", target: NSApp))
+        appMenu.addItem(menuItem(
+            "Hide Others",
+            action: #selector(NSApplication.hideOtherApplications(_:)),
+            key: "h",
+            modifiers: [.command, .option],
+            target: NSApp
+        ))
+        appMenu.addItem(menuItem("Show All", action: #selector(NSApplication.unhideAllApplications(_:)), target: NSApp))
+        appMenu.addItem(.separator())
+        appMenu.addItem(menuItem("Quit LineBoy", action: #selector(NSApplication.terminate(_:)), key: "q", target: NSApp))
+        appMenuItem.submenu = appMenu
+        mainMenu.addItem(appMenuItem)
+
+        let fileMenuItem = NSMenuItem()
+        let fileMenu = NSMenu(title: "File")
+        fileMenuItem.title = "File"
+        fileMenu.addItem(menuItem("Open…", action: #selector(openFile(_:)), key: "o", target: self))
+        fileMenu.addItem(.separator())
+        fileMenu.addItem(menuItem("Close Window", action: #selector(NSWindow.performClose(_:)), key: "w"))
+        fileMenuItem.submenu = fileMenu
+        mainMenu.addItem(fileMenuItem)
+
+        let editMenuItem = NSMenuItem()
+        let editMenu = NSMenu(title: "Edit")
+        editMenuItem.title = "Edit"
+        editMenu.addItem(menuItem("Undo", action: NSSelectorFromString("undo:"), key: "z"))
+        editMenu.addItem(menuItem("Redo", action: NSSelectorFromString("redo:"), key: "z", modifiers: [.command, .shift]))
+        editMenu.addItem(.separator())
+        editMenu.addItem(menuItem("Cut", action: NSSelectorFromString("cut:"), key: "x"))
+        editMenu.addItem(menuItem("Copy", action: NSSelectorFromString("copy:"), key: "c"))
+        editMenu.addItem(menuItem("Paste", action: NSSelectorFromString("paste:"), key: "v"))
+        editMenu.addItem(menuItem("Select All", action: NSSelectorFromString("selectAll:"), key: "a"))
+        editMenuItem.submenu = editMenu
+        mainMenu.addItem(editMenuItem)
+
+        let viewMenuItem = NSMenuItem()
+        let viewMenu = NSMenu(title: "View")
+        viewMenuItem.title = "View"
+        viewMenu.addItem(menuItem(
+            "Toggle Full Screen",
+            action: #selector(NSWindow.toggleFullScreen(_:)),
+            key: "f",
+            modifiers: [.command, .control]
+        ))
+        viewMenuItem.submenu = viewMenu
+        mainMenu.addItem(viewMenuItem)
+
+        let windowMenuItem = NSMenuItem()
+        let windowMenu = NSMenu(title: "Window")
+        windowMenuItem.title = "Window"
+        windowMenu.addItem(menuItem("Minimize", action: #selector(NSWindow.miniaturize(_:)), key: "m"))
+        windowMenu.addItem(menuItem("Zoom", action: #selector(NSWindow.performZoom(_:))))
+        windowMenu.addItem(.separator())
+        windowMenu.addItem(menuItem("Bring All to Front", action: #selector(NSApplication.arrangeInFront(_:)), target: NSApp))
+        windowMenuItem.submenu = windowMenu
+        mainMenu.addItem(windowMenuItem)
+
+        NSApp.windowsMenu = windowMenu
+        NSApp.mainMenu = mainMenu
+    }
+
+    private func menuItem(
+        _ title: String,
+        action: Selector,
+        key: String = "",
+        modifiers: NSEvent.ModifierFlags = [.command],
+        target: AnyObject? = nil
+    ) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        item.keyEquivalentModifierMask = modifiers
+        item.target = target
+        return item
+    }
+
+    @objc private func showOptions(_ sender: Any?) {
+        clickToolbarAction("OPTIONS")
+    }
+
+    @objc private func openFile(_ sender: Any?) {
+        clickToolbarAction("OPEN")
+    }
+
+    private func clickToolbarAction(_ action: String) {
+        guard let webView = window?.contentView as? WKWebView,
+              ["OPEN", "OPTIONS"].contains(action) else { return }
+        webView.evaluateJavaScript("document.querySelector('[data-action=\"\(action)\"]')?.click();")
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }

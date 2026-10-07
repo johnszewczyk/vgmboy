@@ -34,8 +34,10 @@ a two-column terminal settings view. DISPLAY contains WIDTH MODE (FILL or
 FRAME), SCANLINES, the active beam pitch, and a native fullscreen toggle. CRT
 contains a THIN/NORMAL/WIDE beam-width control and reports the active pitch.
 FILL and FRAME, scanline visibility, beam width, and the selected raster
-profile are remembered. The window can also enter fullscreen from its standard
-window control.
+profile are remembered. The native app provides standard macOS menus and
+shortcuts: Command+O opens a file, Command+comma opens OPTIONS, Control+Command+F
+toggles fullscreen, Command+M minimizes, Command+W closes the window, and
+Command+Q quits. The Edit menu forwards standard text commands to WebKit.
 
 In the native app, the library tree loads group counts from the shared catalog
 and fetches a group's game rows when it expands. Selecting a game loads its
