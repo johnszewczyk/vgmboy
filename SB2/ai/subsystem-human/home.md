@@ -34,9 +34,10 @@
 - Sidebar selection remains available to navigation and activation but has no
   selected-row marker. Folder and console disclosure updates immediately.
 - Dense catalog rows keep zero vertical item padding with a 1px row gap. The
-  pane divider is 1px. The title strip, status strip, and toolbars share one
-  2.5rem row height. Main action controls use a 1.5rem square and 1rem icons;
-  the search field and playlist close control use the same 1.5rem control size.
+  pane divider is 1px. UI Chrome Font Size scales the title strip, status strip,
+  toolbars, and option controls together: at 10pt, rows are 2.5rem high, main
+  controls are 1.5rem square, and icons are 1rem. Sidebar and playlist text
+  sizes remain independent of this chrome scale.
 - Playlist column headers use the same 1.5rem height, dark button surface, and
   corner size as the main action controls, with the header strip kept visually
   quiet around them.

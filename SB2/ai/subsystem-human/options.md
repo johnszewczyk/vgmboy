@@ -15,7 +15,12 @@
   uses a centered cover crop so non-square images fill square tiles.
   The same page layout and title/footer chrome appear in the optional
   standalone Options window.
-- Setting fields share one 2.5rem control height and 24ch width, with the width
+- UI Chrome Font Size scales toolbar rows, square buttons, icons, and option
+  control heights together. At 10pt, toolbar rows are 2.5rem, square buttons
+  are 1.5rem, and icons are 1rem; these proportions stay constant as the font
+  size changes. Rem-based chrome spacing scales with it as well. Playlist and
+  sidebar text sizes remain independent.
+- Setting fields share the toolbar row height and a 24ch width, with the width
   scaling together on narrow windows. Database path readouts keep the same
   height and use the available row width.
 - Sidebar folders and console groups open and close immediately.
