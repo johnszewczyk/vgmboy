@@ -25,8 +25,10 @@ gzip-compressed `.vgz` members. See
 | Source Tag | UAC Tag | UAC Coded Tag | Tag Notes |
 | --- | --- | --- | --- |
 | `system_english` / `system_original` | Platform | `game.console` | Prefer English, then original. VGM labels are exempt from the limited aliases in [Platforms](PLATFORMS.md). |
-| `title_english` / `title_original` | Title | `members[].metadata["Title"]` | Prefer English, then original; no filename fallback. |
-| `game_english` / `game_original` | Album | `game.metadata["Album"]` | Project the one Game Name fact once: prefer English, then original. Do not also emit **Game** or **Game Title** aliases. |
+| `title_english` | Title | `members[].metadata["Title"]` | Preserve the English track title when populated. |
+| `title_original` | Title (JP) | `members[].metadata["Title (JP)"]` | Preserve the Japanese track title as a separate language field. |
+| `game_english` | Game Title | `members[].metadata["Game Title"]` | Preserve the English game name on its VGM track. |
+| `game_original` | Game Title (JP) | `members[].metadata["Game Title (JP)"]` | Preserve the Japanese game name on its VGM track. |
 | `artist_english` / `artist_original` | Album Artist / Artist | `game.metadata["Album Artist"]` or `members[].metadata["Artist"]` | Use Album Artist for a shared credit and track Artist only for a track-specific credit. |
 | `date` | Date / Year | `game.metadata["Date"]` or `game.metadata["Year"]` | Use Date for a full date and Year when only a year is present. |
 | `converted_by` | Dumper | `game.metadata["Dumper"]` | Preserve the GD3 credit; do not rename it Encoded By. |
