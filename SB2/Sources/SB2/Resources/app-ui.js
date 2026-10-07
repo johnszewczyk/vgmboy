@@ -58,7 +58,7 @@ function isGalleryActive() {
 
 function applyGallerySettings() {
   const root = document.documentElement;
-  root.style.setProperty("--sb-gallery-size-scale", String(state.gallerySizeScale));
+  root.style.setProperty("--sb-gallery-tile-min-width", `${9 * state.gallerySizeScale}rem`);
   root.style.setProperty("--sb-gallery-gap", `${state.galleryGapRem}rem`);
   root.style.setProperty("--sb-gallery-radius", `${state.galleryRadiusRem}rem`);
   if (refs.gallerySizeInput) refs.gallerySizeInput.value = String(state.gallerySizeScale);
@@ -1876,7 +1876,6 @@ function renderGalleryView() {
     image.dataset.sourcePath = artwork.sourcePath;
     image.dataset.titleSnap = artwork.titleSnap;
     image.addEventListener("load", () => artworkFrame.classList.add("has-art"), { once: true });
-    artworkFrame.append(placeholder, image);
 
     const title = document.createElement("span");
     title.className = "gallery-card-title";
@@ -1884,7 +1883,11 @@ function renderGalleryView() {
     const system = document.createElement("span");
     system.className = "gallery-card-system";
     system.textContent = String(game.system || game.rootName || "");
-    button.append(artworkFrame, title, system);
+    const caption = document.createElement("span");
+    caption.className = "gallery-card-caption";
+    caption.append(title, system);
+    artworkFrame.append(placeholder, image, caption);
+    button.append(artworkFrame);
     card.appendChild(button);
     refs.galleryGrid.appendChild(card);
 
@@ -2181,7 +2184,6 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
 
 function renderSidebar() {
   const view = currentSidebarView();
-  refs.gallerySidebarToolbar?.classList.toggle("is-hidden", !isGalleryActive());
   const modeLabels = { consoles: "Console View", paths: "Path View" };
   const modeIcons = { consoles: "#icon-database", paths: "#icon-folder-tree" };
   if (refs.sidebarViewToggleButton) {
@@ -3855,6 +3857,7 @@ async function bootstrap() {
   window.SB2OptionsController.applyManifest(await window.spcBoySB2.frontendOptionsManifest());
   setStartupStage(0, "Applying saved interface settings and reopening your last session.");
   await loadSettings();
+  applyGallerySettings();
   await syncSidebarView();
   let savedPlaylistTabs = null;
   if (!window.spcBoySB2?.isOptionsWindow && window.spcBoySB2?.playlistTabsLoad) {

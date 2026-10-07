@@ -11,6 +11,8 @@
   Section headings are underlined; setting rows use whitespace without
   divider lines. UI Chrome and UI Fonts are separate SPCBOY pages. UI Fonts
   exposes playlist-header styling and titlebar font color and bold controls.
+  UI Chrome > Gallery Tiles controls tile size, gap, and corner radius; artwork
+  uses a centered cover crop so non-square images fill square tiles.
   The same page layout and title/footer chrome appear in the optional
   standalone Options window.
 - Setting fields share one 2.5rem control height and 24ch width, with the width
