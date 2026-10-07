@@ -55,9 +55,10 @@ inspect the recipe/source mapping, and round-trip into a separate directory
 before promotion. A successfully harvested member defaults to UAC role
 `playable`; an explicit recipe role remains authoritative.
 
-When source records identify one unambiguous distributor and set, the packer
-projects it to direct Title Case package tags: `Set Collection`, `Set Name`, and
-`Set URL`, with optional `Set Legacy URL` and `Set Archive URL`. For Redump
+When source records identify one unambiguous set, the packer projects direct
+Title Case package tags `Set Name` and `Set URL`, with optional `Set Legacy URL`
+and `Set Archive URL`. Collection identity remains in `sources[]`; no
+`Set Collection` tag is written. For Redump
 packages, the `redump-disc-archive` record is authoritative over derived output
 and metadata-only association records; its Archive.org download URL is
 projected to the matching item details page. Existing collections can be audited
@@ -70,22 +71,16 @@ VGMRips system pages and retains both the old Project2612 address and its
 Wayback snapshot. This is a useful current directory link, not a claim that
 every original Project2612 package was one-to-one migrated.
 
-New packages write `game.metadata.containedContainerVersions` only when SPC or
-VGM members are present. It records SPC and VGM version/count groups at package
-level; mixed-version review belongs to AudioMan rather than the generic wrapper.
-Each SPC member exposes
-`metadata.spcVersion` (from its version byte), `metadata.spcVersionByte`, and
-`metadata.spcHeaderVersion` (from the signature text). The byte and signature
-are reported separately because real SPCs can disagree between them; neither
-is silently normalized. VGZ members are rejected by the generic packer because
-their nested gzip wrapper reduces outer Zstandard compression; other
-format-specific policy belongs to the caller. This
-inspection does not change source bytes. Every member receives a CRC32/ISO-HDLC
-hash scoped to its exact raw bytes. Playable members receive BLAKE3, CRC32,
-SHA-1, and MD5 records for the playable-payload scope; for SPC this is the
-complete stored file. Existing BLAKE3 member identity remains available.
-AudioMan must convert VGZ to raw VGM and freshen VGM versions before
-packaging when that is the selected set policy.
+New SPC and VGM members expose one per-member `Format` tag derived from their
+container headers (for example, `SPC v.30` or `VGM v.1.71`). The wrapper does
+not add a redundant camelCase package-level version summary or extra SPC
+header-version tags; mixed-version review belongs in AudioMan's dashboard.
+VGZ members are rejected by the generic packer because their nested gzip
+wrapper reduces outer Zstandard compression. AudioMan removes one VGZ gzip
+layer before packaging and records that transformation; the VGM version stays
+unchanged. Every member receives a CRC32/ISO-HDLC hash scoped to its exact raw
+bytes. Playable members receive BLAKE3, CRC32, SHA-1, and MD5 records for the
+playable-payload scope; for SPC and VGM this is the complete stored native file.
 
 Native SPC replacement work is closed. `Container/` keeps the former research
 and state-profile prototype as historical material; this wrapper remains the

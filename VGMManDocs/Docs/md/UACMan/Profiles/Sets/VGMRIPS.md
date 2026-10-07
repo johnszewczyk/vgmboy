@@ -17,6 +17,10 @@ Apply these rules together with the [VGM format profile](../VGM.md) and the
   the normalized platform name for Sega folders, including **Sega Genesis**,
   **Sega CD**, **Sega 32X**, **Sega Pico**, and **Sega SG-1000**. Keep arcade
   boards under the set's **Arcade** folder.
+- **Conversion scope** — Process and report one console folder at a time. Make
+  one UAC per game package for that console; leave every other console folder
+  untouched until its own pass. Reuse current source/member identities and
+  metadata records rather than refreshing the entire multi-console source set.
 - **Outer filenames** — Replace underscores with spaces in outer package and
   artwork filenames. Remove a redundant console parenthetical when the
   destination folder identifies that platform. Preserve title punctuation,
@@ -33,6 +37,9 @@ Apply these rules together with the [VGM format profile](../VGM.md) and the
   `{"memberPath":"artwork/file.png","mediaType":"image/png"}`. Use an array
   of references when a package has multiple title images. Do not label artwork
   as a front cover unless the source identifies it that way.
+- **Package set tags** — Use **Set Name** `VGMRIPS` and **Set URL** for the
+  official snapshot/source page. Do not add **Set Collection**; `sources[]`
+  retains the collection identity and package-level source file.
 
 ## Reports
 
