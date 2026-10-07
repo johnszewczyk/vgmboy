@@ -51,16 +51,27 @@ Persist the selected raster profile, fill/frame width mode, scanline visibility,
 beam width, palette brightness, selector motion, and library-pane width in local
 display preferences. Brightness applies a gamma-style remap to the monochrome UI
 palette only; retain the transparent beam rows and pure-black scanline gaps.
-Keep the selector as one
-terminal-level block beneath controls and above their backgrounds; position it
-from the target's measured bounds divided by the current terminal zoom. Move it
-between toolbar controls and option categories on pointer entry or focus, and
-respect the saved motion switch plus `prefers-reduced-motion`. Snap the
-resizable separator and DISPLAY width slider to the same 8px source-column
-bounds, preserve at least 10 columns in the library and 20 in the content pane
-where the raster allows, and default the library to one-third of the available
-columns. Keep keyboard arrows in one-column steps, Home at the one-third default,
-and End at the maximum width. SCANLINES off exposes the DOM
+Keep the selector as one terminal-level block beneath controls and above their
+backgrounds; position it from the target's measured bounds divided by the
+current terminal zoom. Delegate pointer hover and focus tracking across enabled
+buttons, visible inputs, and the sidebar separator. Resolve pointer children to
+their containing control, ignore hidden or disabled targets, and restore the
+last selected control when the pointer leaves an interactive target. Move the
+block to programmatically selected rows, tabs, and option categories as well.
+Measure the separator's centered 2×24px handle rather than its full-height drag
+surface. Track the currently hovered target separately from the selected
+target, so pointer exit restores selection and keyboard/programmatic selection
+supersedes stale pointer hover. Remeasure the active block on captured scroll
+events and clip its bounds to the terminal and any scrolling ancestor; never let
+it float outside a clipped list. Keep each current target above the block with
+a transparent background so the same white block and black text treatment
+works across controls. Respect the saved motion switch plus
+`prefers-reduced-motion`. Snap the resizable
+separator and DISPLAY width slider to the same 8px source-column bounds,
+preserve at least 10 columns in the library and 20 in the content pane where the
+raster allows, and default the library to one-third of the available columns.
+Keep keyboard arrows in one-column steps, Home at the one-third default, and End
+at the maximum width. SCANLINES off exposes the DOM
 without changing the grid. The resolution row and view toolbar must flex with
 the active column count so controls use available width at each profile.
 

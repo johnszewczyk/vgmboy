@@ -50,15 +50,21 @@ app launches and in the browser preview's local storage. Native catalog rows
 are reloaded lazily when a saved catalog-backed tab is selected; the app still
 starts in sample mode without loading the full catalog.
 
-One white selection block travels between the active top toolbar control and
-the option-category tabs. DISPLAY can turn that motion off. The library starts
-at one-third of the available character columns and keeps at least 20 columns
-for its content pane. Its DISPLAY sidebar-width slider and draggable separator
-use the same 8px character-column bounds and saved value; arrow keys change one
-column at a time, Home restores the one-third default, and End sets the widest
-allowed library pane. Brightness runs from 60% to 140% and remaps the monochrome
-palette while leaving the pure-black scanline gaps unchanged. Brightness,
-selector motion, and pane width persist with the display preferences.
+One white selector block flows across the interactive controls throughout the
+screen: resolution choices, view and transport buttons, search, library rows,
+playlist tabs and tracks, option controls, and the sidebar resize handle. It
+follows pointer hover and keyboard focus, then returns to the selected control
+when the pointer leaves. It stays clipped to the visible scroll area as rows
+move, and keyboard or programmatic selection takes over from stale pointer
+hover. DISPLAY can turn selector motion off. The library starts at one-third of
+the available character columns and keeps at least 20 columns for its content
+pane. Its DISPLAY sidebar-width slider and draggable
+separator use the same 8px character-column bounds and saved value; arrow keys
+change one column at a time, Home restores the one-third default, and End sets
+the widest allowed library pane. Brightness runs from 60% to 140% and remaps the
+monochrome palette while leaving the pure-black scanline gaps unchanged.
+Brightness, selector motion, and pane width persist with the display
+preferences.
 
 Phosphor persistence is disabled to keep interaction responsive. OPTIONS opens
 a two-column terminal settings view. DISPLAY contains WIDTH MODE (FILL or

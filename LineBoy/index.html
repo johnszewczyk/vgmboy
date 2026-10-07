@@ -121,6 +121,19 @@
       will-change: transform, width;
     }
     .selector-block:not(.is-ready) { visibility: hidden; transition: none; }
+    .selector-block.is-clipped { visibility: hidden; }
+    .selector-current {
+      position: relative;
+      z-index: 2;
+      background: transparent !important;
+      color: var(--black) !important;
+      outline: none !important;
+    }
+    .selector-current .chev,
+    .selector-current .count,
+    .selector-current .num,
+    .selector-current .length,
+    .selector-current::placeholder { color: var(--black) !important; }
     .topline,
     .resolutionline,
     .toolrow,
@@ -227,9 +240,6 @@
     .nav-button[aria-pressed="true"] {
       outline: none;
     }
-    .nav-button.selector-current,
-    .playlist-tab-select.selector-current { background: transparent; color: var(--black); }
-
     .workspace {
       --workspace-rows: repeat(var(--workspace-lines), 16px);
       grid-row: 4 / var(--footer-row);
@@ -370,6 +380,7 @@
     .divider:hover::after,
     .divider:focus-visible::after,
     .workspace.is-resizing .divider::after { background: var(--dim); }
+    .divider.selector-current::after { background: transparent !important; }
 
     .listpanel .panel-title { grid-row: 1; }
     .playlist-tab-row {
@@ -425,8 +436,8 @@
     .playlist-tab-close { flex: 0 0 2ch; color: var(--dim); }
     .playlist-tab-add {
       flex: 0 0 3ch;
-      background: var(--well-highlight);
-      color: var(--black);
+      background: transparent;
+      color: var(--gray);
       text-align: center;
     }
     .playlist-tab-select:hover,
@@ -549,7 +560,6 @@
     .option-category[aria-pressed="true"] {
       outline: none;
     }
-    .option-category.selector-current { background: transparent; color: var(--black); }
     .option-page {
       grid-row: 2 / -1;
       min-height: 0;
@@ -912,6 +922,7 @@
     const now = document.querySelector("#now");
     const clock = document.querySelector("#clock");
     const navButtons = [...document.querySelectorAll(".nav-button")];
+    const selectorTargetSelector = "button:not(:disabled), input:not([type='hidden']), .divider";
     const nativeHost = Boolean(window.webkit?.messageHandlers?.lineBoy);
     // Keep full-catalog reads opt-in during UI testing; sample records remain instant.
     const LIVE_CATALOG_ENABLED = false;
@@ -956,6 +967,8 @@
     let selectedOptionsPage = "DISPLAY";
     let currentNavAction = "LIST";
     let lastSelectorTarget = null;
+    let selectedSelectorTarget = null;
+    let hoveredSelectorTarget = null;
     let returnAction = "LIST";
     let activeGame = GAMES.CHRONO;
     let favoritesOnly = false;
@@ -1171,28 +1184,51 @@
     }
 
     function currentSelectorTarget() {
+      if (isAvailableSelectorTarget(hoveredSelectorTarget)) return hoveredSelectorTarget;
+      if (isAvailableSelectorTarget(selectedSelectorTarget)) return selectedSelectorTarget;
       if (optionsVisible) {
-        return optionCategories.includes(lastSelectorTarget)
-          ? lastSelectorTarget
-          : optionCategories.find((button) => button.dataset.optionsPage === selectedOptionsPage);
+        return optionCategories.find((button) => button.dataset.optionsPage === selectedOptionsPage);
       }
-      return navButtons.includes(lastSelectorTarget)
-        || playlistTabButtons().includes(lastSelectorTarget)
-        || lastSelectorTarget === playlistTabAddButton
-        ? lastSelectorTarget
-        : navButtons.find((button) => button.dataset.action === currentNavAction)
+      return navButtons.find((button) => button.dataset.action === currentNavAction)
         || navButtons.find((button) => button.dataset.action === "LIST");
     }
 
     function positionSelectionBlock(target) {
-      if (!target || !activeRaster) return;
+      if (!isAvailableSelectorTarget(target) || !activeRaster) return;
       const terminalRect = terminal.getBoundingClientRect();
-      const targetRect = target.getBoundingClientRect();
       const scale = activeRaster.scale || 1;
-      const x = (targetRect.left - terminalRect.left) / scale;
-      const y = (targetRect.top - terminalRect.top) / scale;
-      selectorBlock.style.width = `${targetRect.width / scale}px`;
-      selectorBlock.style.height = `${targetRect.height / scale}px`;
+      const bounds = target.getBoundingClientRect();
+      const targetRect = target.matches(".divider")
+        ? { left: bounds.left + 3 * scale, top: bounds.top + (bounds.height - 24 * scale) / 2,
+          right: bounds.left + 5 * scale, bottom: bounds.top + (bounds.height + 24 * scale) / 2 }
+        : { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom };
+      const clip = { left: terminalRect.left, top: terminalRect.top,
+        right: terminalRect.right, bottom: terminalRect.bottom };
+      for (let ancestor = target.parentElement; ancestor && ancestor !== terminal; ancestor = ancestor.parentElement) {
+        const style = getComputedStyle(ancestor);
+        const rect = ancestor.getBoundingClientRect();
+        if (["auto", "scroll", "hidden", "clip"].includes(style.overflowX)) {
+          clip.left = Math.max(clip.left, rect.left);
+          clip.right = Math.min(clip.right, rect.right);
+        }
+        if (["auto", "scroll", "hidden", "clip"].includes(style.overflowY)) {
+          clip.top = Math.max(clip.top, rect.top);
+          clip.bottom = Math.min(clip.bottom, rect.bottom);
+        }
+      }
+      const left = Math.max(targetRect.left, clip.left);
+      const top = Math.max(targetRect.top, clip.top);
+      const right = Math.min(targetRect.right, clip.right);
+      const bottom = Math.min(targetRect.bottom, clip.bottom);
+      if (right <= left || bottom <= top) {
+        selectorBlock.classList.add("is-clipped");
+        return;
+      }
+      selectorBlock.classList.remove("is-clipped");
+      const x = (left - terminalRect.left) / scale;
+      const y = (top - terminalRect.top) / scale;
+      selectorBlock.style.width = `${(right - left) / scale}px`;
+      selectorBlock.style.height = `${(bottom - top) / scale}px`;
       selectorBlock.style.transform = `translate3d(${x}px, ${y}px, 0)`;
       document.querySelectorAll(".selector-current").forEach((element) => {
         element.classList.remove("selector-current");
@@ -1245,7 +1281,7 @@
       });
       optionsPageTitle.textContent = page;
       if (optionsVisible) {
-        positionSelectionBlock(optionCategories.find((button) => button.dataset.optionsPage === page));
+        selectSelectionTarget(optionCategories.find((button) => button.dataset.optionsPage === page));
       }
     }
 
@@ -1342,11 +1378,45 @@
       });
     });
 
-    [...navButtons, ...optionCategories].forEach((button) => {
-      button.addEventListener("pointerenter", () => positionSelectionBlock(button));
-      button.addEventListener("focus", () => positionSelectionBlock(button));
-    });
+    function selectorTargetFrom(node) {
+      return node instanceof Element ? node.closest(selectorTargetSelector) : null;
+    }
 
+    function isAvailableSelectorTarget(target) {
+      return target instanceof HTMLElement
+        && terminal.contains(target)
+        && target.matches(selectorTargetSelector)
+        && !target.disabled
+        && !target.closest("[hidden]");
+    }
+
+    function selectSelectionTarget(target) {
+      if (!isAvailableSelectorTarget(target)) return;
+      hoveredSelectorTarget = null;
+      selectedSelectorTarget = target;
+      positionSelectionBlock(target);
+    }
+
+    terminal.addEventListener("pointerover", (event) => {
+      const target = selectorTargetFrom(event.target);
+      if (!isAvailableSelectorTarget(target) || target === selectorTargetFrom(event.relatedTarget)) return;
+      hoveredSelectorTarget = target;
+      positionSelectionBlock(target);
+    });
+    terminal.addEventListener("pointerout", (event) => {
+      const target = selectorTargetFrom(event.target);
+      if (!target || target === selectorTargetFrom(event.relatedTarget)) return;
+      if (!selectorTargetFrom(event.relatedTarget)) {
+        hoveredSelectorTarget = null;
+        positionSelectionBlock(currentSelectorTarget());
+      }
+    });
+    terminal.addEventListener("focusin", (event) => {
+      selectSelectionTarget(selectorTargetFrom(event.target));
+    });
+    terminal.addEventListener("scroll", () => {
+      positionSelectionBlock(currentSelectorTarget());
+    }, true);
     widthModeButton.addEventListener("click", () => {
       widthMode = widthMode === "FILL" ? "FRAME" : "FILL";
       saveDisplayPreferences();
@@ -1413,6 +1483,7 @@
         selectedTreeRow = row;
       }
       if (moveFocus) row.focus();
+      selectSelectionTarget(row);
     }
 
     async function setFolderExpanded(row, expanded) {
@@ -1638,7 +1709,8 @@
     }
 
     function renderPlaylistTabs() {
-      const selectorWasOnPlaylistTab = lastSelectorTarget?.matches(".playlist-tab-select") === true;
+      const selectorWasInTabStrip = [lastSelectorTarget, selectedSelectorTarget]
+        .some((target) => target?.matches(".playlist-tab-select, .playlist-tab-close") === true);
       const selectorWasOnAddButton = lastSelectorTarget === playlistTabAddButton;
       const fragment = document.createDocumentFragment();
       playlistTabs.forEach((tab, index) => {
@@ -1657,8 +1729,6 @@
         select.tabIndex = tab.id === activePlaylistTabID ? 0 : -1;
         select.textContent = tab.title;
         select.addEventListener("click", () => activatePlaylistTab(tab.id));
-        select.addEventListener("pointerenter", () => positionSelectionBlock(select));
-        select.addEventListener("focus", () => positionSelectionBlock(select));
         select.addEventListener("keydown", (event) => {
           if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
           event.preventDefault();
@@ -1681,9 +1751,9 @@
 
       playlistTabsView.replaceChildren(fragment);
       if (selectorWasOnAddButton) {
-        positionSelectionBlock(playlistTabAddButton);
-      } else if (selectorWasOnPlaylistTab) {
-        positionSelectionBlock(playlistTabButtons().find((button) => button.getAttribute("aria-selected") === "true"));
+        selectSelectionTarget(playlistTabAddButton);
+      } else if (selectorWasInTabStrip) {
+        selectSelectionTarget(playlistTabButtons().find((button) => button.getAttribute("aria-selected") === "true"));
       }
     }
 
@@ -1705,6 +1775,7 @@
       songList.scrollTop = Math.max(0, Number(tab.scrollTop) || 0);
       restoringPlaylistTab = false;
       renderPlaylistTabs();
+      selectSelectionTarget(playlistTabButtons().find((button) => button.getAttribute("aria-selected") === "true"));
       status.textContent = `PLAYLIST/TAB ${playlistTabs.indexOf(tab) + 1}`;
       schedulePlaylistTabsSave();
       if (catalogHost && tab.rootId && tab.game) hydrateCatalogPlaylist(tab.id);
@@ -1846,8 +1917,6 @@
       return tab ? activatePlaylistTab(tab.id) : false;
     };
     playlistTabAddButton.addEventListener("click", createPlaylistTab);
-    playlistTabAddButton.addEventListener("pointerenter", () => positionSelectionBlock(playlistTabAddButton));
-    playlistTabAddButton.addEventListener("focus", () => positionSelectionBlock(playlistTabAddButton));
 
     function visibleSongs() { return [...songList.querySelectorAll(".song:not([hidden])")]; }
 
@@ -1868,6 +1937,7 @@
         row.tabIndex = selected ? 0 : -1;
       });
       if (moveFocus) song.focus();
+      if (moveFocus || document.activeElement === song) selectSelectionTarget(song);
       song.scrollIntoView({ block: "nearest" });
       updateTrackPath(song);
       schedulePlaylistTabsSave();
@@ -2299,7 +2369,7 @@
           button.setAttribute("aria-pressed", String(selected));
         }
       });
-      positionSelectionBlock(optionsVisible
+      selectSelectionTarget(optionsVisible
         ? currentSelectorTarget()
         : navButtons.find((button) => button.dataset.action === currentNavAction));
     }
