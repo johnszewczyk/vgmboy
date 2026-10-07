@@ -17,10 +17,15 @@
     :root {
       color-scheme: dark;
       --black: #080808;
+      --screen-black: #0b0b0b;
       --well: #141414;
       --gray: #bdbdbd;
       --white: #eeeeee;
       --dim: #888888;
+      --selected-muted: #454545;
+      --well-highlight: #414141;
+      --frame-color: #555555;
+      --selector-duration: 220ms;
       --mono: "Modern DOS", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
     }
 
@@ -63,7 +68,7 @@
       grid-template-rows: var(--grid-rows);
       position: relative;
       isolation: isolate;
-      background: #0b0b0b;
+      background: var(--screen-black);
       color: var(--gray);
       zoom: 1;
     }
@@ -72,7 +77,7 @@
       position: absolute;
       z-index: 4;
       inset: 0;
-      border: var(--frame-width, 1px) solid #555;
+      border: var(--frame-width, 1px) solid var(--frame-color);
       pointer-events: none;
     }
     .terminal::before {
@@ -101,6 +106,21 @@
       pointer-events: none;
     }
     .terminal[data-filter="webgl"][data-scanlines="on"] .beam-screen { display: block; }
+    .selector-block {
+      position: absolute;
+      z-index: 1;
+      top: 0;
+      left: 0;
+      width: 0;
+      height: 16px;
+      background: var(--white);
+      pointer-events: none;
+      transform: translate3d(0, 0, 0);
+      transition: transform var(--selector-duration) cubic-bezier(.2, .8, .2, 1),
+        width var(--selector-duration) cubic-bezier(.2, .8, .2, 1);
+      will-change: transform, width;
+    }
+    .selector-block:not(.is-ready) { visibility: hidden; transition: none; }
     .topline,
     .resolutionline,
     .toolrow,
@@ -187,6 +207,8 @@
       gap: 1ch;
     }
     .nav-button {
+      position: relative;
+      z-index: 2;
       min-width: 0;
       width: 100%;
       height: 16px;
@@ -203,16 +225,15 @@
     .nav-button:hover,
     .nav-button:focus-visible,
     .nav-button[aria-pressed="true"] {
-      background: var(--white);
-      color: var(--black);
       outline: none;
     }
+    .nav-button.selector-current { background: transparent; color: var(--black); }
 
     .workspace {
       --workspace-rows: repeat(var(--workspace-lines), 16px);
       grid-row: 4 / var(--footer-row);
       display: grid;
-      grid-template-columns: 128px 8px minmax(0, 1fr);
+      grid-template-columns: var(--sidebar-width, 128px) 8px minmax(0, 1fr);
       grid-template-rows: var(--workspace-rows);
       min-height: 0;
     }
@@ -273,7 +294,7 @@
     }
     .library-search::placeholder { color: var(--dim); opacity: 1; }
     .library-search:focus-visible { background: var(--gray); color: var(--black); outline: none; }
-    .library-search:focus-visible::placeholder { color: #454545; }
+    .library-search:focus-visible::placeholder { color: var(--selected-muted); }
     .library-results {
       grid-row: 3 / -1;
       min-height: 0;
@@ -321,18 +342,33 @@
     .tree-row[aria-selected="true"] .chev,
     .tree-row:hover .count,
     .tree-row:focus-visible .count,
-    .tree-row[aria-selected="true"] .count { color: #454545; }
+    .tree-row[aria-selected="true"] .count { color: var(--selected-muted); }
 
     .divider {
       grid-column: 2;
       grid-row: 1 / -1;
-      display: grid;
-      grid-template-rows: var(--workspace-rows);
-      color: #777777;
-      text-align: center;
-      pointer-events: none;
+      position: relative;
+      min-width: 8px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: col-resize;
+      touch-action: none;
+      user-select: none;
     }
-    .divider span { height: 16px; line-height: 16px; }
+    .divider::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 3px;
+      width: 2px;
+      height: 24px;
+      background: transparent;
+      transform: translateY(-50%);
+    }
+    .divider:hover::after,
+    .divider:focus-visible::after,
+    .workspace.is-resizing .divider::after { background: var(--dim); }
 
     .listpanel .panel-title { grid-row: 1; }
     .list-head {
@@ -344,7 +380,7 @@
       gap: 1ch;
       align-items: center;
       padding: 0 1ch;
-      background: #414141;
+      background: var(--well-highlight);
       color: var(--black);
       text-transform: uppercase;
     }
@@ -396,7 +432,7 @@
     .song[aria-selected="true"] .num,
     .song:hover .length,
     .song:focus-visible .length,
-    .song[aria-selected="true"] .length { color: #454545; }
+    .song[aria-selected="true"] .length { color: var(--selected-muted); }
 
     .statusline {
       grid-row: var(--footer-row);
@@ -422,6 +458,8 @@
       align-content: start;
     }
     .option-category {
+      position: relative;
+      z-index: 2;
       width: 100%;
       height: 16px;
       padding: 0 1ch;
@@ -435,10 +473,9 @@
     .option-category:hover,
     .option-category:focus-visible,
     .option-category[aria-pressed="true"] {
-      background: var(--gray);
-      color: var(--black);
       outline: none;
     }
+    .option-category.selector-current { background: transparent; color: var(--black); }
     .option-page {
       grid-row: 2 / -1;
       min-height: 0;
@@ -486,6 +523,40 @@
       color: var(--black);
       outline: none;
     }
+    .range-control {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 4ch;
+      align-items: center;
+      gap: .5ch;
+    }
+    .brightness-range {
+      width: 100%;
+      min-width: 0;
+      height: 16px;
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      appearance: none;
+      -webkit-appearance: none;
+      cursor: ew-resize;
+    }
+    .brightness-range::-webkit-slider-runnable-track {
+      height: 2px;
+      background: var(--dim);
+    }
+    .brightness-range::-webkit-slider-thumb {
+      width: 8px;
+      height: 12px;
+      margin-top: -5px;
+      border: 0;
+      border-radius: 0;
+      background: var(--gray);
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .brightness-range:focus-visible { outline: 1px solid var(--white); outline-offset: 1px; }
+    .range-readout { color: var(--white); text-align: right; }
     .option-note {
       min-height: 16px;
       padding: 0 1ch;
@@ -501,15 +572,19 @@
     }
 
     @media (prefers-reduced-motion: no-preference) {
-      .resolution-choice, .nav-button, .tree-row, .song {
+      .resolution-choice, .nav-button, .tree-row, .song, .option-category {
         transition: background-color 70ms linear, color 70ms linear;
       }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .selector-block { transition: none; }
     }
   </style>
 </head>
 <body>
   <div class="crt">
     <div class="terminal" data-filter="css" data-scanlines="on" role="application" aria-label="LineBoy monochrome line-grid player">
+      <div class="selector-block" id="selector-block" aria-hidden="true"></div>
       <canvas class="beam-screen" aria-hidden="true"></canvas>
 
       <header class="topline">
@@ -562,7 +637,9 @@
           <div class="library-results" id="library-results" role="tree" aria-label="Library search results" hidden></div>
         </aside>
 
-        <div class="divider" id="column-divider" aria-hidden="true"></div>
+        <div class="divider" id="column-divider" role="separator" aria-orientation="vertical"
+          aria-label="Resize library pane" aria-valuemin="16" aria-valuemax="19" aria-valuenow="16"
+          tabindex="0" title="Drag to resize; use arrow keys to snap by character cells"></div>
 
         <section class="panel listpanel" aria-label="Playlist">
           <div class="panel-title"><span id="game-title">CHRONO TRIGGER</span><span class="count" id="track-count">27 TRK</span></div>
@@ -584,6 +661,8 @@
           <div class="option-page" data-options-content="DISPLAY">
             <div class="option-row"><span>WIDTH</span><button class="option-value" id="width-mode" type="button" aria-pressed="true">FILL</button></div>
             <div class="option-row"><span>SCANLINES</span><button class="option-value" id="scanline-mode" type="button" aria-pressed="true">ON</button></div>
+            <div class="option-row"><span>BRIGHTNESS</span><div class="range-control"><input class="brightness-range" id="brightness-range" type="range" min="60" max="140" step="5" value="100" aria-label="Screen brightness"><output class="range-readout" id="brightness-readout" for="brightness-range">100%</output></div></div>
+            <div class="option-row"><span>SELECTOR FLOW</span><button class="option-value" id="selector-flow-mode" type="button" aria-pressed="true">ON</button></div>
             <div class="option-row"><span>RASTER</span><span class="option-key" id="option-raster">320X240</span></div>
             <div class="option-row"><span>PITCH</span><span class="option-key" id="option-pitch">6PX</span></div>
             <div class="option-note" id="width-note">FILL WIDTH USES 8PX CELLS.</div>
@@ -687,6 +766,7 @@
     const display = document.querySelector(".beam-screen");
     const workspace = document.querySelector(".workspace");
     const divider = document.querySelector("#column-divider");
+    const selectorBlock = document.querySelector("#selector-block");
     const gridSize = document.querySelector("#grid-size");
     const pixelScale = document.querySelector("#pixel-scale");
     const resolutionButtons = [...document.querySelectorAll(".resolution-choice")];
@@ -706,6 +786,9 @@
           widthMode,
           scanlinesEnabled,
           beamWidthMode,
+          brightnessPercent,
+          selectorFlowEnabled,
+          sidebarColumns,
         }));
       } catch {}
     }
@@ -724,6 +807,9 @@
     const widthModeButton = document.querySelector("#width-mode");
     const scanlineModeButton = document.querySelector("#scanline-mode");
     const beamWidthModeButton = document.querySelector("#beam-width-mode");
+    const brightnessRange = document.querySelector("#brightness-range");
+    const brightnessReadout = document.querySelector("#brightness-readout");
+    const selectorFlowModeButton = document.querySelector("#selector-flow-mode");
     const rasterReadout = document.querySelector("#option-raster");
     const pitchReadout = document.querySelector("#option-pitch");
     const crtPitchReadout = document.querySelector("#crt-pitch");
@@ -740,6 +826,9 @@
     const clock = document.querySelector("#clock");
     const navButtons = [...document.querySelectorAll(".nav-button")];
     const nativeHost = Boolean(window.webkit?.messageHandlers?.lineBoy);
+    // Keep full-catalog reads opt-in during UI testing; sample records remain instant.
+    const LIVE_CATALOG_ENABLED = false;
+    const catalogHost = nativeHost && LIVE_CATALOG_ENABLED;
     const nativeRequests = new Map();
     const nativeTracks = new Map();
     const nativeGames = new Map();
@@ -770,8 +859,15 @@
     ];
     let beamWidthMode = beamWidthModes.some((mode) => mode.id === savedDisplayPreferences.beamWidthMode)
       ? savedDisplayPreferences.beamWidthMode : "NORMAL";
+    let brightnessPercent = Number.isFinite(Number(savedDisplayPreferences.brightnessPercent))
+      ? Math.max(60, Math.min(140, Number(savedDisplayPreferences.brightnessPercent))) : 100;
+    let selectorFlowEnabled = savedDisplayPreferences.selectorFlowEnabled !== false;
+    let sidebarColumns = Number.isInteger(savedDisplayPreferences.sidebarColumns)
+      ? savedDisplayPreferences.sidebarColumns : null;
     let optionsVisible = false;
     let selectedOptionsPage = "DISPLAY";
+    let currentNavAction = "LIST";
+    let lastSelectorTarget = null;
     let returnAction = "LIST";
     let activeGame = GAMES.CHRONO;
     let favoritesOnly = false;
@@ -817,6 +913,67 @@
       if (value.error) status.textContent = `PLAYBACK/ERROR ${value.error}`;
     }
 
+    function scalePaletteColor(hex, multiplier) {
+      const value = Number.parseInt(hex.slice(1), 16);
+      const channel = (shift) => {
+        const linear = ((value >> shift) & 255) / 255;
+        return Math.round(255 * Math.pow(linear, 1 / multiplier));
+      };
+      return `rgb(${channel(16)} ${channel(8)} ${channel(0)})`;
+    }
+
+    function applyBrightness() {
+      const multiplier = brightnessPercent / 100;
+      const colors = {
+        "--black": "#080808",
+        "--screen-black": "#0b0b0b",
+        "--well": "#141414",
+        "--gray": "#bdbdbd",
+        "--white": "#eeeeee",
+        "--dim": "#888888",
+        "--selected-muted": "#454545",
+        "--well-highlight": "#414141",
+        "--frame-color": "#555555",
+      };
+      Object.entries(colors).forEach(([property, color]) => {
+        terminal.style.setProperty(property, scalePaletteColor(color, multiplier));
+      });
+      terminal.style.setProperty("--selector-duration", selectorFlowEnabled ? "220ms" : "0ms");
+      brightnessRange.value = String(brightnessPercent);
+      brightnessRange.setAttribute("aria-valuetext", `${brightnessPercent} percent`);
+      brightnessReadout.value = `${brightnessPercent}%`;
+      brightnessReadout.textContent = `${brightnessPercent}%`;
+      selectorFlowModeButton.textContent = selectorFlowEnabled ? "ON" : "OFF";
+      selectorFlowModeButton.setAttribute("aria-pressed", String(selectorFlowEnabled));
+      selectorFlowModeButton.setAttribute("aria-label",
+        `Selector flow ${selectorFlowEnabled ? "on" : "off"}. Activate to turn it ${selectorFlowEnabled ? "off" : "on"}.`);
+    }
+
+    function sidebarBounds(columns = activeRaster?.columns || 40) {
+      const minimum = Math.min(16, Math.max(1, columns - 20));
+      return { minimum, maximum: Math.max(minimum, columns - 21) };
+    }
+
+    function applySidebarColumnLayout() {
+      if (!activeRaster) return;
+      const { minimum, maximum } = sidebarBounds();
+      sidebarColumns = Math.max(minimum, Math.min(maximum, Math.round(sidebarColumns)));
+      workspace.style.gridTemplateColumns = `${sidebarColumns * 8}px 8px minmax(0, 1fr)`;
+      workspace.style.setProperty("--sidebar-width", `${sidebarColumns * 8}px`);
+      divider.setAttribute("aria-valuemin", String(minimum));
+      divider.setAttribute("aria-valuemax", String(maximum));
+      divider.setAttribute("aria-valuenow", String(sidebarColumns));
+      divider.setAttribute("aria-valuetext", `${sidebarColumns} character columns`);
+    }
+
+    function setSidebarColumns(value, persist = false) {
+      const { minimum, maximum } = sidebarBounds();
+      sidebarColumns = Math.max(minimum, Math.min(maximum, Math.round(value)));
+      applySidebarColumnLayout();
+      positionSelectionBlock(currentSelectorTarget());
+      if (persist) saveDisplayPreferences();
+    }
+
     function updateRaster() {
       const raster = resolutionById.get(requestedRaster);
       const deviceRatio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
@@ -847,7 +1004,13 @@
       const columns = sourceWidth / 8;
       const halfLineInset = (sourceHeight - textRows * 16) / 2;
       const workspaceLines = textRows - 4;
-      const sidebarColumns = Math.max(16, Math.min(24, Math.round(columns * 0.2)));
+      const sidebarBoundsForRaster = {
+        minimum: Math.min(16, Math.max(1, columns - 20)),
+        maximum: Math.max(Math.min(16, Math.max(1, columns - 20)), columns - 21),
+      };
+      const defaultSidebarColumns = Math.max(sidebarBoundsForRaster.minimum,
+        Math.min(sidebarBoundsForRaster.maximum, Math.round(columns * 0.2)));
+      sidebarColumns = Number.isInteger(sidebarColumns) ? sidebarColumns : defaultSidebarColumns;
 
       activeRaster = {
         ...raster,
@@ -874,20 +1037,15 @@
       terminal.style.setProperty("--footer-row", textRows);
       terminal.style.setProperty("--workspace-lines", workspaceLines);
       terminal.style.setProperty("--grid-rows", `repeat(${textRows}, 16px)`);
-      workspace.style.gridTemplateColumns = `${sidebarColumns * 8}px 8px minmax(0, 1fr)`;
       workspace.style.gridTemplateRows = `repeat(${workspaceLines}, 16px)`;
       workspace.style.setProperty("--workspace-rows", `repeat(${workspaceLines}, 16px)`);
-      if (divider.childElementCount !== workspaceLines) {
-        divider.replaceChildren(...Array.from({ length: workspaceLines }, () => {
-          const line = document.createElement("span");
-          line.textContent = "│";
-          return line;
-        }));
-      }
+      applySidebarColumnLayout();
       gridSize.textContent = `${columns}X${textRows}`;
       pixelScale.textContent = `${scanPitch}PX`;
       terminal.dataset.raster = `${sourceWidth}x${sourceHeight}`;
       terminal.dataset.videoMode = raster.width === 320 ? "standard" : "high";
+      applyBrightness();
+      positionSelectionBlock(currentSelectorTarget());
       resolutionButtons.forEach((button) => {
         button.setAttribute("aria-pressed", String(button.dataset.resolution === requestedRaster));
         const profile = resolutionById.get(button.dataset.resolution);
@@ -903,6 +1061,38 @@
       saveDisplayPreferences();
       updateRaster();
       scheduleRender();
+    }
+
+    function currentSelectorTarget() {
+      if (optionsVisible) {
+        return optionCategories.includes(lastSelectorTarget)
+          ? lastSelectorTarget
+          : optionCategories.find((button) => button.dataset.optionsPage === selectedOptionsPage);
+      }
+      return navButtons.includes(lastSelectorTarget)
+        ? lastSelectorTarget
+        : navButtons.find((button) => button.dataset.action === currentNavAction)
+        || navButtons.find((button) => button.dataset.action === "LIST");
+    }
+
+    function positionSelectionBlock(target) {
+      if (!target || !activeRaster) return;
+      const terminalRect = terminal.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const scale = activeRaster.scale || 1;
+      const x = (targetRect.left - terminalRect.left) / scale;
+      const y = (targetRect.top - terminalRect.top) / scale;
+      selectorBlock.style.width = `${targetRect.width / scale}px`;
+      selectorBlock.style.height = `${targetRect.height / scale}px`;
+      selectorBlock.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      document.querySelectorAll(".selector-current").forEach((element) => {
+        element.classList.remove("selector-current");
+      });
+      target.classList.add("selector-current");
+      lastSelectorTarget = target;
+      if (!selectorBlock.classList.contains("is-ready")) {
+        requestAnimationFrame(() => selectorBlock.classList.add("is-ready"));
+      }
     }
 
     function updateOptionReadouts() {
@@ -945,6 +1135,9 @@
         section.hidden = section.dataset.optionsContent !== page;
       });
       optionsPageTitle.textContent = page;
+      if (optionsVisible) {
+        positionSelectionBlock(optionCategories.find((button) => button.dataset.optionsPage === page));
+      }
     }
 
     function setOptionsVisible(visible) {
@@ -972,6 +1165,71 @@
     optionCategories.forEach((button) => button.addEventListener("click", () => {
       setOptionsPage(button.dataset.optionsPage);
     }));
+
+    brightnessRange.addEventListener("input", () => {
+      brightnessPercent = Number(brightnessRange.value);
+      applyBrightness();
+      saveDisplayPreferences();
+    });
+
+    selectorFlowModeButton.addEventListener("click", () => {
+      selectorFlowEnabled = !selectorFlowEnabled;
+      applyBrightness();
+      saveDisplayPreferences();
+      status.textContent = `DISPLAY/SELECTOR ${selectorFlowEnabled ? "FLOW ON" : "FLOW OFF"}`;
+    });
+
+    [divider].forEach((separator) => {
+      let dragging = false;
+      let resizeFrame = 0;
+      separator.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return;
+        dragging = true;
+        workspace.classList.add("is-resizing");
+        separator.setPointerCapture(event.pointerId);
+        event.preventDefault();
+      });
+      separator.addEventListener("pointermove", (event) => {
+        if (!dragging || resizeFrame) return;
+        const clientX = event.clientX;
+        resizeFrame = requestAnimationFrame(() => {
+          resizeFrame = 0;
+          const bounds = workspace.getBoundingClientRect();
+          const column = (clientX - bounds.left) / ((activeRaster?.scale || 1) * 8) - 0.5;
+          setSidebarColumns(column);
+        });
+      });
+      const finishResize = (event) => {
+        if (!dragging) return;
+        dragging = false;
+        workspace.classList.remove("is-resizing");
+        if (resizeFrame) {
+          cancelAnimationFrame(resizeFrame);
+          resizeFrame = 0;
+          const bounds = workspace.getBoundingClientRect();
+          const column = (event.clientX - bounds.left) / ((activeRaster?.scale || 1) * 8) - 0.5;
+          setSidebarColumns(column);
+        }
+        if (separator.hasPointerCapture(event.pointerId)) separator.releasePointerCapture(event.pointerId);
+        saveDisplayPreferences();
+      };
+      separator.addEventListener("pointerup", finishResize);
+      separator.addEventListener("pointercancel", finishResize);
+      separator.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+          event.preventDefault();
+          setSidebarColumns(sidebarColumns + (event.key === "ArrowRight" ? 1 : -1), true);
+        } else if (event.key === "Home") {
+          event.preventDefault();
+          setSidebarColumns(Math.round(activeRaster.columns * 0.2), true);
+        }
+      });
+    });
+
+    [...navButtons, ...optionCategories].forEach((button) => {
+      button.addEventListener("pointerenter", () => positionSelectionBlock(button));
+      button.addEventListener("focus", () => positionSelectionBlock(button));
+    });
 
     widthModeButton.addEventListener("click", () => {
       widthMode = widthMode === "FILL" ? "FRAME" : "FILL";
@@ -1014,8 +1272,11 @@
       widthMode = "FILL";
       scanlinesEnabled = true;
       beamWidthMode = "NORMAL";
-      saveDisplayPreferences();
+      brightnessPercent = 100;
+      selectorFlowEnabled = true;
+      sidebarColumns = null;
       updateRaster();
+      saveDisplayPreferences();
       scheduleRender();
       status.textContent = "DISPLAY/DEFAULTS RESTORED";
     });
@@ -1134,6 +1395,7 @@
         song.dataset.favorite = String(favorite);
         song.dataset.length = length;
         song.dataset.displayPath = displayPath || "";
+        song.dataset.nativeTrack = String(!Array.isArray(item));
         song.dataset.index = String(index);
 
         const number = document.createElement("span");
@@ -1190,7 +1452,7 @@
     }
 
     function handleSongKeydown(event, song) {
-      if (event.key.toLowerCase() === "f" && nativeHost) {
+      if (event.key.toLowerCase() === "f") {
         event.preventDefault();
         toggleFavorite(song);
         return;
@@ -1222,7 +1484,7 @@
           setFolderExpanded(row, row.getAttribute("aria-expanded") !== "true");
           status.textContent = `SYSTEM/${row.dataset.system || row.dataset.folder}`;
         } else if (row.dataset.game) {
-          if (nativeHost && nativeGames.has(row.dataset.game)) {
+          if (catalogHost && nativeGames.has(row.dataset.game)) {
             loadNativeGame(nativeGames.get(row.dataset.game), row);
           } else {
             const game = GAMES[row.dataset.game];
@@ -1372,11 +1634,11 @@
 
     async function runLibrarySearch(query, version) {
       try {
-        const result = nativeHost
+        const result = catalogHost
           ? await nativeRequest("catalogSearch", { query })
           : sampleSearchMatches(query);
         if (version !== librarySearchVersion || !librarySearchActive) return;
-        showLibrarySearchResults(result.games || [], Number(result.count) || 0, !nativeHost);
+        showLibrarySearchResults(result.games || [], Number(result.count) || 0, !catalogHost);
       } catch (error) {
         if (version !== librarySearchVersion || !librarySearchActive) return;
         showLibrarySearchResults([], 0);
@@ -1390,7 +1652,7 @@
       clearTimeout(librarySearchTimer);
       if (!query) {
         setLibrarySearchMode(false);
-        if (nativeHost) status.textContent = `CATALOG ${formatCatalogCount(catalogGameCount)}G / ${formatCatalogCount(catalogTrackCount)}T`;
+        if (catalogHost) status.textContent = `CATALOG ${formatCatalogCount(catalogGameCount)}G / ${formatCatalogCount(catalogTrackCount)}T`;
         return;
       }
       setLibrarySearchMode(true);
@@ -1494,7 +1756,7 @@
     }
 
     async function bootstrapNativeCatalog() {
-      if (!nativeHost) return;
+      if (!catalogHost) return;
       try {
         const payload = await nativeRequest("catalogBootstrap");
         nativeFavoriteIDs = new Set(payload.favoriteIds || []);
@@ -1524,7 +1786,7 @@
     async function playSong(song = songList.querySelector('.song[aria-selected="true"]')) {
       if (!song) return;
       selectSong(song);
-      if (!nativeHost) {
+      if (!nativeHost || song.dataset.nativeTrack !== "true") {
         playing = !playing;
         now.textContent = playing ? "PLAYING" : "STOPPED";
         const button = document.querySelector('[data-action="PLAY"]');
@@ -1541,7 +1803,15 @@
     }
 
     async function toggleFavorite(song = songList.querySelector('.song[aria-selected="true"]')) {
-      if (!nativeHost || !song) return;
+      if (!song) return;
+      if (!nativeHost || song.dataset.nativeTrack !== "true") {
+        const isFavorite = song.dataset.favorite !== "true";
+        song.dataset.favorite = String(isFavorite);
+        song.querySelector(".title").textContent = `${isFavorite ? "*" : ""}${song.dataset.title}`;
+        if (favoritesOnly && !isFavorite) applyFavoriteFilter();
+        status.textContent = isFavorite ? "FAVORITE/ADDED" : "FAVORITE/REMOVED";
+        return;
+      }
       try {
         const result = await nativeRequest("toggleFavorite", { trackId: song.dataset.trackId });
         const isFavorite = Boolean(result.favorite);
@@ -1559,7 +1829,7 @@
       const rows = visibleSongs();
       if (!rows.length) return;
       const selected = rows.find((song) => song.getAttribute("aria-selected") === "true") || rows[0];
-      if (!nativeHost) {
+      if (!nativeHost || rows.some((song) => song.dataset.nativeTrack !== "true")) {
         const selectedIndex = rows.indexOf(selected);
         const nextIndex = (selectedIndex + (direction === "next" ? 1 : -1) + rows.length) % rows.length;
         selectSong(rows[nextIndex]);
@@ -1579,12 +1849,16 @@
     }
 
     function setNavSelection(action) {
+      if (["OPEN", "TREE", "LIST", "FAVORITES", "OPTIONS"].includes(action)) currentNavAction = action;
       navButtons.forEach((button) => {
         const selected = button.dataset.action === action;
         if (["OPEN", "TREE", "LIST", "FAVORITES", "OPTIONS"].includes(button.dataset.action)) {
           button.setAttribute("aria-pressed", String(selected));
         }
       });
+      positionSelectionBlock(optionsVisible
+        ? currentSelectorTarget()
+        : navButtons.find((button) => button.dataset.action === currentNavAction));
     }
 
     terminal.addEventListener("keydown", (event) => {
@@ -1799,7 +2073,7 @@
 
     updateRaster();
     renderSongs(GAMES.CHRONO, "08");
-    if (nativeHost) bootstrapNativeCatalog();
+    if (catalogHost) bootstrapNativeCatalog();
 
     scheduleRender();
     new ResizeObserver(() => {
@@ -1811,7 +2085,7 @@
       scheduleRender();
     });
     setInterval(() => {
-      if (!nativeHost) {
+      if (!nativeHost || !nativeTrackLoaded) {
         seconds += 1;
         clock.textContent = new Date(seconds * 1000).toISOString().slice(11, 19);
       } else {

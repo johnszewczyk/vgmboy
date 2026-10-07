@@ -41,28 +41,31 @@ buttons and a two-cell blank gap before transport. There is no visible divider
 between the command and transport groups. The resolution profile row remains a
 separate testing control row.
 
+One white selection block travels between the active top toolbar control and
+the option-category tabs. DISPLAY can turn that motion off. The draggable pane
+separator changes the library width in whole 8px character columns; arrow keys
+on the separator adjust one column at a time. Brightness runs from 60% to 140%
+and remaps the monochrome palette while leaving the pure-black scanline gaps
+unchanged. Brightness, selector motion, and pane width persist with the display
+preferences.
+
 Phosphor persistence is disabled to keep interaction responsive. OPTIONS opens
 a two-column terminal settings view. DISPLAY contains WIDTH MODE (FILL or
-FRAME), SCANLINES, the active beam pitch, and a native fullscreen toggle. CRT
-contains a THIN/NORMAL/WIDE beam-width control and reports the active pitch.
-FILL and FRAME, scanline visibility, beam width, and the selected raster
-profile are remembered. The native app provides standard macOS menus and
+FRAME), SCANLINES, BRIGHTNESS, SELECTOR FLOW, the active beam pitch, and a
+native fullscreen toggle. CRT contains a THIN/NORMAL/WIDE beam-width control
+and reports the active pitch. FILL and FRAME, scanline visibility, brightness,
+selector motion, pane width, beam width, and the selected raster profile are
+remembered. The native app provides standard macOS menus and
 shortcuts: Command+O opens a file, Command+comma opens OPTIONS, Control+Command+F
 toggles fullscreen, Command+M minimizes, Command+W closes the window, and
 Command+Q quits. The Edit menu forwards standard text commands to WebKit.
 
-In the native app, the library tree loads group counts from the shared catalog
-and fetches a group's game rows when it expands. The library search field sits
-under its header, aligned to the playlist column headings. Command+F focuses
-the field; entering a query temporarily replaces the tree with matching games
-from the shared CatalogBrowserCore search projection. At most 250 rows are
-rendered at once, with `+` on the count when more results match. Clearing the
-query restores the tree and its prior selection. Search results can be moved
-with the arrow keys; selecting one loads that game's tracks. The browser
-preview searches its sample games. Selecting a game loads its tracks, F on a
-selected track toggles shared
-Favorites, and FAV filters the current playlist. Previous and next use the
-shared queue rules and start the adjacent track. PLAY pauses or resumes;
-double-clicking a row starts it. FILE opens a supported local file through the
-native picker. The browser preview keeps its sample library and local-only
-transport behavior.
+The native app currently starts from the same small sample library as the
+browser preview. `LIVE_CATALOG_ENABLED` is false in `index.html`, so startup
+does not bootstrap the full shared catalog. Turning it on restores the native
+CatalogBrowserCore search projection and lazy group loading. In sample mode,
+Command+F searches the sample games; clearing the query restores the tree and
+its prior selection. Selecting a game loads its sample tracks. F toggles local
+sample favorites and FAV filters the current playlist. The native file picker
+remains connected for opening a real local track; its playback uses the native
+transport, while sample-track playback and track stepping stay local.

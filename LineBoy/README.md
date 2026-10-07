@@ -4,11 +4,11 @@ LineBoy is a monochrome DOS-style player interface experiment. It lays every
 control, label, sidebar item, and track row onto an 8×16 character-cell grid,
 then paints it with full-intensity beam rows and crisp, integer-pixel black
 gaps. The filter preserves the font's fixed character advance. The native
-WebKit host reads the shared VGMMan catalog, persists favorites through
-FrontendCore, and routes playback through the shared transport and VGMBoy
-decoder. Its library search uses the shared CatalogBrowserCore projection and
-search index. The browser build remains a sample-data preview without native
-services.
+WebKit host retains adapters for the shared VGMMan catalog, FrontendCore, and
+VGMBoy playback. The live catalog bootstrap is opt-in and currently disabled
+(`LIVE_CATALOG_ENABLED = false`) so visual testing starts immediately from the
+small sample library. The sample search and playlist controls stay usable; the
+native file picker and window controls remain connected.
 
 ## Display grid
 
@@ -43,8 +43,11 @@ FrontendCore, and VGMBoy. The native app also supplies standard macOS app,
 File, Edit, View, and Window menus, including Command+O, Command+F for library
 search, Command+comma, Control+Command+F, Command+W, and Command+Q. Filled
 toolbar actions have cell-sized gaps; transport is separated by a larger blank
-gap with no visible divider. Search replaces the library tree temporarily and
-returns to its previous selection when cleared.
+gap with no visible divider. A single animated selector block moves between
+toolbar actions and option categories. DISPLAY exposes palette brightness and
+selector motion. The library pane divider resizes in 8px character columns and
+remembers its width. Search replaces the sample tree temporarily and returns
+to its previous selection when cleared.
 
 The font `assets/ModernDOS8x16.ttf` is Modern DOS 8×16 by Jayvee Enaguas,
 dedicated under CC0 1.0. The included `assets/CC0-1.0.txt` preserves its

@@ -37,21 +37,32 @@ bootstrap, fetch game rows only when a group expands, and remove their DOM rows
 on collapse. Run catalog reads off the main actor.
 
 Persist the selected raster profile, fill/frame width mode, scanline visibility,
-and beam width in local display preferences. The WebGL beam-row uniform and CSS
-fallback use the same THIN/NORMAL/WIDE setting. SCANLINES off exposes the DOM
+beam width, palette brightness, selector motion, and library-pane width in local
+display preferences. Brightness applies a gamma-style remap to the monochrome UI
+palette only; retain the transparent beam rows and pure-black scanline gaps.
+Keep the selector as one
+terminal-level block beneath controls and above their backgrounds; position it
+from the target's measured bounds divided by the current terminal zoom. Move it
+between toolbar controls and option categories on pointer entry or focus, and
+respect the saved motion switch plus `prefers-reduced-motion`. Snap the
+resizable separator to 8px source columns, preserve at least 16 columns in the
+library and 20 in the content pane where the raster allows, and keep its
+keyboard arrow controls in one-column steps. SCANLINES off exposes the DOM
 without changing the grid. The resolution row and view toolbar must flex with
 the active column count so controls use available width at each profile.
 
-Keep the native library search on the shared `CatalogBrowserCore` game search
-projection. Build one `CatalogSearchIndex` from the bootstrap snapshot, retain
-it behind the native bridge, and query it off the WebKit event path; do not
-reopen SQLite for each keystroke or duplicate searchable-field normalization in
-JavaScript. Debounce query updates, cap rendered results at 250, and preserve
-the tree DOM and its selection while the separate results scroller is shown.
-The sample browser preview may search its local sample game records. Keep the
-search input on its own 16px row aligned to the playlist heading row. Toolbar
-blocks use a one-cell internal gap and a two-cell gap before transport; retain
-the test resolution row and do not add a visible group divider.
+Keep `LIVE_CATALOG_ENABLED` false for normal visual testing so native startup
+uses the sample tree and never bootstraps the full catalog. When deliberately
+enabled for integration work, keep search on the shared `CatalogBrowserCore`
+game projection: build one `CatalogSearchIndex` from the bootstrap snapshot,
+retain it behind the native bridge, and query it off the WebKit event path; do
+not reopen SQLite for each keystroke or duplicate searchable-field
+normalization in JavaScript. Debounce query updates, cap rendered results at
+250, and preserve the tree DOM and its selection while the results scroller is
+shown. The sample preview searches its local records. Keep the search input on
+its own 16px row aligned to the playlist heading row. Toolbar blocks use a
+one-cell internal gap and a two-cell gap before transport; retain the test
+resolution row and do not add a visible group divider.
 
 Route native fullscreen requests through the LineBoy bridge to the owning
 NSWindow; the browser preview uses the document fullscreen API.
@@ -59,5 +70,6 @@ NSWindow; the browser preview uses the document fullscreen API.
 `build.sh` copies the runtime HTML and licensed font into the ignored
 `.build/site` directory and packages `.build/LineBoy.app`. `launch.sh` builds,
 closes an existing LineBoy process, and opens the fresh app. The static preview
-serves mock data; the WebKit app routes catalog, favorites, queue movement, and
-playback to the shared VGMMan components.
+serves mock data. The WebKit host retains native catalog, favorites, queue, and
+playback adapters, but visual testing leaves the catalog gate off and uses
+local demo records; native file-open and window actions remain active.
