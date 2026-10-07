@@ -1,7 +1,8 @@
 (() => {
 const uiApp = window.SB2App;
 const { state, refs, persistSettings, loadSettings, targetPlaybackSeconds, COLUMN_DEFS } = uiApp;
-if (document.body.classList.contains("sb2-frontend")) {
+const isStandaloneOptionsWindow = window.spcBoySB2?.isOptionsWindow === true;
+if (document.body.classList.contains("sb2-frontend") && !isStandaloneOptionsWindow) {
   const searchWrap = document.querySelector(".sidebar-search-wrap");
   const searchSlot = document.querySelector(".sb-status-sidebar");
   const functionButtons = document.querySelector(".sidebar-search-actions");
@@ -158,6 +159,10 @@ function restorePlaylistTabView(tab) {
   renderPlaylistTabs();
   renderPlaylist();
   renderSidebar();
+  const activeTabTarget = refs.playlistTabs?.querySelector(".playlist-tab-select[aria-selected='true']");
+  if (isAvailableInteractionTarget(activeTabTarget)) selectInteractionTarget(activeTabTarget);
+  else if (isAvailableInteractionTarget(selectedPlaylistRow)) selectInteractionTarget(selectedPlaylistRow);
+  else syncInteractionSelectionTarget();
   if (state.activePlaylistTabKind === "gallery") void loadGalleryGames();
   uiApp.playback.updateTimingSummary();
   uiApp.playback.updatePlaybackReadout();
@@ -194,6 +199,7 @@ function renderPlaylistTabs() {
   if (!refs.playlistTabs) return;
   if (tabs.length <= 1) {
     refs.playlistTabs.replaceChildren();
+    syncInteractionSelectionTarget();
     return;
   }
 
@@ -245,6 +251,7 @@ function renderPlaylistTabs() {
   }
 
   for (const item of remainingItems.values()) item.remove();
+  syncInteractionSelectionTarget();
 }
 
 function activatePlaylistTab(tabID, { syncOutgoing = true } = {}) {
@@ -426,6 +433,183 @@ let selectedPlaylistRow = null;
 let currentPlaylistRow = null;
 let selectionIndicatorFrame = 0;
 let lastPlaylistSelectionID = null;
+const interactionTargetSelector = [
+  "button:not(:disabled)",
+  "input:not([type='hidden']):not(:disabled)",
+  "select:not(:disabled)",
+  "textarea:not(:disabled)",
+  "a[href]",
+  "[role='button']",
+  "[tabindex]:not([tabindex='-1'])"
+].join(", ");
+const interactionScopeElement = isStandaloneOptionsWindow
+  ? refs.optionsOverlay?.querySelector(".options-panel")
+  : document.querySelector(".app-shell");
+const interactionIndicator = isStandaloneOptionsWindow
+  ? interactionScopeElement?.querySelector(".sb2-options-selection-indicator")
+  : document.getElementById("sb2-selection-indicator");
+let selectedInteractionTarget = null;
+let hoveredInteractionTarget = null;
+let interactionClassTarget = null;
+let interactionInstantFrame = 0;
+
+function interactionTargetFrom(node) {
+  return node instanceof Element ? node.closest(interactionTargetSelector) : null;
+}
+
+function isAvailableInteractionTarget(target) {
+  return target instanceof HTMLElement
+    && interactionScopeElement?.contains(target)
+    && target.matches(interactionTargetSelector)
+    && !target.disabled
+    && target.getAttribute("aria-disabled") !== "true"
+    && !target.closest("[hidden], .is-hidden")
+    && target.getClientRects().length > 0;
+}
+
+function fallbackInteractionTarget() {
+  const activeOptionsTab = state.optionsOpen
+    ? interactionScopeElement?.querySelector(".options-nav-item.is-selected")
+    : null;
+  if (isAvailableInteractionTarget(activeOptionsTab)) return activeOptionsTab;
+  const activeTab = refs.playlistTabs?.querySelector(".playlist-tab-select[aria-selected='true']");
+  if (isAvailableInteractionTarget(activeTab)) return activeTab;
+  if (isAvailableInteractionTarget(selectedPlaylistRow)) return selectedPlaylistRow;
+  const sidebarTarget = sidebarSelectionTarget();
+  if (isAvailableInteractionTarget(sidebarTarget)) return sidebarTarget;
+  return null;
+}
+
+function currentInteractionTarget() {
+  if (isAvailableInteractionTarget(hoveredInteractionTarget)) return hoveredInteractionTarget;
+  if (isAvailableInteractionTarget(selectedInteractionTarget)) return selectedInteractionTarget;
+  return fallbackInteractionTarget();
+}
+
+function positionInteractionIndicator(target, { instant = false } = {}) {
+  if (!interactionIndicator || !interactionScopeElement) return false;
+  if (!isAvailableInteractionTarget(target)) {
+    interactionIndicator.classList.add("is-hidden");
+    interactionIndicator.classList.remove("is-clipped");
+    interactionClassTarget?.classList.remove("sb2-selection-current");
+    interactionClassTarget = null;
+    return false;
+  }
+
+  const scopeRect = interactionScopeElement.getBoundingClientRect();
+  const bounds = target.getBoundingClientRect();
+  let targetRect = { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom };
+  let radius = getComputedStyle(target).borderRadius;
+  if (target.matches(".sidebar-resize-handle")) {
+    const width = Math.max(3, bounds.width);
+    const height = Math.min(40, bounds.height);
+    targetRect = {
+      left: bounds.left + (bounds.width - width) / 2,
+      top: bounds.top + (bounds.height - height) / 2,
+      right: bounds.left + (bounds.width + width) / 2,
+      bottom: bounds.top + (bounds.height + height) / 2
+    };
+    radius = "999px";
+  }
+
+  const clip = { left: scopeRect.left, top: scopeRect.top, right: scopeRect.right, bottom: scopeRect.bottom };
+  for (let ancestor = target.parentElement; ancestor && ancestor !== interactionScopeElement; ancestor = ancestor.parentElement) {
+    const style = getComputedStyle(ancestor);
+    const rect = ancestor.getBoundingClientRect();
+    if (["auto", "scroll", "hidden", "clip"].includes(style.overflowX)) {
+      clip.left = Math.max(clip.left, rect.left);
+      clip.right = Math.min(clip.right, rect.right);
+    }
+    if (["auto", "scroll", "hidden", "clip"].includes(style.overflowY)) {
+      clip.top = Math.max(clip.top, rect.top);
+      clip.bottom = Math.min(clip.bottom, rect.bottom);
+    }
+  }
+
+  const left = Math.max(targetRect.left, clip.left);
+  const top = Math.max(targetRect.top, clip.top);
+  const right = Math.min(targetRect.right, clip.right);
+  const bottom = Math.min(targetRect.bottom, clip.bottom);
+  if (right <= left || bottom <= top) {
+    interactionIndicator.classList.add("is-clipped");
+    interactionIndicator.classList.remove("is-hidden");
+    interactionClassTarget?.classList.remove("sb2-selection-current");
+    interactionClassTarget = null;
+    return false;
+  }
+
+  const isFirstPosition = !interactionIndicator.classList.contains("is-ready");
+  if (instant || isFirstPosition) {
+    window.cancelAnimationFrame(interactionInstantFrame);
+    interactionIndicator.classList.add("is-instant");
+  }
+  interactionIndicator.style.width = `${right - left}px`;
+  interactionIndicator.style.height = `${bottom - top}px`;
+  interactionIndicator.style.borderRadius = radius;
+  interactionIndicator.style.transform = `translate3d(${left - scopeRect.left}px, ${top - scopeRect.top}px, 0)`;
+  interactionIndicator.classList.remove("is-hidden", "is-clipped");
+  interactionIndicator.classList.add("is-ready");
+  if (interactionClassTarget && interactionClassTarget !== target) {
+    interactionClassTarget.classList.remove("sb2-selection-current");
+  }
+  interactionClassTarget = target;
+  target.classList.add("sb2-selection-current");
+  if (instant || isFirstPosition) {
+    interactionInstantFrame = window.requestAnimationFrame(() => {
+      interactionInstantFrame = 0;
+      interactionIndicator.classList.remove("is-instant");
+    });
+  }
+  return true;
+}
+
+function selectInteractionTarget(target) {
+  if (!isAvailableInteractionTarget(target)) return false;
+  hoveredInteractionTarget = null;
+  selectedInteractionTarget = target;
+  return positionInteractionIndicator(target);
+}
+
+function syncInteractionSelectionTarget() {
+  if (isAvailableInteractionTarget(selectedInteractionTarget)) return;
+  const target = fallbackInteractionTarget();
+  if (target) {
+    selectedInteractionTarget = target;
+    positionInteractionIndicator(currentInteractionTarget(), { instant: true });
+  }
+  else positionInteractionIndicator(null);
+}
+
+interactionScopeElement?.addEventListener("pointerover", (event) => {
+  const target = interactionTargetFrom(event.target);
+  if (!isAvailableInteractionTarget(target) || target === interactionTargetFrom(event.relatedTarget)) return;
+  hoveredInteractionTarget = target;
+  positionInteractionIndicator(target);
+});
+interactionScopeElement?.addEventListener("pointerout", (event) => {
+  const target = interactionTargetFrom(event.target);
+  if (!target || target === interactionTargetFrom(event.relatedTarget)) return;
+  if (!interactionTargetFrom(event.relatedTarget)) {
+    hoveredInteractionTarget = null;
+    positionInteractionIndicator(currentInteractionTarget());
+  }
+});
+interactionScopeElement?.addEventListener("focusin", (event) => {
+  const target = interactionTargetFrom(event.target);
+  if (!isAvailableInteractionTarget(target)) return;
+  selectInteractionTarget(target);
+});
+interactionScopeElement?.addEventListener("scroll", () => {
+  positionInteractionIndicator(currentInteractionTarget(), { instant: true });
+}, true);
+interactionScopeElement?.addEventListener("pointermove", (event) => {
+  if (interactionTargetFrom(event.target)?.matches(".sidebar-resize-handle")) {
+    positionInteractionIndicator(currentInteractionTarget(), { instant: true });
+  }
+}, { passive: true });
+window.addEventListener("resize", () => {
+  positionInteractionIndicator(currentInteractionTarget(), { instant: true });
+}, { passive: true });
 
 function playlistUsesVirtualRows() {
   return state.playlist.length > PLAYLIST_VIRTUALIZATION_THRESHOLD;
@@ -628,6 +812,12 @@ function syncSidebarSelectionRowClass(target = sidebarSelectionTarget()) {
   selectedBrowserButton = target?.classList.contains("tree-node") ? target : null;
   selectedDatabaseSidebarButton = target?.classList.contains("database-game-row")
     || target?.classList.contains("database-console-row") ? target : null;
+  if (isAvailableInteractionTarget(target)) {
+    selectedInteractionTarget = target;
+    positionInteractionIndicator(currentInteractionTarget());
+  } else if (!isAvailableInteractionTarget(selectedInteractionTarget)) {
+    syncInteractionSelectionTarget();
+  }
   return target;
 }
 
@@ -656,6 +846,12 @@ function clearPlaylistSelection() {
   state.playlistSelectionAnchorId = null;
   selectedPlaylistRow = null;
   lastPlaylistSelectionID = null;
+  const activeTabTarget = refs.playlistTabs?.querySelector(".playlist-tab-select[aria-selected='true']");
+  if (isAvailableInteractionTarget(activeTabTarget)) selectInteractionTarget(activeTabTarget);
+  else {
+    selectedInteractionTarget = null;
+    syncInteractionSelectionTarget();
+  }
   schedulePlaylistSelectionIndicator();
 }
 
@@ -2748,6 +2944,7 @@ function selectPlaylistTrack(trackId, { focus = false, extend = false, range = f
   const primaryRow = selection.primaryId ? playlistRowsByTrackId.get(selection.primaryId) || null : null;
   const clickedRow = playlistRowsByTrackId.get(track.id) || null;
   selectedPlaylistRow = primaryRow;
+  if (isAvailableInteractionTarget(primaryRow)) selectInteractionTarget(primaryRow);
   schedulePlaylistSelectionIndicator();
   if (focus) clickedRow?.focus({ preventScroll: true });
   return track;
@@ -2910,6 +3107,10 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
       window.requestAnimationFrame(appendBatch);
     } else {
       if (spacers?.bottom > 0) refs.playlistBody.appendChild(makePlaylistVirtualSpacer(spacers.bottom, "bottom"));
+      if (selectedPlaylistRow && state.selectedTrackId && !isAvailableInteractionTarget(hoveredInteractionTarget)) {
+        selectedInteractionTarget = selectedPlaylistRow;
+        positionInteractionIndicator(selectedPlaylistRow);
+      }
       schedulePlaylistSelectionIndicator();
       measurePlaylistRowHeight();
     }
@@ -3245,6 +3446,24 @@ function renderAll() {
   renderSidebar();
   renderPlaylistHeader();
   renderPlaylist();
+  if (state.optionsOpen) {
+    if (!refs.optionsOverlay.contains(hoveredInteractionTarget)) hoveredInteractionTarget = null;
+    const activeOptionsTab = interactionScopeElement?.querySelector(".options-nav-item.is-selected");
+    const focusedOptionsTarget = interactionScopeElement?.contains(document.activeElement)
+      ? interactionTargetFrom(document.activeElement)
+      : null;
+    const preferredOptionsTarget = isAvailableInteractionTarget(focusedOptionsTarget)
+      ? focusedOptionsTarget
+      : activeOptionsTab;
+    if (isAvailableInteractionTarget(preferredOptionsTarget)) {
+      selectedInteractionTarget = preferredOptionsTarget;
+      if (!isAvailableInteractionTarget(hoveredInteractionTarget)) {
+        positionInteractionIndicator(preferredOptionsTarget, { instant: true });
+      }
+    }
+  } else {
+    syncInteractionSelectionTarget();
+  }
   uiApp.playback.updateTimingSummary();
   uiApp.playback.updatePlaybackReadout();
   uiApp.playback.updateNativeDiagnostics();
