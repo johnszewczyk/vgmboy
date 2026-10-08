@@ -8,8 +8,9 @@
   Search shares the next toolbar with square library-view, History, Favorites,
   and fold controls; it shrinks to leave room for all five buttons. The catalog
   tree fills the remaining scrollable area.
-- The sidebar status bar remains at the bottom and shows compact game and system
-  totals, with exact counts available in its tooltip.
+- The sidebar status bar shows compact game and system totals when the library
+  is ready. Loading, error, and empty-result messages appear there instead of
+  taking over the catalog tree; full details are available in its tooltip.
 - The footer aligns to the sidebar split and shows elapsed time, track length,
   and playlist length at right.
 - Startup reads the shared CocoaSpice catalog through CatalogReader; ScanSong
