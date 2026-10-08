@@ -2,13 +2,11 @@
 const uiApp = window.SB2App;
 const { state, refs, persistSettings, loadSettings, targetPlaybackSeconds, COLUMN_DEFS } = uiApp;
 const isStandaloneOptionsWindow = window.spcBoySB2?.isOptionsWindow === true;
+const sidebarStats = document.getElementById("sidebar-stats");
 let optionsReturnFocusTarget = null;
 if (document.body.classList.contains("sb2-frontend") && !isStandaloneOptionsWindow) {
-  const searchWrap = document.querySelector(".sidebar-search-wrap");
-  const searchSlot = document.querySelector(".sb-status-sidebar");
   const optionsOverlay = refs.optionsOverlay;
   const content = document.querySelector(".content");
-  if (searchWrap && searchSlot) searchSlot.append(searchWrap);
   if (optionsOverlay && content) content.append(optionsOverlay);
 }
 const expandedFolders = new Set();
@@ -2379,6 +2377,7 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
 }
 
 function renderSidebar() {
+  updateSidebarStats();
   const view = currentSidebarView();
   const modeLabels = { consoles: "Console View", paths: "Path View" };
   const modeIcons = { consoles: "#icon-database", paths: "#icon-folder-tree" };
@@ -2398,6 +2397,20 @@ function renderSidebar() {
   }
   if (view.contentMode === "database") renderDatabaseGames();
   else renderTree();
+}
+
+function updateSidebarStats() {
+  if (!sidebarStats) return;
+  const gameCount = Array.isArray(state.databaseGames) ? state.databaseGames.length : 0;
+  const systemCount = Array.isArray(state.databaseGameGroups) ? state.databaseGameGroups.length : 0;
+  if (state.databaseSidebarLoading && gameCount === 0) {
+    sidebarStats.textContent = "LOADING LIBRARY";
+    sidebarStats.title = "Loading library statistics";
+    return;
+  }
+  const compactCount = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
+  sidebarStats.textContent = `${compactCount.format(gameCount)} GAMES · ${compactCount.format(systemCount)} SYSTEMS`;
+  sidebarStats.title = `${gameCount.toLocaleString()} games across ${systemCount.toLocaleString()} systems`;
 }
 
 function syncAnimatedRanges() {

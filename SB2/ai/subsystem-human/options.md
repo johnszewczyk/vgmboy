@@ -34,8 +34,9 @@
   corner radius, hover colors, selected colors, and height. Text buttons keep
   natural width except where a grouped action row gives them equal widths.
   Setting fields share the control height and a 24ch width, with the
-  width scaling together on narrow windows. Database path readouts keep that
-  height and use the available row width.
+  width scaling together on narrow windows. CSS color fields are 20ch wide so
+  the longest named color fits without oversized controls. Database path
+  readouts keep that height and use the available row width.
 - Sidebar folders and console groups open and close immediately.
 - UI Chrome > Animations controls the shared selector motion across interface
   hovers, keyboard focus, and selected rows. Turning it off sets the transition
