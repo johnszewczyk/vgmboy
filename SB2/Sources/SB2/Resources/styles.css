@@ -1696,10 +1696,6 @@ body.scan-log-window .scan-log-panel {
   padding: 8px 10px;
 }
 
-.sidebar-empty {
-  color: var(--muted);
-}
-
 @media (max-width: 900px) {
   .native-diagnostics {
     width: 100%;
@@ -2286,15 +2282,6 @@ body.sb2-frontend .gallery-card-system {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-body.sb2-frontend .gallery-empty {
-  grid-column: 1 / -1;
-  align-self: start;
-  max-width: 48ch;
-  padding: var(--sb-space-100);
-  color: #858aa7;
-  font: var(--sb-playlist-font-size)/1.5 var(--mono-font-family);
-}
-
 body.sb2-frontend .sb-status {
   display: grid;
   grid-template-columns: var(--sb-sidebar-track) var(--sb-divider-size) minmax(0, 1fr);
@@ -2333,6 +2320,8 @@ body.sb2-frontend .sb-sidebar-stats {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+body.sb2-frontend .sb-sidebar-stats.is-status { color: #aeb5ca; }
+body.sb2-frontend .sb-sidebar-stats.is-error { color: #ef7c84; }
 body.sb2-frontend .sb-status-content {
   height: 100%;
   min-height: 0;

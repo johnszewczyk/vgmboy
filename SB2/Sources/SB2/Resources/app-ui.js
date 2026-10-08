@@ -19,7 +19,6 @@ let playlistRenderGeneration = 0;
 let textMeasureContext = null;
 let renderedDatabaseGames = null;
 let databaseGameButtons = [];
-let databaseEmptyState = null;
 let databaseConsoleGroups = [];
 let collapsedDatabaseConsoles = new Set();
 let databaseRowRenderGeneration = 0;
@@ -854,10 +853,7 @@ function clearPlaylistSelection() {
 function showStartupFailure(message) {
   failStartup(message);
   refs.treeRoot.innerHTML = "";
-  const empty = document.createElement("div");
-  empty.className = "empty sidebar-empty";
-  empty.textContent = message;
-  refs.treeRoot.appendChild(empty);
+  updateSidebarStats(message, { error: true });
 
   refs.playlistBody.innerHTML = "";
   const row = document.createElement("tr");
@@ -1372,30 +1368,33 @@ function filteredTree() {
 function renderTree() {
   renderedDatabaseGames = null;
   databaseGameButtons = [];
-  databaseEmptyState = null;
   databaseConsoleGroups = [];
   selectedBrowserButton = null;
   resetSidebarContent();
   const visibleTree = filteredTree();
   if (visibleTree.length === 0) {
-    const empty = document.createElement("div");
-    empty.className = "empty sidebar-empty";
-    empty.textContent = isGalleryActive() && !state.galleryGamesLoaded
-      ? "Loading artwork index…"
-      : isGalleryActive() && state.galleryGamesError
-        ? state.galleryGamesError
-        : isGalleryActive() && !state.galleryGames.length
-          ? "No Title Snap artwork is indexed. Scan the library with ScanSong."
-          : currentSidebarView().contentMode === "tree"
-            ? "No artwork paths match this view."
-            : "No database tree is available.";
-    refs.treeRoot.appendChild(empty);
+    if (state.databaseSidebarError) {
+      updateSidebarStats(state.databaseSidebarError, { error: true });
+    } else if (isGalleryActive() && !state.galleryGamesLoaded) {
+      updateSidebarStats("Loading artwork index…");
+    } else if (isGalleryActive() && state.galleryGamesError) {
+      updateSidebarStats(state.galleryGamesError, { error: true });
+    } else if (isGalleryActive() && !state.galleryGames.length) {
+      updateSidebarStats("No Title Snap artwork is indexed.", {
+        title: "No Title Snap artwork is indexed. Scan the library with ScanSong."
+      });
+    } else if (state.sidebarQuery.trim()) {
+      updateSidebarStats("No catalog paths match this search.");
+    } else {
+      updateSidebarStats("No database tree is available.");
+    }
     syncSidebarFoldButton();
     return;
   }
 
   ensureExpandedToSelection(visibleTree);
   visibleTree.forEach((node) => renderTreeNode(node, refs.treeRoot));
+  updateSidebarStats();
   syncSidebarFoldButton();
 }
 
@@ -1629,10 +1628,7 @@ function renderDatabaseGames() {
   if (state.databaseSidebarLoading) {
     renderedDatabaseGames = null;
     resetSidebarContent();
-    const loading = document.createElement("div");
-    loading.className = "empty sidebar-empty sidebar-loading";
-    loading.textContent = "Loading catalog…";
-    refs.treeRoot.appendChild(loading);
+    updateSidebarStats("Loading catalog…");
     return;
   }
   const gamesForView = visibleDatabaseGames();
@@ -1714,9 +1710,6 @@ function renderDatabaseGames() {
       databaseConsoleGroups.push({ group, games, consoleName, gameItems });
     });
 
-    databaseEmptyState = document.createElement("div");
-    databaseEmptyState.className = "empty sidebar-empty";
-    refs.treeRoot.appendChild(databaseEmptyState);
     renderedDatabaseGames = gamesForView;
     appendDatabaseGameRowsInBatches();
   }
@@ -1737,16 +1730,27 @@ function renderDatabaseGames() {
     if (disclosure) disclosure.textContent = games.classList.contains("is-hidden") ? "▸" : "▾";
   }
 
-  databaseEmptyState.classList.toggle("is-hidden", !state.databaseSidebarError && gamesForView.length > 0);
-  databaseEmptyState.textContent = state.databaseSidebarError || (isGalleryActive()
-    ? !state.galleryGamesLoaded
-      ? "Loading artwork index…"
-      : state.galleryGamesError || (state.galleryGames.length
+  if (state.databaseSidebarError) {
+    updateSidebarStats(state.databaseSidebarError, { error: true });
+  } else if (isGalleryActive() && !state.galleryGamesLoaded) {
+    updateSidebarStats("Loading artwork index…");
+  } else if (isGalleryActive() && state.galleryGamesError) {
+    updateSidebarStats(state.galleryGamesError, { error: true });
+  } else if (isGalleryActive() && gamesForView.length === 0) {
+    updateSidebarStats(state.galleryGames.length
+      ? "No artwork titles match this search."
+      : "No Title Snap artwork is indexed.", {
+      title: state.galleryGames.length
         ? "No artwork titles match this search."
-        : "No Title Snap artwork is indexed. Scan the library with ScanSong.")
-    : state.databaseGames.length
-      ? "No database games match this search."
-      : "Use ScanSong to populate the selected database.");
+        : "No Title Snap artwork is indexed. Scan the library with ScanSong."
+    });
+  } else if (!isGalleryActive() && state.sidebarQuery.trim() && gamesForView.length === 0) {
+    updateSidebarStats("No database games match this search.");
+  } else if (!isGalleryActive() && state.databaseGames.length === 0) {
+    updateSidebarStats("Use ScanSong to populate the selected database.");
+  } else {
+    updateSidebarStats();
+  }
   syncSidebarFoldButton();
 }
 
@@ -1990,10 +1994,7 @@ function renderGalleryView() {
   if (!state.galleryGamesLoaded) {
     galleryRenderSignature = "loading";
     refs.galleryGrid.replaceChildren();
-    const loading = document.createElement("div");
-    loading.className = "gallery-empty";
-    loading.textContent = "Reading the artwork index…";
-    refs.galleryGrid.appendChild(loading);
+    updateSidebarStats("Reading the artwork index…");
     void loadGalleryGames();
     return;
   }
@@ -2011,11 +2012,10 @@ function renderGalleryView() {
   refs.galleryGrid.replaceChildren();
 
   if (!records.length) {
-    const empty = document.createElement("div");
-    empty.className = "gallery-empty";
-    empty.textContent = state.galleryGamesError
-      || "No Title Snap artwork is indexed. Scan the library with ScanSong to add covers.";
-    refs.galleryGrid.appendChild(empty);
+    updateSidebarStats(state.galleryGamesError || "No Title Snap artwork is indexed.", {
+      error: Boolean(state.galleryGamesError),
+      title: state.galleryGamesError || "No Title Snap artwork is indexed. Scan the library with ScanSong to add covers."
+    });
     return;
   }
 
@@ -2241,7 +2241,7 @@ function reportDatabaseSidebarError(action, error) {
   const detail = String(error?.message || error || "Unknown database error");
   state.databaseSidebarError = `Could not ${action}: ${detail}`;
   console.error(`[SPCBoy] could not ${action}`, error);
-  if (currentSidebarView().contentMode === "database") renderDatabaseGames();
+  renderSidebar();
 }
 
 function databaseRowsToPlaylistTracks(response, { adoptProjection = true } = {}) {
@@ -2395,28 +2395,34 @@ function renderSidebar() {
   refs.sidebarHistoryButton?.setAttribute("aria-pressed", String(historyActive));
   if (state.databaseSidebarLoading) {
     resetSidebarContent();
-    const loading = document.createElement("div");
-    loading.className = "empty sidebar-empty sidebar-loading";
-    loading.textContent = "Loading catalog…";
-    refs.treeRoot.appendChild(loading);
+    updateSidebarStats("Loading catalog…");
     return;
   }
   if (view.contentMode === "database") renderDatabaseGames();
   else renderTree();
 }
 
-function updateSidebarStats() {
+function updateSidebarStats(message = "", { error = false, title = "" } = {}) {
   if (!sidebarStats) return;
-  const gameCount = Array.isArray(state.databaseGames) ? state.databaseGames.length : 0;
-  const systemCount = Array.isArray(state.databaseGameGroups) ? state.databaseGameGroups.length : 0;
-  if (state.databaseSidebarLoading && gameCount === 0) {
-    sidebarStats.textContent = "LOADING LIBRARY";
-    sidebarStats.title = "Loading library statistics";
+  const statusMessage = String(message || (state.databaseSidebarLoading
+    ? "Loading catalog…"
+    : state.databaseSidebarError || "")).trim();
+  if (statusMessage) {
+    sidebarStats.textContent = statusMessage;
+    sidebarStats.title = title || state.databaseSidebarError || statusMessage;
+    const isError = error || Boolean(state.databaseSidebarError);
+    sidebarStats.setAttribute("aria-label", isError ? "Library error" : "Library status");
+    sidebarStats.classList.add("is-status");
+    sidebarStats.classList.toggle("is-error", isError);
     return;
   }
+  const gameCount = Array.isArray(state.databaseGames) ? state.databaseGames.length : 0;
+  const systemCount = Array.isArray(state.databaseGameGroups) ? state.databaseGameGroups.length : 0;
   const compactCount = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
   sidebarStats.textContent = `${compactCount.format(gameCount)} GAMES · ${compactCount.format(systemCount)} SYSTEMS`;
   sidebarStats.title = `${gameCount.toLocaleString()} games across ${systemCount.toLocaleString()} systems`;
+  sidebarStats.setAttribute("aria-label", "Library statistics");
+  sidebarStats.classList.remove("is-status", "is-error");
 }
 
 function syncAnimatedRanges() {
