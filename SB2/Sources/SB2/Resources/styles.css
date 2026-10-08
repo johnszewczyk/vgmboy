@@ -1727,6 +1727,8 @@ body.sb2-frontend {
   --sb-space-090: calc(var(--ui-font-size-pt) * .9pt);
   --sb-space-100: calc(var(--ui-font-size-pt) * 1pt);
   --sb-toolbar-height: calc(var(--ui-font-size-pt) * 2.5pt);
+  --sb-toolbar-inset: var(--sb-space-025);
+  --sb-toolbar-gap: var(--sb-space-010);
   --sb-titlebar-height: var(--sb-toolbar-height);
   --sb-statusbar-height: var(--sb-toolbar-height);
   --sb-control-size: calc(var(--ui-font-size-pt) * 1.5pt);
@@ -1736,6 +1738,13 @@ body.sb2-frontend {
   --app-easing: cubic-bezier(0.2, 0, 0, 1);
   --sb-divider-size: 1px;
   --sb-control-font-size: calc(var(--ui-font-size-pt) * .78pt);
+  --sb-button-surface: #15191f;
+  --sb-button-hover-surface: #202633;
+  --sb-button-selected-surface: #102b3f;
+  --sb-button-ink: #9299b5;
+  --sb-button-hover-ink: #d4d8e8;
+  --sb-button-selected-ink: #67c7ff;
+  --sb-button-radius: var(--sb-space-020);
   --sb-sidebar-font-size: calc(var(--sidebar-font-size-pt) * .78pt);
   --sb-playlist-font-size: calc(var(--playlist-font-size-pt) * .78pt);
   --sb-playlist-meta-font-size: calc(var(--playlist-font-size-pt) * .66pt);
@@ -1753,9 +1762,9 @@ body.sb2-frontend {
   --control-icon-size: var(--sb-control-icon-size);
   --top-toolbar-control-height: var(--sb-toolbar-height);
   --top-toolbar-height: var(--sb-toolbar-height);
-  --top-toolbar-inset: var(--sb-space-025);
-  --toolbar-gap: var(--sb-space-010);
-  --control-radius: var(--sb-space-020);
+  --top-toolbar-inset: var(--sb-toolbar-inset);
+  --toolbar-gap: var(--sb-toolbar-gap);
+  --control-radius: var(--sb-button-radius);
   --item-spacing-rem: 0;
   --list-item-padding-y: 0;
   color: var(--text);
@@ -1906,8 +1915,8 @@ body.sb2-frontend .sidebar {
 body.sb2-frontend .transport-toolbar {
   display: flex;
   height: var(--sb-toolbar-height);
-  padding: var(--sb-space-025) var(--sb-space-010);
-  gap: var(--sb-space-010);
+  padding: var(--sb-toolbar-inset);
+  gap: var(--sb-toolbar-gap);
 }
 
 body.sb2-frontend .transport { flex: 1 1 auto; min-width: 0; gap: var(--sb-space-010); margin-left: 0; }
@@ -1919,21 +1928,20 @@ body.sb2-frontend .transport-toolbar .tool-button {
   min-height: var(--sb-control-size);
   padding: 0;
   border: 0;
-  border-radius: var(--sb-space-020);
-  background: #15191f;
-  color: #9299b5;
+  border-radius: var(--sb-button-radius);
+  background: var(--sb-button-surface);
+  color: var(--sb-button-ink);
 }
 body.sb2-frontend .transport-toolbar .tool-button .ui-icon { width: var(--sb-control-icon-size); height: var(--sb-control-icon-size); }
-body.sb2-frontend .transport-toolbar .tool-button:hover { background: #202633; color: #d4d8e8; }
-body.sb2-frontend .transport-toolbar .tool-button.is-primary,
-body.sb2-frontend .transport-toolbar .tool-button[aria-pressed="true"] { background: #102b3f; color: #67c7ff; }
+body.sb2-frontend .transport-toolbar .tool-button:hover { background: var(--sb-button-hover-surface); color: var(--sb-button-hover-ink); }
+body.sb2-frontend .transport-toolbar .tool-button[aria-pressed="true"] { background: var(--sb-button-selected-surface); color: var(--sb-button-selected-ink); }
 
 body.sb2-frontend .sidebar-search-wrap {
   height: var(--sb-toolbar-height);
   min-height: var(--sb-toolbar-height);
   margin-top: 0;
-  padding: var(--sb-space-025);
-  gap: var(--sb-space-010);
+  padding: var(--sb-toolbar-inset);
+  gap: var(--sb-toolbar-gap);
 }
 body.sb2-frontend .sidebar-search-input {
   height: var(--sb-control-size);
@@ -1957,11 +1965,11 @@ body.sb2-frontend .sidebar-mode-button {
   height: var(--sb-control-size);
   padding: 0;
   border: 0;
-  border-radius: var(--sb-space-020);
-  background: #15191f;
-  color: #9299b5;
+  border-radius: var(--sb-button-radius);
+  background: var(--sb-button-surface);
+  color: var(--sb-button-ink);
 }
-body.sb2-frontend .sidebar-mode-button:hover { background: #202633; color: #d4d8e8; }
+body.sb2-frontend .sidebar-mode-button:hover { background: var(--sb-button-hover-surface); color: var(--sb-button-hover-ink); }
 body.sb2-frontend .sidebar-mode-button .ui-icon { width: var(--sb-control-icon-size); height: var(--sb-control-icon-size); }
 body.sb2-frontend #database-expand-all-button { display: inline-flex; font: inherit; }
 body.sb2-frontend #tree-root.tree-root {
@@ -2099,13 +2107,14 @@ body.sb2-frontend .sb2-startup-notice.is-ready .sb2-startup-progress span { widt
   to { transform: translateX(310%); }
 }
 body.sb2-frontend .playlist-bottom-toolbar { display: none; }
-body.sb2-frontend .playlist-tabs-toolbar { height: var(--sb-toolbar-height); padding: var(--sb-space-025); }
-body.sb2-frontend .playlist-tabs { height: calc(var(--sb-toolbar-height) - (2 * var(--sb-space-025))); }
-body.sb2-frontend .playlist-tab { height: 100%; border: 0; border-radius: var(--sb-space-020); background: #15191f; }
-body.sb2-frontend .playlist-tab::before { background: #102333; }
-body.sb2-frontend .playlist-tab.is-active .playlist-tab-close { color: #8fd1ff; }
+body.sb2-frontend .playlist-tabs-toolbar { height: var(--sb-toolbar-height); padding: var(--sb-toolbar-inset); }
+body.sb2-frontend .playlist-tabs { height: calc(var(--sb-toolbar-height) - (2 * var(--sb-toolbar-inset))); }
+body.sb2-frontend .playlist-tab { height: 100%; border: 0; border-radius: var(--sb-button-radius); background: var(--sb-button-surface); }
+body.sb2-frontend .playlist-tab::before { background: var(--sb-button-selected-surface); }
+body.sb2-frontend .playlist-tab.is-active .playlist-tab-close { color: var(--sb-button-selected-ink); }
 body.sb2-frontend .playlist-tab-select,
-body.sb2-frontend .playlist-tab-close { height: 100%; align-self: stretch; border-radius: var(--sb-space-020); font-size: var(--sb-control-font-size); }
+body.sb2-frontend .playlist-tab-close { height: var(--sb-control-size); align-self: center; border-radius: var(--sb-button-radius); font-size: var(--sb-control-font-size); }
+body.sb2-frontend .playlist-tab-select { height: var(--sb-control-size); align-self: center; border-radius: var(--sb-button-radius); font-size: var(--sb-control-font-size); }
 body.sb2-frontend .playlist-tab-close { flex-basis: var(--sb-control-size); width: var(--sb-control-size); }
 body.sb2-frontend .playlist-wrap {
   display: grid;
@@ -2130,13 +2139,13 @@ body.sb2-frontend .playlist-header-label {
   height: var(--sb-control-size);
   min-height: var(--sb-control-size);
   padding: 0 var(--sb-space-050);
-  border-radius: var(--sb-space-020);
-  background: #15191f;
+  border-radius: var(--sb-button-radius);
+  background: var(--sb-button-surface);
   transition: background 120ms var(--app-easing), color 120ms var(--app-easing);
 }
 body.sb2-frontend .playlist-header-table th:hover .playlist-header-label {
-  background: #202633;
-  color: #d4d8e8;
+  background: var(--sb-button-hover-surface);
+  color: var(--sb-button-hover-ink);
 }
 body.sb2-frontend .playlist-body-table td { padding-top: 0; padding-bottom: 0; line-height: 1.05; }
 body.sb2-frontend .playlist-body-table tr { height: 1.05em; }
@@ -2340,24 +2349,24 @@ body.sb2-frontend .options-header .tool-button {
   margin-left: 0;
   padding: 0 var(--sb-space-075);
   transform: none;
-  border: 1px solid #344354;
-  border-radius: var(--sb-space-020);
-  background: #18212d;
-  color: #c8d2e4;
+  border: 0;
+  border-radius: var(--sb-button-radius);
+  background: var(--sb-button-surface);
+  color: var(--sb-button-ink);
   font-family: var(--ui-font-family);
   font-size: var(--sb-control-font-size);
   font-weight: 500;
   line-height: 1;
 }
 body.sb2-frontend .options-header .tool-button .ui-icon { width: var(--sb-control-icon-size); height: var(--sb-control-icon-size); }
-body.sb2-frontend .options-header .tool-button:hover { border-color: #526a84; background: #202c3a; color: #f0f3fb; }
+body.sb2-frontend .options-header .tool-button:hover { background: var(--sb-button-hover-surface); color: var(--sb-button-hover-ink); }
 body.sb2-frontend .options-header .tool-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 body.sb2-frontend .options-body { grid-template-columns: 12rem minmax(0, 1fr); gap: 2rem; min-height: 0; height: 100%; }
 body.sb2-frontend .options-nav { gap: 1.25rem; padding: var(--sb-space-050) 0; }
 body.sb2-frontend .options-nav-group { gap: var(--sb-space-010); padding: 0; border: 0; border-radius: 0; background: transparent; }
 body.sb2-frontend .options-nav-group + .options-nav-group { border: 0; }
 body.sb2-frontend .options-nav-group-title { padding: 0 var(--sb-space-050) var(--sb-space-020); color: #777f9c; font-size: var(--sb-space-066); font-weight: 500; letter-spacing: .08em; }
-body.sb2-frontend .options-nav-item { min-height: var(--sb-control-size); gap: var(--sb-space-066); padding: 0 var(--sb-space-075); border: 0; border-radius: var(--sb-space-020); background: transparent; color: #9299b5; font-size: var(--sb-space-090); font-weight: 400; }
+body.sb2-frontend .options-nav-item { height: var(--sb-control-size); min-height: var(--sb-control-size); gap: var(--sb-space-066); padding: 0 var(--sb-space-075); border: 0; border-radius: var(--sb-button-radius); background: var(--sb-button-surface); color: var(--sb-button-ink); font-size: var(--sb-control-font-size); font-weight: 400; }
 /* Keep each owner's options navigation explicitly alphabetical in visual order. */
 body.sb2-frontend #options-database-tab { order: 1; }
 body.sb2-frontend #options-theme-tab { order: 2; }
@@ -2367,9 +2376,9 @@ body.sb2-frontend #options-audio-tab { order: 1; }
 body.sb2-frontend #options-diagnostics-tab { order: 2; }
 body.sb2-frontend #options-playback-tab { order: 3; }
 body.sb2-frontend #options-routing-tab { order: 4; }
-body.sb2-frontend .options-nav-item:hover { background: #11151b; color: #d0d4e5; }
+body.sb2-frontend .options-nav-item:hover { background: var(--sb-button-hover-surface); color: var(--sb-button-hover-ink); }
 body.sb2-frontend .options-nav-item .ui-icon { width: 1rem; height: 1rem; }
-body.sb2-frontend .options-nav-item.is-selected { background: #102333; color: #8fd1ff; }
+body.sb2-frontend .options-nav-item.is-selected { background: var(--sb-button-selected-surface); color: var(--sb-button-selected-ink); }
 body.sb2-frontend .options-content { padding: 1rem 2rem 2rem; border: 0; border-radius: 0; font-family: var(--ui-font-family); font-size: 1rem; line-height: 1.5; scrollbar-color: #3a4050 #090b0f; }
 body.sb2-frontend .options-page { width: min(100%, 65ch); gap: 2rem; min-height: 100%; margin-inline: auto; padding: 0 0 2rem; border-radius: 0; background: transparent; }
 body.sb2-frontend .options-page-title { margin: 0; padding: 0 0 .75rem; border-bottom: 1px solid #343a48; color: #e0e1eb; font-size: 1.5rem; line-height: 1.3; font-weight: 600; letter-spacing: 0; }
@@ -2443,23 +2452,23 @@ body.sb2-frontend .options-input:focus-visible { outline: 2px solid var(--accent
 body.sb2-frontend .options-inline-trailing { flex: 0 1 var(--sb-options-control-width); min-width: 12ch; }
 body.sb2-frontend .options-color-text-input { max-width: var(--sb-options-control-width); }
 body.sb2-frontend .options-subpanel .tool-button {
-  height: var(--sb-options-control-height);
-  min-height: var(--sb-options-control-height);
-  padding: 0 .9rem;
+  height: var(--sb-control-size);
+  min-height: var(--sb-control-size);
+  padding: 0 var(--sb-space-075);
   border: 0;
-  border-radius: .25rem;
-  background: #15191f;
-  color: #c4c8d9;
+  border-radius: var(--sb-button-radius);
+  background: var(--sb-button-surface);
+  color: var(--sb-button-ink);
 }
-body.sb2-frontend .options-subpanel .tool-button:hover { background: #202633; color: #e0e1eb; }
+body.sb2-frontend .options-subpanel .tool-button:hover { background: var(--sb-button-hover-surface); color: var(--sb-button-hover-ink); }
 body.sb2-frontend .options-subpanel p { margin: 1rem 0 .5rem; color: #a5abc0; font-size: .9rem; line-height: 1.5; }
 body.sb2-frontend .options-subpanel p strong { color: #d8dced; }
 body.sb2-frontend .options-path-control { padding: .5rem .66rem; border: 1px solid #2c3340; border-radius: .25rem; background: #0f1218; }
 body.sb2-frontend .options-path-control .options-path-readout { width: 100%; max-width: none; height: var(--sb-options-control-height); min-height: var(--sb-options-control-height); padding: .33rem .5rem; border: 0; background: transparent; color: #aeb5ca; font-family: var(--mono-font-family); font-size: .9rem; }
 body.sb2-frontend .options-path-control .tool-button { width: var(--sb-control-size); min-width: var(--sb-control-size); height: var(--sb-control-size); min-height: var(--sb-control-size); align-self: center; }
-body.sb2-frontend .options-library-toolbar { gap: .75rem; margin-top: 1rem; }
-body.sb2-frontend .options-library-toolbar .tool-button { height: var(--sb-options-control-height); min-height: var(--sb-options-control-height); background: #15191f; }
-body.sb2-frontend .options-library-toolbar .tool-button:hover { background: #202633; }
+body.sb2-frontend .options-library-toolbar { gap: var(--sb-toolbar-gap); margin-top: 1rem; }
+body.sb2-frontend .options-library-toolbar .tool-button { height: var(--sb-control-size); min-height: var(--sb-control-size); background: var(--sb-button-surface); }
+body.sb2-frontend .options-library-toolbar .tool-button:hover { background: var(--sb-button-hover-surface); }
 body.sb2-frontend .diagnostics-list { gap: var(--sb-space-050); }
 body.sb2-frontend .diagnostics-row { min-height: 3rem; padding: .66rem .25rem; color: #c9cfe0; font-size: 1rem; }
 body.sb2-frontend .diagnostics-row strong { color: #e0e1eb; font-family: var(--mono-font-family); font-size: .9rem; }
@@ -2471,13 +2480,99 @@ body.sb2-frontend .database-info-panel,
 body.sb2-frontend .database-stats-panel,
 body.sb2-frontend .library-cache-row,
 body.sb2-frontend .library-root-row { padding: var(--sb-space-050) 0; border: 0; border-radius: 0; background: transparent; }
-body.sb2-frontend .options-panel-actions { gap: .75rem; }
-body.sb2-frontend .options-panel-actions .tool-button { height: var(--sb-options-control-height); min-height: var(--sb-options-control-height); padding: 0 .9rem; }
+body.sb2-frontend .options-panel-actions { gap: var(--sb-toolbar-gap); }
+body.sb2-frontend .options-panel-actions .tool-button { height: var(--sb-control-size); min-height: var(--sb-control-size); padding: 0 var(--sb-space-075); }
 
-/* Keep the dense shell's action controls on one compact height. Labeled
-   buttons keep their natural width; icon controls use the shared square. */
-body.sb2-frontend .tool-button { height: var(--sb-control-size); min-height: var(--sb-control-size); }
-body.sb2-frontend .glyph-button { width: var(--sb-control-size); min-width: var(--sb-control-size); padding: 0; }
+/* One control contract across the SB2 shell: equal toolbar rows and insets,
+   equal button height and state colors, and square geometry for icon actions. */
+body.sb2-frontend .transport-toolbar,
+body.sb2-frontend .sidebar-search-wrap,
+body.sb2-frontend .playlist-tabs-toolbar,
+body.sb2-frontend .playlist-bottom-toolbar {
+  min-height: var(--sb-toolbar-height);
+  padding: var(--sb-toolbar-inset);
+  gap: var(--sb-toolbar-gap);
+}
+body.sb2-frontend .tool-button,
+body.sb2-frontend .sidebar-mode-button,
+body.sb2-frontend .playlist-tab-select,
+body.sb2-frontend .playlist-tab-close,
+body.sb2-frontend .options-nav-item {
+  box-sizing: border-box;
+  min-height: var(--sb-control-size);
+  font-family: var(--mono-font-family);
+  font-size: var(--sb-control-font-size);
+  line-height: 1;
+  transition: background-color 120ms var(--app-easing), color 120ms var(--app-easing);
+}
+body.sb2-frontend .tool-button,
+body.sb2-frontend .sidebar-mode-button,
+body.sb2-frontend .playlist-tab-close,
+body.sb2-frontend .options-nav-item {
+  border: 0;
+  border-radius: var(--sb-button-radius);
+  background: var(--sb-button-surface);
+  color: var(--sb-button-ink);
+}
+body.sb2-frontend .tool-button:not(.glyph-button),
+body.sb2-frontend .options-nav-item { min-width: var(--sb-control-size); }
+body.sb2-frontend .tool-button.glyph-button,
+body.sb2-frontend .sidebar-mode-button,
+body.sb2-frontend .playlist-tab-close,
+body.sb2-frontend .options-path-control .tool-button {
+  flex: 0 0 var(--sb-control-size);
+  width: var(--sb-control-size);
+  min-width: var(--sb-control-size);
+  height: var(--sb-control-size);
+  padding: 0;
+}
+body.sb2-frontend .tool-button .ui-icon,
+body.sb2-frontend .sidebar-mode-button .ui-icon,
+body.sb2-frontend .playlist-tab-close .ui-icon,
+body.sb2-frontend .options-nav-item .ui-icon {
+  width: var(--sb-control-icon-size);
+  height: var(--sb-control-icon-size);
+  flex: 0 0 var(--sb-control-icon-size);
+}
+body.sb2-frontend .tool-button:hover,
+body.sb2-frontend .sidebar-mode-button:hover,
+body.sb2-frontend .playlist-tab-close:hover,
+body.sb2-frontend .options-nav-item:hover {
+  background: var(--sb-button-hover-surface);
+  color: var(--sb-button-hover-ink);
+}
+body.sb2-frontend .tool-button.is-primary:not([aria-pressed="true"]) {
+  background: var(--sb-button-surface);
+  color: var(--sb-button-ink);
+}
+body.sb2-frontend .playlist-tab-select {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--sb-button-ink);
+}
+body.sb2-frontend .playlist-tab-select:hover { background: var(--sb-button-hover-surface); color: var(--sb-button-hover-ink); }
+body.sb2-frontend .playlist-tab-select.is-active { color: var(--sb-button-selected-ink); }
+body.sb2-frontend .options-nav-item { height: var(--sb-control-size); }
+body.sb2-frontend .options-nav-item.is-selected { background: var(--sb-button-selected-surface); color: var(--sb-button-selected-ink); }
+body.sb2-frontend .playlist-header-label {
+  border-radius: var(--sb-button-radius);
+  background: var(--sb-button-surface);
+  color: var(--sb-button-ink);
+  font-size: var(--sb-control-font-size);
+  line-height: 1;
+}
+body.sb2-frontend .playlist-header-table th:hover .playlist-header-label { background: var(--sb-button-hover-surface); color: var(--sb-button-hover-ink); }
+body.sb2-frontend button:not(.favorite-toggle):not(.tree-node):not(.database-game-row):not(.database-console-row):is(:active, [aria-pressed="true"], .is-selected) {
+  background: var(--sb-button-selected-surface);
+  color: var(--sb-button-selected-ink);
+}
+body.sb2-frontend button:not(.favorite-toggle):not(.tree-node):not(.database-game-row):not(.database-console-row):is(:active, [aria-pressed="true"], .is-selected) .ui-icon { color: inherit; }
+body.sb2-frontend :is(.database-tree-control, .options-header .tool-button, .options-subpanel .tool-button, .library-root-actions .tool-button) {
+  font-family: var(--mono-font-family);
+  font-size: var(--sb-control-font-size);
+  line-height: 1;
+}
 body.sb2-frontend .sidebar-search-input { height: var(--sb-control-size); min-height: var(--sb-control-size); padding-inline: var(--sb-space-075); }
 
 body.sb2-frontend.options-window .app-shell { grid-template-rows: var(--sb-titlebar-height) minmax(0, 1fr) var(--sb-statusbar-height); }
