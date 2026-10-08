@@ -22,22 +22,26 @@ private enum PathAdditionOutcome: Sendable {
     case failure(String)
 }
 
+private enum MetadataTagSummaryOutcome: Sendable {
+    case success([CatalogMetadataTagSummary])
+    case failure(String)
+}
+
 private enum CatalogSnapshot: Sendable {
     case missing
-    case loaded(CanonicalCatalogSummary, [CatalogRoot], [Int64: CatalogScanTally], [CatalogMetadataTagSummary])
+    case loaded(CanonicalCatalogSummary, [CatalogRoot], [Int64: CatalogScanTally])
     case failure(String)
 
     static func read(databaseURL: URL) -> Self {
         guard FileManager.default.fileExists(atPath: databaseURL.path) else { return .missing }
         do {
-            let summary = try CanonicalCatalog.inspect(databaseURL: databaseURL)
             let reader = try CanonicalCatalogReader(databaseURL: databaseURL)
+            let summary = reader.summary
             let roots = try reader.roots()
             let tallies = try Dictionary(uniqueKeysWithValues: roots.map {
                 ($0.id, try reader.scanTally(rootID: $0.id))
             })
-            let metadataTagSummaries = try reader.metadataTagSummaries()
-            return .loaded(summary, roots, tallies, metadataTagSummaries)
+            return .loaded(summary, roots, tallies)
         } catch {
             return .failure(error.localizedDescription)
         }
@@ -61,6 +65,9 @@ final class ScannerAppModel: ObservableObject {
     @Published var roots: [CatalogRoot] = []
     @Published var rootTallies: [Int64: CatalogScanTally] = [:]
     @Published var metadataTagSummaries: [CatalogMetadataTagSummary] = []
+    @Published private(set) var isLoadingMetadataTagSummaries = false
+    @Published private(set) var metadataTagSummaryError: String?
+    @Published private(set) var catalogRevision = 0
     @Published var scanStatus = "Add one or more scan paths."
     @Published var currentPath: String?
     @Published var currentFile: String?
@@ -85,6 +92,9 @@ final class ScannerAppModel: ObservableObject {
     private var maintenanceTask: Task<Void, Never>?
     private var maintenanceWorker: Task<MaintenanceOutcome, Never>?
     private var activeRootID: Int64?
+    private var loadedCatalogPath: String?
+    private var metadataTagSummariesLoadedForPath: String?
+    private var metadataTagSummaryRequestID: UUID?
     fileprivate var operationStartedAt: Date?
     private var logWindows: [Int64: ScannerScanLogWindow] = [:]
     private var abbreviatedPaths: [Int64: String] = [:]
@@ -138,7 +148,48 @@ final class ScannerAppModel: ObservableObject {
     var canScanAll: Bool { !isBusy && roots.contains(where: \.isEnabled) }
     var hasInactiveLinks: Bool { roots.contains(where: { $0.deadSourceCount > 0 }) }
     var hasDatabaseFile: Bool { FileManager.default.fileExists(atPath: databaseURL.path) }
+    var hasLoadedCatalog: Bool { loadedCatalogPath == databaseURL.standardizedFileURL.path }
+    var hasLoadedMetadataTagSummaries: Bool {
+        metadataTagSummariesLoadedForPath == databaseURL.standardizedFileURL.path
+    }
     var fileTypePolicies: [ScannerFileTypePolicy] { ScannerFormatPolicy.knownUnsupportedFileTypes }
+
+    func loadMetadataTagSummariesIfNeeded() {
+        let selectedURL = databaseURL.standardizedFileURL
+        let selectedPath = selectedURL.path
+        guard hasDatabaseFile,
+              hasLoadedCatalog,
+              metadataTagSummariesLoadedForPath != selectedPath,
+              metadataTagSummaryRequestID == nil else { return }
+
+        isLoadingMetadataTagSummaries = true
+        metadataTagSummaryError = nil
+        let requestID = UUID()
+        metadataTagSummaryRequestID = requestID
+        let worker = Task.detached(priority: .utility) {
+            do {
+                let reader = try CanonicalCatalogReader(databaseURL: selectedURL)
+                return MetadataTagSummaryOutcome.success(try reader.metadataTagSummaries())
+            } catch {
+                return MetadataTagSummaryOutcome.failure(error.localizedDescription)
+            }
+        }
+        Task { [weak self] in
+            let outcome = await worker.value
+            guard let self,
+                  metadataTagSummaryRequestID == requestID,
+                  databaseURL.standardizedFileURL == selectedURL else { return }
+            metadataTagSummaryRequestID = nil
+            isLoadingMetadataTagSummaries = false
+            switch outcome {
+            case .success(let summaries):
+                metadataTagSummaries = summaries
+                metadataTagSummariesLoadedForPath = selectedPath
+            case .failure(let message):
+                metadataTagSummaryError = message
+            }
+        }
+    }
 
     var databaseFileDisplayPath: String {
         hasDatabaseFile ? databaseURL.path : "(None)"
@@ -416,6 +467,7 @@ final class ScannerAppModel: ObservableObject {
 
     private func setCatalog(_ url: URL) {
         databaseURL = url.standardizedFileURL
+        invalidateMetadataTagSummaries()
         UserDefaults.standard.set(databaseURL.path, forKey: Self.catalogPathKey)
         logWindows.values.forEach { $0.close() }
         logWindows.removeAll()
@@ -451,19 +503,20 @@ final class ScannerAppModel: ObservableObject {
     }
 
     private func applyCatalogSnapshot(_ snapshot: CatalogSnapshot) {
+        invalidateMetadataTagSummaries()
+        loadedCatalogPath = nil
         switch snapshot {
         case .missing:
             catalogStatus = "New schema-25 catalog will be created when scanning starts."
             roots = []
             rootTallies = [:]
-            metadataTagSummaries = []
             abbreviatedPaths = [:]
             if scanStatus == "Opening catalog…" { scanStatus = "Add one or more scan paths." }
-        case .loaded(let summary, let loadedRoots, let tallies, let tagSummaries):
+        case .loaded(let summary, let loadedRoots, let tallies):
+            loadedCatalogPath = summary.path
             catalogStatus = "Schema \(summary.schemaVersion) • \(summary.rootCount) paths • \(summary.trackCount) tracks"
             roots = loadedRoots
             rootTallies = tallies
-            metadataTagSummaries = tagSummaries
             rebuildAbbreviatedPaths()
             if scanStatus == "Opening catalog…" || scanStatus.hasPrefix("Add one or more") {
                 scanStatus = readyText
@@ -472,10 +525,18 @@ final class ScannerAppModel: ObservableObject {
             catalogStatus = "Cannot use catalog: \(message)"
             roots = []
             rootTallies = [:]
-            metadataTagSummaries = []
             abbreviatedPaths = [:]
             scanStatus = "Catalog unavailable: \(message)"
         }
+    }
+
+    private func invalidateMetadataTagSummaries() {
+        metadataTagSummaryRequestID = nil
+        metadataTagSummariesLoadedForPath = nil
+        metadataTagSummaries = []
+        isLoadingMetadataTagSummaries = false
+        metadataTagSummaryError = nil
+        catalogRevision &+= 1
     }
 
     private func runCatalogChange(

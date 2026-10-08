@@ -59,6 +59,10 @@ struct ScannerOptionsView: View {
         .frame(minWidth: 620, minHeight: 420)
         .background(windowBackground)
         .background(OptionsWindowConfigurator())
+        .task(id: selection == .metadataTags ? model.catalogRevision : -1) {
+            guard selection == .metadataTags else { return }
+            model.loadMetadataTagSummariesIfNeeded()
+        }
     }
 
     private var fileTypesPage: some View {
@@ -103,7 +107,32 @@ struct ScannerOptionsView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            if model.metadataTagSummaries.isEmpty {
+            if model.isLoadingMetadataTagSummaries {
+                ProgressView("Loading indexed tags…")
+                    .frame(maxWidth: .infinity, minHeight: 180)
+            } else if let error = model.metadataTagSummaryError {
+                VStack(spacing: 10) {
+                    Text("Couldn’t load metadata tags: \(error)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Retry") { model.loadMetadataTagSummariesIfNeeded() }
+                }
+                .frame(maxWidth: .infinity, minHeight: 180)
+            } else if !model.hasDatabaseFile {
+                Text("Select or create a catalog to view indexed tags.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 180, alignment: .center)
+            } else if !model.hasLoadedCatalog {
+                Text("The selected catalog is unavailable.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 180, alignment: .center)
+            } else if !model.hasLoadedMetadataTagSummaries {
+                ProgressView("Preparing metadata tags…")
+                    .frame(maxWidth: .infinity, minHeight: 180)
+            } else if model.metadataTagSummaries.isEmpty {
                 Text("No source tags are indexed yet. Run a Deep Scan to collect tags from existing files.")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)

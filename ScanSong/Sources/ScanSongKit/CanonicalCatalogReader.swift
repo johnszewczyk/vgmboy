@@ -9,10 +9,11 @@ import SQLite3
 public final class CanonicalCatalogReader: @unchecked Sendable {
     private let database: OpaquePointer
     public let databaseURL: URL
+    public let summary: CanonicalCatalogSummary
 
     public init(databaseURL: URL) throws {
         self.databaseURL = databaseURL.standardizedFileURL
-        _ = try CanonicalCatalog.inspect(databaseURL: self.databaseURL)
+        summary = try CanonicalCatalog.inspect(databaseURL: self.databaseURL)
 
         var handle: OpaquePointer?
         let status = sqlite3_open_v2(
