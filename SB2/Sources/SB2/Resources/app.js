@@ -493,6 +493,20 @@ refs.sidebarViewToggleButton?.addEventListener("click", () => {
   app.ui.cycleSidebarMode().catch((error) => console.error("[SPCBoy] sidebar view switch failed", error));
 });
 
+refs.sidebarHistoryButton?.addEventListener("click", () => {
+  app.ui.showPlaybackHistory().catch((error) => console.error("[SPCBoy] playback history failed", error));
+});
+
+refs.sidebarFavoritesButton?.addEventListener("click", () => {
+  app.ui.showFavoritesPlaylist().catch((error) => console.error("[SPCBoy] favorites playlist failed", error));
+});
+
+refs.toolbarVolumeButton?.addEventListener("click", () => app.ui.toggleToolbarVolumePopover());
+refs.toolbarVolumeInput?.addEventListener("input", (event) => app.ui.setAppVolume(Number(event.target.value) / 100));
+document.addEventListener("pointerdown", (event) => {
+  if (!refs.toolbarVolumeControl?.contains(event.target)) app.ui.setToolbarVolumePopoverOpen(false);
+});
+
 if (window.spcBoySB2?.onTransportShortcut) {
   window.spcBoySB2.onTransportShortcut((action) => {
     if (action === "settings") {
@@ -537,6 +551,11 @@ if (window.spcBoySB2?.onNativeAACExport) {
 }
 
 window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && refs.toolbarVolumePopover && !refs.toolbarVolumePopover.hidden) {
+    event.preventDefault();
+    app.ui.setToolbarVolumePopoverOpen(false, { returnFocus: true });
+    return;
+  }
   const target = event.target;
   const isRangeInput = target instanceof HTMLInputElement && target.type === "range";
   if (!event.metaKey && !event.ctrlKey && !event.altKey && (event.key === "-" || event.key === "=" || event.key === "Subtract" || event.key === "Equal") && (!target || !target.isContentEditable) && (!target.tagName || target.tagName !== "TEXTAREA") && (!target.tagName || target.tagName !== "INPUT" || isRangeInput)) {

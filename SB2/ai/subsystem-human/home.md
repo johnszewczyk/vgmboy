@@ -3,10 +3,11 @@
 - The top title strip shows SPCBOY, the current console and album, and CPU use.
 - Window controls are rendered in the title strip; AppKit's native stoplights
   are hidden, and the strip remains draggable.
-- Playback and Options controls share the first sidebar toolbar and stretch to
-  equal widths across it. Search fills the next toolbar; square library-view
-  and fold controls sit in the third toolbar. The catalog tree fills the
-  remaining scrollable area.
+- Nine playback, audio, and Options controls share the first sidebar toolbar at
+  equal widths. The Volume control opens a 100px popup slider in 5% steps.
+  Search fills the next toolbar; square console/path, History, Favorites, and
+  fold controls sit in the third toolbar. The catalog tree fills the remaining
+  scrollable area.
 - The sidebar status bar remains at the bottom and shows compact game and system
   totals, with exact counts available in its tooltip.
 - The footer aligns to the sidebar split and shows elapsed time, track length,
@@ -58,11 +59,11 @@
   floating blocks.
   Sidebar and playlist text sizes remain independent of this chrome scale.
 - All SB2 buttons use the same dark surface, radius, hover ink, and selected
-  treatment. Buttons match the 1.75rem control height; icon buttons are square.
-  The sidebar toolbar places playback and library actions in one row of eleven
-  square controls, and the pane enforces enough minimum width to keep the row
-  intact. Text bars use the same height and 0.25rem inline padding; glyph
-  buttons center their icons in the same square footprint.
+  treatment. Buttons match the 1.75rem control height. The nine first-row
+  controls share the available width equally; library-view, History, Favorites,
+  and fold controls stay square in their toolbar. The pane enforces enough
+  minimum width to keep the first row intact. Text bars use the same height and
+  0.25rem inline padding; glyph buttons center their icons.
   Playlist tabs are separate rounded blocks with a visible gap and the same
   height as square buttons; their width follows the label. Column headers use
   that same block height and state colors. Setting inputs may use the full
