@@ -723,6 +723,14 @@ body.options-window .tool-button:hover {
 
 .playlist-table th { font-weight: var(--playlist-header-font-weight); }
 
+/* Pointer resizing writes once per display frame. Keep the dragged seam
+   directly under the pointer; configured width easing resumes on release. */
+body.playlist-columns-resizing .playlist-table,
+body.playlist-columns-resizing .playlist-table th,
+body.playlist-columns-resizing .playlist-table td {
+  transition: none;
+}
+
 .playlist-header-label {
   display: flex;
   align-items: center;
@@ -1989,7 +1997,6 @@ body.sb2-frontend .sidebar-mode-button {
 }
 body.sb2-frontend .sidebar-mode-button:hover { background: var(--sb-button-hover-surface); color: var(--sb-button-hover-ink); }
 body.sb2-frontend .sidebar-mode-button .ui-icon { width: var(--sb-control-icon-size); height: var(--sb-control-icon-size); }
-body.sb2-frontend #database-expand-all-button { display: inline-flex; font: inherit; }
 body.sb2-frontend .toolbar-volume-control {
   position: relative;
   z-index: 30;
