@@ -2540,6 +2540,7 @@ body.sb2-frontend .options-nav-item {
 }
 body.sb2-frontend .tool-button:not(.glyph-button),
 body.sb2-frontend .options-nav-item { min-width: var(--sb-control-size); }
+body.sb2-frontend .tool-button:not(.glyph-button) { padding-inline: var(--sb-toolbar-gap); }
 body.sb2-frontend .tool-button.glyph-button,
 body.sb2-frontend .sidebar-mode-button,
 body.sb2-frontend .playlist-tab-close,
