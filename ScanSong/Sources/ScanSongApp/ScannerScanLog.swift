@@ -53,7 +53,10 @@ enum ScannerScanLogStore {
         } else if let result {
             let sourceFailures = result.failures.filter { $0.identity.archiveEntry == nil }.count
             let memberFailures = result.failures.count - sourceFailures
-            resultText = "\(result.discoveredSourceCount) discovered, \(result.scannedSourceCount) scanned, \(result.trackCount) tracks, \(result.reusedSourceCount) reused, \(sourceFailures) source failures, \(memberFailures) member failures, \(result.skipped.count) skipped"
+            let visibleSkippedCount = result.skipped.filter {
+                ScannerFormatPolicy.normalize($0.extensionName) != "png"
+            }.count
+            resultText = "\(result.discoveredSourceCount) discovered, \(result.scannedSourceCount) scanned, \(result.trackCount) tracks, \(result.reusedSourceCount) reused, \(sourceFailures) source failures, \(memberFailures) member failures, \(visibleSkippedCount) skipped"
         } else {
             resultText = "\(tally.sourceCount) files, \(root.lastScanTrackCount) tracks"
         }
@@ -130,9 +133,88 @@ enum ScannerScanLogStore {
 @MainActor
 final class ScannerScanLogWindow {
     private let window: NSWindow
-    private let textView = NSTextView()
 
     init(root: CatalogRoot, summary: String, lines: [String]) {
+        let sections = ScannerScanLogSections(lines: lines)
+
+        let summaryLabel = NSTextField(labelWithString: summary)
+        summaryLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        summaryLabel.textColor = .secondaryLabelColor
+        summaryLabel.lineBreakMode = .byTruncatingTail
+        summaryLabel.maximumNumberOfLines = 1
+
+        let operationLabel = NSTextField(labelWithString: sections.operationSummary ?? "No scan summary was recorded.")
+        operationLabel.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        operationLabel.textColor = .tertiaryLabelColor
+        operationLabel.lineBreakMode = .byTruncatingTail
+        operationLabel.maximumNumberOfLines = 1
+
+        let tabs = NSTabView()
+        tabs.tabViewType = .topTabsBezelBorder
+        tabs.addTabViewItem(Self.makeTab(
+            title: "Failures",
+            rows: sections.failures,
+            emptyMessage: "No failures were recorded for this path.",
+            truncated: sections.isTruncated
+        ))
+        tabs.addTabViewItem(Self.makeTab(
+            title: "Unrecognized",
+            rows: sections.unrecognized,
+            emptyMessage: "No unrecognized files were recorded for this path.",
+            truncated: sections.isTruncated
+        ))
+        tabs.addTabViewItem(Self.makeTab(
+            title: "Ignored",
+            rows: sections.ignored,
+            emptyMessage: "No ignored files were recorded for this path.",
+            truncated: sections.isTruncated
+        ))
+
+        let content = NSStackView()
+        content.orientation = .vertical
+        content.alignment = .width
+        content.spacing = 6
+        content.addArrangedSubview(summaryLabel)
+        content.addArrangedSubview(operationLabel)
+        content.addArrangedSubview(tabs)
+        summaryLabel.heightAnchor.constraint(equalToConstant: 22).isActive = true
+        operationLabel.heightAnchor.constraint(equalToConstant: 18).isActive = true
+        tabs.widthAnchor.constraint(greaterThanOrEqualToConstant: 680).isActive = true
+        tabs.heightAnchor.constraint(greaterThanOrEqualToConstant: 360).isActive = true
+
+        let rootView = NSView()
+        content.translatesAutoresizingMaskIntoConstraints = false
+        rootView.addSubview(content)
+        NSLayoutConstraint.activate([
+            content.leadingAnchor.constraint(equalTo: rootView.leadingAnchor, constant: 12),
+            content.trailingAnchor.constraint(equalTo: rootView.trailingAnchor, constant: -12),
+            content.topAnchor.constraint(equalTo: rootView.topAnchor, constant: 12),
+            content.bottomAnchor.constraint(equalTo: rootView.bottomAnchor, constant: -12)
+        ])
+
+        window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 920, height: 600),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.minSize = NSSize(width: 720, height: 450)
+        window.title = "Scan Log — \(URL(fileURLWithPath: root.path).lastPathComponent)"
+        window.contentView = rootView
+        window.center()
+        window.isReleasedWhenClosed = false
+    }
+
+    private static func makeTab(
+        title: String,
+        rows: [String],
+        emptyMessage: String,
+        truncated: Bool
+    ) -> NSTabViewItem {
+        let item = NSTabViewItem(identifier: title)
+        item.label = "\(title) · \(rows.count)\(truncated ? "+" : "")"
+
+        let textView = NSTextView(frame: .zero)
         textView.isEditable = false
         textView.isSelectable = true
         textView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
@@ -142,37 +224,15 @@ final class ScannerScanLogWindow {
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = true
         textView.autoresizingMask = [.width]
-        textView.string = lines.joined(separator: "\n").appending(lines.isEmpty ? "No scan result has been recorded." : "\n")
+        textView.string = rows.isEmpty ? emptyMessage : rows.joined(separator: "\n").appending("\n")
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = false
         scrollView.documentView = textView
-
-        let summaryLabel = NSTextField(labelWithString: summary)
-        summaryLabel.font = .systemFont(ofSize: 12, weight: .medium)
-        summaryLabel.textColor = .secondaryLabelColor
-        summaryLabel.lineBreakMode = .byTruncatingTail
-        summaryLabel.maximumNumberOfLines = 1
-
-        let content = NSStackView()
-        content.orientation = .vertical
-        content.spacing = 0
-        content.addArrangedSubview(summaryLabel)
-        content.addArrangedSubview(scrollView)
-        summaryLabel.heightAnchor.constraint(equalToConstant: 36).isActive = true
-
-        window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 760, height: 560),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "Scan Log — \(URL(fileURLWithPath: root.path).lastPathComponent)"
-        window.contentView = content
-        window.center()
-        window.isReleasedWhenClosed = false
+        item.view = scrollView
+        return item
     }
 
     func show() {
@@ -181,5 +241,63 @@ final class ScannerScanLogWindow {
 
     func close() {
         window.close()
+    }
+}
+
+private struct ScannerScanLogSections {
+    var operationSummary: String?
+    var failures: [String] = []
+    var unrecognized: [String] = []
+    var ignored: [String] = []
+    var isTruncated = false
+
+    init(lines: [String]) {
+        var containsFilteredPNG = false
+        for line in lines {
+            if line == ScanLogFormatter.header { continue }
+            if line.hasPrefix("Log truncated") {
+                isTruncated = true
+                operationSummary = [operationSummary, line].compactMap { $0 }.joined(separator: " • ")
+                continue
+            }
+            if line.hasPrefix("Unable to read") {
+                operationSummary = [operationSummary, line].compactMap { $0 }.joined(separator: " • ")
+                continue
+            }
+            guard let firstSeparator = line.range(of: " | "),
+                  let secondSeparator = line.range(of: " | ", range: firstSeparator.upperBound..<line.endIndex) else {
+                continue
+            }
+
+            let status = String(line[..<firstSeparator.lowerBound])
+            let detail = String(line[firstSeparator.upperBound..<secondSeparator.lowerBound])
+            let path = String(line[secondSeparator.upperBound...])
+            if status == "complete" || status == "stopped" {
+                operationSummary = detail
+                continue
+            }
+            guard !Self.isPNGDiagnostic(detail: detail, path: path) else {
+                containsFilteredPNG = true
+                continue
+            }
+
+            switch status {
+            case "ignored": ignored.append(line)
+            case "unrecognized": unrecognized.append(line)
+            default: failures.append(line)
+            }
+        }
+        if isTruncated || containsFilteredPNG {
+            operationSummary = operationSummary.map(Self.omitStaleSkippedTotal)
+        }
+    }
+
+    private static func isPNGDiagnostic(detail: String, path: String) -> Bool {
+        detail.localizedCaseInsensitiveContains("(.png")
+            || URL(fileURLWithPath: path).pathExtension.lowercased() == "png"
+    }
+
+    private static func omitStaleSkippedTotal(_ summary: String) -> String {
+        summary.replacingOccurrences(of: #", \d+ skipped\b"#, with: "", options: .regularExpression)
     }
 }

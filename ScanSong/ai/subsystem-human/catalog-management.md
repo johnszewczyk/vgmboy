@@ -40,10 +40,13 @@
 
 ## Scan Results
 
-- The last-result log has fixed `status | detail | path` columns. Actual
-  archive failures retain the root-relative `archive#member` path; successful members are
-  never listed, and skipped archive members are grouped by archive and
-  extension. Scan Status is the only in-window summary.
+- The per-path scan log separates failures, unrecognized files, and ignored
+  files into tabs with counts. Its summary stays above the tabs, and counts
+  marked with `+` indicate a truncated log. Actual archive failures retain the
+  root-relative `archive#member` path; successful members are never listed, and
+  skipped archive members are grouped by archive and extension. PNG artwork is
+  indexed as Title Snap and omitted from diagnostics, including when viewing
+  older saved logs. Scan Status remains the in-window summary.
 - Scanner-owned extraction scratch prefixes are removed from diagnostic details;
   the archive/member path remains the stable identifier.
 - During a scan or catalog operation, the relevant controls dim and Scan Status

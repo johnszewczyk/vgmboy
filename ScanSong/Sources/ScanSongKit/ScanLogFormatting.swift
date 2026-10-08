@@ -40,7 +40,7 @@ public enum ScanLogFormatter {
             render(status: status, detail: summary, path: ".")
         ]
 
-        let sortedFailures = failures.sorted {
+        let sortedFailures = failures.filter { !isPNGIdentity($0.identity) }.sorted {
             let left = identityDescription(for: $0.identity)
             let right = identityDescription(for: $1.identity)
             if left != right { return left.localizedStandardCompare(right) == .orderedAscending }
@@ -78,7 +78,7 @@ public enum ScanLogFormatter {
         var lines: [String] = []
         var archiveGroups: [ArchiveSkipGroup: Int] = [:]
 
-        for item in skipped {
+        for item in skipped where ScannerFormatPolicy.normalize(item.extensionName) != "png" {
             if item.identity.archiveEntry != nil {
                 let key = ArchiveSkipGroup(
                     path: item.identity.path,
@@ -133,6 +133,13 @@ public enum ScanLogFormatter {
 
     private static func identityDescription(for identity: ScanItemIdentity) -> String {
         identity.archiveEntry.map { "\(identity.path)#\($0)" } ?? identity.path
+    }
+
+    private static func isPNGIdentity(_ identity: ScanItemIdentity) -> Bool {
+        if URL(fileURLWithPath: identity.path).pathExtension.lowercased() == "png" { return true }
+        return identity.archiveEntry.map {
+            URL(fileURLWithPath: $0).pathExtension.lowercased() == "png"
+        } ?? false
     }
 
     private static func relativeIdentityDescription(for identity: ScanItemIdentity, rootPath: String) -> String {
