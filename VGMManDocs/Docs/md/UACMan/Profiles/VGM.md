@@ -63,10 +63,10 @@ gzip-compressed `.vgz` members. See
   artwork is a pack-level **Title Snap** attachment, with one reference for
   each included image.
 - **No invented fields** — Do not add blank tags, `nativeMetadata`, parser
-  dumps, technical statistics, a generic `Format` tag, or duplicate `Game`,
-  `Album`, and `Game Title` values when the source does not contain those
-  distinct facts. Set identity uses **Set Name** and **Set URL** only; keep
-  detailed provenance in `sources[]`.
+  dumps, technical statistics, a versionless `Format` tag, or duplicate
+  `Game`, `Album`, and `Game Title` values when the source does not contain
+  those distinct facts. Set identity uses **Set Name** and **Set URL** only;
+  keep detailed provenance in `sources[]`.
 
 ## Required Checks
 
