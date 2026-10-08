@@ -47,6 +47,9 @@ for ScanSong's external inspection executables.
 - The Amiga scanner handoff is the release `vgmboy-amiga-inspect` product copied
   to `.build/scanner-plugins`; it links the Homebrew UADE runtime and uses the
   same `AmigaFormatManifest` admission source as VGMBoyKit.
+- Scanner-plugin packaging resolves SwiftPM's release product directory with
+  `swift build --show-bin-path`; do not assume an architecture-specific `.build`
+  subdirectory because SwiftPM output layout can vary by toolchain.
 - Scanner inspection APIs are split by format. The MDX inspector depends on
   `VGMBoyMDXInspectionCore` plus `VGMBoyCMDX`; the Amiga inspector depends on
   `VGMBoyAmigaInspectionCore` plus `VGMBoyCUADE`. Neither depends on the

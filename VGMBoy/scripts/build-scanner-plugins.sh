@@ -86,14 +86,16 @@ if [[ -x "$VGMSTREAM_OUTPUT" && -x "$MDX_OUTPUT" && -x "$AMIGA_OUTPUT" && -f "$S
     exit 0
 fi
 
+SWIFT_BIN_DIR="$(swift build --disable-sandbox --package-path "$ROOT_DIR" --configuration release --show-bin-path)"
+
 swift build --disable-sandbox --package-path "$ROOT_DIR" --configuration release --product vgmboy-amiga-inspect >/dev/null
-AMIGA_BUILT="$ROOT_DIR/.build/arm64-apple-macosx/release/vgmboy-amiga-inspect"
+AMIGA_BUILT="$SWIFT_BIN_DIR/vgmboy-amiga-inspect"
 [[ -x "$AMIGA_BUILT" ]] || { echo "Missing built Amiga inspector: $AMIGA_BUILT" >&2; exit 1; }
 cp -X "$AMIGA_BUILT" "$AMIGA_OUTPUT"
 chmod 755 "$AMIGA_OUTPUT"
 
 swift build --disable-sandbox --package-path "$ROOT_DIR" --configuration release --product vgmboy-mdx-inspect >/dev/null
-MDX_BUILT="$ROOT_DIR/.build/arm64-apple-macosx/release/vgmboy-mdx-inspect"
+MDX_BUILT="$SWIFT_BIN_DIR/vgmboy-mdx-inspect"
 [[ -x "$MDX_BUILT" ]] || { echo "Missing built MDX inspector: $MDX_BUILT" >&2; exit 1; }
 cp -X "$MDX_BUILT" "$MDX_OUTPUT"
 chmod 755 "$MDX_OUTPUT"
