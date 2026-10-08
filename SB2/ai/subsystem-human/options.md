@@ -23,8 +23,8 @@
   The same page layout and title/footer chrome appear in the optional
   standalone Options window.
 - UI Chrome Font Size scales toolbar rows, buttons, icons, and setting-field
-  heights together. At 10pt, toolbar rows and action buttons are 2.5rem high,
-  icon buttons are 2.5rem square, and icons are 1rem. Every toolbar shares a
+  heights together. At 10pt, toolbar rows and action buttons are 1.75rem high,
+  icon buttons are 1.75rem square, and icons are 1rem. Every toolbar shares a
   0.25rem horizontal inset and 0.25rem gap; these proportions stay
   constant as the font size changes. Rem-based chrome spacing scales with it
   as well. Playlist and sidebar text sizes remain independent.

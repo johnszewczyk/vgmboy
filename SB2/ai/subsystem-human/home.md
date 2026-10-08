@@ -45,18 +45,19 @@
 - Dense catalog rows keep zero vertical item padding with a 1px row gap. The
   pane divider is 1px. UI Chrome Font Size scales the title strip, status strip,
   toolbars, and option controls together: at 10pt, every toolbar row and action
-  button is 2.5rem high, icon actions are 2.5rem square, and icons are 1rem.
+  button is 1.75rem high, icon actions are 1.75rem square, and icons are 1rem.
   Toolbar rows share a 0.25rem horizontal inset and 0.25rem gap. The same gap
   separates neighboring controls, stacked bars, playlist headers and rows, and
   sidebar toolbar sections.
   Sidebar and playlist text sizes remain independent of this chrome scale.
 - All SB2 buttons use the same dark surface, radius, hover ink, and selected
-  treatment. Buttons match the 2.5rem toolbar height; icon buttons are square.
-  Sidebar transport uses two stacked rows of four square controls at that
-  height so all actions remain visible in the standard pane. Text bars use the
+  treatment. Buttons match the 1.75rem toolbar height; icon buttons are square.
+  Sidebar transport uses one row of eight square controls, and the sidebar
+  enforces enough minimum width to keep that row intact. Text bars use the
   same height and 0.25rem inline padding; glyph buttons center their icons in
   the same square footprint.
   Playlist tabs are separate rounded blocks with a visible gap, sized as
-  toolbar controls rather than stretched into continuous cabinet tabs. Column
-  headers follow the same control height and state colors. Setting inputs may
+  shorter, horizontally elongated toolbar blocks rather than stretched into
+  continuous cabinet tabs. Column headers follow the same control height and
+  state colors. Setting inputs may
   use the full toolbar-row height; they are fields rather than action buttons.
