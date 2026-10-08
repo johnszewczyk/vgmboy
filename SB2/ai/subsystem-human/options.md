@@ -23,15 +23,17 @@
   The same page layout and title/footer chrome appear in the optional
   standalone Options window.
 - UI Chrome Font Size scales toolbar rows, buttons, icons, and setting-field
-  heights together. At 10pt, toolbar rows and action buttons are 1.75rem high,
-  icon buttons are 1.75rem square, and icons are 1rem. Every toolbar shares a
-  0.25rem horizontal inset and 0.25rem gap; these proportions stay
+  heights together. At 10pt, controls and header blocks are 1.75rem high, icon
+  buttons are 1.75rem square, and icons are 1rem. Floating toolbar rows are
+  2.25rem high with a 0.25rem inset on all sides; adjacent controls and bars
+  keep matching gaps. The title and bottom status strips remain continuous
+  chrome. These proportions stay
   constant as the font size changes. Rem-based chrome spacing scales with it
   as well. Playlist and sidebar text sizes remain independent.
 - Action buttons across the home screen and Options use the same surface,
   corner radius, hover colors, selected colors, and height. Text buttons keep
   natural width except where a grouped action row gives them equal widths.
-  Setting fields share the full toolbar-row height and a 24ch width, with the
+  Setting fields share the control height and a 24ch width, with the
   width scaling together on narrow windows. Database path readouts keep that
   height and use the available row width.
 - Sidebar folders and console groups open and close immediately.
