@@ -37,6 +37,10 @@ Apply these rules together with the [VGM format profile](../VGM.md) and the
   `{"memberPath":"artwork/file.png","mediaType":"image/png"}`. Use an array
   of references when a package has multiple title images. Do not label artwork
   as a front cover unless the source identifies it that way.
+- **Package notes** — Preserve each curated source TXT byte-for-byte inside its
+  UAC as `meta.txt`, referenced by `game.metadata.documents`. Record its source
+  filename and the member-name normalization in provenance. Keep the note as a
+  document; do not duplicate its track list or package history as tags.
 - **Package set tags** — Use **Set Name** `VGMRIPS` and **Set URL** for the
   official snapshot/source page. Do not add **Set Collection**; `sources[]`
   retains the collection identity and package-level source file.

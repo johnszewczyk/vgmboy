@@ -38,6 +38,14 @@ the per-set ledger recording operations and checkpoints.
   MetaMan `{name, value}` records describe its reader interface, not UAC tag
   names. Do not serialize bulk native-tag maps, parser diagnostics, or reader
   dumps. Preserve source bytes unchanged.
+- **Text documents** — Each format or set profile states whether source text
+  is mined into existing metadata/playback fields, retained as a package
+  document, or omitted after its useful information is represented elsewhere.
+  Never silently discard a source document. When a primary human-readable
+  notes document is retained, use the package member name `meta.txt` and
+  reference it through `game.metadata.documents`; preserve the source basename
+  and any path rename in the member/source provenance. Keep the document bytes
+  unchanged. Do not invent tags just to avoid retaining useful narrative notes.
 - **Omission** — Omit empty, guessed, parser-default, and duplicate values.
   Use **Date** for a full date and **Year** when only a year is known. Omit
   **Disc Number** for a single-disc release; keep Date and Year together only

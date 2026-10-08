@@ -55,10 +55,13 @@ gzip-compressed `.vgz` members. See
 - **Hashes** — Use the UAC Stream Hashes for each complete raw VGM member:
   BLAKE3-256, CRC32/ISO-HDLC, SHA-1, and MD5. These are wrapper hash records,
   not extra metadata tags.
-- **Other package members** — Preserve source text and artwork bytes. Do not
-  turn arbitrary text-file keys, track-list summaries, package history, or
-  reader diagnostics into tags in this GD3 pass. VGMRIPS artwork is a pack-level
-  **Title Snap** attachment, with one reference for each included image.
+- **VGMRIPS text and artwork** — The curated per-game TXT is a readable package
+  note, not a second tag catalog. Include its unchanged bytes as `meta.txt` and
+  reference it through package `documents`; preserve its source filename in
+  provenance. Do not duplicate its track list, package history, or reader
+  diagnostics as tags. The native GD3 fields remain the tag source. VGMRIPS
+  artwork is a pack-level **Title Snap** attachment, with one reference for
+  each included image.
 - **No invented fields** — Do not add blank tags, `nativeMetadata`, parser
   dumps, technical statistics, a generic `Format` tag, or duplicate `Game`,
   `Album`, and `Game Title` values when the source does not contain those
