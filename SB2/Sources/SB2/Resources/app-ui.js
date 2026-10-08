@@ -1272,7 +1272,9 @@ function renderTreeNode(node, container) {
   button.classList.toggle("tree-file", node.kind === "file");
   button.setAttribute("aria-expanded", node.kind === "folder" ? String(expanded) : "false");
   button.innerHTML = `
-    <span class="tree-disclosure">${node.kind === "folder" ? (expanded ? "▾" : "▸") : "·"}</span><span class="tree-label">${escapeHtml(node.name)}</span>
+    ${node.kind === "folder"
+      ? `<span class="tree-disclosure">${expanded ? "▾" : "▸"}</span>`
+      : `<span class="tree-indent" aria-hidden="true"></span>`}<span class="tree-label">${escapeHtml(node.name)}</span>
   `;
   button.addEventListener("click", (event) => {
     window.clearTimeout(browserClickTimer);
@@ -1541,7 +1543,7 @@ function makeDatabaseGameButton(game) {
   }
   button.dataset.databaseGameKey = databaseGameKey(game);
   button.dataset.searchText = `${game.name} ${game.rootName || ""}`.toLowerCase();
-  button.innerHTML = `<span class="database-disclosure">·</span><span class="database-game-name">${escapeHtml(game.displayName || game.name)}</span>${state.sidebarPathCounts ? `<span class="database-game-meta">${game.trackCount}</span>` : ""}`;
+  button.innerHTML = `<span class="database-indent" aria-hidden="true"></span><span class="database-game-name">${escapeHtml(game.displayName || game.name)}</span>${state.sidebarPathCounts ? `<span class="database-game-meta">${game.trackCount}</span>` : ""}`;
   button.addEventListener("click", (event) => {
     if (event.detail > 1) return;
     selectDatabaseSidebarRow(button, { focus: true, preview: true });
