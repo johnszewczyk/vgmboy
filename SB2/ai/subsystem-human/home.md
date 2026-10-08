@@ -67,5 +67,8 @@
   use the same height and 0.25rem inline padding; glyph buttons center their icons.
   Playlist tabs are separate rounded blocks with a visible gap and the same
   height as square buttons; their width follows the label. Column headers use
-  that same block height and state colors. Setting inputs may use the full
+  that same block height and state colors. Each tab retains its own title and
+  tracks; async sidebar loads only update the tab they started from. Column
+  resizing follows display frames while dragging and resumes configured easing
+  after release. Setting inputs may use the full
   control height; they are fields rather than action buttons.
