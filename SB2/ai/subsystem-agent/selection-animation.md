@@ -32,6 +32,9 @@ SB2's shared animated selector for interactive items in the main app shell.
   state or change playback behavior.
 - Honor the UI setting that disables selection motion and the system reduced
   motion preference.
+- The main Options overlay uses the same configured motion duration for its
+  top-down entrance and exit. Keep it inert and hidden from accessibility while
+  closed, and restore focus to its opener when dismissed.
 - Keep the standalone Options window's overlay outside the hidden main shell.
   Do not relocate its controls into `.content` when the native options-window
   flag is set.

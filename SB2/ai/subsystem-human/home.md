@@ -25,8 +25,9 @@
   title and system as an image overlay. Zero gap and square corners create a
   continuous tile grid by default; tile size, gap, and corner radius live in
   Options > UI Chrome > Gallery Tiles.
-- Options open in the playlist pane as a subpage and leave the title and footer
-  visible. A separate Options window uses the same chrome.
+- Options slide down over the main content and leave the title and footer
+  visible. Command-comma (⌘,) toggles Options; the visible Close Options control and
+  Escape dismiss the page. A separate Options window uses the same chrome.
 - One animated selector follows pointer hover and keyboard focus across the
   title controls, transport and library toolbars, sidebar rows, playlist tabs
   and rows, and controls on both Options presentations. Programmatic playlist

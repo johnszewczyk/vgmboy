@@ -496,7 +496,7 @@ refs.sidebarViewToggleButton?.addEventListener("click", () => {
 if (window.spcBoySB2?.onTransportShortcut) {
   window.spcBoySB2.onTransportShortcut((action) => {
     if (action === "settings") {
-      app.ui.setOptionsOpen(true);
+      app.ui.toggleOptionsOpen();
       return;
     }
 

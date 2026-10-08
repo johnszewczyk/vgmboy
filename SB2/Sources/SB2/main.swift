@@ -176,7 +176,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                       case "favoritesPlaylist": app.ui?.showFavoritesPlaylist?.(); break;
                       case "playbackHistory": app.ui?.showPlaybackHistory?.(); break;
                       case "galleryPlaylist": app.ui?.showGalleryPlaylist?.(); break;
-                      case "settings": app.ui?.setOptionsOpen?.(true); break;
+                      case "settings": app.ui?.toggleOptionsOpen?.(); break;
                       default: break;
                     }
                   }
@@ -405,7 +405,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
         let settingsMenuItem = NSMenuItem()
         let settingsMenu = NSMenu(title: "Options")
-        settingsMenu.addItem(menuItem("Settings", command: .settings, action: #selector(settings(_:))))
+        settingsMenu.addItem(menuItem("Options", command: .settings, action: #selector(settings(_:))))
         settingsMenuItem.submenu = settingsMenu
         mainMenu.addItem(settingsMenuItem)
 
