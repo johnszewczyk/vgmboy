@@ -27,9 +27,9 @@ preference namespace, archive cache, and renderer distinct.
 
 ## Local Rules
 
-- Keep the pixel-style home controls compact: transport and library actions share
-  the sidebar's top row, search stays at the bottom, and timing sits in the
-  bottom status bar.
+- Keep the pixel-style home controls compact: transport fills the first sidebar
+  toolbar, search fills the second, and square library-view/fold controls sit in
+  a third row. The bottom sidebar status bar reports catalog totals.
 - Keep SPCBOY-owned Database, Interface, and Windows options separate from
   VGMBoy-owned Playback, Routing, Audio, and Diagnostics options.
 - The progress slider is hidden in this skin. Other frontends keep their own

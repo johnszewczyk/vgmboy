@@ -58,7 +58,12 @@
               <button id="repeat-button" class="tool-button glyph-button ui-control" type="button" title="Repeat off" aria-label="Repeat off"><svg class="ui-icon" aria-hidden="true"><use href="#icon-repeat-2"></use></svg></button>
               <button id="options-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Options" aria-label="Options" aria-haspopup="dialog" aria-expanded="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button>
             </div>
-            <div class="sidebar-search-actions">
+          </div>
+          <div class="sidebar-search-wrap toolbar">
+            <input id="sidebar-search-input" class="sidebar-search-input" type="search" placeholder="Search" />
+          </div>
+          <div class="sidebar-library-toolbar toolbar" aria-label="Library controls">
+            <div class="sidebar-library-actions">
               <div class="sidebar-view-actions" role="group" aria-label="Library view">
                 <button id="sidebar-view-toggle-button" class="sidebar-mode-button" type="button" title="Library view" aria-label="Library view"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sidebar-views"></use></svg></button>
               </div>
@@ -67,9 +72,6 @@
                 <button id="database-collapse-all-button" class="sidebar-mode-button database-tree-control" type="button" title="Collapse all" aria-label="Collapse all"><svg class="ui-icon" aria-hidden="true"><use href="#icon-list-collapse"></use></svg></button>
               </div>
             </div>
-          </div>
-          <div class="sidebar-search-wrap toolbar">
-              <input id="sidebar-search-input" class="sidebar-search-input" type="search" placeholder="Search" />
           </div>
           <div id="tree-root" class="tree-root"></div>
           <div id="sidebar-context-menu" class="sidebar-context-menu is-hidden" role="menu"></div>
@@ -124,7 +126,7 @@
         </section>
       </main>
       <footer class="sb-status" aria-label="Playback status">
-        <div class="sb-status-sidebar"></div><div class="sb-status-divider"></div>
+        <div class="sb-status-sidebar"><span id="sidebar-stats" class="sb-sidebar-stats" aria-label="Library statistics">Loading library</span></div><div class="sb-status-divider"></div>
         <div class="sb-status-content">
           <span class="sb-status-state" data-startup-state="ready"><i></i><span id="sb2-app-status-label">READY</span></span>
           <div class="sb-times timing-readout toolbar-control">
@@ -211,10 +213,10 @@
               <div class="options-subpanel">
                 <h2 class="options-subpanel-title">Palette</h2>
                 <div class="options-help-text">Colors accept CSS values, bare hex such as 333 or 999AAA, and channels such as 30 30 30 or 30 30 30 .5.</div>
-                <label class="options-field"><span>Accent Color</span><span class="options-inline-trailing"><input id="accent-color-input" class="options-input options-color-text-input" type="text" value="lightskyblue" placeholder="lightskyblue, #87cefa, rgb(...), oklch(...)" aria-label="Accent color CSS value" /></span></label>
-                <label class="options-field"><span>Primary</span><span class="options-inline-trailing"><input id="ui-chrome-primary-color-input" class="options-input options-color-text-input" type="text" value="rgb(30 30 30)" placeholder="rgb(30 30 30), #1e1e1e, color name" aria-label="Primary UI chrome color CSS value" /></span></label>
-                <label class="options-field"><span>Secondary</span><span class="options-inline-trailing"><input id="ui-chrome-secondary-color-input" class="options-input options-color-text-input" type="text" value="rgb(40 40 40)" aria-label="Secondary UI chrome color CSS value" /></span></label>
-                <label class="options-field"><span>Pane Background</span><span class="options-inline-trailing"><input id="ui-chrome-pane-color-input" class="options-input options-color-text-input" type="text" value="rgb(20 20 20)" aria-label="Pane background UI chrome color CSS value" /></span></label>
+                <label class="options-field"><span>Accent Color</span><span class="options-inline-trailing options-color-trailing"><input id="accent-color-input" class="options-input options-color-text-input" type="text" value="lightskyblue" placeholder="lightskyblue, #87cefa, rgb(...), oklch(...)" aria-label="Accent color CSS value" /></span></label>
+                <label class="options-field"><span>Primary</span><span class="options-inline-trailing options-color-trailing"><input id="ui-chrome-primary-color-input" class="options-input options-color-text-input" type="text" value="rgb(30 30 30)" placeholder="rgb(30 30 30), #1e1e1e, color name" aria-label="Primary UI chrome color CSS value" /></span></label>
+                <label class="options-field"><span>Secondary</span><span class="options-inline-trailing options-color-trailing"><input id="ui-chrome-secondary-color-input" class="options-input options-color-text-input" type="text" value="rgb(40 40 40)" aria-label="Secondary UI chrome color CSS value" /></span></label>
+                <label class="options-field"><span>Pane Background</span><span class="options-inline-trailing options-color-trailing"><input id="ui-chrome-pane-color-input" class="options-input options-color-text-input" type="text" value="rgb(20 20 20)" aria-label="Pane background UI chrome color CSS value" /></span></label>
               </div>
               <div class="options-subpanel">
                 <h2 class="options-subpanel-title">Playlist Options</h2>
@@ -235,18 +237,18 @@
                 <div class="options-help-text">Toolbar rows, buttons, icons, and option controls scale with UI Chrome Font Size. Library and playlist text stays independent.</div>
                 <label class="options-field"><span class="options-field-copy"><span>UI Chrome Font Size</span><small>Scales toolbar, button, icon, and option-control dimensions.</small></span><span class="options-inline-trailing"><input id="ui-chrome-font-size-input" class="options-input" type="text" inputmode="decimal" value="10" aria-label="UI chrome font size in points" /></span></label>
                 <label class="options-field"><span class="options-field-copy"><span>Sidebar + Playlist Font Size</span><small>Database and playlist content size in points.</small></span><span class="options-inline-trailing"><input id="sidebar-font-size-input" class="options-input" type="text" inputmode="decimal" value="10" aria-label="Sidebar and playlist font size in points" /></span></label>
-                <label class="options-field"><span>Sidebar + Playlist Font Color</span><span class="options-inline-trailing"><input id="sidebar-text-color-input" class="options-input options-color-text-input" type="text" value="#a9a9a9" placeholder="#a9a9a9, rgb(...), red" aria-label="Sidebar and playlist font color CSS value" /></span></label>
+                <label class="options-field"><span>Sidebar + Playlist Font Color</span><span class="options-inline-trailing options-color-trailing"><input id="sidebar-text-color-input" class="options-input options-color-text-input" type="text" value="#a9a9a9" placeholder="#a9a9a9, rgb(...), red" aria-label="Sidebar and playlist font color CSS value" /></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="ui-chrome-monospace-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>UI Chrome Monospace</span><small>Use a monospace face for toolbars and option chrome.</small></span></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="application-monospace-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Sidebar + Playlist Monospace</span><small>Use a monospace face for database and playlist content.</small></span></span></label>
               </div>
               <div class="options-subpanel">
                 <h2 class="options-subpanel-title">Playlist Headers</h2>
-                <label class="options-field"><span>Playlist Header Font Color</span><span class="options-inline-trailing"><input id="playlist-header-text-color-input" class="options-input options-color-text-input" type="text" value="gray" aria-label="Playlist header font color CSS value" /></span></label>
+                <label class="options-field"><span>Playlist Header Font Color</span><span class="options-inline-trailing options-color-trailing"><input id="playlist-header-text-color-input" class="options-input options-color-text-input" type="text" value="gray" aria-label="Playlist header font color CSS value" /></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="playlist-header-bold-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Bold Headers</span><small>Use a heavier font for playlist column headers.</small></span></span></label>
               </div>
               <div class="options-subpanel">
                 <h2 class="options-subpanel-title">Titlebar</h2>
-                <label class="options-field"><span>Titlebar Font Color</span><span class="options-inline-trailing"><input id="titlebar-text-color-input" class="options-input options-color-text-input" type="text" value="#e0e1eb" aria-label="Titlebar font color CSS value" /></span></label>
+                <label class="options-field"><span>Titlebar Font Color</span><span class="options-inline-trailing options-color-trailing"><input id="titlebar-text-color-input" class="options-input options-color-text-input" type="text" value="#e0e1eb" aria-label="Titlebar font color CSS value" /></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="titlebar-bold-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Bold Titlebar</span><small>Use a heavier font for the app title, console, and playlist labels.</small></span></span></label>
               </div>
             </div>

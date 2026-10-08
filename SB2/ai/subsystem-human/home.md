@@ -3,9 +3,12 @@
 - The top title strip shows SPCBOY, the current console and album, and CPU use.
 - Window controls are rendered in the title strip; AppKit's native stoplights
   are hidden, and the strip remains draggable.
-- Transport, library view, and fold controls share the sidebar toolbar. Search
-  occupies the matching sidebar cell in the lower status strip; the catalog
-  tree fills the remaining scrollable area.
+- Playback and Options controls share the first sidebar toolbar and stretch to
+  equal widths across it. Search fills the next toolbar; square library-view
+  and fold controls sit in the third toolbar. The catalog tree fills the
+  remaining scrollable area.
+- The sidebar status bar remains at the bottom and shows compact game and system
+  totals, with exact counts available in its tooltip.
 - The footer aligns to the sidebar split and shows elapsed time, track length,
   and playlist length at right.
 - Startup reads the shared CocoaSpice catalog through CatalogReader; ScanSong
@@ -42,9 +45,9 @@
 - Sidebar selection remains available to navigation and activation. Hover,
   focus, and current selection use the transient shared selector rather than a
   pinned selected-row fill. Folder and console disclosure updates immediately.
-- Non-expandable file and catalog-game rows have no bullet; each uses a two-
-  character indent. Expandable folders and consoles retain their disclosure
-  markers.
+- Non-expandable file and catalog-game rows have no bullet; each uses exactly a
+  two-character indent from its parent label. Expandable folders and consoles
+  retain their disclosure markers.
 - Dense catalog rows keep zero vertical item padding with a 1px row gap. The
   pane divider is 1px. UI Chrome Font Size scales the title strip, status strip,
   toolbars, and option controls together. At 10pt, control and header blocks are
