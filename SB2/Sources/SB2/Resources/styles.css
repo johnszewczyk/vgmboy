@@ -1726,12 +1726,13 @@ body.sb2-frontend {
   --sb-space-075: calc(var(--ui-font-size-pt) * .75pt);
   --sb-space-090: calc(var(--ui-font-size-pt) * .9pt);
   --sb-space-100: calc(var(--ui-font-size-pt) * 1pt);
-  --sb-toolbar-height: calc(var(--ui-font-size-pt) * 2.5pt);
+  --sb-toolbar-height: calc(var(--ui-font-size-pt) * 1.75pt);
   --sb-toolbar-inset: var(--sb-space-025);
   --sb-toolbar-gap: var(--sb-space-025);
   --sb-titlebar-height: var(--sb-toolbar-height);
   --sb-statusbar-height: var(--sb-toolbar-height);
   --sb-control-size: var(--sb-toolbar-height);
+  --sb-sidebar-min-width: calc((8 * var(--sb-control-size)) + (7 * var(--sb-toolbar-gap)) + (2 * var(--sb-toolbar-inset)));
   --sb-control-icon-size: calc(var(--ui-font-size-pt) * 1pt);
   --sb-options-control-height: var(--sb-toolbar-height);
   --sb-options-control-width: 24ch;
@@ -1862,7 +1863,7 @@ body.sb2-frontend .sb-cpu-meter b { display: block; width: 0; height: 100%; back
 body.sb2-frontend .sb-cpu strong { min-width: 2rem; color: #c0c5d8; font-size: inherit; font-weight: 400; text-align: right; }
 
 body.sb2-frontend .workspace {
-  grid-template-columns: clamp(12rem, calc(var(--sidebar-width-percent) * 1%), 40%) var(--sb-divider-size) minmax(0, 1fr);
+  grid-template-columns: minmax(var(--sb-sidebar-min-width), clamp(var(--sb-sidebar-min-width), calc(var(--sidebar-width-percent) * 1%), 40%)) var(--sb-divider-size) minmax(0, 1fr);
   height: auto;
   min-height: 0;
   overflow: hidden;
@@ -1909,13 +1910,14 @@ body.sb2-frontend .sb2-selection-current.sb-window-control { box-shadow: 0 0 0 2
 }
 
 body.sb2-frontend .sidebar {
-  grid-template-rows: calc((2 * var(--sb-control-size)) + var(--sb-toolbar-gap)) minmax(0, 1fr) auto;
+  min-width: var(--sb-sidebar-min-width);
+  grid-template-rows: var(--sb-control-size) minmax(0, 1fr) auto;
   row-gap: var(--sb-toolbar-gap);
 }
 
 body.sb2-frontend .transport-toolbar {
   display: flex;
-  height: calc((2 * var(--sb-control-size)) + var(--sb-toolbar-gap));
+  height: var(--sb-control-size);
   min-height: var(--sb-toolbar-height);
   align-items: flex-start;
   padding: 0 var(--sb-toolbar-inset);
@@ -1926,8 +1928,8 @@ body.sb2-frontend .transport-toolbar {
 body.sb2-frontend .transport {
   display: grid;
   flex: 0 0 auto;
-  grid-template-columns: repeat(4, var(--sb-control-size));
-  grid-auto-rows: var(--sb-control-size);
+  grid-template-columns: repeat(8, var(--sb-control-size));
+  grid-template-rows: var(--sb-control-size);
   min-width: 0;
   width: max-content;
   gap: var(--sb-toolbar-gap);
