@@ -15,10 +15,10 @@ profile for each package. Record only reusable Project 2612 rules here.
 
 ## Source Authority
 
-- **Package fields** — Set **Set Collection** to `Project 2612`; use the
-  source-record's platform-specific name as **Set Name** and its current
-  listing as **Set URL**. Preserve the original and archive links as **Set
-  Legacy URL** and **Set Archive URL** when applicable. Keep complete source
+- **Package fields** — Use the source-record's platform-specific name as
+  **Set Name** and its current listing as **Set URL**. Preserve the original
+  and archive links as **Set Legacy URL** and **Set Archive URL** when
+  applicable. Keep complete source
   locations and identifiers in `sources[]`.
 - **Membership** — Do not infer set membership from title or content overlap.
 
@@ -28,16 +28,18 @@ profile for each package. Record only reusable Project 2612 rules here.
   rule. Keep platform-specific identity limits in the relevant dated review
   report.
 
-## VGMRIPS Overlap Filter
+## Cross-Set Comparison
 
-- **Sega consolidation** — VGMRIPS is the primary managed source when Sega
-  packages overlap. In a consolidated UAC output, omit Project 2612 playable
-  contributions only after the current VGMRIPS package has the same complete
-  stream-hash multiset and Project 2612's distinct TXT metadata has been
-  harvested for source-attributed aggregation. Keep every Project 2612 source
-  archive and its source-set inventory unchanged. This filters only the
-  duplicated playable contribution; it does not collapse source notes into
-  VGMRIPS tags or remove Project 2612 provenance.
+- **Separate outputs** — Keep Project 2612 as its own UAC source set. The
+  VGMRIPS UAC collection remains standalone with its current tree intact; do
+  not split, relocate, or combine its packages with Project 2612 or another
+  source set as part of this work.
+- **Overlap evidence** — Compare complete stream hashes and source metadata to
+  identify exact and partial overlaps. An exact match is evidence for review,
+  not permission to omit Project 2612 tracks, merge package metadata, or delete
+  either source's UAC. Preserve each source's tags, attachments, and provenance
+  under its own package until a later per-package decision explicitly changes
+  that boundary.
 - **Text structure** — Keep package headers, notes, and history separate from
   tracklist tables. Track names, order, lengths, and loop lengths are source
   evidence, not package tags; retain them in the tracklist record and do not

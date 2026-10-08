@@ -21,6 +21,13 @@ Apply these rules together with the [VGM format profile](../VGM.md) and the
   one UAC per game package for that console; leave every other console folder
   untouched until its own pass. Reuse current source/member identities and
   metadata records rather than refreshing the entire multi-console source set.
+- **Standalone collection** — Keep the VGMRIPS UAC collection in its own
+  existing tree. Cross-set comparisons do not authorize splitting, relocating,
+  or combining its packages with Project2612 or another source collection.
+- **Overlap evidence** — Use complete stream-hash comparisons to identify
+  exact or partial Project2612 overlaps. Keep both sources' UAC packages,
+  metadata, attachments, and provenance distinct; leave unresolved matches for
+  review under the Project2612 profile and dated comparison report.
 - **Outer filenames** — Replace underscores with spaces in outer package and
   artwork filenames. Remove a redundant console parenthetical when the
   destination folder identifies that platform. Preserve title punctuation,
