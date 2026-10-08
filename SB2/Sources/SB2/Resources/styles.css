@@ -1914,7 +1914,7 @@ body.sb2-frontend .sb2-selection-current.sb-window-control { box-shadow: 0 0 0 2
 
 body.sb2-frontend .sidebar {
   min-width: var(--sb-sidebar-min-width);
-  grid-template-rows: repeat(3, var(--sb-toolbar-height)) minmax(0, 1fr);
+  grid-template-rows: repeat(2, var(--sb-toolbar-height)) minmax(0, 1fr);
   row-gap: 0;
 }
 
@@ -1975,15 +1975,6 @@ body.sb2-frontend .sidebar-search-input {
   color: var(--text);
   font-family: var(--mono-font-family);
   font-size: var(--sb-control-font-size);
-}
-body.sb2-frontend .sidebar-library-toolbar {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  height: var(--sb-toolbar-height);
-  min-height: var(--sb-toolbar-height);
-  padding: var(--sb-toolbar-inset);
-  gap: var(--sb-toolbar-gap);
 }
 body.sb2-frontend .sidebar-library-actions { display: flex; align-items: center; gap: var(--sb-toolbar-gap); }
 body.sb2-frontend .sidebar-view-actions,
