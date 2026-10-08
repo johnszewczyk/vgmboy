@@ -73,11 +73,13 @@ The required top-level fields are `manifestVersion` (`1` or `2`), `packageID`,
 
 Each UAC has one manifest: its JSON record in the UAC metadata frame. Tags are
 key/value fields inside that manifest, primarily in `game.metadata` and
-`member.metadata`; the manifest is not a second tag store. The GUI reads and
-edits these stored fields only. It does not inspect member contents or invoke
-format readers to fill or refresh tags. The UACMan command-line tools may use
-MetaMan before packaging to read source formats and project their tags into
-the manifest.
+`member.metadata`; the manifest is not a second tag store. Structural package
+attachment references also live in `game.metadata`, but are not tags. The GUI
+shows their member files in the Attachments table and leaves the reference
+fields out of Pack Tags and Tag Analyzer. The GUI reads and edits stored tags
+only. It does not inspect member contents or invoke format readers to fill or
+refresh tags. The UACMan command-line tools may use MetaMan before packaging
+to read source formats and project their tags into the manifest.
 
 New projections must not write a bulk `nativeMetadata` object or another copy
 of source-native tags, reader facts, or parser diagnostics into the manifest.
@@ -126,7 +128,8 @@ before distributing newly packed files.
   Arrays retain multiple scans for one role. `game.metadata.cue_sheet` may
   point to a source `.cue` member; `game.metadata.documents` may similarly
   list notes, text files, Markdown, and other documentation. These open JSON
-  fields do not change member bytes. References should resolve to manifest
+  fields are structural attachment references, not free-form tags, and do not
+  change member bytes. References should resolve to manifest
   member paths, and image/document payloads remain independently hashed members.
   When source records establish one clear set, new writers add direct Title
   Case package tags `Set Name` and `Set URL`, with optional `Set Legacy URL`,

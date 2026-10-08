@@ -67,8 +67,11 @@ are applied atomically and refused if the tag already exists on any target
 track. Collection package edits are staged until **Save changes** and can be
 discarded with **Revert changes**. **Pack Tags** contains the
 package-level tag table, a final inline draft row marked with **＋**, and the
-attachments table. Each table title is part of its own canonical grid rather
-than a separate decorative section heading. Non-string
+attachments table. Structural package attachment references remain in the
+manifest but do not appear as tag rows; their member files appear in the
+attachments table. A `.txt` document is labeled **Text File** there. Each table
+title is part of its own canonical grid rather than a separate decorative
+section heading. Non-string
 values in Pack Tags and Track Tags use `[Nested Tags]` to open an animated,
 full-width inserted canonical subtable. Arrays and objects inside those tables
 reuse the recursive canonical JSON table at every depth; JSON-encoded strings
@@ -96,8 +99,9 @@ folder path is restored when UACMan launches again. The app-bar search filters p
 current analyzer results; matching tag names and their pack/track counts update
 with the filter.
 
-The analyzer lists exact tag field names from package metadata, package
-extensions, every member's metadata, and member extensions; extension names are
+The analyzer lists tag field names from package metadata, package extensions,
+every member's metadata, and member extensions. Structural package attachment
+references are not tags and do not appear in this list; extension names are
 shown with the `extension.` namespace. Its canonical numbered table shows the
 number of matching packs and playable tracks for each field. A pack counts once
 per field even when that field appears in multiple places in its manifest.

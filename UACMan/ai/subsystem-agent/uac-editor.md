@@ -22,9 +22,12 @@
   transient browser index only: do not persist it as a second catalog, follow
   symlinks, or decompress/extract payloads for collection summaries.
 - `UACTagAnalyzer` reuses collection path discovery, then reads each candidate
-  package manifest once. It inventories keys in `game.metadata`,
+  package manifest once. It inventories tag keys in `game.metadata`,
   `game.extensions`, and every member's `metadata` and `extensions`; extension
-  keys use the `extension.` namespace shown by the editor. It returns field
+  keys use the `extension.` namespace shown by the editor. It omits the
+  structural package attachment references `cover_front`, `cover_back`,
+  `cue_sheet`, and `documents`; these remain in `game.metadata` and are shown
+  through the Attachments table, not treated as free-form tags. It returns tag
   names, counts, and matching values; the WebView snapshot sends the matching
   values when a tag name is selected. Unreadable paths/packages remain issues
   so the UI can label an incomplete result.
