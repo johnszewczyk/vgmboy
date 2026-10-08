@@ -1,9 +1,16 @@
 # Options
 
-- Options open as a subpage in the playlist pane.
-- SPCBOY owns Database, UI Chrome, UI Fonts, and Windows settings. VGMBoy owns Playback,
-  Routing, Audio, and Diagnostics settings; the navigation keeps these groups
-  separate.
+- Options slide down over the main content from the Options toolbar button or
+  Command-comma (⌘,). Command-comma toggles the page; Escape, the visible Close
+  Options button, and clicking outside the page dismiss it.
+- Opening Options moves keyboard focus to Close Options; closing returns focus
+  to the control that opened it.
+- SPCBOY owns Database, UI Chrome, UI Fonts, and Windows settings. VGMBoy owns
+  Audio, Diagnostics, Playback, and Routing settings; the navigation keeps
+  these groups separate.
+- Pages stay alphabetical within their owner groups: Database, UI Chrome,
+  UI Fonts, Windows; then Audio, Diagnostics, Playback, Routing. Section groups
+  within pages are alphabetical.
 - The options sidebar groups SPCBOY-owned frontend settings separately from
   VGMBoy-owned playback-core settings. Keep that ownership split when adding
   settings.

@@ -2242,6 +2242,32 @@ body.sb2-frontend .sb-status-state[data-startup-state="error"] i { background: #
 body.sb2-frontend .sb-times { display: flex; align-items: center; gap: var(--sb-space-050); margin-left: auto; color: #c0c5d8; font-size: var(--sb-playlist-font-size); font-variant-numeric: tabular-nums; }
 body.sb2-frontend .sb-times .time-label { min-width: 0; color: inherit; text-align: right; }
 body.sb2-frontend .sb-times .time-separator { color: #737a96; }
+body.sb2-frontend .sb-status-sidebar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 0;
+}
+body.sb2-frontend .sb-status-sidebar .sidebar-search-wrap {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding: 0 var(--sb-space-025);
+}
+body.sb2-frontend .sb-status-content {
+  height: 100%;
+  min-height: 0;
+  align-items: center;
+  line-height: 1.2;
+}
+body.sb2-frontend .sb-status-state,
+body.sb2-frontend .sb-times {
+  min-height: var(--sb-control-size);
+  align-items: center;
+  line-height: 1.2;
+}
 
 /* Options read as spacious settings lists while the navigation keeps the
    SPCBoy frontend and VGMBoy core ownership split visible. */
@@ -2250,11 +2276,21 @@ body.sb2-frontend .options-overlay {
   z-index: 20;
   inset: var(--sb-titlebar-height) 0 var(--sb-statusbar-height);
   display: block;
+  visibility: hidden;
+  pointer-events: none;
   padding: 0;
   overflow: hidden;
-  background: #090b0f;
+  background: rgb(0 0 0 / 0%);
+  transition:
+    visibility 0s linear var(--selection-animation-duration),
+    background-color var(--selection-animation-duration) var(--selection-animation-easing);
 }
-body.sb2-frontend .options-overlay.is-hidden { display: none; }
+body.sb2-frontend .options-overlay.is-open {
+  visibility: visible;
+  pointer-events: auto;
+  background: rgb(0 0 0 / 24%);
+  transition-delay: 0s, 0s;
+}
 body.sb2-frontend .options-panel {
   position: relative;
   display: grid;
@@ -2267,14 +2303,27 @@ body.sb2-frontend .options-panel {
   border-radius: 0;
   background: #090b0f;
   box-shadow: none;
+  opacity: 0;
+  transform: translate3d(0, -100%, 0);
+  transition:
+    transform var(--selection-animation-duration) var(--selection-animation-easing),
+    opacity var(--selection-animation-duration) var(--selection-animation-easing);
+  will-change: transform, opacity;
+}
+body.sb2-frontend .options-overlay.is-open .options-panel {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
 }
 body.sb2-frontend .options-header {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
+  gap: var(--sb-space-075);
   height: var(--sb-toolbar-height);
+  min-height: 0;
   margin: 0;
-  padding: 0;
+  padding: 0 0 var(--sb-space-050);
+  border-bottom: 1px solid #2c3340;
   color: #e0e1eb;
   font-size: 1.1rem;
   font-weight: 600;
@@ -2282,24 +2331,42 @@ body.sb2-frontend .options-header {
 }
 body.sb2-frontend .options-header .tool-button {
   position: static;
-  width: var(--sb-control-size);
-  min-width: var(--sb-control-size);
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
   height: var(--sb-control-size);
   min-height: var(--sb-control-size);
-  margin-left: auto;
+  gap: var(--sb-space-050);
+  margin-left: 0;
+  padding: 0 var(--sb-space-075);
   transform: none;
-  border: 0;
+  border: 1px solid #344354;
   border-radius: var(--sb-space-020);
-  background: #15191f;
-  color: #9299b5;
+  background: #18212d;
+  color: #c8d2e4;
+  font-family: var(--ui-font-family);
+  font-size: var(--sb-control-font-size);
+  font-weight: 500;
+  line-height: 1;
 }
-body.sb2-frontend .options-header .tool-button:hover { background: #202633; color: #e0e1eb; }
+body.sb2-frontend .options-header .tool-button .ui-icon { width: var(--sb-control-icon-size); height: var(--sb-control-icon-size); }
+body.sb2-frontend .options-header .tool-button:hover { border-color: #526a84; background: #202c3a; color: #f0f3fb; }
+body.sb2-frontend .options-header .tool-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 body.sb2-frontend .options-body { grid-template-columns: 12rem minmax(0, 1fr); gap: 2rem; min-height: 0; height: 100%; }
 body.sb2-frontend .options-nav { gap: 1.25rem; padding: var(--sb-space-050) 0; }
 body.sb2-frontend .options-nav-group { gap: var(--sb-space-010); padding: 0; border: 0; border-radius: 0; background: transparent; }
 body.sb2-frontend .options-nav-group + .options-nav-group { border: 0; }
 body.sb2-frontend .options-nav-group-title { padding: 0 var(--sb-space-050) var(--sb-space-020); color: #777f9c; font-size: var(--sb-space-066); font-weight: 500; letter-spacing: .08em; }
 body.sb2-frontend .options-nav-item { min-height: var(--sb-control-size); gap: var(--sb-space-066); padding: 0 var(--sb-space-075); border: 0; border-radius: var(--sb-space-020); background: transparent; color: #9299b5; font-size: var(--sb-space-090); font-weight: 400; }
+/* Keep each owner's options navigation explicitly alphabetical in visual order. */
+body.sb2-frontend #options-database-tab { order: 1; }
+body.sb2-frontend #options-theme-tab { order: 2; }
+body.sb2-frontend #options-fonts-tab { order: 3; }
+body.sb2-frontend #options-windows-tab { order: 4; }
+body.sb2-frontend #options-audio-tab { order: 1; }
+body.sb2-frontend #options-diagnostics-tab { order: 2; }
+body.sb2-frontend #options-playback-tab { order: 3; }
+body.sb2-frontend #options-routing-tab { order: 4; }
 body.sb2-frontend .options-nav-item:hover { background: #11151b; color: #d0d4e5; }
 body.sb2-frontend .options-nav-item .ui-icon { width: 1rem; height: 1rem; }
 body.sb2-frontend .options-nav-item.is-selected { background: #102333; color: #8fd1ff; }
@@ -2416,7 +2483,11 @@ body.sb2-frontend .sidebar-search-input { height: var(--sb-control-size); min-he
 body.sb2-frontend.options-window .app-shell { grid-template-rows: var(--sb-titlebar-height) minmax(0, 1fr) var(--sb-statusbar-height); }
 body.sb2-frontend.options-window .workspace { display: none; }
 body.sb2-frontend.options-window .options-overlay { display: block !important; }
-body.sb2-frontend.options-window .options-panel { padding-top: var(--sb-space-075); }
+body.sb2-frontend.options-window .options-panel { padding-top: var(--sb-space-075); opacity: 1; transform: none; transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  body.sb2-frontend .options-overlay { transition-duration: 0ms; transition-delay: 0ms, 0ms; }
+  body.sb2-frontend .options-panel { transition-duration: 0ms; transition-delay: 0ms, 0ms; }
+}
 
 @media (max-width: 720px) {
   body.sb2-frontend { --sb-options-control-width: 16ch; }

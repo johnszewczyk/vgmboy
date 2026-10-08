@@ -56,7 +56,7 @@
               <button id="equalizer-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Enable Equalizer" aria-label="Enable Equalizer" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg></button>
               <button id="long-play-button" class="tool-button glyph-button ui-control" type="button" title="Toggle Long Play" aria-label="Toggle Long Play"><svg class="ui-icon" aria-hidden="true"><use href="#icon-infinity"></use></svg></button>
               <button id="repeat-button" class="tool-button glyph-button ui-control" type="button" title="Repeat off" aria-label="Repeat off"><svg class="ui-icon" aria-hidden="true"><use href="#icon-repeat-2"></use></svg></button>
-              <button id="options-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Options" aria-label="Options"><svg class="ui-icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button>
+              <button id="options-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Options" aria-label="Options" aria-haspopup="dialog" aria-expanded="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button>
             </div>
           </div>
           <div class="sidebar-search-wrap toolbar">
@@ -137,12 +137,12 @@
       <div id="playback-error-toast" class="playback-error-toast is-hidden" role="alert" aria-live="assertive"></div>
     </div>
 
-    <div id="options-overlay" class="options-overlay is-hidden" aria-hidden="true">
+    <div id="options-overlay" class="options-overlay" aria-hidden="true" inert>
       <div class="options-panel" role="dialog" aria-modal="true" aria-label="Options">
         <div class="sb2-selection-indicator sb2-options-selection-indicator is-hidden" aria-hidden="true"></div>
         <div class="options-header">
           <span>Options</span>
-          <button id="options-close-button" class="tool-button glyph-button" title="Close" aria-label="Close">×</button>
+          <button id="options-close-button" class="tool-button options-close-button" type="button" title="Close Options" aria-label="Close Options"><svg class="ui-icon" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg><span>Close Options</span></button>
         </div>
 
         <div class="options-body">
@@ -164,26 +164,38 @@
           </nav>
 
           <div class="options-content">
+            <div id="options-database-section" class="options-page options-database-page">
+              <h1 class="options-page-title">SPCBoy / Database</h1>
+              <div class="options-subpanel options-cache-panel">
+                <h2 class="options-subpanel-title">Cache</h2>
+                <div class="database-stats-panel options-path-control"><input id="library-cache-path" class="options-input options-path-readout" type="text" readonly placeholder="Archive cache path" aria-label="Archive cache path" /><button id="library-cache-browse-button" class="tool-button glyph-button" type="button" aria-label="Show archive cache in Finder" title="Show archive cache in Finder"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="archive-cache-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Cache</span><small>Usage: <strong id="database-cache-summary">—</strong></small><small>Decompressed files can be retained to reduce load time.</small></span></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><span class="options-checkbox-copy"><span>Cache Limit</span><small>Least-recently-used archive entries are removed automatically. Active playback is never removed.</small></span></span><span class="options-inline-trailing"><select id="archive-cache-limit-select" class="options-input" aria-label="Archive cache size limit"><option value="2147483648" selected>2 GB</option><option value="4294967296">4 GB</option><option value="8589934592">8 GB</option><option value="17179869184">16 GB</option></select></span></label>
+                <p><strong>ScanSong scratch files are separate:</strong> they are disposable and reclaimed after each source or after cancellation.</p>
+                <div class="options-library-toolbar options-panel-actions">
+                  <button id="library-cache-default-button" class="tool-button" type="button">Use Default</button>
+                  <button id="library-clear-cache-button" class="tool-button" type="button">Clear Cache</button>
+                  <button id="library-show-cache-button" class="tool-button" type="button">Show in Finder</button>
+                </div>
+              </div>
+              <div class="options-subpanel options-database-panel">
+                <h2 class="options-subpanel-title">Database</h2>
+                <div class="database-stats-panel options-path-control"><input id="library-database-path" class="options-input options-path-readout" type="text" readonly placeholder="ScanSong catalog path" aria-label="Database path" /><button id="library-database-browse-button" class="tool-button glyph-button" type="button" aria-label="Browse for catalog" title="Browse for catalog"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
+                <p id="library-database-location-status">SPCBoy reads the shared schema-24 catalog read-only.</p>
+                <div class="options-library-toolbar">
+                  <button id="library-database-default-button" class="tool-button" type="button">Use Default</button>
+                  <button id="library-database-reload-button" class="tool-button" type="button">Reload Library</button>
+                  <button id="library-database-show-button" class="tool-button" type="button">Show in Finder</button>
+                </div>
+              </div>
+              <div class="options-subpanel options-favorites-panel">
+                <h2 class="options-subpanel-title">Favorites</h2>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="favorite-historical-sort-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Sort by Date Added</span><small>Sort favorites playlist by date added.</small></span></span></label>
+              </div>
+            </div>
+
             <div id="options-theme-section" class="options-page options-theme-page is-hidden">
               <h1 class="options-page-title">SPCBoy / UI Chrome</h1>
-              <div class="options-subpanel">
-                <h2 class="options-subpanel-title">Palette</h2>
-                <div class="options-help-text">Colors accept CSS values, bare hex such as 333 or 999AAA, and channels such as 30 30 30 or 30 30 30 .5.</div>
-                <label class="options-field"><span>Accent Color</span><span class="options-inline-trailing"><input id="accent-color-input" class="options-input options-color-text-input" type="text" value="lightskyblue" placeholder="lightskyblue, #87cefa, rgb(...), oklch(...)" aria-label="Accent color CSS value" /></span></label>
-                <label class="options-field"><span>Primary</span><span class="options-inline-trailing"><input id="ui-chrome-primary-color-input" class="options-input options-color-text-input" type="text" value="rgb(30 30 30)" placeholder="rgb(30 30 30), #1e1e1e, color name" aria-label="Primary UI chrome color CSS value" /></span></label>
-                <label class="options-field"><span>Secondary</span><span class="options-inline-trailing"><input id="ui-chrome-secondary-color-input" class="options-input options-color-text-input" type="text" value="rgb(40 40 40)" aria-label="Secondary UI chrome color CSS value" /></span></label>
-                <label class="options-field"><span>Pane Background</span><span class="options-inline-trailing"><input id="ui-chrome-pane-color-input" class="options-input options-color-text-input" type="text" value="rgb(20 20 20)" aria-label="Pane background UI chrome color CSS value" /></span></label>
-              </div>
-              <div class="options-subpanel">
-                <h2 class="options-subpanel-title">Sidebar Options</h2>
-                <label class="options-field"><span>Sidebar Width</span><span class="options-inline-trailing"><input id="sidebar-width-input" class="options-input" type="text" inputmode="numeric" value="20" aria-label="Sidebar width percent" /></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="sidebar-path-counts-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Path Counts</span><small>Show track counts beside database games.</small></span></span></label>
-              </div>
-              <div class="options-subpanel">
-                <h2 class="options-subpanel-title">Playlist Options</h2>
-                <label class="options-field"><span class="options-field-copy"><span>Item Spacing</span><small>Row spacing in rems (for example, 0.2rem).</small></span><span class="options-inline-trailing"><input id="ui-item-spacing-input" class="options-input" type="text" inputmode="decimal" value=".2" aria-label="Item spacing in rems" /></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="column-auto-size-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Column Auto-size</span><small>Automatically resize columns for content width on selection.</small></span></span></label>
-              </div>
               <div class="options-subpanel">
                 <h2 class="options-subpanel-title">Animations</h2>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="auto-resize-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Auto-Resize</span><small>Duration for automatic playlist column resizing (ms).</small></span></span><span class="options-inline-trailing"><input id="auto-resize-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Auto-resize animation milliseconds" /></span></label>
@@ -195,6 +207,24 @@
                 <label class="options-field"><span class="options-field-copy"><span>Tile Size</span><small>Base tile width; the grid uses the available pane width.</small></span><span class="options-inline-trailing gallery-option-control"><input id="gallery-size-input" class="gallery-option-range" type="range" min="0.65" max="1.60" step="0.05" value="1" aria-label="Gallery tile size" /><output id="gallery-size-value">1.00×</output></span></label>
                 <label class="options-field"><span class="options-field-copy"><span>Tile Gap</span><small>Spacing between tiles in rems.</small></span><span class="options-inline-trailing gallery-option-control"><input id="gallery-gap-input" class="gallery-option-range" type="range" min="0" max="1" step="0.01" value="0" aria-label="Gallery tile gap" /><output id="gallery-gap-value">0rem</output></span></label>
                 <label class="options-field"><span class="options-field-copy"><span>Corner Radius</span><small>Tile corner radius in rems.</small></span><span class="options-inline-trailing gallery-option-control"><input id="gallery-radius-input" class="gallery-option-range" type="range" min="0" max="1" step="0.01" value="0" aria-label="Gallery tile corner radius" /><output id="gallery-radius-value">0rem</output></span></label>
+              </div>
+              <div class="options-subpanel">
+                <h2 class="options-subpanel-title">Palette</h2>
+                <div class="options-help-text">Colors accept CSS values, bare hex such as 333 or 999AAA, and channels such as 30 30 30 or 30 30 30 .5.</div>
+                <label class="options-field"><span>Accent Color</span><span class="options-inline-trailing"><input id="accent-color-input" class="options-input options-color-text-input" type="text" value="lightskyblue" placeholder="lightskyblue, #87cefa, rgb(...), oklch(...)" aria-label="Accent color CSS value" /></span></label>
+                <label class="options-field"><span>Primary</span><span class="options-inline-trailing"><input id="ui-chrome-primary-color-input" class="options-input options-color-text-input" type="text" value="rgb(30 30 30)" placeholder="rgb(30 30 30), #1e1e1e, color name" aria-label="Primary UI chrome color CSS value" /></span></label>
+                <label class="options-field"><span>Secondary</span><span class="options-inline-trailing"><input id="ui-chrome-secondary-color-input" class="options-input options-color-text-input" type="text" value="rgb(40 40 40)" aria-label="Secondary UI chrome color CSS value" /></span></label>
+                <label class="options-field"><span>Pane Background</span><span class="options-inline-trailing"><input id="ui-chrome-pane-color-input" class="options-input options-color-text-input" type="text" value="rgb(20 20 20)" aria-label="Pane background UI chrome color CSS value" /></span></label>
+              </div>
+              <div class="options-subpanel">
+                <h2 class="options-subpanel-title">Playlist Options</h2>
+                <label class="options-field"><span class="options-field-copy"><span>Item Spacing</span><small>Row spacing in rems (for example, 0.2rem).</small></span><span class="options-inline-trailing"><input id="ui-item-spacing-input" class="options-input" type="text" inputmode="decimal" value=".2" aria-label="Item spacing in rems" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="column-auto-size-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Column Auto-size</span><small>Automatically resize columns for content width on selection.</small></span></span></label>
+              </div>
+              <div class="options-subpanel">
+                <h2 class="options-subpanel-title">Sidebar Options</h2>
+                <label class="options-field"><span>Sidebar Width</span><span class="options-inline-trailing"><input id="sidebar-width-input" class="options-input" type="text" inputmode="numeric" value="20" aria-label="Sidebar width percent" /></span></label>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="sidebar-path-counts-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Path Counts</span><small>Show track counts beside database games.</small></span></span></label>
               </div>
             </div>
 
@@ -227,45 +257,6 @@
                 <h2 class="options-subpanel-title">Always on Top</h2>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="main-window-always-on-top-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Main Window</span><small>Keep main window on top of other apps.</small></span></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="settings-window-always-on-top-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Options Window</span><small>Keep options window on top of main window.</small></span></span></label>
-              </div>
-            </div>
-
-            <div id="options-database-section" class="options-page options-database-page">
-              <h1 class="options-page-title">SPCBoy / Database</h1>
-              <div class="options-subpanel options-cache-panel">
-                <h2 class="options-subpanel-title">Cache</h2>
-                <div class="database-stats-panel options-path-control"><input id="library-cache-path" class="options-input options-path-readout" type="text" readonly placeholder="Archive cache path" aria-label="Archive cache path" /><button id="library-cache-browse-button" class="tool-button glyph-button" type="button" aria-label="Show archive cache in Finder" title="Show archive cache in Finder"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="archive-cache-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Cache</span><small>Usage: <strong id="database-cache-summary">—</strong></small><small>Decompressed files can be retained to reduce load time.</small></span></span></label>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><span class="options-checkbox-copy"><span>Cache Limit</span><small>Least-recently-used archive entries are removed automatically. Active playback is never removed.</small></span></span><span class="options-inline-trailing"><select id="archive-cache-limit-select" class="options-input" aria-label="Archive cache size limit"><option value="2147483648" selected>2 GB</option><option value="4294967296">4 GB</option><option value="8589934592">8 GB</option><option value="17179869184">16 GB</option></select></span></label>
-                <p><strong>ScanSong scratch files are separate:</strong> they are disposable and reclaimed after each source or after cancellation.</p>
-                <div class="options-library-toolbar options-panel-actions">
-                  <button id="library-cache-default-button" class="tool-button" type="button">Use Default</button>
-                  <button id="library-clear-cache-button" class="tool-button" type="button">Clear Cache</button>
-                  <button id="library-show-cache-button" class="tool-button" type="button">Show in Finder</button>
-                </div>
-              </div>
-              <div class="options-subpanel options-database-panel">
-                <h2 class="options-subpanel-title">Database</h2>
-                <div class="database-stats-panel options-path-control"><input id="library-database-path" class="options-input options-path-readout" type="text" readonly placeholder="ScanSong catalog path" aria-label="Database path" /><button id="library-database-browse-button" class="tool-button glyph-button" type="button" aria-label="Browse for catalog" title="Browse for catalog"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-tree"></use></svg></button></div>
-                <p id="library-database-location-status">SPCBoy reads the shared schema-24 catalog read-only.</p>
-                <div class="options-library-toolbar">
-                  <button id="library-database-default-button" class="tool-button" type="button">Use Default</button>
-                  <button id="library-database-reload-button" class="tool-button" type="button">Reload Library</button>
-                  <button id="library-database-show-button" class="tool-button" type="button">Show in Finder</button>
-                </div>
-              </div>
-              <div class="options-subpanel options-favorites-panel">
-                <h2 class="options-subpanel-title">Favorites</h2>
-                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="favorite-historical-sort-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Sort by Date Added</span><small>Sort favorites playlist by date added.</small></span></span></label>
-              </div>
-            </div>
-
-            <div id="options-routing-section" class="options-page options-routing-page is-hidden">
-              <h1 class="options-page-title">VGMBoy / Routing</h1>
-              <div class="options-subpanel">
-                <h2 class="options-subpanel-title">Decoder Conflicts</h2>
-                <div class="options-help-text">When installed plugins declare the same extension, scanning and playback use the same declared candidate set. This page exposes those conflicts before a per-format preference or global-priority policy is chosen.</div>
-                <div id="routing-conflicts-list" class="routing-conflicts-list" aria-live="polite"></div>
               </div>
             </div>
 
@@ -307,6 +298,38 @@
               </div>
             </div>
 
+            <div id="options-diagnostics-section" class="options-page options-diagnostics-page is-hidden">
+              <h1 class="options-page-title">VGMBoy / Diagnostics</h1>
+              <div class="options-subpanel diagnostics-category">
+                <h2 class="options-subpanel-title">Buffer</h2>
+                <div class="diagnostics-list" aria-live="polite">
+                  <div class="diagnostics-row"><span>Buffer</span><strong id="native-buffer-label" class="play-stat-value">0 / — frames</strong></div>
+                  <div class="diagnostics-row"><span>Fill</span><strong id="native-buffer-fill-label" class="play-stat-value">—</strong></div>
+                  <div class="diagnostics-row"><span>Underruns</span><strong id="native-underrun-label" class="play-stat-value">0</strong></div>
+                  <div class="diagnostics-row"><span>Requested / Supplied</span><strong id="native-frames-label" class="play-stat-value">0 / 0</strong></div>
+                </div>
+              </div>
+              <div class="options-subpanel diagnostics-category">
+                <h2 class="options-subpanel-title">Decoder</h2>
+                <div class="diagnostics-list" aria-live="polite">
+                  <div class="diagnostics-row"><span>Decoder</span><strong id="native-decoder-label" class="play-stat-value">—</strong></div>
+                  <div class="diagnostics-row"><span>Rates</span><strong id="native-rates-label" class="play-stat-value">— / — Hz</strong></div>
+                  <div class="diagnostics-row"><span>Decoded / Audible</span><strong id="native-decoded-label" class="play-stat-value">0 / 0</strong></div>
+                  <div class="diagnostics-row"><span>Tempo</span><strong id="native-tempo-label" class="play-stat-value">1×</strong></div>
+                  <div class="diagnostics-row"><span>Decode</span><strong id="native-decode-label" class="play-stat-value">Ready</strong></div>
+                </div>
+              </div>
+              <div class="options-subpanel diagnostics-category">
+                <h2 class="options-subpanel-title">Transport</h2>
+                <div id="native-diagnostics" class="diagnostics-list" aria-live="polite">
+                  <div class="diagnostics-row"><span>Transport</span><strong id="native-transport-label" class="play-stat-value">Idle</strong></div>
+                  <div class="diagnostics-row"><span>Track</span><strong id="native-track-label" class="play-stat-value">Not loaded</strong></div>
+                  <div class="diagnostics-row"><span>Output</span><strong id="native-output-label" class="play-stat-value">Idle</strong></div>
+                  <div class="diagnostics-row"><span>Position</span><strong id="native-position-label" class="play-stat-value">0:00</strong></div>
+                </div>
+              </div>
+            </div>
+
             <div id="options-playback-section" class="options-page options-page-playback is-hidden">
               <h1 class="options-page-title">VGMBoy / Playback</h1>
               <div class="options-subpanel">
@@ -327,35 +350,12 @@
               </div>
             </div>
 
-            <div id="options-diagnostics-section" class="options-page options-diagnostics-page is-hidden">
-              <h1 class="options-page-title">VGMBoy / Diagnostics</h1>
-              <div class="options-subpanel diagnostics-category">
-                <h2 class="options-subpanel-title">Transport</h2>
-                <div id="native-diagnostics" class="diagnostics-list" aria-live="polite">
-                  <div class="diagnostics-row"><span>Transport</span><strong id="native-transport-label" class="play-stat-value">Idle</strong></div>
-                  <div class="diagnostics-row"><span>Track</span><strong id="native-track-label" class="play-stat-value">Not loaded</strong></div>
-                  <div class="diagnostics-row"><span>Output</span><strong id="native-output-label" class="play-stat-value">Idle</strong></div>
-                  <div class="diagnostics-row"><span>Position</span><strong id="native-position-label" class="play-stat-value">0:00</strong></div>
-                </div>
-              </div>
-              <div class="options-subpanel diagnostics-category">
-                <h2 class="options-subpanel-title">Buffer</h2>
-                <div class="diagnostics-list" aria-live="polite">
-                  <div class="diagnostics-row"><span>Buffer</span><strong id="native-buffer-label" class="play-stat-value">0 / — frames</strong></div>
-                  <div class="diagnostics-row"><span>Fill</span><strong id="native-buffer-fill-label" class="play-stat-value">—</strong></div>
-                  <div class="diagnostics-row"><span>Underruns</span><strong id="native-underrun-label" class="play-stat-value">0</strong></div>
-                  <div class="diagnostics-row"><span>Requested / Supplied</span><strong id="native-frames-label" class="play-stat-value">0 / 0</strong></div>
-                </div>
-              </div>
-              <div class="options-subpanel diagnostics-category">
-                <h2 class="options-subpanel-title">Decoder</h2>
-                <div class="diagnostics-list" aria-live="polite">
-                  <div class="diagnostics-row"><span>Decoder</span><strong id="native-decoder-label" class="play-stat-value">—</strong></div>
-                  <div class="diagnostics-row"><span>Rates</span><strong id="native-rates-label" class="play-stat-value">— / — Hz</strong></div>
-                  <div class="diagnostics-row"><span>Decoded / Audible</span><strong id="native-decoded-label" class="play-stat-value">0 / 0</strong></div>
-                  <div class="diagnostics-row"><span>Tempo</span><strong id="native-tempo-label" class="play-stat-value">1×</strong></div>
-                  <div class="diagnostics-row"><span>Decode</span><strong id="native-decode-label" class="play-stat-value">Ready</strong></div>
-                </div>
+            <div id="options-routing-section" class="options-page options-routing-page is-hidden">
+              <h1 class="options-page-title">VGMBoy / Routing</h1>
+              <div class="options-subpanel">
+                <h2 class="options-subpanel-title">Decoder Conflicts</h2>
+                <div class="options-help-text">When installed plugins declare the same extension, scanning and playback use the same declared candidate set. This page exposes those conflicts before a per-format preference or global-priority policy is chosen.</div>
+                <div id="routing-conflicts-list" class="routing-conflicts-list" aria-live="polite"></div>
               </div>
             </div>
           </div>

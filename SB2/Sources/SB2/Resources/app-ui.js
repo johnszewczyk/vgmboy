@@ -2,6 +2,7 @@
 const uiApp = window.SB2App;
 const { state, refs, persistSettings, loadSettings, targetPlaybackSeconds, COLUMN_DEFS } = uiApp;
 const isStandaloneOptionsWindow = window.spcBoySB2?.isOptionsWindow === true;
+let optionsReturnFocusTarget = null;
 if (document.body.classList.contains("sb2-frontend") && !isStandaloneOptionsWindow) {
   const searchWrap = document.querySelector(".sidebar-search-wrap");
   const searchSlot = document.querySelector(".sb-status-sidebar");
@@ -3350,8 +3351,10 @@ function applyRoutingPreferences(preferences) {
 function renderAll() {
   applyUISettings();
   updateSB2Titlebar();
-  refs.optionsOverlay.classList.toggle("is-hidden", !state.optionsOpen);
+  refs.optionsOverlay.classList.toggle("is-open", state.optionsOpen);
   refs.optionsOverlay.setAttribute("aria-hidden", state.optionsOpen ? "false" : "true");
+  refs.optionsOverlay.inert = !state.optionsOpen;
+  refs.optionsToolbarButton.setAttribute("aria-expanded", state.optionsOpen ? "true" : "false");
   const databaseSelected = state.optionsSection === "database";
   const routingSelected = state.optionsSection === "routing";
   const playbackSelected = state.optionsSection === "playback";
@@ -3995,17 +3998,41 @@ function commitSidebarWidthInput(rawValue) {
 }
 
 function setOptionsOpen(nextOpen) {
+  const shouldOpen = Boolean(nextOpen);
   if (!nextOpen && window.spcBoySB2?.isOptionsWindow) {
     window.spcBoySB2.closeOptionsWindow();
     return;
   }
-  state.optionsOpen = nextOpen;
-  if (nextOpen) {
+  if (shouldOpen && !state.optionsOpen) {
+    const activeElement = document.activeElement;
+    optionsReturnFocusTarget = activeElement instanceof HTMLElement
+      && activeElement !== document.body
+      && !refs.optionsOverlay.contains(activeElement)
+      ? activeElement
+      : refs.optionsToolbarButton;
+  }
+  state.optionsOpen = shouldOpen;
+  if (shouldOpen) {
     state.optionsSection = "database";
     uiApp.ui.refreshDatabaseLocation().catch((error) => console.error("[SPCBoy] database location refresh failed", error));
     uiApp.ui.refreshArchiveCacheSummary().catch((error) => console.error("[SPCBoy] archive cache refresh failed", error));
   }
   renderAll();
+  if (shouldOpen) {
+    requestAnimationFrame(() => {
+      if (state.optionsOpen) refs.optionsCloseButton.focus({ preventScroll: true });
+    });
+  } else {
+    const returnTarget = optionsReturnFocusTarget?.isConnected && !refs.optionsOverlay.contains(optionsReturnFocusTarget)
+      ? optionsReturnFocusTarget
+      : refs.optionsToolbarButton;
+    optionsReturnFocusTarget = null;
+    returnTarget.focus({ preventScroll: true });
+  }
+}
+
+function toggleOptionsOpen() {
+  setOptionsOpen(!state.optionsOpen);
 }
 
 function updateSB2Titlebar() {
@@ -4273,6 +4300,7 @@ uiApp.ui = {
   applyRoutingPreferences,
   commitSidebarWidthInput,
   setOptionsOpen,
+  toggleOptionsOpen,
   updateSB2Titlebar,
   toggleAllSidebarNodes,
   setAllDatabaseConsolesCollapsed,
