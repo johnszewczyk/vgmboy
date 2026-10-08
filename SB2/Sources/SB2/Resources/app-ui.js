@@ -6,12 +6,9 @@ let optionsReturnFocusTarget = null;
 if (document.body.classList.contains("sb2-frontend") && !isStandaloneOptionsWindow) {
   const searchWrap = document.querySelector(".sidebar-search-wrap");
   const searchSlot = document.querySelector(".sb-status-sidebar");
-  const functionButtons = document.querySelector(".sidebar-search-actions");
-  const transport = document.querySelector(".transport-toolbar .transport");
   const optionsOverlay = refs.optionsOverlay;
   const content = document.querySelector(".content");
   if (searchWrap && searchSlot) searchSlot.append(searchWrap);
-  if (functionButtons && transport) transport.append(functionButtons);
   if (optionsOverlay && content) content.append(optionsOverlay);
 }
 const expandedFolders = new Set();

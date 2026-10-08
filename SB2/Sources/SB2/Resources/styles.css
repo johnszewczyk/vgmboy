@@ -1726,15 +1726,16 @@ body.sb2-frontend {
   --sb-space-075: calc(var(--ui-font-size-pt) * .75pt);
   --sb-space-090: calc(var(--ui-font-size-pt) * .9pt);
   --sb-space-100: calc(var(--ui-font-size-pt) * 1pt);
-  --sb-toolbar-height: calc(var(--ui-font-size-pt) * 1.75pt);
   --sb-toolbar-inset: var(--sb-space-025);
   --sb-toolbar-gap: var(--sb-space-025);
-  --sb-titlebar-height: var(--sb-toolbar-height);
-  --sb-statusbar-height: var(--sb-toolbar-height);
-  --sb-control-size: var(--sb-toolbar-height);
-  --sb-sidebar-min-width: calc((8 * var(--sb-control-size)) + (7 * var(--sb-toolbar-gap)) + (2 * var(--sb-toolbar-inset)));
+  --sb-control-size: calc(var(--ui-font-size-pt) * 1.75pt);
+  --sb-toolbar-height: calc(var(--sb-control-size) + var(--sb-toolbar-inset) + var(--sb-toolbar-inset));
+  --sb-titlebar-height: var(--sb-control-size);
+  --sb-statusbar-height: var(--sb-control-size);
+  --sb-sidebar-min-width: calc((11 * var(--sb-control-size)) + (10 * var(--sb-toolbar-gap)) + (2 * var(--sb-toolbar-inset)));
+  --sb-sidebar-track: minmax(var(--sb-sidebar-min-width), clamp(var(--sb-sidebar-min-width), calc(var(--sidebar-width-percent) * 1%), 40%));
   --sb-control-icon-size: calc(var(--ui-font-size-pt) * 1pt);
-  --sb-options-control-height: var(--sb-toolbar-height);
+  --sb-options-control-height: var(--sb-control-size);
   --sb-options-control-width: 24ch;
   --app-easing: cubic-bezier(0.2, 0, 0, 1);
   --sb-divider-size: 1px;
@@ -1761,7 +1762,7 @@ body.sb2-frontend {
   --line: #292f39;
   --control-height: var(--sb-control-size);
   --control-icon-size: var(--sb-control-icon-size);
-  --top-toolbar-control-height: var(--sb-toolbar-height);
+  --top-toolbar-control-height: var(--sb-control-size);
   --top-toolbar-height: var(--sb-toolbar-height);
   --top-toolbar-inset: var(--sb-toolbar-inset);
   --toolbar-gap: var(--sb-toolbar-gap);
@@ -1863,7 +1864,7 @@ body.sb2-frontend .sb-cpu-meter b { display: block; width: 0; height: 100%; back
 body.sb2-frontend .sb-cpu strong { min-width: 2rem; color: #c0c5d8; font-size: inherit; font-weight: 400; text-align: right; }
 
 body.sb2-frontend .workspace {
-  grid-template-columns: minmax(var(--sb-sidebar-min-width), clamp(var(--sb-sidebar-min-width), calc(var(--sidebar-width-percent) * 1%), 40%)) var(--sb-divider-size) minmax(0, 1fr);
+  grid-template-columns: var(--sb-sidebar-track) var(--sb-divider-size) minmax(0, 1fr);
   height: auto;
   min-height: 0;
   overflow: hidden;
@@ -1911,25 +1912,26 @@ body.sb2-frontend .sb2-selection-current.sb-window-control { box-shadow: 0 0 0 2
 
 body.sb2-frontend .sidebar {
   min-width: var(--sb-sidebar-min-width);
-  grid-template-rows: var(--sb-control-size) minmax(0, 1fr) auto;
-  row-gap: var(--sb-toolbar-gap);
+  grid-template-rows: var(--sb-toolbar-height) minmax(0, 1fr) auto;
+  row-gap: 0;
 }
 
 body.sb2-frontend .transport-toolbar {
-  display: flex;
-  height: var(--sb-control-size);
+  display: grid;
+  grid-template-columns: max-content max-content;
+  grid-template-rows: minmax(0, 1fr);
+  justify-content: start;
+  height: var(--sb-toolbar-height);
   min-height: var(--sb-toolbar-height);
-  align-items: flex-start;
-  padding: 0 var(--sb-toolbar-inset);
+  align-items: center;
+  padding: var(--sb-toolbar-inset);
   gap: var(--sb-toolbar-gap);
   overflow: visible;
 }
 
 body.sb2-frontend .transport {
-  display: grid;
+  display: flex;
   flex: 0 0 auto;
-  grid-template-columns: repeat(8, var(--sb-control-size));
-  grid-template-rows: var(--sb-control-size);
   min-width: 0;
   width: max-content;
   gap: var(--sb-toolbar-gap);
@@ -1952,8 +1954,8 @@ body.sb2-frontend .transport-toolbar .tool-button:hover { background: var(--sb-b
 body.sb2-frontend .transport-toolbar .tool-button[aria-pressed="true"] { background: var(--sb-button-selected-surface); color: var(--sb-button-selected-ink); }
 
 body.sb2-frontend .sidebar-search-wrap {
-  height: var(--sb-toolbar-height);
-  min-height: var(--sb-toolbar-height);
+  height: var(--sb-control-size);
+  min-height: var(--sb-control-size);
   margin-top: 0;
   padding: 0 var(--sb-toolbar-inset);
   gap: var(--sb-toolbar-gap);
@@ -1971,7 +1973,7 @@ body.sb2-frontend .sidebar-search-input {
   font-family: var(--mono-font-family);
   font-size: var(--sb-control-font-size);
 }
-body.sb2-frontend .sidebar-search-actions { flex: 0 0 auto; gap: var(--sb-toolbar-gap); margin-left: auto; }
+body.sb2-frontend .sidebar-search-actions { flex: 0 0 auto; gap: var(--sb-toolbar-gap); margin-left: 0; }
 body.sb2-frontend .sidebar-view-actions,
 body.sb2-frontend .sidebar-fold-actions { gap: var(--sb-toolbar-gap); }
 body.sb2-frontend .sidebar-mode-button {
@@ -2123,8 +2125,8 @@ body.sb2-frontend .sb2-startup-notice.is-ready .sb2-startup-progress span { widt
   to { transform: translateX(310%); }
 }
 body.sb2-frontend .playlist-bottom-toolbar { display: none; }
-body.sb2-frontend .playlist-tabs-toolbar { height: var(--sb-toolbar-height); padding: 0 var(--sb-toolbar-inset); }
-body.sb2-frontend .content.has-playlist-tabs { row-gap: var(--sb-toolbar-gap); }
+body.sb2-frontend .playlist-tabs-toolbar { height: var(--sb-toolbar-height); padding: var(--sb-toolbar-inset); }
+body.sb2-frontend .content.has-playlist-tabs { row-gap: 0; }
 body.sb2-frontend .playlist-tabs-toolbar:not(.is-hidden) + .playlist-wrap { margin-top: 0; }
 body.sb2-frontend .playlist-tabs { height: 100%; overflow-x: auto; }
 body.sb2-frontend .playlist-tab {
@@ -2147,6 +2149,7 @@ body.sb2-frontend .playlist-wrap {
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   padding: 0 var(--sb-space-025) var(--sb-space-025);
 }
+body.sb2-frontend .content:not(.has-playlist-tabs) .playlist-wrap { padding-top: var(--sb-toolbar-inset); }
 body.sb2-frontend .playlist-scroll-wrap,
 body.sb2-frontend .gallery-view { grid-area: 1 / 1; min-width: 0; min-height: 0; }
 body.sb2-frontend .playlist-scroll-wrap { row-gap: var(--sb-toolbar-gap); background: #090b0f; }
@@ -2260,7 +2263,7 @@ body.sb2-frontend .gallery-empty {
 
 body.sb2-frontend .sb-status {
   display: grid;
-  grid-template-columns: clamp(12rem, calc(var(--sidebar-width-percent) * 1%), 40%) var(--sb-divider-size) minmax(0, 1fr);
+  grid-template-columns: var(--sb-sidebar-track) var(--sb-divider-size) minmax(0, 1fr);
   min-width: 0;
   height: var(--sb-statusbar-height);
   border-top: 1px solid #2b3039;
@@ -2329,7 +2332,7 @@ body.sb2-frontend .options-overlay.is-open {
 body.sb2-frontend .options-panel {
   position: relative;
   display: grid;
-  grid-template-rows: var(--sb-toolbar-height) minmax(0, 1fr);
+  grid-template-rows: var(--sb-control-size) minmax(0, 1fr);
   gap: 1.5rem;
   width: 100%;
   height: 100%;
@@ -2354,7 +2357,7 @@ body.sb2-frontend .options-header {
   align-items: center;
   justify-content: space-between;
   gap: var(--sb-space-075);
-  height: var(--sb-toolbar-height);
+  height: var(--sb-control-size);
   min-height: 0;
   margin: 0;
   padding: 0 0 var(--sb-space-050);
@@ -2509,13 +2512,15 @@ body.sb2-frontend .library-root-row { padding: var(--sb-space-050) 0; border: 0;
 body.sb2-frontend .options-panel-actions { gap: var(--sb-toolbar-gap); }
 body.sb2-frontend .options-panel-actions .tool-button { height: var(--sb-control-size); min-height: var(--sb-control-size); padding: 0 var(--sb-space-075); }
 
-/* One control contract across the SB2 shell: equal toolbar rows and full-height
-   controls, with matching gaps and square geometry for icon actions. */
+/* Floating toolbars use equal outer insets and gaps around square controls. */
 body.sb2-frontend .transport-toolbar,
-body.sb2-frontend .sidebar-search-wrap,
-body.sb2-frontend .playlist-tabs-toolbar,
-body.sb2-frontend .playlist-bottom-toolbar {
+body.sb2-frontend .playlist-tabs-toolbar {
   min-height: var(--sb-toolbar-height);
+  padding: var(--sb-toolbar-inset);
+  gap: var(--sb-toolbar-gap);
+}
+body.sb2-frontend .sidebar-search-wrap {
+  min-height: var(--sb-control-size);
   padding: 0 var(--sb-toolbar-inset);
   gap: var(--sb-toolbar-gap);
 }
