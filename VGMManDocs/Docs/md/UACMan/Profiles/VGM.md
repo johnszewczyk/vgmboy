@@ -38,20 +38,36 @@ gzip-compressed `.vgz` members. See
 - **Sega System normalization** — Use `Sega Genesis`, `Sega CD`, `Sega 32X`,
   `Sega Master System`, `Sega Game Gear`, `Sega SG-1000`, and `Sega SC-3000`
   consistently. Map unambiguous GD3 spellings such as `Sega Mega Drive / Genesis`
-  to `Sega Genesis`, `Sega MegaCD / SegaCD` to `Sega CD`,
+  and `Sega Mega Drive / Genesis Mini` to `Sega Genesis`, `Sega MegaCD / SegaCD` to `Sega CD`,
   `Sega 32X / Mega 32X` to `Sega 32X`, and `Sega Game 1000` to
   `Sega SG-1000`. Resolve `Sega Master System / Game Gear` only when the
   containing pack establishes one platform; otherwise hold it for review.
-  Keep distinct compatible systems, such as Othello Multivision, distinct.
+  When a GD3 English System value is normalized, write the same canonical
+  value into the UAC VGM member and `game.console`. Record the original and
+  output stream hashes and the field change in the UAC transformation. Leave
+  the source ZIP byte-identical and preserve the Japanese System value unless
+  a per-set report documents a proven correction.
+  Also normalize the approved device aliases `NeoGeo Pocket Color` to `Neo Geo
+  Pocket Color` and `Bandai WonderSwan` to `WonderSwan`. Keep distinct
+  compatible systems, such as Othello Multivision, distinct.
 - **Shared fields** — Promote a source field to package scope only when it is
   populated and uniform for every track. If values vary or some tracks omit
   the field, preserve populated values at member scope so package metadata does
   not imply a value on tracks that lack it.
-- **VGZ packaging** — The UAC payload stores raw `.vgm`. Remove one gzip layer
-  without changing the VGM header version or command stream, update companion
-  playlist references to `.vgm`, and record both transformations. Detect gzip
-  by magic even when a source filename ends in `.vgm`. Hold a second gzip layer
-  or invalid VGM header for review. Keep the original source archive unchanged.
+- **VGZ packaging** — The UAC payload stores raw `.vgm`. Detect gzip by magic,
+  not the suffix: remove exactly one gzip layer without changing the VGM header
+  version or command stream, then update playlist references to `.vgm`. If a
+  `.vgz` member already begins with a valid `Vgm ` header, pass its bytes through
+  unchanged, rename that UAC member to `.vgm`, and report the source suffix
+  mismatch. Record these transformations and keep the original source archive
+  unchanged. Hold a second gzip layer or invalid VGM header for review.
+- **M3U playlists** — Preserve every source playlist as its own UAC playlist and
+  member. A playlist may be a partial queue; keep exactly its listed entries and
+  retain every unqueued VGM track in the package. Preserve playlist order,
+  comments, byte-order mark, and line endings while changing `.vgz` references
+  to `.vgm`. Resolve a mismatched entry only when one source member is an
+  unambiguous exact, case-insensitive, or same-number match; record that repair
+  in the set report. Hold a package for review when an entry cannot be resolved.
 - **Hashes** — Use the UAC Stream Hashes for each complete raw VGM member:
   BLAKE3-256, CRC32/ISO-HDLC, SHA-1, and MD5. These are wrapper hash records,
   not extra metadata tags.
@@ -61,7 +77,8 @@ gzip-compressed `.vgz` members. See
   provenance. Do not duplicate its track list, package history, or reader
   diagnostics as tags. The native GD3 fields remain the tag source. VGMRIPS
   artwork is a pack-level **Title Snap** attachment, with one reference for
-  each included image.
+  each in-archive image. Report loose image sidecars separately; do not silently
+  substitute them for the source ZIP artwork or add duplicate copies.
 - **No invented fields** — Do not add blank tags, `nativeMetadata`, parser
   dumps, technical statistics, a versionless `Format` tag, or duplicate
   `Game`, `Album`, and `Game Title` values when the source does not contain
@@ -85,6 +102,10 @@ gzip-compressed `.vgz` members. See
 - **Package accounting** — Compare source and UAC member paths, identify every
   intentional extension or playlist rewrite, and report missing/extra files,
   corruption, version mixtures, and UAC verification results in the affected
-  set's AudioMan dashboard.
+  set's AudioMan dashboard. Preserve additional source members when their role
+  is understood; otherwise hold the package for review instead of dropping
+  them.
 - **Platform** — Hold missing, mixed, or ambiguous system identities for
-  review; retain the raw source tags in the unchanged VGM bytes.
+  review. For an approved alias, verify that each affected embedded VGM English
+  System value exactly matches `game.console`; keep original source tags in the
+  unchanged source ZIP and Songbase record.
