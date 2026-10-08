@@ -93,10 +93,12 @@
   scanner route are grouped as `unrecognized` diagnostics unless they are known
   decoder support files, archive documentation, or extensionless material; none
   become playable candidates.
-- Metadata Tags lists exact preserved source spellings with their trimmed,
-  uppercased lookup keys and shows track coverage and value occurrence counts. Existing
-  catalog entries need a Deep Scan to collect raw tags. This page is an inventory;
-  it does not define aliases or add player playlist columns.
+- Metadata Tags loads its inventory when opened, keeping the potentially costly
+  tag aggregation out of catalog startup. It lists exact preserved source
+  spellings with their trimmed, uppercased lookup keys and shows track coverage
+  and value occurrence counts. Existing catalog entries need a Deep Scan to
+  collect raw tags. This page is an inventory; it does not define aliases or add
+  player playlist columns.
 
 ## Files
 
