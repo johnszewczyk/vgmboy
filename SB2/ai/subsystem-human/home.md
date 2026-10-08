@@ -42,6 +42,9 @@
 - Sidebar selection remains available to navigation and activation. Hover,
   focus, and current selection use the transient shared selector rather than a
   pinned selected-row fill. Folder and console disclosure updates immediately.
+- Non-expandable file and catalog-game rows have no bullet; each uses a two-
+  character indent. Expandable folders and consoles retain their disclosure
+  markers.
 - Dense catalog rows keep zero vertical item padding with a 1px row gap. The
   pane divider is 1px. UI Chrome Font Size scales the title strip, status strip,
   toolbars, and option controls together. At 10pt, control and header blocks are
