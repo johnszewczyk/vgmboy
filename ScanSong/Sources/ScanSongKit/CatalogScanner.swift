@@ -89,6 +89,7 @@ public final class CatalogScanner: @unchecked Sendable {
     private static let titleSnapTagName = "Title Snap"
     private static let titleSnapArchiveMemberPrefix = "archive-member:"
     private static let titleSnapScanSignature = "title-snap-scan-v2:"
+    private static let uacTitleSnapScanSignature = "uac-title-snap-scan-v1:"
     public typealias ProgressHandler = @Sendable (CatalogScanProgress) -> Void
 
     private let writer: CanonicalCatalogWriter
@@ -721,13 +722,16 @@ public final class CatalogScanner: @unchecked Sendable {
 
     private static func withTitleSnapScanSignature(_ candidate: ScanCandidate) -> ScanCandidate {
         let signature = candidate.fingerprint.contentSignature
+        let scanSignature = StandaloneArchiveExtractor.isUAC(candidate.sourceURL)
+            ? uacTitleSnapScanSignature
+            : titleSnapScanSignature
         let sidecarSignature = titleSnapSidecarURLs(for: candidate.sourceURL).map { sidecar in
             let values = try? sidecar.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey])
             guard values?.isRegularFile == true, values?.isSymbolicLink != true else { return "missing" }
             let modifiedAt = values?.contentModificationDate?.timeIntervalSince1970 ?? 0
             return "\(values?.fileSize ?? 0):\(modifiedAt)"
         }.joined(separator: ",")
-        let taggedSignature = "\(signature ?? "")|\(titleSnapScanSignature)\(sidecarSignature)"
+        let taggedSignature = "\(signature ?? "")|\(scanSignature)\(sidecarSignature)"
         return ScanCandidate(
             identity: candidate.identity,
             fingerprint: ScanFingerprint(
@@ -743,6 +747,7 @@ public final class CatalogScanner: @unchecked Sendable {
     private static func titleSnapWasInspected(_ signature: String?) -> Bool {
         guard let signature else { return false }
         return signature.contains("|\(titleSnapScanSignature)")
+            || signature.contains("|\(uacTitleSnapScanSignature)")
     }
 
     private static func tags(_ existing: [ScannerMetadataTag], addingTitleSnap value: String?) -> [ScannerMetadataTag] {
@@ -763,6 +768,9 @@ public final class CatalogScanner: @unchecked Sendable {
         }
         var records: [CatalogTrackRecord] = []
         var skipped: [ScanSkippedFile] = []
+
+        let titleSnap = UACCatalogMetadataAdapter.titleSnapLocator(in: containerDocument)
+            ?? Self.looseTitleSnapURL(for: candidate.sourceURL)
 
         for track in metadata.tracks {
             let document = track.document
@@ -810,7 +818,7 @@ public final class CatalogScanner: @unchecked Sendable {
                 metadata: UACCatalogMetadataAdapter.project(document),
                 tags: Self.tags(
                     ScanTrackMetadata.tags(from: document),
-                    addingTitleSnap: Self.looseTitleSnapURL(for: candidate.sourceURL)
+                    addingTitleSnap: titleSnap
                 ),
                 browserGameOverride: containerDocument.fields.title ?? "",
                 browserSystemOverride: containerDocument.fields.system ?? ""
