@@ -44,9 +44,12 @@
   pinned selected-row fill. Folder and console disclosure updates immediately.
 - Dense catalog rows keep zero vertical item padding with a 1px row gap. The
   pane divider is 1px. UI Chrome Font Size scales the title strip, status strip,
-  toolbars, and option controls together: at 10pt, rows are 2.5rem high, main
-  controls are 1.5rem square, and icons are 1rem. Sidebar and playlist text
-  sizes remain independent of this chrome scale.
-- Playlist column headers use the same 1.5rem height, dark button surface, and
-  corner size as the main action controls, with the header strip kept visually
-  quiet around them.
+  toolbars, and option controls together: at 10pt, every toolbar row is 2.5rem
+  high, every action button is 1.5rem high, icon actions are 1.5rem square,
+  and icons are 1rem. Toolbar rows share a 0.25rem inset and 0.1rem gap.
+  Sidebar and playlist text sizes remain independent of this chrome scale.
+- All SB2 buttons use the same dark surface, radius, hover ink, and selected
+  treatment. Text buttons keep natural or equal-flex width within their group;
+  icon buttons remain square. Playlist tabs and column headers follow the same
+  control height and state colors. Setting inputs may use the full toolbar-row
+  height; they are fields rather than action buttons.
