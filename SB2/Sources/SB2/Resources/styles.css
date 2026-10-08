@@ -1728,10 +1728,10 @@ body.sb2-frontend {
   --sb-space-100: calc(var(--ui-font-size-pt) * 1pt);
   --sb-toolbar-height: calc(var(--ui-font-size-pt) * 2.5pt);
   --sb-toolbar-inset: var(--sb-space-025);
-  --sb-toolbar-gap: var(--sb-space-010);
+  --sb-toolbar-gap: var(--sb-space-025);
   --sb-titlebar-height: var(--sb-toolbar-height);
   --sb-statusbar-height: var(--sb-toolbar-height);
-  --sb-control-size: calc(var(--ui-font-size-pt) * 1.5pt);
+  --sb-control-size: var(--sb-toolbar-height);
   --sb-control-icon-size: calc(var(--ui-font-size-pt) * 1pt);
   --sb-options-control-height: var(--sb-toolbar-height);
   --sb-options-control-width: 24ch;
@@ -1744,7 +1744,7 @@ body.sb2-frontend {
   --sb-button-ink: #9299b5;
   --sb-button-hover-ink: #d4d8e8;
   --sb-button-selected-ink: #67c7ff;
-  --sb-button-radius: var(--sb-space-020);
+  --sb-button-radius: var(--sb-space-050);
   --sb-sidebar-font-size: calc(var(--sidebar-font-size-pt) * .78pt);
   --sb-playlist-font-size: calc(var(--playlist-font-size-pt) * .78pt);
   --sb-playlist-meta-font-size: calc(var(--playlist-font-size-pt) * .66pt);
@@ -1909,17 +1909,30 @@ body.sb2-frontend .sb2-selection-current.sb-window-control { box-shadow: 0 0 0 2
 }
 
 body.sb2-frontend .sidebar {
-  grid-template-rows: var(--sb-toolbar-height) minmax(0, 1fr) auto;
+  grid-template-rows: calc((2 * var(--sb-control-size)) + var(--sb-toolbar-gap)) minmax(0, 1fr) auto;
+  row-gap: var(--sb-toolbar-gap);
 }
 
 body.sb2-frontend .transport-toolbar {
   display: flex;
-  height: var(--sb-toolbar-height);
-  padding: var(--sb-toolbar-inset);
+  height: calc((2 * var(--sb-control-size)) + var(--sb-toolbar-gap));
+  min-height: var(--sb-toolbar-height);
+  align-items: flex-start;
+  padding: 0 var(--sb-toolbar-inset);
   gap: var(--sb-toolbar-gap);
+  overflow: visible;
 }
 
-body.sb2-frontend .transport { flex: 1 1 auto; min-width: 0; gap: var(--sb-space-010); margin-left: 0; }
+body.sb2-frontend .transport {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(4, var(--sb-control-size));
+  grid-auto-rows: var(--sb-control-size);
+  min-width: 0;
+  width: max-content;
+  gap: var(--sb-toolbar-gap);
+  margin-left: 0;
+}
 body.sb2-frontend .transport-toolbar .tool-button {
   flex: 0 0 var(--sb-control-size);
   width: var(--sb-control-size);
@@ -1940,11 +1953,11 @@ body.sb2-frontend .sidebar-search-wrap {
   height: var(--sb-toolbar-height);
   min-height: var(--sb-toolbar-height);
   margin-top: 0;
-  padding: var(--sb-toolbar-inset);
+  padding: 0 var(--sb-toolbar-inset);
   gap: var(--sb-toolbar-gap);
 }
 body.sb2-frontend .sidebar-search-input {
-  height: var(--sb-control-size);
+  height: 100%;
   min-height: var(--sb-control-size);
   flex: 1 1 auto;
   min-width: 0;
@@ -1956,8 +1969,9 @@ body.sb2-frontend .sidebar-search-input {
   font-family: var(--mono-font-family);
   font-size: var(--sb-control-font-size);
 }
-body.sb2-frontend .sidebar-search-actions { flex: 0 0 auto; gap: var(--sb-space-010); margin-left: auto; }
-body.sb2-frontend .sidebar-fold-actions { gap: var(--sb-space-010); }
+body.sb2-frontend .sidebar-search-actions { flex: 0 0 auto; gap: var(--sb-toolbar-gap); margin-left: auto; }
+body.sb2-frontend .sidebar-view-actions,
+body.sb2-frontend .sidebar-fold-actions { gap: var(--sb-toolbar-gap); }
 body.sb2-frontend .sidebar-mode-button {
   flex: 0 0 var(--sb-control-size);
   width: var(--sb-control-size);
@@ -2107,14 +2121,24 @@ body.sb2-frontend .sb2-startup-notice.is-ready .sb2-startup-progress span { widt
   to { transform: translateX(310%); }
 }
 body.sb2-frontend .playlist-bottom-toolbar { display: none; }
-body.sb2-frontend .playlist-tabs-toolbar { height: var(--sb-toolbar-height); padding: var(--sb-toolbar-inset); }
-body.sb2-frontend .playlist-tabs { height: calc(var(--sb-toolbar-height) - (2 * var(--sb-toolbar-inset))); }
-body.sb2-frontend .playlist-tab { height: 100%; border: 0; border-radius: var(--sb-button-radius); background: var(--sb-button-surface); }
+body.sb2-frontend .playlist-tabs-toolbar { height: var(--sb-toolbar-height); padding: 0 var(--sb-toolbar-inset); }
+body.sb2-frontend .content.has-playlist-tabs { row-gap: var(--sb-toolbar-gap); }
+body.sb2-frontend .playlist-tabs-toolbar:not(.is-hidden) + .playlist-wrap { margin-top: 0; }
+body.sb2-frontend .playlist-tabs { height: 100%; overflow-x: auto; }
+body.sb2-frontend .playlist-tab {
+  flex: 0 1 14rem;
+  min-width: 10rem;
+  max-width: min(24rem, 45vw);
+  height: 100%;
+  border: 0;
+  border-radius: var(--sb-button-radius);
+  background: var(--sb-button-surface);
+}
 body.sb2-frontend .playlist-tab::before { background: var(--sb-button-selected-surface); }
 body.sb2-frontend .playlist-tab.is-active .playlist-tab-close { color: var(--sb-button-selected-ink); }
 body.sb2-frontend .playlist-tab-select,
-body.sb2-frontend .playlist-tab-close { height: var(--sb-control-size); align-self: center; border-radius: var(--sb-button-radius); font-size: var(--sb-control-font-size); }
-body.sb2-frontend .playlist-tab-select { height: var(--sb-control-size); align-self: center; border-radius: var(--sb-button-radius); font-size: var(--sb-control-font-size); }
+body.sb2-frontend .playlist-tab-close { height: 100%; align-self: center; border-radius: var(--sb-button-radius); font-size: var(--sb-control-font-size); }
+body.sb2-frontend .playlist-tab-select { height: 100%; flex: 1 1 auto; align-self: center; padding-inline: var(--sb-toolbar-gap); border-radius: var(--sb-button-radius); font-size: var(--sb-control-font-size); }
 body.sb2-frontend .playlist-tab-close { flex-basis: var(--sb-control-size); width: var(--sb-control-size); }
 body.sb2-frontend .playlist-wrap {
   display: grid;
@@ -2123,7 +2147,7 @@ body.sb2-frontend .playlist-wrap {
 }
 body.sb2-frontend .playlist-scroll-wrap,
 body.sb2-frontend .gallery-view { grid-area: 1 / 1; min-width: 0; min-height: 0; }
-body.sb2-frontend .playlist-scroll-wrap { row-gap: 1px; background: #090b0f; }
+body.sb2-frontend .playlist-scroll-wrap { row-gap: var(--sb-toolbar-gap); background: #090b0f; }
 body.sb2-frontend .playlist-header-wrap,
 body.sb2-frontend .playlist-header-table { background: #111419; }
 body.sb2-frontend .playlist-table { font-family: var(--mono-font-family); font-size: var(--sb-playlist-font-size); }
@@ -2138,7 +2162,7 @@ body.sb2-frontend .playlist-header-table th {
 body.sb2-frontend .playlist-header-label {
   height: var(--sb-control-size);
   min-height: var(--sb-control-size);
-  padding: 0 var(--sb-space-050);
+  padding: 0 var(--sb-toolbar-gap);
   border-radius: var(--sb-button-radius);
   background: var(--sb-button-surface);
   transition: background 120ms var(--app-easing), color 120ms var(--app-easing);
@@ -2483,14 +2507,14 @@ body.sb2-frontend .library-root-row { padding: var(--sb-space-050) 0; border: 0;
 body.sb2-frontend .options-panel-actions { gap: var(--sb-toolbar-gap); }
 body.sb2-frontend .options-panel-actions .tool-button { height: var(--sb-control-size); min-height: var(--sb-control-size); padding: 0 var(--sb-space-075); }
 
-/* One control contract across the SB2 shell: equal toolbar rows and insets,
-   equal button height and state colors, and square geometry for icon actions. */
+/* One control contract across the SB2 shell: equal toolbar rows and full-height
+   controls, with matching gaps and square geometry for icon actions. */
 body.sb2-frontend .transport-toolbar,
 body.sb2-frontend .sidebar-search-wrap,
 body.sb2-frontend .playlist-tabs-toolbar,
 body.sb2-frontend .playlist-bottom-toolbar {
   min-height: var(--sb-toolbar-height);
-  padding: var(--sb-toolbar-inset);
+  padding: 0 var(--sb-toolbar-inset);
   gap: var(--sb-toolbar-gap);
 }
 body.sb2-frontend .tool-button,
