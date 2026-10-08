@@ -186,6 +186,8 @@ const audioEngine = {
 const refs = {
   sidebarSearchInput: document.getElementById("sidebar-search-input"),
   sidebarViewToggleButton: document.getElementById("sidebar-view-toggle-button"),
+  sidebarHistoryButton: document.getElementById("sidebar-history-button"),
+  sidebarFavoritesButton: document.getElementById("sidebar-favorites-button"),
   sidebarViewButtons: [],
   databaseCollapseAllButton: document.getElementById("database-collapse-all-button"),
   databaseExpandAllButton: document.getElementById("database-expand-all-button"),
@@ -289,6 +291,11 @@ const refs = {
   equalizerBandValues: [...document.querySelectorAll("[data-equalizer-value]")],
   appVolumeInput: document.getElementById("app-volume-input"),
   appVolumeValue: document.getElementById("app-volume-value"),
+  toolbarVolumeControl: document.getElementById("toolbar-volume-control"),
+  toolbarVolumeButton: document.getElementById("toolbar-volume-button"),
+  toolbarVolumePopover: document.getElementById("toolbar-volume-popover"),
+  toolbarVolumeInput: document.getElementById("toolbar-volume-input"),
+  toolbarVolumeValue: document.getElementById("toolbar-volume-value"),
   monoEnabledCheckbox: document.getElementById("mono-enabled-checkbox"),
   previousButton: document.getElementById("previous-button"),
   stopButton: document.getElementById("stop-button"),
@@ -547,7 +554,7 @@ function normalizeEqualizerGain(value) {
 
 function normalizeAppVolume(value) {
   const numeric = Number(value);
-  return Number.isFinite(numeric) ? Math.max(0, Math.min(1, numeric)) : 1;
+  return Number.isFinite(numeric) ? Math.round(Math.max(0, Math.min(1, numeric)) * 20) / 20 : 1;
 }
 
 function normalizeArchiveCacheLimit(value) {

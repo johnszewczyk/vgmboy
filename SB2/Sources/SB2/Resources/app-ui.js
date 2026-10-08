@@ -2387,6 +2387,12 @@ function renderSidebar() {
     const icon = refs.sidebarViewToggleButton.querySelector("use");
     if (icon) icon.setAttribute("href", modeIcons[view.storedMode] || "#icon-sidebar-views");
   }
+  const favoritesActive = state.playlistTitle === "Favorites";
+  const historyActive = state.playlistTitle === "History";
+  refs.sidebarFavoritesButton?.classList.toggle("is-selected", favoritesActive);
+  refs.sidebarFavoritesButton?.setAttribute("aria-pressed", String(favoritesActive));
+  refs.sidebarHistoryButton?.classList.toggle("is-selected", historyActive);
+  refs.sidebarHistoryButton?.setAttribute("aria-pressed", String(historyActive));
   if (state.databaseSidebarLoading) {
     resetSidebarContent();
     const loading = document.createElement("div");
@@ -3455,7 +3461,14 @@ function renderAll() {
   refs.databaseCacheSummary.textContent = state.archiveCacheSummary ? formatArchiveCacheSummary(state.archiveCacheSummary) : "—";
   syncEqualizerControls();
   refs.appVolumeInput.value = String(state.appVolume);
-  refs.appVolumeValue.textContent = `${Math.round(state.appVolume * 100)}%`;
+  const volumePercent = Math.round(state.appVolume * 100);
+  refs.appVolumeValue.textContent = `${volumePercent}%`;
+  if (refs.toolbarVolumeInput) refs.toolbarVolumeInput.value = String(volumePercent);
+  if (refs.toolbarVolumeValue) refs.toolbarVolumeValue.textContent = `${volumePercent}%`;
+  if (refs.toolbarVolumeButton) {
+    refs.toolbarVolumeButton.title = `Volume ${volumePercent}%`;
+    refs.toolbarVolumeButton.setAttribute("aria-label", `Volume ${volumePercent}%`);
+  }
   refs.monoEnabledCheckbox.checked = state.monoEnabled;
   syncAnimatedRanges();
   renderSidebar();
@@ -3679,6 +3692,19 @@ function setAppVolume(volume) {
   persistSettings();
   window.spcBoySB2?.nativePlaybackSetVolume?.({ outputVolume: state.appVolume }).catch?.(() => {});
   renderAll();
+}
+
+function setToolbarVolumePopoverOpen(open, { returnFocus = false } = {}) {
+  if (!refs.toolbarVolumePopover || !refs.toolbarVolumeButton) return false;
+  const isOpen = Boolean(open);
+  refs.toolbarVolumePopover.hidden = !isOpen;
+  refs.toolbarVolumeButton.setAttribute("aria-expanded", String(isOpen));
+  if (returnFocus) refs.toolbarVolumeButton.focus();
+  return isOpen;
+}
+
+function toggleToolbarVolumePopover() {
+  return setToolbarVolumePopoverOpen(refs.toolbarVolumePopover?.hidden !== false);
 }
 
 function setMonoEnabled(enabled) {
@@ -4275,6 +4301,8 @@ uiApp.ui = {
   setEqualizerBandGain,
   resetEqualizer,
   setAppVolume,
+  setToolbarVolumePopoverOpen,
+  toggleToolbarVolumePopover,
   setMonoEnabled,
   adjustAppVolume,
   commitSpcLengthInput,

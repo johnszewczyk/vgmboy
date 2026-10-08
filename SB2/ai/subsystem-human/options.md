@@ -14,6 +14,8 @@
 - The options sidebar groups SPCBOY-owned frontend settings separately from
   VGMBoy-owned playback-core settings. Keep that ownership split when adding
   settings.
+- Playback volume uses twenty 5% steps in Options and in the compact Volume
+  popup on the home toolbar.
 - Option pages use a readable system font and a 65-character content width.
   Section headings are underlined; setting rows use whitespace without
   divider lines. UI Chrome and UI Fonts are separate SPCBOY pages. UI Fonts
