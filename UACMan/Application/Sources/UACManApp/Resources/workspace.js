@@ -24,6 +24,7 @@
     catch { return null; }
   };
   const preferredMetadataColumns = ["Title", "Artist", "Album", "Year", "Genre", "Play Length (ms)", "Duration (ms)"];
+  const structuralPackageAttachmentKeys = new Set(["cover_front", "cover_back", "cue_sheet", "documents"]);
   const metadataDisplayNames = {
     title: "Title",
     Title: "Title",
@@ -931,7 +932,9 @@
     };
     const game = parseObject(state.gameMetadataJSON) || {};
     const gameExtensions = parseObject(state.gameExtensionsJSON) || {};
-    Object.entries(game).forEach(([key, value]) => add(key, "Package Tags", value));
+    Object.entries(game).forEach(([key, value]) => {
+      if (!structuralPackageAttachmentKeys.has(key)) add(key, "Package Tags", value);
+    });
     Object.entries(gameExtensions).forEach(([key, value]) => add(`extension.${key}`, "Package Extensions", value));
     playableMembers().forEach(member => {
       Object.entries(member.metadata || {}).forEach(([key, value]) => add(key, "Track Tags", value));
@@ -1618,10 +1621,13 @@
   function renderAttachments() {
     const assets = state.members.filter(member => member.role !== "playable" && member.role !== "track");
     if (!assets.length) return "";
+    const displayAttachmentRole = asset => asset.role === "document" && String(asset.format || "").toLowerCase() === "txt"
+      ? "Text File"
+      : asset.role;
     const header = canonicalHeaderMarkup(["#", "Role", "Format", "Filename", "Stored path", "Size", "⌕"]);
     const rows = assets.map((asset, index) => canonicalRowMarkup([
       canonicalNumberCellMarkup(index + 1, `Attachment number ${index + 1}`, { className:"file-number" }),
-      canonicalCellMarkup(`<input class="tag-table-field" value="${esc(asset.role)}" disabled>`),
+      canonicalCellMarkup(`<input class="tag-table-field" value="${esc(displayAttachmentRole(asset))}" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field" value="${esc(asset.format || "unknown")}" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field file-name-field" value="${esc(asset.name)}" disabled>`),
       canonicalCellMarkup(`<input class="tag-table-field file-path-field" value="${esc(asset.path)}" disabled>`),

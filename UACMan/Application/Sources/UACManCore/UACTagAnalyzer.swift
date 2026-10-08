@@ -109,6 +109,13 @@ public struct UACTagAnalysisResult: Equatable, Sendable {
 /// Inventories field names and their manifest occurrences. It reads package
 /// manifests only; it never materializes or modifies compressed members.
 public enum UACTagAnalyzer {
+    private static let structuralPackageAttachmentKeys: Set<String> = [
+        "cover_front",
+        "cover_back",
+        "cue_sheet",
+        "documents"
+    ]
+
     public static func analyze(
         root: URL,
         manifestReader: UACCollectionManifestReader,
@@ -149,8 +156,11 @@ public enum UACTagAnalyzer {
                 let archiveTrackCount = manifest.members.filter {
                     $0.role == "playable" || $0.role == "track"
                 }.count
-                var packageTagNames = Set(manifest.game.metadata.keys)
+                var packageTagNames = Set(manifest.game.metadata.keys.filter {
+                    !structuralPackageAttachmentKeys.contains($0)
+                })
                 for (name, value) in manifest.game.metadata {
+                    guard !structuralPackageAttachmentKeys.contains(name) else { continue }
                     addMatch(name, value: value, package: package, member: nil, scope: "Package Tags", storageScope: "packageMetadata", storageKey: name, isTrack: false, archiveAlbum: archiveAlbum, archiveTrackCount: archiveTrackCount, archiveTitle: manifest.game.title, archiveConsole: manifest.game.console, to: &tagCounts)
                 }
                 for (name, value) in manifest.game.extensions {
