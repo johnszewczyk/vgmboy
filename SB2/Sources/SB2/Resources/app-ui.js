@@ -26,6 +26,7 @@ let browserClickTimer = 0;
 let databaseGameClickTimer = 0;
 let databaseGameSearchRecords = [];
 let columnResizePointerId = null;
+let columnResizeFrame = 0;
 const PLAYLIST_VIRTUALIZATION_THRESHOLD = 200;
 const PLAYLIST_VIRTUAL_OVERSCAN = 12;
 let playlistVirtualRowHeight = 28;
@@ -186,6 +187,10 @@ function ensurePlaylistTab() {
 }
 
 function renderPlaylistTabs() {
+  // Playlist state is the source of truth for the active tab. Several flows
+  // update the playlist before rendering tabs; sync here so its label and
+  // restored contents cannot lag behind the visible playlist.
+  syncActivePlaylistTab();
   updateSB2Titlebar();
   const tabs = Array.isArray(state.playlistTabs) ? state.playlistTabs : [];
   const hasTabs = tabs.length > 1;
@@ -1060,7 +1065,9 @@ function catalogPlaylistSelection(response, selectedPath) {
   return {
     selectedFolderPath: selectedPath,
     selectedBrowserPath: state.selectedBrowserPath,
-    playlist: databaseRowsToPlaylistTracks(response),
+    // Defer active-tab projection updates until the async selection passes
+    // applyFolderSelection's active-tab guard.
+    playlist: databaseRowsToPlaylistTracks(response, { adoptProjection: false }),
     columnContentHints: response?.columnContentHints,
     sortSessionId: response?.sortSessionId || null
   };
@@ -1114,6 +1121,7 @@ function showSidebarContextMenu(node, event) {
 
 async function activateBrowserNode(node, { playNow = true } = {}) {
   const generation = ++browserSelectionGeneration;
+  const targetTabID = state.activePlaylistTabId;
   try {
     state.selectedBrowserPath = node.path;
     persistSettings();
@@ -1125,8 +1133,10 @@ async function activateBrowserNode(node, { playNow = true } = {}) {
     const selection = await loadBrowserSelection(node);
     if (!selection
         || generation !== browserSelectionGeneration
-        || state.selectedBrowserPath !== node.path) return;
-    await applyFolderSelection(selection, state.activePlaylistTabId, node.name);
+        || state.selectedBrowserPath !== node.path
+        || targetTabID !== state.activePlaylistTabId) return;
+    const applied = await applyFolderSelection(selection, targetTabID, node.name);
+    if (!applied || targetTabID !== state.activePlaylistTabId) return;
     const target = selection.playlist?.[0];
     if (playNow && target) await playVisibleTrack(target.id, 0);
   } catch (error) {
@@ -1136,11 +1146,14 @@ async function activateBrowserNode(node, { playNow = true } = {}) {
 
 async function previewBrowserLeaf(node) {
   const generation = ++browserSelectionGeneration;
+  const targetTabID = state.activePlaylistTabId;
   try {
     const selection = await loadBrowserSelection(node);
     if (!selection) return;
-    if (generation !== browserSelectionGeneration || state.selectedBrowserPath !== node.path) return;
-    await applyFolderSelection(selection, state.activePlaylistTabId, node.name);
+    if (generation !== browserSelectionGeneration
+        || state.selectedBrowserPath !== node.path
+        || targetTabID !== state.activePlaylistTabId) return;
+    await applyFolderSelection(selection, targetTabID, node.name);
   } catch (error) {
     console.error(error);
   }
@@ -1842,9 +1855,12 @@ async function cycleSidebarMode() {
 }
 
 async function showFavoritesPlaylist() {
-  await refreshFavorites();
   if (!activateOrCreateProjectionTab("Favorites")) return false;
+  const targetTabID = state.activePlaylistTabId;
+  await refreshFavorites();
+  if (targetTabID !== state.activePlaylistTabId) return false;
   await invalidatePlaylistCatalogSession();
+  if (targetTabID !== state.activePlaylistTabId) return false;
   state.playlist = [...state.favorites];
   state.playlistTitle = "Favorites";
   state.catalogPlaylistColumnContentHints = null;
@@ -1855,6 +1871,7 @@ async function showFavoritesPlaylist() {
   renderPlaylistTabs();
   renderPlaylist();
   renderSidebar();
+  return true;
 }
 
 function formatHistoryTimestamp(milliseconds) {
@@ -1902,11 +1919,12 @@ function historyRecordToPlaylistTrack(record) {
 }
 
 async function showPlaybackHistory() {
-  const renderGeneration = playlistRenderGeneration;
-  const records = await window.spcBoySB2.playbackHistoryList();
-  if (renderGeneration !== playlistRenderGeneration) return false;
   if (!activateOrCreateProjectionTab("History")) return false;
+  const targetTabID = state.activePlaylistTabId;
+  const records = await window.spcBoySB2.playbackHistoryList();
+  if (targetTabID !== state.activePlaylistTabId) return false;
   await invalidatePlaylistCatalogSession();
+  if (targetTabID !== state.activePlaylistTabId) return false;
   state.playlist = (Array.isArray(records) ? records : [])
     .map(historyRecordToPlaylistTrack)
     .filter(Boolean);
@@ -2098,6 +2116,7 @@ async function showGalleryPlaylist() {
   } else if (tab.id !== state.activePlaylistTabId) {
     activatePlaylistTab(tab.id);
   }
+  const targetTabID = state.activePlaylistTabId;
 
   tab.kind = "gallery";
   state.activePlaylistTabKind = "gallery";
@@ -2111,6 +2130,7 @@ async function showGalleryPlaylist() {
   state.sidebarQuery = "";
   refs.sidebarSearchInput.value = "";
   await invalidatePlaylistCatalogSession();
+  if (targetTabID !== state.activePlaylistTabId) return false;
   if (state.sidebarMode === "paths" && !state.databaseFileTree.length) {
     void loadDatabaseFiles().catch((error) => reportDatabaseSidebarError("read Gallery paths", error));
   }
@@ -2655,27 +2675,45 @@ function beginColumnResize(event, columnId, header) {
   );
   const maximumWidth = Math.max(minimumWidth, Math.min(80, 100 - otherMinimumTotal));
   const pointerId = event.pointerId;
+  const resizeCells = [...playlistRowsByTrackId.values()]
+    .map((row) => row.querySelector(`[data-column-id="${CSS.escape(columnId)}"]`))
+    .filter(Boolean);
+  let pendingClientX = startX;
   columnResizePointerId = pointerId;
-  const onMove = (moveEvent) => {
-    if (moveEvent.pointerId !== pointerId) return;
+  document.body.classList.add("playlist-columns-resizing");
+  const applyResize = (clientX) => {
     const nextWidth = Math.min(
       maximumWidth,
-      Math.max(minimumWidth, Math.min(80, startWidth + ((moveEvent.clientX - startX) / tableWidth) * 100))
+      Math.max(minimumWidth, Math.min(80, startWidth + ((clientX - startX) / tableWidth) * 100))
     );
     state.columnWidths[columnId] = nextWidth;
     header.style.width = `${nextWidth}%`;
-    for (const row of playlistRowsByTrackId.values()) {
-      const cell = row.querySelector(`[data-column-id="${CSS.escape(columnId)}"]`);
-      if (cell) cell.style.width = `${nextWidth}%`;
-    }
+    for (const cell of resizeCells) cell.style.width = `${nextWidth}%`;
+  };
+  const flushResize = (clientX) => {
+    if (columnResizeFrame) window.cancelAnimationFrame(columnResizeFrame);
+    columnResizeFrame = 0;
+    pendingClientX = clientX;
+    applyResize(clientX);
+  };
+  const onMove = (moveEvent) => {
+    if (moveEvent.pointerId !== pointerId) return;
+    pendingClientX = moveEvent.clientX;
+    if (columnResizeFrame) return;
+    columnResizeFrame = window.requestAnimationFrame(() => {
+      columnResizeFrame = 0;
+      applyResize(pendingClientX);
+    });
   };
   const finish = (finishEvent) => {
     if (finishEvent?.pointerId !== pointerId) return;
+    flushResize(Number.isFinite(finishEvent.clientX) ? finishEvent.clientX : pendingClientX);
     document.removeEventListener("pointermove", onMove);
     document.removeEventListener("pointerup", onUp);
     document.removeEventListener("pointercancel", finish);
     handle?.releasePointerCapture?.(pointerId);
     columnResizePointerId = null;
+    document.body.classList.remove("playlist-columns-resizing");
     const draggedWidth = state.columnWidths[columnId];
     redistributeOtherColumnWidths(otherColumns, 100 - draggedWidth, tableWidth);
     persistSettings();
@@ -4128,7 +4166,7 @@ function sidebarAllGroupsExpanded() {
 }
 
 function syncSidebarFoldButton() {
-  const button = refs.databaseCollapseAllButton;
+  const button = refs.sidebarFoldToggleButton;
   const use = button?.querySelector("use");
   const allExpanded = sidebarAllGroupsExpanded();
   use?.setAttribute("href", allExpanded ? "#icon-list-collapse" : "#icon-list-expand");
@@ -4248,7 +4286,7 @@ function selectedPathTitle(path) {
 }
 
 async function applyFolderSelection(selection, targetTabID = state.activePlaylistTabId, title = null) {
-  if (targetTabID !== state.activePlaylistTabId) return false;
+  if (!selection || targetTabID !== state.activePlaylistTabId) return false;
   const preserveBrowserFocus = document.activeElement?.classList.contains("tree-node");
   state.selectedFolderPath = selection.selectedFolderPath;
   state.playlist = selection.playlist;
@@ -4273,6 +4311,7 @@ async function applyFolderSelection(selection, targetTabID = state.activePlaylis
   uiApp.playback.updateTimingSummary();
   uiApp.playback.updatePlaybackReadout();
   scrollSelectedTrackIntoView();
+  return true;
 }
 
 uiApp.ui = {

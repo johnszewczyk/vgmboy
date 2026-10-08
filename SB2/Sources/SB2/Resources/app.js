@@ -81,15 +81,11 @@ refs.stopButton.addEventListener("click", () => {
   app.playback.stopPlaybackState().catch((error) => console.error("[SPCBoy] stop failed", error));
 });
 
-refs.databaseCollapseAllButton.addEventListener("click", () => {
+refs.sidebarFoldToggleButton.addEventListener("click", () => {
   app.ui.toggleAllSidebarNodes().catch((error) => console.error(error));
 });
 
 refs.optionsToolbarButton.addEventListener("click", () => app.ui.setOptionsOpen(true));
-
-refs.databaseExpandAllButton.addEventListener("click", () => {
-  app.ui.setAllSidebarNodesCollapsed(false).catch((error) => console.error(error));
-});
 
 refs.nextButton.addEventListener("click", () => {
   app.playback.playAdjacent(1);
