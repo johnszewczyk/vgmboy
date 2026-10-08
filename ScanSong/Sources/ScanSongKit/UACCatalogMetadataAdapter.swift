@@ -1,9 +1,55 @@
+import Foundation
 import MetaManCore
 
 /// Projects the established common fields from UAC member metadata.
 /// UAC is authoritative: absent, null, or invalid fields become blank/default
 /// values and never fall back to tags in the contained source file.
 enum UACCatalogMetadataAdapter {
+    /// Resolves UAC's canonical package-level front-cover reference to the
+    /// locator consumed by catalog gallery readers. UAC keeps the image as an
+    /// ordinary payload member; materialization remains on demand in the UI.
+    static func titleSnapLocator(in packageDocument: MetadataDocument) -> String? {
+        guard case .object(let manifest)? = packageDocument.structuredMetadata,
+              case .object(let game)? = manifest["game"],
+              case .object(let gameMetadata)? = game["metadata"],
+              let referenceValue = gameMetadata["cover_front"] else {
+            return nil
+        }
+
+        let references: [MetadataJSONValue]
+        switch referenceValue {
+        case .object:
+            references = [referenceValue]
+        case .array(let values):
+            references = values
+        default:
+            return nil
+        }
+
+        let packageMemberPaths: Set<String> = {
+            guard case .array(let members)? = manifest["members"] else { return [] }
+            return Set(members.compactMap { member -> String? in
+                guard case .object(let fields) = member,
+                      case .string(let path)? = fields["path"] else { return nil }
+                return path
+            })
+        }()
+
+        for reference in references {
+            guard case .object(let fields) = reference,
+                  case .string(let memberPath)? = fields["memberPath"],
+                  case .string(let mediaType)? = fields["mediaType"],
+                  mediaType.caseInsensitiveCompare("image/png") == .orderedSame,
+                  URL(fileURLWithPath: memberPath).pathExtension.caseInsensitiveCompare("png") == .orderedSame,
+                  StandaloneArchiveExtractor.isSafeRelativePath(memberPath),
+                  packageMemberPaths.contains(memberPath) else {
+                continue
+            }
+            return "archive-member:\(memberPath)"
+        }
+        return nil
+    }
+
     static func project(_ document: MetadataDocument) -> ScannerMetadata {
         let timing = document.timing
         return ScannerMetadata(

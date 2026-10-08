@@ -25,11 +25,13 @@
   count, and issue count.
 - Scan All scans enabled paths. An individual path can be scanned without
   enabling it.
-- Scans record a `Title Snap` locator when a source has a non-empty adjacent
-  PNG using the source stem (`Game.png` beside `Game.zip`), a full-filename
-  sidecar (`Track.vgm.png`), or a PNG inside an archive. In-archive art takes
-  precedence; the first safe PNG by member path ordering is recorded as
-  `archive-member:<member path>`. Readers materialize archive art on demand.
+- Scans recognize PNGs as artwork, not unsupported playable files. They record
+  a `Title Snap` locator for a non-empty adjacent PNG using the source stem
+  (`Game.png` beside `Game.zip`) or full-filename sidecar (`Track.vgm.png`), a
+  PNG inside an archive, or a UAC package's `game.metadata.cover_front`
+  reference. Embedded archive/UAC art takes precedence over an adjacent
+  sidecar; the first valid PNG reference is stored as
+  `archive-member:<member path>`. Readers materialize embedded art on demand.
 
 ## Link Maintenance
 
@@ -44,9 +46,10 @@
   files into tabs with counts. Its summary stays above the tabs, and counts
   marked with `+` indicate a truncated log. Actual archive failures retain the
   root-relative `archive#member` path; successful members are never listed, and
-  skipped archive members are grouped by archive and extension. PNG artwork is
-  indexed as Title Snap and omitted from diagnostics, including when viewing
-  older saved logs. Scan Status remains the in-window summary.
+  skipped archive members are grouped by archive and extension. Recognized PNG
+  artwork is indexed as Title Snap and omitted from unsupported-file
+  diagnostics, including when viewing older saved logs. Scan Status remains
+  the in-window summary.
 - Scanner-owned extraction scratch prefixes are removed from diagnostic details;
   the archive/member path remains the stable identifier.
 - During a scan or catalog operation, the relevant controls dim and Scan Status
