@@ -31,7 +31,7 @@ been reviewed.
 | `ay` | Profile pending | AY subtune and timing behavior needs UAC mapping. |
 | `sap` | Profile pending | SAP header directives, songs, and timings need UAC mapping. |
 | `nsf` | Draft profile | See [`NSF-NSFE.md`](NSF-NSFE.md); fixture validation pending. |
-| `gbs` | Draft profile | See [`GBS.md`](GBS.md); fixture validation pending. |
+| `gbs` | Draft profile | See [`GBS.md`](GBS.md); raw M3U timing and competing sidecar rows need lossless handling and fixture/GUI checks. |
 | `nsfe` | Draft profile | See [`NSF-NSFE.md`](NSF-NSFE.md); fixture validation pending. |
 | `hes` | Draft profile | See [`HES.md`](HES.md); fixture validation pending. |
 | `sndh` | Profile pending | Document subtune and timing projection. |
