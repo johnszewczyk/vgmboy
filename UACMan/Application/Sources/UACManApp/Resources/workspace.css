@@ -550,7 +550,7 @@ button { cursor:pointer; }
 .canonical-unfold-content .canonical-table-title-cell[data-action="closeCanonicalSubtable"] { cursor:pointer; }
 .canonical-table .canonical-table-delete-heading .canonical-table-heading-input {
   border-color:transparent!important;
-  background:color-mix(in srgb,var(--red,#bd4848) 62%,#000)!important;
+  background:transparent!important;
   color:#fff!important;
 }
 .canonical-table .tag-number-cell,
