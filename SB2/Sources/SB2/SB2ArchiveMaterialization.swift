@@ -23,15 +23,18 @@ enum SB2ArchiveMaterialization {
     private static let cacheStore = ArchiveCacheStore(cacheRootURL: cacheRootURL)
     private static let playbackMaterializer = ArchivePlaybackMaterializer(
         cacheRootURL: cacheRootURL,
-        preferenceKeys: cacheKeys
+        preferenceKeys: cacheKeys,
+        decompressUACManifestFrame: SB2UACManifestFrameCodec.decoder
     )
     private static let exportMaterializer = ArchivePlaybackMaterializer(
         cacheRootURL: cacheRootURL,
-        preferenceKeys: cacheKeys
+        preferenceKeys: cacheKeys,
+        decompressUACManifestFrame: SB2UACManifestFrameCodec.decoder
     )
     private static let artworkMaterializer = ArchivePlaybackMaterializer(
         cacheRootURL: cacheRootURL,
-        preferenceKeys: cacheKeys
+        preferenceKeys: cacheKeys,
+        decompressUACManifestFrame: SB2UACManifestFrameCodec.decoder
     )
     private static let artworkMaterializationLock = NSLock()
 
