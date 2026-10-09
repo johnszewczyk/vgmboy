@@ -121,7 +121,7 @@ enum GameMusicMetadataReader {
             timing: MetadataTiming(
                 introLengthMs: -1,
                 loopLengthMs: -1,
-                playLengthMs: defaultPlayLengthMs,
+                playLengthMs: kind == .nsf ? defaultPlayLengthMs : -1,
                 fadeLengthMs: -1
             ),
             technicalFacts: facts

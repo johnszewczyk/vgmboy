@@ -18,9 +18,10 @@ The native header fields and version byte follow the
 - **Coverage** — GBS header game, artist, and comment fields; M3U track rows
   and recognized `# @KEY value` comments.
 - **Status** — Profile rules complete; conversion is held until timing and
-  competing M3U rows survive the reader-to-UAC path. The current reader parses
-  integer timing only and chooses one richest row when rows conflict. Retain
-  the original M3U and do not certify those projections as lossless.
+  competing M3U rows survive the reader-to-UAC path. MetaMan now converts
+  fractional play, loop, and fade times to integer milliseconds; it still
+  chooses one richest row when rows conflict. Retain the original M3U and do
+  not certify conflicting projections as lossless.
 
 ## Field Mapping
 
@@ -34,7 +35,7 @@ The native header fields and version byte follow the
 | M3U `# @DATE value` | Date | `game.metadata["Date"]` | Keep the source value; do not infer a date from a filename or composite track title. |
 | M3U `::GBS,index,title,...` title | Title | `playlists[].entries[].title` | Source track title, retained as written. Do not split embedded composer, game, publisher, or copyright text out of the title. |
 | M3U source index | Playlist `trackIndex` | `playlists[].entries[].trackIndex` | GBS indexes are zero-based, including hexadecimal indexes. Do not create a second Track Number tag. |
-| M3U time, loop, fade, repeat columns | Playlist entry timing fields | `lengthRaw`, `loopRaw`, `fadeRaw`, `repeatRaw` | Keep authored raw values and the original M3U bytes. Do not emit these as descriptive tags or replace missing/unparsed values with defaults. |
+| M3U time, loop, fade columns | Playlist entry extra fields | `Play Length (ms)`, `Loop Length (ms)`, `Fade Length (ms)` | Convert fractional final time components to integer milliseconds. Keep the original M3U attachment as the byte-exact source of authored strings. Missing or invalid times stay absent. Repeat-count values currently remain available in the M3U attachment and are not projected as entry fields. |
 | GBS header version byte | Format | `playlists[].entries[].extraFields["Format"]` | Use `GBS v.<version>` on every logical track, for example `GBS v.1`. Read the byte from that physical member; never normalize versions. |
 
 ## Format Procedures
@@ -69,12 +70,12 @@ The native header fields and version byte follow the
   zero-based index. If titles or timings disagree, retain the competing rows
   and route the track/package to review. Do not silently select the richest
   row, merge rows, or treat a second title as a duplicate without evidence.
-- **Timing** — M3U timing is playback data, not a metadata tag. Preserve raw
-  play, loop, fade, and repeat values in playlist-entry fields. The current
-  MetaMan reader accepts integer colon components only; fractional times and
-  some loop values are lost. A 150-second reader fallback is not source data
-  and must never be written to UAC. Keep the original M3U and hold affected
-  rows until raw timing is represented losslessly.
+- **Timing** — M3U timing is playback data attached to the logical track.
+  MetaMan converts play, loop, and fade values, including a fractional final
+  component with up to millisecond precision, to integer milliseconds for
+  playlist entry fields. The source M3U attachment preserves authored strings
+  and repeat counts. Invalid or absent timing stays absent; GBS header-only
+  tracks have no known duration and must not receive a 150-second fallback.
 - **Composite titles and comments** — Keep a composite M3U title as one Title
   value. Promote a recognized, populated `# @KEY` value only through an
   explicit useful-field mapping with canonical Title Case tag names. Do not
@@ -109,13 +110,14 @@ The native header fields and version byte follow the
   zero-based track index. Preserve order, repeated indexes, raw row text, and
   all sidecars; report missing, duplicate, or conflicting references.
 - **Timing fidelity** — Compare source timing strings with UAC playlist
-  entries. Confirm fractional seconds, unusual loop values, repeat counts, and
-  absent values survive without integer truncation or a 150-second fallback.
+  entries. Confirm fractional seconds and unusual loop values convert without
+  truncation, repeat counts remain available in the source M3U attachment, and
+  absent values stay absent without a 150-second fallback.
 - **Tag scope** — Confirm Album and Album Artist are shared only when their
   source values agree, track titles remain attached to the correct index, and
   no empty, inferred, or diagnostic tags were added.
 - **UAC review** — Verify Format is visible on each track, hashes are visible
   in Stream Hashes, and source M3Us remain available as package attachments.
-  Keep affected conversions held until fractional timing and all competing
-  M3U rows are preserved; verify fixture behavior and GUI visibility before
-  treating the implementation as approved.
+  Keep affected conversions held until competing M3U rows are preserved;
+  verify fixture behavior and GUI visibility before treating the implementation
+  as approved.
