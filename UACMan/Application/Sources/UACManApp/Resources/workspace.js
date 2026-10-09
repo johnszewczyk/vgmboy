@@ -814,6 +814,8 @@
   let state = null;
   let sort = { key:"track", direction:1 };
   let mainView = "members";
+  let collectionBatchSelectionMode = false;
+  let collectionSelectionAnchorPath = "";
   let trackBrowserPath = "";
   let selectedTagTrackPaths = new Set();
   let dirtyTrackPaths = new Set();
@@ -1006,15 +1008,60 @@
   }
 
   function renderCollections() {
-    const query = $("#collection-filter").value.trim().toLocaleLowerCase();
-    const entries = state.collectionEntries.filter(entry => !query || [entry.title, entry.console, entry.packageID, entry.relativePath].some(value => String(value || "").toLocaleLowerCase().includes(query)));
+    const entries = visibleCollectionEntries();
+    const selectedPaths = new Set(state.selectedCollectionPackagePaths || []);
+    const selectedCount = selectedPaths.size;
+    $("#library-panel").classList.toggle("collection-selection-mode", collectionBatchSelectionMode);
+    $("#collection-batch-select").textContent = collectionBatchSelectionMode ? "Done" : "Batch Select";
+    $("#collection-selection-bulk").classList.toggle("hidden", !collectionBatchSelectionMode);
+    $("#collection-selection-hint").classList.toggle("hidden", !collectionBatchSelectionMode);
+    $("#collection-edit-selected").classList.toggle("hidden", selectedCount === 0);
+    $("#collection-edit-selected").disabled = selectedCount === 0;
+    $("#collection-edit-selected").textContent = `Edit ${selectedCount} selected`;
     $("#collection-list").innerHTML = entries.map(entry => {
       const title = entry.title || entry.relativePath.split("/").pop().replace(/\.uac$/i, "");
       const selected = state.selectedCollectionPackagePath === entry.relativePath;
-      const checked = (state.selectedCollectionPackagePaths || []).includes(entry.relativePath);
+      const checked = selectedPaths.has(entry.relativePath);
       return `<div class="collection-item ${selected ? "selected" : ""}" data-package="${esc(entry.relativePath)}" title="${esc(entry.packageID)} · ${bytes(entry.fileByteCount)}"><button class="collection-package-select" type="button" data-action="toggleCollectionPackageSelection" data-package-path="${esc(entry.relativePath)}" role="checkbox" aria-checked="${checked}" aria-label="${checked ? "Remove" : "Add"} ${esc(title)} ${checked ? "from" : "to"} batch selection">${checked ? "✓" : "−"}</button><div class="collection-item-copy"><div class="collection-title">${esc(title)}</div><div class="collection-meta">${esc(entry.console || "Unknown platform")} · ${entry.playableMemberCount} playable · ${entry.totalMemberCount} members</div><div class="collection-path">${esc(entry.relativePath)}</div></div></div>`;
     }).join("");
     if (entries.length === 0) $("#collection-list").innerHTML = `<div class="empty-note">${state.collectionEntries.length ? "No packages match this filter." : "Choose Collection to scan a folder of UAC packages."}</div>`;
+  }
+
+  function visibleCollectionEntries() {
+    const query = $("#collection-filter").value.trim().toLocaleLowerCase();
+    return state.collectionEntries.filter(entry => !query || [entry.title, entry.console, entry.packageID, entry.relativePath].some(value => String(value || "").toLocaleLowerCase().includes(query)));
+  }
+
+  function setCollectionPackagesSelected(paths, selected) {
+    if (!paths.length) return;
+    bridge("setCollectionPackageSelection", { paths, selected });
+  }
+
+  function selectCollectionPackageFromRow(packageItem, event) {
+    const path = packageItem?.dataset.package || "";
+    if (!path) return;
+    const visiblePaths = visibleCollectionEntries().map(entry => entry.relativePath);
+    const selectedPaths = new Set(state.selectedCollectionPackagePaths || []);
+    const targetIndex = visiblePaths.indexOf(path);
+    const anchorIndex = visiblePaths.indexOf(collectionSelectionAnchorPath);
+    if (event.shiftKey && targetIndex >= 0) {
+      if (anchorIndex < 0) {
+        setCollectionPackagesSelected([path], true);
+        collectionSelectionAnchorPath = path;
+      } else {
+        const start = Math.min(targetIndex, anchorIndex);
+        const end = Math.max(targetIndex, anchorIndex);
+        setCollectionPackagesSelected(visiblePaths.slice(start, end + 1), true);
+      }
+      return;
+    }
+    const explicitToggle = event.target.closest("[data-action=toggleCollectionPackageSelection]");
+    if (explicitToggle || event.metaKey || event.ctrlKey) {
+      setCollectionPackagesSelected([path], !selectedPaths.has(path));
+    } else {
+      setCollectionPackagesSelected([path], true);
+    }
+    collectionSelectionAnchorPath = path;
   }
 
   function renderIssues() {
@@ -1217,7 +1264,7 @@
     if (tracks.length) targetOptions.push({ value:"allTracks", label:"All Tracks" }, { value:"selectedTracks", label:"Selected Tracks" });
     if (state?.documentName) targetOptions.push({ value:"package", label:"Package" });
     if (selectedPackages.length) targetOptions.push({ value:"selectedPackages", label:`${selectedPackages.length} Selected Package${selectedPackages.length === 1 ? "" : "s"}` });
-    const defaultTarget = tracks.length ? "allTracks" : state?.documentName ? "package" : "selectedPackages";
+    const defaultTarget = selectedPackages.length ? "selectedPackages" : tracks.length ? "allTracks" : state?.documentName ? "package" : "selectedPackages";
     const targetMarkup = targetOptions.map(option => `<option value="${option.value}"${option.value === defaultTarget ? " selected" : ""}>${esc(option.label)}</option>`).join("");
     const draft = canonicalRowMarkup([
       canonicalNumberCellMarkup("＋", "Create tag"),
@@ -2481,6 +2528,10 @@
     const packageItem = event.target.closest("[data-package]");
     const memberRow = event.target.closest("tr[data-member]");
     const trackRow = event.target.closest("[data-track-row]");
+    if (packageItem && collectionBatchSelectionMode) {
+      selectCollectionPackageFromRow(packageItem, event);
+      return;
+    }
     if (packageItem && !event.target.closest("[data-action=toggleCollectionPackageSelection]")) {
       bridge("selectPackage", { path:packageItem.dataset.package });
       return;
@@ -2500,7 +2551,31 @@
     }
     if (!action) return;
     if (action === "toggleCollectionPackageSelection") {
-      bridge("toggleCollectionPackageSelection", { path:event.target.closest("[data-package-path]")?.dataset.packagePath || "" });
+      const packageButton = event.target.closest("[data-package-path]");
+      const path = packageButton?.dataset.packagePath || "";
+      const selected = new Set(state.selectedCollectionPackagePaths || []);
+      if (path) setCollectionPackagesSelected([path], !selected.has(path));
+      return;
+    }
+    if (action === "toggleCollectionBatchSelectionMode") {
+      collectionBatchSelectionMode = !collectionBatchSelectionMode;
+      collectionSelectionAnchorPath = "";
+      renderCollections();
+      return;
+    }
+    if (action === "selectVisibleCollectionPackages") {
+      setCollectionPackagesSelected(visibleCollectionEntries().map(entry => entry.relativePath), true);
+      return;
+    }
+    if (action === "clearCollectionPackageSelection") {
+      setCollectionPackagesSelected(state.selectedCollectionPackagePaths || [], false);
+      collectionSelectionAnchorPath = "";
+      return;
+    }
+    if (action === "editSelectedCollectionPackages") {
+      if (!(state.selectedCollectionPackagePaths || []).length) return;
+      mainView = "newTag";
+      render(state);
       return;
     }
     if (action === "toggleNewTagTrack") {

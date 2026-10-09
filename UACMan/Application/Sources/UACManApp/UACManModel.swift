@@ -1124,6 +1124,17 @@ final class UACManModel {
         }
     }
 
+    func setCollectionPackageSelection(_ relativePaths: [String], selected: Bool) {
+        let validPaths = Set(collectionEntries.map(\.relativePath))
+        for relativePath in relativePaths where validPaths.contains(relativePath) {
+            if selected {
+                selectedCollectionPackagePaths.insert(relativePath)
+            } else {
+                selectedCollectionPackagePaths.remove(relativePath)
+            }
+        }
+    }
+
     func stageCollectionPackageTagEdit(
         key rawKey: String,
         operation rawOperation: String,

@@ -58,11 +58,17 @@ its frame does not fill the page when it has only a few rows. **New Tag** pairs 
 scrollable canonical track list with canonical-cell selection controls and a
 canonical tag editor. Track selection cells show **−** when clear and **✓**
 when selected. The target selector applies a string tag to **All Tracks**,
-**Selected Tracks**, or the **Package**. When a collection is loaded, each
-collection entry also has a separate selection control; choose **Selected
-Packages** to edit package-level tags across those packages. Its **Operation**
-supports **Set value**, **Fill missing**, or **Remove**. Search filters the
-track list without clearing track or package selections. Track tag additions
+**Selected Tracks**, or the **Package**. When a collection is loaded, package
+rows can be selected in **Batch Select** mode. Click a row to add it,
+Command-click or use its checkbox to toggle it, Shift-click to add a visible
+range, or choose **Select visible** to add every package matching the current
+filter; filtering does not discard hidden selections. **Clear** removes the
+full selection. The selection count stays visible, and **Edit N selected**
+opens the New Tag editor with **Selected Packages** active. Its **Operation**
+supports **Set value**, **Fill missing**, or **Remove**. Applying an operation
+reports how many selected packages actually change; edits remain staged until
+**Save changes**. Search filters the track list without clearing track or
+package selections. Track tag additions
 are applied atomically and refused if the tag already exists on any target
 track. Collection package edits are staged until **Save changes** and can be
 discarded with **Revert changes**. **Pack Tags** contains the
