@@ -98,11 +98,11 @@ preferences are stored in UACMan's local app preferences; they are not written
 to UAC manifests.
 
 **Tag Analyzer** (Beta) is a separate workspace page that works with or without
-an open package. **Browse** selects and saves a folder path. The magnifier
-button starts scanning its regular `.uac` packages recursively. The selected
-folder path is restored when UACMan launches again. The app-bar search filters package filenames in the
-current analyzer results; matching tag names and their pack/track counts update
-with the filter.
+an open package. **Browse** selects and saves a folder path, then immediately
+scans its regular `.uac` packages recursively. The magnifier button reruns the
+scan. The selected folder path is restored when UACMan launches again. The
+app-bar search filters package filenames in the current analyzer results;
+matching tag names and their pack/track counts update with the filter.
 
 The analyzer lists tag field names from package metadata, package extensions,
 every member's metadata, and member extensions. Structural package attachment
