@@ -12,6 +12,7 @@ directory, chip list, or partial text match.
 | Nintendo NES | NES; Nintendo Entertainment System; Famicom; Family Computer |
 | Nintendo SNES | SNES; Super NES; Super Nintendo; Super Nintendo Entertainment System; Super Famicom |
 | Nintendo Game Boy | GB; Game Boy; Gameboy; Nintendo Game Boy |
+| Nintendo Game Boy Color | GBC; Game Boy Color; Gameboy Color; Nintendo Game Boy Color |
 | NEC TurboGrafx-16 | TurboGrafx; TurboGrafx-16; PC Engine; PC-Engine |
 | MSX | MSX Home Computer |
 | Sega Master System | Master System; Sega Mark III; Mark III |
