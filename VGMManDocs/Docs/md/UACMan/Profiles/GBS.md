@@ -10,14 +10,17 @@ The native header fields and version byte follow the
 
 ## Scope
 
-- **Reader** — `gbs`; `GameMusicMetadataReader.swift` and
-  `GBSM3UMetadataReader.swift`.
+- **Metadata reader** — MetaMan's `gbs` reader parses the fixed GBS header and
+  optional extended-M3U rows. The current VGMBoy playback registry supports
+  `.gbs` through libgme. Neither current application reader supports `.gbr`,
+  `.mgb`, or general `.gb` ROMs.
 - **Source members** — `.gbs`; optional companion `.m3u` files.
 - **Coverage** — GBS header game, artist, and comment fields; M3U track rows
   and recognized `# @KEY value` comments.
-- **Status** — Draft. The current reader drops fractional M3U timing and picks
-  one of conflicting M3U rows; retain raw rows and hold those cases until the
-  conversion path preserves them.
+- **Status** — Profile rules complete; conversion is held until timing and
+  competing M3U rows survive the reader-to-UAC path. The current reader parses
+  integer timing only and chooses one richest row when rows conflict. Retain
+  the original M3U and do not certify those projections as lossless.
 
 ## Field Mapping
 
@@ -45,6 +48,11 @@ The native header fields and version byte follow the
 - **Physical file and subsongs** — Store each source `.gbs` once and point
   ordered playlist entries at it. Keep a one-track GBS as an explicit
   playlist entry too. Hash the physical member once, not once per subsong.
+- **Identity and platform** — A GBS signature identifies the container, not
+  whether the music belongs to Game Boy or Game Boy Color. Use source
+  platform evidence and the format-agnostic No-Intro identity workflow; hold
+  titles that resolve differently across the GB and GBC DATs for review. A
+  unique title-root suggestion is not by itself a regional/revision Game ID.
 - **Format version** — Read version byte `0x03` for every physical GBS and
   surface it in each track's **Format** field. A set can contain v1, v2, or
   v4 files; do not flatten them to one version. Report multiple versions
@@ -69,13 +77,22 @@ The native header fields and version byte follow the
   rows until raw timing is represented losslessly.
 - **Composite titles and comments** — Keep a composite M3U title as one Title
   value. Promote a recognized, populated `# @KEY` value only through an
-  explicit useful-field mapping in Title Case. Do not turn freeform comments,
-  unknown keys, or parser diagnostics into new tags; retain useful narrative
-  in the original M3U attachment.
-- **Other members** — Inspect each non-GBS member. A `.gbs` suffix is not proof
-  of GBS data; a missing signature or an identified ROM is a format mismatch
-  for review, not a valid track. Preserve valid companion data and report
-  unexplained or foreign members instead of silently dropping them.
+  explicit useful-field mapping with canonical Title Case tag names. Do not
+  surface raw lower-case source keys, empty values, freeform comments, unknown
+  keys, or parser diagnostics as UAC tags; retain the original M3U attachment.
+- **Related but separate members** — These are not GBS tracks and must not be
+  folded into a GBS package or counted as GBS duplicates:
+
+  | Member | Identification | Handling |
+  | --- | --- | --- |
+  | `.gbr` | Older Game Boy music-dump format (`GBRF` signature) | Separate format and review; current VGMBoy/MetaMan readers do not support it. The independent [gbsplay project](https://github.com/mmitch/gbsplay) lists GBR support. |
+  | `.mgb` | Paragon 5 GameBoy Tracker module (`GameBoy Music Module` marker) | Separate tracker format and review; current VGMBoy/MetaMan readers do not support it. See [Paragon 5 tracker files](https://gbdev.gg8.se/files/musictools/Paragon5/). |
+  | `.gb` | Raw Game Boy ROM image | ROM, not a GBS music container; route to ROM review. gbsplay supports only a subset as music, which is not support in our current reader. |
+
+  Validate content signatures, not suffixes. A `.gbs`-named member that lacks
+  the `GBS` signature (including a ROM image) is an extension/content
+  mismatch for review, not a playable GBS track. Preserve the source archive
+  and report the member instead of silently dropping it.
 - **Hashes** — Apply the four compact pre-disc hashes to each physical GBS
   stream under the shared procedure. Keep these as UAC integrity/source
   identity records, not invented tag keys.
@@ -85,6 +102,9 @@ The native header fields and version byte follow the
 - **Header and version** — Check every physical `.gbs` signature, header
   length, version byte, declared track count, first index, and nonempty
   identity fields. Record version counts and identify mixed-version games.
+- **Format boundary** — Inventory `.gbr`, `.mgb`, and `.gb` members separately;
+  confirm they are not counted as GBS tracks or silently discarded. Treat a
+  mismatched `.gbs` suffix as a review item.
 - **Playlist mapping** — Resolve every M3U row to one member and an in-range
   zero-based track index. Preserve order, repeated indexes, raw row text, and
   all sidecars; report missing, duplicate, or conflicting references.
@@ -96,4 +116,6 @@ The native header fields and version byte follow the
   no empty, inferred, or diagnostic tags were added.
 - **UAC review** — Verify Format is visible on each track, hashes are visible
   in Stream Hashes, and source M3Us remain available as package attachments.
-  Keep this profile Draft until fixture and GUI visibility checks pass.
+  Keep affected conversions held until fractional timing and all competing
+  M3U rows are preserved; verify fixture behavior and GUI visibility before
+  treating the implementation as approved.
