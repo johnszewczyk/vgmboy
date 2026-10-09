@@ -242,59 +242,73 @@ struct MainView: View {
 
     private var playlistTabStrip: some View {
         HStack(spacing: 4) {
-            ScrollView(.horizontal) {
-                HStack(spacing: 4) {
-                    ForEach(model.playlistTabs) { tab in
-                        HStack(spacing: 5) {
-                            Button(tab.title) {
-                                model.activatePlaylistTab(tab.id)
-                            }
-                            .buttonStyle(.plain)
-                            .lineLimit(1)
-                            .help(tab.title)
+            GeometryReader { geometry in
+                let tabCount = model.playlistTabs.count
+                let spacing: CGFloat = 4
+                let horizontalInset: CGFloat = 16
+                let minimumTabWidth: CGFloat = 76
+                let equalTabWidth = tabCount > 0
+                    ? (geometry.size.width - horizontalInset - CGFloat(tabCount - 1) * spacing) / CGFloat(tabCount)
+                    : geometry.size.width - horizontalInset
+                let tabWidth = max(minimumTabWidth, equalTabWidth)
 
-                            Button {
-                                model.closePlaylistTab(tab.id)
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 9, weight: .semibold))
-                                    .frame(width: 14, height: 14)
+                ScrollView(.horizontal) {
+                    HStack(spacing: spacing) {
+                        ForEach(model.playlistTabs) { tab in
+                            HStack(spacing: 5) {
+                                Button(tab.title) {
+                                    model.activatePlaylistTab(tab.id)
+                                }
+                                .buttonStyle(.plain)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .help(tab.title)
+
+                                Button {
+                                    model.closePlaylistTab(tab.id)
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 9, weight: .semibold))
+                                        .frame(width: 14, height: 14)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Close tab")
                             }
-                            .buttonStyle(.plain)
-                            .help("Close tab")
-                        }
-                        .font(.system(size: 11))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(
-                            model.activePlaylistTabID == tab.id
-                                ? Color.accentColor.opacity(0.2)
-                                : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 5)
-                        )
-                        .overlay(alignment: .bottom) {
-                            if model.activePlaylistTabID == tab.id {
-                                Rectangle()
-                                    .fill(Color.accentColor)
-                                    .frame(height: 1)
+                            .font(.system(size: 11))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .frame(width: tabWidth)
+                            .background(
+                                model.activePlaylistTabID == tab.id
+                                    ? Color.accentColor.opacity(0.2)
+                                    : Color.clear,
+                                in: RoundedRectangle(cornerRadius: 5)
+                            )
+                            .overlay(alignment: .bottom) {
+                                if model.activePlaylistTabID == tab.id {
+                                    Rectangle()
+                                        .fill(Color.accentColor)
+                                        .frame(height: 1)
+                                }
                             }
+                            .accessibilityElement(children: .contain)
+                            .onDrag {
+                                draggedPlaylistTabID = tab.id
+                                return NSItemProvider(object: tab.id as NSString)
+                            }
+                            .onDrop(of: [UTType.plainText], delegate: PlaylistTabReorderDropDelegate(
+                                destinationTabID: tab.id,
+                                draggedTabID: $draggedPlaylistTabID,
+                                model: model,
+                                animationDuration: Double(model.effectiveAutoResizeAnimationMilliseconds) / 1_000
+                            ))
                         }
-                        .accessibilityElement(children: .contain)
-                        .onDrag {
-                            draggedPlaylistTabID = tab.id
-                            return NSItemProvider(object: tab.id as NSString)
-                        }
-                        .onDrop(of: [UTType.plainText], delegate: PlaylistTabReorderDropDelegate(
-                            destinationTabID: tab.id,
-                            draggedTabID: $draggedPlaylistTabID,
-                            model: model,
-                            animationDuration: Double(model.effectiveAutoResizeAnimationMilliseconds) / 1_000
-                        ))
                     }
+                    .padding(.horizontal, 8)
                 }
-                .padding(.horizontal, 8)
+                .scrollIndicators(.hidden)
             }
-            .scrollIndicators(.hidden)
+            .frame(height: 30)
 
             Button {
                 model.createPlaylistTab(duplicateActive: false)

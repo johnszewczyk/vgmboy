@@ -22,6 +22,7 @@ and renderer distinct.
 - Home and playlist behavior: `subsystem-human/home.md`
 - Sidebar actions and Gallery projection lifecycle: `subsystem-agent/sidebar-actions.md`
 - Selection and hover motion: `subsystem-agent/selection-animation.md`
+- Archive playback and materialization: `subsystem-agent/archive-materialization.md`
 - Options behavior: `subsystem-human/options.md`
 - Startup progress ownership: `subsystem-agent/startup-experience.md`
 - Swift package and app bundle: `Package.swift`, `Sources/SB2/`

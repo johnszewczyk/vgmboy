@@ -18,6 +18,8 @@ Playlist-tab ordering, activation, and saved order.
   identity.
 - Favorites and History shortcuts activate their named tabs when present and
   create those tabs on first use.
+- Tabs divide the available strip width equally, with a 76-point minimum width
+  that enables horizontal scrolling when the full set no longer fits.
 - Preserve each tab's title, queue, and selection while changing its position.
 - Keep the persisted 64-tab limit and versioned snapshot format.
 
