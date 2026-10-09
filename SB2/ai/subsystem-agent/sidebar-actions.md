@@ -28,6 +28,18 @@ in the SB2 home view.
   the user invoked them. Tab activation invalidates pending sidebar work. Any
   asynchronous catalog action must recheck its captured tab before replacing
   playlist content, queuing tracks, or starting playback.
+- Playlist loads are transactions: query and sort a candidate array first,
+  then commit it only if its request generation, active tab ID, sidebar
+  interaction generation, and (for path browsing) browser-selection
+  generation still match. Do not write candidate tracks or projection hints
+  into shared UI state before the final guard; tab rendering snapshots that
+  shared state into the active tab.
+- Async sorts are bound to both the active tab ID and the exact playlist array
+  they started with. Duplicate tabs may contain identical track IDs, so IDs
+  alone are not a sufficient stale-response check.
+- Playlist-tab select and close controls resolve their current tab ID from the
+  rendered tab container. A close request must resolve to a live tab before
+  applying the single-tab window-close behavior.
 - A Gallery row click only selects the title because Gallery does not display a
   playlist table. Enter or double-click opens a regular playlist tab and starts
   playback, leaving the Gallery tab intact.
