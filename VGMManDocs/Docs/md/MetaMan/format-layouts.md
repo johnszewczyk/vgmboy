@@ -106,7 +106,11 @@ their referenced GBS member. It projects authored track titles, timing, and
 `# @TITLE` / `# @ARTIST` / other `# @KEY` comments onto the corresponding
 tracks, while retaining the M3U bytes as companion metadata. Decimal and
 `$hex` track indexes follow NEZplug's zero-based GBS convention. No Game Boy
-CPU emulation is used to invent per-track titles or timing.
+CPU emulation is used to invent per-track titles or timing. The final
+colon-delimited time component accepts up to three decimal digits and converts
+them exactly to milliseconds for play, loop, and fade timing. GBS headers do
+not encode a duration, so a missing M3U value remains unknown rather than
+receiving a default duration.
 
 | Source position | Meaning |
 | --- | --- |

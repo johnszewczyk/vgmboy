@@ -133,7 +133,7 @@ enum GBSM3UMetadataReader {
             let timing = MetadataTiming(
                 introLengthMs: baseTiming?.introLengthMs ?? -1,
                 loopLengthMs: entry?.loopLengthMs ?? baseTiming?.loopLengthMs ?? -1,
-                playLengthMs: entry?.playLengthMs ?? baseTiming?.playLengthMs ?? 150_000,
+                playLengthMs: entry?.playLengthMs ?? baseTiming?.playLengthMs ?? -1,
                 fadeLengthMs: entry?.fadeLengthMs ?? baseTiming?.fadeLengthMs ?? -1
             )
             var diagnostics = track.document.diagnostics
@@ -265,12 +265,29 @@ enum GBSM3UMetadataReader {
         let components = text.split(separator: ":", omittingEmptySubsequences: false)
         guard (1...3).contains(components.count) else { return nil }
         var seconds = 0
-        for component in components {
-            guard let number = Int(component), number >= 0,
+        var fractionalMilliseconds = 0
+        // Parse decimal time without floating-point rounding; only the final
+        // component may carry a fraction, with millisecond precision at most.
+        for (index, component) in components.enumerated() {
+            let isFinalComponent = index == components.count - 1
+            let secondsAndFraction = component.split(separator: ".", omittingEmptySubsequences: false)
+            guard secondsAndFraction.count == 1
+                    || (isFinalComponent && secondsAndFraction.count == 2),
+                  let number = Int(secondsAndFraction[0]), number >= 0,
                   seconds <= (Int.max - number) / 60 else { return nil }
             seconds = seconds * 60 + number
+
+            if secondsAndFraction.count == 2 {
+                let fraction = secondsAndFraction[1]
+                guard (1...3).contains(fraction.utf8.count),
+                      fraction.utf8.allSatisfy({ (48...57).contains($0) }),
+                      var fractionValue = Int(fraction) else { return nil }
+                if fraction.utf8.count == 1 { fractionValue *= 100 }
+                if fraction.utf8.count == 2 { fractionValue *= 10 }
+                fractionalMilliseconds = fractionValue
+            }
         }
-        guard seconds <= Int.max / 1_000 else { return nil }
-        return seconds * 1_000
+        guard seconds <= (Int.max - fractionalMilliseconds) / 1_000 else { return nil }
+        return seconds * 1_000 + fractionalMilliseconds
     }
 }
