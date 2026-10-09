@@ -107,6 +107,13 @@ Schema 25 also retains each ordered source tag in `track_metadata_tags` for
 ScanSong's Metadata Tags inventory. CocoaSpice still consumes only the common
 track fields; it does not expose the additional UAC manifest fields.
 
+For gallery artwork, ScanSong reads the package-level `game.metadata["Title
+Snap"]` attachment tag as a direct member path or an array of paths. It checks
+that a PNG path is safe and resolves to a declared package member, then stores
+an `archive-member:<path>` locator as the catalog's `Title Snap` tag. It does
+not extract the image during scanning. The former `cover_front` descriptor
+shape remains readable for existing packages.
+
 ## Route summary
 
 | ScanSong route | Registered extensions | Structure published | Metadata source | Dependency or archive rule |
