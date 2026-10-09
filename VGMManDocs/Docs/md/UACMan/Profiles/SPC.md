@@ -54,8 +54,13 @@ sub-container and version together, such as `SPC v.30` or `SPC v.10`.
   Length (ms)`, using the reader's default loop count of one only when the
   source omits the count. Do not surface the parser's 150-second fallback or
   create a timing tag when neither source block supplies a positive duration.
-  Packing any SPC members requires the MetaMan-backed SPC harvest option so
-  these player-facing values cannot be silently skipped.
+  This is player-critical metadata, not an optional enrichment. Every
+  source-timed track must carry the calculated `Play Length (ms)` before its
+  UAC is accepted as complete. A source track with no positive ID666 or xID6
+  duration remains untagged and must be listed as an explicit untimed
+  exception; never guess a value. Packing any SPC members requires the
+  MetaMan-backed SPC harvest option so these player-facing values cannot be
+  silently skipped.
 - **Tag cleanup** — Keep source-backed fields in Title Case; omit blank tags,
   parser-only encoding labels, and the encoded xID6 OST Track code. Keep source
   **Disc Number** and the filename/order-based **Track Number** distinct.
@@ -68,6 +73,11 @@ sub-container and version together, such as `SPC v.30` or `SPC v.10`.
   member.
 - **Package integrity** — Run `uacman inspect --verify`, then unpack and
   compare member paths, sizes, and source-byte identity.
+- **Player timing gate** — Before accepting a package, compare every source
+  SPC's positive ID666/xID6 duration with its UAC `Play Length (ms)`. Require
+  zero missing or mismatched values for source-timed tracks. Keep any
+  genuinely untimed source tracks in the per-set exceptions report, with no
+  fabricated tag.
 - **Report ownership** — Keep reusable SPC reader/fixture findings in UACMan
   procedures. Record live set counts, applied tags, and exceptions in
   AudioMan's per-set UAC dashboard, separate from ROM/set completeness.

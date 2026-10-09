@@ -345,6 +345,16 @@ Updating metadata
 requires a new header/manifest while copying the compressed payload bytes
 unchanged—never recompress solely to edit metadata.
 
+The Python wrapper checks TAR member names and indexed byte ranges before
+publishing a newly packed package. `uacman inspect --verify` verifies the
+compressed payload hash, TAR paths/ranges, and supported raw-member hashes. For legacy
+packages whose ordered TAR entries and stored member hashes prove that only
+header paths disagree with the manifest, `uacman repair-member-paths` reports
+the mismatch and `--apply` corrects those TAR header names atomically. It
+preserves every member payload byte and refuses ambiguous order, changed
+ranges, unsupported header layouts, or insufficient temporary space. A
+manifest-only edit may not alter member paths, offsets, sizes, or byte hashes.
+
 `UACContainer.manifestJSON` exposes the decoded manifest bytes without a
 model-based JSON re-encode, so editors can retain unknown future keys.
 `UACContainerWriter.rewriteManifest` validates a source package and new
