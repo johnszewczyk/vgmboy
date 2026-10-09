@@ -221,6 +221,7 @@ private extension UACManSkinPreferences {
     var javascriptValue: [String: Any] {
         [
             "appearanceMode": appearanceMode.rawValue,
+            "nestedTableMode": nestedTableMode.rawValue,
             "lightColors": lightColors,
             "darkColors": darkColors,
             "interfaceFontSize": interfaceFontSize,

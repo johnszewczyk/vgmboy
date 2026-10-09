@@ -6,8 +6,16 @@ public enum UACManAppearanceMode: String, Codable, CaseIterable, Sendable {
     case dark
 }
 
+public enum UACManNestedTableMode: String, Codable, CaseIterable, Sendable {
+    case staircase
+    case seamless
+    case spaced
+    case popup
+}
+
 public struct UACManSkinPreferences: Codable, Equatable, Sendable {
     public var appearanceMode: UACManAppearanceMode
+    public var nestedTableMode: UACManNestedTableMode
     public var lightColors: [String: String]
     public var darkColors: [String: String]
     public var interfaceFontSize: Double
@@ -17,6 +25,7 @@ public struct UACManSkinPreferences: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case appearanceMode
+        case nestedTableMode
         case lightColors
         case darkColors
         case interfaceFontSize
@@ -27,6 +36,7 @@ public struct UACManSkinPreferences: Codable, Equatable, Sendable {
 
     public init(
         appearanceMode: UACManAppearanceMode = .system,
+        nestedTableMode: UACManNestedTableMode = .staircase,
         lightColors: [String: String] = Self.defaultLightColors,
         darkColors: [String: String] = Self.defaultDarkColors,
         interfaceFontSize: Double = 13,
@@ -35,6 +45,7 @@ public struct UACManSkinPreferences: Codable, Equatable, Sendable {
         tableCellRadius: Double = 0
     ) {
         self.appearanceMode = appearanceMode
+        self.nestedTableMode = nestedTableMode
         self.lightColors = lightColors
         self.darkColors = darkColors
         self.interfaceFontSize = interfaceFontSize
@@ -46,6 +57,7 @@ public struct UACManSkinPreferences: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         appearanceMode = try values.decodeIfPresent(UACManAppearanceMode.self, forKey: .appearanceMode) ?? .system
+        nestedTableMode = try values.decodeIfPresent(UACManNestedTableMode.self, forKey: .nestedTableMode) ?? .staircase
         lightColors = Self.colors(
             try values.decodeIfPresent([String: String].self, forKey: .lightColors),
             fillingFrom: Self.defaultLightColors

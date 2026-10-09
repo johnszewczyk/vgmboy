@@ -72,11 +72,15 @@ manifest but do not appear as tag rows; their member files appear in the
 attachments table. A `.txt` document is labeled **Text File** there. Each table
 title is part of its own canonical grid rather than a separate decorative
 section heading. Non-string
-values in Pack Tags and Track Tags use `[Nested Tags]` to open an animated,
-full-width inserted canonical subtable. Arrays and objects inside those tables
-reuse the recursive canonical JSON table at every depth; JSON-encoded strings
-remain strings when saved. Only the wide Tracks giga-table uses a dimmed popup
-for structured JSON, so its row geometry remains fixed.
+values in Pack Tags and Track Tags use `[Nested Tags]` to open the recursive
+canonical JSON table. The **Nested Tables** option controls how those tables
+appear: **Staircase** aligns each child table with its parent’s second column,
+**Seamless** keeps the current flush inline look, **Spaced** adds blank space
+around an inline table, and **Pop-up** centers it over a dimmed, scrollable
+window-sized layer. Arrays and objects reuse the same table at every depth;
+JSON-encoded strings remain strings when saved. The wide Tracks giga-table
+keeps its own dimmed popup for structured JSON so its row geometry remains
+fixed.
 When a single UAC is opened directly, the library rail collapses automatically;
 it returns when a collection is opened. The last existing UAC or collection path
 is restored on launch when no command-line document was supplied.
@@ -88,9 +92,10 @@ appearance window. The **System**, **Light**, and **Dark** controls immediately
 set the workspace appearance; System follows macOS. Light and dark palettes
 can be edited separately, and each color accepts 3/6 digit hex, an RGB triplet,
 or a CSS named color. The table title-bar background has its own color setting.
-The same window adjusts interface and table font sizes and the corner radii of
-table frames and cells. These preferences are stored in UACMan's local app
-preferences; they are not written to UAC manifests.
+The same window adjusts interface and table font sizes, the corner radii of
+table frames and cells, and the display style for nested tables. These
+preferences are stored in UACMan's local app preferences; they are not written
+to UAC manifests.
 
 **Tag Analyzer** (Beta) is a separate workspace page that works with or without
 an open package. **Browse** selects and saves a folder path. The magnifier

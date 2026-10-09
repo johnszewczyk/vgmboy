@@ -60,6 +60,8 @@ struct UACManOptionsView: View {
                     typographySection
                     Divider()
                     tablesSection
+                    Divider()
+                    nestedTablesSection
                 }
                 .padding(24)
                 .frame(maxWidth: 760, alignment: .leading)
@@ -170,6 +172,30 @@ struct UACManOptionsView: View {
         }
     }
 
+    private var nestedTablesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Nested Tables")
+                    .font(.headline)
+                Spacer()
+                Picker("Nested Tables", selection: nestedTableModeBinding) {
+                    Text("Staircase").tag(UACManNestedTableMode.staircase)
+                    Text("Seamless").tag(UACManNestedTableMode.seamless)
+                    Text("Spaced").tag(UACManNestedTableMode.spaced)
+                    Text("Pop-up").tag(UACManNestedTableMode.popup)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 390)
+                .labelsHidden()
+            }
+
+            Text("Choose how unfolded tables appear. Staircase aligns each child table with the parent’s second column.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     private func sizeControl(
         title: String,
         value: Binding<Double>,
@@ -204,6 +230,15 @@ struct UACManOptionsView: View {
             get: { model.skinPreferences.appearanceMode },
             set: { mode in
                 model.updateSkinPreferences { $0.appearanceMode = mode }
+            }
+        )
+    }
+
+    private var nestedTableModeBinding: Binding<UACManNestedTableMode> {
+        Binding(
+            get: { model.skinPreferences.nestedTableMode },
+            set: { mode in
+                model.updateSkinPreferences { $0.nestedTableMode = mode }
             }
         )
     }

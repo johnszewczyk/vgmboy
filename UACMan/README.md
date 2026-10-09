@@ -37,8 +37,10 @@ or rewriting the payload. Every table uses the shared field-grid structure with
 fixed page-level column contracts so wide tables retain their intended shape.
 The wide master Tracks table opens structured values in a centered Nested Tags
 popup, so horizontal scrolling does not hide the editor. The smaller Pack Tags
-and selected-file Track Tags tables keep the left-aligned full-width child subtable
-beneath the source row, using the same canonical field-grid presentation.
+and selected-file Track Tags tables use the same recursive canonical tables.
+Choose **Staircase**, **Seamless**, **Spaced**, or **Pop-up** in Options to set
+how those nested tables open; Staircase aligns each child with its parent’s
+second column, while Pop-up dims the workspace behind a viewport-bounded card.
 New imported and authored tag names are stored directly in Title Case
 (Title, Artist, Track Number, Play Length (ms)). The editor keeps UAC
 structural property names such as game.title in their defined schema form.

@@ -216,9 +216,79 @@
       return Boolean(foldID && this.openFoldIDs.has(foldID));
     }
 
+    static isPopupMode() {
+      return document.documentElement.dataset.nestedTableMode === "popup";
+    }
+
+    static updatePopupStack() {
+      const rows = [...document.querySelectorAll("[data-canonical-subrow]")];
+      if (!this.isPopupMode()) {
+        rows.forEach(row => {
+          row.setAttribute("role", "row");
+          row.removeAttribute("aria-modal");
+          row.removeAttribute("aria-label");
+          row.removeAttribute("aria-hidden");
+          row.style.removeProperty("z-index");
+        });
+        return;
+      }
+
+      const visibleRows = [...this.openFoldIDs]
+        .map(foldID => this.subrow(foldID))
+        .filter(row => row?.classList.contains("open"));
+      const topRow = visibleRows[visibleRows.length - 1];
+      rows.forEach(row => {
+        const stackIndex = visibleRows.indexOf(row);
+        if (stackIndex < 0) {
+          row.setAttribute("role", "row");
+          row.setAttribute("aria-hidden", "true");
+          row.removeAttribute("aria-modal");
+          row.removeAttribute("aria-label");
+          row.style.removeProperty("z-index");
+          return;
+        }
+        const title = row.querySelector(".canonical-table-title-toggle")?.value
+          || row.querySelector(".canonical-table[aria-label]")?.getAttribute("aria-label")
+          || "Nested table";
+        row.setAttribute("role", "dialog");
+        row.setAttribute("aria-modal", String(row === topRow));
+        row.setAttribute("aria-label", title);
+        row.setAttribute("aria-hidden", "false");
+        row.style.zIndex = String(60 + stackIndex);
+      });
+    }
+
+    static synchronizeFoldPresentation() {
+      for (const [subrow, animation] of this.foldAnimations) {
+        animation.cancel();
+        this.foldAnimations.delete(subrow);
+      }
+      const popupMode = this.isPopupMode();
+      document.querySelectorAll("[data-canonical-subrow]").forEach(subrow => {
+        const foldID = subrow.dataset.canonicalSubrow || "";
+        const contentHost = subrow.querySelector(":scope > .inserted-table-cell > .inserted-table-panel > .canonical-unfold-content");
+        const hasContent = Boolean(contentHost?.firstElementChild || contentHost?.textContent.trim());
+        const open = this.isFoldOpen(foldID) && (!popupMode || hasContent);
+        subrow.classList.toggle("open", open);
+        subrow.style.removeProperty("height");
+        subrow.style.removeProperty("overflow");
+        subrow.style.removeProperty("transition");
+        subrow.style.removeProperty("opacity");
+        if (open && hasContent) this.pendingFoldAnimations.delete(foldID);
+        const toggle = this.toggleFor(foldID);
+        if (toggle) {
+          toggle.setAttribute("aria-expanded", String(this.isFoldOpen(foldID)));
+          const icon = $(".canonical-fold-icon", toggle);
+          if (icon) icon.textContent = this.isFoldOpen(foldID) ? "−" : "＋";
+        }
+      });
+      this.updatePopupStack();
+    }
+
     static unfoldedRowMarkup(foldID, content = "", nestedRows = "") {
       const renderedContent = this.contentMarkup(content);
-      const open = this.isFoldOpen(foldID);
+      const hasContent = Boolean(renderedContent.trim() || nestedRows.trim());
+      const open = this.isFoldOpen(foldID) && (!this.isPopupMode() || hasContent);
       const classes = ["inserted-table-row", open ? "open" : ""].filter(Boolean).join(" ");
       return canonicalRowMarkup([
         canonicalCellMarkup(`<div class="inserted-table-panel"><div class="canonical-unfold-content">${renderedContent}</div>${nestedRows}</div>`, { className:"inserted-table-cell" })
@@ -246,7 +316,7 @@
       if (!contentHost) return false;
       const renderedContent = this.contentMarkup(content);
       const hadContent = Boolean(contentHost.firstElementChild || contentHost.textContent.trim());
-      if (this.isFoldOpen(foldID) && !hadContent) {
+      if (this.isFoldOpen(foldID) && !hadContent && !this.isPopupMode()) {
         subrow.style.height = "0px";
         subrow.style.overflow = "hidden";
       }
@@ -259,6 +329,7 @@
     static animateSubrow(subrow, open) {
       if (!subrow) return;
       const currentHeight = Math.ceil(subrow.getBoundingClientRect().height);
+      const currentOpacity = Number.parseFloat(window.getComputedStyle(subrow).opacity);
       const foldID = subrow.dataset.canonicalSubrow || "";
       const previous = this.foldAnimations.get(subrow);
       if (previous) previous.cancel();
@@ -267,6 +338,59 @@
       if (!panel) return;
       const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || false;
       const duration = reduceMotion ? 1 : 250;
+      if (this.isPopupMode()) {
+        const finishOpen = animation => {
+          if (animation && this.foldAnimations.get(subrow) !== animation) return;
+          if (animation) this.foldAnimations.delete(subrow);
+          subrow.style.removeProperty("opacity");
+          subrow.style.removeProperty("transition");
+          if (subrow.isConnected && this.subrow(foldID) === subrow && this.isFoldOpen(foldID)) {
+            this.pendingFoldAnimations.delete(foldID);
+          }
+        };
+        const finishClose = animation => {
+          if (animation && this.foldAnimations.get(subrow) !== animation) return;
+          if (animation) this.foldAnimations.delete(subrow);
+          subrow.classList.remove("open");
+          subrow.style.removeProperty("opacity");
+          subrow.style.removeProperty("transition");
+          this.updatePopupStack();
+        };
+        subrow.style.removeProperty("height");
+        subrow.style.removeProperty("overflow");
+        if (open) {
+          const wasOpen = subrow.classList.contains("open");
+          subrow.classList.add("open");
+          this.updatePopupStack();
+          const startOpacity = previous && Number.isFinite(currentOpacity)
+            ? currentOpacity
+            : wasOpen ? 1 : 0;
+          const keyframes = [{ opacity:startOpacity }, { opacity:1 }];
+          if (typeof subrow.animate !== "function") {
+            subrow.style.transition = `opacity ${duration}ms cubic-bezier(.22,1,.36,1)`;
+            subrow.style.opacity = "0";
+            requestAnimationFrame(() => { subrow.style.opacity = "1"; });
+            window.setTimeout(() => finishOpen(null), duration);
+            return;
+          }
+          const animation = subrow.animate(keyframes, { duration, easing:"cubic-bezier(.22,1,.36,1)" });
+          this.foldAnimations.set(subrow, animation);
+          animation.onfinish = () => finishOpen(animation);
+          return;
+        }
+        if (!subrow.classList.contains("open")) {
+          finishClose(null);
+          return;
+        }
+        if (reduceMotion || typeof subrow.animate !== "function") {
+          finishClose(null);
+          return;
+        }
+        const animation = subrow.animate([{ opacity:1 }, { opacity:0 }], { duration, easing:"cubic-bezier(.22,1,.36,1)" });
+        this.foldAnimations.set(subrow, animation);
+        animation.onfinish = () => finishClose(animation);
+        return;
+      }
       subrow.style.overflow = "hidden";
       if (open) {
         subrow.classList.add("open");
@@ -392,7 +516,12 @@
       if (subrow) {
         const contentHost = subrow.querySelector(":scope > .inserted-table-cell > .inserted-table-panel > .canonical-unfold-content");
         const hasContent = Boolean(contentHost?.firstElementChild || contentHost?.textContent.trim());
-        if (open && !hasContent) {
+        if (open && !hasContent && this.isPopupMode()) {
+          subrow.classList.remove("open");
+          subrow.style.removeProperty("height");
+          subrow.style.removeProperty("overflow");
+          this.updatePopupStack();
+        } else if (open && !hasContent) {
           subrow.classList.add("open");
           subrow.style.height = "0px";
           subrow.style.overflow = "hidden";
@@ -703,6 +832,12 @@
   function applySkin(preferences) {
     if (!preferences || typeof preferences !== "object") return;
     skinPreferences = preferences;
+    const nestedTableModes = new Set(["staircase", "seamless", "spaced", "popup"]);
+    const requestedNestedMode = nestedTableModes.has(preferences.nestedTableMode)
+      ? preferences.nestedTableMode
+      : "staircase";
+    const previousNestedMode = document.documentElement.dataset.nestedTableMode || "";
+    document.documentElement.dataset.nestedTableMode = requestedNestedMode;
     const values = [
       ["--ui-font-size", preferences.interfaceFontSize, 11, 18],
       ["--table-font-size", preferences.tableFontSize, 8, 16],
@@ -714,6 +849,8 @@
       if (Number.isFinite(number)) document.documentElement.style.setProperty(property, `${Math.min(maximum, Math.max(minimum, number))}px`);
     }
     applyCurrentSkinPalette();
+    if (previousNestedMode !== requestedNestedMode) CanonicalTable.synchronizeFoldPresentation();
+    else CanonicalTable.updatePopupStack();
   }
 
   window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", applyCurrentSkinPalette);
@@ -796,6 +933,7 @@
     renderInspector();
     CanonicalTable.applyColumnSchemas();
     CanonicalTable.playPendingFoldAnimations();
+    CanonicalTable.updatePopupStack();
     $("#members-view").classList.toggle("hidden", mainView !== "members");
     $("#metadata-view").classList.toggle("hidden", mainView === "members");
     $$(".main-view-tabs button").forEach(button => button.classList.toggle("active", button.dataset.view === mainView));
@@ -2278,6 +2416,15 @@
 
   document.addEventListener("click", event => {
     if (!event.target.closest(".track-context-menu")) closeTrackContextMenu();
+    if (CanonicalTable.isPopupMode()) {
+      const unfoldBackdrop = event.target.closest(".inserted-table-row.open");
+      const popupPanel = unfoldBackdrop?.querySelector(":scope > .inserted-table-cell > .inserted-table-panel");
+      if (unfoldBackdrop && !popupPanel?.contains(event.target)) {
+        const toggle = CanonicalTable.toggleFor(unfoldBackdrop.dataset.canonicalSubrow || "");
+        if (toggle) CanonicalTable.setFoldOpen(toggle, false);
+        return;
+      }
+    }
     const popupBackdrop = event.target.closest("[data-multiple-values-popup]");
     if (popupBackdrop && event.target === popupBackdrop) {
       closeMultipleValuesPopup(popupBackdrop);
@@ -2358,7 +2505,7 @@
       const foldID = toggle?.dataset.foldId || "";
       const subrow = CanonicalTable.subrow(foldID);
       if (toggle && subrow) {
-        const opening = !subrow.classList.contains("open");
+        const opening = !CanonicalTable.isFoldOpen(foldID);
         CanonicalTable.setFoldOpen(toggle, opening);
         if (!opening) return;
         const tagName = toggle.dataset.tagName || "";
@@ -2523,6 +2670,17 @@
     if (submitEditableRowOnEnter(event)) return;
     if (event.key === "Escape") {
       if (trackContextMenu) { closeTrackContextMenu(); return; }
+      if (CanonicalTable.isPopupMode()) {
+        const popupRows = [...document.querySelectorAll(".inserted-table-row.open")]
+          .filter(row => window.getComputedStyle(row).position === "fixed")
+          .sort((left, right) => Number(left.style.zIndex || 0) - Number(right.style.zIndex || 0));
+        const topPopup = popupRows[popupRows.length - 1];
+        if (topPopup) {
+          const toggle = CanonicalTable.toggleFor(topPopup.dataset.canonicalSubrow || "");
+          if (toggle) CanonicalTable.setFoldOpen(toggle, false);
+          return;
+        }
+      }
       const popup = $("[data-multiple-values-popup]:not([hidden])");
       if (popup) { closeMultipleValuesPopup(popup); return; }
     }
