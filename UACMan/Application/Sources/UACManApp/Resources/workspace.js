@@ -24,7 +24,11 @@
     catch { return null; }
   };
   const preferredMetadataColumns = ["Title", "Artist", "Album", "Year", "Genre", "Play Length (ms)", "Duration (ms)"];
-  const structuralPackageAttachmentKeys = new Set(["cover_front", "cover_back", "cue_sheet", "documents"]);
+  const legacyPackageAttachmentNames = new Map([
+    ["title_snap", "Title Snap"], ["text_file", "Text File"],
+    ["cover_front", "Cover Front"], ["cover_back", "Cover Back"],
+    ["cue_sheet", "Cue Sheet"], ["documents", "Documents"]
+  ]);
   const metadataDisplayNames = {
     title: "Title",
     Title: "Title",
@@ -90,6 +94,35 @@
     }).join(" ");
   };
   const displayTrackKey = key => String(key).startsWith("extension.") ? `Extension: ${displayMetadataKey(String(key).slice("extension.".length))}` : displayMetadataKey(key);
+  const attachmentMemberPaths = value => {
+    const values = Array.isArray(value) ? value : [value];
+    if (!values.length) return [];
+    const paths = values.map(item => typeof item === "string"
+      ? item
+      : item && typeof item === "object" && typeof item.memberPath === "string" ? item.memberPath : null);
+    return paths.every(path => typeof path === "string") ? paths : [];
+  };
+  function packageAttachmentTags() {
+    const metadata = parseObject(state?.gameMetadataJSON) || {};
+    const attachmentPaths = new Set((state?.members || [])
+      .filter(member => member.role !== "playable" && member.role !== "track")
+      .map(member => member.path));
+    const tags = [];
+    for (const [rawName, rawValue] of Object.entries(metadata)) {
+      const paths = attachmentMemberPaths(rawValue);
+      if (!paths.length || paths.some(path => !attachmentPaths.has(path))) continue;
+      const canonicalName = legacyPackageAttachmentNames.get(rawName) || rawName;
+      if (rawName === "documents" || canonicalName === "Documents") {
+        const textPaths = paths.filter(path => /\.txt$/i.test(path));
+        const otherPaths = paths.filter(path => !/\.txt$/i.test(path));
+        if (textPaths.length) tags.push({ rawName, name:"Text File", paths:textPaths, value:textPaths.length === 1 ? textPaths[0] : textPaths });
+        if (otherPaths.length) tags.push({ rawName, name:"Documents", paths:otherPaths, value:otherPaths.length === 1 ? otherPaths[0] : otherPaths });
+      } else {
+        tags.push({ rawName, name:canonicalName, paths, value:paths.length === 1 ? paths[0] : paths });
+      }
+    }
+    return tags;
+  }
   const metadataKeyFromLabel = (label, originalKey) => {
     const raw = String(label ?? "").trim();
     if (raw === displayTrackKey(originalKey)) return originalKey;
@@ -1070,8 +1103,13 @@
     };
     const game = parseObject(state.gameMetadataJSON) || {};
     const gameExtensions = parseObject(state.gameExtensionsJSON) || {};
+    const attachmentTags = packageAttachmentTags();
+    const representedKeys = new Set(attachmentTags.map(tag => tag.rawName));
+    attachmentTags.forEach(tag => add(tag.name, "Package Attachments", tag.value));
     Object.entries(game).forEach(([key, value]) => {
-      if (!structuralPackageAttachmentKeys.has(key)) add(key, "Package Tags", value);
+      if (!representedKeys.has(key) && !legacyPackageAttachmentNames.has(key)) {
+        add(key, "Package Tags", value);
+      }
     });
     Object.entries(gameExtensions).forEach(([key, value]) => add(`extension.${key}`, "Package Extensions", value));
     playableMembers().forEach(member => {
@@ -1107,7 +1145,8 @@
         valueInput = `<input data-tag-value aria-label="Tag value for ${esc(entry.key)}" value="${esc(sample)}">`;
       }
       const displayName = displayTrackKey(entry.key);
-      const tagType = multipleValues ? "Multiple Values" : signatures.size === 1 ? (Array.isArray(sample) ? "list" : typeof sample) : "various";
+      const isAttachment = [...entry.scopes].includes("Package Attachments");
+      const tagType = isAttachment ? "Attachment" : multipleValues ? "Multiple Values" : signatures.size === 1 ? (Array.isArray(sample) ? "list" : typeof sample) : "various";
       const readOnlyMultipleValues = multipleValues && !editableMultipleValues;
       const submitTitle = readOnlyMultipleValues ? "Multiple Values contain different values" : "Submit changed fields";
       const foldAttribute = multipleValues ? ` data-multiple-fold-id="${esc(foldID)}"` : "";
@@ -1759,7 +1798,15 @@
   function renderAttachments() {
     const assets = state.members.filter(member => member.role !== "playable" && member.role !== "track");
     if (!assets.length) return "";
-    const displayAttachmentRole = asset => asset.role === "document" && String(asset.format || "").toLowerCase() === "txt"
+    const roleByPath = new Map();
+    packageAttachmentTags().forEach(tag => tag.paths.forEach(path => {
+      const roles = roleByPath.get(path) || [];
+      roles.push(tag.name);
+      roleByPath.set(path, roles);
+    }));
+    const displayAttachmentRole = asset => roleByPath.has(asset.path)
+      ? roleByPath.get(asset.path).join(" · ")
+      : asset.role === "document" && String(asset.format || "").toLowerCase() === "txt"
       ? "Text File"
       : asset.role;
     const header = canonicalHeaderMarkup(["#", "Role", "Format", "Filename", "Stored path", "Size", "⌕"]);

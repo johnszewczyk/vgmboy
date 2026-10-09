@@ -110,10 +110,20 @@ public struct UACTagAnalysisResult: Equatable, Sendable {
 /// manifests only; it never materializes or modifies compressed members.
 public enum UACTagAnalyzer {
     private static let structuralPackageAttachmentKeys: Set<String> = [
+        "title_snap",
+        "text_file",
         "cover_front",
         "cover_back",
         "cue_sheet",
-        "documents"
+        "documents",
+    ]
+    private static let legacyPackageAttachmentNames = [
+        "title_snap": "Title Snap",
+        "text_file": "Text File",
+        "cover_front": "Cover Front",
+        "cover_back": "Cover Back",
+        "cue_sheet": "Cue Sheet",
+        "documents": "Documents"
     ]
 
     public static func analyze(
@@ -156,12 +166,19 @@ public enum UACTagAnalyzer {
                 let archiveTrackCount = manifest.members.filter {
                     $0.role == "playable" || $0.role == "track"
                 }.count
-                var packageTagNames = Set(manifest.game.metadata.keys.filter {
-                    !structuralPackageAttachmentKeys.contains($0)
-                })
+                let attachmentMemberPaths = Set(manifest.members.filter {
+                    $0.role != "playable" && $0.role != "track"
+                }.map(\.path))
+                var packageTagNames = Set<String>()
                 for (name, value) in manifest.game.metadata {
-                    guard !structuralPackageAttachmentKeys.contains(name) else { continue }
-                    addMatch(name, value: value, package: package, member: nil, scope: "Package Tags", storageScope: "packageMetadata", storageKey: name, isTrack: false, archiveAlbum: archiveAlbum, archiveTrackCount: archiveTrackCount, archiveTitle: manifest.game.title, archiveConsole: manifest.game.console, to: &tagCounts)
+                    let displayName = legacyPackageAttachmentNames[name] ?? name
+                    if let attachmentValue = Self.resolvedAttachmentValue(value, memberPaths: attachmentMemberPaths) {
+                        packageTagNames.insert(displayName)
+                        addMatch(displayName, value: attachmentValue, package: package, member: nil, scope: "Package Attachments", storageScope: "packageMetadata", storageKey: name, isTrack: false, archiveAlbum: archiveAlbum, archiveTrackCount: archiveTrackCount, archiveTitle: manifest.game.title, archiveConsole: manifest.game.console, to: &tagCounts)
+                    } else if !structuralPackageAttachmentKeys.contains(name) {
+                        packageTagNames.insert(displayName)
+                        addMatch(displayName, value: value, package: package, member: nil, scope: "Package Tags", storageScope: "packageMetadata", storageKey: name, isTrack: false, archiveAlbum: archiveAlbum, archiveTrackCount: archiveTrackCount, archiveTitle: manifest.game.title, archiveConsole: manifest.game.console, to: &tagCounts)
+                    }
                 }
                 for (name, value) in manifest.game.extensions {
                     let fieldName = "extension.\(name)"
@@ -294,6 +311,36 @@ public enum UACTagAnalyzer {
             }
             return string
         }
+    }
+
+    private static func resolvedAttachmentValue(
+        _ value: UACJSONValue,
+        memberPaths: Set<String>
+    ) -> UACJSONValue? {
+        let values: [UACJSONValue]
+        if case .array(let items) = value {
+            values = items
+        } else {
+            values = [value]
+        }
+        guard !values.isEmpty else { return nil }
+        var paths: [String] = []
+        for item in values {
+            let path: String?
+            switch item {
+            case .string(let value):
+                path = value
+            case .object(let fields):
+                if case .string(let value)? = fields["memberPath"] { path = value }
+                else { path = nil }
+            default:
+                path = nil
+            }
+            guard let path, memberPaths.contains(path) else { return nil }
+            paths.append(path)
+        }
+        if paths.count == 1 { return .string(paths[0]) }
+        return .array(paths.map(UACJSONValue.string))
     }
 
     private static func archiveAlbum(in manifest: UACManifest) -> String {

@@ -144,11 +144,14 @@ reports folder discovery and package reads, and **×** stops the scan. Cancellin
 clears the incomplete list. Unreadable folders or packages are reported, and
 their presence marks the result as potentially incomplete.
 
-New projected and authored tag names are stored in Title Case. Standard UAC
-structure keeps its contract spelling for attachment references such as
-`game.metadata.cue_sheet`. Package set facts use the direct Title Case tags
-**Set Collection**, **Set Name**, and **Set URL**, with optional **Set Legacy
-URL**, **Set Archive URL**, and **Set Date**. The Tag Analyzer reports the
+New projected and authored tag names are stored in Title Case. Package
+attachments are package-level tags: the tag name gives the attachment role and
+the value is a direct member path or an array of member paths. Pack Tags marks
+these rows as **Attachment**, and Tag Analyzer shows their names and path
+values. Do not store nested `mediaType`/`memberPath` descriptors; the member
+record already carries file format, size, and hashes. Package set facts use
+the direct Title Case tags **Set Name** and **Set URL**, with optional **Set
+Legacy URL**, **Set Archive URL**, and **Set Date**. The Tag Analyzer reports the
 exact stored tag name, including legacy casing, so it can audit old manifests
 without rewriting them.
 

@@ -8,6 +8,11 @@ Markdown documents are preserved and hashed as members alongside playable
 streams. AudioMan is a downstream operator of this CLI, not an owner or runtime
 dependency of the wrapper.
 
+Package attachment roles are stored as Title Case `game.metadata` tags whose
+values are direct member paths (or arrays for multiple files of one role). The
+member record carries file format, size, and hashes; do not emit nested
+`mediaType`/`memberPath` descriptors.
+
 - Swift package target: `UACWrapperCore`.
 - `UACContainerReader` owns framing and payload ranges; `UACManifest` contains
   the public JSON model; `UACManifestValidator` owns structural validation.
