@@ -8,6 +8,20 @@ import VGMBoySNDH
 import zlib
 @testable import ScanSongKit
 
+private func makeAttachmentProjectionUACDocument(
+    gameMetadata: [String: MetadataJSONValue],
+    memberPaths: [String]
+) -> MetadataDocument {
+    MetadataDocument(
+        format: "uac",
+        fields: MetadataFields(),
+        structuredMetadata: .object([
+            "game": .object(["metadata": .object(gameMetadata)]),
+            "members": .array(memberPaths.map { .object(["path": .string($0)]) })
+        ])
+    )
+}
+
 @Test func builtInPoliciesPreserveRequiredStructureWork() throws {
     let registry = BuiltInScannerPlugins.registry
     #expect(BuiltInScannerPlugins.archiveExtensions.contains("uac"))
@@ -2370,6 +2384,57 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
     #expect(row == [String(result.trackCount), String(result.trackCount)])
 }
 
+@Test func uacTitleSnapAttachmentUsesDirectPackageMemberPath() {
+    let document = makeAttachmentProjectionUACDocument(
+        gameMetadata: ["Title Snap": .string("art/title.png")],
+        memberPaths: ["track.spc", "art/title.png"]
+    )
+
+    #expect(UACCatalogMetadataAdapter.titleSnapLocator(in: document) == "archive-member:art/title.png")
+}
+
+@Test func uacTitleSnapAttachmentAcceptsPathArraysAndLegacyDescriptors() {
+    let directArray = makeAttachmentProjectionUACDocument(
+        gameMetadata: ["Title Snap": .array([
+            .string("art/missing.png"),
+            .string("art/title.png")
+        ])],
+        memberPaths: ["art/title.png"]
+    )
+    #expect(UACCatalogMetadataAdapter.titleSnapLocator(in: directArray) == "archive-member:art/title.png")
+
+    let legacyDescriptor = makeAttachmentProjectionUACDocument(
+        gameMetadata: ["cover_front": .array([
+            .object([
+                "mediaType": .string("image/png"),
+                "memberPath": .string("art/legacy.png")
+            ])
+        ])],
+        memberPaths: ["art/legacy.png"]
+    )
+    #expect(UACCatalogMetadataAdapter.titleSnapLocator(in: legacyDescriptor) == "archive-member:art/legacy.png")
+}
+
+@Test func uacTitleSnapAttachmentRequiresASafePNGMember() {
+    let missingMember = makeAttachmentProjectionUACDocument(
+        gameMetadata: ["Title Snap": .string("art/missing.png")],
+        memberPaths: ["track.spc"]
+    )
+    #expect(UACCatalogMetadataAdapter.titleSnapLocator(in: missingMember) == nil)
+
+    let unsafePath = makeAttachmentProjectionUACDocument(
+        gameMetadata: ["Title Snap": .string("../title.png")],
+        memberPaths: ["../title.png"]
+    )
+    #expect(UACCatalogMetadataAdapter.titleSnapLocator(in: unsafePath) == nil)
+
+    let nonPNGMember = makeAttachmentProjectionUACDocument(
+        gameMetadata: ["Title Snap": .string("art/title.jpg")],
+        memberPaths: ["art/title.jpg"]
+    )
+    #expect(UACCatalogMetadataAdapter.titleSnapLocator(in: nonPNGMember) == nil)
+}
+
 @Test func uacSPCMembersUseOnlyManifestTrackMetadataInCocoaSpiceCatalog() async throws {
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("ScanSong-uac-spc-\(UUID().uuidString)", isDirectory: true)
@@ -2385,17 +2450,24 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
 
     let payloadRoot = directory.appendingPathComponent("payload", isDirectory: true)
     let memberPath = "variants/original/track.spc"
+    let snapMemberPath = "art/title.png"
     let memberURL = payloadRoot.appendingPathComponent(memberPath)
     try FileManager.default.createDirectory(
         at: memberURL.deletingLastPathComponent(),
         withIntermediateDirectories: true
     )
     try spc.write(to: memberURL)
+    let snapURL = payloadRoot.appendingPathComponent(snapMemberPath)
+    try FileManager.default.createDirectory(
+        at: snapURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    try Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]).write(to: snapURL)
 
     let rawTarURL = directory.appendingPathComponent("payload.tar")
     try runFixtureTool(
         "/usr/bin/tar",
-        ["-cf", rawTarURL.path, "-C", payloadRoot.path, "variants"]
+        ["-cf", rawTarURL.path, "-C", payloadRoot.path, "variants", "art"]
     )
     let compressedPayloadURL = directory.appendingPathComponent("payload.tar.zst")
     try runFixtureTool(
@@ -2416,7 +2488,8 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
         game: UACGame(
             id: "uac-game-id",
             title: "Canonical Package Title",
-            console: "Nintendo SNES"
+            console: "Nintendo SNES",
+            metadata: ["Title Snap": .string(snapMemberPath)]
         ),
         variants: [UACVariant(id: "original", label: "Original", kind: "source")],
         members: [
@@ -2432,6 +2505,15 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
                     "game": .string("UAC Track Game"),
                     "title": .string("Manifest Edited Title")
                 ]
+            ),
+            UACMember(
+                path: snapMemberPath,
+                originalName: "title.png",
+                variantID: "original",
+                role: "attachment",
+                format: "png",
+                byteSize: 8,
+                blake3: String(repeating: "c", count: 64)
             )
         ],
         playlists: [
@@ -2509,6 +2591,17 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
          LIMIT 1;
         """
     )
+    let titleSnapRow = try querySingleRow(
+        database: try #require(database),
+        sql: """
+        SELECT tags.tag_name, tags.value
+          FROM track_metadata_tags tags
+          JOIN tracks t ON t.id=tags.track_id
+         WHERE tags.normalized_name='TITLE SNAP'
+         ORDER BY t.track_index
+         LIMIT 1;
+        """
+    )
     sqlite3_close(database)
     #expect(row == [
         memberPath,
@@ -2520,6 +2613,7 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
         "0",
         "2"
     ])
+    #expect(titleSnapRow == ["Title Snap", "archive-member:\(snapMemberPath)"])
 }
 
 @Test func uacCannotEnterThePayloadExtractionPath() async {
