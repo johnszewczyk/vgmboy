@@ -8,6 +8,7 @@ public struct SPCMetadataProjection: Equatable, Sendable {
     /// promoted to the game record without a duplicate member copy.
     public let memberFields: [String: UACJSONValue]
     public let sharedCandidates: [String: UACJSONValue]
+    public let sourcePlayLengthMs: Int?
 }
 
 public struct SPCSharedMetadataProjection: Equatable, Sendable {
@@ -35,6 +36,16 @@ public struct SPCMetadataMergeResult: Equatable, Sendable {
 public enum SPCMetadataProjector {
     public static func project(_ document: MetadataDocument) -> SPCMetadataProjection {
         var member = MetaManMetadataProjector.memberFields(from: document)
+        // MetaMan's SPC reader uses a 150-second display default when neither
+        // ID666 nor xID6 supplies timing. UAC playback metadata must describe
+        // source-provided timing only, so replace that generic projection with
+        // a value derived from the SPC's native timing tags.
+        let sourcePlayLengthMs = sourcePlayLengthMilliseconds(from: document)
+        if let sourcePlayLengthMs {
+            member["Play Length (ms)"] = .integer(Int64(sourcePlayLengthMs))
+        } else {
+            member.removeValue(forKey: "Play Length (ms)")
+        }
         // The package title and canonical console belong to the game record.
         // Their exact source bytes remain in the byte-identical SPC member.
         member.removeValue(forKey: "Game")
@@ -53,7 +64,45 @@ public enum SPCMetadataProjector {
             if let value = member[key] { shared[key] = value }
         }
         if let artist = member["Artist"] { shared["Album Artist"] = artist }
-        return SPCMetadataProjection(memberFields: member, sharedCandidates: shared)
+        return SPCMetadataProjection(
+            memberFields: member,
+            sharedCandidates: shared,
+            sourcePlayLengthMs: sourcePlayLengthMs
+        )
+    }
+
+    private static func sourcePlayLengthMilliseconds(from document: MetadataDocument) -> Int? {
+        let tags = Dictionary(grouping: document.tags, by: { normalizedTagName($0.name) })
+
+        // ID666 stores playback length in whole seconds. Match MetaMan's
+        // existing precedence when this source field is positive.
+        if let seconds = integerValue(in: tags[normalizedTagName("Length (seconds)")]), seconds > 0 {
+            return seconds * 1_000
+        }
+
+        // xID6 stores the authored intro, loop, end, and loop-count values.
+        // Only calculate a duration when at least one duration field is
+        // positively present; loop-count-only or zero-valued tags are not a
+        // playback duration.
+        let intro = integerValue(in: tags[normalizedTagName("Intro Length (ms)")]) ?? 0
+        let loop = integerValue(in: tags[normalizedTagName("Loop Length (ms)")]) ?? 0
+        let end = integerValue(in: tags[normalizedTagName("End Length (ms)")]) ?? 0
+        guard intro > 0 || loop > 0 || end > 0 else { return nil }
+        let loopCount = integerValue(in: tags[normalizedTagName("Loop Count")]) ?? 1
+        let duration = intro + loop * max(0, loopCount) + max(0, end)
+        return duration > 0 ? duration : nil
+    }
+
+    private static func integerValue(in tags: [MetadataTag]?) -> Int? {
+        tags?.compactMap { Int($0.value.trimmingCharacters(in: .whitespacesAndNewlines)) }.first
+    }
+
+    private static func normalizedTagName(_ value: String) -> String {
+        value.unicodeScalars
+            .filter(CharacterSet.alphanumerics.contains)
+            .map(String.init)
+            .joined()
+            .lowercased()
     }
 
     /// A value is shared only when every inspected track has it and all tracks

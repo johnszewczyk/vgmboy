@@ -44,7 +44,7 @@ UAC_METADATA_HEADER_SIZE = 40
 UAC_MANIFEST_ZSTD_MAGIC = b"ZJ01"
 UAC_COMPRESSED_MANIFEST_PREFIX_SIZE = 8
 UAC_MAX_MANIFEST_SIZE = 16 * 1024 * 1024
-UACMAN_VERSION = "0.2.0"
+UACMAN_VERSION = "0.2.1"
 ZSTD_FRAME_MAGIC = b"\x28\xb5\x2f\xfd"
 ZSTD_SEEK_TABLE_MAGIC = 0x184D2A5E
 ZSTD_SEEK_TABLE_FOOTER_MAGIC = 0x8F92EAB1
@@ -814,10 +814,12 @@ def harvest_spc_metadata(
 
     failures = response.get("failures")
     members = response.get("memberMetadata")
+    source_timed_paths = response.get("sourceTimedMemberPaths")
     game_metadata = response.get("gameMetadata")
     conflicts = response.get("sharedFieldConflicts")
     diagnostic_count = response.get("diagnosticCount")
     if (not isinstance(failures, list) or not isinstance(members, dict)
+            or not isinstance(source_timed_paths, list)
             or not isinstance(game_metadata, dict) or not isinstance(conflicts, list)
             or not isinstance(diagnostic_count, int)):
         raise UACError("UACMan metadata helper returned malformed SPC metadata.")
@@ -834,6 +836,28 @@ def harvest_spc_metadata(
     members = match_unicode_member_paths(members, spc_paths, "MetaMan SPC harvest")
     if any(not isinstance(fields, dict) for fields in members.values()):
         raise UACError("UACMan metadata helper returned a non-object member projection.")
+    if any(not isinstance(path, str) for path in source_timed_paths):
+        raise UACError("UACMan metadata helper returned a non-string source-timed SPC path.")
+    timed_records = {path: True for path in source_timed_paths}
+    timed_records = match_unicode_member_paths(
+        timed_records, spc_paths, "MetaMan SPC source-timing coverage", allow_partial=True
+    )
+    for path, fields in members.items():
+        projected = [value for key, value in fields.items()
+                     if imported_metadata_tag_name(key) == "Play Length (ms)"]
+        if path in timed_records:
+            try:
+                positive = any(int(value) > 0 for value in projected)
+            except (TypeError, ValueError):
+                positive = False
+            if not positive:
+                raise UACError(
+                    f"MetaMan reported source timing for {path} but did not project a positive Play Length (ms)."
+                )
+        elif projected:
+            raise UACError(
+                f"MetaMan projected Play Length (ms) for {path} without source timing; refusing a fallback value."
+            )
 
     game = recipe["game"]
     for key, value in game_metadata.items():
@@ -1562,13 +1586,14 @@ def manifest_bytes(recipe: dict, records: list[dict], payload: Path, level: int,
 
 def pack(args: argparse.Namespace) -> tuple[int, int, list[str], list[tuple[str, int, int]]]:
     root = Path(args.input_dir).expanduser().absolute()
+    if not root.is_dir():
+        raise UACError(f"Input directory does not exist: {root}")
     recipe = args.recipe if isinstance(args.recipe, dict) else load_recipe(Path(args.recipe).expanduser())
     add_source_set_metadata(recipe)
     apply_contained_container_versions(root, recipe)
     output = Path(args.output).expanduser().absolute()
     if output.exists():
         raise UACError(f"Refusing to overwrite existing output: {output}")
-    output.parent.mkdir(parents=True, exist_ok=True)
     profile = compression_profile(args.level, args.frame_size)
     del profile  # validate the requested profile before creating any output
 
@@ -1576,6 +1601,13 @@ def pack(args: argparse.Namespace) -> tuple[int, int, list[str], list[tuple[str,
     metadata_diagnostics = 0
     metadata_conflicts: list[str] = []
     metadata_helper = getattr(args, "harvest_spc_metadata", None)
+    included_files, _ = discover_files(root, include_macos_sidecars=False)
+    has_spc_members = any(Path(relative).suffix.casefold() == ".spc" for _, relative in included_files)
+    if has_spc_members and not metadata_helper:
+        raise UACError(
+            "SPC members require --harvest-spc-metadata so source tags and "
+            "source-provided Play Length (ms) are projected before packaging."
+        )
     if metadata_helper:
         harvested_spc, metadata_diagnostics, metadata_conflicts = harvest_spc_metadata(
             root,
@@ -1596,6 +1628,7 @@ def pack(args: argparse.Namespace) -> tuple[int, int, list[str], list[tuple[str,
         if count or diagnostics:
             generic_harvests.append((extension.lower().removeprefix("."), count, diagnostics))
 
+    output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="uacman-pack-") as temporary:
         work = Path(temporary)
         tar_path = work / "payload.tar"
@@ -2068,7 +2101,7 @@ def parser() -> argparse.ArgumentParser:
     pack_parser.add_argument(
         "--harvest-spc-metadata",
         metavar="UACMAN_METADATA_CLI",
-        help="Read SPC tags through UACManMetadataCLI/MetaManCore before writing the manifest.",
+        help="Required for .spc input; project source tags and source-timed Play Length (ms) through MetaManCore.",
     )
     pack_parser.add_argument(
         "--harvest-format-metadata",

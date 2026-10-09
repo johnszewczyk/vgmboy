@@ -42,7 +42,11 @@ their payloads do not need to be repacked just to remove the synthetic
 `variants/original/` directory. Version-2 files require updated UAC consumers.
 
 For creation-time SPC metadata, build `UACManMetadataCLI` from the project
-root and pass it with `--harvest-spc-metadata`. For another MetaMan-supported
+root and pass it with `--harvest-spc-metadata`; packing any `.spc` member
+without this harvest is rejected. The projector writes `Play Length (ms)`
+from a positive ID666 `Length (seconds)` value or the SPC reader's xID6
+intro/loop/end timing calculation. It omits the reader's 150-second default
+when the SPC source has no timing. For another MetaMan-supported
 format, use `--harvest-format-metadata vgm <UACManMetadataCLI>` (`mdx`, SID,
 NSF, NSFE, GBS, standard audio, and APE are also supported); the option can be
 repeated for additional extensions. MetaManCore projects selected, useful
