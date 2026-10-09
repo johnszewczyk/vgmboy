@@ -147,6 +147,11 @@ struct UACManWebWorkspace: NSViewRepresentable {
                 if let path = payload["path"] as? String { model.selectCollectionPackage(path) }
             case "toggleCollectionPackageSelection":
                 if let path = payload["path"] as? String { model.toggleCollectionPackageSelection(path) }
+            case "setCollectionPackageSelection":
+                model.setCollectionPackageSelection(
+                    payload["paths"] as? [String] ?? [],
+                    selected: payload["selected"] as? Bool ?? false
+                )
             case "stageCollectionPackageTagEdit":
                 model.stageCollectionPackageTagEdit(
                     key: payload["key"] as? String ?? "",

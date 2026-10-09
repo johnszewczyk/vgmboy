@@ -31,6 +31,17 @@
       <div class="panel-heading"><div><span class="eyebrow">LIBRARY</span><h2>Collections</h2></div><button class="icon-button" data-action="rescanCollection" id="rescan-button" title="Rescan collection" disabled>↻</button></div>
       <div class="collection-root" id="collection-root">No collection selected</div>
       <label class="search"><span>⌕</span><input id="collection-filter" placeholder="Filter packages" autocomplete="off"><kbd>⌘ F</kbd></label>
+      <div class="collection-selection-tools">
+        <div class="collection-selection-primary">
+          <button class="button secondary compact" data-action="toggleCollectionBatchSelectionMode" id="collection-batch-select">Batch Select</button>
+          <button class="button primary compact hidden" data-action="editSelectedCollectionPackages" id="collection-edit-selected" disabled>Edit selected</button>
+        </div>
+        <div class="collection-selection-bulk hidden" id="collection-selection-bulk">
+          <button class="button secondary compact" data-action="selectVisibleCollectionPackages">Select visible</button>
+          <button class="button secondary compact" data-action="clearCollectionPackageSelection">Clear</button>
+        </div>
+        <div class="collection-selection-hint hidden" id="collection-selection-hint">Click a row to add · ⌘-click or checkbox to toggle · Shift-click for a range</div>
+      </div>
       <div class="collection-list" id="collection-list"></div>
       <div class="collection-foot" id="collection-foot">Open a folder to browse its UAC packages.</div>
       <details class="issues hidden" id="issues-details"><summary>Unreadable packages <span id="issue-count"></span></summary><div id="issues-list"></div></details>
