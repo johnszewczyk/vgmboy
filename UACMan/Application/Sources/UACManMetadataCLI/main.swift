@@ -6,6 +6,7 @@ private struct HarvestResponse: Encodable {
     let schemaVersion = 1
     let memberMetadata: [String: [String: UACJSONValue]]
     let trackMetadata: [String: [MetaManMetadataTrackProjection]]
+    let sourceTimedMemberPaths: [String]
     let gameMetadata: [String: UACJSONValue]
     let sharedFieldConflicts: [String]
     let diagnosticCount: Int
@@ -28,6 +29,9 @@ private enum UACManMetadataCLI {
                         ($0.memberPath, $0.projection.memberFields)
                     }),
                     trackMetadata: [:],
+                    sourceTimedMemberPaths: outcome.items.compactMap {
+                        $0.projection.sourcePlayLengthMs == nil ? nil : $0.memberPath
+                    },
                     gameMetadata: shared.fields,
                     sharedFieldConflicts: shared.conflicts,
                     diagnosticCount: outcome.diagnosticCount,
@@ -41,6 +45,7 @@ private enum UACManMetadataCLI {
                 response = HarvestResponse(
                     memberMetadata: outcome.memberMetadata,
                     trackMetadata: outcome.trackMetadata,
+                    sourceTimedMemberPaths: [],
                     gameMetadata: [:],
                     sharedFieldConflicts: [],
                     diagnosticCount: outcome.diagnosticCount,

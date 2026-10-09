@@ -59,7 +59,9 @@ The GUI reads and edits the finished tags in the UAC manifest. It does not
 inspect member contents or invoke format readers. The separate
 `UACManMetadataCLI` product uses MetaManCore to read source directories and
 project selected, useful, source-backed metadata at package-creation time. SPC
-keeps its soundtrack-aware projection; VGM and VGZ use the common member
+keeps its soundtrack-aware projection and requires that harvest whenever an
+SPC member is packed. Positive ID666 or xID6 timing becomes `Play Length (ms)`;
+the reader's 150-second display fallback is never stored. VGM and VGZ use the common member
 projection, including GD3 metadata such as Genesis game, system, composer, and
 timing fields. Standard audio (including FLAC) and APE project selected
 canonical fields while their unchanged source members retain the complete

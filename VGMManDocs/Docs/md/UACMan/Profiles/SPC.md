@@ -48,9 +48,14 @@ sub-container and version together, such as `SPC v.30` or `SPC v.10`.
   list on the track as a positive source-identity tag, as specified by the set
   profile. Keep the four RSN digests in the permanent source-state database;
   embedding them in UAC does not replace that record.
-- **Playback timing** — Keep source timing only when policy and a consumer use
-  it. A parser's 150-second fallback is not source timing; store playback data
-  in wrapper playback fields, not descriptive tags.
+- **Playback timing** — Surface a positive ID666 `Length (seconds)` as integer
+  `Play Length (ms)` (`seconds × 1,000`). When ID666 has no positive length,
+  derive it from xID6 `Intro Length (ms) + Loop Length (ms) × Loop Count + End
+  Length (ms)`, using the reader's default loop count of one only when the
+  source omits the count. Do not surface the parser's 150-second fallback or
+  create a timing tag when neither source block supplies a positive duration.
+  Packing any SPC members requires the MetaMan-backed SPC harvest option so
+  these player-facing values cannot be silently skipped.
 - **Tag cleanup** — Keep source-backed fields in Title Case; omit blank tags,
   parser-only encoding labels, and the encoded xID6 OST Track code. Keep source
   **Disc Number** and the filename/order-based **Track Number** distinct.
