@@ -1641,6 +1641,7 @@ def pack(args: argparse.Namespace) -> tuple[int, int, list[str], list[tuple[str,
             args.include_macos_sidecars,
             getattr(args, "member_path_map", None),
         )
+        verify_tar_structure({"members": records}, tar_path)
         tar_size = tar_path.stat().st_size
         zstd_version = compress_seekable_tar(tar_path, payload_path, args.level, args.frame_size)
         if not payload_path.is_file():
@@ -1731,6 +1732,205 @@ def verify_uac_members(path: Path, manifest: dict) -> None:
             detail = result.stderr.decode("utf-8", errors="replace").strip()
             raise UACError(f"UAC payload failed full decompression verification: {detail}")
         verify_tar_members(manifest, tar_path)
+
+
+def verify_tar_structure(manifest: dict, tar_path: Path) -> list[tarfile.TarInfo]:
+    """Check the TAR index and member paths without rereading member payloads."""
+    expected_records = manifest.get("members")
+    if not isinstance(expected_records, list):
+        raise UACError("UAC manifest has no member list.")
+    if any(
+        not isinstance(record, dict)
+        or not isinstance(record.get("byteSize"), int)
+        or record["byteSize"] < 0
+        or not isinstance(record.get("path"), str)
+        for record in expected_records
+    ):
+        raise UACError("UAC manifest contains malformed member records.")
+    expected = {record.get("path"): record for record in expected_records if isinstance(record, dict)}
+    if len(expected) != len(expected_records):
+        raise UACError("UAC manifest contains duplicate or malformed members.")
+    with tarfile.open(tar_path, mode="r:") as archive:
+        members = archive.getmembers()
+        if len(members) != len(expected) or {member.name for member in members} != set(expected):
+            raise UACError("TAR member paths do not match the UAC manifest.")
+        for member in members:
+            record = expected[member.name]
+            if not member.isfile() or not safe_relative_path(member.name):
+                raise UACError(f"UAC TAR contains an unsafe or non-regular member: {member.name}")
+            if member.offset_data != record.get("tarDataOffset") or member.size != record.get("byteSize"):
+                raise UACError(f"UAC TAR member range disagrees with its manifest: {member.name}")
+        return members
+
+
+def encode_manifest_frame(manifest: dict) -> bytes:
+    """Encode the UAC metadata frame using the current bounded JSON contract."""
+    try:
+        manifest_data = json.dumps(
+            manifest,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    except (TypeError, ValueError) as error:
+        raise UACError(f"UAC manifest is not valid JSON: {error}") from error
+    if not (0 < len(manifest_data) <= UAC_MAX_MANIFEST_SIZE):
+        raise UACError("UAC manifest exceeds the 16 MiB reader limit.")
+    zstd = shutil.which("zstd")
+    if not zstd:
+        raise UACError("Writing a UAC manifest requires the zstd command-line encoder.")
+    compressed = compress_manifest(zstd, manifest_data)
+    stored_manifest = (
+        UAC_MANIFEST_ZSTD_MAGIC + struct.pack("<I", len(manifest_data)) + compressed
+        if compressed is not None else manifest_data
+    )
+    metadata_frame = (
+        UAC_METADATA_MAGIC
+        + struct.pack("<HH", 1, 0)
+        + hashlib.sha256(manifest_data).digest()
+        + stored_manifest
+    )
+    if len(metadata_frame) > 0xFFFFFFFF:
+        raise UACError("UAC metadata frame exceeds its 32-bit framing limit.")
+    return struct.pack("<II", UAC_SKIPPABLE_MAGIC, len(metadata_frame)) + metadata_frame
+
+
+def repair_member_paths(args: argparse.Namespace) -> None:
+    """Repair TAR header names only when manifest order, offsets, and member hashes prove identity."""
+    path = Path(args.container).expanduser().resolve()
+    if path.is_symlink() or not path.is_file():
+        raise UACError(f"Refusing to repair a symlink or non-file: {path}")
+    identity_before_read = filesystem_identity(path)
+    manifest, payload_offset, payload_size, _, _, _ = read_uac(path, verify_payload=True)
+    if filesystem_identity(path) != identity_before_read:
+        raise UACError(f"UAC changed while it was being read: {path}")
+    expected_records = manifest.get("members")
+    if not isinstance(expected_records, list):
+        raise UACError("UAC manifest has no member list.")
+    if any(
+        not isinstance(record, dict)
+        or not isinstance(record.get("byteSize"), int)
+        or record["byteSize"] < 0
+        or not isinstance(record.get("path"), str)
+        for record in expected_records
+    ):
+        raise UACError("UAC manifest contains malformed members; refusing path repair.")
+    estimated_tar_bytes = 1024 + sum(
+        512 + ((int(record.get("byteSize", 0)) + 511) // 512) * 512
+        for record in expected_records if isinstance(record, dict)
+    )
+    if shutil.disk_usage(path.parent).free < estimated_tar_bytes * 2:
+        raise UACError(
+            "Path repair needs temporary space for the TAR and recompressed payload; "
+            f"estimated requirement is {estimated_tar_bytes * 2:,} bytes."
+        )
+    with tempfile.TemporaryDirectory(prefix=".uacman-path-repair-", dir=path.parent) as temporary:
+        work = Path(temporary)
+        tar_path = work / "payload.tar"
+        with tar_path.open("wb") as tar_output, path.open("rb") as source:
+            source.seek(payload_offset)
+            result = subprocess.run(
+                [shutil.which("zstd") or "zstd", "-q", "-d", "-c", "--"],
+                stdin=source,
+                stdout=tar_output,
+                stderr=subprocess.PIPE,
+            )
+        if result.returncode:
+            detail = result.stderr.decode("utf-8", errors="replace").strip()
+            raise UACError(f"UAC payload failed full decompression: {detail}")
+        with tarfile.open(tar_path, mode="r:") as archive:
+            members = archive.getmembers()
+        if len(members) != len(expected_records):
+            raise UACError("TAR member count does not match the UAC manifest; refusing path repair.")
+        mismatches = [(member.name, record.get("path")) for member, record in zip(members, expected_records)
+                      if member.name != record.get("path")]
+        if not mismatches:
+            verify_tar_members(manifest, tar_path)
+            print(json.dumps({"path": str(path), "repairedPaths": 0, "verified": True}, indent=2))
+            return
+        if not args.apply:
+            print(json.dumps({
+                "path": str(path),
+                "mode": "dry-run",
+                "repairedPaths": 0,
+                "pathMismatches": mismatches,
+                "message": "Pass --apply to repair TAR header names after member identity checks.",
+            }, ensure_ascii=False, indent=2))
+            return
+
+        # The only approved repair is a name correction in the fixed-width TAR
+        # header. First prove the ordered offsets, sizes, and stored hashes; the
+        # post-edit verifier then proves the same bytes still match the UAC.
+        pairs = zip(members, expected_records)
+        for member, record in pairs:
+            if (not member.isfile() or not safe_relative_path(member.name)
+                    or not isinstance(record, dict) or not safe_relative_path(record.get("path", ""))
+                    or member.offset_data != record.get("tarDataOffset")
+                    or member.size != record.get("byteSize")):
+                raise UACError("TAR order/ranges do not prove a safe manifest-path repair.")
+        verify_tar_members(manifest, tar_path, allow_ordered_path_mismatch=True)
+
+        with tar_path.open("r+b") as tar_file:
+            for member, record in zip(members, expected_records):
+                wanted = record["path"]
+                if member.name == wanted:
+                    continue
+                encoded_name = wanted.encode("utf-8")
+                if len(encoded_name) > 100 or member.offset_data != member.offset + 512:
+                    raise UACError(f"TAR name requires a full archive rebuild and is not safely repairable in place: {wanted}")
+                tar_file.seek(member.offset)
+                header = bytearray(tar_file.read(512))
+                stored_name = header[:100].split(b"\0", 1)[0].decode("utf-8", errors="strict")
+                if stored_name != member.name:
+                    raise UACError(f"TAR header name does not match the parsed member: {member.name}")
+                header[:100] = encoded_name.ljust(100, b"\0")
+                header[148:156] = b" " * 8
+                checksum = sum(header)
+                header[148:156] = f"{checksum:06o}\0 ".encode("ascii")
+                tar_file.seek(member.offset)
+                tar_file.write(header)
+            tar_file.flush()
+            os.fsync(tar_file.fileno())
+        verify_tar_members(manifest, tar_path)
+
+        frame_match = SEEKABLE_PROFILE.fullmatch(manifest.get("payload", {}).get("compressionProfile", ""))
+        if not frame_match:
+            raise UACError("Cannot safely retain the package's seekable compression profile.")
+        level, frame_size = int(frame_match.group(1)), int(frame_match.group(2))
+        payload_path = work / "payload.tar.zst"
+        encoder_version = compress_seekable_tar(tar_path, payload_path, level, frame_size)
+        repaired_payload_size = payload_path.stat().st_size
+        repaired_manifest = json.loads(json.dumps(manifest))
+        repaired_manifest["payload"]["blake3"] = b3_file_from_offset(payload_path)
+        repaired_manifest["payload"]["encoderVersion"] = encoder_version
+        header = encode_manifest_frame(repaired_manifest)
+        staging_fd, staging_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".uac-repair", dir=path.parent)
+        staging = Path(staging_name)
+        try:
+            os.fchmod(staging_fd, stat.S_IMODE(path.stat().st_mode))
+            with os.fdopen(staging_fd, "wb") as target, payload_path.open("rb") as payload:
+                target.write(header)
+                shutil.copyfileobj(payload, target, length=1024 * 1024)
+                target.flush()
+                os.fsync(target.fileno())
+            repaired, _, _, _, _, _ = read_uac(staging, verify_payload=True)
+            verify_uac_members(staging, repaired)
+            if filesystem_identity(path) != identity_before_read:
+                raise UACError(f"UAC changed before atomic replacement: {path}")
+            os.replace(staging, path)
+        finally:
+            staging.unlink(missing_ok=True)
+    print(json.dumps({
+        "path": str(path),
+        "mode": "repaired",
+        "repairedPaths": len(mismatches),
+        "pathMismatches": mismatches,
+        "payloadBytesBefore": payload_size,
+        "payloadBytesAfter": repaired_payload_size,
+        "memberBytesPreserved": True,
+        "verified": True,
+    }, ensure_ascii=False, indent=2))
 
 
 def read_uac(path: Path, verify_payload: bool = True) -> tuple[dict, int, int, str, int, int]:
@@ -1828,6 +2028,18 @@ def rewrite_uac_manifest(path: Path, manifest: dict, expected_original_manifest:
         raise UACError(f"UAC manifest changed after the collection scan: {path}")
     if manifest.get("payload") != original_manifest.get("payload"):
         raise UACError("Manifest-only updates may not alter payload metadata.")
+    member_identity_fields = ("path", "byteSize", "tarDataOffset", "blake3", "streamBlake3", "hashes")
+    old_members = original_manifest.get("members")
+    new_members = manifest.get("members")
+    if not isinstance(old_members, list) or not isinstance(new_members, list):
+        raise UACError("Manifest-only updates require the existing member list.")
+    old_identity = [tuple(member.get(field) for field in member_identity_fields)
+                    for member in old_members if isinstance(member, dict)]
+    new_identity = [tuple(member.get(field) for field in member_identity_fields)
+                    for member in new_members if isinstance(member, dict)]
+    if (len(old_identity) != len(old_members) or len(new_identity) != len(new_members)
+            or old_identity != new_identity):
+        raise UACError("Manifest-only updates may not change member paths, ranges, or byte identities.")
     try:
         manifest_data = json.dumps(
             manifest,
@@ -1943,6 +2155,8 @@ def inspect(args: argparse.Namespace) -> None:
         path,
         verify_payload=args.verify,
     )
+    if args.verify:
+        verify_uac_members(path, manifest)
     summary = {
         "packageID": manifest.get("packageID"),
         "game": manifest.get("game"),
@@ -1963,7 +2177,12 @@ def inspect(args: argparse.Namespace) -> None:
     print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
 
 
-def verify_tar_members(manifest: dict, tar_path: Path) -> list[tarfile.TarInfo]:
+def verify_tar_members(
+    manifest: dict,
+    tar_path: Path,
+    *,
+    allow_ordered_path_mismatch: bool = False,
+) -> list[tarfile.TarInfo]:
     expected_records = manifest.get("members")
     if not isinstance(expected_records, list):
         raise UACError("UAC manifest has no member list.")
@@ -1972,12 +2191,21 @@ def verify_tar_members(manifest: dict, tar_path: Path) -> list[tarfile.TarInfo]:
         raise UACError("UAC manifest contains duplicate or malformed members.")
     with tarfile.open(tar_path, mode="r:") as archive:
         members = archive.getmembers()
-        if len(members) != len(expected) or {member.name for member in members} != set(expected):
-            raise UACError("TAR member paths do not match the UAC manifest.")
-        for member in members:
-            record = expected[member.name]
+        if allow_ordered_path_mismatch:
+            if len(members) != len(expected_records):
+                raise UACError("TAR member count does not match the UAC manifest.")
+            member_records = list(zip(members, expected_records))
+        else:
+            if len(members) != len(expected) or {member.name for member in members} != set(expected):
+                raise UACError("TAR member paths do not match the UAC manifest.")
+            member_records = [(member, expected[member.name]) for member in members]
+        for member, record in member_records:
+            if not isinstance(record, dict):
+                raise UACError("UAC manifest contains a malformed member record.")
             if not member.isfile() or not safe_relative_path(member.name):
                 raise UACError(f"UAC TAR contains an unsafe or non-regular member: {member.name}")
+            if not safe_relative_path(record.get("path", "")):
+                raise UACError(f"UAC manifest contains an unsafe member path: {record.get('path')}")
             if member.offset_data != record.get("tarDataOffset") or member.size != record.get("byteSize"):
                 raise UACError(f"UAC TAR member range disagrees with its manifest: {member.name}")
             source = archive.extractfile(member)
@@ -2116,9 +2344,13 @@ def parser() -> argparse.ArgumentParser:
     )
     pack_parser.set_defaults(run=pack)
 
-    inspect_parser = commands.add_parser("inspect", help="Read UAC metadata and optionally verify the compressed payload hash.")
+    inspect_parser = commands.add_parser("inspect", help="Read UAC metadata and optionally verify its full payload.")
     inspect_parser.add_argument("container")
-    inspect_parser.add_argument("--verify", action="store_true")
+    inspect_parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="verify payload BLAKE3, TAR paths/ranges, and supported raw-member hashes",
+    )
     inspect_parser.set_defaults(run=inspect)
 
     enrich_sets_parser = commands.add_parser(
@@ -2134,6 +2366,15 @@ def parser() -> argparse.ArgumentParser:
     unpack_parser.add_argument("output")
     unpack_parser.add_argument("--omit-manifest", action="store_true", help="Explicitly omit the manifest.json sidecar.")
     unpack_parser.set_defaults(run=unpack)
+
+    repair_paths_parser = commands.add_parser(
+        "repair-member-paths",
+        help="Correct TAR header names to match the manifest after ordered hash verification.",
+    )
+    repair_paths_parser.add_argument("container")
+    repair_paths_parser.add_argument("--apply", action="store_true",
+                                     help="atomically repair the package; default is report-only")
+    repair_paths_parser.set_defaults(run=repair_member_paths)
     return root
 
 
