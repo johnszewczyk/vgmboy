@@ -573,23 +573,8 @@ final class UACManModel {
         let root = url.standardizedFileURL
         tagAnalyzerRootURL = root
         UserDefaults.standard.set(root.path, forKey: PreferenceKey.lastTagAnalyzerPath)
-        tagAnalyzerHasResult = false
-        tagAnalyzerTags = []
-        tagAnalyzerSelectedMatchesTagName = nil
-        tagAnalyzerSelectedMatches = []
-        tagAnalyzerIssues = []
-        tagAnalyzerProgress = UACTagAnalysisProgress(
-            phase: .discovering,
-            directoriesVisited: 0,
-            packagesFound: 0,
-            packagesProcessed: 0,
-            totalPackages: 0,
-            currentRelativePath: "",
-            uniqueTagCount: 0
-        )
-        tagAnalyzerStatusMessage = "Folder selected. Choose Analyze to inventory its UAC tag names."
-        statusMessage = "Folder selected for tag analysis."
         errorMessage = nil
+        startTagAnalysis()
     }
 
     func startTagAnalysis() {
