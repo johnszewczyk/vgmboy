@@ -186,6 +186,7 @@ const audioEngine = {
 const refs = {
   sidebarSearchInput: document.getElementById("sidebar-search-input"),
   sidebarViewToggleButton: document.getElementById("sidebar-view-toggle-button"),
+  sidebarGalleryButton: document.getElementById("sidebar-gallery-button"),
   sidebarHistoryButton: document.getElementById("sidebar-history-button"),
   sidebarFavoritesButton: document.getElementById("sidebar-favorites-button"),
   sidebarViewButtons: [],

@@ -489,6 +489,10 @@ refs.sidebarViewToggleButton?.addEventListener("click", () => {
   app.ui.cycleSidebarMode().catch((error) => console.error("[SPCBoy] sidebar view switch failed", error));
 });
 
+refs.sidebarGalleryButton?.addEventListener("click", () => {
+  app.ui.showGalleryPlaylist().catch((error) => console.error("[SPCBoy] gallery view failed", error));
+});
+
 refs.sidebarHistoryButton?.addEventListener("click", () => {
   app.ui.showPlaybackHistory().catch((error) => console.error("[SPCBoy] playback history failed", error));
 });

@@ -12,8 +12,10 @@ family.
   repositories or submodules. Run Git commands from the family root.
 - Cross-package changes belong in one family-root commit so the checked-in
   package combination stays reviewable.
-- SPCBoyWK is the maintained SPCBoy player. CocoaSpice, SPCBoyWK, and ViewBoy
-  remain separate app packages with independent identities and presentation.
+- SPCBoyWK is the retired legacy SPCBOY frontend, superseded by SB2. Its source
+  remains in the family for history and reproducible builds, but it is not an
+  active product. CocoaSpice, SB2, and ViewBoy remain separate app packages
+  with independent identities and presentation.
 - Vendored decoder snapshots under `VGMBoy/vendor/` are ordinary tracked files,
   not submodules. Their upstream pins and provenance are documented beside the
   vendor tree.

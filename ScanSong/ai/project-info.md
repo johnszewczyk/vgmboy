@@ -3,7 +3,8 @@
 ## Product
 
 ScanSong is the VGMMan family's native catalog-management app and command-line
-scanner. It writes schema-25 catalogs read by CocoaSpice, SPCBoyWK, and ViewBoy.
+scanner. It writes schema-25 catalogs read by CocoaSpice, SB2, and ViewBoy.
+Retired SPCBoyWK remains a historical catalog consumer.
 
 ## Major Components
 

@@ -3,14 +3,15 @@
 ## Scope
 
 VGMBoy owns the shared playback core, decoder integration, dependency staging, and scanner-facing
-inspection builds for the CocoaSpice, SPCBoyWK, ViewBoy, and ScanSong products.
+inspection builds for the CocoaSpice, SB2, ViewBoy, and ScanSong products.
 
 ## Ownership
 
 - CocoaSpice is the native SwiftUI playlist frontend. It reads the ScanSong catalog and links
   `VGMBoyKit` in-process.
-- SPCBoyWK is the active native WebKit frontend. It reads the ScanSong catalog and links the
-  shared VGMBoy core through its native endpoint bridge.
+- SB2 is the current SPCBOY WebKit frontend under development. It reads the
+  ScanSong catalog and links the shared VGMBoy core through its native endpoint
+  bridge. SPCBoyWK is retired; its retained source remains a historical client.
 - ViewBoy is a separate active WebKit frontend with its own bundle identity and phosphor display
   layer. It reads the same catalog and links the shared core through its native bridge.
 - ScanSong is the native catalog-management app and the sole schema-24 catalog writer. It bundles
@@ -19,8 +20,8 @@ inspection builds for the CocoaSpice, SPCBoyWK, ViewBoy, and ScanSong products.
 
 ## Invariants
 
-- CocoaSpice, SPCBoyWK, and ViewBoy open the selected catalog read-only; all catalog writes belong
-  to ScanSong.
+- CocoaSpice, SB2, ViewBoy, and retained legacy SPCBoyWK source open the selected
+  catalog read-only; all catalog writes belong to ScanSong.
 - Frontends own queue policy, presentation, archive materialization, and host-specific process
   boundaries. VGMBoy owns format admission, decoder selection, timing, transport, equalization,
   and audio output.

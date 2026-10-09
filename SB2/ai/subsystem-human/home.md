@@ -5,8 +5,9 @@
   are hidden, and the strip remains draggable.
 - Nine playback, audio, and Options controls share the first sidebar toolbar at
   equal widths. The Volume control opens a 100px popup slider in 5% steps.
-  Search shares the next toolbar with four square buttons for library view,
-  History, Favorites, and expand/collapse; the search field shrinks to make room.
+  Search shares the next toolbar with five square buttons for Console/Path
+  view, Gallery, History, Favorites, and expand/collapse; the search field
+  shrinks to make room.
   The catalog tree fills the remaining scrollable area.
 - The sidebar status bar shows compact game and system totals when the library
   is ready. Loading, error, and empty-result messages appear there instead of
@@ -22,14 +23,17 @@
   and elapsed time. It briefly confirms readiness or remains visible with the
   startup error.
 - Command-Shift-F opens or switches to Favorites; Command-Shift-H opens or
-  switches to Playback History; Command-Shift-G or View > Gallery opens or
-  switches to Gallery.
-- Gallery is a playlist tab with an artwork-only grid. Its sidebar preserves
-  Console and Path views while filtering both to games/sources with a ScanSong
-  `Title Snap` value. Gallery tiles use square, centered cover crops and show
-  title and system as an image overlay. Zero gap and square corners create a
-  continuous tile grid by default; tile size, gap, and corner radius live in
-  Options > UI Chrome > Gallery Tiles.
+  switches to Playback History; Command-Shift-G or the Gallery toolbar button
+  opens or switches to Gallery.
+- Gallery is a playlist tab with an artwork-only grid. Its own sidebar toolbar
+  button opens Gallery. The sidebar automatically uses Console View and shows
+  only indexed `Title Snap` games, grouped by console with a thumbnail on each
+  game row. Console/Path switching is disabled while Gallery is active. A
+  single sidebar click selects an artwork title; Enter or double-click opens a
+  playlist tab and starts playback. Gallery tiles use square, centered cover
+  crops and show title and system as an image overlay. Zero gap and square
+  corners create a continuous tile grid by default; tile size, gap, and corner
+  radius live in Options > UI Chrome > Gallery Tiles.
 - Options slide down over the main content and leave the title and footer
   visible. Command-comma (⌘,) toggles Options; the visible Close Options control and
   Escape dismiss the page. A separate Options window uses the same chrome.
@@ -61,8 +65,8 @@
   Sidebar and playlist text sizes remain independent of this chrome scale.
 - All SB2 buttons use the same dark surface, radius, hover ink, and selected
   treatment. Buttons match the 1.75rem control height. The nine first-row
-  controls share the available width equally; Search shares a row with four
-  square library-view, History, Favorites, and expand/collapse controls. The
+  controls share the available width equally; Search shares a row with five
+  square Console/Path, Gallery, History, Favorites, and expand/collapse controls. The
   pane enforces enough minimum width to keep the first row intact. Text bars
   use the same height and 0.25rem inline padding; glyph buttons center their icons.
   Playlist tabs are separate rounded blocks with a visible gap and the same

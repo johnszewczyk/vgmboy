@@ -2,13 +2,16 @@
 
 ## Scope
 
-`scripts/verify-family.sh` inventories the VGMMan Git repository and checks its
-ten maintained Swift packages/apps: CatalogReader, VGMBoy, FrontendCore,
-MetaMan, UACMan, UACMan/Wrapper, ScanSong, CocoaSpice, SPCBoyWK, and ViewBoy.
-It also checks current documentation links and canonical project-info routing,
-UACWrapper's Python CLI, every
-active WebKit renderer JavaScript source file, and each renderer's `*.test.js`
-suite.
+`scripts/verify-family.sh` inventories the VGMMan Git repository and checks
+nine maintained Swift packages/apps: CatalogReader, VGMBoy, FrontendCore,
+MetaMan, UACMan, UACMan/Wrapper, ScanSong, CocoaSpice, and ViewBoy. It retains
+build, syntax, and renderer checks for retired SPCBoyWK as a historical source
+compatibility check; those checks do not make it an active frontend. The script
+does not include in-development SB2 in its package list, so SB2 changes require
+their own focused renderer syntax, build, and packaged UI verification. It also
+checks current documentation links and canonical project-info routing,
+UACWrapper's Python CLI, active WebKit renderer JavaScript sources, and their
+`*.test.js` suites.
 
 The checker records branch and dirty state, Git archive refs, toolchain and
 external-library versions, commands, durations, and full logs. It allocates
@@ -30,7 +33,7 @@ libraries, and host audio services remain external inputs.
 | Vendored dependency preparation | Passed from tracked source. |
 | Swift package tests | CatalogReader 26, FrontendCore 84, MetaMan 167, UACWrapper 23, UACMan 25, ScanSong 152, CocoaSpice 59 passed in the current worktree. |
 | UACWrapper Python | 26 tests passed. |
-| WebKit packages and renderers | SPCBoyWK and ViewBoy builds, checked JavaScript files, and renderer suites passed (82 and 22 tests). |
+| WebKit packages and renderers | Retained SPCBoyWK source and ViewBoy builds, checked JavaScript files, and renderer suites passed (82 and 22 tests). |
 | VGMBoy | Built; 75 tests ran. AAC export returned `.audioToolbox(1718449215)` and live transport did not start/resume on this host. The same two tests recorded five issues in both runs; the full family command exited nonzero. |
 | ScanSong packaged UI | A release app built and launched; it opened the existing default catalog (15 paths, 546,365 tracks). An isolated temporary catalog added one fixture path, scanned six SPC files into six tracks with zero issues, and updated its enabled state. The default catalog selection was restored without scanning or mutating it. |
 

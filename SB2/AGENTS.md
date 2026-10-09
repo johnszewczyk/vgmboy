@@ -1,7 +1,8 @@
 # AGENTS
 
-This is the fourth frontend under development in the VGMMan family, with its
-own package, app bundle, preference namespace, and release boundary. Read
+This is the current SPCBOY frontend under development in the VGMMan family,
+superseding retired SPCBoyWK. SB2 has its own package, app bundle, preference
+namespace, and release boundary. Read
 `../AGENTS.md`, `../project-info.md`, then `ai/AGENTS.md` and
 `ai/project-info.md` before changing implementation.
 

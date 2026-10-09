@@ -3,7 +3,8 @@
 ## Product
 
 `CatalogReader` is the shared read-only catalog and browser-behavior package
-for the active VGMMan player frontends: CocoaSpice, SPCBoyWK, and ViewBoy.
+for the active VGMMan player frontends: CocoaSpice, SB2, and ViewBoy. The
+retired SPCBoyWK package remains a historical consumer of these interfaces.
 
 ## Major Components
 

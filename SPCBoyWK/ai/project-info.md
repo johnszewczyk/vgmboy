@@ -2,9 +2,10 @@
 
 ## Product
 
-`SPCBoyWK` is a maintained, independent native macOS WebKit player in the
-VGMMan family. It is a separate product from the phosphor-skinned ViewBoy
-frontend.
+`SPCBoyWK` is the retired legacy native macOS WebKit SPCBOY frontend in the
+VGMMan family. SB2 is its active successor under development. SPCBoyWK source
+and package files remain for historical reference and reproducible builds;
+SPCBoyWK is not listed as an active app and receives no feature work.
 
 ## Major Components
 

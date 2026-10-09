@@ -2,9 +2,10 @@
 
 ## Product
 
-SPCBOY SB2 is an independent WebKit player frontend under development. It shares catalog and
-playback contracts with the VGMMan family while keeping its app identity,
-preference namespace, archive cache, and renderer distinct.
+SPCBOY SB2 is the current WebKit SPCBOY frontend under development, superseding
+retired SPCBoyWK. It shares catalog and playback contracts with the VGMMan
+family while keeping its app identity, preference namespace, archive cache,
+and renderer distinct.
 
 ## Major Components
 
@@ -19,6 +20,7 @@ preference namespace, archive cache, and renderer distinct.
 ## Task Routing
 
 - Home and playlist behavior: `subsystem-human/home.md`
+- Sidebar actions and Gallery projection lifecycle: `subsystem-agent/sidebar-actions.md`
 - Selection and hover motion: `subsystem-agent/selection-animation.md`
 - Options behavior: `subsystem-human/options.md`
 - Startup progress ownership: `subsystem-agent/startup-experience.md`
@@ -28,8 +30,9 @@ preference namespace, archive cache, and renderer distinct.
 ## Local Rules
 
 - Keep the pixel-style home controls compact: transport fills the first sidebar
-  toolbar, search fills the second, and square library-view/fold controls sit in
-  a third row. The bottom sidebar status bar reports catalog totals.
+  toolbar, while search shares its row with square library-view, Gallery,
+  History, Favorites, and expand/collapse controls. The bottom sidebar status bar
+  reports catalog totals.
 - Keep SPCBOY-owned Database, Interface, and Windows options separate from
   VGMBoy-owned Playback, Routing, Audio, and Diagnostics options.
 - The progress slider is hidden in this skin. Other frontends keep their own
