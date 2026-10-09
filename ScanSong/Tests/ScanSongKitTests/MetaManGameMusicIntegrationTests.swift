@@ -27,5 +27,34 @@ func gbsScannerUsesMetaManTrackDocuments() async throws {
     #expect(inspection.tracks.allSatisfy { $0.metadata?.game == "GBS Game" })
     #expect(inspection.tracks.allSatisfy { $0.metadata?.author == "Author" })
     #expect(inspection.tracks.allSatisfy { $0.metadata?.system == "Nintendo Game Boy" })
-    #expect(inspection.tracks.allSatisfy { $0.metadata?.playLengthMs == 150_000 })
+    #expect(inspection.tracks.allSatisfy { $0.metadata?.playLengthMs == -1 })
+}
+
+@Test("GBS scanner projects fractional sibling-M3U timing through MetaMan")
+func gbsScannerProjectsFractionalPlaylistTiming() async throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("scansong-metaman-gbs-m3u-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    var data = Data(repeating: 0, count: 0x70)
+    data.replaceSubrange(0..<3, with: Data("GBS".utf8))
+    data[0x03] = 1
+    data[0x04] = 2
+    data[0x05] = 1
+    let fileURL = directory.appendingPathComponent("fixture.gbs")
+    try data.write(to: fileURL)
+    try "fixture.gbs::GBS,0,Opening,1:23.456,0:10.500-,0:02.250,3\n"
+        .write(to: directory.appendingPathComponent("01 Opening.m3u"), atomically: true, encoding: .utf8)
+
+    let route = try #require(BuiltInScannerPlugins.registry.route(forPath: fileURL.path))
+    let handler = try #require(BuiltInFormatInspectors.registry.handler(for: route))
+    let inspection = try await handler.inspect(fileURL: fileURL, route: route)
+    let track = try #require(inspection.tracks.first?.metadata)
+
+    #expect(track.song == "Opening")
+    #expect(track.playLengthMs == 83_456)
+    #expect(track.introLengthMs == 10_500)
+    #expect(track.loopLengthMs == -1)
+    #expect(track.fadeLengthMs == 2_250)
 }
