@@ -37,10 +37,10 @@ const PLAYLIST_VIRTUAL_OVERSCAN = 12;
 const EMPTY_DATABASE_GAMES = [];
 let playlistVirtualRowHeight = 28;
 let playlistViewportFrame = 0;
-let catalogPlaylistSortGeneration = 0;
-let projectionPlaylistSortGeneration = 0;
 let playlistTabsSaveTimer = 0;
 let playlistTabsSaveChain = Promise.resolve();
+let playlistContentRequestGeneration = 0;
+let playlistSortGeneration = 0;
 const treeSearchText = new WeakMap();
 let startupStartedAt = 0;
 let startupRevealTimer = 0;
@@ -103,6 +103,43 @@ function makePlaylistTabID() {
 function findActivePlaylistTab() {
   return state.playlistTabs?.find((tab) => tab.id === state.activePlaylistTabId) || null;
 }
+
+function beginPlaylistContentRequest({
+  targetTabID = state.activePlaylistTabId,
+  interactionGeneration = null,
+  browserGeneration = null
+} = {}) {
+  return {
+    generation: ++playlistContentRequestGeneration,
+    targetTabID,
+    interactionGeneration,
+    browserGeneration
+  };
+}
+
+function isCurrentPlaylistContentRequest(request) {
+  return Boolean(request)
+    && request.generation === playlistContentRequestGeneration
+    && request.targetTabID === state.activePlaylistTabId
+    && (request.interactionGeneration === null
+      || request.interactionGeneration === sidebarInteractionGeneration)
+    && (request.browserGeneration === null
+      || request.browserGeneration === browserSelectionGeneration);
+}
+
+refs.playlistTabs?.addEventListener("click", (event) => {
+  const item = event.target.closest?.(".playlist-tab[data-playlist-tab-id]");
+  if (!item || !refs.playlistTabs.contains(item)) return;
+  const tabID = item.dataset.playlistTabId;
+  if (!state.playlistTabs?.some((tab) => tab.id === tabID)) return;
+  if (event.target.closest?.(".playlist-tab-close")) {
+    event.preventDefault();
+    event.stopPropagation();
+    closePlaylistTab(tabID);
+    return;
+  }
+  activatePlaylistTab(tabID);
+});
 
 function syncActivePlaylistTab() {
   const tab = findActivePlaylistTab();
@@ -229,10 +266,6 @@ function renderPlaylistTabs() {
     if (!item) {
       item = document.createElement("div");
       item.className = "playlist-tab";
-      item.dataset.playlistTabId = tab.id;
-      item.addEventListener("click", (event) => {
-        if (!event.target.closest(".playlist-tab-close")) activatePlaylistTab(tab.id);
-      });
 
       const select = document.createElement("button");
       select.type = "button";
@@ -244,13 +277,10 @@ function renderPlaylistTabs() {
       close.type = "button";
       close.className = "playlist-tab-close";
       close.textContent = "×";
-      close.addEventListener("click", (event) => {
-        event.stopPropagation();
-        closePlaylistTab(tab.id);
-      });
       item.appendChild(close);
     }
 
+    item.dataset.playlistTabId = tab.id;
     const select = item.querySelector(".playlist-tab-select");
     const close = item.querySelector(".playlist-tab-close");
     const title = String(tab.title || "Playlist");
@@ -276,6 +306,8 @@ function activatePlaylistTab(tabID, { syncOutgoing = true } = {}) {
   const tab = state.playlistTabs?.find((entry) => entry.id === tabID);
   if (!tab || tab.id === state.activePlaylistTabId) return false;
   if (syncOutgoing) syncActivePlaylistTab();
+  playlistContentRequestGeneration += 1;
+  playlistSortGeneration += 1;
   browserSelectionGeneration += 1;
   invalidateSidebarInteractions();
   void invalidatePlaylistCatalogSession().catch((error) => console.error("[SPCBoy] playlist request invalidation failed", error));
@@ -325,12 +357,12 @@ function activateOrCreateProjectionTab(title) {
 
 function closePlaylistTab(tabID = state.activePlaylistTabId) {
   const tabs = state.playlistTabs || [];
+  const closingIndex = tabs.findIndex((tab) => tab.id === tabID);
+  if (closingIndex < 0) return false;
   if (tabs.length <= 1) {
     window.spcBoySB2?.closeMainWindow?.().catch((error) => console.error("[SPCBoy] close window failed", error));
     return false;
   }
-  const closingIndex = tabs.findIndex((tab) => tab.id === tabID);
-  if (closingIndex < 0) return false;
   const wasActive = tabs[closingIndex].id === state.activePlaylistTabId;
   if (wasActive) syncActivePlaylistTab();
   tabs.splice(closingIndex, 1);
@@ -346,6 +378,10 @@ function closePlaylistTab(tabID = state.activePlaylistTabId) {
 
 function restorePlaylistTabs(value) {
   if (value?.version !== 1 || !Array.isArray(value.tabs) || !value.tabs.length) return false;
+  playlistContentRequestGeneration += 1;
+  playlistSortGeneration += 1;
+  browserSelectionGeneration += 1;
+  invalidateSidebarInteractions();
   const identifiers = new Set();
   const tabs = value.tabs.slice(0, 64).filter((tab) => {
     if (!tab || typeof tab.id !== "string" || !tab.id || identifiers.has(tab.id)) return false;
@@ -1141,13 +1177,18 @@ function showSidebarContextMenu(node, event) {
     }],
     ["Show in Finder", async () => window.spcBoySB2.showInFinder(finderPath)],
     ["Play Now", async () => activateBrowserNode(node)],
-    ["Queue", async () => queueBrowserNode(node)]
+    ["Queue", async (request) => queueBrowserNode(node, request)]
   ]);
 }
 
 async function activateBrowserNode(node, { playNow = true } = {}) {
   const generation = ++browserSelectionGeneration;
   const targetTabID = state.activePlaylistTabId;
+  const request = beginPlaylistContentRequest({
+    targetTabID,
+    interactionGeneration: sidebarInteractionGeneration,
+    browserGeneration: generation
+  });
   try {
     state.selectedBrowserPath = node.path;
     persistSettings();
@@ -1158,11 +1199,10 @@ async function activateBrowserNode(node, { playNow = true } = {}) {
     }
     const selection = await loadBrowserSelection(node);
     if (!selection
-        || generation !== browserSelectionGeneration
-        || state.selectedBrowserPath !== node.path
-        || targetTabID !== state.activePlaylistTabId) return;
-    const applied = await applyFolderSelection(selection, targetTabID, node.name);
-    if (!applied || targetTabID !== state.activePlaylistTabId) return;
+        || !isCurrentPlaylistContentRequest(request)
+        || state.selectedBrowserPath !== node.path) return;
+    const applied = await applyFolderSelection(selection, targetTabID, node.name, request);
+    if (!applied || !isCurrentPlaylistContentRequest(request)) return;
     const target = selection.playlist?.[0];
     if (playNow && target) await playVisibleTrack(target.id, 0);
   } catch (error) {
@@ -1173,13 +1213,16 @@ async function activateBrowserNode(node, { playNow = true } = {}) {
 async function previewBrowserLeaf(node) {
   const generation = ++browserSelectionGeneration;
   const targetTabID = state.activePlaylistTabId;
+  const request = beginPlaylistContentRequest({
+    targetTabID,
+    interactionGeneration: sidebarInteractionGeneration,
+    browserGeneration: generation
+  });
   try {
     const selection = await loadBrowserSelection(node);
-    if (!selection) return;
-    if (generation !== browserSelectionGeneration
-        || state.selectedBrowserPath !== node.path
-        || targetTabID !== state.activePlaylistTabId) return;
-    await applyFolderSelection(selection, targetTabID, node.name);
+    if (!selection || !isCurrentPlaylistContentRequest(request)
+        || state.selectedBrowserPath !== node.path) return;
+    await applyFolderSelection(selection, targetTabID, node.name, request);
   } catch (error) {
     console.error(error);
   }
@@ -1209,6 +1252,7 @@ function selectBrowserNode(node, { focus = false, previewLeaf = true } = {}) {
   lastPlaylistSelectionID = null;
   if (state.selectedBrowserPath !== node.path) {
     browserSelectionGeneration += 1;
+    playlistContentRequestGeneration += 1;
   }
   state.selectedBrowserPath = node.path;
   persistSettings();
@@ -1252,11 +1296,16 @@ function jumpFocusedListToEdge(toEnd, focused = document.activeElement) {
   return false;
 }
 
-function appendPlaylistTracks(additions, selectedBrowserPath = state.selectedBrowserPath) {
-  if (!additions.length) return;
+function appendPlaylistTracks(additions, selectedBrowserPath = state.selectedBrowserPath, {
+  targetTabID = state.activePlaylistTabId,
+  interactionGeneration = sidebarInteractionGeneration
+} = {}) {
+  if (targetTabID !== state.activePlaylistTabId
+      || interactionGeneration !== sidebarInteractionGeneration
+      || !Array.isArray(additions) || !additions.length) return false;
   const existingIds = new Set(state.playlist.map((track) => track.id));
   const uniqueAdditions = additions.filter((track) => !existingIds.has(track.id));
-  if (!uniqueAdditions.length) return;
+  if (!uniqueAdditions.length) return false;
   state.selectedBrowserPath = selectedBrowserPath;
   state.playlist = [...state.playlist, ...uniqueAdditions];
   state.catalogPlaylistColumnContentHints = null;
@@ -1268,12 +1317,21 @@ function appendPlaylistTracks(additions, selectedBrowserPath = state.selectedBro
   syncTreeSelection();
   renderPlaylist();
   uiApp.playback.updateTimingSummary();
+  return true;
 }
 
-async function queueBrowserNode(node) {
+async function queueBrowserNode(node, {
+  targetTabID = state.activePlaylistTabId,
+  interactionGeneration = sidebarInteractionGeneration
+} = {}) {
+  const generation = ++browserSelectionGeneration;
+  const request = beginPlaylistContentRequest({ targetTabID, interactionGeneration, browserGeneration: generation });
   const selection = await loadBrowserSelection(node);
-  if (!selection) return;
-  appendPlaylistTracks(Array.isArray(selection.playlist) ? selection.playlist : [], node.path);
+  if (!selection || !isCurrentPlaylistContentRequest(request)) return false;
+  return appendPlaylistTracks(Array.isArray(selection.playlist) ? selection.playlist : [], node.path, {
+    targetTabID,
+    interactionGeneration
+  });
 }
 
 async function toggleBrowserNode(node) {
@@ -1513,6 +1571,7 @@ let sidebarInteractionGeneration = 0;
 
 function invalidateSidebarInteractions() {
   sidebarInteractionGeneration += 1;
+  playlistContentRequestGeneration += 1;
   databaseGroupTransitionGeneration += 1;
   window.clearTimeout(databaseGameClickTimer);
   databaseGameClickTimer = 0;
@@ -1785,7 +1844,8 @@ function renderDatabaseGames() {
           event.preventDefault();
           event.stopPropagation();
           void (async () => {
-            await applySharedDatabaseGroupAction("select", consoleName);
+            const selected = await applySharedDatabaseGroupAction("select", consoleName);
+            if (!selected) return;
             await activateDatabaseSelection();
           })().catch((error) => reportDatabaseSidebarError("play the selected console", error));
         }
@@ -1794,7 +1854,8 @@ function renderDatabaseGames() {
         event.preventDefault();
         event.stopPropagation();
         void (async () => {
-          await applySharedDatabaseGroupAction("select", consoleName);
+          const selected = await applySharedDatabaseGroupAction("select", consoleName);
+          if (!selected) return;
           await activateDatabaseSelection();
         })().catch((error) => reportDatabaseSidebarError("play the selected console", error));
       });
@@ -1962,10 +2023,11 @@ async function cycleSidebarMode() {
 async function showFavoritesPlaylist() {
   if (!activateOrCreateProjectionTab("Favorites")) return false;
   const targetTabID = state.activePlaylistTabId;
+  const request = beginPlaylistContentRequest({ targetTabID, interactionGeneration: sidebarInteractionGeneration });
   await refreshFavorites();
-  if (targetTabID !== state.activePlaylistTabId) return false;
+  if (!isCurrentPlaylistContentRequest(request)) return false;
   await invalidatePlaylistCatalogSession();
-  if (targetTabID !== state.activePlaylistTabId) return false;
+  if (!isCurrentPlaylistContentRequest(request)) return false;
   state.playlist = [...state.favorites];
   state.playlistTitle = "Favorites";
   state.catalogPlaylistColumnContentHints = null;
@@ -2026,10 +2088,11 @@ function historyRecordToPlaylistTrack(record) {
 async function showPlaybackHistory() {
   if (!activateOrCreateProjectionTab("History")) return false;
   const targetTabID = state.activePlaylistTabId;
+  const request = beginPlaylistContentRequest({ targetTabID, interactionGeneration: sidebarInteractionGeneration });
   const records = await window.spcBoySB2.playbackHistoryList();
-  if (targetTabID !== state.activePlaylistTabId) return false;
+  if (!isCurrentPlaylistContentRequest(request)) return false;
   await invalidatePlaylistCatalogSession();
-  if (targetTabID !== state.activePlaylistTabId) return false;
+  if (!isCurrentPlaylistContentRequest(request)) return false;
   state.playlist = (Array.isArray(records) ? records : [])
     .map(historyRecordToPlaylistTrack)
     .filter(Boolean);
@@ -2442,25 +2505,31 @@ async function loadDatabaseGamesIntoPlaylist(games, {
   targetTabID = state.activePlaylistTabId,
   interactionGeneration = sidebarInteractionGeneration
 } = {}) {
-  if (targetTabID !== state.activePlaylistTabId
-      || interactionGeneration !== sidebarInteractionGeneration) return false;
+  const request = beginPlaylistContentRequest({ targetTabID, interactionGeneration });
+  if (!isCurrentPlaylistContentRequest(request)) return false;
   await invalidatePlaylistCatalogSession();
-  if (targetTabID !== state.activePlaylistTabId
-      || interactionGeneration !== sidebarInteractionGeneration) return false;
+  if (!isCurrentPlaylistContentRequest(request)) return false;
   const rows = await window.spcBoySB2.databaseGameTracks(games);
   if (rows?.stale === true
-      || targetTabID !== state.activePlaylistTabId
-      || interactionGeneration !== sidebarInteractionGeneration) return false;
-  state.databaseSidebarError = "";
-  state.selectedDatabaseGameKey = games.length === 1 ? databaseGameKey(games[0]) : null;
-  state.playlist = databaseRowsToPlaylistTracks(rows);
-  state.playlistTitle = String(title || (games.length === 1
+      || !isCurrentPlaylistContentRequest(request)) return false;
+  const playlist = databaseRowsToPlaylistTracks(rows, { adoptProjection: false });
+  const playlistTitle = String(title || (games.length === 1
     ? String(games[0].displayName || games[0].name || "Playlist")
     : `${databaseConsoleName(games[0]) || "Playlist"} (${games.length})`));
+  const sortedPlaylist = await sortPlaylistCandidate(playlist, {
+    title: playlistTitle,
+    columnContentHints: rows.columnContentHints,
+    sortSessionId: rows.sortSessionId || null,
+    shouldContinue: () => isCurrentPlaylistContentRequest(request)
+  });
+  if (!sortedPlaylist || !isCurrentPlaylistContentRequest(request)) return false;
+  state.databaseSidebarError = "";
+  state.selectedDatabaseGameKey = games.length === 1 ? databaseGameKey(games[0]) : null;
+  state.playlist = sortedPlaylist;
+  state.playlistTitle = playlistTitle;
+  state.catalogPlaylistColumnContentHints = rows.columnContentHints || null;
+  state.catalogPlaylistSortSessionId = rows.sortSessionId || null;
   renderPlaylistTabs();
-  await applyCatalogPlaylistSort();
-  if (targetTabID !== state.activePlaylistTabId
-      || interactionGeneration !== sidebarInteractionGeneration) return false;
   // Sidebar selection is a preview operation. It must not replace the
   // playback queue or clear the active track; explicit Play/Enter adopts this
   // visible playlist through playTrack({ replaceQueue: true }).
@@ -2701,34 +2770,8 @@ function isCatalogPlaylistProjection() {
     && state.playlist.every((track) => track.catalogRow === true);
 }
 
-async function applyCatalogPlaylistSort() {
-  if (!state.playlistSortEnabled
-      || !isCatalogPlaylistProjection()
-      || !state.catalogPlaylistSortSessionId) return false;
-  const generation = ++catalogPlaylistSortGeneration;
-  const originalIDs = state.playlist.map((track) => track.id);
-  const orderedIDs = await window.spcBoySB2.databasePlaylistSort({
-    sessionId: state.catalogPlaylistSortSessionId,
-    column: state.sortColumn,
-    direction: state.sortDirection,
-    ids: originalIDs
-  });
-  if (generation !== catalogPlaylistSortGeneration
-      || !Array.isArray(orderedIDs)
-      || orderedIDs.length !== originalIDs.length
-      || state.playlist.length !== originalIDs.length
-      || state.playlist.some((track, index) => track.id !== originalIDs[index])) {
-    return false;
-  }
-  const tracksByID = new Map(state.playlist.map((track) => [track.id, track]));
-  const sorted = orderedIDs.map((id) => tracksByID.get(id));
-  if (sorted.some((track) => !track)) return false;
-  state.playlist = sorted;
-  return true;
-}
-
-function playlistSortRecords() {
-  return state.playlist.map((track, naturalOrder) => ({
+function playlistSortRecords(playlist = state.playlist) {
+  return playlist.map((track, naturalOrder) => ({
     id: String(track.id),
     naturalOrder,
     fileText: String(track.filename || ""),
@@ -2745,34 +2788,87 @@ function playlistSortRecords() {
 }
 
 async function applyProjectionPlaylistSort() {
-  if (!state.playlistSortEnabled || isCatalogPlaylistProjection()) return false;
-  const generation = ++projectionPlaylistSortGeneration;
-  const originalIDs = state.playlist.map((track) => track.id);
-  const orderedIDs = await window.spcBoySB2.playlistProjectionSort({
-    records: playlistSortRecords(),
-    frontendColumn: state.sortColumn,
+  if (isCatalogPlaylistProjection()) return false;
+  return applyPlaylistSortToCurrent();
+}
+
+function playlistSortSettings() {
+  return {
+    enabled: state.playlistSortEnabled,
+    column: state.sortColumn,
     direction: state.sortDirection
-  });
-  if (generation !== projectionPlaylistSortGeneration
-      || !Array.isArray(orderedIDs)
-      || orderedIDs.length !== originalIDs.length
-      || state.playlist.length !== originalIDs.length
-      || state.playlist.some((track, index) => track.id !== originalIDs[index])) {
-    return false;
+  };
+}
+
+function samePlaylistSortSettings(left, right) {
+  return left.enabled === right.enabled
+    && left.column === right.column
+    && left.direction === right.direction;
+}
+
+async function sortPlaylistCandidate(playlist, {
+  title = state.playlistTitle,
+  columnContentHints = state.catalogPlaylistColumnContentHints,
+  sortSessionId = state.catalogPlaylistSortSessionId,
+  shouldContinue = () => true
+} = {}, attempt = 0) {
+  if (!shouldContinue()) return null;
+  const settings = playlistSortSettings();
+  if (!settings.enabled || (settings.column === "timestamp" && title !== "History")) return playlist;
+
+  const originalIDs = playlist.map((track) => String(track.id));
+  const catalogProjection = columnContentHints !== null
+    && playlist.length > 0
+    && playlist.every((track) => track.catalogRow === true);
+  let orderedIDs;
+  if (catalogProjection && sortSessionId) {
+    orderedIDs = await window.spcBoySB2.databasePlaylistSort({
+      sessionId: sortSessionId,
+      column: settings.column,
+      direction: settings.direction,
+      ids: originalIDs
+    });
+  } else {
+    orderedIDs = await window.spcBoySB2.playlistProjectionSort({
+      records: playlistSortRecords(playlist),
+      frontendColumn: settings.column,
+      direction: settings.direction
+    });
   }
-  const tracksByID = new Map(state.playlist.map((track) => [track.id, track]));
-  const sorted = orderedIDs.map((id) => tracksByID.get(id));
-  if (sorted.some((track) => !track)) return false;
+
+  if (!shouldContinue()) return null;
+  if (!samePlaylistSortSettings(settings, playlistSortSettings())) {
+    return attempt < 2
+      ? sortPlaylistCandidate(playlist, { title, columnContentHints, sortSessionId, shouldContinue }, attempt + 1)
+      : playlist;
+  }
+  if (!Array.isArray(orderedIDs)
+      || orderedIDs.length !== originalIDs.length
+      || new Set(orderedIDs.map(String)).size !== originalIDs.length) return playlist;
+  const tracksByID = new Map(playlist.map((track) => [String(track.id), track]));
+  const sorted = orderedIDs.map((id) => tracksByID.get(String(id)));
+  return sorted.some((track) => !track) ? playlist : sorted;
+}
+
+async function applyPlaylistSortToCurrent() {
+  const sourcePlaylist = state.playlist;
+  const targetTabID = state.activePlaylistTabId;
+  const generation = ++playlistSortGeneration;
+  const sorted = await sortPlaylistCandidate(sourcePlaylist, {
+    shouldContinue: () => generation === playlistSortGeneration
+      && targetTabID === state.activePlaylistTabId
+      && sourcePlaylist === state.playlist
+  });
+  if (generation !== playlistSortGeneration
+      || targetTabID !== state.activePlaylistTabId
+      || sourcePlaylist !== state.playlist
+      || sorted === sourcePlaylist) return false;
   state.playlist = sorted;
   return true;
 }
 
 async function applyExplicitPlaylistSort() {
-  if (state.sortColumn === "timestamp" && state.playlistTitle !== "History") return false;
-  if (isCatalogPlaylistProjection()) {
-    return applyCatalogPlaylistSort();
-  }
-  return applyProjectionPlaylistSort();
+  return applyPlaylistSortToCurrent();
 }
 
 function closeColumnMenu() {
@@ -4448,16 +4544,24 @@ function selectedPathTitle(path) {
   return parts.at(-1) || "Playlist";
 }
 
-async function applyFolderSelection(selection, targetTabID = state.activePlaylistTabId, title = null) {
-  if (!selection || targetTabID !== state.activePlaylistTabId) return false;
+async function applyFolderSelection(selection, targetTabID = state.activePlaylistTabId, title = null, request = null) {
+  if (!selection) return false;
+  const action = request || beginPlaylistContentRequest({ targetTabID });
+  if (!isCurrentPlaylistContentRequest(action)) return false;
+  const playlistTitle = String(title || selectedPathTitle(selection.selectedFolderPath) || "Playlist");
+  const sortedPlaylist = await sortPlaylistCandidate(selection.playlist, {
+    title: playlistTitle,
+    columnContentHints: selection.columnContentHints || null,
+    sortSessionId: selection.sortSessionId || null,
+    shouldContinue: () => isCurrentPlaylistContentRequest(action)
+  });
+  if (!sortedPlaylist || !isCurrentPlaylistContentRequest(action)) return false;
   const preserveBrowserFocus = document.activeElement?.classList.contains("tree-node");
   state.selectedFolderPath = selection.selectedFolderPath;
-  state.playlist = selection.playlist;
-  state.playlistTitle = String(title || selectedPathTitle(selection.selectedFolderPath) || "Playlist");
+  state.playlist = sortedPlaylist;
+  state.playlistTitle = playlistTitle;
   state.catalogPlaylistColumnContentHints = selection.columnContentHints || null;
   state.catalogPlaylistSortSessionId = selection.sortSessionId || null;
-  await applyExplicitPlaylistSort();
-  if (targetTabID !== state.activePlaylistTabId) return false;
   clearPlaylistSelection();
   if (!state.currentTrackId) {
     state.totalSeconds = targetPlaybackSeconds();
