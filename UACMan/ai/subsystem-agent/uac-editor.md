@@ -84,9 +84,12 @@
   reports partial completion and retains edits for packages not yet saved.
 - `.canonical-table-surface` owns the outer border, radius, and scrolling for a
   top-level table. A nested table uses the same `.canonical-table` root and row
-  and cell primitives inside its unfold row, without another surface class,
-  border, or accumulated horizontal inset. Nested tables retain zero padding
-  so their rows align to the parent's content edge. Keep each table's schema local to its root so
+  and cell primitives inside its unfold row. Nested tables retain zero table
+  padding; the selected global nested-table mode controls their placement.
+  Staircase mode offsets each unfolded child by the parent number-column width
+  plus one column gap, aligning its first column with the parent's second cell.
+  Spaced mode adds blank strips with pseudo-elements. Popup mode gives the
+  unfolded row a viewport-bounded canonical card and dimmed backdrop. Keep each table's schema local to its root so
   nested rows inherit only their own table's column tracks. Tag Analyzer's
   parent, pack, occurrence, and recursive JSON tables all use this class; their
   differences belong in their schema and cell content. Tag-name and matched-pack
@@ -95,7 +98,9 @@
   expanded title, not in the parent value cell.
 - Generate visible row deletion controls with `canonicalDeleteButtonMarkup`.
   It must emit the same fixed-size `.icon-button.danger` used on Track Tags;
-  do not put a full-width `.tag-table-field` box in a narrow action column.
+  keep its × red. A header's × is a white glyph in its dark red heading cell;
+  it is a column label, not a delete action. Do not put a full-width
+  `.tag-table-field` box in a narrow action column.
   Expanded child-table titles are bare, full-width canonical heading inputs:
   they keep the standard heading-cell appearance and the whole cell folds the
   table, with no separate chevron or action overlay. The parent row's fold
@@ -111,9 +116,10 @@
   and content rows. Let tall controls such as JSON textareas grow their own
   row; do not increase every row in a nested value table to accommodate them.
 - Render nested value editors and popups through `CanonicalTable` too. Unfolded
-  child tables render inside the full-width unfold content, optionally wrapped
-  by semantic annotations such as inline errors, without a separate surface,
-  border, or horizontal inset. Give each unfold a
+  child tables render inside unfold content, optionally wrapped by semantic
+  annotations such as inline errors. Inline modes do not add a separate
+  surface or border; popup mode uses the shared inserted row as a dimmed modal
+  layer. Give each unfold a
   hierarchical ID and render child rows through `rowWithUnfolds`; a child can
   contain further unfold rows at any depth. Keep multiple unfolds on one row
   in declared hierarchical order, open ancestors when a deeper fold is
@@ -139,9 +145,9 @@
   The field row's ✓ serializes the complete nested tree back to the manifest
   field.
 - `CanonicalTable.setFoldOpen`, `fillUnfold`, and `playPendingFoldAnimations`
-  own unfold motion. Use the same measured-height Web Animations path for
-  immediate and asynchronously loaded child tables; do not add per-table CSS
-  fold animations. Keep pending opens until their animation finishes, and
+  own unfold motion. Inline modes use the shared measured-height Web Animations
+  path; popup mode uses the shared opacity path so viewport cards are not
+  height-clipped. Do not add per-table fold animations. Keep pending opens until their animation finishes, and
   transfer them to replacement rows if a render replaces an unfolding row.
   Keep unloaded folds pending until their content is present.
 - Table-specific classes describe semantic content or widths only. Folding is

@@ -101,7 +101,7 @@ button { cursor:pointer; }
 .canonical-table .tag-submit-cell,.canonical-table .tag-delete-cell,.canonical-table .canonical-table-action-cell { justify-content:center; }
 .canonical-table .icon-button { width:23px; height:23px; padding:0; border:1px solid var(--line); border-radius:var(--table-cell-radius); background:transparent; color:var(--muted); cursor:pointer; }
 .canonical-table .icon-button:hover { color:var(--text); border-color:var(--accent); }
-.canonical-table .icon-button.danger,.canonical-table .danger { color:var(--danger, #e06c75); }
+.canonical-table .icon-button.danger,.canonical-table .danger { color:var(--red, #bd4848); }
 .canonical-table .icon-button:disabled { opacity:.42; cursor:default; }
 .canonical-number-cell { justify-content:center; }
 .canonical-number-field { text-align:center; padding-right:0!important; padding-left:0!important; }
@@ -391,6 +391,66 @@ button { cursor:pointer; }
 /* Nested tables can sit in an annotation/error wrapper. Their rows align to
    the parent content edge at every depth, without accumulating table insets. */
 .canonical-unfold-content .canonical-table { width:100%; max-width:100%; min-width:0; padding:0; }
+:root[data-nested-table-mode="staircase"] .canonical-unfold-content {
+  width:calc(100% - var(--canonical-number-column) - var(--canonical-table-gap));
+  max-width:calc(100% - var(--canonical-number-column) - var(--canonical-table-gap));
+  margin-left:calc(var(--canonical-number-column) + var(--canonical-table-gap));
+}
+:root[data-nested-table-mode="spaced"] .canonical-unfold-content::before,
+:root[data-nested-table-mode="spaced"] .canonical-unfold-content::after {
+  content:"";
+  display:block;
+  height:8px;
+}
+:root[data-nested-table-mode="popup"] .inserted-table-row.open {
+  position:fixed;
+  inset:0;
+  z-index:60;
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  place-items:center;
+  width:auto;
+  max-width:none;
+  min-width:0;
+  max-height:none;
+  margin:0;
+  padding:12px;
+  overflow:hidden;
+  background:rgb(0 0 0 / 58%);
+  backdrop-filter:blur(2px);
+}
+:root[data-nested-table-mode="popup"] .inserted-table-row.open > .inserted-table-cell {
+  display:flex;
+  width:min(960px,calc(100vw - 24px));
+  max-width:100%;
+  height:auto;
+  max-height:calc(100vh - 24px);
+  overflow:hidden;
+  border:1px solid var(--line);
+  border-radius:var(--table-surface-radius);
+  background:var(--panel);
+  box-shadow:var(--shadow);
+}
+:root[data-nested-table-mode="popup"] .inserted-table-row.open > .inserted-table-cell > .inserted-table-panel {
+  display:flex;
+  flex-direction:column;
+  width:100%;
+  max-height:100%;
+  overflow:auto;
+  overscroll-behavior:contain;
+  background:var(--panel);
+}
+:root[data-nested-table-mode="popup"] .inserted-table-row.open .canonical-unfold-content {
+  width:100%;
+  max-width:100%;
+  min-height:0;
+  margin:0;
+  overflow:auto;
+  overscroll-behavior:contain;
+}
+:root[data-nested-table-mode="popup"] .inserted-table-row.open > .inserted-table-cell {
+  max-height:calc(100dvh - 24px);
+}
 .multiple-value-number { text-align:center; }
 
 
@@ -488,7 +548,11 @@ button { cursor:pointer; }
 .canonical-table-title-close { width:23px!important; height:23px!important; min-width:23px!important; padding:0!important; }
 .canonical-table .icon-button.canonical-table-title-close { color:var(--accent); font-size:15px; }
 .canonical-unfold-content .canonical-table-title-cell[data-action="closeCanonicalSubtable"] { cursor:pointer; }
-.canonical-table .canonical-table-delete-heading .canonical-table-heading-input { color:var(--danger,#e06c75)!important; }
+.canonical-table .canonical-table-delete-heading .canonical-table-heading-input {
+  border-color:transparent!important;
+  background:color-mix(in srgb,var(--red,#bd4848) 62%,#000)!important;
+  color:#fff!important;
+}
 .canonical-table .tag-number-cell,
 .canonical-table .tag-create-number,
 .canonical-table .multiple-value-number { text-align:center; }
