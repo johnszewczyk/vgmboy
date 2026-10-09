@@ -68,9 +68,12 @@ canonical fields while their unchanged source members retain the complete
 native tags. New imports do not copy bulk `nativeMetadata`, parser details, or
 full reader results into the UAC manifest. PNG, `.cue`,
 `.txt`, `.md`, and other source files are ordinary byte-exact UAC members with
-BLAKE3 identities; arbitrary JSON metadata can point to them (for example
-`cover_front`, `cover_back`, and `cue_sheet`). Current players preserve but do
-not interpret external CUE indexes to split one FLAC member into virtual
+BLAKE3 identities. Package attachments use one Title Case tag per role in
+`game.metadata`, with a direct member path as its value (or an array of paths
+for several files); for example, `Title Snap: "art/title.png"` and
+`Text File: "meta.txt"`. Do not store nested `mediaType`/`memberPath`
+descriptors or duplicate member facts in metadata. Current players preserve
+but do not interpret external CUE indexes to split one FLAC member into virtual
 tracks. NSF, NSFE, and GBS track-aware results can
 be represented as ordered UAC `subsong` playlist entries that point to the
 same original member. The member retains shared metadata, while each entry keeps

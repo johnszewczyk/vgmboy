@@ -235,11 +235,11 @@ def normalize_recipe(recipe: dict) -> dict:
     if not isinstance(game["metadata"], dict) or not isinstance(game["extensions"], dict):
         raise UACError("Game metadata and extensions must be JSON objects.")
     normalize_package_set_tags(game["metadata"])
-    game["metadata"] = normalize_authored_metadata_fields(
+    game["metadata"] = normalize_package_attachment_tags(normalize_authored_metadata_fields(
         game["metadata"],
         "Game",
-        frozenset({"cover_front", "cover_back", "cue_sheet", "documents", "containedContainerVersions"}),
-    )
+        frozenset({"containedContainerVersions"}),
+    ))
     member_overrides = recipe.get("memberOverrides", {})
     if not isinstance(member_overrides, dict):
         raise UACError("Recipe memberOverrides must be an object keyed by input-relative path.")
@@ -380,6 +380,70 @@ def normalize_recipe(recipe: dict) -> dict:
                         f"Subsong playlist entries require a nonnegative decimal trackIndex: {playlist_id}"
                     )
     return recipe
+
+
+_PACKAGE_ATTACHMENT_TAG_NAMES = frozenset({
+    "Title Snap", "Cover Front", "Cover Back", "Cue Sheet", "Text File", "Documents"
+})
+
+
+def _attachment_member_path(value: object) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value
+    if isinstance(value, dict):
+        path = value.get("memberPath")
+        if isinstance(path, str) and path.strip():
+            return path
+    return None
+
+
+def normalize_package_attachment_tags(metadata: dict) -> dict:
+    """Flatten legacy attachment descriptors into one role tag and member path(s)."""
+    result: dict = {}
+    grouped: dict[str, list[str]] = {}
+    for name, value in metadata.items():
+        values = value if isinstance(value, list) else [value]
+        has_reference_objects = any(isinstance(item, dict) and "memberPath" in item for item in values)
+        if name not in _PACKAGE_ATTACHMENT_TAG_NAMES and not has_reference_objects:
+            result[name] = value
+            continue
+
+        paths = [_attachment_member_path(item) for item in values]
+        if not paths or any(path is None for path in paths):
+            if name in _PACKAGE_ATTACHMENT_TAG_NAMES:
+                raise UACError(f"Package attachment tag {name!r} must contain member path strings.")
+            result[name] = value
+            continue
+        path_values = [path for path in paths if path is not None]
+        if name == "Documents":
+            grouped.setdefault("Text File", []).extend(path for path in path_values if Path(path).suffix.casefold() == ".txt")
+            grouped.setdefault("Documents", []).extend(path for path in path_values if Path(path).suffix.casefold() != ".txt")
+        else:
+            grouped.setdefault(name, []).extend(path_values)
+
+    for name, paths in grouped.items():
+        unique_paths = list(dict.fromkeys(paths))
+        result[name] = unique_paths[0] if len(unique_paths) == 1 else unique_paths
+    return result
+
+
+def validate_package_attachment_tags(game: dict, records: list[dict]) -> None:
+    member_paths = {
+        record["path"] for record in records
+        if record.get("role") not in {"playable", "track"}
+    }
+    metadata = game.get("metadata", {})
+    for name, value in metadata.items():
+        values = value if isinstance(value, list) else [value]
+        known_attachment = name in _PACKAGE_ATTACHMENT_TAG_NAMES
+        references_member = any(isinstance(path, str) and path in member_paths for path in values)
+        if not known_attachment and not references_member:
+            continue
+        if not values or not all(isinstance(path, str) and safe_relative_path(path) and path in member_paths
+                                 for path in values):
+            raise UACError(
+                f"Package attachment tag {name!r} must contain only paths to packaged attachment members."
+            )
 
 
 def source_set_metadata(sources: object) -> dict | None:
@@ -1545,6 +1609,7 @@ def finalize_transformations(
 
 def manifest_bytes(recipe: dict, records: list[dict], payload: Path, level: int, frame_size: int, zstd_version: str) -> bytes:
     game = recipe["game"]
+    validate_package_attachment_tags(game, records)
     game_id = game.get("id")
     if not isinstance(game_id, str) or not game_id.strip():
         raise UACError("Recipe game requires a non-empty id.")

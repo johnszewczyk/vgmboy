@@ -73,13 +73,20 @@ The required top-level fields are `manifestVersion` (`1` or `2`), `packageID`,
 
 Each UAC has one manifest: its JSON record in the UAC metadata frame. Tags are
 key/value fields inside that manifest, primarily in `game.metadata` and
-`member.metadata`; the manifest is not a second tag store. Structural package
-attachment references also live in `game.metadata`, but are not tags. The GUI
-shows their member files in the Attachments table and leaves the reference
-fields out of Pack Tags and Tag Analyzer. The GUI reads and edits stored tags
-only. It does not inspect member contents or invoke format readers to fill or
-refresh tags. The UACMan command-line tools may use MetaMan before packaging
-to read source formats and project their tags into the manifest.
+`member.metadata`; the manifest is not a second tag store. Package attachments
+are package-level tags in `game.metadata`: the tag name gives the attachment
+role and its value is the exact path of a member, or an array of member paths
+when several files share that role. Use Title Case for standard and
+format-specific role names. This rule applies to every package attachment;
+there is no separate attachment descriptor object or set of per-file fields.
+UACMan labels these rows as `Attachment`
+in Pack Tags, lists their files in the Attachments table, and includes their
+names and path values in Tag Analyzer. Do not wrap an attachment path in
+`mediaType`, `memberPath`, or other descriptive fields. The member record
+already provides its role, format, size, and hashes. The GUI reads and edits
+stored tags only. It does not inspect member contents or invoke format readers
+to fill or refresh tags. The UACMan command-line tools may use MetaMan before
+packaging to read source formats and project their tags into the manifest.
 
 New projections must not write a bulk `nativeMetadata` object or another copy
 of source-native tags, reader facts, or parser diagnostics into the manifest.
@@ -121,16 +128,21 @@ know manifest version 1 reject new version-2 packages; ship updated consumers
 before distributing newly packed files.
 
 - `game` contains the logical game ID, canonical title/platform, canonical
-  release IDs, and extensible metadata. Common attachment pointers belong in
-  this metadata map and resolve to ordinary members. For example,
-  `game.metadata.cover_front` and `cover_back` may each be one reference object
-  or an array of references shaped as `{"memberPath":"scans/front.png","mediaType":"image/png"}` for a single-variant package.
-  Arrays retain multiple scans for one role. `game.metadata.cue_sheet` may
-  point to a source `.cue` member; `game.metadata.documents` may similarly
-  list notes, text files, Markdown, and other documentation. These open JSON
-  fields are structural attachment references, not free-form tags, and do not
-  change member bytes. References should resolve to manifest
-  member paths, and image/document payloads remain independently hashed members.
+  release IDs, and extensible metadata. Package attachments are direct tags in
+  `game.metadata`. Their values must resolve to `members[].path`: use one string
+  for one member and an array of strings for multiple members with the same
+  role. Standard names include `Title Snap`, `Cover Front`, `Cover Back`,
+  `Cue Sheet`, `Text File`, and `Documents`; use Title Case for other authored
+  attachment roles. For example, `game.metadata["Title Snap"]` may be
+  `"art/title.png"`, while `game.metadata["Text File"]` may be
+  `"meta.txt"`. Use a single path string for one attachment or an array of
+  paths for several files with the same role. Keep file type, byte size, and
+  hashes in the member record;
+  never add `mediaType`/`memberPath` descriptor objects or duplicate those
+  facts as tags. Image and document payloads remain independently hashed
+  members. Readers may accept legacy lower-case attachment keys and descriptor
+  objects for compatibility, but writers must emit Title Case tag names and
+  direct member path values.
   When source records establish one clear set, new writers add direct Title
   Case package tags `Set Name` and `Set URL`, with optional `Set Legacy URL`,
   `Set Archive URL`, and `Set Date`. Do not add `Set Collection`; keep
@@ -272,7 +284,9 @@ before distributing newly packed files.
   Case tags `Set Name`, `Set URL`, and optional `Set Legacy URL`,
   `Set Archive URL`, or `Set Date`; source-specific identifiers remain in
   their documented `sources[]` fields. Common attachment keys include
-  `game.metadata.cover_front`, `cover_back`, `cue_sheet`, and `documents`.
+  package-level attachment tags such as `Title Snap`, `Cover Front`,
+  `Cover Back`, `Cue Sheet`, `Text File`, and `Documents`; each value is a
+  direct member path or an array of paths.
   Format-specific and genuinely user-defined fields remain open-ended typed
   JSON in namespaced `extensions` maps at game, variant, member, and source
   level. Do not use a custom extension as a second spelling for a shared
@@ -316,8 +330,11 @@ the variant namespace to prevent same-path collisions; single-variant packages
 do not add a synthetic `variants/original/` directory.
 The structured manifest playlist is the UAC playback list; the original M3U
 member is retained as byte-exact reversible evidence, not required for UAC-aware
-playback. PNGs, CUE sheets, M3U/M3U8, documentation, and other files are
-ordinary typed members and may carry arbitrary metadata. Packaging a cue sheet
+playback. A member's inclusion alone does not make it a package attachment; if
+the package exposes a member as an attachment, its role and path belong in one
+package-level attachment tag as defined above. PNGs, CUE sheets, M3U/M3U8,
+documentation, and other files are ordinary typed members and may carry
+arbitrary metadata. Packaging a cue sheet
 preserves it and its audio-member references; current UAC players do not
 interpret an external CUE to split one APE or FLAC member into virtual tracks.
 Cue-aware playback requires an explicit player feature that resolves cue file
