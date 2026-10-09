@@ -3,6 +3,9 @@
 - Options slide down over the main content from the Options toolbar button or
   Command-comma (⌘,). Command-comma toggles the page; Escape, the visible Close
   Options button, and clicking outside the page dismiss it.
+- Close Options is a square icon button matching the other SB2 toolbar controls.
+  The Options layer covers home controls and floating popovers while leaving
+  the app title and status bars visible.
 - Opening Options moves keyboard focus to Close Options; closing returns focus
   to the control that opened it.
 - SPCBOY owns Database, UI Chrome, UI Fonts, and Windows settings. VGMBoy owns
@@ -15,7 +18,7 @@
   VGMBoy-owned playback-core settings. Keep that ownership split when adding
   settings.
 - Playback volume uses twenty 5% steps in Options and in the compact Volume
-  popup on the home toolbar.
+  popup on the home toolbar. The home popup stays behind the Options layer.
 - Option pages use a readable system font and a 65-character content width.
   Section headings are underlined; setting rows use whitespace without
   divider lines. UI Chrome and UI Fonts are separate SPCBOY pages. UI Fonts
