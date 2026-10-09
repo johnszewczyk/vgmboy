@@ -119,7 +119,7 @@ shape remains readable for existing packages.
 | ScanSong route | Registered extensions | Structure published | Metadata source | Dependency or archive rule |
 | --- | --- | --- | --- | --- |
 | `spc-direct` | `.spc` | One track | MetaManCore SPC ID666/xID6 reader | All valid files are handled directly, including tagless info-only defaults; no libgme runtime link. |
-| `game-music-direct` | `.gbs`, `.nsf` | One row per header-declared track | `MetaManCore.readResult` fixed-header readers | No emulator is started; the formats do not store authored per-track names or timing. |
+| `game-music-direct` | `.gbs`, `.nsf` | One row per header-declared track | `MetaManCore.readResult` fixed-header readers; optional NEZplug M3U for GBS | No emulator is started. NSF headers and GBS headers do not store authored per-track names or timing; a GBS M3U can supply them. MetaMan currently discovers directory M3Us only when exactly one GBS file is present in that directory. |
 | `nsfe-direct` | `.nsfe` | One row per NSFE playlist entry | `MetaManCore.readResult` bounded chunk reader | No emulator is started; labels/authors/times are source-indexed and mapped through the optional playlist, including duplicates. |
 | `kss-direct` | `.kss` | 256 compatibility slots | MetaManCore KSCC/KSSX header reader | Header-only; preserves libgme 0.6.5's info-only listing and timing fallback. KSSX track declarations are retained as facts; KSS M3U files are not consumed. |
 | `ay-direct` | `.ay` | One row per AY header-declared subtune | `MetaManCore` ZXAYEMUL reader | No decoder; signed relative pointers expose titles, author/comment, raw metadata blocks, and native 50 Hz track lengths. |

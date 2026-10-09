@@ -86,7 +86,8 @@ func gbsReaderProjectsNEZPlugPlaylistMetadata() throws {
     # @COMPOSER Test Composer
     # @DATE 2000-01-02
 
-    fixture.gbs::GBS,0,Opening\\, theme,0:42,0:20,0:05,3
+    fixture.gbs::GBS,0,Opening\\, theme,0:42.375,0:20.500-,0:05.125,3
+    fixture.gbs::GBS,1,Finale,1:02:03.007,0:00:10.250,0:00:02.125,2
     other.gbs::GBS,1,Unrelated,1:00,,10
     """
     let context = MetadataReadContext(companionFiles: [
@@ -105,14 +106,20 @@ func gbsReaderProjectsNEZPlugPlaylistMetadata() throws {
     #expect(first.fields.game == "Fixture Album")
     #expect(first.fields.artist == "Test Publisher")
     #expect(first.fields.date == "2000-01-02")
-    #expect(first.timing == MetadataTiming(introLengthMs: -1, loopLengthMs: 20_000, playLengthMs: 42_000, fadeLengthMs: 5_000))
+    #expect(first.timing == MetadataTiming(introLengthMs: 20_500, loopLengthMs: -1, playLengthMs: 42_375, fadeLengthMs: 5_125))
     #expect(first.technicalFacts["m3uLoopCount"] == "3")
     #expect(first.technicalFacts["m3uSourcePath"] == "01 Opening.m3u")
     #expect(first.rawMetadataBlocks?["companion-m3u"] == Data(m3u.utf8))
     #expect(first.tags.contains(MetadataTag(name: "COMPOSER", value: "Test Composer")))
-    #expect(result.tracks[1].document.fields.title == nil)
+    #expect(result.tracks[1].document.fields.title == "Finale")
     #expect(result.tracks[1].document.fields.game == "Fixture Album")
     #expect(result.tracks[1].document.fields.artist == "Test Publisher")
+    #expect(result.tracks[1].document.timing == MetadataTiming(
+        introLengthMs: 0,
+        loopLengthMs: 10_250,
+        playLengthMs: 3_723_007,
+        fadeLengthMs: 2_125
+    ))
 }
 
 @Test("GBS file-URL reads discover sibling NEZPlug playlists")
@@ -125,14 +132,93 @@ func gbsFileURLReadDiscoversSiblingPlaylists() throws {
     let gbsURL = root.appendingPathComponent("fixture.gbs")
     let source = makeGBS()
     try source.write(to: gbsURL)
-    try "fixture.gbs::GBS,0,File URL Track,1:23,,5\n"
+    try "fixture.gbs::GBS,0,File URL Track,1:23.456,,5\n"
         .write(to: root.appendingPathComponent("01 File URL Track.m3u"), atomically: true, encoding: .utf8)
 
     let result = try MetaManCore.readResult(fileURL: gbsURL)
     #expect(result.tracks[0].document.fields.title == "File URL Track")
-    #expect(result.tracks[0].document.timing?.playLengthMs == 83_000)
+    #expect(result.tracks[0].document.timing?.playLengthMs == 83_456)
     #expect(result.tracks[0].document.technicalFacts["m3uSourcePath"] == "01 File URL Track.m3u")
     #expect(try Data(contentsOf: gbsURL) == source)
+}
+
+@Test("GBS M3U rejects sub-millisecond fractions without inventing a duration")
+func gbsReaderLeavesUnsupportedFractionsUnknown() throws {
+    let m3u = "fixture.gbs::GBS,0,Track,0:42.1234,0:20.9999,0:05.0001,3\n"
+    let result = try MetaManCore.readResult(
+        data: makeGBS(),
+        formatHint: "gbs",
+        displayName: "fixture.gbs",
+        context: MetadataReadContext(companionFiles: [
+            MetadataCompanionFile(relativePath: "fixture.m3u", data: Data(m3u.utf8))
+        ])
+    )
+
+    #expect(result.tracks[0].document.timing == MetadataTiming(
+        introLengthMs: -1,
+        loopLengthMs: -1,
+        playLengthMs: -1,
+        fadeLengthMs: -1
+    ))
+    #expect(result.tracks[0].document.rawMetadataBlocks?["companion-m3u"] == Data(m3u.utf8))
+}
+
+@Test("GBS M3U row conflicts keep only timing values that agree")
+func gbsReaderDoesNotChooseConflictingTimingRows() throws {
+    let m3u = """
+    fixture.gbs::GBS,0,Track,0:10.000,0:03.000,0:02.000,2
+    fixture.gbs::GBS,0,Track,0:12.000,0:03.000,0:05.000,3
+    """
+    let result = try MetaManCore.readResult(
+        data: makeGBS(),
+        formatHint: "gbs",
+        displayName: "fixture.gbs",
+        context: MetadataReadContext(companionFiles: [
+            MetadataCompanionFile(relativePath: "fixture.m3u", data: Data(m3u.utf8))
+        ])
+    )
+    let track = result.tracks[0].document
+
+    #expect(track.timing?.playLengthMs == -1)
+    #expect(track.timing?.loopLengthMs == 3_000)
+    #expect(track.timing?.fadeLengthMs == -1)
+    #expect(track.diagnostics.contains { $0.contains("Conflicting GBS M3U rows") })
+}
+
+@Test("GBS M3U can supply timing without a track title")
+func gbsReaderRetainsTimingFromUntitledRows() throws {
+    let m3u = "fixture.gbs::GBS,0,,0:10.250,,,\n"
+    let result = try MetaManCore.readResult(
+        data: makeGBS(),
+        formatHint: "gbs",
+        displayName: "fixture.gbs",
+        context: MetadataReadContext(companionFiles: [
+            MetadataCompanionFile(relativePath: "fixture.m3u", data: Data(m3u.utf8))
+        ])
+    )
+
+    #expect(result.tracks[0].document.fields.title == nil)
+    #expect(result.tracks[0].document.timing?.playLengthMs == 10_250)
+}
+
+@Test("GBS M3U bare loop marker uses the authored play length")
+func gbsReaderMapsWholeTrackLoopMarker() throws {
+    let m3u = "fixture.gbs::GBS,0,Track,0:30.125,-,0:05,2\n"
+    let result = try MetaManCore.readResult(
+        data: makeGBS(),
+        formatHint: "gbs",
+        displayName: "fixture.gbs",
+        context: MetadataReadContext(companionFiles: [
+            MetadataCompanionFile(relativePath: "fixture.m3u", data: Data(m3u.utf8))
+        ])
+    )
+
+    #expect(result.tracks[0].document.timing == MetadataTiming(
+        introLengthMs: 0,
+        loopLengthMs: 30_125,
+        playLengthMs: 30_125,
+        fadeLengthMs: 5_000
+    ))
 }
 
 @Test("NSF, GBS, and NSFE reject malformed headers and chunk boundaries")
