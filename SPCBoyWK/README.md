@@ -1,9 +1,13 @@
 # SPCBoy (WK)
 
-SPCBoyWK is a maintained native macOS WebKit player frontend in the VGMMan
-family. It owns its app identity, AppKit/WKWebView host, renderer, and typed
-bridge while sharing catalog, archive, queue, preference, and playback
-contracts with the other family packages.
+SPCBoyWK is the retired legacy native macOS WebKit SPCBOY frontend in the
+VGMMan family. SB2 is its active successor under development. SPCBoyWK source
+and package files remain for historical reference and reproducible builds; the
+app is no longer listed in LaunchPad and receives no feature work.
+
+The retained frontend owns its historical app identity, AppKit/WKWebView host,
+renderer, and typed bridge while sharing catalog, archive, queue, preference,
+and playback contracts with the family packages.
 
 Catalog-backed playback uses read-only CatalogReader projections and the shared
 FrontendCore archive path. VGMBoyKit owns playback, timing, and audio output.
@@ -12,13 +16,12 @@ write the catalog. Settings open in a separate native window with an independent
 WebKit view. The renderer presents authoritative native transport events and
 status snapshots.
 
-## Build and run
+## Historical build
 
 ```sh
 ./build.sh
-./launch.sh
 ```
 
-`launch.sh` performs a clean release build and opens the packaged app. For task
-routing, read [AGENTS.md](AGENTS.md), then [`ai/project-info.md`](ai/project-info.md).
-The focused user behavior and engineering constraints are linked there.
+This builds the retained package for source verification. It is not an active
+development frontend. For task routing, read [AGENTS.md](AGENTS.md), then
+[`ai/project-info.md`](ai/project-info.md).

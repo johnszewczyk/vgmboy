@@ -5,9 +5,10 @@ Read [`ai/AGENTS.md`](ai/AGENTS.md), then
 routed by the task.
 
 VGMBoy owns playback admission, decoder integration, timing, native transport,
-and the macOS audio device. The three maintained player frontends—CocoaSpice,
-SPCBoyWK, and ViewBoy—are clients of the shared kit and family service
-packages; cross-app behavior belongs with its shared owner.
+and the macOS audio device. The maintained player frontends—CocoaSpice, SB2,
+and ViewBoy—are clients of the shared kit and family service packages. Retired
+SPCBoyWK remains a historical client; cross-app behavior belongs with its
+shared owner.
 
 Do not fork upstream decoders or duplicate a complete MetaMan reader in a
 playback/scanner adapter. Keep public APIs narrow, fail explicitly on

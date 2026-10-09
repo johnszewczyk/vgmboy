@@ -18,17 +18,23 @@ let autoSizedPlaylistSignature = null;
 let playlistRenderGeneration = 0;
 let textMeasureContext = null;
 let renderedDatabaseGames = null;
+let galleryVisibleDatabaseSource = null;
+let galleryVisibleGallerySource = null;
+let galleryVisibleDatabaseResults = [];
+let galleryVisibleArtworkByID = new Map();
 let databaseGameButtons = [];
 let databaseConsoleGroups = [];
 let collapsedDatabaseConsoles = new Set();
 let databaseRowRenderGeneration = 0;
 let browserClickTimer = 0;
 let databaseGameClickTimer = 0;
+let sidebarContextMenuGeneration = 0;
 let databaseGameSearchRecords = [];
 let columnResizePointerId = null;
 let columnResizeFrame = 0;
 const PLAYLIST_VIRTUALIZATION_THRESHOLD = 200;
 const PLAYLIST_VIRTUAL_OVERSCAN = 12;
+const EMPTY_DATABASE_GAMES = [];
 let playlistVirtualRowHeight = 28;
 let playlistViewportFrame = 0;
 let catalogPlaylistSortGeneration = 0;
@@ -42,8 +48,11 @@ let startupElapsedTimer = 0;
 let startupDismissTimer = 0;
 let startupHasAppeared = false;
 let galleryLoadPromise = null;
+let galleryStaleRetryTimer = 0;
+let galleryStaleRetryCount = 0;
 let galleryRenderSignature = null;
 let galleryArtworkObserver = null;
+let sidebarGalleryArtworkObserver = null;
 let galleryArtworkInFlight = 0;
 const galleryArtworkQueue = [];
 const galleryArtworkCache = new Map();
@@ -140,6 +149,15 @@ function persistPlaylistTabs() {
 function restorePlaylistTabView(tab) {
   state.activePlaylistTabId = tab.id;
   state.activePlaylistTabKind = tab.kind === "gallery" ? "gallery" : "playlist";
+  if (state.activePlaylistTabKind === "gallery") {
+    const sidebarModeChanged = state.sidebarMode !== "consoles";
+    state.sidebarMode = "consoles";
+    state.sidebarQuery = "";
+    state.databaseSearchGames = null;
+    refs.sidebarSearchInput.value = "";
+    void syncSidebarView();
+    if (sidebarModeChanged) persistSettings();
+  }
   state.playlistTitle = String(tab.title || "Playlist");
   state.playlist = Array.isArray(tab.playlist) ? [...tab.playlist] : [];
   state.selectedTrackId = tab.selectedTrackId || null;
@@ -259,6 +277,7 @@ function activatePlaylistTab(tabID, { syncOutgoing = true } = {}) {
   if (!tab || tab.id === state.activePlaylistTabId) return false;
   if (syncOutgoing) syncActivePlaylistTab();
   browserSelectionGeneration += 1;
+  invalidateSidebarInteractions();
   void invalidatePlaylistCatalogSession().catch((error) => console.error("[SPCBoy] playlist request invalidation failed", error));
   restorePlaylistTabView(tab);
   persistPlaylistTabs();
@@ -1074,6 +1093,7 @@ function catalogPlaylistSelection(response, selectedPath) {
 }
 
 function hideSidebarContextMenu() {
+  sidebarContextMenuGeneration += 1;
   refs.sidebarContextMenu?.classList.add("is-hidden");
   if (refs.sidebarContextMenu) refs.sidebarContextMenu.innerHTML = "";
 }
@@ -1081,6 +1101,9 @@ function hideSidebarContextMenu() {
 function showContextMenu(event, actions) {
   const menu = refs.sidebarContextMenu;
   if (!menu) return;
+  const menuGeneration = ++sidebarContextMenuGeneration;
+  const targetTabID = state.activePlaylistTabId;
+  const interactionGeneration = sidebarInteractionGeneration;
   event.preventDefault();
   event.stopPropagation();
   menu.innerHTML = "";
@@ -1090,8 +1113,11 @@ function showContextMenu(event, actions) {
     button.role = "menuitem";
     button.textContent = label;
     button.addEventListener("click", () => {
+      if (menuGeneration !== sidebarContextMenuGeneration
+          || targetTabID !== state.activePlaylistTabId
+          || interactionGeneration !== sidebarInteractionGeneration) return;
       hideSidebarContextMenu();
-      Promise.resolve(action()).catch((error) => console.error("[SPCBoy] sidebar context action failed", error));
+      Promise.resolve(action({ targetTabID, interactionGeneration })).catch((error) => console.error("[SPCBoy] sidebar context action failed", error));
     });
     menu.appendChild(button);
   }
@@ -1427,9 +1453,9 @@ function visibleDatabaseSidebarRows() {
 
 function selectDatabaseSidebarRow(button, { focus = true, preview = false } = {}) {
   if (!button) return false;
+  const interactionGeneration = invalidateSidebarInteractions();
+  const targetTabID = state.activePlaylistTabId;
   lastPlaylistSelectionID = null;
-  window.clearTimeout(databaseGameClickTimer);
-  databaseGameClickTimer = 0;
 
   const gameID = button.dataset.databaseGameKey;
   if (gameID) {
@@ -1457,7 +1483,10 @@ function selectDatabaseSidebarRow(button, { focus = true, preview = false } = {}
     if (game) {
       databaseGameClickTimer = window.setTimeout(() => {
         databaseGameClickTimer = 0;
-        loadDatabaseGame(game).catch((error) => reportDatabaseSidebarError("preview the selected game", error));
+        if (interactionGeneration !== sidebarInteractionGeneration
+            || targetTabID !== state.activePlaylistTabId
+            || !button.isConnected) return;
+        loadDatabaseGame(game, { targetTabID, interactionGeneration }).catch((error) => reportDatabaseSidebarError("preview the selected game", error));
       }, 220);
     }
   }
@@ -1480,6 +1509,16 @@ function moveDatabaseSidebarSelection(currentButton, delta) {
 }
 
 let databaseGroupTransitionGeneration = 0;
+let sidebarInteractionGeneration = 0;
+
+function invalidateSidebarInteractions() {
+  sidebarInteractionGeneration += 1;
+  databaseGroupTransitionGeneration += 1;
+  window.clearTimeout(databaseGameClickTimer);
+  databaseGameClickTimer = 0;
+  hideSidebarContextMenu();
+  return sidebarInteractionGeneration;
+}
 
 function databaseGroupStateSnapshot() {
   return {
@@ -1522,9 +1561,15 @@ async function applySharedDatabaseGroupAction(action, groupName = null, gameID =
 function visibleDatabaseGames() {
   const games = Array.isArray(state.databaseSearchGames) ? state.databaseSearchGames : state.databaseGames;
   if (!isGalleryActive()) return games;
-  if (!state.galleryGamesLoaded) return [];
-  const galleryIDs = new Set(state.galleryGames.map((game) => game.id));
-  return games.filter((game) => galleryIDs.has(databaseGameKey(game)));
+  if (!state.galleryGamesLoaded) return EMPTY_DATABASE_GAMES;
+  if (games !== galleryVisibleDatabaseSource || state.galleryGames !== galleryVisibleGallerySource) {
+    const galleryIDs = new Set(state.galleryGames.map((game) => game.id));
+    galleryVisibleDatabaseResults = games.filter((game) => galleryIDs.has(databaseGameKey(game)));
+    galleryVisibleDatabaseSource = games;
+    galleryVisibleGallerySource = state.galleryGames;
+    galleryVisibleArtworkByID = new Map(state.galleryGames.map((game) => [game.id, game]));
+  }
+  return galleryVisibleDatabaseResults;
 }
 
 function visibleDatabaseGameGroups() {
@@ -1553,10 +1598,25 @@ function makeDatabaseGameButton(game) {
   }
   button.dataset.databaseGameKey = databaseGameKey(game);
   button.dataset.searchText = `${game.name} ${game.rootName || ""}`.toLowerCase();
-  button.innerHTML = `<span class="database-indent" aria-hidden="true"></span><span class="database-game-name">${escapeHtml(game.displayName || game.name)}</span>${state.sidebarPathCounts ? `<span class="database-game-meta">${game.trackCount}</span>` : ""}`;
+  const artwork = isGalleryActive() ? galleryVisibleArtworkByID.get(databaseGameKey(game)) : null;
+  if (artwork) {
+    const frame = document.createElement("span");
+    frame.className = "database-game-artwork-frame is-missing";
+    frame.setAttribute("aria-hidden", "true");
+    const image = document.createElement("img");
+    image.className = "database-game-artwork-image";
+    image.alt = "";
+    image.loading = "lazy";
+    image.decoding = "async";
+    image.dataset.sourcePath = artwork.sourcePath;
+    image.dataset.titleSnap = artwork.titleSnap;
+    frame.appendChild(image);
+    button.appendChild(frame);
+  }
+  button.insertAdjacentHTML("beforeend", `<span class="database-indent" aria-hidden="true"></span><span class="database-game-name">${escapeHtml(game.displayName || game.name)}</span>${state.sidebarPathCounts ? `<span class="database-game-meta">${game.trackCount}</span>` : ""}`);
   button.addEventListener("click", (event) => {
     if (event.detail > 1) return;
-    selectDatabaseSidebarRow(button, { focus: true, preview: true });
+    selectDatabaseSidebarRow(button, { focus: true, preview: !isGalleryActive() });
   });
   button.addEventListener("keydown", (event) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -1568,6 +1628,10 @@ function makeDatabaseGameButton(game) {
     if (event.key !== "Enter") return;
     event.preventDefault();
     event.stopPropagation();
+    if (isGalleryActive()) {
+      void openGalleryGame(game).catch((error) => reportDatabaseSidebarError("play the selected artwork title", error));
+      return;
+    }
     selectDatabaseSidebarRow(button, { focus: true });
     loadDatabaseGame(game).then((loaded) => {
       const targetID = loaded ? databaseLoadedSelectionID() : null;
@@ -1578,6 +1642,10 @@ function makeDatabaseGameButton(game) {
   button.addEventListener("dblclick", (event) => {
     event.preventDefault();
     event.stopPropagation();
+    if (isGalleryActive()) {
+      void openGalleryGame(game).catch((error) => reportDatabaseSidebarError("play the selected artwork title", error));
+      return;
+    }
     selectDatabaseSidebarRow(button, { focus: true });
     loadDatabaseGame(game).then((loaded) => {
       const targetID = loaded ? databaseLoadedSelectionID() : null;
@@ -1598,14 +1666,20 @@ function makeDatabaseGameButton(game) {
         const row = rows.rows[0];
         if (row) await window.spcBoySB2.showInFinder(row.archivePath || row.path);
       }],
-      ["Play Now", async () => {
-        const loaded = await loadDatabaseGame(game);
+      ["Play Now", async ({ targetTabID, interactionGeneration }) => {
+        if (targetTabID === state.activePlaylistTabId && isGalleryActive()) {
+          await openGalleryGame(game);
+          return;
+        }
+        const loaded = await loadDatabaseGame(game, { targetTabID, interactionGeneration });
         const targetID = loaded ? databaseLoadedSelectionID() : null;
         if (targetID) await playVisibleTrack(targetID, 0);
       }],
-      ["Queue", async () => {
+      ["Queue", async ({ targetTabID, interactionGeneration }) => {
         const rows = await window.spcBoySB2.databaseGameTracks([game]);
-        if (rows?.stale === true) return;
+        if (rows?.stale === true
+            || targetTabID !== state.activePlaylistTabId
+            || interactionGeneration !== sidebarInteractionGeneration) return;
         appendPlaylistTracks(databaseRowsToPlaylistTracks(rows, { adoptProjection: false }));
       }]
     ]);
@@ -1627,6 +1701,8 @@ function appendDatabaseGameRowsInBatches() {
       const { games, game } = pendingRows[offset++];
       const button = makeDatabaseGameButton(game);
       games.appendChild(button);
+      const artworkFrame = button.querySelector(".database-game-artwork-frame");
+      if (artworkFrame) sidebarGalleryArtworkObserver?.observe(artworkFrame);
       databaseGameButtons.push(button);
     }
     if (offset < pendingRows.length) {
@@ -1638,6 +1714,22 @@ function appendDatabaseGameRowsInBatches() {
 }
 
 function renderDatabaseGames() {
+  refs.treeRoot.classList.toggle("is-gallery-view", isGalleryActive());
+  if (isGalleryActive()) {
+    if (!sidebarGalleryArtworkObserver && typeof IntersectionObserver === "function") {
+      sidebarGalleryArtworkObserver = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          sidebarGalleryArtworkObserver?.unobserve(entry.target);
+          const image = entry.target.querySelector(".database-game-artwork-image");
+          if (image) requestGalleryArtwork(image);
+        }
+      }, { root: refs.treeRoot, rootMargin: "120px" });
+    }
+  } else {
+    sidebarGalleryArtworkObserver?.disconnect();
+    sidebarGalleryArtworkObserver = null;
+  }
   if (state.databaseSidebarLoading) {
     renderedDatabaseGames = null;
     resetSidebarContent();
@@ -1646,6 +1738,7 @@ function renderDatabaseGames() {
   }
   const gamesForView = visibleDatabaseGames();
   if (renderedDatabaseGames !== gamesForView) {
+    sidebarGalleryArtworkObserver?.disconnect();
     resetSidebarContent();
     databaseConsoleGroups = [];
     const groupsForView = visibleDatabaseGameGroups();
@@ -1712,6 +1805,10 @@ function renderDatabaseGames() {
             if (tab) await loadDatabaseGamesIntoPlaylist(gameItems, { title: consoleName });
           }],
           ["Play Now", async () => {
+            if (isGalleryActive()) {
+              if (gameItems[0]) await openGalleryGame(gameItems[0]);
+              return;
+            }
             const loaded = await loadDatabaseGamesIntoPlaylist(gameItems, { title: consoleName });
             const targetID = loaded ? databaseLoadedSelectionID() : null;
             if (targetID) await playVisibleTrack(targetID, 0);
@@ -1832,7 +1929,13 @@ async function loadDatabaseFiles() {
 
 async function setSidebarMode(mode) {
   if (!["paths", "consoles"].includes(mode)) return false;
+  if (isGalleryActive() && mode !== "consoles") return false;
+  const targetTabID = state.activePlaylistTabId;
+  const interactionGeneration = invalidateSidebarInteractions();
   await invalidatePlaylistCatalogSession();
+  if (targetTabID !== state.activePlaylistTabId
+      || interactionGeneration !== sidebarInteractionGeneration
+      || (isGalleryActive() && mode !== "consoles")) return false;
   state.sidebarMode = mode;
   state.sidebarQuery = "";
   await syncSidebarView();
@@ -1840,6 +1943,8 @@ async function setSidebarMode(mode) {
   state.databaseSearchGames = null;
   if (mode === "paths" && !state.databaseFiles.length) await loadDatabaseFiles();
   if (mode === "consoles" && !state.databaseGames.length) await loadDatabaseGames();
+  if (targetTabID !== state.activePlaylistTabId
+      || interactionGeneration !== sidebarInteractionGeneration) return false;
   persistSettings();
   renderAll();
   syncTreeSelection();
@@ -2117,6 +2222,7 @@ async function showGalleryPlaylist() {
     activatePlaylistTab(tab.id);
   }
   const targetTabID = state.activePlaylistTabId;
+  const interactionGeneration = invalidateSidebarInteractions();
 
   tab.kind = "gallery";
   state.activePlaylistTabKind = "gallery";
@@ -2127,12 +2233,19 @@ async function showGalleryPlaylist() {
   state.playlistSelectionAnchorId = null;
   state.catalogPlaylistColumnContentHints = null;
   state.catalogPlaylistSortSessionId = null;
+  state.sidebarMode = "consoles";
   state.sidebarQuery = "";
+  state.databaseSearchGames = null;
   refs.sidebarSearchInput.value = "";
   await invalidatePlaylistCatalogSession();
-  if (targetTabID !== state.activePlaylistTabId) return false;
-  if (state.sidebarMode === "paths" && !state.databaseFileTree.length) {
-    void loadDatabaseFiles().catch((error) => reportDatabaseSidebarError("read Gallery paths", error));
+  if (targetTabID !== state.activePlaylistTabId
+      || interactionGeneration !== sidebarInteractionGeneration) return false;
+  await syncSidebarView();
+  persistSettings();
+  if (!state.databaseGames.length && !state.databaseSidebarLoading) {
+    await loadDatabaseGames();
+    if (targetTabID !== state.activePlaylistTabId
+        || interactionGeneration !== sidebarInteractionGeneration) return false;
   }
   galleryRenderSignature = null;
   renderPlaylistTabs();
@@ -2141,12 +2254,15 @@ async function showGalleryPlaylist() {
   renderSidebar();
   uiApp.playback.updateTimingSummary();
   uiApp.playback.updatePlaybackReadout();
-  void loadGalleryGames();
+  void loadGalleryGames({ force: Boolean(state.galleryGamesError) });
   return true;
 }
 
 async function refreshDatabaseGamesForVisibleRoots() {
   const previousSelection = state.selectedDatabaseGameKey;
+  window.clearTimeout(galleryStaleRetryTimer);
+  galleryStaleRetryTimer = 0;
+  galleryStaleRetryCount = 0;
   state.galleryGames = [];
   state.galleryGamesLoaded = false;
   state.galleryGamesError = "";
@@ -2177,6 +2293,11 @@ async function refreshDatabaseGamesForVisibleRoots() {
 
 async function loadGalleryGames({ force = false } = {}) {
   if (!force && state.galleryGamesLoaded) return state.galleryGames;
+  if (force) {
+    state.galleryGamesLoaded = false;
+    state.galleryGamesError = "";
+    galleryStaleRetryCount = 0;
+  }
   if (galleryLoadPromise) return galleryLoadPromise;
   if (typeof window.spcBoySB2?.databaseGalleryGames !== "function") {
     state.galleryGames = [];
@@ -2193,10 +2314,14 @@ async function loadGalleryGames({ force = false } = {}) {
   galleryLoadPromise = (async () => {
     try {
       const projection = await window.spcBoySB2.databaseGalleryGames();
-      if (projection?.stale === true) return false;
+      if (projection?.stale === true) {
+        galleryStaleRetryCount += 1;
+        return false;
+      }
       state.galleryGames = Array.isArray(projection) ? projection : [];
       state.galleryGamesError = "";
       state.galleryGamesLoaded = true;
+      galleryStaleRetryCount = 0;
       galleryRenderSignature = null;
       return state.galleryGames;
     } catch (error) {
@@ -2207,6 +2332,18 @@ async function loadGalleryGames({ force = false } = {}) {
       return [];
     } finally {
       galleryLoadPromise = null;
+      if (isGalleryActive() && !state.galleryGamesLoaded) {
+        if (galleryStaleRetryCount < 3) {
+          window.clearTimeout(galleryStaleRetryTimer);
+          galleryStaleRetryTimer = window.setTimeout(() => {
+            galleryStaleRetryTimer = 0;
+            if (!galleryLoadPromise && !state.galleryGamesLoaded) void loadGalleryGames();
+          }, 80);
+        } else {
+          state.galleryGamesLoaded = true;
+          state.galleryGamesError = "The library changed while Gallery was loading. Select Gallery to retry.";
+        }
+      }
       if (isGalleryActive()) {
         renderGalleryView();
         renderSidebar();
@@ -2217,6 +2354,7 @@ async function loadGalleryGames({ force = false } = {}) {
 }
 
 async function updateSidebarSearch(query) {
+  invalidateSidebarInteractions();
   state.sidebarQuery = String(query || "");
   state.databaseSidebarError = "";
   state.databaseSearchGames = state.sidebarQuery.trim()
@@ -2229,8 +2367,8 @@ async function updateSidebarSearch(query) {
   renderSidebar();
 }
 
-async function loadDatabaseGame(game) {
-  return loadDatabaseGamesIntoPlaylist([game]);
+async function loadDatabaseGame(game, options = {}) {
+  return loadDatabaseGamesIntoPlaylist([game], options);
 }
 
 async function toggleSelectedFavorites() {
@@ -2299,12 +2437,20 @@ function databaseRowsToPlaylistTracks(response, { adoptProjection = true } = {})
   }));
 }
 
-async function loadDatabaseGamesIntoPlaylist(games, { title = null } = {}) {
-  const targetTabID = state.activePlaylistTabId;
+async function loadDatabaseGamesIntoPlaylist(games, {
+  title = null,
+  targetTabID = state.activePlaylistTabId,
+  interactionGeneration = sidebarInteractionGeneration
+} = {}) {
+  if (targetTabID !== state.activePlaylistTabId
+      || interactionGeneration !== sidebarInteractionGeneration) return false;
   await invalidatePlaylistCatalogSession();
-  if (targetTabID !== state.activePlaylistTabId) return false;
+  if (targetTabID !== state.activePlaylistTabId
+      || interactionGeneration !== sidebarInteractionGeneration) return false;
   const rows = await window.spcBoySB2.databaseGameTracks(games);
-  if (rows?.stale === true || targetTabID !== state.activePlaylistTabId) return false;
+  if (rows?.stale === true
+      || targetTabID !== state.activePlaylistTabId
+      || interactionGeneration !== sidebarInteractionGeneration) return false;
   state.databaseSidebarError = "";
   state.selectedDatabaseGameKey = games.length === 1 ? databaseGameKey(games[0]) : null;
   state.playlist = databaseRowsToPlaylistTracks(rows);
@@ -2313,7 +2459,8 @@ async function loadDatabaseGamesIntoPlaylist(games, { title = null } = {}) {
     : `${databaseConsoleName(games[0]) || "Playlist"} (${games.length})`));
   renderPlaylistTabs();
   await applyCatalogPlaylistSort();
-  if (targetTabID !== state.activePlaylistTabId) return false;
+  if (targetTabID !== state.activePlaylistTabId
+      || interactionGeneration !== sidebarInteractionGeneration) return false;
   // Sidebar selection is a preview operation. It must not replace the
   // playback queue or clear the active track; explicit Play/Enter adopts this
   // visible playlist through playTrack({ replaceQueue: true }).
@@ -2334,6 +2481,10 @@ async function activateDatabaseSelection() {
   const gamesForView = visibleDatabaseGames();
   const selectedGame = gamesForView.find((entry) => databaseGameKey(entry) === state.selectedDatabaseGameKey);
   if (selectedGame) {
+    if (isGalleryActive()) {
+      await openGalleryGame(selectedGame);
+      return;
+    }
     const loaded = await loadDatabaseGame(selectedGame);
     const targetID = loaded ? databaseLoadedSelectionID() : null;
     if (targetID) await playVisibleTrack(targetID, 0);
@@ -2342,6 +2493,10 @@ async function activateDatabaseSelection() {
   if (state.selectedDatabaseConsoleName) {
     const games = gamesForView.filter((game) => databaseConsoleName(game) === state.selectedDatabaseConsoleName);
     if (games.length) {
+      if (isGalleryActive()) {
+        await openGalleryGame(games[0]);
+        return;
+      }
       const loaded = await loadDatabaseGamesIntoPlaylist(games, { title: state.selectedDatabaseConsoleName });
       const targetID = loaded ? databaseLoadedSelectionID() : null;
       if (targetID) await playVisibleTrack(targetID, 0);
@@ -2378,6 +2533,10 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
   if (databaseGameButton?.dataset.databaseGameKey) {
     const game = visibleDatabaseGames().find((entry) => databaseGameKey(entry) === databaseGameButton.dataset.databaseGameKey);
     if (game) {
+      if (isGalleryActive()) {
+        await openGalleryGame(game);
+        return true;
+      }
       selectDatabaseSidebarRow(databaseGameButton, { focus: true });
       const loaded = await loadDatabaseGame(game);
       const targetID = loaded ? databaseLoadedSelectionID() : null;
@@ -2399,14 +2558,18 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
 function renderSidebar() {
   updateSidebarStats();
   const view = currentSidebarView();
+  const galleryActive = isGalleryActive();
   const modeLabels = { consoles: "Console View", paths: "Path View" };
   const modeIcons = { consoles: "#icon-database", paths: "#icon-folder-tree" };
   if (refs.sidebarViewToggleButton) {
-    refs.sidebarViewToggleButton.title = modeLabels[view.storedMode] || "Library view";
-    refs.sidebarViewToggleButton.setAttribute("aria-label", modeLabels[view.storedMode] || "Library view");
+    refs.sidebarViewToggleButton.title = galleryActive ? "Console View (Gallery)" : modeLabels[view.storedMode] || "Library view";
+    refs.sidebarViewToggleButton.setAttribute("aria-label", galleryActive ? "Console View (Gallery)" : modeLabels[view.storedMode] || "Library view");
+    refs.sidebarViewToggleButton.disabled = galleryActive;
     const icon = refs.sidebarViewToggleButton.querySelector("use");
     if (icon) icon.setAttribute("href", modeIcons[view.storedMode] || "#icon-sidebar-views");
   }
+  refs.sidebarGalleryButton?.classList.toggle("is-selected", galleryActive);
+  refs.sidebarGalleryButton?.setAttribute("aria-pressed", String(galleryActive));
   const favoritesActive = state.playlistTitle === "Favorites";
   const historyActive = state.playlistTitle === "History";
   refs.sidebarFavoritesButton?.classList.toggle("is-selected", favoritesActive);

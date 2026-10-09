@@ -6,8 +6,9 @@ VGMBoy owns playback format admission, decoder integration, timing, output gain,
 transport, and the macOS audio device for the VGMMan family. It is a shared
 in-process kit, not a daemon or catalog service.
 
-CocoaSpice, SPCBoyWK, and ViewBoy are maintained player clients. Each bundles
-the shared playback core behind its own host adapter. ScanSong consumes
+CocoaSpice, SB2, and ViewBoy are maintained player clients. Each bundles the
+shared playback core behind its own host adapter. Retired SPCBoyWK remains a
+historical client. ScanSong consumes
 VGMBoy-built inspection helpers, but does not link the playback kit or invoke
 a player app.
 

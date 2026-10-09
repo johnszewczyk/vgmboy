@@ -11,9 +11,9 @@ history live in this repository.
 - VGMBoy and MetaMan provide playback and native metadata interpretation.
 - ScanSong writes the catalog; CatalogReader and FrontendCore provide shared
   read and frontend policy boundaries.
-- UACMan owns its package format and editor. CocoaSpice, SPCBoyWK, and ViewBoy
-  are active separate player apps; SPCBOY SB2 is a fourth frontend under
-  development.
+- UACMan owns its package format and editor. CocoaSpice, SPCBOY SB2, and ViewBoy
+  are active separate player apps; SB2 is the current SPCBOY frontend under
+  development. SPCBoyWK is retired and retained for historical reference.
 - LineBoy is a standalone monochrome line-grid player experiment in its own
   family subfolder. It uses CatalogReader for catalog access, FrontendCore for
   favorites and queue policy, and VGMBoy for playback.
@@ -34,7 +34,7 @@ crosses that ownership boundary.
 | Read-only catalog access and browser projections | [CatalogReader/AGENTS.md](CatalogReader/AGENTS.md) |
 | Shared archive/cache, preferences, queue, and transport policy | [FrontendCore/AGENTS.md](FrontendCore/AGENTS.md) |
 | AppKit/SwiftUI presentation | [CocoaSpice/AGENTS.md](CocoaSpice/AGENTS.md) |
-| Native WebKit player and typed host bridge | [SPCBoyWK/AGENTS.md](SPCBoyWK/AGENTS.md) |
+| Retired native WebKit SPCBOY frontend | [SPCBoyWK/AGENTS.md](SPCBoyWK/AGENTS.md) |
 | SPCBOY SB2 pixel-style WebKit frontend | [SB2/AGENTS.md](SB2/AGENTS.md) |
 | Screen-first Yoga LCD player | [ViewBoy/AGENTS.md](ViewBoy/AGENTS.md) |
 | Monochrome DOS-style line-grid display experiment | [LineBoy/AGENTS.md](LineBoy/AGENTS.md) |
