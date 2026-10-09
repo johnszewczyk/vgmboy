@@ -34,7 +34,9 @@ SB2's shared animated selector for interactive items in the main app shell.
   motion preference.
 - The main Options overlay uses the same configured motion duration for its
   top-down entrance and exit. Keep it inert and hidden from accessibility while
-  closed, and restore focus to its opener when dismissed.
+  closed, and restore focus to its opener when dismissed. Its stacking layer
+  must cover home controls and popovers, including the volume popup, while the
+  inset app title and status bars remain visible.
 - Keep the standalone Options window's overlay outside the hidden main shell.
   Do not relocate its controls into `.content` when the native options-window
   flag is set.
