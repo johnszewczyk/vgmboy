@@ -65,6 +65,14 @@ the per-set ledger recording operations and checkpoints.
   not add a redundant package-level generic **Format** tag.
 - **Format check** — Confirm all playable members belong to the package's
   structural format; reject a package that mixes formats.
+- **Status** — Add package-level `Status` only for a confirmed issue requiring
+  a re-rip. Its non-empty value is an array containing one or more exact
+  labels: `Mixed Versions`, `Incomplete`, or `Corrupt`. Omit the tag when no
+  issue is declared; never write `Good`. `Corrupt` requires evidence of a
+  critical known defect, and the affected material stays retained outside a
+  clean canonical package. `Mixed Versions` packages may remain in a canonical
+  set during review, but the tag still marks them for re-rip. Keep detailed
+  findings and reasons in the per-set dashboard report, not in extra UAC tags.
 - **Playback data** — Use wrapper-defined loop objects and playlist-entry
   timing fields, not descriptive tags. Follow the shared
   [hash and timing policy](README.md#hash-and-timing-scope). Source-archive
