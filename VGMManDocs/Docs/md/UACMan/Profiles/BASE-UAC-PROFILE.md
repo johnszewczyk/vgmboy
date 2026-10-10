@@ -46,6 +46,15 @@ the per-set ledger recording operations and checkpoints.
   reference it through `game.metadata.documents`; preserve the source basename
   and any path rename in the member/source provenance. Keep the document bytes
   unchanged. Do not invent tags just to avoid retaining useful narrative notes.
+- **Title Snap** — When a set workflow positively identifies an exact game or
+  release image, store one package-level **Title Snap** field whose value is
+  the relative path to a bundled PNG asset (for example,
+  `art/title-snap.png`). Include the image as a `role: asset` member with the
+  normal UAC member-integrity records, and record its source and attachment
+  operation in package provenance. Do not duplicate this tag across tracks or
+  leave it blank. If the exact image is unavailable, region/release identity
+  conflicts, or an existing snap differs, leave the package unchanged and
+  route the case to the set report for review; do not substitute a nearby image.
 - **Omission** — Omit empty, guessed, parser-default, and duplicate values.
   Use **Date** for a full date and **Year** when only a year is known. Omit
   **Disc Number** for a single-disc release; keep Date and Year together only
