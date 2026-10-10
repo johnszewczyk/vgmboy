@@ -15,8 +15,8 @@ Today/Yesterday filters, and daily counts.
 
 The player also supports whole-album favorites and a Shuffle Favorites action.
 Its Gallery view groups albums under console tabs and shows only games with
-artwork. The deployment builds a private square JPEG thumbnail cache from PNGs
-inside compressed UACs; package paths and original artwork stay server-side.
+artwork. The deployment builds a private, optimized 240-pixel square PNG cache
+from art inside compressed UACs; package paths and original artwork stay server-side.
 Album favorites appear on member profiles and the shared favorites page, where
 Play album adds that album to the shared player's queue.
 
