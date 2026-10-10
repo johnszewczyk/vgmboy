@@ -50,6 +50,10 @@ gzip-compressed `.vgz` members. See
   Also normalize the approved device aliases `NeoGeo Pocket Color` to `Neo Geo
   Pocket Color` and `Bandai WonderSwan` to `WonderSwan`. Keep distinct
   compatible systems, such as Othello Multivision, distinct.
+- **GD3 field preservation** — GD3 v1.00 defines eleven ordered strings. When
+  changing a known standard field, preserve any additional serialized strings
+  and report the member's nonstandard string count. Do not promote unnamed
+  trailing strings into UAC tags.
 - **Shared fields** — Promote a source field to package scope only when it is
   populated and uniform for every track. If values vary or some tracks omit
   the field, preserve populated values at member scope so package metadata does
@@ -96,9 +100,9 @@ gzip-compressed `.vgz` members. See
   preserves the source version, and matches the indexed decompressed-stream
   identity when that evidence exists. Confirm every rewritten playlist
   reference resolves to one packaged member.
-- **GD3 decoding** — Review UTF-16 diagnostics and conflicting values. Do not
-  silently discard a populated standard GD3 field or promote unknown trailing
-  fields without reviewing their meaning.
+- **GD3 decoding** — Review UTF-16 diagnostics, conflicting values, and any
+  extra serialized strings. Do not silently discard a populated standard GD3
+  field or promote unknown trailing fields without reviewing their meaning.
 - **Package accounting** — Compare source and UAC member paths, identify every
   intentional extension or playlist rewrite, and report missing/extra files,
   corruption, version mixtures, and UAC verification results in the affected
