@@ -24,3 +24,5 @@ put source-field mappings in format profiles.
   fields and set-specific identity rules.
 - **VGMRIPS** — [`VGMRIPS.md`](VGMRIPS.md) records source-snapshot, platform
   folder, filename, artwork, and Title Snap rules.
+- **JoshW NSF** — [`JoshW-NSF.md`](JoshW-NSF.md) records NSF-only source scope,
+  source links, and package rules.
