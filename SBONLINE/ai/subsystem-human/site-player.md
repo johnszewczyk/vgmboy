@@ -13,6 +13,13 @@ Long Play offers Off, 5, 10, or 15 minutes. Playback speed ranges from 0.5× to
 site-level Played page includes plays from all members, with profile icons,
 Today/Yesterday filters, and daily counts.
 
+The player also supports whole-album favorites and a Shuffle Favorites action.
+Its Gallery view groups albums under console tabs and shows only games with
+artwork. The deployment builds a private square JPEG thumbnail cache from PNGs
+inside compressed UACs; package paths and original artwork stay server-side.
+Album favorites appear on member profiles and the shared favorites page, where
+Play album adds that album to the shared player's queue.
+
 The hosted player is integrated with the site's passkey accounts, profiles,
 Community, shared Feed, and Now Playing. See the
 [private-admin behavior note](../../../../MathBook/ai/subsystem-human/private-admin.md)
