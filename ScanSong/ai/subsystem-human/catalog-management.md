@@ -103,5 +103,7 @@
 ## Files
 
 - `Sources/ScanSongApp/ScanSongApp.swift`
+- `Sources/ScanSongApp/ScannerAppModel.swift`
+- `Sources/ScanSongApp/ScannerWindow.swift`
 - `Sources/ScanSongApp/ScannerOptionsView.swift`
 - `Sources/ScanSongApp/ScannerScanLog.swift`

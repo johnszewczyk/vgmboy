@@ -1,0 +1,1015 @@
+import AppKit
+import Darwin
+import Foundation
+import ScanSongKit
+import SwiftUI
+import UniformTypeIdentifiers
+
+private enum ScanOutcome: Sendable {
+    case success([CatalogScanResult])
+    case cancelled
+    case failure(String)
+}
+
+private enum MaintenanceOutcome: Sendable {
+    case checked(CatalogLinkTestResult)
+    case cleaned(Int)
+    case failure(String)
+}
+
+private enum PathAdditionOutcome: Sendable {
+    case success
+    case failure(String)
+}
+
+private enum MetadataTagSummaryOutcome: Sendable {
+    case success([CatalogMetadataTagSummary])
+    case failure(String)
+}
+
+private enum CatalogSnapshot: Sendable {
+    case missing
+    case loaded(CanonicalCatalogSummary, [CatalogRoot], [Int64: CatalogScanTally])
+    case failure(String)
+
+    static func read(databaseURL: URL) -> Self {
+        guard FileManager.default.fileExists(atPath: databaseURL.path) else { return .missing }
+        do {
+            let reader = try CanonicalCatalogReader(databaseURL: databaseURL)
+            let summary = reader.summary
+            let roots = try reader.roots()
+            let tallies = try Dictionary(uniqueKeysWithValues: roots.map {
+                ($0.id, try reader.scanTally(rootID: $0.id))
+            })
+            return .loaded(summary, roots, tallies)
+        } catch {
+            return .failure(error.localizedDescription)
+        }
+    }
+}
+
+private enum CatalogChangeOutcome: Sendable {
+    case success(CatalogSnapshot)
+    case failure(String)
+}
+
+@MainActor
+final class ScannerAppModel: ObservableObject {
+    private static let catalogPathKey = "ScanSong.catalogPath"
+    private static let ignoredFileTypesKey = "ScanSong.ignoredFileTypes"
+    private static let cocoaSpiceDefaultsSuite = "com.local.cocoaspice"
+    private static let cocoaSpiceCatalogPathKey = "CocoaSpice.libraryDatabasePath"
+
+    @Published var databaseURL: URL
+    @Published var catalogStatus = "Choose or create a canonical catalog."
+    @Published var roots: [CatalogRoot] = []
+    @Published var rootTallies: [Int64: CatalogScanTally] = [:]
+    @Published var metadataTagSummaries: [CatalogMetadataTagSummary] = []
+    @Published private(set) var isLoadingMetadataTagSummaries = false
+    @Published private(set) var metadataTagSummaryError: String?
+    @Published private(set) var catalogRevision = 0
+    @Published var scanStatus = "Add one or more scan paths."
+    @Published var currentPath: String?
+    @Published var currentFile: String?
+    @Published var operationProgress: ScannerOperationProgress?
+    @Published private(set) var completedOperation: ScannerOperationTelemetry?
+    @Published var isScanning = false
+    @Published var isMaintaining = false
+    @Published var isCancelling = false
+    @Published var deepScan = false
+    @Published var showsResetPathsConfirmation = false
+    @Published var showsResetCatalogConfirmation = false
+    @Published var showsDeleteCatalogConfirmation = false
+    @Published var showsCleanLinksConfirmation = false
+    @Published private(set) var ignoredFileExtensions: Set<String>
+
+    private var scanTask: Task<Void, Never>?
+    private var worker: Task<ScanOutcome, Never>?
+    private var pathTask: Task<PathAdditionOutcome, Never>?
+    private var pathObserverTask: Task<Void, Never>?
+    private var pathChangeTask: Task<CatalogChangeOutcome, Never>?
+    private var pathChangeObserverTask: Task<Void, Never>?
+    private var maintenanceTask: Task<Void, Never>?
+    private var maintenanceWorker: Task<MaintenanceOutcome, Never>?
+    private var activeRootID: Int64?
+    private var loadedCatalogPath: String?
+    private var metadataTagSummariesLoadedForPath: String?
+    private var metadataTagSummaryRequestID: UUID?
+    var operationStartedAt: Date?
+    private var logWindows: [Int64: ScannerScanLogWindow] = [:]
+    private var abbreviatedPaths: [Int64: String] = [:]
+    private var closeWhenIdle: (() -> Void)?
+
+    init() {
+        if let storedPath = UserDefaults.standard.string(forKey: Self.catalogPathKey),
+           (storedPath as NSString).isAbsolutePath {
+            databaseURL = URL(fileURLWithPath: storedPath).standardizedFileURL
+        } else {
+            databaseURL = Self.defaultCatalogURL()
+        }
+        let knownExtensions = Set(ScannerFormatPolicy.knownUnsupportedFileTypes.map(\.id))
+        let storedExtensions = UserDefaults.standard.stringArray(forKey: Self.ignoredFileTypesKey) ?? []
+        ignoredFileExtensions = Set(storedExtensions.map(ScannerFormatPolicy.normalize)).intersection(knownExtensions)
+        if storedExtensions.isEmpty {
+            ignoredFileExtensions = ScannerFormatPolicy.defaultIgnoredExtensions
+        }
+        isMaintaining = true
+        operationStartedAt = Date()
+        scanStatus = "Opening catalog…"
+        operationProgress = ScannerOperationProgress(
+            operation: .catalog,
+            phase: "opening",
+            processed: 0,
+            total: nil,
+            failures: 0,
+            detail: "Opening catalog…"
+        )
+        Task { [weak self] in
+            guard let self else { return }
+            await refreshCatalog()
+            isMaintaining = false
+            operationProgress = nil
+            completeRequestedCloseIfIdle()
+        }
+    }
+
+    deinit {
+        scanTask?.cancel()
+        worker?.cancel()
+        pathObserverTask?.cancel()
+        pathTask?.cancel()
+        pathChangeObserverTask?.cancel()
+        pathChangeTask?.cancel()
+        maintenanceTask?.cancel()
+        maintenanceWorker?.cancel()
+    }
+
+    var isBusy: Bool { isScanning || isMaintaining }
+    var canScanAll: Bool { !isBusy && roots.contains(where: \.isEnabled) }
+    var hasInactiveLinks: Bool { roots.contains(where: { $0.deadSourceCount > 0 }) }
+    var hasDatabaseFile: Bool { FileManager.default.fileExists(atPath: databaseURL.path) }
+    var hasLoadedCatalog: Bool { loadedCatalogPath == databaseURL.standardizedFileURL.path }
+    var hasLoadedMetadataTagSummaries: Bool {
+        metadataTagSummariesLoadedForPath == databaseURL.standardizedFileURL.path
+    }
+    var fileTypePolicies: [ScannerFileTypePolicy] { ScannerFormatPolicy.knownUnsupportedFileTypes }
+
+    func loadMetadataTagSummariesIfNeeded() {
+        let selectedURL = databaseURL.standardizedFileURL
+        let selectedPath = selectedURL.path
+        guard hasDatabaseFile,
+              hasLoadedCatalog,
+              metadataTagSummariesLoadedForPath != selectedPath,
+              metadataTagSummaryRequestID == nil else { return }
+
+        isLoadingMetadataTagSummaries = true
+        metadataTagSummaryError = nil
+        let requestID = UUID()
+        metadataTagSummaryRequestID = requestID
+        let worker = Task.detached(priority: .utility) {
+            do {
+                let reader = try CanonicalCatalogReader(databaseURL: selectedURL)
+                return MetadataTagSummaryOutcome.success(try reader.metadataTagSummaries())
+            } catch {
+                return MetadataTagSummaryOutcome.failure(error.localizedDescription)
+            }
+        }
+        Task { [weak self] in
+            let outcome = await worker.value
+            guard let self,
+                  metadataTagSummaryRequestID == requestID,
+                  databaseURL.standardizedFileURL == selectedURL else { return }
+            metadataTagSummaryRequestID = nil
+            isLoadingMetadataTagSummaries = false
+            switch outcome {
+            case .success(let summaries):
+                metadataTagSummaries = summaries
+                metadataTagSummariesLoadedForPath = selectedPath
+            case .failure(let message):
+                metadataTagSummaryError = message
+            }
+        }
+    }
+
+    var databaseFileDisplayPath: String {
+        hasDatabaseFile ? databaseURL.path : "(None)"
+    }
+
+    func isFileTypeIgnored(_ policy: ScannerFileTypePolicy) -> Bool {
+        ignoredFileExtensions.contains(policy.id)
+    }
+
+    func setFileTypeIgnored(_ extensionName: String, ignored: Bool) {
+        guard !isBusy else { return }
+        let normalized = ScannerFormatPolicy.normalize(extensionName)
+        guard fileTypePolicies.contains(where: { $0.id == normalized }) else { return }
+        if ignored {
+            ignoredFileExtensions.insert(normalized)
+        } else {
+            ignoredFileExtensions.remove(normalized)
+        }
+        UserDefaults.standard.set(Array(ignoredFileExtensions).sorted(), forKey: Self.ignoredFileTypesKey)
+    }
+
+    var progressFraction: Double? {
+        operationProgress?.fraction
+    }
+
+    func chooseCatalog() {
+        guard !isBusy else { return }
+        let panel = NSOpenPanel()
+        panel.title = "Choose Media Catalog"
+        panel.prompt = "Choose Catalog"
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.database]
+        panel.directoryURL = databaseURL.deletingLastPathComponent()
+        guard panel.runModal() == .OK, let selected = panel.url else { return }
+        setCatalog(selected)
+    }
+
+    func addNewCatalog() {
+        guard !isBusy else { return }
+        let panel = NSSavePanel()
+        panel.title = "Add New Media Catalog"
+        panel.prompt = "Add New"
+        panel.canCreateDirectories = true
+        panel.allowedContentTypes = [.database]
+        panel.nameFieldStringValue = "Library.sqlite"
+        panel.directoryURL = databaseURL.deletingLastPathComponent()
+        guard panel.runModal() == .OK, let selected = panel.url else { return }
+
+        let candidate = selected.standardizedFileURL
+        guard !FileManager.default.fileExists(atPath: candidate.path) else {
+            catalogStatus = "A database already exists at that path. Choose a new file name."
+            return
+        }
+
+        runCatalogChange("Creating database…", { databaseURL in
+            guard !FileManager.default.fileExists(atPath: databaseURL.path) else {
+                throw NSError(
+                    domain: "ScanSong.CatalogCreation",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "A database already exists at that path. Choose a new file name."]
+                )
+            }
+            // The writer creates the schema-25 file before it becomes selected.
+            _ = try CanonicalCatalogWriter(databaseURL: databaseURL)
+        }, targetURL: candidate, selectOnSuccess: true, kind: .catalog,
+           successText: "Add one or more scan paths.")
+    }
+
+    func useDefaultCatalog() {
+        guard !isBusy else { return }
+        setCatalog(Self.defaultCatalogURL())
+    }
+
+    func resetCatalog() {
+        guard !isBusy, hasDatabaseFile else { return }
+        runCatalogChange("Resetting database…", { databaseURL in
+            try CanonicalCatalogWriter(databaseURL: databaseURL).resetCatalog()
+            ScannerScanLogStore.discardAll(databaseURL: databaseURL)
+        }, kind: .catalog, successText: "Database reset. Add one or more scan paths.") {
+            self.logWindows.values.forEach { $0.close() }
+            self.logWindows.removeAll()
+        }
+    }
+
+    func deleteCatalogFile() {
+        guard !isBusy, hasDatabaseFile else { return }
+        runCatalogChange("Deleting database file…", { databaseURL in
+            let fileManager = FileManager.default
+            try fileManager.removeItem(at: databaseURL)
+            for suffix in ["-wal", "-shm"] {
+                let sidecar = URL(fileURLWithPath: databaseURL.path + suffix)
+                if fileManager.fileExists(atPath: sidecar.path) {
+                    try fileManager.removeItem(at: sidecar)
+                }
+            }
+            ScannerScanLogStore.discardAll(databaseURL: databaseURL)
+        }, kind: .catalog, successText: "No database file selected. Use Default, Open, or Add New.") {
+            self.logWindows.values.forEach { $0.close() }
+            self.logWindows.removeAll()
+        }
+    }
+
+    func addPaths() {
+        let panel = NSOpenPanel()
+        panel.title = "Add Scan Paths"
+        panel.prompt = "Add Path"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = true
+        guard panel.runModal() == .OK else { return }
+        add(panel.urls)
+    }
+
+    func removePath(_ id: Int64) {
+        guard !isBusy else { return }
+        runCatalogChange("Removing scan path…", { databaseURL in
+            try CanonicalCatalogWriter(databaseURL: databaseURL).removeRoot(id: id)
+        }) {
+            self.logWindows[id]?.close()
+            self.logWindows[id] = nil
+        }
+    }
+
+    func resetPaths() {
+        guard !isBusy else { return }
+        let rootIDs = roots.map(\.id)
+        runCatalogChange("Removing all scan paths…", { databaseURL in
+            let writer = try CanonicalCatalogWriter(databaseURL: databaseURL)
+            for id in rootIDs { try writer.removeRoot(id: id) }
+        }) {
+            self.logWindows.values.forEach { $0.close() }
+            self.logWindows.removeAll()
+        }
+    }
+
+    func setPathEnabled(_ id: Int64, enabled: Bool) {
+        guard !isBusy else { return }
+        runCatalogChange(enabled ? "Enabling scan path…" : "Disabling scan path…") { databaseURL in
+            try CanonicalCatalogWriter(databaseURL: databaseURL).setRootEnabled(id: id, enabled: enabled)
+        }
+    }
+
+    func toggleAllPathsEnabled() {
+        guard !isBusy, !roots.isEmpty else { return }
+        let enable = roots.contains(where: { !$0.isEnabled })
+        let rootIDs = roots.map(\.id)
+        runCatalogChange(enable ? "Enabling scan paths…" : "Disabling scan paths…") { databaseURL in
+            let writer = try CanonicalCatalogWriter(databaseURL: databaseURL)
+            for id in rootIDs { try writer.setRootEnabled(id: id, enabled: enable) }
+        }
+    }
+
+    func scanPath(_ id: Int64) {
+        startScan(roots: roots.filter { $0.id == id })
+    }
+
+    func scanAllPaths() {
+        startScan(roots: roots.filter(\.isEnabled))
+    }
+
+    func checkLinks() {
+        runMaintenance(kind: .checkLinks, starting: "Checking catalog links…") { writer, progress in
+            .checked(try writer.testFiles(progress: progress))
+        }
+    }
+
+    func cleanLinks() {
+        runMaintenance(kind: .removeLinks, starting: "Removing inactive catalog links…") { writer, progress in
+            .cleaned(try writer.clearDeadLinks(progress: progress))
+        }
+    }
+
+    func showScanLog(_ id: Int64) {
+        if let window = logWindows[id] {
+            window.show()
+            return
+        }
+        guard let root = roots.first(where: { $0.id == id }) else { return }
+        let tally = rootTallies[id] ?? emptyTally
+        let window = ScannerScanLogWindow(
+            root: root,
+            summary: ScannerScanLogStore.summary(root: root, tally: tally),
+            lines: ScannerScanLogStore.read(databaseURL: databaseURL, rootID: id)
+        )
+        logWindows[id] = window
+        window.show()
+    }
+
+    func hasScanLog(_ id: Int64) -> Bool {
+        ScannerScanLogStore.exists(databaseURL: databaseURL, rootID: id)
+            || roots.first(where: { $0.id == id })?.lastScanStartedAt != nil
+    }
+
+    func cancelScan() {
+        guard isScanning, !isCancelling else { return }
+        isCancelling = true
+        scanStatus = "Cancelling and retaining completed checkpoints…"
+        worker?.cancel()
+    }
+
+    /// A window close must never tear down a scan halfway through an archive or
+    /// publication transaction. Scans cancel cooperatively; maintenance is
+    /// allowed to finish its current SQLite operation before the window closes.
+    func closeWhenWorkIsSafe(_ close: @escaping () -> Void) {
+        guard isBusy else {
+            close()
+            return
+        }
+        closeWhenIdle = close
+        if isScanning { cancelScan() }
+    }
+
+    func rootStatusText(_ root: CatalogRoot) -> String {
+        let tally = rootTallies[root.id] ?? emptyTally
+        if let error = root.lastScanError, !error.isEmpty {
+            return "Last scan failed • \(error)"
+        }
+        guard let completedAt = root.lastScanCompletedAt else {
+            return "Not scanned • \(tally.sourceCount) files"
+        }
+        let completed = DateFormatter.localizedString(from: completedAt, dateStyle: .medium, timeStyle: .short)
+        let issues = tally.failedSourceCount + tally.inactiveSourceCount
+        return "Last scan \(completed) • \(tally.sourceCount) files • \(root.lastScanTrackCount) tracks • \(issues) issue\(issues == 1 ? "" : "s")"
+    }
+
+    func rootStatusIsEmpty(_ root: CatalogRoot) -> Bool {
+        root.lastScanCompletedAt != nil && root.lastScanTrackCount == 0
+    }
+
+    func rootStatusHasIssues(_ root: CatalogRoot) -> Bool {
+        let tally = rootTallies[root.id] ?? emptyTally
+        return root.lastScanError?.isEmpty == false || tally.failedSourceCount > 0 || tally.inactiveSourceCount > 0
+    }
+
+    func rootStatusIsClean(_ root: CatalogRoot) -> Bool {
+        root.lastScanCompletedAt != nil && !rootStatusIsEmpty(root) && !rootStatusHasIssues(root)
+    }
+
+    func abbreviatedPath(for root: CatalogRoot) -> String {
+        abbreviatedPaths[root.id] ?? root.path
+    }
+
+    private func rebuildAbbreviatedPaths() {
+        let paths = roots.map { URL(fileURLWithPath: $0.path).pathComponents }
+        guard let first = paths.first else {
+            abbreviatedPaths = [:]
+            return
+        }
+        let sharedCount = paths.dropFirst().reduce(first.count) { count, path in
+            zip(first.prefix(count), path.prefix(count)).prefix { $0 == $1 }.count
+        }
+        abbreviatedPaths = Dictionary(uniqueKeysWithValues: zip(roots, paths).map { root, components in
+            let suffix = Array(components.dropFirst(min(sharedCount, components.count)))
+            let visible = suffix.isEmpty ? Array(components.suffix(2)) : suffix
+            return (root.id, visible.joined(separator: "/"))
+        })
+    }
+
+    private var emptyTally: CatalogScanTally {
+        CatalogScanTally(
+            sourceCount: 0,
+            activeSourceCount: 0,
+            successfulSourceCount: 0,
+            failedSourceCount: 0,
+            inactiveSourceCount: 0
+        )
+    }
+
+    private var readyText: String {
+        let enabled = roots.filter(\.isEnabled).count
+        return "Ready • \(roots.count) scan path\(roots.count == 1 ? "" : "s") • \(enabled) enabled"
+    }
+
+    private func setCatalog(_ url: URL) {
+        databaseURL = url.standardizedFileURL
+        invalidateMetadataTagSummaries()
+        UserDefaults.standard.set(databaseURL.path, forKey: Self.catalogPathKey)
+        logWindows.values.forEach { $0.close() }
+        logWindows.removeAll()
+        isMaintaining = true
+        operationStartedAt = Date()
+        currentPath = nil
+        currentFile = nil
+        scanStatus = "Opening catalog…"
+        operationProgress = ScannerOperationProgress(
+            operation: .catalog,
+            phase: "opening",
+            processed: 0,
+            total: nil,
+            failures: 0,
+            detail: "Opening catalog…"
+        )
+        Task { [weak self] in
+            guard let self else { return }
+            await refreshCatalog()
+            isMaintaining = false
+            operationProgress = nil
+            completeRequestedCloseIfIdle()
+        }
+    }
+
+    private func refreshCatalog() async {
+        let selectedURL = databaseURL
+        let snapshot = await Task.detached(priority: .utility) {
+            CatalogSnapshot.read(databaseURL: selectedURL)
+        }.value
+        guard selectedURL == databaseURL else { return }
+        applyCatalogSnapshot(snapshot)
+    }
+
+    private func applyCatalogSnapshot(_ snapshot: CatalogSnapshot) {
+        invalidateMetadataTagSummaries()
+        loadedCatalogPath = nil
+        switch snapshot {
+        case .missing:
+            catalogStatus = "New schema-25 catalog will be created when scanning starts."
+            roots = []
+            rootTallies = [:]
+            abbreviatedPaths = [:]
+            if scanStatus == "Opening catalog…" { scanStatus = "Add one or more scan paths." }
+        case .loaded(let summary, let loadedRoots, let tallies):
+            loadedCatalogPath = summary.path
+            catalogStatus = "Schema \(summary.schemaVersion) • \(summary.rootCount) paths • \(summary.trackCount) tracks"
+            roots = loadedRoots
+            rootTallies = tallies
+            rebuildAbbreviatedPaths()
+            if scanStatus == "Opening catalog…" || scanStatus.hasPrefix("Add one or more") {
+                scanStatus = readyText
+            }
+        case .failure(let message):
+            catalogStatus = "Cannot use catalog: \(message)"
+            roots = []
+            rootTallies = [:]
+            abbreviatedPaths = [:]
+            scanStatus = "Catalog unavailable: \(message)"
+        }
+    }
+
+    private func invalidateMetadataTagSummaries() {
+        metadataTagSummaryRequestID = nil
+        metadataTagSummariesLoadedForPath = nil
+        metadataTagSummaries = []
+        isLoadingMetadataTagSummaries = false
+        metadataTagSummaryError = nil
+        catalogRevision &+= 1
+    }
+
+    private func runCatalogChange(
+        _ activity: String,
+        _ change: @escaping @Sendable (URL) throws -> Void,
+        targetURL: URL? = nil,
+        selectOnSuccess: Bool = false,
+        kind: ScannerOperationKind = .managePaths,
+        successText: String? = nil,
+        afterSuccess: (@MainActor () -> Void)? = nil
+    ) {
+        guard !isBusy else { return }
+        isMaintaining = true
+        operationStartedAt = Date()
+        completedOperation = nil
+        currentPath = nil
+        currentFile = nil
+        operationProgress = ScannerOperationProgress(
+            operation: kind,
+            phase: "updating",
+            processed: 0,
+            total: nil,
+            failures: 0,
+            detail: activity
+        )
+        scanStatus = activity
+        let selectedURL = targetURL ?? databaseURL
+        let worker = Task.detached(priority: .utility) {
+            do {
+                try change(selectedURL)
+                let snapshot = CatalogSnapshot.read(databaseURL: selectedURL)
+                if case .failure(let message) = snapshot { return CatalogChangeOutcome.failure(message) }
+                return CatalogChangeOutcome.success(snapshot)
+            } catch {
+                return CatalogChangeOutcome.failure(error.localizedDescription)
+            }
+        }
+        pathChangeTask = worker
+        pathChangeObserverTask = Task { [weak self] in
+            let outcome = await worker.value
+            guard let self else { return }
+            pathChangeTask = nil
+            pathChangeObserverTask = nil
+            switch outcome {
+            case .success(let snapshot):
+                if selectOnSuccess {
+                    databaseURL = selectedURL
+                    UserDefaults.standard.set(selectedURL.path, forKey: Self.catalogPathKey)
+                    logWindows.values.forEach { $0.close() }
+                    logWindows.removeAll()
+                }
+                applyCatalogSnapshot(snapshot)
+                afterSuccess?()
+                let result = successText ?? (roots.isEmpty ? "No scan paths configured" : readyText)
+                let completedAt = Date()
+                let telemetry = ScannerOperationTelemetry(
+                    operation: kind,
+                    startedAt: operationStartedAt ?? completedAt,
+                    completedAt: completedAt,
+                    processed: 0,
+                    total: nil,
+                    failures: 0,
+                    result: result
+                )
+                completedOperation = telemetry
+                scanStatus = telemetry.statusText
+            case .failure(let message):
+                await refreshCatalog()
+                recordMaintenanceFailure(message)
+            }
+            isMaintaining = false
+            operationProgress = nil
+            completeRequestedCloseIfIdle()
+        }
+    }
+
+    private func add(_ urls: [URL]) {
+        guard !isBusy else { return }
+        let canonical = Array(Set(urls.map { $0.standardizedFileURL.resolvingSymlinksInPath() }))
+            .sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+        guard !canonical.isEmpty else { return }
+
+        isMaintaining = true
+        completedOperation = nil
+        operationStartedAt = Date()
+        currentPath = nil
+        currentFile = nil
+        operationProgress = ScannerOperationProgress(
+            operation: .addPath,
+            phase: "adding",
+            processed: 0,
+            total: nil,
+            failures: 0,
+            detail: "Adding \(canonical.count) scan path\(canonical.count == 1 ? "" : "s")…"
+        )
+        scanStatus = "Adding \(canonical.count) scan path\(canonical.count == 1 ? "" : "s") to the catalog…"
+
+        let databaseURL = databaseURL
+        let worker = Task.detached(priority: .utility) {
+            do {
+                let writer = try CanonicalCatalogWriter(databaseURL: databaseURL)
+                for url in canonical { _ = try writer.addRoot(path: url.path) }
+                return PathAdditionOutcome.success
+            } catch {
+                return PathAdditionOutcome.failure(error.localizedDescription)
+            }
+        }
+        pathTask = worker
+        pathObserverTask = Task { [weak self] in
+            let outcome = await worker.value
+            guard let self else { return }
+            pathTask = nil
+            pathObserverTask = nil
+            switch outcome {
+            case .success:
+                await refreshCatalog()
+                let completedAt = Date()
+                let telemetry = ScannerOperationTelemetry(
+                    operation: .addPath,
+                    startedAt: operationStartedAt ?? completedAt,
+                    completedAt: completedAt,
+                    processed: canonical.count,
+                    total: canonical.count,
+                    failures: 0,
+                    result: readyText
+                )
+                completedOperation = telemetry
+                scanStatus = telemetry.statusText
+            case .failure(let message):
+                await refreshCatalog()
+                recordMaintenanceFailure(message)
+            }
+            isMaintaining = false
+            operationProgress = nil
+            completeRequestedCloseIfIdle()
+        }
+    }
+
+    private func startScan(roots requestedRoots: [CatalogRoot]) {
+        guard !isBusy, !requestedRoots.isEmpty else { return }
+        let databaseURL = databaseURL
+        let ignoredFileExtensions = ignoredFileExtensions
+        let mode: ScanMode = deepScan ? .newScan : .incremental
+        let progressBuffer = LatestValueBuffer<CatalogScanProgress>()
+        isScanning = true
+        isCancelling = false
+        operationProgress = ScannerOperationProgress(
+            operation: .scan,
+            phase: "preparing",
+            processed: 0,
+            total: nil,
+            failures: 0,
+            detail: "Preparing catalog…"
+        )
+        completedOperation = nil
+        operationStartedAt = Date()
+        activeRootID = requestedRoots.first?.id
+        currentPath = nil
+        currentFile = nil
+        scanStatus = "Preparing catalog…"
+
+        let worker = Task.detached(priority: .utility) {
+            defer { progressBuffer.finish() }
+            do {
+                let scanner = try CatalogScanner(
+                    databaseURL: databaseURL,
+                    ignoredFileExtensions: ignoredFileExtensions
+                )
+                let results = try await scanner.scan(
+                    rootURLs: requestedRoots.map { URL(fileURLWithPath: $0.path) },
+                    mode: mode
+                ) {
+                    progressBuffer.publish($0)
+                }
+                return ScanOutcome.success(results)
+            } catch is CancellationError {
+                return ScanOutcome.cancelled
+            } catch {
+                return ScanOutcome.failure(error.localizedDescription)
+            }
+        }
+        self.worker = worker
+        scanTask = Task { [weak self] in
+            guard let self else { return }
+            await self.sampleProgress(from: progressBuffer, apply: self.applyVisibleProgress)
+            await self.finish(await worker.value)
+        }
+    }
+
+    private func runMaintenance(
+        kind: ScannerOperationKind,
+        starting activity: String,
+        _ operation: @escaping @Sendable (CanonicalCatalogWriter, @escaping @Sendable (CatalogMaintenanceProgress) -> Void) throws -> MaintenanceOutcome
+    ) {
+        guard !isBusy else { return }
+        isMaintaining = true
+        operationStartedAt = Date()
+        completedOperation = nil
+        currentPath = nil
+        currentFile = nil
+        operationProgress = ScannerOperationProgress(
+            operation: kind,
+            phase: "preparing",
+            processed: 0,
+            total: nil,
+            failures: 0,
+            detail: activity
+        )
+        scanStatus = activity
+        let databaseURL = databaseURL
+        let progressBuffer = LatestValueBuffer<CatalogMaintenanceProgress>()
+        let worker = Task.detached(priority: .utility) {
+            defer { progressBuffer.finish() }
+            do {
+                let result = try operation(
+                    CanonicalCatalogWriter(databaseURL: databaseURL),
+                    { progressBuffer.publish($0) }
+                )
+                return result
+            } catch {
+                return MaintenanceOutcome.failure(error.localizedDescription)
+            }
+        }
+        self.maintenanceWorker = worker
+        maintenanceTask = Task { [weak self] in
+            guard let self else { return }
+            await self.sampleProgress(from: progressBuffer, apply: self.applyMaintenanceProgress)
+            let outcome = await worker.value
+            maintenanceWorker = nil
+            maintenanceTask = nil
+            switch outcome {
+            case .checked(let result):
+                let missingDescription = result.missingSourceCount == 0
+                    ? "No missing files found"
+                    : "\(result.missingSourceCount) missing file\(result.missingSourceCount == 1 ? "" : "s") found and marked inactive"
+                completeMaintenance(
+                    kind: kind,
+                    processed: result.testedSourceCount,
+                    failures: result.missingSourceCount,
+                    result: "Checked \(result.testedSourceCount) files • \(missingDescription) • \(result.restoredSourceCount) restored"
+                )
+            case .cleaned(let count):
+                completeMaintenance(
+                    kind: kind,
+                    processed: count,
+                    failures: 0,
+                    result: "Removed \(count) inactive link\(count == 1 ? "" : "s")"
+                )
+            case .failure(let message):
+                recordMaintenanceFailure(message)
+            }
+            await refreshCatalog()
+            isMaintaining = false
+            completeRequestedCloseIfIdle()
+        }
+    }
+
+    private func applyMaintenanceProgress(_ update: CatalogMaintenanceProgress) {
+        let kind: ScannerOperationKind = update.operation == .checkLinks ? .checkLinks : .removeLinks
+        operationProgress = ScannerOperationProgress(
+            operation: kind,
+            phase: "maintenance",
+            processed: update.processed,
+            total: update.total,
+            failures: update.failures,
+            detail: update.detail
+        )
+        scanStatus = update.detail
+        if let currentPath = update.currentPath {
+            self.currentPath = (currentPath as NSString).deletingLastPathComponent
+            self.currentFile = (currentPath as NSString).lastPathComponent
+        } else {
+            currentPath = nil
+            currentFile = nil
+        }
+    }
+
+    private func completeMaintenance(
+        kind: ScannerOperationKind,
+        processed: Int,
+        failures: Int,
+        result: String
+    ) {
+        let completedAt = Date()
+        let telemetry = ScannerOperationTelemetry(
+            operation: kind,
+            startedAt: operationStartedAt ?? completedAt,
+            completedAt: completedAt,
+            processed: processed,
+            total: processed,
+            failures: failures,
+            result: result
+        )
+        completedOperation = telemetry
+        scanStatus = telemetry.statusText
+        operationProgress = nil
+        currentPath = nil
+        currentFile = nil
+    }
+
+    private func sampleProgress<Value: Sendable>(
+        from buffer: LatestValueBuffer<Value>,
+        apply: (Value) -> Void
+    ) async {
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: ScannerProgressDelivery.sampleIntervalNanoseconds)
+            guard !Task.isCancelled else { break }
+            if let update = buffer.take() {
+                apply(update)
+            }
+            if buffer.isFinished { break }
+        }
+        if let update = buffer.take() {
+            apply(update)
+        }
+    }
+
+    private func applyVisibleProgress(_ update: CatalogScanProgress) {
+        operationProgress = ScannerOperationProgress(
+            operation: .scan,
+            phase: update.phase.rawValue,
+            processed: update.processed,
+            total: update.discovered,
+            failures: update.failed,
+            detail: update.detail
+        )
+        activeRootID = roots.first(where: { $0.path == update.rootPath })?.id
+        if let candidate = update.currentPath {
+            if let separator = candidate.firstIndex(of: "#") {
+                let sourcePath = String(candidate[..<separator])
+                let archiveEntry = String(candidate[candidate.index(after: separator)...])
+                currentPath = (sourcePath as NSString).deletingLastPathComponent
+                currentFile = "\((sourcePath as NSString).lastPathComponent)#\(archiveEntry)"
+            } else {
+                currentPath = (candidate as NSString).deletingLastPathComponent
+                currentFile = (candidate as NSString).lastPathComponent
+            }
+        }
+        switch update.phase {
+        case .preparing: scanStatus = "Preparing catalog…"
+        case .discovery: scanStatus = "Discovering supported sources…"
+        case .planning: scanStatus = "Discovered \(update.discovered) sources"
+        case .archiveListing: scanStatus = "Extracting archives…"
+        case .materialization: scanStatus = "Materializing archive members…"
+        case .inspection: scanStatus = "Inspecting sources…"
+        case .persistence:
+            scanStatus = "Saved \(update.phaseCompleted ?? update.processed) of \(update.discovered) • \(update.failed) failed"
+        case .publication:
+            currentPath = nil
+            currentFile = nil
+            scanStatus = update.detail ?? "Publishing catalog atomically…"
+        case .cleanup: scanStatus = "Cleaning temporary scan files…"
+        }
+    }
+
+    private func finish(_ outcome: ScanOutcome) async {
+        worker = nil
+        scanTask = nil
+        currentPath = nil
+        currentFile = nil
+        operationProgress = ScannerOperationProgress(
+            operation: .scan,
+            phase: "cleanup",
+            processed: 0,
+            total: nil,
+            failures: 0,
+            detail: "Saving scan report and refreshing catalog…"
+        )
+        scanStatus = "Saving scan report and refreshing catalog…"
+        var logError: String?
+        switch outcome {
+        case .success(let results):
+            for result in results {
+                logError = await writeLastScanLog(rootID: result.root.id, result: result, terminalMessage: nil) ?? logError
+            }
+            let completedAt = results.compactMap(\.root.lastScanCompletedAt).max() ?? Date()
+            let startedAt = results.compactMap(\.root.lastScanStartedAt).min() ?? completedAt
+            let totalDiscovered = results.reduce(0) { $0 + $1.discoveredSourceCount }
+            let totalFailures = results.reduce(0) { $0 + $1.failures.count }
+            let totalSkipped = results.reduce(0) { $0 + $1.skipped.count }
+            let totalTracks = results.reduce(0) { $0 + $1.trackCount }
+            let telemetry = ScannerOperationTelemetry(
+                operation: .scan,
+                startedAt: operationStartedAt ?? startedAt,
+                completedAt: completedAt,
+                processed: totalDiscovered,
+                total: totalDiscovered,
+                failures: totalFailures,
+                result: "\(totalDiscovered) items • \(totalTracks) tracks • \(totalFailures) failed • \(totalSkipped) skipped"
+            )
+            completedOperation = telemetry
+            scanStatus = telemetry.statusText
+        case .cancelled:
+            logError = await writeLastScanLog(rootID: activeRootID, result: nil, terminalMessage: "Cancelled. Completed checkpoints were retained.")
+            scanStatus = "Cancelled. Completed source checkpoints were retained; Scan resumes them."
+        case .failure(let message):
+            logError = await writeLastScanLog(rootID: activeRootID, result: nil, terminalMessage: "Stopped before publication — \(message)")
+            if isCatalogContention(message) {
+                scanStatus = "Catalog busy. Existing records remain consistent; retry the scan shortly."
+            } else {
+                scanStatus = "Scan stopped before publication: \(message)"
+            }
+        }
+        operationProgress = nil
+        activeRootID = nil
+        await refreshCatalog()
+        if let logError { scanStatus += " • Scan log unavailable: \(logError)" }
+        isScanning = false
+        isCancelling = false
+        completeRequestedCloseIfIdle()
+    }
+
+    private func completeRequestedCloseIfIdle() {
+        guard !isBusy, let close = closeWhenIdle else { return }
+        closeWhenIdle = nil
+        close()
+    }
+
+    private func writeLastScanLog(rootID: Int64?, result: CatalogScanResult?, terminalMessage: String?) async -> String? {
+        guard let rootID else { return nil }
+        logWindows[rootID]?.close()
+        logWindows[rootID] = nil
+        let selectedURL = databaseURL
+        return await Task.detached(priority: .utility) {
+            do {
+                let reader = try CanonicalCatalogReader(databaseURL: selectedURL)
+                guard let root = try reader.roots().first(where: { $0.id == rootID }) else { return nil }
+                let tally = try reader.scanTally(rootID: rootID)
+                ScannerScanLogStore.writeLastResult(
+                    databaseURL: selectedURL,
+                    root: root,
+                    tally: tally,
+                    result: result,
+                    terminalMessage: terminalMessage
+                )
+                return nil
+            } catch {
+                return error.localizedDescription
+            }
+        }.value
+    }
+
+    private func record(_ error: Error, stage: String) {
+        if CatalogWriterError.isContention(error) {
+            scanStatus = "Catalog busy. Player playback may continue; retry the operation shortly."
+            return
+        }
+        scanStatus = "Catalog operation failed at \(stage): \(error.localizedDescription)"
+    }
+
+    private func recordMaintenanceFailure(_ message: String) {
+        if isCatalogContention(message) {
+            scanStatus = "Catalog busy. Player playback may continue; retry the operation shortly."
+        } else {
+            scanStatus = "Catalog maintenance failed: \(message)"
+        }
+    }
+
+    private func isCatalogContention(_ message: String) -> Bool {
+        message.contains("Another ScanSong session is already writing this catalog.")
+            || message.contains("The catalog is busy with another SQLite operation.")
+    }
+
+    private static func defaultCatalogURL() -> URL {
+        if let configuredPath = UserDefaults(suiteName: cocoaSpiceDefaultsSuite)?
+            .string(forKey: cocoaSpiceCatalogPathKey)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !configuredPath.isEmpty,
+           (configuredPath as NSString).isAbsolutePath {
+            return URL(fileURLWithPath: configuredPath).standardizedFileURL
+        }
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("CocoaSpice", isDirectory: true)
+            .appendingPathComponent("Library.sqlite", isDirectory: false)
+    }
+}
