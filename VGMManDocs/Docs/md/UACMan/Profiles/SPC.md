@@ -41,6 +41,18 @@ sub-container and version together, such as `SPC v.30` or `SPC v.10`.
 
 - **OST fields** — `OST Title`, `OST Disc`, and `OST Track` are defined xID6
   fields (`0x10`, `0x11`, and `0x12`), not arbitrary user-defined tags.
+- **No-Intro title snaps** — For a positively identified SNES release with an
+  unambiguous matching image in the selected No-Intro title-snap pack, retain
+  the PNG byte-for-byte as an ordinary `asset` member with format `png` and
+  expose it with package tag `Title Snap`, whose value is the member path
+  (for example, `art/title.png`). Match through the stored No-Intro Game ID
+  and release name; use region evidence to choose among regional images. A
+  title-only guess, multiple candidate images, or an absent image stays out of
+  the package and is reported for review. Record the image-pack source and
+  source-member path in `sources[]` and the attachment transformation. Keep
+  the audio set's existing `Set Name` and `Set URL`; the artwork source does
+  not replace them. Preserve a valid existing `Title Snap` rather than adding
+  a second image without comparing the candidate.
 - **Dual tag blocks** — Preserve ID666 and xID6 source bytes; record
   contradictory fields or parser diagnostics in the dated report.
 - **Source hashes** — Keep the four **Stream Hashes** for each SPC track. For
