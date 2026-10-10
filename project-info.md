@@ -14,6 +14,9 @@ history live in this repository.
 - UACMan owns its package format and editor. CocoaSpice, SPCBOY SB2, and ViewBoy
   are active separate player apps; SB2 is the current SPCBOY frontend under
   development. SPCBoyWK is retired and retained for historical reference.
+- SBONLINE is the hosted SPCBOY web-player project, separate from the SB2 macOS
+  frontend. Its production site integration and deployment currently live in
+  MathBook's `private-admin/` app.
 - LineBoy is a standalone monochrome line-grid player experiment in its own
   family subfolder. It uses CatalogReader for catalog access, FrontendCore for
   favorites and queue policy, and VGMBoy for playback.
@@ -36,6 +39,7 @@ crosses that ownership boundary.
 | AppKit/SwiftUI presentation | [CocoaSpice/AGENTS.md](CocoaSpice/AGENTS.md) |
 | Retired native WebKit SPCBOY frontend | [SPCBoyWK/AGENTS.md](SPCBoyWK/AGENTS.md) |
 | SPCBOY SB2 pixel-style WebKit frontend | [SB2/AGENTS.md](SB2/AGENTS.md) |
+| Hosted SPCBOY web player | [SBONLINE/AGENTS.md](SBONLINE/AGENTS.md) |
 | Screen-first Yoga LCD player | [ViewBoy/AGENTS.md](ViewBoy/AGENTS.md) |
 | Monochrome DOS-style line-grid display experiment | [LineBoy/AGENTS.md](LineBoy/AGENTS.md) |
 | Published Markdown library and native documentation viewer | [VGMManDocs/AGENTS.md](VGMManDocs/AGENTS.md) |

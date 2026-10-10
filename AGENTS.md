@@ -32,6 +32,12 @@ the published Markdown library and its viewer. Keep each frontend as a separate
 presentation client over the shared catalog, frontend, and playback packages;
 do not merge one skin into another.
 
+SBONLINE is the hosted SPCBOY web-player project; use `SBONLINE/AGENTS.md` for
+its route. Its production Django integration, account features, streaming
+adapter, and deployment currently remain in MathBook's `private-admin/` app.
+Keep SBONLINE separate from the SB2 macOS app, and do not claim production code
+has moved until its source and deployment packaging move together.
+
 For a ViewBoy task, the active application and UI live in `ViewBoy/`; use its
 `README.md` and `AGENTS.md` route and launch with `ViewBoy/launch.sh`. `SPCBoyWK/`
 is a retired legacy frontend, and `LocalRecovery/ViewBoy/` contains historical
