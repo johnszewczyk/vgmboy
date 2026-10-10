@@ -52,6 +52,8 @@ Scanner data and checkpoint rules remain in [scanner-contract.md](scanner-contra
 
 ## Files
 
+- [ScannerAppModel.swift](../../Sources/ScanSongApp/ScannerAppModel.swift)
+- [ScannerWindow.swift](../../Sources/ScanSongApp/ScannerWindow.swift)
 - [ScanSongApp.swift](../../Sources/ScanSongApp/ScanSongApp.swift)
 - [ScannerOperationTelemetry.swift](../../Sources/ScanSongApp/ScannerOperationTelemetry.swift)
 - [ScannerScanLog.swift](../../Sources/ScanSongApp/ScannerScanLog.swift)
