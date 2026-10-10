@@ -30,9 +30,9 @@ been reviewed.
 | --- | --- | --- |
 | `ay` | Profile pending | AY subtune and timing behavior needs UAC mapping. |
 | `sap` | Profile pending | SAP header directives, songs, and timings need UAC mapping. |
-| `nsf` | Draft profile | See [`NSF-NSFE.md`](NSF-NSFE.md); fixture validation pending. |
+| `nsf` | Proposed; conversion held | See [`NSF.md`](NSF.md); MetaMan M3U parsing and fallback-timing fixes are required before UAC creation. |
 | `gbs` | Profile rules complete; conversion held | See [`GBS.md`](GBS.md); fractional and loop-start timing now map to milliseconds, while conflicting values are omitted and require review plus fixture/GUI verification. |
-| `nsfe` | Draft profile | See [`NSF-NSFE.md`](NSF-NSFE.md); fixture validation pending. |
+| `nsfe` | Profile pending | Separate from NSF; excluded from the current JoshW NSF profile. |
 | `hes` | Draft profile | See [`HES.md`](HES.md); fixture validation pending. |
 | `sndh` | Profile pending | Document subtune and timing projection. |
 | `kss` | Draft profile | See [`KSS.md`](KSS.md); fixture validation pending. |
