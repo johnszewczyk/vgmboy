@@ -227,11 +227,16 @@ private struct CocoaSpiceCommands: Commands {
         }
 
         CommandMenu("Playlist Tabs") {
-            ForEach(0..<min(model.playlistTabs.count, 9), id: \.self) { index in
-                Button(model.playlistTabs[index].title) {
-                    model.activatePlaylistTab(at: index)
+            ForEach(model.playlistTabs.prefix(9)) { tab in
+                Button(tab.title) {
+                    model.activatePlaylistTab(tab.id)
                 }
-                .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
+                .keyboardShortcut(
+                    KeyEquivalent(Character(String(
+                        (model.playlistTabs.firstIndex(where: { $0.id == tab.id }) ?? 0) + 1
+                    ))),
+                    modifiers: .command
+                )
             }
         }
 
