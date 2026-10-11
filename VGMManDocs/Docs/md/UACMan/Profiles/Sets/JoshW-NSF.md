@@ -29,8 +29,15 @@ per-set reports.
 - **Companion data** — Keep all applicable M3Us byte-exact. The same-stem
   aggregate M3U controls UAC entry order, titles, and playback timing; per-
   track sidecars are evidence for comparison, not additional queue rows.
-  Hold conflicting playlists, unresolved member references, IPS patches, or
-  documents that cannot be safely scoped to this NSF package.
+  Each authored entry keeps its exact row, raw timing/count values, and
+  positive millisecond projections together under one nested `M3U` JSON tag
+  in `playlists[].entries[].extraFields`. The M3U remains a byte-exact package
+  member and the playlist's `originalMemberPath` identifies the queue source.
+  Readers must obtain timing from the nested object while continuing to read
+  older flat entries. Keep meaningful shared credits such as Composer, Dumper,
+  and Taggers as their standard package tags. Hold conflicting playlists,
+  unresolved member references, IPS patches, or documents that cannot be
+  safely scoped to this NSF package.
 - **Platform** — Use the approved canonical aliases in
   [`PLATFORMS.md`](../PLATFORMS.md). Hold FDS UAC output until Famicom Disk
   System has an approved platform alias; do not label it Nintendo NES based
@@ -75,7 +82,10 @@ per-set reports.
   bytes, and record the exact `.nsf` selected for the UAC.
 - Confirm every playlist row resolves to that NSF and an in-range song,
   including fractional time precision, escaped commas, loop starts, fades,
-  and cross-playlist conflicts.
+  and cross-playlist conflicts. Confirm M3U details appear once as a nested
+  `M3U` tag, not as several top-level timing tags or duplicate raw entry
+  fields, and that the reader still projects the nested timing to its common
+  playback interface.
 - Confirm a partial aggregate list is followed by unlisted NSF header songs
   with no fabricated title or timing; the original aggregate path and every
   selected raw M3U row are visible in the UAC playlist.

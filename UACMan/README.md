@@ -86,10 +86,12 @@ sidecars. For NSF, it supplies sibling NSFPlay M3Us and selects the same-stem
 aggregate as the authored queue, using other M3Us only to check for conflicts.
 NSF M3U song indexes are converted from one-based to UAC's zero-based index;
 partial aggregate lists retain all header songs by appending unlisted songs
-without invented titles or timings. Authored NSF time, loop, loop-start, fade,
-and repeat values populate UAC's native playlist fields; positive millisecond
-projections make timing readable in metadata. Raw rows and original M3Us stay
-bundled intact. The NSF aggregate's explicit credit comments are projected to
+without invented titles or timings. Each authored NSF entry groups its exact
+M3U row, populated raw timing/repeat values, and positive millisecond
+projections inside one expandable `M3U` JSON tag in `extraFields`. The UAC
+reader projects those nested millisecond values into its common timing fields
+and remains compatible with older flat entries. Original M3Us stay bundled
+byte-for-byte. The NSF aggregate's explicit credit comments are projected to
 package metadata; generated-playlist notices and freeform comments stay only
 in the source M3U. NSF M3U values are not applied to the source NSF bytes.
 

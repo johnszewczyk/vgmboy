@@ -1230,6 +1230,7 @@ def harvest_format_metadata(
                 title = metadata.get("Title")
                 artist = metadata.get("Artist")
                 source_playlist_path = track.get("sourcePlaylistPath")
+                m3u_fields = {}
                 if source_playlist_path is not None:
                     if not isinstance(source_playlist_path, str) or not safe_relative_path(source_playlist_path):
                         raise UACError(f"MetaMan .{extension} projection contains an unsafe M3U path: {path}")
@@ -1238,6 +1239,15 @@ def harvest_format_metadata(
                 member_metadata = recipe["memberOverrides"].get(path, {}).get("metadata", {})
                 for key, value in metadata.items():
                     if key in {"Title", "Artist"}:
+                        continue
+                    if extension == "nsf" and key in {
+                        "Intro Length (ms)", "Loop Length (ms)",
+                        "Play Length (ms)", "Fade Length (ms)",
+                    }:
+                        # Keep M3U-authored timing together under one expandable
+                        # track tag; the UAC reader projects these values back
+                        # into its common timing interface.
+                        m3u_fields[key] = value
                         continue
                     matching_member_key = next(
                         (
@@ -1249,6 +1259,24 @@ def harvest_format_metadata(
                     if matching_member_key is not None and member_metadata[matching_member_key] == value:
                         continue
                     extra_fields[key] = value
+                if extension == "nsf":
+                    for source_key, tag_name in (
+                        ("rawLine", "Raw Row"),
+                        ("lengthRaw", "Play Time"),
+                        ("loopRaw", "Loop"),
+                        ("loopStartRaw", "Loop Start"),
+                        ("fadeRaw", "Fade"),
+                        ("repeatRaw", "Loop Count"),
+                    ):
+                        value = track.get(source_key)
+                        if isinstance(value, str) and value:
+                            m3u_fields[tag_name] = value
+                    if m3u_fields:
+                        if "M3U" in extra_fields:
+                            raise UACError(
+                                f"NSF track metadata already contains the reserved nested M3U tag: {path}"
+                            )
+                        extra_fields["M3U"] = m3u_fields
                 entry = {
                     "targetMemberPath": target_path,
                     "entryKind": "subsong",
@@ -1259,17 +1287,18 @@ def harvest_format_metadata(
                     "extraFields": extra_fields,
                     "extensions": {},
                 }
-                for source_key, target_key in (
-                    ("rawLine", "rawLine"),
-                    ("lengthRaw", "lengthRaw"),
-                    ("loopRaw", "loopRaw"),
-                    ("loopStartRaw", "loopStartRaw"),
-                    ("fadeRaw", "fadeRaw"),
-                    ("repeatRaw", "repeatRaw"),
-                ):
-                    value = track.get(source_key)
-                    if isinstance(value, str) and value:
-                        entry[target_key] = value
+                if extension != "nsf":
+                    for source_key, target_key in (
+                        ("rawLine", "rawLine"),
+                        ("lengthRaw", "lengthRaw"),
+                        ("loopRaw", "loopRaw"),
+                        ("loopStartRaw", "loopStartRaw"),
+                        ("fadeRaw", "fadeRaw"),
+                        ("repeatRaw", "repeatRaw"),
+                    ):
+                        value = track.get(source_key)
+                        if isinstance(value, str) and value:
+                            entry[target_key] = value
                 entries.append(entry)
 
         original_playlist_path = None

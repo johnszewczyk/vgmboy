@@ -42,6 +42,11 @@ tags. See
 [`uac-wrapper-format.md`](../../../../UACMan/ai/subsystem-agent/uac-wrapper-format.md)
 for the complete binary and manifest contract.
 
+For NSF playlist entries, the UAC reader accepts the current nested
+`extraFields["M3U"]` object and projects its positive millisecond values into
+`MetadataDocument.timing`; it also preserves the object as one visible `M3U`
+tag. Existing UAC entries with flat timing fields remain readable.
+
 ### Standard audio and FLAC Vorbis comments
 
 The ordinary audio reader uses AVFoundation's file-URL APIs for common tags
@@ -103,15 +108,19 @@ declared NSF songs omitted by a partial list without inventing titles or
 timings. Per-track M3Us are comparison evidence, not extra queue rows. Escaped
 commas and quoted CSV fields are parsed. Fractional seconds are converted to
 milliseconds with half-up rounding, while the exact raw fields, source row,
-and original M3U member path remain available to UAC.
+and original M3U member path remain available to UAC. UAC stores the NSF M3U
+row, populated raw timing/count values, and positive millisecond projections
+as one nested `M3U` object in each affected playlist entry's `extraFields`.
+`UACMetadataReader` reads timing from that object and keeps it as one visible
+tag; the reader also accepts the previous flat UAC layout.
 
 The M3U `loop` value is a loop duration (`h:m:s`), loop start (`h:m:s-`), or
 no-loop marker (`-` or `0`). The `fade` value is a duration; `loopcount` is
 retained as the native repeat field (`0` means player default). Readable
 positive `Play Length (ms)`, `Loop Length (ms)`, `Intro Length (ms)`, and
-`Fade Length (ms)` are projected to UAC entries. Missing timing is left
-missing; NSF does not have a fixed per-song end time in its header.
-Keep the raw UAC playlist timing fields alongside those readable values;
+`Fade Length (ms)` are projected inside that nested UAC object. Missing timing
+is left missing; NSF does not have a fixed per-song end time in its header.
+Keep populated raw fields and the exact row beside those readable values;
 absence of an M3U time must not be interpreted as a promise to loop forever.
 That playback behavior is a player-core decision.
 
