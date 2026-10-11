@@ -283,9 +283,9 @@ enum UACMetadataReader {
             return direct
         }
 
-        // NSF M3U values are one expandable playlist-entry tag in current
-        // packages. Keep reading the earlier flat representation above for
-        // existing packages while projecting the nested values into the
+        // NSF and GBS M3U values are one expandable playlist-entry tag in
+        // current packages. Keep reading the earlier flat representation
+        // above for existing packages while projecting nested values into the
         // common MetadataTiming API.
         guard case .object(let m3u)? = metadata["M3U"] else { return nil }
         switch key {
