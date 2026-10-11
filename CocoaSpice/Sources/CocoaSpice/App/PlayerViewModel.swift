@@ -646,9 +646,11 @@ final class PlayerViewModel {
     private var sidebarHasExpandedItems: Bool {
         switch effectiveSidebarBrowserMode {
         case .games:
-            !expandedDatabaseSystems.isEmpty
+            let knownGroups = Set(databaseGameItems.map(sidebarSystemName(for:)))
+            return !expandedDatabaseSystems.isDisjoint(with: knownGroups)
         case .files:
-            !databaseFileSidebar.expandedFolderIDs.isEmpty
+            let visibleFolderIDs = databaseFileSidebar.allFolderIDs
+            return !databaseFileSidebar.expandedFolderIDs.isDisjoint(with: visibleFolderIDs)
         }
     }
     var playlistContentRevision: Int { queue.contentRevision }

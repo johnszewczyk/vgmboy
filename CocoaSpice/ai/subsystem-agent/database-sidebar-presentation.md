@@ -20,6 +20,9 @@
 - Library scan-root status text is standardized as enabled state, display order, indexed track count, and last completed scan time or error.
 - Sidebar presentation state owns loaded rows, the visible filtered subset, and native selection independently from queue and playback state.
 - With `Group by Console` enabled, root console rows only expand or collapse. Game leaves retain selection, multi-select, Return, double-click, and context-menu behavior.
+- The fold/unfold-all toolbar action collapses every known expanded console group
+  or folder when at least one current item is expanded; otherwise it expands all.
+  Stale persisted disclosure IDs do not make the control appear expanded.
 - A non-empty sidebar search temporarily expands the matching system groups. Clearing the query folds every system group while retaining the library/sidebar root itself.
 - Sidebar state publishes a content revision whenever the loaded or filtered game rows change. The native table caches the flattened rows for that revision and rebuilds them only after a content, `Group by Console`, or expansion change.
 - Disclosure-only changes preserve the current viewport. Selection

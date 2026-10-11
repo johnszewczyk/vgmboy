@@ -48,6 +48,10 @@ in the SB2 home view.
 - Gallery artwork loads share the bounded Gallery artwork cache and request
   queue. Sidebar thumbnails use an observer rooted to the sidebar scroll pane;
   do not eagerly materialize every image in the Gallery projection.
+- The expand/collapse control switches to Collapse All when any console group
+  or user-expandable folder is open. The permanent Path View root anchor does
+  not count. The action collapses all in that case, and expands all only when
+  none are open.
 - Late shared console-state responses cannot overwrite selection after a tab
   switch or newer sidebar action.
 
