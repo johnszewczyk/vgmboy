@@ -46,8 +46,8 @@ private enum UACManMetadataCLI {
                     memberMetadata: outcome.memberMetadata,
                     trackMetadata: outcome.trackMetadata,
                     sourceTimedMemberPaths: [],
-                    gameMetadata: [:],
-                    sharedFieldConflicts: [],
+                    gameMetadata: outcome.gameMetadata,
+                    sharedFieldConflicts: outcome.sharedFieldConflicts,
                     diagnosticCount: outcome.diagnosticCount,
                     failures: outcome.failures
                 )

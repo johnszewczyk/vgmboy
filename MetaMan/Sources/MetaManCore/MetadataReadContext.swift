@@ -11,8 +11,9 @@ public typealias MetadataContainerFrameDecoder = @Sendable (
 ) throws -> Data
 
 /// Named related-file bytes for data-based readers whose metadata or track map
-/// depends on companions. File-URL convenience readers resolve only the
-/// format-declared companions they explicitly support; this context never
+/// depends on companions. `relativePath` and `sourceRelativePath` share the
+/// host's package-relative coordinate system when the latter is supplied; a
+/// file-URL convenience reader may use sibling basenames. This context never
 /// authorizes arbitrary path access.
 public struct MetadataCompanionFile: Equatable, Sendable {
     /// Path relative to the source file's containing directory.
@@ -27,9 +28,14 @@ public struct MetadataCompanionFile: Equatable, Sendable {
 
 public struct MetadataReadContext: Equatable, Sendable {
     public let companionFiles: [MetadataCompanionFile]
+    /// Optional source member path relative to the same package root used by
+    /// companion paths. Readers use it to resolve playlist references exactly
+    /// when the caller already knows the package layout.
+    public let sourceRelativePath: String?
 
-    public init(companionFiles: [MetadataCompanionFile] = []) {
+    public init(companionFiles: [MetadataCompanionFile] = [], sourceRelativePath: String? = nil) {
         self.companionFiles = companionFiles
+        self.sourceRelativePath = sourceRelativePath
     }
 
     func companionData(beside sourceName: String, fileExtension: String) -> Data? {
@@ -59,7 +65,7 @@ public struct MetadataReadContext: Equatable, Sendable {
     }
 
     func appending(_ companion: MetadataCompanionFile) -> MetadataReadContext {
-        MetadataReadContext(companionFiles: companionFiles + [companion])
+        MetadataReadContext(companionFiles: companionFiles + [companion], sourceRelativePath: sourceRelativePath)
     }
 
     private static func normalizedRelativePath(_ path: String) -> String? {

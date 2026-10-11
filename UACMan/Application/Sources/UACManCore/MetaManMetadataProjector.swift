@@ -39,23 +39,32 @@ public enum MetaManMetadataProjector {
 
     public static func memberFields(from document: MetadataDocument) -> [String: UACJSONValue] {
         var member: [String: UACJSONValue] = [:]
-        let commonFields: [(String, String?)] = [
-            ("Title", document.fields.title),
-            ("Game", document.fields.game),
-            ("System", document.fields.system),
-            ("Artist", document.fields.artist),
-            ("Album", document.fields.album),
-            ("Date", document.fields.date),
-            ("Year", document.fields.year),
-            ("Genre", document.fields.genre),
-            ("Comment", document.fields.comment),
-            ("Copyright", document.fields.copyright),
-            ("Encoded By", document.fields.encodedBy)
-        ]
+        let commonFields: [(String, String?)]
+        if document.format.caseInsensitiveCompare("nsf") == .orderedSame {
+            commonFields = [("Title", document.fields.title)]
+        } else {
+            commonFields = [
+                ("Title", document.fields.title),
+                ("Game", document.fields.game),
+                ("System", document.fields.system),
+                ("Artist", document.fields.artist),
+                ("Album", document.fields.album),
+                ("Date", document.fields.date),
+                ("Year", document.fields.year),
+                ("Genre", document.fields.genre),
+                ("Comment", document.fields.comment),
+                ("Copyright", document.fields.copyright),
+                ("Encoded By", document.fields.encodedBy)
+            ]
+        }
         for (key, value) in commonFields {
             if let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 member[key] = .string(value)
             }
+        }
+        if document.format.caseInsensitiveCompare("nsf") == .orderedSame,
+           let version = document.technicalFacts["version"], !version.isEmpty {
+            member["Format"] = .string("NSF v.\(version)")
         }
         if let timing = document.timing {
             // Zero and negative values are the readers' "not supplied" defaults.
@@ -94,6 +103,9 @@ public enum MetaManMetadataProjector {
         from documents: [MetadataDocument]
     ) -> [String: UACJSONValue] {
         guard !documents.isEmpty else { return [:] }
+        if documents.allSatisfy({ $0.format.caseInsensitiveCompare("nsf") == .orderedSame }) {
+            return sharedNSFFields(from: documents).fields
+        }
         let commonFields: [(String, (MetadataDocument) -> String?)] = [
             ("Game", { $0.fields.game }),
             ("System", { $0.fields.system }),
@@ -113,5 +125,81 @@ public enum MetaManMetadataProjector {
             member[key] = .string(value)
         }
         return member
+    }
+
+    public static func sharedNSFFields(
+        from documents: [MetadataDocument]
+    ) -> (fields: [String: UACJSONValue], conflicts: [String]) {
+        guard !documents.isEmpty else { return ([:], []) }
+        var member: [String: UACJSONValue] = [:]
+        var conflicts: [String] = []
+
+        func commonHeaderValue(_ keyPath: KeyPath<MetadataFields, String?>) -> String? {
+            let values = documents.map { $0.fields[keyPath: keyPath]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "" }
+            guard let first = values.first, !first.isEmpty, values.allSatisfy({ $0 == first }) else { return nil }
+            return first
+        }
+        if let value = commonHeaderValue(\.game) { member["Game Title"] = .string(value) }
+        if let value = commonHeaderValue(\.artist) { member["Album Artist"] = .string(value) }
+
+        let tags = documents[0].tags
+        func values(for sourceNames: Set<String>) -> [String] {
+            var seen = Set<String>()
+            return tags.compactMap { tag in
+                guard sourceNames.contains(tag.name.uppercased()),
+                      !isPlaceholder(tag.value) else { return nil }
+                let value = tag.value.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !value.isEmpty, seen.insert(value).inserted else { return nil }
+                return value
+            }
+        }
+        func setCredit(_ tag: String, from sourceNames: Set<String>) {
+            let sourceValues = values(for: sourceNames)
+            guard !sourceValues.isEmpty else { return }
+            member[tag] = metadataValue(sourceValues)
+        }
+
+        setCredit("Composer", from: ["NSF M3U MUSIC BY"])
+        setCredit("Dumper", from: ["NSF M3U RIPPED BY", "NSF M3U RIPPER"])
+        setCredit("Developer", from: ["NSF M3U DEVELOPED BY"])
+        setCredit("Publisher", from: ["NSF M3U PUBLISHED BY"])
+        let taggers = values(for: ["NSF M3U TAGGED BY", "NSF M3U UPDATED BY"])
+        if !taggers.isEmpty { member["Taggers"] = .array(taggers.map(UACJSONValue.string)) }
+
+        let headerCopyrightValues = documents.compactMap { normalizedSourceValue($0.fields.copyright) }
+        let m3uCopyrightValues = values(for: ["NSF M3U COPYRIGHT"])
+        let copyrightValues = Array(Set(headerCopyrightValues + m3uCopyrightValues)).sorted()
+        let m3uCopyrightConflict = documents.contains { document in
+            document.diagnostics.contains { $0.contains("package comment NSF M3U Copyright") }
+        }
+        if copyrightValues.count == 1 && !m3uCopyrightConflict {
+            member["Copyright"] = .string(copyrightValues[0])
+        } else if copyrightValues.count > 1 || m3uCopyrightConflict {
+            conflicts.append("NSF header and M3U copyright values disagree; Copyright was not promoted.")
+        }
+
+        let years = values(for: ["NSF M3U YEAR"])
+        if years.count == 1 { member["Year"] = .string(years[0]) }
+        else if years.count > 1 { conflicts.append("NSF M3U Published in comments contain multiple years; Year was not promoted.") }
+        let dates = values(for: ["NSF M3U DATE"])
+        if dates.count == 1 { member["Date"] = .string(dates[0]) }
+        else if dates.count > 1 { conflicts.append("NSF M3U Published in comments contain multiple dates; Date was not promoted.") }
+        return (member, conflicts)
+    }
+
+    private static func normalizedSourceValue(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let cleaned = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty || isPlaceholder(cleaned) ? nil : cleaned
+    }
+
+    private static func isPlaceholder(_ value: String) -> Bool {
+        let token = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            .filter { $0.isLetter || $0.isNumber || $0 == "?" }
+        return token.isEmpty || ["unknown", "n/a", "na", "none", "?", "??", "???"].contains(token)
+    }
+
+    private static func metadataValue(_ values: [String]) -> UACJSONValue {
+        values.count == 1 ? .string(values[0]) : .array(values.map(UACJSONValue.string))
     }
 }

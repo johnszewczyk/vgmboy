@@ -357,25 +357,38 @@ class UACManRoundTripTests(unittest.TestCase):
             one_track_bytes = make_nsf_fixture("One-track bytes")
             game.write_bytes(game_bytes)
             one_track.write_bytes(one_track_bytes)
+            (source / "game.m3u").write_text(
+                "game.nsf::NSF,2,Track 2,1:02.500,0:20,0:05,2\n", encoding="utf-8"
+            )
+            (source / "companion.nsfe").write_bytes(b"NSFE source companion")
             helper = root / "metadata-helper"
             response = {
                 "schemaVersion": 1,
                 "memberMetadata": {
-                    "game.nsf": {"game": "Fixture Game", "system": "Nintendo NES", "artist": "Composer"},
-                    "one-track.nsf": {"title": "Solo", "game": "Fixture Game", "system": "Nintendo NES"},
+                    "game.nsf": {"Game Title": "Fixture Game", "Album Artist": "Composer"},
+                    "one-track.nsf": {"Game Title": "Fixture Game", "Album Artist": "Composer"},
                 },
                 "trackMetadata": {
                     "game.nsf": [{
                         "sourceTrackIndex": index,
                         "metadata": {
-                            "title": f"Track {index + 1}", "game": "Fixture Game",
-                            "artist": "Composer", "playLengthMs": 150000,
+                            "title": f"Track {index + 1}", "Format": "NSF v.1",
+                            "Play Length (ms)": 62500,
                             "nativeMetadata": {"format": "nsf", "technicalFacts": {"sourceTrackIndex": str(index)}},
                         },
-                    } for index in range(3)],
-                    "one-track.nsf": [{"sourceTrackIndex": 0, "metadata": {"title": "Solo"}}],
+                        **({
+                            "sourcePlaylistPath": "game.m3u",
+                            "rawLine": "game.nsf::NSF,2,Track 2,1:02.500,0:20,0:05,2",
+                            "lengthRaw": "1:02.500",
+                            "loopRaw": "0:20",
+                            "fadeRaw": "0:05",
+                            "repeatRaw": "2",
+                        } if index == 1 else {}),
+                    } for index in (0, 1, 1, 2)],
+                    "one-track.nsf": [{"sourceTrackIndex": 0, "metadata": {"title": "Solo", "Format": "NSF v.1"}}],
                 },
-                "gameMetadata": {}, "sharedFieldConflicts": [], "diagnosticCount": 1, "failures": [],
+                "gameMetadata": {"Game Title": "Fixture Game", "Album Artist": "Composer"},
+                "sharedFieldConflicts": [], "diagnosticCount": 1, "failures": [],
             }
             helper.write_text(
                 "#!/usr/bin/env python3\nimport json\nprint(json.dumps(" + repr(response) + "))\n",
@@ -395,14 +408,24 @@ class UACManRoundTripTests(unittest.TestCase):
             count, diagnostics = uacman.harvest_format_metadata(source, helper, recipe, "nsf")
 
             self.assertEqual((count, diagnostics), (2, 1))
+            self.assertEqual(recipe["game"]["metadata"]["Game Title"], "Fixture Game")
+            self.assertEqual(recipe["game"]["metadata"]["Album Artist"], "Composer")
             self.assertNotIn("title", recipe["memberOverrides"]["game.nsf"]["metadata"])
+            self.assertEqual(recipe["memberOverrides"]["companion.nsfe"]["role"], "asset")
             imported = recipe["playlists"][0]
             self.assertEqual(imported["id"], "metaman-nsf-tracks")
-            self.assertEqual(len(imported["entries"]), 4)
-            self.assertEqual([entry["trackIndex"] for entry in imported["entries"]], ["0", "1", "2", "0"])
+            self.assertEqual(len(imported["entries"]), 5)
+            self.assertEqual([entry["trackIndex"] for entry in imported["entries"]], ["0", "1", "1", "2", "0"])
             self.assertEqual({entry["targetMemberPath"] for entry in imported["entries"][:3]}, {"game.nsf"})
             self.assertEqual(imported["entries"][1]["title"], "Track 2")
-            self.assertEqual(imported["entries"][1]["extraFields"]["Play Length (ms)"], 150000)
+            self.assertEqual(imported["entries"][1]["extraFields"]["Play Length (ms)"], 62500)
+            self.assertEqual(imported["entries"][1]["extraFields"]["Format"], "NSF v.1")
+            self.assertEqual(imported["entries"][1]["lengthRaw"], "1:02.500")
+            self.assertEqual(imported["entries"][1]["loopRaw"], "0:20")
+            self.assertEqual(imported["entries"][1]["fadeRaw"], "0:05")
+            self.assertEqual(imported["entries"][1]["repeatRaw"], "2")
+            self.assertEqual(imported["entries"][1]["rawLine"], "game.nsf::NSF,2,Track 2,1:02.500,0:20,0:05,2")
+            self.assertEqual(imported["originalMemberPath"], "game.m3u")
             self.assertNotIn("visibleTrackIndex", imported["entries"][1]["extraFields"])
             self.assertNotIn("sourceTrackIndex", imported["entries"][1]["extraFields"])
             self.assertNotIn("metaManMetadata", imported["entries"][1]["extraFields"])
@@ -430,7 +453,13 @@ class UACManRoundTripTests(unittest.TestCase):
             self.run_uacman("unpack", str(container), str(unpacked))
             manifest = json.loads((unpacked / "manifest.json").read_text(encoding="utf-8"))
             track_list = next(item for item in manifest["playlists"] if item["id"] == "metaman-nsf-tracks")
-            self.assertEqual(len(track_list["entries"]), 4)
+            self.assertEqual(len(track_list["entries"]), 5)
+            self.assertEqual(track_list["originalMemberPath"], "game.m3u")
+            self.assertEqual(manifest["game"]["metadata"]["Game Title"], "Fixture Game")
+            nsfe_member = next(item for item in manifest["members"] if item["path"] == "companion.nsfe")
+            self.assertEqual(nsfe_member["role"], "asset")
+            self.assertEqual((unpacked / "game.m3u").read_text(encoding="utf-8"),
+                             "game.nsf::NSF,2,Track 2,1:02.500,0:20,0:05,2\n")
             self.assertEqual((unpacked / "game.nsf").read_bytes(), game_bytes)
             self.assertEqual((unpacked / "one-track.nsf").read_bytes(), one_track_bytes)
 

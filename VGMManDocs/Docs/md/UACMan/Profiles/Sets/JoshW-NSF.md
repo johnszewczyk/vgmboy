@@ -9,15 +9,12 @@ per-set reports.
 
 - **Collection** — The NSF catalog at `https://nsf.joshw.info/`, covering
   Nintendo NES and Famicom Disk System source packages.
-- **Format** — `.nsf` only. Exclude `.nsfe` from this pass, even when both
-  formats occur in one outer archive. Do not combine NSFE songs with NSF
-  songs.
+- **Format** — `.nsf` is the only playable format in this pass. If the source
+  package also contains `.nsfe`, preserve it as a byte-exact `asset`; do not
+  create NSFE song rows or combine its songs with NSF.
 - **Package selection** — Use one source package per distinct archive. If an
   identical archive is staged in more than one platform folder, create only
   one UAC and use the folder matching its verified platform.
-- **Readiness** — Profile proposed; hold UAC creation until NSF M3U parsing,
-  authored timing, version display, Stream Hashes, and UACMan visibility meet
-  the format profile.
 
 ## Source Authority
 
@@ -29,10 +26,11 @@ per-set reports.
 - **Source linkage** — Link the UAC to the exact source archive through
   `sources[]`. Reuse its stored identity only after current archive/member
   content is matched. Do not infer provenance from shared NSF bytes alone.
-- **Companion data** — Keep the M3U files that resolve to the selected NSF,
-  plus useful source text, as byte-exact package attachments. Hold ambiguous
-  playlists, IPS patches, or documents that describe both NSF and NSFE rather
-  than applying or dropping them.
+- **Companion data** — Keep all applicable M3Us byte-exact. The same-stem
+  aggregate M3U controls UAC entry order, titles, and playback timing; per-
+  track sidecars are evidence for comparison, not additional queue rows.
+  Hold conflicting playlists, unresolved member references, IPS patches, or
+  documents that cannot be safely scoped to this NSF package.
 - **Platform** — Use the approved canonical aliases in
   [`PLATFORMS.md`](../PLATFORMS.md). Hold FDS UAC output until Famicom Disk
   System has an approved platform alias; do not label it Nintendo NES based
@@ -55,7 +53,7 @@ per-set reports.
 ## Set Procedures
 
 - **NSF source tags** — Apply the NSF format mappings for Game Title,
-  Album Artist, Copyright, Comment, Composer, Dumper, Taggers, Developer,
+  Album Artist, Copyright, Composer, Dumper, Taggers, Developer,
   Publisher, Year/Date, per-track Title, and authored timing. Omit blank,
   placeholder, and generated-tool values.
 - **Member hashes** — Keep the four standard compact hashes for each physical
@@ -76,7 +74,11 @@ per-set reports.
 - Confirm every playlist row resolves to that NSF and an in-range song,
   including fractional time precision, escaped commas, loop starts, fades,
   and cross-playlist conflicts.
+- Confirm a partial aggregate list is followed by unlisted NSF header songs
+  with no fabricated title or timing; the original aggregate path and every
+  selected raw M3U row are visible in the UAC playlist.
 - Confirm all source-backed values use Title Case tags, no blank or generated
   tags appear, and source M3Us/text remain attached.
 - Verify the physical NSF appears once, its four hashes are visible in
-  Stream Hashes, and the package contains no NSFE member.
+  Stream Hashes, and any NSFE companion is an asset rather than playable NSF
+  content.

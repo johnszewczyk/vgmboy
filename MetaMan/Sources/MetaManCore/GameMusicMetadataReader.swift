@@ -28,7 +28,11 @@ enum GameMusicMetadataReader {
         let hint = formatHint.map(normalize)
         let name = displayName ?? hint?.uppercased() ?? "game-music source"
         switch hint {
-        case "nsf": return try readFixedHeader(data, kind: .nsf, displayName: name)
+        case "nsf": return try NSFM3UMetadataReader.enrich(
+            readFixedHeader(data, kind: .nsf, displayName: name),
+            context: context,
+            displayName: name
+        )
         case "gbs": return try GBSM3UMetadataReader.enrich(
             readFixedHeader(data, kind: .gbs, displayName: name),
             context: context,
@@ -36,7 +40,13 @@ enum GameMusicMetadataReader {
         )
         case "nsfe": return try readNSFE(data, displayName: name)
         case nil:
-            if data.starts(with: nsfSignature) { return try readFixedHeader(data, kind: .nsf, displayName: name) }
+            if data.starts(with: nsfSignature) {
+                return try NSFM3UMetadataReader.enrich(
+                    readFixedHeader(data, kind: .nsf, displayName: name),
+                    context: context,
+                    displayName: name
+                )
+            }
             if data.starts(with: Data("GBS".utf8)) {
                 return try GBSM3UMetadataReader.enrich(
                     readFixedHeader(data, kind: .gbs, displayName: name),
@@ -75,8 +85,11 @@ enum GameMusicMetadataReader {
         let firstTrackOffset = kind == .nsf ? 0x07 : 0x05
         let version = Int(data[versionOffset])
         let trackCount = Int(data[countOffset])
-        guard version > 0, trackCount > 0 else {
-            throw malformed("\(kind.format.uppercased()) has no usable version or tracks: \(displayName)")
+        let firstTrack = Int(data[firstTrackOffset])
+        let supportedVersion = kind == .nsf ? (1...2).contains(version) : version > 0
+        let firstTrackIsValid = kind != .nsf || (firstTrack > 0 && firstTrack <= trackCount)
+        guard supportedVersion, trackCount > 0, firstTrackIsValid else {
+            throw malformed("\(kind.format.uppercased()) has an unsupported version, track count, or first-track index: \(displayName)")
         }
 
         let identityOffset = kind == .nsf ? 0x0E : 0x10
@@ -110,18 +123,19 @@ enum GameMusicMetadataReader {
                 game: game.isEmpty ? nil : game,
                 system: kind.system,
                 artist: artist.isEmpty ? nil : artist,
-                comment: comment.isEmpty ? nil : comment
+                comment: kind == .gbs && !comment.isEmpty ? comment : nil,
+                copyright: kind == .nsf && !comment.isEmpty ? comment : nil
             ),
             tags: [
                 MetadataTag(name: "game", value: game),
                 MetadataTag(name: "artist", value: artist),
-                MetadataTag(name: "comment", value: comment)
+                MetadataTag(name: kind == .nsf ? "copyright" : "comment", value: comment)
             ],
             rawMetadataBlocks: ["fixed-header": Data(data.prefix(headerSize))],
             timing: MetadataTiming(
                 introLengthMs: -1,
                 loopLengthMs: -1,
-                playLengthMs: kind == .nsf ? defaultPlayLengthMs : -1,
+                playLengthMs: -1,
                 fadeLengthMs: -1
             ),
             technicalFacts: facts
