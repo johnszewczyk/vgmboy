@@ -18,6 +18,10 @@
 - Files-sidebar search uses its own `LatestTaskOwner`; new search text cancels the prior utility filter/index task and only the current query may update the native tree.
 - Queue construction uses its own `LatestTaskOwner` across database activation, folder loading, dropped imports, and sidebar-path activation. A newer queue request or cleared library/sidebar context invalidates older loading results.
 - `DatabaseSidebarLoader` owns independent latest-task lifecycles for Games and Files reads. It owns cached snapshot invalidation and stale-result rejection; `PlayerViewModel` supplies only mode policy and post-load behavior.
+- The Gallery projection uses the independent shared `.gallery` catalog scope.
+  It starts only after startup is ready, resets on catalog reload, and cancels
+  when its Gallery tab closes. Thumbnail tasks are limited to three at a time;
+  the view owns their lifetime and the shared reader owns archive-read cleanup.
 - Random-library loading uses its own `LatestTaskOwner`; changing random scope or refreshing the database sidebar invalidates a pending random-game load before it can start playback.
 - Sidebar search uses a dedicated task owner.
 - Generation counters drop stale async results when newer requests supersede them.
@@ -31,5 +35,7 @@
 ## Files
 
 - [CatalogSessionCore.swift](../../../CatalogReader/Sources/CatalogSessionCore/CatalogSessionCore.swift)
+- [GalleryView.swift](../../Sources/CocoaSpice/App/GalleryView.swift)
+- [CocoaSpiceGalleryArtwork.swift](../../Sources/CocoaSpice/App/CocoaSpiceGalleryArtwork.swift)
 - [PlaybackRequestState.swift](../../Sources/CocoaSpice/App/PlaybackRequestState.swift)
 - [PlayerViewModel.swift](../../Sources/CocoaSpice/App/PlayerViewModel.swift)

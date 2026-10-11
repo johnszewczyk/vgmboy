@@ -11,6 +11,9 @@
   diagnostics, link maintenance, and every catalog write.
 - CocoaSpice owns only catalog path selection, explicit read-only reload, and
   presentation of indexed games and files.
+- `CatalogSessionCore` also supplies the read-only Title Snap Gallery projection
+  and an independent `.gallery` request scope. Gallery SQL stays in CatalogReader;
+  the frontend owns tile presentation and activation.
 - `OptionsView` directs users to ScanSong for every catalog-maintenance action.
 
 ## Invariants

@@ -6,8 +6,10 @@
 - Left pane: database browser.
 - Right pane: editable playlist.
 - Playlist tabs: sit above the playlist table; each tab owns its queue and selection.
+- Gallery is a special playlist tab. Its artwork index loads after startup is
+  ready, and thumbnails load only for visible tiles.
 - Main-window navigation toolbar: individual Console View, Path View,
-  Favorites, plus a fold/unfold-all
+  Gallery, Favorites, plus a fold/unfold-all
   item beside the native sidebar disclosure control. These remain individual
   native toolbar items rather than a grouped capsule.
 - Main transport toolbar order: Previous, Stop, Play/Pause, Next, then Long Play, repeat, random playback, and Equalizer on/off. Stop uses a square glyph; the infinity button turns Long Play on or off.

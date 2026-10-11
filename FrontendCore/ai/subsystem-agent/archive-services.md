@@ -14,6 +14,9 @@ and playable-member lifetime shared by native frontends.
 - `ArchiveMaterializationCore` owns selected-entry or dependency-complete
   extraction, PSF closure, lazyUSF/TXTP preparation, LHA routing, cleanup, and
   cache-backed atomic materialization.
+- `TitleSnapArtworkReader` is the shared safe PNG boundary for Gallery previews.
+  The frontend injects a Gallery-isolated materializer and owns thumbnail
+  decoding, cache sizing, and presentation.
 - `ArchiveManifestReader` owns temporary non-cache manifest reads with frontend-
   supplied extraction.
 - `ArchiveMaterializationCore` consumes `UACWrapperCore`, owned by

@@ -321,6 +321,12 @@ final class PlayerViewModel {
     var playlistTabs: [CocoaSpicePlaylistTab] = []
     var activePlaylistTabID = ""
     var activePlaylistTitle = "Playlist"
+    private(set) var galleryGames: [CatalogGalleryGame] = []
+    private(set) var galleryIsLoading = false
+    private(set) var galleryLoadError: String?
+    private(set) var galleryHasLoaded = false
+    var selectedGalleryGameID: String?
+    var isGalleryTabActive: Bool { activePlaylistTab?.kind == .gallery }
     private var isRestoringPlaylistTabs = false
     private var startupRestorationCompleted = false
     private var playlistTabsSaveWorkItem: DispatchWorkItem?
@@ -337,11 +343,12 @@ final class PlayerViewModel {
         }
         syncActivePlaylistTab()
         let source = activePlaylistTab
+        let shouldDuplicate = duplicateActive && source?.kind != .gallery
         let tab = CocoaSpicePlaylistTab(
-            title: title ?? (duplicateActive ? "\(source?.title ?? "Playlist") Copy" : "Playlist"),
-            tracks: duplicateActive ? (source?.tracks ?? playlist) : [],
-            selectedTrackID: duplicateActive ? (source?.selectedTrackID ?? selectedTrackID) : nil,
-            selectedTrackIDs: duplicateActive ? (source?.selectedTrackIDs ?? selectedTrackIDs) : []
+            title: title ?? (shouldDuplicate ? "\(source?.title ?? "Playlist") Copy" : "Playlist"),
+            tracks: shouldDuplicate ? (source?.tracks ?? playlist) : [],
+            selectedTrackID: shouldDuplicate ? (source?.selectedTrackID ?? selectedTrackID) : nil,
+            selectedTrackIDs: shouldDuplicate ? (source?.selectedTrackIDs ?? selectedTrackIDs) : []
         )
         playlistTabs.append(tab)
         activatePlaylistTab(tab.id)
@@ -379,6 +386,9 @@ final class PlayerViewModel {
         refreshPlaylistMetadata()
         updateRemoteTransportState()
         schedulePlaylistTabsSave()
+        if tab.kind == .gallery, startupProgress.phase == .ready {
+            loadGalleryGamesIfNeeded()
+        }
     }
 
     func activatePlaylistTab(at index: Int) {
@@ -388,7 +398,14 @@ final class PlayerViewModel {
 
     func closePlaylistTab(_ tabID: String) {
         guard let index = playlistTabs.firstIndex(where: { $0.id == tabID }) else { return }
+        if playlistTabs[index].kind == .gallery {
+            resetGalleryProjection()
+        }
         if playlistTabs.count == 1 {
+            if playlistTabs[index].kind == .gallery {
+                playlistTabs[index].kind = .playlist
+                playlistTabs[index].title = "Playlist"
+            }
             activePlaylistTitle = "Playlist"
             playlist = []
             selectedTrackID = nil
@@ -438,6 +455,119 @@ final class PlayerViewModel {
 
     private var activePlaylistTab: CocoaSpicePlaylistTab? {
         playlistTabs.first(where: { $0.id == activePlaylistTabID })
+    }
+
+    func showGallery() {
+        if let galleryTab = playlistTabs.first(where: { $0.kind == .gallery }) {
+            activatePlaylistTab(galleryTab.id)
+        } else {
+            guard playlistTabs.count < 64 else {
+                statusText = "Playlist tab limit reached."
+                return
+            }
+            syncActivePlaylistTab()
+            let tab = CocoaSpicePlaylistTab(title: "Gallery", kind: .gallery)
+            playlistTabs.append(tab)
+            activatePlaylistTab(tab.id)
+        }
+        statusText = galleryIsLoading
+            ? "Loading artwork index…"
+            : galleryLoadError ?? (galleryHasLoaded
+                ? "Showing \(galleryGames.count) artwork titles."
+                : "Gallery will load when startup is ready.")
+        if startupProgress.phase == .ready {
+            loadGalleryGamesIfNeeded()
+        }
+    }
+
+    func selectGalleryGame(_ game: CatalogGalleryGame) {
+        selectedGalleryGameID = game.id
+        statusText = [game.game, game.system].filter { !$0.isEmpty }.joined(separator: " • ")
+    }
+
+    func retryGalleryLoad() {
+        galleryHasLoaded = false
+        galleryLoadError = nil
+        loadGalleryGamesIfNeeded()
+    }
+
+    func playGalleryGame(_ game: CatalogGalleryGame) {
+        guard isGalleryTabActive else { return }
+        let galleryTabID = activePlaylistTabID
+        createPlaylistTab(duplicateActive: false)
+        guard activePlaylistTabID != galleryTabID,
+              activePlaylistTab?.kind == .playlist else { return }
+        let item = DatabaseGameItem(
+            rootID: game.rootID,
+            rootPath: game.rootPath,
+            name: game.game,
+            systemName: game.system,
+            trackCount: databaseGameItems.first(where: { $0.id == game.id })?.trackCount ?? 0,
+            displayName: game.game
+        )
+        activateDatabaseGame(item, replace: true, autoplay: true)
+    }
+
+    private func resetGalleryProjection() {
+        gallerySessions.cancel(.gallery)
+        galleryGames = []
+        galleryIsLoading = false
+        galleryLoadError = nil
+        galleryHasLoaded = false
+        selectedGalleryGameID = nil
+    }
+
+    private func loadGalleryGamesIfNeeded() {
+        guard isGalleryTabActive,
+              startupProgress.phase == .ready,
+              !galleryHasLoaded,
+              !galleryIsLoading else { return }
+        guard let databaseURL = libraryDatabaseURL else {
+            galleryLoadError = "The library catalog is unavailable."
+            galleryHasLoaded = true
+            statusText = galleryLoadError ?? "The library catalog is unavailable."
+            return
+        }
+
+        let generation = gallerySessions.begin(.gallery)
+        let preferFoldersOverMetadata = self.preferFoldersOverMetadata
+        galleryIsLoading = true
+        galleryLoadError = nil
+        if isGalleryTabActive {
+            statusText = "Loading artwork index…"
+        }
+        let task = Task { [weak self] in
+            let result = await Task.detached(priority: .utility) {
+                Result {
+                    try CatalogSidebarReader.titleSnapGalleryGames(
+                        databaseURL: databaseURL,
+                        preferFoldersOverMetadata: preferFoldersOverMetadata
+                    )
+                }
+            }.value
+            guard !Task.isCancelled,
+                  let self,
+                  self.gallerySessions.isCurrent(generation, for: .gallery) else { return }
+            self.gallerySessions.finish(generation, for: .gallery)
+            self.galleryIsLoading = false
+            switch result {
+            case .success(let games):
+                self.galleryGames = games
+                self.galleryHasLoaded = true
+                if self.isGalleryTabActive {
+                    self.statusText = games.isEmpty
+                        ? "No indexed Title Snap artwork was found."
+                        : "Showing \(games.count) artwork titles."
+                }
+            case .failure(let error):
+                self.galleryLoadError = "Could not load Gallery: \(error.localizedDescription)"
+                self.galleryHasLoaded = true
+                if self.isGalleryTabActive {
+                    self.statusText = self.galleryLoadError ?? "Could not load Gallery."
+                }
+            }
+        }
+        gallerySessions.install(task, generation: generation, for: .gallery)
     }
 
     private func syncActivePlaylistTab() {
@@ -771,6 +901,7 @@ final class PlayerViewModel {
     private let libraryDatabase: LibraryDatabase?
     private var playbackTimer: Timer?
     private let playlistMetadataTaskOwner = LatestTaskOwner()
+    @ObservationIgnored private let gallerySessions = CatalogSessionCoordinator()
     private let playbackRequestState = PlaybackRequestState()
     private let folderSelectionTaskOwner = LatestTaskOwner()
     private let queueBuildTaskOwner = LatestTaskOwner()
@@ -3168,6 +3299,7 @@ final class PlayerViewModel {
     }
 
     private func reloadDatabaseSidebar() {
+        resetGalleryProjection()
         databaseSidebarLoader.invalidateAndLoad(
             databaseURL: libraryDatabase?.databaseURL,
             mode: effectiveSidebarBrowserMode,
@@ -3176,6 +3308,9 @@ final class PlayerViewModel {
             didLoadFiles: { [weak self] in self?.databaseFilesDidLoad() },
             didFail: { [weak self] message in self?.startupProgress.fail(message) }
         )
+        if startupProgress.phase == .ready, isGalleryTabActive {
+            loadGalleryGamesIfNeeded()
+        }
     }
 
     private func loadDatabaseSidebarIfNeeded() {
@@ -3221,6 +3356,9 @@ final class PlayerViewModel {
                     || databaseSidebarLoader.hasLoadedGames
                     || databaseSidebarLoader.hasLoadedFiles {
             startupProgress.finish()
+            if isGalleryTabActive {
+                loadGalleryGamesIfNeeded()
+            }
         }
     }
 
