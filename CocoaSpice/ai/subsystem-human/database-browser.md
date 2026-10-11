@@ -7,6 +7,11 @@
   changing the sidebar view. Command-D toggles the selected track or selected
   game/group. Options > Database > Favorites chooses Historical (added order)
   or Alphabetical display for the next snapshot.
+- Gallery: the toolbar button or Command-Shift-G opens or switches to the
+  artwork Gallery tab without changing the sidebar view. It shows indexed
+  Title Snap artwork; double-click a tile or choose Play Now to open a playlist
+  tab and start that game. Gallery metadata waits until startup completes, and
+  visible tiles load bounded, downsampled thumbnails on demand.
 - Direct files and supported archives can be dropped onto the playlist for immediate playback. The sidebar remains database-only and does not browse arbitrary disk paths.
 - Rows: dense list of scanned games by default.
 - Options > Interface > Sidebar Line Gap controls added vertical spacing between Database sidebar rows from 0–16 pt; 0 pt adds no spacing.

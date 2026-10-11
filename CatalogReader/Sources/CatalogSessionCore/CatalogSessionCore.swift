@@ -87,6 +87,7 @@ public final class LatestTaskOwner: @unchecked Sendable {
 public enum CatalogSessionScope: String, CaseIterable, Codable, Sendable {
     case games
     case files
+    case gallery
     case playlist
     case search
 }
@@ -94,7 +95,8 @@ public enum CatalogSessionScope: String, CaseIterable, Codable, Sendable {
 public extension CatalogSessionScope {
     static func scope(for method: String) -> Self? {
         switch method {
-        case "databaseGames", "databaseGalleryGames": return .games
+        case "databaseGames": return .games
+        case "databaseGalleryGames": return .gallery
         case "databaseFiles", "databaseFileTree": return .files
         case "databaseGameTracks", "databaseFileTracks", "databaseFolderTracks",
              "refreshTree", "openPath", "selectFolder", "selectFile": return .playlist
@@ -161,7 +163,11 @@ public enum CatalogSidebarReader {
         try ReadOnlyCatalog(databaseURL: databaseURL).fileBuckets()
     }
 
-    public static func titleSnapGalleryGames(databaseURL: URL) throws -> [CatalogGalleryGame] {
-        try ReadOnlyCatalog(databaseURL: databaseURL).titleSnapGalleryGames()
+    public static func titleSnapGalleryGames(
+        databaseURL: URL,
+        preferFoldersOverMetadata: Bool = true
+    ) throws -> [CatalogGalleryGame] {
+        try ReadOnlyCatalog(databaseURL: databaseURL)
+            .titleSnapGalleryGames(preferFoldersOverMetadata: preferFoldersOverMetadata)
     }
 }

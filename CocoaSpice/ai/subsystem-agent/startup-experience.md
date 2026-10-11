@@ -14,6 +14,8 @@ CocoaSpice startup stages and the native progress screen.
   completion or failure settles startup progress.
 - `MainView` owns the CocoaSpice-skinned overlay. It does not own catalog or
   session work.
+- Gallery metadata and artwork are excluded from startup readiness. If Gallery
+  is the restored active tab, its projection begins after startup reaches ready.
 
 ## Invariants
 

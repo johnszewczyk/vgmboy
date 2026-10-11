@@ -1,8 +1,14 @@
 import Foundation
 
+enum CocoaSpicePlaylistTabKind: String, Equatable, Sendable {
+    case playlist
+    case gallery
+}
+
 struct CocoaSpicePlaylistTab: Identifiable, Equatable, Sendable {
     let id: String
     var title: String
+    var kind: CocoaSpicePlaylistTabKind
     var tracks: [TrackItem]
     var selectedTrackID: String?
     var selectedTrackIDs: Set<String>
@@ -10,13 +16,15 @@ struct CocoaSpicePlaylistTab: Identifiable, Equatable, Sendable {
     init(
         id: String = UUID().uuidString,
         title: String = "Playlist",
+        kind: CocoaSpicePlaylistTabKind = .playlist,
         tracks: [TrackItem] = [],
         selectedTrackID: String? = nil,
         selectedTrackIDs: Set<String> = []
     ) {
         self.id = id
         self.title = title
-        self.tracks = tracks
+        self.kind = kind
+        self.tracks = kind == .gallery ? [] : tracks
         self.selectedTrackID = selectedTrackID
         self.selectedTrackIDs = selectedTrackIDs
     }
@@ -41,6 +49,7 @@ enum CocoaSpicePlaylistTabsStore {
     private struct TabRecord: Codable {
         var id: String
         var title: String
+        var kind: String?
         var tracks: [String]
         var selectedTrackID: String?
         var selectedTrackIDs: [String]
@@ -60,20 +69,22 @@ enum CocoaSpicePlaylistTabsStore {
             guard let size = attributes[.size] as? NSNumber,
                   size.intValue <= maximumFileSize else { return nil }
             let payload = try JSONDecoder().decode(Payload.self, from: Data(contentsOf: url))
-            guard payload.version == 1,
+            guard payload.version == 1 || payload.version == 2,
                   !payload.tabs.isEmpty,
                   payload.tabs.count <= maximumTabCount,
                   payload.tabs.contains(where: { $0.id == payload.activeTabID }),
                   Set(payload.tabs.map(\.id)).count == payload.tabs.count else { return nil }
 
             let tabs = payload.tabs.map { record in
-                let tracks = record.tracks.compactMap(TrackItem.fromPersistedValue)
+                let kind = CocoaSpicePlaylistTabKind(rawValue: record.kind ?? "playlist") ?? .playlist
+                let tracks = kind == .gallery ? [] : record.tracks.compactMap(TrackItem.fromPersistedValue)
                     .filter { supportedExtensions.contains($0.playablePathExtension) }
                 let trackIDs = Set(tracks.map(\.id))
                 let selectedID = record.selectedTrackID.flatMap { trackIDs.contains($0) ? $0 : nil }
                 return CocoaSpicePlaylistTab(
                     id: record.id,
-                    title: String(record.title.prefix(120)),
+                    title: kind == .gallery ? "Gallery" : String(record.title.prefix(120)),
+                    kind: kind,
                     tracks: tracks,
                     selectedTrackID: selectedID,
                     selectedTrackIDs: Set(record.selectedTrackIDs.filter(trackIDs.contains))
@@ -90,12 +101,13 @@ enum CocoaSpicePlaylistTabsStore {
               snapshot.tabs.count <= maximumTabCount,
               snapshot.tabs.contains(where: { $0.id == snapshot.activeTabID }) else { return }
         let payload = Payload(
-            version: 1,
+            version: 2,
             activeTabID: snapshot.activeTabID,
             tabs: snapshot.tabs.map { tab in
                 TabRecord(
                     id: tab.id,
                     title: String(tab.title.prefix(120)),
+                    kind: tab.kind.rawValue,
                     tracks: tab.tracks.map(\.persistedValue),
                     selectedTrackID: tab.selectedTrackID,
                     selectedTrackIDs: tab.selectedTrackIDs.sorted()

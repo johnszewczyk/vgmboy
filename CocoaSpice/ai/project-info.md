@@ -22,6 +22,7 @@ VGMBoyKit through a host adapter.
 Human-facing behavior:
 
 - Main shell: [main-shell.md](subsystem-human/main-shell.md)
+- Artwork Gallery: [gallery.md](subsystem-human/gallery.md)
 - Playlist and queue: [playlist.md](subsystem-human/playlist.md)
 - Playback: [playback.md](subsystem-human/playback.md)
 - Supported formats: [supported-formats.md](subsystem-human/supported-formats.md)

@@ -12,7 +12,9 @@ in the SB2 home view.
 - `app.js` binds the Gallery library toolbar control.
 - `app-core.js` exposes the control reference.
 - `WKNativeBridge.swift` serves read-only Gallery metadata and artwork through
-  CatalogReader and FrontendCore.
+  CatalogReader and FrontendCore. `TitleSnapArtworkReader` in
+  `ArchiveMaterializationCore` owns the shared safe PNG locator boundary; SB2
+  keeps its app-specific materializer and data-URL bridge.
 
 ## Invariants
 

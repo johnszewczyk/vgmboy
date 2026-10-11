@@ -21,6 +21,13 @@ struct MainView: View {
             ToolbarItem(placement: .navigation) { sidebarToolbarButton(.games) }
             ToolbarItem(placement: .navigation) { sidebarToolbarButton(.files) }
             ToolbarItem(placement: .navigation) {
+                Button(action: model.showGallery) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                }
+                .help("Gallery")
+                .accessibilityLabel("Gallery")
+            }
+            ToolbarItem(placement: .navigation) {
                 Button {
                     model.toggleSidebarDisclosureAll()
                 } label: {
@@ -224,12 +231,16 @@ struct MainView: View {
             VStack(spacing: 0) {
                 playlistTabStrip
 
-                ZStack {
-                    PlaylistTableView(model: model)
+                if model.isGalleryTabActive {
+                    GalleryView(model: model)
+                } else {
+                    ZStack {
+                        PlaylistTableView(model: model)
 
-                    if model.playlist.isEmpty {
-                        ContentUnavailableView("Empty Queue", systemImage: "music.note.list", description: Text("Double-click a game or a folder search result in the sidebar to queue tracks."))
-                            .allowsHitTesting(false)
+                        if model.playlist.isEmpty {
+                            ContentUnavailableView("Empty Queue", systemImage: "music.note.list", description: Text("Double-click a game or a folder search result in the sidebar to queue tracks."))
+                                .allowsHitTesting(false)
+                        }
                     }
                 }
 

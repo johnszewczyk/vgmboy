@@ -14,14 +14,17 @@
   for each snapshot request and returns published `CatalogGameBucket` or
   `CatalogFileBucket` values. It does not build rows, trees, search indexes, or
   queues.
+- Title Snap Gallery uses its own `.gallery` session scope and returns the
+  shared artwork-bearing game projection without coupling its request lifetime
+  to the regular Games sidebar read.
 - ScanSong remains the sole catalog writer. Frontends remain read-only.
 
 ## Invariants
 
 - Replacing, completing, or cancelling a task invalidates older generations;
   stale callbacks must not publish results.
-- Games and Files workflows use independent task owners, so one large snapshot
-  cannot cancel or block the other.
+- Games, Files, and Gallery workflows use independent task owners, so one
+  snapshot cannot cancel another.
 - Sidebar reads are database projections only. They must not walk source paths,
   rescan files, inspect decoders, materialize archives, or write the catalog.
 - Reader failures are surfaced to the frontend; no empty-database or alternate
