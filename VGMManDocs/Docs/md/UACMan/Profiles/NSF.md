@@ -30,10 +30,11 @@ playlist rows follow the
 | NSF header copyright slot (`0x4E..0x6D`) | Copyright | `game.metadata["Copyright"]` | The NSF header's third 32-byte text field is copyright, not a separate comment. Preserve when populated; omit empty and placeholder values. |
 | NSF header version byte | Format | `playlists[].entries[].extraFields["Format"]` | Put `NSF v.1` or `NSF v.2` on each logical track. Read the exact byte from that NSF; never normalize versions. |
 | M3U row title | Title | `playlists[].entries[].title` | Keep the authored title for the referenced song. Do not invent `Track N` titles. |
-| M3U play time | Play Length (ms) | `playlists[].entries[].extraFields` | Convert a positive authored time to integer milliseconds without dropping fractional seconds. Missing, invalid, and zero values stay absent. |
-| M3U loop duration | Loop Length (ms) | `playlists[].entries[].extraFields` | Use only a valid positive authored duration. `loopRaw` also retains the player-facing authored value. A dash or zero meaning no loop creates no tag. |
-| M3U loop-start time (`h:m:s-`) | Intro Length (ms) | `playlists[].entries[].extraFields` | Keep the exact authored value, including its trailing `-`, in `loopStartRaw`; parse the prefix as the intro length. Do not invent a separate `No Loop` or loop-start tag. |
-| M3U fade time | Fade Length (ms) | `playlists[].entries[].extraFields` | Convert a positive authored value to integer milliseconds. Missing or zero values stay absent. |
+| NSFPlay M3U row and authored values | M3U | `playlists[].entries[].extraFields["M3U"]` | Keep the exact raw row, populated raw timing/count fields, and positive millisecond projections together in one nested JSON value. Do not expose separate M3U timing tags or duplicate the raw fields at entry level. |
+| M3U play time | `M3U["Play Length (ms)"]` | `playlists[].entries[].extraFields["M3U"]` | Convert a positive authored time to integer milliseconds without dropping fractional seconds. Missing, invalid, and zero values stay absent. |
+| M3U loop duration | `M3U["Loop Length (ms)"]` | `playlists[].entries[].extraFields["M3U"]` | Use only a valid positive authored duration. Keep the populated raw value under `M3U["Loop"]`. A dash or zero meaning no loop creates no value. |
+| M3U loop-start time (`h:m:s-`) | `M3U["Intro Length (ms)"]` | `playlists[].entries[].extraFields["M3U"]` | Keep the exact authored value, including its trailing `-`, under `M3U["Loop Start"]`; parse the prefix as the intro length. Do not invent a separate `No Loop` tag. |
+| M3U fade time | `M3U["Fade Length (ms)"]` | `playlists[].entries[].extraFields["M3U"]` | Convert a positive authored value to integer milliseconds. Keep the populated raw value under `M3U["Fade"]`; missing or zero values stay absent. |
 | M3U `Music by` comment | Composer | `game.metadata["Composer"]` | Keep populated explicit credits. Filter blank and placeholder values. |
 | M3U `Ripped by` / `Ripper` comment | Dumper | `game.metadata["Dumper"]` | Preserve the source role as Dumper; do not rename it Ripper or Encoded By. |
 | M3U `Tagged by` / `Updated by` comments | Taggers | `game.metadata["Taggers"]` | Preserve distinct exact values as a list; do not split or rewrite a source credit string. |
@@ -44,14 +45,20 @@ playlist rows follow the
 NSFPlay M3U song numbers are decimal and one-based; map `n` to UAC's
 zero-based `trackIndex = n - 1`. Preserve authored order and repeated rows.
 Parse escaped commas in titles as data, not additional columns. Fractional
-seconds are rounded half-up to milliseconds for readable metadata while the
-exact raw values and source row remain in the manifest and original M3U.
-`loopcount` is carried as UAC's native `repeatRaw`, never as a surfaced tag.
-Keep the raw `lengthRaw`, `loopRaw`, `loopStartRaw`, `fadeRaw`, and `repeatRaw`
-values for playback-aware readers; the millisecond fields are the readable
-metadata projection, not replacements for the source semantics. If the M3U
-omits a track time, leave Play Length absent. Missing time does not itself
-mean “play forever”; actual end-of-track behavior belongs to the playback core.
+seconds are rounded half-up to milliseconds. Keep the exact row and populated
+raw values in one `M3U` JSON object on the corresponding playlist entry; put
+positive readable millisecond projections in that same object. Its nested
+property names use Title Case: `Raw Row`, `Play Time`, `Loop`, `Loop Start`,
+`Fade`, `Loop Count`, `Play Length (ms)`, `Loop Length (ms)`, `Intro Length
+(ms)`, and `Fade Length (ms)`. The containing playlist's `originalMemberPath`
+identifies the M3U source, so do not repeat it on every entry. Omit absent raw
+values and projections. The entry's first-class `title` remains the track
+title; native NSF `Format` also remains a direct track field. Do not duplicate
+the M3U row in entry-level raw fields or flatten its timing projections into
+extra tags. Readers obtain timing from the nested JSON object and continue to
+accept older flat UAC entries. If the M3U omits a track time, leave Play
+Length absent. Missing time does not itself mean “play forever”; actual
+end-of-track behavior belongs to the playback core.
 
 ## Format Procedures
 
@@ -119,7 +126,8 @@ mean “play forever”; actual end-of-track behavior belongs to the playback co
   every logical track.
 - **UAC review** — Confirm each physical NSF appears once, its four hashes are
   visible in Stream Hashes, applicable M3Us/text remain attached, and no
-  outer `.7z` is embedded. Check `originalMemberPath`, raw M3U row and timing
-  fields, readable millisecond fields, `Format: NSF v.N`, and that absent
-  source timings stay absent. Verify the manifest and playback entries in
-  UACMan before treating a conversion as complete.
+  outer `.7z` is embedded. Check `originalMemberPath`, the single nested M3U
+  object per authored track, its raw row and source-backed timing values,
+  readable millisecond projections, `Format: NSF v.N`, and that absent source
+  timings stay absent. Verify the manifest and playback entries in UACMan
+  before treating a conversion as complete.

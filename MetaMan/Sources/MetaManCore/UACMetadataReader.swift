@@ -279,7 +279,22 @@ enum UACMetadataReader {
         case "fadeLengthMs": titleCaseKey = "Fade Length (ms)"
         default: return metadata[key]
         }
-        return metadata[titleCaseKey] ?? metadata[key]
+        if let direct = metadata[titleCaseKey] ?? metadata[key] {
+            return direct
+        }
+
+        // NSF M3U values are one expandable playlist-entry tag in current
+        // packages. Keep reading the earlier flat representation above for
+        // existing packages while projecting the nested values into the
+        // common MetadataTiming API.
+        guard case .object(let m3u)? = metadata["M3U"] else { return nil }
+        switch key {
+        case "introLengthMs": return m3u["Intro Length (ms)"]
+        case "loopLengthMs": return m3u["Loop Length (ms)"]
+        case "playLengthMs": return m3u["Play Length (ms)"]
+        case "fadeLengthMs": return m3u["Fade Length (ms)"]
+        default: return nil
+        }
     }
 
     private static func canonicalMetadataTagName(_ key: String) -> String? {
