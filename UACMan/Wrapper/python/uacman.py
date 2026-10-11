@@ -1215,7 +1215,12 @@ def harvest_format_metadata(
             playlist_id = f"{base_id}-{suffix}"
             suffix += 1
         entries = []
-        original_playlist_paths: set[str] = set()
+        original_playlist_paths = {
+            track["sourcePlaylistPath"]
+            for tracks in normalized_tracks.values()
+            for track in tracks
+            if isinstance(track.get("sourcePlaylistPath"), str) and track["sourcePlaylistPath"]
+        }
         all_member_paths = {relative for _, relative in included}
         for path in sorted(expected_paths):
             tracks = normalized_tracks[path]
@@ -1240,7 +1245,7 @@ def harvest_format_metadata(
                 for key, value in metadata.items():
                     if key in {"Title", "Artist"}:
                         continue
-                    if extension == "nsf" and key in {
+                    if extension in {"nsf", "gbs"} and key in {
                         "Intro Length (ms)", "Loop Length (ms)",
                         "Play Length (ms)", "Fade Length (ms)",
                     }:
@@ -1259,7 +1264,17 @@ def harvest_format_metadata(
                     if matching_member_key is not None and member_metadata[matching_member_key] == value:
                         continue
                     extra_fields[key] = value
-                if extension == "nsf":
+                if extension in {"nsf", "gbs"}:
+                    if extension == "gbs" and source_playlist_path and len(original_playlist_paths) > 1:
+                        source_path = original_member_path(source_playlist_path, member_path_map)
+                        if not safe_relative_path(source_path) or source_path not in all_member_paths:
+                            raise UACError(
+                                f"GBS M3U source is not included as a UAC member: {source_playlist_path}"
+                            )
+                        source_path = variant_member_path(
+                            source_path, variant_id, recipe.get("variants", [])
+                        )
+                        m3u_fields["Source Path"] = source_path
                     for source_key, tag_name in (
                         ("rawLine", "Raw Row"),
                         ("lengthRaw", "Play Time"),
@@ -1274,7 +1289,7 @@ def harvest_format_metadata(
                     if m3u_fields:
                         if "M3U" in extra_fields:
                             raise UACError(
-                                f"NSF track metadata already contains the reserved nested M3U tag: {path}"
+                                f".{extension} track metadata already contains the reserved nested M3U tag: {path}"
                             )
                         extra_fields["M3U"] = m3u_fields
                 entry = {
@@ -1287,7 +1302,7 @@ def harvest_format_metadata(
                     "extraFields": extra_fields,
                     "extensions": {},
                 }
-                if extension != "nsf":
+                if extension not in {"nsf", "gbs"}:
                     for source_key, target_key in (
                         ("rawLine", "rawLine"),
                         ("lengthRaw", "lengthRaw"),
@@ -1302,16 +1317,19 @@ def harvest_format_metadata(
                 entries.append(entry)
 
         original_playlist_path = None
-        if extension == "nsf" and original_playlist_paths:
-            if len(original_playlist_paths) != 1:
+        if extension in {"nsf", "gbs"} and original_playlist_paths:
+            if extension == "nsf" and len(original_playlist_paths) != 1:
                 raise UACError("One NSF UAC package references multiple aggregate M3Us; split the source packages before packaging.")
-            source_path = next(iter(original_playlist_paths))
-            source_path = original_member_path(source_path, member_path_map)
-            if source_path not in all_member_paths:
-                raise UACError(f"NSF aggregate M3U is not included as a UAC member: {source_path}")
-            original_playlist_path = variant_member_path(source_path, variant_id, recipe.get("variants", []))
-            if not safe_relative_path(original_playlist_path):
-                raise UACError(f"Unsafe NSF aggregate M3U member path: {original_playlist_path}")
+            if len(original_playlist_paths) == 1:
+                source_path = next(iter(original_playlist_paths))
+                source_path = original_member_path(source_path, member_path_map)
+                if source_path not in all_member_paths:
+                    raise UACError(f".{extension.upper()} M3U is not included as a UAC member: {source_path}")
+                original_playlist_path = variant_member_path(
+                    source_path, variant_id, recipe.get("variants", [])
+                )
+                if not safe_relative_path(original_playlist_path):
+                    raise UACError(f"Unsafe .{extension.upper()} M3U member path: {original_playlist_path}")
 
         playlist = {
             "id": playlist_id,

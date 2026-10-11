@@ -17,8 +17,10 @@ The native header fields and version byte follow the
 - **Source members** — `.gbs`; optional companion `.m3u` files.
 - **Coverage** — GBS header game, artist, and comment fields; M3U track rows
   and recognized `# @KEY value` comments.
-- **Status** — Profile rules complete; conversion is held until timing and
-  competing M3U rows survive the reader-to-UAC path. MetaMan now converts
+- **Status** — Profile rules complete and the UAC writer now stores GBS M3U
+  rows in the nested `M3U` field. Conversion remains held until a packaged
+  fixture and UACMan GUI review confirm timing visibility and conflict
+  handling. MetaMan converts
   fractional play, loop, and fade times to integer milliseconds, and reads
   NEZplug's loop-duration, loop-start, and whole-play loop forms. When rows
   conflict, ambiguous fields are omitted and diagnosed. Retain the original
@@ -36,7 +38,8 @@ The native header fields and version byte follow the
 | M3U `# @DATE value` | Date | `game.metadata["Date"]` | Keep the source value; do not infer a date from a filename or composite track title. |
 | M3U `::GBS,index,title,...` title | Title | `playlists[].entries[].title` | Source track title, retained as written. Do not split embedded composer, game, publisher, or copyright text out of the title. |
 | M3U source index | Playlist `trackIndex` | `playlists[].entries[].trackIndex` | GBS indexes are zero-based, including hexadecimal indexes. Do not create a second Track Number tag. |
-| M3U time, loop, fade columns | Playlist entry extra fields | `Play Length (ms)`, `Intro Length (ms)`, `Loop Length (ms)`, `Fade Length (ms)` | Convert fractional final time components to integer milliseconds. A loop-start value marked with `-` maps to Intro Length; do not infer a loop duration from it. A bare `-` sets Loop Length equal to Play Length. Keep the original M3U attachment as the byte-exact source of authored strings. Missing or invalid times stay absent. Repeat-count values remain in the M3U attachment and are not projected as entry fields. |
+| M3U row, source path, and authored values | M3U | `playlists[].entries[].extraFields["M3U"]` | Keep the exact raw row, source M3U path, populated raw timing/count fields, and positive millisecond projections together in one nested JSON value. Do not expose separate M3U timing tags or duplicate raw fields at entry level. |
+| M3U time, loop, fade columns | M3U timing properties | `playlists[].entries[].extraFields["M3U"]` | Convert fractional final time components to integer milliseconds. A loop-start value marked with `-` maps to Intro Length; do not infer a loop duration from it. A bare `-` sets Loop Length equal to Play Length. Missing or invalid times stay absent. Keep raw strings and repeat counts in the nested value and the original M3U attachment byte-exact. |
 | GBS header version byte | Format | `playlists[].entries[].extraFields["Format"]` | Use `GBS v.<version>` on every logical track, for example `GBS v.1`. Read the byte from that physical member; never normalize versions. |
 
 ## Format Procedures
@@ -69,18 +72,27 @@ The native header fields and version byte follow the
   attachment, including multiple M3Us that refer to the same GBS. Their rows
   can carry track names and playback timing, so they are not disposable
   generated queues. Preserve original names and paths in source provenance.
+  Store each applicable row in one Title Case nested `M3U` JSON value on its
+  playlist entry. Include `Source Path`, `Raw Row`, populated raw `Play Time`,
+  `Loop`, `Loop Start`, `Fade`, and `Loop Count`, plus positive
+  `Play Length (ms)`, `Intro Length (ms)`, `Loop Length (ms)`, and
+  `Fade Length (ms)` projections. Keep the first-class entry `title` and
+  wrapper timing projections usable by playback; do not flatten the M3U fields
+  into separate entry tags. When one M3U applies to the package playlist,
+  `originalMemberPath` identifies it and `Source Path` is omitted from each
+  row. When several M3Us apply, per-entry `Source Path` disambiguates them.
 - **M3U row conflicts** — Compare all rows for the same GBS member and
   zero-based index. If titles or timings disagree, retain the competing rows
   and route the track/package to review. Do not silently select the richest
   row, merge rows, or treat a second title as a duplicate without evidence.
 - **Timing** — M3U timing is playback data attached to the logical track.
   MetaMan converts play, loop, and fade values, including a fractional final
-  component with up to millisecond precision, to integer milliseconds for
-  playlist entry fields. A trailing hyphen on the loop field marks a loop
-  start; a bare hyphen means the loop duration equals play length. The source
-  M3U attachment preserves authored strings and repeat counts. Invalid or
-  absent timing stays absent; GBS header-only tracks have no known duration
-  and must not receive a 150-second fallback.
+  component with up to millisecond precision, to integer milliseconds.
+  Preserve both those projections and their authored source strings under the
+  nested `M3U` value. A trailing hyphen on the loop field marks a loop start;
+  a bare hyphen means the loop duration equals play length. Invalid or absent
+  timing stays absent; GBS header-only tracks have no known duration and must
+  not receive a 150-second fallback.
 - **Composite titles and comments** — Keep a composite M3U title as one Title
   value. Promote a recognized, populated `# @KEY` value only through an
   explicit useful-field mapping with canonical Title Case tag names. Do not

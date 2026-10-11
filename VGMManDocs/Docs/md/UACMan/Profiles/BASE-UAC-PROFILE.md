@@ -22,6 +22,10 @@ the per-set ledger recording operations and checkpoints.
   `playlists[].entries[]`. Subsong `title` and `artist` are first-class fields;
   other direct track fields belong in `extraFields`. `pack.meta` and
   `track.meta` are not current manifest fields.
+- **Nested source metadata** — Use a nested JSON value only when a format
+  profile explicitly names a source structure that belongs together, such as
+  the authored row and timing fields under `M3U`. Do not flatten that record
+  into a family of redundant surface tags.
 - **Album** — Use the source-format profile's mapping for game or release
   names. For SPC, the source **Game** field maps to track **Album**; keep
   package identity in structural `game.title` and the package-level **Game
@@ -64,6 +68,12 @@ the per-set ledger recording operations and checkpoints.
   leave it blank. If the exact image is unavailable, region/release identity
   conflicts, or an existing snap differs, leave the package unchanged and
   route the case to the set report for review; do not substitute a nearby image.
+- **Snap-based identity evidence** — A title-snap collection may help identify
+  an otherwise unnamed package. Match the candidate image by its visible title
+  and recognizable screen, then record the source pack and match evidence in
+  the identity review. A filename match or generic artwork alone does not
+  establish a specific region or release; keep those fields unknown unless the
+  image or another source resolves them.
 - **Omission** — Omit empty, guessed, parser-default, and duplicate values.
   Use **Date** for a full date and **Year** when only a year is known. Omit
   **Disc Number** for a single-disc release; keep Date and Year together only
@@ -79,8 +89,9 @@ the per-set ledger recording operations and checkpoints.
   labels: `Mixed Versions`, `Incomplete`, or `Corrupt`. Omit the tag when no
   issue is declared; never write `Good`. `Corrupt` requires evidence of a
   critical known defect, and the affected material stays retained outside a
-  clean canonical package. `Mixed Versions` packages may remain in a canonical
-  set during review, but the tag still marks them for re-rip. Keep detailed
+  clean canonical package. A positively identified `Mixed Versions` package
+  may be integrated into its final set path with its Status tag and observed
+  per-track Format values intact; it remains a re-rip candidate. Keep detailed
   findings and reasons in the per-set dashboard report, not in extra UAC tags.
 - **Playback data** — Use wrapper-defined loop objects and playlist-entry
   timing fields, not descriptive tags. Follow the shared
