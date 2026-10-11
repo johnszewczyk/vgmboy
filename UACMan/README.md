@@ -81,10 +81,17 @@ only selected per-track fields that are not already on that member, plus its
 decoder track index. Original members remain byte-identical; metadata saves
 rewrite only the manifest and preserve the compressed payload byte-for-byte.
 
-For GBS, the directory harvester also supplies sibling NEZplug extended-M3U
-sidecars to MetaMan. Authored track names, timing, and M3U comment tags are
-projected onto the matching GBS subsongs; the original M3U files remain intact
-as ordinary UAC members.
+For GBS, the directory harvester supplies sibling NEZplug extended-M3U
+sidecars. For NSF, it supplies sibling NSFPlay M3Us and selects the same-stem
+aggregate as the authored queue, using other M3Us only to check for conflicts.
+NSF M3U song indexes are converted from one-based to UAC's zero-based index;
+partial aggregate lists retain all header songs by appending unlisted songs
+without invented titles or timings. Authored NSF time, loop, loop-start, fade,
+and repeat values populate UAC's native playlist fields; positive millisecond
+projections make timing readable in metadata. Raw rows and original M3Us stay
+bundled intact. The NSF aggregate's explicit credit comments are projected to
+package metadata; generated-playlist notices and freeform comments stay only
+in the source M3U. NSF M3U values are not applied to the source NSF bytes.
 
 Build the CLI bridge with `swift build -c release --product UACManMetadataCLI`.
 Its `harvest-spc-directory <path>` command emits the specialized SPC projection.
@@ -99,10 +106,11 @@ track by default, including MetaMan-supported formats not in UACMan's built-in
 extension list; an explicit recipe role can keep a member as an asset.
 
 NSF-family tracks use the source track index as the UAC `trackIndex` so players
-can select a subsong without extracting or rewriting the stream. MetaMan
-results with missing, negative, or duplicate decoder indexes fail the harvest;
-they are never flattened into one member record. UAC playlist order and the
-per-track projection retain the metadata used for each catalog row.
+can select a subsong without extracting or rewriting the stream. Missing or
+negative indexes fail the harvest. Repeated indexes are retained when the
+source playlist deliberately repeats a song (including NSF/NSFE playlists).
+UAC playlist order and the per-track projection retain the metadata used for
+each catalog row.
 
 Build and launch the app bundle with:
 

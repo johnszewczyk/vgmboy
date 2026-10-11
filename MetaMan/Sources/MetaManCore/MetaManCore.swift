@@ -17,7 +17,7 @@ public enum MetaManCore {
         MetadataFormatDescriptor(
             identifier: "nsf",
             fileExtensions: ["nsf"],
-            methodology: "Direct fixed-header reader for identity, playback setup, and declared tracks; no playback decoder or emulator is started, and absent authored timing keeps scanner-compatible defaults."
+            methodology: "Direct fixed-header reader plus bounded NSFPlay M3U parsing for ordered song titles and authored timing; no playback decoder or emulator is started, and missing timing remains unknown."
         ),
         MetadataFormatDescriptor(
             identifier: "gbs",
@@ -701,6 +701,9 @@ public enum MetaManCore {
         for fileURL: URL,
         context: MetadataReadContext
     ) throws -> MetadataReadContext {
+        if fileURL.pathExtension.caseInsensitiveCompare("nsf") == .orderedSame {
+            return try contextIncludingNSFPlaylists(for: fileURL, context: context)
+        }
         if fileURL.pathExtension.caseInsensitiveCompare("gbs") == .orderedSame {
             return try contextIncludingGBSPlaylists(for: fileURL, context: context)
         }
@@ -730,6 +733,73 @@ public enum MetaManCore {
         }
         return context.appending(
             MetadataCompanionFile(relativePath: playlistURL.lastPathComponent, data: data)
+        )
+    }
+
+    private static func contextIncludingNSFPlaylists(
+        for fileURL: URL,
+        context: MetadataReadContext
+    ) throws -> MetadataReadContext {
+        guard !context.companionFiles.contains(where: {
+            URL(fileURLWithPath: $0.relativePath).pathExtension.caseInsensitiveCompare("m3u") == .orderedSame
+        }) else {
+            guard context.sourceRelativePath == nil else { return context }
+            let hasPackageQualifiedPlaylistPath = context.companionFiles.contains {
+                $0.relativePath.contains("/") || $0.relativePath.contains("\\")
+            }
+            guard !hasPackageQualifiedPlaylistPath else { return context }
+            return MetadataReadContext(
+                companionFiles: context.companionFiles,
+                sourceRelativePath: fileURL.lastPathComponent
+            )
+        }
+
+        let directoryURL = fileURL.deletingLastPathComponent()
+        let children = try FileManager.default.contentsOfDirectory(
+            at: directoryURL,
+            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey],
+            options: [.skipsHiddenFiles]
+        )
+        let nsfFiles = children.filter { $0.pathExtension.caseInsensitiveCompare("nsf") == .orderedSame }
+        let allPlaylists = children.filter { $0.pathExtension.caseInsensitiveCompare("m3u") == .orderedSame }
+        let playlists: [URL]
+        if nsfFiles.count == 1 {
+            // A one-NSF source package can also have per-song sidecar M3Us;
+            // pass all of them so the parser can compare them to the aggregate.
+            playlists = allPlaylists
+        } else {
+            let stem = fileURL.deletingPathExtension().lastPathComponent
+            playlists = allPlaylists.filter {
+                $0.deletingPathExtension().lastPathComponent
+                    .compare(stem, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+            }
+        }
+        let ordered = playlists.sorted { $0.lastPathComponent < $1.lastPathComponent }
+        guard !ordered.isEmpty else { return context }
+        guard ordered.count <= 4_096 else {
+            throw MetadataReadError.malformedFile("NSF companion M3U directory has too many files: \(fileURL.lastPathComponent)")
+        }
+
+        var totalBytes: UInt64 = 0
+        var companions: [MetadataCompanionFile] = []
+        for playlistURL in ordered {
+            let values = try playlistURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+            guard values.isRegularFile == true, values.isSymbolicLink != true,
+                  let size = values.fileSize, size >= 0, size <= 4 * 1024 * 1024 else {
+                throw MetadataReadError.malformedFile("NSF companion M3U is not a bounded regular file: \(playlistURL.lastPathComponent)")
+            }
+            totalBytes += UInt64(size)
+            guard totalBytes <= 32 * 1024 * 1024 else {
+                throw MetadataReadError.malformedFile("NSF companion M3U set exceeds the 32 MiB limit: \(fileURL.lastPathComponent)")
+            }
+            companions.append(MetadataCompanionFile(
+                relativePath: playlistURL.lastPathComponent,
+                data: try Data(contentsOf: playlistURL, options: [.mappedIfSafe])
+            ))
+        }
+        return MetadataReadContext(
+            companionFiles: companions,
+            sourceRelativePath: fileURL.lastPathComponent
         )
     }
 

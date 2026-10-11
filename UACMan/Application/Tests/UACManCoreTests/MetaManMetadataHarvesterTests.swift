@@ -108,15 +108,88 @@ import UACWrapperCore
     let tracks = outcome.trackMetadata["NES/game.nsf"]
     #expect(outcome.failures.isEmpty)
     #expect(outcome.diagnosticCount == 0)
-    #expect(member?["Game"] == .string("Fixture Game"))
-    #expect(member?["System"] == .string("Nintendo NES"))
-    #expect(member?["Artist"] == .string("Fixture Composer"))
+    #expect(member?["Game Title"] == .string("Fixture Game"))
+    #expect(member?["Album Artist"] == .string("Fixture Composer"))
+    #expect(member?["System"] == nil)
+    #expect(outcome.gameMetadata["Game Title"] == .string("Fixture Game"))
+    #expect(outcome.gameMetadata["Album Artist"] == .string("Fixture Composer"))
     #expect(member?["Title"] == nil)
     #expect(member?["Play Length (ms)"] == nil)
     #expect(tracks?.count == 3)
     #expect(tracks?.compactMap(\.sourceTrackIndex) == [0, 1, 2])
-    #expect(tracks?.allSatisfy { $0.metadata["Play Length (ms)"] == .integer(150_000) } == true)
+    #expect(tracks?.allSatisfy { $0.metadata["Play Length (ms)"] == nil } == true)
+    #expect(tracks?.allSatisfy { $0.metadata["Format"] == .string("NSF v.1") } == true)
     #expect(try Data(contentsOf: memberURL) == fixture)
+}
+
+@Test func nsfDirectoryHarvestCarriesM3UOrderTimingAndRawRowProvenance() throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("uac-nsf-m3u-harvest-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let game = root.appendingPathComponent("NES", isDirectory: true)
+    try FileManager.default.createDirectory(at: game, withIntermediateDirectories: true)
+    let memberURL = game.appendingPathComponent("game.nsf")
+    let fixture = makeNSFFixture(trackCount: 3, game: "Fixture Game", artist: "Fixture Composer")
+    try fixture.write(to: memberURL)
+    let m3u = """
+    # Music by Test Composer
+    # Ripped by Test Dumper
+    # Tagged by Tagger One
+    # Updated by Tagger Two
+    # Developed by Test Developer
+    # Published in 1994 by Test Publisher
+    # Copyright 1994 Example Software
+    game.nsf::NSF,3,Finale,0:00:09.375,0:00:02.500-,0:00:01.25,2
+    game.nsf::NSF,1,Opening,1:02.03,0:00:20,0:05,0
+    """
+    try Data(m3u.utf8).write(to: game.appendingPathComponent("game.m3u"))
+
+    let outcome = try MetaManMetadataHarvester.harvest(directoryURL: root, formatExtension: "nsf")
+    let tracks = try #require(outcome.trackMetadata["NES/game.nsf"])
+    #expect(outcome.failures.isEmpty)
+    #expect(tracks.compactMap(\.sourceTrackIndex) == [2, 0, 1])
+    #expect(tracks[0].metadata["Title"] == .string("Finale"))
+    #expect(tracks[0].metadata["Format"] == .string("NSF v.1"))
+    #expect(tracks[0].metadata["Play Length (ms)"] == .integer(9_375))
+    #expect(tracks[0].metadata["Intro Length (ms)"] == .integer(2_500))
+    #expect(tracks[0].metadata["Fade Length (ms)"] == .integer(1_250))
+    #expect(tracks[0].sourcePlaylistPath == "NES/game.m3u")
+    #expect(tracks[0].rawLine == "game.nsf::NSF,3,Finale,0:00:09.375,0:00:02.500-,0:00:01.25,2")
+    #expect(tracks[0].lengthRaw == "0:00:09.375")
+    #expect(tracks[0].loopStartRaw == "0:00:02.500-")
+    #expect(tracks[0].repeatRaw == "2")
+    #expect(outcome.gameMetadata["Composer"] == .string("Test Composer"))
+    #expect(outcome.gameMetadata["Dumper"] == .string("Test Dumper"))
+    #expect(outcome.gameMetadata["Taggers"] == .array([.string("Tagger One"), .string("Tagger Two")]))
+    #expect(outcome.gameMetadata["Developer"] == .string("Test Developer"))
+    #expect(outcome.gameMetadata["Publisher"] == .string("Test Publisher"))
+    #expect(outcome.gameMetadata["Year"] == .string("1994"))
+    #expect(outcome.gameMetadata["Copyright"] == .string("1994 Example Software"))
+    #expect(tracks[2].metadata["Title"] == nil)
+    #expect(tracks[2].metadata["Play Length (ms)"] == nil)
+}
+
+@Test func nsfDirectoryHarvestWithholdsCopyrightWhenM3UPlaylistsConflict() throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("uac-nsf-credit-conflict-\(UUID().uuidString)", isDirectory: true)
+    let game = root.appendingPathComponent("NES", isDirectory: true)
+    try FileManager.default.createDirectory(at: game, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    try makeNSFFixture(trackCount: 1, game: "Fixture Game", artist: "Fixture Composer")
+        .write(to: game.appendingPathComponent("game.nsf"))
+    try "#Copyright: M3U Copyright A\ngame.nsf::NSF,1,Opening,1:00,-,0:00,0\n"
+        .write(to: game.appendingPathComponent("game.m3u"), atomically: true, encoding: .utf8)
+    try "#Copyright: M3U Copyright B\ngame.nsf::NSF,1,Opening,1:00,-,0:00,0\n"
+        .write(to: game.appendingPathComponent("01 - Opening.m3u"), atomically: true, encoding: .utf8)
+
+    let outcome = try MetaManMetadataHarvester.harvest(directoryURL: root, formatExtension: "nsf")
+    #expect(outcome.failures.isEmpty)
+    #expect(outcome.memberMetadata["NES/game.nsf"]?["Copyright"] == nil)
+    #expect(outcome.gameMetadata["Copyright"] == nil)
+    #expect(outcome.sharedFieldConflicts.contains { $0.contains("Copyright") && $0.contains("not promoted") })
 }
 
 @Test func gbsDirectoryHarvestAttachesNEZPlugM3UTracksToMetaManDocuments() throws {

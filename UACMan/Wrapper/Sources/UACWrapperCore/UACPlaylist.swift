@@ -30,9 +30,10 @@ public struct UACPlaylist: Codable, Equatable, Sendable {
     }
 }
 
-/// One ordered pointer plus the parsed and raw playlist fields that apply to
-/// it. Timing values remain raw text for now; this avoids imposing one
-/// format's units or loop semantics on another format.
+/// One ordered pointer plus the raw playlist fields that apply to it. Raw
+/// timing strings preserve source syntax; format-specific normalized values,
+/// when known, may also appear in `extraFields` without redefining this shared
+/// cross-format contract.
 public struct UACPlaylistEntry: Codable, Equatable, Sendable {
     public let targetMemberPath: String
     public let targetMemberBlake3: String?

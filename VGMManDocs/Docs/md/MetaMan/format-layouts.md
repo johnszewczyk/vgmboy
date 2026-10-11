@@ -89,11 +89,44 @@ retains the complete header; it does not read or execute the music program.
 | `0x00..0x04` | `NESM` plus `0x1A` signature. |
 | `0x05`, `0x06`, `0x07` | Version, track count, and first-track index. |
 | `0x08..0x0D` | Load, init, and play addresses as three little-endian 16-bit values. |
-| `0x0E..0x2D`, `0x2E..0x4D`, `0x4E..0x6D` | Game, artist, and copyright/comment fields (32 bytes each). |
+| `0x0E..0x2D`, `0x2E..0x4D`, `0x4E..0x6D` | Game, artist, and copyright fields (32 bytes each). |
 | `0x6E..0x6F` | NTSC speed in microseconds per frame. |
 | `0x70..0x77` | Eight initial bank values. |
 | `0x78..0x79` | PAL speed in microseconds per frame. |
 | `0x7A`, `0x7B` | Playback flags and expansion-audio flags. |
+
+The optional NSFPlay extended-M3U row form is
+`filename::NSF,song,title,time,loop,fade,loopcount`. Its decimal song number
+is one-based (`1` is the first declared song). MetaMan selects the same-stem
+aggregate playlist, keeps authored row order and repetitions, then appends
+declared NSF songs omitted by a partial list without inventing titles or
+timings. Per-track M3Us are comparison evidence, not extra queue rows. Escaped
+commas and quoted CSV fields are parsed. Fractional seconds are converted to
+milliseconds with half-up rounding, while the exact raw fields, source row,
+and original M3U member path remain available to UAC.
+
+The M3U `loop` value is a loop duration (`h:m:s`), loop start (`h:m:s-`), or
+no-loop marker (`-` or `0`). The `fade` value is a duration; `loopcount` is
+retained as the native repeat field (`0` means player default). Readable
+positive `Play Length (ms)`, `Loop Length (ms)`, `Intro Length (ms)`, and
+`Fade Length (ms)` are projected to UAC entries. Missing timing is left
+missing; NSF does not have a fixed per-song end time in its header.
+Keep the raw UAC playlist timing fields alongside those readable values;
+absence of an M3U time must not be interpreted as a promise to loop forever.
+That playback behavior is a player-core decision.
+
+From the aggregate M3U only, explicit `Music by`, `Ripped by`/`Ripper`,
+`Tagged by`, `Updated by`, `Developed by`, `Published in`/`Published by`, and
+`Copyright` comments are mapped to the corresponding package metadata fields
+(`Composer`, `Dumper`, `Taggers`, `Developer`, `Year`/`Date`, `Publisher`, and
+`Copyright`). Unknown/freeform comments and playlist-generator notes remain
+only in the original M3U. Ambiguous year or conflicting copyright values are
+reported and not promoted.
+
+The third NSF header text slot is copyright, not a general comment field. UAC
+places populated header game and artist values at package scope as `Game
+Title` and `Album Artist`, and the third field as `Copyright`. The per-track
+`Format` value is `NSF v.N` from that file's version byte.
 
 ### GBS
 

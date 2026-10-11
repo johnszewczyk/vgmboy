@@ -5,17 +5,23 @@ import UACWrapperCore
 public struct MetaManMetadataHarvestOutcome: Sendable {
     public let memberMetadata: [String: [String: UACJSONValue]]
     public let trackMetadata: [String: [MetaManMetadataTrackProjection]]
+    public let gameMetadata: [String: UACJSONValue]
+    public let sharedFieldConflicts: [String]
     public let failures: [String]
     public let diagnosticCount: Int
 
     public init(
         memberMetadata: [String: [String: UACJSONValue]],
         trackMetadata: [String: [MetaManMetadataTrackProjection]] = [:],
+        gameMetadata: [String: UACJSONValue] = [:],
+        sharedFieldConflicts: [String] = [],
         failures: [String],
         diagnosticCount: Int
     ) {
         self.memberMetadata = memberMetadata
         self.trackMetadata = trackMetadata
+        self.gameMetadata = gameMetadata
+        self.sharedFieldConflicts = sharedFieldConflicts
         self.failures = failures
         self.diagnosticCount = diagnosticCount
     }
@@ -26,16 +32,42 @@ public struct MetaManMetadataTrackProjection: Encodable, Sendable {
     /// in playlist entries because the manifest keeps playlist fields open.
     public let sourceTrackIndex: Int?
     public let metadata: [String: UACJSONValue]
+    public let sourcePlaylistPath: String?
+    public let rawLine: String?
+    public let lengthRaw: String?
+    public let loopRaw: String?
+    public let loopStartRaw: String?
+    public let fadeRaw: String?
+    public let repeatRaw: String?
 
-    public init(sourceTrackIndex: Int?, metadata: [String: UACJSONValue]) {
+    public init(
+        sourceTrackIndex: Int?,
+        metadata: [String: UACJSONValue],
+        sourcePlaylistPath: String? = nil,
+        rawLine: String? = nil,
+        lengthRaw: String? = nil,
+        loopRaw: String? = nil,
+        loopStartRaw: String? = nil,
+        fadeRaw: String? = nil,
+        repeatRaw: String? = nil
+    ) {
         self.sourceTrackIndex = sourceTrackIndex
         self.metadata = metadata
+        self.sourcePlaylistPath = sourcePlaylistPath
+        self.rawLine = rawLine
+        self.lengthRaw = lengthRaw
+        self.loopRaw = loopRaw
+        self.loopStartRaw = loopStartRaw
+        self.fadeRaw = fadeRaw
+        self.repeatRaw = repeatRaw
     }
 }
 
 public enum MetaManMetadataHarvester {
     private static let maximumMemberSize: UInt64 = 64 * 1024 * 1024
     private static let maximumCompanionPlaylistSize: UInt64 = 4 * 1024 * 1024
+    private static let maximumCompanionPlaylistCount = 4_096
+    private static let maximumCompanionPlaylistSetSize: UInt64 = 32 * 1024 * 1024
     // Audio tracks can exceed the general cap. These readers use file APIs or
     // memory mapping instead of copying the encoded audio into a working buffer.
     private static let maximumAudioMemberSize: UInt64 = 1024 * 1024 * 1024
@@ -73,12 +105,13 @@ public enum MetaManMetadataHarvester {
         }
 
         var files: [(url: URL, path: String)] = []
-        var gbsPlaylistsByDirectory: [String: [URL]] = [:]
+        var playlistsByDirectory: [String: [URL]] = [:]
+        var nsfFilesByDirectory: [String: [URL]] = [:]
         for case let url as URL in enumerator {
             let fileExtension = url.pathExtension.lowercased()
             let isTarget = fileExtension == ext
-            let isGBSPlaylist = ext == "gbs" && fileExtension == "m3u"
-            guard isTarget || isGBSPlaylist else { continue }
+            let isFormatPlaylist = ["gbs", "nsf"].contains(ext) && fileExtension == "m3u"
+            guard isTarget || isFormatPlaylist else { continue }
             let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
             guard values.isSymbolicLink != true, values.isRegularFile == true else {
                 throw MetaManMetadataHarvesterError.notRegularFile(url.path)
@@ -89,8 +122,12 @@ public enum MetaManMetadataHarvester {
             }
             if isTarget {
                 files.append((url, path))
+                if ext == "nsf" {
+                    nsfFilesByDirectory[url.deletingLastPathComponent().standardizedFileURL.path, default: []]
+                        .append(url)
+                }
             } else {
-                gbsPlaylistsByDirectory[url.deletingLastPathComponent().standardizedFileURL.path, default: []]
+                playlistsByDirectory[url.deletingLastPathComponent().standardizedFileURL.path, default: []]
                     .append(url)
             }
         }
@@ -100,6 +137,7 @@ public enum MetaManMetadataHarvester {
         var trackMetadata: [String: [MetaManMetadataTrackProjection]] = [:]
         var failures: [String] = []
         var diagnosticCount = 0
+        var nsfProjectionConflicts: [String] = []
         for file in files {
             do {
                 let attributes = try FileManager.default.attributesOfItem(atPath: file.url.path)
@@ -111,21 +149,49 @@ public enum MetaManMetadataHarvester {
                     throw MetaManMetadataHarvesterError.memberTooLarge(file.path)
                 }
                 let context: MetadataReadContext
-                if ext == "gbs" {
+                if ext == "gbs" || ext == "nsf" {
                     let directory = file.url.deletingLastPathComponent().standardizedFileURL.path
-                    let playlistURLs = gbsPlaylistsByDirectory[directory] ?? []
-                    let companions = try playlistURLs.sorted { $0.lastPathComponent < $1.lastPathComponent }.map { playlistURL in
+                    let siblings = playlistsByDirectory[directory] ?? []
+                    let playlistURLs: [URL]
+                    if ext == "nsf", (nsfFilesByDirectory[directory] ?? []).count > 1 {
+                        let stem = file.url.deletingPathExtension().lastPathComponent
+                        playlistURLs = siblings.filter {
+                            $0.deletingPathExtension().lastPathComponent
+                                .compare(stem, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+                        }
+                    } else {
+                        playlistURLs = siblings
+                    }
+                    let orderedPlaylists = playlistURLs.sorted { $0.lastPathComponent < $1.lastPathComponent }
+                    guard orderedPlaylists.count <= maximumCompanionPlaylistCount else {
+                        throw MetaManMetadataHarvesterError.tooManyCompanionPlaylists(ext, file.path)
+                    }
+                    var playlistSetBytes: UInt64 = 0
+                    let companions = try orderedPlaylists.map { playlistURL in
                         let playlistAttributes = try FileManager.default.attributesOfItem(atPath: playlistURL.path)
                         guard let playlistSize = playlistAttributes[.size] as? NSNumber,
                               playlistSize.uint64Value <= maximumCompanionPlaylistSize else {
-                            throw MetaManMetadataHarvesterError.companionPlaylistTooLarge(playlistURL.lastPathComponent)
+                            throw MetaManMetadataHarvesterError.companionPlaylistTooLarge(ext, playlistURL.lastPathComponent)
+                        }
+                        playlistSetBytes += playlistSize.uint64Value
+                        guard playlistSetBytes <= maximumCompanionPlaylistSetSize else {
+                            throw MetaManMetadataHarvesterError.companionPlaylistSetTooLarge(ext, file.path)
+                        }
+                        let companionPath: String
+                        if ext == "nsf" {
+                            companionPath = String(playlistURL.standardizedFileURL.path.dropFirst(root.path.count + 1))
+                        } else {
+                            companionPath = playlistURL.lastPathComponent
                         }
                         return MetadataCompanionFile(
-                            relativePath: playlistURL.lastPathComponent,
+                            relativePath: companionPath,
                             data: try Data(contentsOf: playlistURL, options: [.mappedIfSafe])
                         )
                     }
-                    context = MetadataReadContext(companionFiles: companions)
+                    context = MetadataReadContext(
+                        companionFiles: companions,
+                        sourceRelativePath: ext == "nsf" ? file.path : nil
+                    )
                 } else {
                     context = MetadataReadContext()
                 }
@@ -134,19 +200,35 @@ public enum MetaManMetadataHarvester {
                     throw MetaManMetadataHarvesterError.noTracks(file.path)
                 }
                 diagnosticCount += result.tracks.reduce(0) { $0 + $1.document.diagnostics.count }
+                if ext == "nsf" {
+                    let readerDiagnostics = Set(result.tracks.flatMap { $0.document.diagnostics })
+                    nsfProjectionConflicts.append(contentsOf: readerDiagnostics.sorted().map { "\(file.path): \($0)" })
+                }
                 trackMetadata[file.path] = result.tracks.map { track in
-                    MetaManMetadataTrackProjection(
+                    let facts = track.document.technicalFacts
+                    return MetaManMetadataTrackProjection(
                         sourceTrackIndex: track.sourceTrackIndex,
-                        metadata: MetaManMetadataProjector.memberFields(from: track.document)
+                        metadata: MetaManMetadataProjector.memberFields(from: track.document),
+                        sourcePlaylistPath: facts["m3uSourcePath"],
+                        rawLine: facts["m3uRawLine"],
+                        lengthRaw: facts["m3uTimeRaw"],
+                        loopRaw: facts["m3uLoopRaw"],
+                        loopStartRaw: facts["m3uLoopStartRaw"],
+                        fadeRaw: facts["m3uFadeRaw"],
+                        repeatRaw: facts["m3uRepeatRaw"]
                     )
                 }
-                if result.tracks.count == 1, let track = result.tracks.first {
+                if ext == "nsf" {
+                    let shared = MetaManMetadataProjector.sharedNSFFields(from: result.tracks.map(\.document))
+                    memberMetadata[file.path] = shared.fields
+                    nsfProjectionConflicts.append(contentsOf: shared.conflicts.map { "\(file.path): \($0)" })
+                } else if result.tracks.count == 1, let track = result.tracks.first {
                     memberMetadata[file.path] = MetaManMetadataProjector.memberFields(from: track.document)
                 } else {
                     let indexes = result.tracks.compactMap(\.sourceTrackIndex)
                     guard indexes.count == result.tracks.count,
                           indexes.allSatisfy({ $0 >= 0 }),
-                          Set(indexes).count == indexes.count else {
+                          (ext == "nsfe" || Set(indexes).count == indexes.count) else {
                         throw MetaManMetadataHarvesterError.unrepresentableTrackMap(file.path)
                     }
                     memberMetadata[file.path] = MetaManMetadataProjector.sharedMemberFields(
@@ -160,12 +242,33 @@ public enum MetaManMetadataHarvester {
             }
         }
 
+        let shared = ext == "nsf" ? sharedNSFPackageMetadata(memberMetadata) : (fields: [:], conflicts: [])
         return MetaManMetadataHarvestOutcome(
             memberMetadata: memberMetadata,
             trackMetadata: trackMetadata,
+            gameMetadata: shared.fields,
+            sharedFieldConflicts: nsfProjectionConflicts + shared.conflicts,
             failures: failures,
             diagnosticCount: diagnosticCount
         )
+    }
+
+    private static func sharedNSFPackageMetadata(
+        _ members: [String: [String: UACJSONValue]]
+    ) -> (fields: [String: UACJSONValue], conflicts: [String]) {
+        let keys = Set(members.values.flatMap(\.keys)).sorted()
+        var fields: [String: UACJSONValue] = [:]
+        var conflicts: [String] = []
+        for key in keys {
+            let values = members.values.compactMap { $0[key] }
+            guard let first = values.first else { continue }
+            if values.allSatisfy({ $0 == first }), values.count == members.count {
+                fields[key] = first
+            } else if values.dropFirst().contains(where: { $0 != first }) {
+                conflicts.append("NSF package field \(key) differs across source members; it was not promoted to game metadata.")
+            }
+        }
+        return (fields, conflicts)
     }
 }
 
@@ -177,7 +280,9 @@ private enum MetaManMetadataHarvesterError: Error, LocalizedError {
     case notRegularFile(String)
     case unsafeRelativePath(String)
     case memberTooLarge(String)
-    case companionPlaylistTooLarge(String)
+    case tooManyCompanionPlaylists(String, String)
+    case companionPlaylistTooLarge(String, String)
+    case companionPlaylistSetTooLarge(String, String)
     case noTracks(String)
     case unrepresentableTrackMap(String)
 
@@ -190,7 +295,9 @@ private enum MetaManMetadataHarvesterError: Error, LocalizedError {
         case .notRegularFile(let path): "Metadata input is not a regular file: \(path)"
         case .unsafeRelativePath(let path): "Metadata input has an unsafe member path: \(path)"
         case .memberTooLarge(let path): "Member exceeds the metadata-reader safety limit for its format: \(path)"
-        case .companionPlaylistTooLarge(let path): "GBS companion playlist exceeds the 4 MiB metadata limit: \(path)"
+        case .tooManyCompanionPlaylists(let format, let path): ".\(format.uppercased()) companion directory has too many playlists: \(path)"
+        case .companionPlaylistTooLarge(let format, let path): ".\(format.uppercased()) companion playlist exceeds the 4 MiB metadata limit: \(path)"
+        case .companionPlaylistSetTooLarge(let format, let path): ".\(format.uppercased()) companion playlists exceed the 32 MiB set limit: \(path)"
         case .noTracks(let path): "MetaMan returned no logical tracks for \(path)."
         case .unrepresentableTrackMap(let path):
             "\(path) has track indexes that UAC cannot map to unique playable subsong entries."

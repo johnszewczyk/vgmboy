@@ -1085,11 +1085,15 @@ def harvest_format_metadata(
     failures = response.get("failures")
     members = response.get("memberMetadata")
     track_metadata = response.get("trackMetadata", {})
+    game_fields = response.get("gameMetadata", {})
+    shared_field_conflicts = response.get("sharedFieldConflicts", [])
     diagnostics = response.get("diagnosticCount")
     if (
         not isinstance(failures, list)
         or not isinstance(members, dict)
         or not isinstance(track_metadata, dict)
+        or not isinstance(game_fields, dict)
+        or not isinstance(shared_field_conflicts, list)
         or not isinstance(diagnostics, int)
     ):
         raise UACError(f"UACMan metadata helper returned malformed .{extension} metadata.")
@@ -1127,15 +1131,50 @@ def harvest_format_metadata(
                 raise UACError(f"UACMan metadata helper returned an invalid source track index: {path}#{ordinal}")
             if source_index is not None:
                 indexes.append(source_index)
-            normalized.append({
+            normalized_track = {
                 "sourceTrackIndex": source_index,
                 "metadata": normalize_imported_metadata_fields(track["metadata"]),
-            })
-        if len(normalized) > 1 and (len(indexes) != len(normalized) or len(set(indexes)) != len(indexes)):
+            }
+            for field_name in (
+                "sourcePlaylistPath", "rawLine", "lengthRaw", "loopRaw",
+                "loopStartRaw", "fadeRaw", "repeatRaw",
+            ):
+                value = track.get(field_name)
+                if value is None:
+                    continue
+                if not isinstance(value, str):
+                    raise UACError(
+                        f"MetaMan .{extension} projection contains a non-string {field_name}: {path}#{ordinal}"
+                    )
+                if value:
+                    normalized_track[field_name] = value
+            normalized.append(normalized_track)
+        indexes_missing = len(indexes) != len(normalized)
+        duplicate_indexes = len(set(indexes)) != len(indexes)
+        if len(normalized) > 1 and (indexes_missing or (extension not in {"nsf", "nsfe"} and duplicate_indexes)):
             raise UACError(
                 f"MetaMan .{extension} tracks do not have unique playable source indexes: {path}."
             )
         normalized_tracks[path] = normalized
+
+    if extension == "nsf":
+        game = recipe.get("game")
+        if not isinstance(game, dict):
+            raise UACError("Recipe game must be an object before NSF metadata can be imported.")
+        game_metadata = game.setdefault("metadata", {})
+        if not isinstance(game_metadata, dict):
+            raise UACError("Recipe game metadata must be an object before NSF metadata can be imported.")
+        for key, value in game_fields.items():
+            merge_imported_metadata_tag(game_metadata, key, value)
+
+        # NSFE companions are preserved as source assets in an NSF package;
+        # they do not generate extra playable songs in this NSF pass.
+        for _, path in included:
+            if Path(path).suffix.lower() == ".nsfe":
+                override = recipe["memberOverrides"].setdefault(path, {})
+                if not isinstance(override, dict):
+                    raise UACError(f"Member override must be an object: {path}")
+                override.setdefault("role", "asset")
 
     for path, fields in members.items():
         override = recipe["memberOverrides"].setdefault(path, {})
@@ -1150,6 +1189,8 @@ def harvest_format_metadata(
         if not isinstance(metadata, dict):
             raise UACError(f"Member metadata override must be an object: {path}")
         for key, value in fields.items():
+            if extension == "nsf" and key in game_fields and game_fields[key] == value:
+                continue
             merge_imported_metadata_tag(metadata, key, value)
 
     playlist_id = None
@@ -1174,6 +1215,8 @@ def harvest_format_metadata(
             playlist_id = f"{base_id}-{suffix}"
             suffix += 1
         entries = []
+        original_playlist_paths: set[str] = set()
+        all_member_paths = {relative for _, relative in included}
         for path in sorted(expected_paths):
             tracks = normalized_tracks[path]
             for track in tracks:
@@ -1186,6 +1229,11 @@ def harvest_format_metadata(
                     raise UACError(f"Unsafe UAC subsong target path: {target_path}")
                 title = metadata.get("Title")
                 artist = metadata.get("Artist")
+                source_playlist_path = track.get("sourcePlaylistPath")
+                if source_playlist_path is not None:
+                    if not isinstance(source_playlist_path, str) or not safe_relative_path(source_playlist_path):
+                        raise UACError(f"MetaMan .{extension} projection contains an unsafe M3U path: {path}")
+                    original_playlist_paths.add(source_playlist_path)
                 extra_fields = {}
                 member_metadata = recipe["memberOverrides"].get(path, {}).get("metadata", {})
                 for key, value in metadata.items():
@@ -1201,7 +1249,7 @@ def harvest_format_metadata(
                     if matching_member_key is not None and member_metadata[matching_member_key] == value:
                         continue
                     extra_fields[key] = value
-                entries.append({
+                entry = {
                     "targetMemberPath": target_path,
                     "entryKind": "subsong",
                     "formatTag": extension,
@@ -1210,15 +1258,43 @@ def harvest_format_metadata(
                     "artist": artist if isinstance(artist, str) and artist.strip() else None,
                     "extraFields": extra_fields,
                     "extensions": {},
-                })
-        playlists.append({
+                }
+                for source_key, target_key in (
+                    ("rawLine", "rawLine"),
+                    ("lengthRaw", "lengthRaw"),
+                    ("loopRaw", "loopRaw"),
+                    ("loopStartRaw", "loopStartRaw"),
+                    ("fadeRaw", "fadeRaw"),
+                    ("repeatRaw", "repeatRaw"),
+                ):
+                    value = track.get(source_key)
+                    if isinstance(value, str) and value:
+                        entry[target_key] = value
+                entries.append(entry)
+
+        original_playlist_path = None
+        if extension == "nsf" and original_playlist_paths:
+            if len(original_playlist_paths) != 1:
+                raise UACError("One NSF UAC package references multiple aggregate M3Us; split the source packages before packaging.")
+            source_path = next(iter(original_playlist_paths))
+            source_path = original_member_path(source_path, member_path_map)
+            if source_path not in all_member_paths:
+                raise UACError(f"NSF aggregate M3U is not included as a UAC member: {source_path}")
+            original_playlist_path = variant_member_path(source_path, variant_id, recipe.get("variants", []))
+            if not safe_relative_path(original_playlist_path):
+                raise UACError(f"Unsafe NSF aggregate M3U member path: {original_playlist_path}")
+
+        playlist = {
             "id": playlist_id,
             "title": f"MetaMan {extension.upper()} tracks",
             "variantID": variant_id,
             "entries": entries,
             "metadata": {"reader": "MetaManCore", "format": extension},
             "extensions": {},
-        })
+        }
+        if original_playlist_path is not None:
+            playlist["originalMemberPath"] = original_playlist_path
+        playlists.append(playlist)
 
     imports = recipe.setdefault("extensions", {}).setdefault("metaManMetadataImport", {})
     if not isinstance(imports, dict):
@@ -1231,6 +1307,8 @@ def harvest_format_metadata(
         "memberCount": len(members),
         "diagnosticCount": diagnostics,
     })
+    if shared_field_conflicts:
+        format_import["sharedFieldConflicts"] = [str(item) for item in shared_field_conflicts]
     if playlist_id is not None:
         format_import["trackAwareMemberCount"] = sum(
             len(tracks) > 1 for tracks in normalized_tracks.values()

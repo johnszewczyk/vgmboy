@@ -12,9 +12,10 @@ func fixedHeaderGameMusicReadersPreserveIdentityAndNativeFacts() throws {
     #expect(nsfDocument.format == "nsf")
     #expect(nsfDocument.fields.game == "NSF Game")
     #expect(nsfDocument.fields.artist == "Composer")
-    #expect(nsfDocument.fields.comment == "Copyright")
+    #expect(nsfDocument.fields.comment == nil)
+    #expect(nsfDocument.fields.copyright == "Copyright")
     #expect(nsfDocument.fields.system == "Nintendo NES")
-    #expect(nsfDocument.timing == MetadataTiming(introLengthMs: -1, loopLengthMs: -1, playLengthMs: 150_000, fadeLengthMs: -1))
+    #expect(nsfDocument.timing == MetadataTiming(introLengthMs: -1, loopLengthMs: -1, playLengthMs: -1, fadeLengthMs: -1))
     #expect(nsfDocument.technicalFacts["loadAddress"] == "0x8000")
     #expect(nsfDocument.technicalFacts["firstTrack"] == "2")
     #expect(nsfDocument.rawMetadataBlocks?["fixed-header"] == Data(nsf.prefix(0x80)))
@@ -45,6 +46,124 @@ func fixedHeaderGameMusicReadersPreserveIdentityAndNativeFacts() throws {
     } catch let error as MetadataReadError {
         #expect(error == .trackAwareResultRequired("GBS"))
     }
+}
+
+@Test("NSFPlay M3Us define ordered subsongs and exact readable timing without defaults")
+func nsfReaderProjectsNSFPlayPlaylistAndFractionalTiming() throws {
+    let playlist = """
+    fixture.nsf::NSF,3,Last\\, Theme,0:00:05.250,0:00:02.500-,0:00:01.5,2
+    fixture.nsf::NSF,1,Opening,1:02.03,0:00:20,0:05,0
+    """
+    let result = try MetaManCore.readResult(
+        data: makeNSF(),
+        formatHint: "nsf",
+        displayName: "fixture.nsf",
+        context: MetadataReadContext(companionFiles: [
+            MetadataCompanionFile(relativePath: "fixture.m3u", data: Data(playlist.utf8))
+        ])
+    )
+
+    #expect(result.tracks.map(\.sourceTrackIndex) == [2, 0, 1])
+    #expect(result.tracks.map { $0.document.fields.title } == ["Last, Theme", "Opening", nil])
+    let loopStart = result.tracks[0].document
+    #expect(loopStart.timing == MetadataTiming(introLengthMs: 2_500, loopLengthMs: -1, playLengthMs: 5_250, fadeLengthMs: 1_500))
+    #expect(loopStart.technicalFacts["m3uSourcePath"] == "fixture.m3u")
+    #expect(loopStart.technicalFacts["m3uTimeRaw"] == "0:00:05.250")
+    #expect(loopStart.technicalFacts["m3uLoopStartRaw"] == "0:00:02.500-")
+    #expect(loopStart.technicalFacts["m3uRepeatRaw"] == "2")
+    let durationLoop = result.tracks[1].document
+    #expect(durationLoop.timing == MetadataTiming(introLengthMs: -1, loopLengthMs: 20_000, playLengthMs: 62_030, fadeLengthMs: 5_000))
+    #expect(durationLoop.technicalFacts["m3uLoopRaw"] == "0:00:20")
+    #expect(result.tracks[2].document.timing?.playLengthMs == -1)
+    #expect(result.tracks[2].document.technicalFacts["m3uSourcePath"] == "fixture.m3u")
+    #expect(result.tracks[2].document.technicalFacts["m3uRawLine"] == nil)
+    #expect(result.tracks[2].document.technicalFacts["m3uPlayLengthMs"] == nil)
+}
+
+@Test("NSF M3U references resolve against the source member's package-relative path")
+func nsfReaderDoesNotAcceptBasenameOnlyReferenceWhenPackagePathIsKnown() throws {
+    let result = try MetaManCore.readResult(
+        data: makeNSF(),
+        formatHint: "nsf",
+        displayName: "fixture.nsf",
+        context: MetadataReadContext(
+            companionFiles: [MetadataCompanionFile(
+                relativePath: "NES/fixture.m3u",
+                data: Data("Other/fixture.nsf::NSF,1,Wrong member,1:00,-,0:00,0\n".utf8)
+            )],
+            sourceRelativePath: "NES/fixture.nsf"
+        )
+    )
+    #expect(result.tracks.map(\.sourceTrackIndex) == [0, 1, 2])
+    #expect(result.tracks.allSatisfy { $0.document.fields.title == nil })
+    #expect(result.tracks.first?.document.diagnostics.contains(where: { $0.contains("references another member") }) == true)
+}
+
+@Test("NSF M3U sidecar credit conflicts are withheld from canonical tags")
+func nsfReaderWithholdsConflictedPackageCredits() throws {
+    let result = try MetaManCore.readResult(
+        data: makeNSF(),
+        formatHint: "nsf",
+        displayName: "fixture.nsf",
+        context: MetadataReadContext(companionFiles: [
+            MetadataCompanionFile(
+                relativePath: "fixture.m3u",
+                data: Data("#Music by: Composer A\nfixture.nsf::NSF,1,Opening,1:00,-,0:00,0\n".utf8)
+            ),
+            MetadataCompanionFile(
+                relativePath: "01 - Opening.m3u",
+                data: Data("#Music by: Composer B\nfixture.nsf::NSF,1,Opening,1:00,-,0:00,0\n".utf8)
+            )
+        ], sourceRelativePath: "fixture.nsf")
+    )
+
+    let track = try #require(result.tracks.first?.document)
+    #expect(!track.tags.contains { $0.name == "NSF M3U Music By" })
+    #expect(track.diagnostics.contains { $0.contains("package comment NSF M3U Music By") && $0.contains("not promoted") })
+}
+
+@Test("NSF M3U malformed timing remains absent and is reported")
+func nsfReaderReportsMalformedTimingInsteadOfGuessing() throws {
+    let result = try MetaManCore.readResult(
+        data: makeNSF(),
+        formatHint: "nsf",
+        displayName: "fixture.nsf",
+        context: MetadataReadContext(companionFiles: [
+            MetadataCompanionFile(
+                relativePath: "fixture.m3u",
+                data: Data("fixture.nsf::NSF,1,Opening,not-a-time,invalid-loop,invalid-fade,bad-count\n".utf8)
+            )
+        ])
+    )
+    let track = try #require(result.tracks.first?.document)
+    #expect(track.timing?.playLengthMs == -1)
+    #expect(track.timing?.loopLengthMs == -1)
+    #expect(track.timing?.fadeLengthMs == -1)
+    #expect(track.diagnostics.contains { $0.contains("Invalid NSF M3U play time") })
+    #expect(track.diagnostics.contains { $0.contains("Invalid NSF M3U loop value") })
+    #expect(track.diagnostics.contains { $0.contains("Invalid NSF M3U fade time") })
+    #expect(track.diagnostics.contains { $0.contains("Invalid NSF M3U loop count") })
+}
+
+@Test("NSF file-URL reads discover sibling NSFPlay playlists")
+func nsfFileURLReadDiscoversSiblingPlaylists() throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("metaman-nsf-m3u-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let nsfURL = root.appendingPathComponent("fixture.nsf")
+    let source = makeNSF()
+    try source.write(to: nsfURL)
+    try "fixture.nsf::NSF,2,File URL Track,1:23.456,-,0:00,5\n"
+        .write(to: root.appendingPathComponent("fixture.m3u"), atomically: true, encoding: .utf8)
+
+    let result = try MetaManCore.readResult(fileURL: nsfURL)
+    #expect(result.tracks[0].sourceTrackIndex == 1)
+    #expect(result.tracks[0].document.fields.title == "File URL Track")
+    #expect(result.tracks[0].document.timing?.playLengthMs == 83_456)
+    #expect(result.tracks[0].document.technicalFacts["m3uSourcePath"] == "fixture.m3u")
+    #expect(try Data(contentsOf: nsfURL) == source)
 }
 
 @Test("NSFE preserves playlist repetitions, source indices, tags, timing, and raw non-audio chunks")
@@ -225,6 +344,16 @@ func gbsReaderMapsWholeTrackLoopMarker() throws {
 func gameMusicReadersRejectMalformedSources() throws {
     #expect(throws: MetadataReadError.self) {
         try MetaManCore.readResult(data: Data("bad".utf8), formatHint: "nsf", displayName: "bad.nsf")
+    }
+    var unsupportedNSFVersion = makeNSF()
+    unsupportedNSFVersion[0x05] = 3
+    #expect(throws: MetadataReadError.self) {
+        try MetaManCore.readResult(data: unsupportedNSFVersion, formatHint: "nsf", displayName: "unsupported.nsf")
+    }
+    var invalidNSFFirstTrack = makeNSF()
+    invalidNSFFirstTrack[0x07] = 4
+    #expect(throws: MetadataReadError.self) {
+        try MetaManCore.readResult(data: invalidNSFFirstTrack, formatHint: "nsf", displayName: "invalid-first-track.nsf")
     }
     #expect(throws: MetadataReadError.self) {
         try MetaManCore.readResult(data: Data("GBS".utf8), displayName: "short.gbs")
