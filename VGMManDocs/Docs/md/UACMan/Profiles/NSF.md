@@ -24,7 +24,7 @@ playlist rows follow the
 
 | Source field | UAC field | UAC coded location | Rule |
 | --- | --- | --- | --- |
-| Verified game identity | Game ID | `game.metadata["Game ID"]` | Keep a verified No-Intro release identity separate from source titles. A title-root match alone does not establish region or revision. |
+| Verified No-Intro game identity | Game ID | `game.metadata["Game ID"]` | Store the canonical DAT title root as a string. Keep numeric DAT IDs in AudioMan only; the root does not establish region or revision. |
 | NSF header `game` | Game Title | `game.metadata["Game Title"]` | Preserve a populated source value. Do not rename it Album or replace it with Game ID. |
 | NSF header `artist` | Album Artist | `game.metadata["Album Artist"]` | Shared source credit; omit blank and placeholder values. Do not copy it to every track. |
 | NSF header copyright slot (`0x4E..0x6D`) | Copyright | `game.metadata["Copyright"]` | The NSF header's third 32-byte text field is copyright, not a separate comment. Preserve when populated; omit empty and placeholder values. |
@@ -68,7 +68,7 @@ mean “play forever”; actual end-of-track behavior belongs to the playback co
   Flag references to other files for review. When a source archive also
   contains `.nsfe`, preserve it as an `asset`; this NSF pass does not expose
   its songs as NSF tracks.
-- **Shared tags** — Set Name, Set URL, Game Title, Game ID, Album Artist,
+- **Shared tags** — Set Name, Set URL, Game Title, canonical-root Game ID, Album Artist,
   Dumper, Taggers, and other source-backed package fields belong at package
   scope when they describe that package. Track Title and authored playback
   fields belong to the corresponding logical track. Do not repeat package

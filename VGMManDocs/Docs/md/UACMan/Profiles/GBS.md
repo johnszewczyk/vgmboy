@@ -53,8 +53,10 @@ The native header fields and version byte follow the
 - **Identity and platform** — A GBS signature identifies the container, not
   whether the music belongs to Game Boy or Game Boy Color. Use source
   platform evidence and the format-agnostic No-Intro identity workflow; hold
-  titles that resolve differently across the GB and GBC DATs for review. A
-  unique title-root suggestion is not by itself a regional/revision Game ID.
+  titles that resolve differently across the GB and GBC DATs for review. When
+  the game root is positive, put the canonical DAT title root string in
+  package **Game ID**; this does not select a region or revision. Keep numeric
+  DAT IDs in AudioMan only.
 - **Format version** — Read version byte `0x03` for every physical GBS and
   surface it in each track's **Format** field. A set can contain v1, v2, or
   v4 files; do not flatten them to one version. Report multiple versions

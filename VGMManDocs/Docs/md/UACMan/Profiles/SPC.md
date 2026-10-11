@@ -45,8 +45,9 @@ sub-container and version together, such as `SPC v.30` or `SPC v.10`.
   unambiguous matching image in the selected No-Intro title-snap pack, retain
   the PNG byte-for-byte as an ordinary `asset` member with format `png` and
   expose it with package tag `Title Snap`, whose value is the member path
-  (for example, `art/title.png`). Match through the stored No-Intro Game ID
-  and release name; use region evidence to choose among regional images. A
+  (for example, `art/title.png`). Match through the Songbase No-Intro identity
+  link and canonical game-root title; keep its numeric DAT ID in AudioMan and
+  use separate region evidence to choose among regional images. A
   title-only guess, multiple candidate images, or an absent image stays out of
   the package and is reported for review. Record the image-pack source and
   source-member path in `sources[]` and the attachment transformation. Keep

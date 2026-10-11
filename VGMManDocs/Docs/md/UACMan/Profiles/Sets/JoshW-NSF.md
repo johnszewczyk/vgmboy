@@ -40,8 +40,10 @@ per-set reports.
 
 - **Game Title** — Preserve the NSF header game name under Game Title. Keep
   this source title distinct from a canonical Game ID.
-- **Game ID** — Add a No-Intro Game ID only after AudioMan verifies one
-  release. A unique title root does not prove region or revision.
+- **Game ID** — Once AudioMan positively identifies a No-Intro game root,
+  store its canonical title string as package **Game ID**. Keep numeric DAT
+  IDs and release candidates in AudioMan; a root title does not prove region
+  or revision.
 - **Region** — Keep a source-backed Region when known. Use `Region: --` only
   after review confirms it is unresolved. Put a known region in the filename
   only to distinguish packages that would otherwise collide; never put `--`

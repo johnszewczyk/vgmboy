@@ -16,8 +16,9 @@ in AudioMan set reports.
 ## Source Authority
 
 - **Source** — <Authoritative set name and stable URL or release reference.>
-- **Package fields** — <Set Collection, Set Name, Set URL; optional legacy or
-  archive URL/date when supported. Full provenance remains in sources[].>
+- **Package fields** — <Set Name and Set URL; optional legacy or archive
+  URL/date when supported. Do not add Set Collection. Full provenance remains
+  in sources[].>
 - **Hashes** — <Set-specific byte scope only; use shared hash rules otherwise.>
 
 ## Identity Enrichment

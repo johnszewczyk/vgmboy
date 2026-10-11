@@ -71,8 +71,8 @@ profile defines only how confirmed values are represented in UAC packages.
   When a package or track set uses only the game's Japanese title, treat that
   as evidence for **Region** `JP`; do not leave it unknown merely because the
   source omits a region code. A Japanese title is not enough to choose among
-  multiple revisions or dumps of that JP release, so assign **Game ID** only
-  when one No-Intro ID remains supported.
+  revisions or dumps, but the package **Game ID** still uses the canonical
+  No-Intro game-root title when the game itself is positively identified.
   Keep source **Album** values unchanged while title/Album conflicts are
   reviewed.
 - **Regional merges** — Check track-level **Game Title** values, their track
@@ -84,12 +84,12 @@ profile defines only how confirmed values are represented in UAC packages.
   stream hashes, source-RSN hash claims, and bundled source documents in each
   derived package. Assign a region only where the group identifies one; route
   unresolved region/revision groups to review rather than merging them back.
-- **Game ID field** — Copy a No-Intro **Game ID** only when existing evidence
-  identifies one release ID. A canonical game-root title is sufficient to
-  identify the game for naming and review, but does not justify choosing one
-  regional/revision Game ID from several candidates. The package profile does
-  not define No-Intro matching, source-set membership, or completeness rules.
-  Keep **Game ID** separate from source **Album**.
+- **Game ID field** — Store the canonical No-Intro game-root title as a single
+  string in package **Game ID** once the game identity is positive. Do not put
+  the numeric DAT ID in the UAC or its structural canonical-ID arrays; keep
+  those release identifiers and candidate lists in AudioMan. The root title
+  does not choose a region or revision. Keep **Game ID** separate from source
+  track **Album**.
 - **Database enrichment** — Once a package has one positive **Game ID** and
   title conflicts are resolved, apply the approved aggregate metadata to UAC
   tracks while preserving source-native facts and provenance. Identity matching
