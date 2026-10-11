@@ -12,10 +12,10 @@ the procedure for each package's source format.
 
 ## Source Authority
 
-- **Package fields** — Project **Set Collection**, **Set Name**, and **Set
-  URL** once per package when the set is unambiguous. Add optional **Set Legacy
-  URL**, **Set Archive URL**, or **Set Date** when supported. Keep full source
-  records and hashes in `sources[]`.
+- **Package fields** — Add **Set Name** and **Set URL** once per package when
+  the set is unambiguous. Add optional **Set Legacy URL**, **Set Archive URL**,
+  or **Set Date** when supported. Do not add **Set Collection**. Keep full
+  source records and hashes in `sources[]`.
 - **Original packages** — Keep source packages in source-state outside derived
   UAC payloads; link each UAC package through `sources[]`.
 - **Hash scope** — Record each hash with its actual byte scope, algorithm,
@@ -33,13 +33,15 @@ the procedure for each package's source format.
   scope explicit and do not silently exclude unmatched items.
 - **Source pass** — Map populated, recognized source fields through the format
   profile. Keep selected canonical UAC fields; do not add database enrichment.
-- **Identity pass** — Match the known title against an authoritative game
-  database. Add a release Game ID and selected database fields only after a
-  positive, unique match; record the enrichment source in provenance.
+- **Identity pass** — For a positive No-Intro match, put the canonical DAT
+  game-root title in package **Game ID** as one string. Keep numeric DAT IDs
+  and release candidates in AudioMan's database only; never duplicate them in
+  UAC metadata or structural canonical-ID arrays. Keep **Region** separate.
 - **Unresolved release** — This is normal after the source pass. Keep the
-  known base title in `game.title`, omit Game ID while release, region, or
-  revision is uncertain, and do not quarantine solely because identity remains
-  unresolved.
+  known base title in `game.title` and omit **Game ID** when the game root is
+  uncertain or absent from No-Intro. A region/revision ambiguity does not
+  prevent surfacing a positively identified root title; do not quarantine
+  solely because that release detail remains unresolved.
 
 ## Set Procedures
 

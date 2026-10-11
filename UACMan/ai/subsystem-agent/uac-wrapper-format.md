@@ -111,6 +111,14 @@ Editing the value of a legacy field alone preserves its stored name; a
 deliberate rename can normalize it to Title Case. The Tag Analyzer reports the
 exact stored name so legacy casing remains auditable.
 
+For No-Intro-backed identities, package-level `game.metadata["Game ID"]` is
+the displayed canonical game-root title string. Numeric No-Intro DAT IDs stay
+in AudioMan's identity database; do not write them into UAC metadata,
+`game.canonicalIDs`, or `variants[].canonicalReleaseIDs`. The title root does
+not identify region or revision; store **Region** separately only when
+supported. The wrapper still supports structural canonical identifiers for
+other explicitly profiled identity systems.
+
 Use package metadata **Album** for a release or soundtrack title only when the
 source has that distinct field. `game.title` remains the required structural
 identity. A format profile may preserve a populated source game-name field as

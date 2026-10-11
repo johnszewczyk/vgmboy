@@ -35,11 +35,12 @@ version distributions, and exceptions in AudioMan's per-set report.
 ## Identity Enrichment
 
 - **Game identity** — Use a positive No-Intro title-root link for structural
-  `game.title` and the package filename. Add **Game ID** only when one DAT
-  release record is supported. An ambiguous release can still have a known
-  game title. Set **Region** only when every remaining DAT candidate agrees;
-  use `--` when review confirms it is unknown. Do not put `--` in a filename.
-  Add a known region suffix only to resolve a filename collision.
+  `game.title`, the package filename, and the package **Game ID** string.
+  **Game ID** is the displayed canonical game-root title, never the numeric
+  DAT ID. An ambiguous release can still have a known game title. Set
+  **Region** only when evidence resolves it; use `--` when review confirms it
+  is unknown. Do not put `--` in a filename. Add a known region suffix only
+  to resolve a filename collision.
 - **Platform** — The exact SMS Power pack page is authoritative for the
   platform represented by that VGM pack. Set `game.console` from that page
   and make the populated English GD3 System value match it in the UAC member.

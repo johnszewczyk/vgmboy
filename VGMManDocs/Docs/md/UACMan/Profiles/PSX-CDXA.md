@@ -24,7 +24,7 @@ Store the canonical platform once as structural
 
 | Source Tag | UAC Tag | UAC Coded Tag | Tag Notes |
 | --- | --- | --- | --- |
-| — | Game ID | `game.metadata["Game ID"]` | Add only after one matching release is verified from an authoritative record. |
+| Verified No-Intro game root, when applicable | Game ID | `game.metadata["Game ID"]` | Store the canonical root title as a string; keep numeric No-Intro DAT IDs in AudioMan. Do not infer a PSX identity from an unrelated DAT. |
 | — | Region | `game.metadata["Region"]` | Use a source-backed two-letter code such as `US`; use the same code in the package name. |
 | — | Set Name | `game.metadata["Set Name"]` | Use the exact source collection name. |
 | — | Set URL | `game.metadata["Set URL"]` | Keep source URLs and checksums in `sources[]`. |

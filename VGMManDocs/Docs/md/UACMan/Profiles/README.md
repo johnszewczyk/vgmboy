@@ -131,6 +131,12 @@ MetaManCore's reader interface, not a UAC tag format. Source provenance belongs
 in `sources[]`; profile a direct metadata field only when it is useful to UAC
 users.
 
+For No-Intro-backed identities, package **Game ID** is the canonical displayed
+game-root title string. The numeric DAT `dat_id` is an internal AudioMan join
+key and must not be copied into UAC metadata or structural canonical-ID arrays.
+The title root identifies the game, not a region or revision; retain
+source-backed **Region** separately.
+
 ## Set-Based Profiles
 
 Set-specific profiles live in [`Sets/`](Sets/README.md). A format profile
@@ -160,10 +166,12 @@ source relationship between collections from title or content overlap alone.
   [`SNESMusicOrg-SPC-2026-09-23.md`](../../../../../UACMan/ai/reports/SNESMusicOrg-SPC-2026-09-23.md)
 - Current SNESMusic.org tag-cleanup preview:
   [`SNESMusicOrg-SPC-Tag-Cleanup-Preview-2026-09-24.md`](../../../../../UACMan/ai/reports/SNESMusicOrg-SPC-Tag-Cleanup-Preview-2026-09-24.md)
-- SNESMusic.org source-tag and Game ID surfacing preview and execution:
+- Historical SNESMusic.org source-tag and numeric Game ID surfacing preview
+  and execution (audit only; current Game ID values are canonical title roots):
   [`SNESMusicOrg-Source-Tag-Surfacing-Preview-2026-09-24.md`](../../../../../UACMan/ai/reports/SNESMusicOrg-Source-Tag-Surfacing-Preview-2026-09-24.md),
   [`SNESMusicOrg-Source-Tag-Surfacing-Execution-2026-09-24.md`](../../../../../UACMan/ai/reports/SNESMusicOrg-Source-Tag-Surfacing-Execution-2026-09-24.md)
-- Game ID assignment and Game Title review ledgers:
+- Historical numeric Game ID assignment and Game Title review ledgers (audit
+  only; do not use numeric DAT IDs as UAC Game ID values):
   [`SNESMusicOrg-Source-Tag-GameID-Preview-2026-09-24.tsv`](../../../../../UACMan/ai/reports/SNESMusicOrg-Source-Tag-GameID-Preview-2026-09-24.tsv),
   [`SNESMusicOrg-GameTitle-Review-Routing-Preview-2026-09-24.tsv`](../../../../../UACMan/ai/reports/SNESMusicOrg-GameTitle-Review-Routing-Preview-2026-09-24.tsv)
 - OST Disc to Disc Number member ledger:

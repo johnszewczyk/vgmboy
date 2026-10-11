@@ -17,7 +17,13 @@ directory, chip list, or partial text match.
 | MSX | MSX Home Computer |
 | Sega Master System | Master System; Sega Mark III; Mark III |
 | Sega Game Gear | Game Gear |
-| Sega Mega Drive | Mega Drive; Sega Genesis; Genesis |
+| Sega Genesis | Sega Mega Drive; Mega Drive; Genesis |
+| Sega CD | Sega Mega CD; Mega-CD; MegaCD; SegaCD |
+| Sega 32X | 32X; Mega 32X; Super 32X |
+| Sega Pico | Pico |
+| Sega SG-1000 | SG-1000; Game 1000 |
+| Sega SC-3000 | SC-3000; Computer 3000 |
+| Othello Multivision | Othello Multivision |
 | Sony PlayStation | PlayStation; PlayStation 1; PS1; PSX; Sony PlayStation |
 
 Use the canonical name exactly as written. If a source does not establish one
@@ -26,6 +32,6 @@ identity, hold it for review rather than inventing an alias.
 
 ## Format Exceptions
 
-VGM/VGZ supports many platforms. Preserve the populated GD3 platform label as
-read by the VGM profile; do not force it through this limited alias list. Hold
-missing, mixed, or ambiguous labels for review.
+VGM/VGZ supports many platforms. Apply the VGM profile's exact Sega GD3 alias
+mapping; preserve other populated labels as read. Hold missing, mixed, or
+ambiguous labels for review.

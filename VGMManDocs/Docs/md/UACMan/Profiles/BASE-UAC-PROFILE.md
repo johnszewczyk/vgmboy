@@ -24,8 +24,17 @@ the per-set ledger recording operations and checkpoints.
   `track.meta` are not current manifest fields.
 - **Album** — Use the source-format profile's mapping for game or release
   names. For SPC, the source **Game** field maps to track **Album**; keep
-  package identity in structural `game.title` and any confirmed **Game ID**
-  separately.
+  package identity in structural `game.title` and the package-level **Game
+  ID** separately when No-Intro positively identifies the game.
+- **No-Intro Game ID** — Store the canonical No-Intro game-root title as one
+  package-level string in `game.metadata["Game ID"]`. Use the DAT's displayed
+  title root, without its region, revision, or dump-status suffix. Keep
+  No-Intro's numeric `dat_id` only in AudioMan's identity database; do not put
+  it in UAC metadata, `game.canonicalIDs`, or
+  `variants[].canonicalReleaseIDs`. A known title root does not establish
+  region or revision; keep **Region** separate and omit it when unknown. If a
+  title is not represented in No-Intro or its root remains ambiguous, omit
+  **Game ID** and leave the identity for review.
 - **Artist scope** — Store a package-wide artist as **Album Artist** in
   `game.metadata`. Store a track-specific performer, artist, author, or
   composer as **Artist** on that logical track. Do not repeat a shared album
