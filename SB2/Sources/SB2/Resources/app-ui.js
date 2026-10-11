@@ -4411,26 +4411,33 @@ async function sampleSB2CPU() {
 }
 
 async function toggleAllSidebarNodes() {
-  const allExpanded = sidebarAllGroupsExpanded();
-  await setAllSidebarNodesCollapsed(allExpanded);
+  const hasExpandedNodes = sidebarHasExpandedNodes();
+  await setAllSidebarNodesCollapsed(hasExpandedNodes);
 }
 
-function sidebarAllGroupsExpanded() {
+function sidebarHasExpandedNodes() {
   if (currentSidebarView().contentMode === "database") {
-    return databaseConsoleGroups.length > 0
-      && databaseConsoleGroups.every(({ consoleName }) => !collapsedDatabaseConsoles.has(consoleName));
+    return databaseConsoleGroups.some(({ consoleName }) => !collapsedDatabaseConsoles.has(consoleName));
   }
-  const folders = [...refs.treeRoot.querySelectorAll(".tree-node:not(.tree-file)")];
-  return folders.length > 0 && folders.every((button) => button.getAttribute("aria-expanded") === "true");
+  const expandedFolders = [...refs.treeRoot.querySelectorAll(
+    ".tree-node:not(.tree-file)[aria-expanded='true']"
+  )];
+  return expandedFolders.some((button) => {
+    const node = renderedBrowserNodesByPath.get(button.dataset.browserPath);
+    return node
+      && node.path !== state.rootPath
+      && !node.alwaysExpanded
+      && node.children.length > 0;
+  });
 }
 
 function syncSidebarFoldButton() {
   const button = refs.sidebarFoldToggleButton;
   const use = button?.querySelector("use");
-  const allExpanded = sidebarAllGroupsExpanded();
-  use?.setAttribute("href", allExpanded ? "#icon-list-collapse" : "#icon-list-expand");
+  const hasExpandedNodes = sidebarHasExpandedNodes();
+  use?.setAttribute("href", hasExpandedNodes ? "#icon-list-collapse" : "#icon-list-expand");
   if (button) {
-    button.title = allExpanded ? "Collapse all" : "Expand all";
+    button.title = hasExpandedNodes ? "Collapse all" : "Expand all";
     button.setAttribute("aria-label", button.title);
   }
 }

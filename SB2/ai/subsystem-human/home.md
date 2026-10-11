@@ -51,6 +51,8 @@
 - Sidebar selection remains available to navigation and activation. Hover,
   focus, and current selection use the transient shared selector rather than a
   pinned selected-row fill. Folder and console disclosure updates immediately.
+- The expand/collapse toggle collapses every console group or non-root folder
+  if any is already open; it expands all only when those items are folded.
 - Non-expandable file and catalog-game rows have no bullet; each uses exactly a
   two-character indent from its parent label. Expandable folders and consoles
   retain their disclosure markers.
