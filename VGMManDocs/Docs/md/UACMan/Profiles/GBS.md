@@ -18,13 +18,23 @@ The native header fields and version byte follow the
 - **Coverage** — GBS header Game Title, Author, and Copyright fields; M3U
   track rows and recognized `# @KEY value` comments.
 - **Status** — Reader, writer, and consumer mappings are aligned for ASCII
-  header values and M3U projections. The GBS header does not declare a text
-  encoding; hold non-ASCII header strings for source-specific review as
-  described below. Apply this profile per package: inspect each associated
-  M3U, hold conflicting rows for review, then verify the generated playlist
-  through UACMan, ScanSong, and Songbase. Parser support alone does not
-  establish that a source
-  set is coherent or canonical. MetaMan converts
+  header values and M3U rows the reader recognizes. The GBS header does not
+  declare a text encoding; hold non-ASCII header strings for source-specific
+  review as described below. The
+  [NEZplug extended-M3U syntax](https://github.com/BouKiCHi/nezplay/blob/master/in_nez.txt#L948-L968)
+  defines `::KSS`
+  and `::GBS` as distinct type markers. Some JoshW sidecars use `::KSS` while
+  naming members whose extension and validated signature are GBS; these are
+  source-side type-marker mismatches, and the current GBS reader ignores
+  them. Preserve the source rows and hold those packages until an explicit
+  recovery policy is approved. Apply this profile per package:
+  inspect every associated M3U, compare a master queue with per-track
+  sidecars, hold conflicting or unprojected rows, then verify the generated
+  playlist through UACMan, ScanSong, and Songbase. A zero reader-conflict
+  count is not sufficient: direct comparison found all 72 Medarot 4 sidecar
+  titles differ from the corresponding master-queue titles. Parser support
+  alone does not establish that a source set is coherent or canonical.
+  MetaMan converts
   fractional play, loop, and fade times to integer milliseconds, and reads
   NEZplug's loop-duration, loop-start, and whole-play loop forms. When rows
   conflict, ambiguous fields are omitted and diagnosed. Retain the original
@@ -144,6 +154,14 @@ The native header fields and version byte follow the
   title. When an alternate source for the same GBS payload supplies different
   subtrack names, preserve the source distinction and report it for review
   rather than silently replacing or combining the lists.
+- **Set identity** — Follow the base profile and identify the package's
+  immediate source distribution, not the later JohnS conglomerate. For the
+  current JoshW source use `Set Name: JoshW` and
+  `Set URL: https://gbs.joshw.info/`. For GBS Penultimate use its recorded
+  source identity (`Set Name: Game Boy`,
+  `Set URL: https://snesmusic.org/hoot/gbs/`). Do not copy either source's
+  tags onto the other source's packages. If a source's set name or URL is not
+  established, omit that field rather than inventing one.
 - **GBS header fields** — Validate the 112-byte fixed header, `GBS` signature,
   nonzero version and track count, and the declared first-track index. Keep
   load/init/play addresses and timer bytes as validation evidence only; do
@@ -156,6 +174,11 @@ The native header fields and version byte follow the
   A row reference may omit the final `.gbs` suffix; resolve it to an exact,
   case-insensitive member stem only when that identifies one physical GBS.
   Hold a source package with colliding member stems for review.
+  `::KSS` and `::GBS` are distinct NEZplug type markers, not synonyms. If a
+  `::KSS` row names a `.gbs` file, resolve the exact path and validate the
+  target's GBS signature, record a source marker mismatch, and hold the package.
+  Do not silently coerce the marker or project that row as GBS until an
+  explicit recovery rule exists; retain the original M3U byte-for-byte.
   Store each applicable row in one Title Case nested `M3U` JSON value on its
   playlist entry. Include `Source Path`, `Raw Row`, populated raw `Play Time`,
   `Loop`, `Loop Start`, `Fade`, and `Loop Count`, plus positive
@@ -175,6 +198,12 @@ The native header fields and version byte follow the
   queue orders for review. Capturing an authored loop value records what the
   source says, not that listening has confirmed its correctness. Leave that
   judgment open for listening where needed; never invent a loop value.
+  Also compare every multi-row master M3U directly with matching one-row
+  sidecars. Reader diagnostics alone are not a sufficient conflict check:
+  Medarot 4's 72 master titles and 72 sidecar titles differ even though the
+  preflight reported zero reader conflicts. Retain both source forms in the
+  attachment and hold the package until the authoritative displayed title is
+  selected.
 - **Cross-format loop evidence** — A VGMRIPS VGM may corroborate GBS loop data
   when its GD3 `Comment` identifies the exact GBS source filename and
   zero-based subsong index, and the track title also aligns. Compare loop
@@ -229,6 +258,11 @@ The native header fields and version byte follow the
   files as track annotations. Hold repeated indexes, out-of-range references,
   or conflicting multi-row queue orders for review; retain all sidecars and
   report missing, duplicate, or conflicting references.
+- **M3U reader coverage** — Confirm every authored row was actually projected
+  into the UAC playlist. Compare source row totals, indexes, titles, and timing
+  across master M3Us and one-row sidecars, even if the reader emits no
+  diagnostic. Hold `::KSS` rows that reference validated `.gbs` members as
+  marker mismatches; do not coerce their marker or discard their timing.
 - **Timing fidelity** — Compare source timing strings with UAC playlist
   entries. Confirm fractional seconds and both loop syntaxes convert without
   truncation, conflicting values are omitted, repeat counts remain available
@@ -237,6 +271,9 @@ The native header fields and version byte follow the
 - **Tag scope** — Confirm Album and Album Artist are shared only when their
   source values agree, track titles remain attached to the correct index, and
   no empty, inferred, or diagnostic tags were added.
+- **Catalog** — When all playable GBS members in a package share one
+  `DMG-`/`CGB-` filename stem, confirm that exact stem is present once as
+  package `Catalog`; hold differing member codes and do not infer the value.
 - **UAC review** — Verify Format and M3U are visible on each logical track,
   package metadata stays at package scope, hashes are visible
   in Stream Hashes, and source M3Us remain available as package attachments.
