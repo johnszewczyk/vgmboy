@@ -83,11 +83,8 @@ enum GBSM3UMetadataReader {
         }
         guard !entries.isEmpty else { return result }
 
-        let commonTags = preferredCommonTags(from: entries)
-        let commonFields = Dictionary(
-            commonTags.map { ($0.normalizedName, $0.value) },
-            uniquingKeysWith: { first, _ in first }
-        )
+        let commonTagResolution = unambiguousCommonTags(from: entries)
+        let commonTags = commonTagResolution.tags
         let grouped = Dictionary(grouping: entries, by: \.index)
         let commonEntry = entries.sorted {
             if $0.quality != $1.quality { return $0.quality > $1.quality }
@@ -110,11 +107,14 @@ enum GBSM3UMetadataReader {
             let fields = track.document.fields
             let enrichedFields = MetadataFields(
                 title: title ?? fields.title,
-                game: commonFields["TITLE"] ?? fields.game,
+                // Keep the native header identity separate from M3U comments.
+                // The package projector compares both and only promotes an
+                // M3U value when it agrees with the source header.
+                game: fields.game,
                 system: fields.system,
-                artist: commonFields["ARTIST"] ?? fields.artist,
+                artist: fields.artist,
                 album: fields.album,
-                date: commonFields["DATE"] ?? fields.date,
+                date: fields.date,
                 year: fields.year,
                 genre: fields.genre,
                 comment: fields.comment,
@@ -138,14 +138,17 @@ enum GBSM3UMetadataReader {
 
             var rawBlocks = track.document.rawMetadataBlocks ?? [:]
             if let rawData = entry?.rawData ?? commonEntry?.rawData { rawBlocks["companion-m3u"] = rawData }
-            let baseTiming = track.document.timing
             let timing = MetadataTiming(
-                introLengthMs: introLengthMs ?? baseTiming?.introLengthMs ?? -1,
-                loopLengthMs: loopLengthMs ?? baseTiming?.loopLengthMs ?? -1,
-                playLengthMs: playLengthMs ?? baseTiming?.playLengthMs ?? -1,
-                fadeLengthMs: fadeLengthMs ?? baseTiming?.fadeLengthMs ?? -1
+                // The fixed GBS header has no duration. Never carry MetaMan's
+                // generic 150-second compatibility default into the source
+                // projection when an M3U omits or invalidates a time value.
+                introLengthMs: introLengthMs ?? -1,
+                loopLengthMs: loopLengthMs ?? -1,
+                playLengthMs: playLengthMs ?? -1,
+                fadeLengthMs: fadeLengthMs ?? -1
             )
             var diagnostics = track.document.diagnostics
+            diagnostics.append(contentsOf: commonTagResolution.diagnostics)
             if let index, choices.count > 1,
                hasConflictingValues(choices.map { $0.title.isEmpty ? nil : $0.title })
                     || hasConflictingValues(choices.map(\.playLengthMs))
@@ -220,19 +223,33 @@ enum GBSM3UMetadataReader {
         return MetadataTag(name: name, value: value)
     }
 
-    private static func preferredCommonTags(from entries: [Entry]) -> [MetadataTag] {
-        let ranked = entries.sorted {
-            if $0.tags.count != $1.tags.count { return $0.tags.count > $1.tags.count }
-            return $0.relativePath < $1.relativePath
-        }
+    private static func unambiguousCommonTags(
+        from entries: [Entry]
+    ) -> (tags: [MetadataTag], diagnostics: [String]) {
+        guard !entries.isEmpty else { return ([], []) }
+        let names = Set(entries.flatMap { $0.tags.map(\.normalizedName) }).sorted()
         var result: [MetadataTag] = []
-        var seen = Set<String>()
-        for entry in ranked {
-            for tag in entry.tags where seen.insert(tag.normalizedName).inserted {
-                result.append(tag)
+        var diagnostics: [String] = []
+        for name in names {
+            let valuesByEntry = entries.map { entry in
+                entry.tags
+                    .filter { $0.normalizedName == name }
+                    .map { $0.value.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+            }
+            let values = Set(valuesByEntry.flatMap { $0 })
+            guard values.count == 1,
+                  valuesByEntry.allSatisfy({ Set($0).count == 1 }) else {
+                let displayName = entries.flatMap(\.tags).first(where: { $0.normalizedName == name })?.name ?? name
+                diagnostics.append("GBS M3U # @\(displayName) values are missing or inconsistent across applicable rows; the shared value was not promoted.")
+                continue
+            }
+            if let value = values.first {
+                let displayName = entries.flatMap(\.tags).first(where: { $0.normalizedName == name })?.name ?? name
+                result.append(MetadataTag(name: displayName, value: value))
             }
         }
-        return result
+        return (result, diagnostics)
     }
 
     private static func csvFields(_ line: String) -> [String] {

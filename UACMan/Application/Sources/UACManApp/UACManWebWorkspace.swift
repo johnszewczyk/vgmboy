@@ -122,6 +122,8 @@ struct UACManWebWorkspace: NSViewRepresentable {
                     tagName: payload["tagName"] as? String ?? "",
                     archiveRelativePath: payload["archiveRelativePath"] as? String ?? "",
                     memberRelativePath: payload["memberRelativePath"] as? String ?? "",
+                    playlistID: payload["playlistID"] as? String ?? "",
+                    playlistEntryIndex: payload["playlistEntryIndex"] as? Int,
                     storageScope: payload["storageScope"] as? String ?? "",
                     storageKey: payload["storageKey"] as? String ?? "",
                     expectedValueJSON: payload["expectedValueJSON"] as? String ?? "",
@@ -134,6 +136,8 @@ struct UACManWebWorkspace: NSViewRepresentable {
                     tagName: payload["tagName"] as? String ?? "",
                     archiveRelativePath: payload["archiveRelativePath"] as? String ?? "",
                     memberRelativePath: payload["memberRelativePath"] as? String ?? "",
+                    playlistID: payload["playlistID"] as? String ?? "",
+                    playlistEntryIndex: payload["playlistEntryIndex"] as? Int,
                     storageScope: payload["storageScope"] as? String ?? "",
                     storageKey: payload["storageKey"] as? String ?? "",
                     expectedValueJSON: payload["expectedValueJSON"] as? String ?? ""

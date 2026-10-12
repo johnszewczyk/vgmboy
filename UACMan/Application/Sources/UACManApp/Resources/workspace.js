@@ -1477,7 +1477,8 @@
   function tagAnalyzerJSONValueFoldID(parentFoldID, match) {
     const member = match.memberRelativePath || "package";
     const scope = match.storageScope || match.scope || "metadata";
-    return `${parentFoldID}/field/${encodeURIComponent(member)}/${encodeURIComponent(scope)}`;
+    const entry = match.playlistID ? `${match.playlistID}/${match.playlistEntryIndex}` : "";
+    return `${parentFoldID}/field/${encodeURIComponent(member)}/${encodeURIComponent(scope)}/${encodeURIComponent(entry)}`;
   }
 
   function tagAnalyzerJSONEntryFoldID(parentFoldID, entryID) {
@@ -1562,7 +1563,10 @@
 
   function tagAnalyzerFieldRowMarkup(tagName, match, index, parentFoldID) {
     const memberPath = match.memberRelativePath || "";
-    const trackName = memberPath ? memberPath.split("/").pop() : "Package";
+    const memberName = memberPath ? memberPath.split("/").pop() : "Package";
+    const trackName = match.playlistID && match.trackIndex !== ""
+      ? `${memberName} · Track ${match.trackIndex}`
+      : memberName;
     const value = match.valueIsJSON ? match.valueJSON : match.value;
     let parsedValue = null;
     if (match.valueIsJSON) {
@@ -1579,8 +1583,9 @@
       ? '<textarea class="tag-table-field tag-analyzer-match-value" data-tag-analyzer-value rows="3" aria-label="Tag value for ' + esc(tagName) + '">' + esc(value) + '</textarea>'
       : '<input class="tag-table-field tag-analyzer-match-value" data-tag-analyzer-value value="' + esc(value) + '" aria-label="Tag value for ' + esc(tagName) + '">';
     const trackControl = '<input class="tag-table-field tag-analyzer-match-track" value="' + esc(trackName) + '" title="' + esc(memberPath || "Package-level tag field") + '" aria-label="Track" disabled>';
-    const nameControl = '<input class="tag-table-field" data-tag-analyzer-name value="' + esc(tagName) + '" aria-label="Tag name ' + esc(tagName) + '">';
-    const rowAttributes = 'data-tag-analyzer-match data-tag-name="' + esc(tagName) + '" data-archive-relative-path="' + esc(match.archiveRelativePath) + '" data-member-relative-path="' + esc(match.memberRelativePath || "") + '" data-storage-scope="' + esc(match.storageScope) + '" data-storage-key="' + esc(match.storageKey) + '" data-expected-value-json="' + esc(match.valueJSON) + '" data-value-is-json="' + match.valueIsJSON + '" data-value-is-json-string="' + valueIsJSONString + '" data-json-value-fold-id="' + esc(valueFoldID) + '"';
+    const firstClassField = match.storageScope === "playlistEntryField";
+    const nameControl = '<input class="tag-table-field" data-tag-analyzer-name value="' + esc(tagName) + '" aria-label="Tag name ' + esc(tagName) + '"' + (firstClassField ? ' disabled title="First-class playlist field name"' : '') + '>';
+    const rowAttributes = 'data-tag-analyzer-match data-tag-name="' + esc(tagName) + '" data-archive-relative-path="' + esc(match.archiveRelativePath) + '" data-member-relative-path="' + esc(match.memberRelativePath || "") + '" data-playlist-id="' + esc(match.playlistID || "") + '" data-playlist-entry-index="' + esc(match.playlistEntryIndex ?? "") + '" data-track-index="' + esc(match.trackIndex || "") + '" data-storage-scope="' + esc(match.storageScope) + '" data-storage-key="' + esc(match.storageKey) + '" data-expected-value-json="' + esc(match.valueJSON) + '" data-value-is-json="' + match.valueIsJSON + '" data-value-is-json-string="' + valueIsJSONString + '" data-json-value-fold-id="' + esc(valueFoldID) + '"';
     const disabled = state?.isDeletingTagAnalyzerTrackFields ? " disabled" : "";
     const row = canonicalRowMarkup([
       canonicalNumberCellMarkup(index + 1, "Tag field number " + (index + 1), { className:"multiple-value-number-cell" }),
@@ -2182,6 +2187,8 @@
       tagName:row?.dataset.tagName || "",
       archiveRelativePath:row?.dataset.archiveRelativePath || "",
       memberRelativePath:row?.dataset.memberRelativePath || "",
+      playlistID:row?.dataset.playlistId || "",
+      playlistEntryIndex:row?.dataset.playlistEntryIndex === "" ? null : Number(row.dataset.playlistEntryIndex),
       storageScope:row?.dataset.storageScope || "",
       storageKey:row?.dataset.storageKey || "",
       expectedValueJSON:row?.dataset.expectedValueJson || ""

@@ -58,6 +58,9 @@ public struct UACTagFieldMatch: Equatable, Sendable {
     public let archiveConsole: String
     public let archiveTrackCount: Int
     public let memberRelativePath: String?
+    public let playlistID: String?
+    public let playlistEntryIndex: Int?
+    public let trackIndex: String?
     public let scope: String
     public let storageScope: String
     public let storageKey: String
@@ -74,6 +77,9 @@ public struct UACTagFieldMatch: Equatable, Sendable {
         archiveConsole: String = "",
         archiveTrackCount: Int = 0,
         memberRelativePath: String?,
+        playlistID: String? = nil,
+        playlistEntryIndex: Int? = nil,
+        trackIndex: String? = nil,
         scope: String,
         storageScope: String,
         storageKey: String,
@@ -89,6 +95,9 @@ public struct UACTagFieldMatch: Equatable, Sendable {
         self.archiveConsole = archiveConsole
         self.archiveTrackCount = archiveTrackCount
         self.memberRelativePath = memberRelativePath
+        self.playlistID = playlistID
+        self.playlistEntryIndex = playlistEntryIndex
+        self.trackIndex = trackIndex
         self.scope = scope
         self.storageScope = storageScope
         self.storageKey = storageKey
@@ -163,9 +172,19 @@ public enum UACTagAnalyzer {
                 let manifest = try manifestReader(package.url)
                 packagesRead += 1
                 let archiveAlbum = Self.archiveAlbum(in: manifest)
-                let archiveTrackCount = manifest.members.filter {
+                let playableMemberPaths = Set(manifest.members.filter {
                     $0.role == "playable" || $0.role == "track"
-                }.count
+                }.map(\.path))
+                let physicalTrackCount = playableMemberPaths.count
+                let logicalTrackIDs = Set(manifest.playlists.flatMap { playlist in
+                    playlist.entries.compactMap { entry -> String? in
+                        guard entry.entryKind == "subsong",
+                              playableMemberPaths.contains(entry.targetMemberPath),
+                              let trackIndex = entry.trackIndex else { return nil }
+                        return "\(entry.targetMemberPath)\u{1F}\(trackIndex)"
+                    }
+                })
+                let archiveTrackCount = logicalTrackIDs.isEmpty ? physicalTrackCount : logicalTrackIDs.count
                 let attachmentMemberPaths = Set(manifest.members.filter {
                     $0.role != "playable" && $0.role != "track"
                 }.map(\.path))
@@ -198,6 +217,53 @@ public enum UACTagAnalyzer {
                         addMatch(fieldName, value: value, package: package, member: member.path, scope: "\(member.role) Extensions", storageScope: "memberExtensions", storageKey: name, isTrack: isTrack, archiveAlbum: archiveAlbum, archiveTrackCount: archiveTrackCount, archiveTitle: manifest.game.title, archiveConsole: manifest.game.console, to: &tagCounts)
                     }
                     packageTagNames.formUnion(memberTagNames)
+                }
+                for playlist in manifest.playlists {
+                    for (entryIndex, entry) in playlist.entries.enumerated()
+                    where playableMemberPaths.contains(entry.targetMemberPath) {
+                        let isTrack = entry.entryKind == "subsong"
+                        if let title = entry.title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            packageTagNames.insert("Title")
+                            addMatch("Title", value: .string(title), package: package,
+                                     member: entry.targetMemberPath, playlistID: playlist.id,
+                                     playlistEntryIndex: entryIndex, trackIndex: entry.trackIndex,
+                                     scope: "Playlist Entry Tags", storageScope: "playlistEntryField",
+                                     storageKey: "title", isTrack: isTrack, archiveAlbum: archiveAlbum,
+                                     archiveTrackCount: archiveTrackCount, archiveTitle: manifest.game.title,
+                                     archiveConsole: manifest.game.console, to: &tagCounts)
+                        }
+                        if let artist = entry.artist, !artist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            packageTagNames.insert("Artist")
+                            addMatch("Artist", value: .string(artist), package: package,
+                                     member: entry.targetMemberPath, playlistID: playlist.id,
+                                     playlistEntryIndex: entryIndex, trackIndex: entry.trackIndex,
+                                     scope: "Playlist Entry Tags", storageScope: "playlistEntryField",
+                                     storageKey: "artist", isTrack: isTrack, archiveAlbum: archiveAlbum,
+                                     archiveTrackCount: archiveTrackCount, archiveTitle: manifest.game.title,
+                                     archiveConsole: manifest.game.console, to: &tagCounts)
+                        }
+                        for (name, value) in entry.extraFields {
+                            packageTagNames.insert(name)
+                            addMatch(name, value: value, package: package,
+                                     member: entry.targetMemberPath, playlistID: playlist.id,
+                                     playlistEntryIndex: entryIndex, trackIndex: entry.trackIndex,
+                                     scope: "Playlist Entry Tags", storageScope: "playlistEntryExtraFields",
+                                     storageKey: name, isTrack: isTrack, archiveAlbum: archiveAlbum,
+                                     archiveTrackCount: archiveTrackCount, archiveTitle: manifest.game.title,
+                                     archiveConsole: manifest.game.console, to: &tagCounts)
+                        }
+                        for (name, value) in entry.extensions {
+                            let fieldName = "extension.\(name)"
+                            packageTagNames.insert(fieldName)
+                            addMatch(fieldName, value: value, package: package,
+                                     member: entry.targetMemberPath, playlistID: playlist.id,
+                                     playlistEntryIndex: entryIndex, trackIndex: entry.trackIndex,
+                                     scope: "Playlist Entry Extensions", storageScope: "playlistEntryExtensions",
+                                     storageKey: name, isTrack: isTrack, archiveAlbum: archiveAlbum,
+                                     archiveTrackCount: archiveTrackCount, archiveTitle: manifest.game.title,
+                                     archiveConsole: manifest.game.console, to: &tagCounts)
+                        }
+                    }
                 }
                 for name in packageTagNames {
                     tagCounts[name, default: MutableTagNameUsage()].matchedPackCount += 1
@@ -262,6 +328,9 @@ public enum UACTagAnalyzer {
         value: UACJSONValue,
         package: UACCollectionPackageFile,
         member: String?,
+        playlistID: String? = nil,
+        playlistEntryIndex: Int? = nil,
+        trackIndex: String? = nil,
         scope: String,
         storageScope: String,
         storageKey: String,
@@ -284,6 +353,9 @@ public enum UACTagAnalyzer {
             archiveConsole: archiveConsole,
             archiveTrackCount: archiveTrackCount,
             memberRelativePath: member,
+            playlistID: playlistID,
+            playlistEntryIndex: playlistEntryIndex,
+            trackIndex: trackIndex,
             scope: scope,
             storageScope: storageScope,
             storageKey: storageKey,

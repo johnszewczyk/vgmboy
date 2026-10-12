@@ -420,6 +420,9 @@ final class UACManModel {
                     "archiveConsole": match.archiveConsole,
                     "archiveTrackCount": match.archiveTrackCount,
                     "memberRelativePath": match.memberRelativePath ?? "",
+                    "playlistID": match.playlistID ?? "",
+                    "playlistEntryIndex": match.playlistEntryIndex.map { $0 as Any } ?? NSNull(),
+                    "trackIndex": match.trackIndex ?? "",
                     "scope": match.scope,
                     "storageScope": match.storageScope,
                     "storageKey": match.storageKey,
@@ -653,6 +656,8 @@ final class UACManModel {
         tagName: String,
         archiveRelativePath: String,
         memberRelativePath: String,
+        playlistID: String,
+        playlistEntryIndex: Int?,
         storageScope: String,
         storageKey: String,
         expectedValueJSON: String,
@@ -676,6 +681,8 @@ final class UACManModel {
             tagName: tagName,
             archiveRelativePath: archiveRelativePath,
             memberRelativePath: memberRelativePath,
+            playlistID: playlistID,
+            playlistEntryIndex: playlistEntryIndex,
             storageScope: storageScope,
             storageKey: storageKey,
             expectedValueJSON: expectedValueJSON,
@@ -688,6 +695,8 @@ final class UACManModel {
         tagName: String,
         archiveRelativePath: String,
         memberRelativePath: String,
+        playlistID: String,
+        playlistEntryIndex: Int?,
         storageScope: String,
         storageKey: String,
         expectedValueJSON: String
@@ -697,6 +706,8 @@ final class UACManModel {
             tagName: tagName,
             archiveRelativePath: archiveRelativePath,
             memberRelativePath: memberRelativePath,
+            playlistID: playlistID,
+            playlistEntryIndex: playlistEntryIndex,
             storageScope: storageScope,
             storageKey: storageKey,
             expectedValueJSON: expectedValueJSON,
@@ -846,6 +857,8 @@ final class UACManModel {
         tagName: String,
         archiveRelativePath: String,
         memberRelativePath: String,
+        playlistID: String,
+        playlistEntryIndex: Int?,
         storageScope: String,
         storageKey: String,
         expectedValueJSON: String,
@@ -858,6 +871,8 @@ final class UACManModel {
               let match = tag.matches.first(where: {
                   $0.archiveRelativePath == archiveRelativePath
                       && ($0.memberRelativePath ?? "") == memberRelativePath
+                      && ($0.playlistID ?? "") == playlistID
+                      && $0.playlistEntryIndex == playlistEntryIndex
                       && $0.storageScope == storageScope
                       && $0.storageKey == storageKey
                       && $0.valueJSON == expectedValueJSON
@@ -2089,6 +2104,8 @@ private extension UACTagFieldMatch {
     func isSameTagAnalyzerMatch(as other: UACTagFieldMatch) -> Bool {
         archiveRelativePath == other.archiveRelativePath
             && memberRelativePath == other.memberRelativePath
+            && playlistID == other.playlistID
+            && playlistEntryIndex == other.playlistEntryIndex
             && storageScope == other.storageScope
             && storageKey == other.storageKey
     }

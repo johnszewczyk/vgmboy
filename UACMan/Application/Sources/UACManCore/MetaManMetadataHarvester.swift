@@ -138,6 +138,8 @@ public enum MetaManMetadataHarvester {
         var failures: [String] = []
         var diagnosticCount = 0
         var nsfProjectionConflicts: [String] = []
+        var gbsProjectionConflicts: [String] = []
+        var gbsSourceDocuments: [MetadataDocument] = []
         for file in files {
             do {
                 let attributes = try FileManager.default.attributesOfItem(atPath: file.url.path)
@@ -199,10 +201,20 @@ public enum MetaManMetadataHarvester {
                 guard !result.tracks.isEmpty else {
                     throw MetaManMetadataHarvesterError.noTracks(file.path)
                 }
-                diagnosticCount += result.tracks.reduce(0) { $0 + $1.document.diagnostics.count }
-                if ext == "nsf" {
+                if ext == "gbs" {
+                    diagnosticCount += Set(result.tracks.flatMap { $0.document.diagnostics }).count
+                } else {
+                    diagnosticCount += result.tracks.reduce(0) { $0 + $1.document.diagnostics.count }
+                }
+                if ext == "nsf" || ext == "gbs" {
                     let readerDiagnostics = Set(result.tracks.flatMap { $0.document.diagnostics })
-                    nsfProjectionConflicts.append(contentsOf: readerDiagnostics.sorted().map { "\(file.path): \($0)" })
+                    let prefixed = readerDiagnostics.sorted().map { "\(file.path): \($0)" }
+                    if ext == "nsf" {
+                        nsfProjectionConflicts.append(contentsOf: prefixed)
+                    } else {
+                        gbsProjectionConflicts.append(contentsOf: prefixed)
+                        gbsSourceDocuments.append(contentsOf: result.tracks.map(\.document))
+                    }
                 }
                 trackMetadata[file.path] = result.tracks.map { track in
                     let facts = track.document.technicalFacts
@@ -222,6 +234,10 @@ public enum MetaManMetadataHarvester {
                     let shared = MetaManMetadataProjector.sharedNSFFields(from: result.tracks.map(\.document))
                     memberMetadata[file.path] = shared.fields
                     nsfProjectionConflicts.append(contentsOf: shared.conflicts.map { "\(file.path): \($0)" })
+                } else if ext == "gbs" {
+                    // GBS header identity belongs on the package; per-track
+                    // entries carry Title, Format, and M3U playback data.
+                    memberMetadata[file.path] = [:]
                 } else if result.tracks.count == 1, let track = result.tracks.first {
                     memberMetadata[file.path] = MetaManMetadataProjector.memberFields(from: track.document)
                 } else {
@@ -242,12 +258,19 @@ public enum MetaManMetadataHarvester {
             }
         }
 
-        let shared = ext == "nsf" ? sharedNSFPackageMetadata(memberMetadata) : (fields: [:], conflicts: [])
+        let shared: (fields: [String: UACJSONValue], conflicts: [String])
+        if ext == "nsf" {
+            shared = sharedNSFPackageMetadata(memberMetadata)
+        } else if ext == "gbs" {
+            shared = sharedGBSPackageMetadata(gbsSourceDocuments)
+        } else {
+            shared = ([:], [])
+        }
         return MetaManMetadataHarvestOutcome(
             memberMetadata: memberMetadata,
             trackMetadata: trackMetadata,
             gameMetadata: shared.fields,
-            sharedFieldConflicts: nsfProjectionConflicts + shared.conflicts,
+            sharedFieldConflicts: nsfProjectionConflicts + gbsProjectionConflicts + shared.conflicts,
             failures: failures,
             diagnosticCount: diagnosticCount
         )
@@ -269,6 +292,78 @@ public enum MetaManMetadataHarvester {
             }
         }
         return (fields, conflicts)
+    }
+
+    private static func sharedGBSPackageMetadata(
+        _ documents: [MetadataDocument]
+    ) -> (fields: [String: UACJSONValue], conflicts: [String]) {
+        guard !documents.isEmpty else { return ([:], []) }
+        var fields: [String: UACJSONValue] = [:]
+        var conflicts: [String] = []
+
+        func sharedHeaderValue(
+            _ keyPath: KeyPath<MetadataFields, String?>,
+            name: String
+        ) -> String? {
+            let values = documents.map { normalized($0.fields[keyPath: keyPath]) }
+            let distinct = Set(values.compactMap { $0 })
+            guard distinct.count <= 1,
+                  distinct.isEmpty || values.allSatisfy({ $0 != nil }) else {
+                conflicts.append("GBS header \(name) differs across source members; it was not promoted.")
+                return nil
+            }
+            return distinct.first
+        }
+
+        func sharedM3UValue(_ sourceName: String, tagName: String) -> String? {
+            let values = documents.map { document -> String? in
+                let matching = document.tags
+                    .filter { $0.normalizedName == sourceName }
+                    .compactMap { normalized($0.value) }
+                let distinct = Set(matching)
+                return distinct.count == 1 ? distinct.first : nil
+            }
+            let distinct = Set(values.compactMap { $0 })
+            guard distinct.count == 1, values.allSatisfy({ $0 != nil }) else {
+                if !distinct.isEmpty {
+                    conflicts.append("GBS M3U # @\(tagName) differs across source members; it was not promoted.")
+                }
+                return nil
+            }
+            return distinct.first
+        }
+
+        let headerAlbum = sharedHeaderValue(\.game, name: "game")
+        let headerArtist = sharedHeaderValue(\.artist, name: "artist")
+        let headerCopyright = sharedHeaderValue(\.comment, name: "comment")
+        let m3uAlbum = sharedM3UValue("TITLE", tagName: "TITLE")
+        let m3uArtist = sharedM3UValue("ARTIST", tagName: "ARTIST")
+        let m3uDate = sharedM3UValue("DATE", tagName: "DATE")
+
+        func choose(_ header: String?, _ m3u: String?, field: String) -> String? {
+            guard let m3u else { return header }
+            guard let header else { return m3u }
+            guard header == m3u else {
+                conflicts.append("GBS header and M3U values disagree for \(field); the header value was retained.")
+                return header
+            }
+            return header
+        }
+        if let album = choose(headerAlbum, m3uAlbum, field: "Album") {
+            fields["Album"] = .string(album)
+        }
+        if let artist = choose(headerArtist, m3uArtist, field: "Album Artist") {
+            fields["Album Artist"] = .string(artist)
+        }
+        if let headerCopyright { fields["Copyright"] = .string(headerCopyright) }
+        if let m3uDate { fields["Date"] = .string(m3uDate) }
+        return (fields, conflicts)
+    }
+
+    private static func normalized(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 
