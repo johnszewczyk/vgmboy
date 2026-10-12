@@ -8,12 +8,12 @@
   the app title and status bars visible.
 - Opening Options moves keyboard focus to Close Options; closing returns focus
   to the control that opened it.
-- SPCBOY owns Database, UI Chrome, UI Fonts, and Windows settings. VGMBoy owns
-  Audio, Diagnostics, Playback, and Routing settings; the navigation keeps
-  these groups separate.
-- Pages stay alphabetical within their owner groups: Database, UI Chrome,
-  UI Fonts, Windows; then Audio, Diagnostics, Playback, Routing. Section groups
-  within pages are alphabetical.
+- SPCBOY owns Database, Gallery, UI Chrome, UI Fonts, and Windows settings.
+  VGMBoy owns Audio, Diagnostics, Playback, and Routing settings; the
+  navigation keeps these groups separate.
+- Pages stay alphabetical within their owner groups: Database, Gallery, UI
+  Chrome, UI Fonts, Windows; then Audio, Diagnostics, Playback, Routing.
+  Section groups within pages are alphabetical.
 - The options sidebar groups SPCBOY-owned frontend settings separately from
   VGMBoy-owned playback-core settings. Keep that ownership split when adding
   settings.
@@ -23,8 +23,9 @@
   Section headings are underlined; setting rows use whitespace without
   divider lines. UI Chrome and UI Fonts are separate SPCBOY pages. UI Fonts
   exposes playlist-header styling and titlebar font color and bold controls.
-  UI Chrome > Gallery Tiles controls tile size, gap, and corner radius; artwork
-  uses a centered cover crop so non-square images fill square tiles.
+  The Gallery page controls frame size, gap, corner radius, and compact title
+  display; artwork uses a centered cover crop so non-square images fill square
+  frames.
   The same page layout and title/footer chrome appear in the optional
   standalone Options window.
 - UI Chrome Font Size scales toolbar rows, buttons, icons, and setting-field

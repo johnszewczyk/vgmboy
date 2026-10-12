@@ -20,8 +20,10 @@ in the SB2 home view.
 
 - Gallery is a library view and has a dedicated square button in the sidebar
   library toolbar. It is represented by a playlist tab, but its sidebar always
-  uses Console View and displays only games with indexed `Title Snap` artwork.
-  Console groups remain foldable; game rows show the corresponding artwork.
+  uses Console View and displays only consoles with indexed `Title Snap`
+  artwork. Gallery rows keep the normal sidebar spacing, font, and leaf marker;
+  selecting a console filters the full Gallery grid. Do not unfold game rows or
+  render artwork thumbnails in the sidebar.
 - Gallery-filtered games must keep a stable array identity until the database
   or Gallery projection changes. The sidebar inserts large game lists in
   batches, and replacing an equivalent array on each render cancels pending
