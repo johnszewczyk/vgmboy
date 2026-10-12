@@ -483,6 +483,28 @@ import Testing
     }
 }
 
+@Test func rejectsCompressedFramesAboveTheReaderBound() throws {
+    var payload = Data([0x28, 0xB5, 0x2F, 0xFD, 0x01])
+    var seekTable = Data()
+    seekTable.append(contentsOf: littleEndian(UACZstandardSeekTable.maximumFrameCompressedByteCount + 1))
+    seekTable.append(contentsOf: littleEndian(UInt32(4)))
+    seekTable.append(contentsOf: littleEndian(UInt32(1)))
+    seekTable.append(0)
+    seekTable.append(contentsOf: littleEndian(UACZstandardSeekTable.seekableFooterMagic))
+    payload.append(contentsOf: littleEndian(UACZstandardSeekTable.skippableFrameMagic))
+    payload.append(contentsOf: littleEndian(UInt32(seekTable.count)))
+    payload.append(seekTable)
+    let fixture = try makeFixture(
+        payload: payload,
+        manifestData: seekableManifestJSON(tarDataOffset: 0)
+    )
+    defer { try? FileManager.default.removeItem(at: fixture.url) }
+
+    #expect(throws: UACContainerError.invalidSeekTable("Frame 0 has an invalid size.")) {
+        try UACContainerReader.read(from: fixture.url)
+    }
+}
+
 private struct Fixture {
     let url: URL
     let copyURL: URL

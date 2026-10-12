@@ -56,7 +56,13 @@ let package = Package(
                 .product(name: "VGMBoyKit", package: "VGMBoy")
             ]
         ),
-        .testTarget(name: "ArchiveMaterializationCoreTests", dependencies: ["ArchiveMaterializationCore"]),
+        .testTarget(
+            name: "ArchiveMaterializationCoreTests",
+            dependencies: [
+                "ArchiveMaterializationCore",
+                .product(name: "UACWrapperCore", package: "UACWrapper")
+            ]
+        ),
         .testTarget(name: "ArchiveCacheCoreTests", dependencies: ["ArchiveCacheCore"]),
         .testTarget(name: "LocalFileBrowserCoreTests", dependencies: ["LocalFileBrowserCore"]),
         .testTarget(name: "FavoriteTrackCoreTests", dependencies: ["FavoriteTrackCore"]),

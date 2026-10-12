@@ -22,8 +22,16 @@ and playable-member lifetime shared by native frontends.
 - `ArchiveMaterializationCore` consumes `UACWrapperCore`, owned by
   `UACMan/Wrapper`, to validate the wrapper manifest and route members for
   playback. FrontendCore does not own UAC encoding or package creation.
-- UAC manifest decompression is injected by the host through a bounded
-  `UACManifestFrameDecoder`; archive services do not launch or bundle a codec.
+- `UACZstandardCLIFrameCodec` adapts the host-installed Zstandard executable
+  to UAC's bounded manifest and independent-frame decoder callbacks. It does
+  not bundle a codec; callers may inject alternate decoders for testing or a
+  host-specific executable configuration.
+- Both `ArchiveMaterializer` and `ArchivePlaybackMaterializer` use
+  `UACSeekableMemberFile` for a selected member in `tar+zstd-seekable`
+  packages, then stage only that member in bounded chunks. The seekable reader
+  decompresses only TAR frames intersecting the member's byte range. Legacy
+  `tar+zstd` packages and dependency-complete requests retain the sequential
+  extraction route.
 - `ArchiveCacheCore` owns stable source identity, durable/disposable roots,
   recovery, free-space and size policy, touching, bounded LRU pruning, and cache
   leases.
@@ -38,6 +46,9 @@ and playable-member lifetime shared by native frontends.
 - Selected-entry and complete-set materialization remain distinct contracts.
 - UAC member paths are manifest-relative archive paths, never filesystem
   locations; invalid manifests must not fall back to another container route.
+- The seek-table parser rejects compressed frames larger than 65 MiB and TAR
+  frames larger than 64 MiB before allocating frame data. CLI decoding enforces
+  the same 64 MiB stdout bound while the child process is running.
 - Loose `.tar.zst`, `.tar.zstd`, and `.tzst` source archives are retired and
   must not return to archive routing. Standalone media `.zst`/`.zstd` files
   remain single-file wrappers, and UAC's internal TAR+Zstandard payload stays

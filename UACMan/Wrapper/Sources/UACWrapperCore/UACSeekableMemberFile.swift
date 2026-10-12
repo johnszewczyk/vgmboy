@@ -15,7 +15,7 @@ public final class UACSeekableMemberFile: @unchecked Sendable {
     private let container: UACContainer
     private let memberDataOffset: UInt64
     private let frameCacheLimit: Int
-    private let decompressFrame: @Sendable (Data, UInt32?) throws -> Data
+    private let decompressFrame: UACSeekableFrameDecoder
     private let lock = NSLock()
     private var frameCache: [Int: Data] = [:]
     private var recentFrameIndexes: [Int] = []
@@ -28,7 +28,7 @@ public final class UACSeekableMemberFile: @unchecked Sendable {
         memberPath: String,
         maximumCachedFrames: Int = UACSeekableMemberFile.defaultMaximumCachedFrames,
         decompressManifestFrame: UACManifestFrameDecoder? = nil,
-        decompressFrame: @escaping @Sendable (Data, UInt32?) throws -> Data
+        decompressFrame: @escaping UACSeekableFrameDecoder
     ) throws {
         guard (1...Self.maximumCachedFrames).contains(maximumCachedFrames) else {
             throw UACContainerError.invalidSeekFrameCacheLimit

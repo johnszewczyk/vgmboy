@@ -318,7 +318,7 @@ enum ZipArchiveSupport {
             memberPath: entryPath,
             maximumCachedFrames: 2,
             decompressManifestFrame: UACManifestFrameCodec.decoder,
-            decompressFrame: UACSeekableFrameCodec.decoder
+            decompressFrame: UACZstandardCLIFrameCodec.shared.seekableFrameDecoder
         )
         guard memberFile.size > 0, memberFile.size <= 16 * 1024 * 1024 else {
             throw ArchiveError.listingLimitExceeded("The selected SPC member is empty or exceeds the 16 MiB in-memory playback limit.")

@@ -74,7 +74,7 @@ import Testing
     ))
 }
 
-@Test func routesUACSelectedMembersThroughTheSameStreamingTarPipeline() {
+@Test func routesLegacyUACSelectedMembersThroughStreamingTarPipeline() {
     let invocation = ArchiveToolRouting.selectedEntries(
         kind: .uac,
         archiveURL: URL(fileURLWithPath: "/tmp/game.uac"),
