@@ -30,3 +30,5 @@ put source-field mappings in format profiles.
   platform, and version rules.
 - **JoshW NSF** — [`JoshW-NSF.md`](JoshW-NSF.md) records NSF-only source scope,
   source links, and package rules.
+- **JoshW GBS** — [`JoshW-GBS.md`](JoshW-GBS.md) records Game Boy and Game Boy
+  Color GBS source scope, playlist preservation, and source metadata.

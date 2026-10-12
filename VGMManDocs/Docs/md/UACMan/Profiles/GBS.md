@@ -37,8 +37,16 @@ The native header fields and version byte follow the
 | M3U `# @TITLE value` | Album | `game.metadata["Album"]` | Use only when all applicable rows agree and the value agrees with a populated header; otherwise retain the header and route the conflict to review. |
 | M3U `# @ARTIST value` | Album Artist | `game.metadata["Album Artist"]` | Use only when the value is shared and unambiguous; if it conflicts with a populated header, retain the header and report the conflict. |
 | M3U `# @DATE value` | Date | `game.metadata["Date"]` | Keep the source value; do not infer a date from a filename or composite track title. |
+| M3U `# @YEAR value` | Year | `game.metadata["Year"]` | Preserve separately from Date when both are present. |
+| M3U `# @COMPOSER value` | Composer | `game.metadata["Composer"]` | Promote only a populated, unambiguous shared value. |
+| M3U `# @RIPPER value` | Dumper | `game.metadata["Dumper"]` | The source uses Ripper; UAC uses the established Dumper field. |
+| M3U `# @TAGGER value` | Tagger | `game.metadata["Tagger"]` | Promote only a populated, unambiguous shared value. |
+| M3U `# @DEVELOPER value` | Developer | `game.metadata["Developer"]` | Promote only when present and unambiguous. |
+| M3U `# @PUBLISHER value` | Publisher | `game.metadata["Publisher"]` | Promote only when present and unambiguous. |
+| M3U `# @GENRE value` | Genre | `game.metadata["Genre"]` | Promote only when present and unambiguous. |
+| M3U `# @COPYRIGHT value` | Copyright | `game.metadata["Copyright"]` | Compare with the GBS header comment; keep a conflicting value in the attached M3U for review. |
 | M3U `::GBS,index,title,...` title | Title | `playlists[].entries[].title` | Source track title, retained as written. Do not split embedded composer, game, publisher, or copyright text out of the title. |
-| M3U source index | Playlist `trackIndex` | `playlists[].entries[].trackIndex` | GBS indexes are zero-based, including hexadecimal indexes. Do not create a second Track Number tag. |
+| M3U source index and row order | Playlist `trackIndex` and entry order | `playlists[].entries[].trackIndex` | GBS indexes are zero-based, including hexadecimal indexes. Keep entries in the M3U's row order; do not sort them by source index or create a second Track Number tag. |
 | M3U row, source path, and authored values | M3U | `playlists[].entries[].extraFields["M3U"]` | Keep the exact raw row, source M3U path, populated raw timing/count fields, and positive millisecond projections together in one nested JSON value. Do not expose separate M3U timing tags or duplicate raw fields at entry level. |
 | M3U time, loop, fade columns | M3U timing properties | `playlists[].entries[].extraFields["M3U"]` | Convert fractional final time components to integer milliseconds. A loop-start value marked with `-` maps to Intro Length; do not infer a loop duration from it. A bare `-` sets Loop Length equal to Play Length. Missing or invalid times stay absent. Keep raw strings and repeat counts in the nested value and the original M3U attachment byte-exact. |
 | GBS header version byte | Format | `playlists[].entries[].extraFields["Format"]` | Use `GBS v.<version>` on every logical track, for example `GBS v.1`. Read the byte from that physical member; never normalize versions. |
@@ -94,7 +102,8 @@ The native header fields and version byte follow the
 - **GBS header fields** — Validate the 112-byte fixed header, `GBS` signature,
   nonzero version and track count, and the declared first-track index. Keep
   load/init/play addresses and timer bytes as validation evidence only; do
-  not promote them to user-facing tags.
+  not promote them to user-facing tags. Treat `?`, `<?>`, and `< ? >` header
+  placeholders as absent so they do not block a populated M3U value.
 - **M3U files** — Preserve every source M3U byte-for-byte as a package
   attachment, including multiple M3Us that refer to the same GBS. Their rows
   can carry track names and playback timing, so they are not disposable
@@ -115,6 +124,9 @@ The native header fields and version byte follow the
   zero-based index. If titles or timings disagree, retain the competing rows
   and route the track/package to review. Do not silently select the richest
   row, merge rows, or treat a second title as a duplicate without evidence.
+  Preserve each M3U's row order in the UAC playlist. Hold repeated source
+  indexes or M3Us with different queue orders until the package can represent
+  those alternatives without losing rows.
 - **Timing** — M3U timing is playback data attached to the logical track.
   MetaMan converts play, loop, and fade values, including a fractional final
   component with up to millisecond precision, to integer milliseconds.
@@ -125,9 +137,11 @@ The native header fields and version byte follow the
   not receive a 150-second fallback.
 - **Composite titles and comments** — Keep a composite M3U title as one Title
   value. Promote a recognized, populated `# @KEY` value only through an
-  explicit useful-field mapping with canonical Title Case tag names. Do not
-  surface raw lower-case source keys, empty values, freeform comments, unknown
-  keys, or parser diagnostics as UAC tags; retain the original M3U attachment.
+  explicit useful-field mapping with canonical Title Case tag names. Current
+  shared mappings are Title, Artist, Date, Year, Composer, Ripper, Tagger,
+  Developer, Publisher, Genre, and Copyright. Do not surface raw lower-case
+  source keys, empty values, placeholders, freeform comments, unknown keys, or
+  parser diagnostics as UAC tags; retain the original M3U attachment.
 - **Related but separate members** — These are not GBS tracks and must not be
   folded into a GBS package or counted as GBS duplicates:
 
@@ -154,8 +168,9 @@ The native header fields and version byte follow the
   confirm they are not counted as GBS tracks or silently discarded. Treat a
   mismatched `.gbs` suffix as a review item.
 - **Playlist mapping** — Resolve every M3U row to one member and an in-range
-  zero-based track index. Preserve order, repeated indexes, raw row text, and
-  all sidecars; report missing, duplicate, or conflicting references.
+  zero-based track index. Preserve order and raw row text. Hold repeated
+  indexes or conflicting queue orders for review; retain all sidecars and
+  report missing, duplicate, or conflicting references.
 - **Timing fidelity** — Compare source timing strings with UAC playlist
   entries. Confirm fractional seconds and both loop syntaxes convert without
   truncation, conflicting values are omitted, repeat counts remain available

@@ -23,6 +23,7 @@ enum GBSM3UMetadataReader {
         let loopCount: Int?
         let tags: [MetadataTag]
         let relativePath: String
+        let sourceOrder: Int
         let rawData: Data
         let sourceEncoding: String
 
@@ -89,6 +90,7 @@ enum GBSM3UMetadataReader {
                     loopCount: row.loopCount,
                     tags: comments,
                     relativePath: companion.relativePath,
+                    sourceOrder: parsedRows - 1,
                     rawData: companion.data,
                     sourceEncoding: sourceEncoding
                 ))
@@ -101,6 +103,22 @@ enum GBSM3UMetadataReader {
 
         let commonTagResolution = unambiguousCommonTags(from: entries)
         let commonTags = commonTagResolution.tags
+        let playlistGroups = Dictionary(grouping: entries, by: \.relativePath)
+        let playlistOrders = playlistGroups.keys.sorted().map { path in
+            (path, (playlistGroups[path] ?? []).sorted { $0.sourceOrder < $1.sourceOrder }.map(\.index))
+        }
+        var playlistDiagnostics: [String] = []
+        for (path, order) in playlistOrders where Set(order).count != order.count {
+            playlistDiagnostics.append(
+                "GBS M3U \(path) repeats a source track index; preserve the original playlist for review."
+            )
+        }
+        if let firstOrder = playlistOrders.first?.1,
+           playlistOrders.dropFirst().contains(where: { $0.1 != firstOrder }) {
+            playlistDiagnostics.append(
+                "GBS M3U files define different row orders; preserve the competing playlists for review."
+            )
+        }
         let grouped = Dictionary(grouping: entries, by: \.index)
         let commonEntry = entries.sorted {
             if $0.quality != $1.quality { return $0.quality > $1.quality }
@@ -145,6 +163,7 @@ enum GBSM3UMetadataReader {
             var facts = track.document.technicalFacts
             if let entry {
                 facts["m3uSourcePath"] = entry.relativePath
+                facts["m3uSourceOrder"] = String(entry.sourceOrder)
                 facts["m3uRawLine"] = entry.rawLine
                 facts["m3uTimeRaw"] = entry.timeRaw
                 facts["m3uLoopRaw"] = entry.loopRaw
@@ -174,6 +193,7 @@ enum GBSM3UMetadataReader {
             )
             var diagnostics = track.document.diagnostics
             diagnostics.append(contentsOf: commonTagResolution.diagnostics)
+            diagnostics.append(contentsOf: playlistDiagnostics)
             if let index, choices.count > 1,
                hasConflictingValues(choices.map { $0.title.isEmpty ? nil : $0.title })
                     || hasConflictingValues(choices.map(\.playLengthMs))

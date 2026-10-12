@@ -1135,6 +1135,17 @@ def harvest_format_metadata(
                 "sourceTrackIndex": source_index,
                 "metadata": normalize_imported_metadata_fields(track["metadata"]),
             }
+            playlist_order = track.get("sourcePlaylistOrder")
+            if playlist_order is not None:
+                if (
+                    not isinstance(playlist_order, int)
+                    or isinstance(playlist_order, bool)
+                    or playlist_order < 0
+                ):
+                    raise UACError(
+                        f"MetaMan .{extension} projection contains an invalid sourcePlaylistOrder: {path}#{ordinal}"
+                    )
+                normalized_track["sourcePlaylistOrder"] = playlist_order
             for field_name in (
                 "sourcePlaylistPath", "rawLine", "lengthRaw", "loopRaw",
                 "loopStartRaw", "fadeRaw", "repeatRaw",
@@ -1224,6 +1235,15 @@ def harvest_format_metadata(
         all_member_paths = {relative for _, relative in included}
         for path in sorted(expected_paths):
             tracks = normalized_tracks[path]
+            if extension == "gbs":
+                tracks = sorted(
+                    tracks,
+                    key=lambda track: (
+                        track.get("sourcePlaylistOrder") is None,
+                        track.get("sourcePlaylistOrder", track.get("sourceTrackIndex", 0)),
+                        track.get("sourceTrackIndex", 0),
+                    ),
+                )
             for track in tracks:
                 metadata = track["metadata"]
                 source_index = track["sourceTrackIndex"]
