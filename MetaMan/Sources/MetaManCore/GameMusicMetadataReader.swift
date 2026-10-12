@@ -93,9 +93,14 @@ enum GameMusicMetadataReader {
         }
 
         let identityOffset = kind == .nsf ? 0x0E : 0x10
-        let game = fixedText(data, at: identityOffset, length: 0x20)
-        let artist = fixedText(data, at: identityOffset + 0x20, length: 0x20)
-        let comment = fixedText(data, at: identityOffset + 0x40, length: 0x20)
+        let readHeaderText: (Int) -> String = { offset in
+            kind == .gbs
+                ? gbsHeaderText(data, at: offset, length: 0x20)
+                : fixedText(data, at: offset, length: 0x20)
+        }
+        let game = readHeaderText(identityOffset)
+        let artist = readHeaderText(identityOffset + 0x20)
+        let comment = readHeaderText(identityOffset + 0x40)
         var facts: [String: String] = [
             "version": String(version),
             "trackCount": String(trackCount),
@@ -399,6 +404,15 @@ enum GameMusicMetadataReader {
         let bytes = Data(data[offset..<(offset + length)].prefix { $0 != 0 })
         return (String(data: bytes, encoding: .windowsCP1252) ?? String(decoding: bytes, as: UTF8.self))
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// GBS does not declare a character encoding for its fixed-width header
+    /// strings. Project ASCII only; the complete raw header remains available
+    /// in `rawMetadataBlocks` for source-specific review of other byte ranges.
+    private static func gbsHeaderText(_ data: Data, at offset: Int, length: Int) -> String {
+        let bytes = Data(data[offset..<(offset + length)].prefix { $0 != 0 })
+        guard bytes.allSatisfy({ $0 < 0x80 }) else { return "" }
+        return String(data: bytes, encoding: .ascii)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
     private static func validateTrackReferences(

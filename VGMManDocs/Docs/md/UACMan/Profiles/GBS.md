@@ -19,21 +19,25 @@ The native header fields and version byte follow the
   track rows and recognized `# @KEY value` comments.
 - **Status** — Reader, writer, and consumer mappings are aligned for ASCII
   header values and M3U rows the reader recognizes. The GBS header does not
-  declare a text encoding; hold non-ASCII header strings for source-specific
-  review as described below. The
+  declare a text encoding; only ASCII header strings are promoted. Non-ASCII
+  fields remain in the unchanged GBS member and are routed to the
+  header-encoding uncertainty bucket. The
   [NEZplug extended-M3U syntax](https://github.com/BouKiCHi/nezplay/blob/master/in_nez.txt#L948-L968)
   defines `::KSS`
   and `::GBS` as distinct type markers. Some JoshW sidecars use `::KSS` while
   naming members whose extension and validated signature are GBS; these are
   source-side type-marker mismatches, and the current GBS reader ignores
-  them. Preserve the source rows and hold those packages until an explicit
-  recovery policy is approved. Apply this profile per package:
+  them. Preserve the source rows and leave them out of projected playlist
+  metadata until an explicit recovery policy is approved. Apply this profile per package:
   inspect every associated M3U, compare a master queue with per-track
   sidecars, hold conflicting or unprojected rows, then verify the generated
   playlist through UACMan, ScanSong, and Songbase. A zero reader-conflict
   count is not sufficient: direct comparison found all 72 Medarot 4 sidecar
   titles differ from the corresponding master-queue titles. Parser support
   alone does not establish that a source set is coherent or canonical.
+  Metadata uncertainty does not block byte-preserving UAC packaging when the
+  GBS payloads pass header validation; retain every original member and
+  classify unresolved fields in the per-set report.
   MetaMan converts
   fractional play, loop, and fade times to integer milliseconds, and reads
   NEZplug's loop-duration, loop-start, and whole-play loop forms. When rows
@@ -113,33 +117,40 @@ The native header fields and version byte follow the
   the game root is positive, put the canonical DAT title root string in
   package **Game ID**; this does not select a region or revision. Keep numeric
   DAT IDs in AudioMan only.
-- **Settled-package promotion** — A package with valid GBS member(s), no
-  unresolved source-header, M3U/title/timing, or version conflict, and no
-  unexplained companion file can move to UAC without waiting for unrelated
-  review cases. Preserve its source package and members; project populated
-  native header values to Album, Album Artist, and Copyright; add one logical
-  playlist entry per declared track with `Format` on every entry; and retain
-  the four playable-payload hashes for every physical GBS. If no M3U supplies
-  a track title or timing, leave those fields absent. Do not add a `Game ID`
-  until the canonical title root has positive No-Intro evidence. Keep each
-  unresolved package as its own case page in the AudioMan set report.
+- **UAC packaging with unresolved metadata** — A package whose GBS members
+  pass signature, header-length, nonzero-version, and nonzero-track-count
+  checks can be wrapped even when source metadata needs later review. Bucket
+  the uncertainty in the AudioMan set report; packaging does not resolve the
+  case. Preserve every source member byte-for-byte, including all M3Us and
+  unexplained companions. Project only populated, unambiguous source-backed
+  fields. Omit conflicting playlist/header fields and non-ASCII fixed-header
+  strings until resolved; retain their exact bytes in the GBS and M3U
+  attachments. Add one logical playlist entry per declared track with
+  `Format` on every entry and retain the four playable-payload hashes for
+  every physical GBS. If no unambiguous M3U supplies a track title or timing,
+  leave those fields absent. Do not add a `Game ID` until the canonical title
+  root has positive No-Intro evidence. Keep each unresolved package in its
+  uncertainty bucket and case report. Metadata uncertainty alone does not
+  create a `Status` tag; use a non-empty `Status` only for the established
+  Mixed Versions, Incomplete, or Corrupt conditions.
 - **Multiple GBS members** — Project the native `game`, `artist`, and
   `comment` values (Game Title, Author, and Copyright) to package scope only
   when the included physical GBS members agree. The current MetaMan/UAC
   metadata harvester keeps only shared header
   values at package scope and does not preserve varying header values on each
-  physical member. Hold any package whose source headers disagree until an
-  explicit member-level mapping is decided. Do not assume a varying header
+  physical member. Omit header fields that disagree across members and route
+  the package to the varying-header bucket; raw member bytes remain bundled.
+  Do not assume a varying header
   `artist` (the source Author field) is a track `Title`, or replace a
   conflicting header with the outer archive filename. Record each package as
   its own review case.
 - **Header text encoding** — The [GBS format reference](https://github.com/mmitch/gbsplay/blob/master/gbsformat.txt)
   defines fixed-width Game Title, Author, and Copyright strings but does not
   identify a character encoding. ASCII values can be projected normally. For
-  non-ASCII bytes, do not assume UTF-8 or Windows-1252 and do not surface
-  mojibake. Preserve the source GBS
-  unchanged, include exact bytes in the case evidence, and hold decoded values
-  until the encoding is verified for that source. A CP932 rendering may be
+  non-ASCII bytes, MetaMan omits that individual decoded field; do not assume
+  UTF-8 or Windows-1252 and do not surface mojibake. Preserve the source GBS
+  unchanged, include exact bytes in the header-encoding bucket, and hold
+  decoded values until the encoding is verified for that source. A CP932 rendering may be
   shown as a review aid, but it is not approved metadata until confirmed.
 - **Format version** — Read version byte `0x03` for every physical GBS and
   surface it in each track's **Format** field. A set can contain v1, v2, or
