@@ -164,8 +164,9 @@
             <div class="options-nav-group" aria-labelledby="options-native-heading">
               <div id="options-native-heading" class="options-nav-group-title">SPCBoy</div>
               <button id="options-database-tab" data-app-option-section="database" class="options-nav-item is-selected" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-database"></use></svg><span>Database</span></button>
+              <button id="options-gallery-tab" data-app-option-section="gallery" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-gallery"></use></svg><span>Gallery</span></button>
               <button id="options-theme-tab" data-app-option-section="interface" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"></use></svg><span>UI Chrome</span></button>
-              <button id="options-fonts-tab" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-scroll-text"></use></svg><span>UI Fonts</span></button>
+              <button id="options-fonts-tab" data-app-option-section="fonts" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-scroll-text"></use></svg><span>UI Fonts</span></button>
               <button id="options-windows-tab" data-app-option-section="windows" class="options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sidebar-views"></use></svg><span>Windows</span></button>
             </div>
             <div class="options-nav-group" aria-labelledby="options-extension-heading">
@@ -208,19 +209,24 @@
               </div>
             </div>
 
+            <div id="options-gallery-section" class="options-page options-gallery-page is-hidden">
+              <h1 class="options-page-title">SPCBoy / Gallery</h1>
+              <div class="options-subpanel">
+                <h2 class="options-subpanel-title">Picture Frames</h2>
+                <div class="options-help-text">Artwork is center-cropped to fill square frames.</div>
+                <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="gallery-compact-titles-checkbox" type="checkbox" /><span class="options-checkbox-copy"><span>Compact Titles</span><small>Use a smaller, single-line title overlay in each frame.</small></span></span></label>
+                <label class="options-field"><span class="options-field-copy"><span>Frame Size</span><small>Base frame width; the grid uses the available pane width.</small></span><span class="options-inline-trailing gallery-option-control"><input id="gallery-size-input" class="gallery-option-range" type="range" min="0.65" max="1.60" step="0.05" value="1" aria-label="Gallery frame size" /><output id="gallery-size-value">1.00×</output></span></label>
+                <label class="options-field"><span class="options-field-copy"><span>Frame Gap</span><small>Spacing between frames in rems.</small></span><span class="options-inline-trailing gallery-option-control"><input id="gallery-gap-input" class="gallery-option-range" type="range" min="0" max="1" step="0.01" value="0" aria-label="Gallery frame gap" /><output id="gallery-gap-value">0rem</output></span></label>
+                <label class="options-field"><span class="options-field-copy"><span>Corner Radius</span><small>Frame corner radius in rems.</small></span><span class="options-inline-trailing gallery-option-control"><input id="gallery-radius-input" class="gallery-option-range" type="range" min="0" max="1" step="0.01" value="0" aria-label="Gallery frame corner radius" /><output id="gallery-radius-value">0rem</output></span></label>
+              </div>
+            </div>
+
             <div id="options-theme-section" class="options-page options-theme-page is-hidden">
               <h1 class="options-page-title">SPCBoy / UI Chrome</h1>
               <div class="options-subpanel">
                 <h2 class="options-subpanel-title">Animations</h2>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="auto-resize-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Auto-Resize</span><small>Duration for automatic playlist column resizing (ms).</small></span></span><span class="options-inline-trailing"><input id="auto-resize-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Auto-resize animation milliseconds" /></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="selection-animation-enabled-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Selection + Hover</span><small>Duration for selector movement across controls, tabs, and selected playlist rows (ms).</small></span></span><span class="options-inline-trailing"><input id="selection-animation-input" class="options-input" type="text" inputmode="numeric" value="200" aria-label="Selection and hover animation milliseconds" /></span></label>
-              </div>
-              <div class="options-subpanel">
-                <h2 class="options-subpanel-title">Gallery Tiles</h2>
-                <div class="options-help-text">Square tiles center-crop non-square artwork. Zero gap and square corners create a continuous grid.</div>
-                <label class="options-field"><span class="options-field-copy"><span>Tile Size</span><small>Base tile width; the grid uses the available pane width.</small></span><span class="options-inline-trailing gallery-option-control"><input id="gallery-size-input" class="gallery-option-range" type="range" min="0.65" max="1.60" step="0.05" value="1" aria-label="Gallery tile size" /><output id="gallery-size-value">1.00×</output></span></label>
-                <label class="options-field"><span class="options-field-copy"><span>Tile Gap</span><small>Spacing between tiles in rems.</small></span><span class="options-inline-trailing gallery-option-control"><input id="gallery-gap-input" class="gallery-option-range" type="range" min="0" max="1" step="0.01" value="0" aria-label="Gallery tile gap" /><output id="gallery-gap-value">0rem</output></span></label>
-                <label class="options-field"><span class="options-field-copy"><span>Corner Radius</span><small>Tile corner radius in rems.</small></span><span class="options-inline-trailing gallery-option-control"><input id="gallery-radius-input" class="gallery-option-range" type="range" min="0" max="1" step="0.01" value="0" aria-label="Gallery tile corner radius" /><output id="gallery-radius-value">0rem</output></span></label>
               </div>
               <div class="options-subpanel">
                 <h2 class="options-subpanel-title">Palette</h2>

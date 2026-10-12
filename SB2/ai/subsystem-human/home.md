@@ -27,13 +27,15 @@
   opens or switches to Gallery.
 - Gallery is a playlist tab with an artwork-only grid. Its own sidebar toolbar
   button opens Gallery. The sidebar automatically uses Console View and shows
-  only indexed `Title Snap` games, grouped by console with a thumbnail on each
-  game row. Console/Path switching is disabled while Gallery is active. A
-  single sidebar click selects an artwork title; Enter or double-click opens a
-  playlist tab and starts playback. Gallery tiles use square, centered cover
-  crops and show title and system as an image overlay. Zero gap and square
-  corners create a continuous tile grid by default; tile size, gap, and corner
-  radius live in Options > UI Chrome > Gallery Tiles.
+  only consoles with indexed `Title Snap` artwork. Console rows use the normal
+  sidebar spacing, font, and leaf marker; selecting one fills the Gallery grid
+  with its artwork, without unfolding game rows or showing sidebar thumbnails.
+  Console/Path switching is disabled while Gallery is active. A single Gallery
+  card click selects an artwork title; Enter or double-click opens a playlist
+  tab and starts playback, leaving the Gallery tab intact. Gallery frames use
+  square, centered cover crops and show title and system as an image overlay.
+  Frame size, gap, corner radius, and compact title display live in Options >
+  Gallery. Zero gap and square corners create a continuous grid by default.
 - Options slide down over the main content and leave the title and footer
   visible. Command-comma (⌘,) toggles Options; the visible Close Options control and
   Escape dismiss the page. A separate Options window uses the same chrome.

@@ -380,6 +380,11 @@ refs.optionsThemeTab.addEventListener("click", () => {
   app.ui.renderAll();
 });
 
+refs.optionsGalleryTab.addEventListener("click", () => {
+  state.optionsSection = "gallery";
+  app.ui.renderAll();
+});
+
 refs.optionsFontsTab.addEventListener("click", () => {
   state.optionsSection = "fonts";
   app.ui.renderAll();

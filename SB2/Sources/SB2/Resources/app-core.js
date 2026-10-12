@@ -70,6 +70,7 @@ const state = {
   gallerySizeScale: 1,
   galleryGapRem: 0,
   galleryRadiusRem: 0,
+  galleryCompactTitles: false,
   playbackTabId: null,
   // The visible playlist is a browsing projection. Playback advances through
   // this separate queue so selecting another sidebar item cannot silently
@@ -195,6 +196,7 @@ const refs = {
   gallerySizeInput: document.getElementById("gallery-size-input"),
   galleryGapInput: document.getElementById("gallery-gap-input"),
   galleryRadiusInput: document.getElementById("gallery-radius-input"),
+  galleryCompactTitlesCheckbox: document.getElementById("gallery-compact-titles-checkbox"),
   gallerySizeValue: document.getElementById("gallery-size-value"),
   galleryGapValue: document.getElementById("gallery-gap-value"),
   galleryRadiusValue: document.getElementById("gallery-radius-value"),
@@ -221,9 +223,11 @@ const refs = {
   optionsDiagnosticsTab: document.getElementById("options-diagnostics-tab"),
   optionsAudioTab: document.getElementById("options-audio-tab"),
   optionsThemeTab: document.getElementById("options-theme-tab"),
+  optionsGalleryTab: document.getElementById("options-gallery-tab"),
   optionsFontsTab: document.getElementById("options-fonts-tab"),
   optionsWindowsTab: document.getElementById("options-windows-tab"),
   optionsThemeSection: document.getElementById("options-theme-section"),
+  optionsGallerySection: document.getElementById("options-gallery-section"),
   optionsFontsSection: document.getElementById("options-fonts-section"),
   optionsWindowsSection: document.getElementById("options-windows-section"),
   optionsDatabaseSection: document.getElementById("options-database-section"),
@@ -363,6 +367,7 @@ async function loadSettings() {
     state.gallerySizeScale = Math.max(0.65, Math.min(1.6, Number(parsed.gallerySizeScale) || 1));
     state.galleryGapRem = Math.max(0, Math.min(1, Number(parsed.galleryGapRem ?? 0)));
     state.galleryRadiusRem = Math.max(0, Math.min(1, Number(parsed.galleryRadiusRem ?? 0)));
+    state.galleryCompactTitles = Boolean(parsed.galleryCompactTitles);
     state.favoriteSortOrder = parsed.favoriteSortOrder === "alphabetical" ? "alphabetical" : "historical";
     state.selectedDatabaseGameKey = parsed.selectedDatabaseGameKey || null;
     state.collapsedConsoleNames = Array.isArray(parsed.collapsedConsoleNames)
@@ -459,6 +464,7 @@ function persistSettings() {
     gallerySizeScale: state.gallerySizeScale,
     galleryGapRem: state.galleryGapRem,
     galleryRadiusRem: state.galleryRadiusRem,
+    galleryCompactTitles: state.galleryCompactTitles,
     favoriteSortOrder: state.favoriteSortOrder,
     selectedDatabaseGameKey: state.selectedDatabaseGameKey,
     collapsedConsoleNames: state.collapsedConsoleNames,

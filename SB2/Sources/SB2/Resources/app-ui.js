@@ -65,9 +65,11 @@ function applyGallerySettings() {
   root.style.setProperty("--sb-gallery-tile-min-width", `${9 * state.gallerySizeScale}rem`);
   root.style.setProperty("--sb-gallery-gap", `${state.galleryGapRem}rem`);
   root.style.setProperty("--sb-gallery-radius", `${state.galleryRadiusRem}rem`);
+  refs.galleryGrid?.classList.toggle("is-compact-titles", state.galleryCompactTitles);
   if (refs.gallerySizeInput) refs.gallerySizeInput.value = String(state.gallerySizeScale);
   if (refs.galleryGapInput) refs.galleryGapInput.value = String(state.galleryGapRem);
   if (refs.galleryRadiusInput) refs.galleryRadiusInput.value = String(state.galleryRadiusRem);
+  if (refs.galleryCompactTitlesCheckbox) refs.galleryCompactTitlesCheckbox.checked = state.galleryCompactTitles;
   if (refs.gallerySizeValue) refs.gallerySizeValue.value = `${state.gallerySizeScale.toFixed(2)}×`;
   if (refs.galleryGapValue) refs.galleryGapValue.value = `${Number(state.galleryGapRem.toFixed(2))}rem`;
   if (refs.galleryRadiusValue) refs.galleryRadiusValue.value = `${Number(state.galleryRadiusRem.toFixed(2))}rem`;
@@ -91,6 +93,11 @@ function bindGallerySetting(input, key, minimum, maximum) {
 bindGallerySetting(refs.gallerySizeInput, "gallerySizeScale", 0.65, 1.6);
 bindGallerySetting(refs.galleryGapInput, "galleryGapRem", 0, 1);
 bindGallerySetting(refs.galleryRadiusInput, "galleryRadiusRem", 0, 1);
+refs.galleryCompactTitlesCheckbox?.addEventListener("change", () => {
+  state.galleryCompactTitles = refs.galleryCompactTitlesCheckbox.checked;
+  applyGallerySettings();
+  persistSettings();
+});
 applyGallerySettings();
 
 function makePlaylistTabID() {
@@ -1814,7 +1821,7 @@ function renderDatabaseGames() {
       let games = null;
       if (galleryActive) {
         heading.setAttribute("aria-pressed", String(isSelected));
-        heading.innerHTML = `<span class="database-console-label">${escapeHtml(consoleName)}</span>`;
+        heading.innerHTML = `<span class="database-disclosure" aria-hidden="true">•</span><span class="database-console-label">${escapeHtml(consoleName)}</span>`;
       } else {
         heading.setAttribute("aria-expanded", String(expanded));
         heading.innerHTML = `<span class="database-disclosure">${expanded ? "▾" : "▸"}</span><span class="database-console-label">${escapeHtml(consoleName)}</span>`;
@@ -3716,15 +3723,18 @@ function renderAll() {
   const themeSelected = state.optionsSection === "theme";
   const fontsSelected = state.optionsSection === "fonts";
   const windowsSelected = state.optionsSection === "windows";
+  const gallerySelected = state.optionsSection === "gallery";
   refs.optionsDatabaseTab.classList.toggle("is-selected", databaseSelected);
   refs.optionsRoutingTab.classList.toggle("is-selected", routingSelected);
   refs.optionsPlaybackTab.classList.toggle("is-selected", playbackSelected);
   refs.optionsDiagnosticsTab.classList.toggle("is-selected", diagnosticsSelected);
   refs.optionsAudioTab.classList.toggle("is-selected", audioSelected);
   refs.optionsThemeTab.classList.toggle("is-selected", themeSelected);
+  refs.optionsGalleryTab.classList.toggle("is-selected", gallerySelected);
   refs.optionsFontsTab.classList.toggle("is-selected", fontsSelected);
   refs.optionsWindowsTab.classList.toggle("is-selected", windowsSelected);
   refs.optionsThemeSection.classList.toggle("is-hidden", !themeSelected);
+  refs.optionsGallerySection.classList.toggle("is-hidden", !gallerySelected);
   refs.optionsFontsSection.classList.toggle("is-hidden", !fontsSelected);
   refs.optionsWindowsSection.classList.toggle("is-hidden", !windowsSelected);
   refs.optionsDatabaseSection.classList.toggle("is-hidden", !databaseSelected);
@@ -4484,7 +4494,14 @@ async function bootstrap() {
   // Load persisted appearance before the first Options-window paint. The
   // window is native-sized and immediately visible; deferring this until
   // after catalog/cache requests produces a distracting default-style flash.
-  window.SB2OptionsController.applyManifest(await window.spcBoySB2.frontendOptionsManifest());
+  const optionsManifest = await window.spcBoySB2.frontendOptionsManifest();
+  const appSections = [...(optionsManifest?.appSections || [])];
+  const interfaceIndex = appSections.indexOf("interface");
+  if (interfaceIndex >= 0) appSections.splice(interfaceIndex, 0, "gallery");
+  else appSections.push("gallery");
+  const fontsIndex = appSections.indexOf("interface");
+  appSections.splice(fontsIndex >= 0 ? fontsIndex + 1 : appSections.length, 0, "fonts");
+  window.SB2OptionsController.applyManifest({ ...optionsManifest, appSections });
   setStartupStage(0, "Applying saved interface settings and reopening your last session.");
   await loadSettings();
   applyGallerySettings();
