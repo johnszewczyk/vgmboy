@@ -2309,12 +2309,9 @@ function renderGalleryView() {
     const title = document.createElement("span");
     title.className = "gallery-card-title";
     title.textContent = String(game.displayName || game.name || "Untitled");
-    const system = document.createElement("span");
-    system.className = "gallery-card-system";
-    system.textContent = String(game.system || game.rootName || "");
     const caption = document.createElement("span");
     caption.className = "gallery-card-caption";
-    caption.append(title, system);
+    caption.append(title);
     artworkFrame.append(placeholder, image);
     button.append(artworkFrame, caption);
     card.appendChild(button);

@@ -2254,12 +2254,9 @@ body.sb2-frontend .gallery-artwork-frame.has-art .gallery-artwork-image { displa
 body.sb2-frontend .gallery-artwork-frame.has-art .gallery-artwork-placeholder { display: none; }
 body.sb2-frontend .gallery-artwork-placeholder { position: absolute; inset: 0; display: grid; place-items: center; font: var(--sb-space-066)/1 var(--mono-font-family); letter-spacing: .05em; }
 body.sb2-frontend .gallery-card-caption {
-  display: grid;
-  gap: var(--sb-space-020);
+  display: block;
   min-width: 0;
-  min-height: calc(2.5em + var(--sb-space-075) + var(--sb-space-075));
-  align-content: center;
-  padding: var(--sb-space-075);
+  padding: 0.25rem;
   background: #171b23;
 }
 body.sb2-frontend .gallery-card-title {
@@ -2272,17 +2269,8 @@ body.sb2-frontend .gallery-card-title {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
-body.sb2-frontend .gallery-card-system {
-  min-width: 0;
-  overflow: hidden;
-  color: #b0b8d0;
-  font: var(--sb-playlist-meta-font-size)/1.2 var(--mono-font-family);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 body.sb2-frontend .gallery-grid.is-compact-titles .gallery-card-caption {
   display: block;
-  padding: var(--sb-space-050);
 }
 body.sb2-frontend .gallery-grid.is-compact-titles .gallery-card-title {
   display: block;
@@ -2292,7 +2280,6 @@ body.sb2-frontend .gallery-grid.is-compact-titles .gallery-card-title {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-body.sb2-frontend .gallery-grid.is-compact-titles .gallery-card-system { display: none; }
 body.sb2-frontend .gallery-grid.is-pad-to-square .gallery-artwork-image { object-fit: contain; }
 body.sb2-frontend .sb-status {
   display: grid;
