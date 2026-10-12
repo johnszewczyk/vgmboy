@@ -31,6 +31,8 @@ public struct MetaManMetadataTrackProjection: Encodable, Sendable {
     /// The native decoder/subsong index. UAC stores this as a decimal string
     /// in playlist entries because the manifest keeps playlist fields open.
     public let sourceTrackIndex: Int?
+    /// Zero-based row position in the source M3U queue, when one applies.
+    public let sourcePlaylistOrder: Int?
     public let metadata: [String: UACJSONValue]
     public let sourcePlaylistPath: String?
     public let rawLine: String?
@@ -42,6 +44,7 @@ public struct MetaManMetadataTrackProjection: Encodable, Sendable {
 
     public init(
         sourceTrackIndex: Int?,
+        sourcePlaylistOrder: Int? = nil,
         metadata: [String: UACJSONValue],
         sourcePlaylistPath: String? = nil,
         rawLine: String? = nil,
@@ -52,6 +55,7 @@ public struct MetaManMetadataTrackProjection: Encodable, Sendable {
         repeatRaw: String? = nil
     ) {
         self.sourceTrackIndex = sourceTrackIndex
+        self.sourcePlaylistOrder = sourcePlaylistOrder
         self.metadata = metadata
         self.sourcePlaylistPath = sourcePlaylistPath
         self.rawLine = rawLine
@@ -220,6 +224,7 @@ public enum MetaManMetadataHarvester {
                     let facts = track.document.technicalFacts
                     return MetaManMetadataTrackProjection(
                         sourceTrackIndex: track.sourceTrackIndex,
+                        sourcePlaylistOrder: facts["m3uSourceOrder"].flatMap(Int.init),
                         metadata: MetaManMetadataProjector.memberFields(from: track.document),
                         sourcePlaylistPath: facts["m3uSourcePath"],
                         rawLine: facts["m3uRawLine"],
@@ -305,7 +310,7 @@ public enum MetaManMetadataHarvester {
             _ keyPath: KeyPath<MetadataFields, String?>,
             name: String
         ) -> String? {
-            let values = documents.map { normalized($0.fields[keyPath: keyPath]) }
+            let values = documents.map { normalizedSourceValue($0.fields[keyPath: keyPath]) }
             let distinct = Set(values.compactMap { $0 })
             guard distinct.count <= 1,
                   distinct.isEmpty || values.allSatisfy({ $0 != nil }) else {
@@ -331,9 +336,18 @@ public enum MetaManMetadataHarvester {
         let headerAlbum = sharedHeaderValue(\.game, name: "game")
         let headerArtist = sharedHeaderValue(\.artist, name: "artist")
         let headerCopyright = sharedHeaderValue(\.comment, name: "comment")
+        let headerYear = sharedHeaderValue(\.year, name: "year")
         let m3uAlbum = sharedM3UValue("TITLE", tagName: "TITLE")
         let m3uArtist = sharedM3UValue("ARTIST", tagName: "ARTIST")
         let m3uDate = sharedM3UValue("DATE", tagName: "DATE")
+        let m3uYear = sharedM3UValue("YEAR", tagName: "YEAR")
+        let m3uComposer = sharedM3UValue("COMPOSER", tagName: "COMPOSER")
+        let m3uDumper = sharedM3UValue("RIPPER", tagName: "RIPPER")
+        let m3uTagger = sharedM3UValue("TAGGER", tagName: "TAGGER")
+        let m3uDeveloper = sharedM3UValue("DEVELOPER", tagName: "DEVELOPER")
+        let m3uPublisher = sharedM3UValue("PUBLISHER", tagName: "PUBLISHER")
+        let m3uCopyright = sharedM3UValue("COPYRIGHT", tagName: "COPYRIGHT")
+        let m3uGenre = sharedM3UValue("GENRE", tagName: "GENRE")
 
         func choose(_ header: String?, _ m3u: String?, field: String) -> String? {
             guard let m3u else { return header }
@@ -350,8 +364,19 @@ public enum MetaManMetadataHarvester {
         if let artist = choose(headerArtist, m3uArtist, field: "Album Artist") {
             fields["Album Artist"] = .string(artist)
         }
-        if let headerCopyright { fields["Copyright"] = .string(headerCopyright) }
+        if let copyright = choose(headerCopyright, m3uCopyright, field: "Copyright") {
+            fields["Copyright"] = .string(copyright)
+        }
+        if let year = choose(headerYear, m3uYear, field: "Year") {
+            fields["Year"] = .string(year)
+        }
         if let m3uDate { fields["Date"] = .string(m3uDate) }
+        if let m3uComposer { fields["Composer"] = .string(m3uComposer) }
+        if let m3uDumper { fields["Dumper"] = .string(m3uDumper) }
+        if let m3uTagger { fields["Tagger"] = .string(m3uTagger) }
+        if let m3uDeveloper { fields["Developer"] = .string(m3uDeveloper) }
+        if let m3uPublisher { fields["Publisher"] = .string(m3uPublisher) }
+        if let m3uGenre { fields["Genre"] = .string(m3uGenre) }
         return (fields, conflicts)
     }
 
@@ -359,6 +384,13 @@ public enum MetaManMetadataHarvester {
         guard let value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func normalizedSourceValue(_ value: String?) -> String? {
+        guard let trimmed = normalized(value) else { return nil }
+        let placeholder = trimmed.lowercased().replacingOccurrences(of: " ", with: "")
+        guard !["?", "<?>", "< ? >"].contains(placeholder) else { return nil }
+        return trimmed
     }
 }
 
