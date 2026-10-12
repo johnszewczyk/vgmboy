@@ -4425,11 +4425,12 @@ async function sampleSB2CPU() {
       const cpuMilliseconds = Number(await window.spcBoySB2.processCPUTimeMilliseconds());
       const wallMilliseconds = performance.now();
       if (Number.isFinite(cpuMilliseconds) && previousCPU !== null && previousWall !== null) {
-        const processorCount = Math.max(1, Number(navigator.hardwareConcurrency) || 1);
-        const percent = Math.max(0, Math.min(100, Math.round(
-          ((cpuMilliseconds - previousCPU) / Math.max(1, wallMilliseconds - previousWall)) * 100 / processorCount
-        )));
-        refs.sb2CPUValue.textContent = `${String(percent).padStart(2, "0")}%`;
+        // Show this process's use of one logical core, with enough precision
+        // to make the low but steady audio/UI workload visible.
+        const percent = Math.max(0, Math.min(100,
+          ((cpuMilliseconds - previousCPU) / Math.max(1, wallMilliseconds - previousWall)) * 100
+        ));
+        refs.sb2CPUValue.textContent = `${percent.toFixed(1)}%`;
         refs.sb2CPUFill.style.width = `${percent}%`;
       }
       previousCPU = cpuMilliseconds;
