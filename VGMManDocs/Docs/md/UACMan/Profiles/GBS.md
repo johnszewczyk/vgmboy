@@ -47,9 +47,10 @@ The native header fields and version byte follow the
 | M3U `# @COPYRIGHT value` | Copyright | `game.metadata["Copyright"]` | Compare with the GBS header comment; keep a conflicting value in the attached M3U for review. |
 | M3U `::GBS,index,title,...` title | Title | `playlists[].entries[].title` | Source track title, retained as written. Do not split embedded composer, game, publisher, or copyright text out of the title. |
 | M3U source index and row order | Playlist `trackIndex` and entry order | `playlists[].entries[].trackIndex` | GBS indexes are zero-based, including hexadecimal indexes. Keep entries in the M3U's row order; do not sort them by source index or create a second Track Number tag. |
-| M3U row, source path, and authored values | M3U | `playlists[].entries[].extraFields["M3U"]` | Keep the exact raw row, source M3U path, populated raw timing/count fields, and positive millisecond projections together in one nested JSON value. Do not expose separate M3U timing tags or duplicate raw fields at entry level. |
+| M3U row, source path, and authored values | M3U | `playlists[].entries[].extraFields["M3U"]` | Keep the tag name exactly `M3U`; do not split or title-case the acronym. Keep the exact raw row, source M3U path, populated raw timing/count fields, and positive millisecond projections together in one nested JSON value. Do not expose separate M3U timing tags or duplicate raw fields at entry level. |
 | M3U time, loop, fade columns | M3U timing properties | `playlists[].entries[].extraFields["M3U"]` | Convert fractional final time components to integer milliseconds. A loop-start value marked with `-` maps to Intro Length; do not infer a loop duration from it. A bare `-` sets Loop Length equal to Play Length. Missing or invalid times stay absent. Keep raw strings and repeat counts in the nested value and the original M3U attachment byte-exact. |
 | GBS header version byte | Format | `playlists[].entries[].extraFields["Format"]` | Use `GBS v.<version>` on every logical track, for example `GBS v.1`. Read the byte from that physical member; never normalize versions. |
+| GBS member filename stem beginning with `DMG-` or `CGB-` | Catalog | `game.metadata["Catalog"]` | Preserve the exact stem, including prefix and suffix (for example, `DMG-AIPE-USA`). Set it once at package scope when all included GBS members share one code. Do not infer it from a title, No-Intro ID, or region. Different codes in one package require review. |
 
 ## Application Behavior
 
@@ -99,6 +100,15 @@ The native header fields and version byte follow the
   surface it in each track's **Format** field. A set can contain v1, v2, or
   v4 files; do not flatten them to one version. Report multiple versions
   within a game/package and hold the affected package for review.
+- **Catalog and subtrack names** — Read `Catalog` only from a playable GBS
+  member filename whose stem begins `DMG-` or `CGB-`; retain the complete stem
+  verbatim. A single shared code belongs at package scope. Differing codes in
+  one package require review. Keep each M3U-authored track title exactly as
+  written, including numbered or generic titles such as `BGM #01` and numeric
+  labels. Do not derive a title from a sidecar filename or invent a better
+  title. When an alternate source for the same GBS payload supplies different
+  subtrack names, preserve the source distinction and report it for review
+  rather than silently replacing or combining the lists.
 - **GBS header fields** — Validate the 112-byte fixed header, `GBS` signature,
   nonzero version and track count, and the declared first-track index. Keep
   load/init/play addresses and timer bytes as validation evidence only; do
