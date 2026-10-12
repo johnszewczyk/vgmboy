@@ -24,9 +24,11 @@
   divider lines. UI Chrome and UI Fonts are separate SPCBOY pages. UI Fonts
   exposes playlist-header styling and titlebar font color and bold controls.
   The Gallery page controls crop-to-square or pad-to-square artwork fit, frame
-  size, gap, corner radius, and compact nametag titles. Each card keeps artwork
-  inside a bordered square with a separate title nametag below it; frame gap
-  also pads the grid's outer edges.
+  size, gap, and corner radius. Each card keeps inset square artwork with a
+  separate one-line title nametag. Titles use the Sidebar + Playlist font size
+  and end with an ellipsis when they do not fit. Frame gap also pads the grid's
+  outer edges. Gallery settings are stored with native SB2 preferences and
+  restored on launch.
   The same page layout and title/footer chrome appear in the optional
   standalone Options window.
 - UI Chrome Font Size scales toolbar rows, buttons, icons, and setting-field

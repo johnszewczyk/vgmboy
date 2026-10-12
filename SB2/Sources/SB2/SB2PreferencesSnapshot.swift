@@ -59,6 +59,10 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
     var favoriteSortOrder: FavoriteOrder?
     var selectedDatabaseGameKey: String?
     var collapsedConsoleNames: [String]?
+    var gallerySizeScale: Double?
+    var galleryGapRem: Double?
+    var galleryRadiusRem: Double?
+    var galleryFitMode: String?
     var uiFontSizePt: Double?
     var uiChromeFontSizePt: Double?
     var contentFontSizePt: Double?
@@ -187,6 +191,10 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
         selectedFolderPath = nil
         selectedBrowserPath = nil
         sidebarMode = sidebarMode == .paths ? .paths : .consoles
+        gallerySizeScale = min(1.6, max(0.65, gallerySizeScale ?? 1))
+        galleryGapRem = min(1, max(0, galleryGapRem ?? 0))
+        galleryRadiusRem = min(1, max(0, galleryRadiusRem ?? 0))
+        galleryFitMode = galleryFitMode == "pad" ? "pad" : "crop"
         normalizeSharedPlaybackPreferences()
         normalizePlaylistColumnPreferences()
         autoResizeAnimationMilliseconds = FrontendAnimationTimings.clamp(
