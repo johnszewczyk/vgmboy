@@ -15,12 +15,15 @@ The native header fields and version byte follow the
   `.gbs` through libgme. Neither current application reader supports `.gbr`,
   `.mgb`, or general `.gb` ROMs.
 - **Source members** — `.gbs`; optional companion `.m3u` files.
-- **Coverage** — GBS header game, artist, and comment fields; M3U track rows
-  and recognized `# @KEY value` comments.
-- **Status** — Reader, writer, and consumer mappings are aligned in code.
-  Apply this profile per package: inspect every associated M3U, hold conflicting
-  rows for review, then verify the generated playlist through UACMan,
-  ScanSong, and Songbase. Parser support alone does not establish that a source
+- **Coverage** — GBS header Game Title, Author, and Copyright fields; M3U
+  track rows and recognized `# @KEY value` comments.
+- **Status** — Reader, writer, and consumer mappings are aligned for ASCII
+  header values and M3U projections. The GBS header does not declare a text
+  encoding; hold non-ASCII header strings for source-specific review as
+  described below. Apply this profile per package: inspect each associated
+  M3U, hold conflicting rows for review, then verify the generated playlist
+  through UACMan, ScanSong, and Songbase. Parser support alone does not
+  establish that a source
   set is coherent or canonical. MetaMan converts
   fractional play, loop, and fade times to integer milliseconds, and reads
   NEZplug's loop-duration, loop-start, and whole-play loop forms. When rows
@@ -31,9 +34,9 @@ The native header fields and version byte follow the
 
 | Source Tag | UAC Tag | UAC Coded Tag | Tag Notes |
 | --- | --- | --- | --- |
-| GBS header `game` | Album | `game.metadata["Album"]` | One nonempty, shared value for the physical GBS file. Do not substitute a filename or an inferred DAT title. |
-| GBS header `artist` | Album Artist | `game.metadata["Album Artist"]` | Shared source value; do not duplicate it as track Artist. |
-| GBS header copyright string (MetaMan exposes `comment`) | Copyright | `game.metadata["Copyright"]` | This fixed header slot is the format's copyright field; preserve its populated value as written. |
+| GBS header Game Title | Album | `game.metadata["Album"]` | One nonempty, shared value for the physical GBS file. Do not substitute a filename or an inferred DAT title. |
+| GBS header Author (MetaMan exposes `artist`) | Album Artist | `game.metadata["Album Artist"]` | Shared source value; do not duplicate it as track Artist. |
+| GBS header Copyright (MetaMan exposes `comment`) | Copyright | `game.metadata["Copyright"]` | This fixed header slot is the format's copyright field; preserve its populated value as written. |
 | M3U `# @TITLE value` | Album | `game.metadata["Album"]` | Use only when all applicable rows agree and the value agrees with a populated header; otherwise retain the header and route the conflict to review. |
 | M3U `# @ARTIST value` | Album Artist | `game.metadata["Album Artist"]` | Use only when the value is shared and unambiguous; if it conflicts with a populated header, retain the header and report the conflict. |
 | M3U `# @DATE value` | Date | `game.metadata["Date"]` | Keep the source value; do not infer a date from a filename or composite track title. |
@@ -100,16 +103,34 @@ The native header fields and version byte follow the
   the game root is positive, put the canonical DAT title root string in
   package **Game ID**; this does not select a region or revision. Keep numeric
   DAT IDs in AudioMan only.
-- **Settled-package promotion** — A package with one valid GBS member, no
-  unresolved M3U/title/timing conflict, no header/version exception, and no
+- **Settled-package promotion** — A package with valid GBS member(s), no
+  unresolved source-header, M3U/title/timing, or version conflict, and no
   unexplained companion file can move to UAC without waiting for unrelated
-  review cases. Preserve its source package and member; project populated
+  review cases. Preserve its source package and members; project populated
   native header values to Album, Album Artist, and Copyright; add one logical
   playlist entry per declared track with `Format` on every entry; and retain
-  the four playable-payload hashes for the physical GBS. If no M3U supplies a
-  track title or timing, leave those fields absent. Do not add a `Game ID`
+  the four playable-payload hashes for every physical GBS. If no M3U supplies
+  a track title or timing, leave those fields absent. Do not add a `Game ID`
   until the canonical title root has positive No-Intro evidence. Keep each
   unresolved package as its own case page in the AudioMan set report.
+- **Multiple GBS members** — Project the native `game`, `artist`, and
+  `comment` values (Game Title, Author, and Copyright) to package scope only
+  when the included physical GBS members agree. The current MetaMan/UAC
+  metadata harvester keeps only shared header
+  values at package scope and does not preserve varying header values on each
+  physical member. Hold any package whose source headers disagree until an
+  explicit member-level mapping is decided. Do not assume a varying header
+  `artist` (the source Author field) is a track `Title`, or replace a
+  conflicting header with the outer archive filename. Record each package as
+  its own review case.
+- **Header text encoding** — The [GBS format reference](https://github.com/mmitch/gbsplay/blob/master/gbsformat.txt)
+  defines fixed-width Game Title, Author, and Copyright strings but does not
+  identify a character encoding. ASCII values can be projected normally. For
+  non-ASCII bytes, do not assume UTF-8 or Windows-1252 and do not surface
+  mojibake. Preserve the source GBS
+  unchanged, include exact bytes in the case evidence, and hold decoded values
+  until the encoding is verified for that source. A CP932 rendering may be
+  shown as a review aid, but it is not approved metadata until confirmed.
 - **Format version** — Read version byte `0x03` for every physical GBS and
   surface it in each track's **Format** field. A set can contain v1, v2, or
   v4 files; do not flatten them to one version. Report multiple versions
