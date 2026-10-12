@@ -66,10 +66,12 @@ function applyGallerySettings() {
   root.style.setProperty("--sb-gallery-gap", `${state.galleryGapRem}rem`);
   root.style.setProperty("--sb-gallery-radius", `${state.galleryRadiusRem}rem`);
   refs.galleryGrid?.classList.toggle("is-compact-titles", state.galleryCompactTitles);
+  refs.galleryGrid?.classList.toggle("is-pad-to-square", state.galleryFitMode === "pad");
   if (refs.gallerySizeInput) refs.gallerySizeInput.value = String(state.gallerySizeScale);
   if (refs.galleryGapInput) refs.galleryGapInput.value = String(state.galleryGapRem);
   if (refs.galleryRadiusInput) refs.galleryRadiusInput.value = String(state.galleryRadiusRem);
   if (refs.galleryCompactTitlesCheckbox) refs.galleryCompactTitlesCheckbox.checked = state.galleryCompactTitles;
+  if (refs.galleryFitModeSelect) refs.galleryFitModeSelect.value = state.galleryFitMode;
   if (refs.gallerySizeValue) refs.gallerySizeValue.value = `${state.gallerySizeScale.toFixed(2)}×`;
   if (refs.galleryGapValue) refs.galleryGapValue.value = `${Number(state.galleryGapRem.toFixed(2))}rem`;
   if (refs.galleryRadiusValue) refs.galleryRadiusValue.value = `${Number(state.galleryRadiusRem.toFixed(2))}rem`;
@@ -95,6 +97,11 @@ bindGallerySetting(refs.galleryGapInput, "galleryGapRem", 0, 1);
 bindGallerySetting(refs.galleryRadiusInput, "galleryRadiusRem", 0, 1);
 refs.galleryCompactTitlesCheckbox?.addEventListener("change", () => {
   state.galleryCompactTitles = refs.galleryCompactTitlesCheckbox.checked;
+  applyGallerySettings();
+  persistSettings();
+});
+refs.galleryFitModeSelect?.addEventListener("change", () => {
+  state.galleryFitMode = refs.galleryFitModeSelect.value === "pad" ? "pad" : "crop";
   applyGallerySettings();
   persistSettings();
 });
@@ -2308,8 +2315,8 @@ function renderGalleryView() {
     const caption = document.createElement("span");
     caption.className = "gallery-card-caption";
     caption.append(title, system);
-    artworkFrame.append(placeholder, image, caption);
-    button.append(artworkFrame);
+    artworkFrame.append(placeholder, image);
+    button.append(artworkFrame, caption);
     card.appendChild(button);
     refs.galleryGrid.appendChild(card);
 

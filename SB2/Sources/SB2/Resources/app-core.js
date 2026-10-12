@@ -71,6 +71,7 @@ const state = {
   galleryGapRem: 0,
   galleryRadiusRem: 0,
   galleryCompactTitles: false,
+  galleryFitMode: "crop",
   playbackTabId: null,
   // The visible playlist is a browsing projection. Playback advances through
   // this separate queue so selecting another sidebar item cannot silently
@@ -197,6 +198,7 @@ const refs = {
   galleryGapInput: document.getElementById("gallery-gap-input"),
   galleryRadiusInput: document.getElementById("gallery-radius-input"),
   galleryCompactTitlesCheckbox: document.getElementById("gallery-compact-titles-checkbox"),
+  galleryFitModeSelect: document.getElementById("gallery-fit-mode-select"),
   gallerySizeValue: document.getElementById("gallery-size-value"),
   galleryGapValue: document.getElementById("gallery-gap-value"),
   galleryRadiusValue: document.getElementById("gallery-radius-value"),
@@ -368,6 +370,7 @@ async function loadSettings() {
     state.galleryGapRem = Math.max(0, Math.min(1, Number(parsed.galleryGapRem ?? 0)));
     state.galleryRadiusRem = Math.max(0, Math.min(1, Number(parsed.galleryRadiusRem ?? 0)));
     state.galleryCompactTitles = Boolean(parsed.galleryCompactTitles);
+    state.galleryFitMode = parsed.galleryFitMode === "pad" ? "pad" : "crop";
     state.favoriteSortOrder = parsed.favoriteSortOrder === "alphabetical" ? "alphabetical" : "historical";
     state.selectedDatabaseGameKey = parsed.selectedDatabaseGameKey || null;
     state.collapsedConsoleNames = Array.isArray(parsed.collapsedConsoleNames)
@@ -465,6 +468,7 @@ function persistSettings() {
     galleryGapRem: state.galleryGapRem,
     galleryRadiusRem: state.galleryRadiusRem,
     galleryCompactTitles: state.galleryCompactTitles,
+    galleryFitMode: state.galleryFitMode,
     favoriteSortOrder: state.favoriteSortOrder,
     selectedDatabaseGameKey: state.selectedDatabaseGameKey,
     collapsedConsoleNames: state.collapsedConsoleNames,

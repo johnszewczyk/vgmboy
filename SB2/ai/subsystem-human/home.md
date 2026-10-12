@@ -32,10 +32,12 @@
   with its artwork, without unfolding game rows or showing sidebar thumbnails.
   Console/Path switching is disabled while Gallery is active. A single Gallery
   card click selects an artwork title; Enter or double-click opens a playlist
-  tab and starts playback, leaving the Gallery tab intact. Gallery frames use
-  square, centered cover crops and show title and system as an image overlay.
-  Frame size, gap, corner radius, and compact title display live in Options >
-  Gallery. Zero gap and square corners create a continuous grid by default.
+  tab and starts playback, leaving the Gallery tab intact. Gallery cards use a
+  bordered square artwork frame and a separate nametag below it. Artwork can
+  crop to fill the square or pad to show the complete image. Frame size, gap,
+  corner radius, fit, and compact nametag titles live in Options > Gallery. The
+  frame gap also pads the grid edges; zero gap and square corners create a
+  continuous grid by default.
 - Options slide down over the main content and leave the title and footer
   visible. Command-comma (⌘,) toggles Options; the visible Close Options control and
   Escape dismiss the page. A separate Options window uses the same chrome.

@@ -28,6 +28,9 @@ in the SB2 home view.
   or Gallery projection changes. The sidebar inserts large game lists in
   batches, and replacing an equivalent array on each render cancels pending
   batches and can leave rows missing or inactive.
+- Gallery cards keep square artwork separate from a bordered, bottom nametag.
+  The artwork fit setting chooses centered crop or centered padding; frame gap
+  applies at grid edges as well as between cards.
 - A delayed sidebar preview and a context-menu action belong to the tab where
   the user invoked them. Tab activation invalidates pending sidebar work. Any
   asynchronous catalog action must recheck its captured tab before replacing
