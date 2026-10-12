@@ -18,6 +18,8 @@ row models, queue publication, and UI.
 ## Invariants
 
 - Only attached and enabled roots are visible to browser projections.
+- Use `schemaVersion()` for startup schema checks; `summary()` also counts all
+  track rows and is reserved for callers that need that full count.
 - Dead sources are excluded from active read results.
 - Catalog identity preserves root ID, source path, archive entry, and track index.
 - Source, folder, and path hydration are bounded SQLite projections; they never

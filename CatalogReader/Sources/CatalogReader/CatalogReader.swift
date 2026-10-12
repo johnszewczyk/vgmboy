@@ -205,9 +205,16 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
     public func summary() throws -> CatalogSummary {
         CatalogSummary(
             path: databaseURL.path,
-            schemaVersion: try scalarInt("PRAGMA user_version;"),
+            schemaVersion: try schemaVersion(),
             trackCount: try scalarInt("SELECT COUNT(*) FROM tracks;")
         )
+    }
+
+    /// Reads only the catalog schema version. Callers that need to validate a
+    /// catalog during startup should not have to count every track just to
+    /// retrieve this small piece of metadata.
+    public func schemaVersion() throws -> Int {
+        try scalarInt("PRAGMA user_version;")
     }
 
     /// Counts only the rows a player is permitted to present. This is distinct

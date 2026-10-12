@@ -24,8 +24,12 @@ async function handleLibraryRootsChanged(roots) {
   state.databaseFileTree = [];
   renderAll();
   try {
-    await refreshDatabaseGamesForVisibleRoots();
-    if (state.sidebarMode === "paths") await app.ui.loadDatabaseFiles();
+    if (state.sidebarMode === "paths") {
+      app.ui.invalidateDatabaseGames();
+      await app.ui.loadDatabaseFiles();
+    } else {
+      await refreshDatabaseGamesForVisibleRoots();
+    }
     persistSettings();
   } finally {
     state.databaseSidebarLoading = false;

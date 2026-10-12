@@ -183,7 +183,7 @@ function persistPlaylistTabs() {
   }, 500);
 }
 
-function restorePlaylistTabView(tab) {
+function restorePlaylistTabView(tab, { loadMissingGames = true, loadGalleryData = true } = {}) {
   state.activePlaylistTabId = tab.id;
   state.activePlaylistTabKind = tab.kind === "gallery" ? "gallery" : "playlist";
   if (state.activePlaylistTabKind === "gallery") {
@@ -194,6 +194,12 @@ function restorePlaylistTabView(tab) {
     refs.sidebarSearchInput.value = "";
     void syncSidebarView();
     if (sidebarModeChanged) persistSettings();
+    if (sidebarModeChanged
+        && loadMissingGames
+        && !state.databaseGames.length
+        && !state.databaseSidebarLoading) {
+      void loadDatabaseGames();
+    }
   }
   state.playlistTitle = String(tab.title || "Playlist");
   state.playlist = Array.isArray(tab.playlist) ? [...tab.playlist] : [];
@@ -214,7 +220,7 @@ function restorePlaylistTabView(tab) {
   if (isAvailableInteractionTarget(activeTabTarget)) selectInteractionTarget(activeTabTarget);
   else if (isAvailableInteractionTarget(selectedPlaylistRow)) selectInteractionTarget(selectedPlaylistRow);
   else syncInteractionSelectionTarget();
-  if (state.activePlaylistTabKind === "gallery") void loadGalleryGames();
+  if (state.activePlaylistTabKind === "gallery" && loadGalleryData) void loadGalleryGames();
   uiApp.playback.updateTimingSummary();
   uiApp.playback.updatePlaybackReadout();
 }
@@ -376,7 +382,7 @@ function closePlaylistTab(tabID = state.activePlaylistTabId) {
   return true;
 }
 
-function restorePlaylistTabs(value) {
+function restorePlaylistTabs(value, { loadMissingGames = true, loadGalleryData = true } = {}) {
   if (value?.version !== 1 || !Array.isArray(value.tabs) || !value.tabs.length) return false;
   playlistContentRequestGeneration += 1;
   playlistSortGeneration += 1;
@@ -404,7 +410,7 @@ function restorePlaylistTabs(value) {
   if (!tabs.length) return false;
   state.playlistTabs = tabs;
   state.activePlaylistTabId = identifiers.has(value.activeID) ? value.activeID : tabs[0].id;
-  restorePlaylistTabView(findActivePlaylistTab());
+  restorePlaylistTabView(findActivePlaylistTab(), { loadMissingGames, loadGalleryData });
   renderPlaylistTabs();
   persistPlaylistTabs();
   return true;
@@ -439,6 +445,17 @@ function rebuildDatabaseGameSearchIndex(games = state.databaseGames) {
     // The WebKit list only filters it locally so typing never reopens SQLite.
     searchText: String(game.searchText || "")
   }));
+}
+
+function invalidateDatabaseGames() {
+  state.databaseGames = [];
+  state.databaseGameGroups = [];
+  state.databaseSearchGames = null;
+  rebuildDatabaseGameSearchIndex([]);
+  state.galleryGames = [];
+  state.galleryGamesLoaded = false;
+  state.galleryGamesError = "";
+  galleryRenderSignature = null;
 }
 
 function localDatabaseSearch(query) {
@@ -4482,11 +4499,15 @@ async function bootstrap() {
   state.databaseLocationStatus = state.databaseLocation?.requiresRestart
     ? "Restart SPCBoy to use the selected database."
     : "The shared ScanSong catalog is active and opened read-only.";
-  await window.spcBoySB2?.configureArchiveCache?.({
-    enabled: state.archiveCacheEnabled,
-    limitBytes: state.archiveCacheLimitBytes
-  });
-  await uiApp.ui.refreshArchiveCacheSummary();
+  const [archiveCacheConfiguration, archiveCacheLocation] = await Promise.all([
+    window.spcBoySB2?.configureArchiveCache?.({
+      enabled: state.archiveCacheEnabled,
+      limitBytes: state.archiveCacheLimitBytes
+    }),
+    window.spcBoySB2?.archiveCacheLocation?.()
+  ]);
+  state.archiveCacheSummary = archiveCacheConfiguration?.summary || null;
+  state.archiveCacheLocation = archiveCacheLocation || "";
   if (window.spcBoySB2?.setRoutingPreferences) {
     state.routingPreferences = { ...(await window.spcBoySB2.setRoutingPreferences(state.routingPreferences)) };
     persistSettings();
@@ -4525,14 +4546,23 @@ async function bootstrap() {
   clearPlaylistSelection();
   state.totalSeconds = targetPlaybackSeconds();
   persistSettings();
+  setStartupStage(2, "Reopening saved playlists and preparing playback controls.");
+  const restoredPlaylistTabs = !window.spcBoySB2?.isOptionsWindow
+    && restorePlaylistTabs(savedPlaylistTabs, { loadMissingGames: false, loadGalleryData: false });
+  if (!restoredPlaylistTabs && !window.spcBoySB2?.isOptionsWindow) ensurePlaylistTab();
+
   if (!window.spcBoySB2?.isOptionsWindow && window.spcBoySB2?.databaseRoots) {
-    setStartupStage(2, "Indexing library sources for the sidebar and its search results.");
+    setStartupStage(3, "Loading the selected library view and its search results.");
     state.libraryRoots = await window.spcBoySB2.databaseRoots();
     await uiApp.ui.handleLibraryRootsChanged(state.libraryRoots);
+  } else {
+    setStartupStage(3, "Preparing playback controls.");
   }
-  setStartupStage(3, "Reopening saved playlists and preparing playback controls.");
-  const restoredPlaylistTabs = !window.spcBoySB2?.isOptionsWindow && restorePlaylistTabs(savedPlaylistTabs);
-  if (!restoredPlaylistTabs && !window.spcBoySB2?.isOptionsWindow) ensurePlaylistTab();
+  if (restoredPlaylistTabs
+      && state.activePlaylistTabKind === "gallery"
+      && !state.galleryGamesLoaded) {
+    void loadGalleryGames();
+  }
   renderAll();
   if (!restoredPlaylistTabs && state.sidebarMode === "consoles") {
     const selectedGame = state.databaseGames.find((game) => databaseGameKey(game) === state.selectedDatabaseGameKey);
@@ -4665,6 +4695,7 @@ uiApp.ui = {
   setAllDatabaseConsolesCollapsed,
   setAllSidebarNodesCollapsed,
   refreshDatabaseGamesForVisibleRoots,
+  invalidateDatabaseGames,
   setSidebarMode,
   cycleSidebarMode,
   updateSidebarSearch,
