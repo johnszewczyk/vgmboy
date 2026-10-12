@@ -1157,13 +1157,13 @@ def harvest_format_metadata(
             )
         normalized_tracks[path] = normalized
 
-    if extension == "nsf":
+    if extension in {"nsf", "gbs"}:
         game = recipe.get("game")
         if not isinstance(game, dict):
-            raise UACError("Recipe game must be an object before NSF metadata can be imported.")
+            raise UACError(f"Recipe game must be an object before .{extension} metadata can be imported.")
         game_metadata = game.setdefault("metadata", {})
         if not isinstance(game_metadata, dict):
-            raise UACError("Recipe game metadata must be an object before NSF metadata can be imported.")
+            raise UACError(f"Recipe game metadata must be an object before .{extension} metadata can be imported.")
         for key, value in game_fields.items():
             merge_imported_metadata_tag(game_metadata, key, value)
 

@@ -144,7 +144,9 @@ GBS has a fixed 112-byte header. Addresses are little-endian; the three
 header-declared track becomes a result entry with its native zero-based source
 index. When a directory harvest supplies sibling NEZplug extended-M3U files,
 MetaMan matches `filename::GBS,index,title,time,loop,fade,loopcount` rows to
-their referenced GBS member. It projects authored track titles, timing, and
+their referenced GBS member. A row may omit the final `.gbs` suffix; MetaMan
+then matches an exact case-insensitive filename stem. It projects authored
+track titles, timing, and
 `# @TITLE` / `# @ARTIST` / other `# @KEY` comments onto the corresponding
 tracks, while retaining the M3U bytes as companion metadata. Decimal and
 `$hex` track indexes follow NEZplug's zero-based GBS convention. No Game Boy
@@ -156,6 +158,8 @@ intro timing without inferring a loop duration, while a bare hyphen means the
 loop duration equals the play time. Conflicting M3U rows leave ambiguous
 fields unset and add a diagnostic. GBS headers do not encode a duration, so a
 missing M3U value remains unknown rather than receiving a default duration.
+If multiple source members share the same stem, archive packaging must hold
+the ambiguous reference for review rather than assigning it to both.
 
 | Source position | Meaning |
 | --- | --- |

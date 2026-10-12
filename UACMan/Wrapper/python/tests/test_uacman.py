@@ -502,7 +502,12 @@ class UACManRoundTripTests(unittest.TestCase):
                         },
                     }],
                 },
-                "gameMetadata": {}, "sharedFieldConflicts": [], "diagnosticCount": 0, "failures": [],
+                "gameMetadata": {
+                    "Album": "Fixture Album",
+                    "Album Artist": "Fixture Composer",
+                    "Copyright": "1989 Example Publisher",
+                },
+                "sharedFieldConflicts": [], "diagnosticCount": 0, "failures": [],
             }
             helper.write_text(
                 "#!/usr/bin/env python3\nimport json\nprint(json.dumps(" + repr(response) + "))\n",
@@ -534,6 +539,9 @@ class UACManRoundTripTests(unittest.TestCase):
             self.assertTrue(inspected["verifiedPayload"])
             self.assertEqual(inspected["members"], 2)
             self.assertEqual(manifest["manifestVersion"], 2)
+            self.assertEqual(manifest["game"]["metadata"]["Album"], "Fixture Album")
+            self.assertEqual(manifest["game"]["metadata"]["Album Artist"], "Fixture Composer")
+            self.assertEqual(manifest["game"]["metadata"]["Copyright"], "1989 Example Publisher")
             self.assertEqual([entry["trackIndex"] for entry in track_list["entries"]], ["0", "1", "0"])
             self.assertEqual(
                 [entry["targetMemberPath"] for entry in track_list["entries"]],

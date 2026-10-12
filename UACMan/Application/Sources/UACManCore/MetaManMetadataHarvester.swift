@@ -316,13 +316,8 @@ public enum MetaManMetadataHarvester {
         }
 
         func sharedM3UValue(_ sourceName: String, tagName: String) -> String? {
-            let values = documents.map { document -> String? in
-                let matching = document.tags
-                    .filter { $0.normalizedName == sourceName }
-                    .compactMap { normalized($0.value) }
-                let distinct = Set(matching)
-                return distinct.count == 1 ? distinct.first : nil
-            }
+            let factKey = "m3uSharedTag.\(sourceName)"
+            let values = documents.map { normalized($0.technicalFacts[factKey]) }
             let distinct = Set(values.compactMap { $0 })
             guard distinct.count == 1, values.allSatisfy({ $0 != nil }) else {
                 if !distinct.isEmpty {
