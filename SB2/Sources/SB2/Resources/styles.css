@@ -2227,9 +2227,10 @@ body.sb2-frontend .gallery-card-button {
   width: 100%;
   min-width: 0;
   overflow: hidden;
-  padding: 0;
+  gap: var(--sb-space-025);
+  padding: var(--sb-space-025);
   border: 1px solid #343a47;
-  border-radius: var(--sb-gallery-radius, 0rem);
+  border-radius: max(3px, var(--sb-gallery-radius, 0rem));
   background: #141820;
   color: #b6b7dc;
   font: inherit;
@@ -2245,7 +2246,7 @@ body.sb2-frontend .gallery-artwork-frame {
   width: 100%;
   aspect-ratio: 1 / 1;
   overflow: hidden;
-  border-bottom: 1px solid #343a47;
+  border-radius: max(3px, var(--sb-gallery-radius, 0rem));
   background: #0b0d12;
   color: #555a77;
 }
@@ -2256,27 +2257,15 @@ body.sb2-frontend .gallery-artwork-placeholder { position: absolute; inset: 0; d
 body.sb2-frontend .gallery-card-caption {
   display: block;
   min-width: 0;
-  padding: 0.25rem;
-  background: #171b23;
+  padding: 0;
+  background: transparent;
 }
 body.sb2-frontend .gallery-card-title {
-  display: -webkit-box;
+  display: block;
   min-width: 0;
   overflow: hidden;
   color: #f1f2fa;
-  font: var(--sb-playlist-font-size)/1.25 var(--mono-font-family);
-  overflow-wrap: anywhere;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-body.sb2-frontend .gallery-grid.is-compact-titles .gallery-card-caption {
-  display: block;
-}
-body.sb2-frontend .gallery-grid.is-compact-titles .gallery-card-title {
-  display: block;
-  overflow: hidden;
-  font-size: var(--sb-playlist-meta-font-size);
-  line-height: 1.2;
+  font: var(--sb-sidebar-font-size)/1.05 var(--mono-font-family);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2463,35 +2452,7 @@ body.sb2-frontend .gallery-option-control output {
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
-body.sb2-frontend .gallery-option-range {
-  width: 100%;
-  min-width: 0;
-  height: var(--sb-options-control-height);
-  margin: 0;
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  cursor: pointer;
-}
-body.sb2-frontend .gallery-option-range::-webkit-slider-runnable-track { height: 2px; background: #343a45; }
-body.sb2-frontend .gallery-option-range::-webkit-slider-thumb {
-  width: var(--sb-space-066);
-  height: var(--sb-space-066);
-  margin-top: calc((2px - var(--sb-space-066)) / 2);
-  appearance: none;
-  -webkit-appearance: none;
-  border: 1px solid #090b0f;
-  border-radius: 0;
-  background: var(--accent);
-}
-body.sb2-frontend .gallery-option-range::-moz-range-track { height: 2px; background: #343a45; }
-body.sb2-frontend .gallery-option-range::-moz-range-thumb {
-  width: var(--sb-space-066);
-  height: var(--sb-space-066);
-  border: 1px solid #090b0f;
-  border-radius: 0;
-  background: var(--accent);
-}
+body.sb2-frontend .gallery-option-control .range-slider { height: var(--sb-options-control-height); }
 body.sb2-frontend .options-input {
   width: 100%;
   max-width: var(--sb-options-control-width);

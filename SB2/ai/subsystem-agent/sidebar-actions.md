@@ -31,6 +31,11 @@ in the SB2 home view.
 - Gallery cards keep square artwork separate from a bordered, bottom nametag.
   The artwork fit setting chooses centered crop or centered padding; frame gap
   applies at grid edges as well as between cards.
+- Gallery cards use inset, clipped artwork and a fixed one-line title using the
+  same font size as sidebar and playlist rows; truncate long titles with an
+  ellipsis so card geometry stays uniform. Persist gallery size, gap, radius,
+  and fit mode in `SB2PreferencesSnapshot` as well as the JavaScript settings
+  projection.
 - A delayed sidebar preview and a context-menu action belong to the tab where
   the user invoked them. Tab activation invalidates pending sidebar work. Any
   asynchronous catalog action must recheck its captured tab before replacing
