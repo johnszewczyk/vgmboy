@@ -1856,7 +1856,7 @@ body.sb2-frontend .sb-album { min-width: 0; overflow: hidden; text-overflow: ell
 body.sb2-frontend .sb-cpu { display: flex; align-items: center; gap: var(--sb-space-050); margin-left: auto; color: #858aa7; font-size: var(--sb-space-066); }
 body.sb2-frontend .sb-cpu-meter { width: 2rem; height: .25rem; background: #252a34; }
 body.sb2-frontend .sb-cpu-meter b { display: block; width: 0; height: 100%; background: #72d8a9; }
-body.sb2-frontend .sb-cpu strong { min-width: 2rem; color: #c0c5d8; font-size: inherit; font-weight: 400; text-align: right; }
+body.sb2-frontend .sb-cpu strong { min-width: 3rem; color: #c0c5d8; font-size: inherit; font-weight: 400; text-align: right; }
 
 body.sb2-frontend .workspace {
   grid-template-columns: var(--sb-sidebar-track) var(--sb-divider-size) minmax(0, 1fr);
