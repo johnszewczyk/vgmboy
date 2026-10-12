@@ -18,6 +18,7 @@ let package = Package(
             name: "SB2",
             dependencies: [
                 .product(name: "CatalogBrowserCore", package: "CatalogReader"),
+                .product(name: "CatalogGalleryCore", package: "CatalogReader"),
                 .product(name: "FrontendCommandCore", package: "CatalogReader"),
                 .product(name: "CatalogReader", package: "CatalogReader"),
                 .product(name: "CatalogPlaylistCore", package: "CatalogReader"),

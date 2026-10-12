@@ -21,6 +21,7 @@ let renderedDatabaseGames = null;
 let galleryVisibleDatabaseSource = null;
 let galleryVisibleGallerySource = null;
 let galleryVisibleDatabaseResults = [];
+let galleryConsoleGroups = [];
 let databaseGameButtons = [];
 let databaseConsoleGroups = [];
 let collapsedDatabaseConsoles = new Set();
@@ -459,6 +460,7 @@ function invalidateDatabaseGames() {
   state.databaseSearchGames = null;
   rebuildDatabaseGameSearchIndex([]);
   state.galleryGames = [];
+  galleryConsoleGroups = [];
   state.galleryGamesLoaded = false;
   state.galleryGamesError = "";
   galleryRenderSignature = null;
@@ -1670,7 +1672,8 @@ function visibleDatabaseGames() {
 
 function visibleDatabaseGameGroups() {
   const gamesByKey = new Map(visibleDatabaseGames().map((game) => [databaseGameKey(game), game]));
-  return (Array.isArray(state.databaseGameGroups) ? state.databaseGameGroups : [])
+  const sourceGroups = isGalleryActive() ? galleryConsoleGroups : state.databaseGameGroups;
+  return (Array.isArray(sourceGroups) ? sourceGroups : [])
     .map((group) => ({
       consoleName: String(group?.name || ""),
       gameItems: (Array.isArray(group?.gameIDs) ? group.gameIDs : [])
@@ -2228,8 +2231,14 @@ function renderGalleryView() {
 
   const allRecords = Array.isArray(state.galleryGames) ? state.galleryGames : [];
   const selectedConsole = String(state.selectedDatabaseConsoleName || "");
+  const selectedGroup = selectedConsole
+    ? galleryConsoleGroups.find((group) => String(group?.name || "") === selectedConsole)
+    : null;
+  const selectedGameIDs = selectedGroup
+    ? new Set(Array.isArray(selectedGroup.gameIDs) ? selectedGroup.gameIDs : [])
+    : null;
   const records = selectedConsole
-    ? allRecords.filter((record) => databaseConsoleName(record) === selectedConsole)
+    ? allRecords.filter((record) => selectedGameIDs?.has(record.id))
     : allRecords;
   const signature = JSON.stringify([
     state.galleryGamesError,
@@ -2370,6 +2379,7 @@ async function refreshDatabaseGamesForVisibleRoots() {
   galleryStaleRetryTimer = 0;
   galleryStaleRetryCount = 0;
   state.galleryGames = [];
+  galleryConsoleGroups = [];
   state.galleryGamesLoaded = false;
   state.galleryGamesError = "";
   galleryRenderSignature = null;
@@ -2402,11 +2412,13 @@ async function loadGalleryGames({ force = false } = {}) {
   if (force) {
     state.galleryGamesLoaded = false;
     state.galleryGamesError = "";
+    galleryConsoleGroups = [];
     galleryStaleRetryCount = 0;
   }
   if (galleryLoadPromise) return galleryLoadPromise;
   if (typeof window.spcBoySB2?.databaseGalleryGames !== "function") {
     state.galleryGames = [];
+    galleryConsoleGroups = [];
     state.galleryGamesLoaded = true;
     state.galleryGamesError = "Artwork indexing is unavailable in this build.";
     galleryRenderSignature = null;
@@ -2424,7 +2436,10 @@ async function loadGalleryGames({ force = false } = {}) {
         galleryStaleRetryCount += 1;
         return false;
       }
-      state.galleryGames = Array.isArray(projection) ? projection : [];
+      state.galleryGames = Array.isArray(projection)
+        ? projection
+        : (Array.isArray(projection?.games) ? projection.games : []);
+      galleryConsoleGroups = Array.isArray(projection?.groups) ? projection.groups : [];
       state.galleryGamesError = "";
       state.galleryGamesLoaded = true;
       galleryStaleRetryCount = 0;
@@ -2432,6 +2447,7 @@ async function loadGalleryGames({ force = false } = {}) {
       return state.galleryGames;
     } catch (error) {
       state.galleryGames = [];
+      galleryConsoleGroups = [];
       state.galleryGamesError = `Artwork index unavailable · ${error.message}`;
       state.galleryGamesLoaded = true;
       galleryRenderSignature = null;

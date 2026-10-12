@@ -13,6 +13,8 @@ retired SPCBoyWK package remains a historical consumer of these interfaces.
   cancellation/stale-result ownership.
 - `CatalogBrowserCore`: UI-neutral browser state, grouping, search, identity,
   and deterministic presentation data.
+- `CatalogGalleryCore`: UI-neutral Title Snap Gallery grouping, search
+  membership, console fallback, and selected-console filtering.
 - `FrontendCommandCore`: shared semantic shortcut definitions for native and
   WebKit hosts.
 
@@ -24,6 +26,8 @@ Agent engineering notes:
   [catalog-boundary.md](subsystem-agent/catalog-boundary.md)
 - Shared browser state, grouping, and search:
   [catalog-browser-core.md](subsystem-agent/catalog-browser-core.md)
+- Shared Title Snap Gallery projection:
+  [catalog-gallery-core.md](subsystem-agent/catalog-gallery-core.md)
 - Playlist row text, filename identity, and duration projection:
   [catalog-playlist-presentation-core.md](subsystem-agent/catalog-playlist-presentation-core.md)
 - Read-only session generations and stale-task cancellation:

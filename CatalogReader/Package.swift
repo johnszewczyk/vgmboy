@@ -10,6 +10,7 @@ let package = Package(
         .library(name: "CatalogPlaylistCore", targets: ["CatalogPlaylistCore"]),
         .library(name: "CatalogPlaylistPresentationCore", targets: ["CatalogPlaylistPresentationCore"]),
         .library(name: "CatalogBrowserCore", targets: ["CatalogBrowserCore"]),
+        .library(name: "CatalogGalleryCore", targets: ["CatalogGalleryCore"]),
         .library(name: "CatalogSessionCore", targets: ["CatalogSessionCore"]),
         .library(name: "FrontendCommandCore", targets: ["FrontendCommandCore"])
     ],
@@ -21,6 +22,7 @@ let package = Package(
             dependencies: ["CatalogReader", "CatalogPlaylistCore"]
         ),
         .target(name: "CatalogBrowserCore", dependencies: ["CatalogReader"]),
+        .target(name: "CatalogGalleryCore", dependencies: ["CatalogReader", "CatalogBrowserCore"]),
         .target(name: "CatalogSessionCore", dependencies: ["CatalogReader"]),
         .target(name: "FrontendCommandCore"),
         .testTarget(name: "CatalogReaderTests", dependencies: ["CatalogReader", "CatalogPlaylistCore"], linkerSettings: [.linkedLibrary("sqlite3")]),
