@@ -137,6 +137,15 @@ The native header fields and version byte follow the
   Preserve each M3U's row order in the UAC playlist. Hold repeated source
   indexes or M3Us with different queue orders until the package can represent
   those alternatives without losing rows.
+- **Cross-format loop evidence** — A VGMRIPS VGM may corroborate GBS loop data
+  when its GD3 `Comment` identifies the exact GBS source filename and
+  zero-based subsong index, and the track title also aligns. Compare loop
+  presence and loop samples with the authored M3U `Play Length`, `Loop`, and
+  `Loop Start` values using the [VGM profile](VGM.md). A game-title match alone
+  is only a candidate. Treat the VGM as separate captured evidence: never copy
+  its loop marker into GBS metadata, and leave missing GBS loop values absent.
+  Record mismatches or unavailable source provenance in the per-set report for
+  review.
 - **Timing** — M3U timing is playback data attached to the logical track.
   MetaMan converts play, loop, and fade values, including a fractional final
   component with up to millisecond precision, to integer milliseconds.
