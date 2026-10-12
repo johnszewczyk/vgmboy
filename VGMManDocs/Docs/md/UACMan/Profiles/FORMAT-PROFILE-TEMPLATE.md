@@ -23,6 +23,12 @@ selection, normalization, or review rule. Use `—` when a field is structural
 or derived instead of source metadata. Do not list unrecognized or arbitrary
 source fields.
 
+## Application Behavior
+
+- **<Application>** — <Describe a format-specific reader, writer, UI,
+  playback/catalog, or database behavior that differs from the shared base
+  contract.>
+
 ## Format Procedures
 
 - **<Topic>** — <One concise rule that cannot be expressed in the mapping table.>

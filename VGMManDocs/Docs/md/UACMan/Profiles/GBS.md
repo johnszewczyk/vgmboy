@@ -17,10 +17,10 @@ The native header fields and version byte follow the
 - **Source members** — `.gbs`; optional companion `.m3u` files.
 - **Coverage** — GBS header game, artist, and comment fields; M3U track rows
   and recognized `# @KEY value` comments.
-- **Status** — Profile rules complete and the UAC writer now stores GBS M3U
-  rows in the nested `M3U` field. Conversion remains held until a packaged
-  fixture and UACMan GUI review confirm timing visibility and conflict
-  handling. MetaMan converts
+- **Status** — The reader, writer, and consumer mappings are aligned in code.
+  Production conversion still needs a packaged GBS fixture opened in UACMan
+  and checked in ScanSong/Songbase; no end-to-end package review was performed
+  in this profile pass. MetaMan converts
   fractional play, loop, and fade times to integer milliseconds, and reads
   NEZplug's loop-duration, loop-start, and whole-play loop forms. When rows
   conflict, ambiguous fields are omitted and diagnosed. Retain the original
@@ -33,14 +33,40 @@ The native header fields and version byte follow the
 | GBS header `game` | Album | `game.metadata["Album"]` | One nonempty, shared value for the physical GBS file. Do not substitute a filename or an inferred DAT title. |
 | GBS header `artist` | Album Artist | `game.metadata["Album Artist"]` | Shared source value; do not duplicate it as track Artist. |
 | GBS header copyright string (MetaMan exposes `comment`) | Copyright | `game.metadata["Copyright"]` | This fixed header slot is the format's copyright field; preserve its populated value as written. |
-| M3U `# @TITLE value` | Album | `game.metadata["Album"]` | Use only when all applicable rows agree; otherwise retain the header value and route the conflict to review. |
-| M3U `# @ARTIST value` | Album Artist | `game.metadata["Album Artist"]` | Use only when the value is shared and unambiguous. |
+| M3U `# @TITLE value` | Album | `game.metadata["Album"]` | Use only when all applicable rows agree and the value agrees with a populated header; otherwise retain the header and route the conflict to review. |
+| M3U `# @ARTIST value` | Album Artist | `game.metadata["Album Artist"]` | Use only when the value is shared and unambiguous; if it conflicts with a populated header, retain the header and report the conflict. |
 | M3U `# @DATE value` | Date | `game.metadata["Date"]` | Keep the source value; do not infer a date from a filename or composite track title. |
 | M3U `::GBS,index,title,...` title | Title | `playlists[].entries[].title` | Source track title, retained as written. Do not split embedded composer, game, publisher, or copyright text out of the title. |
 | M3U source index | Playlist `trackIndex` | `playlists[].entries[].trackIndex` | GBS indexes are zero-based, including hexadecimal indexes. Do not create a second Track Number tag. |
 | M3U row, source path, and authored values | M3U | `playlists[].entries[].extraFields["M3U"]` | Keep the exact raw row, source M3U path, populated raw timing/count fields, and positive millisecond projections together in one nested JSON value. Do not expose separate M3U timing tags or duplicate raw fields at entry level. |
 | M3U time, loop, fade columns | M3U timing properties | `playlists[].entries[].extraFields["M3U"]` | Convert fractional final time components to integer milliseconds. A loop-start value marked with `-` maps to Intro Length; do not infer a loop duration from it. A bare `-` sets Loop Length equal to Play Length. Missing or invalid times stay absent. Keep raw strings and repeat counts in the nested value and the original M3U attachment byte-exact. |
 | GBS header version byte | Format | `playlists[].entries[].extraFields["Format"]` | Use `GBS v.<version>` on every logical track, for example `GBS v.1`. Read the byte from that physical member; never normalize versions. |
+
+## Application Behavior
+
+- **MetaMan** reads the fixed GBS header and matching NEZplug extended-M3U
+  rows. It preserves the header game/artist/copyright fields separately from
+  M3U comments, retains source timing strings, parses fractional milliseconds,
+  and diagnoses missing or inconsistent shared comments and duplicate-row
+  conflicts.
+- **UACMan writer** places shared header identity in package `game.metadata`
+  and `Title`, `Format`, and the single nested `M3U` value on each logical
+  playlist entry. A one-track GBS still gets an explicit subsong entry. The
+  Tag Analyzer reads and edits first-class playlist titles and entry
+  `extraFields`, including the nested M3U JSON, in their original playlist
+  entry scope.
+- **MetaMan UAC reader and ScanSong** expand each mapped subsong to one logical
+  track row. They expose `Format` and nested `M3U` with the track, and convert
+  the nested positive millisecond values back to the playback timing API. A
+  missing timing value remains missing.
+- **AudioMan Songbase** retains the ordered source playlist JSON in
+  `uac_package_manifests.playlists_json` and indexes first-class title plus
+  per-entry metadata under `archive_metadata_fields` as
+  `uac-playlist-entry`. This is a manifest projection; ingestion does not
+  rehash the GBS payload or count one physical GBS member once per subsong.
+- **Dashboard reports** continue to record per-set results, discrepancies,
+  and conversion checks. This profile only defines input and application
+  mapping rules.
 
 ## Format Procedures
 
@@ -134,7 +160,8 @@ The native header fields and version byte follow the
 - **Tag scope** — Confirm Album and Album Artist are shared only when their
   source values agree, track titles remain attached to the correct index, and
   no empty, inferred, or diagnostic tags were added.
-- **UAC review** — Verify Format is visible on each track, hashes are visible
+- **UAC review** — Verify Format and M3U are visible on each logical track,
+  package metadata stays at package scope, hashes are visible
   in Stream Hashes, and source M3Us remain available as package attachments.
   Keep affected conversions held until competing M3U rows are reviewed; verify
   fixture behavior and GUI visibility before treating the implementation as

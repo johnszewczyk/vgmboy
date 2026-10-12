@@ -4,7 +4,10 @@ This directory is the canonical, editable source for UACMan conversion profiles.
 The UACMan GUI reads and edits `.uac` manifests only. The UACMan tool can use
 MetaManCore during explicit package creation to read source formats. Apply the shared
 [`BASE-UAC-PROFILE.md`](BASE-UAC-PROFILE.md); each format profile records only
-its reader, field mapping, format-specific exceptions, and required checks.
+its reader, field mapping, format-specific exceptions, application behavior,
+and required checks. The base profile defines the shared UACMan, MetaMan,
+ScanSong, Songbase, and dashboard contract; a format profile records only its
+application-specific differences.
 
 These profiles are input rules for constructing and reviewing UAC packages;
 they are not ROM-set inventory or completeness protocols. AudioMan owns
@@ -31,7 +34,7 @@ been reviewed.
 | `ay` | Profile pending | AY subtune and timing behavior needs UAC mapping. |
 | `sap` | Profile pending | SAP header directives, songs, and timings need UAC mapping. |
 | `nsf` | Proposed; conversion held | See [`NSF.md`](NSF.md); MetaMan M3U parsing and fallback-timing fixes are required before UAC creation. |
-| `gbs` | Profile rules complete; conversion held for fixture/GUI review | See [`GBS.md`](GBS.md); M3U rows now use one nested `M3U` value, including source path and raw strings, while positive timing is projected to milliseconds. Conflicting rows require review. |
+| `gbs` | Reader/writer/consumer mappings aligned; package review pending | See [`GBS.md`](GBS.md); header identity stays at package scope; each logical track carries `Format` and one nested `M3U` value. Only authored positive timing is projected. Review a packaged fixture in UACMan, ScanSong, and Songbase before approving production conversion. |
 | `nsfe` | Profile pending | Separate from NSF; excluded from the current JoshW NSF profile. |
 | `hes` | Draft profile | See [`HES.md`](HES.md); fixture validation pending. |
 | `sndh` | Profile pending | Document subtune and timing projection. |
@@ -157,7 +160,7 @@ source relationship between collections from title or content overlap alone.
 - VGM/VGZ profile: [`VGM.md`](VGM.md)
 - HES profile: [`HES.md`](HES.md)
 - KSS profile: [`KSS.md`](KSS.md)
-- NSF/NSFE profile: [`NSF-NSFE.md`](NSF-NSFE.md)
+- NSF profile: [`NSF.md`](NSF.md); NSFE remains a separate pending profile.
 - GBS profile: [`GBS.md`](GBS.md)
 - PlayStation CD-XA and Red Book profile: [`PSX-CDXA.md`](PSX-CDXA.md)
 - Current PSX beta-package review:

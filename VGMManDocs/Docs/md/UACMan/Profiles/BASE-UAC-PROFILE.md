@@ -105,14 +105,45 @@ the per-set ledger recording operations and checkpoints.
   remains the detailed provenance authority. Omit a projection when sources
   conflict or the value is not trustworthy.
 
+## Application Behavior
+
+- **MetaMan input** — A format profile may promote only facts its named reader
+  actually returns. Preserve native source bytes and attached sidecars so
+  values outside the current mapping remain recoverable.
+- **UACMan writer** — The mapping table defines the output manifest path.
+  Package fields go in `game.metadata`; single-member fields go in
+  `members[].metadata`; logical subsong fields go in the playlist entry's
+  first-class fields or `extraFields`, as specified by the profile. Profiles
+  are human instructions, not automatic mapping configuration.
+- **UACMan review** — The Tag Analyzer must show and edit package, member, and
+  playlist-entry fields in their true storage scope. Nested JSON remains one
+  field and is edited as JSON; the UI must not flatten it or make it invisible.
+- **MetaMan UAC reader and ScanSong** — Read fields from the manifest scope
+  where they are stored. Expand subsong playlist entries into logical track
+  rows, expose their track metadata, and project wrapper timing into the
+  playback timing interface without inventing absent values.
+- **AudioMan Songbase** — Keep the complete UAC manifest and ordered playlist
+  JSON for exact retrieval. Index first-class playlist titles and entry
+  `extraFields` separately from physical member rows. Songbase ingestion reads
+  embedded hashes and does not rehash contained payloads.
+- **Dashboard** — Record observed set coverage, conflicts, failures, and
+  verification in per-set reports. A profile describes the input mapping and
+  app contract; it is not a report of completed output.
+
 ## Profile Structure
 
 Every format profile uses the same headings: **Scope**, **Field Mapping**,
-**Format Procedures**, and **Required Checks**.
+**Format Procedures**, and **Required Checks**. Add an **Application
+Behavior** section when that format has a specific producer, UI, playback, or
+database nuance beyond the shared contract above.
 
 - **Scope** — Name the reader, source members, coverage, and validation status.
 - **Field Mapping** — Use the shared four-column table; group it by source
   scope only when needed.
+- **Application Behavior** — State any format-specific exception to the
+  shared application contract above. Document only the applications that
+  participate in the path, and distinguish stored source data from projected
+  display/query fields.
 - **Format Procedures** — Use concise `- **Topic** — rule` entries only for
   behavior that does not fit in the mapping table.
 - **Required Checks** — Use concise `- **Check** — evidence` entries needed

@@ -53,13 +53,12 @@ public enum UACTagAnalyzerEditor {
             throw UACTagAnalyzerEditorError.invalidManifest
         }
 
-        let fieldsKey: String
         switch match.storageScope {
         case "packageMetadata", "packageExtensions":
             guard var game = manifest["game"] as? [String: Any] else {
                 throw UACTagAnalyzerEditorError.invalidManifest
             }
-            fieldsKey = match.storageScope == "packageMetadata" ? "metadata" : "extensions"
+            let fieldsKey = match.storageScope == "packageMetadata" ? "metadata" : "extensions"
             try editField(
                 in: &game,
                 fieldsKey: fieldsKey,
@@ -76,7 +75,7 @@ public enum UACTagAnalyzerEditor {
                 throw UACTagAnalyzerEditorError.missingMemberPath
             }
             var member = members[index]
-            fieldsKey = match.storageScope == "memberMetadata" ? "metadata" : "extensions"
+            let fieldsKey = match.storageScope == "memberMetadata" ? "metadata" : "extensions"
             try editField(
                 in: &member,
                 fieldsKey: fieldsKey,
@@ -87,6 +86,30 @@ public enum UACTagAnalyzerEditor {
             )
             members[index] = member
             manifest["members"] = members
+        case "playlistEntryExtraFields", "playlistEntryExtensions":
+            try editPlaylistEntry(in: &manifest, match: match) { entry in
+                let fieldsKey = match.storageScope == "playlistEntryExtraFields" ? "extraFields" : "extensions"
+                try editField(
+                    in: &entry,
+                    fieldsKey: fieldsKey,
+                    match: match,
+                    expectedValue: expectedValue,
+                    newName: newName,
+                    newValue: newValue
+                )
+            }
+        case "playlistEntryField":
+            try editPlaylistEntry(in: &manifest, match: match) { entry in
+                guard newName == match.storageKey else {
+                    throw UACTagAnalyzerEditorError.unsupportedScope("renaming first-class playlist entry fields")
+                }
+                try editDirectField(
+                    in: &entry,
+                    key: match.storageKey,
+                    expectedValue: expectedValue,
+                    newValue: newValue
+                )
+            }
         default:
             throw UACTagAnalyzerEditorError.unsupportedScope(match.storageScope)
         }
@@ -134,7 +157,8 @@ public enum UACTagAnalyzerEditor {
                 && $0.archiveRelativePath == first.archiveRelativePath
                 && $0.archiveURL.standardizedFileURL == archiveURL
                 && $0.memberRelativePath != nil
-                && ["memberMetadata", "memberExtensions"].contains($0.storageScope)
+                && ["memberMetadata", "memberExtensions", "playlistEntryExtraFields",
+                    "playlistEntryExtensions", "playlistEntryField"].contains($0.storageScope)
         }) else {
             throw UACTagAnalyzerEditorError.unsupportedScope("bulk deletion requires track fields from one package")
         }
@@ -154,14 +178,18 @@ public enum UACTagAnalyzerEditor {
             if let path = member["path"] as? String { memberIndices[path] = index }
         }
         for match in matches {
-            guard let memberPath = match.memberRelativePath,
-                  let index = memberIndices[memberPath] else {
-                throw UACTagAnalyzerEditorError.missingMemberPath
+            if ["memberMetadata", "memberExtensions"].contains(match.storageScope) {
+                guard let memberPath = match.memberRelativePath,
+                      let index = memberIndices[memberPath] else {
+                    throw UACTagAnalyzerEditorError.missingMemberPath
+                }
+                var member = members[index]
+                let fieldsKey = match.storageScope == "memberExtensions" ? "extensions" : "metadata"
+                try removeField(in: &member, fieldsKey: fieldsKey, match: match)
+                members[index] = member
+            } else {
+                try removePlaylistEntryField(in: &manifest, match: match)
             }
-            var member = members[index]
-            let fieldsKey = match.storageScope == "memberExtensions" ? "extensions" : "metadata"
-            try removeField(in: &member, fieldsKey: fieldsKey, match: match)
-            members[index] = member
         }
         manifest["members"] = members
 
@@ -237,6 +265,45 @@ public enum UACTagAnalyzerEditor {
         parent[fieldsKey] = fields
     }
 
+    private static func editPlaylistEntry(
+        in manifest: inout [String: Any],
+        match: UACTagFieldMatch,
+        edit: (inout [String: Any]) throws -> Void
+    ) throws {
+        guard let playlistID = match.playlistID,
+              let entryIndex = match.playlistEntryIndex,
+              var playlists = manifest["playlists"] as? [[String: Any]],
+              let playlistIndex = playlists.firstIndex(where: { $0["id"] as? String == playlistID }),
+              var entries = playlists[playlistIndex]["entries"] as? [[String: Any]],
+              entries.indices.contains(entryIndex),
+              entries[entryIndex]["targetMemberPath"] as? String == match.memberRelativePath else {
+            throw UACTagAnalyzerEditorError.invalidManifest
+        }
+        var entry = entries[entryIndex]
+        try edit(&entry)
+        entries[entryIndex] = entry
+        playlists[playlistIndex]["entries"] = entries
+        manifest["playlists"] = playlists
+    }
+
+    private static func editDirectField(
+        in entry: inout [String: Any],
+        key: String,
+        expectedValue: UACJSONValue,
+        newValue: UACJSONValue?
+    ) throws {
+        guard let currentRawValue = entry[key] else { throw UACTagAnalyzerEditorError.invalidManifest }
+        let currentData = try JSONSerialization.data(withJSONObject: currentRawValue, options: [.fragmentsAllowed, .sortedKeys])
+        let currentValue = try JSONDecoder().decode(UACJSONValue.self, from: currentData)
+        guard currentValue == expectedValue else { throw UACTagAnalyzerEditorError.fieldChanged(key) }
+        if let newValue {
+            let encoded = try JSONEncoder().encode(newValue)
+            entry[key] = try JSONSerialization.jsonObject(with: encoded, options: [.fragmentsAllowed])
+        } else {
+            entry.removeValue(forKey: key)
+        }
+    }
+
     private static func removeField(
         in parent: inout [String: Any],
         fieldsKey: String,
@@ -255,6 +322,30 @@ public enum UACTagAnalyzerEditor {
         }
         fields.removeValue(forKey: match.storageKey)
         parent[fieldsKey] = fields
+    }
+
+    private static func removePlaylistEntryField(
+        in manifest: inout [String: Any],
+        match: UACTagFieldMatch
+    ) throws {
+        try editPlaylistEntry(in: &manifest, match: match) { entry in
+            if match.storageScope == "playlistEntryField" {
+                guard let expectedData = match.valueJSON.data(using: .utf8),
+                      let currentRawValue = entry[match.storageKey] else {
+                    throw UACTagAnalyzerEditorError.invalidManifest
+                }
+                let currentData = try JSONSerialization.data(withJSONObject: currentRawValue, options: [.fragmentsAllowed, .sortedKeys])
+                let currentValue = try JSONDecoder().decode(UACJSONValue.self, from: currentData)
+                let expectedValue = try JSONDecoder().decode(UACJSONValue.self, from: expectedData)
+                guard currentValue == expectedValue else {
+                    throw UACTagAnalyzerEditorError.fieldChanged(match.storageKey)
+                }
+                entry.removeValue(forKey: match.storageKey)
+            } else {
+                let fieldsKey = match.storageScope == "playlistEntryExtensions" ? "extensions" : "extraFields"
+                try removeField(in: &entry, fieldsKey: fieldsKey, match: match)
+            }
+        }
     }
 
     private struct SourceStamp: Equatable {

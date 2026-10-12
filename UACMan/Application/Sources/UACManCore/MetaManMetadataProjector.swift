@@ -20,6 +20,8 @@ public enum MetaManMetadataProjector {
         case "system": return "System"
         case "artist": return "Artist"
         case "album": return "Album"
+        case "albumartist": return "Album Artist"
+        case "format": return "Format"
         case "date": return "Date"
         case "year": return "Year"
         case "genre": return "Genre"
@@ -40,7 +42,8 @@ public enum MetaManMetadataProjector {
     public static func memberFields(from document: MetadataDocument) -> [String: UACJSONValue] {
         var member: [String: UACJSONValue] = [:]
         let commonFields: [(String, String?)]
-        if document.format.caseInsensitiveCompare("nsf") == .orderedSame {
+        if document.format.caseInsensitiveCompare("nsf") == .orderedSame
+            || document.format.caseInsensitiveCompare("gbs") == .orderedSame {
             commonFields = [("Title", document.fields.title)]
         } else {
             commonFields = [
@@ -66,7 +69,25 @@ public enum MetaManMetadataProjector {
            let version = document.technicalFacts["version"], !version.isEmpty {
             member["Format"] = .string("NSF v.\(version)")
         }
-        if let timing = document.timing {
+        if document.format.caseInsensitiveCompare("gbs") == .orderedSame,
+           let version = document.technicalFacts["version"], !version.isEmpty {
+            member["Format"] = .string("GBS v.\(version)")
+        }
+        if document.format.caseInsensitiveCompare("gbs") == .orderedSame {
+            // The GBS native reader exposes a 150-second compatibility
+            // default. Only its explicit M3U projections are source timing.
+            for (fact, tag) in [
+                ("m3uIntroLengthMs", "Intro Length (ms)"),
+                ("m3uLoopLengthMs", "Loop Length (ms)"),
+                ("m3uPlayLengthMs", "Play Length (ms)"),
+                ("m3uFadeLengthMs", "Fade Length (ms)")
+            ] {
+                if let rawValue = document.technicalFacts[fact],
+                   let value = Int64(rawValue), value > 0 {
+                    member[tag] = .integer(value)
+                }
+            }
+        } else if let timing = document.timing {
             // Zero and negative values are the readers' "not supplied" defaults.
             // Do not materialize those defaults as package tags; a present value
             // must describe a measured duration.
@@ -105,6 +126,11 @@ public enum MetaManMetadataProjector {
         guard !documents.isEmpty else { return [:] }
         if documents.allSatisfy({ $0.format.caseInsensitiveCompare("nsf") == .orderedSame }) {
             return sharedNSFFields(from: documents).fields
+        }
+        if documents.allSatisfy({ $0.format.caseInsensitiveCompare("gbs") == .orderedSame }) {
+            // GBS game, artist, and copyright values describe the package.
+            // Track entries carry their own title, version, and M3U data.
+            return [:]
         }
         let commonFields: [(String, (MetadataDocument) -> String?)] = [
             ("Game", { $0.fields.game }),
