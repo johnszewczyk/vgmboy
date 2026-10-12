@@ -87,8 +87,10 @@ import VGMBoyFormatCore
         #expect(checksum == nil)
         decodeCounter.increment()
         switch compressed.last {
-        case 1: return Data("ABCD".utf8)
-        case 2: return Data("EFGHI".utf8)
+        case 1: return Data("1234".utf8)
+        case 2: return Data("ABCD".utf8)
+        case 3: return Data("EFGH".utf8)
+        case 4: return Data("9876".utf8)
         default: throw UACContainerError.invalidPayloadMagic
         }
     }
@@ -119,8 +121,10 @@ import VGMBoyFormatCore
         #expect(checksum == nil)
         decodeCounter.increment()
         switch compressed.last {
-        case 1: return Data("ABCD".utf8)
-        case 2: return Data("EFGHI".utf8)
+        case 1: return Data("1234".utf8)
+        case 2: return Data("ABCD".utf8)
+        case 3: return Data("EFGH".utf8)
+        case 4: return Data("9876".utf8)
         default: throw UACContainerError.invalidPayloadMagic
         }
     }
@@ -417,7 +421,7 @@ private func makeSeekableUACFixtureForArchivePlayback(in directory: URL) throws 
             role: "playable",
             format: "spc",
             byteSize: 4,
-            tarDataOffset: 2,
+            tarDataOffset: 6,
             blake3: digest
         )]
     )
@@ -425,13 +429,18 @@ private func makeSeekableUACFixtureForArchivePlayback(in directory: URL) throws 
     encoder.outputFormatting = [.sortedKeys]
     let manifestData = try encoder.encode(manifest)
 
-    var payload = Data([0x28, 0xB5, 0x2F, 0xFD, 1, 0x28, 0xB5, 0x2F, 0xFD, 2])
+    var payload = Data([
+        0x28, 0xB5, 0x2F, 0xFD, 1,
+        0x28, 0xB5, 0x2F, 0xFD, 2,
+        0x28, 0xB5, 0x2F, 0xFD, 3,
+        0x28, 0xB5, 0x2F, 0xFD, 4,
+    ])
     var seekTable = Data()
-    appendLittleEndian(UInt32(5), to: &seekTable)
+    for _ in 0..<4 {
+        appendLittleEndian(UInt32(5), to: &seekTable)
+        appendLittleEndian(UInt32(4), to: &seekTable)
+    }
     appendLittleEndian(UInt32(4), to: &seekTable)
-    appendLittleEndian(UInt32(5), to: &seekTable)
-    appendLittleEndian(UInt32(5), to: &seekTable)
-    appendLittleEndian(UInt32(2), to: &seekTable)
     seekTable.append(0)
     appendLittleEndian(UACZstandardSeekTable.seekableFooterMagic, to: &seekTable)
     appendLittleEndian(UACZstandardSeekTable.skippableFrameMagic, to: &payload)
