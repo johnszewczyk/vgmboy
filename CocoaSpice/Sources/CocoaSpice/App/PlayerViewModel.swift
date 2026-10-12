@@ -1043,6 +1043,7 @@ final class PlayerViewModel {
         )
         restorePersistedPlaylist(restoredState.sessionState)
         restorePlaylistTabs()
+        hydrateRestoredPlaylistMetadata()
         restorePlaylistColumnState(restoredState.playlistColumnState)
         sidebarSearchText = restoredState.sidebarSearchText
         startPlaybackTimer()
@@ -3638,7 +3639,6 @@ final class PlayerViewModel {
         refreshPlaylistTotalDurationReadout()
         playlistColumnWidthHints = nil
         refreshPlaylistMetadata(limit: 128)
-        hydrateRestoredPlaylistMetadata()
         if session.deferredTrackCount > 0 {
             statusText = "Restored \(session.tracks.count.formatted()) queue tracks; \(session.deferredTrackCount.formatted()) deferred to keep startup responsive"
         }

@@ -756,7 +756,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "requiresRestart": false,
             "reloaded": reloaded,
             "catalog": [
-                "schemaVersion": try catalog.summary().schemaVersion,
+                "schemaVersion": try catalog.schemaVersion(),
                 "trackCount": try catalog.activeTrackCount()
             ]
         ]

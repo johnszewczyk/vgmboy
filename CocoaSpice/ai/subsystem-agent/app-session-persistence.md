@@ -14,6 +14,8 @@
 - Playback timing persistence is now unified to one `Long Play` toggle and one manual duration key.
 - Playlist state is separate from sidebar state.
 - Persisted playlist restore includes queued paths, selected track path, and current track path.
+- Restore playlist metadata only after playlist tabs choose the active queue, so
+  startup does not hydrate metadata for a queue replaced by the restored tab.
 - Launch restores at most 1,024 queued entries and performs no filesystem existence walk. Remaining entries stay in the persisted session so startup work remains bounded; a missing source fails only if the user later activates it.
 - The current database sidebar persists its last selected library folder path independently from queued playlist state.
 - Sidebar double-click behavior, `Playlist Follows Cursor`, `Group by Console`, the Games/Files selection, and `Prefer Folders over Metadatas` persist in `UserDefaults`. A non-empty search temporarily displays Games results without rewriting the stored Games/Files selection.

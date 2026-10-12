@@ -17,6 +17,10 @@ SB2's startup progress contract and compact WebKit status card.
 - Keep the shared stage order and timing. A fast startup does not show a brief
   card; ready briefly confirms completion; failure stays visible.
 - Keep the loading card out of the separate Options window.
+- Restore the active playlist tab before loading the sidebar projection so a
+  Gallery tab selects Games and startup reads only that sidebar mode.
+- Use the archive-cache configuration response for the initial inventory; do
+  not immediately call `archiveCacheSummary` to enumerate it again.
 - Preserve app-specific details and visual treatment in SB2 resources.
 
 ## Files
