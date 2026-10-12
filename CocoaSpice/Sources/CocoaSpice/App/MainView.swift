@@ -23,6 +23,7 @@ struct MainView: View {
             ToolbarItem(placement: .navigation) {
                 Button(action: model.showGallery) {
                     Image(systemName: "photo.on.rectangle.angled")
+                        .foregroundStyle(model.isGalleryTabActive ? Color.accentColor : Color.primary)
                 }
                 .help("Gallery")
                 .accessibilityLabel("Gallery")
@@ -35,7 +36,7 @@ struct MainView: View {
                 }
                 .help(model.sidebarDisclosureControlTitle)
                 .accessibilityLabel(model.sidebarDisclosureControlTitle)
-                .disabled(!model.sidebarDisclosureControlEnabled)
+                .disabled(model.isGalleryTabActive || !model.sidebarDisclosureControlEnabled)
             }
             // Keep playback transport out of the navigation slot. The
             // navigation slot is reserved for the sidebar disclosure and its
@@ -122,6 +123,7 @@ struct MainView: View {
         }
         .help(mode.title)
         .accessibilityLabel(mode.title)
+        .disabled(model.isGalleryTabActive)
     }
 
     private var liveMainView: some View {
@@ -137,7 +139,7 @@ struct MainView: View {
                 .padding(.top, 0)
                 .padding(.bottom, 2)
 
-                if let error = model.databaseSidebarLoadError {
+                if !model.isGalleryTabActive, let error = model.databaseSidebarLoadError {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
@@ -154,75 +156,82 @@ struct MainView: View {
                     .background(.orange.opacity(0.12))
                 }
 
-                Group {
-                    if model.effectiveSidebarBrowserMode == .games
-                        ? model.isLoadingDatabaseSidebar
-                        : model.isLoadingDatabaseFileSidebar {
-                        VStack(spacing: 10) {
-                            ProgressView()
-                                .progressViewStyle(.linear)
-                                .frame(width: 180)
-                            Text(model.effectiveSidebarBrowserMode == .games ? "Loading Games Library" : "Loading Files Library")
-                                .font(.headline)
-                            Text(model.databaseSidebarLoadingStatus)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else if model.effectiveSidebarBrowserMode == .games && model.databaseGameItems.isEmpty {
-                        ContentUnavailableView(
-                            "No Database Games",
-                            systemImage: "books.vertical",
-                            description: Text("Open a published ScanSong catalog with game entries.")
-                        )
-                    } else if model.effectiveSidebarBrowserMode == .files && model.databaseFileItems.isEmpty {
-                        ContentUnavailableView(
-                            "No Database Files",
-                            systemImage: "folder",
-                            description: Text("Open a published ScanSong catalog with file entries.")
-                        )
-                    } else if model.effectiveSidebarBrowserMode == .games && model.visibleDatabaseGameItems.isEmpty {
-                        ContentUnavailableView(
-                            "No Matches",
-                            systemImage: "magnifyingglass",
-                            description: Text("No database games match the current sidebar search.")
-                        )
-                    } else if model.effectiveSidebarBrowserMode == .files && model.visibleDatabaseFileItems.isEmpty {
-                        ContentUnavailableView(
-                            "No Matches",
-                            systemImage: "magnifyingglass",
-                            description: Text("No scanned files match the current sidebar search.")
-                        )
-                    } else {
-                        // These are native AppKit table views. Keep both alive
-                        // after they are first shown so switching Games/Files
-                        // never reconstructs the expanded Files hierarchy.
-                        ZStack {
-                            DatabaseGameListView(
-                                model: model,
-                                sidebarFontSize: model.databaseSidebarFontSize,
-                                sidebarTextColor: model.databaseSidebarTextColor,
-                                sidebarMonospace: model.databaseSidebarMonospaceFont,
-                                sidebarLineGap: model.databaseSidebarLineGapPoints,
-                                primarySelectionSolid: model.solidPlaylistSelectionBar
+                ZStack {
+                    Group {
+                        if model.effectiveSidebarBrowserMode == .games
+                            ? model.isLoadingDatabaseSidebar
+                            : model.isLoadingDatabaseFileSidebar {
+                            VStack(spacing: 10) {
+                                ProgressView()
+                                    .progressViewStyle(.linear)
+                                    .frame(width: 180)
+                                Text(model.effectiveSidebarBrowserMode == .games ? "Loading Games Library" : "Loading Files Library")
+                                    .font(.headline)
+                                Text(model.databaseSidebarLoadingStatus)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if model.effectiveSidebarBrowserMode == .games && model.databaseGameItems.isEmpty {
+                            ContentUnavailableView(
+                                "No Database Games",
+                                systemImage: "books.vertical",
+                                description: Text("Open a published ScanSong catalog with game entries.")
                             )
-                            .opacity(model.effectiveSidebarBrowserMode == .games ? 1 : 0)
-                            .allowsHitTesting(model.effectiveSidebarBrowserMode == .games)
+                        } else if model.effectiveSidebarBrowserMode == .files && model.databaseFileItems.isEmpty {
+                            ContentUnavailableView(
+                                "No Database Files",
+                                systemImage: "folder",
+                                description: Text("Open a published ScanSong catalog with file entries.")
+                            )
+                        } else if model.effectiveSidebarBrowserMode == .games && model.visibleDatabaseGameItems.isEmpty {
+                            ContentUnavailableView(
+                                "No Matches",
+                                systemImage: "magnifyingglass",
+                                description: Text("No database games match the current sidebar search.")
+                            )
+                        } else if model.effectiveSidebarBrowserMode == .files && model.visibleDatabaseFileItems.isEmpty {
+                            ContentUnavailableView(
+                                "No Matches",
+                                systemImage: "magnifyingglass",
+                                description: Text("No scanned files match the current sidebar search.")
+                            )
+                        } else {
+                            // Keep the native Games and Files tables alive so
+                            // switching views does not rebuild the file tree.
+                            ZStack {
+                                DatabaseGameListView(
+                                    model: model,
+                                    sidebarFontSize: model.databaseSidebarFontSize,
+                                    sidebarTextColor: model.databaseSidebarTextColor,
+                                    sidebarMonospace: model.databaseSidebarMonospaceFont,
+                                    sidebarLineGap: model.databaseSidebarLineGapPoints,
+                                    primarySelectionSolid: model.solidPlaylistSelectionBar
+                                )
+                                .opacity(model.effectiveSidebarBrowserMode == .games ? 1 : 0)
+                                .allowsHitTesting(model.effectiveSidebarBrowserMode == .games)
 
-                            DatabaseFileListView(
-                                model: model,
-                                sidebarFontSize: model.databaseSidebarFontSize,
-                                sidebarTextColor: model.databaseSidebarTextColor,
-                                sidebarMonospace: model.databaseSidebarMonospaceFont,
-                                sidebarDisclosureGap: model.databaseSidebarDisclosureGapPoints,
-                                sidebarChildIndent: model.databaseSidebarChildIndentPoints,
-                                sidebarLineGap: model.databaseSidebarLineGapPoints,
-                                hideFileExtensions: model.databaseSidebarHidesFileExtensions,
-                                primarySelectionSolid: model.solidPlaylistSelectionBar
-                            )
-                            .opacity(model.effectiveSidebarBrowserMode == .files ? 1 : 0)
-                            .allowsHitTesting(model.effectiveSidebarBrowserMode == .files)
+                                DatabaseFileListView(
+                                    model: model,
+                                    sidebarFontSize: model.databaseSidebarFontSize,
+                                    sidebarTextColor: model.databaseSidebarTextColor,
+                                    sidebarMonospace: model.databaseSidebarMonospaceFont,
+                                    sidebarDisclosureGap: model.databaseSidebarDisclosureGapPoints,
+                                    sidebarChildIndent: model.databaseSidebarChildIndentPoints,
+                                    sidebarLineGap: model.databaseSidebarLineGapPoints,
+                                    hideFileExtensions: model.databaseSidebarHidesFileExtensions,
+                                    primarySelectionSolid: model.solidPlaylistSelectionBar
+                                )
+                                .opacity(model.effectiveSidebarBrowserMode == .files ? 1 : 0)
+                                .allowsHitTesting(model.effectiveSidebarBrowserMode == .files)
+                            }
                         }
+                    }
+                    .opacity(model.isGalleryTabActive ? 0 : 1)
+                    .allowsHitTesting(!model.isGalleryTabActive)
+
+                    if model.isGalleryTabActive {
+                        gallerySidebarContent
                     }
                 }
             }
@@ -248,6 +257,55 @@ struct MainView: View {
                 statusBar
             }
             .frame(minWidth: 320, minHeight: 240)
+        }
+    }
+
+    @ViewBuilder
+    private var gallerySidebarContent: some View {
+        if model.galleryIsLoading || !model.galleryHasLoaded {
+            VStack(spacing: 10) {
+                ProgressView()
+                    .progressViewStyle(.linear)
+                    .frame(width: 180)
+                Text("Loading Gallery Consoles")
+                    .font(.headline)
+                Text("Reading consoles with indexed Title Snap artwork.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(12)
+        } else if let error = model.galleryLoadError {
+            ContentUnavailableView {
+                Label("Gallery Unavailable", systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(error)
+            } actions: {
+                Button("Retry") { model.retryGalleryLoad() }
+            }
+        } else if model.galleryConsoleNames.isEmpty {
+            ContentUnavailableView(
+                "No Artwork Consoles",
+                systemImage: "photo.on.rectangle.angled",
+                description: Text("No consoles with indexed Title Snap artwork were found.")
+            )
+        } else if model.visibleGalleryConsoleNames.isEmpty {
+            ContentUnavailableView(
+                "No Matches",
+                systemImage: "magnifyingglass",
+                description: Text("No artwork titles or consoles match the current sidebar search.")
+            )
+        } else {
+            GalleryConsoleListView(
+                model: model,
+                consoleNames: model.visibleGalleryConsoleNames,
+                sidebarFontSize: model.databaseSidebarFontSize,
+                sidebarTextColor: model.databaseSidebarTextColor,
+                sidebarMonospace: model.databaseSidebarMonospaceFont,
+                sidebarLineGap: model.databaseSidebarLineGapPoints,
+                primarySelectionSolid: model.solidPlaylistSelectionBar
+            )
         }
     }
 
@@ -826,6 +884,199 @@ private struct DatabaseGameListView: NSViewRepresentable {
                     let children = isExpanded ? group.items.map(SidebarRow.game) : []
                     return [.system(group.name, isExpanded: isExpanded)] + children
                 }
+        }
+    }
+}
+
+private struct GalleryConsoleListView: NSViewRepresentable {
+    @Bindable var model: PlayerViewModel
+    let consoleNames: [String]
+    let sidebarFontSize: CGFloat
+    let sidebarTextColor: PlayerViewModel.DatabaseSidebarTextColor
+    let sidebarMonospace: Bool
+    let sidebarLineGap: CGFloat
+    let primarySelectionSolid: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            model: model,
+            consoleNames: consoleNames,
+            sidebarFontSize: sidebarFontSize,
+            sidebarTextColor: sidebarTextColor,
+            sidebarMonospace: sidebarMonospace
+        )
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let chrome = DatabaseSidebarTableChrome.makeTableView(
+            rowHeight: sidebarFontSize + 5,
+            rowGap: sidebarLineGap,
+            columnIdentifier: "GalleryConsole",
+            coordinator: context.coordinator,
+            doubleAction: #selector(Coordinator.handleDoubleAction(_:)),
+            activationHandler: { [weak coordinator = context.coordinator] in
+                coordinator?.handleReturnActivation()
+            },
+            rowMenuProvider: { _ in nil },
+            selectionColor: NSColor.controlAccentColor,
+            primarySelectionSolid: primarySelectionSolid
+        )
+        chrome.tableView.allowsMultipleSelection = false
+        context.coordinator.attach(tableView: chrome.tableView)
+        return chrome.scrollView
+    }
+
+    func updateNSView(_ nsView: NSScrollView, context: Context) {
+        context.coordinator.model = model
+        context.coordinator.update(
+            consoleNames: consoleNames,
+            sidebarFontSize: sidebarFontSize,
+            sidebarTextColor: sidebarTextColor,
+            sidebarMonospace: sidebarMonospace,
+            sidebarLineGap: sidebarLineGap,
+            primarySelectionSolid: primarySelectionSolid
+        )
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+        @Bindable var model: PlayerViewModel
+        private(set) var consoleNames: [String]
+        var sidebarFontSize: CGFloat
+        var sidebarTextColor: PlayerViewModel.DatabaseSidebarTextColor
+        var sidebarMonospace: Bool
+        private var sidebarLineGap: CGFloat = 0
+        private var lastSelectedName: String?
+        private weak var tableView: DatabaseSidebarNativeTableView?
+        private var reloadScheduled = false
+
+        init(
+            model: PlayerViewModel,
+            consoleNames: [String],
+            sidebarFontSize: CGFloat,
+            sidebarTextColor: PlayerViewModel.DatabaseSidebarTextColor,
+            sidebarMonospace: Bool
+        ) {
+            self._model = Bindable(model)
+            self.consoleNames = consoleNames
+            self.sidebarFontSize = sidebarFontSize
+            self.sidebarTextColor = sidebarTextColor
+            self.sidebarMonospace = sidebarMonospace
+        }
+
+        func attach(tableView: DatabaseSidebarNativeTableView) {
+            self.tableView = tableView
+        }
+
+        func update(
+            consoleNames: [String],
+            sidebarFontSize: CGFloat,
+            sidebarTextColor: PlayerViewModel.DatabaseSidebarTextColor,
+            sidebarMonospace: Bool,
+            sidebarLineGap: CGFloat,
+            primarySelectionSolid: Bool
+        ) {
+            guard let tableView else { return }
+            let contentChanged = self.consoleNames != consoleNames
+            let appearanceChanged = self.sidebarFontSize != sidebarFontSize
+                || self.sidebarTextColor != sidebarTextColor
+                || self.sidebarMonospace != sidebarMonospace
+                || self.sidebarLineGap != sidebarLineGap
+            self.consoleNames = consoleNames
+            self.sidebarFontSize = sidebarFontSize
+            self.sidebarTextColor = sidebarTextColor
+            self.sidebarMonospace = sidebarMonospace
+            self.sidebarLineGap = sidebarLineGap
+            tableView.intercellSpacing = NSSize(width: 0, height: sidebarLineGap)
+            tableView.selectionHighlightView?.isPrimarySelectionSolid = primarySelectionSolid
+            let selectionChanged = lastSelectedName != model.selectedGalleryConsoleName
+            guard contentChanged || appearanceChanged || selectionChanged else { return }
+            guard !reloadScheduled else { return }
+            reloadScheduled = true
+            DispatchQueue.main.async { [weak self, weak tableView] in
+                guard let self, let tableView else { return }
+                self.reloadScheduled = false
+                if contentChanged || appearanceChanged {
+                    tableView.reloadData()
+                }
+                self.syncSelection(
+                    in: tableView,
+                    refreshHighlight: contentChanged || appearanceChanged,
+                    scrollToSelection: selectionChanged
+                )
+            }
+        }
+
+        func numberOfRows(in tableView: NSTableView) -> Int {
+            consoleNames.count
+        }
+
+        func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+            sidebarFontSize + 5
+        }
+
+        func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+            guard consoleNames.indices.contains(row) else { return nil }
+            let cell = DatabaseSidebarTableChrome.textCell(
+                in: tableView,
+                identifier: NSUserInterfaceItemIdentifier("GalleryConsoleCell")
+            )
+            cell.textField?.stringValue = "•  \(consoleNames[row])"
+            cell.textField?.font = sidebarMonospace
+                ? .monospacedSystemFont(ofSize: sidebarFontSize, weight: .regular)
+                : .systemFont(ofSize: sidebarFontSize)
+            cell.textField?.textColor = DatabaseSidebarTableChrome.textColor(sidebarTextColor)
+            return cell
+        }
+
+        func tableViewSelectionDidChange(_ notification: Notification) {
+            guard let tableView,
+                  tableView.selectedRow >= 0,
+                  consoleNames.indices.contains(tableView.selectedRow) else { return }
+            let name = consoleNames[tableView.selectedRow]
+            model.selectGalleryConsole(name)
+            lastSelectedName = name
+            DatabaseSidebarTableChrome.updateSelectionHighlight(
+                in: tableView,
+                animationMilliseconds: model.effectiveSelectionAnimationMilliseconds,
+                animated: true
+            )
+        }
+
+        @objc func handleDoubleAction(_ sender: Any?) {
+            handleReturnActivation()
+        }
+
+        func handleReturnActivation() {
+            guard let tableView,
+                  consoleNames.indices.contains(tableView.selectedRow) else { return }
+            model.selectGalleryConsole(consoleNames[tableView.selectedRow])
+        }
+
+        private func syncSelection(
+            in tableView: NSTableView,
+            refreshHighlight: Bool,
+            scrollToSelection: Bool
+        ) {
+            let selectedRow = model.selectedGalleryConsoleName.flatMap(consoleNames.firstIndex(of:))
+            if tableView.selectedRow != selectedRow {
+                if let selectedRow {
+                    tableView.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false)
+                    if scrollToSelection {
+                        tableView.scrollRowToVisible(selectedRow)
+                    }
+                } else {
+                    tableView.deselectAll(nil)
+                }
+            }
+            lastSelectedName = model.selectedGalleryConsoleName
+            if refreshHighlight {
+                DatabaseSidebarTableChrome.updateSelectionHighlight(
+                    in: tableView,
+                    animationMilliseconds: model.effectiveSelectionAnimationMilliseconds,
+                    animated: false
+                )
+            }
         }
     }
 }

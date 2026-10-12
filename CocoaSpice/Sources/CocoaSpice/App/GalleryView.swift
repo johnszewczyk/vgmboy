@@ -8,6 +8,7 @@ struct GalleryView: View {
     private let columns = [GridItem(.adaptive(minimum: 150, maximum: 260), spacing: 10)]
 
     var body: some View {
+        let visibleGames = model.visibleGalleryGames
         Group {
             if model.galleryIsLoading {
                 VStack(spacing: 10) {
@@ -28,12 +29,16 @@ struct GalleryView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(24)
-            } else if model.galleryGames.isEmpty {
+            } else if visibleGames.isEmpty {
                 VStack(spacing: 10) {
                     Image(systemName: "photo.on.rectangle.angled")
                         .font(.title2)
                         .foregroundStyle(.secondary)
-                    Text(model.galleryHasLoaded ? "No indexed Title Snap artwork was found." : "Gallery waits for startup to finish.")
+                    Text(!model.galleryHasLoaded
+                        ? "Gallery waits for startup to finish."
+                        : model.galleryGames.isEmpty
+                            ? "No indexed Title Snap artwork was found."
+                            : "No artwork titles match the current console selection.")
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
                 }
@@ -42,7 +47,7 @@ struct GalleryView: View {
             } else {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 10) {
-                        ForEach(model.galleryGames) { game in
+                        ForEach(visibleGames) { game in
                             GalleryArtworkTile(
                                 game: game,
                                 isSelected: model.selectedGalleryGameID == game.id,
