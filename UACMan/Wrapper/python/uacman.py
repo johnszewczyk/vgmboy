@@ -958,6 +958,7 @@ _CANONICAL_IMPORTED_TAG_NAMES = {
     "genre": "Genre",
     "comment": "Comment",
     "copyright": "Copyright",
+    "m3u": "M3U",
     "encodedby": "Encoded By",
     "tracknumber": "Track Number",
     "introlengthms": "Intro Length (ms)",
