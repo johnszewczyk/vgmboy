@@ -17,10 +17,11 @@ The native header fields and version byte follow the
 - **Source members** — `.gbs`; optional companion `.m3u` files.
 - **Coverage** — GBS header game, artist, and comment fields; M3U track rows
   and recognized `# @KEY value` comments.
-- **Status** — The reader, writer, and consumer mappings are aligned in code.
-  Production conversion still needs a packaged GBS fixture opened in UACMan
-  and checked in ScanSong/Songbase; no end-to-end package review was performed
-  in this profile pass. MetaMan converts
+- **Status** — Reader, writer, and consumer mappings are aligned in code.
+  Apply this profile per package: inspect every associated M3U, hold conflicting
+  rows for review, then verify the generated playlist through UACMan,
+  ScanSong, and Songbase. Parser support alone does not establish that a source
+  set is coherent or canonical. MetaMan converts
   fractional play, loop, and fade times to integer milliseconds, and reads
   NEZplug's loop-duration, loop-start, and whole-play loop forms. When rows
   conflict, ambiguous fields are omitted and diagnosed. Retain the original
@@ -98,6 +99,9 @@ The native header fields and version byte follow the
   attachment, including multiple M3Us that refer to the same GBS. Their rows
   can carry track names and playback timing, so they are not disposable
   generated queues. Preserve original names and paths in source provenance.
+  A row reference may omit the final `.gbs` suffix; resolve it to an exact,
+  case-insensitive member stem only when that identifies one physical GBS.
+  Hold a source package with colliding member stems for review.
   Store each applicable row in one Title Case nested `M3U` JSON value on its
   playlist entry. Include `Source Path`, `Raw Row`, populated raw `Play Time`,
   `Loop`, `Loop Start`, `Fade`, and `Loop Count`, plus positive
@@ -163,6 +167,7 @@ The native header fields and version byte follow the
 - **UAC review** — Verify Format and M3U are visible on each logical track,
   package metadata stays at package scope, hashes are visible
   in Stream Hashes, and source M3Us remain available as package attachments.
-  Keep affected conversions held until competing M3U rows are reviewed; verify
-  fixture behavior and GUI visibility before treating the implementation as
-  approved.
+  The Tag Analyzer's playable-track count and playlist-entry rows expose
+  subsong metadata; the physical-member Tracks grid can show one GBS file for
+  many logical subsongs. Keep affected conversions held until competing M3U
+  rows are reviewed.

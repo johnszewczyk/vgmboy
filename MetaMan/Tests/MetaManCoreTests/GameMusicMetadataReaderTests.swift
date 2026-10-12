@@ -222,23 +222,57 @@ func gbsReaderProjectsNEZPlugPlaylistMetadata() throws {
     #expect(result.tracks.count == 2)
     let first = result.tracks[0].document
     #expect(first.fields.title == "Opening, theme")
-    #expect(first.fields.game == "Fixture Album")
-    #expect(first.fields.artist == "Test Publisher")
-    #expect(first.fields.date == "2000-01-02")
+    #expect(first.fields.game == "GBS Game")
+    #expect(first.fields.artist == "Author")
+    #expect(first.fields.date == nil)
+    #expect(first.values(forTag: "TITLE").contains("Fixture Album"))
+    #expect(first.values(forTag: "ARTIST").contains("Test Publisher"))
+    #expect(first.values(forTag: "DATE") == ["2000-01-02"])
     #expect(first.timing == MetadataTiming(introLengthMs: 20_500, loopLengthMs: -1, playLengthMs: 42_375, fadeLengthMs: 5_125))
     #expect(first.technicalFacts["m3uLoopCount"] == "3")
     #expect(first.technicalFacts["m3uSourcePath"] == "01 Opening.m3u")
+    #expect(first.technicalFacts["m3uRawLine"] == "fixture.gbs::GBS,0,Opening\\, theme,0:42.375,0:20.500-,0:05.125,3")
+    #expect(first.technicalFacts["m3uTimeRaw"] == "0:42.375")
+    #expect(first.technicalFacts["m3uLoopStartRaw"] == "0:20.500-")
+    #expect(first.technicalFacts["m3uFadeRaw"] == "0:05.125")
+    #expect(first.technicalFacts["m3uRepeatRaw"] == "3")
+    #expect(first.technicalFacts["m3uSharedTag.TITLE"] == "Fixture Album")
+    #expect(first.technicalFacts["m3uSharedTag.ARTIST"] == "Test Publisher")
     #expect(first.rawMetadataBlocks?["companion-m3u"] == Data(m3u.utf8))
     #expect(first.tags.contains(MetadataTag(name: "COMPOSER", value: "Test Composer")))
     #expect(result.tracks[1].document.fields.title == "Finale")
-    #expect(result.tracks[1].document.fields.game == "Fixture Album")
-    #expect(result.tracks[1].document.fields.artist == "Test Publisher")
+    #expect(result.tracks[1].document.fields.game == "GBS Game")
+    #expect(result.tracks[1].document.fields.artist == "Author")
+    #expect(result.tracks[1].document.technicalFacts["m3uLoopRaw"] == "0:00:10.250")
+    #expect(result.tracks[1].document.technicalFacts["m3uRepeatRaw"] == "2")
     #expect(result.tracks[1].document.timing == MetadataTiming(
         introLengthMs: 0,
         loopLengthMs: 10_250,
         playLengthMs: 3_723_007,
         fadeLengthMs: 2_125
     ))
+}
+
+@Test("GBS M3U references resolve when the source omits the .gbs suffix")
+func gbsReaderResolvesExtensionlessMemberStem() throws {
+    let m3u = "fixture::GBS,0,Stem track,0:42.375,0:20.500-,0:05.125,3\n"
+    let result = try MetaManCore.readResult(
+        data: makeGBS(),
+        formatHint: "gbs",
+        displayName: "fixture.gbs",
+        context: MetadataReadContext(companionFiles: [
+            MetadataCompanionFile(relativePath: "game.m3u", data: Data(m3u.utf8))
+        ])
+    )
+
+    let track = try #require(result.tracks.first?.document)
+    #expect(track.fields.title == "Stem track")
+    #expect(track.timing == MetadataTiming(introLengthMs: 20_500, loopLengthMs: -1, playLengthMs: 42_375, fadeLengthMs: 5_125))
+    #expect(track.technicalFacts["m3uRawLine"] == "fixture::GBS,0,Stem track,0:42.375,0:20.500-,0:05.125,3")
+    #expect(track.technicalFacts["m3uTimeRaw"] == "0:42.375")
+    #expect(track.technicalFacts["m3uLoopStartRaw"] == "0:20.500-")
+    #expect(track.technicalFacts["m3uFadeRaw"] == "0:05.125")
+    #expect(track.technicalFacts["m3uRepeatRaw"] == "3")
 }
 
 @Test("GBS file-URL reads discover sibling NEZPlug playlists")

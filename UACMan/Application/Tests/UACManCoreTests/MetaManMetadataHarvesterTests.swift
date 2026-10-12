@@ -207,6 +207,8 @@ import UACWrapperCore
     gbs[4] = 2
     gbs[5] = 0
     gbs.replaceSubrange(0x10..<0x30, with: Data("Header Game".utf8) + Data(repeating: 0, count: 21))
+    gbs.replaceSubrange(0x30..<0x50, with: Data("Header Artist".utf8) + Data(repeating: 0, count: 19))
+    gbs.replaceSubrange(0x50..<0x70, with: Data("1989 Capcom".utf8) + Data(repeating: 0, count: 21))
     try gbs.write(to: gbsURL)
 
     let m3uURL = gameBoy.appendingPathComponent("01 Opening.m3u")
@@ -223,12 +225,18 @@ import UACWrapperCore
     let tracks = outcome.trackMetadata["GB/game.gbs"]
     #expect(outcome.failures.isEmpty)
     #expect(outcome.diagnosticCount == 0)
-    #expect(metadata?["Game"] == .string("M3U Album"))
+    #expect(metadata?.isEmpty == true)
+    #expect(outcome.gameMetadata["Album"] == .string("Header Game"))
+    #expect(outcome.gameMetadata["Album Artist"] == .string("Header Artist"))
+    #expect(outcome.gameMetadata["Copyright"] == .string("1989 Capcom"))
+    #expect(outcome.sharedFieldConflicts.contains { $0.contains("header and M3U values disagree for Album") })
+    #expect(!outcome.sharedFieldConflicts.contains { $0.contains("M3U # @TITLE differs") })
     #expect(tracks?.count == 2)
     #expect(tracks?[0].metadata["Title"] == .string("Opening Theme"))
     #expect(tracks?[0].metadata["Play Length (ms)"] == .integer(42_000))
     #expect(tracks?[0].metadata["Loop Length (ms)"] == .integer(20_000))
-    #expect(tracks?[0].metadata["Artist"] == .string("M3U Artist"))
+    #expect(tracks?[0].metadata["Artist"] == nil)
+    #expect(tracks?[0].metadata["Format"] == .string("GBS v.1"))
     #expect(tracks?[1].metadata["Title"] == nil)
     #expect(try Data(contentsOf: gbsURL) == gbs)
     #expect(try Data(contentsOf: m3uURL) == m3u)

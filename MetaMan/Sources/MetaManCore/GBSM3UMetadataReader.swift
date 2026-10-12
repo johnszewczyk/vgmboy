@@ -10,6 +10,12 @@ enum GBSM3UMetadataReader {
     private struct Entry {
         let index: Int
         let title: String
+        let rawLine: String
+        let timeRaw: String?
+        let loopRaw: String?
+        let loopStartRaw: String?
+        let fadeRaw: String?
+        let repeatRaw: String?
         let playLengthMs: Int?
         let introLengthMs: Int?
         let loopLengthMs: Int?
@@ -39,7 +45,9 @@ enum GBSM3UMetadataReader {
             URL(fileURLWithPath: $0.relativePath).pathExtension.caseInsensitiveCompare("m3u") == .orderedSame
         }
         guard !companions.isEmpty else { return result }
-        let targetName = URL(fileURLWithPath: displayName).lastPathComponent.lowercased()
+        let targetURL = URL(fileURLWithPath: displayName)
+        let targetName = targetURL.lastPathComponent.lowercased()
+        let targetStem = targetURL.deletingPathExtension().lastPathComponent.lowercased()
         let validIndexes = Set(result.tracks.compactMap(\.sourceTrackIndex))
         var entries: [Entry] = []
 
@@ -59,13 +67,21 @@ enum GBSM3UMetadataReader {
                     if let tag = parseTagComment(line) { comments.append(tag) }
                     continue
                 }
-                guard let row = parseRow(line), row.fileName.lowercased() == targetName else { continue }
+                guard let row = parseRow(line),
+                      row.fileName.lowercased() == targetName
+                        || row.fileName.lowercased() == targetStem else { continue }
                 parsedRows += 1
                 guard entries.count < maximumPlaylistRows,
                       validIndexes.contains(row.index) else { continue }
                 entries.append(Entry(
                     index: row.index,
                     title: row.title,
+                    rawLine: row.rawLine,
+                    timeRaw: row.timeRaw,
+                    loopRaw: row.loopRaw,
+                    loopStartRaw: row.loopStartRaw,
+                    fadeRaw: row.fadeRaw,
+                    repeatRaw: row.repeatRaw,
                     playLengthMs: row.playLengthMs,
                     introLengthMs: row.introLengthMs,
                     loopLengthMs: row.loopLengthMs,
@@ -129,6 +145,15 @@ enum GBSM3UMetadataReader {
             var facts = track.document.technicalFacts
             if let entry {
                 facts["m3uSourcePath"] = entry.relativePath
+                facts["m3uRawLine"] = entry.rawLine
+                facts["m3uTimeRaw"] = entry.timeRaw
+                facts["m3uLoopRaw"] = entry.loopRaw
+                facts["m3uLoopStartRaw"] = entry.loopStartRaw
+                facts["m3uFadeRaw"] = entry.fadeRaw
+                facts["m3uRepeatRaw"] = entry.repeatRaw
+            }
+            for tag in commonTags {
+                facts["m3uSharedTag.\(tag.normalizedName)"] = tag.value
             }
             if let playLengthMs { facts["m3uPlayLengthMs"] = String(playLengthMs) }
             if let introLengthMs { facts["m3uIntroLengthMs"] = String(introLengthMs) }
@@ -179,6 +204,12 @@ enum GBSM3UMetadataReader {
         let fileName: String
         let index: Int
         let title: String
+        let rawLine: String
+        let timeRaw: String?
+        let loopRaw: String?
+        let loopStartRaw: String?
+        let fadeRaw: String?
+        let repeatRaw: String?
         let playLengthMs: Int?
         let introLengthMs: Int?
         let loopLengthMs: Int?
@@ -196,20 +227,38 @@ enum GBSM3UMetadataReader {
               let index = parseIndex(fields[0]),
               !fileName.isEmpty else { return nil }
         let title = fields[1].trimmingCharacters(in: .whitespacesAndNewlines)
-        let playLengthMs = fields.indices.contains(2) ? parseTime(fields[2]) : nil
-        let loopTiming = fields.indices.contains(3) ? parseLoopTime(fields[3], playLengthMs: playLengthMs) : nil
-        let fadeLengthMs = fields.indices.contains(4) ? parseTime(fields[4]) : nil
-        let loopCount = fields.indices.contains(5) ? Int(fields[5].trimmingCharacters(in: .whitespacesAndNewlines)) : nil
+        let timeRaw = populatedField(fields, 2)
+        let playLengthMs = timeRaw.flatMap(parseTime)
+        let loopField = populatedField(fields, 3)
+        let loopTiming = loopField.flatMap { parseLoopTime($0, playLengthMs: playLengthMs) }
+        let loopStartRaw = loopField.flatMap { $0 != "-" && $0.hasSuffix("-") ? $0 : nil }
+        let loopRaw = loopStartRaw == nil ? loopField : nil
+        let fadeRaw = populatedField(fields, 4)
+        let fadeLengthMs = fadeRaw.flatMap(parseTime)
+        let repeatRaw = populatedField(fields, 5)
+        let loopCount = repeatRaw.flatMap(Int.init).flatMap { $0 >= 0 ? $0 : nil }
         return ParsedRow(
             fileName: fileName,
             index: index,
             title: title,
+            rawLine: line,
+            timeRaw: timeRaw,
+            loopRaw: loopRaw,
+            loopStartRaw: loopStartRaw,
+            fadeRaw: fadeRaw,
+            repeatRaw: repeatRaw,
             playLengthMs: playLengthMs,
             introLengthMs: loopTiming?.introLengthMs,
             loopLengthMs: loopTiming?.loopLengthMs,
             fadeLengthMs: fadeLengthMs,
             loopCount: loopCount
         )
+    }
+
+    private static func populatedField(_ fields: [String], _ index: Int) -> String? {
+        guard fields.indices.contains(index) else { return nil }
+        let value = fields[index].trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
     }
 
     private static func parseTagComment(_ line: String) -> MetadataTag? {
