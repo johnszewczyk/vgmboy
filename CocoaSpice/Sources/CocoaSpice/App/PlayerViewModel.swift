@@ -154,6 +154,7 @@ final class PlayerViewModel {
             guard sidebarSearchQuery != newValue else { return }
             sidebarSearchQuery = newValue
             applySidebarSearch()
+            refreshGalleryConsoleSearchResults()
             scheduleSidebarSearchPersistence()
         }
     }
@@ -325,8 +326,39 @@ final class PlayerViewModel {
     private(set) var galleryIsLoading = false
     private(set) var galleryLoadError: String?
     private(set) var galleryHasLoaded = false
+    private(set) var galleryConsoleNames: [String] = []
+    private(set) var visibleGalleryConsoleNames: [String] = []
+    var selectedGalleryConsoleName: String?
     var selectedGalleryGameID: String?
+    private(set) var visibleGalleryGames: [CatalogGalleryGame] = []
     var isGalleryTabActive: Bool { activePlaylistTab?.kind == .gallery }
+
+    private func refreshGalleryConsoleSearchResults() {
+        let query = sidebarSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else {
+            visibleGalleryConsoleNames = galleryConsoleNames
+            return
+        }
+        let matchingNames = Set(galleryGames.compactMap { game -> String? in
+            let rootName = URL(fileURLWithPath: game.rootPath, isDirectory: true).lastPathComponent
+            let searchText = CatalogBrowserSearchText.game(
+                name: game.game,
+                system: game.system,
+                rootDisplayName: rootName,
+                displayName: game.game
+            )
+            return searchText.contains(query) ? Self.galleryConsoleName(for: game) : nil
+        })
+        visibleGalleryConsoleNames = galleryConsoleNames.filter(matchingNames.contains)
+    }
+
+    private func refreshVisibleGalleryGames() {
+        guard let selectedGalleryConsoleName else {
+            visibleGalleryGames = galleryGames
+            return
+        }
+        visibleGalleryGames = galleryGames.filter { Self.galleryConsoleName(for: $0) == selectedGalleryConsoleName }
+    }
     private var isRestoringPlaylistTabs = false
     private var startupRestorationCompleted = false
     private var playlistTabsSaveWorkItem: DispatchWorkItem?
@@ -368,6 +400,7 @@ final class PlayerViewModel {
     func activatePlaylistTab(_ tabID: String) {
         guard tabID != activePlaylistTabID,
               let tab = playlistTabs.first(where: { $0.id == tabID }) else { return }
+        let enteringGallery = tab.kind == .gallery && !isGalleryTabActive
         syncActivePlaylistTab()
         isRestoringPlaylistTabs = true
         activePlaylistTabID = tab.id
@@ -378,6 +411,11 @@ final class PlayerViewModel {
         isRestoringPlaylistTabs = false
         if let selectedTrackID, !selectedTrackIDs.contains(selectedTrackID) {
             selectedTrackIDs.insert(selectedTrackID)
+        }
+        if enteringGallery {
+            selectedGalleryConsoleName = nil
+            sidebarSearchText = ""
+            refreshVisibleGalleryGames()
         }
         syncActivePlaylistTab()
         metadataCache = metadataCache.filter { id, _ in tab.tracks.contains(where: { $0.id == id }) }
@@ -485,6 +523,15 @@ final class PlayerViewModel {
         statusText = [game.game, game.system].filter { !$0.isEmpty }.joined(separator: " • ")
     }
 
+    func selectGalleryConsole(_ consoleName: String) {
+        guard galleryConsoleNames.contains(consoleName) else { return }
+        selectedGalleryConsoleName = consoleName
+        selectedGalleryGameID = nil
+        refreshVisibleGalleryGames()
+        let count = visibleGalleryGames.count
+        statusText = "Showing \(count) artwork title\(count == 1 ? "" : "s") for \(consoleName)."
+    }
+
     func retryGalleryLoad() {
         galleryHasLoaded = false
         galleryLoadError = nil
@@ -514,7 +561,11 @@ final class PlayerViewModel {
         galleryIsLoading = false
         galleryLoadError = nil
         galleryHasLoaded = false
+        galleryConsoleNames = []
+        visibleGalleryConsoleNames = []
+        selectedGalleryConsoleName = nil
         selectedGalleryGameID = nil
+        visibleGalleryGames = []
     }
 
     private func loadGalleryGamesIfNeeded() {
@@ -553,6 +604,13 @@ final class PlayerViewModel {
             switch result {
             case .success(let games):
                 self.galleryGames = games
+                self.galleryConsoleNames = Self.galleryConsoleNames(from: games)
+                if let selected = self.selectedGalleryConsoleName,
+                   !self.galleryConsoleNames.contains(selected) {
+                    self.selectedGalleryConsoleName = nil
+                }
+                self.refreshGalleryConsoleSearchResults()
+                self.refreshVisibleGalleryGames()
                 self.galleryHasLoaded = true
                 if self.isGalleryTabActive {
                     self.statusText = games.isEmpty
@@ -568,6 +626,27 @@ final class PlayerViewModel {
             }
         }
         gallerySessions.install(task, generation: generation, for: .gallery)
+    }
+
+    private static func galleryConsoleName(for game: CatalogGalleryGame) -> String {
+        let name = game.system.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "Unknown Console" : name
+    }
+
+    private static func galleryConsoleNames(from games: [CatalogGalleryGame]) -> [String] {
+        let projectedGames = games.map { game in
+            CatalogBrowserGame(
+                bucket: CatalogGameBucket(
+                    rootID: game.rootID,
+                    rootPath: game.rootPath,
+                    game: game.game,
+                    system: game.system,
+                    trackCount: 1
+                ),
+                displayName: game.game
+            )
+        }
+        return CatalogBrowserProjection.groups(from: projectedGames).map(\.name)
     }
 
     private func syncActivePlaylistTab() {

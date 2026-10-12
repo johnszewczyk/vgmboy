@@ -13,7 +13,9 @@
   presentation of indexed games and files.
 - `CatalogSessionCore` also supplies the read-only Title Snap Gallery projection
   and an independent `.gallery` request scope. Gallery SQL stays in CatalogReader;
-  the frontend owns tile presentation and activation.
+  the frontend derives its console-only sidebar from that projection and owns
+  tile presentation, sidebar selection, filtering, and activation. Do not issue
+  a separate query or use the full Games list to populate Gallery consoles.
 - `OptionsView` directs users to ScanSong for every catalog-maintenance action.
 
 ## Invariants
