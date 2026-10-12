@@ -16,8 +16,10 @@ and manifest contract.
 - FrontendCore owns shared path-based archive materialization and cache policy;
   it consumes `UACWrapperCore` but does not implement UAC parsing.
 - CocoaSpice owns UAC playback adaptation. For SPC playback it passes a
-  seekable UAC member to the in-memory decoder path; formats requiring a file
-  path use FrontendCore materialization.
+  seekable UAC member to the in-memory decoder path. Path-based selected-member
+  playback in active frontends uses FrontendCore's indexed member materializer
+  for `tar+zstd-seekable`; legacy streams and dependency-complete formats keep
+  the sequential extraction route.
 - VGMBoy owns decoder admission and playback behavior. AudioMan is a downstream
   `/audio` operator that chooses source sets and package recipes; it does not
   own, link, or implement UACMan.
@@ -45,9 +47,10 @@ and manifest contract.
 
 - Reject malformed or unsupported UAC packages; never reinterpret an invalid
   `.uac` as TAR, ZIP, or standalone audio.
-- Compressed manifest and member-frame decoding must use bounded host-supplied
-  Zstandard adapters. The format core owns bounds and validation, not the codec
-  process lifecycle.
+- Compressed manifest and member-frame decoding must use the bounded shared
+  Zstandard CLI adapter or a host-injected equivalent. UACWrapperCore owns
+  format bounds and validation; FrontendCore owns the bounded external-process
+  adapter for local playback.
 - If the selected decoder requires a filesystem path, use the existing shared
   materialization route. Do not add another archive extractor to a frontend.
 

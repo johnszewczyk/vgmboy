@@ -1,8 +1,147 @@
+import CryptoKit
 import Foundation
 import Testing
 import ArchiveCacheCore
+import UACWrapperCore
 import VGMBoyFormatCore
 @testable import ArchiveMaterializationCore
+
+@Test func boundedProcessRunnerReturnsOutputAndStopsAtTheLimit() throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ArchiveProcessRunnerBoundedTests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let runner = ArchiveProcessRunner(configuration: .init(
+        environment: ProcessInfo.processInfo.environment,
+        temporaryDirectory: root,
+        temporaryFilePrefix: "bounded",
+        maxConcurrency: 1,
+        listingTimeout: 5,
+        extractionTimeout: 5,
+        capturedOutputMaximumBytes: 1024
+    ))
+
+    let output = try runner.runBounded(
+        executable: "/usr/bin/printf",
+        arguments: ["hello"],
+        maximumOutputBytes: 5,
+        operation: .extraction
+    )
+    #expect(output == Data("hello".utf8))
+    #expect(throws: ArchiveProcessRunnerError.outputLimitExceeded(bytes: 6)) {
+        try runner.runBounded(
+            executable: "/usr/bin/printf",
+            arguments: ["123456"],
+            maximumOutputBytes: 5,
+            operation: .extraction
+        )
+    }
+}
+
+@Test func sharedUACFrameCodecDecodesOneFrameAndChecksItsSeekChecksum() throws {
+    guard let zstdPath = ArchiveMaterializerConfiguration.default.zstdCandidates.first(where: {
+        FileManager.default.isExecutableFile(atPath: $0)
+    }) else { return }
+
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("UACZstandardCLIFrameCodecTests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let sourceURL = root.appendingPathComponent("frame.tar-part", isDirectory: false)
+    let sourceData = Data("bounded frame bytes".utf8)
+    try sourceData.write(to: sourceURL)
+
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: zstdPath)
+    process.arguments = ["-q", "-c", "--", sourceURL.path]
+    let output = Pipe()
+    process.standardOutput = output
+    process.standardError = FileHandle.nullDevice
+    try process.run()
+    let compressed = output.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    #expect(process.terminationStatus == 0)
+
+    let codec = UACZstandardCLIFrameCodec()
+    let checksum = UACSeekableFrameChecksum.value(for: sourceData)
+    #expect(try codec.seekableFrameDecoder(compressed, checksum) == sourceData)
+    #expect(throws: UACZstandardCLIFrameCodecError.checksumMismatch) {
+        try codec.seekableFrameDecoder(compressed, checksum &+ 1)
+    }
+}
+
+@Test func playbackMaterializerSeeksOnlyFramesCoveringSelectedUACMember() throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ArchivePlaybackSeekableUACTests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let archiveURL = try makeSeekableUACFixtureForArchivePlayback(in: root)
+    let cacheURL = root.appendingPathComponent("cache", isDirectory: true)
+    let keys = ArchiveCachePreferenceKeys(
+        modeKey: "ArchivePlaybackSeekableUACTests.\(UUID().uuidString).mode",
+        limitKey: "ArchivePlaybackSeekableUACTests.\(UUID().uuidString).limit"
+    )
+    ArchiveCachePolicy(mode: .disabled, maximumBytes: ArchiveCachePolicy.defaultLimitBytes).save(keys: keys)
+    let decodeCounter = ArchivePlaybackFrameDecodeCounter()
+    let frameDecoder: UACSeekableFrameDecoder = { compressed, checksum in
+        #expect(checksum == nil)
+        decodeCounter.increment()
+        switch compressed.last {
+        case 1: return Data("ABCD".utf8)
+        case 2: return Data("EFGHI".utf8)
+        default: throw UACContainerError.invalidPayloadMagic
+        }
+    }
+    let materializer = ArchivePlaybackMaterializer(
+        cacheRootURL: cacheURL,
+        preferenceKeys: keys,
+        capacityProvider: { _ in Int64.max },
+        decompressUACSeekableFrame: frameDecoder
+    )
+
+    let selected = try materializer.materialize(
+        archiveURL: archiveURL,
+        entryPath: "variants/original/track.spc",
+        requirement: .selectedEntry
+    )
+    #expect(try Data(contentsOf: selected) == Data("CDEF".utf8))
+    #expect(decodeCounter.value == 2)
+}
+
+@Test func sharedMaterializerSeeksOnlyFramesCoveringSelectedUACMember() throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ArchiveMaterializerSeekableUACTests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let archiveURL = try makeSeekableUACFixtureForArchivePlayback(in: root)
+    let decodeCounter = ArchivePlaybackFrameDecodeCounter()
+    let frameDecoder: UACSeekableFrameDecoder = { compressed, checksum in
+        #expect(checksum == nil)
+        decodeCounter.increment()
+        switch compressed.last {
+        case 1: return Data("ABCD".utf8)
+        case 2: return Data("EFGHI".utf8)
+        default: throw UACContainerError.invalidPayloadMagic
+        }
+    }
+    let materializer = ArchiveMaterializer(
+        configuration: .init(
+            temporaryDirectoryName: "ArchiveMaterializerSeekableUACTests-\(UUID().uuidString)",
+            bsdtarCandidates: [],
+            zstdCandidates: []
+        ),
+        decompressUACSeekableFrame: frameDecoder
+    )
+    defer { materializer.release() }
+
+    let selected = try materializer.materialize(
+        archivePath: archiveURL.path,
+        entry: "variants/original/track.spc",
+        requirement: .selectedEntry
+    )
+    #expect(try Data(contentsOf: selected) == Data("CDEF".utf8))
+    #expect(decodeCounter.value == 2)
+}
 
 @Test func materializationSessionReplacesAndClearsOnlyTemporaryOwnership() throws {
     let root = FileManager.default.temporaryDirectory
@@ -240,6 +379,85 @@ import VGMBoyFormatCore
         includingPropertiesForKeys: nil
     )) ?? []
     #expect(remaining.filter { $0.lastPathComponent.hasPrefix(".set-") }.isEmpty)
+}
+
+private final class ArchivePlaybackFrameDecodeCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
+
+    func increment() {
+        lock.lock()
+        count += 1
+        lock.unlock()
+    }
+}
+
+private func makeSeekableUACFixtureForArchivePlayback(in directory: URL) throws -> URL {
+    let digest = String(repeating: "a", count: 64)
+    let manifest = UACManifest(
+        packageID: "fixture-game",
+        payload: UACPayload(
+            format: "tar+zstd-seekable",
+            compressionProfile: "uac-zstd-seekable-level-3-frame-4194304-v1",
+            encoderVersion: "FrontendCore fixture",
+            blake3: digest
+        ),
+        game: UACGame(id: "fixture-game", title: "Fixture Game", console: "Nintendo SNES"),
+        variants: [UACVariant(id: "original", label: "Original", kind: "retail")],
+        members: [UACMember(
+            path: "variants/original/track.spc",
+            originalName: "track.spc",
+            variantID: "original",
+            role: "playable",
+            format: "spc",
+            byteSize: 4,
+            tarDataOffset: 2,
+            blake3: digest
+        )]
+    )
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    let manifestData = try encoder.encode(manifest)
+
+    var payload = Data([0x28, 0xB5, 0x2F, 0xFD, 1, 0x28, 0xB5, 0x2F, 0xFD, 2])
+    var seekTable = Data()
+    appendLittleEndian(UInt32(5), to: &seekTable)
+    appendLittleEndian(UInt32(4), to: &seekTable)
+    appendLittleEndian(UInt32(5), to: &seekTable)
+    appendLittleEndian(UInt32(5), to: &seekTable)
+    appendLittleEndian(UInt32(2), to: &seekTable)
+    seekTable.append(0)
+    appendLittleEndian(UACZstandardSeekTable.seekableFooterMagic, to: &seekTable)
+    appendLittleEndian(UACZstandardSeekTable.skippableFrameMagic, to: &payload)
+    appendLittleEndian(UInt32(seekTable.count), to: &payload)
+    payload.append(seekTable)
+
+    var metadataFrame = UACContainerReader.metadataMagic
+    appendLittleEndian(UInt16(1), to: &metadataFrame)
+    appendLittleEndian(UInt16(0), to: &metadataFrame)
+    metadataFrame.append(contentsOf: SHA256.hash(data: manifestData))
+    metadataFrame.append(manifestData)
+
+    var container = Data()
+    appendLittleEndian(UACContainerReader.uacSkippableMagic, to: &container)
+    appendLittleEndian(UInt32(metadataFrame.count), to: &container)
+    container.append(metadataFrame)
+    container.append(payload)
+
+    let archiveURL = directory.appendingPathComponent("seekable-fixture.uac", isDirectory: false)
+    try container.write(to: archiveURL, options: .atomic)
+    return archiveURL
+}
+
+private func appendLittleEndian<T: FixedWidthInteger>(_ value: T, to data: inout Data) {
+    var littleEndian = value.littleEndian
+    withUnsafeBytes(of: &littleEndian) { data.append(contentsOf: $0) }
 }
 
 private func testCacheStore(at root: URL) -> ArchiveCacheStore {

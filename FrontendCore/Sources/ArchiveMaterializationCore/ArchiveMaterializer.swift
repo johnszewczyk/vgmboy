@@ -20,15 +20,21 @@ public final class ArchiveMaterializer: @unchecked Sendable {
     private let processRunner: ArchiveProcessRunner
     private let session: ArchiveMaterializationSession
     private let decompressUACManifestFrame: UACManifestFrameDecoder?
+    private let decompressUACSeekableFrame: UACSeekableFrameDecoder?
+    private let uacZstandardCodec: UACZstandardCLIFrameCodec
 
     public init(
         configuration: ArchiveMaterializerConfiguration = .default,
         session: ArchiveMaterializationSession = ArchiveMaterializationSession(),
-        decompressUACManifestFrame: UACManifestFrameDecoder? = nil
+        decompressUACManifestFrame: UACManifestFrameDecoder? = nil,
+        decompressUACSeekableFrame: UACSeekableFrameDecoder? = nil,
+        uacZstandardCodec: UACZstandardCLIFrameCodec = .shared
     ) {
         self.configuration = configuration
         self.session = session
         self.decompressUACManifestFrame = decompressUACManifestFrame
+        self.decompressUACSeekableFrame = decompressUACSeekableFrame
+        self.uacZstandardCodec = uacZstandardCodec
         self.processRunner = ArchiveProcessRunner(configuration: .init(
             environment: ProcessInfo.processInfo.environment,
             temporaryFilePrefix: "FrontendCore-materializer",
@@ -132,7 +138,7 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         guard ArchiveContainerKind(archiveURL: archiveURL) == .uac else { return }
         let container = try UACContainerReader.read(
             from: archiveURL,
-            decompressManifestFrame: decompressUACManifestFrame
+            decompressManifestFrame: decompressUACManifestFrame ?? uacZstandardCodec.manifestDecoder
         )
         guard container.manifest.members.contains(where: { $0.path == entryPath }) else {
             throw ArchiveMaterializationError.invalidEntry
@@ -144,6 +150,13 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         guard let kind = ArchiveContainerKind(archiveURL: archiveURL) else {
             throw ArchiveMaterializationError.toolUnavailable("supported archive format")
         }
+        if kind == .uac, try writeSeekableUACMember(
+            archiveURL: archiveURL,
+            entryPath: entry,
+            outputURL: output
+        ) {
+            return
+        }
         try extractWithArchiveTool(
             ArchiveToolRouting.selectedEntryToStdout(
                 kind: kind,
@@ -152,6 +165,31 @@ public final class ArchiveMaterializer: @unchecked Sendable {
             ),
             outputURL: output
         )
+    }
+
+    private func writeSeekableUACMember(
+        archiveURL: URL,
+        entryPath: String,
+        outputURL: URL
+    ) throws -> Bool {
+        let manifestDecoder = decompressUACManifestFrame ?? uacZstandardCodec.manifestDecoder
+        let container = try UACContainerReader.read(
+            from: archiveURL,
+            decompressManifestFrame: manifestDecoder
+        )
+        guard container.manifest.members.contains(where: { $0.path == entryPath }) else {
+            throw ArchiveMaterializationError.invalidEntry
+        }
+        guard container.manifest.payload.format == "tar+zstd-seekable" else { return false }
+
+        let memberFile = try UACSeekableMemberFile(
+            url: archiveURL,
+            memberPath: entryPath,
+            decompressManifestFrame: manifestDecoder,
+            decompressFrame: decompressUACSeekableFrame ?? uacZstandardCodec.seekableFrameDecoder
+        )
+        try UACSeekableMemberMaterializer.write(memberFile, to: outputURL)
+        return true
     }
 
     private func extractCompleteSet(archiveURL: URL, destination: URL) throws {

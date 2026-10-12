@@ -59,6 +59,12 @@ public typealias UACManifestFrameDecoder = @Sendable (
     _ expectedByteCount: Int,
     _ maximumMemoryByteCount: Int
 ) throws -> Data
+/// Host-supplied decoder for one independently compressed UAC TAR frame.
+/// The member reader verifies the decoded size and optional seek-table checksum.
+public typealias UACSeekableFrameDecoder = @Sendable (
+    _ compressedFrame: Data,
+    _ checksum: UInt32?
+) throws -> Data
 public typealias UACManifestFrameEncoder = @Sendable (_ manifestData: Data) throws -> Data
 
 /// Reads a raw or independently Zstandard-compressed JSON manifest in the

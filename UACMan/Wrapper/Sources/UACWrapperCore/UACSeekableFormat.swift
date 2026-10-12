@@ -26,6 +26,9 @@ public struct UACZstandardSeekTable: Equatable, Sendable {
     /// theoretical 1 GiB maximum so one requested frame cannot demand extreme
     /// memory. The package builder uses a 4 MiB default.
     public static let maximumFrameTarByteCount: UInt32 = 64 * 1024 * 1024
+    /// Allows bounded codec overhead above an incompressible maximum-size TAR
+    /// frame while preventing a corrupt index from forcing multi-gigabyte reads.
+    public static let maximumFrameCompressedByteCount: UInt32 = 65 * 1024 * 1024
 
     /// Returns the independently compressed frames intersecting a byte range
     /// in the decompressed TAR stream.
@@ -129,6 +132,7 @@ public struct UACZstandardSeekTable: Equatable, Sendable {
             let compressedByteCount = Self.uint32LE(entries, at: entryOffset)
             let tarByteCount = Self.uint32LE(entries, at: entryOffset + 4)
             guard compressedByteCount > 0,
+                  compressedByteCount <= maximumFrameCompressedByteCount,
                   tarByteCount <= maximumFrameTarByteCount else {
                 throw UACContainerError.invalidSeekTable("Frame \(index) has an invalid size.")
             }

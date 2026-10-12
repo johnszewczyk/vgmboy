@@ -17,13 +17,17 @@ public final class ArchivePlaybackMaterializer: @unchecked Sendable {
     private let playbackLease: ArchivePlaybackLease
     private let preferenceKeys: ArchiveCachePreferenceKeys
     private let decompressUACManifestFrame: UACManifestFrameDecoder?
+    private let decompressUACSeekableFrame: UACSeekableFrameDecoder?
+    private let uacZstandardCodec: UACZstandardCLIFrameCodec
 
     public init(
         cacheRootURL: URL,
         preferenceKeys: ArchiveCachePreferenceKeys,
         playbackLease: ArchivePlaybackLease = ArchivePlaybackLease(),
         capacityProvider: ArchiveCacheStore.CapacityProvider? = nil,
-        decompressUACManifestFrame: UACManifestFrameDecoder? = nil
+        decompressUACManifestFrame: UACManifestFrameDecoder? = nil,
+        decompressUACSeekableFrame: UACSeekableFrameDecoder? = nil,
+        uacZstandardCodec: UACZstandardCLIFrameCodec = .shared
     ) {
         let cacheStore = ArchiveCacheStore(
             cacheRootURL: cacheRootURL,
@@ -37,6 +41,8 @@ public final class ArchivePlaybackMaterializer: @unchecked Sendable {
         )
         self.preferenceKeys = preferenceKeys
         self.decompressUACManifestFrame = decompressUACManifestFrame
+        self.decompressUACSeekableFrame = decompressUACSeekableFrame
+        self.uacZstandardCodec = uacZstandardCodec
     }
 
     /// Returns the selected playable file, never the cache root directory.
@@ -55,14 +61,18 @@ public final class ArchivePlaybackMaterializer: @unchecked Sendable {
         guard !normalizedEntry.isEmpty, ArchiveEntryPath.isSafe(normalizedEntry) else {
             throw ArchiveMaterializationError.invalidEntry
         }
+        let uacContainer: UACContainer?
         if ArchiveContainerKind(archiveURL: archiveURL) == .uac {
             let container = try UACContainerReader.read(
                 from: archiveURL,
-                decompressManifestFrame: decompressUACManifestFrame
+                decompressManifestFrame: manifestFrameDecoder
             )
             guard container.manifest.members.contains(where: { $0.path == normalizedEntry }) else {
                 throw ArchiveMaterializationError.invalidEntry
             }
+            uacContainer = container
+        } else {
+            uacContainer = nil
         }
 
         let policy = ArchiveCachePolicy.load(keys: preferenceKeys)
@@ -74,6 +84,16 @@ public final class ArchivePlaybackMaterializer: @unchecked Sendable {
                 entryPath: normalizedEntry,
                 policy: policy
             ) { temporaryURL in
+                if uacContainer?.manifest.payload.format == "tar+zstd-seekable" {
+                    let memberFile = try UACSeekableMemberFile(
+                        url: archiveURL,
+                        memberPath: normalizedEntry,
+                        decompressManifestFrame: self.manifestFrameDecoder,
+                        decompressFrame: self.seekableFrameDecoder
+                    )
+                    try UACSeekableMemberMaterializer.write(memberFile, to: temporaryURL)
+                    return
+                }
                 try ArchiveMaterializer.shared.execute(
                     ArchiveToolRouting.selectedEntryToStdout(
                         kind: try archiveKind(for: archiveURL),
@@ -146,6 +166,14 @@ public final class ArchivePlaybackMaterializer: @unchecked Sendable {
             throw ArchiveMaterializationError.toolUnavailable("supported archive format")
         }
         return kind
+    }
+
+    private var manifestFrameDecoder: UACManifestFrameDecoder {
+        decompressUACManifestFrame ?? uacZstandardCodec.manifestDecoder
+    }
+
+    private var seekableFrameDecoder: UACSeekableFrameDecoder {
+        decompressUACSeekableFrame ?? uacZstandardCodec.seekableFrameDecoder
     }
 
     private func validatePlayableOutput(_ url: URL) throws {

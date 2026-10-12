@@ -410,13 +410,14 @@ The seekable Zstandard API supports arbitrary decompressed byte-range reads
 through a seekable backing source. `UACSeekableMemberFile` exposes an indexed
 member as a read-only virtual byte file: it reads only intersecting compressed
 frames, caches at most four by default and no more than 64 MiB total in memory,
-and writes no extracted audio to disk. Its injected frame decoder must validate any optional seek-table
-checksum. CocoaSpice injects a bounded host Zstandard decoder for compressed
-manifests and seekable payload frames. For SPC, CocoaSpice reads the selected
-member through this virtual file and supplies the bounded member bytes to
-libgme's in-memory open API; decompressed SPC bytes are not written to playback
-cache. Other formats whose decoders require filesystem paths use the existing
-selected-entry materialization route. The UACMan wrapper CLI accepts a JSON
+and writes no extracted audio to disk. Its injected frame decoder must validate
+any optional seek-table checksum. FrontendCore supplies a bounded adapter for
+the host-installed Zstandard CLI and uses that virtual file to materialize only
+the selected member for path-based playback in seekable packages. Legacy
+`tar+zstd` streams and dependency-complete formats retain sequential extraction.
+CocoaSpice also reads SPC members through the virtual file and supplies bounded
+member bytes to libgme's in-memory open API; decompressed SPC bytes are not
+written to playback cache. The UACMan wrapper CLI accepts a JSON
 recipe and can invoke MetaManCore through UACManMetadataCLI. SPC uses its
 soundtrack-aware projection; single-track formats use the common member
 projection, and track-aware formats use ordered subsong playlist entries. A

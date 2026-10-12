@@ -7,8 +7,9 @@ public enum ArchiveContainerKind: String, CaseIterable, Equatable, Sendable {
     case lha
     case rsn
     case tar
-    /// UAC is a Zstandard skippable metadata frame followed by a standard
-    /// TAR+Zstandard frame, so the ordinary streaming TAR pipeline applies.
+    /// UAC may use indexed independent Zstandard frames or a legacy streaming
+    /// TAR+Zstandard payload. Selected indexed members use UACWrapperCore;
+    /// this routing is retained for legacy and complete-set materialization.
     case uac
     /// A single playable payload compressed directly with Zstandard, such as
     /// `track.vgm.zst`. It has no member listing and cannot satisfy a

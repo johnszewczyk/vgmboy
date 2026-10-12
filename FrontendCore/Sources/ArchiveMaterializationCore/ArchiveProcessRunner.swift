@@ -140,6 +140,103 @@ public final class ArchiveProcessRunner: @unchecked Sendable {
         return try Data(contentsOf: outputURL, options: .mappedIfSafe)
     }
 
+    /// Runs a process while enforcing a hard stdout limit during execution.
+    /// Unlike `run`, excess output is drained and the child is stopped as soon
+    /// as the bound is crossed, so a malformed compressed frame cannot fill
+    /// the temporary volume before its size is checked.
+    public func runBounded(
+        executable: String,
+        arguments: [String],
+        maximumOutputBytes: Int64,
+        operation: ArchiveProcessOperation
+    ) throws -> Data {
+        guard maximumOutputBytes > 0 else {
+            throw ArchiveProcessRunnerError.outputLimitExceeded(bytes: 0)
+        }
+        try acquirePermit()
+        defer { releasePermit() }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.environment = configuration.environment
+
+        let stdout = Pipe()
+        let stderr = Pipe()
+        process.standardOutput = stdout
+        process.standardError = stderr
+        let completion = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in completion.signal() }
+
+        do {
+            try process.run()
+        } catch {
+            process.terminationHandler = nil
+            try? stdout.fileHandleForWriting.close()
+            try? stderr.fileHandleForWriting.close()
+            throw error
+        }
+
+        // The child inherited these descriptors when launched; close the
+        // parent's copies so the readers observe EOF when the child exits.
+        try? stdout.fileHandleForWriting.close()
+        try? stderr.fileHandleForWriting.close()
+
+        let stdoutCollector = ArchiveProcessBoundedDataCollector(maximumBytes: maximumOutputBytes)
+        let stderrCollector = ArchiveProcessBoundedDataCollector(
+            maximumBytes: min(configuration.capturedOutputMaximumBytes, 128 * 1024)
+        )
+        let readers = DispatchGroup()
+        readers.enter()
+        Thread.detachNewThread {
+            defer { readers.leave() }
+            Self.collect(
+                from: stdout.fileHandleForReading,
+                into: stdoutCollector,
+                terminate: { if process.isRunning { process.terminate() } }
+            )
+        }
+        readers.enter()
+        Thread.detachNewThread {
+            defer { readers.leave() }
+            Self.collect(from: stderr.fileHandleForReading, into: stderrCollector)
+        }
+
+        do {
+            try waitForProcess(
+                process,
+                completion: completion,
+                executable: executable,
+                timeout: operation == .extraction ? configuration.extractionTimeout : configuration.listingTimeout
+            )
+        } catch {
+            readers.wait()
+            process.terminationHandler = nil
+            throw error
+        }
+        readers.wait()
+        process.terminationHandler = nil
+
+        if let readFailure = stdoutCollector.readFailure {
+            throw ArchiveProcessRunnerError.failed(
+                executable: URL(fileURLWithPath: executable).lastPathComponent,
+                status: process.terminationStatus,
+                message: readFailure
+            )
+        }
+        if stdoutCollector.exceededLimit {
+            throw ArchiveProcessRunnerError.outputLimitExceeded(bytes: stdoutCollector.receivedBytes)
+        }
+        guard process.terminationStatus == 0 else {
+            throw ArchiveProcessRunnerError.failed(
+                executable: URL(fileURLWithPath: executable).lastPathComponent,
+                status: process.terminationStatus,
+                message: processErrorText(stderrCollector.value, status: process.terminationStatus)
+            )
+        }
+        return stdoutCollector.value
+    }
+
     /// Runs a process with stdout directed to a caller-owned output file.
     public func runWritingOutput(
         executable: String,
@@ -239,10 +336,85 @@ public final class ArchiveProcessRunner: @unchecked Sendable {
         )
     }
 
+    private static func collect(
+        from handle: FileHandle,
+        into collector: ArchiveProcessBoundedDataCollector,
+        terminate: (() -> Void)? = nil
+    ) {
+        defer { try? handle.close() }
+        do {
+            while let chunk = try handle.read(upToCount: 64 * 1024), !chunk.isEmpty {
+                if !collector.append(chunk) { terminate?() }
+            }
+        } catch {
+            collector.setReadFailure(error.localizedDescription)
+            terminate?()
+        }
+    }
+
     private func processErrorText(_ data: Data, status: Int32) -> String {
         let text = String(decoding: data, as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return text.isEmpty ? "exit code \(status)" : text
+    }
+}
+
+private final class ArchiveProcessBoundedDataCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private let maximumBytes: Int64
+    private var data = Data()
+    private var received = Int64(0)
+    private var didExceedLimit = false
+    private var failure: String?
+
+    init(maximumBytes: Int64) {
+        self.maximumBytes = max(0, maximumBytes)
+    }
+
+    var value: Data {
+        lock.lock()
+        defer { lock.unlock() }
+        return data
+    }
+
+    var receivedBytes: Int64 {
+        lock.lock()
+        defer { lock.unlock() }
+        return received
+    }
+
+    var exceededLimit: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return didExceedLimit
+    }
+
+    var readFailure: String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return failure
+    }
+
+    @discardableResult
+    func append(_ chunk: Data) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        let (nextReceived, overflow) = received.addingReportingOverflow(Int64(chunk.count))
+        received = overflow ? Int64.max : nextReceived
+        let remaining = max(0, maximumBytes - Int64(data.count))
+        if Int64(chunk.count) > remaining {
+            didExceedLimit = true
+            if remaining > 0 { data.append(chunk.prefix(Int(remaining))) }
+            return false
+        }
+        if !didExceedLimit { data.append(chunk) }
+        return !didExceedLimit
+    }
+
+    func setReadFailure(_ message: String) {
+        lock.lock()
+        failure = message
+        lock.unlock()
     }
 }
 
