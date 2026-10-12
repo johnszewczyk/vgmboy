@@ -21,7 +21,6 @@ let renderedDatabaseGames = null;
 let galleryVisibleDatabaseSource = null;
 let galleryVisibleGallerySource = null;
 let galleryVisibleDatabaseResults = [];
-let galleryVisibleArtworkByID = new Map();
 let databaseGameButtons = [];
 let databaseConsoleGroups = [];
 let collapsedDatabaseConsoles = new Set();
@@ -52,7 +51,6 @@ let galleryStaleRetryTimer = 0;
 let galleryStaleRetryCount = 0;
 let galleryRenderSignature = null;
 let galleryArtworkObserver = null;
-let sidebarGalleryArtworkObserver = null;
 let galleryArtworkInFlight = 0;
 const galleryArtworkQueue = [];
 const galleryArtworkCache = new Map();
@@ -1533,6 +1531,7 @@ function selectDatabaseSidebarRow(button, { focus = true, preview = false } = {}
   lastPlaylistSelectionID = null;
 
   const gameID = button.dataset.databaseGameKey;
+  let consoleSelection = null;
   if (gameID) {
     const game = visibleDatabaseGames().find((entry) => databaseGameKey(entry) === gameID);
     if (!game) return false;
@@ -1545,13 +1544,27 @@ function selectDatabaseSidebarRow(button, { focus = true, preview = false } = {}
     if (!consoleName) return false;
     state.selectedDatabaseConsoleName = consoleName;
     state.selectedDatabaseGameKey = null;
-    void applySharedDatabaseGroupAction("select", consoleName)
-      .catch((error) => reportDatabaseSidebarError("select the database console", error));
+    consoleSelection = applySharedDatabaseGroupAction("select", consoleName);
+    if (!isGalleryActive()) {
+      void consoleSelection.catch((error) => reportDatabaseSidebarError("select the database console", error));
+    }
   }
 
   syncSidebarSelectionRowClass(button);
   if (focus) button.focus();
   persistSettings();
+
+  if (isGalleryActive() && !gameID && consoleSelection) {
+    void consoleSelection.then((selected) => {
+      if (!selected
+          || interactionGeneration !== sidebarInteractionGeneration
+          || targetTabID !== state.activePlaylistTabId
+          || !isGalleryActive()) return;
+      galleryRenderSignature = null;
+      renderDatabaseGames();
+      renderGalleryView();
+    }).catch((error) => reportDatabaseSidebarError("select the Gallery console", error));
+  }
 
   if (gameID && preview) {
     const game = visibleDatabaseGames().find((entry) => databaseGameKey(entry) === gameID);
@@ -1643,7 +1656,6 @@ function visibleDatabaseGames() {
     galleryVisibleDatabaseResults = games.filter((game) => galleryIDs.has(databaseGameKey(game)));
     galleryVisibleDatabaseSource = games;
     galleryVisibleGallerySource = state.galleryGames;
-    galleryVisibleArtworkByID = new Map(state.galleryGames.map((game) => [game.id, game]));
   }
   return galleryVisibleDatabaseResults;
 }
@@ -1674,21 +1686,6 @@ function makeDatabaseGameButton(game) {
   }
   button.dataset.databaseGameKey = databaseGameKey(game);
   button.dataset.searchText = `${game.name} ${game.rootName || ""}`.toLowerCase();
-  const artwork = isGalleryActive() ? galleryVisibleArtworkByID.get(databaseGameKey(game)) : null;
-  if (artwork) {
-    const frame = document.createElement("span");
-    frame.className = "database-game-artwork-frame is-missing";
-    frame.setAttribute("aria-hidden", "true");
-    const image = document.createElement("img");
-    image.className = "database-game-artwork-image";
-    image.alt = "";
-    image.loading = "lazy";
-    image.decoding = "async";
-    image.dataset.sourcePath = artwork.sourcePath;
-    image.dataset.titleSnap = artwork.titleSnap;
-    frame.appendChild(image);
-    button.appendChild(frame);
-  }
   button.insertAdjacentHTML("beforeend", `<span class="database-indent" aria-hidden="true"></span><span class="database-game-name">${escapeHtml(game.displayName || game.name)}</span>${state.sidebarPathCounts ? `<span class="database-game-meta">${game.trackCount}</span>` : ""}`);
   button.addEventListener("click", (event) => {
     if (event.detail > 1) return;
@@ -1777,8 +1774,6 @@ function appendDatabaseGameRowsInBatches() {
       const { games, game } = pendingRows[offset++];
       const button = makeDatabaseGameButton(game);
       games.appendChild(button);
-      const artworkFrame = button.querySelector(".database-game-artwork-frame");
-      if (artworkFrame) sidebarGalleryArtworkObserver?.observe(artworkFrame);
       databaseGameButtons.push(button);
     }
     if (offset < pendingRows.length) {
@@ -1790,22 +1785,8 @@ function appendDatabaseGameRowsInBatches() {
 }
 
 function renderDatabaseGames() {
-  refs.treeRoot.classList.toggle("is-gallery-view", isGalleryActive());
-  if (isGalleryActive()) {
-    if (!sidebarGalleryArtworkObserver && typeof IntersectionObserver === "function") {
-      sidebarGalleryArtworkObserver = new IntersectionObserver((entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          sidebarGalleryArtworkObserver?.unobserve(entry.target);
-          const image = entry.target.querySelector(".database-game-artwork-image");
-          if (image) requestGalleryArtwork(image);
-        }
-      }, { root: refs.treeRoot, rootMargin: "120px" });
-    }
-  } else {
-    sidebarGalleryArtworkObserver?.disconnect();
-    sidebarGalleryArtworkObserver = null;
-  }
+  const galleryActive = isGalleryActive();
+  refs.treeRoot.classList.toggle("is-gallery-view", galleryActive);
   if (state.databaseSidebarLoading) {
     renderedDatabaseGames = null;
     resetSidebarContent();
@@ -1814,7 +1795,6 @@ function renderDatabaseGames() {
   }
   const gamesForView = visibleDatabaseGames();
   if (renderedDatabaseGames !== gamesForView) {
-    sidebarGalleryArtworkObserver?.disconnect();
     resetSidebarContent();
     databaseConsoleGroups = [];
     const groupsForView = visibleDatabaseGameGroups();
@@ -1824,17 +1804,30 @@ function renderDatabaseGames() {
       group.className = "database-console-group";
       const heading = document.createElement("button");
       heading.type = "button";
-      heading.className = `database-console-row${state.selectedDatabaseConsoleName === consoleName && !state.selectedDatabaseGameKey ? " is-selected" : ""}`;
+      const isSelected = state.selectedDatabaseConsoleName === consoleName
+        && (galleryActive || !state.selectedDatabaseGameKey);
+      heading.className = `database-console-row${isSelected ? " is-selected" : ""}`;
       if (heading.classList.contains("is-selected")) selectedDatabaseSidebarButton = heading;
       heading.dataset.databaseConsoleName = consoleName;
       heading.tabIndex = 0;
       const expanded = !collapsedDatabaseConsoles.has(consoleName);
-      heading.innerHTML = `<span class="database-disclosure">${expanded ? "▾" : "▸"}</span><span class="database-console-label">${escapeHtml(consoleName)}</span>`;
-      const games = document.createElement("div");
-      games.className = "database-console-games";
-      games.classList.toggle("is-hidden", !expanded);
+      let games = null;
+      if (galleryActive) {
+        heading.setAttribute("aria-pressed", String(isSelected));
+        heading.innerHTML = `<span class="database-console-label">${escapeHtml(consoleName)}</span>`;
+      } else {
+        heading.setAttribute("aria-expanded", String(expanded));
+        heading.innerHTML = `<span class="database-disclosure">${expanded ? "▾" : "▸"}</span><span class="database-console-label">${escapeHtml(consoleName)}</span>`;
+        games = document.createElement("div");
+        games.className = "database-console-games";
+        games.classList.toggle("is-hidden", !expanded);
+      }
       heading.addEventListener("click", async () => {
         const preserveFocus = document.activeElement === heading;
+        if (galleryActive) {
+          selectDatabaseSidebarRow(heading, { focus: preserveFocus });
+          return;
+        }
         try {
           await applySharedDatabaseGroupAction("toggle", consoleName);
           renderDatabaseGames();
@@ -1850,6 +1843,12 @@ function renderDatabaseGames() {
           event.preventDefault();
           event.stopPropagation();
           moveDatabaseSidebarSelection(heading, event.key === "ArrowDown" ? 1 : -1);
+          return;
+        }
+        if (galleryActive && (event.key === " " || event.key === "Enter")) {
+          event.preventDefault();
+          event.stopPropagation();
+          selectDatabaseSidebarRow(heading, { focus: true });
           return;
         }
         if (event.key === " ") {
@@ -1870,6 +1869,10 @@ function renderDatabaseGames() {
       heading.addEventListener("dblclick", (event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (galleryActive) {
+          selectDatabaseSidebarRow(heading, { focus: true });
+          return;
+        }
         void (async () => {
           const selected = await applySharedDatabaseGroupAction("select", consoleName);
           if (!selected) return;
@@ -1893,13 +1896,14 @@ function renderDatabaseGames() {
           }]
         ]);
       });
-      group.append(heading, games);
+      group.appendChild(heading);
+      if (games) group.appendChild(games);
       refs.treeRoot.appendChild(group);
       databaseConsoleGroups.push({ group, games, consoleName, gameItems });
     });
 
     renderedDatabaseGames = gamesForView;
-    appendDatabaseGameRowsInBatches();
+    if (!galleryActive) appendDatabaseGameRowsInBatches();
   }
 
   const query = state.sidebarQuery.trim();
@@ -1909,22 +1913,33 @@ function renderDatabaseGames() {
   }
 
   for (const { group, games, consoleName } of databaseConsoleGroups) {
+    const heading = group.querySelector(".database-console-row");
+    const isSelected = state.selectedDatabaseConsoleName === consoleName
+      && (galleryActive || !state.selectedDatabaseGameKey);
+    heading?.classList.toggle("is-selected", isSelected);
+    if (galleryActive) {
+      heading?.setAttribute("aria-pressed", String(isSelected));
+      continue;
+    }
     if (query) {
       games.classList.remove("is-hidden");
     } else {
       games.classList.toggle("is-hidden", collapsedDatabaseConsoles.has(consoleName));
     }
     const disclosure = group.querySelector(".database-console-row .database-disclosure");
-    if (disclosure) disclosure.textContent = games.classList.contains("is-hidden") ? "▸" : "▾";
+    if (disclosure) {
+      disclosure.textContent = games.classList.contains("is-hidden") ? "▸" : "▾";
+      heading?.setAttribute("aria-expanded", String(!games.classList.contains("is-hidden")));
+    }
   }
 
   if (state.databaseSidebarError) {
     updateSidebarStats(state.databaseSidebarError, { error: true });
-  } else if (isGalleryActive() && !state.galleryGamesLoaded) {
+  } else if (galleryActive && !state.galleryGamesLoaded) {
     updateSidebarStats("Loading artwork index…");
-  } else if (isGalleryActive() && state.galleryGamesError) {
+  } else if (galleryActive && state.galleryGamesError) {
     updateSidebarStats(state.galleryGamesError, { error: true });
-  } else if (isGalleryActive() && gamesForView.length === 0) {
+  } else if (galleryActive && gamesForView.length === 0) {
     updateSidebarStats(state.galleryGames.length
       ? "No artwork titles match this search."
       : "No Title Snap artwork is indexed.", {
@@ -1932,9 +1947,9 @@ function renderDatabaseGames() {
         ? "No artwork titles match this search."
         : "No Title Snap artwork is indexed. Scan the library with ScanSong."
     });
-  } else if (!isGalleryActive() && state.sidebarQuery.trim() && gamesForView.length === 0) {
+  } else if (!galleryActive && state.sidebarQuery.trim() && gamesForView.length === 0) {
     updateSidebarStats("No database games match this search.");
-  } else if (!isGalleryActive() && state.databaseGames.length === 0) {
+  } else if (!galleryActive && state.databaseGames.length === 0) {
     updateSidebarStats("Use ScanSong to populate the selected database.");
   } else {
     updateSidebarStats();
@@ -1943,6 +1958,7 @@ function renderDatabaseGames() {
 }
 
 async function setAllDatabaseConsolesCollapsed(collapsed) {
+  if (isGalleryActive()) return;
   await applySharedDatabaseGroupAction("allCollapsed", null, null, { collapsed });
   renderDatabaseGames();
 }
@@ -2202,9 +2218,14 @@ function renderGalleryView() {
     return;
   }
 
-  const records = Array.isArray(state.galleryGames) ? state.galleryGames : [];
+  const allRecords = Array.isArray(state.galleryGames) ? state.galleryGames : [];
+  const selectedConsole = String(state.selectedDatabaseConsoleName || "");
+  const records = selectedConsole
+    ? allRecords.filter((record) => databaseConsoleName(record) === selectedConsole)
+    : allRecords;
   const signature = JSON.stringify([
     state.galleryGamesError,
+    selectedConsole,
     records.map(({ id, sourcePath, titleSnap }) => [id, sourcePath, titleSnap])
   ]);
   if (galleryRenderSignature === signature) return;
@@ -2251,9 +2272,6 @@ function renderGalleryView() {
       if (event.detail > 1) return;
       refs.galleryGrid.querySelector(".gallery-card-button.is-selected")?.classList.remove("is-selected");
       button.classList.add("is-selected");
-      state.selectedDatabaseGameKey = databaseGameKey(game);
-      state.selectedDatabaseConsoleName = databaseConsoleName(game);
-      renderSidebar();
     });
     button.addEventListener("dblclick", (event) => {
       event.preventDefault();
@@ -2294,6 +2312,7 @@ function renderGalleryView() {
 }
 
 async function showGalleryPlaylist() {
+  const enteringGallery = !isGalleryActive();
   let tab = state.playlistTabs?.find((entry) => entry.kind === "gallery");
   if (!tab) {
     tab = createPlaylistTab({ duplicateActive: false, title: "Gallery" });
@@ -2311,6 +2330,8 @@ async function showGalleryPlaylist() {
   state.selectedTrackId = null;
   state.selectedTrackIds = [];
   state.playlistSelectionAnchorId = null;
+  state.selectedDatabaseGameKey = null;
+  if (enteringGallery) state.selectedDatabaseConsoleName = null;
   state.catalogPlaylistColumnContentHints = null;
   state.catalogPlaylistSortSessionId = null;
   state.sidebarMode = "consoles";
@@ -2564,13 +2585,10 @@ async function loadDatabaseGamesIntoPlaylist(games, {
 }
 
 async function activateDatabaseSelection() {
+  if (isGalleryActive()) return false;
   const gamesForView = visibleDatabaseGames();
   const selectedGame = gamesForView.find((entry) => databaseGameKey(entry) === state.selectedDatabaseGameKey);
   if (selectedGame) {
-    if (isGalleryActive()) {
-      await openGalleryGame(selectedGame);
-      return;
-    }
     const loaded = await loadDatabaseGame(selectedGame);
     const targetID = loaded ? databaseLoadedSelectionID() : null;
     if (targetID) await playVisibleTrack(targetID, 0);
@@ -2579,10 +2597,6 @@ async function activateDatabaseSelection() {
   if (state.selectedDatabaseConsoleName) {
     const games = gamesForView.filter((game) => databaseConsoleName(game) === state.selectedDatabaseConsoleName);
     if (games.length) {
-      if (isGalleryActive()) {
-        await openGalleryGame(games[0]);
-        return;
-      }
       const loaded = await loadDatabaseGamesIntoPlaylist(games, { title: state.selectedDatabaseConsoleName });
       const targetID = loaded ? databaseLoadedSelectionID() : null;
       if (targetID) await playVisibleTrack(targetID, 0);
@@ -2634,6 +2648,7 @@ async function activateFocusedItem(focusTarget = document.activeElement) {
   const databaseConsoleButton = focused?.closest?.(".database-console-row");
   if (databaseConsoleButton?.dataset.databaseConsoleName) {
     selectDatabaseSidebarRow(databaseConsoleButton, { focus: true });
+    if (isGalleryActive()) return true;
     await activateDatabaseSelection();
     return true;
   }
@@ -4433,6 +4448,7 @@ async function toggleAllSidebarNodes() {
 }
 
 function sidebarHasExpandedNodes() {
+  if (isGalleryActive()) return false;
   if (currentSidebarView().contentMode === "database") {
     return databaseConsoleGroups.some(({ consoleName }) => !collapsedDatabaseConsoles.has(consoleName));
   }
@@ -4450,6 +4466,8 @@ function sidebarHasExpandedNodes() {
 
 function syncSidebarFoldButton() {
   const button = refs.sidebarFoldToggleButton;
+  button?.parentElement?.classList.toggle("is-hidden", isGalleryActive());
+  if (isGalleryActive()) return;
   const use = button?.querySelector("use");
   const hasExpandedNodes = sidebarHasExpandedNodes();
   use?.setAttribute("href", hasExpandedNodes ? "#icon-list-collapse" : "#icon-list-expand");
