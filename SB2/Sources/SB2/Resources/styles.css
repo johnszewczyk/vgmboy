@@ -2039,20 +2039,7 @@ body.sb2-frontend .database-game-row {
   gap: 0;
   padding-left: calc(var(--sb-space-050) + 1rem + 2ch);
 }
-body.sb2-frontend .database-game-artwork-frame {
-  position: relative;
-  display: block;
-  flex: 0 0 2rem;
-  width: 2rem;
-  height: 2rem;
-  overflow: hidden;
-  border-radius: 2px;
-  background: #141820;
-}
-body.sb2-frontend .database-game-artwork-image { display: none; width: 100%; height: 100%; object-fit: cover; object-position: center; }
-body.sb2-frontend .database-game-artwork-frame.has-art .database-game-artwork-image { display: block; }
-body.sb2-frontend .tree-root.is-gallery-view .database-console-games { padding-left: 0; }
-body.sb2-frontend .tree-root.is-gallery-view .database-game-row { min-height: 2.25rem; gap: var(--sb-space-050); padding: 0 var(--sb-space-025); }
+body.sb2-frontend .tree-root.is-gallery-view .database-console-row { min-height: 2.25rem; }
 body.sb2-frontend .sidebar-resize-handle::before { background: #29303a; }
 body.sb2-frontend .tree-group { margin-left: var(--sb-space-075); padding-left: var(--sb-space-025); }
 body.sb2-frontend .database-console-games { padding-left: 0; }
