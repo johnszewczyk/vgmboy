@@ -1527,17 +1527,6 @@ body.options-window .options-header { display: none; }
   max-width: 18ch;
 }
 
-input.options-input[inputmode="numeric"],
-input.options-input[inputmode="decimal"] {
-  width: 4rem;
-}
-
-.options-number-input {
-  width: 8rem;
-  min-width: 0;
-  font-variant-numeric: tabular-nums;
-}
-
 .options-duration-input {
   font-variant-numeric: tabular-nums;
 }
