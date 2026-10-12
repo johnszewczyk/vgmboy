@@ -148,7 +148,13 @@ their referenced GBS member. A row may omit the final `.gbs` suffix; MetaMan
 then matches an exact case-insensitive filename stem. It projects authored
 track titles, timing, and
 `# @TITLE` / `# @ARTIST` / other `# @KEY` comments onto the corresponding
-tracks, while retaining the M3U bytes as companion metadata. Decimal and
+tracks, while retaining the M3U bytes as companion metadata. A one-row M3U is
+treated as a per-track annotation, not a competing queue. When present, the
+multi-row M3U supplies queue order; conflicting multi-row orders are diagnosed.
+Shared comments are compared by source track index, so a sidecar that omits a
+master playlist's repeated comment does not create a false missing-value
+conflict. Conflicting populated values for one index remain ambiguous and are
+not promoted. Decimal and
 `$hex` track indexes follow NEZplug's zero-based GBS convention. No Game Boy
 CPU emulation is used to invent per-track titles or timing. The final
 colon-delimited time component accepts up to three decimal digits and converts

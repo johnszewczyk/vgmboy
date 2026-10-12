@@ -101,8 +101,6 @@ enum GBSM3UMetadataReader {
         }
         guard !entries.isEmpty else { return result }
 
-        let commonTagResolution = unambiguousCommonTags(from: entries)
-        let commonTags = commonTagResolution.tags
         let playlistGroups = Dictionary(grouping: entries, by: \.relativePath)
         let playlistOrders = playlistGroups.keys.sorted().map { path in
             (path, (playlistGroups[path] ?? []).sorted { $0.sourceOrder < $1.sourceOrder }.map(\.index))
@@ -113,13 +111,26 @@ enum GBSM3UMetadataReader {
                 "GBS M3U \(path) repeats a source track index; preserve the original playlist for review."
             )
         }
-        if let firstOrder = playlistOrders.first?.1,
-           playlistOrders.dropFirst().contains(where: { $0.1 != firstOrder }) {
+        // A one-row M3U is a per-track annotation, not an authored queue. Many
+        // GBS distributions include one such file per named track alongside a
+        // multi-row master playlist. Compare queue order only among playlists
+        // that actually contain more than one row.
+        let queueOrders = playlistOrders.filter { $0.1.count > 1 }
+        if let firstOrder = queueOrders.first?.1,
+           queueOrders.dropFirst().contains(where: { $0.1 != firstOrder }) {
             playlistDiagnostics.append(
                 "GBS M3U files define different row orders; preserve the competing playlists for review."
             )
         }
         let grouped = Dictionary(grouping: entries, by: \.index)
+        let commonTagResolution = unambiguousCommonTags(from: grouped)
+        let commonTags = commonTagResolution.tags
+        var queueOrderByIndex: [Int: Int] = [:]
+        if let authoredQueue = queueOrders.first?.1 {
+            for (position, index) in authoredQueue.enumerated() where queueOrderByIndex[index] == nil {
+                queueOrderByIndex[index] = position
+            }
+        }
         let commonEntry = entries.sorted {
             if $0.quality != $1.quality { return $0.quality > $1.quality }
             return $0.relativePath < $1.relativePath
@@ -163,13 +174,22 @@ enum GBSM3UMetadataReader {
             var facts = track.document.technicalFacts
             if let entry {
                 facts["m3uSourcePath"] = entry.relativePath
-                facts["m3uSourceOrder"] = String(entry.sourceOrder)
                 facts["m3uRawLine"] = entry.rawLine
                 facts["m3uTimeRaw"] = entry.timeRaw
                 facts["m3uLoopRaw"] = entry.loopRaw
                 facts["m3uLoopStartRaw"] = entry.loopStartRaw
                 facts["m3uFadeRaw"] = entry.fadeRaw
                 facts["m3uRepeatRaw"] = entry.repeatRaw
+            }
+            if let index {
+                if let queueOrder = queueOrderByIndex[index] {
+                    facts["m3uSourceOrder"] = String(queueOrder)
+                } else if let entry {
+                    // With annotations only, retain their local row order;
+                    // tied one-row annotations fall back to the GBS index in
+                    // the UAC writer.
+                    facts["m3uSourceOrder"] = String(entry.sourceOrder)
+                }
             }
             for tag in commonTags {
                 facts["m3uSharedTag.\(tag.normalizedName)"] = tag.value
@@ -293,28 +313,47 @@ enum GBSM3UMetadataReader {
     }
 
     private static func unambiguousCommonTags(
-        from entries: [Entry]
+        from entriesByTrack: [Int: [Entry]]
     ) -> (tags: [MetadataTag], diagnostics: [String]) {
-        guard !entries.isEmpty else { return ([], []) }
-        let names = Set(entries.flatMap { $0.tags.map(\.normalizedName) }).sorted()
+        guard !entriesByTrack.isEmpty else { return ([], []) }
+        let allEntries = entriesByTrack.values.flatMap { $0 }
+        let names = Set(allEntries.flatMap { $0.tags.map(\.normalizedName) }).sorted()
         var result: [MetadataTag] = []
         var diagnostics: [String] = []
         for name in names {
-            let valuesByEntry = entries.map { entry in
-                entry.tags
-                    .filter { $0.normalizedName == name }
-                    .map { $0.value.trimmingCharacters(in: .whitespacesAndNewlines) }
-                    .filter { !$0.isEmpty }
+            var valuesByTrack: [String] = []
+            var conflictingIndexes: [Int] = []
+            for index in entriesByTrack.keys.sorted() {
+                let values = Set((entriesByTrack[index] ?? []).flatMap { entry in
+                    entry.tags
+                        .filter { $0.normalizedName == name }
+                        .map { $0.value.trimmingCharacters(in: .whitespacesAndNewlines) }
+                        .filter { !$0.isEmpty }
+                })
+                if values.count > 1 {
+                    conflictingIndexes.append(index)
+                } else if let value = values.first {
+                    valuesByTrack.append(value)
+                }
             }
-            let values = Set(valuesByEntry.flatMap { $0 })
+            let values = Set(valuesByTrack)
+            if !conflictingIndexes.isEmpty {
+                let displayName = allEntries.flatMap(\.tags).first(where: { $0.normalizedName == name })?.name ?? name
+                diagnostics.append(
+                    "GBS M3U # @\(displayName) values conflict for source track indexes \(conflictingIndexes.map { String($0) }.joined(separator: ", ")); the shared value was not promoted."
+                )
+                continue
+            }
+            // A master M3U's shared comment is repeated on each applicable
+            // row. One-row track sidecars may omit that comment, so compare
+            // the resolved values by source index rather than by M3U file.
+            // Missing values remain absent and do not become a blank tag.
             guard values.count == 1,
-                  valuesByEntry.allSatisfy({ Set($0).count == 1 }) else {
-                let displayName = entries.flatMap(\.tags).first(where: { $0.normalizedName == name })?.name ?? name
-                diagnostics.append("GBS M3U # @\(displayName) values are missing or inconsistent across applicable rows; the shared value was not promoted.")
+                  valuesByTrack.count == entriesByTrack.count else {
                 continue
             }
             if let value = values.first {
-                let displayName = entries.flatMap(\.tags).first(where: { $0.normalizedName == name })?.name ?? name
+                let displayName = allEntries.flatMap(\.tags).first(where: { $0.normalizedName == name })?.name ?? name
                 result.append(MetadataTag(name: displayName, value: value))
             }
         }
