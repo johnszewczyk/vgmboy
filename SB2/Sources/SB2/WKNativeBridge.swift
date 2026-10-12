@@ -4,6 +4,7 @@ import CatalogReader
 import CatalogPlaylistCore
 import CatalogPlaylistPresentationCore
 import CatalogBrowserCore
+import CatalogGalleryCore
 import CatalogSessionCore
 import Darwin
 import FavoriteStoreCore
@@ -781,21 +782,31 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         ]
     }
 
-    nonisolated private static func galleryGames(catalogURL: URL) throws -> [[String: Any]] {
-        try CatalogSidebarReader.titleSnapGalleryGames(databaseURL: catalogURL).map { game in
-            [
-                "id": game.id,
-                "rootId": game.rootID,
-                "rootPath": game.rootPath,
-                "rootName": URL(fileURLWithPath: game.rootPath).lastPathComponent,
-                "name": game.game,
-                "displayName": game.game,
-                "system": game.system,
-                "consoleGroupName": game.system,
-                "sourcePath": game.sourcePath,
-                "titleSnap": game.titleSnap
-            ]
-        }
+    nonisolated private static func galleryGames(catalogURL: URL) throws -> [String: Any] {
+        let games = try CatalogSidebarReader.titleSnapGalleryGames(databaseURL: catalogURL)
+        let projection = CatalogGalleryIndex(games: games)
+        return [
+            "games": games.map { game in
+                [
+                    "id": CatalogGalleryIndex.catalogGameID(for: game),
+                    "rootId": game.rootID,
+                    "rootPath": game.rootPath,
+                    "rootName": URL(fileURLWithPath: game.rootPath).lastPathComponent,
+                    "name": game.game,
+                    "displayName": game.game,
+                    "system": game.system,
+                    "consoleGroupName": CatalogGalleryIndex.consoleName(for: game),
+                    "sourcePath": game.sourcePath,
+                    "titleSnap": game.titleSnap
+                ]
+            },
+            "groups": projection.consoleGroups.map { group in
+                [
+                    "name": group.name,
+                    "gameIDs": group.gameIDs
+                ]
+            }
+        ]
     }
 
     nonisolated private static func files(catalogURL: URL) throws -> [[String: Any]] {

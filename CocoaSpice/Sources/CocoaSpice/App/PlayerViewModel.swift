@@ -2,6 +2,7 @@ import AppKit
 import ArchiveCacheCore
 import FrontendPreferencesCore
 import CatalogBrowserCore
+import CatalogGalleryCore
 import CatalogPlaylistPresentationCore
 import CatalogReader
 import CatalogSessionCore
@@ -323,6 +324,7 @@ final class PlayerViewModel {
     var activePlaylistTabID = ""
     var activePlaylistTitle = "Playlist"
     private(set) var galleryGames: [CatalogGalleryGame] = []
+    private var galleryProjection: CatalogGalleryIndex?
     private(set) var galleryIsLoading = false
     private(set) var galleryLoadError: String?
     private(set) var galleryHasLoaded = false
@@ -334,30 +336,18 @@ final class PlayerViewModel {
     var isGalleryTabActive: Bool { activePlaylistTab?.kind == .gallery }
 
     private func refreshGalleryConsoleSearchResults() {
-        let query = sidebarSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !query.isEmpty else {
-            visibleGalleryConsoleNames = galleryConsoleNames
+        guard var galleryProjection else {
+            visibleGalleryConsoleNames = []
             return
         }
-        let matchingNames = Set(galleryGames.compactMap { game -> String? in
-            let rootName = URL(fileURLWithPath: game.rootPath, isDirectory: true).lastPathComponent
-            let searchText = CatalogBrowserSearchText.game(
-                name: game.game,
-                system: game.system,
-                rootDisplayName: rootName,
-                displayName: game.game
-            )
-            return searchText.contains(query) ? Self.galleryConsoleName(for: game) : nil
-        })
-        visibleGalleryConsoleNames = galleryConsoleNames.filter(matchingNames.contains)
+        visibleGalleryConsoleNames = galleryProjection
+            .consoleGroups(matching: sidebarSearchQuery)
+            .map(\.name)
+        self.galleryProjection = galleryProjection
     }
 
     private func refreshVisibleGalleryGames() {
-        guard let selectedGalleryConsoleName else {
-            visibleGalleryGames = galleryGames
-            return
-        }
-        visibleGalleryGames = galleryGames.filter { Self.galleryConsoleName(for: $0) == selectedGalleryConsoleName }
+        visibleGalleryGames = galleryProjection?.games(inConsole: selectedGalleryConsoleName) ?? []
     }
     private var isRestoringPlaylistTabs = false
     private var startupRestorationCompleted = false
@@ -549,7 +539,9 @@ final class PlayerViewModel {
             rootPath: game.rootPath,
             name: game.game,
             systemName: game.system,
-            trackCount: databaseGameItems.first(where: { $0.id == game.id })?.trackCount ?? 0,
+            trackCount: databaseGameItems.first(where: {
+                $0.id == CatalogGalleryIndex.catalogGameID(for: game)
+            })?.trackCount ?? 0,
             displayName: game.game
         )
         activateDatabaseGame(item, replace: true, autoplay: true)
@@ -558,6 +550,7 @@ final class PlayerViewModel {
     private func resetGalleryProjection() {
         gallerySessions.cancel(.gallery)
         galleryGames = []
+        galleryProjection = nil
         galleryIsLoading = false
         galleryLoadError = nil
         galleryHasLoaded = false
@@ -604,7 +597,8 @@ final class PlayerViewModel {
             switch result {
             case .success(let games):
                 self.galleryGames = games
-                self.galleryConsoleNames = Self.galleryConsoleNames(from: games)
+                self.galleryProjection = CatalogGalleryIndex(games: games)
+                self.galleryConsoleNames = self.galleryProjection?.consoleGroups.map(\.name) ?? []
                 if let selected = self.selectedGalleryConsoleName,
                    !self.galleryConsoleNames.contains(selected) {
                     self.selectedGalleryConsoleName = nil
@@ -626,27 +620,6 @@ final class PlayerViewModel {
             }
         }
         gallerySessions.install(task, generation: generation, for: .gallery)
-    }
-
-    private static func galleryConsoleName(for game: CatalogGalleryGame) -> String {
-        let name = game.system.trimmingCharacters(in: .whitespacesAndNewlines)
-        return name.isEmpty ? "Unknown Console" : name
-    }
-
-    private static func galleryConsoleNames(from games: [CatalogGalleryGame]) -> [String] {
-        let projectedGames = games.map { game in
-            CatalogBrowserGame(
-                bucket: CatalogGameBucket(
-                    rootID: game.rootID,
-                    rootPath: game.rootPath,
-                    game: game.game,
-                    system: game.system,
-                    trackCount: 1
-                ),
-                displayName: game.game
-            )
-        }
-        return CatalogBrowserProjection.groups(from: projectedGames).map(\.name)
     }
 
     private func syncActivePlaylistTab() {
