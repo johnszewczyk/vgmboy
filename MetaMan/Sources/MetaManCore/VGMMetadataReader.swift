@@ -2,6 +2,8 @@ import Foundation
 
 enum VGMMetadataReader {
     private static let headerSize = 0x40
+    private static let gd3HeaderSize = 12
+    private static let maximumGD3PayloadSize = 64 * 1024 * 1024
     private static let gd3Signature = Data("Gd3 ".utf8)
 
     private static let gd3FieldNames = [
@@ -26,6 +28,53 @@ enum VGMMetadataReader {
         guard data.count >= headerSize, matches(data) else {
             throw malformed("Not a VGM file with a valid 64-byte header.")
         }
+        let gd3 = try readGD3(data: data, relativeOffset: readUInt32(data, at: 0x14))
+        return makeDocument(
+            header: data,
+            fileSize: UInt64(data.count),
+            gd3: gd3,
+            displayName: displayName
+        )
+    }
+
+    /// Reads the fixed header and declared GD3 block without loading the VGM
+    /// command stream. Large loop captures can be hundreds of MiB while the
+    /// metadata needed for timing remains in the 64-byte header.
+    static func read(fileURL: URL) throws -> MetadataDocument {
+        let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+        guard let size = attributes[.size] as? NSNumber else {
+            throw malformed("Could not determine the VGM file size.")
+        }
+        let fileSize = size.uint64Value
+        guard fileSize >= UInt64(headerSize) else {
+            throw malformed("Not a VGM file with a valid 64-byte header.")
+        }
+
+        let file = try FileHandle(forReadingFrom: fileURL)
+        defer { try? file.close() }
+        guard let header = try file.read(upToCount: headerSize),
+              header.count == headerSize, matches(header) else {
+            throw malformed("Not a VGM file with a valid 64-byte header.")
+        }
+        let gd3 = try readGD3(
+            file: file,
+            relativeOffset: readUInt32(header, at: 0x14),
+            fileSize: fileSize
+        )
+        return makeDocument(
+            header: header,
+            fileSize: fileSize,
+            gd3: gd3,
+            displayName: fileURL.lastPathComponent
+        )
+    }
+
+    private static func makeDocument(
+        header data: Data,
+        fileSize: UInt64,
+        gd3: GD3Data?,
+        displayName: String?
+    ) -> MetadataDocument {
 
         let eofOffset = readUInt32(data, at: 0x04)
         let version = readUInt32(data, at: 0x08)
@@ -39,23 +88,21 @@ enum VGMMetadataReader {
             : headerSize
 
         var diagnostics: [String] = []
-        if eofOffset > 0, UInt64(eofOffset) + 4 > UInt64(data.count) {
+        if eofOffset > 0, UInt64(eofOffset) + 4 > fileSize {
             diagnostics.append("VGM EOF offset points beyond the available file bytes.")
         }
-        if dataOffset > data.count {
+        if UInt64(dataOffset) > fileSize {
             diagnostics.append("VGM data offset points beyond the available file bytes.")
         }
         if loopRelativeOffset > 0 {
             let loopOffset = 0x1C + Int(loopRelativeOffset)
-            if loopOffset >= data.count {
+            if UInt64(loopOffset) >= fileSize {
                 diagnostics.append("VGM loop offset points beyond the available file bytes.")
             }
         }
         if loopSamples > totalSamples {
             diagnostics.append("VGM loop sample count exceeds its total sample count; header values were retained.")
         }
-
-        let gd3 = try readGD3(data: data, relativeOffset: gd3RelativeOffset)
         diagnostics.append(contentsOf: gd3?.diagnostics ?? [])
 
         let values = gd3?.fields ?? []
@@ -127,19 +174,66 @@ enum VGMMetadataReader {
     private static func readGD3(data: Data, relativeOffset: UInt32) throws -> GD3Data? {
         guard relativeOffset > 0 else { return nil }
         let absoluteOffset = 0x14 + Int(relativeOffset)
-        guard absoluteOffset <= data.count - 12,
+        guard absoluteOffset <= data.count - gd3HeaderSize,
               data[absoluteOffset..<(absoluteOffset + 4)] == gd3Signature else {
             throw malformed("VGM GD3 pointer is invalid.")
         }
 
-        let version = readUInt32(data, at: absoluteOffset + 4)
         let byteCount = Int(readUInt32(data, at: absoluteOffset + 8))
-        let payloadStart = absoluteOffset + 12
-        guard byteCount.isMultiple(of: 2), byteCount <= data.count - payloadStart else {
+        let payloadStart = absoluteOffset + gd3HeaderSize
+        guard byteCount.isMultiple(of: 2), byteCount <= maximumGD3PayloadSize,
+              byteCount <= data.count - payloadStart else {
+            throw malformed("VGM GD3 payload length is invalid or extends beyond the file.")
+        }
+        return try decodeGD3(block: Data(data[absoluteOffset..<(payloadStart + byteCount)]))
+    }
+
+    private static func readGD3(
+        file: FileHandle,
+        relativeOffset: UInt32,
+        fileSize: UInt64
+    ) throws -> GD3Data? {
+        guard relativeOffset > 0 else { return nil }
+        let absoluteOffset = UInt64(0x14) + UInt64(relativeOffset)
+        guard absoluteOffset <= fileSize,
+              fileSize - absoluteOffset >= UInt64(gd3HeaderSize) else {
+            throw malformed("VGM GD3 pointer is invalid.")
+        }
+        try file.seek(toOffset: absoluteOffset)
+        guard let header = try file.read(upToCount: gd3HeaderSize),
+              header.count == gd3HeaderSize,
+              header.prefix(4) == gd3Signature else {
+            throw malformed("VGM GD3 pointer is invalid.")
+        }
+        let byteCount = readUInt32(header, at: 8)
+        let payloadStart = absoluteOffset + UInt64(gd3HeaderSize)
+        guard byteCount.isMultiple(of: 2),
+              UInt64(byteCount) <= UInt64(maximumGD3PayloadSize),
+              UInt64(byteCount) <= fileSize - payloadStart else {
+            throw malformed("VGM GD3 payload length is invalid or extends beyond the file.")
+        }
+        let payload = try file.read(upToCount: Int(byteCount)) ?? Data()
+        guard payload.count == Int(byteCount) else {
+            throw malformed("VGM GD3 payload ended before its declared length.")
+        }
+        var block = header
+        block.append(payload)
+        return try decodeGD3(block: block)
+    }
+
+    private static func decodeGD3(block data: Data) throws -> GD3Data {
+        guard data.count >= gd3HeaderSize, data.prefix(4) == gd3Signature else {
+            throw malformed("VGM GD3 pointer is invalid.")
+        }
+        let version = readUInt32(data, at: 4)
+        let byteCount = Int(readUInt32(data, at: 8))
+        guard byteCount.isMultiple(of: 2), byteCount <= maximumGD3PayloadSize,
+              byteCount == data.count - gd3HeaderSize else {
             throw malformed("VGM GD3 payload length is invalid or extends beyond the file.")
         }
 
-        let payloadEnd = payloadStart + byteCount
+        let payloadStart = gd3HeaderSize
+        let payloadEnd = data.count
         let payload = data[payloadStart..<payloadEnd]
         var values: [String] = []
         var codeUnits: [UInt16] = []
@@ -190,7 +284,7 @@ enum VGMMetadataReader {
         return GD3Data(
             fields: values,
             tags: tags,
-            raw: Data(data[absoluteOffset..<payloadEnd]),
+            raw: data,
             version: version,
             diagnostics: diagnostics
         )

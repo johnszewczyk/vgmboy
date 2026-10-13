@@ -652,8 +652,10 @@ VGM's standard header is 64 bytes; its fixed integers are little-endian.
 
 GD3 begins at `0x14 + pointer`: `Gd3 `, 32-bit version, 32-bit payload byte
 count, then NUL-terminated UTF-16LE strings. The standard ordered sequence has
-11 values; extra values are retained. VGZ first inflates through a bounded
-gzip path. Timing uses the 44.1 kHz sample counts. See
+11 values; extra values are retained. File-URL reads seek directly to the
+64-byte header and declared GD3 block, so a large VGM command stream is not
+loaded to read header timing. GD3 payloads are bounded to 64 MiB. VGZ first
+inflates through a bounded gzip path. Timing uses the 44.1 kHz sample counts. See
 [VGMMetadataReader.swift](../../../../MetaMan/Sources/MetaManCore/VGMMetadataReader.swift).
 
 ### ProTracker-family MOD
