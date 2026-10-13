@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the format note's playback and scanner-route tables against source."""
+"""Check format coverage, plugin profiles, and scanner routes against source."""
 
 from collections import Counter
 from pathlib import Path
@@ -12,6 +12,7 @@ DOC_PATH = ROOT / "ScanSong/ai/subsystem-agent/format-accommodations.md"
 REGISTRY_PATH = ROOT / "VGMBoy/Sources/VGMBoyKit/FormatRegistry.swift"
 MANIFEST_PATH = ROOT / "VGMBoy/Sources/VGMBoyFormatCore/VGMStreamFormatManifest.swift"
 PLUGINS_PATH = ROOT / "ScanSong/Sources/ScanSongKit/BuiltInScannerPlugins.swift"
+PROFILE_DIR = ROOT / "ScanSong/ai/subsystem-agent/format-profiles"
 
 
 def fail(message: str) -> None:
@@ -123,6 +124,57 @@ def main() -> int:
     for family in sorted(expected_families - documented_families):
         errors.append(f"playback table is missing family {family!r}")
 
+    playback_descriptors = registry.split(
+        "public static let playbackDescriptors:", 1
+    )[1].split("public static let playbackExtensions", 1)[0]
+    source_profiles = set(
+        re.findall(r'PlaybackFormatDescriptor\(id:\s*"([^"]+)"', playback_descriptors)
+    )
+    profile_section = table_section(document, "## Parent plugin profiles")
+    profile_rows = [
+        (match.group(1), match.group(2))
+        for line in profile_section.splitlines()
+        if (
+            match := re.match(
+                r"\|\s*`([^`]+)`\s*\|\s*\[[^]]+\]\((format-profiles/[^)]+\.md)\)\s*\|",
+                line,
+            )
+        )
+    ]
+    documented_profiles = Counter(plugin_id for plugin_id, _ in profile_rows)
+    for plugin_id, count in sorted(documented_profiles.items()):
+        if count > 1:
+            errors.append(f"parent plugin profile table repeats {plugin_id!r} {count} times")
+    for plugin_id in sorted(source_profiles - documented_profiles.keys()):
+        errors.append(f"parent plugin profile table is missing {plugin_id!r}")
+    for plugin_id in sorted(documented_profiles.keys() - source_profiles):
+        errors.append(f"parent plugin profile table documents unknown playback plugin {plugin_id!r}")
+
+    expected_profile_paths = {
+        f"format-profiles/{plugin_id}.md" for plugin_id in source_profiles
+    }
+    for plugin_id, profile_path in profile_rows:
+        if profile_path != f"format-profiles/{plugin_id}.md":
+            errors.append(
+                f"{plugin_id!r} profile must be named "
+                f"format-profiles/{plugin_id}.md, not {profile_path!r}"
+            )
+        if not (DOC_PATH.parent / profile_path).is_file():
+            errors.append(f"parent plugin profile file is missing: {profile_path}")
+
+    linked_profile_paths = set(
+        re.findall(r"\]\((format-profiles/[^)]+\.md)\)", document)
+    )
+    profile_files = {
+        path.relative_to(DOC_PATH.parent).as_posix() for path in PROFILE_DIR.glob("*.md")
+    }
+    for profile_path in sorted(expected_profile_paths - linked_profile_paths):
+        errors.append(f"parent plugin profile is not linked from the index: {profile_path}")
+    for profile_path in sorted(linked_profile_paths - profile_files):
+        errors.append(f"format index links to a missing profile: {profile_path}")
+    for profile_path in sorted(profile_files - linked_profile_paths):
+        errors.append(f"format profile is not linked from the index: {profile_path}")
+
     route_section = table_section(document, "## Route summary")
     documented_routes = [
         match.group(1)
@@ -148,7 +200,8 @@ def main() -> int:
 
     print(
         f"Format documentation is consistent: {len(documented_families)} playback "
-        f"families and {len(source_routes)} scanner routes checked."
+        f"families, {len(source_profiles)} parent plugin profiles, and "
+        f"{len(source_routes)} scanner routes checked."
     )
     return 0
 
