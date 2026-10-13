@@ -212,12 +212,20 @@ enum UACMetadataReader {
                       let tagName = canonicalMetadataTagName(name) else { continue }
                 metadata[tagName] = value
             }
+            let isGBS = (reference.entry.formatTag ?? "").caseInsensitiveCompare("gbs") == .orderedSame
+            if isGBS {
+                // GBS M3U durations, fades, and loop controls are author-set
+                // listening hints. They are not playback metadata in UAC.
+                for key in [
+                    "Intro Length (ms)", "Loop Length (ms)", "Play Length (ms)",
+                    "Fade Length (ms)", "Duration (ms)", "Loop", "M3U"
+                ] {
+                    metadata.removeValue(forKey: key)
+                }
+            }
             if let title = reference.entry.title { metadata["Title"] = .string(title) }
             if let artist = reference.entry.artist { metadata["Artist"] = .string(artist) }
-            let loop = loopMetadata(
-                metadata: metadata,
-                playlistEntry: reference.entry
-            )
+            let loop = isGBS ? nil : loopMetadata(metadata: metadata, playlistEntry: reference.entry)
             tracks.append(makeTrack(
                 member: member,
                 memberIndex: memberIndex,

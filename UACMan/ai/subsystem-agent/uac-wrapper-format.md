@@ -216,9 +216,13 @@ before distributing newly packed files.
   member. Keep needed non-shared per-entry metadata as direct `extraFields`
   keys; do not attach a complete MetaMan projection. Subsong entries expand
   as separate UAC metadata tracks; ordinary `file` playlist entries do not.
-  If an original M3U/M3U8 exists,
-  `originalMemberPath` points to its ordinary TAR member; its original bytes
-  remain unchanged for exact unpacking.
+  If an original M3U/M3U8 exists, `originalMemberPath` points to its ordinary
+  TAR member. Most formats retain those bytes unchanged. The GBS profile is an
+  explicit exception: bundled M3U rows omit authored time, loop, fade, and
+  repeat columns; the linked source archive remains the exact original.
+  Format-specific profiles may omit authored playback hints that are not part
+  of useful UAC metadata. The GBS profile omits M3U timing, loop, fade, and
+  repeat values while retaining track titles, source indexes, and queue order.
 - Each `source` records the source collection/set and original package identity.
   When known, include `packageBlake3` and `packageByteSize` for the exact source
   package bytes. `metadata.sourceRelativePath`, `sourceHashScope`, and
@@ -330,15 +334,18 @@ discarded as sidecars.
 
 ## Preservation and Compression
 
-The UAC layer must not retag, transcode, normalize, or rewrite member bytes.
-TAR member extraction reproduces every listed input file byte-for-byte.
+The UAC layer must not retag, transcode, normalize, or rewrite playable member
+bytes. TAR extraction reproduces each packaged member exactly; an explicitly
+profiled transformation may change a non-playable attachment and must record
+source inputs and final member hashes in `transformations[]`. The GBS profile
+uses this exception to remove M3U timing columns while retaining row facts.
 Original filenames and relative companion layout are preserved, so M3U
 pointers and decoder dependencies remain together. Multi-variant packages use
 the variant namespace to prevent same-path collisions; single-variant packages
 do not add a synthetic `variants/original/` directory.
-The structured manifest playlist is the UAC playback list; the original M3U
-member is retained as byte-exact reversible evidence, not required for UAC-aware
-playback. A member's inclusion alone does not make it a package attachment; if
+The structured manifest playlist is the UAC playback list; a bundled M3U
+member is not required for UAC-aware playback. A member's inclusion alone does
+not make it a package attachment; if
 the package exposes a member as an attachment, its role and path belong in one
 package-level attachment tag as defined above. PNGs, CUE sheets, M3U/M3U8,
 documentation, and other files are ordinary typed members and may carry

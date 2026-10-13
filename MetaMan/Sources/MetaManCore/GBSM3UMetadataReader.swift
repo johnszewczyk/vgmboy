@@ -10,17 +10,6 @@ enum GBSM3UMetadataReader {
     private struct Entry {
         let index: Int
         let title: String
-        let rawLine: String
-        let timeRaw: String?
-        let loopRaw: String?
-        let loopStartRaw: String?
-        let fadeRaw: String?
-        let repeatRaw: String?
-        let playLengthMs: Int?
-        let introLengthMs: Int?
-        let loopLengthMs: Int?
-        let fadeLengthMs: Int?
-        let loopCount: Int?
         let tags: [MetadataTag]
         let relativePath: String
         let sourceOrder: Int
@@ -28,12 +17,7 @@ enum GBSM3UMetadataReader {
         let sourceEncoding: String
 
         var quality: Int {
-            (title.isEmpty ? 0 : 4)
-                + (playLengthMs == nil ? 0 : 2)
-                + (introLengthMs == nil ? 0 : 1)
-                + (loopLengthMs == nil ? 0 : 1)
-                + (fadeLengthMs == nil ? 0 : 1)
-                + tags.count
+            (title.isEmpty ? 0 : 4) + tags.count
         }
     }
 
@@ -77,17 +61,6 @@ enum GBSM3UMetadataReader {
                 entries.append(Entry(
                     index: row.index,
                     title: row.title,
-                    rawLine: row.rawLine,
-                    timeRaw: row.timeRaw,
-                    loopRaw: row.loopRaw,
-                    loopStartRaw: row.loopStartRaw,
-                    fadeRaw: row.fadeRaw,
-                    repeatRaw: row.repeatRaw,
-                    playLengthMs: row.playLengthMs,
-                    introLengthMs: row.introLengthMs,
-                    loopLengthMs: row.loopLengthMs,
-                    fadeLengthMs: row.fadeLengthMs,
-                    loopCount: row.loopCount,
                     tags: comments,
                     relativePath: companion.relativePath,
                     sourceOrder: parsedRows - 1,
@@ -143,11 +116,6 @@ enum GBSM3UMetadataReader {
                       return $0.relativePath < $1.relativePath
                   }).first
             let title = unambiguous(choices.map { $0.title.isEmpty ? nil : $0.title })
-            let playLengthMs = unambiguous(choices.map(\.playLengthMs))
-            let introLengthMs = unambiguous(choices.map(\.introLengthMs))
-            let loopLengthMs = unambiguous(choices.map(\.loopLengthMs))
-            let fadeLengthMs = unambiguous(choices.map(\.fadeLengthMs))
-            let loopCount = unambiguous(choices.map(\.loopCount))
 
             let fields = track.document.fields
             let enrichedFields = MetadataFields(
@@ -174,12 +142,6 @@ enum GBSM3UMetadataReader {
             var facts = track.document.technicalFacts
             if let entry {
                 facts["m3uSourcePath"] = entry.relativePath
-                facts["m3uRawLine"] = entry.rawLine
-                facts["m3uTimeRaw"] = entry.timeRaw
-                facts["m3uLoopRaw"] = entry.loopRaw
-                facts["m3uLoopStartRaw"] = entry.loopStartRaw
-                facts["m3uFadeRaw"] = entry.fadeRaw
-                facts["m3uRepeatRaw"] = entry.repeatRaw
             }
             if let index {
                 if let queueOrder = queueOrderByIndex[index] {
@@ -194,34 +156,21 @@ enum GBSM3UMetadataReader {
             for tag in commonTags {
                 facts["m3uSharedTag.\(tag.normalizedName)"] = tag.value
             }
-            if let playLengthMs { facts["m3uPlayLengthMs"] = String(playLengthMs) }
-            if let introLengthMs { facts["m3uIntroLengthMs"] = String(introLengthMs) }
-            if let loopLengthMs { facts["m3uLoopLengthMs"] = String(loopLengthMs) }
-            if let fadeLengthMs { facts["m3uFadeLengthMs"] = String(fadeLengthMs) }
-            if let loopCount { facts["m3uLoopCount"] = String(loopCount) }
-
             var rawBlocks = track.document.rawMetadataBlocks ?? [:]
             if let rawData = entry?.rawData ?? commonEntry?.rawData { rawBlocks["companion-m3u"] = rawData }
             let timing = MetadataTiming(
-                // The fixed GBS header has no duration. Never carry MetaMan's
-                // generic 150-second compatibility default into the source
-                // projection when an M3U omits or invalidates a time value.
-                introLengthMs: introLengthMs ?? -1,
-                loopLengthMs: loopLengthMs ?? -1,
-                playLengthMs: playLengthMs ?? -1,
-                fadeLengthMs: fadeLengthMs ?? -1
+                // GBS M3U time, fade, and loop columns are not retained.
+                introLengthMs: -1,
+                loopLengthMs: -1,
+                playLengthMs: -1,
+                fadeLengthMs: -1
             )
             var diagnostics = track.document.diagnostics
             diagnostics.append(contentsOf: commonTagResolution.diagnostics)
             diagnostics.append(contentsOf: playlistDiagnostics)
             if let index, choices.count > 1,
-               hasConflictingValues(choices.map { $0.title.isEmpty ? nil : $0.title })
-                    || hasConflictingValues(choices.map(\.playLengthMs))
-                    || hasConflictingValues(choices.map(\.introLengthMs))
-                    || hasConflictingValues(choices.map(\.loopLengthMs))
-                    || hasConflictingValues(choices.map(\.fadeLengthMs))
-                    || hasConflictingValues(choices.map(\.loopCount)) {
-                diagnostics.append("Conflicting GBS M3U rows map to source track \(index); ambiguous title and timing values were omitted.")
+               hasConflictingValues(choices.map { $0.title.isEmpty ? nil : $0.title }) {
+                diagnostics.append("Conflicting GBS M3U titles map to source track \(index); the ambiguous title was omitted.")
             }
             let document = MetadataDocument(
                 format: track.document.format,
@@ -244,17 +193,6 @@ enum GBSM3UMetadataReader {
         let fileName: String
         let index: Int
         let title: String
-        let rawLine: String
-        let timeRaw: String?
-        let loopRaw: String?
-        let loopStartRaw: String?
-        let fadeRaw: String?
-        let repeatRaw: String?
-        let playLengthMs: Int?
-        let introLengthMs: Int?
-        let loopLengthMs: Int?
-        let fadeLengthMs: Int?
-        let loopCount: Int?
     }
 
     private static func parseRow(_ line: String) -> ParsedRow? {
@@ -267,38 +205,11 @@ enum GBSM3UMetadataReader {
               let index = parseIndex(fields[0]),
               !fileName.isEmpty else { return nil }
         let title = fields[1].trimmingCharacters(in: .whitespacesAndNewlines)
-        let timeRaw = populatedField(fields, 2)
-        let playLengthMs = timeRaw.flatMap(parseTime)
-        let loopField = populatedField(fields, 3)
-        let loopTiming = loopField.flatMap { parseLoopTime($0, playLengthMs: playLengthMs) }
-        let loopStartRaw = loopField.flatMap { $0 != "-" && $0.hasSuffix("-") ? $0 : nil }
-        let loopRaw = loopStartRaw == nil ? loopField : nil
-        let fadeRaw = populatedField(fields, 4)
-        let fadeLengthMs = fadeRaw.flatMap(parseTime)
-        let repeatRaw = populatedField(fields, 5)
-        let loopCount = repeatRaw.flatMap(Int.init).flatMap { $0 >= 0 ? $0 : nil }
         return ParsedRow(
             fileName: fileName,
             index: index,
-            title: title,
-            rawLine: line,
-            timeRaw: timeRaw,
-            loopRaw: loopRaw,
-            loopStartRaw: loopStartRaw,
-            fadeRaw: fadeRaw,
-            repeatRaw: repeatRaw,
-            playLengthMs: playLengthMs,
-            introLengthMs: loopTiming?.introLengthMs,
-            loopLengthMs: loopTiming?.loopLengthMs,
-            fadeLengthMs: fadeLengthMs,
-            loopCount: loopCount
+            title: title
         )
-    }
-
-    private static func populatedField(_ fields: [String], _ index: Int) -> String? {
-        guard fields.indices.contains(index) else { return nil }
-        let value = fields[index].trimmingCharacters(in: .whitespacesAndNewlines)
-        return value.isEmpty ? nil : value
     }
 
     private static func parseTagComment(_ line: String) -> MetadataTag? {
@@ -398,27 +309,6 @@ enum GBSM3UMetadataReader {
         return Int(text)
     }
 
-    private struct ParsedLoopTime {
-        let introLengthMs: Int?
-        let loopLengthMs: Int?
-    }
-
-    /// NEZplug's loop column is either a loop duration, a loop start marked
-    /// with a trailing hyphen, or "-" meaning the loop duration equals play.
-    private static func parseLoopTime(_ value: String, playLengthMs: Int?) -> ParsedLoopTime? {
-        let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return nil }
-        if text == "-" {
-            return ParsedLoopTime(introLengthMs: 0, loopLengthMs: playLengthMs)
-        }
-        if text.hasSuffix("-") {
-            guard let loopStartMs = parseTime(String(text.dropLast())) else { return nil }
-            return ParsedLoopTime(introLengthMs: loopStartMs, loopLengthMs: nil)
-        }
-        guard let loopLengthMs = parseTime(text) else { return nil }
-        return ParsedLoopTime(introLengthMs: 0, loopLengthMs: loopLengthMs)
-    }
-
     private static func unambiguous<Value: Hashable>(_ values: [Value?]) -> Value? {
         guard let first = values.first,
               values.dropFirst().allSatisfy({ $0 == first }) else { return nil }
@@ -430,36 +320,4 @@ enum GBSM3UMetadataReader {
         return !values.dropFirst().allSatisfy { $0 == first }
     }
 
-    private static func parseTime(_ value: String) -> Int? {
-        let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, text != "-" else { return nil }
-        let components = text.split(separator: ":", omittingEmptySubsequences: false)
-        guard (1...3).contains(components.count) else { return nil }
-        var seconds = 0
-        var fractionalMilliseconds = 0
-        // Parse decimal time without floating-point rounding; only the final
-        // component may carry a fraction, with millisecond precision at most.
-        for (index, component) in components.enumerated() {
-            let isFinalComponent = index == components.count - 1
-            let secondsAndFraction = component.split(separator: ".", omittingEmptySubsequences: false)
-            guard secondsAndFraction.count == 1
-                    || (isFinalComponent && secondsAndFraction.count == 2),
-                  let number = Int(secondsAndFraction[0]), number >= 0,
-                  (components.count == 1 || index == 0 || number < 60),
-                  seconds <= (Int.max - number) / 60 else { return nil }
-            seconds = seconds * 60 + number
-
-            if secondsAndFraction.count == 2 {
-                let fraction = secondsAndFraction[1]
-                guard (1...3).contains(fraction.utf8.count),
-                      fraction.utf8.allSatisfy({ (48...57).contains($0) }),
-                      var fractionValue = Int(fraction) else { return nil }
-                if fraction.utf8.count == 1 { fractionValue *= 100 }
-                if fraction.utf8.count == 2 { fractionValue *= 10 }
-                fractionalMilliseconds = fractionValue
-            }
-        }
-        guard seconds <= (Int.max - fractionalMilliseconds) / 1_000 else { return nil }
-        return seconds * 1_000 + fractionalMilliseconds
-    }
 }

@@ -222,17 +222,18 @@ public enum MetaManMetadataHarvester {
                 }
                 trackMetadata[file.path] = result.tracks.map { track in
                     let facts = track.document.technicalFacts
+                    let isGBS = ext == "gbs"
                     return MetaManMetadataTrackProjection(
                         sourceTrackIndex: track.sourceTrackIndex,
                         sourcePlaylistOrder: facts["m3uSourceOrder"].flatMap(Int.init),
                         metadata: MetaManMetadataProjector.memberFields(from: track.document),
                         sourcePlaylistPath: facts["m3uSourcePath"],
-                        rawLine: facts["m3uRawLine"],
-                        lengthRaw: facts["m3uTimeRaw"],
-                        loopRaw: facts["m3uLoopRaw"],
-                        loopStartRaw: facts["m3uLoopStartRaw"],
-                        fadeRaw: facts["m3uFadeRaw"],
-                        repeatRaw: facts["m3uRepeatRaw"]
+                        rawLine: isGBS ? nil : facts["m3uRawLine"],
+                        lengthRaw: isGBS ? nil : facts["m3uTimeRaw"],
+                        loopRaw: isGBS ? nil : facts["m3uLoopRaw"],
+                        loopStartRaw: isGBS ? nil : facts["m3uLoopStartRaw"],
+                        fadeRaw: isGBS ? nil : facts["m3uFadeRaw"],
+                        repeatRaw: isGBS ? nil : facts["m3uRepeatRaw"]
                     )
                 }
                 if ext == "nsf" {
@@ -241,7 +242,7 @@ public enum MetaManMetadataHarvester {
                     nsfProjectionConflicts.append(contentsOf: shared.conflicts.map { "\(file.path): \($0)" })
                 } else if ext == "gbs" {
                     // GBS header identity belongs on the package; per-track
-                    // entries carry Title, Format, and M3U playback data.
+                    // entries carry source Title and Format, never M3U timing.
                     memberMetadata[file.path] = [:]
                 } else if result.tracks.count == 1, let track = result.tracks.first {
                     memberMetadata[file.path] = MetaManMetadataProjector.memberFields(from: track.document)

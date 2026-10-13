@@ -73,21 +73,8 @@ public enum MetaManMetadataProjector {
            let version = document.technicalFacts["version"], !version.isEmpty {
             member["Format"] = .string("GBS v.\(version)")
         }
-        if document.format.caseInsensitiveCompare("gbs") == .orderedSame {
-            // The GBS native reader exposes a 150-second compatibility
-            // default. Only its explicit M3U projections are source timing.
-            for (fact, tag) in [
-                ("m3uIntroLengthMs", "Intro Length (ms)"),
-                ("m3uLoopLengthMs", "Loop Length (ms)"),
-                ("m3uPlayLengthMs", "Play Length (ms)"),
-                ("m3uFadeLengthMs", "Fade Length (ms)")
-            ] {
-                if let rawValue = document.technicalFacts[fact],
-                   let value = Int64(rawValue), value > 0 {
-                    member[tag] = .integer(value)
-                }
-            }
-        } else if let timing = document.timing {
+        if document.format.caseInsensitiveCompare("gbs") != .orderedSame,
+           let timing = document.timing {
             // Zero and negative values are the readers' "not supplied" defaults.
             // Do not materialize those defaults as package tags; a present value
             // must describe a measured duration.

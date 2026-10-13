@@ -24,9 +24,12 @@ AudioMan's per-set reports.
 - **Source archive** — Preserve the original source-state archive outside UAC.
   Link each UAC to that exact archive through `sources[]`; do not bundle the
   outer archive or surface its hashes as GBS stream hashes.
-- **M3U and attachments** — Retain every applicable source M3U byte-exact.
-  It supplies track names, order, timing, and shared credits. Keep other
-  package attachments byte-exact and classify them before packaging.
+- **M3U and attachments** — Retain each applicable M3U in the UAC with its
+  file references, source indexes, titles, queue order, and factual comments.
+  Strip play length, loop, fade, and repeat columns from the bundled copy.
+  The exact source archive linked through `sources[]` retains the original M3U
+  bytes. Keep other package attachments byte-exact and classify them before
+  packaging.
 
 ## Identity and Naming
 
@@ -58,13 +61,17 @@ AudioMan's per-set reports.
 
 - Confirm the selected GBS bytes and each original archive's source link match
   Songbase/source inventory evidence.
-- Confirm every M3U row resolves to a declared zero-based GBS track and that
-  titles and timings agree across applicable M3Us.
+- Confirm every M3U row resolves to a declared zero-based GBS track, playlist
+  titles and order are preserved, and factual comments agree across
+  applicable M3Us. Ignore timing-column differences.
 - Confirm Album, Album Artist, Date/Year, Composer, Dumper, Tagger, Developer,
-  Publisher, Genre, and Copyright are populated only from the mapped source
-  fields; omit placeholders and empty values.
-- Confirm all source M3Us and other retained attachments are present and
-  byte-exact, the logical track entries retain Format and nested M3U values,
-  and the physical GBS appears once with its four Stream Hashes.
+  Publisher, Genre, and Copyright are populated only from their mapped GBS,
+  M3U, or source-filename fields; omit placeholders and empty values. Report
+  filename conflicts without overwriting the conflicting UAC value.
+- Confirm all applicable M3U facts are retained, their bundled timing columns
+  are removed, other retained attachments are byte-exact, and the logical
+  track entries retain Title, Format, source index, and queue order without
+  nested M3U timing values. The physical GBS appears once with its four
+  Stream Hashes.
 - Review the package in UACMan Tag Analyzer and confirm no unapproved tags or
-  guessed playback timings were added.
+  authored playback timings were added.
