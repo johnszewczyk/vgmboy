@@ -31,7 +31,7 @@ title, and track window. Supported options:
 - Commodore 64 (libsidplayfp): `.sid` (exposes every declared subtune as a
   playlist track and selects the requested subtune on playback)
 - Atari XL (ASAP): `.sap` (TYPE B, C, D, and S; native speed)
-- Sega/console logs (libvgm): `.vgm`, `.vgz`, `.gym`, `.s98`, `.dro`
+- Sega/console logs (libvgm): `.vgm`, `.vgz`, `.s98`, `.dro`
 - Tracker modules (libopenmpt): `.669`, `.dmf`, `.far`, `.it`, `.mod`, `.mptm`, `.mtm`, `.okt`,
   `.ptm`, `.s3m`, `.stm`, `.ult`, and `.xm`
 - Standard audio: AVFoundation handles `.aac`, `.aif`, `.aiff`, `.caf`, `.flac`, `.m4a`, `.mp3`,

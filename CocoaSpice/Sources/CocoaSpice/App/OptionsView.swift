@@ -325,7 +325,7 @@ struct OptionsView: View {
             )
             tempoRow(
                 title: "libvgm",
-                detail: "GYM, S98, VGM, VGZ, and DRO",
+                detail: "S98, VGM, VGZ, and DRO",
                 enabled: Binding(
                     get: { model.libvgmTempoEnabled },
                     set: { model.setLibVgmTempoEnabled($0) }

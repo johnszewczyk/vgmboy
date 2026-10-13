@@ -22,7 +22,7 @@ struct AboutView: View {
         Dependency(
             name: "libvgm",
             version: "0.1 / 867223e",
-            purpose: "VGM, VGZ, GYM, and S98 formats",
+            purpose: "VGM, VGZ, S98, and DRO formats",
             license: "Mixed upstream component licenses; see source notices",
             sourceURL: URL(string: "https://github.com/ValleyBell/libvgm")!,
             licenseURL: URL(string: "https://github.com/ValleyBell/libvgm/tree/master/licenses")!

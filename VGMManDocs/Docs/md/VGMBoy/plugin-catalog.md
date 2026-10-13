@@ -16,7 +16,7 @@ Last reviewed: **2026-09-17**
 | `libgme` | Game Music Emu 0.6.5 through Homebrew | `CGameMusicEmu` | ScanSong tests only as a parity oracle; no production scanner link | Playback supports AY, GBS, HES, KSS, NSF, NSFE, SPC |
 | `asap` | ASAP 8.0.0 from vendored ZXTune revision `c93e81d081685ea2c7cd21fe0077e93d84b4d88d` | `VGMBoyCASAP` / `ASAPDecoder` | None; ScanSong uses MetaManCore for SAP fields | SAP TYPE B/C/D/S; long play, native speed only; GPL-2.0-or-later |
 | `MetaManCore` | Sibling decoder-independent metadata package | None | Shared direct metadata route | AY, SAP, NSF/GBS/NSFE, HES/M3U, SNDH/ICE!, GSF/miniGSF, SID, SPC, S98, VGM/VGZ, PSF-family tags, and supported stream headers |
-| `libvgm` | `867223e7c33d63de115d1ab955f784c44f19040a` | `CLibVGM` | Native libVGM route | GYM, S98, DRO |
+| `libvgm` | `867223e7c33d63de115d1ab955f784c44f19040a` | `CLibVGM` | Native libVGM route | VGM, VGZ, S98, DRO |
 | `psgplay` | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | `CPSGPlay` | VGMBoy playback; legacy metadata API is test-only oracle | Atari ST SNDH playback; ScanSong production metadata is read by MetaManCore |
 | `mdxmini` | `003531a471c1955f4ed4357d0e2a6cba809c34a0` plus vendored LZX code | `CMDX` | `vgmboy-mdx-inspect` (open/dependency validation only; metadata timing is MetaMan-owned) | X68000 MDX and PDX; sibling banks, legacy `\name`, inner LZX 0.32/0.42 |
 | `uade` | Homebrew UADE 3.05 | `CUADE` | `vgmboy-amiga-inspect` | Amiga EaglePlayer modules, TFMX, MED, and prefix-led replayers |
@@ -68,7 +68,8 @@ NSF payload remains playback data owned by the libgme-backed VGMBoy player.
 
 ### libVGM (`libvgm`)
 
-libVGM remains the playback decoder route for VGM/VGZ, GYM, S98, and DRO.
+libVGM remains the playback decoder route for VGM/VGZ, S98, and DRO. GYM is
+not admitted by VGMBoy or ScanSong.
 ScanSong's VGM/VGZ header, GD3, and timing reader now lives in the separate
 MetaManCore package. Tempo support is exposed only for families where the bridge
 has verified it.

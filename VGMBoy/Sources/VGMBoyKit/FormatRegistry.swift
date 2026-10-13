@@ -154,7 +154,7 @@ public enum FormatRegistry {
     public static let asapExtensions: Set<String> = ["sap"]
 
     public static let libvgmExtensions: Set<String> = [
-        "vgm", "vgz", "gym", "s98", "dro"
+        "vgm", "vgz", "s98", "dro"
     ]
 
     public static let psgPlayExtensions: Set<String> = ["sndh"]

@@ -48,7 +48,7 @@ private func makeAttachmentProjectionUACDocument(
     #expect(registry.route(pathExtension: "vgm")?.pluginID == "vgm-direct")
     #expect(registry.route(pathExtension: "vgz")?.metadataPolicy == .direct)
     #expect(registry.route(pathExtension: "vgm")?.structurePolicy == .knownSingle)
-    #expect(registry.route(pathExtension: "gym")?.pluginID == "libvgm")
+    #expect(registry.route(pathExtension: "gym") == nil)
     #expect(registry.route(pathExtension: "s98")?.pluginID == "s98-direct")
     #expect(registry.route(pathExtension: "s98")?.metadataPolicy == .direct)
     #expect(registry.route(pathExtension: "flac")?.metadataPolicy == .direct)

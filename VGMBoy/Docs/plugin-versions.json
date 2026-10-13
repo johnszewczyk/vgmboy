@@ -36,7 +36,7 @@
       "sourceIdentity": "git commit",
       "upstream": "https://github.com/ValleyBell/libvgm.git",
       "milestoneCheck": "release-or-tag",
-      "formats": ["VGM", "VGZ", "GYM", "S98", "DRO"]
+      "formats": ["VGM", "VGZ", "S98", "DRO"]
     },
     {
       "id": "psgplay",

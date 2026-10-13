@@ -354,9 +354,6 @@ public struct BuiltInFormatInspector: ScanFormatHandler {
                 includeDateAndEncodedByInComment: route.pluginID == "s98-direct"
             )
             return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: metadata, tags: ScanTrackMetadata.tags(from: document))])
-        case "libvgm":
-            // GYM remains structure-known without a complete metadata adapter.
-            return ScanInspection(route: route, tracks: [ScanTrackMetadata(trackIndex: 0, trackCount: 1, metadata: nil)])
         case "sndh-direct":
             return try SNDHInspector.inspect(fileURL: fileURL, route: route)
         case "standard-audio":

@@ -66,7 +66,6 @@ public enum BuiltInScannerPlugins {
     // decoder acceptance, subsong enumeration, or metadata not yet covered
     // by a complete direct reader.
     private static let decoderMetadataDescriptors: [ScannerPluginDescriptor] = [
-        .init(pluginID: "libvgm", displayName: "libVGM", supportedExtensions: ["gym"], structurePolicy: .knownSingle, metadataPolicy: .decoder, priority: 10),
         .init(pluginID: "mdx", displayName: "mdxmini", supportedExtensions: ["mdx"], structurePolicy: .knownSingle, metadataPolicy: .decoder, priority: 10),
         .init(pluginID: "amiga-uade", displayName: "UADE", supportedExtensions: AmigaFormatManifest.prefixes, supportsMultiTrack: true, structurePolicy: .enumerate, metadataPolicy: .decoder, priority: 20),
         .init(pluginID: "vgmstream-hd-bank", displayName: "vgmstream", supportedExtensions: ["hd", "hbd", "iecs"], structurePolicy: .dependencyEnumerate, metadataPolicy: .decoder, priority: 10),
