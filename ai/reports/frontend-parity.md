@@ -3,40 +3,36 @@
 ## Rule
 
 Equivalent player behavior should use the same shared policy and VGMBoy command
-contract. CocoaSpice, SPCBoyWK, SB2, and ViewBoy retain separate renderers, app
-identities, persistence keys, and host adapters; a shared contract does not
-promise pixel-identical UI.
+contract. CocoaSpice, SB2, and ViewBoy retain separate renderers, app
+identities, persistence keys, and host adapters; shared contracts do not promise
+pixel-identical UI. SPCBoyWK is retired and is not an active parity target.
 
-## Current evidence and open checks
-
-| Boundary | Current evidence | Remaining user-boundary check |
-| --- | --- | --- |
-| Shared policy | FrontendCore and CatalogReader package suites pass in the clean checkout recorded in `../verification/family.md`. | VGMBoy's AAC and live-output checks need working host audio services. |
-| CocoaSpice | Package tests pass. | Launch the current bundle with a schema-24 catalog and exercise selection, queue, and playback through the visible UI. |
-| SPCBoyWK | Package build and renderer tests pass. | Repeat the same catalog and archive fixture through the packaged WebKit player. |
-| SPCBOY SB2 | Release app bundle built; its native bridge exposes the same 40 request names as SPCBoyWK plus the CPU readout, with an independent bundle and preference identity. | Inspect the packaged UI, then repeat the same catalog and archive fixture through its pixel-style WebKit player. |
-| ViewBoy | Production bundle builds and renderer tests pass. | Select the same catalog and exercise a live playback fixture in the packaged app. |
-
-No current four-app, same-fixture parity run is recorded. SB2's packaged UI and
-live audio boundary also remain unverified. Compare the exact
-catalog revision, selected source/member/subtrack, queue action, and observed
-transport result before closing a shared-behavior gate. A package test or a
-window that merely opens does not establish audio parity.
-
-The SB2 bridge inventory comparison checks exposed method names only; it does
-not establish equivalent native behavior or playback results.
-
-## Shared boundary
+## Current source boundaries
 
 | Behavior | Shared owner | Frontend responsibility |
 | --- | --- | --- |
-| Catalog and playlist projection | CatalogReader | Render rows and apply explicit user sorting. |
+| Catalog and playlist projection | CatalogReader | Render rows and measure them with frontend fonts. |
+| Playlist sorting | `CatalogPlaylistPresentationCore.CatalogPlaylistSorting` | Submit current row records and retain selection while applying ordered IDs. |
+| Catalog grouping and search | `CatalogBrowserCore` | Render projected groups and map matching IDs into the sidebar. |
+| Playlist-tab order transitions | `FrontendCore.PlaylistTabsPersistenceCore` | Adapt local tab payloads, storage, focus, and final-tab behavior. |
 | Archive preparation | FrontendCore | Request playback through each native bridge. |
 | Decoder session, timing, and output | VGMBoy | Render status and issue named commands. |
 | Queue, transitions, fade eligibility | FrontendCore | Present queue state and local animation. |
 | Preferences and playlist layout policy | FrontendCore | Persist local keys and adapt shared values to each renderer. |
 | Display and app identity | Each frontend | Keep each app's host, screen renderer, and preferences product-specific. |
 
-[`../verification/family.md`](../verification/family.md) contains the package
-results and clean checkout procedure. This report tracks the cross-app user
-boundary.
+## Verification status
+
+This update aligned source ownership and routed ViewBoy playlist sorting,
+console grouping, and catalog search through shared policies. It also added the
+shared tab-order reducer to CocoaSpice, SB2, and ViewBoy. Package builds,
+packaged-app launches, same-catalog interaction checks, and live playback were
+not run for this update, so runtime parity remains open.
+
+Compare the exact catalog revision, selected source/member/subtrack, queue
+action, and observed transport result before closing a shared-behavior gate. A
+package build or a window that merely opens does not establish audio parity.
+
+[`../verification/family.md`](../verification/family.md) contains prior package
+results and the clean-checkout procedure. Those historical results do not
+verify the source changes in this update.

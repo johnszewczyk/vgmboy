@@ -39,6 +39,7 @@ let playlistVirtualRowHeight = 28;
 let playlistViewportFrame = 0;
 let playlistTabsSaveTimer = 0;
 let playlistTabsSaveChain = Promise.resolve();
+let playlistTabTransitionChain = Promise.resolve();
 let playlistContentRequestGeneration = 0;
 let playlistSortGeneration = 0;
 const treeSearchText = new WeakMap();
@@ -142,10 +143,10 @@ refs.playlistTabs?.addEventListener("click", (event) => {
   if (event.target.closest?.(".playlist-tab-close")) {
     event.preventDefault();
     event.stopPropagation();
-    closePlaylistTab(tabID);
+    void closePlaylistTab(tabID).catch((error) => console.error("[SPCBoy] playlist tab close failed", error));
     return;
   }
-  activatePlaylistTab(tabID);
+  void activatePlaylistTab(tabID).catch((error) => console.error("[SPCBoy] playlist tab activation failed", error));
 });
 
 function syncActivePlaylistTab() {
@@ -232,7 +233,7 @@ function restorePlaylistTabView(tab, { loadMissingGames = true, loadGalleryData 
   uiApp.playback.updatePlaybackReadout();
 }
 
-function ensurePlaylistTab() {
+async function ensurePlaylistTab() {
   if (!Array.isArray(state.playlistTabs)) state.playlistTabs = [];
   let active = findActivePlaylistTab();
   if (active) return active;
@@ -248,8 +249,10 @@ function ensurePlaylistTab() {
     catalogPlaylistColumnContentHints: state.catalogPlaylistColumnContentHints,
     catalogPlaylistSortSessionId: state.catalogPlaylistSortSessionId
   };
-  state.playlistTabs.push(active);
-  state.activePlaylistTabId = active.id;
+  await transitionPlaylistTabs(
+    { kind: "insert", id: active.id, activate: true },
+    { additionalTabs: [active] }
+  );
   renderPlaylistTabs();
   return active;
 }
@@ -315,10 +318,38 @@ function renderPlaylistTabs() {
   syncInteractionSelectionTarget();
 }
 
-function activatePlaylistTab(tabID, { syncOutgoing = true } = {}) {
+async function transitionPlaylistTabs(action, { additionalTabs = [], updateActive = true } = {}) {
+  const operation = playlistTabTransitionChain.catch(() => {}).then(async () => {
+    const result = await window.spcBoySB2.playlistTabsReduce({
+      state: {
+        orderedIDs: (state.playlistTabs || []).map((tab) => tab.id),
+        activeID: state.activePlaylistTabId
+      },
+      action
+    });
+    if (!result || !Array.isArray(result.orderedIDs)) {
+      throw new Error("Shared tab transition returned invalid state.");
+    }
+    const tabsByID = new Map([...(state.playlistTabs || []), ...additionalTabs]
+      .map((tab) => [tab.id, tab]));
+    state.playlistTabs = result.orderedIDs.map((id) => tabsByID.get(id)).filter(Boolean);
+    if (updateActive) state.activePlaylistTabId = result.activeID || null;
+    return result;
+  });
+  playlistTabTransitionChain = operation.catch(() => {});
+  return operation;
+}
+
+async function activatePlaylistTab(tabID, { syncOutgoing = true } = {}) {
   const tab = state.playlistTabs?.find((entry) => entry.id === tabID);
   if (!tab || tab.id === state.activePlaylistTabId) return false;
   if (syncOutgoing) syncActivePlaylistTab();
+  const next = await transitionPlaylistTabs(
+    { kind: "activate", id: tabID },
+    { updateActive: false }
+  );
+  if (next.activeID !== tabID) return false;
+  state.activePlaylistTabId = tabID;
   playlistContentRequestGeneration += 1;
   playlistSortGeneration += 1;
   browserSelectionGeneration += 1;
@@ -329,14 +360,14 @@ function activatePlaylistTab(tabID, { syncOutgoing = true } = {}) {
   return true;
 }
 
-function activatePlaylistTabAtIndex(index) {
+async function activatePlaylistTabAtIndex(index) {
   if (!Number.isInteger(index) || index < 0) return false;
   const tab = state.playlistTabs?.[index];
   return tab ? activatePlaylistTab(tab.id) : false;
 }
 
-function createPlaylistTab({ duplicateActive = true, title = null } = {}) {
-  const source = ensurePlaylistTab();
+async function createPlaylistTab({ duplicateActive = true, title = null } = {}) {
+  const source = await ensurePlaylistTab();
   syncActivePlaylistTab();
   if ((state.playlistTabs?.length || 0) >= 64) {
     console.warn("[SPCBoy] playlist tab limit reached");
@@ -354,21 +385,24 @@ function createPlaylistTab({ duplicateActive = true, title = null } = {}) {
     catalogPlaylistColumnContentHints: duplicateActive ? source.catalogPlaylistColumnContentHints : null,
     catalogPlaylistSortSessionId: duplicateActive ? source.catalogPlaylistSortSessionId : null
   };
-  state.playlistTabs.push(tab);
-  activatePlaylistTab(tab.id, { syncOutgoing: false });
+  await transitionPlaylistTabs(
+    { kind: "insert", id: tab.id, activate: false },
+    { additionalTabs: [tab], updateActive: false }
+  );
+  await activatePlaylistTab(tab.id, { syncOutgoing: false });
   renderPlaylistTabs();
   persistPlaylistTabs();
   return tab;
 }
 
-function activateOrCreateProjectionTab(title) {
+async function activateOrCreateProjectionTab(title) {
   if (findActivePlaylistTab()?.title === title) return true;
   const existing = state.playlistTabs?.find((tab) => tab.title === title);
   if (existing) return activatePlaylistTab(existing.id);
-  return Boolean(createPlaylistTab({ duplicateActive: false, title }));
+  return Boolean(await createPlaylistTab({ duplicateActive: false, title }));
 }
 
-function closePlaylistTab(tabID = state.activePlaylistTabId) {
+async function closePlaylistTab(tabID = state.activePlaylistTabId) {
   const tabs = state.playlistTabs || [];
   const closingIndex = tabs.findIndex((tab) => tab.id === tabID);
   if (closingIndex < 0) return false;
@@ -378,10 +412,13 @@ function closePlaylistTab(tabID = state.activePlaylistTabId) {
   }
   const wasActive = tabs[closingIndex].id === state.activePlaylistTabId;
   if (wasActive) syncActivePlaylistTab();
-  tabs.splice(closingIndex, 1);
+  const next = await transitionPlaylistTabs(
+    { kind: "close", id: tabID },
+    { updateActive: false }
+  );
   if (wasActive) {
-    const next = tabs[Math.min(closingIndex, tabs.length - 1)];
-    activatePlaylistTab(next.id, { syncOutgoing: false });
+    state.activePlaylistTabId = null;
+    if (next.activeID) await activatePlaylistTab(next.activeID, { syncOutgoing: false });
   } else {
     renderPlaylistTabs();
   }
@@ -389,7 +426,7 @@ function closePlaylistTab(tabID = state.activePlaylistTabId) {
   return true;
 }
 
-function restorePlaylistTabs(value, { loadMissingGames = true, loadGalleryData = true } = {}) {
+async function restorePlaylistTabs(value, { loadMissingGames = true, loadGalleryData = true } = {}) {
   if (value?.version !== 1 || !Array.isArray(value.tabs) || !value.tabs.length) return false;
   playlistContentRequestGeneration += 1;
   playlistSortGeneration += 1;
@@ -418,7 +455,12 @@ function restorePlaylistTabs(value, { loadMissingGames = true, loadGalleryData =
   }));
   if (!tabs.length) return false;
   state.playlistTabs = tabs;
-  state.activePlaylistTabId = identifiers.has(value.activeID) ? value.activeID : tabs[0].id;
+  const restored = await transitionPlaylistTabs({
+    kind: "restore",
+    orderedIDs: tabs.map((tab) => tab.id),
+    activeID: identifiers.has(value.activeID) ? value.activeID : tabs[0].id
+  });
+  state.activePlaylistTabId = restored.activeID || tabs[0].id;
   restorePlaylistTabView(findActivePlaylistTab(), { loadMissingGames, loadGalleryData });
   renderPlaylistTabs();
   persistPlaylistTabs();
@@ -1199,7 +1241,7 @@ function showSidebarContextMenu(node, event) {
   const finderPath = node.catalogFile?.path || node.catalogFolder?.folderPath || node.path;
   showContextMenu(event, [
     ["Open in New Playlist", async () => {
-      const tab = createPlaylistTab({ duplicateActive: false, title: node.name || "Playlist" });
+      const tab = await createPlaylistTab({ duplicateActive: false, title: node.name || "Playlist" });
       if (tab) await activateBrowserNode(node, { playNow: false });
     }],
     ["Show in Finder", async () => window.spcBoySB2.showInFinder(finderPath)],
@@ -1743,7 +1785,7 @@ function makeDatabaseGameButton(game) {
     selectDatabaseSidebarRow(button, { focus: false });
     showContextMenu(event, [
       ["Open in New Playlist", async () => {
-        const tab = createPlaylistTab({ duplicateActive: false, title: game.displayName || game.name });
+        const tab = await createPlaylistTab({ duplicateActive: false, title: game.displayName || game.name });
         if (tab) await loadDatabaseGame(game);
       }],
       ["Show in Finder", async () => {
@@ -1895,7 +1937,7 @@ function renderDatabaseGames() {
       heading.addEventListener("contextmenu", (event) => {
         showContextMenu(event, [
           ["Open in New Playlist", async () => {
-            const tab = createPlaylistTab({ duplicateActive: false, title: consoleName });
+            const tab = await createPlaylistTab({ duplicateActive: false, title: consoleName });
             if (tab) await loadDatabaseGamesIntoPlaylist(gameItems, { title: consoleName });
           }],
           ["Play Now", async () => {
@@ -2067,7 +2109,7 @@ async function cycleSidebarMode() {
 }
 
 async function showFavoritesPlaylist() {
-  if (!activateOrCreateProjectionTab("Favorites")) return false;
+  if (!await activateOrCreateProjectionTab("Favorites")) return false;
   const targetTabID = state.activePlaylistTabId;
   const request = beginPlaylistContentRequest({ targetTabID, interactionGeneration: sidebarInteractionGeneration });
   await refreshFavorites();
@@ -2132,7 +2174,7 @@ function historyRecordToPlaylistTrack(record) {
 }
 
 async function showPlaybackHistory() {
-  if (!activateOrCreateProjectionTab("Recent")) return false;
+  if (!await activateOrCreateProjectionTab("Recent")) return false;
   const targetTabID = state.activePlaylistTabId;
   const request = beginPlaylistContentRequest({ targetTabID, interactionGeneration: sidebarInteractionGeneration });
   const records = await window.spcBoySB2.playbackHistoryList();
@@ -2162,7 +2204,7 @@ async function showPlaybackHistory() {
 
 async function openGalleryGame(game) {
   const title = String(game.displayName || game.name || "Playlist");
-  const tab = createPlaylistTab({ duplicateActive: false, title });
+  const tab = await createPlaylistTab({ duplicateActive: false, title });
   if (!tab) return false;
   const loaded = await loadDatabaseGame(game);
   const targetID = loaded ? databaseLoadedSelectionID() : null;
@@ -2331,10 +2373,10 @@ async function showGalleryPlaylist() {
   const enteringGallery = !isGalleryActive();
   let tab = state.playlistTabs?.find((entry) => entry.kind === "gallery");
   if (!tab) {
-    tab = createPlaylistTab({ duplicateActive: false, title: "Gallery" });
+    tab = await createPlaylistTab({ duplicateActive: false, title: "Gallery" });
     if (!tab) return false;
   } else if (tab.id !== state.activePlaylistTabId) {
-    activatePlaylistTab(tab.id);
+    await activatePlaylistTab(tab.id);
   }
   const targetTabID = state.activePlaylistTabId;
   const interactionGeneration = invalidateSidebarInteractions();
@@ -4600,8 +4642,8 @@ async function bootstrap() {
   persistSettings();
   setStartupStage(2, "Reopening saved playlists and preparing playback controls.");
   const restoredPlaylistTabs = !window.spcBoySB2?.isOptionsWindow
-    && restorePlaylistTabs(savedPlaylistTabs, { loadMissingGames: false, loadGalleryData: false });
-  if (!restoredPlaylistTabs && !window.spcBoySB2?.isOptionsWindow) ensurePlaylistTab();
+    && await restorePlaylistTabs(savedPlaylistTabs, { loadMissingGames: false, loadGalleryData: false });
+  if (!restoredPlaylistTabs && !window.spcBoySB2?.isOptionsWindow) await ensurePlaylistTab();
 
   if (!window.spcBoySB2?.isOptionsWindow && window.spcBoySB2?.databaseRoots) {
     setStartupStage(3, "Loading the selected library view and its search results.");

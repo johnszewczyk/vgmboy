@@ -16,6 +16,7 @@ import PlaybackQueueCore
 import PlaybackHistoryCore
 import PlaybackTransportCore
 import PlaylistIdentityCore
+import PlaylistTabsPersistenceCore
 import VGMBoyEndpointCore
 import VGMBoyKit
 import WebKit
@@ -214,6 +215,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             bootstrap: (...args) => request("bootstrap", args),
             playlistTabsLoad: () => request("playlistTabsLoad"),
             playlistTabsSave: (...args) => request("playlistTabsSave", args),
+            playlistTabsReduce: (...args) => request("playlistTabsReduce", args),
             databaseLocation: (...args) => request("databaseLocation", args),
             databaseRoots: (...args) => request("databaseRoots", args),
             databaseGames: (...args) => request("databaseGames", args),
@@ -543,6 +545,19 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         case "playlistTabsSave":
             guard let payload = args.first as? [String: Any] else { throw BridgeError.invalidArguments }
             return try PlaylistTabsStore.shared.save(payload)
+        case "playlistTabsReduce":
+            guard let payload = args.first as? [String: Any],
+                  JSONSerialization.isValidJSONObject(payload) else {
+                throw BridgeError.invalidArguments
+            }
+            let request = try JSONDecoder().decode(
+                PlaylistTabOrderTransitionRequest.self,
+                from: JSONSerialization.data(withJSONObject: payload)
+            )
+            return try Self.object(PlaylistTabOrderReducer.reduce(
+                state: request.state,
+                action: request.action
+            ))
         case "showInFinder":
             guard let path = args.first as? String else { return false }
             NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path).standardizedFileURL])

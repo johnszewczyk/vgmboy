@@ -154,7 +154,7 @@ public struct CatalogBrowserGameGroup: Identifiable, Codable, Equatable, Sendabl
 }
 
 /// Canonical text projection for the shared catalog Games search. It keeps the
-/// searchable fields and case normalization out of renderer models while still
+/// searchable fields and normalization out of renderer models while still
 /// allowing a WebKit skin to filter its already-published list without a
 /// database round trip per keystroke.
 public enum CatalogBrowserSearchText {
@@ -168,7 +168,7 @@ public enum CatalogBrowserSearchText {
     }
 
     public static func normalized(_ value: String) -> String {
-        value.lowercased()
+        value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
     }
 }
 
@@ -225,7 +225,9 @@ public struct CatalogFileSearchIndex: Sendable {
         entries = files.map { file in
             Entry(
                 file: file,
-                searchableText: "\(Self.filename(in: file.path)) \(file.folderPath) \(file.path)".lowercased()
+                searchableText: CatalogBrowserSearchText.normalized(
+                    "\(Self.filename(in: file.path)) \(file.folderPath) \(file.path)"
+                )
             )
         }
     }
@@ -234,9 +236,8 @@ public struct CatalogFileSearchIndex: Sendable {
         query: String,
         isCancelled: @Sendable () -> Bool = { false }
     ) -> [CatalogFileBucket]? {
-        let terms = query
+        let terms = CatalogBrowserSearchText.normalized(query)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
             .split(whereSeparator: \.isWhitespace)
             .map(String.init)
         guard !terms.isEmpty else { return entries.map(\.file) }

@@ -2,6 +2,7 @@ import AppKit
 import ArchiveCacheCore
 import CatalogReader
 import CatalogPlaylistCore
+import CatalogPlaylistPresentationCore
 import CatalogBrowserCore
 import CatalogSessionCore
 import FavoriteStoreCore
@@ -14,6 +15,7 @@ import PlaybackHistoryCore
 import PlaybackQueueCore
 import PlaybackTransportCore
 import PlaylistIdentityCore
+import PlaylistTabsPersistenceCore
 import VGMBoyEndpointCore
 import VGMBoyKit
 import WebKit
@@ -152,6 +154,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             databaseFiles: (...args) => request("databaseFiles", args),
             databaseFileTree: (...args) => request("databaseFileTree", args),
             databaseSearchGames: (...args) => request("databaseSearchGames", args),
+            databaseSearchFiles: (...args) => request("databaseSearchFiles", args),
+            playlistProjectionSort: (...args) => request("playlistProjectionSort", args),
             databaseGameTracks: (...args) => request("databaseGameTracks", args),
             databaseGroupState: (...args) => request("databaseGroupState", args),
             catalogSessionInvalidate: (...args) => request("catalogSessionInvalidate", args),
@@ -172,6 +176,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             frontendSettingsSave: (...args) => request("frontendSettingsSave", args),
             playlistTabsLoad: () => request("playlistTabsLoad"),
             playlistTabsSave: (...args) => request("playlistTabsSave", args),
+            playlistTabsReduce: (...args) => request("playlistTabsReduce", args),
             endpointSurface: (...args) => request("endpointSurface", args),
             reloadDatabaseLibrary: (...args) => request("reloadDatabaseLibrary", args),
             configureArchiveCache: (...args) => request("configureArchiveCache", args),
@@ -286,6 +291,26 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             do {
                 _ = try Self.playlistTabsSave(payload)
                 Task { await Self.reply(to: message.webView, id: id, success: true, valueJSON: "true") }
+            } catch {
+                Task { await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": error.localizedDescription])) }
+            }
+            return
+        }
+
+        if method == "playlistTabsReduce" {
+            guard let payload = args.first as? [String: Any],
+                  JSONSerialization.isValidJSONObject(payload) else {
+                Task { await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": BridgeError.invalidSettings.localizedDescription])) }
+                return
+            }
+            do {
+                let request = try JSONDecoder().decode(
+                    PlaylistTabOrderTransitionRequest.self,
+                    from: JSONSerialization.data(withJSONObject: payload)
+                )
+                let next = PlaylistTabOrderReducer.reduce(state: request.state, action: request.action)
+                let valueJSON = Self.json(try Self.object(next))
+                Task { await Self.reply(to: message.webView, id: id, success: true, valueJSON: valueJSON) }
             } catch {
                 Task { await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": error.localizedDescription])) }
             }
@@ -534,6 +559,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         case "databaseSearchGames":
             let query = (args.first as? String) ?? ""
             return try searchGames(query, catalogURL: catalogURL)
+        case "databaseSearchFiles":
+            let query = (args.first as? String) ?? ""
+            return try searchFiles(query, catalogURL: catalogURL)
+        case "playlistProjectionSort":
+            return try projectionPlaylistSortedIDs(args.first)
         case "databaseGameTracks":
             return try gameTracks(args.first, catalogURL: catalogURL)
         case "databaseGroupState":
@@ -757,19 +787,14 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         }
     }
 
-    nonisolated private static func games(catalogURL: URL) throws -> [[String: Any]] {
+    nonisolated private static func games(catalogURL: URL) throws -> [String: Any] {
         let projected = CatalogBrowserProjection.games(from: try openCatalog(catalogURL).gameBuckets())
-        return projected.map {
-            [
-                "rootId": $0.rootID,
-                "rootPath": $0.rootPath,
-                "rootName": URL(fileURLWithPath: $0.rootPath).lastPathComponent,
-                "name": $0.name,
-                "displayName": $0.displayName,
-                "system": $0.system,
-                "trackCount": $0.trackCount
-            ]
-        }
+        return [
+            "games": projected.map(browserGameResponse),
+            "groups": CatalogBrowserProjection.groups(from: projected).map { group in
+                ["name": group.name, "gameIDs": group.games.map(\.id)]
+            }
+        ]
     }
 
     nonisolated private static func files(catalogURL: URL) throws -> [[String: Any]] {
@@ -847,9 +872,47 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             CatalogBrowserProjection.games(from: try openCatalog(catalogURL).gameBuckets()),
             query: query
         )
-        return projected.map {
-            ["rootId": $0.rootID, "rootPath": $0.rootPath, "rootName": URL(fileURLWithPath: $0.rootPath).lastPathComponent, "name": $0.name, "displayName": $0.displayName, "system": $0.system, "trackCount": $0.trackCount]
+        return projected.map(browserGameResponse)
+    }
+
+    nonisolated private static func browserGameResponse(_ game: CatalogBrowserGame) -> [String: Any] {
+        [
+            "id": game.id,
+            "rootId": game.rootID,
+            "rootPath": game.rootPath,
+            "rootName": game.rootDisplayName,
+            "name": game.name,
+            "displayName": game.displayName,
+            "system": game.system,
+            "consoleGroupName": game.consoleGroupName,
+            "searchText": game.searchText,
+            "trackCount": game.trackCount
+        ]
+    }
+
+    nonisolated private static func searchFiles(_ query: String, catalogURL: URL) throws -> [[String: Any]] {
+        let matches = CatalogFileSearchIndex(files: try openCatalog(catalogURL).fileBuckets())
+            .matchingFiles(query: query) ?? []
+        return matches.map { ["rootId": $0.rootID, "path": $0.path] }
+    }
+
+    nonisolated private static func projectionPlaylistSortedIDs(_ value: Any?) throws -> [String] {
+        guard let value, JSONSerialization.isValidJSONObject(value) else {
+            throw BridgeError.invalidArguments
         }
+        let request = try JSONDecoder().decode(
+            CatalogPlaylistSortRequest.self,
+            from: JSONSerialization.data(withJSONObject: value)
+        )
+        guard let column = request.column,
+              Set(request.records.map(\.id)).count == request.records.count else {
+            throw BridgeError.invalidArguments
+        }
+        return CatalogPlaylistSorting.orderedIDs(
+            records: request.records,
+            column: column,
+            direction: request.direction
+        )
     }
 
     nonisolated private static func gameTracks(_ value: Any?, catalogURL: URL) throws -> [[String: Any]] {
