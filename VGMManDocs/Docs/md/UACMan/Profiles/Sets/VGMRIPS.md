@@ -38,12 +38,13 @@ Apply these rules together with the [VGM format profile](../VGM.md) and the
   `Review/Sega`, retaining the source system label in the filename. Keep artwork
   with its uniquely matched package; retain ambiguous or unmatched artwork in
   `Review/Sega/Artwork` until its package is established.
-- **Title Snap** — Keep source artwork beside its ZIP while staging. When the
-  image is bundled into UAC, keep it as a normal package member and expose it
-  through pack-level **Title Snap** metadata using a member reference shaped as
-  `{"memberPath":"artwork/file.png","mediaType":"image/png"}`. Use an array
-  of references when a package has multiple title images. Do not label artwork
-  as a front cover unless the source identifies it that way.
+- **Title Snap** — Keep source artwork beside its ZIP while staging. When a
+  unique image is bundled into UAC, store it as a `role: asset` PNG member and
+  set the package-level **Title Snap** value to that member's relative path,
+  such as `art/title-snap.png`. The value is a plain string, not a nested
+  object or array. Keep region/release alternatives in review rather than
+  choosing the nearest artwork. Do not label artwork as a front cover unless
+  the source identifies it that way.
 - **Package notes** — Preserve each curated source TXT byte-for-byte inside its
   UAC as `meta.txt`, referenced by `game.metadata.documents`. Record its source
   filename and the member-name normalization in provenance. Keep the note as a
