@@ -2003,7 +2003,7 @@ body.sb2-frontend .toolbar-volume-popover {
   flex-direction: column;
   gap: var(--sb-space-025);
   box-sizing: border-box;
-  width: 100px;
+  width: 220px;
   padding: var(--sb-space-050);
   border: 1px solid #29303a;
   border-radius: var(--sb-button-radius);
@@ -2012,6 +2012,20 @@ body.sb2-frontend .toolbar-volume-popover {
 }
 body.sb2-frontend .toolbar-volume-popover[hidden] { display: none; }
 body.sb2-frontend .toolbar-volume-popover input { width: 100%; margin: 0; accent-color: var(--accent); }
+body.sb2-frontend .toolbar-volume-ticks {
+  display: block;
+  height: 6px;
+  margin: 0 8px;
+  background-image: repeating-linear-gradient(to right, #aab0c8 0 1px, transparent 1px calc(100% / var(--volume-detent-count, 20)));
+  position: relative;
+}
+body.sb2-frontend .toolbar-volume-ticks::after {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 1px;
+  background: #aab0c8;
+  content: "";
+}
 body.sb2-frontend .toolbar-volume-popover output { align-self: flex-end; color: #aab0c8; font: var(--sb-control-font-size)/1 var(--mono-font-family); }
 body.sb2-frontend #tree-root.tree-root {
   min-height: 0;

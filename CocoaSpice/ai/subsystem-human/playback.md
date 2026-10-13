@@ -30,6 +30,7 @@
 - Random playback has three toolbar states: off, random selection from the indexed library, and random selection from the current playlist. All three toolbar glyphs are native SF Symbols.
 - Random Library queues the requested playback action while a small track-count-weighted library pool loads, so Next and end-of-track advance cannot race an empty asynchronous pool or require hydrating the entire indexed library.
 - App Volume and Mono are applied by the bundled VGMBoy core. App Volume attenuates only CocoaSpice playback; Mono averages the rendered left and right channels and outputs that signal to both speakers.
+- Main-toolbar Volume opens a slider with twenty 5% detents; the toolbar icon and its popover report the current playback volume.
 
 ## Timing
 

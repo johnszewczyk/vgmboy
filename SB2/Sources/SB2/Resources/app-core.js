@@ -30,6 +30,7 @@ const DEFAULT_COLUMN_WIDTHS = Object.freeze({
 });
 const DEFAULT_COLUMN_VISIBILITY = Object.freeze(Object.fromEntries(COLUMN_DEFS.map((column) => [column.id, true])));
 const EQUALIZER_BAND_FREQUENCIES = Object.freeze([31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]);
+const PLAYBACK_VOLUME_DETENT_COUNT = Math.max(1, Math.round(Number(window.spcBoySB2?.volumeDetentCount) || 20));
 const playbackSpeed = window.SB2PlaybackSpeed;
 
 const state = {
@@ -299,6 +300,7 @@ const refs = {
   toolbarVolumeButton: document.getElementById("toolbar-volume-button"),
   toolbarVolumePopover: document.getElementById("toolbar-volume-popover"),
   toolbarVolumeInput: document.getElementById("toolbar-volume-input"),
+  toolbarVolumeTicks: document.getElementById("toolbar-volume-ticks"),
   toolbarVolumeValue: document.getElementById("toolbar-volume-value"),
   monoEnabledCheckbox: document.getElementById("mono-enabled-checkbox"),
   previousButton: document.getElementById("previous-button"),
@@ -334,6 +336,10 @@ const refs = {
   sb2CPUFill: document.getElementById("sb2-cpu-fill"),
   playbackErrorToast: document.getElementById("playback-error-toast")
 };
+
+if (refs.appVolumeInput) refs.appVolumeInput.step = String(1 / PLAYBACK_VOLUME_DETENT_COUNT);
+if (refs.toolbarVolumeInput) refs.toolbarVolumeInput.step = String(100 / PLAYBACK_VOLUME_DETENT_COUNT);
+refs.toolbarVolumeTicks?.style.setProperty("--volume-detent-count", String(PLAYBACK_VOLUME_DETENT_COUNT));
 
 async function loadSettings() {
   try {
@@ -560,7 +566,9 @@ function normalizeEqualizerGain(value) {
 
 function normalizeAppVolume(value) {
   const numeric = Number(value);
-  return Number.isFinite(numeric) ? Math.round(Math.max(0, Math.min(1, numeric)) * 20) / 20 : 1;
+  return Number.isFinite(numeric)
+    ? Math.round(Math.max(0, Math.min(1, numeric)) * PLAYBACK_VOLUME_DETENT_COUNT) / PLAYBACK_VOLUME_DETENT_COUNT
+    : 1;
 }
 
 function normalizeArchiveCacheLimit(value) {
