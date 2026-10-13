@@ -35,14 +35,13 @@ The native header fields and version byte follow the
   count is not sufficient: direct comparison found all 72 Medarot 4 sidecar
   titles differ from the corresponding master-queue titles. Parser support
   alone does not establish that a source set is coherent or canonical.
-  Metadata uncertainty does not block byte-preserving UAC packaging when the
-  GBS payloads pass header validation; retain every original member and
-  classify unresolved fields in the per-set report.
-  MetaMan converts
-  fractional play, loop, and fade times to integer milliseconds, and reads
-  NEZplug's loop-duration, loop-start, and whole-play loop forms. When rows
-  conflict, ambiguous fields are omitted and diagnosed. Retain the original
-  M3U and keep conflicting projections held for review.
+  Metadata uncertainty does not block UAC packaging when the GBS payloads pass
+  header validation; preserve playable GBS bytes and classify unresolved
+  fields in the per-set report.
+  MetaMan uses M3U rows only for source track indexes, titles, queue order,
+  and useful factual comments. It ignores all time, loop, fade, and repeat
+  columns, and bundled UAC M3Us omit those columns too. Keep the exact source
+  archive linked by `sources[]` as the original M3U evidence.
 
 ## Field Mapping
 
@@ -63,36 +62,34 @@ The native header fields and version byte follow the
 | M3U `# @GENRE value` | Genre | `game.metadata["Genre"]` | Promote only when present and unambiguous. |
 | M3U `# @COPYRIGHT value` | Copyright | `game.metadata["Copyright"]` | Compare with the GBS header comment; keep a conflicting value in the attached M3U for review. |
 | M3U `::GBS,index,title,...` title | Title | `playlists[].entries[].title` | Source track title, retained as written. Do not split embedded composer, game, publisher, or copyright text out of the title. |
-| M3U source index and row order | Playlist `trackIndex` and entry order | `playlists[].entries[].trackIndex` | GBS indexes are zero-based, including hexadecimal indexes. Keep entries in the M3U's row order; do not sort them by source index or create a second Track Number tag. |
-| M3U row, source path, and authored values | M3U | `playlists[].entries[].extraFields["M3U"]` | Keep the tag name exactly `M3U`; do not split or title-case the acronym. Keep the exact raw row, source M3U path, populated raw timing/count fields, and positive millisecond projections together in one nested JSON value. Do not expose separate M3U timing tags or duplicate raw fields at entry level. |
-| M3U time, loop, fade columns | M3U timing properties | `playlists[].entries[].extraFields["M3U"]` | Convert fractional final time components to integer milliseconds. A loop-start value marked with `-` maps to Intro Length; do not infer a loop duration from it. A bare `-` sets Loop Length equal to Play Length. Missing or invalid times stay absent. Keep raw strings and repeat counts in the nested value and the original M3U attachment byte-exact. |
+| M3U source index and row order | Playlist `trackIndex`, entry `title`, and entry order | `playlists[].entries[]` | Preserve the zero-based GBS source index, including hexadecimal source notation after conversion to decimal. Copy the authored track title exactly. Keep the entry array in the authored master-queue order; when no multi-row queue exists, use GBS source-index order. Do not add a duplicate Track Number tag. |
+| M3U comments with useful shared facts | Canonical package tags | `game.metadata` | Use the explicit mappings above for populated, unambiguous factual comments. Preserve source values; omit blank and unknown comments. |
+| M3U source path | Attachment provenance | `members[].path` and playlist `originalMemberPath` | Keep the M3U attachment with rows reduced to file reference, source index, and title; retain factual comments. The exact M3U remains in the source archive linked by `sources[]`. |
+| M3U time, loop, fade, and repeat columns | Removed | — | Do not parse, store, surface, bundle, or use authored play length, loop, loop-start, fade, or repeat values for GBS. Do not compare them when deciding whether two GBS rips are the same. These are arbitrary listening hints, not intrinsic GBS data. |
 | GBS header version byte | Format | `playlists[].entries[].extraFields["Format"]` | Use `GBS v.<version>` on every logical track, for example `GBS v.1`. Read the byte from that physical member; never normalize versions. |
 | GBS member filename stem beginning with `DMG-` or `CGB-` | Catalog | `game.metadata["Catalog"]` | Preserve the exact stem, including prefix and suffix (for example, `DMG-AIPE-USA`). Set it once at package scope when all included GBS members share one code. Do not infer it from a title, No-Intro ID, or region. Different codes in one package require review. |
 
 ## Application Behavior
 
 - **MetaMan** reads the fixed GBS header and matching NEZplug extended-M3U
-  rows. It preserves the header game/artist/copyright fields separately from
-  M3U comments, retains source timing strings, and parses fractional
-  milliseconds. One-row M3Us are per-track annotations; only multi-row M3Us
-  define competing queue orders. When a queue exists, its row order controls
-  playlist order. If only annotations exist, source GBS index controls order.
-  Shared comments are resolved by track index, so absent comments in a sidecar
-  do not create false conflicts. Conflicting populated comments or duplicate
-  row values remain diagnosed and unpromoted.
+  rows for track indexes, authored titles, and useful comments. It does not
+  interpret GBS M3U timing columns. One-row M3Us annotate a track; a multi-row
+  master queue sets playlist order. If no master queue exists, source GBS index
+  sets order. Shared comments resolve by track index, so absent sidecar
+  comments do not create false conflicts. Conflicting titles or populated
+  factual comments remain diagnosed and unpromoted.
 - **UACMan writer** places shared header identity in package `game.metadata`
-  and `Title`, `Format`, and the single nested `M3U` value on each logical
-  playlist entry. A one-track GBS still gets an explicit subsong entry. The
+  and source `Title`, `Format`, `trackIndex`, and playlist order on each
+  logical playlist entry. It omits M3U timing and nested `M3U` tags. A
+  one-track GBS still gets an explicit subsong entry. The
   Tag Analyzer reads and edits first-class playlist titles and entry
-  `extraFields`, including the nested M3U JSON, in their original playlist
-  entry scope.
+  `extraFields` in their original playlist-entry scope.
 - **MetaMan UAC reader and ScanSong** expand each mapped subsong to one logical
-  track row. They expose `Format` and nested `M3U` with the track, and convert
-  the nested positive millisecond values back to the playback timing API. A
-  missing timing value remains missing.
+  track row. They expose source `Title`, `Format`, source track index, and
+  queue order. GBS entries never produce playback timing or loop values.
 - **AudioMan Songbase** retains the ordered source playlist JSON in
-  `uac_package_manifests.playlists_json` and indexes first-class title plus
-  per-entry metadata under `archive_metadata_fields` as
+  `uac_package_manifests.playlists_json` and indexes first-class title,
+  source track index, and per-entry metadata under `archive_metadata_fields` as
   `uac-playlist-entry`. This is a manifest projection; ingestion does not
   rehash the GBS payload or count one physical GBS member once per subsong.
 - **Dashboard reports** continue to record per-set results, discrepancies,
@@ -121,14 +118,16 @@ The native header fields and version byte follow the
   pass signature, header-length, nonzero-version, and nonzero-track-count
   checks can be wrapped even when source metadata needs later review. Bucket
   the uncertainty in the AudioMan set report; packaging does not resolve the
-  case. Preserve every source member byte-for-byte, including all M3Us and
-  unexplained companions. Project only populated, unambiguous source-backed
-  fields. Omit conflicting playlist/header fields and non-ASCII fixed-header
-  strings until resolved; retain their exact bytes in the GBS and M3U
-  attachments. Add one logical playlist entry per declared track with
+  case. Preserve every playable GBS member byte-for-byte. Sanitize timing
+  columns from bundled M3Us while retaining row facts; preserve other
+  unexplained companions byte-for-byte. Project only populated, unambiguous
+  source-backed fields. Omit conflicting playlist/header fields and non-ASCII
+  fixed-header strings until resolved; the exact source GBS remains bundled,
+  and the source archive remains linked for the original M3U bytes. Add one
+  logical playlist entry per declared track with
   `Format` on every entry and retain the four playable-payload hashes for
-  every physical GBS. If no unambiguous M3U supplies a track title or timing,
-  leave those fields absent. Do not add a `Game ID` until the canonical title
+  every physical GBS. If no unambiguous M3U supplies a track title, leave it
+  absent. Do not add a `Game ID` until the canonical title
   root has positive No-Intro evidence. Keep each unresolved package in its
   uncertainty bucket and case report. Metadata uncertainty alone does not
   create a `Status` tag; use a non-empty `Status` only for the established
@@ -149,7 +148,7 @@ The native header fields and version byte follow the
   identify a character encoding. ASCII values can be projected normally. For
   non-ASCII bytes, MetaMan omits that individual decoded field; do not assume
   UTF-8 or Windows-1252 and do not surface mojibake. Preserve the source GBS
-  unchanged, include exact bytes in the header-encoding bucket, and hold
+  unchanged, include exact GBS bytes in the header-encoding bucket, and hold
   decoded values until the encoding is verified for that source. A CP932 rendering may be
   shown as a review aid, but it is not approved metadata until confirmed.
 - **Format version** — Read version byte `0x03` for every physical GBS and
@@ -178,10 +177,11 @@ The native header fields and version byte follow the
   load/init/play addresses and timer bytes as validation evidence only; do
   not promote them to user-facing tags. Treat `?`, `<?>`, and `< ? >` header
   placeholders as absent so they do not block a populated M3U value.
-- **M3U files** — Preserve every source M3U byte-for-byte as a package
-  attachment, including multiple M3Us that refer to the same GBS. Their rows
-  can carry track names and playback timing, so they are not disposable
-  generated queues. Preserve original names and paths in source provenance.
+- **M3U files** — Retain applicable M3Us as package attachments, including
+  multiple M3Us that refer to the same GBS. In each UAC copy, remove timing,
+  loop, fade, and repeat columns while retaining file references, source
+  indexes, titles, authored order, and factual comments. The linked source
+  archive preserves the exact original M3U bytes.
   A row reference may omit the final `.gbs` suffix; resolve it to an exact,
   case-insensitive member stem only when that identifies one physical GBS.
   Hold a source package with colliding member stems for review.
@@ -189,56 +189,41 @@ The native header fields and version byte follow the
   `::KSS` row names a `.gbs` file, resolve the exact path and validate the
   target's GBS signature, record a source marker mismatch, and hold the package.
   Do not silently coerce the marker or project that row as GBS until an
-  explicit recovery rule exists; retain the original M3U byte-for-byte.
-  Store each applicable row in one Title Case nested `M3U` JSON value on its
-  playlist entry. Include `Source Path`, `Raw Row`, populated raw `Play Time`,
-  `Loop`, `Loop Start`, `Fade`, and `Loop Count`, plus positive
-  `Play Length (ms)`, `Intro Length (ms)`, `Loop Length (ms)`, and
-  `Fade Length (ms)` projections. Keep the first-class entry `title` and
-  wrapper timing projections usable by playback; do not flatten the M3U fields
-  into separate entry tags. When one M3U applies to the package playlist,
-  `originalMemberPath` identifies it and `Source Path` is omitted from each
-  row. When several M3Us apply, per-entry `Source Path` disambiguates them.
+  explicit recovery rule exists; retain factual row data and report the marker
+  mismatch. Timing columns are still removed from the bundled copy.
+  Copy each resolved track title to the first-class playlist entry `title`;
+  retain its zero-based source index in `trackIndex` and preserve the authored
+  queue in entry-array order. Do not create a nested `M3U` tag, duplicate
+  Track Number tag, raw row, or timing projection. Shared factual comments use
+  the explicit package mappings above. `originalMemberPath` and the bundled
+  M3U member preserve source-path provenance.
 - **M3U row conflicts** — Compare all rows for the same GBS member and
-  zero-based index. If titles, comments, or timings disagree, retain the
+  zero-based index. If titles or factual comments disagree, retain the
   competing source rows and route the track/package to its own case review.
-  Do not silently select the richest row, merge rows, or treat a second title
-  as a duplicate without evidence. A one-row sidecar annotates its referenced
+  Differences in time, loop, fade, or repeat columns are discarded and do not
+  create a conflict or distinguish same-stream rips. Do not silently select the richest row, merge rows, or
+  treat a second title as a duplicate without evidence. A one-row sidecar annotates its referenced
   track and does not assert queue order. Preserve the order from the authored
   multi-row queue; hold repeated indexes or genuinely different multi-row
-  queue orders for review. Capturing an authored loop value records what the
-  source says, not that listening has confirmed its correctness. Leave that
-  judgment open for listening where needed; never invent a loop value.
+  queue orders for review.
   Also compare every multi-row master M3U directly with matching one-row
   sidecars. Reader diagnostics alone are not a sufficient conflict check:
   Medarot 4's 72 master titles and 72 sidecar titles differ even though the
-  preflight reported zero reader conflicts. Retain both source forms in the
-  attachment and hold the package until the authoritative displayed title is
+  preflight reported zero reader conflicts. Retain both factual forms in the
+  review evidence and hold the package until the authoritative displayed title is
   selected.
-- **Cross-format loop evidence** — A VGMRIPS VGM may corroborate GBS loop data
-  when its GD3 `Comment` identifies the exact GBS source filename and
-  zero-based subsong index, and the track title also aligns. Compare loop
-  presence and loop samples with the authored M3U `Play Length`, `Loop`, and
-  `Loop Start` values using the [VGM profile](VGM.md). A game-title match alone
-  is only a candidate. Treat the VGM as separate captured evidence: never copy
-  its loop marker into GBS metadata, and leave missing GBS loop values absent.
-  Record mismatches or unavailable source provenance in the per-set report for
-  review.
-- **Timing** — M3U timing is playback data attached to the logical track.
-  MetaMan converts play, loop, and fade values, including a fractional final
-  component with up to millisecond precision, to integer milliseconds.
-  Preserve both those projections and their authored source strings under the
-  nested `M3U` value. A trailing hyphen on the loop field marks a loop start;
-  a bare hyphen means the loop duration equals play length. Invalid or absent
-  timing stays absent; GBS header-only tracks have no known duration and must
-  not receive a 150-second fallback.
+- **GBS duplicates** — Compare physical GBS member identity and multiplicity.
+  M3U timing values never distinguish rips. Track names, source indexes, and
+  queue order remain separate curation facts and must be checked before
+  selecting a title/order projection when sources disagree.
 - **Composite titles and comments** — Keep a composite M3U title as one Title
   value. Promote a recognized, populated `# @KEY` value only through an
   explicit useful-field mapping with canonical Title Case tag names. Current
   shared mappings are Title, Artist, Date, Year, Composer, Ripper, Tagger,
   Developer, Publisher, Genre, and Copyright. Do not surface raw lower-case
   source keys, empty values, placeholders, freeform comments, unknown keys, or
-  parser diagnostics as UAC tags; retain the original M3U attachment.
+  parser diagnostics as UAC tags; retain the sanitized M3U attachment and
+  exact source-archive link.
 - **Related but separate members** — These are not GBS tracks and must not be
   folded into a GBS package or counted as GBS duplicates:
 
@@ -265,29 +250,33 @@ The native header fields and version byte follow the
   confirm they are not counted as GBS tracks or silently discarded. Treat a
   mismatched `.gbs` suffix as a review item.
 - **Playlist mapping** — Resolve every M3U row to one member and an in-range
-  zero-based track index. Preserve order and raw row text. Treat one-row
-  files as track annotations. Hold repeated indexes, out-of-range references,
-  or conflicting multi-row queue orders for review; retain all sidecars and
-  report missing, duplicate, or conflicting references.
+  zero-based track index. Preserve title, source index, and authored queue
+  order. Treat one-row files as track annotations. Hold repeated indexes,
+  out-of-range references, conflicting titles, or competing queue orders for
+  review; retain sanitized M3U attachments and report missing, duplicate, or
+  conflicting references.
+  Verify the track-index/title/order sequence before treating same-stream
+  representations as metadata-equivalent.
 - **M3U reader coverage** — Confirm every authored row was actually projected
-  into the UAC playlist. Compare source row totals, indexes, titles, and timing
-  across master M3Us and one-row sidecars, even if the reader emits no
-  diagnostic. Hold `::KSS` rows that reference validated `.gbs` members as
-  marker mismatches; do not coerce their marker or discard their timing.
-- **Timing fidelity** — Compare source timing strings with UAC playlist
-  entries. Confirm fractional seconds and both loop syntaxes convert without
-  truncation, conflicting values are omitted, repeat counts remain available
-  in the source M3U attachment, and absent values stay absent without a
-  150-second fallback.
+  into the UAC playlist. Compare source row totals, indexes, titles, and queue
+  order across master M3Us and one-row sidecars, even if the reader emits no
+  diagnostic. Ignore timing-column differences. Hold `::KSS` rows that
+  reference validated `.gbs` members as marker mismatches; retain their
+  sanitized M3U attachment without interpreting its timing columns.
+- **Timing omission** — Confirm no GBS playlist entry, nested tag, member tag,
+  or playback projection contains play length, loop, loop start, fade, repeat,
+  or other authored timing values, and no bundled M3U row retains those
+  columns. The source archive linked through `sources[]` is the byte-exact
+  evidence. Timing differences never distinguish same-stream rips.
 - **Tag scope** — Confirm Album and Album Artist are shared only when their
   source values agree, track titles remain attached to the correct index, and
   no empty, inferred, or diagnostic tags were added.
 - **Catalog** — When all playable GBS members in a package share one
   `DMG-`/`CGB-` filename stem, confirm that exact stem is present once as
   package `Catalog`; hold differing member codes and do not infer the value.
-- **UAC review** — Verify Format and M3U are visible on each logical track,
+- **UAC review** — Verify Title and Format are visible on each logical track,
   package metadata stays at package scope, hashes are visible
-  in Stream Hashes, and source M3Us remain available as package attachments.
+  in Stream Hashes, and sanitized M3Us remain available as package attachments.
   The Tag Analyzer's playable-track count and playlist-entry rows expose
   subsong metadata; the physical-member Tracks grid can show one GBS file for
   many logical subsongs. Keep affected conversions held until competing M3U

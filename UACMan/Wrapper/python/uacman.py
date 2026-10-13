@@ -1270,10 +1270,11 @@ def harvest_format_metadata(
                         "Intro Length (ms)", "Loop Length (ms)",
                         "Play Length (ms)", "Fade Length (ms)",
                     }:
-                        # Keep M3U-authored timing together under one expandable
-                        # track tag; the UAC reader projects these values back
-                        # into its common timing interface.
-                        m3u_fields[key] = value
+                        # NSF M3U timing remains part of its playback profile.
+                        # GBS M3U timing is an arbitrary listening hint and is
+                        # intentionally omitted from UAC metadata.
+                        if extension == "nsf":
+                            m3u_fields[key] = value
                         continue
                     matching_member_key = next(
                         (
@@ -1285,17 +1286,7 @@ def harvest_format_metadata(
                     if matching_member_key is not None and member_metadata[matching_member_key] == value:
                         continue
                     extra_fields[key] = value
-                if extension in {"nsf", "gbs"}:
-                    if extension == "gbs" and source_playlist_path and len(original_playlist_paths) > 1:
-                        source_path = original_member_path(source_playlist_path, member_path_map)
-                        if not safe_relative_path(source_path) or source_path not in all_member_paths:
-                            raise UACError(
-                                f"GBS M3U source is not included as a UAC member: {source_playlist_path}"
-                            )
-                        source_path = variant_member_path(
-                            source_path, variant_id, recipe.get("variants", [])
-                        )
-                        m3u_fields["Source Path"] = source_path
+                if extension == "nsf":
                     for source_key, tag_name in (
                         ("rawLine", "Raw Row"),
                         ("lengthRaw", "Play Time"),
