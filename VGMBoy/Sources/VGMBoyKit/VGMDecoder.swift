@@ -18,7 +18,7 @@ enum VGMDecoderError: LocalizedError {
     }
 }
 
-/// Wraps the libvgm core (VGM/VGZ/GYM/S98/DRO) through the CLibVGM bridge.
+/// Wraps the libvgm core (VGM/VGZ/S98/DRO) through the CLibVGM bridge.
 /// Single-track. The bridge handles VGZ gzip decompression internally.
 final class VGMDecoder: AudioDecoder, @unchecked Sendable {
     // The bridge exposes libvgm's natural timing, but its PlayerA wrapper

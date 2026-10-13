@@ -91,7 +91,7 @@
 | Control | Detail | Value field | Default |
 | --- | --- | --- | --- |
 | [ ] `libgme` | `SPC, NSF/NSFE, GBS, HES, KSS, and AY` | `[text field: 1]` | `1×` |
-| [ ] `libvgm` | `GYM, S98, VGM, VGZ, and DRO` | `[text field: 1]` | `1×` |
+| [ ] `libvgm` | `S98, VGM, VGZ, and DRO` | `[text field: 1]` | `1×` |
 
 **Tempo field format:** placeholder `1`, rounded-border style, width `72`.  
 **Accepted input:** fractions and decimals.  
