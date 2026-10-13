@@ -38,6 +38,9 @@ content strings for column measurement.
   used by timestamp-bearing projections such as playback history.
 - Empty title, game, author, system, and duration values use the visible
   fallbacks (`displayName`, group name, `—`, `—`, `—`) in every frontend.
+- When a catalog row has no System metadata value, the visible projection uses
+  its recognized `browserSystem` when present before falling back to `—`. The
+  source metadata remains unchanged.
 - There are no AppKit, SwiftUI, WebKit, DOM, decoder, scanner, write, or
   playback dependencies.
 

@@ -20,6 +20,8 @@ Playlist-tab ordering, activation, and saved order.
   create those tabs on first use.
 - Tabs divide the available strip width equally, with a 76-point minimum width
   that enables horizontal scrolling when the full set no longer fits.
+- Clicking anywhere in the tab tile activates it; the close control remains a
+  separate hit target.
 - Playlist-tab commands enumerate tab values by stable identity and activate by
   ID; do not capture numeric indices into the mutable tab array.
 - Preserve each tab's title, queue, and selection while changing its position.

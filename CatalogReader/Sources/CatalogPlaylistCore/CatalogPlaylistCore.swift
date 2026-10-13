@@ -117,7 +117,7 @@ public enum CatalogPlaylistReader {
         COALESCE(m.title, '') AS title,
         COALESCE(NULLIF(m.game, ''), NULLIF(t.browser_game, ''), '') AS game,
         COALESCE(m.author, '') AS author,
-        COALESCE(m.system, '') AS system,
+        COALESCE(NULLIF(m.system, ''), NULLIF(t.browser_system, ''), '') AS system,
         COALESCE(m.comment, '') AS comment,
         COALESCE(m.intro_length_ms, 0) AS intro_length_ms,
         COALESCE(m.loop_length_ms, 0) AS loop_length_ms,

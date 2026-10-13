@@ -369,7 +369,7 @@ extension LibraryDatabase {
             metadata[track.id] = TrackMetadata(
                 game: row.game,
                 song: row.title,
-                system: row.system,
+                system: row.display.systemText,
                 author: row.author,
                 comment: row.comment,
                 introLengthMs: row.introLengthMilliseconds,
