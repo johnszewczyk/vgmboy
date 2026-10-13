@@ -38,9 +38,7 @@ private enum CatalogSnapshot: Sendable {
             let reader = try CanonicalCatalogReader(databaseURL: databaseURL)
             let summary = reader.summary
             let roots = try reader.roots()
-            let tallies = try Dictionary(uniqueKeysWithValues: roots.map {
-                ($0.id, try reader.scanTally(rootID: $0.id))
-            })
+            let tallies = try reader.scanTallies()
             return .loaded(summary, roots, tallies)
         } catch {
             return .failure(error.localizedDescription)
@@ -107,12 +105,9 @@ final class ScannerAppModel: ObservableObject {
         } else {
             databaseURL = Self.defaultCatalogURL()
         }
-        let knownExtensions = Set(ScannerFormatPolicy.knownUnsupportedFileTypes.map(\.id))
-        let storedExtensions = UserDefaults.standard.stringArray(forKey: Self.ignoredFileTypesKey) ?? []
-        ignoredFileExtensions = Set(storedExtensions.map(ScannerFormatPolicy.normalize)).intersection(knownExtensions)
-        if storedExtensions.isEmpty {
-            ignoredFileExtensions = ScannerFormatPolicy.defaultIgnoredExtensions
-        }
+        ignoredFileExtensions = ScannerFormatPolicy.ignoredExtensions(
+            savedSelection: UserDefaults.standard.stringArray(forKey: Self.ignoredFileTypesKey)
+        )
         isMaintaining = true
         operationStartedAt = Date()
         scanStatus = "Opening catalog…"
@@ -212,7 +207,7 @@ final class ScannerAppModel: ObservableObject {
     }
 
     var progressFraction: Double? {
-        operationProgress?.fraction
+        isCancelling ? nil : operationProgress?.fraction
     }
 
     func chooseCatalog() {
@@ -875,6 +870,9 @@ final class ScannerAppModel: ObservableObject {
                 currentFile = (candidate as NSString).lastPathComponent
             }
         }
+        // Retain live source/detail telemetry while the worker reaches its
+        // checkpoint boundary, without replacing the cancellation message.
+        guard !isCancelling else { return }
         switch update.phase {
         case .preparing: scanStatus = "Preparing catalog…"
         case .discovery: scanStatus = "Discovering supported sources…"

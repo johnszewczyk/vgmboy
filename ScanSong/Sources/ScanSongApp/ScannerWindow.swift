@@ -157,7 +157,9 @@ struct ScannerWindow: View {
                 HStack(spacing: 8) {
                     ProgressView()
                         .controlSize(.small)
-                    Text("\(progress.operation.rawValue) • \(progress.phaseLabel)")
+                    Text(model.isCancelling
+                         ? "Scan • Cancelling safely"
+                         : "\(progress.operation.rawValue) • \(progress.phaseLabel)")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.white)
                     Spacer(minLength: 8)

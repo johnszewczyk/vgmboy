@@ -33,14 +33,11 @@ export CLANG_MODULE_CACHE_PATH="$MODULE_CACHE"
 export SWIFTPM_MODULECACHE_OVERRIDE="$MODULE_CACHE"
 export XDG_CACHE_HOME="$BUILD_DIR/cache"
 
-swift build --package-path "$SCRIPT_DIR" --build-path "$BUILD_DIR" --disable-sandbox --configuration release --product ScanSong
-BIN_DIR="$BUILD_DIR/arm64-apple-macosx/release"
-if [[ ! -x "$BIN_DIR/ScanSong" ]]; then
-    BIN_DIR="$(swift build --package-path "$SCRIPT_DIR" --build-path "$BUILD_DIR" --disable-sandbox --configuration release --show-bin-path)"
-fi
-[[ -x "$BIN_DIR/ScanSong" ]] || { echo "Missing clean-built executable: $BIN_DIR/ScanSong" >&2; exit 1; }
+swift build --package-path "$SCRIPT_DIR" --build-path "$BUILD_DIR" --disable-sandbox --configuration release --product ScanSongApp
+BIN_DIR="$(swift build --package-path "$SCRIPT_DIR" --build-path "$BUILD_DIR" --disable-sandbox --configuration release --show-bin-path)"
+[[ -x "$BIN_DIR/ScanSongApp" ]] || { echo "Missing clean-built executable: $BIN_DIR/ScanSongApp" >&2; exit 1; }
 
-install -m 755 "$BIN_DIR/ScanSong" "$APP_DIR/Contents/MacOS/ScanSong"
+install -m 755 "$BIN_DIR/ScanSongApp" "$APP_DIR/Contents/MacOS/ScanSong"
 install -m 644 "$SCRIPT_DIR/Resources/Info.plist" "$APP_DIR/Contents/Info.plist"
 [[ -x "$VGMBoy_SCANNER_PLUGIN_BUILDER" ]] || { echo "Missing VGMBoy scanner plugin builder: $VGMBoy_SCANNER_PLUGIN_BUILDER" >&2; exit 1; }
 "$VGMBoy_SCANNER_PLUGIN_BUILDER"
