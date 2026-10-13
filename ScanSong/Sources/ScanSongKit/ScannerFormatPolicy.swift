@@ -58,6 +58,13 @@ public enum ScannerFormatPolicy {
     public static let defaultIgnoredExtensions: Set<String> =
         Set(knownUnsupportedFileTypes.map(\.id))
 
+    /// A missing preference uses the defaults; an authored empty selection
+    /// means that the user wants unsupported files reported in the scan log.
+    public static func ignoredExtensions(savedSelection: [String]?) -> Set<String> {
+        guard let savedSelection else { return defaultIgnoredExtensions }
+        return Set(savedSelection.map(normalize)).intersection(defaultIgnoredExtensions)
+    }
+
     public static func normalize(_ value: String) -> String {
         value.trimmingCharacters(in: CharacterSet(charactersIn: ". ")).lowercased()
     }

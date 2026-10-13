@@ -56,6 +56,8 @@
   shows the current phase, a live elapsed clock, and an activity indicator.
   Scan and link checks show source/item and failure counts when available.
   Scan cancellation remains available while the worker is stopping.
+- Cancelling shows `Cancelling safely` and ongoing activity until the scanner
+  reaches its checkpoint boundary. Incoming file details remain visible.
 - The linear bar shows a source fraction only while planning or inspecting
   with a known source total. Saving checkpoints reports a separate saved
   count; discovery, archive work, publication, and cleanup show ongoing
@@ -88,6 +90,8 @@
   Checked types are ignored before discovery and archive-member inspection;
   supported formats remain active so malformed files still appear in the scan
   result and last-result log.
+- An empty ignore selection remains empty after restarting the app. Defaults
+  apply when no selection has been saved.
 - The ignore selection is persisted in ScanSong preferences. Explicitly ignored
   files are recorded in the post-operation scan log. Archive members without a
   scanner route are grouped as `unrecognized` diagnostics unless they are known

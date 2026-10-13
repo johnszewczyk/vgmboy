@@ -21,6 +21,8 @@ Scanner data and checkpoint rules remain in [scanner-contract.md](scanner-contra
   creation run off the main actor. The worker returns one snapshot of roots and
   tallies; the model applies it on the main actor. A busy operation disables
   conflicting controls while leaving the window and scan cancellation live.
+- Catalog snapshots load the inventory tallies for all attached roots in one
+  query, including empty and disabled paths.
 - Scanner and link-maintenance callbacks publish into a lock-protected
   latest-value buffer. The main actor samples at 250 ms. Neither callbacks nor
   view animation wait for a render or reduce worker throughput.
@@ -46,6 +48,9 @@ Scanner data and checkpoint rules remain in [scanner-contract.md](scanner-contra
 - Scan cancellation requests a checkpoint-safe stop and waits for child
   processes; catalog maintenance and path changes finish their current
   database operation before the app closes.
+- Progress callbacks continue updating file/detail telemetry during scan
+  cancellation, while the cancellation label and indeterminate meter remain
+  visible until the worker finishes.
 - A completed source fraction does not imply catalog publication or UI
   completion. Keep phase and completion telemetry separate from the source
   meter.

@@ -1938,6 +1938,20 @@ func gameCubeFixturesInspectThroughVGMStream() async throws {
     ]))
 }
 
+@Test func ignoredFileTypeSelectionPreservesAnAuthoredEmptyPreference() {
+    let suiteName = "ScanSong-ignore-preferences-\(UUID().uuidString)"
+    let preferences = UserDefaults(suiteName: suiteName)!
+    defer { preferences.removePersistentDomain(forName: suiteName) }
+    let key = "ignoredFileTypes"
+    #expect(ScannerFormatPolicy.ignoredExtensions(savedSelection: preferences.stringArray(forKey: key))
+            == ScannerFormatPolicy.defaultIgnoredExtensions)
+
+    preferences.set([String](), forKey: key)
+    #expect(ScannerFormatPolicy.ignoredExtensions(savedSelection: preferences.stringArray(forKey: key)).isEmpty)
+    preferences.set([" .SGC ", "wav", "obsolete"], forKey: key)
+    #expect(ScannerFormatPolicy.ignoredExtensions(savedSelection: preferences.stringArray(forKey: key)) == ["sgc"])
+}
+
 @Test func ignoredFileTypePolicySkipsOnlyConfiguredExtensions() async throws {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("ScanSong-ignore-policy-\(UUID().uuidString)", isDirectory: true)
@@ -2948,6 +2962,48 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
     #expect(try writer.clearDeadLinks() == 1)
     #expect(try writer.roots().first?.deadSourceCount == 0)
     #expect(try CanonicalCatalog.inspect(databaseURL: databaseURL).trackCount == 0)
+}
+
+@Test func catalogBatchTalliesMatchIndividualCountsForAttachedPaths() async throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ScanSong-batch-tallies-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let populated = directory.appendingPathComponent("Populated", isDirectory: true)
+    let empty = directory.appendingPathComponent("Empty", isDirectory: true)
+    let detached = directory.appendingPathComponent("Detached", isDirectory: true)
+    for root in [populated, empty, detached] {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    }
+    let missing = populated.appendingPathComponent("Missing.spc")
+    try makeSPCFile(id666Flag: 0x1A).write(to: missing)
+    try makeSPCFile(id666Flag: 0x1A).write(to: populated.appendingPathComponent("Present.spc"))
+    try Data([0]).write(to: populated.appendingPathComponent("Broken.spc"))
+    let databaseURL = directory.appendingPathComponent("Library.sqlite")
+    let result = try await CatalogScanner(databaseURL: databaseURL).scan(rootURL: populated, mode: .newScan)
+    #expect(result.failures.count == 1)
+
+    let writer = try CanonicalCatalogWriter(databaseURL: databaseURL)
+    let emptyRoot = try writer.addRoot(path: empty.path)
+    let detachedRoot = try writer.addRoot(path: detached.path)
+    try writer.removeRoot(id: detachedRoot.id)
+    try writer.setRootEnabled(id: result.root.id, enabled: false)
+    try FileManager.default.removeItem(at: missing)
+    _ = try writer.testFiles()
+
+    let reader = try CanonicalCatalogReader(databaseURL: databaseURL)
+    let tallies = try reader.scanTallies()
+    let roots = try reader.roots()
+    #expect(Set(tallies.keys) == Set(roots.map(\.id)))
+    #expect(tallies[detachedRoot.id] == nil)
+    for root in roots {
+        #expect(tallies[root.id] == (try reader.scanTally(rootID: root.id)))
+    }
+    #expect(tallies[emptyRoot.id]?.sourceCount == 0)
+    #expect(tallies[emptyRoot.id]?.activeSourceCount == 0)
+    #expect(tallies[result.root.id]?.sourceCount == 3)
+    #expect(tallies[result.root.id]?.successfulSourceCount == 2)
+    #expect(tallies[result.root.id]?.failedSourceCount == 1)
+    #expect(tallies[result.root.id]?.inactiveSourceCount == 1)
 }
 
 @Test func resetCatalogEmptiesRootsAndIndexedTracksWithoutDeletingTheDatabaseFile() async throws {

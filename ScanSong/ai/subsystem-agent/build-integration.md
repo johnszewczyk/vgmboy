@@ -30,6 +30,13 @@ executables.
 
 ## Invariants
 
+- SwiftPM builds the GUI product as `ScanSongApp` and the JSONL CLI as
+  `scansong`. Product names must differ beyond case on the default macOS
+  filesystem. Packaging installs `ScanSongApp` as the bundle's `ScanSong`
+  executable, preserving the visible app name.
+- Packaging takes the executable directory from SwiftPM's `--show-bin-path`
+  for the selected configuration rather than preferring an existing directory
+  from another build system.
 - ScanSong never reaches into CocoaSpice, SPCBoy, or a frontend-owned helper path.
 - The app bundle contains the VGMBoy-built `vgmstream-cli`,
   `vgmboy-mdx-inspect`,

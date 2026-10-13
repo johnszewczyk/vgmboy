@@ -92,6 +92,34 @@ public final class CanonicalCatalogReader: @unchecked Sendable {
         )
     }
 
+    /// Loads every attached path in one query, including paths with no sources.
+    /// Disabled paths retain their inventory just as they do in `scanTally`.
+    public func scanTallies() throws -> [Int64: CatalogScanTally] {
+        let rows = try query(
+            """
+            SELECT r.id, COUNT(i.id),
+                   SUM(CASE WHEN i.id IS NOT NULL AND d.path IS NULL THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN i.state='successful' THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN i.state='failed' THEN 1 ELSE 0 END),
+                   COUNT(d.path)
+            FROM library_roots r
+            LEFT JOIN scan_items i ON i.root_id=r.id AND i.archive_entry=''
+            LEFT JOIN dead_sources d ON d.root_id=i.root_id AND d.path=i.path
+            WHERE r.is_attached=1
+            GROUP BY r.id;
+            """
+        ) { statement in
+            (sqlite3_column_int64(statement, 0), CatalogScanTally(
+                sourceCount: Int(sqlite3_column_int64(statement, 1)),
+                activeSourceCount: Int(sqlite3_column_int64(statement, 2)),
+                successfulSourceCount: Int(sqlite3_column_int64(statement, 3)),
+                failedSourceCount: Int(sqlite3_column_int64(statement, 4)),
+                inactiveSourceCount: Int(sqlite3_column_int64(statement, 5))
+            ))
+        }
+        return Dictionary(uniqueKeysWithValues: rows)
+    }
+
     public func metadataTagSummaries() throws -> [CatalogMetadataTagSummary] {
         let hasTagTable = try query(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='track_metadata_tags';"

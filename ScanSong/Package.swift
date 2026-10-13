@@ -8,7 +8,7 @@ let package = Package(
     products: [
         .library(name: "ScanSongKit", targets: ["ScanSongKit"]),
         .executable(name: "scansong", targets: ["scansong"]),
-        .executable(name: "ScanSong", targets: ["ScanSongApp"])
+        .executable(name: "ScanSongApp", targets: ["ScanSongApp"])
     ],
     dependencies: [
         .package(path: "../VGMBoy"),
