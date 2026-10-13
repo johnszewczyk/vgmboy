@@ -32,7 +32,7 @@ and renderer distinct.
 
 - Keep the pixel-style home controls compact: transport fills the first sidebar
   toolbar, while search shares its row with square library-view, Gallery,
-  History, Favorites, and expand/collapse controls. The bottom sidebar status bar
+  Recent, Favorites, and expand/collapse controls. The bottom sidebar status bar
   reports catalog totals.
 - Keep SPCBOY-owned Database, Interface, and Windows options separate from
   VGMBoy-owned Playback, Routing, Audio, and Diagnostics options.

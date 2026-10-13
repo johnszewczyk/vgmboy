@@ -369,7 +369,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         viewMenu.addItem(menuItem("Path View", command: .sidebarPaths, action: #selector(sidebarPaths(_:))))
         viewMenu.addItem(.separator())
         viewMenu.addItem(menuItem("Favorites Playlist", command: .favoritesPlaylist, action: #selector(favoritesPlaylist(_:))))
-        viewMenu.addItem(menuItem("Playback History", command: .playbackHistory, action: #selector(playbackHistory(_:))))
+        viewMenu.addItem(menuItem("Recent", command: .playbackHistory, action: #selector(playbackHistory(_:))))
         let galleryItem = NSMenuItem(title: "Gallery", action: #selector(galleryPlaylist(_:)), keyEquivalent: "g")
         galleryItem.keyEquivalentModifierMask = [.command, .shift]
         galleryItem.target = self

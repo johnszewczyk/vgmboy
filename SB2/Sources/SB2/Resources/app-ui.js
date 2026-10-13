@@ -402,7 +402,9 @@ function restorePlaylistTabs(value, { loadMissingGames = true, loadGalleryData =
     return true;
   }).map((tab) => ({
     id: tab.id,
-    title: typeof tab.title === "string" ? tab.title : "Playlist",
+    title: typeof tab.title === "string"
+      ? (tab.title === "History" ? "Recent" : tab.title)
+      : "Playlist",
     kind: tab.kind === "gallery" ? "gallery" : "playlist",
     playlist: Array.isArray(tab.playlist) ? tab.playlist : [],
     selectedTrackId: typeof tab.selectedTrackId === "string" ? tab.selectedTrackId : null,
@@ -2130,7 +2132,7 @@ function historyRecordToPlaylistTrack(record) {
 }
 
 async function showPlaybackHistory() {
-  if (!activateOrCreateProjectionTab("History")) return false;
+  if (!activateOrCreateProjectionTab("Recent")) return false;
   const targetTabID = state.activePlaylistTabId;
   const request = beginPlaylistContentRequest({ targetTabID, interactionGeneration: sidebarInteractionGeneration });
   const records = await window.spcBoySB2.playbackHistoryList();
@@ -2140,7 +2142,7 @@ async function showPlaybackHistory() {
   state.playlist = (Array.isArray(records) ? records : [])
     .map(historyRecordToPlaylistTrack)
     .filter(Boolean);
-  state.playlistTitle = "History";
+  state.playlistTitle = "Recent";
   state.catalogPlaylistColumnContentHints = null;
   state.catalogPlaylistSortSessionId = null;
   state.playlistSortEnabled = true;
@@ -2693,7 +2695,7 @@ function renderSidebar() {
   refs.sidebarGalleryButton?.classList.toggle("is-selected", galleryActive);
   refs.sidebarGalleryButton?.setAttribute("aria-pressed", String(galleryActive));
   const favoritesActive = state.playlistTitle === "Favorites";
-  const historyActive = state.playlistTitle === "History";
+  const historyActive = state.playlistTitle === "Recent";
   refs.sidebarFavoritesButton?.classList.toggle("is-selected", favoritesActive);
   refs.sidebarFavoritesButton?.setAttribute("aria-pressed", String(favoritesActive));
   refs.sidebarHistoryButton?.classList.toggle("is-selected", historyActive);
@@ -2867,7 +2869,7 @@ async function sortPlaylistCandidate(playlist, {
 } = {}, attempt = 0) {
   if (!shouldContinue()) return null;
   const settings = playlistSortSettings();
-  if (!settings.enabled || (settings.column === "timestamp" && title !== "History")) return playlist;
+  if (!settings.enabled || (settings.column === "timestamp" && title !== "Recent")) return playlist;
 
   const originalIDs = playlist.map((track) => String(track.id));
   const catalogProjection = columnContentHints !== null
@@ -3143,7 +3145,7 @@ function renderPlaylistHeader() {
 
   for (const column of orderedColumns()) {
     const canSortColumn = column.sortable !== false
-      && (column.id !== "timestamp" || state.playlistTitle === "History");
+      && (column.id !== "timestamp" || state.playlistTitle === "Recent");
     const th = document.createElement("th");
     th.dataset.columnId = column.id;
     th.draggable = true;

@@ -224,7 +224,7 @@ private struct CocoaSpiceCommands: Commands {
             }
             .keyboardShortcut("g", modifiers: [.command, .shift])
 
-            Button("Playback History") {
+            Button("Recent", systemImage: "clock.arrow.circlepath") {
                 model.showPlaybackHistory()
             }
             .keyboardShortcut("h", modifiers: [.command, .shift])

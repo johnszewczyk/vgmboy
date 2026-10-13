@@ -6,7 +6,7 @@
 - Nine playback, audio, and Options controls share the first sidebar toolbar at
   equal widths. The Volume control opens a 100px popup slider in 5% steps.
   Search shares the next toolbar with five square buttons for Console/Path
-  view, Gallery, History, Favorites, and expand/collapse; the search field
+  view, Gallery, Recent, Favorites, and expand/collapse; the search field
   shrinks to make room.
   The catalog tree fills the remaining scrollable area.
 - The sidebar status bar shows compact game and system totals when the library
@@ -23,7 +23,7 @@
   and elapsed time. It briefly confirms readiness or remains visible with the
   startup error.
 - Command-Shift-F opens or switches to Favorites; Command-Shift-H opens or
-  switches to Playback History; Command-Shift-G or the Gallery toolbar button
+  switches to Recent; Command-Shift-G or the Gallery toolbar button
   opens or switches to Gallery.
 - Gallery is a playlist tab with an artwork-only grid. Its own sidebar toolbar
   button opens Gallery. The sidebar automatically uses Console View and shows
@@ -72,7 +72,7 @@
 - All SB2 buttons use the same dark surface, radius, hover ink, and selected
   treatment. Buttons match the 1.75rem control height. The nine first-row
   controls share the available width equally; Search shares a row with five
-  square Console/Path, Gallery, History, Favorites, and expand/collapse controls. The
+  square Console/Path, Gallery, Recent, Favorites, and expand/collapse controls. The
   pane enforces enough minimum width to keep the first row intact. Text bars
   use the same height and 0.25rem inline padding; glyph buttons center their icons.
   Playlist tabs are separate rounded blocks with a visible gap and the same

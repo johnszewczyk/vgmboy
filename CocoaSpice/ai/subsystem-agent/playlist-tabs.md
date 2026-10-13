@@ -16,7 +16,7 @@ Playlist-tab ordering, activation, and saved order.
 
 - Reordering does not activate a different playlist or change the active tab
   identity.
-- Favorites and History shortcuts activate their named tabs when present and
+- Favorites and Recent shortcuts activate their named tabs when present and
   create those tabs on first use.
 - Tabs divide the available strip width equally, with a 76-point minimum width
   that enables horizontal scrolling when the full set no longer fits.

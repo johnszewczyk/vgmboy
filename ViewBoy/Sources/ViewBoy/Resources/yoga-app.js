@@ -844,11 +844,13 @@ function restorePlaylistTabs(value) {
       && tab.sourceKey !== FAVORITES_TAB_SOURCE) {
       selectedTrackIDs.push(trackID(playlist[selectedTrack]));
     }
+    const sourceKey = typeof tab.sourceKey === "string" ? tab.sourceKey : null;
     return {
       id: tab.id,
-      title: typeof tab.title === "string" && tab.title.trim() ? tab.title : "PLAYLIST",
+      title: sourceKey === HISTORY_TAB_SOURCE ? "RECENT"
+        : typeof tab.title === "string" && tab.title.trim() ? tab.title : "PLAYLIST",
       gameKey: typeof tab.gameKey === "string" ? tab.gameKey : null,
-      sourceKey: typeof tab.sourceKey === "string" ? tab.sourceKey : null,
+      sourceKey,
       playlist,
       selectedTrack,
       selectedTrackIDs,
@@ -1751,7 +1753,7 @@ function libraryToolbarItems() {
     },
     {
       id: "history",
-      title: "HISTORY",
+      title: "RECENT",
       icon: "clock",
       view: "HISTORY",
       onClick: routeSidebarAction(() => { void showPlaybackHistory(); }),
@@ -5458,9 +5460,9 @@ async function showPlaybackHistory() {
         timestamp: historyTimestamp(timestampMilliseconds),
       };
     }).filter(Boolean);
-    openProjectionPlaylist(HISTORY_TAB_SOURCE, "HISTORY", state.historyTracks, preserveOptionsIfOpen);
+    openProjectionPlaylist(HISTORY_TAB_SOURCE, "RECENT", state.historyTracks, preserveOptionsIfOpen);
   } catch (error) {
-    state.status = `HISTORY ERROR: ${error.message}`;
+    state.status = `RECENT ERROR: ${error.message}`;
     render();
   }
 }

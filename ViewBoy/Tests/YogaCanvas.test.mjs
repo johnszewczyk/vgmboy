@@ -460,8 +460,8 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
     'main content keeps the fixed eight-pixel inset from the LCD edge');
   assert.ok(toolbarTargets.some((target) => target.name === 'OPTIONS'),
     'Options remains reachable from the sidebar controls');
-  assert.ok(toolbarTargets.some((target) => target.name === 'HISTORY'),
-    'the sidebar exposes the shared Playback History view');
+  assert.ok(toolbarTargets.some((target) => target.name === 'RECENT'),
+    'the sidebar exposes the Recent view');
   const sidebarActions = toolbarTargets.filter((target) => target.sidebarAction);
   assert.deepEqual(sidebarActions.map((target) => target.sidebarAction),
     ['library', 'paths', 'favorites', 'history', 'tree', 'options'],
@@ -2336,10 +2336,10 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.ok(historyRecordCalls.length > 0, 'successful playback is recorded through shared PlaybackHistory');
   assert.ok(hitTargetSnapshot().some((target) => target.name.startsWith('DATE/TIME')),
-    'Command-Shift-H opens History with its timestamp column');
-  assert.ok(hitTargetSnapshot().some((target) => target.playlistTabTitle && target.name === 'TAB HISTORY')
+    'Command-Shift-H opens Recent with its timestamp column');
+  assert.ok(hitTargetSnapshot().some((target) => target.playlistTabTitle && target.name === 'TAB RECENT')
     && hitTargetSnapshot().some((target) => target.playlistTabClose),
-  'History opens as an ordinary closable playlist tab');
+  'Recent opens as an ordinary closable playlist tab');
 
   while (savedPlaylistTabs.at(-1).tabs.length < 9) {
     globalThis.ViewBoy.dispatch('newPlaylistTab');

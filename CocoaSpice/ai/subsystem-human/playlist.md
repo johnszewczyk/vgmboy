@@ -9,7 +9,7 @@
 - Directly opened files have no catalog metadata. Their title and game cells use filename and folder display fallbacks; author, system, and duration remain unknown.
 - Columns: there is no row-level Play/Stop column; playback uses row activation and the main transport controls.
 - Columns: visible columns auto-size after queue publication without changing the current row selection.
-- History: Command-Shift-H opens or switches to the History tab, newest play first. Its sortable Date/Time column displays local time as `YYYY.MM.DD-HH.MM.SS.MS` and auto-hides when rows have no history timestamp.
+- Recent: Command-Shift-H opens or switches to the Recent tab, newest play first. Its sortable Date/Time column displays local time as `YYYY.MM.DD-HH.MM.SS.MS` and auto-hides when rows have no timestamp.
 - Columns: drag-and-drop resize.
 - Columns: double-click a divider to auto-size to current content.
 - Columns: the header menu can auto-size one column or all visible columns.
