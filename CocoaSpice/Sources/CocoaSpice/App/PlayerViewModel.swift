@@ -2008,10 +2008,10 @@ final class PlayerViewModel {
                     )
                     return (track, metadata)
                 }
-                guard self.activateOrCreatePlaylistTab(titled: "History") else { return }
+                guard self.activateOrCreatePlaylistTab(titled: "Recent") else { return }
                 self.playlistMetadataTaskOwner.cancel()
                 self.playlist = rows.map(\.0)
-                self.setActivePlaylistTitle("History")
+                self.setActivePlaylistTitle("Recent")
                 self.metadataCache = Dictionary(uniqueKeysWithValues: rows.map { ($0.0.id, $0.1) })
                 self.syncManualPlaylistOrder()
                 self.playlistSortColumn = .timestamp
@@ -2027,10 +2027,10 @@ final class PlayerViewModel {
                 self.refreshPlaylistTotalDurationReadout()
                 self.refreshPlaylistMetadata()
                 self.statusText = self.playlist.isEmpty
-                    ? "No playback history yet."
-                    : "Showing \(self.playlist.count) playback history entries."
+                    ? "No recent plays yet."
+                    : "Showing \(self.playlist.count) recent plays."
             } catch {
-                self?.statusText = "Could not load playback history: \(error.localizedDescription)"
+                self?.statusText = "Could not load recent plays: \(error.localizedDescription)"
             }
         }
     }

@@ -174,7 +174,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         viewMenu.addItem(playbackQueueItem)
         viewMenu.addItem(.separator())
         viewMenu.addItem(menuItem("Favorites Playlist", command: .favoritesPlaylist, action: #selector(favoritesPlaylist(_:))))
-        viewMenu.addItem(menuItem("Playback History", command: .playbackHistory, action: #selector(playbackHistory(_:))))
+        viewMenu.addItem(menuItem("Recent", command: .playbackHistory, action: #selector(playbackHistory(_:))))
         viewMenuItem.submenu = viewMenu
         mainMenu.addItem(viewMenuItem)
 

@@ -81,9 +81,10 @@ enum CocoaSpicePlaylistTabsStore {
                     .filter { supportedExtensions.contains($0.playablePathExtension) }
                 let trackIDs = Set(tracks.map(\.id))
                 let selectedID = record.selectedTrackID.flatMap { trackIDs.contains($0) ? $0 : nil }
+                let title = record.title == "History" ? "Recent" : String(record.title.prefix(120))
                 return CocoaSpicePlaylistTab(
                     id: record.id,
-                    title: kind == .gallery ? "Gallery" : String(record.title.prefix(120)),
+                    title: kind == .gallery ? "Gallery" : title,
                     kind: kind,
                     tracks: tracks,
                     selectedTrackID: selectedID,
