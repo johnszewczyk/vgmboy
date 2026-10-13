@@ -276,6 +276,7 @@ public enum CatalogPlaylistPresentation {
                 game: $0.game,
                 author: $0.author,
                 system: $0.system,
+                browserSystem: "",
                 comment: $0.comment,
                 introLengthMilliseconds: $0.introLengthMilliseconds,
                 loopLengthMilliseconds: $0.loopLengthMilliseconds,
@@ -302,6 +303,7 @@ public enum CatalogPlaylistPresentation {
                 game: $0.game,
                 author: $0.author,
                 system: $0.system,
+                browserSystem: $0.browserSystem,
                 comment: $0.comment,
                 introLengthMilliseconds: $0.introLengthMilliseconds,
                 loopLengthMilliseconds: $0.loopLengthMilliseconds,
@@ -324,6 +326,7 @@ public enum CatalogPlaylistPresentation {
         let game: String
         let author: String
         let system: String
+        let browserSystem: String
         let comment: String
         let introLengthMilliseconds: Int
         let loopLengthMilliseconds: Int
@@ -366,7 +369,7 @@ public enum CatalogPlaylistPresentation {
             titleText: nonEmpty(input.title) ?? displayName,
             gameText: nonEmpty(input.game) ?? groupName,
             authorText: nonEmpty(input.author) ?? "—",
-            systemText: nonEmpty(input.system) ?? "—",
+            systemText: nonEmpty(input.system) ?? nonEmpty(input.browserSystem) ?? "—",
             lengthText: formattedDuration(milliseconds: input.lengthMilliseconds)
         )
         return CatalogPlaylistPresentationRow(

@@ -5,7 +5,7 @@
 - Display: file metadata in a headed table.
 - Columns: favorite, index, file, title, game, author, system, path, and length. The favorite glyph is immediately before #; its filled state uses the configured playlist text color.
 - Columns: missing metadata falls back to useful file or folder text.
-- Metadata: catalog-backed queues display only the fields published in the selected catalog; incomplete fields remain incomplete until ScanSong republishes them.
+- Metadata: playlist fields come from the selected catalog. If a track has no System metadata value, the playlist displays its recognized catalog browser system when available; this does not add a source tag.
 - Directly opened files have no catalog metadata. Their title and game cells use filename and folder display fallbacks; author, system, and duration remain unknown.
 - Columns: there is no row-level Play/Stop column; playback uses row activation and the main transport controls.
 - Columns: visible columns auto-size after queue publication without changing the current row selection.
@@ -41,6 +41,7 @@
 ## Persistence
 
 - Tabs: playlist tabs restore their queues, names, and selections on next launch.
+- Tabs: clicking anywhere in a tab tile activates it; the close control remains a separate action.
 - Tabs: visible tabs share the tab strip width equally; one tab fills the available strip, and additional tabs scroll when their equal-width minimum no longer fits.
 - Tabs: drag a tab across its neighbors to reorder it; surrounding tabs ease into the new positions and the order persists for the next launch.
 - Tabs: `Command-T` opens an empty tab; File > Close Current Playlist Tab (`Command-W`) closes the current tab; `Command-1` through `Command-9` select a tab.

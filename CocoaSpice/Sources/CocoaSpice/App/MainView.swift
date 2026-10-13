@@ -324,29 +324,38 @@ struct MainView: View {
                 ScrollView(.horizontal) {
                     HStack(spacing: spacing) {
                         ForEach(model.playlistTabs) { tab in
-                            HStack(spacing: 5) {
-                                Button(tab.title) {
+                            HStack(spacing: 0) {
+                                Button {
                                     model.activatePlaylistTab(tab.id)
+                                } label: {
+                                    HStack {
+                                        Text(tab.title)
+                                            .lineLimit(1)
+                                            .truncationMode(.tail)
+                                        Spacer(minLength: 0)
+                                    }
+                                    .padding(.leading, 8)
+                                    .padding(.trailing, 4)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
-                                .lineLimit(1)
-                                .frame(maxWidth: .infinity, alignment: .leading)
                                 .help(tab.title)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                                 Button {
                                     model.closePlaylistTab(tab.id)
                                 } label: {
                                     Image(systemName: "xmark")
                                         .font(.system(size: 9, weight: .semibold))
-                                        .frame(width: 14, height: 14)
+                                        .frame(width: 22, height: 30)
+                                        .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
                                 .help("Close tab")
                             }
                             .font(.system(size: 11))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .frame(width: tabWidth)
+                            .frame(width: tabWidth, height: 30)
                             .background(
                                 model.activePlaylistTabID == tab.id
                                     ? Color.accentColor.opacity(0.2)
