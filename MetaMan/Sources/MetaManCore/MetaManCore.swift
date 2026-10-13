@@ -52,7 +52,7 @@ public enum MetaManCore {
         MetadataFormatDescriptor(
             identifier: "vgm",
             fileExtensions: ["vgm", "vgz"],
-            methodology: "Direct VGM header and complete GD3 parser; gzip input is inflated with a 256 MiB output bound; no playback decoder."
+            methodology: "Direct VGM header and complete GD3 parser; file reads seek over VGM command streams and cap GD3 payloads at 64 MiB; gzip input is inflated with a 256 MiB output bound; no playback decoder."
         ),
         MetadataFormatDescriptor(
             identifier: "mdx",
@@ -224,6 +224,9 @@ public enum MetaManCore {
         if fileURL.pathExtension.caseInsensitiveCompare("mod") == .orderedSame {
             return try MODMetadataReader.read(fileURL: fileURL)
         }
+        if fileURL.pathExtension.caseInsensitiveCompare("vgm") == .orderedSame {
+            return try VGMMetadataReader.read(fileURL: fileURL)
+        }
         if StandardAudioMetadataReader.supportedExtensions.contains(fileURL.pathExtension.lowercased()) {
             return try StandardAudioMetadataReader.read(fileURL: fileURL)
         }
@@ -296,6 +299,10 @@ public enum MetaManCore {
         }
         if formatHint == "mod" {
             let document = try MODMetadataReader.read(fileURL: fileURL)
+            return MetadataReadResult(tracks: [MetadataTrack(document: document)])
+        }
+        if formatHint == "vgm" {
+            let document = try VGMMetadataReader.read(fileURL: fileURL)
             return MetadataReadResult(tracks: [MetadataTrack(document: document)])
         }
         if StandardAudioMetadataReader.supportedExtensions.contains(formatHint) {

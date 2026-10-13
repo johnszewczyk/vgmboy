@@ -72,11 +72,11 @@ public enum MetaManMetadataHarvester {
     private static let maximumCompanionPlaylistSize: UInt64 = 4 * 1024 * 1024
     private static let maximumCompanionPlaylistCount = 4_096
     private static let maximumCompanionPlaylistSetSize: UInt64 = 32 * 1024 * 1024
-    // Audio tracks can exceed the general cap. These readers use file APIs or
-    // memory mapping instead of copying the encoded audio into a working buffer.
+    // Audio tracks and VGM loop captures can exceed the general cap. These
+    // readers use file APIs or bounded reads instead of copying encoded streams.
     private static let maximumAudioMemberSize: UInt64 = 1024 * 1024 * 1024
     private static let largeAudioExtensions: Set<String> = [
-        "aif", "aiff", "ape", "flac", "m4a", "mp3", "ogg", "wav"
+        "aif", "aiff", "ape", "flac", "m4a", "mp3", "ogg", "vgm", "wav"
     ]
 
     /// Harvests a directory of native source files for one format extension.
