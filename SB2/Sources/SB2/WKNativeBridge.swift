@@ -205,6 +205,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
           const api = {
             isOptionsWindow: \(optionsWindowFlag),
+            volumeDetentCount: \(FrontendPlaybackVolumeScale.detentCount),
             playbackBackends: \(Self.json(Self.playbackBackendManifest)),
             startupStages: \(Self.json(FrontendStartupStage.allCases.map(\.manifest))),
             startupTiming: {

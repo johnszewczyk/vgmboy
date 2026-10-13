@@ -1,6 +1,22 @@
 import Foundation
 import Observation
 
+/// Shared detent scale for compact frontend playback-volume controls.
+///
+/// The native and WebKit skins draw their own slider, but use the same number
+/// of 5% intervals so a given control gesture has the same volume resolution.
+public enum FrontendPlaybackVolumeScale {
+    public static let detentCount = 20
+    public static let tickMarkCount = detentCount + 1
+    public static let increment = 1.0 / Double(detentCount)
+
+    public static func normalized(_ value: Double) -> Double {
+        guard value.isFinite else { return 1 }
+        let clamped = min(max(value, 0), 1)
+        return (clamped * Double(detentCount)).rounded() / Double(detentCount)
+    }
+}
+
 /// Shared interaction timings for the native and WebKit frontends.
 public struct FrontendAnimationTimings: Codable, Equatable, Sendable {
     public static let defaultDurationMilliseconds = 200

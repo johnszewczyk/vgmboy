@@ -12,7 +12,7 @@
   Gallery, Favorites, plus a fold/unfold-all
   item beside the native sidebar disclosure control. These remain individual
   native toolbar items rather than a grouped capsule.
-- Main transport toolbar order: Previous, Stop, Play/Pause, Next, then Long Play, repeat, random playback, and Equalizer on/off. Stop uses a square glyph; the infinity button turns Long Play on or off.
+- Main transport toolbar order: Previous, Stop, Play/Pause, Next, then Long Play, repeat, random playback, Equalizer on/off, and Volume. Stop uses a square glyph; the infinity button turns Long Play on or off. Volume opens a compact slider with twenty 5% detents.
 - The sidebar begins with search and list content.
 - Startup: if loading lasts beyond a short reveal delay, a four-step screen shows workspace restore, library connection, sidebar preparation, and playlist restore, with elapsed time. It briefly confirms readiness and stays visible with the error if startup fails.
 - Sidebar: shows a loading indicator while its current database view loads after startup. Games load first; the potentially large Files tree loads only after Files is opened.

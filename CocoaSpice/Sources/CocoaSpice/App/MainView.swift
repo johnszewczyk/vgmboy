@@ -2,6 +2,7 @@ import AppKit
 import CatalogBrowserCore
 import FavoriteStoreCore
 import FrontendCommandCore
+import FrontendPreferencesCore
 import FrontendStartupCore
 import SwiftUI
 import UniformTypeIdentifiers
@@ -12,6 +13,7 @@ struct MainView: View {
     @Bindable var model: PlayerViewModel
     @State private var draggedPlaylistTabID: String?
     @State private var startupCardVisible = false
+    @State private var isVolumePopoverPresented = false
 
     var body: some View {
         liveMainView
@@ -71,6 +73,7 @@ struct MainView: View {
                     Image(systemName: "slider.horizontal.3").foregroundStyle(model.equalizerEnabled ? .primary : .secondary)
                 }
                 .help(model.equalizerEnabled ? "Equalizer: On" : "Equalizer: Off")
+                volumeToolbarButton
             }
         }
         .overlay {
@@ -124,6 +127,69 @@ struct MainView: View {
         .help(mode.title)
         .accessibilityLabel(mode.title)
         .disabled(model.isGalleryTabActive)
+    }
+
+    private var volumeToolbarButton: some View {
+        Button {
+            isVolumePopoverPresented.toggle()
+        } label: {
+            Image(systemName: volumeSymbolName)
+        }
+        .help("Volume \(volumePercent)%")
+        .accessibilityLabel("Volume")
+        .accessibilityValue("\(volumePercent)%")
+        .popover(isPresented: $isVolumePopoverPresented, arrowEdge: .bottom) {
+            volumePopover
+        }
+    }
+
+    private var volumePopover: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text("Volume")
+                Spacer()
+                Text("\(volumePercent)%")
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            .font(.system(size: 12, weight: .medium))
+
+            Slider(
+                value: Binding(
+                    get: { FrontendPlaybackVolumeScale.normalized(Double(model.appVolume)) },
+                    set: { model.setAppVolume(Float($0)) }
+                ),
+                in: 0...1,
+                step: FrontendPlaybackVolumeScale.increment
+            )
+            .accessibilityLabel("Volume")
+            .accessibilityValue("\(volumePercent)%")
+
+            HStack(spacing: 0) {
+                ForEach(0..<FrontendPlaybackVolumeScale.tickMarkCount, id: \.self) { mark in
+                    Capsule()
+                        .fill(Color.secondary.opacity(mark.isMultiple(of: 5) ? 0.75 : 0.4))
+                        .frame(width: 1, height: mark.isMultiple(of: 5) ? 6 : 4)
+                    if mark < FrontendPlaybackVolumeScale.tickMarkCount - 1 {
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+            .accessibilityHidden(true)
+        }
+        .padding(12)
+        .frame(width: 210)
+    }
+
+    private var volumePercent: Int {
+        Int((FrontendPlaybackVolumeScale.normalized(Double(model.appVolume)) * 100).rounded())
+    }
+
+    private var volumeSymbolName: String {
+        if volumePercent == 0 { return "speaker.slash" }
+        if volumePercent < 35 { return "speaker.wave.1" }
+        return "speaker.wave.2"
     }
 
     private var liveMainView: some View {

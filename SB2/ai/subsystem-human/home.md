@@ -4,7 +4,8 @@
 - Window controls are rendered in the title strip; AppKit's native stoplights
   are hidden, and the strip remains draggable.
 - Nine playback, audio, and Options controls share the first sidebar toolbar at
-  equal widths. The Volume control opens a 100px popup slider in 5% steps.
+  equal widths. The Volume control opens a 220px popup slider with twenty 5%
+  detents and visible tick marks.
   Search shares the next toolbar with five square buttons for Console/Path
   view, Gallery, Recent, Favorites, and expand/collapse; the search field
   shrinks to make room.
