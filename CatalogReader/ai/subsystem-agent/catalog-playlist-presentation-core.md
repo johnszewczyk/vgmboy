@@ -13,8 +13,9 @@ content strings for column measurement.
 - This module owns deterministic display fallback, subtrack suffix, duration
   formatting, archive-member leaf naming, content hints, and the comparison
   policy for an explicit playlist sort.
-- CocoaSpice and SPCBoyWK own font metrics, column pixel widths, animation,
-  selection, an explicit sort gesture, and actual rendering.
+- CocoaSpice, SB2, and ViewBoy own font metrics, column pixel widths, animation,
+  selection, an explicit sort gesture, and actual rendering. All three use the
+  shared comparison policy for explicit playlist sorts.
 
 ## Invariants
 

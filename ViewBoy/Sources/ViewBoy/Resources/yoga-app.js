@@ -489,6 +489,12 @@ let columnLayoutAnimation = null;
 let lastColumnWidths = null;
 let columnAnimationTreeReusedFrames = 0;
 let tabLayoutAnimation = null;
+let playlistSortGeneration = 0;
+let playlistTabTransitionChain = Promise.resolve();
+let gameSearchGeneration = 0;
+let fileSearchGeneration = 0;
+let gameSearchTimer = 0;
+let fileSearchTimer = 0;
 let reorderAnimation = null;
 let reorderPreview = null;
 let currentRenderTime = 0;
@@ -557,7 +563,16 @@ const state = {
   equalizerValueBoxes: [],
   libraryRandomToken: 0,
   games: [],
+  consoleGroups: [],
   consoleSystems: [],
+  gameSearchQuery: null,
+  gameSearchIDs: null,
+  gameSearchPendingQuery: null,
+  fileSearchQuery: null,
+  fileSearchKeys: null,
+  fileSearchPendingQuery: null,
+  sortedPlaylistTrackIDs: null,
+  sortedPlaylistSourceIDs: null,
   favoriteTracks: [],
   favoriteIDs: new Set(),
   historyTracks: [],
@@ -828,7 +843,33 @@ function persistPlaylistTabs() {
     .catch((error) => { console.error("[ViewBoy] playlist tabs could not be saved", error); });
 }
 
-function restorePlaylistTabs(value) {
+async function transitionPlaylistTabs(action, { additionalTabs = [], updateActive = true } = {}) {
+  const operation = playlistTabTransitionChain.catch(() => {}).then(async () => {
+    const next = await bridge.playlistTabsReduce({
+      state: {
+        orderedIDs: state.playlistTabs.map((tab) => tab.id),
+        activeID: state.activePlaylistTabId,
+      },
+      action,
+    });
+    if (!next || !Array.isArray(next.orderedIDs)) throw new Error("Shared tab transition returned invalid state.");
+    const tabsByID = new Map([...state.playlistTabs, ...additionalTabs].map((tab) => [tab.id, tab]));
+    state.playlistTabs = next.orderedIDs.map((id) => tabsByID.get(id)).filter(Boolean);
+    if (updateActive) state.activePlaylistTabId = next.activeID || null;
+    return next;
+  });
+  playlistTabTransitionChain = operation.catch(() => {});
+  return operation;
+}
+
+function handlePlaylistTabTask(operation) {
+  void operation.catch((error) => {
+    state.status = `TAB ERROR: ${error.message}`;
+    render();
+  });
+}
+
+async function restorePlaylistTabs(value) {
   if (value?.version !== 1 || !Array.isArray(value.tabs)) return false;
   const seen = new Set();
   const restored = value.tabs.slice(0, 64).filter((tab) => {
@@ -861,7 +902,12 @@ function restorePlaylistTabs(value) {
   });
   if (!restored.length) return false;
   state.playlistTabs = restored;
-  state.activePlaylistTabId = seen.has(value.activeID) ? value.activeID : restored[0].id;
+  const restoredOrder = await transitionPlaylistTabs({
+    kind: "restore",
+    orderedIDs: restored.map((tab) => tab.id),
+    activeID: seen.has(value.activeID) ? value.activeID : restored[0].id,
+  });
+  state.activePlaylistTabId = restoredOrder.activeID || restored[0].id;
   const active = activePlaylistTab();
   tracks = [...active.playlist];
   state.activeQueue = [...active.playlist];
@@ -875,14 +921,20 @@ function restorePlaylistTabs(value) {
   return true;
 }
 
-function activatePlaylistTab(id) {
+async function activatePlaylistTab(id) {
   const tab = state.playlistTabs.find((entry) => entry.id === id);
   if (!tab) return false;
+  const wasActive = tab.id === state.activePlaylistTabId;
+  if (wasActive && state.tab !== "SETTINGS") return false;
   state.enterSelection = "playlist";
   state.sidebarEnterContext = null;
   const leavingOptions = state.tab === "SETTINGS";
-  if (tab.id !== state.activePlaylistTabId) syncActivePlaylistTab();
-  else if (state.tab !== "SETTINGS") return false;
+  if (!wasActive) syncActivePlaylistTab();
+  const next = await transitionPlaylistTabs(
+    { kind: "activate", id: tab.id },
+    { updateActive: false }
+  );
+  if (next.activeID !== tab.id) return false;
   state.activePlaylistTabId = tab.id;
   tracks = [...tab.playlist];
   state.activeQueue = [...tab.playlist];
@@ -894,11 +946,13 @@ function activatePlaylistTab(id) {
     state.sortColumn = null;
     state.sortDirection = "ASCENDING";
   }
+  state.sortedPlaylistTrackIDs = null;
   state.selectedTrack = Math.min(tab.selectedTrack || 0, Math.max(0, tab.playlist.length - 1));
   state.selectedTrackIDs = new Set(selectionIDsForTab(tab));
   state.selectionAnchorID = tab.selectionAnchorID || [...state.selectedTrackIDs].at(-1) || null;
   state.queueScroll = Math.max(0, tab.scroll || 0);
   state.tableHorizontalScroll = 0;
+  await applySharedPlaylistSort();
   if (leavingOptions) navigateAppTab("QUEUE");
   else {
     state.tab = "QUEUE";
@@ -944,7 +998,7 @@ function tabLayoutWeightAt(id, time = currentRenderTime) {
   return animation.from[id] + (animation.to[id] - animation.from[id]) * eased;
 }
 
-function createPlaylistTab({
+async function createPlaylistTab({
   duplicateActive = true,
   title = null,
   playlist = null,
@@ -969,7 +1023,10 @@ function createPlaylistTab({
       : (Array.isArray(playlist) && playlist[0] ? trackID(playlist[0]) : null),
     scroll: duplicateActive && source ? source.scroll : 0,
   };
-  state.playlistTabs.push(next);
+  await transitionPlaylistTabs(
+    { kind: "insert", id: next.id, activate: true },
+    { additionalTabs: [next] }
+  );
   if (priorWidths) animateTabLayout(priorWidths, [...state.playlistTabs]);
   state.activePlaylistTabId = next.id;
   tracks = [...next.playlist];
@@ -981,12 +1038,15 @@ function createPlaylistTab({
   state.queueScroll = next.scroll;
   state.tab = keepOptionsOpen ? "SETTINGS" : "QUEUE";
   state.tableHorizontalScroll = 0;
+  state.sortedPlaylistTrackIDs = null;
+  state.sortedPlaylistSourceIDs = null;
+  await applySharedPlaylistSort();
   render();
   persistPlaylistTabs();
   return next;
 }
 
-function closePlaylistTab(id = state.activePlaylistTabId) {
+async function closePlaylistTab(id = state.activePlaylistTabId) {
   const index = state.playlistTabs.findIndex((tab) => tab.id === id);
   if (index < 0) return false;
   if (state.playlistTabs.length === 1) {
@@ -1013,12 +1073,14 @@ function closePlaylistTab(id = state.activePlaylistTabId) {
     const priorTabs = [...state.playlistTabs];
     const priorWidths = state.tab !== "SETTINGS" ? captureTabWidths() : null;
     const wasActive = state.playlistTabs[index].id === state.activePlaylistTabId;
-    state.playlistTabs.splice(index, 1);
+    const nextState = await transitionPlaylistTabs(
+      { kind: "close", id },
+      { updateActive: false }
+    );
     if (priorWidths) animateTabLayout(priorWidths, priorTabs);
     if (wasActive) {
-      const next = state.playlistTabs[Math.min(index, state.playlistTabs.length - 1)];
       state.activePlaylistTabId = null;
-      activatePlaylistTab(next.id);
+      if (nextState.activeID) await activatePlaylistTab(nextState.activeID);
       return true;
     }
   }
@@ -1030,18 +1092,65 @@ function closePlaylistTab(id = state.activePlaylistTabId) {
 function visibleTracks() {
   const source = activeTracks();
   if (!state.sortColumn) return source;
-  const direction = state.sortDirection === "ASCENDING" ? 1 : -1;
-  const items = source.map((track, index) => ({ track, index }));
-  return items.sort((first, second) => {
-    if (state.sortColumn === "timestamp") {
-      return direction * ((Number(first.track.timestampMilliseconds) || 0)
-        - (Number(second.track.timestampMilliseconds) || 0)) || first.index - second.index;
+  const orderedIDs = state.sortedPlaylistTrackIDs;
+  const naturalIDs = source.map(trackID);
+  if (!Array.isArray(orderedIDs) || orderedIDs.length !== source.length
+      || !Array.isArray(state.sortedPlaylistSourceIDs)
+      || naturalIDs.length !== state.sortedPlaylistSourceIDs.length
+      || naturalIDs.some((id, index) => id !== state.sortedPlaylistSourceIDs[index])) return source;
+  const tracksByID = new Map(source.map((track) => [trackID(track), track]));
+  const sorted = orderedIDs.map((id) => tracksByID.get(id));
+  return sorted.some((track) => !track) ? source : sorted;
+}
+
+async function applySharedPlaylistSort() {
+  const generation = ++playlistSortGeneration;
+  const source = activeTracks();
+  const sourceIDs = source.map(trackID);
+  if (!state.sortColumn) {
+    state.sortedPlaylistTrackIDs = null;
+    state.sortedPlaylistSourceIDs = null;
+    return true;
+  }
+  if (!bridge?.playlistProjectionSort) return false;
+  const records = source.map((track, naturalOrder) => ({
+    id: trackID(track),
+    naturalOrder,
+    trackNumber: track.trackNumber === null || track.trackNumber === undefined || track.trackNumber === ""
+      ? null : (Number.isFinite(Number(track.trackNumber)) ? Math.round(Number(track.trackNumber)) : null),
+    fileText: tableValue(track, "filename", naturalOrder),
+    titleText: tableValue(track, "title", naturalOrder),
+    gameText: tableValue(track, "game", naturalOrder),
+    authorText: tableValue(track, "artist", naturalOrder),
+    systemText: tableValue(track, "system", naturalOrder),
+    pathText: tableValue(track, "path", naturalOrder),
+    lengthMilliseconds: Math.max(0, Math.round(Number(track.playLengthMs) || 0)),
+    timestampMilliseconds: track.timestampMilliseconds === null || track.timestampMilliseconds === undefined
+      ? null : (Number.isFinite(Number(track.timestampMilliseconds))
+        ? Math.round(Number(track.timestampMilliseconds)) : null),
+  }));
+  try {
+    const orderedIDs = await bridge.playlistProjectionSort({
+      records,
+      frontendColumn: state.sortColumn,
+      direction: state.sortDirection.toLowerCase(),
+    });
+    if (generation !== playlistSortGeneration || source !== activeTracks()) return false;
+    const recordIDs = new Set(records.map((record) => record.id));
+    if (!Array.isArray(orderedIDs) || orderedIDs.length !== records.length
+        || new Set(orderedIDs).size !== records.length
+        || orderedIDs.some((id) => !recordIDs.has(id))) return false;
+    state.sortedPlaylistTrackIDs = orderedIDs;
+    state.sortedPlaylistSourceIDs = sourceIDs;
+    return true;
+  } catch (error) {
+    if (generation === playlistSortGeneration) {
+      state.sortedPlaylistTrackIDs = null;
+      state.sortedPlaylistSourceIDs = null;
+      state.status = `PLAYLIST SORT ERROR: ${error.message}`;
     }
-    return direction * String(tableValue(first.track, state.sortColumn, first.index))
-      .localeCompare(String(tableValue(second.track, state.sortColumn, second.index)), undefined,
-        { numeric: true, sensitivity: "base" }) || first.index - second.index;
-  })
-    .map(({ track }) => track);
+    return false;
+  }
 }
 
 function easeSelection(progress) {
@@ -1749,7 +1858,7 @@ function libraryToolbarItems() {
       title: "FAVORITES",
       icon: "heart",
       view: "FAVORITES",
-      onClick: routeSidebarAction(() => selectSidebarView("FAVORITES")),
+      onClick: routeSidebarAction(() => handlePlaylistTabTask(selectSidebarView("FAVORITES"))),
     },
     {
       id: "history",
@@ -2342,19 +2451,22 @@ function tableContentLengths(items, columns) {
   return measured;
 }
 
-function toggleSort(columnKey) {
-  const selectedID = visibleTracks()[state.selectedTrack]
-    ? trackID(visibleTracks()[state.selectedTrack]) : null;
+async function toggleSort(columnKey) {
+  const previousVisible = visibleTracks();
+  const selectedID = previousVisible[state.selectedTrack]
+    ? trackID(previousVisible[state.selectedTrack]) : null;
   if (state.sortColumn === columnKey) {
     state.sortDirection = state.sortDirection === "ASCENDING" ? "DESCENDING" : "ASCENDING";
   } else {
     state.sortColumn = columnKey;
     state.sortDirection = "ASCENDING";
   }
-  const nextIndex = visibleTracks().findIndex((track) => trackID(track) === selectedID);
+  await applySharedPlaylistSort();
+  const sortedTracks = visibleTracks();
+  const nextIndex = sortedTracks.findIndex((track) => trackID(track) === selectedID);
   if (nextIndex >= 0) state.selectedTrack = nextIndex;
   state.queueScroll = Math.max(0, Math.min(state.queueScroll,
-    Math.max(0, visibleTracks().length - visibleRowCount())));
+    Math.max(0, sortedTracks.length - visibleRowCount())));
   if (state.selectedTrack < state.queueScroll) state.queueScroll = state.selectedTrack;
   if (state.selectedTrack >= state.queueScroll + visibleRowCount()) {
     state.queueScroll = state.selectedTrack - visibleRowCount() + 1;
@@ -2646,7 +2758,7 @@ function createTableHeader(parent, columns) {
       reorderKind: "column",
       reorderKey: column.key,
       reorderable: column.reorderable !== false,
-      onClick: column.sortable === false ? undefined : () => toggleSort(column.key),
+      onClick: column.sortable === false ? undefined : () => { void toggleSort(column.key); },
     });
   });
   return header;
@@ -2863,21 +2975,75 @@ function optionsNavigationRows() {
   ], OPTIONS_GAP_DOTS);
 }
 
-function libraryRows() {
-  if (state.sidebarMode === "paths") return pathRows();
-  const query = normalizedText(state.searchQuery).trim();
-  const groups = new Map();
-  for (const game of state.games) {
-    const system = game.system || "OTHER";
-    const gameName = game.displayName || game.name || "";
-    const matches = !query || normalizedText(`${gameName} ${game.name || ""} ${system}`).includes(query);
-    if (!matches) continue;
-    if (!groups.has(system)) groups.set(system, []);
-    groups.get(system).push(game);
+function ensureBrowserSearch(query, mode) {
+  const isPaths = mode === "paths";
+  const queryName = isPaths ? "fileSearchQuery" : "gameSearchQuery";
+  const pendingName = isPaths ? "fileSearchPendingQuery" : "gameSearchPendingQuery";
+  if (!query) {
+    if (state[queryName] !== "" || state[pendingName] !== null) {
+      window.clearTimeout(isPaths ? fileSearchTimer : gameSearchTimer);
+      if (isPaths) fileSearchTimer = 0;
+      else gameSearchTimer = 0;
+      if (isPaths) fileSearchGeneration += 1;
+      else gameSearchGeneration += 1;
+      state[queryName] = "";
+      state[pendingName] = null;
+      if (isPaths) state.fileSearchKeys = null;
+      else state.gameSearchIDs = null;
+    }
+    return;
   }
+  if (state[queryName] === query || state[pendingName] === query) return;
+
+  window.clearTimeout(isPaths ? fileSearchTimer : gameSearchTimer);
+  const generation = isPaths ? ++fileSearchGeneration : ++gameSearchGeneration;
+  state[pendingName] = query;
+  const schedule = isPaths ? (callback) => { fileSearchTimer = window.setTimeout(callback, 140); }
+    : (callback) => { gameSearchTimer = window.setTimeout(callback, 140); };
+  schedule(async () => {
+    try {
+      const matches = isPaths
+        ? await bridge.databaseSearchFiles(query)
+        : await bridge.databaseSearchGames(query);
+      if (generation !== (isPaths ? fileSearchGeneration : gameSearchGeneration)
+          || state.searchQuery.trim() !== query) return;
+      if (isPaths) {
+        state.fileSearchKeys = new Set((Array.isArray(matches) ? matches : [])
+          .map((file) => `${file.rootId}\u001f${file.path}`));
+        state.fileSearchQuery = query;
+      } else {
+        state.gameSearchIDs = new Set((Array.isArray(matches) ? matches : [])
+          .map((game) => game.id).filter(Boolean));
+        state.gameSearchQuery = query;
+      }
+    } catch (error) {
+      state.status = `SEARCH ERROR: ${error.message}`;
+      if (isPaths) state.fileSearchQuery = query;
+      else state.gameSearchQuery = query;
+      if (isPaths) state.fileSearchKeys = new Set();
+      else state.gameSearchIDs = new Set();
+    } finally {
+      if (generation === (isPaths ? fileSearchGeneration : gameSearchGeneration)) {
+        state[pendingName] = null;
+        render();
+      }
+    }
+  });
+}
+
+function libraryRows() {
+  const query = state.searchQuery.trim();
+  if (state.sidebarMode === "paths") return pathRows(query);
+  ensureBrowserSearch(query, "consoles");
+  const searchIDs = state.gameSearchQuery === query ? state.gameSearchIDs : null;
+  const gamesByID = new Map(state.games.map((game) => [game.id, game]));
   const rows = [];
   const transition = state.sidebarTransition;
-  for (const system of [...groups.keys()].sort()) {
+  for (const group of state.consoleGroups) {
+    const games = group.gameIDs.map((id) => gamesByID.get(id))
+      .filter((game) => game && (!searchIDs || searchIDs.has(game.id)));
+    if (searchIDs && !games.length) continue;
+    const system = group.name;
     const searching = Boolean(query);
     const expanded = searching || state.expandedSystems.has(system);
     const groupTransition = transition?.systems?.get(system);
@@ -2887,7 +3053,7 @@ function libraryRows() {
     const disclosureProgress = progress;
     rows.push({ text: system, system, group: true, disclosureProgress });
     if (showChildren) {
-      for (const game of groups.get(system)) {
+      for (const game of games) {
         rows.push({
           text: game.displayName || game.name,
           game,
@@ -2900,14 +3066,17 @@ function libraryRows() {
   return rows;
 }
 
-function pathRows() {
-  const query = normalizedText(state.searchQuery).trim();
+function pathRows(query) {
+  ensureBrowserSearch(query, "paths");
+  const searchKeys = state.fileSearchQuery === query ? state.fileSearchKeys : null;
   const rows = [];
   const transition = state.sidebarTransition;
   function append(node, depth, revealProgress) {
     const children = Array.isArray(node.children) ? node.children : [];
-    const directMatch = !query || normalizedText(`${node.name || ""} ${node.path || ""}`).includes(query);
-    const matchingChildren = query ? children.filter((child) => pathSubtreeMatches(child, query)) : children;
+    const directMatch = !searchKeys || (node.catalogFile
+      && searchKeys.has(`${node.catalogFile.rootId}\u001f${node.catalogFile.path}`));
+    const matchingChildren = searchKeys
+      ? children.filter((child) => pathSubtreeMatches(child, searchKeys)) : children;
     if (query && !directMatch && matchingChildren.length === 0) return false;
     const expanded = Boolean(query) || state.expandedPathNodes.has(node.path);
     const nodeTransition = transition?.paths?.get(node.path);
@@ -2935,9 +3104,11 @@ function pathRows() {
   return rows;
 }
 
-function pathSubtreeMatches(node, query) {
-  return normalizedText(`${node.name || ""} ${node.path || ""}`).includes(query)
-    || (Array.isArray(node.children) && node.children.some((child) => pathSubtreeMatches(child, query)));
+function pathSubtreeMatches(node, searchKeys) {
+  const fileMatch = node.catalogFile
+    && searchKeys.has(`${node.catalogFile.rootId}\u001f${node.catalogFile.path}`);
+  return Boolean(fileMatch)
+    || (Array.isArray(node.children) && node.children.some((child) => pathSubtreeMatches(child, searchKeys)));
 }
 
 function addLibraryPane(parent) {
@@ -3162,7 +3333,7 @@ function addCatalogPane(parent) {
     reorderKind: "tab",
     reorderKey: tab.id,
         activePlaylistTab: tab.id === state.activePlaylistTabId,
-        onClick: isExiting ? undefined : () => activatePlaylistTab(tab.id),
+        onClick: isExiting ? undefined : () => handlePlaylistTabTask(activatePlaylistTab(tab.id)),
         controlTitle: `TAB ${tab.title}`,
         paint(box) {
           if (tab.id === state.activePlaylistTabId) {
@@ -3187,7 +3358,7 @@ function addCatalogPane(parent) {
         playlistTabId: tab.id,
         reorderKey: tab.id,
         controlTitle: `TAB ${tab.title}`,
-        onClick: isExiting ? undefined : () => activatePlaylistTab(tab.id),
+        onClick: isExiting ? undefined : () => handlePlaylistTabTask(activatePlaylistTab(tab.id)),
       });
       label(item, "X", {
         width: buttonWidth("X"),
@@ -3200,10 +3371,10 @@ function addCatalogPane(parent) {
         playlistTabClose: true,
         playlistTabId: tab.id,
         controlTitle: "X",
-        onClick: isExiting ? undefined : () => closePlaylistTab(tab.id),
+        onClick: isExiting ? undefined : () => handlePlaylistTabTask(closePlaylistTab(tab.id)),
       });
     });
-    pixelButton(tabRow, "[+]", () => createPlaylistTab({ duplicateActive: true }), {
+    pixelButton(tabRow, "[+]", () => handlePlaylistTabTask(createPlaylistTab({ duplicateActive: true })), {
       width: buttonWidth("[+]"),
     });
     makeWidget(panel, { height: uiGap() });
@@ -5331,7 +5502,7 @@ async function toggleFavorite(track) {
   }
 }
 
-function openProjectionPlaylist(sourceKey, title, playlist, preserveOptionsIfOpen = false) {
+async function openProjectionPlaylist(sourceKey, title, playlist, preserveOptionsIfOpen = false) {
   const keepOptionsOpen = state.tab === "SETTINGS" && preserveOptionsIfOpen;
   const leavingOptions = state.tab === "SETTINGS" && !keepOptionsOpen;
   const priorWidths = state.tab === "SETTINGS" ? null : captureTabWidths();
@@ -5352,7 +5523,10 @@ function openProjectionPlaylist(sourceKey, title, playlist, preserveOptionsIfOpe
       selectedTrack: 0,
       scroll: 0,
     };
-    state.playlistTabs.push(tab);
+    await transitionPlaylistTabs(
+      { kind: "insert", id: tab.id, activate: false },
+      { additionalTabs: [tab], updateActive: false }
+    );
     if (priorWidths) animateTabLayout(priorWidths, [...state.playlistTabs]);
   } else {
     tab.title = title;
@@ -5364,6 +5538,12 @@ function openProjectionPlaylist(sourceKey, title, playlist, preserveOptionsIfOpe
     render();
     return true;
   }
+
+  const order = await transitionPlaylistTabs(
+    { kind: "activate", id: tab.id },
+    { updateActive: false }
+  );
+  if (order.activeID !== tab.id) return false;
 
   state.enterSelection = "playlist";
   state.sidebarEnterContext = null;
@@ -5410,7 +5590,7 @@ async function showFavoritesPlaylist() {
     if (!Array.isArray(favorites)) return;
     state.favoriteTracks = favorites;
     state.favoriteIDs = new Set(favorites.map(favoriteID));
-    openProjectionPlaylist(FAVORITES_TAB_SOURCE, "FAVORITES", favorites, preserveOptionsIfOpen);
+    await openProjectionPlaylist(FAVORITES_TAB_SOURCE, "FAVORITES", favorites, preserveOptionsIfOpen);
   } catch (error) {
     state.status = `FAVORITES ERROR: ${error.message}`;
     render();
@@ -5460,24 +5640,24 @@ async function showPlaybackHistory() {
         timestamp: historyTimestamp(timestampMilliseconds),
       };
     }).filter(Boolean);
-    openProjectionPlaylist(HISTORY_TAB_SOURCE, "RECENT", state.historyTracks, preserveOptionsIfOpen);
+    await openProjectionPlaylist(HISTORY_TAB_SOURCE, "RECENT", state.historyTracks, preserveOptionsIfOpen);
   } catch (error) {
     state.status = `RECENT ERROR: ${error.message}`;
     render();
   }
 }
 
-function selectSidebarView(view) {
+async function selectSidebarView(view) {
   if (view === "FAVORITES") {
     state.enterSelection = "playlist";
     state.sidebarEnterContext = null;
-    void showFavoritesPlaylist();
+    await showFavoritesPlaylist();
     return;
   }
   if (view === "HISTORY") {
     state.enterSelection = "playlist";
     state.sidebarEnterContext = null;
-    void showPlaybackHistory();
+    await showPlaybackHistory();
     return;
   }
   if (view === "QUEUE") {
@@ -5498,10 +5678,20 @@ function selectSidebarView(view) {
         id: playlistTabID(), title: "QUEUE", gameKey: null,
         playlist: [...queue], selectedTrack: state.selectedTrack, scroll: state.queueScroll,
       } : activePlaylistTab();
-      if (tab && !state.playlistTabs.some((entry) => entry.id === tab.id)) state.playlistTabs.push(tab);
+      if (tab && !state.playlistTabs.some((entry) => entry.id === tab.id)) {
+        await transitionPlaylistTabs(
+          { kind: "insert", id: tab.id, activate: false },
+          { additionalTabs: [tab], updateActive: false }
+        );
+      }
       if (tab) tab.playlist = [...queue];
     }
     if (tab) {
+      const next = await transitionPlaylistTabs(
+        { kind: "activate", id: tab.id },
+        { updateActive: false }
+      );
+      if (next.activeID !== tab.id) return false;
       state.activePlaylistTabId = tab.id;
       tracks = [...queue];
     }
@@ -5663,6 +5853,7 @@ async function loadPathNode(node) {
     const keepOptionsOpen = state.tab === "SETTINGS";
     if (!keepOptionsOpen) tracks = pathTracks;
     let tab = state.playlistTabs.find((entry) => entry.sourceKey === key);
+    let insertedTab = false;
     if (!tab && state.playlistTabs.length < 64) {
       const priorWidths = state.tab === "SETTINGS" ? null : captureTabWidths();
       tab = {
@@ -5674,7 +5865,15 @@ async function loadPathNode(node) {
         selectedTrack: 0,
         scroll: 0,
       };
-      state.playlistTabs.push(tab);
+      await transitionPlaylistTabs(
+        { kind: "insert", id: tab.id, activate: false },
+        { additionalTabs: [tab], updateActive: false }
+      );
+      insertedTab = true;
+      if (token !== state.catalogToken) {
+        await transitionPlaylistTabs({ kind: "close", id: tab.id }, { updateActive: false });
+        return false;
+      }
       if (priorWidths) animateTabLayout(priorWidths, [...state.playlistTabs]);
     }
     if (tab) {
@@ -5686,6 +5885,17 @@ async function loadPathNode(node) {
       tab.selectionAnchorID = pathTracks[0] ? trackID(pathTracks[0]) : null;
       tab.scroll = 0;
       if (!keepOptionsOpen) {
+        const next = await transitionPlaylistTabs(
+          { kind: "activate", id: tab.id },
+          { updateActive: false }
+        );
+        if (token !== state.catalogToken) {
+          if (insertedTab) {
+            await transitionPlaylistTabs({ kind: "close", id: tab.id }, { updateActive: false });
+          }
+          return false;
+        }
+        if (next.activeID !== tab.id) return false;
         state.activePlaylistTabId = tab.id;
         state.activeGameKey = null;
       }
@@ -5718,7 +5928,7 @@ async function tracksForSidebarContext(context) {
   if (context.kind === "game" && bridge.databaseGameTracks) {
     rows = await bridge.databaseGameTracks([context.game]);
   } else if (context.kind === "system" && bridge.databaseGameTracks) {
-    const games = state.games.filter((game) => (game.system || "OTHER") === context.system);
+    const games = state.games.filter((game) => game.consoleGroupName === context.system);
     rows = await bridge.databaseGameTracks(games);
   } else if (context.kind === "path") {
     const node = context.node;
@@ -5925,23 +6135,24 @@ async function loadCatalog() {
   const token = ++state.catalogToken;
   render();
   try {
-    const games = await bridge.databaseGames();
+    const catalog = await bridge.databaseGames();
     if (token !== state.catalogToken) return;
-    if (games?.stale) {
+    if (catalog?.stale) {
       state.catalogLoading = false;
       render();
       return false;
     }
-    state.games = Array.isArray(games) ? games : [];
-    state.games.sort((a, b) => (a.system || "").localeCompare(b.system || "")
-      || (a.displayName || a.name || "").localeCompare(b.displayName || b.name || ""));
-    state.consoleSystems = [...new Set(state.games.map((game) => game.system || "OTHER"))].sort();
+    state.games = Array.isArray(catalog?.games) ? catalog.games : [];
+    state.consoleGroups = Array.isArray(catalog?.groups) ? catalog.groups : [];
+    state.consoleSystems = state.consoleGroups.map((group) => group.name);
+    state.gameSearchQuery = null;
+    state.gameSearchIDs = null;
     state.status = state.games.length ? "READY" : "CATALOG EMPTY";
     state.catalogLoading = false;
     render();
     if (state.games.length) {
       const game = state.games.find((item) => gameKey(item) === state.activeGameKey) || state.games[0];
-      const system = game.system || "OTHER";
+      const system = game.consoleGroupName;
       if (!state.expandedSystems.has(system)) await reduceDatabaseGroupState("toggle", system);
       await loadGame(game);
     } else {
@@ -5966,7 +6177,7 @@ async function loadGame(game) {
   state.status = `LOADING ${game.displayName || game.name}`;
   render();
   try {
-    await reduceDatabaseGroupState("selectGame", game.system || "OTHER", selectedKey);
+    await reduceDatabaseGroupState("selectGame", game.consoleGroupName, selectedKey);
     state.activeGameKey = selectedKey;
     const rows = await bridge.databaseGameTracks([game]);
     if (token !== state.catalogToken || rows?.stale) return;
@@ -5975,6 +6186,7 @@ async function loadGame(game) {
     state.queueScroll = 0;
     state.status = tracks.length ? (game.displayName || game.name) : "NO TRACKS";
     let tab = state.playlistTabs.find((entry) => entry.gameKey === selectedKey);
+    let insertedTab = false;
     if (!tab && state.playlistTabs.length < 64) {
       tab = {
         id: playlistTabID(),
@@ -5986,7 +6198,15 @@ async function loadGame(game) {
         selectionAnchorID: null,
         scroll: 0,
       };
-      state.playlistTabs.push(tab);
+      await transitionPlaylistTabs(
+        { kind: "insert", id: tab.id, activate: false },
+        { additionalTabs: [tab], updateActive: false }
+      );
+      insertedTab = true;
+      if (token !== state.catalogToken) {
+        await transitionPlaylistTabs({ kind: "close", id: tab.id }, { updateActive: false });
+        return;
+      }
     }
     if (tab) {
       tab.title = game.displayName || game.name || tab.title;
@@ -5995,6 +6215,15 @@ async function loadGame(game) {
       tab.selectedTrackIDs = tracks[0] ? [trackID(tracks[0])] : [];
       tab.selectionAnchorID = tracks[0] ? trackID(tracks[0]) : null;
       tab.scroll = 0;
+      const next = await transitionPlaylistTabs(
+        { kind: "activate", id: tab.id },
+        { updateActive: false }
+      );
+      if (token !== state.catalogToken) {
+        if (insertedTab) await transitionPlaylistTabs({ kind: "close", id: tab.id }, { updateActive: false });
+        return;
+      }
+      if (next.activeID !== tab.id) return;
       state.activePlaylistTabId = tab.id;
     }
     resetPlaylistSelection(tracks, tab);
@@ -6222,7 +6451,7 @@ async function openLocalPath() {
     const localTracks = Array.isArray(playlist) ? playlist : [];
     const sourceName = String(snapshot.rootPath || snapshot.path || "LOCAL FILES").split(/[\\/]/).filter(Boolean).at(-1) || "LOCAL FILES";
     state.status = localTracks.length ? "LOCAL FILES" : "NO PLAYABLE FILES AT PATH";
-    createPlaylistTab({ duplicateActive: false, title: sourceName, playlist: localTracks });
+    await createPlaylistTab({ duplicateActive: false, title: sourceName, playlist: localTracks });
     state.tab = "QUEUE";
     persistPlaylistTabs();
     render();
@@ -6656,18 +6885,25 @@ function setReorderAnimation(kind, fromX, time) {
     : null;
 }
 
-function applyReorderOrder(kind, keys) {
+async function applyReorderOrder(kind, keys, sourceKey) {
   if (kind === "column") {
     state.columnOrder = [...keys];
     saveDisplayOptions();
     return;
   }
-  const tabsByID = new Map(state.playlistTabs.map((tab) => [tab.id, tab]));
-  state.playlistTabs = keys.map((id) => tabsByID.get(id)).filter(Boolean);
+  const targetIndex = keys.indexOf(sourceKey);
+  if (targetIndex < 0) throw new Error("Dragged playlist tab is no longer available.");
+  await transitionPlaylistTabs(
+    { kind: "move", id: sourceKey, index: targetIndex },
+    { updateActive: false }
+  );
+  if (!sameOrder(state.playlistTabs.map((tab) => tab.id), keys)) {
+    throw new Error("Shared tab ordering did not match the drag preview.");
+  }
   persistPlaylistTabs();
 }
 
-function finishReorderInteraction(interaction, commit, time = performance.now()) {
+async function finishReorderInteraction(interaction, commit, time = performance.now()) {
   if (interaction.dragging) {
     interaction.pointX = interaction.lastPointX;
     render(false, true, time);
@@ -6677,7 +6913,13 @@ function finishReorderInteraction(interaction, commit, time = performance.now())
     ? reorderPreview.keys : interaction.originalOrder;
   const nextKeys = commit ? previewKeys : interaction.originalOrder;
   const changed = !sameOrder(nextKeys, interaction.originalOrder);
-  if (commit && changed) applyReorderOrder(interaction.itemKind, nextKeys);
+  if (commit && changed) {
+    try {
+      await applyReorderOrder(interaction.itemKind, nextKeys, interaction.sourceKey);
+    } catch (error) {
+      state.status = `TAB ORDER ERROR: ${error.message}`;
+    }
+  }
   reorderPreview = null;
   pointerInteraction = null;
   setReorderAnimation(interaction.itemKind, fromX, time);
@@ -6790,7 +7032,10 @@ canvas.addEventListener("pointerup", (event) => {
       const point = logicalPoint(event);
       interaction.lastPointX = point.x;
       interaction.pointX = point.x;
-      finishReorderInteraction(interaction, true);
+      void finishReorderInteraction(interaction, true).catch((error) => {
+        state.status = `TAB ORDER ERROR: ${error.message}`;
+        render();
+      });
     } else {
       pointerInteraction = null;
     }
@@ -6806,7 +7051,10 @@ canvas.addEventListener("pointercancel", () => {
     setAnimationFPS(initialFPS, false);
     render(false, true);
   } else if (pointerInteraction?.kind === "reorder" && pointerInteraction.dragging) {
-    finishReorderInteraction(pointerInteraction, false);
+    void finishReorderInteraction(pointerInteraction, false).catch((error) => {
+      state.status = `TAB ORDER ERROR: ${error.message}`;
+      render();
+    });
   } else {
     pointerInteraction = null;
   }
@@ -7010,20 +7258,20 @@ canvas.addEventListener("keydown", (event) => {
   if (commandKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "w") {
     event.preventDefault();
     event.stopPropagation();
-    closePlaylistTab();
+    handlePlaylistTabTask(closePlaylistTab());
   } else if (commandKey && !event.altKey && !event.shiftKey && event.key === ",") {
     event.preventDefault();
     toggleOptionsScreen();
   } else if (commandKey && event.shiftKey && event.key.toLowerCase() === "f") {
     event.preventDefault();
-    selectSidebarView("FAVORITES");
+    handlePlaylistTabTask(selectSidebarView("FAVORITES"));
   } else if (commandKey && event.shiftKey && event.key.toLowerCase() === "h") {
     event.preventDefault();
     void showPlaybackHistory();
   } else if (commandKey && !event.shiftKey && !event.altKey && /^[1-9]$/.test(event.key)) {
     event.preventDefault();
     const tab = state.playlistTabs[Number(event.key) - 1];
-    if (tab) activatePlaylistTab(tab.id);
+    if (tab) handlePlaylistTabTask(activatePlaylistTab(tab.id));
   } else if (commandKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "d") {
     event.preventDefault();
     const selected = visibleTracks()[state.selectedTrack];
@@ -7031,10 +7279,10 @@ canvas.addEventListener("keydown", (event) => {
   } else if (commandKey && event.altKey && /^[1-9]$/.test(event.key)) {
     event.preventDefault();
     const tab = state.playlistTabs[Number(event.key) - 1];
-    if (tab) activatePlaylistTab(tab.id);
+    if (tab) handlePlaylistTabTask(activatePlaylistTab(tab.id));
   } else if (commandKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "t") {
     event.preventDefault();
-    createPlaylistTab({ duplicateActive: true });
+    handlePlaylistTabTask(createPlaylistTab({ duplicateActive: true }));
   } else if (commandKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "o") {
     event.preventDefault();
     openLocalPath();
@@ -7197,7 +7445,7 @@ window.ViewBoy = Object.freeze({
       && command !== "settings" && !String(command).startsWith("optionsPage:")) return;
     if (String(command).startsWith("selectPlaylistTab:")) {
       const tab = state.playlistTabs[Number(String(command).split(":").at(-1)) - 1];
-      if (tab) activatePlaylistTab(tab.id);
+      if (tab) handlePlaylistTabTask(activatePlaylistTab(tab.id));
       return;
     }
     switch (command) {
@@ -7208,17 +7456,17 @@ window.ViewBoy = Object.freeze({
       case "repeatOne": toggleRepeatOne(); break;
       case "playlistRandom": toggleRandomMode("playlist"); break;
       case "libraryRandom": toggleRandomMode("library"); break;
-      case "newPlaylistTab": createPlaylistTab({ duplicateActive: true }); break;
-      case "closePlaylistTab": closePlaylistTab(); break;
+      case "newPlaylistTab": handlePlaylistTabTask(createPlaylistTab({ duplicateActive: true })); break;
+      case "closePlaylistTab": handlePlaylistTabTask(closePlaylistTab()); break;
       case "openPath": openLocalPath(); break;
       case "settings": toggleOptionsScreen(); break;
       case "sidebarPaths": void setSidebarMode("paths"); break;
       case "sidebarConsoles": void setSidebarMode("consoles"); break;
       case "sidebarDiskPath": openLocalPath(); break;
-      case "favoritesPlaylist": selectSidebarView("FAVORITES"); break;
+      case "favoritesPlaylist": handlePlaylistTabTask(selectSidebarView("FAVORITES")); break;
       case "playbackHistory": void showPlaybackHistory(); break;
-      case "library": selectSidebarView("LIBRARY"); break;
-      case "queue": selectSidebarView("QUEUE"); break;
+      case "library": handlePlaylistTabTask(selectSidebarView("LIBRARY")); break;
+      case "queue": handlePlaylistTabTask(selectSidebarView("QUEUE")); break;
       case "optionsPage:DISPLAY": openOptionsScreen("DISPLAY"); break;
       case "optionsPage:TRANSPORT": openOptionsScreen("DISPLAY"); break;
       case "optionsPage:PLAYBACK": openOptionsScreen("PLAYBACK"); break;
@@ -7229,7 +7477,7 @@ window.ViewBoy = Object.freeze({
       case "optionsPage:INTERFACE": openOptionsScreen("DISPLAY"); break;
       case "optionsPage:LIBRARY": openOptionsScreen("LIBRARY"); break;
       case "optionsPage:DATABASE": openOptionsScreen("DATABASE"); break;
-      case "closeWindow": closePlaylistTab(); break;
+      case "closeWindow": handlePlaylistTabTask(closePlaylistTab()); break;
       default: break;
     }
   },
@@ -7251,8 +7499,8 @@ pendingCommands.splice(0).forEach((command) => window.ViewBoy.dispatch(command))
   bridge.onLibrarySnapshot?.((snapshot) => {
     if (Array.isArray(snapshot?.playlist)) {
       const optionsOpen = state.tab === "SETTINGS";
-      createPlaylistTab({ duplicateActive: false, title: "QUEUE", playlist: snapshot.playlist,
-        preserveOptions: optionsOpen });
+      handlePlaylistTabTask(createPlaylistTab({ duplicateActive: false, title: "QUEUE", playlist: snapshot.playlist,
+        preserveOptions: optionsOpen }));
       if (optionsOpen) optionsReturnTab = "QUEUE";
       persistPlaylistTabs();
       render();
@@ -7267,7 +7515,7 @@ pendingCommands.splice(0).forEach((command) => window.ViewBoy.dispatch(command))
       state.sidebarMode = state.preferences.sidebarMode === "paths" ? "paths" : "consoles";
       await configureAudio();
       await loadFavorites();
-      restoredTabs = restorePlaylistTabs(await bridge.playlistTabsLoad?.());
+      restoredTabs = await restorePlaylistTabs(await bridge.playlistTabsLoad?.());
     } catch (error) {
       state.status = `OPTION ERROR: ${error.message}`;
       failStartupExperience(state.status);
@@ -7285,12 +7533,15 @@ pendingCommands.splice(0).forEach((command) => window.ViewBoy.dispatch(command))
       return;
     }
     setStartupStage(3);
-    if (restoredTabs) restorePlaylistTabs(await bridge.playlistTabsLoad?.());
+    if (restoredTabs) await restorePlaylistTabs(await bridge.playlistTabsLoad?.());
     if (!state.playlistTabs.length) {
-      state.playlistTabs = [{
+      const initialTab = {
         id: playlistTabID(), title: "PLAYLIST", gameKey: null, playlist: [...tracks], selectedTrack: 0, scroll: 0,
-      }];
-      state.activePlaylistTabId = state.playlistTabs[0].id;
+      };
+      await transitionPlaylistTabs(
+        { kind: "insert", id: initialTab.id, activate: true },
+        { additionalTabs: [initialTab] }
+      );
     }
     state.playlistTabsReady = true;
     persistPlaylistTabs();

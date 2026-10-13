@@ -4,6 +4,12 @@ The LCD sidebar has six equal square bitmap actions for Console/Library, Path, F
 
 `CatalogBrowserCore` reduces individual and all-system disclosure plus game selection through the native `databaseGroupState` bridge. JavaScript keeps the returned expansion and selection state for rendering. Path-node disclosure state remains in ViewBoy's display preferences. Both group types animate from per-node progress values so nested row stacks clip away fully at completion; do not force root paths open after their saved state has been cleared. Disclosure follows the shared motion duration and FPS gate. `CatalogReader` supplies catalog games, tracks, and the indexed file tree; the UI does not scan source folders or write catalog data.
 
+The native `databaseGames` projection returns `CatalogBrowserProjection.groups`
+with stable game IDs and canonical group names. Search uses the shared
+`CatalogBrowserProjection.search` and `CatalogFileSearchIndex` policies; the
+Canvas adapter filters by returned IDs and file identities. Keep grouping,
+fallback labels, ordering, and matching out of the renderer.
+
 The Library pane's fixed width fits six icon buttons and their interface gaps. Keep that width as its flex basis and minimum/maximum width, with flex growth and shrink disabled. Equal square hit targets stay aligned in one row as UI Chrome Gap changes; icon geometry does not depend on font metrics or label lengths. Its tree viewport takes only the remaining vertical space (`flexBasis: 0`, `minHeight: 0`) and clips the expanding row content. Large group disclosures may animate rows, but they must not resize the pane or shift the adjacent playlist pane. Keep the search and navigation controls directly above the tree without section banners. Pane bottoms remain content areas with no status bar; the app footer owns file and playback-time readouts, temporarily replacing the file path with catalog reload progress.
 
 View > Playback Queue displays the active playback list, falling back to the browsed playlist before playback starts. Favorites reads and updates the shared `FavoriteStoreCore`. The native File menu and Command-O invoke the local path chooser and folder projection; they are separate from Path mode, which browses the catalog's indexed paths.

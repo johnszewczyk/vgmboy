@@ -2,17 +2,18 @@
 
 ## Purpose
 
-Map the shared behavior contracts that can support tabs, views, search, and
-options across the VGMMan frontends. This is an architecture map; it does not
-introduce a cross-renderer widget toolkit or change app behavior.
+Map the shared behavior contracts currently used by the active VGMMan
+frontends. This is an architecture map; it does not introduce a cross-renderer
+widget toolkit.
 
 ## Current ownership
 
 | Feature | Shared foundation today | App-owned today | Current boundary |
 | --- | --- | --- | --- |
-| Tabs | `FrontendCore/PlaylistIdentityCore` defines stable playlist row IDs. `PlaylistTabsPersistenceCore` now owns the common version-1 WebKit snapshot envelope, validation, and bounded atomic file I/O used by SPCBoyWK and SB2. | Apps still own tab lifecycle, ordering, selection restoration, rendering, and storage location. CocoaSpice has its own typed snapshot format; ViewBoy persists through UserDefaults. | WebKit persistence policy is shared between SPCBoyWK and SB2; the tab state transition contract remains app-specific. LineBoy has no playlist-tab UI identified in its current source. |
-| Views | `CatalogReader/CatalogBrowserCore` defines catalog modes/state, temporary search view, content/result source, projections, and sidebar row intent. `FrontendCommandCore` shares command and shortcut identifiers. | Each app owns its navigation surface, view composition, focus, geometry, and transitions. LineBoy lays out its own fixed-cell display. | Share view semantics and commands; keep view widgets and layout with each renderer. Favorites remains a playlist projection rather than a catalog view. |
-| Search | `CatalogBrowserCore` provides canonical game/file search text and search indexes; browser mode/query state is also defined there. | Apps own input controls, focus/clear behavior, result rendering, and adapters. WebKit clients locally filter bridge-published search projections. | The shared text projection and matching semantics exist. Some client-side filtering and state adaptation remain duplicated. |
+| Tabs | `FrontendCore/PlaylistIdentityCore` defines stable playlist row IDs. `PlaylistTabsPersistenceCore` owns ordinary tab transitions for activation, insertion, close fallback, move, and restore. CocoaSpice calls the reducer directly; SB2 and ViewBoy call it through their native bridges. | Apps own tab payloads, final-tab/window behavior, selection restoration, rendering, and storage location. CocoaSpice uses its typed snapshot format; SB2 and ViewBoy keep their own snapshot adapters. | Ordinary tab ordering and active fallback now share one policy across the three active frontends. |
+| Playlist sorting | `CatalogPlaylistPresentationCore.CatalogPlaylistSorting` owns field comparison, stable natural-order ties, missing track-number handling, and explicit direction. | Frontends provide their visible row values and map sorted IDs back to rows while preserving selection. | CocoaSpice, SB2, and ViewBoy use the same explicit sort policy. |
+| Views | `CatalogReader/CatalogBrowserCore` defines catalog modes/state, temporary search view, content/result source, projections, and sidebar row intent. `FrontendCommandCore` shares command and shortcut identifiers. | Each active app owns its navigation surface, view composition, focus, geometry, and transitions. | Share view semantics and commands; keep view widgets and layout with each renderer. Favorites remains a playlist projection rather than a catalog view. |
+| Search | `CatalogBrowserCore` provides canonical game/file search indexes, console groups, row identities, and browser state. | Apps own input controls, focus/clear behavior, result rendering, and adapters. ViewBoy requests matching IDs from the shared indexes and maps them onto Canvas rows. | ViewBoy no longer rebuilds console grouping or game/path matching in JavaScript. Search controls and rendering remain skin-owned. |
 | Options | `FrontendCore/FrontendPreferencesCore` owns common preference values/store behavior, animation bounds, window roles, and `FrontendOptionsManifest`. The manifest currently describes Database, Interface, and Windows sections. | Each app owns its option schema, settings commands, page/dialog structure, and native/WebKit/Canvas/WebGL controls. | Shared preferences and categories are data contracts, not shared controls or a common option renderer. |
 
 ## Existing library map
@@ -21,36 +22,31 @@ introduce a cross-renderer widget toolkit or change app behavior.
   file-tree policy, and catalog playlist presentation/sorting contracts.
 - **FrontendCore** owns frontend preferences plus stable playlist identity,
   startup, favorites/history, queue, archive/cache, and transport policy.
-- **PlaylistTabsPersistenceCore** owns shared WebKit tab snapshot validation and
-  file I/O; app targets provide their own storage URL and render/state adapter.
+- **PlaylistTabsPersistenceCore** owns ordered tab-state transitions and shared
+  WebKit snapshot validation/file I/O; app targets provide their own storage
+  format, persistence location, payload adapter, and renderer.
 - **FrontendCommandCore** owns renderer-neutral command and shortcut IDs.
 - **VGMBoy** owns playback admission, decoding, timing, and audio output.
 - **App targets** own their visual and interaction adapters: AppKit/SwiftUI in
-  CocoaSpice, DOM/WebKit in SPCBoyWK and SB2, Yoga/Canvas in ViewBoy, and the
-  fixed-cell WebGL experiment in LineBoy.
+  CocoaSpice, DOM/WebKit in SB2, and Yoga/Canvas in ViewBoy.
 
 This keeps the common libraries focused on data, state transitions, and
 policy. A shared widget library would have to erase real differences between
-SwiftUI, DOM, Canvas, and LineBoy's character-cell layout, so it is not the
-right first extraction.
+SwiftUI, DOM, and Canvas, so it is not the right first extraction.
 
-SPCBoyWK and SB2 also carry tiny parallel JavaScript option and playlist
-selection helpers; the checked-in copies currently differ only in their
-exported app namespace. That is a real duplication, but a small one. It is
-lower priority than agreeing on tab state and option schemas.
+The active app set is CocoaSpice, SB2, and ViewBoy. SPCBoyWK is retired and is
+not a parity target for new shared UI work.
 
 ## Recommended shared contracts
 
-1. **Tabs — next contract candidate.** The shared persistence envelope is in
-   place for SPCBoyWK and SB2. Define a renderer-neutral reducer for
-   create/duplicate, activate, close, reorder, restore, and active-tab fallback
-   only after comparing behavior with CocoaSpice and ViewBoy. Keep app storage
-   locations, host bridges, and visual tab components local.
+1. **Tabs — reducer adopted.** Keep ordinary tab order and active selection
+   transitions in `PlaylistTabsPersistenceCore`. Keep app storage locations,
+   payloads, final-tab behavior, and visual components local.
 2. **Views — keep the existing CatalogBrowserCore boundary.** Treat the
    catalog mode, temporary search mode, and row intents as semantic state.
    Reconcile `FrontendSidebarView` with `CatalogBrowserMode` only if the
-   supported mode sets are intended to match; do not force LineBoy's display
-   layout into catalog navigation enums.
+   supported mode sets are intended to match; keep each frontend's display
+   layout out of catalog navigation enums.
 3. **Search — consolidate policy at the existing boundary.** Keep canonical
    searchable fields, normalization, token matching, and file-tree search in
    CatalogBrowserCore. Reduce client-side copies by consuming the shared
@@ -64,11 +60,10 @@ lower priority than agreeing on tab state and option schemas.
 
 ## First implementation sequence
 
-1. Compare tab semantics and persisted payloads across CocoaSpice, SPCBoyWK,
-   SB2, and ViewBoy; write the contract and compatibility cases before moving
-   code.
-2. Audit remaining duplicated browse/search algorithms against
-   CatalogBrowserCore and route only policy duplication into that package.
+1. Keep tab payload compatibility and host-specific final-tab behavior
+   documented while all three active apps use the shared reducer.
+2. Route future catalog group and search changes through CatalogBrowserCore;
+   do not add renderer-local comparison or grouping rules.
 3. Inventory shared option values separately from app-specific settings, then
    add schema fields to `FrontendOptionsManifest` only for genuinely common
    controls.
@@ -84,7 +79,5 @@ lower priority than agreeing on tab state and option schemas.
 - `FrontendCore/Sources/PlaylistIdentityCore/PlaylistIdentityCore.swift`
 - `FrontendCore/Sources/PlaylistTabsPersistenceCore/PlaylistTabsPersistenceCore.swift`
 - `CocoaSpice/Sources/CocoaSpice/App/PlaylistTabs.swift`
-- `SPCBoyWK/Sources/SPCBoyWK/PlaylistTabsStore.swift`
 - `SB2/Sources/SB2/PlaylistTabsStore.swift`
 - `ViewBoy/Sources/ViewBoy/WKNativeBridge.swift`
-- `LineBoy/Sources/LineBoy/main.swift`

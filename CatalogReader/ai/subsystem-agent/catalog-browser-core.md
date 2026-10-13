@@ -23,13 +23,16 @@ write SQLite, or activate playback.
   snapshot into the playlist without changing this catalog state.
 - Duplicate game names are disambiguated consistently from system and root information.
 - Display labels never become selection identity.
-- Search terms match the same normalized name, system, root, and display-label fields in every skin; extending a query may reuse prior candidates, while backspace or replacement restarts from all rows.
+- Search terms use shared case- and diacritic-insensitive normalization across the same name, system, root, and display-label fields in every skin; extending a query may reuse prior candidates, while backspace or replacement restarts from all rows.
 - Empty folder console tags fall through to stored track metadata before the
   projection creates an `Unknown Console` group.
 - `CatalogBrowserGame.consoleGroupName` and
   `CatalogBrowserProjection.groups(from:)` own the Console-view fallback,
   natural group order, and game membership. A renderer may map group IDs into
   native or DOM rows, but must not regroup or sort console labels locally.
+- ViewBoy receives those groups from the native bridge and maps shared game and
+  indexed-path search result IDs onto Canvas rows. Search matching stays in
+  CatalogBrowserCore; a renderer owns query entry and result presentation.
 - Folder, leaf, and group gestures reduce to select, preview, expansion, or
   activation intents without importing SwiftUI, AppKit, WebKit, or DOM state.
 - `CatalogBrowserGroupState` owns Console → Game group selection and disclosure

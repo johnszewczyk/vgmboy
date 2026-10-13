@@ -15,6 +15,7 @@ import Observation
 import PlaybackHistoryCore
 import PlaybackQueueCore
 import PlaybackTransportCore
+import PlaylistTabsPersistenceCore
 import UniformTypeIdentifiers
 import VGMBoyKit
 
@@ -372,23 +373,35 @@ final class PlayerViewModel {
             selectedTrackID: shouldDuplicate ? (source?.selectedTrackID ?? selectedTrackID) : nil,
             selectedTrackIDs: shouldDuplicate ? (source?.selectedTrackIDs ?? selectedTrackIDs) : []
         )
-        playlistTabs.append(tab)
+        _ = applyPlaylistTabOrderAction(PlaylistTabOrderAction(
+            kind: .insert,
+            id: tab.id,
+            activate: false
+        ), additionalTabs: [tab])
         activatePlaylistTab(tab.id)
     }
 
     func movePlaylistTab(_ tabID: String, toIndex targetIndex: Int) {
-        guard let sourceIndex = playlistTabs.firstIndex(where: { $0.id == tabID }),
-              playlistTabs.count > 1 else { return }
-        let destinationIndex = min(max(targetIndex, 0), playlistTabs.count - 1)
-        guard sourceIndex != destinationIndex else { return }
+        guard playlistTabs.count > 1,
+              playlistTabs.firstIndex(where: { $0.id == tabID }) != nil else { return }
         syncActivePlaylistTab()
-        let tab = playlistTabs.remove(at: sourceIndex)
-        playlistTabs.insert(tab, at: min(destinationIndex, playlistTabs.count))
+        let before = playlistTabs.map(\.id)
+        let next = applyPlaylistTabOrderAction(PlaylistTabOrderAction(
+            kind: .move,
+            id: tabID,
+            index: targetIndex
+        ))
+        guard next.orderedIDs != before else { return }
         schedulePlaylistTabsSave()
     }
 
     func activatePlaylistTab(_ tabID: String) {
+        let next = applyPlaylistTabOrderAction(
+            PlaylistTabOrderAction(kind: .activate, id: tabID),
+            updateActive: false
+        )
         guard tabID != activePlaylistTabID,
+              next.activeID == tabID,
               let tab = playlistTabs.first(where: { $0.id == tabID }) else { return }
         let enteringGallery = tab.kind == .gallery && !isGalleryTabActive
         syncActivePlaylistTab()
@@ -443,18 +456,41 @@ final class PlayerViewModel {
             return
         }
         let wasActive = tabID == activePlaylistTabID
-        playlistTabs.remove(at: index)
+        let next = applyPlaylistTabOrderAction(
+            PlaylistTabOrderAction(kind: .close, id: tabID),
+            updateActive: false
+        )
         if playbackTabID == tabID {
             playbackTabID = nil
             playbackPlaylistSnapshot = currentTrack.map { [$0] } ?? []
         }
         if wasActive {
-            let nextIndex = min(index, playlistTabs.count - 1)
             activePlaylistTabID = ""
-            activatePlaylistTab(playlistTabs[nextIndex].id)
+            if let nextID = next.activeID {
+                activatePlaylistTab(nextID)
+            }
         } else {
             schedulePlaylistTabsSave()
         }
+    }
+
+    @discardableResult
+    private func applyPlaylistTabOrderAction(
+        _ action: PlaylistTabOrderAction,
+        updateActive: Bool = true,
+        additionalTabs: [CocoaSpicePlaylistTab] = []
+    ) -> PlaylistTabOrderState {
+        let state = PlaylistTabOrderState(
+            orderedIDs: playlistTabs.map(\.id),
+            activeID: activePlaylistTabID
+        )
+        let next = PlaylistTabOrderReducer.reduce(state: state, action: action)
+        let tabsByID = Dictionary(uniqueKeysWithValues: (playlistTabs + additionalTabs).map { ($0.id, $0) })
+        playlistTabs = next.orderedIDs.compactMap { tabsByID[$0] }
+        if updateActive {
+            activePlaylistTabID = next.activeID ?? ""
+        }
+        return next
     }
 
     func setActivePlaylistTitle(_ title: String) {
@@ -495,7 +531,11 @@ final class PlayerViewModel {
             }
             syncActivePlaylistTab()
             let tab = CocoaSpicePlaylistTab(title: "Gallery", kind: .gallery)
-            playlistTabs.append(tab)
+            _ = applyPlaylistTabOrderAction(PlaylistTabOrderAction(
+                kind: .insert,
+                id: tab.id,
+                activate: false
+            ), additionalTabs: [tab])
             activatePlaylistTab(tab.id)
         }
         statusText = galleryIsLoading
@@ -3701,7 +3741,12 @@ final class PlayerViewModel {
             supportedExtensions: PlaybackFormatRegistry.supportedExtensions
         ) {
             playlistTabs = snapshot.tabs
-            activePlaylistTabID = snapshot.activeTabID
+            let restoredOrder = applyPlaylistTabOrderAction(PlaylistTabOrderAction(
+                kind: .restore,
+                orderedIDs: snapshot.tabs.map(\.id),
+                activeID: snapshot.activeTabID
+            ))
+            activePlaylistTabID = restoredOrder.activeID ?? ""
             guard let tab = activePlaylistTab else { return }
             isRestoringPlaylistTabs = true
             activePlaylistTitle = tab.title
@@ -3710,14 +3755,20 @@ final class PlayerViewModel {
             selectedTrackIDs = tab.selectedTrackIDs
             isRestoringPlaylistTabs = false
         } else {
-            activePlaylistTabID = UUID().uuidString
-            playlistTabs = [CocoaSpicePlaylistTab(
-                id: activePlaylistTabID,
+            let initialTab = CocoaSpicePlaylistTab(
+                id: UUID().uuidString,
                 title: activePlaylistTitle,
                 tracks: playlist,
                 selectedTrackID: selectedTrackID,
                 selectedTrackIDs: selectedTrackIDs
-            )]
+            )
+            playlistTabs = [initialTab]
+            let initialOrder = applyPlaylistTabOrderAction(PlaylistTabOrderAction(
+                kind: .restore,
+                orderedIDs: [initialTab.id],
+                activeID: initialTab.id
+            ))
+            activePlaylistTabID = initialOrder.activeID ?? ""
             schedulePlaylistTabsSave()
         }
         if let currentTrack,

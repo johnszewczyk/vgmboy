@@ -324,7 +324,7 @@ struct MainView: View {
                 ScrollView(.horizontal) {
                     HStack(spacing: spacing) {
                         ForEach(model.playlistTabs) { tab in
-                            HStack(spacing: 0) {
+                            ZStack(alignment: .trailing) {
                                 Button {
                                     model.activatePlaylistTab(tab.id)
                                 } label: {
@@ -335,13 +335,15 @@ struct MainView: View {
                                         Spacer(minLength: 0)
                                     }
                                     .padding(.leading, 8)
-                                    .padding(.trailing, 4)
+                                    .padding(.trailing, 26)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                                    .background(Color.clear)
                                     .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
                                 .help(tab.title)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .contentShape(Rectangle())
 
                                 Button {
                                     model.closePlaylistTab(tab.id)
@@ -356,6 +358,7 @@ struct MainView: View {
                             }
                             .font(.system(size: 11))
                             .frame(width: tabWidth, height: 30)
+                            .contentShape(Rectangle())
                             .background(
                                 model.activePlaylistTabID == tab.id
                                     ? Color.accentColor.opacity(0.2)

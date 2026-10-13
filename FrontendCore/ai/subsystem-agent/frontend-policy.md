@@ -18,6 +18,9 @@ startup contracts shared by the VGMMan player frontends.
   key namespace, labels, width units, and rendering. It also publishes the
   shared eight-point-per-side minimum header padding; font measurement,
   indicators, and width-unit conversion remain renderer-local.
+- `PlaylistTabsPersistenceCore` owns the ordinary ordered-ID transitions for
+  playlist-tab insert, activate, close fallback, move, and restore. Frontends
+  retain tab payloads, snapshot storage, visual behavior, and final-tab policy.
 - `PlaybackRequestCore` owns newest-request-wins lifecycle and serial native
   command execution.
 - `PlaybackQueueCore` owns pure queue identity, adjacent navigation, repeat
@@ -66,7 +69,7 @@ startup contracts shared by the VGMMan player frontends.
   the direct session controls at the bridge boundary. Their shared
   normalization keeps a renderer from relying on scalar argument order.
 - `PlaybackQueuedSkipFadeRequest` carries the complete faded-track-change
-  policy input used by both CocoaSpice and SPCBoyWK for playlist activation
+  policy input used by CocoaSpice and SB2 for playlist activation
   and Previous/Next. The shared request returns the bounded duration in seconds
   or milliseconds. Each renderer owns its delayed target handoff and
   cancellation; both reach the same VGMBoy output-gain ramp command.
@@ -92,6 +95,7 @@ startup contracts shared by the VGMMan player frontends.
 - `Sources/FavoriteStoreCore/`
 - `Sources/PlaybackHistoryCore/`
 - `Sources/PlaylistIdentityCore/`
+- `Sources/PlaylistTabsPersistenceCore/`
 - `Sources/FrontendPreferencesCore/`
 - `Sources/PlaybackRequestCore/`
 - `Sources/PlaybackQueueCore/`
