@@ -1,6 +1,6 @@
 # Display
 
-Options uses 1× UI Gap for card/pane insets and neighboring controls, and 2× UI Gap between cards/columns and below pane or card headers. Palette swatches share the card content edges without extra nested padding.
+Options uses 1× UI Gap for card/pane insets and neighboring controls, and 2× UI Gap between cards/columns and below pane or card headers. The PREVIEW row contains one bounded, continuous tone strip aligned with the BG/PIXEL fields. METHOD labels four equal-width LCD/Direct/8/16 buttons. The preview shows all eight or sixteen tones in grayscale modes, with ink/background markers inside the strip.
 
 ViewBoy uses one responsive LCD canvas for library, playlist, options, and playback. Yoga lays out the semantic framebuffer; the display model expands its ink, muted ink, selection and substrate labels into device cells. New installations use four-tone LCD output, an enabled STN aperture, yellow-green BG and black PIXEL. Direct, 8-step and 16-step output remain available. Contrast Boost strengthens ink and matrix edge density, including binary 1 PX gutters with saturated black or white pixels, without changing the matrix setting, dot pitch, layout or spacing. Grayscale TEXT SHADE and BG SHADE remain independently adjustable. Both dark-on-light and inverse tones are supported. The root content retains its fixed eight-dot inset and the LCD surface fills the window.
 

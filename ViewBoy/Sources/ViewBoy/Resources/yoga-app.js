@@ -1389,7 +1389,8 @@ export function choiceControlLayoutSnapshot() {
     .map(({ widget, box }) => [widget.meta.optionChoiceRow, { ...box }]));
   return layoutEntries.flatMap(({ widget, box }) => {
     const title = widget.meta.optionChoiceControls;
-    return title ? [{ title, row: rows.get(title) || null, controls: { ...box } }] : [];
+    return title ? [{ title, label: widget.parent.meta.optionChoiceLabel,
+      row: rows.get(title) || null, controls: { ...box } }] : [];
   });
 }
 
@@ -2213,6 +2214,7 @@ function optionChoice(parent, title, choices, displayTitle = title) {
     gap: stacked ? uiGap() : 0,
   }, {
     optionChoiceRow: title,
+    optionChoiceLabel: displayTitle,
     paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
   });
   if (displayTitle) label(row, displayTitle, { ...(stacked ? { widthPercent: 100 } : { flexGrow: 1, flexBasis: 0, minWidth: 0 }), height }, {
@@ -2605,7 +2607,11 @@ export function optionsContentSnapshot() {
 export function optionsStyleSnapshot() {
   return layoutEntries.flatMap(({ widget, box }) => {
     if (widget.meta.optionPalettePreview) {
-      return [{ kind: "preview", name: "LCD PALETTE", box: { ...box } }];
+      return [{ kind: "preview", name: "LCD PALETTE", label: "PREVIEW",
+        toneCount: grayscaleLevels(state.pixelShadeMode) || RGB.length, box: { ...box } }];
+    }
+    if (widget.meta.optionPaletteStrip) {
+      return [{ kind: "tone-strip", name: "LCD PALETTE", box: { ...box } }];
     }
     if (widget.meta.optionPanelTitle) {
       return [{ kind: "title", name: widget.meta.optionPanelTitle, headerRole: widget.meta.paneHeader ?? null,
@@ -3518,32 +3524,38 @@ function addColumnContextMenu(parent) {
 }
 
 function addPalettePreview(parent) {
-  const preview = makeWidget(parent, {
-    direction: FlexDirection.Row,
-    gap: uiGap(),
-  }, { optionPalettePreview: true });
-  RGB.forEach((_, shade) => makeWidget(preview, {
-    flexGrow: 1,
-    height: rowHeight(8),
+  const preview = controlRow(parent, { gap: 0 }, { optionPalettePreview: true });
+  label(preview, "PREVIEW", { widthPercent: 33.3333, height: buttonStandardHeight() }, {
+    inset: controlPaddingDots(),
+  });
+  makeWidget(preview, {
+    widthPercent: 66.6667,
+    maxWidth: framedTextWidth("RGB(255,255,255)"),
+    height: buttonStandardHeight(),
   }, {
+    optionPaletteStrip: true,
     paint(box) {
       const levels = grayscaleLevels(state.pixelShadeMode);
-      if (levels) {
+      const count = levels || RGB.length;
+      strokeRect(box.x, box.y, box.width, box.height, 1);
+      for (let shade = 0; shade < count; shade++) {
+        const left = box.x + 1 + Math.round((box.width - 2) * shade / count);
+        const right = box.x + 1 + Math.round((box.width - 2) * (shade + 1) / count);
+        if (!levels) {
+          fillRect(left, box.y + 1, right - left, box.height - 2, shade);
+          continue;
+        }
         const edge = shade < levels / 2 ? levels - 1 : 0;
-        fillToneRect(box.x + 1, box.y + 1, box.width - 2, box.height - 2, shade);
-        strokeToneRect(box.x, box.y, box.width, box.height, edge);
+        fillToneRect(left, box.y + 1, right - left, box.height - 2, shade);
         if (shade === activeGrayscaleTone(state.pixelToneIndex, levels)) {
-          fillToneRect(box.x + 2, box.y + 2, box.width - 4, 2, edge);
+          fillToneRect(left, box.y + 2, right - left, 1, edge);
         }
         if (shade === activeGrayscaleTone(state.backgroundToneIndex, levels)) {
-          fillToneRect(box.x + 2, box.y + box.height - 4, box.width - 4, 2, edge);
+          fillToneRect(left, box.y + box.height - 3, right - left, 1, edge);
         }
-      } else {
-        strokeRect(box.x, box.y, box.width, box.height, 1);
-        fillRect(box.x + 1, box.y + 1, box.width - 2, box.height - 2, shade);
       }
     },
-  }));
+  });
 }
 
 function optionGroup(parent, title, contentHeights = null) {
@@ -3706,7 +3718,7 @@ function customColorInput(parent, endpoint, title) {
 
 function addLCDColorOptions(parent) {
   const levels = grayscaleLevels(state.pixelShadeMode);
-  const rowHeights = [rowHeight(8), buttonStandardHeight(), buttonStandardHeight(),
+  const rowHeights = [buttonStandardHeight(), buttonStandardHeight(), buttonStandardHeight(),
     buttonStandardHeight(), buttonStandardHeight() * 2 + uiGap(), ...(levels ? [buttonStandardHeight(), buttonStandardHeight()] : []),
     ...(state.editingColorEndpoint || state.colorInputError ? [rowHeight()] : [])];
   const colors = optionGroup(parent, "LCD PALETTE", rowHeights);
@@ -3720,7 +3732,7 @@ function addLCDColorOptions(parent) {
       onClick: () => setPixelShadeMode("GRAY8") },
     { title: "16", accessibilityTitle: "16 SHADE", selected: state.pixelShadeMode === "GRAY16",
       onClick: () => setPixelShadeMode("GRAY16") },
-  ], "");
+  ], "METHOD");
   customColorInput(colors, "background", "BG");
   customColorInput(colors, "font", "PIXEL");
   const boost = makeWidget(colors, { direction: FlexDirection.Column, gap: uiGap() });

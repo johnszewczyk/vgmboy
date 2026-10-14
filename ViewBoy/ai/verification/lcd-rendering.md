@@ -32,8 +32,11 @@ passes nine focused tests. JavaScript syntax checks pass.
   spacing. Reset writes 4/4/1 in one update; minimum padding reserves glyphs and
   borders, and cards stay within the content viewport. Header-to-content and
   card gaps equal 2× UI Gap at values 4 and 5. Wide columns use the same factor;
-  palette preview shares the card inset and profile bottom padding is exactly
+  the PREVIEW row shares the card inset and profile bottom padding is exactly
   1× UI Gap.
+- PREVIEW and METHOD labels remain present. One continuous strip paints all
+  four semantic tones or all 8/16 grayscale tones, verified in the framebuffer.
+  The four method buttons have equal widths.
 
 ## Package
 
@@ -66,7 +69,11 @@ window, Standard 5x7 text and 3 PX dots:
 
 - At saved pad/gap/line values 3/4/3, the refined packaged Display page shows
   eight logical dots below pane/card headers and between cards. Palette
-  swatches share the other controls' content edges. Preferences were unchanged.
+  preview rows share the other controls' content edges. Preferences were unchanged.
+- The rebuilt palette card at saved 3/7/3 spacing shows PREVIEW beside one
+  compact tone strip aligned with BG/PIXEL fields, and METHOD beside four equal
+  buttons. Settled LCD and Direct views retain both labels. All 8/16 tones are
+  additionally verified by the framebuffer test.
 - The packaged app also shows aligned filled OPTIONS/DISPLAY headers.
   Native Button Pad 1→2 and UI Gap 6→7 adjustments visibly resize controls and
   pane/card spacing; the original 1/6/1 values were restored.
