@@ -46,12 +46,15 @@ export function cellCoverage(size, matrix = true, profile = "STN") {
 }
 
 export function deviceCell(ink, background, coverage, boost = 0) {
-  // Optional optical-density gain at partially covered edges. Endpoints,
-  // pitch and the aperture mask remain separate from this output adjustment.
-  const gain = 1 + clamp(Number(boost) / 100) * 2;
+  // Readability gain is separate from physical coverage. Classic 1 PX cells
+  // have only binary coverage: tint their gutters toward ink, capped at 65%,
+  // so saturated black/white faces still gain contrast and the grid survives.
+  // Zero boost reproduces the selected aperture without this adjustment.
+  const strength = clamp(Number(boost) / 100);
+  const gain = 1 + strength * 2;
   return coverage.map((area) => {
-    const opacity = area > 0 && area < 1
-      ? Math.min(0.98, 1 - (1 - area) ** gain) : area;
+    const opacity = area === 0 ? strength * 0.65
+      : area < 1 ? Math.min(0.98, 1 - (1 - area) ** gain) : area;
     return mixReflectance(background, ink, opacity);
   });
 }

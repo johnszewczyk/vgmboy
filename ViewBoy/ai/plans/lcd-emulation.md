@@ -21,6 +21,10 @@ Direct, 8, and 16 methods remain available. Their matrix setting and dot pitch
 stay independent of the output mode. Existing explicitly saved matrix-off
 preferences are retained; new installations enable the component aperture.
 
+## Display Refinement
+
+Implemented: Contrast Boost now works with classic binary gutters and saturated endpoints. The deliberate gutter tint is separate from physical coverage and capped at 65% so the grid stays visible. Zero boost retains exact classic output. Display has a live slider with fine keyboard adjustment, fixed readout geometry, contextual color editing, five grouped cards, logical-dot pane insets and a compact Options sidebar. Page selection borders no longer intersect glyphs.
+
 ## Primary Source Register
 
 | Source | Established fact | Modeling use and boundary |

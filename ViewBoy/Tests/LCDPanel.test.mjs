@@ -58,6 +58,33 @@ test('four LCD tones retain hue, endpoints, and ordering in either polarity', ()
   }
 });
 
+test('1 PX boost works with saturated endpoints at every size and retains distinct gutters', () => {
+  for (const size of [2, 3, 4, 5, 6]) {
+    for (const [ink, background, direction] of [
+      ['#000000', '#9BBC0F', -1], ['#FFFFFF', '#111111', 1],
+    ]) {
+      const mask = cellCoverage(size, true, 'CLASSIC');
+      const baseline = deviceCell(ink, background, mask);
+      let previous = baseline;
+      mask.forEach((area, index) => assert.equal(baseline[index], area ? ink : background));
+      for (const boost of [25, 50, 75, 100]) {
+        const colors = deviceCell(ink, background, mask, boost);
+        mask.forEach((area, index) => {
+          if (area) assert.equal(colors[index], ink, 'face stays at the exact endpoint');
+          else {
+            assert.ok((luminance(colors[index]) - luminance(previous[index])) * direction > 0,
+              'gutters strengthen contrast monotonically');
+            assert.notEqual(colors[index], ink, 'gutters never merge with the face');
+          }
+        });
+        previous = colors;
+      }
+      assert.deepEqual(mask, cellCoverage(size, true, 'CLASSIC'));
+      assert.ok(deviceCell(ink, background, cellCoverage(size, false), 100).every((color) => color === ink));
+    }
+  }
+});
+
 test('background and exact gapless endpoints survive Contrast Boost', () => {
   for (const size of [2, 3, 4, 5, 6]) {
     assert.ok(deviceCell('#000000', '#9BBC0F', cellCoverage(size, false)).every((color) => color === '#000000'));

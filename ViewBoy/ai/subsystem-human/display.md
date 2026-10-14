@@ -1,6 +1,8 @@
 # Display
 
-ViewBoy uses one responsive LCD canvas for library, playlist, options, and playback. Yoga lays out the semantic framebuffer; the display model expands its ink, muted ink, selection and substrate labels into device cells. New installations use four-tone LCD output, an enabled STN aperture, yellow-green BG and black PIXEL. Direct, 8-step and 16-step output remain available. Contrast Boost strengthens ink and matrix edge density without changing the matrix setting, dot pitch, layout or spacing. Grayscale TEXT SHADE and BG SHADE remain independently adjustable. Both dark-on-light and inverse tones are supported. The root content retains its fixed eight-dot inset and the LCD surface fills the window.
+ViewBoy uses one responsive LCD canvas for library, playlist, options, and playback. Yoga lays out the semantic framebuffer; the display model expands its ink, muted ink, selection and substrate labels into device cells. New installations use four-tone LCD output, an enabled STN aperture, yellow-green BG and black PIXEL. Direct, 8-step and 16-step output remain available. Contrast Boost strengthens ink and matrix edge density, including binary 1 PX gutters with saturated black or white pixels, without changing the matrix setting, dot pitch, layout or spacing. Grayscale TEXT SHADE and BG SHADE remain independently adjustable. Both dark-on-light and inverse tones are supported. The root content retains its fixed eight-dot inset and the LCD surface fills the window.
+
+The Display page groups colors, screen profile, interface behavior, spacing, and motion into five cards. Its contrast slider supports dragging and fine keyboard steps; minus/plus uses five-percent steps. Zero boost reproduces the chosen aperture without a readability override. Color editing hints are contextual, and invalid drafts remain editable.
 
 The published color and spacing specification is [ViewBoy UI Design](../../../VGMManDocs/Docs/md/ViewBoy/ui-design.md).
 

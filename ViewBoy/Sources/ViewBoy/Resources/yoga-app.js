@@ -598,6 +598,7 @@ const state = {
   editingRateBackend: null,
   rateDraft: "",
   animationFPSFocused: false,
+  lcdContrastFocused: false,
   tableHorizontalScroll: 0,
   tableHorizontalMax: 0,
   tableViewportWidth: 0,
@@ -1880,7 +1881,8 @@ function libraryPaneWidth() {
   const toolbarWidth = items.length * SIDEBAR_BUTTON_SIZE_DOTS
     + Math.max(0, items.length - 1) * gapDots
     + 2 * gapDots;
-  return Math.max(94, toolbarWidth / STYLE_SCALE);
+  return state.tab === "SETTINGS" ? toolbarWidth / STYLE_SCALE
+    : Math.max(94, toolbarWidth / STYLE_SCALE);
 }
 
 function appStatusDetails() {
@@ -2162,10 +2164,10 @@ function optionToggleDuration(parent, title, controlPrefix, checked, onClick, ke
   label(row, title, { flexGrow: 1, height }, {
     textShade: 0, inset: controlPaddingDots(),
   });
-  pixelButton(row, "[-]", () => adjustPlaybackDuration(key, -step, minimum, maximum, fallback), {
+  pixelButton(row, "-", () => adjustPlaybackDuration(key, -step, minimum, maximum, fallback), {
     controlTitle: `${controlPrefix} -`,
   });
-  pixelButton(row, "[+]", () => adjustPlaybackDuration(key, step, minimum, maximum, fallback), {
+  pixelButton(row, "+", () => adjustPlaybackDuration(key, step, minimum, maximum, fallback), {
     controlTitle: `${controlPrefix} +`,
   });
   durationInput(row, key, optionDuration(state.preferences[key] ?? fallback, allowOpen),
@@ -2196,8 +2198,8 @@ function optionToggleAdjuster(parent, title, controlPrefix, checked, onClick,
   label(row, title, { flexGrow: 1, height }, {
     textShade: 0, inset: controlPaddingDots(),
   });
-  pixelButton(row, "[-]", onDecrease, { controlTitle: `${controlPrefix} -` });
-  pixelButton(row, "[+]", onIncrease, { controlTitle: `${controlPrefix} +` });
+  pixelButton(row, "-", onDecrease, { controlTitle: `${controlPrefix} -` });
+  pixelButton(row, "+", onIncrease, { controlTitle: `${controlPrefix} +` });
   label(row, value, { width: framedTextWidth(value), height }, {
     border: BUTTON_BORDER_DOTS,
     textShade: 0,
@@ -2217,18 +2219,18 @@ function optionChoice(parent, title, choices, displayTitle = title) {
     optionChoiceRow: title,
     paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
   });
-  label(row, displayTitle, { widthPercent: 33.3333, height }, {
+  if (displayTitle) label(row, displayTitle, { widthPercent: 33.3333, height }, {
     textShade: 0, inset: controlPaddingDots(),
   });
   const controls = makeWidget(row, {
     direction: FlexDirection.Row,
-    widthPercent: 66.6667,
+    widthPercent: displayTitle ? 66.6667 : 100,
     gap: uiGap(),
     alignItems: Align.Center,
   }, { optionChoiceControls: title });
   choices.forEach((choice) => pixelButton(controls, choice.title, choice.onClick, {
     flexGrow: 1,
-    flexBasis: 0,
+    flexBasis: displayTitle ? 0 : framedTextWidth(choice.title),
     minWidth: 0,
     selected: choice.selected,
     controlTitle: `${title} ${choice.accessibilityTitle ?? choice.title}`,
@@ -2245,8 +2247,8 @@ function optionAdjuster(parent, title, value, onDecrease, onIncrease, accessible
     textShade: 0, inset: controlPaddingDots(),
   });
   const controlHeight = buttonStandardHeight();
-  pixelButton(row, "[-]", onDecrease, { controlTitle: `${accessibleTitle} -` });
-  pixelButton(row, "[+]", onIncrease, { controlTitle: `${accessibleTitle} +` });
+  pixelButton(row, "-", onDecrease, { controlTitle: `${accessibleTitle} -` });
+  pixelButton(row, "+", onIncrease, { controlTitle: `${accessibleTitle} +` });
   label(row, value, { width: framedTextWidth(value), height: controlHeight }, {
     border: 1,
     textShade: 0,
@@ -2290,6 +2292,43 @@ function setAnimationFPSFromPointer(pointerX, box, persist = false) {
     (pointerX - track.left) / Math.max(1, track.right - track.left)));
   setAnimationFPS(ANIMATION_FPS_MIN
     + fraction * (ANIMATION_FPS_MAX - ANIMATION_FPS_MIN), persist);
+}
+
+function setLCDContrastFromPointer(pointerX, box, persist = false) {
+  const track = animationFPSTrack(box);
+  setLCDContrastBoost(100 * (pointerX - track.left) / Math.max(1, track.right - track.left), persist);
+}
+
+function addLCDContrastControl(parent) {
+  const height = buttonStandardHeight();
+  const row = controlRow(parent, { height });
+  pixelButton(row, "-", () => setLCDContrastBoost(state.lcdContrastBoost - 5),
+    { width: framedTextWidth("+"), controlTitle: "CONTRAST BOOST -" });
+  makeWidget(row, { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, height }, {
+    controlTitle: "CONTRAST BOOST SLIDER",
+    lcdContrastControl: true,
+    paint(box) {
+      const track = animationFPSTrack(box);
+      const x = Math.round(track.left + state.lcdContrastBoost / 100 * (track.right - track.left));
+      fillRect(track.left, track.y, track.right - track.left + 1, 1, 1);
+      fillRect(track.left, track.y, x - track.left + 1, 1, 0);
+      for (const fraction of [0, 0.5, 1]) {
+        const tickX = Math.round(track.left + fraction * (track.right - track.left));
+        fillRect(tickX, track.y - 2, 1, 5, 0);
+      }
+      fillRect(x - 2, track.y - 3, 5, 7, 0);
+      if (state.lcdContrastFocused) strokeRect(box.x, box.y, box.width, box.height, 0);
+    },
+    onClick(event) {
+      const point = logicalPoint(event);
+      const entry = findTargetEntry(point, (widget) => widget.meta.lcdContrastControl);
+      if (entry) setLCDContrastFromPointer(point.x, entry.box, true);
+    },
+  });
+  pixelButton(row, "+", () => setLCDContrastBoost(state.lcdContrastBoost + 5),
+    { width: framedTextWidth("+"), controlTitle: "CONTRAST BOOST +" });
+  label(row, `${state.lcdContrastBoost}%`, { width: framedTextWidth("100%"), height },
+    { border: BUTTON_BORDER_DOTS, textShade: 0, align: "center", inset: controlPaddingDots() });
 }
 
 function addAnimationFPSControl(parent) {
@@ -2376,10 +2415,10 @@ function optionDurationAdjuster(parent, title, key, minimum, maximum, fallback, 
   label(row, title, { flexGrow: 1, height: buttonStandardHeight() }, {
     textShade: 0, inset: controlPaddingDots(),
   });
-  pixelButton(row, "[-]", () => adjustPlaybackDuration(key, -step, minimum, maximum, fallback), {
+  pixelButton(row, "-", () => adjustPlaybackDuration(key, -step, minimum, maximum, fallback), {
     controlTitle: `${title} -`,
   });
-  pixelButton(row, "[+]", () => adjustPlaybackDuration(key, step, minimum, maximum, fallback), {
+  pixelButton(row, "+", () => adjustPlaybackDuration(key, step, minimum, maximum, fallback), {
     controlTitle: `${title} +`,
   });
   durationInput(row, key, optionDuration(state.preferences[key] ?? fallback, allowOpen),
@@ -2861,7 +2900,7 @@ function createLibraryRow(parent, text, options = {}) {
       flexShrink: 0,
     });
   }
-  const rowHeightValue = rowHeight();
+  const rowHeightValue = rowHeight(options.optionPage ? 4 : 0);
   return label(parent, text, {
     height: rowHeightValue,
     paddingHorizontal: controlPaddingDots(),
@@ -3114,19 +3153,19 @@ function addLibraryPane(parent) {
     flexGrow: 0,
     flexShrink: 0,
     gap: 0,
-    padding: sidebarGapDots,
+    padding: optionsOpen ? sidebarGapDots / STYLE_SCALE : sidebarGapDots,
   }, {
     paint(box) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
     },
   });
-  label(library, optionsOpen ? "OPTION PAGES" : "SEARCH LIBRARY", {
+  label(library, optionsOpen ? "OPTIONS" : "SEARCH LIBRARY", {
     height: buttonStandardHeight(),
   }, {
     textShade: optionsOpen ? 0 : state.searchQuery || state.searchFocused
       ? 0 : inactiveSearchTextShade(),
     inset: controlPaddingDots(),
-    border: 1,
+    border: optionsOpen ? undefined : 1,
     fill: !optionsOpen && state.searchFocused ? 2 : undefined,
     searchField: !optionsOpen,
     textValue: optionsOpen ? undefined : searchFieldText,
@@ -3512,7 +3551,7 @@ function addPalettePreview(parent) {
     direction: FlexDirection.Row,
     gap: uiGap(),
     paddingHorizontal: uiGroupInsetDots() / STYLE_SCALE,
-    paddingVertical: uiGapDots() / STYLE_SCALE,
+    paddingVertical: uiGap(),
   });
   RGB.forEach((_, shade) => makeWidget(preview, {
     flexGrow: 1,
@@ -3533,10 +3572,6 @@ function addPalettePreview(parent) {
       } else {
         strokeRect(box.x, box.y, box.width, box.height, 1);
         fillRect(box.x + 1, box.y + 1, box.width - 2, box.height - 2, shade);
-        drawText(String(shade), box.x + 2, box.y + Math.floor((box.height - fontProfile().height) / 2),
-          box.width - 4,
-          shade < 2 ? 3 : 0,
-          "center");
       }
     },
   }));
@@ -3594,16 +3629,16 @@ function addDisplayOptions(parent, pref) {
     buttonStandardHeight(), buttonStandardHeight(), buttonStandardHeight(), buttonStandardHeight(),
   ]);
   optionChoice(profile, "FONT", [
-    { title: "MICRO", accessibilityTitle: "MICRO 3X5", selected: state.font === "MICRO",
+    { title: "3X5", accessibilityTitle: "MICRO 3X5", selected: state.font === "MICRO",
       onClick: () => setFontProfile("MICRO") },
-    { title: "STD", accessibilityTitle: "STANDARD 5X7", selected: state.font === "STANDARD",
+    { title: "5X7", accessibilityTitle: "STANDARD 5X7", selected: state.font === "STANDARD",
       onClick: () => setFontProfile("STANDARD") },
   ]);
   optionAdjuster(profile, "DOT SIZE", `${state.lcdDotSize} PX`,
     () => setLCDDotSize(state.lcdDotSize - 1),
     () => setLCDDotSize(state.lcdDotSize + 1));
   optionToggle(profile, "PIXEL MATRIX GAPS", state.lcdPixelGaps,
-    () => setLCDPixelGaps(!state.lcdPixelGaps));
+    () => setLCDPixelGaps(!state.lcdPixelGaps), { visibleTitle: "PIXEL GRID" });
   optionChoice(profile, "APERTURE", [
     { title: "STN", accessibilityTitle: "STN APERTURE", selected: state.lcdMatrixProfile === "STN",
       onClick: () => setLCDMatrixProfile("STN") },
@@ -3644,6 +3679,11 @@ function beginColorEdit(endpoint) {
 function finishColorEdit(commit) {
   const endpoint = state.editingColorEndpoint;
   const draft = state.colorDraft;
+  if (commit && endpoint && !colorInputToHex(draft)) {
+    state.colorInputError = endpoint;
+    render();
+    return;
+  }
   state.editingColorEndpoint = null;
   state.colorDraft = "";
   state.colorInputError = null;
@@ -3662,8 +3702,8 @@ function finishColorEdit(commit) {
     }
     if (color) {
       state.customPaletteConfigured = true;
-      updateScreenSurface();
       refreshDisplayPalette();
+      updateScreenSurface();
       saveDisplayOptions();
     }
   }
@@ -3698,28 +3738,26 @@ function addLCDColorOptions(parent) {
   const levels = grayscaleLevels(state.pixelShadeMode);
   const rowHeights = [rowHeight(8), buttonStandardHeight(), buttonStandardHeight(),
     buttonStandardHeight(), buttonStandardHeight() * 2 + uiGap(), ...(levels ? [buttonStandardHeight(), buttonStandardHeight()] : []),
-    rowHeight(), rowHeight()];
+    ...(state.editingColorEndpoint || state.colorInputError ? [rowHeight()] : [])];
   const colors = optionGroup(parent, "LCD PALETTE", rowHeights);
   addPalettePreview(colors);
   optionChoice(colors, "PIXEL METHOD", [
     { title: "LCD", accessibilityTitle: "STN LCD", selected: state.pixelShadeMode === "STN",
       onClick: () => setPixelShadeMode("STN") },
-    { title: "DIR", accessibilityTitle: "DIRECT", selected: state.pixelShadeMode === "DIRECT",
+    { title: "DIRECT", accessibilityTitle: "DIRECT", selected: state.pixelShadeMode === "DIRECT",
       onClick: () => setPixelShadeMode("DIRECT") },
     { title: "8", accessibilityTitle: "8 SHADE", selected: state.pixelShadeMode === "GRAY8",
       onClick: () => setPixelShadeMode("GRAY8") },
     { title: "16", accessibilityTitle: "16 SHADE", selected: state.pixelShadeMode === "GRAY16",
       onClick: () => setPixelShadeMode("GRAY16") },
-  ], "METHOD");
+  ], "");
   customColorInput(colors, "background", "BG");
   customColorInput(colors, "font", "PIXEL");
   const boost = makeWidget(colors, { direction: FlexDirection.Column, gap: uiGap() });
   label(boost, "CONTRAST BOOST", { height: buttonStandardHeight() }, {
     textShade: 0, inset: controlPaddingDots(),
   });
-  optionAdjuster(boost, "", `${state.lcdContrastBoost}%`,
-    () => setLCDContrastBoost(state.lcdContrastBoost - 10),
-    () => setLCDContrastBoost(state.lcdContrastBoost + 10), "CONTRAST BOOST");
+  addLCDContrastControl(boost);
   if (levels) {
     optionAdjuster(colors, "TEXT SHADE",
       `${String(activeGrayscaleTone(state.pixelToneIndex, levels) + 1).padStart(2, "0")}/${levels}`,
@@ -3730,16 +3768,10 @@ function addLCDColorOptions(parent) {
       () => adjustPixelTone("background", -1),
       () => adjustPixelTone("background", 1), "BG SHADE");
   }
-  label(colors, state.colorInputError ? "INVALID COLOR" : "ENTER APPLY", {
-    height: rowHeight(),
-  }, {
-    textShade: 0,
-    inset: controlPaddingDots(),
-  });
-  label(colors, "ESC CANCEL", { height: rowHeight() }, {
-    textShade: 0,
-    inset: controlPaddingDots(),
-  });
+  if (state.editingColorEndpoint || state.colorInputError) {
+    label(colors, state.colorInputError ? "INVALID COLOR" : "ENTER SAVE / ESC CANCEL",
+      { height: rowHeight() }, { textShade: 0, inset: controlPaddingDots() });
+  }
 }
 
 function optionDuration(seconds, allowOpen = false) {
@@ -3977,10 +4009,10 @@ function optionPlaybackRateRow(parent, backend) {
   label(row, "RATE", { width: textLayoutWidth("RATE", 0), height: buttonStandardHeight() }, {
     textShade: 0, inset: 0,
   });
-  pixelButton(row, "[-]", () => adjustPlaybackRate(backend, -1), {
+  pixelButton(row, "-", () => adjustPlaybackRate(backend, -1), {
     controlTitle: `${title} RATE -`,
   });
-  pixelButton(row, "[+]", () => adjustPlaybackRate(backend, 1), {
+  pixelButton(row, "+", () => adjustPlaybackRate(backend, 1), {
     controlTitle: `${title} RATE +`,
   });
   playbackRateInput(row, backend);
@@ -4071,11 +4103,11 @@ function equalizerBand(parent, title, index) {
     inset: controlPaddingDots(),
     paint(box) { state.equalizerLabelBoxes[index] = box; },
   });
-  pixelButton(row, "[-]", () => setEqualizerGain(index,
+  pixelButton(row, "-", () => setEqualizerGain(index,
     Math.max(EQ_GAIN_MIN_DB, equalizerGain(index) - EQ_GAIN_STEP_DB)), {
     controlTitle: `EQ ${title} -`,
   });
-  pixelButton(row, "[+]", () => setEqualizerGain(index,
+  pixelButton(row, "+", () => setEqualizerGain(index,
     Math.min(EQ_GAIN_MAX_DB, equalizerGain(index) + EQ_GAIN_STEP_DB)), {
     controlTitle: `EQ ${title} +`,
   });
@@ -4207,34 +4239,32 @@ function addAudioOptions(parent, pref) {
 
 function addInterfaceOptions(parent, pref) {
   const rowHeightValue = buttonStandardHeight();
-  const transport = optionGroup(parent, "TRANSPORT LABELS", [rowHeightValue]);
-  optionChoice(transport, "BUTTONS", [
+  const interfaceGroup = optionGroup(parent, "INTERFACE", [rowHeightValue, rowHeightValue, rowHeightValue]);
+  optionChoice(interfaceGroup, "BUTTONS", [
     { title: "WORDS", selected: !state.transportSymbols, onClick: () => setTransportSymbols(false) },
     { title: "SYMS", accessibilityTitle: "SYMBOLS", selected: state.transportSymbols,
       onClick: () => setTransportSymbols(true) },
   ]);
-  const layout = optionGroup(parent, "PLAYLIST LAYOUT", [rowHeightValue]);
-  optionToggle(layout, "AUTO-SIZE COLUMNS", pref.columnAutoSize !== false,
+  optionToggle(interfaceGroup, "AUTO-SIZE COLUMNS", pref.columnAutoSize !== false,
     () => setPreference("columnAutoSize", pref.columnAutoSize === false), {
-      visibleTitle: "AUTO SIZE",
+      visibleTitle: "AUTO-SIZE COLUMNS",
+    });
+  optionToggle(interfaceGroup, "MAIN WINDOW ON TOP", pref.mainWindowAlwaysOnTop === true,
+    () => setPreference("mainWindowAlwaysOnTop", pref.mainWindowAlwaysOnTop !== true), {
+      visibleTitle: "KEEP WINDOW ON TOP",
     });
   const spacing = optionGroup(parent, "LAYOUT SPACING", [
     rowHeightValue, rowHeightValue, rowHeightValue,
   ]);
-  optionAdjuster(spacing, "BUTTON", spacingReadout("controlPaddingDots"),
+  optionAdjuster(spacing, "BUTTON PAD", spacingReadout("controlPaddingDots"),
     () => adjustDisplaySpacing("controlPaddingDots", -1),
     () => adjustDisplaySpacing("controlPaddingDots", 1), "UI BUTTON PAD");
-  optionAdjuster(spacing, "CHROME", spacingReadout("uiChromeGapDots"),
+  optionAdjuster(spacing, "UI GAP", spacingReadout("uiChromeGapDots"),
     () => adjustDisplaySpacing("uiChromeGapDots", -1),
     () => adjustDisplaySpacing("uiChromeGapDots", 1), "UI CHROME GAP");
-  optionAdjuster(spacing, "LINE", spacingReadout("textLineGapDots"),
+  optionAdjuster(spacing, "LINE GAP", spacingReadout("textLineGapDots"),
     () => adjustDisplaySpacing("textLineGapDots", -1),
     () => adjustDisplaySpacing("textLineGapDots", 1), "TEXT LINE GAP");
-  const window = optionGroup(parent, "WINDOW", [rowHeightValue]);
-  optionToggle(window, "MAIN WINDOW ON TOP", pref.mainWindowAlwaysOnTop === true,
-    () => setPreference("mainWindowAlwaysOnTop", pref.mainWindowAlwaysOnTop !== true), {
-      visibleTitle: "ON TOP",
-    });
   const motion = optionGroup(parent, "MOTION", [rowHeightValue, rowHeightValue]);
   optionToggleAdjuster(motion, "ANIM", "ANIMATION DURATION", animationEnabled(),
     () => setPreference("animationsEnabled", !animationEnabled()),
@@ -4417,12 +4447,12 @@ function addOptionsContent(parent) {
     minWidth: 0,
     minHeight: 0,
     gap: 0,
-    padding: OPTIONS_GAP_DOTS,
+    padding: OPTIONS_GAP_DOTS / STYLE_SCALE,
   }, {
     id: "options-pane",
     paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
-  openPageTitle(panel, state.optionsPage === "DISPLAY" ? "DISPLAY + UI" : state.optionsPage);
+  openPageTitle(panel, state.optionsPage);
   const viewport = makeWidget(panel, {
     direction: FlexDirection.Column,
     flexGrow: 1,
@@ -5413,10 +5443,12 @@ function setLCDMatrixProfile(profile) {
   render();
 }
 
-function setLCDContrastBoost(value) {
-  state.lcdContrastBoost = Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+function setLCDContrastBoost(value, persist = true) {
+  const next = Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+  if (next === state.lcdContrastBoost) return;
+  state.lcdContrastBoost = next;
   refreshDisplayPalette();
-  saveDisplayOptions();
+  if (persist) saveDisplayOptions();
   render();
 }
 
@@ -6960,7 +6992,19 @@ canvas.addEventListener("pointerdown", (event) => {
   const point = logicalPoint(event);
   const entry = findTargetEntry(point);
   const target = entry?.widget;
-  if (target?.meta.animationFPSControl && (event.button ?? 0) === 0) {
+  if (target?.meta.lcdContrastControl && (event.button ?? 0) === 0) {
+    canvas.focus({ preventScroll: true });
+    state.lcdContrastFocused = true;
+    state.animationFPSFocused = false;
+    pointerInteraction = { kind: "lcd-contrast", pointerId: event.pointerId,
+      box: { ...entry.box }, initialBoost: state.lcdContrastBoost };
+    canvas.setPointerCapture?.(event.pointerId);
+    suppressNextClick = true;
+    setLCDContrastFromPointer(point.x, entry.box);
+    render(false, true);
+    event.preventDefault?.();
+  } else if (target?.meta.animationFPSControl && (event.button ?? 0) === 0) {
+    state.lcdContrastFocused = false;
     state.animationFPSFocused = true;
     pointerInteraction = {
       kind: "animation-fps",
@@ -7002,6 +7046,10 @@ canvas.addEventListener("pointerdown", (event) => {
 
 canvas.addEventListener("pointermove", (event) => {
   const point = logicalPoint(event);
+  if (pointerInteraction?.kind === "lcd-contrast") {
+    setLCDContrastFromPointer(point.x, pointerInteraction.box);
+    return;
+  }
   if (pointerInteraction?.kind === "animation-fps") {
     setAnimationFPSFromPointer(point.x, pointerInteraction.box);
     return;
@@ -7047,7 +7095,11 @@ canvas.addEventListener("pointerup", (event) => {
   if (!pointerInteraction || (pointerInteraction.pointerId !== undefined
     && event.pointerId !== undefined && pointerInteraction.pointerId !== event.pointerId)) return;
   const interaction = pointerInteraction;
-  if (interaction.kind === "animation-fps") {
+  if (interaction.kind === "lcd-contrast") {
+    setLCDContrastFromPointer(logicalPoint(event).x, interaction.box);
+    pointerInteraction = null;
+    if (state.lcdContrastBoost !== interaction.initialBoost) saveDisplayOptions();
+  } else if (interaction.kind === "animation-fps") {
     setAnimationFPSFromPointer(logicalPoint(event).x, interaction.box);
     pointerInteraction = null;
     if (state.animationFPS !== interaction.initialFPS) saveDisplayOptions();
@@ -7067,7 +7119,14 @@ canvas.addEventListener("pointerup", (event) => {
 });
 
 canvas.addEventListener("pointercancel", () => {
-  if (pointerInteraction?.kind === "animation-fps") {
+  if (pointerInteraction?.kind === "lcd-contrast") {
+    const initialBoost = pointerInteraction.initialBoost;
+    pointerInteraction = null;
+    suppressNextClick = false;
+    state.lcdContrastFocused = false;
+    setLCDContrastBoost(initialBoost, false);
+    render(false, true);
+  } else if (pointerInteraction?.kind === "animation-fps") {
     const initialFPS = pointerInteraction.initialFPS;
     pointerInteraction = null;
     suppressNextClick = false;
@@ -7140,6 +7199,7 @@ canvas.addEventListener("click", (event) => {
   if (screenTransition) return;
   const target = findTarget(logicalPoint(event));
   state.animationFPSFocused = target?.meta.animationFPSControl === true;
+  state.lcdContrastFocused = target?.meta.lcdContrastControl === true;
   if (state.searchFocused && !target?.meta.searchField) {
     setSearchFocused(false);
     if (!target?.meta.onClick) render();
@@ -7256,6 +7316,25 @@ canvas.addEventListener("keydown", (event) => {
     } else return;
     event.preventDefault();
     return;
+  }
+  if (state.lcdContrastFocused && state.tab === "SETTINGS" && state.optionsPage === "DISPLAY"
+      && !commandKey && !event.altKey) {
+    let next = null;
+    if (["ArrowLeft", "ArrowDown"].includes(event.code)) next = state.lcdContrastBoost - (event.shiftKey ? 10 : 1);
+    else if (["ArrowRight", "ArrowUp"].includes(event.code)) next = state.lcdContrastBoost + (event.shiftKey ? 10 : 1);
+    else if (event.code === "Home") next = 0;
+    else if (event.code === "End") next = 100;
+    else if (event.code === "Escape") {
+      state.lcdContrastFocused = false;
+      render(false, true);
+      event.preventDefault();
+      return;
+    }
+    if (next !== null) {
+      event.preventDefault();
+      setLCDContrastBoost(next);
+      return;
+    }
   }
   if (state.animationFPSFocused && !commandKey && !event.altKey) {
     let nextFPS = null;
