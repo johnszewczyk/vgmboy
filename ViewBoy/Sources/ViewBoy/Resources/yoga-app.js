@@ -1,3 +1,4 @@
+import { MATRIX_PROFILES, cellCoverage, contrastInk, deviceCell, stnPalette } from "./lcd-panel.js";
 import Yoga, {
   Align,
   BoxSizing,
@@ -68,7 +69,7 @@ const DEFAULT_ANIMATION_FPS = 60;
 const ANIMATION_FPS_MIN = 30;
 const ANIMATION_FPS_MAX = 240;
 const ANIMATION_FPS_TICKS = [30, 60, 90, 120, 150, 180, 210, 240];
-const PIXEL_SHADE_MODES = { DIRECT: 0, GRAY8: 8, GRAY16: 16 };
+const PIXEL_SHADE_MODES = { STN: 0, DIRECT: 0, GRAY8: 8, GRAY16: 16 };
 const RAW_GRAYSCALE_TONE_OFFSET = 16;
 const DEFAULT_LCD_BACKGROUND = "#9BBC0F";
 const DEFAULT_LCD_PIXEL = "#000000";
@@ -179,36 +180,30 @@ function packedPalette(palette) {
   return Uint32Array.from(palette, ([red, green, blue]) =>
     ((255 << 24) | (blue << 16) | (green << 8) | red) >>> 0);
 }
-let packedDirectInk = packedPalette([hexToRGB(DEFAULT_LCD_PIXEL)])[0];
-let packedDirectBackground = packedPalette([hexToRGB(DEFAULT_LCD_BACKGROUND)])[0];
-let packedDisplayPalette = packedPalette(paletteRGB(paletteTones()));
-let packedSemanticPalette = packedPalette(paletteRGB(paletteTones()));
-let packedDisplayBackground = packedDirectBackground;
+let semanticColors = paletteTones();
+let semanticCells = [];
+let grayscaleCells = [];
 function refreshDisplayPalette() {
   RGB = paletteRGB(displayPalette());
-  packedDirectInk = packedPalette([hexToRGB(state.customFontColor)])[0];
-  packedDirectBackground = packedPalette([hexToRGB(state.customBackgroundColor)])[0];
-  packedDisplayPalette = packedPalette(RGB);
   const levels = grayscaleLevels(state.pixelShadeMode);
   if (levels) {
     const inkTone = activeGrayscaleTone(state.pixelToneIndex, levels);
     const backgroundTone = activeGrayscaleTone(state.backgroundToneIndex, levels);
-    const ink = packedDisplayPalette[inkTone];
-    const mutedInkTone = Math.min(levels - 1,
-      inkTone + Math.max(1, Math.floor((backgroundTone - inkTone) / 3)));
-    const highlightTone = Math.min(levels - 1,
-      Math.max(backgroundTone + 1, levels - 2));
-    const highlight = packedDisplayPalette[highlightTone];
-    packedDisplayBackground = packedDisplayPalette[backgroundTone];
-    packedSemanticPalette = Uint32Array.of(
-      ink, packedDisplayPalette[mutedInkTone], highlight, packedDisplayBackground,
-    );
+    const direction = backgroundTone - inkTone;
+    semanticColors = [inkTone, Math.round(inkTone + direction * 0.25),
+      Math.round(inkTone + direction * 0.8), backgroundTone].map((tone) => grayscaleTone(tone, levels));
+    semanticColors[0] = contrastInk(semanticColors[0], semanticColors[3], state.lcdContrastBoost);
+  } else if (state.pixelShadeMode === "STN") {
+    semanticColors = stnPalette(state.customFontColor, state.customBackgroundColor, state.lcdContrastBoost);
   } else {
-    packedDisplayBackground = packedDirectBackground;
-    packedSemanticPalette = Uint32Array.of(
-      packedDirectInk, packedDirectInk, packedDirectBackground, packedDirectBackground,
-    );
+    const ink = contrastInk(state.customFontColor, state.customBackgroundColor, state.lcdContrastBoost);
+    semanticColors = [ink, ink, state.customBackgroundColor, state.customBackgroundColor];
   }
+  const coverage = cellCoverage(DEVICE_PIXELS_PER_LCD_DOT, state.lcdPixelGaps, state.lcdMatrixProfile);
+  const cells = (palette) => palette.map((color) => packedPalette(paletteRGB(
+    deviceCell(color, semanticColors[3], coverage, state.lcdContrastBoost))));
+  semanticCells = cells(semanticColors);
+  grayscaleCells = cells(displayPalette());
 }
 const standardGlyphs = {
   A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
@@ -384,20 +379,12 @@ function storedSpacing(value, fallback) {
 function displayPalette() {
   const levels = grayscaleLevels(state.pixelShadeMode);
   return levels ? grayscalePalette(levels)
-    : paletteTones(state.customFontColor, state.customBackgroundColor);
+    : state.pixelShadeMode === "STN"
+      ? stnPalette(state.customFontColor, state.customBackgroundColor, state.lcdContrastBoost)
+      : paletteTones(contrastInk(state.customFontColor, state.customBackgroundColor, state.lcdContrastBoost), state.customBackgroundColor);
 }
 function displaySemanticColor(shade) {
-  const semantic = Math.max(0, Math.min(3, Math.round(Number(shade) || 0)));
-  const levels = grayscaleLevels(state.pixelShadeMode);
-  if (!levels) return semantic < 2 ? state.customFontColor : state.customBackgroundColor;
-  const inkTone = activeGrayscaleTone(state.pixelToneIndex, levels);
-  const backgroundTone = activeGrayscaleTone(state.backgroundToneIndex, levels);
-  const mutedInkTone = Math.min(levels - 1,
-    inkTone + Math.max(1, Math.floor((backgroundTone - inkTone) / 3)));
-  const highlightTone = Math.min(levels - 1,
-    Math.max(backgroundTone + 1, levels - 2));
-  const index = [inkTone, mutedInkTone, highlightTone, backgroundTone][semantic];
-  return grayscaleTone(index, levels);
+  return semanticColors[Math.max(0, Math.min(3, Math.round(Number(shade) || 0)))];
 }
 function updateScreenSurface() {
   const root = document.documentElement;
@@ -405,7 +392,7 @@ function updateScreenSurface() {
   root.style?.setProperty?.("--screen-surface", displaySemanticColor(3));
 }
 function inactiveSearchTextShade() {
-  return 0;
+  return 1;
 }
 function saveDisplayOptions() {
   try {
@@ -421,6 +408,8 @@ function saveDisplayOptions() {
       backgroundToneIndex: state.backgroundToneIndex,
       lcdDotSize: state.lcdDotSize,
       lcdPixelGaps: state.lcdPixelGaps,
+      lcdMatrixProfile: state.lcdMatrixProfile,
+      lcdContrastBoost: state.lcdContrastBoost,
       uiButtonPadDots: state.controlPaddingDots,
       uiChromeGapDots: state.uiChromeGapDots,
       textLineGapDots: state.textLineGapDots,
@@ -520,7 +509,7 @@ const state = {
   customFontInput: savedCustomFontInput,
   customPaletteConfigured: savedCustomPaletteConfigured,
   pixelShadeMode: Object.hasOwn(PIXEL_SHADE_MODES, savedDisplayOptions.pixelShadeMode)
-    ? savedDisplayOptions.pixelShadeMode : "GRAY16",
+    ? savedDisplayOptions.pixelShadeMode : "STN",
   pixelToneIndex: Number.isFinite(Number(savedDisplayOptions.pixelToneIndex))
     ? storedToneIndex(savedDisplayOptions.pixelToneIndex, 16, 0)
     : grayscaleToneIndex(colorInputToHex(savedCustomFontInput) || DEFAULT_LCD_PIXEL, 16),
@@ -532,7 +521,10 @@ const state = {
   colorInputError: null,
   lcdDotSize: LCD_DOT_SIZE_OPTIONS.includes(Number(savedDisplayOptions.lcdDotSize))
     ? Number(savedDisplayOptions.lcdDotSize) : DEFAULT_LCD_DOT_SIZE,
-  lcdPixelGaps: savedDisplayOptions.lcdPixelGaps === true,
+  lcdPixelGaps: savedDisplayOptions.lcdPixelGaps !== false,
+  lcdMatrixProfile: MATRIX_PROFILES.includes(savedDisplayOptions.lcdMatrixProfile)
+    ? savedDisplayOptions.lcdMatrixProfile : "STN",
+  lcdContrastBoost: Math.max(0, Math.min(100, Number(savedDisplayOptions.lcdContrastBoost) || 0)),
   controlPaddingDots: storedSpacing(savedDisplayOptions.uiButtonPadDots
     ?? savedDisplayOptions.controlPaddingDots, DEFAULT_CONTROL_PADDING_DOTS),
   uiChromeGapDots: storedSpacing(savedDisplayOptions.uiChromeGapDots, legacyChromeGapDots),
@@ -1227,17 +1219,18 @@ export function lcdDotSizeSnapshot() {
 }
 
 export function lcdDeviceDotSnapshot(shade = 0) {
-  const shadeIndex = Math.max(0, Math.min(3, Math.round(Number(shade) || 0)));
-  const ink = displaySemanticColor(shadeIndex);
-  const gap = grayscaleLevels(state.pixelShadeMode)
-    ? grayscaleTone(activeGrayscaleTone(state.backgroundToneIndex, grayscaleLevels(state.pixelShadeMode)),
-      grayscaleLevels(state.pixelShadeMode))
-    : state.customBackgroundColor;
-  const faceSize = Math.max(1, DEVICE_PIXELS_PER_LCD_DOT
-    - (state.lcdPixelGaps ? 1 : 0));
+  const cell = semanticCells[Math.max(0, Math.min(3, Math.round(Number(shade) || 0)))];
   return Array.from({ length: DEVICE_PIXELS_PER_LCD_DOT }, (_, y) =>
-    Array.from({ length: DEVICE_PIXELS_PER_LCD_DOT }, (_, x) =>
-      x < faceSize && y < faceSize ? ink : gap));
+    Array.from({ length: DEVICE_PIXELS_PER_LCD_DOT }, (_, x) => {
+      const value = cell[y * DEVICE_PIXELS_PER_LCD_DOT + x];
+      return rgbToHex([value & 255, (value >>> 8) & 255, (value >>> 16) & 255]);
+    }));
+}
+
+export function lcdPanelSnapshot() {
+  return { colors: [...semanticColors], matrixProfile: state.lcdMatrixProfile,
+    contrastBoost: state.lcdContrastBoost,
+    coverage: cellCoverage(DEVICE_PIXELS_PER_LCD_DOT, state.lcdPixelGaps, state.lcdMatrixProfile) };
 }
 
 export function lcdPaletteSnapshot() {
@@ -1584,23 +1577,20 @@ function presentPixels(startY = 0, endY = HEIGHT, startX = 0, endX = WIDTH) {
   const firstColumn = Math.max(0, Math.floor(startX));
   const lastColumn = Math.min(WIDTH, Math.ceil(endX));
   if (lastRow <= firstRow || lastColumn <= firstColumn) return;
-  const faceSize = Math.max(1, DEVICE_PIXELS_PER_LCD_DOT
-    - (state.lcdPixelGaps ? 1 : 0));
   const levels = grayscaleLevels(state.pixelShadeMode);
   for (let y = firstRow; y < lastRow; y += 1) {
     const sourceRow = y * WIDTH;
     const topRow = y * DEVICE_PIXELS_PER_LCD_DOT * outputWidth;
     for (let x = firstColumn; x < lastColumn; x += 1) {
       const shade = pixels[sourceRow + x];
-      const face = levels && shade >= RAW_GRAYSCALE_TONE_OFFSET
-        ? packedDisplayPalette[storedToneIndex(shade - RAW_GRAYSCALE_TONE_OFFSET, levels, 0)]
-        : packedSemanticPalette[Math.max(0, Math.min(3, shade))];
-      const gap = packedDisplayBackground;
+      const cell = levels && shade >= RAW_GRAYSCALE_TONE_OFFSET
+        ? grayscaleCells[storedToneIndex(shade - RAW_GRAYSCALE_TONE_OFFSET, levels, 0)]
+        : semanticCells[Math.max(0, Math.min(3, shade))];
       const outputX = x * DEVICE_PIXELS_PER_LCD_DOT;
       for (let dotY = 0; dotY < DEVICE_PIXELS_PER_LCD_DOT; dotY += 1) {
         const row = topRow + dotY * outputWidth + outputX;
         for (let dotX = 0; dotX < DEVICE_PIXELS_PER_LCD_DOT; dotX += 1) {
-          imageWords[row + dotX] = dotX < faceSize && dotY < faceSize ? face : gap;
+          imageWords[row + dotX] = cell[dotY * DEVICE_PIXELS_PER_LCD_DOT + dotX];
         }
       }
     }
@@ -2218,7 +2208,7 @@ function optionToggleAdjuster(parent, title, controlPrefix, checked, onClick,
   return row;
 }
 
-function optionChoice(parent, title, choices) {
+function optionChoice(parent, title, choices, displayTitle = title) {
   const height = buttonStandardHeight();
   const row = controlRow(parent, {
     height,
@@ -2227,7 +2217,7 @@ function optionChoice(parent, title, choices) {
     optionChoiceRow: title,
     paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
   });
-  label(row, title, { widthPercent: 33.3333, height }, {
+  label(row, displayTitle, { widthPercent: 33.3333, height }, {
     textShade: 0, inset: controlPaddingDots(),
   });
   const controls = makeWidget(row, {
@@ -3574,32 +3564,34 @@ function optionGroup(parent, title, contentHeights = null) {
 }
 
 function addDisplayOptions(parent, pref) {
+  const availableDots = WIDTH - libraryPaneWidth() * STYLE_SCALE - APP_EDGE_PADDING_PX * 2 - OPTIONS_GAP_DOTS * 3;
+  const stacked = availableDots < 520;
   const columns = makeWidget(parent, {
-    direction: FlexDirection.Row,
-    flexGrow: 1,
+    direction: stacked ? FlexDirection.Column : FlexDirection.Row,
+    flexGrow: stacked ? 0 : 1,
     flexShrink: 0,
-    flexBasis: 0,
+    ...(stacked ? {} : { flexBasis: 0 }),
     minWidth: 0,
     gap: uiSectionGap() * 3,
   });
   const screenColumn = makeWidget(columns, {
     direction: FlexDirection.Column,
-    flexGrow: 1,
-    flexBasis: 0,
+    flexGrow: stacked ? 0 : 1,
+    ...(stacked ? {} : { flexBasis: 0 }),
     minWidth: 0,
     gap: uiSectionGap() * 3,
   });
   const interfaceColumn = makeWidget(columns, {
     direction: FlexDirection.Column,
-    flexGrow: 1,
-    flexBasis: 0,
+    flexGrow: stacked ? 0 : 1,
+    ...(stacked ? {} : { flexBasis: 0 }),
     minWidth: 0,
     gap: uiSectionGap() * 3,
   });
 
   addLCDColorOptions(screenColumn);
   const profile = optionGroup(screenColumn, "SCREEN PROFILE", [
-    buttonStandardHeight(), buttonStandardHeight(), buttonStandardHeight(),
+    buttonStandardHeight(), buttonStandardHeight(), buttonStandardHeight(), buttonStandardHeight(),
   ]);
   optionChoice(profile, "FONT", [
     { title: "MICRO", accessibilityTitle: "MICRO 3X5", selected: state.font === "MICRO",
@@ -3612,6 +3604,12 @@ function addDisplayOptions(parent, pref) {
     () => setLCDDotSize(state.lcdDotSize + 1));
   optionToggle(profile, "PIXEL MATRIX GAPS", state.lcdPixelGaps,
     () => setLCDPixelGaps(!state.lcdPixelGaps));
+  optionChoice(profile, "APERTURE", [
+    { title: "STN", accessibilityTitle: "STN APERTURE", selected: state.lcdMatrixProfile === "STN",
+      onClick: () => setLCDMatrixProfile("STN") },
+    { title: "1 PX", accessibilityTitle: "CLASSIC APERTURE", selected: state.lcdMatrixProfile === "CLASSIC",
+      onClick: () => setLCDMatrixProfile("CLASSIC") },
+  ]);
   addInterfaceOptions(interfaceColumn, pref);
 }
 
@@ -3699,20 +3697,29 @@ function customColorInput(parent, endpoint, title) {
 function addLCDColorOptions(parent) {
   const levels = grayscaleLevels(state.pixelShadeMode);
   const rowHeights = [rowHeight(8), buttonStandardHeight(), buttonStandardHeight(),
-    buttonStandardHeight(), ...(levels ? [buttonStandardHeight(), buttonStandardHeight()] : []),
+    buttonStandardHeight(), buttonStandardHeight() * 2 + uiGap(), ...(levels ? [buttonStandardHeight(), buttonStandardHeight()] : []),
     rowHeight(), rowHeight()];
   const colors = optionGroup(parent, "LCD PALETTE", rowHeights);
   addPalettePreview(colors);
   optionChoice(colors, "PIXEL METHOD", [
-    { title: "DIRECT", selected: state.pixelShadeMode === "DIRECT",
+    { title: "LCD", accessibilityTitle: "STN LCD", selected: state.pixelShadeMode === "STN",
+      onClick: () => setPixelShadeMode("STN") },
+    { title: "DIR", accessibilityTitle: "DIRECT", selected: state.pixelShadeMode === "DIRECT",
       onClick: () => setPixelShadeMode("DIRECT") },
     { title: "8", accessibilityTitle: "8 SHADE", selected: state.pixelShadeMode === "GRAY8",
       onClick: () => setPixelShadeMode("GRAY8") },
     { title: "16", accessibilityTitle: "16 SHADE", selected: state.pixelShadeMode === "GRAY16",
       onClick: () => setPixelShadeMode("GRAY16") },
-  ]);
+  ], "METHOD");
   customColorInput(colors, "background", "BG");
   customColorInput(colors, "font", "PIXEL");
+  const boost = makeWidget(colors, { direction: FlexDirection.Column, gap: uiGap() });
+  label(boost, "CONTRAST BOOST", { height: buttonStandardHeight() }, {
+    textShade: 0, inset: controlPaddingDots(),
+  });
+  optionAdjuster(boost, "", `${state.lcdContrastBoost}%`,
+    () => setLCDContrastBoost(state.lcdContrastBoost - 10),
+    () => setLCDContrastBoost(state.lcdContrastBoost + 10), "CONTRAST BOOST");
   if (levels) {
     optionAdjuster(colors, "TEXT SHADE",
       `${String(activeGrayscaleTone(state.pixelToneIndex, levels) + 1).padStart(2, "0")}/${levels}`,
@@ -5384,6 +5391,7 @@ function setLCDDotSize(value) {
   screenTransition = null;
   state.lcdDotSize = size;
   DEVICE_PIXELS_PER_LCD_DOT = size;
+  refreshDisplayPalette();
   saveDisplayOptions();
   fitCanvas();
 }
@@ -5392,6 +5400,22 @@ function setLCDPixelGaps(enabled) {
   const value = enabled === true;
   if (state.lcdPixelGaps === value) return;
   state.lcdPixelGaps = value;
+  refreshDisplayPalette();
+  saveDisplayOptions();
+  render();
+}
+
+function setLCDMatrixProfile(profile) {
+  if (!MATRIX_PROFILES.includes(profile)) return;
+  state.lcdMatrixProfile = profile;
+  refreshDisplayPalette();
+  saveDisplayOptions();
+  render();
+}
+
+function setLCDContrastBoost(value) {
+  state.lcdContrastBoost = Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+  refreshDisplayPalette();
   saveDisplayOptions();
   render();
 }
