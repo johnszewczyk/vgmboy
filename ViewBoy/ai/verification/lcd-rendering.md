@@ -30,7 +30,10 @@ passes nine focused tests. JavaScript syntax checks pass.
 - Options headers share fill, position and height. Button Pad changes header and
   control height, UI Gap changes card insets, and Line Gap changes page-link
   spacing. Reset writes 4/4/1 in one update; minimum padding reserves glyphs and
-  borders, and cards stay within the content viewport.
+  borders, and cards stay within the content viewport. Header-to-content and
+  card gaps equal 2× UI Gap at values 4 and 5. Wide columns use the same factor;
+  palette preview shares the card inset and profile bottom padding is exactly
+  1× UI Gap.
 
 ## Package
 
@@ -61,7 +64,10 @@ window, Standard 5x7 text and 3 PX dots:
   FPS gauge and the persisted 60 FPS readout. The footer stays outside the scroll
   viewport.
 
-- The current packaged app also shows aligned filled OPTIONS/DISPLAY headers.
+- At saved pad/gap/line values 3/4/3, the refined packaged Display page shows
+  eight logical dots below pane/card headers and between cards. Palette
+  swatches share the other controls' content edges. Preferences were unchanged.
+- The packaged app also shows aligned filled OPTIONS/DISPLAY headers.
   Native Button Pad 1→2 and UI Gap 6→7 adjustments visibly resize controls and
   pane/card spacing; the original 1/6/1 values were restored.
 - Unfolding the real 1943 system moves game labels inward by one Standard-font

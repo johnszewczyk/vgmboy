@@ -84,6 +84,25 @@ test('sidebar depth uses one character, labels retain their right budget, and wi
   assert.ok(headers.every((item) => item.fillShade === 2));
   assert.equal(headers[0].box.y, headers[1].box.y);
   assert.equal(headers[0].box.height, headers[1].box.height);
+  const checkSectionSpacing = (gap) => {
+    const styles = optionsStyleSnapshot();
+    const pageHeader = styles.find((item) => item.headerRole === 'content').box;
+    const navHeader = styles.find((item) => item.headerRole === 'navigation').box;
+    const palette = styles.find((item) => item.kind === 'group' && item.name === 'LCD PALETTE').box;
+    const profile = styles.find((item) => item.kind === 'group' && item.name === 'SCREEN PROFILE').box;
+    const paletteTitle = styles.find((item) => item.kind === 'title' && item.name === 'LCD PALETTE').box;
+    const preview = styles.find((item) => item.kind === 'preview').box;
+    const toolbar = hitTargetSnapshot().find((item) => item.sidebarAction).box;
+    assert.equal(palette.y - pageHeader.y - pageHeader.height, gap * 2, 'pane header has a section gap');
+    assert.equal(toolbar.y - navHeader.y - navHeader.height, gap * 2, 'navigation header follows the same rule');
+    assert.equal(profile.y - palette.y - palette.height, gap * 2, 'stacked cards have a section gap');
+    assert.equal(preview.y - paletteTitle.y - paletteTitle.height, gap * 2, 'card header has a section gap');
+    assert.equal(preview.x - palette.x, gap, 'swatches share the card content inset');
+    assert.equal(palette.width - preview.width, gap * 2, 'swatches use the full card content width');
+    const lastControl = target('PIXEL MATRIX GAPS').box;
+    assert.equal(profile.y + profile.height - lastControl.y - lastControl.height, gap, 'card bottom has one inset');
+  };
+  checkSectionSpacing(4);
   const headerBefore = headers[0].box.height;
   click('UI BUTTON PAD +');
   assert.equal(optionsStyleSnapshot().find((item) => item.headerRole === 'navigation').box.height, headerBefore + 2,
@@ -94,6 +113,7 @@ test('sidebar depth uses one character, labels retain their right budget, and wi
   const cardAfter = optionsStyleSnapshot().find((item) => item.kind === 'group' && item.name === 'LCD PALETTE').box;
   const sliderAfter = target('CONTRAST BOOST SLIDER').box;
   assert.equal(sliderAfter.x - cardAfter.x, sliderBefore.x - cardBefore.x + 1, 'card inset follows UI Gap');
+  checkSectionSpacing(5);
   const pageBefore = target('QUEUE', true).box.y - target('LIBRARY', true).box.y;
   click('TEXT LINE GAP +');
   assert.equal(target('QUEUE', true).box.y - target('LIBRARY', true).box.y, pageBefore + 1, 'line gap affects Options links');
@@ -102,6 +122,14 @@ test('sidebar depth uses one character, labels retain their right budget, and wi
   const saved = JSON.parse(options.get('ViewBoy.displayOptions'));
   assert.deepEqual([saved.uiButtonPadDots, saved.uiChromeGapDots, saved.textLineGapDots], [4, 4, 1]);
   assert.equal(lcdDotSizeSnapshot().devicePixelsPerDot, pitch);
+  windowWidth = 1600;
+  events.get('resize')();
+  const wideCards = optionsStyleSnapshot().filter((item) => item.kind === 'group');
+  const widePalette = wideCards.find((item) => item.name === 'LCD PALETTE').box;
+  const wideInterface = wideCards.find((item) => item.name === 'INTERFACE').box;
+  assert.equal(wideInterface.x - widePalette.x - widePalette.width, 8, 'wide columns share the two-gap section spacing');
+  windowWidth = 1000;
+  events.get('resize')();
   for (let i = 0; i < 3; i++) click('UI BUTTON PAD -');
   const font = bitmapFontSnapshot('STANDARD');
   assert.equal(target('FONT STANDARD 5X7').box.height, font.height + 4, 'one-dot padding still reserves borders outside the glyph');

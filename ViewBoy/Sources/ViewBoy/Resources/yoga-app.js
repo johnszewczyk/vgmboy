@@ -1662,6 +1662,7 @@ function makeWidget(parent, style = {}, meta = {}) {
   }
   if (style.paddingLeft !== undefined) yoga.setPadding(Edge.Left, style.paddingLeft * STYLE_SCALE);
   if (style.marginLeft !== undefined) yoga.setMargin(Edge.Left, style.marginLeft * STYLE_SCALE);
+  if (style.marginBottom !== undefined) yoga.setMargin(Edge.Bottom, style.marginBottom * STYLE_SCALE);
   if (style.paddingVertical !== undefined) {
     yoga.setPadding(Edge.Vertical, style.paddingVertical * STYLE_SCALE);
   }
@@ -1749,7 +1750,7 @@ function spacingReadout(key) {
 }
 
 function uiSectionGap() {
-  return uiGap();
+  return uiGap() * 2;
 }
 
 function textLineGapDots() {
@@ -1973,12 +1974,13 @@ function appStatusArea(parent) {
   return status;
 }
 
-function panelTitle(parent, text, meta = {}) {
+function panelTitle(parent, text, meta = {}, style = {}) {
   const titleHeight = buttonStandardHeight();
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
     height: titleHeight,
     alignItems: Align.Center,
+    ...style,
   }, {
     ...meta,
     fill: 2,
@@ -2038,7 +2040,7 @@ function controlRow(parent, style = {}, meta = {}) {
 }
 
 function optionSection(parent, title) {
-  return panelTitle(parent, title);
+  return panelTitle(parent, title, {}, { marginBottom: uiGap() });
 }
 
 function optionToggle(parent, title, checked, onClick, extraMeta = {}) {
@@ -2201,7 +2203,7 @@ function optionToggleAdjuster(parent, title, controlPrefix, checked, onClick,
 function optionChoice(parent, title, choices, displayTitle = title) {
   const height = buttonStandardHeight();
   let availableDots = WIDTH - libraryPaneWidth() * STYLE_SCALE - APP_EDGE_PADDING_PX * 2 - uiGapDots() * 5;
-  if (state.optionsPage === "DISPLAY" && availableDots + 2 * uiGapDots() >= 520) availableDots = (availableDots - uiGapDots() * 3) / 2;
+  if (state.optionsPage === "DISPLAY" && availableDots + 2 * uiGapDots() >= 520) availableDots = (availableDots - uiGapDots() * 2) / 2;
   const choiceWidth = choices.length * framedTextWidth("PLAYLIST") + (choices.length - 1) * uiGap();
   const stacked = Boolean(displayTitle) && availableDots < (choiceWidth + textLayoutWidth("APERTURE")) * STYLE_SCALE + uiGapDots();
   const row = controlRow(parent, {
@@ -2602,6 +2604,9 @@ export function optionsContentSnapshot() {
 
 export function optionsStyleSnapshot() {
   return layoutEntries.flatMap(({ widget, box }) => {
+    if (widget.meta.optionPalettePreview) {
+      return [{ kind: "preview", name: "LCD PALETTE", box: { ...box } }];
+    }
     if (widget.meta.optionPanelTitle) {
       return [{ kind: "title", name: widget.meta.optionPanelTitle, headerRole: widget.meta.paneHeader ?? null,
         fillShade: widget.meta.fill ?? null, box: { ...box } }];
@@ -3143,7 +3148,7 @@ function addLibraryPane(parent) {
       render();
     },
   });
-  makeWidget(library, { height: uiGap() });
+  makeWidget(library, { height: optionsOpen ? uiSectionGap() : uiGap() });
   const sidebarButtonSize = SIDEBAR_BUTTON_SIZE_DOTS / STYLE_SCALE;
   const navigation = controlRow(library, {
     height: sidebarButtonSize,
@@ -3516,9 +3521,7 @@ function addPalettePreview(parent) {
   const preview = makeWidget(parent, {
     direction: FlexDirection.Row,
     gap: uiGap(),
-    paddingHorizontal: uiGroupInsetDots() / STYLE_SCALE,
-    paddingVertical: uiGap(),
-  });
+  }, { optionPalettePreview: true });
   RGB.forEach((_, shade) => makeWidget(preview, {
     flexGrow: 1,
     height: rowHeight(8),
@@ -3573,21 +3576,21 @@ function addDisplayOptions(parent, pref) {
     flexShrink: 0,
     ...(stacked ? {} : { flexBasis: 0 }),
     minWidth: 0,
-    gap: uiSectionGap() * 3,
+    gap: uiSectionGap(),
   });
   const screenColumn = makeWidget(columns, {
     direction: FlexDirection.Column,
     flexGrow: stacked ? 0 : 1,
     ...(stacked ? {} : { flexBasis: 0 }),
     minWidth: 0,
-    gap: uiSectionGap() * 3,
+    gap: uiSectionGap(),
   });
   const interfaceColumn = makeWidget(columns, {
     direction: FlexDirection.Column,
     flexGrow: stacked ? 0 : 1,
     ...(stacked ? {} : { flexBasis: 0 }),
     minWidth: 0,
-    gap: uiSectionGap() * 3,
+    gap: uiSectionGap(),
   });
 
   addLCDColorOptions(screenColumn);
@@ -4391,7 +4394,7 @@ function addOptionsContent(parent) {
     flexShrink: 1,
     minWidth: 0,
     minHeight: 0,
-    gap: 0,
+    gap: uiSectionGap(),
     padding: uiGapDots() / STYLE_SCALE,
   }, {
     id: "options-pane",
