@@ -25,8 +25,8 @@ motion cards. Each Display section uses a full card with a shared filled title
 bar and enclosing outline. Options pane insets, card insets, gaps, and control
 padding use a fixed four-dot grid, independent of the adjustable home-screen
 spacing. The Options sidebar fits its six icons instead of inheriting the wider
-library minimum. Page rows leave room for the selection border around the bitmap
-glyphs.
+library minimum. Page rows leave room around the bitmap glyphs. One shaded marker glides between
+page links, including across the section headings.
 
 In the Path sidebar, root chevron ink shares the leading edge of the search and
 toolbar controls. Nested disclosures move inward by two bitmap glyph advances
@@ -52,8 +52,8 @@ grayscale ramps with independent TEXT SHADE and BG SHADE controls.
 
 **Contrast Boost** ranges from 0 to 100 percent. Drag the slider, use the
 minus/plus buttons in five-percent steps, or focus the slider and use arrows in
-one-percent steps (Shift: ten); Home and End select the endpoints. Its readout
-has a fixed width. Dragging previews the change and commits on release; pointer
+one-percent steps (Shift: ten); Home and End select the endpoints. Its label, minus/plus buttons and fixed-width readout share the common numeric
+row. A full-width framed, filled and ticked gauge sits beneath that row. Dragging previews the change and commits on release; pointer
 cancellation restores the previous value. It increases ink separation from the
 substrate and the density of partially covered STN edges. In 1 PX mode it also
 tints the gutters toward the pixel color, up to 65 percent at maximum boost.
@@ -69,6 +69,39 @@ applies a valid value and Escape cancels. Editing hints appear only during
 entry; invalid drafts stay editable and leave the previous palette intact. The
 live preview shows the output palette; grayscale methods mark the selected text
 and background positions.
+
+## Uniform Controls and Motion
+
+Selectors of the same kind are grouped together. Aperture and Font are adjacent
+and alphabetical, using identical two-way selector columns. Selectors retain bounded widths in wider panes and place labels above their
+buttons when space is tight. Queue places Random before Repeat with matching
+geometry. Numeric controls share square minus/plus buttons
+and one reserved readout width. Contrast, Volume and FPS each place a full-width
+gauge on the following row. FPS buttons change ten FPS; its existing arrow,
+Shift-arrow and Home/End controls remain available.
+
+Gauge ticks use the whole track. Zero has no fill and maximum fills the final
+track pixel. EQ keeps ten aligned bands; narrower panes put each band's gauge
+below its control row. Audio gauges support pointer dragging and keyboard
+steps. A drag previews locally, applies the audio setting on release, and
+restores the starting value when cancelled.
+
+ViewBoy uses SB2's `cubic-bezier(0.2, 0, 0, 1)` for its shared animations. For a
+Bezier parameter `u`, time is `x(u) = 0.6u(1-u)^2 + u^3` and distance is
+`y(u) = 3u^2 - 2u^3`. The renderer solves `x(u) = elapsed/duration`, then uses
+`y(u)` to interpolate. Feeding elapsed time directly into `y` would produce a
+different curve.
+
+| Elapsed duration | SB2 curve: distance covered | Previous quadratic ease |
+| --- | --- | --- |
+| 10% | 15.6% | 2% |
+| 25% | 60.7% | 12.5% |
+| 50% | 87.8% | 50% |
+| 75% | 97.5% | 87.5% |
+
+The curve gives fast travel with a settling tail, stays monotonic and does not
+overshoot. Duration, animation enablement and FPS remain user controls;
+retargeted motion starts from the currently visible position.
 
 ## Grid and Fidelity
 

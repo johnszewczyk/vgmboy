@@ -28,8 +28,8 @@ admits every imported module.
 - Dot-size, aperture, matrix, color, method, and boost changes invalidate the
   tables before repainting. CSS surface color matches the semantic substrate.
 - Display cards stack when the remaining pane is too narrow for two columns;
-  the existing clipped options viewport retains scrolling. Options insets and sidebar width use logical dots, without double scaling. Page rows include four extra dots so their inset selection border cannot cross the glyphs.
-- Contrast slider previews without writing preferences until pointerup; pointercancel restores its starting value. Its fixed readout width keeps drag geometry stable across 0-100%. Keyboard focus is active only on Display in Options.
+  the existing clipped options viewport retains scrolling. Options insets and sidebar width use logical dots, without double scaling. Page rows include four extra dots so their shaded marker has room around the glyphs. Its shared animation uses SB2's timing curve.
+- Contrast slider previews without writing preferences until pointerup; pointercancel restores its starting value. Its numeric row reserves the common value width; its separate full-width gauge keeps drag geometry stable across 0-100%. Keyboard focus is active only on Display in Options.
 
 ## Evidence and Planning
 

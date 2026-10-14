@@ -12,6 +12,7 @@ const canvas = {
 };
 const status = {};
 const options = new Map();
+const savedNativePreferences = [];
 let windowWidth = 1200;
 const windowListeners = new Map();
 globalThis.window = globalThis;
@@ -27,6 +28,7 @@ globalThis.requestAnimationFrame = (callback) => setImmediate(() => callback(per
 globalThis.cancelAnimationFrame = clearImmediate;
 globalThis.viewBoy = {
   frontendSettingsLoad: async () => ({ selectionAnimationEnabled: false, autoResizeAnimationEnabled: false }),
+  frontendSettingsSave: async (preferences) => { savedNativePreferences.push(structuredClone(preferences)); },
   nativePlaybackInit: async () => {}, nativePlaybackAudioConfig: async () => {},
   nativePlaybackState: async () => ({ transport_state: 'stopped' }), favoritesList: async () => [],
   databaseGames: async () => ({ games: [], groups: [] }), playlistTabsLoad: async () => null,
@@ -36,17 +38,17 @@ globalThis.viewBoy = {
 const tick = () => new Promise(setImmediate);
 
 test('LCD controls change actual canvas pixels while preserving matrix, layout, and polarity', async () => {
-  const { hitTargetSnapshot, lcdDotSizeSnapshot, lcdDeviceDotSnapshot, lcdPanelSnapshot, optionsContentSnapshot, optionsStyleSnapshot, selectionBandSnapshot, bitmapFontSnapshot } =
+  const { hitTargetSnapshot, lcdDotSizeSnapshot, lcdDeviceDotSnapshot, lcdPanelSnapshot, optionsContentSnapshot, optionsStyleSnapshot, selectionBandSnapshot, bitmapFontSnapshot, choiceControlLayoutSnapshot, volumeControlSnapshot, equalizerAnimationSnapshot, framebufferShadeSnapshot, spacingReadoutLayoutSnapshot } =
     await import('../Sources/ViewBoy/Resources/yoga-app.js');
   await tick(); await tick();
   globalThis.ViewBoy.dispatch('optionsPage:DISPLAY');
   await tick();
-  const click = (name) => {
+  const click = (name, xFraction = 0.5) => {
     const target = hitTargetSnapshot().find((item) => item.name === name);
     assert.ok(target, `visible control: ${name}`);
     const rect = canvas.getBoundingClientRect();
     const size = lcdDotSizeSnapshot().devicePixelsPerDot;
-    listeners.get('click')({ clientX: (target.box.x + target.box.width / 2) * rect.width / (canvas.width / size),
+    listeners.get('click')({ clientX: (target.box.x + target.box.width * xFraction) * rect.width / (canvas.width / size),
       clientY: (target.box.y + target.box.height / 2) * rect.height / (canvas.height / size), preventDefault() {} });
   };
   const edit = (name, value) => {
@@ -136,5 +138,96 @@ test('LCD controls change actual canvas pixels while preserving matrix, layout, 
   const profileCard = cards.find((item) => item.name === 'SCREEN PROFILE').box;
   assert.equal(profileCard.x, paletteCard.x, 'cards stack at narrow widths');
   assert.ok(profileCard.y >= paletteCard.y + paletteCard.height, 'stacked cards do not overlap');
+  const choices = choiceControlLayoutSnapshot();
+  const aperture = choices.find((row) => row.title === 'APERTURE').controls;
+  const font = choices.find((row) => row.title === 'FONT').controls;
+  assert.equal(aperture.x, font.x);
+  assert.equal(aperture.width, font.width, 'two-way selectors share the same columns');
+  assert.ok(aperture.y < font.y, 'like selectors are ordered alphabetically');
+  const boostBox = hitTargetSnapshot().find((item) => item.name === 'CONTRAST BOOST SLIDER').box;
+  assert.equal(boostBox.width, paletteCard.width - 8, 'contrast slider uses the whole card content width');
+  const motionReadouts = spacingReadoutLayoutSnapshot().filter((item) => ['ANIMATION DURATION', 'ANIMATION FPS CAP'].includes(item.title));
+  assert.equal(motionReadouts[0].box.x, motionReadouts[1].box.x, 'numeric value columns align within Motion');
+  assert.equal(motionReadouts[0].box.width, motionReadouts[1].box.width);
+  click('ANIMATION FPS CAP +');
+  assert.equal(JSON.parse(options.get('ViewBoy.displayOptions')).animationFPS, 70);
+  const fpsBox = hitTargetSnapshot().find((item) => item.name === 'ANIMATION FPS CAP').box;
+  assert.equal(fpsBox.width, boostBox.width, 'FPS uses the same full-width gauge style');
+  click('QUEUE');
+  const queueChoices = choiceControlLayoutSnapshot();
+  assert.deepEqual(queueChoices.map((row) => row.title), ['RANDOM', 'REPEAT']);
+  assert.equal(queueChoices[0].controls.x, queueChoices[1].controls.x);
+  assert.equal(queueChoices[0].controls.width, queueChoices[1].controls.width);
+  assert.ok(queueChoices[0].controls.width < queueChoices[0].row.width * 0.65, 'wide Queue fields stay bounded');
+  click('AUDIO');
+  const output = optionsStyleSnapshot().find((item) => item.kind === 'group' && item.name === 'OUTPUT').box;
+  assert.equal(volumeControlSnapshot().gaugeBox.width, output.width - 8, 'volume is a separate full-width row');
+  const volumeBox = volumeControlSnapshot().gaugeBox;
+  const dragAudio = (box, fraction) => {
+    // The exact common gauge bounds are inset two dots on either side.
+    const point = pointer(box, fraction);
+    const rect = canvas.getBoundingClientRect();
+    const size = lcdDotSizeSnapshot().devicePixelsPerDot;
+    point.clientX = (box.x + 2 + fraction * (box.width - 5)) * rect.width / (canvas.width / size);
+    return point;
+  };
+  const savedBeforeVolume = savedNativePreferences.length;
+  listeners.get('pointerdown')(dragAudio(volumeBox, 0.5));
+  assert.equal(volumeControlSnapshot().value, 0.5);
+  assert.equal(savedNativePreferences.length, savedBeforeVolume, 'audio drag preview does not save');
+  listeners.get('pointercancel')({});
+  assert.equal(volumeControlSnapshot().value, 1, 'cancel leaves the native volume unchanged');
+  listeners.get('pointerdown')(dragAudio(volumeBox, 0.2));
+  listeners.get('pointerup')(dragAudio(volumeBox, 0.4));
+  listeners.get('click')(dragAudio(volumeBox, 0.4));
+  await tick();
+  assert.equal(savedNativePreferences.at(-1).appVolume, 0.4, 'completed volume gesture persists');
+  key('End'); await tick();
+  assert.equal(volumeControlSnapshot().value, 1);
+  const band = () => equalizerAnimationSnapshot()[0];
+  const eqBox = hitTargetSnapshot().find((item) => item.name === 'EQ 31 HZ').box;
+  listeners.get('pointerdown')(dragAudio(eqBox, 1));
+  const maximum = band();
+  assert.equal(maximum.gain, 12);
+  assert.equal(maximum.fillWidth, maximum.bounds.right - maximum.bounds.left + 1);
+  assert.equal(framebufferShadeSnapshot(maximum.bounds.right, eqBox.y + 1), 0, 'maximum fills the final track pixel');
+  assert.equal(maximum.tickXs[0], maximum.bounds.left);
+  assert.equal(maximum.tickXs.at(-1), maximum.bounds.right);
+  listeners.get('pointercancel')({});
+  assert.equal(band().gain, 0);
+  assert.equal(framebufferShadeSnapshot(band().bounds.right, eqBox.y + 1), 3, 'cancel clears the previous fill');
+  listeners.get('pointerdown')(dragAudio(eqBox, 0.5));
+  listeners.get('pointerup')(dragAudio(eqBox, 1));
+  listeners.get('click')(dragAudio(eqBox, 1));
+  await tick();
+  assert.equal(savedNativePreferences.at(-1).equalizerBandGains[0], 12);
+  key('Home'); await tick();
+  assert.equal(band().gain, 0);
+  windowWidth = 640;
+  windowListeners.get('resize')?.();
+  click('DISPLAY'); click('DOT SIZE +'); click('AUDIO');
+  const audioViewport = optionsContentSnapshot().viewport;
+  const narrowBars = hitTargetSnapshot().filter((item) => /^EQ .* HZ$/.test(item.name));
+  assert.ok(narrowBars.every(({ box }) => box.width > 0 && box.x >= audioViewport.x
+    && box.x + box.width <= audioViewport.x + audioViewport.width), 'narrow EQ bars fit the pane');
+  assert.ok(narrowBars.every(({ box }) => box.x === narrowBars[0].box.x && box.width === narrowBars[0].box.width),
+    'all ten bands keep identical columns');
+  windowWidth = 1600; windowListeners.get('resize')?.();
+  click('DISPLAY');
+  click('ANIMATIONS', 0.05);
+  const motionFrames = [];
+  globalThis.requestAnimationFrame = (callback) => { const id = setImmediate(() => {}); motionFrames.push({ callback, id }); return id; };
+  click('QUEUE');
+  const moving = selectionBandSnapshot();
+  assert.ok(moving.duration > 0, 'page selection retains one animated marker');
+  const quarter = selectionBandSnapshot(moving.startedAt + moving.duration / 4);
+  const start = selectionBandSnapshot(moving.startedAt).animatedY;
+  assert.ok(Math.abs((quarter.animatedY - start) / (quarter.targetY - start) - 0.607220362) < 1e-6,
+    'sidebar animation uses SB2 timing');
+  const frame = motionFrames.shift();
+  clearImmediate(frame.id);
+  frame.callback(moving.startedAt + moving.duration / 4);
+  assert.equal(framebufferShadeSnapshot(quarter.x + quarter.width - 2, Math.floor(quarter.animatedY) + 2), 2,
+    'animation paints the moving shaded bar into the actual framebuffer');
   windowListeners.get('pagehide')?.();
 });

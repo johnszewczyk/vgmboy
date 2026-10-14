@@ -1,73 +1,68 @@
-# LCD Rendering Evidence
+# LCD and Options Rendering Evidence
 
 ## Contract
 
-`node --test ViewBoy/Tests/LCDPanel.test.mjs ViewBoy/Tests/LCDCanvas.test.mjs`
-passes seven tests. Coverage includes aperture area across device scales 2-6,
-black-ink reconstruction with a visible matrix, gain in both polarities,
-four-tone ordering, unchanged substrate endpoints, and actual packed ImageData
-changes through display controls. Renderer tests preserve matrix and layout
-across LCD, Direct, 8 and 16 modes and check stacked card bounds with Standard
-5x7 text in a narrow pane. The 1 PX regression checks monotonic boost for saturated black/white at every supported dot size, exact unboosted gutters and visible face/gutter separation at maximum boost. Slider checks cover live pointer preview, completion persistence, cancellation, keyboard steps and fixed geometry across 0-100 percent. Invalid color entry preserves the previous palette; page selection borders clear both bitmap fonts.
+`node --test ViewBoy/Tests/Motion.test.mjs ViewBoy/Tests/LCDPanel.test.mjs ViewBoy/Tests/LCDCanvas.test.mjs`
+passes eight focused tests. JavaScript syntax checks pass.
 
-`node --check` passes for `yoga-app.js` and `lcd-panel.js`. The component geometry
-is checked against Displaytech 128128A v1.1 p2; p9's response table and waveform
-definitions were visually inspected separately for the next-stage plan.
+- LCD aperture area, dark/inverse tones and saturated endpoints at dot sizes 2-6;
+  1 PX boost stays monotonic and retains distinct gutters, including maximum.
+- Actual packed ImageData changes without disabling the matrix or changing pitch.
+- Contrast drag preview, completion persistence, cancellation and keyboard steps;
+  its geometry stays stable across 0-100 percent. Invalid color drafts preserve
+  the previous palette.
+- Aperture/Font selector columns match and are alphabetical; Queue Random/Repeat
+  geometry matches and widths stay bounded. Motion value columns align.
+- Contrast, Volume and FPS gauges use the complete content width on their own
+  rows. Volume/EQ gestures preview without saving, commit on release, restore on
+  cancellation and accept keyboard endpoints. Maximum EQ fills the final track
+  pixel; tick endpoints match the true track bounds; cancellation clears fill.
+- Narrow Standard-font Audio bars remain within the pane and all ten bands use
+  matching columns, including the stacked layout at 640 CSS pixels and 4 PX dots.
+- SB2's cubic-bezier(0.2, 0, 0, 1) is correctly inverted in time, monotonic and
+  bounded. The page selector reaches the expected 60.7% position at a quarter
+  duration and paints shade 2 at that moving position in the actual framebuffer.
 
 ## Package
 
-`ViewBoy/build.sh` clean-builds and packages the release app with the LCD module
-admitted by `ViewBoyResourceSchemeHandler`. `codesign --verify --deep --strict`
-passes. Packaged JavaScript is compared byte-for-byte with source.
+`ViewBoy/build.sh` clean-builds and signs the release app. The new `motion.js`
+module is explicitly admitted by `ViewBoyResourceSchemeHandler`. Packaged
+JavaScript is compared byte-for-byte with source, and
+`codesign --verify --deep --strict` verifies the bundle.
 
-## First-Pass Packaged UI
+## Packaged UI
 
-The real WKWebView app loads its native catalog and saved playlist. Its Display
-cards stack within the narrow native window instead of squeezing labels and
-readouts into two small columns. Native screenshots verify:
+The native WKWebView app loads its catalog and saved playlist and reaches path
+index readiness while Options remains open. At the native 840-CSS-pixel-wide
+window, Standard 5x7 text and 3 PX dots:
 
-- LCD mode, BG `9BBC0F`, PIXEL `000000`, Contrast Boost 40%, dot size 3,
-  STN aperture and Pixel Matrix Gaps enabled: black text is visible and matrix
-  edges remain present.
-- LCD mode with BG `223`, PIXEL `CCC`: light ink, muted ink, selection and
-  substrate remain distinct in inverse polarity.
-- 8-shade inverse output preserves enabled matrix and STN aperture, with text
-  and background selectors following the chosen polarity.
-- Relaunch retains Contrast Boost 40%, the enabled matrix and STN aperture.
-  That first pass left the app on Display with LCD mode, green substrate and black ink.
+- Display shows adjacent matching Aperture/Font selectors, bounded BG/PIXEL
+  fields, aligned stepper/readout columns and a full-width Contrast gauge.
+  Dragging Contrast from 0 to 100 changes the readout and fills the whole track;
+  the selected classic 1 PX matrix remains visible. Zero was restored afterward.
+- The shaded sidebar marker follows the selected page. Queue Random and Repeat
+  have matching bounded rows instead of stretched buttons. Audio and Queue remain
+  separate pages in the existing native shell.
+- Audio shows Volume on two rows. A native drag to 50% produces matching half
+  fill and readout. Volume returns to its original 100% setting.
+- The 31 Hz EQ band reaches +12.0 with full fill through the final tick and returns
+  to its original +0.0. The other nine bands retain identical columns and zeros;
+  EQ enablement is unchanged.
+- Motion shows aligned duration/FPS numeric controls with a separate full-width
+  FPS gauge and the persisted 60 FPS readout. The footer stays outside the scroll
+  viewport.
 
-## Display Refinement Packaged UI (2026-10-14)
-
-A fresh clean release build, signature verification and byte-for-byte resource
-comparison pass. In the native 840-CSS-pixel-wide window, dot size 4 and Standard
-5x7 text, the Display cards stack with the compact Options sidebar. Its selection
-border clears the text; method labels, inputs, contrast slider, readout and
-Interface controls fit their cards. The lower Spacing and Motion cards remain
-within the scroll viewport, above the playback footer.
-
-- LCD, BG `9BBC0F`, PIXEL `000000`, grid enabled, aperture 1 PX: native slider
-  focus and Home/End show visibly different output at 0 and 100 percent, with
-  unchanged cell pitch and a distinct grid at maximum boost.
-- LCD, BG `111111`, PIXEL `FFFFFF`, grid enabled, aperture 1 PX, boost 100:
-  white pixels and muted/selection tones remain distinct, including gutters.
-- The catalog and saved playlist finish restoring in the background while
-  Display remains open; the native path index reaches readiness.
-
-Later window settings changed during verification; no further preference
-restoration or relaunch was performed. New drag completion/cancel persistence
-is covered in the canvas test; this pass does not repeat the native relaunch
-check recorded for the first pass.
+The saved custom purple/green palette, aperture, font and matrix preference were
+used for visual inspection. No new hardware calibration claims are made.
 
 ## Limits
 
-The older broad `YogaCanvas.test.mjs` already fails before this work: it expects
-four default tones while the previous renderer defaulted to 16, and its native
-bridge fixture lacks `playlistTabsReduce`. Its catalog fixture also predates the
-current `{games, groups}` projection. It remains unchanged; repairing unrelated
-playlist, catalog and historical layout assertions is separate work. The new
-tests exercise the LCD changes with the current bridge shape.
+Native screenshots establish control geometry and settled pointer/readout
+results. The intermediate movement timing and raster position are established by
+the controlled Canvas test; this pass does not claim a native high-speed motion
+capture or an audible EQ/volume sweep.
 
-The spatial model is sourced to a standard STN component, not calibrated against
-a physical DMG panel. Ghosting, voltage response, angle dependence and aging are
-planned rather than claimed as implemented. Native visual evidence establishes
-display behavior, not new playback or audio fidelity.
+The older broad `YogaCanvas.test.mjs` remains unchanged. Its pre-existing default
+palette and missing `playlistTabsReduce`/obsolete catalog fixtures are recorded
+in the prior commit's evidence. The focused fixture uses the current bridge and
+catalog shapes and covers the changed rendering and interaction paths.
