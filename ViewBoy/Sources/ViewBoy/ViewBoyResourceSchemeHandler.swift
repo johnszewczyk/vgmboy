@@ -8,6 +8,7 @@ final class ViewBoyResourceSchemeHandler: NSObject, WKURLSchemeHandler {
         "index.html": "text/html",
         "yoga-screen.css": "text/css",
         "yoga-app.js": "text/javascript",
+        "lcd-panel.js": "text/javascript",
         "yoga-layout.js": "text/javascript",
         "yoga-YGEnums.js": "text/javascript",
         "yoga-wasm-base64-esm.js": "text/javascript",
