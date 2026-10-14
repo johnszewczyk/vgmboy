@@ -324,6 +324,7 @@ final class PlayerViewModel {
     var playlistTabs: [CocoaSpicePlaylistTab] = []
     var activePlaylistTabID = ""
     var activePlaylistTitle = "Playlist"
+    private var lastNonGalleryPlaylistTabID: String?
     private(set) var galleryGames: [CatalogGalleryGame] = []
     private var galleryProjection: CatalogGalleryIndex?
     private(set) var galleryIsLoading = false
@@ -412,6 +413,9 @@ final class PlayerViewModel {
         selectedTrackID = tab.selectedTrackID.flatMap { id in tab.tracks.contains(where: { $0.id == id }) ? id : nil }
         selectedTrackIDs = Set(tab.selectedTrackIDs.filter { id in tab.tracks.contains(where: { $0.id == id }) })
         isRestoringPlaylistTabs = false
+        if tab.kind == .playlist {
+            lastNonGalleryPlaylistTabID = tab.id
+        }
         if let selectedTrackID, !selectedTrackIDs.contains(selectedTrackID) {
             selectedTrackIDs.insert(selectedTrackID)
         }
@@ -439,9 +443,6 @@ final class PlayerViewModel {
 
     func closePlaylistTab(_ tabID: String) {
         guard let index = playlistTabs.firstIndex(where: { $0.id == tabID }) else { return }
-        if playlistTabs[index].kind == .gallery {
-            resetGalleryProjection()
-        }
         if playlistTabs.count == 1 {
             if playlistTabs[index].kind == .gallery {
                 playlistTabs[index].kind = .playlist
@@ -1986,6 +1987,14 @@ final class PlayerViewModel {
     }
 
     func setSidebarBrowserMode(_ mode: SidebarBrowserMode) {
+        if isGalleryTabActive {
+            let returnTabID = lastNonGalleryPlaylistTabID.flatMap { lastID in
+                playlistTabs.first(where: { $0.id == lastID && $0.kind == .playlist })?.id
+            } ?? playlistTabs.first(where: { $0.kind == .playlist })?.id
+            if let returnTabID {
+                activatePlaylistTab(returnTabID)
+            }
+        }
         sidebarBrowserMode = mode
         applySidebarSearch()
         loadDatabaseSidebarIfNeeded()
@@ -3771,6 +3780,8 @@ final class PlayerViewModel {
             activePlaylistTabID = initialOrder.activeID ?? ""
             schedulePlaylistTabsSave()
         }
+        lastNonGalleryPlaylistTabID = activePlaylistTab.flatMap { $0.kind == .playlist ? $0.id : nil }
+            ?? playlistTabs.first(where: { $0.kind == .playlist })?.id
         if let currentTrack,
            let playingTab = playlistTabs.first(where: { $0.tracks.contains(where: { $0.id == currentTrack.id }) }) {
             playbackTabID = playingTab.id

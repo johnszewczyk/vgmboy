@@ -18,10 +18,16 @@ Playlist-tab ordering, activation, and saved order.
   identity.
 - Favorites and Recent shortcuts activate their named tabs when present and
   create those tabs on first use.
+- Command-Shift-F and Command-Shift-D both open the shared Favorites playlist;
+  the latter is labeled Bookmarks. Command-Shift-H opens Recent.
+- Choosing Console or Path while Gallery is active returns to the most recently
+  active ordinary playlist tab before changing sidebar mode.
 - Tabs divide the available strip width equally, with a 76-point minimum width
   that enables horizontal scrolling when the full set no longer fits.
 - Clicking anywhere in the tab tile activates it; the close control remains a
   separate hit target.
+- The tab button label owns the full tile frame so activation does not depend
+  on clicking its title text. Keep the close button as an independent overlay.
 - Playlist-tab commands enumerate tab values by stable identity and activate by
   ID; do not capture numeric indices into the mutable tab array.
 - Preserve each tab's title, queue, and selection while changing its position.
