@@ -22,16 +22,23 @@ uses two columns in wide panes and stacks its cards in narrow panes: the live
 LCD palette preview and screen profile sit at left, while one Interface card
 groups button labels, column sizing and window behavior, followed by spacing and
 motion cards. Each Display section uses a full card with a shared filled title
-bar and enclosing outline. Options pane insets, card insets, gaps, and control
-padding use a fixed four-dot grid, independent of the adjustable home-screen
-spacing. The Options sidebar fits its six icons instead of inheriting the wider
-library minimum. Page rows leave room around the bitmap glyphs. One shaded marker glides between
+bar and enclosing outline. The Options navigation and content panes have matching
+filled headers. Layout Spacing controls pane/card insets, gaps and control
+padding in Options as well as the main screen; each change is visible on the
+page being edited. Reset Spacing restores pad/gap/line defaults of 4/4/1 dots.
+The Options sidebar fits its six icons instead of inheriting the wider library
+minimum. Page rows leave room around the bitmap glyphs. One shaded marker glides between
 page links, including across the section headings.
 
 In the Path sidebar, root chevron ink shares the leading edge of the search and
-toolbar controls. Nested disclosures move inward by two bitmap glyph advances
-per depth; folder and file labels share a column at each depth. Chevrons align
-vertically with row text.
+toolbar controls. Nested disclosures and text move inward by one bitmap glyph
+advance per depth; folder and file labels share a column at each depth. Indent
+is charged only to the leading edge; the trailing margin stays at the configured
+button pad. Chevrons align vertically with row text. Main-screen sidebar width adapts to larger windows.
+Drag the dotted edge between the tree and playlist to resize it; the chosen
+window fraction persists. Double-click restores adaptive width. Hovered tree
+rows expose their full source name as a standard tooltip. Width changes do not
+change the playlist or playback.
 
 The main toolbar contains eight equal-width buttons in this order: Previous,
 Stop, Play/Pause, Next, Long Play, Repeat One, Playlist Random, and Library
@@ -132,22 +139,22 @@ the three adjustable controls have distinct jobs:
 | Measure | Value | Applies to | Does not control |
 | --- | --- | --- | --- |
 | App-edge inset | Fixed 8 px on all four sides | Gap between the LCD edge and the outermost toolbar, pane, or footer content | Control text padding or gaps between sibling elements |
-| UI Button Pad | 1–8 px; default 4 | Main-screen control text inset and standard control height | Options grid, app-edge inset, or playlist/sidebar text-row height |
-| UI Chrome Gap | 1–8 px; default 4 | Main-screen separation between controls, panes, tabs, headings, and playlist columns | Options grid or blank space between playlist/sidebar text rows |
-| Text Line Gap | 1–8 px; default 1 | Blank vertical space between playlist and sidebar text rows | Control height, pane inset, or other chrome gaps |
-| Options grid | Fixed: 4 px pane inset, 4 px card inset, 4 px gaps, 4 px control padding | Shared spacing inside every Options page | Main-screen adjustable spacing |
+| UI Button Pad | 1–8 px; default 4 | Control text inset and standard control height on the main screen and Options | App-edge inset or glyph-height library/playlist rows |
+| UI Chrome Gap | 1–8 px; default 4 | Control/pane/card gaps and insets on the main screen and Options; playlist columns | Blank space between text rows or app-edge inset |
+| Text Line Gap | 1–8 px; default 1 | Blank vertical space between playlist/sidebar text rows and Options page links | Control height, pane inset, or other chrome gaps |
+| Tree indent | One bitmap glyph advance per depth | Leading text/disclosure column | Trailing margin or device-pixel pitch |
 
 ### Padding, Gaps, and Margins
 
-- **Padding** is space inside a component: UI Button Pad insets main-screen
-  control text. Options uses fixed grid values so saved main-screen spacing
-  cannot shrink settings controls or clip labels.
+- **Padding** is space inside a component: UI Button Pad insets
+  control text in the main screen and Options. Button borders remain outside the glyphs even at one-dot pad.
+  Options uses the same values and retains matching selector/readout columns.
 - **Gaps** separate sibling controls or sections. UI Chrome Gap is the shared
-  main-screen gap; Text Line Gap is reserved for the two text lists.
+  gap; Text Line Gap controls library/playlist rows and Options page links.
 - **Margins** are local corrections for one widget relationship, such as the
   one-pixel separation before a boxed gauge value. Margins do not define the
   app grid or replace the shared gap settings.
-- The content inset stays eight pixels even when UI Button Pad changes. The
+- The app-edge inset stays eight pixels even when UI Button Pad changes. The
   canvas background still paints to all four window edges.
 
 Buttons and framed panes use a one-pixel LCD border. The upper toolbar's shared

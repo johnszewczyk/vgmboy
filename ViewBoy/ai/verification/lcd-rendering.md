@@ -2,8 +2,8 @@
 
 ## Contract
 
-`node --test ViewBoy/Tests/Motion.test.mjs ViewBoy/Tests/LCDPanel.test.mjs ViewBoy/Tests/LCDCanvas.test.mjs`
-passes eight focused tests. JavaScript syntax checks pass.
+`node --test ViewBoy/Tests/Sidebar.test.mjs ViewBoy/Tests/Motion.test.mjs ViewBoy/Tests/LCDPanel.test.mjs ViewBoy/Tests/LCDCanvas.test.mjs`
+passes nine focused tests. JavaScript syntax checks pass.
 
 - LCD aperture area, dark/inverse tones and saturated endpoints at dot sizes 2-6;
   1 PX boost stays monotonic and retains distinct gutters, including maximum.
@@ -22,6 +22,15 @@ passes eight focused tests. JavaScript syntax checks pass.
 - SB2's cubic-bezier(0.2, 0, 0, 1) is correctly inverted in time, monotonic and
   bounded. The page selector reaches the expected 60.7% position at a quarter
   duration and paints shade 2 at that moving position in the actual framebuffer.
+
+- Sidebar depth advances one character per unfold and keeps the trailing margin
+  independent of depth. Hover preserves the complete filename. Width dragging
+  previews without persistence, cancellation restores the starting width, release
+  saves the fraction, and double-click restores adaptive width.
+- Options headers share fill, position and height. Button Pad changes header and
+  control height, UI Gap changes card insets, and Line Gap changes page-link
+  spacing. Reset writes 4/4/1 in one update; minimum padding reserves glyphs and
+  borders, and cards stay within the content viewport.
 
 ## Package
 
@@ -51,6 +60,13 @@ window, Standard 5x7 text and 3 PX dots:
 - Motion shows aligned duration/FPS numeric controls with a separate full-width
   FPS gauge and the persisted 60 FPS readout. The footer stays outside the scroll
   viewport.
+
+- The current packaged app also shows aligned filled OPTIONS/DISPLAY headers.
+  Native Button Pad 1→2 and UI Gap 6→7 adjustments visibly resize controls and
+  pane/card spacing; the original 1/6/1 values were restored.
+- Unfolding the real 1943 system moves game labels inward by one Standard-font
+  character. Dragging the dotted sidebar edge reveals the complete second game
+  title and longer system names; double-click returns to adaptive width.
 
 The saved custom purple/green palette, aperture, font and matrix preference were
 used for visual inspection. No new hardware calibration claims are made.
