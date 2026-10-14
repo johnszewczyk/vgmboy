@@ -21,14 +21,15 @@ admits every imported module.
   four-tone LCD mode and an enabled STN aperture.
 - Contrast Boost is output gain, not calibrated contrast voltage. Its edge
   adjustment retains a visible matrix and does not modify the coverage mask.
-  At zero boost Direct mode retains exact configured ink/substrate endpoints.
+  At zero boost Direct mode retains exact configured ink/substrate endpoints. Classic binary gutters receive up to 65% ink tint as an explicit readability override; their face/gutter distinction survives at maximum boost and saturated endpoints. Zero boost leaves binary coverage exact.
 - Tone and coverage math is cached as packed device-cell tables when settings
   change. Full and partial framebuffer updates use those same tables; no
   color-space conversion occurs inside the per-frame device-pixel loop.
 - Dot-size, aperture, matrix, color, method, and boost changes invalidate the
   tables before repainting. CSS surface color matches the semantic substrate.
 - Display cards stack when the remaining pane is too narrow for two columns;
-  the existing clipped options viewport retains scrolling.
+  the existing clipped options viewport retains scrolling. Options insets and sidebar width use logical dots, without double scaling. Page rows include four extra dots so their inset selection border cannot cross the glyphs.
+- Contrast slider previews without writing preferences until pointerup; pointercancel restores its starting value. Its fixed readout width keeps drag geometry stable across 0-100%. Keyboard focus is active only on Display in Options.
 
 ## Evidence and Planning
 

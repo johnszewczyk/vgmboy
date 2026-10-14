@@ -36,7 +36,7 @@ globalThis.viewBoy = {
 const tick = () => new Promise(setImmediate);
 
 test('LCD controls change actual canvas pixels while preserving matrix, layout, and polarity', async () => {
-  const { hitTargetSnapshot, lcdDotSizeSnapshot, lcdDeviceDotSnapshot, lcdPanelSnapshot, optionsContentSnapshot, optionsStyleSnapshot } =
+  const { hitTargetSnapshot, lcdDotSizeSnapshot, lcdDeviceDotSnapshot, lcdPanelSnapshot, optionsContentSnapshot, optionsStyleSnapshot, selectionBandSnapshot, bitmapFontSnapshot } =
     await import('../Sources/ViewBoy/Resources/yoga-app.js');
   await tick(); await tick();
   globalThis.ViewBoy.dispatch('optionsPage:DISPLAY');
@@ -54,6 +54,8 @@ test('LCD controls change actual canvas pixels while preserving matrix, layout, 
     for (const key of value) listeners.get('keydown')({ key, preventDefault() {}, stopPropagation() {} });
     listeners.get('keydown')({ key: 'Enter', preventDefault() {}, stopPropagation() {} });
   };
+  assert.ok(selectionBandSnapshot().height >= bitmapFontSnapshot('MICRO').height + 2,
+    'page highlight has room for glyphs and both borders');
   const initial = lcdDotSizeSnapshot();
   assert.equal(initial.pixelGaps, true, 'new installs keep the matrix enabled');
   assert.equal(lcdPanelSnapshot().matrixProfile, 'STN');
@@ -61,13 +63,52 @@ test('LCD controls change actual canvas pixels while preserving matrix, layout, 
   assert.ok(lcdDeviceDotSnapshot().flat().some((color) => color === '#000000'));
   const before = [...canvas.image.data];
   click('CONTRAST BOOST +');
-  assert.equal(lcdPanelSnapshot().contrastBoost, 10);
+  assert.equal(lcdPanelSnapshot().contrastBoost, 5);
   assert.notDeepEqual([...canvas.image.data], before, 'boost reaches the real packed ImageData renderer');
   assert.deepEqual(lcdDotSizeSnapshot(), initial, 'contrast does not resize or disable the matrix');
+  click('APERTURE CLASSIC APERTURE');
+  const classicBefore = lcdDeviceDotSnapshot();
+  click('CONTRAST BOOST +');
+  assert.notDeepEqual(lcdDeviceDotSnapshot(), classicBefore, '1 PX boost reaches saturated black device cells');
+  assert.equal(lcdPanelSnapshot().matrixProfile, 'CLASSIC');
+  assert.deepEqual(lcdDotSizeSnapshot(), initial, '1 PX boost preserves pitch and enabled matrix');
+  click('APERTURE STN APERTURE');
+  click('CONTRAST BOOST -');
+  const slider = () => hitTargetSnapshot().find((item) => item.name === 'CONTRAST BOOST SLIDER');
+  const pointer = (box, fraction) => {
+    const rect = canvas.getBoundingClientRect();
+    const size = lcdDotSizeSnapshot().devicePixelsPerDot;
+    return { pointerId: 1, button: 0, clientX: (box.x + 3 + fraction * (box.width - 7)) * rect.width / (canvas.width / size),
+      clientY: (box.y + box.height / 2) * rect.height / (canvas.height / size), preventDefault() {} };
+  };
+  const trackBox = { ...slider().box };
+  listeners.get('pointerdown')(pointer(trackBox, 0.5));
+  assert.equal(lcdPanelSnapshot().contrastBoost, 50);
+  assert.equal(JSON.parse(options.get('ViewBoy.displayOptions')).lcdContrastBoost, 5, 'drag preview is not persisted');
+  listeners.get('pointermove')(pointer(trackBox, 1));
+  assert.equal(lcdPanelSnapshot().contrastBoost, 100);
+  assert.deepEqual(slider().box, trackBox, 'percentage changes never shift the slider');
+  listeners.get('pointercancel')({});
+  assert.equal(lcdPanelSnapshot().contrastBoost, 5, 'cancel restores the pre-drag value');
+  listeners.get('pointerdown')(pointer(trackBox, 0.25));
+  listeners.get('pointerup')(pointer(trackBox, 0.75));
+  assert.equal(JSON.parse(options.get('ViewBoy.displayOptions')).lcdContrastBoost, 75, 'completed drag persists');
+  listeners.get('click')(pointer(trackBox, 0.75)); // Consume the native click after pointerup.
+  const key = (code, shiftKey = false) => listeners.get('keydown')({ code, key: code, shiftKey, preventDefault() {}, stopPropagation() {} });
+  key('Home'); assert.equal(lcdPanelSnapshot().contrastBoost, 0);
+  key('ArrowRight'); assert.equal(lcdPanelSnapshot().contrastBoost, 1);
+  key('ArrowRight', true); assert.equal(lcdPanelSnapshot().contrastBoost, 11);
+  key('End'); assert.equal(lcdPanelSnapshot().contrastBoost, 100);
+  key('Home'); for (let i = 0; i < 5; i++) key('ArrowRight');
+  key('Escape');
   for (const method of ['DIRECT', '8 SHADE', '16 SHADE', 'STN LCD']) {
     click(`PIXEL METHOD ${method}`);
     assert.deepEqual(lcdDotSizeSnapshot(), initial, `${method} retains the matrix geometry`);
   }
+  const originalBackground = lcdPanelSnapshot().colors[3];
+  edit('BG CSS COLOR INPUT', 'not-a-color');
+  assert.equal(lcdPanelSnapshot().colors[3], originalBackground, 'invalid input preserves the palette');
+  listeners.get('keydown')({ key: 'Escape', preventDefault() {}, stopPropagation() {} });
   edit('BG CSS COLOR INPUT', '111111');
   edit('PIXEL CSS COLOR INPUT', 'DDDDDD');
   const inverse = lcdPanelSnapshot().colors;
@@ -77,16 +118,20 @@ test('LCD controls change actual canvas pixels while preserving matrix, layout, 
   assert.equal(lcdDotSizeSnapshot().pixelGaps, true);
   click('APERTURE STN APERTURE');
   assert.deepEqual(lcdDotSizeSnapshot(), initial);
-  assert.equal(JSON.parse(options.get('ViewBoy.displayOptions')).lcdContrastBoost, 10);
+  assert.equal(JSON.parse(options.get('ViewBoy.displayOptions')).lcdContrastBoost, 5);
   click('FONT STANDARD 5X7');
   windowWidth = 700;
   windowListeners.get('resize')?.();
   await tick();
   assert.equal(lcdDotSizeSnapshot().devicePixelsPerDot, initial.devicePixelsPerDot);
+  assert.ok(selectionBandSnapshot().height >= bitmapFontSnapshot('STANDARD').height + 2,
+    'Standard page highlight does not strike through the label');
   const viewport = optionsContentSnapshot().viewport;
   const cards = optionsStyleSnapshot().filter((item) => item.kind === 'group');
   assert.ok(cards.every(({ box }) => box.x >= viewport.x && box.x + box.width <= viewport.x + viewport.width),
     'narrow Display cards remain within the clipped pane');
+  assert.deepEqual(cards.map((card) => card.name), ['LCD PALETTE', 'SCREEN PROFILE', 'INTERFACE', 'LAYOUT SPACING', 'MOTION'],
+    'interface settings share one card');
   const paletteCard = cards.find((item) => item.name === 'LCD PALETTE').box;
   const profileCard = cards.find((item) => item.name === 'SCREEN PROFILE').box;
   assert.equal(profileCard.x, paletteCard.x, 'cards stack at narrow widths');
