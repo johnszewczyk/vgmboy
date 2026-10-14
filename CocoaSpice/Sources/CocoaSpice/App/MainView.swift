@@ -126,7 +126,6 @@ struct MainView: View {
         }
         .help(mode.title)
         .accessibilityLabel(mode.title)
-        .disabled(model.isGalleryTabActive)
     }
 
     private var volumeToolbarButton: some View {
@@ -402,13 +401,13 @@ struct MainView: View {
                                     }
                                     .padding(.leading, 8)
                                     .padding(.trailing, 26)
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                                    .frame(width: tabWidth, height: 30, alignment: .leading)
                                     .background(Color.clear)
                                     .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
                                 .help(tab.title)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .frame(width: tabWidth, height: 30)
                                 .contentShape(Rectangle())
 
                                 Button {

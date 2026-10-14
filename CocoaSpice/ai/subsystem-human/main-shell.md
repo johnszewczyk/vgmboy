@@ -5,13 +5,17 @@
 - Main window: two-pane layout.
 - Left pane: database browser.
 - Right pane: editable playlist.
-- Playlist tabs: sit above the playlist table; each tab owns its queue and selection.
+- Playlist tabs: sit above the playlist table; each tab owns its queue and
+  selection. Clicking anywhere in a tab tile activates it; the close control is
+  a separate target.
 - Gallery is a special playlist tab. Its artwork index loads after startup is
   ready, and thumbnails load only for visible tiles.
 - Main-window navigation toolbar: individual Console View, Path View,
-  Gallery, Favorites, plus a fold/unfold-all
-  item beside the native sidebar disclosure control. These remain individual
-  native toolbar items rather than a grouped capsule.
+  Gallery, plus a fold/unfold-all item beside the native sidebar disclosure
+  control. These remain individual native toolbar items rather than a grouped
+  capsule.
+- Selecting Console or Path while Gallery is active returns to the most recently
+  active playlist tab, then changes the sidebar view.
 - Main transport toolbar order: Previous, Stop, Play/Pause, Next, then Long Play, repeat, random playback, Equalizer on/off, and Volume. Stop uses a square glyph; the infinity button turns Long Play on or off. Volume opens a compact slider with twenty 5% detents.
 - The sidebar begins with search and list content.
 - Startup: if loading lasts beyond a short reveal delay, a four-step screen shows workspace restore, library connection, sidebar preparation, and playlist restore, with elapsed time. It briefly confirms readiness and stays visible with the error if startup fails.

@@ -219,6 +219,11 @@ private struct CocoaSpiceCommands: Commands {
             }
             .keyboardShortcut("f", modifiers: [.command, .shift])
 
+            Button("Bookmarks") {
+                model.showFavoritesPlaylist()
+            }
+            .keyboardShortcut("d", modifiers: [.command, .shift])
+
             Button("Artwork Gallery") {
                 model.showGallery()
             }
