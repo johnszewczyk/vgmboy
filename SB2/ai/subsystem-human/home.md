@@ -14,7 +14,8 @@
   is ready. Loading, error, and empty-result messages appear there instead of
   taking over the catalog tree; full details are available in its tooltip.
 - The footer aligns to the sidebar split and shows elapsed time, track length,
-  and playlist length at right.
+  and playlist length at right. Library totals, playback status, and time values
+  share a centered text baseline.
 - Startup reads the shared CocoaSpice catalog through CatalogReader; ScanSong
   remains its writer.
 - Development runs can select an isolated catalog with
