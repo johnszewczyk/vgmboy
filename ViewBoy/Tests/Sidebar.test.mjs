@@ -1,0 +1,112 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+const listeners = new Map();
+let windowWidth = 1000;
+const canvas = {
+  style: {}, focus() {}, setPointerCapture() {}, addEventListener: (name, fn) => listeners.set(name, fn),
+  getBoundingClientRect: () => ({ left: 0, top: 0, width: parseFloat(canvas.style.width), height: parseFloat(canvas.style.height) }),
+  getContext: () => ({ createImageData: (width, height) => ({ width, height, data: new Uint8ClampedArray(width * height * 4) }), putImageData() {} }),
+};
+const options = new Map([['ViewBoy.displayOptions', JSON.stringify({ font: 'STANDARD' })]]);
+const events = new Map();
+globalThis.window = globalThis;
+globalThis.devicePixelRatio = 2;
+globalThis.addEventListener = (name, fn) => events.set(name, fn);
+globalThis.document = {
+  documentElement: { dataset: {}, style: { setProperty() {} } },
+  querySelector: (name) => name === '#lcd' ? canvas : name === '#screen-window'
+    ? { getBoundingClientRect: () => ({ width: windowWidth, height: 1000 }) } : {},
+};
+globalThis.localStorage = { getItem: (key) => options.get(key) ?? null, setItem: (key, value) => options.set(key, value) };
+globalThis.requestAnimationFrame = (callback) => setImmediate(() => callback(performance.now() + 1000));
+globalThis.cancelAnimationFrame = clearImmediate;
+const filename = 'A complete long song filename.gbs';
+globalThis.viewBoy = {
+  frontendSettingsLoad: async () => ({ sidebarMode: 'paths', selectionAnimationEnabled: false, autoResizeAnimationEnabled: false }),
+  frontendSettingsSave: async () => {}, nativePlaybackInit: async () => {}, nativePlaybackAudioConfig: async () => {},
+  nativePlaybackState: async () => ({ transport_state: 'stopped' }), favoritesList: async () => [],
+  databaseGames: async () => ({ games: [], groups: [] }), playlistTabsLoad: async () => null,
+  playlistTabsSave: async () => {}, playlistTabsReduce: async ({ state, action }) => ({ orderedIDs: [...state.orderedIDs, action.id], activeID: action.id }),
+  databaseFileTree: async () => [{ kind: 'folder', name: 'ROOT', path: '/root', children: [
+    { kind: 'folder', name: 'PARENT', path: '/root/parent', children: [
+      { kind: 'folder', name: 'CHILD', path: '/root/parent/child', children: [
+        { kind: 'file', name: filename, path: '/root/parent/child/song.gbs' },
+      ] },
+    ] },
+  ] }],
+};
+const tick = () => new Promise(setImmediate);
+
+test('sidebar depth uses one character, labels retain their right budget, and width gestures persist safely', async () => {
+  const { hitTargetSnapshot, lcdDotSizeSnapshot, bitmapFontSnapshot, optionsStyleSnapshot, optionsContentSnapshot } =
+    await import('../Sources/ViewBoy/Resources/yoga-app.js');
+  for (let i = 0; i < 8; i++) await tick();
+  const target = (name, page = false) => { const value = hitTargetSnapshot().find((item) => item.name === name && (!page || item.optionPage)); assert.ok(value, name); return value; };
+  const point = (box, x = box.x + box.width / 2, detail = 1) => {
+    const rect = canvas.getBoundingClientRect();
+    const size = lcdDotSizeSnapshot().devicePixelsPerDot;
+    return { clientX: x * rect.width / (canvas.width / size),
+      clientY: (box.y + box.height / 2) * rect.height / (canvas.height / size), pointerId: 1, button: 0, detail, preventDefault() {} };
+  };
+  const click = (name) => listeners.get('click')(point(target(name).box));
+  click('PARENT'); click('CHILD');
+  const rows = ['ROOT', 'PARENT', 'CHILD', filename].map((name) => target(name));
+  const advance = rows[0].glyphAdvance;
+  for (let i = 1; i < rows.length; i++) assert.equal(rows[i].textInset - rows[i - 1].textInset, advance);
+  assert.equal(rows[3].textRightInset, 4, 'depth does not consume the trailing margin');
+  assert.equal(rows[3].textCapacity, Math.floor((rows[3].box.width - rows[3].textInset - 4 + 1) / advance));
+  assert.ok(rows[3].textCapacity > Math.floor((rows[3].box.width - rows[3].textInset * 2 + 1) / advance), 'deep labels gain usable characters');
+  listeners.get('pointermove')(point(rows[3].box));
+  assert.equal(canvas.title, filename, 'hover retains the full source name');
+  const initialCapacity = rows[3].textCapacity;
+  const splitter = target('SIDEBAR WIDTH').box;
+  listeners.get('pointerdown')(point(splitter));
+  listeners.get('pointermove')(point(splitter, splitter.x + 120));
+  assert.ok(target(filename).textCapacity > initialCapacity);
+  assert.equal(JSON.parse(options.get('ViewBoy.displayOptions')).sidebarWidthFraction, null, 'preview is not persisted');
+  listeners.get('pointercancel')({});
+  assert.equal(target(filename).textCapacity, initialCapacity);
+  listeners.get('pointerdown')(point(splitter));
+  listeners.get('pointermove')(point(splitter, splitter.x + 120));
+  listeners.get('pointerup')(point(splitter, splitter.x + 120));
+  listeners.get('click')(point(splitter, splitter.x + 120)); // consume click after drag
+  assert.ok(JSON.parse(options.get('ViewBoy.displayOptions')).sidebarWidthFraction > 0.3);
+  const capacity = target(filename).textCapacity;
+  assert.ok(capacity >= filename.length, 'widening reveals the full long filename');
+  listeners.get('click')(point(target('SIDEBAR WIDTH').box, undefined, 2));
+  assert.equal(JSON.parse(options.get('ViewBoy.displayOptions')).sidebarWidthFraction, null);
+  assert.equal(target(filename).textCapacity, initialCapacity, 'double click restores adaptive width');
+
+  globalThis.ViewBoy.dispatch('optionsPage:DISPLAY');
+  const headers = optionsStyleSnapshot().filter((item) => item.headerRole);
+  assert.deepEqual(headers.map((item) => item.headerRole), ['navigation', 'content']);
+  assert.ok(headers.every((item) => item.fillShade === 2));
+  assert.equal(headers[0].box.y, headers[1].box.y);
+  assert.equal(headers[0].box.height, headers[1].box.height);
+  const headerBefore = headers[0].box.height;
+  click('UI BUTTON PAD +');
+  assert.equal(optionsStyleSnapshot().find((item) => item.headerRole === 'navigation').box.height, headerBefore + 2,
+    'button padding affects Options immediately');
+  const cardBefore = optionsStyleSnapshot().find((item) => item.kind === 'group' && item.name === 'LCD PALETTE').box;
+  const sliderBefore = target('CONTRAST BOOST SLIDER').box;
+  click('UI CHROME GAP +');
+  const cardAfter = optionsStyleSnapshot().find((item) => item.kind === 'group' && item.name === 'LCD PALETTE').box;
+  const sliderAfter = target('CONTRAST BOOST SLIDER').box;
+  assert.equal(sliderAfter.x - cardAfter.x, sliderBefore.x - cardBefore.x + 1, 'card inset follows UI Gap');
+  const pageBefore = target('QUEUE', true).box.y - target('LIBRARY', true).box.y;
+  click('TEXT LINE GAP +');
+  assert.equal(target('QUEUE', true).box.y - target('LIBRARY', true).box.y, pageBefore + 1, 'line gap affects Options links');
+  const pitch = lcdDotSizeSnapshot().devicePixelsPerDot;
+  click('RESET SPACING');
+  const saved = JSON.parse(options.get('ViewBoy.displayOptions'));
+  assert.deepEqual([saved.uiButtonPadDots, saved.uiChromeGapDots, saved.textLineGapDots], [4, 4, 1]);
+  assert.equal(lcdDotSizeSnapshot().devicePixelsPerDot, pitch);
+  for (let i = 0; i < 3; i++) click('UI BUTTON PAD -');
+  const font = bitmapFontSnapshot('STANDARD');
+  assert.equal(target('FONT STANDARD 5X7').box.height, font.height + 4, 'one-dot padding still reserves borders outside the glyph');
+  const viewport = optionsContentSnapshot().viewport;
+  assert.ok(optionsStyleSnapshot().filter((item) => item.kind === 'group').every(({ box }) =>
+    box.x >= viewport.x && box.x + box.width <= viewport.x + viewport.width));
+  events.get('pagehide')?.();
+});

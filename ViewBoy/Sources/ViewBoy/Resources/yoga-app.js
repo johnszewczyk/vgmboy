@@ -17,9 +17,6 @@ import Yoga, {
 const DEFAULT_LCD_DOT_SIZE = 3;
 const LCD_DOT_SIZE_OPTIONS = [2, 3, 4, 5, 6];
 const APP_EDGE_PADDING_PX = 8;
-const OPTIONS_CARD_INSET_DOTS = 4;
-const OPTIONS_GAP_DOTS = 4;
-const OPTIONS_CONTROL_PAD_DOTS = 4;
 let DEVICE_PIXELS_PER_LCD_DOT = DEFAULT_LCD_DOT_SIZE;
 const BASELINE_LAYOUT_UNIT_CSS_PIXELS = 2.5;
 const RANDOM_HISTORY_LIMIT = 256;
@@ -409,6 +406,7 @@ function saveDisplayOptions() {
       lcdPixelGaps: state.lcdPixelGaps,
       lcdMatrixProfile: state.lcdMatrixProfile,
       lcdContrastBoost: state.lcdContrastBoost,
+      sidebarWidthFraction: state.sidebarWidthFraction,
       uiButtonPadDots: state.controlPaddingDots,
       uiChromeGapDots: state.uiChromeGapDots,
       textLineGapDots: state.textLineGapDots,
@@ -529,6 +527,8 @@ const state = {
   uiChromeGapDots: storedSpacing(savedDisplayOptions.uiChromeGapDots, legacyChromeGapDots),
   textLineGapDots: storedSpacing(savedDisplayOptions.textLineGapDots, legacyTextLineGapDots),
   animationFPS: storedAnimationFPS(savedDisplayOptions.animationFPS),
+  sidebarWidthFraction: Number(savedDisplayOptions.sidebarWidthFraction) >= 0.15
+    && Number(savedDisplayOptions.sidebarWidthFraction) <= 0.65 ? Number(savedDisplayOptions.sidebarWidthFraction) : null,
   searchQuery: "",
   searchFocused: false,
   optionsScrollOffset: 0,
@@ -1317,6 +1317,9 @@ export function hitTargetSnapshot() {
     editableRateBackend: widget.meta.editableRateBackend ?? null,
     playlistTabId: widget.meta.playlistTabId ?? null,
     textInset: widget.meta.inset ?? controlPaddingDots(),
+    textRightInset: widget.meta.rightInset ?? widget.meta.inset ?? controlPaddingDots(),
+    textCapacity: Math.max(0, Math.floor((box.width - (widget.meta.inset ?? controlPaddingDots())
+      - (widget.meta.rightInset ?? widget.meta.inset ?? controlPaddingDots()) + 1) / fontProfile().advance)),
     glyphAdvance: fontProfile().advance,
     reorderKind: widget.meta.reorderKind ?? null,
     reorderKey: widget.meta.reorderKey ?? null,
@@ -1685,7 +1688,8 @@ function label(parent, text, style = {}, meta = {}) {
       }
       if (meta.border !== undefined) strokeRect(box.x, box.y, box.width, box.height, meta.border);
       if (meta.selectedControl === true && box.width > 4 && box.height > 4) {
-        strokeRect(box.x + 2, box.y + 2, box.width - 4, box.height - 4, 0);
+        const inset = Math.min(2, controlPaddingDots());
+        strokeRect(box.x + inset, box.y + inset, box.width - inset * 2, box.height - inset * 2, 0);
       }
       if (meta.bottomLine !== undefined) {
         line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, meta.bottomLine);
@@ -1695,8 +1699,10 @@ function label(parent, text, style = {}, meta = {}) {
         ? box.y : box.y + Math.floor((box.height - fontProfile().height) / 2);
       const displayText = typeof meta.textValue === "function" ? meta.textValue(box) : text;
       const textShade = meta.textShade ?? 0;
-      drawText(displayText, box.x + (meta.inset ?? controlPaddingDots()), textY,
-        box.width - (meta.inset ?? controlPaddingDots()) * 2,
+      const leftInset = meta.inset ?? controlPaddingDots();
+      const rightInset = meta.rightInset ?? leftInset;
+      drawText(displayText, box.x + leftInset, textY,
+        box.width - leftInset - rightInset,
         textShade, meta.align ?? "left");
       paintClip = previousClip;
     },
@@ -1719,18 +1725,14 @@ function spacingValue(key, time = currentRenderTime) {
     + (animation.to[key] - animation.from[key]) * easeSelection(progress);
 }
 
-function controlPaddingDots() {
-  return state.tab === "SETTINGS"
-    ? OPTIONS_CONTROL_PAD_DOTS
-    : spacingValue("controlPaddingDots");
-}
+function controlPaddingDots() { return spacingValue("controlPaddingDots"); }
 
 function uiGapDots() {
   return spacingValue("uiChromeGapDots");
 }
 
 function uiGroupInsetDots() {
-  return state.tab === "SETTINGS" ? OPTIONS_CARD_INSET_DOTS : uiGapDots();
+  return uiGapDots();
 }
 
 function buttonStandardHeight() {
@@ -1738,11 +1740,12 @@ function buttonStandardHeight() {
 }
 
 function uiGap() {
-  return (state.tab === "SETTINGS" ? OPTIONS_GAP_DOTS : uiGapDots()) / STYLE_SCALE;
+  return uiGapDots() / STYLE_SCALE;
 }
 
 function spacingReadout(key) {
-  return `${Math.round(spacingValue(key))} DOTS`;
+  const dots = Math.round(spacingValue(key));
+  return `${dots} ${dots === 1 ? "DOT" : "DOTS"}`;
 }
 
 function uiSectionGap() {
@@ -1876,12 +1879,14 @@ function libraryToolbarItems() {
 
 function libraryPaneWidth() {
   const items = libraryToolbarItems();
-  const gapDots = state.tab === "SETTINGS" ? OPTIONS_GAP_DOTS : uiGapDots();
+  const gapDots = uiGapDots();
   const toolbarWidth = items.length * SIDEBAR_BUTTON_SIZE_DOTS
     + Math.max(0, items.length - 1) * gapDots
     + 2 * gapDots;
-  return state.tab === "SETTINGS" ? toolbarWidth / STYLE_SCALE
-    : Math.max(94, toolbarWidth / STYLE_SCALE);
+  if (state.tab === "SETTINGS") return toolbarWidth / STYLE_SCALE;
+  const preferred = state.sidebarWidthFraction == null
+    ? Math.max(94 * STYLE_SCALE, WIDTH * 0.3) : WIDTH * state.sidebarWidthFraction;
+  return Math.max(toolbarWidth, Math.min(Math.max(toolbarWidth, WIDTH * 0.65), preferred)) / STYLE_SCALE;
 }
 
 function appStatusDetails() {
@@ -1968,13 +1973,14 @@ function appStatusArea(parent) {
   return status;
 }
 
-function panelTitle(parent, text) {
+function panelTitle(parent, text, meta = {}) {
   const titleHeight = buttonStandardHeight();
   const row = makeWidget(parent, {
     direction: FlexDirection.Row,
     height: titleHeight,
     alignItems: Align.Center,
   }, {
+    ...meta,
     fill: 2,
     optionPanelTitle: text,
     paint(box) { fillRect(box.x, box.y, box.width, box.height, 2); },
@@ -1983,24 +1989,6 @@ function panelTitle(parent, text) {
     textShade: 0,
     inset: controlPaddingDots(),
     align: "center",
-  });
-  return row;
-}
-
-function openPageTitle(parent, text) {
-  const titleHeight = buttonStandardHeight();
-  const row = makeWidget(parent, {
-    direction: FlexDirection.Row,
-    height: titleHeight,
-    alignItems: Align.Center,
-  }, {
-    optionPanelTitle: text,
-    paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 1); },
-  });
-  label(row, text, { flexGrow: 1, height: titleHeight }, {
-    textShade: 0,
-    inset: 0,
-    align: "left",
   });
   return row;
 }
@@ -2023,7 +2011,7 @@ function pixelButton(parent, text, onClick, style = {}) {
     fill: style.optionPage ? undefined : style.selected ? 2 : undefined,
     textShade: 0,
     selectedControl: style.selected === true,
-    inset: style.inset ?? controlPaddingDots(),
+    inset: style.inset ?? (BUTTON_BORDER_DOTS + controlPaddingDots()),
     align: style.align ?? "center",
     controlTitle: style.controlTitle,
     optionOwner: style.optionOwner,
@@ -2212,10 +2200,10 @@ function optionToggleAdjuster(parent, title, controlPrefix, checked, onClick,
 
 function optionChoice(parent, title, choices, displayTitle = title) {
   const height = buttonStandardHeight();
-  let availableDots = WIDTH - libraryPaneWidth() * STYLE_SCALE - APP_EDGE_PADDING_PX * 2 - OPTIONS_GAP_DOTS * 5;
-  if (state.optionsPage === "DISPLAY" && availableDots + 8 >= 520) availableDots = (availableDots - OPTIONS_GAP_DOTS * 3) / 2;
+  let availableDots = WIDTH - libraryPaneWidth() * STYLE_SCALE - APP_EDGE_PADDING_PX * 2 - uiGapDots() * 5;
+  if (state.optionsPage === "DISPLAY" && availableDots + 2 * uiGapDots() >= 520) availableDots = (availableDots - uiGapDots() * 3) / 2;
   const choiceWidth = choices.length * framedTextWidth("PLAYLIST") + (choices.length - 1) * uiGap();
-  const stacked = Boolean(displayTitle) && availableDots < (choiceWidth + textLayoutWidth("APERTURE")) * STYLE_SCALE + OPTIONS_GAP_DOTS;
+  const stacked = Boolean(displayTitle) && availableDots < (choiceWidth + textLayoutWidth("APERTURE")) * STYLE_SCALE + uiGapDots();
   const row = controlRow(parent, {
     height: stacked ? height * 2 + uiGap() : height,
     direction: stacked ? FlexDirection.Column : FlexDirection.Row,
@@ -2615,7 +2603,8 @@ export function optionsContentSnapshot() {
 export function optionsStyleSnapshot() {
   return layoutEntries.flatMap(({ widget, box }) => {
     if (widget.meta.optionPanelTitle) {
-      return [{ kind: "title", name: widget.meta.optionPanelTitle, box: { ...box } }];
+      return [{ kind: "title", name: widget.meta.optionPanelTitle, headerRole: widget.meta.paneHeader ?? null,
+        fillShade: widget.meta.fill ?? null, box: { ...box } }];
     }
     if (widget.meta.optionOwnerTitle) {
       return [{ kind: "owner", name: widget.meta.optionOwnerTitle, box: { ...box } }];
@@ -2870,7 +2859,8 @@ function createLibraryRow(parent, text, options = {}) {
     sidebarContext: options.context || null,
     disclosureProgress: options.disclosureProgress ?? 0,
     disclosureIndent: options.disclosureIndent ?? 0,
-    inset: options.indent ?? (options.disclosure ? controlPaddingDots() + 2 * fontProfile().advance : 0),
+    inset: options.indent ?? (options.disclosure ? controlPaddingDots() + fontProfile().advance : 0),
+    rightInset: controlPaddingDots(),
     paint(box) {
       if (options.disclosure) paintChevron(box, options.disclosureProgress ?? 0,
         options.disclosureIndent ?? 0);
@@ -2952,7 +2942,7 @@ function optionsNavigationRows() {
     ...["AUDIO", "DIAGNOSTICS", "METHODS", "PLAYBACK"].map((page) => ({
       text: page, page,
     })),
-  ], OPTIONS_GAP_DOTS);
+  ], textLineGapDots());
 }
 
 function ensureBrowserSearch(query, mode) {
@@ -3066,8 +3056,8 @@ function pathRows(query) {
       text: node.name || node.path || "PATH",
       node,
       group: children.length > 0,
-      indent: controlPaddingDots() + (depth + 1) * 2 * fontProfile().advance,
-      disclosureIndent: depth * 2 * fontProfile().advance,
+      indent: controlPaddingDots() + (depth + 1) * fontProfile().advance,
+      disclosureIndent: depth * fontProfile().advance,
       disclosureProgress: progress,
       revealProgress,
     });
@@ -3091,9 +3081,32 @@ function pathSubtreeMatches(node, searchKeys) {
     || (Array.isArray(node.children) && node.children.some((child) => pathSubtreeMatches(child, searchKeys)));
 }
 
+function addLibrarySplitter(parent) {
+  makeWidget(parent, { width: 6 / STYLE_SCALE, minWidth: 6 / STYLE_SCALE, flexShrink: 0 }, {
+    controlTitle: "SIDEBAR WIDTH", libraryResize: true,
+    paint(box) {
+      const x = box.x + Math.floor(box.width / 2);
+      const y = box.y + Math.floor(box.height / 2);
+      for (const offset of [-4, 0, 4]) fillRect(x, y + offset, 1, 2, 1);
+    },
+    onClick(event) {
+      if (event.detail < 2) return;
+      state.sidebarWidthFraction = null;
+      saveDisplayOptions();
+      render();
+    },
+  });
+}
+
+function resizeLibraryFromPointer(point, interaction) {
+  state.sidebarWidthFraction = Math.max(0.15, Math.min(0.65,
+    (point.x - interaction.paneLeft - interaction.grabOffset) / WIDTH));
+  render(false, true);
+}
+
 function addLibraryPane(parent) {
   const optionsOpen = state.tab === "SETTINGS";
-  const sidebarGapDots = optionsOpen ? OPTIONS_GAP_DOTS : uiGapDots();
+  const sidebarGapDots = uiGapDots();
   const paneWidth = libraryPaneWidth();
   const library = makeWidget(parent, {
     direction: FlexDirection.Column,
@@ -3104,16 +3117,18 @@ function addLibraryPane(parent) {
     flexGrow: 0,
     flexShrink: 0,
     gap: 0,
-    padding: optionsOpen ? sidebarGapDots / STYLE_SCALE : sidebarGapDots,
+    padding: sidebarGapDots / STYLE_SCALE,
   }, {
+    id: "library-pane",
     paint(box) {
       strokeRect(box.x, box.y, box.width, box.height, 1);
     },
   });
-  label(library, optionsOpen ? "OPTIONS" : "SEARCH LIBRARY", {
+  if (optionsOpen) panelTitle(library, "OPTIONS", { paneHeader: "navigation" });
+  else label(library, "SEARCH LIBRARY", {
     height: buttonStandardHeight(),
   }, {
-    textShade: optionsOpen ? 0 : state.searchQuery || state.searchFocused
+    textShade: state.searchQuery || state.searchFocused
       ? 0 : inactiveSearchTextShade(),
     inset: controlPaddingDots(),
     border: optionsOpen ? undefined : 1,
@@ -3275,7 +3290,7 @@ function addCatalogPane(parent) {
     flexGrow: 1,
     flexShrink: 1,
     gap: 0,
-    padding: uiGapDots(),
+    padding: uiGap(),
   }, {
     id: "catalog-pane",
     paint(box) {
@@ -3550,7 +3565,7 @@ function optionGroup(parent, title, contentHeights = null) {
 }
 
 function addDisplayOptions(parent, pref) {
-  const availableDots = WIDTH - libraryPaneWidth() * STYLE_SCALE - APP_EDGE_PADDING_PX * 2 - OPTIONS_GAP_DOTS * 3;
+  const availableDots = WIDTH - libraryPaneWidth() * STYLE_SCALE - APP_EDGE_PADDING_PX * 2 - uiGapDots() * 3;
   const stacked = availableDots < 520;
   const columns = makeWidget(parent, {
     direction: stacked ? FlexDirection.Column : FlexDirection.Row,
@@ -3949,7 +3964,7 @@ function addDiagnosticsOptions(parent) {
 
 function optionPlaybackRateRow(parent, backend) {
   const title = backend.toUpperCase();
-  const indentDots = 2 * controlPaddingDots() + fontProfile().height + OPTIONS_GAP_DOTS;
+  const indentDots = 2 * controlPaddingDots() + fontProfile().height + uiGapDots();
   const row = controlRow(parent, {
     height: buttonStandardHeight(),
     gap: uiGap(),
@@ -4036,7 +4051,7 @@ function paintGaugeBar(box, fraction, steps, focused = false) {
 }
 
 function equalizerBand(parent, title, index) {
-  const stacked = WIDTH - libraryPaneWidth() * STYLE_SCALE - APP_EDGE_PADDING_PX * 2 - OPTIONS_GAP_DOTS * 5 < 230;
+  const stacked = WIDTH - libraryPaneWidth() * STYLE_SCALE - APP_EDGE_PADDING_PX * 2 - uiGapDots() * 5 < 230;
   const group = makeWidget(parent, { direction: FlexDirection.Column, gap: uiGap(), minWidth: 0 });
   const row = controlRow(group);
   const addValue = () => label(row, equalizerGainLabel(equalizerGainAt(index, currentRenderTime)), {
@@ -4179,7 +4194,7 @@ function addInterfaceOptions(parent, pref) {
       visibleTitle: "KEEP WINDOW ON TOP",
     });
   const spacing = optionGroup(parent, "LAYOUT SPACING", [
-    rowHeightValue, rowHeightValue, rowHeightValue,
+    rowHeightValue, rowHeightValue, rowHeightValue, rowHeightValue,
   ]);
   optionAdjuster(spacing, "BUTTON PAD", spacingReadout("controlPaddingDots"),
     () => adjustDisplaySpacing("controlPaddingDots", -1),
@@ -4190,6 +4205,11 @@ function addInterfaceOptions(parent, pref) {
   optionAdjuster(spacing, "LINE GAP", spacingReadout("textLineGapDots"),
     () => adjustDisplaySpacing("textLineGapDots", -1),
     () => adjustDisplaySpacing("textLineGapDots", 1), "TEXT LINE GAP");
+  pixelButton(spacing, "RESET SPACING", () => setDisplaySpacingValues({
+    controlPaddingDots: DEFAULT_CONTROL_PADDING_DOTS,
+    uiChromeGapDots: DEFAULT_UI_GAP_DOTS,
+    textLineGapDots: DEFAULT_TEXT_LINE_GAP_DOTS,
+  }), { controlTitle: "RESET SPACING" });
   const motion = optionGroup(parent, "MOTION", [rowHeightValue, rowHeightValue, rowHeightValue]);
   optionToggleAdjuster(motion, "ANIM", "ANIMATION DURATION", animationEnabled(),
     () => setPreference("animationsEnabled", !animationEnabled()),
@@ -4372,12 +4392,12 @@ function addOptionsContent(parent) {
     minWidth: 0,
     minHeight: 0,
     gap: 0,
-    padding: OPTIONS_GAP_DOTS / STYLE_SCALE,
+    padding: uiGapDots() / STYLE_SCALE,
   }, {
     id: "options-pane",
     paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
-  openPageTitle(panel, state.optionsPage);
+  panelTitle(panel, state.optionsPage, { paneHeader: "content" });
   const viewport = makeWidget(panel, {
     direction: FlexDirection.Column,
     flexGrow: 1,
@@ -4612,6 +4632,7 @@ function buildTree() {
     alignItems: Align.Stretch,
   });
   addLibraryPane(content);
+  if (state.tab !== "SETTINGS") addLibrarySplitter(content);
   if (state.tab === "SETTINGS") addOptionsContent(content);
   else addCatalogPane(content);
 
@@ -5386,17 +5407,21 @@ function setTransportSymbols(enabled) {
   render();
 }
 
-function setDisplaySpacing(key, value) {
+function setDisplaySpacing(key, value) { setDisplaySpacingValues({ [key]: value }); }
+
+function setDisplaySpacingValues(changes) {
   const defaults = {
     controlPaddingDots: DEFAULT_CONTROL_PADDING_DOTS,
     uiChromeGapDots: DEFAULT_UI_GAP_DOTS,
     textLineGapDots: DEFAULT_TEXT_LINE_GAP_DOTS,
   };
-  if (!(key in defaults)) return;
+  if (!Object.keys(changes).some((key) => key in defaults)) return;
   const now = performance.now();
   const from = Object.fromEntries(Object.keys(defaults)
     .map((spacingKey) => [spacingKey, spacingValue(spacingKey, now)]));
-  state[key] = storedSpacing(value, defaults[key]);
+  for (const key of Object.keys(defaults)) {
+    if (key in changes) state[key] = storedSpacing(changes[key], defaults[key]);
+  }
   saveDisplayOptions();
   if (spacingAnimationFrame) cancelAnimationFrame(spacingAnimationFrame);
   spacingAnimationFrame = 0;
@@ -6957,7 +6982,15 @@ canvas.addEventListener("pointerdown", (event) => {
   const point = logicalPoint(event);
   const entry = findTargetEntry(point);
   const target = entry?.widget;
-  if ((target?.meta.volumeControl || Number.isInteger(target?.meta.equalizerBar)) && (event.button ?? 0) === 0) {
+  if (target?.meta.libraryResize && (event.button ?? 0) === 0) {
+    const pane = boxesById.get("library-pane");
+    pointerInteraction = { kind: "library-resize", pointerId: event.pointerId, paneLeft: pane.x,
+      grabOffset: point.x - (pane.x + pane.width), initialFraction: state.sidebarWidthFraction,
+      startX: point.x, dragging: false };
+    canvas.setPointerCapture?.(event.pointerId);
+    suppressNextClick = false;
+    event.preventDefault?.();
+  } else if ((target?.meta.volumeControl || Number.isInteger(target?.meta.equalizerBar)) && (event.button ?? 0) === 0) {
     const range = target.meta.volumeControl ? { kind: "volume" } : { kind: "eq", index: target.meta.equalizerBar };
     state.audioRangeFocused = range;
     state.lcdContrastFocused = false;
@@ -7024,6 +7057,14 @@ canvas.addEventListener("pointerdown", (event) => {
 
 canvas.addEventListener("pointermove", (event) => {
   const point = logicalPoint(event);
+  if (pointerInteraction?.kind === "library-resize") {
+    if (Math.abs(point.x - pointerInteraction.startX) >= 1) pointerInteraction.dragging = true;
+    if (pointerInteraction.dragging) {
+      suppressNextClick = true;
+      resizeLibraryFromPointer(point, pointerInteraction);
+    }
+    return;
+  }
   if (pointerInteraction?.kind === "audio-range") {
     audioRangeFromPointer(point, pointerInteraction);
     return;
@@ -7070,14 +7111,20 @@ canvas.addEventListener("pointermove", (event) => {
     return;
   }
   const target = findTarget(point);
-  canvas.style.cursor = target ? "pointer" : "default";
+  canvas.style.cursor = target?.meta.libraryResize ? "col-resize" : target ? "pointer" : "default";
+  canvas.title = target?.meta.libraryResize ? "Resize sidebar; double-click to reset"
+    : target?.meta.sidebarContext ? target.meta.text ?? "" : "";
 });
 
 canvas.addEventListener("pointerup", (event) => {
   if (!pointerInteraction || (pointerInteraction.pointerId !== undefined
     && event.pointerId !== undefined && pointerInteraction.pointerId !== event.pointerId)) return;
   const interaction = pointerInteraction;
-  if (interaction.kind === "audio-range") {
+  if (interaction.kind === "library-resize") {
+    if (interaction.dragging) resizeLibraryFromPointer(logicalPoint(event), interaction);
+    pointerInteraction = null;
+    if (interaction.dragging) saveDisplayOptions();
+  } else if (interaction.kind === "audio-range") {
     audioRangeFromPointer(logicalPoint(event), interaction);
     pointerInteraction = null;
     commitAudioRange(interaction.range, interaction.initialValue);
@@ -7105,7 +7152,12 @@ canvas.addEventListener("pointerup", (event) => {
 });
 
 canvas.addEventListener("pointercancel", () => {
-  if (pointerInteraction?.kind === "audio-range") {
+  if (pointerInteraction?.kind === "library-resize") {
+    state.sidebarWidthFraction = pointerInteraction.initialFraction;
+    pointerInteraction = null;
+    suppressNextClick = false;
+    render(false, true);
+  } else if (pointerInteraction?.kind === "audio-range") {
     const interaction = pointerInteraction;
     pointerInteraction = null;
     suppressNextClick = false;
