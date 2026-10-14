@@ -103,9 +103,22 @@ test('LCD controls change actual canvas pixels while preserving matrix, layout, 
   key('End'); assert.equal(lcdPanelSnapshot().contrastBoost, 100);
   key('Home'); for (let i = 0; i < 5; i++) key('ArrowRight');
   key('Escape');
+  assert.equal(choiceControlLayoutSnapshot().find((row) => row.title === 'PIXEL METHOD').label, 'METHOD');
   for (const method of ['DIRECT', '8 SHADE', '16 SHADE', 'STN LCD']) {
     click(`PIXEL METHOD ${method}`);
     assert.deepEqual(lcdDotSizeSnapshot(), initial, `${method} retains the matrix geometry`);
+    const preview = optionsStyleSnapshot().find((item) => item.kind === 'preview');
+    assert.equal(preview.label, 'PREVIEW');
+    const count = method === '8 SHADE' ? 8 : method === '16 SHADE' ? 16 : 4;
+    assert.equal(preview.toneCount, count);
+    const strip = optionsStyleSnapshot().find((item) => item.kind === 'tone-strip').box;
+    const tones = Array.from({ length: count }, (_, i) => framebufferShadeSnapshot(
+      strip.x + 1 + (strip.width - 2) * (i + 0.5) / count, strip.y + strip.height / 2));
+    assert.equal(new Set(tones).size, count, 'the single unbroken preview strip paints every tone');
+    const buttons = hitTargetSnapshot().filter((item) => item.name.startsWith('PIXEL METHOD '));
+    assert.equal(buttons.length, 4);
+    assert.ok(Math.max(...buttons.map((item) => item.box.width)) - Math.min(...buttons.map((item) => item.box.width)) <= 1,
+      'labeled method buttons have equal widths');
   }
   const originalBackground = lcdPanelSnapshot().colors[3];
   edit('BG CSS COLOR INPUT', 'not-a-color');

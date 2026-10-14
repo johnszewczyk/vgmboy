@@ -26,8 +26,9 @@ bar and enclosing outline. The Options navigation and content panes have matchin
 filled headers. Layout Spacing controls pane/card insets, gaps and control
 padding in Options as well as the main screen; each change is visible on the
 page being edited. Insets and neighboring controls use 1× UI Gap; card/column
-gaps and space below pane/card headers use 2× UI Gap. Palette swatches share
-the card content edges. Reset Spacing restores pad/gap/line defaults of 4/4/1 dots.
+gaps and space below pane/card headers use 2× UI Gap. PREVIEW labels one continuous tone strip aligned with the BG/PIXEL fields;
+METHOD labels four equal-width selector buttons. Grayscale previews show all
+eight or sixteen tones, with text/background markers inside the strip. Reset Spacing restores pad/gap/line defaults of 4/4/1 dots.
 The Options sidebar fits its six icons instead of inheriting the wider library
 minimum. Page rows leave room around the bitmap glyphs. One shaded marker glides between
 page links, including across the section headings.
