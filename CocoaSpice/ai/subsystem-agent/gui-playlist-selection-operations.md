@@ -22,6 +22,7 @@
 - Keep selection separate from playback.
 - Arrow-key movement is owned by the native playlist table; the following SwiftUI update must not overwrite the newly moved selection. Enter activates the table's current selected row, enabling arrow-key plus Enter seek/play workflows.
 - The custom shape-layer highlight is non-interactive and stays below row content. Retarget its layer animation from its presentation position so repeated arrow-key navigation does not snap backward. Keep outline mode to a clear fill and accent stroke; do not add blur, backdrop sampling, or per-frame drawing.
+- Recompute the selected capsule geometry after native playlist column resizing and automatic sizing; initial row geometry may be measured before the table reaches its final width, especially at startup or when returning from Gallery.
 - If row activation behavior changes, update both selection semantics and playback-target semantics.
 
 ## Files

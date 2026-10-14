@@ -487,6 +487,9 @@ struct PlaylistTableView: NSViewRepresentable {
 
         nonisolated func tableViewColumnDidResize(_ notification: Notification) {
             MainActor.assumeIsolated {
+                guard let tableView else { return }
+                tableView.layoutSubtreeIfNeeded()
+                updateSelectionHighlight(in: tableView, animated: false)
                 guard !suppressWidthPersistence else { return }
                 persistWidths()
             }
@@ -910,6 +913,7 @@ struct PlaylistTableView: NSViewRepresentable {
 
             if duration == 0 {
                 for (tableColumn, finalWidth) in targets { tableColumn.width = finalWidth }
+                refreshSelectionHighlightGeometry()
                 suppressWidthPersistence = false
                 persistWidths()
                 return
@@ -943,10 +947,17 @@ struct PlaylistTableView: NSViewRepresentable {
                 }
 
                 guard !Task.isCancelled else { return }
+                self.refreshSelectionHighlightGeometry()
                 self.suppressWidthPersistence = false
                 self.persistWidths()
                 self.columnResizeTask = nil
             }
+        }
+
+        private func refreshSelectionHighlightGeometry() {
+            guard let tableView else { return }
+            tableView.layoutSubtreeIfNeeded()
+            updateSelectionHighlight(in: tableView, animated: false)
         }
 
         private func droppedFileURLs(from info: NSDraggingInfo) -> [URL] {
