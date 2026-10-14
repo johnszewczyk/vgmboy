@@ -25,7 +25,9 @@ motion cards. Each Display section uses a full card with a shared filled title
 bar and enclosing outline. The Options navigation and content panes have matching
 filled headers. Layout Spacing controls pane/card insets, gaps and control
 padding in Options as well as the main screen; each change is visible on the
-page being edited. Reset Spacing restores pad/gap/line defaults of 4/4/1 dots.
+page being edited. Insets and neighboring controls use 1× UI Gap; card/column
+gaps and space below pane/card headers use 2× UI Gap. Palette swatches share
+the card content edges. Reset Spacing restores pad/gap/line defaults of 4/4/1 dots.
 The Options sidebar fits its six icons instead of inheriting the wider library
 minimum. Page rows leave room around the bitmap glyphs. One shaded marker glides between
 page links, including across the section headings.
