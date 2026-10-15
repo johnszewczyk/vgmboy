@@ -1005,6 +1005,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "game": hints.gameText,
             "artist": hints.authorText,
             "system": hints.systemText,
+            "path": hints.pathText,
             "lengthLabel": hints.lengthText
         ]
     }

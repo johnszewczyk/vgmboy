@@ -52,6 +52,7 @@ public struct CatalogPlaylistColumnContentHints: Equatable, Sendable {
     public let gameText: String
     public let authorText: String
     public let systemText: String
+    public let pathText: String
     public let lengthText: String
 }
 
@@ -404,6 +405,10 @@ public enum CatalogPlaylistPresentation {
             gameText: longest(rows.map(\.display.gameText)),
             authorText: longest(rows.map(\.display.authorText)),
             systemText: longest(rows.map(\.display.systemText)),
+            pathText: longest(rows.map { row in
+                guard let archiveEntry = row.archiveEntry else { return row.sourcePath }
+                return "\(row.archivePath ?? row.sourcePath)#\(archiveEntry)"
+            }, default: "—"),
             lengthText: longest(rows.map(\.display.lengthText), default: "—")
         )
     }

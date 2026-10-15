@@ -141,7 +141,8 @@ public enum CatalogPlaylistReader {
             FROM tracks t
             INNER JOIN library_roots r ON r.id = t.root_id
             LEFT JOIN track_metadata m ON m.track_id = t.id
-            WHERE r.is_enabled = 1
+            WHERE r.is_attached = 1
+              AND r.is_enabled = 1
               AND NOT EXISTS (SELECT 1 FROM dead_sources d WHERE d.root_id = t.root_id AND d.path = t.path)
               AND t.root_id = ?
               AND t.browser_game = ?
@@ -206,13 +207,19 @@ public enum CatalogPlaylistReader {
         """
 
         var database: OpaquePointer?
-        guard sqlite3_open_v2(databaseURL.path, &database, SQLITE_OPEN_READONLY, nil) == SQLITE_OK,
+        guard sqlite3_open_v2(
+            databaseURL.path,
+            &database,
+            SQLITE_OPEN_READONLY | SQLITE_OPEN_URI | SQLITE_OPEN_FULLMUTEX,
+            nil
+        ) == SQLITE_OK,
               let database else {
             let message = database.map { String(cString: sqlite3_errmsg($0)) } ?? "SQLite could not open the catalog."
             sqlite3_close(database)
             throw CatalogPlaylistCoreError.sqlite(message)
         }
         defer { sqlite3_close(database) }
+        sqlite3_busy_timeout(database, 10_000)
 
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
