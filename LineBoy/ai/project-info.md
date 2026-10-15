@@ -8,6 +8,8 @@ the browser build retains sample data for renderer preview.
 
 - User-visible raster and interaction behavior: `subsystem-human/display.md`.
 - Grid, shader, bridge, and build boundaries: `subsystem-agent/rendering.md`.
+- Frontend parity sequence: `plans/frontend-parity.md`.
+- Current checks and limits: `verification/rendering.md`.
 
 ## Boundaries
 

@@ -116,8 +116,8 @@
       background: var(--white);
       pointer-events: none;
       transform: translate3d(0, 0, 0);
-      transition: transform var(--selector-duration) cubic-bezier(.2, .8, .2, 1),
-        width var(--selector-duration) cubic-bezier(.2, .8, .2, 1);
+      transition: transform var(--selector-duration) cubic-bezier(.2, 0, 0, 1),
+        width var(--selector-duration) cubic-bezier(.2, 0, 0, 1);
       will-change: transform, width;
     }
     .selector-block:not(.is-ready) { visibility: hidden; transition: none; }
@@ -393,6 +393,7 @@
       background: var(--well);
     }
     .playlist-tabs {
+      position: relative;
       min-width: 0;
       flex: 1 1 auto;
       height: 16px;
@@ -407,7 +408,7 @@
     .playlist-tab {
       min-width: 8ch;
       max-width: 20ch;
-      flex: 0 1 18ch;
+      flex: 0 0 18ch;
       display: flex;
       height: 16px;
       background: transparent;
@@ -433,7 +434,8 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .playlist-tab-close { flex: 0 0 2ch; color: var(--dim); }
+    .playlist-tab-close { flex: 0 0 2ch; color: var(--dim); text-align: center; }
+    .playlist-tab[aria-selected="true"] { background: var(--well-highlight); }
     .playlist-tab-add {
       flex: 0 0 3ch;
       background: transparent;
@@ -1094,9 +1096,18 @@
       if (persist) saveDisplayPreferences();
     }
 
+    function rasterCellMetrics(targetCellHeight) {
+      const scanPitch = Math.max(3, Math.round(targetCellHeight / 16));
+      // An even number of beam pitches keeps both 8px columns and 16px rows
+      // on whole device pixels, including fractional source scaling.
+      const beamLinesPerCell = Math.max(2, 2 * Math.round(targetCellHeight / scanPitch / 2));
+      const cellHeight = scanPitch * beamLinesPerCell;
+      return { scanPitch, cellHeight, deviceScale: cellHeight / 16 };
+    }
+
     function updateRaster() {
       const raster = resolutionById.get(requestedRaster);
-      const deviceRatio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+      const deviceRatio = Math.max(1, window.devicePixelRatio || 1);
       const availableWidth = Math.max(1, window.innerWidth - 16) * deviceRatio;
       const availableHeight = Math.max(1, window.innerHeight - 16) * deviceRatio;
       const referenceRaster = resolutionById.get("320X240");
@@ -1110,10 +1121,7 @@
       const targetHeight = referenceRaster.height * referenceScale;
       const profileRows = Math.floor(raster.height / 16);
       const targetCellHeight = targetHeight / profileRows;
-      const scanPitch = Math.max(3, Math.round(targetCellHeight / 16));
-      const beamLinesPerCell = Math.max(1, Math.round(targetCellHeight / scanPitch));
-      const cellHeight = scanPitch * beamLinesPerCell;
-      const deviceScale = cellHeight / 16;
+      const { scanPitch, cellHeight, deviceScale } = rasterCellMetrics(targetCellHeight);
       const scale = deviceScale / deviceRatio;
       const visibleRows = Math.floor((availableHeight / deviceScale) / 16);
       const textRows = Math.max(profileRows, visibleRows);
@@ -1708,6 +1716,12 @@
       return [...playlistTabsView.querySelectorAll(".playlist-tab-select")];
     }
 
+    playlistTabsView.addEventListener("wheel", (event) => {
+      if (playlistTabsView.scrollWidth <= playlistTabsView.clientWidth || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+      playlistTabsView.scrollLeft += event.deltaY;
+      event.preventDefault();
+    }, { passive: false });
+
     function renderPlaylistTabs() {
       const selectorWasInTabStrip = [lastSelectorTarget, selectedSelectorTarget]
         .some((target) => target?.matches(".playlist-tab-select, .playlist-tab-close") === true);
@@ -1741,7 +1755,9 @@
         const close = document.createElement("button");
         close.type = "button";
         close.className = "playlist-tab-close";
-        close.textContent = "×";
+        close.textContent = "X";
+        close.title = `Close ${tab.title}`;
+        select.title = tab.title;
         close.disabled = playlistTabs.length < 2;
         close.setAttribute("aria-label", `Close ${tab.title} tab`);
         close.addEventListener("click", () => closePlaylistTab(tab.id));
@@ -1749,7 +1765,17 @@
         fragment.append(item);
       });
 
+      const previousScroll = playlistTabsView.scrollLeft;
       playlistTabsView.replaceChildren(fragment);
+      playlistTabsView.scrollLeft = previousScroll;
+      const active = playlistTabsView.querySelector('.playlist-tab[aria-selected="true"]');
+      if (active) {
+        const end = active.offsetLeft + active.offsetWidth;
+        if (active.offsetLeft < playlistTabsView.scrollLeft) playlistTabsView.scrollLeft = active.offsetLeft;
+        else if (end > playlistTabsView.scrollLeft + playlistTabsView.clientWidth) {
+          playlistTabsView.scrollLeft = end - playlistTabsView.clientWidth;
+        }
+      }
       if (selectorWasOnAddButton) {
         selectSelectionTarget(playlistTabAddButton);
       } else if (selectorWasInTabStrip) {
@@ -2576,7 +2602,7 @@
       if (!scanlinesEnabled || !gl || !program || !activeRaster) return;
       const rect = terminal.getBoundingClientRect();
       if (rect.width < 1 || rect.height < 1) return;
-      const deviceRatio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+      const deviceRatio = Math.max(1, window.devicePixelRatio || 1);
       const width = Math.max(1, Math.round(rect.width * deviceRatio));
       const height = Math.max(1, Math.round(rect.height * deviceRatio));
       if (display.width !== width || display.height !== height) {

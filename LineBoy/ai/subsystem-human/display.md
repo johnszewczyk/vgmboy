@@ -86,3 +86,7 @@ its prior selection. Selecting a game loads its sample tracks. F toggles local
 sample favorites and FAV filters the current playlist. The native file picker
 remains connected for opening a real local track; its playback uses the native
 transport, while sample-track playback and track stepping stay local.
+
+Playlist tabs keep an 18-character-cell width rather than shrinking into a row of small fragments. The strip scrolls horizontally, including with a vertical wheel over the tabs, and brings the active tab into view. Tab labels and close actions expose full-title tooltips; close uses the DOS-font X. The active tab retains a subdued background while focus moves elsewhere. Selector motion uses the same cubic-bezier(.2, 0, 0, 1) timing curve as ViewBoy.
+
+Raster rows contain an even number of integral beam pitches, keeping the 8px horizontal advance on whole device pixels. The mask and layout use the actual display device ratio, including values above 2. This preserves the existing stationary mask and native DOM text path.

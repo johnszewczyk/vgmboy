@@ -23,9 +23,9 @@ const RANDOM_HISTORY_LIMIT = 256;
 const BUTTON_BORDER_DOTS = 1;
 const SIDEBAR_ICON_SIZE_DOTS = 9;
 const SIDEBAR_BUTTON_SIZE_DOTS = 13;
-const TAB_CLOSE_SIZE_DOTS = 7;
+const TAB_CLOSE_SIZE_DOTS = 9; // Seven-dot icon plus a one-dot clear margin.
 const SIDEBAR_ICON_ART = {
-  close: ["1111111", "1100011", "1010101", "1001001", "1010101", "1100011", "1111111"],
+  close: ["1111111", "1000001", "1010101", "1001001", "1010101", "1000001", "1111111"],
   previous: ["001001", "010010", "100100", "010010", "001001"],
   next: ["100100", "010010", "001001", "010010", "100100"],
   library: [
@@ -2140,17 +2140,8 @@ function optionChecklistRow(parent, title, checked, onClick, extraMeta = {}) {
     optionCheckboxKey: checkboxKey,
     ...extraMeta,
   };
-  const row = makeWidget(parent, {
-    direction: FlexDirection.Row,
-    alignItems: Align.Center,
-    height,
-    gap: uiGap(),
-    paddingHorizontal: controlPaddingDots() / STYLE_SCALE,
-  }, rowMeta);
+  const row = optionFieldRow(parent, visibleTitle, fontProfile().height / STYLE_SCALE, rowMeta);
   appendOptionCheckboxGlyph(row, checkboxKey, checked, rowMeta);
-  label(row, visibleTitle, { flexGrow: 1, height }, {
-    textShade: 0, inset: controlPaddingDots(),
-  });
   return row;
 }
 
@@ -2168,13 +2159,9 @@ function optionToggleDuration(parent, title, controlPrefix, checked, onClick, ke
     optionCheckboxChecked: checked === true,
     optionCheckboxKey: checkboxKey,
   };
-  const row = optionFieldRow(parent, title, height * 2 + uiGap() * 2 + optionValueWidth(), rowMeta,
-    (field) => {
-      appendOptionCheckboxGlyph(field, checkboxKey, checked, rowMeta);
-      label(field, title, { flexGrow: 1, minWidth: 0, height }, {
-        textShade: 0, inset: controlPaddingDots(),
-      });
-    });
+  const row = optionFieldRow(parent, title,
+    height * 2 + uiGap() * 3 + optionValueWidth() + fontProfile().height / STYLE_SCALE, rowMeta);
+  appendOptionCheckboxGlyph(row, checkboxKey, checked, rowMeta);
   pixelButton(row, "-", () => adjustPlaybackDuration(key, -step, minimum, maximum, fallback), {
     controlTitle: `${controlPrefix} -`,
   });
@@ -2200,13 +2187,9 @@ function optionToggleAdjuster(parent, title, controlPrefix, checked, onClick,
     optionCheckboxChecked: checked === true,
     optionCheckboxKey: checkboxKey,
   };
-  const row = optionFieldRow(parent, title, height * 2 + uiGap() * 2 + optionValueWidth(), rowMeta,
-    (field) => {
-      appendOptionCheckboxGlyph(field, checkboxKey, checked, rowMeta);
-      label(field, title, { flexGrow: 1, minWidth: 0, height }, {
-        textShade: 0, inset: controlPaddingDots(),
-      });
-    });
+  const row = optionFieldRow(parent, title,
+    height * 2 + uiGap() * 3 + optionValueWidth() + fontProfile().height / STYLE_SCALE, rowMeta);
+  appendOptionCheckboxGlyph(row, checkboxKey, checked, rowMeta);
   optionStepButton(row, "-", onDecrease, `${controlPrefix} -`);
   optionStepButton(row, "+", onIncrease, `${controlPrefix} +`);
   label(row, value, { width: optionValueWidth(), flexShrink: 0, height }, {
@@ -2221,10 +2204,10 @@ function optionToggleAdjuster(parent, title, controlPrefix, checked, onClick,
 
 function optionChoice(parent, title, choices, displayTitle = title) {
   const height = buttonStandardHeight();
-  let availableDots = WIDTH - libraryPaneWidth() * STYLE_SCALE - APP_EDGE_PADDING_PX * 2 - uiGapDots() * 5;
-  if (state.optionsPage === "DISPLAY" && availableDots + 2 * uiGapDots() >= 520) availableDots = (availableDots - uiGapDots() * 2) / 2;
+  let availableDots = WIDTH - libraryPaneWidth() * STYLE_SCALE - APP_EDGE_PADDING_PX * 2 - uiGapDots() * 3;
   const choiceWidth = choices.length * framedTextWidth("PLAYLIST") + (choices.length - 1) * uiGap();
-  const stacked = Boolean(displayTitle) && availableDots < (choiceWidth + textLayoutWidth("APERTURE")) * STYLE_SCALE + uiGapDots();
+  const stacked = Boolean(displayTitle) && (availableDots / 2 < choiceWidth * STYLE_SCALE
+    || availableDots / 2 < textLayoutWidth(displayTitle) * STYLE_SCALE);
   const row = controlRow(parent, {
     height: stacked ? height * 2 + uiGap() : height,
     direction: stacked ? FlexDirection.Column : FlexDirection.Row,
@@ -2235,14 +2218,13 @@ function optionChoice(parent, title, choices, displayTitle = title) {
     optionChoiceLabel: displayTitle,
     paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
   });
-  if (displayTitle) label(row, displayTitle, { ...(stacked ? { widthPercent: 100 } : { widthPercent: 33.3333, minWidth: 0 }), height }, {
+  if (displayTitle) label(row, displayTitle, { ...(stacked ? { widthPercent: 100 } : { widthPercent: 50, minWidth: 0 }), height }, {
     textShade: 0, inset: controlPaddingDots(),
   });
   const controls = makeWidget(row, {
     direction: FlexDirection.Row,
-    widthPercent: displayTitle && !stacked ? 66.6667 : 100,
+    widthPercent: displayTitle && !stacked ? 50 : 100,
     height,
-    ...(displayTitle ? { maxWidth: choiceWidth } : {}),
     gap: uiGap(),
     alignItems: Align.Center,
   }, { optionChoiceControls: title });
@@ -2264,11 +2246,10 @@ function optionStepButton(parent, direction, onClick, title) {
   });
 }
 
-function optionFieldRow(parent, title, controlsWidth, meta = {}, labelBuilder = null) {
-  let available = WIDTH - libraryPaneWidth() * STYLE_SCALE - APP_EDGE_PADDING_PX * 2 - uiGapDots() * 5;
-  if (state.optionsPage === "DISPLAY" && available + 2 * uiGapDots() >= 520) available = (available - uiGapDots() * 2) / 2;
-  const stacked = available / 3 < textLayoutWidth(title) * STYLE_SCALE + (labelBuilder ? fontProfile().height + uiGapDots() : 0)
-    || available * 2 / 3 < controlsWidth * STYLE_SCALE;
+function optionFieldRow(parent, title, controlsWidth, meta = {}) {
+  const available = WIDTH - libraryPaneWidth() * STYLE_SCALE - APP_EDGE_PADDING_PX * 2 - uiGapDots() * 3;
+  const stacked = available / 2 < textLayoutWidth(title) * STYLE_SCALE
+    || available / 2 < controlsWidth * STYLE_SCALE;
   const height = buttonStandardHeight();
   const row = controlRow(parent, {
     direction: stacked ? FlexDirection.Column : FlexDirection.Row,
@@ -2276,17 +2257,12 @@ function optionFieldRow(parent, title, controlsWidth, meta = {}, labelBuilder = 
     height: stacked ? height * 2 + uiGap() : height,
     gap: stacked ? uiGap() : 0,
   }, meta);
-  if (labelBuilder) {
-    const field = makeWidget(row, { direction: FlexDirection.Row, alignItems: Align.Center,
-      widthPercent: stacked ? 100 : 33.3333, height, gap: uiGap(),
-      paddingLeft: controlPaddingDots() / STYLE_SCALE });
-    labelBuilder(field);
-  } else label(row, title, { widthPercent: stacked ? 100 : 33.3333, height }, {
+  label(row, title, { widthPercent: stacked ? 100 : 50, height }, {
     inset: controlPaddingDots(), textShade: 0,
   });
   return makeWidget(row, {
-    direction: FlexDirection.Row, widthPercent: stacked ? 100 : 66.6667,
-    height, gap: uiGap(), alignItems: Align.Center,
+    direction: FlexDirection.Row, widthPercent: stacked ? 100 : 50,
+    height, gap: uiGap(), alignItems: Align.Center, justifyContent: Justify.FlexEnd,
   });
 }
 
@@ -3350,7 +3326,8 @@ function addCatalogPane(parent) {
       direction: FlexDirection.Row,
       flexGrow: 1,
       flexBasis: 0,
-      gap: uiGap(),
+      minWidth: 0,
+      gap: oneDot(),
       overflow: Overflow.Hidden,
     }, { clipChildren: true });
     const tabs = reorderPreview?.kind === "tab"
@@ -3363,7 +3340,8 @@ function addCatalogPane(parent) {
         flexGrow: tabLayoutWeightAt(tab.id),
         flexBasis: 0,
         flexShrink: 1,
-        minWidth: TAB_CLOSE_SIZE_DOTS / STYLE_SCALE,
+        minWidth: (TAB_CLOSE_SIZE_DOTS + 2) / STYLE_SCALE,
+        paddingHorizontal: oneDot(),
         gap: 0,
         height: buttonStandardHeight(),
         alignItems: Align.Center,
@@ -3561,12 +3539,11 @@ function addColumnContextMenu(parent) {
 
 function addPalettePreview(parent) {
   const preview = controlRow(parent, { gap: 0 }, { optionPalettePreview: true });
-  label(preview, "PREVIEW", { widthPercent: 33.3333, height: buttonStandardHeight() }, {
+  label(preview, "PREVIEW", { widthPercent: 50, height: buttonStandardHeight() }, {
     inset: controlPaddingDots(),
   });
   makeWidget(preview, {
-    widthPercent: 66.6667,
-    maxWidth: framedTextWidth("RGB(255,255,255)"),
+    widthPercent: 50,
     height: buttonStandardHeight(),
   }, {
     optionPaletteStrip: true,
@@ -3594,53 +3571,17 @@ function addPalettePreview(parent) {
   });
 }
 
-function optionGroup(parent, title, contentHeights = null) {
-  const padding = uiGroupInsetDots() / STYLE_SCALE;
-  const style = {
-    direction: FlexDirection.Column,
-    gap: uiGap(),
-    padding,
-  };
-  if (Array.isArray(contentHeights)) {
-    style.minHeight = padding * 2
-      + buttonStandardHeight()
-      + contentHeights.reduce((sum, rowHeightValue) => sum + rowHeightValue, 0)
-      + uiGap() * (contentHeights.length + 1);
-  }
-  const group = makeWidget(parent, style, {
-    optionGroupTitle: title,
-    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
-  });
+function optionGroup(parent, title, _contentHeights = null) {
+  const group = makeWidget(parent, {
+    direction: FlexDirection.Column, gap: uiGap(), minWidth: 0,
+  }, { optionGroupTitle: title });
   optionSection(group, title);
   return group;
 }
 
 function addDisplayOptions(parent, pref) {
-  const availableDots = WIDTH - libraryPaneWidth() * STYLE_SCALE - APP_EDGE_PADDING_PX * 2 - uiGapDots() * 3;
-  const stacked = availableDots < 520;
-  const columns = makeWidget(parent, {
-    direction: stacked ? FlexDirection.Column : FlexDirection.Row,
-    flexGrow: stacked ? 0 : 1,
-    flexShrink: 0,
-    ...(stacked ? {} : { flexBasis: 0 }),
-    minWidth: 0,
-    gap: uiSectionGap(),
-  });
-  const screenColumn = makeWidget(columns, {
-    direction: FlexDirection.Column,
-    flexGrow: stacked ? 0 : 1,
-    ...(stacked ? {} : { flexBasis: 0 }),
-    minWidth: 0,
-    gap: uiSectionGap(),
-  });
-  const interfaceColumn = makeWidget(columns, {
-    direction: FlexDirection.Column,
-    flexGrow: stacked ? 0 : 1,
-    ...(stacked ? {} : { flexBasis: 0 }),
-    minWidth: 0,
-    gap: uiSectionGap(),
-  });
-
+  const screenColumn = parent;
+  const interfaceColumn = parent;
   addLCDColorOptions(screenColumn);
   const profile = optionGroup(screenColumn, "SCREEN PROFILE", [
     buttonStandardHeight(), buttonStandardHeight(), buttonStandardHeight(), buttonStandardHeight(),
@@ -3736,13 +3677,12 @@ function customColorInput(parent, endpoint, title) {
     ? state.customBackgroundInput
     : state.customFontInput;
   const row = controlRow(parent, { gap: 0 }, { optionChoiceRow: `${title} COLOR` });
-  label(row, title, { widthPercent: 33.3333, height: buttonStandardHeight() }, {
+  label(row, title, { widthPercent: 50, height: buttonStandardHeight() }, {
     textShade: 0,
     inset: controlPaddingDots(),
   });
   label(row, editing ? `${state.colorDraft}|` : value, {
-    widthPercent: 66.6667,
-    maxWidth: framedTextWidth("RGB(255,255,255)"),
+    widthPercent: 50,
     height: buttonStandardHeight(),
   }, {
     border: BUTTON_BORDER_DOTS,
@@ -4099,7 +4039,6 @@ function paintGaugeBar(box, fraction, steps, focused = false) {
 }
 
 function equalizerBand(parent, title, index) {
-  const stacked = WIDTH - libraryPaneWidth() * STYLE_SCALE - APP_EDGE_PADDING_PX * 2 - uiGapDots() * 5 < 230;
   const group = makeWidget(parent, { direction: FlexDirection.Column, gap: uiGap(), minWidth: 0 });
   const row = controlRow(group);
   const addValue = () => label(row, equalizerGainLabel(equalizerGainAt(index, currentRenderTime)), {
@@ -4108,7 +4047,7 @@ function equalizerBand(parent, title, index) {
     border: 1, textShade: 0, align: "left", inset: controlPaddingDots(),
     paint(box) { state.equalizerValueBoxes[index] = box; },
   });
-  label(row, title, { ...(stacked ? { flexGrow: 1, flexBasis: 0, minWidth: 0 } : { width: textLayoutWidth("16K HZ") }), height: buttonStandardHeight() }, {
+  label(row, title, { flexGrow: 1, flexBasis: 0, minWidth: 0, height: buttonStandardHeight() }, {
     textShade: 0,
     inset: controlPaddingDots(),
     paint(box) { state.equalizerLabelBoxes[index] = box; },
@@ -4121,12 +4060,11 @@ function equalizerBand(parent, title, index) {
     Math.min(EQ_GAIN_MAX_DB, equalizerGain(index) + EQ_GAIN_STEP_DB)), {
     controlTitle: `EQ ${title} +`,
   });
-  if (stacked) addValue();
-  makeWidget(stacked ? group : row, {
-    flexGrow: stacked ? 0 : 1,
+  addValue();
+  makeWidget(group, {
+    flexGrow: 0,
     minWidth: 0,
     flexShrink: 1,
-    ...(stacked ? {} : { flexBasis: 0 }),
     height: buttonStandardHeight(),
   }, {
     equalizerBar: index,
@@ -4146,7 +4084,6 @@ function equalizerBand(parent, title, index) {
       paintEqualizerBar(box, equalizerGainAt(index, currentRenderTime), index);
     },
   });
-  if (!stacked) addValue();
 }
 
 function animateEqualizerFrame(time) {
@@ -4443,7 +4380,6 @@ function addOptionsContent(parent) {
     padding: uiGapDots() / STYLE_SCALE,
   }, {
     id: "options-pane",
-    paint(box) { strokeRect(box.x, box.y, box.width, box.height, 1); },
   });
   panelTitle(panel, state.optionsPage, { paneHeader: "content" });
   const viewport = makeWidget(panel, {
@@ -4727,7 +4663,7 @@ function intersectBoxes(first, second) {
 function anchorTabClose(box, parentBox) {
   // Yoga child rounding may exceed a floored parent edge by a dot. Use the
   // same final parent bounds for the close cell's painting and hit testing.
-  box.x = parentBox.x + Math.max(0, parentBox.width - box.width);
+  box.x = parentBox.x + Math.max(1, parentBox.width - box.width - 1);
   box.y = parentBox.y + Math.floor((parentBox.height - box.height) / 2);
   return box;
 }

@@ -18,20 +18,18 @@ page. The sidebar action row remains in place and its rows become grouped
 ViewBoy and VGMBoy page links. The adjacent content pane scrolls internally on
 long pages. Changing pages or controls keeps Options open; the gear, Escape, or
 Command-comma returns to the library using the shared roll transition. Display
-uses two columns in wide panes and stacks its cards in narrow panes: the live
-LCD palette preview and screen profile sit at left, while one Interface card
-groups button labels, column sizing and window behavior, followed by spacing and
-motion cards. Each Display section uses a full card with a shared filled title
-bar and enclosing outline. The Options navigation and content panes have matching
-filled headers. Layout Spacing controls pane/card insets, gaps and control
-padding in Options as well as the main screen; each change is visible on the
-page being edited. Insets and neighboring controls use 1× UI Gap; card/column
-gaps and space below pane/card headers use 2× UI Gap. PREVIEW labels one continuous tone strip aligned with the BG/PIXEL fields;
-RENDERING and PALETTE label separate selectors. Grayscale previews show all
-eight or sixteen tones, with text/background markers inside the strip. Reset Spacing restores pad/gap/line defaults of 4/4/1 dots.
-The Options sidebar fits its six icons instead of inheriting the wider library
-minimum. Page rows leave room around the bitmap glyphs. One shaded marker glides between
-page links, including across the section headings.
+uses one scrolling column at every width. Shaded, left-aligned headers divide
+LCD Palette, Screen Profile, Interface, Layout Spacing and Motion. Sections have
+no enclosing dialog outlines or nested insets. Labels use the left half;
+compact selectors and color fields use the right half. Numeric groups align to
+its trailing edge. Long controls receive a whole line when necessary. Contrast,
+Volume and FPS gauges always use separate full-width lines.
+
+UI Gap separates neighboring rows; 2× UI Gap separates sections and headers from
+content. Button Pad controls insets and heights; Line Gap controls category
+links. Reset Spacing restores 4/4/1 dots. PREVIEW is one tone strip. Rendering
+and Palette are separate selectors, with all 8/16 gray tones shown in preview.
+The category sidebar keeps its own shaded header and moving selection marker.
 
 In the Path sidebar, root chevron ink shares the leading edge of the search and
 toolbar controls. Nested disclosures and text move inward by one bitmap glyph
@@ -81,7 +79,7 @@ and background positions.
 
 ## Uniform Controls and Motion
 
-Pane/card headings and field labels align left. Selectors, color fields and numeric groups start at the same one-third field column. Numeric groups keep square minus/plus controls beside a fixed-width, left-aligned readout; narrow rows stack the label above controls. Button captions stay centered within their hit boxes. Selectors of the same kind are grouped together. Aperture and Font are adjacent
+Pane/section headings and field labels align left. Compact selectors and color fields use the right half; numeric groups share its trailing edge. Numeric groups keep square minus/plus controls beside a fixed-width, left-aligned readout; narrow rows stack the label above controls. Button captions stay centered within their hit boxes. Selectors of the same kind are grouped together. Aperture and Font are adjacent
 and alphabetical, using identical two-way selector columns. Selectors retain bounded widths in wider panes and place labels above their
 buttons when space is tight. Queue places Random before Repeat with matching
 geometry. Numeric controls share square minus/plus buttons
@@ -90,7 +88,7 @@ gauge on the following row. FPS buttons change ten FPS; its existing arrow,
 Shift-arrow and Home/End controls remain available.
 
 Gauge ticks use the whole track. Zero has no fill and maximum fills the final
-track pixel. EQ keeps ten aligned bands; narrower panes put each band's gauge
+track pixel. EQ keeps ten aligned bands, each with a full-width gauge
 below its control row. Audio gauges support pointer dragging and keyboard
 steps. A drag previews locally, applies the audio setting on release, and
 restores the starting value when cancelled.
@@ -142,7 +140,7 @@ the three adjustable controls have distinct jobs:
 | --- | --- | --- | --- |
 | App-edge inset | Fixed 8 px on all four sides | Gap between the LCD edge and the outermost toolbar, pane, or footer content | Control text padding or gaps between sibling elements |
 | UI Button Pad | 1–8 px; default 4 | Control text inset and standard control height on the main screen and Options | App-edge inset or glyph-height library/playlist rows |
-| UI Chrome Gap | 1–8 px; default 4 | Control/pane/card gaps and insets on the main screen and Options; playlist columns | Blank space between text rows or app-edge inset |
+| UI Chrome Gap | 1–8 px; default 4 | Control/pane gaps, pane insets and section spacing on the main screen and Options; playlist columns | Blank space between text rows or app-edge inset |
 | Text Line Gap | 1–8 px; default 1 | Blank vertical space between playlist/sidebar text rows and Options page links | Control height, pane inset, or other chrome gaps |
 | Tree indent | One bitmap glyph advance per depth | Leading text/disclosure column | Trailing margin or device-pixel pitch |
 
@@ -160,11 +158,11 @@ the three adjustable controls have distinct jobs:
   canvas background still paints to all four window edges.
 
 Buttons and framed panes use a one-pixel LCD border. The upper toolbar's shared
-button builder keeps its eight controls at matching size and format; the
-left-aligned `<<` label is its only alignment exception.
-Playlist tabs reserve a square close target containing a centered seven-dot
-bitmap X within a square frame. Crowded tab titles collapse without shrinking
-or shifting that close target.
+button builder keeps its eight controls at matching size and format. Previous
+and Next use centered mirrored bitmap chevrons. Playlist tabs reserve a nine-dot
+square close target: a five-dot X, an empty ring and a seven-dot square frame.
+The target stays one dot inside the tab border. One-dot gaps separate tabs;
+crowded titles collapse independently of the close target.
 
 Gauge interiors fill completely at maximum. Their outline supplies the first
 and last notches; only internal divisions are drawn inside the track. No thumb

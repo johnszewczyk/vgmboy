@@ -27,7 +27,9 @@ globalThis.viewBoy = {
   frontendSettingsSave: async () => {}, nativePlaybackInit: async () => {}, nativePlaybackAudioConfig: async () => {},
   nativePlaybackState: async () => ({ transport_state: 'stopped' }), favoritesList: async () => [],
   databaseGames: async () => ({ games: [], groups: [] }), playlistTabsLoad: async () => null,
-  playlistTabsSave: async () => {}, playlistTabsReduce: async ({ state, action }) => ({ orderedIDs: [...state.orderedIDs, action.id], activeID: action.id }),
+  playlistTabsSave: async () => {}, playlistTabsReduce: async ({ state, action }) => action.kind === 'close'
+    ? { orderedIDs: state.orderedIDs.filter((id) => id !== action.id), activeID: state.activeID }
+    : { orderedIDs: [...state.orderedIDs, action.id], activeID: action.id },
   databaseFileTree: async () => [{ kind: 'folder', name: 'ROOT', path: '/root', children: [
     { kind: 'folder', name: 'PARENT', path: '/root/parent', children: [
       { kind: 'folder', name: 'CHILD', path: '/root/parent/child', children: [
@@ -39,7 +41,7 @@ globalThis.viewBoy = {
 const tick = () => new Promise(setImmediate);
 
 test('sidebar depth uses one character, labels retain their right budget, and width gestures persist safely', async () => {
-  const { hitTargetSnapshot, lcdDotSizeSnapshot, bitmapFontSnapshot, optionsStyleSnapshot, optionsContentSnapshot, framebufferShadeSnapshot } =
+  const { hitTargetSnapshot, lcdDotSizeSnapshot, bitmapFontSnapshot, optionsStyleSnapshot, optionsContentSnapshot, choiceControlLayoutSnapshot, framebufferShadeSnapshot } =
     await import('../Sources/ViewBoy/Resources/yoga-app.js');
   for (let i = 0; i < 8; i++) await tick();
   const target = (name, page = false) => { const value = hitTargetSnapshot().find((item) => item.name === name && (!page || item.optionPage)); assert.ok(value, name); return value; };
@@ -99,10 +101,10 @@ test('sidebar depth uses one character, labels retain their right budget, and wi
     assert.equal(toolbar.y - navHeader.y - navHeader.height, gap * 2, 'navigation header follows the same rule');
     assert.equal(profile.y - palette.y - palette.height, gap * 2, 'stacked cards have a section gap');
     assert.equal(preview.y - paletteTitle.y - paletteTitle.height, gap * 2, 'card header has a section gap');
-    assert.equal(preview.x - palette.x, gap, 'swatches share the card content inset');
-    assert.equal(palette.width - preview.width, gap * 2, 'swatches use the full card content width');
+    assert.equal(preview.x, palette.x, 'section rows share the header edge');
+    assert.equal(preview.width, palette.width, 'section rows use the full width');
     const lastControl = target('PIXEL MATRIX GAPS').box;
-    assert.equal(profile.y + profile.height - lastControl.y - lastControl.height, gap, 'card bottom has one inset');
+    assert.equal(profile.y + profile.height - lastControl.y - lastControl.height, 0, 'sections have no dialog padding');
   };
   checkSectionSpacing(4);
   const headerBefore = headers[0].box.height;
@@ -114,7 +116,7 @@ test('sidebar depth uses one character, labels retain their right budget, and wi
   click('UI CHROME GAP +');
   const cardAfter = optionsStyleSnapshot().find((item) => item.kind === 'group' && item.name === 'LCD PALETTE').box;
   const sliderAfter = target('CONTRAST BOOST SLIDER').box;
-  assert.equal(sliderAfter.x - cardAfter.x, sliderBefore.x - cardBefore.x + 1, 'card inset follows UI Gap');
+  assert.equal(sliderAfter.x - cardAfter.x, 0, 'gauge stays aligned with the unframed section');
   checkSectionSpacing(5);
   const pageBefore = target('QUEUE', true).box.y - target('LIBRARY', true).box.y;
   click('TEXT LINE GAP +');
@@ -129,7 +131,12 @@ test('sidebar depth uses one character, labels retain their right budget, and wi
   const wideCards = optionsStyleSnapshot().filter((item) => item.kind === 'group');
   const widePalette = wideCards.find((item) => item.name === 'LCD PALETTE').box;
   const wideInterface = wideCards.find((item) => item.name === 'INTERFACE').box;
-  assert.equal(wideInterface.x - widePalette.x - widePalette.width, 8, 'wide columns share the two-gap section spacing');
+  assert.equal(wideInterface.x, widePalette.x, 'wide Options remains one simple column');
+  assert.ok(wideInterface.y > widePalette.y + widePalette.height);
+  for (const choice of choiceControlLayoutSnapshot()) {
+    assert.ok(choice.controls.width <= choice.row.width / 2 + 1, 'compact selectors fill at most the right half');
+    assert.equal(choice.controls.x + choice.controls.width, choice.row.x + choice.row.width);
+  }
   windowWidth = 1000;
   events.get('resize')();
   for (let i = 0; i < 3; i++) click('UI BUTTON PAD -');
@@ -162,14 +169,25 @@ test('sidebar depth uses one character, labels retain their right budget, and wi
   assert.ok(closeButtons.length >= 12, 'exercise crowded tabs');
   for (const close of closeButtons) {
     const owner = hitTargetSnapshot().find((item) => item.reorderKind === 'tab' && item.reorderKey === close.playlistTabId);
-    assert.ok(close.box.x >= owner.box.x && close.box.x + close.box.width <= owner.box.x + owner.box.width + 0.01,
+    assert.ok(close.box.x >= owner.box.x + 1 && close.box.x + close.box.width <= owner.box.x + owner.box.width - 1,
       JSON.stringify({ close: close.box, owner: owner.box }));
     assert.equal(close.box.width, close.box.height, 'close target remains square');
     const left = Math.round(close.box.x + close.box.width / 2 - 3.5);
     const top = Math.round(close.box.y + close.box.height / 2 - 3.5);
-    assert.equal(framebufferShadeSnapshot(left, top), 0, 'close icon has its own centered square frame');
+    assert.equal(framebufferShadeSnapshot(left, top), 0, 'close frame is centered and fully visible');
     assert.equal(framebufferShadeSnapshot(left + 3, top + 3), 0, 'center of bitmap X is present');
     assert.equal(framebufferShadeSnapshot(left + 6, top + 6), 0, 'far corner of close frame is not clipped');
+    let centerInk = 0;
+    for (let y = 1; y < 6; y++) for (let x = 1; x < 6; x++) {
+      if (framebufferShadeSnapshot(left + x, top + y) === 0) centerInk++;
+    }
+    assert.equal(centerInk, 5, 'minimal X has exactly five ink dots inside the empty box');
+    assert.notEqual(framebufferShadeSnapshot(left + 1, top + 1), 0, 'X stays separated from the frame');
   }
+  const closedId = closeButtons[0].playlistTabId;
+  listeners.get('click')(point(closeButtons[0].box));
+  await tick();
+  assert.ok(!hitTargetSnapshot().some((item) => item.playlistTabClose && item.playlistTabId === closedId && item.interactive),
+    'the painted close target closes its own tab');
   events.get('pagehide')?.();
 });

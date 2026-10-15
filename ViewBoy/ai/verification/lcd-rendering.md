@@ -19,7 +19,7 @@ passes nine focused tests. JavaScript syntax checks pass.
   pixel; both inner edges stay filled without thumb cutouts. Tick endpoints are
   the outline borders, with only internal notches painted; cancellation clears fill.
 - Narrow Standard-font Audio bars remain within the pane and all ten bands use
-  matching columns, including the stacked layout at 640 CSS pixels and 4 PX dots.
+  matching alignment. Every EQ band now uses a numeric row above a full-width gauge.
 - SB2's cubic-bezier(0.2, 0, 0, 1) is correctly inverted in time, monotonic and
   bounded. The page selector reaches the expected 60.7% position at a quarter
   duration and paints shade 2 at that moving position in the actual framebuffer.
@@ -28,21 +28,21 @@ passes nine focused tests. JavaScript syntax checks pass.
   independent of depth. Hover preserves the complete filename. Width dragging
   previews without persistence, cancellation restores the starting width, release
   saves the fraction, and double-click restores adaptive width.
-- Options headers share fill, position and height. Button Pad changes header and
-  control height, UI Gap changes card insets, and Line Gap changes page-link
-  spacing. Reset writes 4/4/1 in one update; minimum padding reserves glyphs and
-  borders, and cards stay within the content viewport. Header-to-content and
-  card gaps equal 2× UI Gap at values 4 and 5. Wide columns use the same factor;
-  the PREVIEW row shares the card inset and profile bottom padding is exactly
-  1× UI Gap.
+- Options uses unframed shaded sections in one column at every width. Labels
+  occupy the left half; compact fields occupy the right half and numeric groups
+  align to its trailing edge. Large selectors stack; gauges fill their own line.
+  UI Gap sets row spacing; section and header/content gaps use 2× UI Gap.
+  Button Pad changes control height; Line Gap changes category spacing.
 - PREVIEW, RENDERING and PALETTE labels remain present. All six rendering/palette
   combinations retain matrix geometry and distinct header/background tones.
   Rendering and palette persist independently; legacy Direct settings migrate.
   One continuous strip paints four semantic tones or all 8/16 grayscale tones.
-- Selector, color-input and numeric control groups share the leading field
-  column; pane/card titles align left. Numeric value columns retain fixed widths.
+- Selectors and color inputs share the right half. Numeric groups retain fixed
+  readout widths. Pane and section titles align left.
 - Crowded tabs reserve square bitmap close targets within their tab bounds. The
-  framed X is present through its far corner at its centered raster coordinates,
+  five-dot X has a clear surrounding ring inside its seven-dot square frame.
+  The icon and square hit target have separate margins from the tab border;
+  clicking the target closes its own tab. The frame remains present through its far corner at its centered raster coordinates,
   including fourteen tabs at 840 CSS pixels, 4 PX dots and 3/7/3 spacing. This
   catches the one-dot Yoga child/parent rounding mismatch. Previous/Next bitmap
   chevrons are centered independently of font text spacing.
@@ -56,26 +56,16 @@ JavaScript is compared byte-for-byte with source, and
 
 ## Packaged UI
 
-The clean signed native WKWebView build loads the real catalog and saved
-playlists while preserving the user's active Journey tab and Options state.
-At the 840-CSS-pixel window with Standard 5x7 text, classic aperture, matrix on,
-custom dark/amber colors and saved 3/7/3 spacing:
+The previous native pass checked the unframed Display and Audio sections at
+840 CSS pixels, Standard 5x7, 4 PX dots, classic aperture and the user's saved
+amber colors and 3/7/3 spacing. Headers, right-side fields and full-width Contrast
+and Volume gauges were visible; the footer stayed outside the scroll viewport.
 
-- Direct/Color retains shaded pane and card headers. Headings align left;
-  Preview, Rendering, Palette, BG/Pixel and Contrast numeric controls share the
-  leading field column. Aperture, Font, Dot Size and spacing controls follow it.
-- Previous and Next use centered mirrored bitmap chevrons. The actual crowded
-  tab strip shows centered framed bitmap X icons, with the title budget separate.
-- At 4 PX dots, the Volume 100% gauge fills the complete interior; its outline
-  supplies endpoint notches. The 31 Hz EQ band reaches +12.0 with fill through
-  both inner edges and returns to its original +0.0. EQ remains disabled.
-- A native Contrast 100% state also fills completely. Its setting and dot size
-  were adjusted by the user during inspection; the agent preserved them.
-- The footer remains outside the clipped scrolling Options viewport. Narrow
-  rows stack labels above the common numeric controls instead of clipping them.
-
-Optical aperture/matrix invariants and all six rendering/palette combinations
-are additionally checked by controlled framebuffer/device-cell tests.
+The final full-width EQ rows and revised five-dot tab-close icon are covered by
+the focused Canvas tests. The rebuilt native package also shows the revised
+close icons centered with clear margins in its three-tab library strip. The
+fourteen-tab case and close action are checked in the Canvas fixture. Final
+full-width EQ rows have not received another native visual pass.
 
 ## Limits
 

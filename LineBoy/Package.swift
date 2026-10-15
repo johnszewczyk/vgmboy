@@ -31,7 +31,7 @@ let package = Package(
                 .product(name: "VGMBoyKit", package: "VGMBoy")
             ],
             path: ".",
-            exclude: ["AGENTS.md", "README.md", "ai", "app-info.plist", "build.sh", "launch.sh"],
+            exclude: ["Tests", "AGENTS.md", "README.md", "ai", "app-info.plist", "build.sh", "launch.sh"],
             sources: ["Sources/LineBoy"],
             resources: [
                 .copy("index.html"),

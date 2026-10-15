@@ -97,3 +97,7 @@ closes an existing LineBoy process, and opens the fresh app. The static preview
 serves mock data. The WebKit host retains native catalog, favorites, queue, and
 playback adapters, but visual testing leaves the catalog gate off and uses
 local demo records; native file-open and window actions remain active.
+
+`rasterCellMetrics` quantizes each 16px row to an even number of integral beam pitches, so half-row-width 8px columns also have integral device-pixel advances. Do not cap devicePixelRatio at 2 in either raster geometry or the WebGL buffer. The pure grid regression covers all five profiles and display ratios through 4; native visual inspection remains distinct from that proof.
+
+Tabs retain their character-cell width with horizontal overflow. Preserve the strip scroll position across replacement, then bring the active item into view using strip-local offsets. Do not use page-level scrollIntoView for tab selection. Wheel events over overflowing tabs advance the strip; native scroll capture repositions the selector.
