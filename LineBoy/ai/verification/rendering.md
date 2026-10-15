@@ -34,3 +34,11 @@ The scanline correction was rebuilt and inspected in the native WKWebView at
 line spacing. The 1024 profile was restored after inspection. The layer is now
 outside terminal zoom and the screen origin is snapped to physical pixels.
 Fractional-DPR physical displays and the CSS fallback were not visually tested.
+
+On 2026-10-15, `./LineBoy/launch.sh` rebuilt and launched the updated native app.
+The saved 20-track 1943 playlist appeared while the catalog sidebar still showed
+CONNECTING CATALOG; after bootstrap the library showed 49.9K games and 454.9K
+tracks. Selecting Air Buster displayed READING PLAYLIST INDEX… immediately and
+then populated 20 tracks. Returning to the saved 1943 game restored its 20 rows
+from the recent-playlist cache. The prior 1943 playlist was restored as active
+after this interaction check. Automated tests were not run.

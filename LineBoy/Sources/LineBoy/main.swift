@@ -68,6 +68,17 @@ private struct LineBoyCatalogBootstrap: Sendable {
     let favoriteIDs: [String]
 }
 
+private struct LineBoyCatalogPlaylistKey: Hashable, Sendable {
+    let rootID: Int64
+    let game: String
+    let system: String
+}
+
+private struct LineBoyCatalogPlaylistRead: Sendable {
+    let tracks: [CatalogTrack]
+    let favoriteIDs: Set<String>
+}
+
 private func readLineBoyCatalogBootstrap(at catalogURL: URL) throws -> LineBoyCatalogBootstrap {
     let catalog = try ReadOnlyCatalog(databaseURL: catalogURL)
     let projection = CatalogBrowserProjection.games(from: try catalog.gameBuckets())
@@ -304,8 +315,11 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
     )
     private var catalogTracks: [String: CatalogTrack] = [:]
     private var localTracks: [String: LocalTrack] = [:]
+    private var catalogPlaylists: [LineBoyCatalogPlaylistKey: [CatalogTrack]] = [:]
+    private var catalogPlaylistRecency: [LineBoyCatalogPlaylistKey] = []
     private var catalogGroups: [String: [LineBoyCatalogGame]] = [:]
     private var catalogSearch: LineBoyCatalogSearch?
+    private let catalogPlaylistCacheLimit = 8
     private weak var webView: WKWebView?
     private weak var window: NSWindow?
 
@@ -380,7 +394,14 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
                 window.toggleFullScreen(nil)
                 reply(requestID, success: ["requested": true])
             case "gameTracks":
-                reply(requestID, success: try gameTracks(arguments))
+                Task { [weak self] in
+                    guard let self else { return }
+                    do {
+                        self.reply(requestID, success: try await self.gameTracks(arguments))
+                    } catch {
+                        self.reply(requestID, failure: error.localizedDescription)
+                    }
+                }
             case "playTrack":
                 reply(requestID, success: try startTrack(arguments["trackId"] as? String ?? ""))
             case "playPause":
@@ -470,25 +491,60 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         ]
     }
 
-    private func gameTracks(_ arguments: [String: Any]) throws -> [String: Any] {
+    private func gameTracks(_ arguments: [String: Any]) async throws -> [String: Any] {
         guard let rootID = (arguments["rootId"] as? NSNumber)?.int64Value,
               let game = arguments["game"] as? String,
               let system = arguments["system"] as? String else {
             throw LineBoyBridgeError.invalidArguments
         }
-        let catalog = try ReadOnlyCatalog(databaseURL: catalogURL)
-        let rows = try catalog.tracks(
-            rootID: rootID,
-            game: game,
-            system: system,
-            preferFoldersOverMetadata: true
-        )
-        let favoriteIDs = Set(try FavoriteStore().snapshots().map(\.identity.id))
+        let key = LineBoyCatalogPlaylistKey(rootID: rootID, game: game, system: system)
+        let rows: [CatalogTrack]
+        let favoriteIDs: Set<String>
+        if let cachedRows = catalogPlaylists[key] {
+            rows = cachedRows
+            favoriteIDs = try await Task.detached(priority: .utility) {
+                Set(try FavoriteStore().snapshots().map(\.identity.id))
+            }.value
+            catalogPlaylistRecency.removeAll { $0 == key }
+            catalogPlaylistRecency.append(key)
+        } else {
+            let catalogURL = self.catalogURL
+            let result = try await Task.detached(priority: .userInitiated) {
+                let catalog = try ReadOnlyCatalog(databaseURL: catalogURL)
+                let tracks = try catalog.tracks(
+                    rootID: rootID,
+                    game: game,
+                    system: system,
+                    preferFoldersOverMetadata: true
+                )
+                let favoriteIDs = Set(try FavoriteStore().snapshots().map(\.identity.id))
+                return LineBoyCatalogPlaylistRead(tracks: tracks, favoriteIDs: favoriteIDs)
+            }.value
+            rows = result.tracks
+            favoriteIDs = result.favoriteIDs
+            catalogPlaylists[key] = rows
+            catalogPlaylistRecency.removeAll { $0 == key }
+            catalogPlaylistRecency.append(key)
+            while catalogPlaylistRecency.count > catalogPlaylistCacheLimit {
+                let expired = catalogPlaylistRecency.removeFirst()
+                catalogPlaylists.removeValue(forKey: expired)
+            }
+        }
+
         var nextTracks: [String: CatalogTrack] = [:]
         rows.forEach { track in
             let identity = Self.favoriteIdentity(for: track)
             nextTracks[identity.id] = track
         }
+        catalogTracks.removeAll(keepingCapacity: true)
+        for expired in catalogPlaylistRecency {
+            for track in catalogPlaylists[expired] ?? [] {
+                let identity = Self.favoriteIdentity(for: track)
+                catalogTracks[identity.id] = track
+            }
+        }
+        catalogTracks.merge(nextTracks) { _, newest in newest }
+
         let projection = CatalogPlaylistPresentation.project(tracks: rows)
         let response = projection.rows.map { track -> [String: Any] in
             let identity = FavoriteTrackIdentity(
@@ -518,7 +574,6 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
                 "displayPath": track.display.sourceFilename
             ]
         }
-        catalogTracks.merge(nextTracks) { _, newest in newest }
         return ["tracks": response]
     }
 

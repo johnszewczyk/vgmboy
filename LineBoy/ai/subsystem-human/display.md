@@ -96,6 +96,13 @@ local sample favorites and FAV filters the current playlist. The native file
 picker remains connected for opening a real local track; native catalog and
 local-file playback use VGMBoy transport.
 
+Saved playlist rows paint from the tab snapshot while native catalog tracks
+rehydrate in the background. First-time game reads must not block the WebKit
+event loop; the native bridge caches the eight most recently requested game
+playlists. While a new game is being read, the list shows a compact DOS status
+row. Tab changes invalidate pending UI updates, so late results cannot replace
+the playlist the user selected.
+
 Playlist tabs use ViewBoy-style square outlines and an independent close cell.
 They share the available width, retain an 18-character basis and
 12-character minimum, then scroll instead of collapsing to unreadable fragments.

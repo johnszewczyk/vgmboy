@@ -514,6 +514,13 @@
       text-overflow: ellipsis;
     }
     .song .length { color: var(--dim); text-align: right; }
+    .playlist-message {
+      grid-column: 1 / -1;
+      min-height: 16px;
+      padding: 0 1ch;
+      color: var(--dim);
+      line-height: 16px;
+    }
     .song:hover,
     .song:focus-visible,
     .song[aria-selected="true"] {
@@ -996,6 +1003,9 @@
     let playlistTabsReady = false;
     let playlistTabsRestored = false;
     let restoringPlaylistTab = false;
+    let catalogPlaylistLoading = false;
+    const catalogHydratedTabs = new Set();
+    const catalogHydrationPromises = new Map();
     let playlistTabsSaveTimer = 0;
     let playlistTabsSaveChain = Promise.resolve();
     let playing = false;
@@ -1736,7 +1746,7 @@
     }
 
     function syncActivePlaylistTab() {
-      if (!playlistTabsReady || restoringPlaylistTab) return;
+      if (!playlistTabsReady || restoringPlaylistTab || catalogPlaylistLoading) return;
       const tab = currentPlaylistTab();
       if (!tab) return;
       const title = String(activeGame.title || "Playlist");
@@ -1856,7 +1866,11 @@
     function activatePlaylistTab(id) {
       const tab = playlistTabs.find((entry) => entry.id === id);
       if (!tab || tab.id === activePlaylistTabID) return false;
-      syncActivePlaylistTab();
+      const previousPlaylistWasLoading = catalogPlaylistLoading;
+      catalogRequestVersion++;
+      catalogPlaylistLoading = false;
+      catalogHydratedTabs.delete(tab.id);
+      if (!previousPlaylistWasLoading) syncActivePlaylistTab();
       activePlaylistTabID = tab.id;
       favoritesOnly = Boolean(tab.favoritesOnly);
       activeGame = {
@@ -1874,28 +1888,40 @@
       selectSelectionTarget(playlistTabButtons().find((button) => button.getAttribute("aria-selected") === "true"));
       status.textContent = `PLAYLIST/TAB ${playlistTabs.indexOf(tab) + 1}`;
       schedulePlaylistTabsSave();
-      if (catalogHost && tab.rootId && tab.game) hydrateCatalogPlaylist(tab.id);
+      if (catalogHost && tab.rootId && tab.game) void hydrateCatalogPlaylist(tab.id);
       return true;
     }
 
-    async function hydrateCatalogPlaylist(tabID) {
+    function hydrateCatalogPlaylist(tabID) {
       const tab = playlistTabs.find((entry) => entry.id === tabID);
-      if (!catalogHost || !tab?.rootId || !tab.game) return;
-      try {
-        const result = await nativeRequest("gameTracks", {
-          rootId: tab.rootId, game: tab.game, system: tab.system,
-        });
-        if (activePlaylistTabID !== tabID) return;
-        tab.playlist = result.tracks || [];
-        activeGame = { ...activeGame, tracks: tab.playlist };
-        restoringPlaylistTab = true;
-        renderSongs(activeGame, tab.selectedTrackId || "");
-        songList.scrollTop = Math.max(0, Number(tab.scrollTop) || 0);
-        restoringPlaylistTab = false;
+      if (!catalogHost || !tab?.rootId || !tab.game) return Promise.resolve(false);
+      if (catalogHydratedTabs.has(tabID)) return Promise.resolve(true);
+      const identity = { rootId: tab.rootId, game: tab.game, system: tab.system };
+      const promiseKey = `${tabID}\u0000${identity.rootId}\u0000${identity.system}\u0000${identity.game}`;
+      if (catalogHydrationPromises.has(promiseKey)) return catalogHydrationPromises.get(promiseKey);
+      const activeRequestVersion = catalogRequestVersion;
+      const pending = nativeRequest("gameTracks", identity).then((result) => {
+        const current = playlistTabs.find((entry) => entry.id === tabID);
+        if (!current || current.rootId !== identity.rootId || current.game !== identity.game) return false;
+        current.playlist = result.tracks || [];
+        if (activePlaylistTabID === tabID && catalogRequestVersion === activeRequestVersion) {
+          catalogHydratedTabs.add(tabID);
+          activeGame = { ...activeGame, tracks: current.playlist };
+          restoringPlaylistTab = true;
+          renderSongs(activeGame, current.selectedTrackId || "");
+          songList.scrollTop = Math.max(0, Number(current.scrollTop) || 0);
+          restoringPlaylistTab = false;
+        }
         schedulePlaylistTabsSave();
-      } catch (error) {
-        status.textContent = `PLAYLIST/RESTORE ERROR ${error.message}`;
-      }
+        return true;
+      }).catch((error) => {
+        if (activePlaylistTabID === tabID && catalogRequestVersion === activeRequestVersion) {
+          status.textContent = `PLAYLIST/RESTORE ERROR ${error.message}`;
+        }
+        return false;
+      }).finally(() => catalogHydrationPromises.delete(promiseKey));
+      catalogHydrationPromises.set(promiseKey, pending);
+      return pending;
     }
 
     function createPlaylistTab() {
@@ -2342,28 +2368,46 @@
 
     async function loadNativeGame(game, row) {
       const version = ++catalogRequestVersion;
-      activeGame = {
+      const loadingTabID = activePlaylistTabID;
+      const nextGame = {
         title: game.displayName || game.game,
         system: game.system,
         rootId: Number(game.rootId),
         game: game.game,
         tracks: [],
       };
-      gameTitle.textContent = activeGame.title;
-      trackCount.textContent = "…";
-      songList.replaceChildren();
-      status.textContent = `CATALOG/${game.system}/${game.game}`;
+      if (loadingTabID) catalogHydratedTabs.delete(loadingTabID);
+      catalogPlaylistLoading = true;
+      gameTitle.textContent = nextGame.title;
+      trackCount.textContent = "READING";
+      const loading = document.createElement("div");
+      loading.className = "playlist-message";
+      loading.setAttribute("role", "status");
+      loading.setAttribute("aria-live", "polite");
+      loading.textContent = "READING PLAYLIST INDEX…";
+      songList.replaceChildren(loading);
+      status.textContent = `PLAYLIST/READING ${game.system}/${game.game}`;
       try {
         const result = await nativeRequest("gameTracks", {
-          rootId: Number(game.rootId), game: game.game, system: game.system
+          rootId: nextGame.rootId, game: nextGame.game, system: nextGame.system
         });
         if (version !== catalogRequestVersion) return;
-        activeGame = { ...activeGame, tracks: result.tracks || [] };
+        catalogPlaylistLoading = false;
+        activeGame = { ...nextGame, tracks: result.tracks || [] };
         renderSongs(activeGame, "");
+        if (loadingTabID && loadingTabID === activePlaylistTabID) catalogHydratedTabs.add(loadingTabID);
         if (row) selectTreeRow(row);
+        status.textContent = `CATALOG/${nextGame.system}/${nextGame.game}`;
       } catch (error) {
         if (version !== catalogRequestVersion) return;
+        catalogPlaylistLoading = false;
+        activeGame = nextGame;
         trackCount.textContent = "ERROR";
+        const failure = document.createElement("div");
+        failure.className = "playlist-message";
+        failure.setAttribute("role", "status");
+        failure.textContent = "PLAYLIST INDEX UNAVAILABLE";
+        songList.replaceChildren(failure);
         status.textContent = `CATALOG/ERROR ${error.message}`;
       }
     }
@@ -2412,6 +2456,8 @@
 
     async function playSong(song = songList.querySelector('.song[aria-selected="true"]')) {
       if (!song) return;
+      const trackID = song.dataset.trackId;
+      const requestedTabID = activePlaylistTabID;
       selectSong(song);
       if (!nativeHost || song.dataset.nativeTrack !== "true") {
         playing = !playing;
@@ -2422,6 +2468,14 @@
         return;
       }
       try {
+        const tab = currentPlaylistTab();
+        if (tab?.rootId && tab.game && !catalogHydratedTabs.has(tab.id)) {
+          if (!await hydrateCatalogPlaylist(tab.id)) return;
+        }
+        if (activePlaylistTabID !== requestedTabID) return;
+        song = [...songList.querySelectorAll(".song")].find((row) => row.dataset.trackId === trackID);
+        if (!song) return;
+        selectSong(song);
         await nativeRequest("playTrack", { trackId: song.dataset.trackId });
         applyNativePlaybackStatus(await nativeRequest("playbackStatus"));
       } catch (error) {
@@ -2440,8 +2494,17 @@
         schedulePlaylistTabsSave();
         return;
       }
+      const trackID = song.dataset.trackId;
+      const requestedTabID = activePlaylistTabID;
       try {
-        const result = await nativeRequest("toggleFavorite", { trackId: song.dataset.trackId });
+        const tab = currentPlaylistTab();
+        if (tab?.rootId && tab.game && !catalogHydratedTabs.has(tab.id)) {
+          if (!await hydrateCatalogPlaylist(tab.id)) return;
+        }
+        if (activePlaylistTabID !== requestedTabID) return;
+        song = [...songList.querySelectorAll(".song")].find((row) => row.dataset.trackId === trackID);
+        if (!song) return;
+        const result = await nativeRequest("toggleFavorite", { trackId: trackID });
         const isFavorite = Boolean(result.favorite);
         song.dataset.favorite = String(isFavorite);
         nativeFavoriteIDs[isFavorite ? "add" : "delete"](song.dataset.trackId);
