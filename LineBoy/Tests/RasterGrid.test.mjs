@@ -15,8 +15,13 @@ test('raster glyph columns and beam pitches land on whole device pixels', () => 
       assert.ok(Number.isInteger(8 * grid.deviceScale), '8px glyph advance stays on device pixels');
       assert.ok(Number.isInteger(16 * grid.deviceScale), '16px row advance stays on device pixels');
       assert.equal(grid.cellHeight % grid.scanPitch, 0, 'scanlines divide rows evenly');
-      assert.ok(grid.scanPitch >= 3);
+      assert.ok(grid.scanPitch >= 2);
+      assert.ok(Number.isInteger(grid.deviceScale), 'every source pixel has an equal whole physical size');
+      for (let row = 0; row < 16; row++) {
+        assert.equal((row + 1) * grid.deviceScale - row * grid.deviceScale, grid.deviceScale);
+      }
     }
   }
-  assert.equal(metrics(26).cellHeight, 24, 'the former 27px row no longer creates 13.5px columns');
+  assert.equal(metrics(36).deviceScale, 2, 'the former 2.25x glyph scale snaps to whole device pixels');
+  assert.equal(metrics(64).deviceScale, 4, 'the accurate 512-profile 4x scale is retained');
 });

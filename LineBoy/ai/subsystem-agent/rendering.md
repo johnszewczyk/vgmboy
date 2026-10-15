@@ -1,7 +1,7 @@
 # Renderer and build boundaries
 
 The HTML DOM owns all visible content, interaction, and native scrolling. A
-transparent WebGL2 overlay draws only the stationary scanline mask: bright beam
+transparent WebGL2 overlay outside the zoomed terminal draws only the stationary scanline mask: bright beam
 rows stay fully transparent and the remaining rows are pure black gaps. Never
 shade beam rows or glyphs with a grayscale spot profile, and never capture or
 redraw text into a framebuffer. Keep the mask above the DOM during scrolling
@@ -26,8 +26,9 @@ fitting even device-pixel multiple. Extend the viewport in whole 16-pixel text
 rows at that scale; in FILL width mode, extend it in whole 8-pixel columns.
 FRAME keeps the selected profile's 4:3 width. Never stretch glyphs to cover
 remainder space. Map each text cell to an integer number of equal beam pitches;
-keep the shader pitch integral even when the source-to-output scale is
-fractional. Snap frame edges and glyph baselines to the beam grid. Preserve the
+quantize each source glyph pixel to a whole device-pixel scale as well as
+keeping row advances and shader pitch integral. Whole character cells alone do
+not prevent uneven source-pixel widths or beating against scanlines. Snap frame edges and glyph baselines to the beam grid. Preserve the
 font's fixed 8px advance with kerning and ligatures disabled. Quantize each beam
 to an integer number of fully lit device rows and leave at least one pure-black
 device row per pitch; do not fade glyph edges or use partial-alpha beam shading.
@@ -99,7 +100,10 @@ serves mock data. The WebKit host retains native catalog, favorites, queue, and
 playback adapters, but visual testing leaves the catalog gate off and uses
 local demo records; native file-open and window actions remain active.
 
-`rasterCellMetrics` quantizes each 16px row to an even number of integral beam pitches, so half-row-width 8px columns also have integral device-pixel advances. Do not cap devicePixelRatio at 2 in either raster geometry or the WebGL buffer. The pure grid regression covers all five profiles and display ratios through 4; native visual inspection remains distinct from that proof.
+`rasterCellMetrics` rounds the target row height to a whole source-pixel device scale.
+Its 16px row and 8px column advances are therefore integral; scan pitch equals
+the scale, with a minimum pitch of two device pixels. This replaces the old
+whole-cell calculation that still permitted scales such as 2.25. Do not cap devicePixelRatio at 2 in either raster geometry or the WebGL buffer. The pure grid regression covers all five profiles and display ratios through 4; native visual inspection remains distinct from that proof.
 
 Tabs fill available space with an 18ch flex basis and 12ch minimum, with horizontal overflow.
 Reserve a separate 3ch close hit cell and an integer 8×8 icon slot; the icon is a
@@ -111,3 +115,11 @@ Sidebar pointerdown explicitly focuses the separator before preventing default.
 Pointer cancellation restores the starting width and does not persist. Keep this
 separate from the normal release commit. The default/reset raster is 800×600;
 existing saved raster selections are preserved.
+
+The beam layer is a fixed-position sibling of the zoomed terminal, never its
+child. Size its buffer and CSS bounds to the same physical extent, so one WebGL
+fragment maps to one display pixel. The CSS fallback also uses device-pixel
+pitch divided by DPR, not by terminal zoom. Center the terminal using rounded
+physical-pixel padding; align the mask origin to those same physical bounds.
+Page scroll moves the fixed layer to the terminal bounds without redrawing the
+mask; inner list scrolling leaves it stationary. Never scale a pre-rendered mask.

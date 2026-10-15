@@ -12,15 +12,16 @@ saved raster choices remain intact.
 
 Each 8×16 glyph cell gives the raster its text capacity: columns are active
 width ÷ 8, and complete text rows are floor(height ÷ 16). The selected profile
-sets its cell scale from the 320×240 reference and the largest fitting even
-device-pixel multiple. The viewport then adds whole glyph rows without changing
+sets a target cell scale from the 320×240 reference, then rounds to a whole
+number of device pixels per source font pixel. Adjacent profiles can share the
+same scale when no intermediate whole-pixel step exists. The viewport then adds whole glyph rows without changing
 that scale. Every text row maps to a whole number of equally spaced beam passes,
 so scan pitch remains integral as the window grows. Frame edges and glyph
 baselines snap to the beam grid. At 800×600, the base profile has 100 columns
 and 37 complete rows, with a centered four-pixel inset when no extra rows are
 needed.
 
-The window keeps an 8-pixel inset around the terminal, leaving a visible frame
+The window keeps at least an 8-pixel inset around the terminal, leaving a visible frame
 inside the native macOS title-bar area. The layout uses 8-pixel columns and
 16-pixel text rows. Its title, resolution choices, curses-style command bar,
 library, playlist, and status line occupy explicit rows. The title row keeps
@@ -103,8 +104,13 @@ moves an overflowing strip and active-tab selection reveals the tab. Labels,
 close actions and track rows expose full titles on hover. Selector motion uses
 cubic-bezier(.2, 0, 0, 1).
 
-Raster rows contain an even number of integral beam pitches, keeping the 8px horizontal advance on whole device pixels. The mask and layout use the actual display device ratio, including values above 2. This preserves the existing stationary mask and native DOM text path.
+Every source font pixel uses a whole device-pixel scale, not merely a whole character-cell advance. Scanlines use an integral physical pitch, with no fractional mask scaling. The mask and layout use the actual display device ratio, including values above 2. This preserves the existing stationary mask and native DOM text path.
 
 Display options use unframed shaded Layout, Screen and Interaction headers with
 left labels and right controls. Clicking the sidebar separator focuses it for
 keyboard resizing; cancelling a drag restores its starting width without saving.
+
+The scanline layer is outside the scaled text surface and maps one mask pixel
+to one physical display pixel. Its CSS fallback uses the same physical pitch.
+Terminal centering snaps the origin as well as the dimensions, avoiding
+half-pixel placement and alternating-width bands.

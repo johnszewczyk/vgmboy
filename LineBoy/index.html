@@ -49,7 +49,7 @@
       min-height: 100vh;
       padding: 8px;
       display: grid;
-      place-items: safe center;
+      place-items: start;
       overflow: auto;
       background: radial-gradient(ellipse at center, transparent 74%, #0006 100%), var(--black);
     }
@@ -80,10 +80,9 @@
       border: var(--frame-width, 1px) solid var(--frame-color);
       pointer-events: none;
     }
-    .terminal::before {
+    .beam-layer::before {
       content: "";
       position: absolute;
-      z-index: 3;
       inset: 0;
       display: none;
       background: repeating-linear-gradient(
@@ -93,7 +92,8 @@
       );
       pointer-events: none;
     }
-    .terminal[data-filter="css"][data-scanlines="on"]::before { display: block; }
+    .beam-layer[data-filter="css"][data-scanlines="on"]::before { display: block; }
+    .beam-layer { position: fixed; z-index: 3; pointer-events: none; overflow: hidden; }
 
     .beam-screen {
       position: absolute;
@@ -105,7 +105,7 @@
       image-rendering: pixelated;
       pointer-events: none;
     }
-    .terminal[data-filter="webgl"][data-scanlines="on"] .beam-screen { display: block; }
+    .beam-layer[data-filter="webgl"][data-scanlines="on"] .beam-screen { display: block; }
     .selector-block {
       position: absolute;
       z-index: 1;
@@ -663,7 +663,6 @@
   <div class="crt">
     <div class="terminal" data-filter="css" data-scanlines="on" role="application" aria-label="LineBoy monochrome line-grid player">
       <div class="selector-block" id="selector-block" aria-hidden="true"></div>
-      <canvas class="beam-screen" aria-hidden="true"></canvas>
 
       <header class="topline">
         <div class="brand">LINEBOY</div>
@@ -783,6 +782,7 @@
 
       <footer class="statusline"><span id="status">SNES/CHRONO/08-BLACKBIRD.SPC</span><span id="now">STOPPED</span></footer>
     </div>
+    <div class="beam-layer" data-filter="css" data-scanlines="on" aria-hidden="true"><canvas class="beam-screen"></canvas></div>
   </div>
 
   <script>
@@ -852,6 +852,8 @@
     };
 
     const terminal = document.querySelector(".terminal");
+    const crt = document.querySelector(".crt");
+    const beamLayer = document.querySelector(".beam-layer");
     const display = document.querySelector(".beam-screen");
     const workspace = document.querySelector(".workspace");
     const divider = document.querySelector("#column-divider");
@@ -1092,12 +1094,21 @@
     }
 
     function rasterCellMetrics(targetCellHeight) {
-      const scanPitch = Math.max(3, Math.round(targetCellHeight / 16));
-      // An even number of beam pitches keeps both 8px columns and 16px rows
-      // on whole device pixels, including fractional source scaling.
-      const beamLinesPerCell = Math.max(2, 2 * Math.round(targetCellHeight / scanPitch / 2));
-      const cellHeight = scanPitch * beamLinesPerCell;
-      return { scanPitch, cellHeight, deviceScale: cellHeight / 16 };
+      // Whole character cells alone are insufficient: every source glyph pixel
+      // must have the same physical size or it beats against the scanline mask.
+      const deviceScale = Math.max(1, Math.round(targetCellHeight / 16));
+      const scanPitch = Math.max(2, deviceScale);
+      return { scanPitch, cellHeight: 16 * deviceScale, deviceScale };
+    }
+
+    function positionBeamLayer() {
+      if (!activeRaster) return;
+      const rect = terminal.getBoundingClientRect();
+      const ratio = activeRaster.deviceRatio;
+      beamLayer.style.left = `${Math.round(rect.left * ratio) / ratio}px`;
+      beamLayer.style.top = `${Math.round(rect.top * ratio) / ratio}px`;
+      beamLayer.style.width = `${Math.round(rect.width * ratio) / ratio}px`;
+      beamLayer.style.height = `${Math.round(rect.height * ratio) / ratio}px`;
     }
 
     function updateRaster() {
@@ -1148,6 +1159,10 @@
       terminal.style.width = `${sourceWidth}px`;
       terminal.style.height = `${sourceHeight}px`;
       terminal.style.zoom = String(scale);
+      // Center with physical-pixel padding; CSS grid centering can leave a
+      // half-device-pixel origin even when all cell dimensions are integral.
+      crt.style.paddingLeft = `${Math.max(Math.round(8 * deviceRatio), Math.floor((window.innerWidth * deviceRatio - sourceWidth * deviceScale) / 2)) / deviceRatio}px`;
+      crt.style.paddingTop = `${Math.max(Math.round(8 * deviceRatio), Math.floor((window.innerHeight * deviceRatio - sourceHeight * deviceScale) / 2)) / deviceRatio}px`;
       terminal.style.setProperty("--frame-width", `${1 / (scale * deviceRatio)}px`);
       terminal.style.paddingBlock = `${halfLineInset}px`;
       terminal.style.gridTemplateColumns = `repeat(${columns}, 8px)`;
@@ -1172,6 +1187,7 @@
         button.setAttribute("aria-label", `${profile.width} by ${profile.height} display profile`);
       });
       updateOptionReadouts();
+      positionBeamLayer();
       return true;
     }
 
@@ -1258,14 +1274,14 @@
       rasterReadout.textContent = activeRaster.id;
       pitchReadout.textContent = `${activeRaster.scanPitch}PX`;
       crtPitchReadout.textContent = `${activeRaster.scanPitch}PX`;
-      terminal.dataset.scanlines = scanlinesEnabled ? "on" : "off";
+      beamLayer.dataset.scanlines = scanlinesEnabled ? "on" : "off";
       const beam = beamWidthModes.find((mode) => mode.id === beamWidthMode) || beamWidthModes[1];
       const beamRows = Math.min(activeRaster.scanPitch - 1,
         Math.max(1, Math.round(activeRaster.scanPitch * beam.radius * 2)));
-      const scanPeriod = activeRaster.scanPitch / activeRaster.deviceScale;
-      const beamWidth = beamRows / activeRaster.deviceScale;
-      terminal.style.setProperty("--scan-period", `${scanPeriod}px`);
-      terminal.style.setProperty("--beam-width", `${beamWidth}px`);
+      const scanPeriod = activeRaster.scanPitch / activeRaster.deviceRatio;
+      const beamWidth = beamRows / activeRaster.deviceRatio;
+      beamLayer.style.setProperty("--scan-period", `${scanPeriod}px`);
+      beamLayer.style.setProperty("--beam-width", `${beamWidth}px`);
       widthNote.textContent = widthMode === "FILL"
         ? "FILL WIDTH USES 8PX CELLS."
         : "FRAME KEEPS THE BASE 4:3 WIDTH.";
@@ -2600,7 +2616,8 @@
 
     function renderFilter() {
       if (!scanlinesEnabled || !gl || !program || !activeRaster) return;
-      const rect = terminal.getBoundingClientRect();
+      positionBeamLayer();
+      const rect = beamLayer.getBoundingClientRect();
       if (rect.width < 1 || rect.height < 1) return;
       const deviceRatio = Math.max(1, window.devicePixelRatio || 1);
       const width = Math.max(1, Math.round(rect.width * deviceRatio));
@@ -2621,10 +2638,10 @@
           Math.max(1, Math.round(activeRaster.scanPitch * mode.radius * 2)));
         gl.uniform1f(filterUniforms.beamRows, beamRows);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
-        terminal.dataset.filter = "webgl";
+        beamLayer.dataset.filter = "webgl";
       } catch (error) {
         console.error("LineBoy scanline filter failed:", error);
-        terminal.dataset.filter = "css";
+        beamLayer.dataset.filter = "css";
       }
     }
 
@@ -2639,6 +2656,7 @@
       updateRaster();
       scheduleRender();
     }).observe(terminal);
+    window.addEventListener("scroll", positionBeamLayer, { passive: true });
     window.addEventListener("resize", () => {
       updateRaster();
       scheduleRender();
