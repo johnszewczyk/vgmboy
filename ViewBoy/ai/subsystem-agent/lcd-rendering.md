@@ -11,7 +11,7 @@ admits every imported module.
 
 - Framebuffer labels describe ink, muted ink, selection, and substrate. Their
   tone mapping works in both polarities; it must not assume ink is darker.
-- Pixel method and Contrast Boost never change dot pitch, matrix enablement,
+- Rendering, palette and Contrast Boost never change dot pitch, matrix enablement,
   aperture selection, layout, fonts, hit targets, or native playback state.
 - The STN aperture integrates a centered fractional square into each device
   pixel. Its side/pitch ratio is 0.39/0.43, from Displaytech 128128A v1.1 p2.
@@ -30,6 +30,8 @@ admits every imported module.
 - Display cards stack when the remaining pane is too narrow for two columns;
   the existing clipped options viewport retains scrolling. Options/main insets share saved spacing in logical dots, without double scaling. Library width is adaptive or user-resized; Options keeps the compact navigation width. Page rows include four extra dots so their shaded marker has room around the glyphs. Its shared animation uses SB2's timing curve.
 - Contrast slider previews without writing preferences until pointerup; pointercancel restores its starting value. Its numeric row reserves the common value width; its separate full-width gauge keeps drag geometry stable across 0-100%. Keyboard focus is active only on Display in Options.
+
+- Rendering and palette persist independently, with migration from the old combined mode. Direct interpolates semantic UI tones in sRGB while LCD mixes reflectance in linear light. Keep both intermediate tones distinct from endpoints when grayscale range provides enough levels; headers must not collapse into BG.
 
 ## Evidence and Planning
 
