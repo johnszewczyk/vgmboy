@@ -460,23 +460,24 @@
     }
     .playlist-data::-webkit-scrollbar { display: none; }
     .list-head {
-      min-width: 0;
+      min-width: var(--playlist-width, 95ch);
       height: 16px;
       display: grid;
-      grid-template-columns: 2ch 3ch 14ch minmax(15ch, 1.6fr) minmax(10ch, 1.3fr) minmax(10ch, 1.2fr) minmax(8ch, 1fr) minmax(16ch, 2fr) 7ch;
+      grid-template-columns: var(--playlist-columns, 2ch 3ch 14ch minmax(15ch, 1.6fr) minmax(10ch, 1.3fr) minmax(10ch, 1.2fr) minmax(8ch, 1fr) minmax(16ch, 2fr) 7ch);
       gap: 1ch;
       align-items: center;
       padding: 0 1ch;
-      min-width: 95ch;
-      width: max(100%, 95ch);
+      width: max(100%, var(--playlist-width, 95ch));
       background: var(--well-highlight);
       color: var(--white);
       text-transform: uppercase;
+      transition: grid-template-columns var(--selector-duration) cubic-bezier(.2, 0, 0, 1);
     }
     .list-head span:last-child { text-align: right; }
     .songs {
       min-height: 0;
-      min-width: 95ch;
+      min-width: var(--playlist-width, 95ch);
+      width: max(100%, var(--playlist-width, 95ch));
       display: grid;
       grid-auto-rows: 16px;
       align-content: start;
@@ -490,11 +491,10 @@
       width: 100%;
       height: 16px;
       display: grid;
-      grid-template-columns: 2ch 3ch 14ch minmax(15ch, 1.6fr) minmax(10ch, 1.3fr) minmax(10ch, 1.2fr) minmax(8ch, 1fr) minmax(16ch, 2fr) 7ch;
+      grid-template-columns: var(--playlist-columns, 2ch 3ch 14ch minmax(15ch, 1.6fr) minmax(10ch, 1.3fr) minmax(10ch, 1.2fr) minmax(8ch, 1fr) minmax(16ch, 2fr) 7ch);
       gap: 1ch;
       align-items: center;
       padding: 0 1ch;
-      min-width: 95ch;
       justify-self: start;
       border: 0;
       background: var(--well);
@@ -504,6 +504,7 @@
       white-space: nowrap;
       cursor: pointer;
       scroll-snap-align: start;
+      transition: grid-template-columns var(--selector-duration) cubic-bezier(.2, 0, 0, 1);
     }
     .song[hidden] { display: none; }
     .song .favorite { color: var(--dim); text-align: center; }
@@ -682,7 +683,7 @@
       }
     }
     @media (prefers-reduced-motion: reduce) {
-      .selector-block { transition: none; }
+      .selector-block, .list-head, .song { transition: none; }
     }
   </style>
 </head>
@@ -762,6 +763,7 @@
           <div class="panel-title"><span>OPTIONS</span><span class="count">MENU</span></div>
           <div class="option-navigation" role="group" aria-label="Option categories">
             <button class="option-category" type="button" data-options-page="DISPLAY" aria-pressed="true">DISPLAY</button>
+            <button class="option-category" type="button" data-options-page="PLAYLIST" aria-pressed="false">PLAYLIST</button>
             <button class="option-category" type="button" data-options-page="CRT" aria-pressed="false">CRT</button>
             <button class="option-category" type="button" data-options-page="KEYS" aria-pressed="false">KEYS</button>
           </div>
@@ -783,6 +785,14 @@
             <div class="option-note" id="width-note">FILL WIDTH USES 8PX CELLS.</div>
             <div class="option-row"><span>WINDOW</span><button class="option-value" id="fullscreen-toggle" type="button" aria-label="Toggle fullscreen">FULL</button></div>
             <div class="option-row"><span>DISPLAY</span><button class="option-value" id="reset-display" type="button">DEFAULTS</button></div>
+          </div>
+          <div class="option-page" data-options-content="PLAYLIST" hidden>
+            <div class="option-section-title">COLUMNS</div>
+            <div class="option-row"><span>AUTO SIZE</span><button class="option-value" id="playlist-column-fit" type="button" aria-pressed="true">ON</button></div>
+            <div class="option-row"><span>MAX WIDTH</span><div class="range-control"><input class="brightness-range" id="playlist-column-width" type="range" min="16" max="64" step="4" value="40" aria-label="Maximum auto-sized playlist column width"><output class="range-readout" id="playlist-column-width-readout" for="playlist-column-width">40CH</output></div></div>
+            <div class="option-row"><span>RESIZE MOTION</span><span class="option-key">SELECTOR EASE</span></div>
+            <div class="option-note">8PX CELLS. LONG PLAYLISTS SCROLL.</div>
+            <div class="option-note">SIZES FOLLOW THE SHARED PLAYLIST PROJECTION.</div>
           </div>
           <div class="option-page" data-options-content="CRT" hidden>
             <div class="option-row"><span>BEAM WIDTH</span><button class="option-value" id="beam-width-mode" type="button">NORMAL</button></div>
@@ -908,6 +918,8 @@
           beamWidthMode,
           brightnessPercent,
           selectorFlowEnabled,
+          playlistColumnAutoSize,
+          playlistColumnMaxWidth,
           sidebarColumns,
           sidebarWidthVersion: 2,
         }));
@@ -933,6 +945,9 @@
     const sidebarWidthRange = document.querySelector("#sidebar-width-range");
     const sidebarWidthReadout = document.querySelector("#sidebar-width-readout");
     const selectorFlowModeButton = document.querySelector("#selector-flow-mode");
+    const playlistColumnFitButton = document.querySelector("#playlist-column-fit");
+    const playlistColumnWidthRange = document.querySelector("#playlist-column-width");
+    const playlistColumnWidthReadout = document.querySelector("#playlist-column-width-readout");
     const rasterReadout = document.querySelector("#option-raster");
     const pitchReadout = document.querySelector("#option-pitch");
     const crtPitchReadout = document.querySelector("#crt-pitch");
@@ -942,6 +957,8 @@
     let treeRows = [...document.querySelectorAll(".tree-row")];
     let searchRows = [];
     const songList = document.querySelector("#song-list");
+    const playlistData = document.querySelector(".playlist-data");
+    const playlistHeader = document.querySelector(".list-head");
     const playlistTabsView = document.querySelector("#playlist-tabs");
     const playlistTabAddButton = document.querySelector("#playlist-tab-add");
     const gameTitle = document.querySelector("#game-title");
@@ -986,6 +1003,11 @@
     let brightnessPercent = Number.isFinite(Number(savedDisplayPreferences.brightnessPercent))
       ? Math.max(60, Math.min(140, Number(savedDisplayPreferences.brightnessPercent))) : 100;
     let selectorFlowEnabled = savedDisplayPreferences.selectorFlowEnabled !== false;
+    let playlistColumnAutoSize = savedDisplayPreferences.playlistColumnAutoSize !== false;
+    let playlistColumnMaxWidth = Number.isFinite(Number(savedDisplayPreferences.playlistColumnMaxWidth))
+      ? Math.max(16, Math.min(64, Math.round(Number(savedDisplayPreferences.playlistColumnMaxWidth) / 4) * 4)) : 40;
+    let activePlaylistColumnHints = null;
+    let playlistColumnLayoutVersion = 0;
     let sidebarColumns = savedDisplayPreferences.sidebarWidthVersion === 2
       && Number.isInteger(savedDisplayPreferences.sidebarColumns)
       ? savedDisplayPreferences.sidebarColumns : null;
@@ -1315,6 +1337,18 @@
       widthNote.textContent = widthMode === "FILL"
         ? "FILL WIDTH USES 8PX CELLS."
         : "FRAME KEEPS THE BASE 4:3 WIDTH.";
+      updatePlaylistColumnControls();
+    }
+
+    function updatePlaylistColumnControls() {
+      playlistColumnFitButton.textContent = playlistColumnAutoSize ? "ON" : "OFF";
+      playlistColumnFitButton.setAttribute("aria-pressed", String(playlistColumnAutoSize));
+      playlistColumnFitButton.setAttribute("aria-label",
+        `Playlist column auto sizing ${playlistColumnAutoSize ? "on" : "off"}. Activate to turn it ${playlistColumnAutoSize ? "off" : "on"}.`);
+      playlistColumnWidthRange.value = String(playlistColumnMaxWidth);
+      playlistColumnWidthRange.setAttribute("aria-valuetext", `${playlistColumnMaxWidth} character cells`);
+      playlistColumnWidthReadout.value = `${playlistColumnMaxWidth}CH`;
+      playlistColumnWidthReadout.textContent = `${playlistColumnMaxWidth}CH`;
     }
 
     function setOptionsPage(page) {
@@ -1328,6 +1362,7 @@
       optionsPageTitle.textContent = page;
       if (optionsVisible) {
         selectSelectionTarget(optionCategories.find((button) => button.dataset.optionsPage === page));
+        status.textContent = `OPTIONS/${page}`;
       }
     }
 
@@ -1339,6 +1374,7 @@
       optionsContent.hidden = !visible;
       workspace.setAttribute("aria-label", visible ? "Options" : "Library and playlist");
       if (visible) setOptionsPage(selectedOptionsPage);
+      else queuePlaylistColumnFit(activePlaylistColumnHints);
     }
 
     window.__lineBoyFocusSearch = () => {
@@ -1372,6 +1408,21 @@
       applyBrightness();
       saveDisplayPreferences();
       status.textContent = `DISPLAY/SELECTOR ${selectorFlowEnabled ? "FLOW ON" : "FLOW OFF"}`;
+    });
+
+    playlistColumnFitButton.addEventListener("click", () => {
+      playlistColumnAutoSize = !playlistColumnAutoSize;
+      updatePlaylistColumnControls();
+      queuePlaylistColumnFit(activePlaylistColumnHints);
+      saveDisplayPreferences();
+      status.textContent = `PLAYLIST/AUTO SIZE ${playlistColumnAutoSize ? "ON" : "OFF"}`;
+    });
+
+    playlistColumnWidthRange.addEventListener("input", () => {
+      playlistColumnMaxWidth = Math.max(16, Math.min(64, Math.round(Number(playlistColumnWidthRange.value) / 4) * 4));
+      updatePlaylistColumnControls();
+      queuePlaylistColumnFit(activePlaylistColumnHints);
+      saveDisplayPreferences();
     });
 
     [divider].forEach((separator) => {
@@ -1510,6 +1561,8 @@
       beamWidthMode = "NORMAL";
       brightnessPercent = 100;
       selectorFlowEnabled = true;
+      playlistColumnAutoSize = true;
+      playlistColumnMaxWidth = 40;
       sidebarColumns = null;
       updateRaster();
       saveDisplayPreferences();
@@ -1606,8 +1659,68 @@
       return String(count);
     }
 
-    function renderSongs(game, preferredTrack = "01") {
+    function playlistColumnCharacters(text) {
+      return [...String(text || "")].length;
+    }
+
+    function playlistColumnText(hints, key, selector) {
+      const hinted = hints?.[key];
+      if (typeof hinted === "string" && hinted.length) return hinted;
+      return [...songList.querySelectorAll(selector)]
+        .reduce((longest, node) => playlistColumnCharacters(node.textContent) > playlistColumnCharacters(longest)
+          ? node.textContent : longest, "");
+    }
+
+    function queuePlaylistColumnFit(hints = activePlaylistColumnHints) {
+      activePlaylistColumnHints = hints || null;
+      const version = ++playlistColumnLayoutVersion;
+      requestAnimationFrame(() => {
+        if (version === playlistColumnLayoutVersion) fitPlaylistColumns(activePlaylistColumnHints);
+      });
+    }
+
+    function fitPlaylistColumns(hints = activePlaylistColumnHints) {
+      if (!playlistColumnAutoSize) {
+        playlistData.style.setProperty("--playlist-columns",
+          "2ch 3ch 14ch minmax(15ch, 1.6fr) minmax(10ch, 1.3fr) minmax(10ch, 1.2fr) minmax(8ch, 1fr) minmax(16ch, 2fr) 7ch");
+        playlistData.style.setProperty("--playlist-width", "95ch");
+        return;
+      }
+
+      const widthFor = (key, selector, minimum) => Math.max(minimum, Math.min(
+        playlistColumnMaxWidth,
+        playlistColumnCharacters(playlistColumnText(hints, key, selector))
+      ));
+      const widths = [
+        2,
+        Math.max(3, playlistColumnCharacters(hints?.index || songList.querySelector(".song .num")?.textContent || "99")),
+        widthFor("filename", ".song .file", 14),
+        widthFor("title", ".song .title", 15),
+        widthFor("game", ".song .game", 10),
+        widthFor("artist", ".song .author", 10),
+        widthFor("system", ".song .system", 8),
+        widthFor("path", ".song .path", 16),
+        Math.max(7, playlistColumnCharacters(hints?.lengthLabel || songList.querySelector(".song .length")?.textContent || "00:00")),
+      ];
+      const availableCells = Math.max(85, Math.floor((playlistData.clientWidth || playlistHeader.clientWidth) / 8) - 10);
+      const flexibleColumns = [[3, 1.6], [4, 1.3], [5, 1.2], [6, 1], [7, 2]];
+      let extra = Math.max(0, availableCells - widths.reduce((total, width) => total + width, 0));
+      const totalWeight = flexibleColumns.reduce((total, [, weight]) => total + weight, 0);
+      for (let position = 0; position < flexibleColumns.length && extra > 0; position++) {
+        const [column, weight] = flexibleColumns[position];
+        const share = position === flexibleColumns.length - 1
+          ? extra : Math.floor(extra * weight / totalWeight);
+        widths[column] += share;
+        extra -= share;
+      }
+      const contentWidth = widths.reduce((total, width) => total + width, 0);
+      playlistData.style.setProperty("--playlist-columns", widths.map((width) => `${width}ch`).join(" "));
+      playlistData.style.setProperty("--playlist-width", `${Math.max(95, contentWidth + 10)}ch`);
+    }
+
+    function renderSongs(game, preferredTrack = "01", columnContentHints = null) {
       activeGame = game;
+      activePlaylistColumnHints = columnContentHints || null;
       gameTitle.textContent = game.title;
       trackCount.textContent = `${game.tracks.length} TRK`;
       songList.replaceChildren();
@@ -1683,6 +1796,7 @@
       });
       songList.append(...rows);
       applyFavoriteFilter(preferredTrack);
+      queuePlaylistColumnFit(activePlaylistColumnHints);
       if (!restoringPlaylistTab) schedulePlaylistTabsSave();
     }
 
@@ -1880,8 +1994,9 @@
         game: typeof tab.game === "string" ? tab.game : null,
         tracks: Array.isArray(tab.playlist) ? tab.playlist : [],
       };
+      activePlaylistColumnHints = tab.columnContentHints || null;
       restoringPlaylistTab = true;
-      renderSongs(activeGame, tab.selectedTrackId || "");
+      renderSongs(activeGame, tab.selectedTrackId || "", activePlaylistColumnHints);
       songList.scrollTop = Math.max(0, Number(tab.scrollTop) || 0);
       restoringPlaylistTab = false;
       renderPlaylistTabs();
@@ -1903,12 +2018,15 @@
       const pending = nativeRequest("gameTracks", identity).then((result) => {
         const current = playlistTabs.find((entry) => entry.id === tabID);
         if (!current || current.rootId !== identity.rootId || current.game !== identity.game) return false;
+        const preferredTrackID = current.selectedTrackId || current.playlist[0]?.id || "";
         current.playlist = result.tracks || [];
+        current.columnContentHints = result.columnContentHints || null;
         if (activePlaylistTabID === tabID && catalogRequestVersion === activeRequestVersion) {
           catalogHydratedTabs.add(tabID);
           activeGame = { ...activeGame, tracks: current.playlist };
+          activePlaylistColumnHints = current.columnContentHints;
           restoringPlaylistTab = true;
-          renderSongs(activeGame, current.selectedTrackId || "");
+          renderSongs(activeGame, preferredTrackID, activePlaylistColumnHints);
           songList.scrollTop = Math.max(0, Number(current.scrollTop) || 0);
           restoringPlaylistTab = false;
         }
@@ -2035,7 +2153,7 @@
       playlistTabsReady = true;
       schedulePlaylistTabsSave();
       if (catalogHost && currentPlaylistTab()?.rootId && currentPlaylistTab()?.game) {
-        hydrateCatalogPlaylist(activePlaylistTabID);
+        await hydrateCatalogPlaylist(activePlaylistTabID);
       }
     }
 
@@ -2376,17 +2494,13 @@
         game: game.game,
         tracks: [],
       };
+      const currentTrackID = songList.querySelector('.song[aria-selected="true"]')?.dataset.trackId || "";
+      const keepCurrentTrack = activeGame.rootId === nextGame.rootId
+        && activeGame.game === nextGame.game
+        && activeGame.system === nextGame.system;
       if (loadingTabID) catalogHydratedTabs.delete(loadingTabID);
       catalogPlaylistLoading = true;
-      gameTitle.textContent = nextGame.title;
-      trackCount.textContent = "READING";
-      const loading = document.createElement("div");
-      loading.className = "playlist-message";
-      loading.setAttribute("role", "status");
-      loading.setAttribute("aria-live", "polite");
-      loading.textContent = "READING PLAYLIST INDEX…";
-      songList.replaceChildren(loading);
-      status.textContent = `PLAYLIST/READING ${game.system}/${game.game}`;
+      status.textContent = `PLAYLIST/LOOKUP ${game.system}/${game.game}`;
       try {
         const result = await nativeRequest("gameTracks", {
           rootId: nextGame.rootId, game: nextGame.game, system: nextGame.system
@@ -2394,20 +2508,13 @@
         if (version !== catalogRequestVersion) return;
         catalogPlaylistLoading = false;
         activeGame = { ...nextGame, tracks: result.tracks || [] };
-        renderSongs(activeGame, "");
+        renderSongs(activeGame, keepCurrentTrack ? currentTrackID : "", result.columnContentHints || null);
         if (loadingTabID && loadingTabID === activePlaylistTabID) catalogHydratedTabs.add(loadingTabID);
         if (row) selectTreeRow(row);
         status.textContent = `CATALOG/${nextGame.system}/${nextGame.game}`;
       } catch (error) {
         if (version !== catalogRequestVersion) return;
         catalogPlaylistLoading = false;
-        activeGame = nextGame;
-        trackCount.textContent = "ERROR";
-        const failure = document.createElement("div");
-        failure.className = "playlist-message";
-        failure.setAttribute("role", "status");
-        failure.textContent = "PLAYLIST INDEX UNAVAILABLE";
-        songList.replaceChildren(failure);
         status.textContent = `CATALOG/ERROR ${error.message}`;
       }
     }
@@ -2807,11 +2914,13 @@
     scheduleRender();
     new ResizeObserver(() => {
       updateRaster();
+      queuePlaylistColumnFit(activePlaylistColumnHints);
       scheduleRender();
     }).observe(terminal);
     window.addEventListener("scroll", positionBeamLayer, { passive: true });
     window.addEventListener("resize", () => {
       updateRaster();
+      queuePlaylistColumnFit(activePlaylistColumnHints);
       scheduleRender();
     });
     setInterval(() => {

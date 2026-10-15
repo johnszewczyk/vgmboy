@@ -75,7 +75,7 @@ private struct LineBoyCatalogPlaylistKey: Hashable, Sendable {
 }
 
 private struct LineBoyCatalogPlaylistRead: Sendable {
-    let tracks: [CatalogTrack]
+    let tracks: [CatalogPlaylistTrack]
     let favoriteIDs: Set<String>
 }
 
@@ -313,9 +313,9 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
             .appendingPathComponent("LineBoy", isDirectory: true)
             .appendingPathComponent("playlist-tabs-v1.json")
     )
-    private var catalogTracks: [String: CatalogTrack] = [:]
+    private var catalogTracks: [String: CatalogPlaylistTrack] = [:]
     private var localTracks: [String: LocalTrack] = [:]
-    private var catalogPlaylists: [LineBoyCatalogPlaylistKey: [CatalogTrack]] = [:]
+    private var catalogPlaylists: [LineBoyCatalogPlaylistKey: [CatalogPlaylistTrack]] = [:]
     private var catalogPlaylistRecency: [LineBoyCatalogPlaylistKey] = []
     private var catalogGroups: [String: [LineBoyCatalogGame]] = [:]
     private var catalogSearch: LineBoyCatalogSearch?
@@ -498,7 +498,7 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
             throw LineBoyBridgeError.invalidArguments
         }
         let key = LineBoyCatalogPlaylistKey(rootID: rootID, game: game, system: system)
-        let rows: [CatalogTrack]
+        let rows: [CatalogPlaylistTrack]
         let favoriteIDs: Set<String>
         if let cachedRows = catalogPlaylists[key] {
             rows = cachedRows
@@ -510,11 +510,9 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         } else {
             let catalogURL = self.catalogURL
             let result = try await Task.detached(priority: .userInitiated) {
-                let catalog = try ReadOnlyCatalog(databaseURL: catalogURL)
-                let tracks = try catalog.tracks(
-                    rootID: rootID,
-                    game: game,
-                    system: system,
+                let tracks = try CatalogPlaylistReader.tracksForGames(
+                    databaseURL: catalogURL,
+                    selections: [CatalogPlaylistGameSelection(rootID: rootID, game: game, system: system)],
                     preferFoldersOverMetadata: true
                 )
                 let favoriteIDs = Set(try FavoriteStore().snapshots().map(\.identity.id))
@@ -531,7 +529,7 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
             }
         }
 
-        var nextTracks: [String: CatalogTrack] = [:]
+        var nextTracks: [String: CatalogPlaylistTrack] = [:]
         rows.forEach { track in
             let identity = Self.favoriteIdentity(for: track)
             nextTracks[identity.id] = track
@@ -574,7 +572,20 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
                 "displayPath": track.display.sourceFilename
             ]
         }
-        return ["tracks": response]
+        let hints = projection.columnContentHints
+        return [
+            "tracks": response,
+            "columnContentHints": [
+                "index": hints.indexText,
+                "filename": hints.fileText,
+                "title": hints.titleText,
+                "game": hints.gameText,
+                "artist": hints.authorText,
+                "system": hints.systemText,
+                "path": hints.pathText,
+                "lengthLabel": hints.lengthText
+            ]
+        ]
     }
 
     private func startTrack(_ id: String) throws -> [String: Any] {
@@ -712,7 +723,7 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         )
     }
 
-    private static func favoriteIdentity(for track: CatalogTrack) -> FavoriteTrackIdentity {
+    private static func favoriteIdentity(for track: CatalogPlaylistTrack) -> FavoriteTrackIdentity {
         FavoriteTrackIdentity(
             sourcePath: track.sourcePath,
             archiveEntry: track.archiveEntry,
@@ -721,7 +732,7 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         )
     }
 
-    private static func displayName(for track: CatalogTrack) -> String {
+    private static func displayName(for track: CatalogPlaylistTrack) -> String {
         let title = track.title.trimmingCharacters(in: .whitespacesAndNewlines)
         if !title.isEmpty, title.count <= 120, !title.contains(track.sourcePath) {
             return title

@@ -54,9 +54,11 @@ app launches and in the browser preview's local storage. Native startup loads
 the real catalog and filters stale sample tabs; saved catalog tabs restore
 their system/game identity and reload tracks lazily. Top-level system groups
 and counts use the shared catalog projection; expanding a group reveals its
-cached game rows. Selecting a game loads its real playlist rows, using the same
-shared file, title, game, artist, system, path, and length presentation as
-CocoaSpice and SB2. The browser preview stays on sample records.
+cached game rows. Selecting a game loads its real playlist rows through the
+shared indexed CatalogPlaylistReader query, using the same file, title, game,
+artist, system, path, and length projection as CocoaSpice and SB2. Saved rows
+stay visible while that read completes. The browser preview stays on sample
+records.
 
 One white selector block flows across the interactive controls throughout the
 screen: resolution choices, view and transport buttons, search, library rows,
@@ -74,13 +76,17 @@ change one column at a time, Home restores the one-third default, and End sets
 the widest allowed library pane. Brightness runs from 60% to 140% and remaps the
 monochrome palette while leaving the pure-black scanline gaps unchanged.
 Brightness, selector motion, and pane width persist with the display
+preferences. PLAYLIST controls automatic content sizing and its maximum column
+width; column changes use the selector's 220ms easing and remain aligned to the
+8px text grid. Both playlist sizing choices persist with the display
 preferences.
 
 Phosphor persistence is disabled to keep interaction responsive. OPTIONS opens
 a two-column terminal settings view. DISPLAY contains WIDTH MODE (FILL or
 FRAME), SCANLINES, BRIGHTNESS, SELECTOR FLOW, the active beam pitch, and a
 native fullscreen toggle. CRT contains a THIN/NORMAL/WIDE beam-width control
-and reports the active pitch. FILL and FRAME, scanline visibility, brightness,
+and reports the active pitch. PLAYLIST contains AUTO SIZE and MAX WIDTH.
+FILL and FRAME, scanline visibility, brightness,
 selector motion, pane width, beam width, and the selected raster profile are
 remembered. The native app provides standard macOS menus and
 shortcuts: Command+O opens a file, Command+comma opens OPTIONS, Control+Command+F
@@ -99,9 +105,10 @@ local-file playback use VGMBoy transport.
 Saved playlist rows paint from the tab snapshot while native catalog tracks
 rehydrate in the background. First-time game reads must not block the WebKit
 event loop; the native bridge caches the eight most recently requested game
-playlists. While a new game is being read, the list shows a compact DOS status
-row. Tab changes invalidate pending UI updates, so late results cannot replace
-the playlist the user selected.
+playlists. Keep the current playlist visible until a new game's indexed rows
+arrive, then replace the heading and rows together. Tab changes invalidate
+pending UI updates, so late results cannot replace the playlist the user
+selected.
 
 Playlist tabs use ViewBoy-style square outlines and an independent close cell.
 They share the available width, retain an 18-character basis and

@@ -29,9 +29,12 @@ track totals from the catalog bucket projection instead of issuing a second
 full-library count, and build the native search index on first search.
 Render saved playlist snapshots before native game-track rehydration. Run the
 SQLite track query and Favorites snapshot off the MainActor; keep only the eight
-most recently read game playlists in the native cache. Use a visible grid-row
-status during uncached reads, and guard UI application with both the active tab
-and catalog request version so stale responses cannot overwrite current state.
+most recently read game playlists in the native cache. Use the shared
+`CatalogPlaylistReader` query for Games playlists; do not recreate game/system
+SQL in LineBoy. Preserve the current playlist while an uncached indexed read is
+pending, then replace its heading and rows together. Guard UI application with
+both the active tab and catalog request version so stale responses cannot
+overwrite current state.
 
 The selected raster profile uses the 320×240 reference to choose its largest
 fitting even device-pixel multiple. Extend the viewport in whole 16-pixel text
