@@ -21,8 +21,12 @@ two tabs fill the strip; the same grow/scroll path is retained. Overflow wheel
 gestures and drag cancellation were not re-exercised in this pass.
 
 These checks establish grid arithmetic and a visible sample screen, not CRT
-hardware calibration or live catalog integration. Keep the sample catalog gate
-disabled for visual work.
+hardware calibration. The browser preview remains sample-only. The native app
+was also checked against the live catalog: it loaded 49.9K games and 454.9K
+tracks, expanded a cached system group, and populated a real 20-track playlist
+with shared metadata columns. Starting its selected VGM updated VGMBoy
+transport status to PLAYING; it was then paused. Audible output was not
+independently monitored.
 
 The scanline correction was rebuilt and inspected in the native WKWebView at
 512, 800 and 1024 profiles. The current window reported 4PX pitch at 512 and

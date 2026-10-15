@@ -153,6 +153,14 @@ public struct CatalogBrowserGameGroup: Identifiable, Codable, Equatable, Sendabl
     public var id: String { name }
 }
 
+public struct CatalogBrowserGameGroupSummary: Identifiable, Codable, Equatable, Sendable {
+    public let name: String
+    public let system: String
+    public let gameCount: Int
+
+    public var id: String { name }
+}
+
 /// Canonical text projection for the shared catalog Games search. It keeps the
 /// searchable fields and normalization out of renderer models while still
 /// allowing a WebKit skin to filter its already-published list without a
@@ -675,6 +683,21 @@ public enum CatalogBrowserProjection {
             CatalogBrowserGameGroup(
                 name: name,
                 games: (grouped[name] ?? []).sorted(by: gameComesBefore)
+            )
+        }
+    }
+
+    /// The lightweight Console-view rows used before a user opens any system.
+    /// Uses the same group labels and natural ordering as `groups(from:)`, but
+    /// does not sort every game's membership just to render the top-level list.
+    public static func groupSummaries(from games: [CatalogBrowserGame]) -> [CatalogBrowserGameGroupSummary] {
+        let grouped = Dictionary(grouping: games, by: \.consoleGroupName)
+        return grouped.keys.sorted(by: naturalAscending).map { name in
+            let rows = grouped[name] ?? []
+            return CatalogBrowserGameGroupSummary(
+                name: name,
+                system: rows.first?.system ?? "",
+                gameCount: rows.count
             )
         }
     }

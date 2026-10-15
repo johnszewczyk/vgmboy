@@ -3,6 +3,7 @@ import ArchiveCacheCore
 import ArchiveMaterializationCore
 import CatalogBrowserCore
 import CatalogPlaylistCore
+import CatalogPlaylistPresentationCore
 import CatalogReader
 import FavoriteStoreCore
 import FavoriteTrackCore
@@ -31,11 +32,10 @@ private struct LineBoyCatalogSearchMatches: Sendable {
 private actor LineBoyCatalogSearch {
     private let games: [LineBoyCatalogGame]
     private var browserState = CatalogBrowserState(mode: .consoles)
-    private var index: CatalogSearchIndex
+    private var index: CatalogSearchIndex?
 
-    init(games: [LineBoyCatalogGame], index: CatalogSearchIndex) {
+    init(games: [LineBoyCatalogGame]) {
         self.games = games
-        self.index = index
     }
 
     func search(_ query: String) -> LineBoyCatalogSearchMatches {
@@ -43,7 +43,10 @@ private actor LineBoyCatalogSearch {
         guard browserState.view == .search else {
             return LineBoyCatalogSearchMatches(count: 0, games: [])
         }
-        let matches = index.matchingIndices(query: browserState.query)
+        if index == nil {
+            index = CatalogSearchIndex(searchValues: games.map(\.searchText))
+        }
+        let matches = index?.matchingIndices(query: browserState.query) ?? []
         return LineBoyCatalogSearchMatches(
             count: matches.count,
             games: matches.prefix(250).map { games[$0] }
@@ -60,8 +63,6 @@ private struct LineBoyCatalogGroup: Sendable {
 private struct LineBoyCatalogBootstrap: Sendable {
     let groups: [LineBoyCatalogGroup]
     let searchGames: [LineBoyCatalogGame]
-    let searchIndex: CatalogSearchIndex
-    let displayNames: [String: String]
     let gameCount: Int
     let trackCount: Int
     let favoriteIDs: [String]
@@ -71,25 +72,19 @@ private func readLineBoyCatalogBootstrap(at catalogURL: URL) throws -> LineBoyCa
     let catalog = try ReadOnlyCatalog(databaseURL: catalogURL)
     let projection = CatalogBrowserProjection.games(from: try catalog.gameBuckets())
     let searchGames = projection.map(lineBoyCatalogGame)
-    let searchIndex = CatalogSearchIndex(searchValues: searchGames.map(\.searchText))
-    let groups = CatalogBrowserProjection.groups(from: projection).map { group in
+    let groups = CatalogBrowserProjection.groupSummaries(from: projection).map { group in
         LineBoyCatalogGroup(
             name: group.name,
-            system: group.games.first?.system ?? "",
-            gameCount: group.games.count
+            system: group.system,
+            gameCount: group.gameCount
         )
     }
     let favorites = Set(try FavoriteStore().snapshots().map(\.identity.id))
-    let displayNames = Dictionary(uniqueKeysWithValues: projection.compactMap { game in
-        game.displayName == game.name ? nil : (game.id, game.displayName)
-    })
     return LineBoyCatalogBootstrap(
         groups: groups,
         searchGames: searchGames,
-        searchIndex: searchIndex,
-        displayNames: displayNames,
         gameCount: projection.count,
-        trackCount: try catalog.activeTrackCount(),
+        trackCount: projection.reduce(into: 0) { $0 += $1.trackCount },
         favoriteIDs: Array(favorites)
     )
 }
@@ -103,11 +98,6 @@ private func lineBoyCatalogGame(_ game: CatalogBrowserGame) -> LineBoyCatalogGam
         trackCount: game.trackCount,
         searchText: game.searchText
     )
-}
-
-private func readLineBoyCatalogGames(at catalogURL: URL, system: String) throws -> [LineBoyCatalogGame] {
-    let catalog = try ReadOnlyCatalog(databaseURL: catalogURL)
-    return CatalogBrowserProjection.games(from: try catalog.gameBuckets(system: system)).map(lineBoyCatalogGame)
 }
 
 @MainActor
@@ -314,6 +304,7 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
     )
     private var catalogTracks: [String: CatalogTrack] = [:]
     private var localTracks: [String: LocalTrack] = [:]
+    private var catalogGroups: [String: [LineBoyCatalogGame]] = [:]
     private var catalogSearch: LineBoyCatalogSearch?
     private weak var webView: WKWebView?
     private weak var window: NSWindow?
@@ -423,12 +414,12 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         let snapshot = try await Task.detached(priority: .userInitiated) {
             try readLineBoyCatalogBootstrap(at: catalogURL)
         }.value
-        catalogSearch = LineBoyCatalogSearch(games: snapshot.searchGames, index: snapshot.searchIndex)
+        catalogGroups = Dictionary(grouping: snapshot.searchGames, by: \.system)
+        catalogSearch = LineBoyCatalogSearch(games: snapshot.searchGames)
         return [
             "groups": snapshot.groups.map { group in
                 ["name": group.name, "system": group.system, "gameCount": group.gameCount] as [String: Any]
             },
-            "displayNames": snapshot.displayNames,
             "gameCount": snapshot.gameCount,
             "trackCount": snapshot.trackCount,
             "favoriteIds": snapshot.favoriteIDs
@@ -463,13 +454,9 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
     }
 
     private func catalogGroup(system: String) async throws -> [String: Any] {
-        guard FileManager.default.fileExists(atPath: catalogURL.path) else {
+        guard let games = catalogGroups[system] else {
             throw LineBoyBridgeError.catalogUnavailable(catalogURL.path)
         }
-        let catalogURL = self.catalogURL
-        let games = try await Task.detached(priority: .userInitiated) {
-            try readLineBoyCatalogGames(at: catalogURL, system: system)
-        }.value
         return [
             "games": games.map { game in
                 [
@@ -498,20 +485,37 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         )
         let favoriteIDs = Set(try FavoriteStore().snapshots().map(\.identity.id))
         var nextTracks: [String: CatalogTrack] = [:]
-        let response = rows.map { track -> [String: Any] in
+        rows.forEach { track in
             let identity = Self.favoriteIdentity(for: track)
+            nextTracks[identity.id] = track
+        }
+        let projection = CatalogPlaylistPresentation.project(tracks: rows)
+        let response = projection.rows.map { track -> [String: Any] in
+            let identity = FavoriteTrackIdentity(
+                sourcePath: track.sourcePath,
+                archiveEntry: track.archiveEntry,
+                trackIndex: track.trackIndex,
+                trackCount: track.trackCount
+            )
             let id = identity.id
-            nextTracks[id] = track
-            let displayTitle = Self.displayName(for: track)
             let trackNumber = track.trackNumber.flatMap { $0 > 0 ? $0 : nil }
                 ?? (track.trackCount > 1 ? track.trackIndex + 1 : 1)
+            let sourceURL = URL(fileURLWithPath: track.sourcePath)
+            let path = track.archiveEntry.map { "\(track.archivePath ?? track.sourcePath)#\($0)" }
+                ?? sourceURL.path
             return [
                 "id": id,
                 "number": trackNumber,
-                "title": displayTitle,
+                "fileText": track.display.fileText,
+                "title": track.display.titleText,
+                "game": track.display.gameText,
+                "author": track.display.authorText,
+                "system": track.display.systemText,
+                "path": path,
                 "lengthMilliseconds": track.lengthMilliseconds,
+                "length": track.display.lengthText,
                 "favorite": favoriteIDs.contains(id),
-                "displayPath": URL(fileURLWithPath: track.archiveEntry ?? track.sourcePath).lastPathComponent
+                "displayPath": track.display.sourceFilename
             ]
         }
         catalogTracks.merge(nextTracks) { _, newest in newest }
@@ -618,7 +622,12 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         return [
             "id": id,
             "number": 1,
+            "fileText": url.lastPathComponent,
             "title": title,
+            "game": title,
+            "author": "—",
+            "system": "—",
+            "path": path,
             "lengthMilliseconds": 0,
             "favorite": false,
             "displayPath": url.lastPathComponent

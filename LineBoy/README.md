@@ -4,11 +4,10 @@ LineBoy is a monochrome DOS-style player interface experiment. It lays every
 control, label, sidebar item, and track row onto an 8×16 character-cell grid,
 then paints it with full-intensity beam rows and crisp, integer-pixel black
 gaps. The filter preserves the font's fixed character advance. The native
-WebKit host retains adapters for the shared VGMMan catalog, FrontendCore, and
-VGMBoy playback. The live catalog bootstrap is opt-in and currently disabled
-(`LIVE_CATALOG_ENABLED = false`) so visual testing starts immediately from the
-small sample library. The sample search and playlist controls stay usable; the
-native file picker and window controls remain connected.
+WebKit host connects to the shared VGMMan catalog, FrontendCore, and VGMBoy
+playback. The native app uses the live catalog; the browser preview stays on
+its small sample library. The native file picker and window controls remain
+available.
 
 ## Display grid
 
@@ -37,9 +36,9 @@ browser preview, serve `.build/site` on loopback with Python's HTTP server.
 
 The native host owns catalog and transport adapters; the HTML owns the shared
 8×16 grid, keyboard interaction, and a persistent WebGL2 scanline mask above
-the live DOM. Scrolling stays beneath that one fixed filter. Both hosts use the
-same interface, while only the native host has access to CatalogReader,
-FrontendCore, and VGMBoy. The native app also supplies standard macOS app,
+the live DOM. Scrolling stays beneath that one fixed filter. The native app
+uses CatalogReader, FrontendCore, and VGMBoy; the browser preview uses sample
+data. The native app also supplies standard macOS app,
 File, Edit, View, and Window menus, including Command+O, Command+F for library
 search, Command+comma, Control+Command+F, Command+W, and Command+Q. Filled
 toolbar actions have cell-sized gaps; transport is separated by a larger blank
@@ -58,7 +57,9 @@ and scroll positions. Use the plus button or Command+T to duplicate the current
 playlist, close tabs with their × controls, or switch among the first nine with
 Command+1 through Command+9. The native app stores tabs through the shared
 `PlaylistTabsPersistenceCore`; the sample-only browser preview uses local
-storage. Saved catalog tabs load their tracks lazily when opened.
+storage. Saved catalog tabs load their tracks lazily when opened. Native
+catalog playlists use the shared CocoaSpice/SB2 presentation for file, title,
+game, artist, system, path, length, and favorites.
 
 The font `assets/ModernDOS8x16.ttf` is Modern DOS 8×16 by Jayvee Enaguas,
 dedicated under CC0 1.0. The included `assets/CC0-1.0.txt` preserves its

@@ -448,25 +448,35 @@
       color: var(--black);
     }
     .playlist-tab-close:disabled { opacity: .35; cursor: default; }
+    .playlist-data {
+      grid-row: 4 / -1;
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: 16px minmax(0, 1fr);
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
+    }
+    .playlist-data::-webkit-scrollbar { display: none; }
     .list-head {
-      grid-row: 4;
       min-width: 0;
       height: 16px;
       display: grid;
-      grid-template-columns: 2ch minmax(0, 1fr) 5ch;
+      grid-template-columns: 2ch 3ch 14ch minmax(15ch, 1.6fr) minmax(10ch, 1.3fr) minmax(10ch, 1.2fr) minmax(8ch, 1fr) minmax(16ch, 2fr) 7ch;
       gap: 1ch;
       align-items: center;
       padding: 0 1ch;
+      min-width: 95ch;
+      width: max(100%, 95ch);
       background: var(--well-highlight);
       color: var(--white);
       text-transform: uppercase;
     }
-    .list-head span:first-child { text-align: left; }
-    .list-head span:nth-child(2) { text-align: left; }
     .list-head span:last-child { text-align: right; }
     .songs {
-      grid-row: 5 / -1;
       min-height: 0;
+      min-width: 95ch;
       display: grid;
       grid-auto-rows: 16px;
       align-content: start;
@@ -480,10 +490,12 @@
       width: 100%;
       height: 16px;
       display: grid;
-      grid-template-columns: 2ch minmax(0, 1fr) 5ch;
+      grid-template-columns: 2ch 3ch 14ch minmax(15ch, 1.6fr) minmax(10ch, 1.3fr) minmax(10ch, 1.2fr) minmax(8ch, 1fr) minmax(16ch, 2fr) 7ch;
       gap: 1ch;
       align-items: center;
       padding: 0 1ch;
+      min-width: 95ch;
+      justify-self: start;
       border: 0;
       background: var(--well);
       color: var(--gray);
@@ -494,8 +506,13 @@
       scroll-snap-align: start;
     }
     .song[hidden] { display: none; }
-    .song .num { color: var(--dim); }
-    .song .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .song .favorite { color: var(--dim); text-align: center; }
+    .song .num { color: var(--dim); text-align: right; }
+    .song .file, .song .title, .song .game, .song .author, .song .system, .song .path {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .song .length { color: var(--dim); text-align: right; }
     .song:hover,
     .song:focus-visible,
@@ -504,6 +521,9 @@
       color: var(--black);
       outline: none;
     }
+    .song:hover .favorite,
+    .song:focus-visible .favorite,
+    .song[aria-selected="true"] .favorite,
     .song:hover .num,
     .song:focus-visible .num,
     .song[aria-selected="true"] .num,
@@ -725,8 +745,10 @@
             <button class="playlist-tab-add" id="playlist-tab-add" type="button"
               aria-label="New playlist tab (Command+T)" title="New playlist tab (Command+T)">[+]</button>
           </div>
-          <div class="list-head" role="row"><span>#</span><span>TRACK</span><span>TIME</span></div>
-          <div class="songs" id="song-list" role="listbox" aria-label="Playlist tracks"></div>
+          <div class="playlist-data">
+            <div class="list-head" role="row"><span>★</span><span>#</span><span>FILE</span><span>TITLE</span><span>GAME</span><span>ARTIST</span><span>SYSTEM</span><span>PATH</span><span>TIME</span></div>
+            <div class="songs" id="song-list" role="listbox" aria-label="Playlist tracks"></div>
+          </div>
         </section>
 
         <aside class="panel options-sidebar" id="options-sidebar" aria-label="Options navigation" hidden>
@@ -923,14 +945,12 @@
     const navButtons = [...document.querySelectorAll(".nav-button")];
     const selectorTargetSelector = "button:not(:disabled), input:not([type='hidden']), .divider";
     const nativeHost = Boolean(window.webkit?.messageHandlers?.lineBoy);
-    // Keep full-catalog reads opt-in during UI testing; sample records remain instant.
-    const LIVE_CATALOG_ENABLED = false;
-    const catalogHost = nativeHost && LIVE_CATALOG_ENABLED;
+    // Native LineBoy is the live player; the browser preview intentionally keeps its sample catalog.
+    const catalogHost = nativeHost;
     const nativeRequests = new Map();
     const nativeTracks = new Map();
     const nativeGames = new Map();
     const nativeGroups = new Map();
-    const nativeDisplayNames = new Map();
     const folderChildren = new Map();
     let selectedTreeRow = treeRows.find((row) => row.getAttribute("aria-selected") === "true") || null;
     let treeSelectionBeforeSearch = null;
@@ -969,7 +989,7 @@
     let selectedSelectorTarget = null;
     let hoveredSelectorTarget = null;
     let returnAction = "LIST";
-    let activeGame = GAMES.CHRONO;
+    let activeGame = nativeHost ? { title: "CATALOG", system: "", tracks: [] } : GAMES.CHRONO;
     let favoritesOnly = false;
     let playlistTabs = [];
     let activePlaylistTabID = null;
@@ -1532,11 +1552,7 @@
           if (!group.games) {
             if (!group.promise) {
               group.promise = nativeRequest("catalogGroup", { system: group.system })
-                .then((payload) => (payload.games || []).map((game) => {
-                  const identity = `${game.rootId}\u001f${game.game}\u001f${game.system}`;
-                  const displayName = nativeDisplayNames.get(identity);
-                  return displayName ? { ...game, displayName } : game;
-                }))
+                .then((payload) => payload.games || [])
                 .finally(() => { group.promise = null; });
             }
             group.games = await group.promise;
@@ -1590,11 +1606,16 @@
         const isSampleRow = Array.isArray(item);
         const id = isSampleRow ? String(item[0]) : String(item.id);
         const numberText = isSampleRow ? String(item[0]) : String(item.number || index + 1).padStart(2, "0");
-        const title = isSampleRow ? String(item[1]) : String(item.title || "TRACK");
+        const title = isSampleRow ? String(item[1]) : String(item.title || item.displayName || "TRACK");
         const length = isSampleRow ? String(item[2] || "--:--")
           : String(item.length || formatTrackLength(item.lengthMilliseconds));
         const favorite = isSampleRow ? Boolean(item[3])
           : nativeFavoriteIDs.has(id) || Boolean(item.favorite);
+        const fileText = isSampleRow ? `${numberText} ${title}.spc` : String(item.fileText || item.displayPath || title);
+        const gameText = isSampleRow ? String(game.title || "—") : String(item.game || "—");
+        const authorText = isSampleRow ? "—" : String(item.author || "—");
+        const systemText = isSampleRow ? String(game.system || "—") : String(item.system || "—");
+        const pathText = isSampleRow ? "—" : String(item.path || item.displayPath || "—");
         const displayPath = isSampleRow ? "" : String(item.displayPath || "");
         const song = document.createElement("button");
         song.type = "button";
@@ -1608,20 +1629,43 @@
         song.dataset.favorite = String(favorite);
         song.dataset.length = length;
         song.dataset.displayPath = displayPath || "";
+        song.dataset.fileText = fileText;
+        song.dataset.gameText = gameText;
+        song.dataset.authorText = authorText;
+        song.dataset.systemText = systemText;
+        song.dataset.pathText = pathText;
         song.dataset.lengthMilliseconds = isSampleRow ? "" : String(item.lengthMilliseconds || "");
         song.dataset.nativeTrack = String(!isSampleRow && item.native !== false);
         song.dataset.index = String(index);
 
+        const favoriteCell = document.createElement("span");
+        favoriteCell.className = "favorite";
+        favoriteCell.textContent = favorite ? "★" : "☆";
         const number = document.createElement("span");
         number.className = "num";
         number.textContent = numberText;
+        const file = document.createElement("span");
+        file.className = "file";
+        file.textContent = fileText;
         const name = document.createElement("span");
         name.className = "title";
-        name.textContent = `${favorite ? "*" : ""}${title}`;
+        name.textContent = title;
+        const gameName = document.createElement("span");
+        gameName.className = "game";
+        gameName.textContent = gameText;
+        const author = document.createElement("span");
+        author.className = "author";
+        author.textContent = authorText;
+        const system = document.createElement("span");
+        system.className = "system";
+        system.textContent = systemText;
+        const path = document.createElement("span");
+        path.className = "path";
+        path.textContent = pathText;
         const time = document.createElement("span");
         time.className = "length";
         time.textContent = length;
-        song.append(number, name, time);
+        song.append(favoriteCell, number, file, name, gameName, author, system, path, time);
         song.addEventListener("click", () => selectSong(song, true));
         song.addEventListener("keydown", (event) => handleSongKeydown(event, song));
         song.addEventListener("dblclick", () => playSong(song));
@@ -1644,6 +1688,11 @@
           id: song.dataset.trackId,
           number: song.querySelector(".num")?.textContent || "",
           title: song.dataset.title || "TRACK",
+          fileText: song.dataset.fileText || "",
+          game: song.dataset.gameText || "",
+          author: song.dataset.authorText || "",
+          system: song.dataset.systemText || "",
+          path: song.dataset.pathText || "",
           length: song.dataset.length || "--:--",
           ...(Number.isFinite(lengthMilliseconds) && lengthMilliseconds > 0 ? { lengthMilliseconds } : {}),
           favorite: song.dataset.favorite === "true",
@@ -1664,6 +1713,11 @@
           id: String(track.id || ""),
           number: String(track.number || ""),
           title: String(track.title || "TRACK").slice(0, 500),
+          fileText: String(track.fileText || "").slice(0, 500),
+          game: String(track.game || "").slice(0, 500),
+          author: String(track.author || "").slice(0, 500),
+          system: String(track.system || "").slice(0, 500),
+          path: String(track.path || "").slice(0, 1500),
           length: String(track.length || formatTrackLength(track.lengthMilliseconds)),
           ...(Number.isFinite(Number(track.lengthMilliseconds)) && Number(track.lengthMilliseconds) > 0
             ? { lengthMilliseconds: Number(track.lengthMilliseconds) } : {}),
@@ -1883,8 +1937,14 @@
 
     function restorePlaylistTabs(value) {
       if (value?.version !== 1 || !Array.isArray(value.tabs)) return false;
+      const restorableTabs = value.tabs.slice(0, 64).filter((tab) => {
+        if (!catalogHost) return true;
+        if (Number.isSafeInteger(tab?.rootId) && tab.rootId > 0 && typeof tab.game === "string" && tab.game) return true;
+        if (Array.isArray(tab?.playlist) && tab.playlist.some((track) => String(track?.id || "").startsWith("local:"))) return true;
+        return Array.isArray(tab?.playlist) && tab.playlist.length === 0 && tab.title === "PLAYLIST";
+      });
       const seen = new Set();
-      playlistTabs = value.tabs.slice(0, 64).filter((tab) => {
+      playlistTabs = restorableTabs.filter((tab) => {
         if (!tab || typeof tab.id !== "string" || !tab.id || seen.has(tab.id) || !Array.isArray(tab.playlist)) return false;
         seen.add(tab.id);
         return true;
@@ -1963,6 +2023,10 @@
     function visibleSongs() { return [...songList.querySelectorAll(".song:not([hidden])")]; }
 
     function updateTrackPath(song) {
+      if (song.dataset.pathText && song.dataset.pathText !== "—") {
+        status.textContent = song.dataset.pathText;
+        return;
+      }
       if (song.dataset.displayPath) {
         status.textContent = `${activeGame.system || "FILE"}/${song.dataset.displayPath}`;
         return;
@@ -2236,10 +2300,6 @@
     function renderNativeLibrary(payload) {
       nativeGames.clear();
       nativeGroups.clear();
-      nativeDisplayNames.clear();
-      Object.entries(payload.displayNames || {}).forEach(([identity, displayName]) => {
-        nativeDisplayNames.set(identity, displayName);
-      });
       folderChildren.clear();
       selectedTreeRow = null;
       libraryTree.replaceChildren();
@@ -2256,12 +2316,12 @@
         folder.className = "tree-row";
         folder.setAttribute("role", "treeitem");
         folder.setAttribute("aria-level", "1");
-        folder.setAttribute("aria-expanded", String(groupIndex === 0 && gameCount > 0));
+        folder.setAttribute("aria-expanded", "false");
         folder.setAttribute("aria-selected", "false");
         folder.tabIndex = -1;
         folder.dataset.folder = folderID;
         folder.dataset.system = group.name;
-        folder.innerHTML = `<span class="chev">${groupIndex === 0 && gameCount ? "−" : "+"}</span><span class="label"></span><span class="count"></span>`;
+        folder.innerHTML = '<span class="chev">+</span><span class="label"></span><span class="count"></span>';
         folder.querySelector(".label").textContent = group.name.toUpperCase();
         folder.querySelector(".count").textContent = String(gameCount);
         treeRowsFragment.append(folder);
@@ -2317,7 +2377,21 @@
         catalogTrackCount = Number(payload.trackCount) || 0;
         const firstGroupRow = renderNativeLibrary(payload);
         status.textContent = `CATALOG ${formatCatalogCount(catalogGameCount)}G / ${formatCatalogCount(catalogTrackCount)}T`;
-        if (firstGroupRow && !playlistTabsRestored) {
+        const activeTab = currentPlaylistTab();
+        if (firstGroupRow && activeTab?.rootId && activeTab.game) {
+          const groupRow = treeRows.find((row) => row.dataset.folder
+            && nativeGroups.get(row.dataset.folder)?.system === activeTab.system);
+          if (groupRow) {
+            const folderID = groupRow.dataset.folder;
+            await setFolderExpanded(groupRow, true);
+            const gameRow = folderChildren.get(folderID)?.find((row) => {
+              const game = nativeGames.get(row.dataset.game);
+              return game?.rootId === activeTab.rootId && game.game === activeTab.game;
+            });
+            if (gameRow) selectTreeRow(gameRow);
+            else status.textContent = `CATALOG/SELECTION ${activeTab.title} NOT FOUND`;
+          }
+        } else if (firstGroupRow && !playlistTabsRestored) {
           selectTreeRow(firstGroupRow);
           const firstGameRow = await setFolderExpanded(firstGroupRow, true);
           if (firstGameRow) handleTreeClick(firstGameRow);
@@ -2360,7 +2434,7 @@
       if (!nativeHost || song.dataset.nativeTrack !== "true" || song.dataset.trackId.startsWith("local:")) {
         const isFavorite = song.dataset.favorite !== "true";
         song.dataset.favorite = String(isFavorite);
-        song.querySelector(".title").textContent = `${isFavorite ? "*" : ""}${song.dataset.title}`;
+        song.querySelector(".favorite").textContent = isFavorite ? "★" : "☆";
         if (favoritesOnly && !isFavorite) applyFavoriteFilter();
         status.textContent = isFavorite ? "FAVORITE/ADDED" : "FAVORITE/REMOVED";
         schedulePlaylistTabsSave();
@@ -2371,7 +2445,7 @@
         const isFavorite = Boolean(result.favorite);
         song.dataset.favorite = String(isFavorite);
         nativeFavoriteIDs[isFavorite ? "add" : "delete"](song.dataset.trackId);
-        song.querySelector(".title").textContent = `${isFavorite ? "*" : ""}${song.dataset.title}`;
+        song.querySelector(".favorite").textContent = isFavorite ? "★" : "☆";
         if (favoritesOnly && !isFavorite) applyFavoriteFilter();
         status.textContent = isFavorite ? "FAVORITE/ADDED" : "FAVORITE/REMOVED";
         schedulePlaylistTabsSave();
@@ -2646,7 +2720,23 @@
     }
 
     updateRaster();
-    renderSongs(GAMES.CHRONO, "08");
+    if (nativeHost) {
+      libraryCount.textContent = "…";
+      libraryTree.replaceChildren();
+      const loadingRow = document.createElement("div");
+      loadingRow.className = "tree-row";
+      loadingRow.setAttribute("role", "treeitem");
+      loadingRow.setAttribute("aria-level", "1");
+      loadingRow.textContent = "CONNECTING CATALOG…";
+      libraryTree.append(loadingRow);
+      treeRows = [];
+      selectedTreeRow = null;
+      gameTitle.textContent = "CONNECTING CATALOG";
+      trackCount.textContent = "…";
+      status.textContent = "CATALOG/CONNECTING";
+    } else {
+      renderSongs(GAMES.CHRONO, "08");
+    }
     void initializePlaylistTabs().then(() => {
       if (catalogHost) bootstrapNativeCatalog();
     });

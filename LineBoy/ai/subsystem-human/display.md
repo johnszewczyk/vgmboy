@@ -50,9 +50,13 @@ tab restores that playlist, its selected track, favorites filter, and scroll
 position. The plus control or Command+T creates a copy of the current playlist;
 each tab can be closed while at least one remains open. Command+1 through
 Command+9 selects one of the first nine tabs. Tab state persists between native
-app launches and in the browser preview's local storage. Native catalog rows
-are reloaded lazily when a saved catalog-backed tab is selected; the app still
-starts in sample mode without loading the full catalog.
+app launches and in the browser preview's local storage. Native startup loads
+the real catalog and filters stale sample tabs; saved catalog tabs restore
+their system/game identity and reload tracks lazily. Top-level system groups
+and counts use the shared catalog projection; expanding a group reveals its
+cached game rows. Selecting a game loads its real playlist rows, using the same
+shared file, title, game, artist, system, path, and length presentation as
+CocoaSpice and SB2. The browser preview stays on sample records.
 
 One white selector block flows across the interactive controls throughout the
 screen: resolution choices, view and transport buttons, search, library rows,
@@ -83,15 +87,14 @@ shortcuts: Command+O opens a file, Command+comma opens OPTIONS, Control+Command+
 toggles fullscreen, Command+M minimizes, Command+W closes the window, and
 Command+Q quits. The Edit menu forwards standard text commands to WebKit.
 
-The native app currently starts from the same small sample library as the
-browser preview. `LIVE_CATALOG_ENABLED` is false in `index.html`, so startup
-does not bootstrap the full shared catalog. Turning it on restores the native
-CatalogBrowserCore search projection and lazy group loading. In sample mode,
-Command+F searches the sample games; clearing the query restores the tree and
-its prior selection. Selecting a game loads its sample tracks. F toggles local
-sample favorites and FAV filters the current playlist. The native file picker
-remains connected for opening a real local track; its playback uses the native
-transport, while sample-track playback and track stepping stay local.
+The native app bootstraps the shared catalog through CatalogBrowserCore, loads
+game rows lazily when a system is unfolded, and searches its shared game
+projection. The browser preview remains on the small sample library. In sample
+mode, Command+F searches the sample games; clearing the query restores the tree
+and its prior selection. Selecting a game loads its sample tracks. F toggles
+local sample favorites and FAV filters the current playlist. The native file
+picker remains connected for opening a real local track; native catalog and
+local-file playback use VGMBoy transport.
 
 Playlist tabs use ViewBoy-style square outlines and an independent close cell.
 They share the available width, retain an 18-character basis and

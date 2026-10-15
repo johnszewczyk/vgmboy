@@ -18,8 +18,15 @@ store the active playlist rows, source identity, selected track, favorites
 filter, and scroll offset; do not include decoded audio or catalog databases.
 Local-file rows store their path as identity and must be revalidated by the
 native bridge before playback. Catalog-backed tabs retain root/system/game
-identity and fetch their rows only when needed. Keep the full catalog bootstrap
-disabled in normal visual testing.
+identity and fetch their tracks only when needed. The native app always
+bootstraps the live catalog; keep the browser preview on local sample data.
+Retain the one native game projection behind the bridge and serve expanded
+system rows from that cache; do not re-query the full catalog for each group.
+Use `CatalogBrowserProjection.groupSummaries` for the top-level sidebar so it
+does not sort all game rows a second time. Share playlist row presentation with
+CocoaSpice and SB2 through `CatalogPlaylistPresentationCore`. Derive displayed
+track totals from the catalog bucket projection instead of issuing a second
+full-library count, and build the native search index on first search.
 
 The selected raster profile uses the 320×240 reference to choose its largest
 fitting even device-pixel multiple. Extend the viewport in whole 16-pixel text
@@ -76,16 +83,15 @@ at the maximum width. SCANLINES off exposes the DOM
 without changing the grid. The resolution row and view toolbar must flex with
 the active column count so controls use available width at each profile.
 
-Keep `LIVE_CATALOG_ENABLED` false for normal visual testing so native startup
-uses the sample tree and never bootstraps the full catalog. When deliberately
-enabled for integration work, keep search on the shared `CatalogBrowserCore`
-game projection: build one `CatalogSearchIndex` from the bootstrap snapshot,
-retain it behind the native bridge, and query it off the WebKit event path; do
-not reopen SQLite for each keystroke or duplicate searchable-field
-normalization in JavaScript. Debounce query updates, cap rendered results at
-250, and preserve the tree DOM and its selection while the results scroller is
-shown. The sample preview searches its local records. Keep the search input on
-its own 16px row aligned to the playlist heading row. The eight toolbar blocks share equal widths and one-cell gaps across both
+The native app bootstraps the live catalog; the browser preview searches its
+local sample records. Keep search on the shared `CatalogBrowserCore` game
+projection: build one `CatalogSearchIndex` on first search, retain it behind
+the native bridge, and query it off the WebKit event path; do not reopen SQLite
+for each keystroke or duplicate searchable-field normalization in JavaScript.
+Debounce query updates, cap rendered results at 250, and preserve the tree DOM
+and its selection while the results scroller is shown.
+Keep the search input on its own 16px row aligned to the playlist heading row.
+The eight toolbar blocks share equal widths and one-cell gaps across both
 command and transport groups; retain the separate resolution row. The toolbar
 occupies source grid rows 3–4; workspace begins at row 5. Library search and tabs
 occupy two workspace rows; the tree and track headers start below that band.
@@ -96,9 +102,9 @@ NSWindow; the browser preview uses the document fullscreen API.
 `build.sh` copies the runtime HTML and licensed font into the ignored
 `.build/site` directory and packages `.build/LineBoy.app`. `launch.sh` builds,
 closes an existing LineBoy process, and opens the fresh app. The static preview
-serves mock data. The WebKit host retains native catalog, favorites, queue, and
-playback adapters, but visual testing leaves the catalog gate off and uses
-local demo records; native file-open and window actions remain active.
+serves mock data. The native WebKit host uses live catalog, favorites, queue,
+and playback adapters; the browser preview uses local demo records. Native
+file-open and window actions remain active.
 
 `rasterCellMetrics` rounds the target row height to a whole source-pixel device scale.
 Its 16px row and 8px column advances are therefore integral; scan pitch equals
