@@ -131,8 +131,11 @@ test('LCD controls change actual canvas pixels while preserving matrix, layout, 
   assert.equal(paletteButtons.length, 3);
   assert.equal(rows.find((row) => row.title === 'RENDERING').controls.x,
     rows.find((row) => row.title === 'PALETTE').controls.x, 'selectors share a leading column');
-  assert.equal(renderButtons[0].box.x, hitTargetSnapshot().find((item) => item.name === 'CONTRAST BOOST -').box.x,
-    'numeric controls begin in the same field column as selectors');
+  assert.ok(hitTargetSnapshot().find((item) => item.name === 'CONTRAST BOOST -').box.x >= renderButtons[0].box.x,
+    'numeric controls stay in the right half');
+  const boostReadout = spacingReadoutLayoutSnapshot().find((item) => item.title === 'CONTRAST BOOST').box;
+  const field = hitTargetSnapshot().find((item) => item.name === 'BG CSS COLOR INPUT').box;
+  assert.equal(boostReadout.x + boostReadout.width, field.x + field.width, 'numeric and color fields share the trailing edge');
   assert.equal(renderButtons[0].box.x, hitTargetSnapshot().find((item) => item.name === 'BG CSS COLOR INPUT').box.x);
   assert.ok(optionsStyleSnapshot().filter((item) => item.kind === 'title').every((item) => item.textAlign === 'left'));
   const originalBackground = lcdPanelSnapshot().colors[3];
@@ -173,7 +176,7 @@ test('LCD controls change actual canvas pixels while preserving matrix, layout, 
   assert.equal(aperture.width, font.width, 'two-way selectors share the same columns');
   assert.ok(aperture.y < font.y, 'like selectors are ordered alphabetically');
   const boostBox = hitTargetSnapshot().find((item) => item.name === 'CONTRAST BOOST SLIDER').box;
-  assert.equal(boostBox.width, paletteCard.width - 8, 'contrast slider uses the whole card content width');
+  assert.equal(boostBox.width, paletteCard.width, 'contrast slider uses the whole card content width');
   const motionReadouts = spacingReadoutLayoutSnapshot().filter((item) => ['ANIMATION DURATION', 'ANIMATION FPS CAP'].includes(item.title));
   assert.equal(motionReadouts[0].box.x, motionReadouts[1].box.x, 'numeric value columns align within Motion');
   assert.equal(motionReadouts[0].box.width, motionReadouts[1].box.width);
@@ -186,10 +189,10 @@ test('LCD controls change actual canvas pixels while preserving matrix, layout, 
   assert.deepEqual(queueChoices.map((row) => row.title), ['RANDOM', 'REPEAT']);
   assert.equal(queueChoices[0].controls.x, queueChoices[1].controls.x);
   assert.equal(queueChoices[0].controls.width, queueChoices[1].controls.width);
-  assert.ok(queueChoices[0].controls.width < queueChoices[0].row.width * 0.65, 'wide Queue fields stay bounded');
+  assert.ok(queueChoices[0].controls.width <= queueChoices[0].row.width, 'long selectors stay inside a dedicated full row');
   click('AUDIO');
   const output = optionsStyleSnapshot().find((item) => item.kind === 'group' && item.name === 'OUTPUT').box;
-  assert.equal(volumeControlSnapshot().gaugeBox.width, output.width - 8, 'volume is a separate full-width row');
+  assert.equal(volumeControlSnapshot().gaugeBox.width, output.width, 'volume is a separate full-width row');
   const volumeBox = volumeControlSnapshot().gaugeBox;
   const dragAudio = (box, fraction) => {
     // The exact common gauge bounds are inset one border dot on either side.
@@ -250,6 +253,8 @@ test('LCD controls change actual canvas pixels while preserving matrix, layout, 
     'all ten bands keep identical columns');
   windowWidth = 1600; windowListeners.get('resize')?.();
   click('DISPLAY');
+  listeners.get('wheel')({ ...pointer(optionsContentSnapshot().viewport, 0.5),
+    deltaY: 1600, deltaX: 0, deltaMode: 0, preventDefault() {} });
   click('ANIMATIONS', 0.05);
   const motionFrames = [];
   globalThis.requestAnimationFrame = (callback) => { const id = setImmediate(() => {}); motionFrames.push({ callback, id }); return id; };
