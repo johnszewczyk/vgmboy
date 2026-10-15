@@ -1,8 +1,8 @@
 # ViewBoy UI Design
 
 ViewBoy renders one responsive LCD pixel grid. Four-tone **LCD** output keeps
-its yellow-green substrate and independently controlled ink. **DIRECT**, **8**,
-and **16** remain available. Contrast Boost changes optical output while the
+its yellow-green substrate and independently controlled ink. LCD/Direct rendering
+and Color/8 Gray/16 Gray palettes are independent settings. Contrast Boost changes optical output while the
 matrix, dot pitch, bitmap font, and hit areas remain intact. The surface reaches
 every window edge with an eight-dot content inset.
 
@@ -27,7 +27,7 @@ filled headers. Layout Spacing controls pane/card insets, gaps and control
 padding in Options as well as the main screen; each change is visible on the
 page being edited. Insets and neighboring controls use 1× UI Gap; card/column
 gaps and space below pane/card headers use 2× UI Gap. PREVIEW labels one continuous tone strip aligned with the BG/PIXEL fields;
-METHOD labels four equal-width selector buttons. Grayscale previews show all
+RENDERING and PALETTE label separate selectors. Grayscale previews show all
 eight or sixteen tones, with text/background markers inside the strip. Reset Spacing restores pad/gap/line defaults of 4/4/1 dots.
 The Options sidebar fits its six icons instead of inheriting the wider library
 minimum. Page rows leave room around the bitmap glyphs. One shaded marker glides between
@@ -46,8 +46,8 @@ change the playlist or playback.
 The main toolbar contains eight equal-width buttons in this order: Previous,
 Stop, Play/Pause, Next, Long Play, Repeat One, Playlist Random, and Library
 Random. All eight use the same template for width, height, border, and default
-text inset. The symbol Previous label `<<` is left-aligned just inside its
-border; other labels are centered. The Next symbol remains `>>`. The four mode
+text inset. Previous/Next symbols use centered, mirrored bitmap double
+chevrons. They do not depend on text glyph spacing. The four mode
 controls use the same darker selected fill while active. This state tint is the
 expected visual difference from an inactive button.
 
@@ -57,8 +57,7 @@ New installations use four-tone **LCD**, BG `#9BBC0F`, PIXEL `#000000`, and an
 enabled STN aperture. Saved method and matrix enablement are retained. LCD maps
 ink, muted ink, selection and substrate to four distinct tinted levels using
 linear-light mixing. Both dark pixels on a light background and light pixels on
-a dark background work. DIRECT uses the two endpoint colors; 8 and 16 use
-grayscale ramps with independent TEXT SHADE and BG SHADE controls.
+a dark background work. RENDERING selects LCD linear-light reflectance mixing or DIRECT interpolation in sRGB channels. Both preserve exact color endpoints at zero boost and retain intermediate muted/header tones. PALETTE independently selects COLOR, 8 GRAY or 16 GRAY; grayscale palettes retain their TEXT SHADE and BG SHADE controls. Matrix geometry and Contrast Boost remain independent.
 
 **Contrast Boost** ranges from 0 to 100 percent. Drag the slider, use the
 minus/plus buttons in five-percent steps, or focus the slider and use arrows in
@@ -82,7 +81,7 @@ and background positions.
 
 ## Uniform Controls and Motion
 
-Selectors of the same kind are grouped together. Aperture and Font are adjacent
+Pane/card headings and field labels align left. Selectors, color fields and numeric groups start at the same one-third field column. Numeric groups keep square minus/plus controls beside a fixed-width, left-aligned readout; narrow rows stack the label above controls. Button captions stay centered within their hit boxes. Selectors of the same kind are grouped together. Aperture and Font are adjacent
 and alphabetical, using identical two-way selector columns. Selectors retain bounded widths in wider panes and place labels above their
 buttons when space is tight. Queue places Random before Repeat with matching
 geometry. Numeric controls share square minus/plus buttons
@@ -163,3 +162,10 @@ the three adjustable controls have distinct jobs:
 Buttons and framed panes use a one-pixel LCD border. The upper toolbar's shared
 button builder keeps its eight controls at matching size and format; the
 left-aligned `<<` label is its only alignment exception.
+Playlist tabs reserve a square close target containing a centered seven-dot
+bitmap X within a square frame. Crowded tab titles collapse without shrinking
+or shifting that close target.
+
+Gauge interiors fill completely at maximum. Their outline supplies the first
+and last notches; only internal divisions are drawn inside the track. No thumb
+is drawn at zero or maximum, so endpoint fill has no cutout.

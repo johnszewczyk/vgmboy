@@ -8,7 +8,7 @@ const canvas = {
   getBoundingClientRect: () => ({ left: 0, top: 0, width: parseFloat(canvas.style.width), height: parseFloat(canvas.style.height) }),
   getContext: () => ({ createImageData: (width, height) => ({ width, height, data: new Uint8ClampedArray(width * height * 4) }), putImageData() {} }),
 };
-const options = new Map([['ViewBoy.displayOptions', JSON.stringify({ font: 'STANDARD' })]]);
+const options = new Map([['ViewBoy.displayOptions', JSON.stringify({ font: 'STANDARD', pixelShadeMode: 'DIRECT' })]]);
 const events = new Map();
 globalThis.window = globalThis;
 globalThis.devicePixelRatio = 2;
@@ -39,7 +39,7 @@ globalThis.viewBoy = {
 const tick = () => new Promise(setImmediate);
 
 test('sidebar depth uses one character, labels retain their right budget, and width gestures persist safely', async () => {
-  const { hitTargetSnapshot, lcdDotSizeSnapshot, bitmapFontSnapshot, optionsStyleSnapshot, optionsContentSnapshot } =
+  const { hitTargetSnapshot, lcdDotSizeSnapshot, bitmapFontSnapshot, optionsStyleSnapshot, optionsContentSnapshot, framebufferShadeSnapshot } =
     await import('../Sources/ViewBoy/Resources/yoga-app.js');
   for (let i = 0; i < 8; i++) await tick();
   const target = (name, page = false) => { const value = hitTargetSnapshot().find((item) => item.name === name && (!page || item.optionPage)); assert.ok(value, name); return value; };
@@ -59,6 +59,8 @@ test('sidebar depth uses one character, labels retain their right budget, and wi
   assert.ok(rows[3].textCapacity > Math.floor((rows[3].box.width - rows[3].textInset * 2 + 1) / advance), 'deep labels gain usable characters');
   listeners.get('pointermove')(point(rows[3].box));
   assert.equal(canvas.title, filename, 'hover retains the full source name');
+  assert.equal(JSON.parse(options.get('ViewBoy.displayOptions')).renderingMode, 'DIRECT', 'legacy Direct mode migrates');
+  assert.equal(JSON.parse(options.get('ViewBoy.displayOptions')).paletteMode, 'COLOR');
   const initialCapacity = rows[3].textCapacity;
   const splitter = target('SIDEBAR WIDTH').box;
   listeners.get('pointerdown')(point(splitter));
@@ -136,5 +138,38 @@ test('sidebar depth uses one character, labels retain their right budget, and wi
   const viewport = optionsContentSnapshot().viewport;
   assert.ok(optionsStyleSnapshot().filter((item) => item.kind === 'group').every(({ box }) =>
     box.x >= viewport.x && box.x + box.width <= viewport.x + viewport.width));
+  click('UI BUTTON PAD +'); click('UI BUTTON PAD +');
+  click('UI CHROME GAP +'); click('UI CHROME GAP +'); click('UI CHROME GAP +');
+  click('DOT SIZE +');
+  windowWidth = 840;
+  events.get('resize')();
+  click('BUTTONS SYMBOLS');
+  for (const name of ['PREVIOUS', 'NEXT']) {
+    const box = target(name).box;
+    const ink = [];
+    for (let y = Math.ceil(box.y + 1); y < box.y + box.height - 1; y++) {
+      for (let x = Math.ceil(box.x + 1); x < box.x + box.width - 1; x++) {
+        if (framebufferShadeSnapshot(x, y) === 0) ink.push({ x, y });
+      }
+    }
+    assert.ok(ink.length > 0);
+    const center = (Math.min(...ink.map((p) => p.x)) + Math.max(...ink.map((p) => p.x)) + 1) / 2;
+    assert.ok(Math.abs(center - (box.x + box.width / 2)) <= 1, `${name} bitmap is centered`);
+  }
+  click('OPTIONS');
+  for (let i = 0; i < 13; i++) { click('[+]'); await tick(); }
+  const closeButtons = hitTargetSnapshot().filter((item) => item.playlistTabClose);
+  assert.ok(closeButtons.length >= 12, 'exercise crowded tabs');
+  for (const close of closeButtons) {
+    const owner = hitTargetSnapshot().find((item) => item.reorderKind === 'tab' && item.reorderKey === close.playlistTabId);
+    assert.ok(close.box.x >= owner.box.x && close.box.x + close.box.width <= owner.box.x + owner.box.width + 0.01,
+      JSON.stringify({ close: close.box, owner: owner.box }));
+    assert.equal(close.box.width, close.box.height, 'close target remains square');
+    const left = Math.round(close.box.x + close.box.width / 2 - 3.5);
+    const top = Math.round(close.box.y + close.box.height / 2 - 3.5);
+    assert.equal(framebufferShadeSnapshot(left, top), 0, 'close icon has its own centered square frame');
+    assert.equal(framebufferShadeSnapshot(left + 3, top + 3), 0, 'center of bitmap X is present');
+    assert.equal(framebufferShadeSnapshot(left + 6, top + 6), 0, 'far corner of close frame is not clipped');
+  }
   events.get('pagehide')?.();
 });

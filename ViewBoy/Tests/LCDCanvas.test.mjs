@@ -80,7 +80,7 @@ test('LCD controls change actual canvas pixels while preserving matrix, layout, 
   const pointer = (box, fraction) => {
     const rect = canvas.getBoundingClientRect();
     const size = lcdDotSizeSnapshot().devicePixelsPerDot;
-    return { pointerId: 1, button: 0, clientX: (box.x + 3 + fraction * (box.width - 7)) * rect.width / (canvas.width / size),
+    return { pointerId: 1, button: 0, clientX: (box.x + 1 + fraction * (box.width - 3)) * rect.width / (canvas.width / size),
       clientY: (box.y + box.height / 2) * rect.height / (canvas.height / size), preventDefault() {} };
   };
   const trackBox = { ...slider().box };
@@ -103,23 +103,38 @@ test('LCD controls change actual canvas pixels while preserving matrix, layout, 
   key('End'); assert.equal(lcdPanelSnapshot().contrastBoost, 100);
   key('Home'); for (let i = 0; i < 5; i++) key('ArrowRight');
   key('Escape');
-  assert.equal(choiceControlLayoutSnapshot().find((row) => row.title === 'PIXEL METHOD').label, 'METHOD');
-  for (const method of ['DIRECT', '8 SHADE', '16 SHADE', 'STN LCD']) {
-    click(`PIXEL METHOD ${method}`);
-    assert.deepEqual(lcdDotSizeSnapshot(), initial, `${method} retains the matrix geometry`);
-    const preview = optionsStyleSnapshot().find((item) => item.kind === 'preview');
-    assert.equal(preview.label, 'PREVIEW');
-    const count = method === '8 SHADE' ? 8 : method === '16 SHADE' ? 16 : 4;
-    assert.equal(preview.toneCount, count);
-    const strip = optionsStyleSnapshot().find((item) => item.kind === 'tone-strip').box;
-    const tones = Array.from({ length: count }, (_, i) => framebufferShadeSnapshot(
-      strip.x + 1 + (strip.width - 2) * (i + 0.5) / count, strip.y + strip.height / 2));
-    assert.equal(new Set(tones).size, count, 'the single unbroken preview strip paints every tone');
-    const buttons = hitTargetSnapshot().filter((item) => item.name.startsWith('PIXEL METHOD '));
-    assert.equal(buttons.length, 4);
-    assert.ok(Math.max(...buttons.map((item) => item.box.width)) - Math.min(...buttons.map((item) => item.box.width)) <= 1,
-      'labeled method buttons have equal widths');
+  for (const rendering of ['DIRECT', 'LCD']) {
+    click(`RENDERING ${rendering}`);
+    for (const palette of ['8 GRAY', '16 GRAY', 'COLOR']) {
+      click(`PALETTE ${palette}`);
+      assert.deepEqual(lcdDotSizeSnapshot(), initial, 'color settings retain matrix geometry');
+      const saved = JSON.parse(options.get('ViewBoy.displayOptions'));
+      assert.equal(saved.renderingMode, rendering);
+      assert.equal(saved.paletteMode, palette === 'COLOR' ? 'COLOR' : palette === '8 GRAY' ? 'GRAY8' : 'GRAY16');
+      assert.ok(!('pixelShadeMode' in saved), 'legacy combined mode is migrated');
+      const colors = lcdPanelSnapshot().colors;
+      assert.notEqual(colors[2], colors[3], 'header/selection tone remains distinct from background');
+      const preview = optionsStyleSnapshot().find((item) => item.kind === 'preview');
+      assert.equal(preview.label, 'PREVIEW');
+      const count = palette === '8 GRAY' ? 8 : palette === '16 GRAY' ? 16 : 4;
+      assert.equal(preview.toneCount, count);
+      const strip = optionsStyleSnapshot().find((item) => item.kind === 'tone-strip').box;
+      const tones = Array.from({ length: count }, (_, i) => framebufferShadeSnapshot(
+        strip.x + 1 + (strip.width - 2) * (i + 0.5) / count, strip.y + strip.height / 2));
+      assert.equal(new Set(tones).size, count, 'preview paints every tone');
+    }
   }
+  const rows = choiceControlLayoutSnapshot();
+  const renderButtons = hitTargetSnapshot().filter((item) => item.name.startsWith('RENDERING '));
+  const paletteButtons = hitTargetSnapshot().filter((item) => item.name.startsWith('PALETTE '));
+  assert.equal(renderButtons.length, 2);
+  assert.equal(paletteButtons.length, 3);
+  assert.equal(rows.find((row) => row.title === 'RENDERING').controls.x,
+    rows.find((row) => row.title === 'PALETTE').controls.x, 'selectors share a leading column');
+  assert.equal(renderButtons[0].box.x, hitTargetSnapshot().find((item) => item.name === 'CONTRAST BOOST -').box.x,
+    'numeric controls begin in the same field column as selectors');
+  assert.equal(renderButtons[0].box.x, hitTargetSnapshot().find((item) => item.name === 'BG CSS COLOR INPUT').box.x);
+  assert.ok(optionsStyleSnapshot().filter((item) => item.kind === 'title').every((item) => item.textAlign === 'left'));
   const originalBackground = lcdPanelSnapshot().colors[3];
   edit('BG CSS COLOR INPUT', 'not-a-color');
   assert.equal(lcdPanelSnapshot().colors[3], originalBackground, 'invalid input preserves the palette');
@@ -177,11 +192,11 @@ test('LCD controls change actual canvas pixels while preserving matrix, layout, 
   assert.equal(volumeControlSnapshot().gaugeBox.width, output.width - 8, 'volume is a separate full-width row');
   const volumeBox = volumeControlSnapshot().gaugeBox;
   const dragAudio = (box, fraction) => {
-    // The exact common gauge bounds are inset two dots on either side.
+    // The exact common gauge bounds are inset one border dot on either side.
     const point = pointer(box, fraction);
     const rect = canvas.getBoundingClientRect();
     const size = lcdDotSizeSnapshot().devicePixelsPerDot;
-    point.clientX = (box.x + 2 + fraction * (box.width - 5)) * rect.width / (canvas.width / size);
+    point.clientX = (box.x + 1 + fraction * (box.width - 3)) * rect.width / (canvas.width / size);
     return point;
   };
   const savedBeforeVolume = savedNativePreferences.length;
@@ -197,6 +212,10 @@ test('LCD controls change actual canvas pixels while preserving matrix, layout, 
   assert.equal(savedNativePreferences.at(-1).appVolume, 0.4, 'completed volume gesture persists');
   key('End'); await tick();
   assert.equal(volumeControlSnapshot().value, 1);
+  for (const x of [volumeBox.x + 1, volumeBox.x + volumeBox.width - 2]) {
+    assert.equal(framebufferShadeSnapshot(x, volumeBox.y + volumeBox.height / 2), 0,
+      'maximum volume fills both inner edges without an endpoint notch hole');
+  }
   const band = () => equalizerAnimationSnapshot()[0];
   const eqBox = hitTargetSnapshot().find((item) => item.name === 'EQ 31 HZ').box;
   listeners.get('pointerdown')(dragAudio(eqBox, 1));
@@ -204,8 +223,12 @@ test('LCD controls change actual canvas pixels while preserving matrix, layout, 
   assert.equal(maximum.gain, 12);
   assert.equal(maximum.fillWidth, maximum.bounds.right - maximum.bounds.left + 1);
   assert.equal(framebufferShadeSnapshot(maximum.bounds.right, eqBox.y + 1), 0, 'maximum fills the final track pixel');
-  assert.equal(maximum.tickXs[0], maximum.bounds.left);
-  assert.equal(maximum.tickXs.at(-1), maximum.bounds.right);
+  assert.equal(maximum.tickXs[0], maximum.bounds.left - 1);
+  assert.equal(maximum.tickXs.at(-1), maximum.bounds.right + 1);
+  for (const x of [maximum.bounds.left, maximum.bounds.right]) {
+    assert.equal(framebufferShadeSnapshot(x, eqBox.y + eqBox.height / 2), 0,
+      'EQ fill reaches both edges at maximum');
+  }
   listeners.get('pointercancel')({});
   assert.equal(band().gain, 0);
   assert.equal(framebufferShadeSnapshot(band().bounds.right, eqBox.y + 1), 3, 'cancel clears the previous fill');

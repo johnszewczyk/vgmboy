@@ -23,7 +23,11 @@ const RANDOM_HISTORY_LIMIT = 256;
 const BUTTON_BORDER_DOTS = 1;
 const SIDEBAR_ICON_SIZE_DOTS = 9;
 const SIDEBAR_BUTTON_SIZE_DOTS = 13;
+const TAB_CLOSE_SIZE_DOTS = 7;
 const SIDEBAR_ICON_ART = {
+  close: ["1111111", "1100011", "1010101", "1001001", "1010101", "1100011", "1111111"],
+  previous: ["001001", "010010", "100100", "010010", "001001"],
+  next: ["100100", "010010", "001001", "010010", "100100"],
   library: [
     "000000000", "011111110", "000000000", "011111110", "000000000",
     "011111110", "000000000", "000000000", "000000000",
@@ -54,7 +58,7 @@ const DEFAULT_UI_GAP_DOTS = 4;
 const DEFAULT_TEXT_LINE_GAP_DOTS = 1;
 const SPACING_DOTS_MIN = 1;
 const SPACING_DOTS_MAX = 8;
-const EQ_BAR_INSET_DOTS = 2;
+const EQ_BAR_INSET_DOTS = 1;
 const REORDER_ENTRY_THRESHOLD_DOTS = 2;
 const EQ_GAIN_MIN_DB = 0;
 const EQ_GAIN_MAX_DB = 12;
@@ -65,7 +69,7 @@ const HISTORY_TAB_SOURCE = "viewboy:special:history";
 const DEFAULT_ANIMATION_FPS = 60;
 const ANIMATION_FPS_MIN = 30;
 const ANIMATION_FPS_MAX = 240;
-const PIXEL_SHADE_MODES = { STN: 0, DIRECT: 0, GRAY8: 8, GRAY16: 16 };
+const PALETTE_MODES = { COLOR: 0, GRAY8: 8, GRAY16: 16 };
 const RAW_GRAYSCALE_TONE_OFFSET = 16;
 const DEFAULT_LCD_BACKGROUND = "#9BBC0F";
 const DEFAULT_LCD_PIXEL = "#000000";
@@ -101,7 +105,7 @@ function rgbToHex([red, green, blue]) {
     .toUpperCase();
 }
 function grayscaleLevels(mode) {
-  return PIXEL_SHADE_MODES[mode] || 0;
+  return PALETTE_MODES[mode] || 0;
 }
 function grayscaleTone(index, levels) {
   const last = Math.max(1, levels - 1);
@@ -130,8 +134,11 @@ function grayscalePalette(levels) {
   return Array.from({ length: levels }, (_, index) => grayscaleTone(index, levels));
 }
 function paletteTones(fontColor = DEFAULT_LCD_PIXEL, backgroundColor = DEFAULT_LCD_BACKGROUND) {
-  // Direct mode preserves exact user-entered PIXEL and BG colors.
-  return [fontColor, fontColor, backgroundColor, backgroundColor];
+  // Direct interpolation keeps exact endpoints and distinct semantic UI tones.
+  const ink = hexToRGB(fontColor);
+  const background = hexToRGB(backgroundColor);
+  return [0, 0.25, 0.8, 1].map((amount) => rgbToHex(ink.map((channel, index) =>
+    Math.round(channel + (background[index] - channel) * amount))));
 }
 function colorInputToHex(input) {
   const value = String(input ?? "").trim();
@@ -181,19 +188,29 @@ let semanticCells = [];
 let grayscaleCells = [];
 function refreshDisplayPalette() {
   RGB = paletteRGB(displayPalette());
-  const levels = grayscaleLevels(state.pixelShadeMode);
+  const levels = grayscaleLevels(state.paletteMode);
   if (levels) {
     const inkTone = activeGrayscaleTone(state.pixelToneIndex, levels);
     const backgroundTone = activeGrayscaleTone(state.backgroundToneIndex, levels);
-    const direction = backgroundTone - inkTone;
-    semanticColors = [inkTone, Math.round(inkTone + direction * 0.25),
-      Math.round(inkTone + direction * 0.8), backgroundTone].map((tone) => grayscaleTone(tone, levels));
+    const ink = grayscaleTone(inkTone, levels);
+    const background = grayscaleTone(backgroundTone, levels);
+    const tones = state.renderingMode === "LCD" ? stnPalette(ink, background) : paletteTones(ink, background);
+    const direction = Math.sign(backgroundTone - inkTone);
+    const span = Math.abs(backgroundTone - inkTone);
+    const indices = tones.map((color) => grayscaleToneIndex(color, levels));
+    if (span >= 3) {
+      const muted = Math.max(1, Math.min(span - 2, (indices[1] - inkTone) * direction));
+      const highlight = Math.max(muted + 1, Math.min(span - 1, (indices[2] - inkTone) * direction));
+      indices[1] = inkTone + muted * direction;
+      indices[2] = inkTone + highlight * direction;
+    } else if (span > 0) indices[2] = backgroundTone - direction;
+    semanticColors = indices.map((tone) => grayscaleTone(tone, levels));
     semanticColors[0] = contrastInk(semanticColors[0], semanticColors[3], state.lcdContrastBoost);
-  } else if (state.pixelShadeMode === "STN") {
+  } else if (state.renderingMode === "LCD") {
     semanticColors = stnPalette(state.customFontColor, state.customBackgroundColor, state.lcdContrastBoost);
   } else {
     const ink = contrastInk(state.customFontColor, state.customBackgroundColor, state.lcdContrastBoost);
-    semanticColors = [ink, ink, state.customBackgroundColor, state.customBackgroundColor];
+    semanticColors = paletteTones(ink, state.customBackgroundColor);
   }
   const coverage = cellCoverage(DEVICE_PIXELS_PER_LCD_DOT, state.lcdPixelGaps, state.lcdMatrixProfile);
   const cells = (palette) => palette.map((color) => packedPalette(paletteRGB(
@@ -373,9 +390,9 @@ function storedSpacing(value, fallback) {
     Number.isFinite(number) ? Math.round(number) : fallback));
 }
 function displayPalette() {
-  const levels = grayscaleLevels(state.pixelShadeMode);
+  const levels = grayscaleLevels(state.paletteMode);
   return levels ? grayscalePalette(levels)
-    : state.pixelShadeMode === "STN"
+    : state.renderingMode === "LCD"
       ? stnPalette(state.customFontColor, state.customBackgroundColor, state.lcdContrastBoost)
       : paletteTones(contrastInk(state.customFontColor, state.customBackgroundColor, state.lcdContrastBoost), state.customBackgroundColor);
 }
@@ -399,7 +416,8 @@ function saveDisplayOptions() {
       customBackgroundInput: state.customBackgroundInput,
       customFontInput: state.customFontInput,
       customPaletteConfigured: state.customPaletteConfigured,
-      pixelShadeMode: state.pixelShadeMode,
+      renderingMode: state.renderingMode,
+      paletteMode: state.paletteMode,
       pixelToneIndex: state.pixelToneIndex,
       backgroundToneIndex: state.backgroundToneIndex,
       lcdDotSize: state.lcdDotSize,
@@ -505,8 +523,12 @@ const state = {
   customBackgroundInput: savedCustomBackgroundInput,
   customFontInput: savedCustomFontInput,
   customPaletteConfigured: savedCustomPaletteConfigured,
-  pixelShadeMode: Object.hasOwn(PIXEL_SHADE_MODES, savedDisplayOptions.pixelShadeMode)
-    ? savedDisplayOptions.pixelShadeMode : "STN",
+  renderingMode: ["LCD", "DIRECT"].includes(savedDisplayOptions.renderingMode)
+    ? savedDisplayOptions.renderingMode
+    : ["DIRECT", "GRAY8", "GRAY16"].includes(savedDisplayOptions.pixelShadeMode) ? "DIRECT" : "LCD",
+  paletteMode: Object.hasOwn(PALETTE_MODES, savedDisplayOptions.paletteMode)
+    ? savedDisplayOptions.paletteMode
+    : ["GRAY8", "GRAY16"].includes(savedDisplayOptions.pixelShadeMode) ? savedDisplayOptions.pixelShadeMode : "COLOR",
   pixelToneIndex: Number.isFinite(Number(savedDisplayOptions.pixelToneIndex))
     ? storedToneIndex(savedDisplayOptions.pixelToneIndex, 16, 0)
     : grayscaleToneIndex(colorInputToHex(savedCustomFontInput) || DEFAULT_LCD_PIXEL, 16),
@@ -1457,7 +1479,7 @@ function fillRect(x, y, width, height, shade) {
 }
 
 function fillToneRect(x, y, width, height, tone) {
-  const levels = grayscaleLevels(state.pixelShadeMode);
+  const levels = grayscaleLevels(state.paletteMode);
   if (!levels) return fillRect(x, y, width, height, tone);
   fillRect(x, y, width, height,
     RAW_GRAYSCALE_TONE_OFFSET + storedToneIndex(tone, levels, 0));
@@ -1581,7 +1603,7 @@ function presentPixels(startY = 0, endY = HEIGHT, startX = 0, endX = WIDTH) {
   const firstColumn = Math.max(0, Math.floor(startX));
   const lastColumn = Math.min(WIDTH, Math.ceil(endX));
   if (lastRow <= firstRow || lastColumn <= firstColumn) return;
-  const levels = grayscaleLevels(state.pixelShadeMode);
+  const levels = grayscaleLevels(state.paletteMode);
   for (let y = firstRow; y < lastRow; y += 1) {
     const sourceRow = y * WIDTH;
     const topRow = y * DEVICE_PIXELS_PER_LCD_DOT * outputWidth;
@@ -1991,7 +2013,7 @@ function panelTitle(parent, text, meta = {}, style = {}) {
   label(row, text, { flexGrow: 1, height: titleHeight }, {
     textShade: 0,
     inset: controlPaddingDots(),
-    align: "center",
+    align: "left",
   });
   return row;
 }
@@ -2146,15 +2168,13 @@ function optionToggleDuration(parent, title, controlPrefix, checked, onClick, ke
     optionCheckboxChecked: checked === true,
     optionCheckboxKey: checkboxKey,
   };
-  const row = controlRow(parent, {
-    height,
-    gap: uiGap(),
-    paddingLeft: controlPaddingDots() / STYLE_SCALE,
-  }, rowMeta);
-  appendOptionCheckboxGlyph(row, checkboxKey, checked, rowMeta);
-  label(row, title, { flexGrow: 1, height }, {
-    textShade: 0, inset: controlPaddingDots(),
-  });
+  const row = optionFieldRow(parent, title, height * 2 + uiGap() * 2 + optionValueWidth(), rowMeta,
+    (field) => {
+      appendOptionCheckboxGlyph(field, checkboxKey, checked, rowMeta);
+      label(field, title, { flexGrow: 1, minWidth: 0, height }, {
+        textShade: 0, inset: controlPaddingDots(),
+      });
+    });
   pixelButton(row, "-", () => adjustPlaybackDuration(key, -step, minimum, maximum, fallback), {
     controlTitle: `${controlPrefix} -`,
   });
@@ -2180,21 +2200,19 @@ function optionToggleAdjuster(parent, title, controlPrefix, checked, onClick,
     optionCheckboxChecked: checked === true,
     optionCheckboxKey: checkboxKey,
   };
-  const row = controlRow(parent, {
-    height,
-    gap: uiGap(),
-    paddingLeft: controlPaddingDots() / STYLE_SCALE,
-  }, rowMeta);
-  appendOptionCheckboxGlyph(row, checkboxKey, checked, rowMeta);
-  label(row, title, { flexGrow: 1, height }, {
-    textShade: 0, inset: controlPaddingDots(),
-  });
+  const row = optionFieldRow(parent, title, height * 2 + uiGap() * 2 + optionValueWidth(), rowMeta,
+    (field) => {
+      appendOptionCheckboxGlyph(field, checkboxKey, checked, rowMeta);
+      label(field, title, { flexGrow: 1, minWidth: 0, height }, {
+        textShade: 0, inset: controlPaddingDots(),
+      });
+    });
   optionStepButton(row, "-", onDecrease, `${controlPrefix} -`);
   optionStepButton(row, "+", onIncrease, `${controlPrefix} +`);
   label(row, value, { width: optionValueWidth(), flexShrink: 0, height }, {
     border: BUTTON_BORDER_DOTS,
     textShade: 0,
-    align: "center",
+    align: "left",
     inset: controlPaddingDots(),
     spacingReadout: controlPrefix,
   });
@@ -2217,7 +2235,7 @@ function optionChoice(parent, title, choices, displayTitle = title) {
     optionChoiceLabel: displayTitle,
     paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
   });
-  if (displayTitle) label(row, displayTitle, { ...(stacked ? { widthPercent: 100 } : { flexGrow: 1, flexBasis: 0, minWidth: 0 }), height }, {
+  if (displayTitle) label(row, displayTitle, { ...(stacked ? { widthPercent: 100 } : { widthPercent: 33.3333, minWidth: 0 }), height }, {
     textShade: 0, inset: controlPaddingDots(),
   });
   const controls = makeWidget(row, {
@@ -2246,21 +2264,42 @@ function optionStepButton(parent, direction, onClick, title) {
   });
 }
 
+function optionFieldRow(parent, title, controlsWidth, meta = {}, labelBuilder = null) {
+  let available = WIDTH - libraryPaneWidth() * STYLE_SCALE - APP_EDGE_PADDING_PX * 2 - uiGapDots() * 5;
+  if (state.optionsPage === "DISPLAY" && available + 2 * uiGapDots() >= 520) available = (available - uiGapDots() * 2) / 2;
+  const stacked = available / 3 < textLayoutWidth(title) * STYLE_SCALE + (labelBuilder ? fontProfile().height + uiGapDots() : 0)
+    || available * 2 / 3 < controlsWidth * STYLE_SCALE;
+  const height = buttonStandardHeight();
+  const row = controlRow(parent, {
+    direction: stacked ? FlexDirection.Column : FlexDirection.Row,
+    alignItems: Align.Stretch,
+    height: stacked ? height * 2 + uiGap() : height,
+    gap: stacked ? uiGap() : 0,
+  }, meta);
+  if (labelBuilder) {
+    const field = makeWidget(row, { direction: FlexDirection.Row, alignItems: Align.Center,
+      widthPercent: stacked ? 100 : 33.3333, height, gap: uiGap(),
+      paddingLeft: controlPaddingDots() / STYLE_SCALE });
+    labelBuilder(field);
+  } else label(row, title, { widthPercent: stacked ? 100 : 33.3333, height }, {
+    inset: controlPaddingDots(), textShade: 0,
+  });
+  return makeWidget(row, {
+    direction: FlexDirection.Row, widthPercent: stacked ? 100 : 66.6667,
+    height, gap: uiGap(), alignItems: Align.Center,
+  });
+}
+
 function optionAdjuster(parent, title, value, onDecrease, onIncrease, accessibleTitle = title) {
   const height = buttonStandardHeight();
-  const row = controlRow(parent, { height }, {
-    paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
-  });
-  label(row, title, { flexGrow: 1, height }, {
-    textShade: 0, inset: controlPaddingDots(),
-  });
+  const row = optionFieldRow(parent, title, height * 2 + uiGap() * 2 + optionValueWidth());
   const controlHeight = buttonStandardHeight();
   optionStepButton(row, "-", onDecrease, `${accessibleTitle} -`);
   optionStepButton(row, "+", onIncrease, `${accessibleTitle} +`);
   label(row, value, { width: optionValueWidth(), flexShrink: 0, height: controlHeight }, {
     border: 1,
     textShade: 0,
-    align: "center",
+    align: "left",
     inset: controlPaddingDots(),
     spacingReadout: accessibleTitle,
   });
@@ -2342,7 +2381,7 @@ function durationInput(parent, key, value, minimum, maximum, fallback, allowOpen
     border: BUTTON_BORDER_DOTS,
     fill: editing ? 2 : undefined,
     textShade: 0,
-    align: "center",
+    align: "left",
     inset: controlPaddingDots(),
     editableDuration: key,
     controlTitle: `${key} TIME`,
@@ -2351,12 +2390,8 @@ function durationInput(parent, key, value, minimum, maximum, fallback, allowOpen
 }
 
 function optionDurationAdjuster(parent, title, key, minimum, maximum, fallback, step, allowOpen = false) {
-  const row = controlRow(parent, { height: buttonStandardHeight() }, {
-    paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
-  });
-  label(row, title, { flexGrow: 1, height: buttonStandardHeight() }, {
-    textShade: 0, inset: controlPaddingDots(),
-  });
+  const row = optionFieldRow(parent, title,
+    buttonStandardHeight() * 2 + uiGap() * 2 + optionValueWidth());
   pixelButton(row, "-", () => adjustPlaybackDuration(key, -step, minimum, maximum, fallback), {
     controlTitle: `${title} -`,
   });
@@ -2608,14 +2643,14 @@ export function optionsStyleSnapshot() {
   return layoutEntries.flatMap(({ widget, box }) => {
     if (widget.meta.optionPalettePreview) {
       return [{ kind: "preview", name: "LCD PALETTE", label: "PREVIEW",
-        toneCount: grayscaleLevels(state.pixelShadeMode) || RGB.length, box: { ...box } }];
+        toneCount: grayscaleLevels(state.paletteMode) || RGB.length, box: { ...box } }];
     }
     if (widget.meta.optionPaletteStrip) {
       return [{ kind: "tone-strip", name: "LCD PALETTE", box: { ...box } }];
     }
     if (widget.meta.optionPanelTitle) {
       return [{ kind: "title", name: widget.meta.optionPanelTitle, headerRole: widget.meta.paneHeader ?? null,
-        fillShade: widget.meta.fill ?? null, box: { ...box } }];
+        fillShade: widget.meta.fill ?? null, textAlign: widget.children[0]?.meta.align, box: { ...box } }];
     }
     if (widget.meta.optionOwnerTitle) {
       return [{ kind: "owner", name: widget.meta.optionOwnerTitle, box: { ...box } }];
@@ -3328,8 +3363,8 @@ function addCatalogPane(parent) {
         flexGrow: tabLayoutWeightAt(tab.id),
         flexBasis: 0,
         flexShrink: 1,
-        minWidth: 0,
-        gap: uiGap(),
+        minWidth: TAB_CLOSE_SIZE_DOTS / STYLE_SCALE,
+        gap: 0,
         height: buttonStandardHeight(),
         alignItems: Align.Center,
       }, {
@@ -3366,14 +3401,15 @@ function addCatalogPane(parent) {
         controlTitle: `TAB ${tab.title}`,
         onClick: isExiting ? undefined : () => handlePlaylistTabTask(activatePlaylistTab(tab.id)),
       });
-      label(item, "X", {
-        width: buttonWidth("X"),
+      label(item, "", {
+        width: TAB_CLOSE_SIZE_DOTS / STYLE_SCALE,
         flexShrink: 0,
-        height: buttonStandardHeight(),
+        height: TAB_CLOSE_SIZE_DOTS / STYLE_SCALE,
       }, {
         textShade: 0,
         inset: controlPaddingDots(),
         align: "center",
+        paint(box) { paintSidebarIcon("close", box, 0); },
         playlistTabClose: true,
         playlistTabId: tab.id,
         controlTitle: "X",
@@ -3535,7 +3571,7 @@ function addPalettePreview(parent) {
   }, {
     optionPaletteStrip: true,
     paint(box) {
-      const levels = grayscaleLevels(state.pixelShadeMode);
+      const levels = grayscaleLevels(state.paletteMode);
       const count = levels || RGB.length;
       strokeRect(box.x, box.y, box.width, box.height, 1);
       for (let shade = 0; shade < count; shade++) {
@@ -3629,16 +3665,19 @@ function addDisplayOptions(parent, pref) {
   addInterfaceOptions(interfaceColumn, pref);
 }
 
-function setPixelShadeMode(mode) {
-  if (!Object.hasOwn(PIXEL_SHADE_MODES, mode) || mode === state.pixelShadeMode) return;
-  state.pixelShadeMode = mode;
+function setDisplayColorOption(key, value) {
+  const valid = key === "renderingMode" ? ["LCD", "DIRECT"].includes(value)
+    : key === "paletteMode" && Object.hasOwn(PALETTE_MODES, value);
+  if (!valid) return;
+  if (state[key] === value) return;
+  state[key] = value;
   refreshDisplayPalette();
   saveDisplayOptions();
   render();
 }
 
 function adjustPixelTone(endpoint, amount) {
-  const levels = grayscaleLevels(state.pixelShadeMode);
+  const levels = grayscaleLevels(state.paletteMode);
   if (!levels) return;
   const key = endpoint === "background" ? "backgroundToneIndex" : "pixelToneIndex";
   const current = activeGrayscaleTone(state[key], levels);
@@ -3717,22 +3756,26 @@ function customColorInput(parent, endpoint, title) {
 }
 
 function addLCDColorOptions(parent) {
-  const levels = grayscaleLevels(state.pixelShadeMode);
+  const levels = grayscaleLevels(state.paletteMode);
   const rowHeights = [buttonStandardHeight(), buttonStandardHeight(), buttonStandardHeight(),
-    buttonStandardHeight(), buttonStandardHeight() * 2 + uiGap(), ...(levels ? [buttonStandardHeight(), buttonStandardHeight()] : []),
+    buttonStandardHeight(), buttonStandardHeight(), buttonStandardHeight() * 2 + uiGap(), ...(levels ? [buttonStandardHeight(), buttonStandardHeight()] : []),
     ...(state.editingColorEndpoint || state.colorInputError ? [rowHeight()] : [])];
   const colors = optionGroup(parent, "LCD PALETTE", rowHeights);
   addPalettePreview(colors);
-  optionChoice(colors, "PIXEL METHOD", [
-    { title: "LCD", accessibilityTitle: "STN LCD", selected: state.pixelShadeMode === "STN",
-      onClick: () => setPixelShadeMode("STN") },
-    { title: "DIRECT", accessibilityTitle: "DIRECT", selected: state.pixelShadeMode === "DIRECT",
-      onClick: () => setPixelShadeMode("DIRECT") },
-    { title: "8", accessibilityTitle: "8 SHADE", selected: state.pixelShadeMode === "GRAY8",
-      onClick: () => setPixelShadeMode("GRAY8") },
-    { title: "16", accessibilityTitle: "16 SHADE", selected: state.pixelShadeMode === "GRAY16",
-      onClick: () => setPixelShadeMode("GRAY16") },
-  ], "METHOD");
+  optionChoice(colors, "RENDERING", [
+    { title: "LCD", selected: state.renderingMode === "LCD",
+      onClick: () => setDisplayColorOption("renderingMode", "LCD") },
+    { title: "DIRECT", selected: state.renderingMode === "DIRECT",
+      onClick: () => setDisplayColorOption("renderingMode", "DIRECT") },
+  ]);
+  optionChoice(colors, "PALETTE", [
+    { title: "COLOR", selected: state.paletteMode === "COLOR",
+      onClick: () => setDisplayColorOption("paletteMode", "COLOR") },
+    { title: "8 GRAY", selected: state.paletteMode === "GRAY8",
+      onClick: () => setDisplayColorOption("paletteMode", "GRAY8") },
+    { title: "16 GRAY", selected: state.paletteMode === "GRAY16",
+      onClick: () => setDisplayColorOption("paletteMode", "GRAY16") },
+  ]);
   customColorInput(colors, "background", "BG");
   customColorInput(colors, "font", "PIXEL");
   const boost = makeWidget(colors, { direction: FlexDirection.Column, gap: uiGap() });
@@ -3877,7 +3920,7 @@ function playbackRateInput(parent, backend) {
   return label(parent, value, { width: framedTextWidth("255/32X"), height: buttonStandardHeight() }, {
     border: BUTTON_BORDER_DOTS,
     textShade: 0,
-    align: "center",
+    align: "left",
     inset: controlPaddingDots(),
     editableRateBackend: backend,
     controlTitle: `${backend.toUpperCase()} RATE INPUT`,
@@ -3979,18 +4022,8 @@ function addDiagnosticsOptions(parent) {
 
 function optionPlaybackRateRow(parent, backend) {
   const title = backend.toUpperCase();
-  const indentDots = 2 * controlPaddingDots() + fontProfile().height + uiGapDots();
-  const row = controlRow(parent, {
-    height: buttonStandardHeight(),
-    gap: uiGap(),
-    paddingLeft: indentDots / STYLE_SCALE,
-  }, {
-    optionPlaybackRate: title,
-    paint(box) { line(box.x, box.y + box.height - 1, box.x + box.width, box.y + box.height, 2); },
-  });
-  label(row, "RATE", { width: textLayoutWidth("RATE", 0), height: buttonStandardHeight() }, {
-    textShade: 0, inset: 0,
-  });
+  const row = optionFieldRow(parent, "RATE",
+    buttonStandardHeight() * 2 + uiGap() * 2 + framedTextWidth("255/32X"), { optionPlaybackRate: title });
   pixelButton(row, "-", () => adjustPlaybackRate(backend, -1), {
     controlTitle: `${title} RATE -`,
   });
@@ -4043,7 +4076,7 @@ function linearTrackBounds(box, steps) {
 function linearTickPositions(box, steps) {
   const bounds = linearTrackBounds(box, steps);
   return Array.from({ length: steps + 1 }, (_, index) =>
-    Math.round(bounds.left + index * (bounds.right - bounds.left) / steps));
+    Math.round(bounds.left - 1 + index * (bounds.right - bounds.left + 2) / steps));
 }
 
 function equalizerTickPositions(box) {
@@ -4058,11 +4091,11 @@ function paintGaugeBar(box, fraction, steps, focused = false) {
   const fillWidth = Math.round((right - left + 1) * bounded);
   fillRect(box.x + 1, box.y + 1, box.width - 2, box.height - 2, 3);
   fillRect(left, box.y + 1, fillWidth, box.height - 2, 0);
-  for (const x of linearTickPositions(box, steps)) {
+  for (const x of linearTickPositions(box, steps).slice(1, -1)) {
     fillRect(x, centerY - 2, 1, 5, x < left + fillWidth ? 3 : 0);
   }
   const thumbX = Math.round(left + bounded * (right - left));
-  fillRect(thumbX, box.y + 2, 1, box.height - 4, bounded === 0 ? 0 : 3);
+  if (bounded > 0 && bounded < 1) fillRect(thumbX, box.y + 2, 1, box.height - 4, 3);
 }
 
 function equalizerBand(parent, title, index) {
@@ -4072,7 +4105,7 @@ function equalizerBand(parent, title, index) {
   const addValue = () => label(row, equalizerGainLabel(equalizerGainAt(index, currentRenderTime)), {
     width: optionValueWidth(), flexShrink: 0, height: buttonStandardHeight(),
   }, {
-    border: 1, textShade: 0, align: "center", inset: controlPaddingDots(),
+    border: 1, textShade: 0, align: "left", inset: controlPaddingDots(),
     paint(box) { state.equalizerValueBoxes[index] = box; },
   });
   label(row, title, { ...(stacked ? { flexGrow: 1, flexBasis: 0, minWidth: 0 } : { width: textLayoutWidth("16K HZ") }), height: buttonStandardHeight() }, {
@@ -4607,18 +4640,19 @@ function buildTree() {
   });
   const toolbar = controlRow(root, { height: toolbarHeight, gap: uiGap() });
   const transportLabels = state.transportSymbols
-    ? { previous: "<<", stop: "[]", play: state.playing ? "||" : ">", next: ">>" }
+    ? { previous: "", stop: "[]", play: state.playing ? "||" : ">", next: "" }
     : { previous: "PREV", stop: "STOP", play: state.playing ? "PAUSE" : "PLAY", next: "NEXT" };
   fillButton(toolbar, transportLabels.previous, () => selectPrevious(), {
     controlTitle: "PREVIOUS",
-    align: state.transportSymbols ? "left" : "center",
-    inset: state.transportSymbols ? BUTTON_BORDER_DOTS : controlPaddingDots(),
+    icon: state.transportSymbols ? "previous" : undefined,
   });
   fillButton(toolbar, transportLabels.stop, () => stopPlayback(), { controlTitle: "STOP" });
   fillButton(toolbar, transportLabels.play, () => togglePlaying(), {
     controlTitle: state.playing ? "PAUSE" : "PLAY",
   });
-  fillButton(toolbar, transportLabels.next, () => selectNext(), { controlTitle: "NEXT" });
+  fillButton(toolbar, transportLabels.next, () => selectNext(), {
+    controlTitle: "NEXT", icon: state.transportSymbols ? "next" : undefined,
+  });
   fillButton(toolbar, "LP", () => toggleLongPlay(), {
     selected: state.preferences.longPlayEnabled === true,
     controlTitle: "LONG PLAY",
@@ -4690,7 +4724,15 @@ function intersectBoxes(first, second) {
   return { x, y, width: Math.max(0, right - x), height: Math.max(0, bottom - y) };
 }
 
-function collect(widget, parentX = 0, parentY = 0, output = [], inheritedClip = null) {
+function anchorTabClose(box, parentBox) {
+  // Yoga child rounding may exceed a floored parent edge by a dot. Use the
+  // same final parent bounds for the close cell's painting and hit testing.
+  box.x = parentBox.x + Math.max(0, parentBox.width - box.width);
+  box.y = parentBox.y + Math.floor((parentBox.height - box.height) / 2);
+  return box;
+}
+
+function collect(widget, parentX = 0, parentY = 0, output = [], inheritedClip = null, parentBox = null) {
   const layout = widget.yoga.getComputedLayout();
   const translateX = widgetTranslationX(widget, parentX + layout.left, currentRenderTime);
   const translateY = widget.meta.translateY ?? 0;
@@ -4704,12 +4746,13 @@ function collect(widget, parentX = 0, parentY = 0, output = [], inheritedClip = 
     width: Math.max(0, layoutPixelEdge(parentX + layout.left + translateX + layout.width) - x),
     height: Math.max(0, layoutPixelEdge(parentY + layout.top + translateY + layout.height) - y),
   };
+  if (widget.meta.playlistTabClose && parentBox) anchorTabClose(box, parentBox);
   const entry = { widget, box, clip: inheritedClip };
   output.push(entry);
   if (widget.meta.id) boxesById.set(widget.meta.id, box);
   if (widget.meta.onClick || widget.meta.columnHeader || widget.meta.tabLayoutVisual) hitTargets.push(entry);
   const childClip = widget.meta.clipChildren ? intersectBoxes(inheritedClip, box) : inheritedClip;
-  for (const child of widget.children) collect(child, box.x, box.y, output, childClip);
+  for (const child of widget.children) collect(child, box.x, box.y, output, childClip, box);
   return output;
 }
 
@@ -4724,12 +4767,14 @@ function paintTree(widget, box, inheritedClip = null) {
     const offsetY = layout.top + (child.meta.frameTranslateY ?? child.meta.translateY ?? 0);
     const x = layoutPixelEdge(box.x + offsetX);
     const y = layoutPixelEdge(box.y + offsetY);
-    paintTree(child, {
+    const childBox = {
       x,
       y,
       width: Math.max(0, layoutPixelEdge(box.x + offsetX + layout.width) - x),
       height: Math.max(0, layoutPixelEdge(box.y + offsetY + layout.height) - y),
-    }, childClip);
+    };
+    if (child.meta.playlistTabClose) anchorTabClose(childBox, box);
+    paintTree(child, childBox, childClip);
   }
   paintClip = priorClip;
 }
