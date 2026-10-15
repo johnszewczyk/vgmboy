@@ -58,7 +58,7 @@
       --columns: 40;
       --line-rows: 15;
       --footer-row: 15;
-      --workspace-lines: 11;
+      --workspace-lines: 10;
       --grid-rows: repeat(15, 16px);
       width: 320px;
       height: 240px;
@@ -201,39 +201,33 @@
     }
 
     .toolrow {
-      grid-row: 3;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      column-gap: 2ch;
+      grid-row: 3 / 5;
+      display: flex;
+      gap: 1ch;
+      padding-block: 4px;
       align-items: stretch;
-      background: transparent;
     }
-    .nav-group {
-      min-width: 0;
-      display: grid;
-      grid-template-columns: repeat(5, minmax(4ch, 1fr));
-      gap: 1ch;
-    }
-    .transport-group {
-      display: grid;
-      grid-template-columns: 2ch 4ch 2ch;
-      gap: 1ch;
-    }
+    .nav-group, .transport-group { display: contents; }
     .nav-button {
       position: relative;
       z-index: 2;
+      flex: 1 1 0;
       min-width: 0;
-      width: 100%;
-      height: 16px;
-      padding: 0;
-      border: 0;
-      background: var(--gray);
-      color: var(--black);
+      height: 24px;
+      padding: 3px 0;
+      border: 1px solid var(--frame-color);
+      background: var(--well);
+      color: var(--gray);
       line-height: 16px;
       text-align: center;
       text-transform: uppercase;
       white-space: nowrap;
       cursor: pointer;
+    }
+    .nav-button[aria-pressed="true"] {
+      background: var(--well-highlight);
+      color: var(--white);
+      border-color: var(--gray);
     }
     .nav-button:hover,
     .nav-button:focus-visible,
@@ -242,7 +236,7 @@
     }
     .workspace {
       --workspace-rows: repeat(var(--workspace-lines), 16px);
-      grid-row: 4 / var(--footer-row);
+      grid-row: 5 / var(--footer-row);
       display: grid;
       grid-template-columns: var(--sidebar-width, 128px) 8px minmax(0, 1fr);
       grid-template-rows: var(--workspace-rows);
@@ -278,7 +272,7 @@
     .panel-title .count { text-align: right; }
 
     .tree {
-      grid-row: 3 / -1;
+      grid-row: 4 / -1;
       min-height: 0;
       display: grid;
       grid-auto-rows: 16px;
@@ -289,11 +283,11 @@
       scroll-snap-type: y proximity;
     }
     .library-search {
-      grid-row: 2;
+      grid-row: 2 / 4;
       min-width: 0;
       width: 100%;
-      height: 16px;
-      padding: 0 1ch;
+      height: 32px;
+      padding: 8px 1ch;
       border: 0;
       border-radius: 0;
       background: var(--well);
@@ -307,7 +301,7 @@
     .library-search:focus-visible { background: var(--gray); color: var(--black); outline: none; }
     .library-search:focus-visible::placeholder { color: var(--selected-muted); }
     .library-results {
-      grid-row: 3 / -1;
+      grid-row: 4 / -1;
       min-height: 0;
       display: grid;
       grid-auto-rows: 16px;
@@ -323,7 +317,7 @@
       width: 100%;
       height: 16px;
       display: grid;
-      grid-template-columns: 2ch minmax(0, 1fr) 3ch;
+      grid-template-columns: 1ch minmax(0, 1fr) 3ch;
       align-items: center;
       gap: 0;
       padding: 0;
@@ -384,39 +378,37 @@
 
     .listpanel .panel-title { grid-row: 1; }
     .playlist-tab-row {
-      grid-row: 2;
+      grid-row: 2 / 4;
       min-width: 0;
-      height: 16px;
+      height: 32px;
       display: flex;
+      align-items: center;
       gap: 1ch;
-      padding: 0 1ch;
-      background: var(--well);
+      padding-block: 4px;
     }
     .playlist-tabs {
       position: relative;
       min-width: 0;
       flex: 1 1 auto;
-      height: 16px;
+      height: 24px;
       display: flex;
-      align-items: stretch;
-      gap: 1ch;
+      gap: 2px;
       overflow-x: auto;
       overflow-y: hidden;
       scrollbar-width: none;
     }
     .playlist-tabs::-webkit-scrollbar { display: none; }
     .playlist-tab {
-      min-width: 8ch;
-      max-width: 20ch;
-      flex: 0 0 18ch;
+      min-width: 12ch;
+      flex: 1 0 18ch;
       display: flex;
-      height: 16px;
-      background: transparent;
+      align-items: center;
+      height: 24px;
+      border: 1px solid var(--frame-color);
+      background: var(--well);
     }
-    .playlist-tab-select,
-    .playlist-tab-close,
-    .playlist-tab-add {
-      height: 16px;
+    .playlist-tab-select, .playlist-tab-close, .playlist-tab-add {
+      height: 22px;
       padding: 0;
       border: 0;
       border-radius: 0;
@@ -427,39 +419,37 @@
     }
     .playlist-tab-select {
       min-width: 0;
-      flex: 1 1 auto;
-      padding: 0 1ch;
+      flex: 1 1 0;
+      padding-inline: 1ch;
       overflow: hidden;
       text-align: left;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .playlist-tab-close { flex: 0 0 2ch; color: var(--dim); text-align: center; }
-    .playlist-tab[aria-selected="true"] { background: var(--well-highlight); }
-    .playlist-tab-add {
-      flex: 0 0 3ch;
-      background: transparent;
-      color: var(--gray);
-      text-align: center;
+    .playlist-tab-close { flex: 0 0 3ch; display: grid; place-items: center; }
+    .tab-close-icon { position: relative; width: 8px; height: 8px; pointer-events: none; }
+    .tab-close-icon::before {
+      content: ""; position: absolute; inset: 0 auto auto 0;
+      width: 7px; height: 7px; border: 1px solid currentColor;
     }
-    .playlist-tab-select:hover,
-    .playlist-tab-select:focus-visible,
-    .playlist-tab[aria-selected="true"] .playlist-tab-select {
+    .tab-close-icon::after {
+      content: ""; position: absolute; left: 2px; top: 2px;
+      width: 1px; height: 1px; background: currentColor;
+      box-shadow: 2px 0 currentColor, 1px 1px currentColor, 0 2px currentColor, 2px 2px currentColor;
+    }
+    .playlist-tab[aria-selected="true"] { border-color: var(--white); background: var(--well-highlight); }
+    .playlist-tab[aria-selected="true"] .playlist-tab-select { color: var(--white); }
+    .playlist-tab-add { flex: 0 0 4ch; height: 24px; border: 1px solid var(--frame-color); }
+    .playlist-tab-select:hover, .playlist-tab-select:focus-visible,
+    .playlist-tab-close:hover, .playlist-tab-close:focus-visible,
+    .playlist-tab-add:hover, .playlist-tab-add:focus-visible {
       outline: none;
       background: var(--gray);
       color: var(--black);
     }
-    .playlist-tab-close:hover,
-    .playlist-tab-close:focus-visible,
-    .playlist-tab-add:hover,
-    .playlist-tab-add:focus-visible {
-      outline: none;
-      background: var(--gray);
-      color: var(--black);
-    }
-    .playlist-tab-close:disabled { visibility: hidden; cursor: default; }
+    .playlist-tab-close:disabled { opacity: .35; cursor: default; }
     .list-head {
-      grid-row: 3;
+      grid-row: 4;
       min-width: 0;
       height: 16px;
       display: grid;
@@ -468,14 +458,14 @@
       align-items: center;
       padding: 0 1ch;
       background: var(--well-highlight);
-      color: var(--black);
+      color: var(--white);
       text-transform: uppercase;
     }
     .list-head span:first-child { text-align: left; }
     .list-head span:nth-child(2) { text-align: left; }
     .list-head span:last-child { text-align: right; }
     .songs {
-      grid-row: 4 / -1;
+      grid-row: 5 / -1;
       min-height: 0;
       display: grid;
       grid-auto-rows: 16px;
@@ -569,6 +559,8 @@
       scrollbar-width: none;
     }
     .option-page::-webkit-scrollbar { display: none; }
+    .option-page { padding-inline: 1ch; }
+    .option-section-title { height: 16px; margin-block: 16px 8px; padding-inline: 1ch; background: var(--well-highlight); color: var(--white); }
     .option-row {
       min-width: 0;
       min-height: 16px;
@@ -576,8 +568,8 @@
       grid-template-columns: minmax(0, 1fr) minmax(8ch, 1fr);
       align-items: center;
       gap: 1ch;
-      padding: 0 1ch;
-      background: var(--well);
+      padding: 0;
+      background: transparent;
       color: var(--gray);
       line-height: 16px;
     }
@@ -715,8 +707,8 @@
             <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-selected="false" tabindex="-1"><span class="chev"></span><span class="label">ATARI ST</span><span class="count">21</span></button>
             <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-selected="false" tabindex="-1"><span class="chev"></span><span class="label">C64</span><span class="count">17</span></button>
             <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-expanded="true" aria-selected="false" tabindex="-1" data-folder="SNES"><span class="chev">−</span><span class="label">SNES</span><span class="count">143</span></button>
-            <button class="tree-row indent" type="button" role="treeitem" aria-level="2" aria-selected="true" tabindex="0" data-parent="SNES" data-game="CHRONO"><span class="chev">›</span><span class="label">CHRONO TRG</span><span class="count">27</span></button>
-            <button class="tree-row indent" type="button" role="treeitem" aria-level="2" aria-selected="false" tabindex="-1" data-parent="SNES" data-game="METROID"><span class="chev">›</span><span class="label">SUPER MET</span><span class="count">8</span></button>
+            <button class="tree-row indent" type="button" role="treeitem" aria-level="2" aria-selected="true" tabindex="0" data-parent="SNES" data-game="CHRONO"><span class="chev">›</span><span class="label">CHRONO TRIGGER</span><span class="count">27</span></button>
+            <button class="tree-row indent" type="button" role="treeitem" aria-level="2" aria-selected="false" tabindex="-1" data-parent="SNES" data-game="METROID"><span class="chev">›</span><span class="label">SUPER METROID</span><span class="count">8</span></button>
             <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-selected="false" tabindex="-1"><span class="chev"></span><span class="label">GENESIS</span><span class="count">72</span></button>
             <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-selected="false" tabindex="-1"><span class="chev"></span><span class="label">PSX</span><span class="count">29</span></button>
           </div>
@@ -732,7 +724,7 @@
           <div class="playlist-tab-row">
             <div class="playlist-tabs" id="playlist-tabs" role="tablist" aria-label="Playlist tabs"></div>
             <button class="playlist-tab-add" id="playlist-tab-add" type="button"
-              aria-label="New playlist tab (Command+T)" title="New playlist tab (Command+T)">+</button>
+              aria-label="New playlist tab (Command+T)" title="New playlist tab (Command+T)">[+]</button>
           </div>
           <div class="list-head" role="row"><span>#</span><span>TRACK</span><span>TIME</span></div>
           <div class="songs" id="song-list" role="listbox" aria-label="Playlist tracks"></div>
@@ -750,10 +742,13 @@
         <section class="panel options-content" id="options-content" aria-label="Options" hidden>
           <div class="panel-title"><span id="options-page-title">DISPLAY</span><span class="count">SETUP</span></div>
           <div class="option-page" data-options-content="DISPLAY">
+            <div class="option-section-title">LAYOUT</div>
             <div class="option-row"><span>WIDTH</span><button class="option-value" id="width-mode" type="button" aria-pressed="true">FILL</button></div>
             <div class="option-row"><span>SIDEBAR</span><div class="range-control"><input class="brightness-range" id="sidebar-width-range" type="range" min="10" max="19" step="1" value="13" aria-label="Library sidebar width"><output class="range-readout" id="sidebar-width-readout" for="sidebar-width-range">13CH</output></div></div>
+            <div class="option-section-title">SCREEN</div>
             <div class="option-row"><span>SCANLINES</span><button class="option-value" id="scanline-mode" type="button" aria-pressed="true">ON</button></div>
             <div class="option-row"><span>BRIGHTNESS</span><div class="range-control"><input class="brightness-range" id="brightness-range" type="range" min="60" max="140" step="5" value="100" aria-label="Screen brightness"><output class="range-readout" id="brightness-readout" for="brightness-range">100%</output></div></div>
+            <div class="option-section-title">INTERACTION</div>
             <div class="option-row"><span>SELECTOR FLOW</span><button class="option-value" id="selector-flow-mode" type="button" aria-pressed="true">ON</button></div>
             <div class="option-row"><span>RASTER</span><span class="option-key" id="option-raster">320X240</span></div>
             <div class="option-row"><span>PITCH</span><span class="option-key" id="option-pitch">6PX</span></div>
@@ -949,7 +944,7 @@
     let nativeCurrentTrackID = null;
     let activeRaster = null;
     let requestedRaster = resolutionById.has(savedDisplayPreferences.raster)
-      ? savedDisplayPreferences.raster : "320X240";
+      ? savedDisplayPreferences.raster : "800X600";
     let widthMode = savedDisplayPreferences.widthMode === "FRAME" ? "FRAME" : "FILL";
     let scanlinesEnabled = savedDisplayPreferences.scanlinesEnabled !== false;
     const beamWidthModes = [
@@ -1060,7 +1055,7 @@
     }
 
     function sidebarBounds(columns = activeRaster?.columns || 40) {
-      const minimum = Math.min(10, Math.max(1, columns - 20));
+      const minimum = Math.min(columns >= 64 ? 20 : 10, Math.max(1, columns - 20));
       return { minimum, maximum: Math.max(minimum, columns - 21) };
     }
 
@@ -1131,11 +1126,8 @@
         : raster.width;
       const columns = sourceWidth / 8;
       const halfLineInset = (sourceHeight - textRows * 16) / 2;
-      const workspaceLines = textRows - 4;
-      const sidebarBoundsForRaster = {
-        minimum: Math.min(10, Math.max(1, columns - 20)),
-        maximum: Math.max(Math.min(10, Math.max(1, columns - 20)), columns - 21),
-      };
+      const workspaceLines = textRows - 5;
+      const sidebarBoundsForRaster = sidebarBounds(columns);
       const defaultSidebarColumns = Math.max(sidebarBoundsForRaster.minimum,
         Math.min(sidebarBoundsForRaster.maximum, Math.round((columns - 1) / 3)));
       sidebarColumns = Number.isInteger(sidebarColumns) ? sidebarColumns : defaultSidebarColumns;
@@ -1339,9 +1331,12 @@
     [divider].forEach((separator) => {
       let dragging = false;
       let resizeFrame = 0;
+      let startingColumns = sidebarColumns;
       separator.addEventListener("pointerdown", (event) => {
         if (event.button !== 0) return;
         dragging = true;
+        startingColumns = sidebarColumns;
+        separator.focus({ preventScroll: true });
         workspace.classList.add("is-resizing");
         separator.setPointerCapture(event.pointerId);
         event.preventDefault();
@@ -1367,8 +1362,9 @@
           const column = (event.clientX - bounds.left) / ((activeRaster?.scale || 1) * 8) - 0.5;
           setSidebarColumns(column);
         }
+        if (event.type === "pointercancel") setSidebarColumns(startingColumns);
         if (separator.hasPointerCapture(event.pointerId)) separator.releasePointerCapture(event.pointerId);
-        saveDisplayPreferences();
+        if (event.type !== "pointercancel") saveDisplayPreferences();
       };
       separator.addEventListener("pointerup", finishResize);
       separator.addEventListener("pointercancel", finishResize);
@@ -1462,7 +1458,7 @@
     });
 
     resetDisplay.addEventListener("click", () => {
-      requestedRaster = "320X240";
+      requestedRaster = "800X600";
       widthMode = "FILL";
       scanlinesEnabled = true;
       beamWidthMode = "NORMAL";
@@ -1592,6 +1588,7 @@
         song.tabIndex = -1;
         song.dataset.trackId = id;
         song.dataset.title = title;
+        song.title = title;
         song.dataset.favorite = String(favorite);
         song.dataset.length = length;
         song.dataset.displayPath = displayPath || "";
@@ -1755,7 +1752,10 @@
         const close = document.createElement("button");
         close.type = "button";
         close.className = "playlist-tab-close";
-        close.textContent = "X";
+        const closeIcon = document.createElement("span");
+        closeIcon.className = "tab-close-icon";
+        closeIcon.setAttribute("aria-hidden", "true");
+        close.append(closeIcon);
         close.title = `Close ${tab.title}`;
         select.title = tab.title;
         close.disabled = playlistTabs.length < 2;

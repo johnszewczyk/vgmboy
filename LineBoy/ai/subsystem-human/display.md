@@ -6,8 +6,9 @@ scanline density. The grid extends to the available window height in whole
 16-pixel rows; WIDTH MODE FILL also extends its width in whole 8-pixel
 columns. FRAME keeps the selected profile's 4:3 width. Text is never stretched
 to fill unused space. Resolution choices spread evenly across their row; the
-command toolbar expands its view blocks across the remaining width and keeps
-transport controls at the right.
+command toolbar gives its eight actions equal widths, with transport at the right.
+New installations and Reset Display select the high-resolution 800×600 profile;
+saved raster choices remain intact.
 
 Each 8×16 glyph cell gives the raster its text capacity: columns are active
 width ÷ 8, and complete text rows are floor(height ÷ 16). The selected profile
@@ -36,10 +37,12 @@ with a grayscale spot profile. Scrolling moves continuously underneath the
 same filter. The CSS mask provides the same fixed-gap fallback when WebGL2 is
 unavailable.
 
-Filled command buttons are separate blocks with one character cell between
-buttons and a two-cell blank gap before transport. There is no visible divider
-between the command and transport groups. The resolution profile row remains a
-separate testing control row.
+Curses-style outlined command buttons occupy a two-text-row band, with
+one character cell between all eight actions. Persistent active buttons use a
+subdued fill; hover and keyboard focus use the shared inverse selector. The
+resolution profile row remains separate. Library and playlist headers match;
+the search field and framed tab toolbar share a two-row band below them. Track
+headings use light text on a shaded bar, followed by dense 16px text rows.
 
 The playlist has a horizontal tab strip above its track headings. Selecting a
 tab restores that playlist, its selected track, favorites filter, and scroll
@@ -57,8 +60,10 @@ follows pointer hover and keyboard focus, then returns to the selected control
 when the pointer leaves. It stays clipped to the visible scroll area as rows
 move, and keyboard or programmatic selection takes over from stale pointer
 hover. DISPLAY can turn selector motion off. The library starts at one-third of
-the available character columns and keeps at least 20 columns for its content
-pane. Its DISPLAY sidebar-width slider and draggable
+the available character columns. High-resolution layouts of 64 columns or more
+reserve at least 20 sidebar columns; smaller layouts retain a 10-column minimum.
+The playlist keeps at least 20 columns. Tree disclosure occupies one column and
+each unfold adds one column of indent. Full sample game names replace short aliases. Its DISPLAY sidebar-width slider and draggable
 separator use the same 8px character-column bounds and saved value; arrow keys
 change one column at a time, Home restores the one-third default, and End sets
 the widest allowed library pane. Brightness runs from 60% to 140% and remaps the
@@ -87,6 +92,19 @@ sample favorites and FAV filters the current playlist. The native file picker
 remains connected for opening a real local track; its playback uses the native
 transport, while sample-track playback and track stepping stay local.
 
-Playlist tabs keep an 18-character-cell width rather than shrinking into a row of small fragments. The strip scrolls horizontally, including with a vertical wheel over the tabs, and brings the active tab into view. Tab labels and close actions expose full-title tooltips; close uses the DOS-font X. The active tab retains a subdued background while focus moves elsewhere. Selector motion uses the same cubic-bezier(.2, 0, 0, 1) timing curve as ViewBoy.
+Playlist tabs use ViewBoy-style square outlines and an independent close cell.
+They share the available width, retain an 18-character basis and
+12-character minimum, then scroll instead of collapsing to unreadable fragments.
+A two-source-pixel gap separates tabs. The active frame stays bright while hover
+moves elsewhere. Close uses the same minimal five-dot X, empty ring and square
+outline as ViewBoy, centered in an eight-pixel icon slot inside a three-character
+hit cell. The [+] button remains outside the scroller. Vertical wheel scrolling
+moves an overflowing strip and active-tab selection reveals the tab. Labels,
+close actions and track rows expose full titles on hover. Selector motion uses
+cubic-bezier(.2, 0, 0, 1).
 
 Raster rows contain an even number of integral beam pitches, keeping the 8px horizontal advance on whole device pixels. The mask and layout use the actual display device ratio, including values above 2. This preserves the existing stationary mask and native DOM text path.
+
+Display options use unframed shaded Layout, Screen and Interaction headers with
+left labels and right controls. Clicking the sidebar separator focuses it for
+keyboard resizing; cancelling a drag restores its starting width without saving.

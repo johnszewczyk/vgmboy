@@ -68,8 +68,8 @@ a transparent background so the same white block and black text treatment
 works across controls. Respect the saved motion switch plus
 `prefers-reduced-motion`. Snap the resizable
 separator and DISPLAY width slider to the same 8px source-column bounds,
-preserve at least 10 columns in the library and 20 in the content pane where the
-raster allows, and default the library to one-third of the available columns.
+preserve at least 20 library columns for layouts with 64 or more columns,
+10 in smaller layouts, and 20 in the content pane where the raster allows, and default the library to one-third of the available columns.
 Keep keyboard arrows in one-column steps, Home at the one-third default, and End
 at the maximum width. SCANLINES off exposes the DOM
 without changing the grid. The resolution row and view toolbar must flex with
@@ -84,9 +84,10 @@ not reopen SQLite for each keystroke or duplicate searchable-field
 normalization in JavaScript. Debounce query updates, cap rendered results at
 250, and preserve the tree DOM and its selection while the results scroller is
 shown. The sample preview searches its local records. Keep the search input on
-its own 16px row aligned to the playlist heading row. Toolbar blocks use a
-one-cell internal gap and a two-cell gap before transport; retain the test
-resolution row and do not add a visible group divider.
+its own 16px row aligned to the playlist heading row. The eight toolbar blocks share equal widths and one-cell gaps across both
+command and transport groups; retain the separate resolution row. The toolbar
+occupies source grid rows 3–4; workspace begins at row 5. Library search and tabs
+occupy two workspace rows; the tree and track headers start below that band.
 
 Route native fullscreen requests through the LineBoy bridge to the owning
 NSWindow; the browser preview uses the document fullscreen API.
@@ -100,4 +101,13 @@ local demo records; native file-open and window actions remain active.
 
 `rasterCellMetrics` quantizes each 16px row to an even number of integral beam pitches, so half-row-width 8px columns also have integral device-pixel advances. Do not cap devicePixelRatio at 2 in either raster geometry or the WebGL buffer. The pure grid regression covers all five profiles and display ratios through 4; native visual inspection remains distinct from that proof.
 
-Tabs retain their character-cell width with horizontal overflow. Preserve the strip scroll position across replacement, then bring the active item into view using strip-local offsets. Do not use page-level scrollIntoView for tab selection. Wheel events over overflowing tabs advance the strip; native scroll capture repositions the selector.
+Tabs fill available space with an 18ch flex basis and 12ch minimum, with horizontal overflow.
+Reserve a separate 3ch close hit cell and an integer 8×8 icon slot; the icon is a
+five-dot X, a clear ring and a 7×7 outline, constructed in CSS without rasterizing
+text. The active outer frame belongs to the tab, independently of the shared
+hover selector. Tabs are 24 source pixels high inside a 32px toolbar band. Preserve the strip scroll position across replacement, then bring the active item into view using strip-local offsets. Do not use page-level scrollIntoView for tab selection. Wheel events over overflowing tabs advance the strip; native scroll capture repositions the selector.
+
+Sidebar pointerdown explicitly focuses the separator before preventing default.
+Pointer cancellation restores the starting width and does not persist. Keep this
+separate from the normal release commit. The default/reset raster is 800×600;
+existing saved raster selections are preserved.

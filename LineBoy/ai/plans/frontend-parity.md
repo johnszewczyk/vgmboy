@@ -2,9 +2,16 @@
 
 LineBoy remains a separate 8×16 DOM/CRT client over CatalogReader, FrontendCore and VGMBoy. Parity means useful shared commands and predictable controls, while preserving its DOS raster and stationary scanline mask. The frontends need not mirror layouts or visuals; keep each pass focused on concrete usability issues.
 
-## First pass
+## Design direction
 
-- Readable fixed-cell tabs, full-name tooltips, active-tab visibility and horizontal strip scrolling.
+LineBoy is ViewBoy in high-resolution DOS: retain the 8×16 font, dense lists,
+monochrome shading and stationary CRT mask. Use simple curses-style toolbars and
+framed tabs. The separate modern graphical mockup remains deferred.
+
+## Implemented
+
+- Framed flexible tabs with reserved pixel close icons, full-name tooltips, active-tab visibility and horizontal strip scrolling.
+- Uniform command toolbar, aligned search/tab bands, legible track headings, wider sidebar minimums, and shaded Display sections.
 - Shared snappy selector timing.
 - Whole-device-pixel glyph advances and uncapped device ratio for mask sizing.
 
