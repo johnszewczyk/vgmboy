@@ -96,8 +96,8 @@ works across controls. Respect the saved motion switch plus
 `prefers-reduced-motion`. Snap the resizable
 separator and DISPLAY width slider to the same 8px source-column bounds,
 preserve at least 20 library columns for layouts with 64 or more columns,
-10 in smaller layouts, and 20 in the content pane where the raster allows, and default the library to one-third of the available columns.
-Keep keyboard arrows in one-column steps, Home at the one-third default, and End
+10 in smaller layouts, and 20 in the content pane where the raster allows, and default the library to one-quarter of the available columns.
+Keep keyboard arrows in one-column steps, Home at the one-quarter default, and End
 at the maximum width. SCANLINES off exposes the DOM
 without changing the grid. The resolution row and view toolbar must flex with
 the active column count so controls use available width at each profile.
@@ -130,11 +130,26 @@ Its 16px row and 8px column advances are therefore integral; scan pitch equals
 the scale, with a minimum pitch of two device pixels. This replaces the old
 whole-cell calculation that still permitted scales such as 2.25. Do not cap devicePixelRatio at 2 in either raster geometry or the WebGL buffer. The pure grid regression covers all five profiles and display ratios through 4; native visual inspection remains distinct from that proof.
 
-Tabs fill available space with an 18ch flex basis and 12ch minimum, with horizontal overflow.
-Reserve a separate 3ch close hit cell and an integer 8×8 icon slot; the icon is a
-five-dot X, a clear ring and a 7×7 outline, constructed in CSS without rasterizing
-text. The active outer frame belongs to the tab, independently of the shared
-hover selector. Tabs are 24 source pixels high inside a 32px toolbar band. Preserve the strip scroll position across replacement, then bring the active item into view using strip-local offsets. Do not use page-level scrollIntoView for tab selection. Wheel events over overflowing tabs advance the strip; native scroll capture repositions the selector.
+Tabs use equal-width 18ch-minimum grid tracks when they fit, then scroll
+horizontally. Reserve a separate 3ch close hit cell and a centered 6×6 ring with
+a pixel X, constructed in CSS without rasterizing text. The active outer frame
+belongs to the tab, independently of the shared hover selector. Tabs are 24
+source pixels high inside a 32px toolbar band. Preserve the strip scroll position
+across replacement, then bring the active item into view using strip-local
+offsets. Do not use page-level scrollIntoView for tab selection. Wheel events
+over overflowing tabs advance the strip; native scroll capture repositions the
+selector.
+
+The playlist heading and song rows live in one two-axis `.playlist-data` scroll
+container. Keep the heading sticky at its top edge, give both axes a visible
+scrollbar, and preserve vertical offset from that container in tab snapshots.
+Rows, headings, and their child labels stay on the exact 16px source line grid;
+the integer raster scale makes their line height equal at every profile.
+
+OPTIONS keeps its compact 16px text grid while separating sections into raised
+cards. Keep option rows and card headings on 16px heights; EQ bands use a
+responsive card grid with 16px label and control lines. Maintain the fixed-width
+DOS font and do not fractional-scale text to gain density.
 
 Sidebar pointerdown explicitly focuses the separator before preventing default.
 Pointer cancellation restores the starting width and does not persist. Keep this

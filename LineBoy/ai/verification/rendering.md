@@ -42,3 +42,15 @@ tracks. Selecting Air Buster displayed READING PLAYLIST INDEX… immediately and
 then populated 20 tracks. Returning to the saved 1943 game restored its 20 rows
 from the recent-playlist cache. The prior 1943 playlist was restored as active
 after this interaction check. Automated tests were not run.
+
+On 2026-10-16, `./LineBoy/build.sh` completed and the native app was inspected at
+the 320, 512, 640, 800 and 1024 raster profiles. Playlist rows and the sticky
+heading remained on the 16px source grid at each profile. The playlist scrolled
+vertically as one surface while its heading stayed pinned; the equal-width tab
+strip and compact centered close icons were visible. The default sidebar and
+Home target now use one quarter of the available columns; the saved width value
+was preserved. OPTIONS showed grouped raised cards and the revised EQ band
+sliders with their labels and readouts fitting at 640. The saved 640 profile and
+top-of-playlist position were restored after inspection. Horizontal playlist
+scrolling is implemented by the shared scroll container but was not independently
+verified by this native interaction pass. Automated tests were not run.

@@ -66,23 +66,28 @@ playlist tabs and tracks, option controls, and the sidebar resize handle. It
 follows pointer hover and keyboard focus, then returns to the selected control
 when the pointer leaves. It stays clipped to the visible scroll area as rows
 move, and keyboard or programmatic selection takes over from stale pointer
-hover. DISPLAY can turn selector motion off. The library starts at one-third of
-the available character columns. High-resolution layouts of 64 columns or more
+hover. DISPLAY can turn selector motion off. The library starts at one-quarter
+of the available character columns. High-resolution layouts of 64 columns or more
 reserve at least 20 sidebar columns; smaller layouts retain a 10-column minimum.
 The playlist keeps at least 20 columns. Tree disclosure occupies one column and
 each unfold adds one column of indent. Full sample game names replace short aliases. Its DISPLAY sidebar-width slider and draggable
 separator use the same 8px character-column bounds and saved value; arrow keys
-change one column at a time, Home restores the one-third default, and End sets
+change one column at a time, Home restores the one-quarter default, and End sets
 the widest allowed library pane. Brightness runs from 60% to 140% and remaps the
 monochrome palette while leaving the pure-black scanline gaps unchanged.
 Brightness, selector motion, and pane width persist with the display
 preferences. PLAYLIST controls automatic content sizing and its maximum column
 width; column changes use the selector's 220ms easing and remain aligned to the
 8px text grid. Both playlist sizing choices persist with the display
-preferences.
+preferences. Playlist rows and headings share one two-axis scroll area; the
+heading remains pinned while long playlists scroll. Track rows keep their exact
+16px source height at every raster profile. Tabs use equal-width cells when they
+fit, then scroll as a strip; their compact close icon stays centered in a fixed
+trailing hit area.
 
 Phosphor persistence is disabled to keep interaction responsive. OPTIONS opens
-a two-column terminal settings view. DISPLAY contains WIDTH MODE (FILL or
+a two-column terminal settings view with raised, grouped cards. Option rows and
+equalizer labels remain on the same 16px line grid. DISPLAY contains WIDTH MODE (FILL or
 FRAME), SCANLINES, BRIGHTNESS, SELECTOR FLOW, the active beam pitch, and a
 native fullscreen toggle. CRT contains a THIN/NORMAL/WIDE beam-width control
 and reports the active pitch. PLAYLIST contains AUTO SIZE and MAX WIDTH.
