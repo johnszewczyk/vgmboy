@@ -54,3 +54,13 @@ sliders with their labels and readouts fitting at 640. The saved 640 profile and
 top-of-playlist position were restored after inspection. Horizontal playlist
 scrolling is implemented by the shared scroll container but was not independently
 verified by this native interaction pass. Automated tests were not run.
+
+On 2026-10-16, `./LineBoy/launch.sh` rebuilt and launched the toolbar/footer
+layout. The 320, 512, 640, 800 and 1024 profiles showed the unlabeled resolution
+blocks on the first row, matching command blocks on the next row, and the name,
+grid, beam pitch, clock, current item and playback state in the two-line footer.
+The selected raster and toolbar text remained centered on 16px lines. OPTIONS
+was visually checked at each profile; category buttons, section headings and
+setting buttons use square color blocks, while range controls use square
+selector handles. The original 640 profile and LIST view were restored.
+Automated tests were not run.

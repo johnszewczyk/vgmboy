@@ -5,8 +5,9 @@ The display offers direct choices for 320×240, 512×384, 640×480, 800×600, an
 scanline density. The grid extends to the available window height in whole
 16-pixel rows; WIDTH MODE FILL also extends its width in whole 8-pixel
 columns. FRAME keeps the selected profile's 4:3 width. Text is never stretched
-to fill unused space. Resolution choices spread evenly across their row; the
-command toolbar gives its eight actions equal widths, with transport at the right.
+to fill unused space. Resolution choices spread evenly across the first row as
+unlabeled blocks. The matching command toolbar gives its eight actions equal
+widths, with transport at the right.
 New installations and Reset Display select the high-resolution 800×600 profile;
 saved raster choices remain intact.
 
@@ -23,9 +24,10 @@ needed.
 
 The window keeps at least an 8-pixel inset around the terminal, leaving a visible frame
 inside the native macOS title-bar area. The layout uses 8-pixel columns and
-16-pixel text rows. Its title, resolution choices, curses-style command bar,
-library, playlist, and status line occupy explicit rows. The title row keeps
-only grid, beam pitch, and clock readouts so the controls have room.
+16-pixel text rows. The unlabeled resolution block toolbar leads, followed by
+the matching command toolbar, library, playlist, and a two-line status footer.
+The footer contains the LineBoy name, grid, beam pitch, clock, current item and
+playback state.
 Labels and controls use the same cell-top baseline: the 10px cap ink is centered
 inside its 16px row, with three source pixels above and below. The fixed-width
 font keeps an 8px advance, with kerning and ligatures disabled. The baseline
@@ -38,12 +40,12 @@ with a grayscale spot profile. Scrolling moves continuously underneath the
 same filter. The CSS mask provides the same fixed-gap fallback when WebGL2 is
 unavailable.
 
-Curses-style outlined command buttons occupy a two-text-row band, with
-one character cell between all eight actions. Persistent active buttons use a
-subdued fill; hover and keyboard focus use the shared inverse selector. The
-resolution profile row remains separate. Library and playlist headers match;
-the search field and framed tab toolbar share a two-row band below them. Track
-headings use light text on a shaded bar, followed by dense 16px text rows.
+The resolution and command toolbars use the same square, filled color-block
+buttons with one character cell between actions. Each toolbar label is centered
+on its 16-pixel row; the active choice and hover or keyboard focus use the white
+inverse selector. Library and playlist headers match; the search field and
+framed tab toolbar share a two-row band below them. Track headings use light
+text on a shaded bar, followed by dense 16px text rows.
 
 The playlist has a horizontal tab strip above its track headings. Selecting a
 tab restores that playlist, its selected track, favorites filter, and scroll
@@ -86,10 +88,11 @@ fit, then scroll as a strip; their compact close icon stays centered in a fixed
 trailing hit area.
 
 Phosphor persistence is disabled to keep interaction responsive. OPTIONS opens
-a two-column terminal settings view with raised, grouped cards. Option rows and
-equalizer labels remain on the same 16px line grid. DISPLAY contains WIDTH MODE (FILL or
-FRAME), SCANLINES, BRIGHTNESS, SELECTOR FLOW, the active beam pitch, and a
-native fullscreen toggle. CRT contains a THIN/NORMAL/WIDE beam-width control
+a two-column terminal settings view with square framed sections, shaded section
+headers, and the same filled block controls as the toolbars. Option rows and
+equalizer labels remain centered on the same 16px line grid. DISPLAY contains
+WIDTH MODE (FILL or FRAME), SCANLINES, BRIGHTNESS, SELECTOR FLOW, the active
+beam pitch, and a native fullscreen toggle. CRT contains a THIN/NORMAL/WIDE beam-width control
 and reports the active pitch. PLAYLIST contains AUTO SIZE and MAX WIDTH.
 PLAYBACK contains Long Play duration, the unknown-duration default, fade
 settings, and independent libgme/libvgm speed controls. AUDIO contains output
@@ -134,9 +137,10 @@ cubic-bezier(.2, 0, 0, 1).
 
 Every source font pixel uses a whole device-pixel scale, not merely a whole character-cell advance. Scanlines use an integral physical pitch, with no fractional mask scaling. The mask and layout use the actual display device ratio, including values above 2. This preserves the existing stationary mask and native DOM text path.
 
-Display options use unframed shaded Layout, Screen and Interaction headers with
-left labels and right controls. Clicking the sidebar separator focuses it for
-keyboard resizing; cancelling a drag restores its starting width without saving.
+Display options use square framed groups, shaded section headers, left labels,
+and centered block controls on the right. Clicking the sidebar separator focuses
+it for keyboard resizing; cancelling a drag restores its starting width without
+saving.
 
 The scanline layer is outside the scaled text surface and maps one mask pixel
 to one physical display pixel. Its CSS fallback uses the same physical pitch.
