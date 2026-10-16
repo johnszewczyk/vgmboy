@@ -16,7 +16,8 @@
   Section groups within pages are alphabetical.
 - The options sidebar groups SPCBOY-owned frontend settings separately from
   VGMBoy-owned playback-core settings. Keep that ownership split when adding
-  settings.
+  settings. Owner headings use the filled toolbar heading block, and category
+  items reuse the common toolbar button surface and selected state.
 - Playback volume uses twenty 5% steps in Options and in the compact Volume
   popup on the home toolbar. The home popup stays behind the Options layer.
 - Option pages use a readable system font and a 65-character content width.

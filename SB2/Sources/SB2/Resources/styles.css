@@ -2206,12 +2206,21 @@ body.sb2-frontend .playlist-header-table th {
   padding-top: 0;
   padding-bottom: 0;
 }
+body.sb2-frontend .toolbar-heading,
 body.sb2-frontend .playlist-header-label {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
   height: var(--sb-control-size);
   min-height: var(--sb-control-size);
   padding: 0 var(--sb-toolbar-gap);
   border-radius: var(--sb-button-radius);
   background: var(--sb-button-surface);
+  color: var(--sb-button-ink);
+  font-family: var(--mono-font-family);
+  font-size: var(--sb-control-font-size);
+  line-height: 1;
   transition: background 120ms var(--app-easing), color 120ms var(--app-easing);
 }
 body.sb2-frontend .playlist-header-table th:hover .playlist-header-label {
@@ -2435,8 +2444,8 @@ body.sb2-frontend .options-body { grid-template-columns: 12rem minmax(0, 1fr); g
 body.sb2-frontend .options-nav { gap: 1.25rem; padding: var(--sb-space-050) 0; }
 body.sb2-frontend .options-nav-group { gap: var(--sb-space-010); padding: 0; border: 0; border-radius: 0; background: transparent; }
 body.sb2-frontend .options-nav-group + .options-nav-group { border: 0; }
-body.sb2-frontend .options-nav-group-title { padding: 0 var(--sb-space-050) var(--sb-space-020); color: #777f9c; font-size: var(--sb-space-066); font-weight: 500; letter-spacing: .08em; }
-body.sb2-frontend .options-nav-item { height: var(--sb-control-size); min-height: var(--sb-control-size); gap: var(--sb-space-066); padding: 0 var(--sb-space-075); border: 0; border-radius: var(--sb-button-radius); background: var(--sb-button-surface); color: var(--sb-button-ink); font-size: var(--sb-control-font-size); font-weight: 400; }
+body.sb2-frontend .options-nav-group-title { justify-content: flex-start; margin: 0; font-weight: 600; text-align: left; }
+body.sb2-frontend .options-nav-item { width: 100%; height: var(--sb-control-size); min-height: var(--sb-control-size); justify-content: flex-start; gap: var(--sb-space-066); padding: 0 var(--sb-space-075); font-weight: 400; text-align: left; }
 /* Keep each owner's options navigation explicitly alphabetical in visual order. */
 body.sb2-frontend #options-database-tab { order: 1; }
 body.sb2-frontend #options-gallery-tab { order: 2; }
@@ -2447,9 +2456,6 @@ body.sb2-frontend #options-audio-tab { order: 1; }
 body.sb2-frontend #options-diagnostics-tab { order: 2; }
 body.sb2-frontend #options-playback-tab { order: 3; }
 body.sb2-frontend #options-routing-tab { order: 4; }
-body.sb2-frontend .options-nav-item:hover { background: var(--sb-button-hover-surface); color: var(--sb-button-hover-ink); }
-body.sb2-frontend .options-nav-item .ui-icon { width: 1rem; height: 1rem; }
-body.sb2-frontend .options-nav-item.is-selected { background: var(--sb-button-selected-surface); color: var(--sb-button-selected-ink); }
 body.sb2-frontend .options-content { padding: 1rem 2rem 2rem; border: 0; border-radius: 0; font-family: var(--ui-font-family); font-size: 1rem; line-height: 1.5; scrollbar-color: #3a4050 #090b0f; }
 body.sb2-frontend .options-page { width: min(100%, 65ch); gap: 2rem; min-height: 100%; margin-inline: auto; padding: 0 0 2rem; border-radius: 0; background: transparent; }
 body.sb2-frontend .options-page-title { margin: 0; padding: 0 0 .75rem; border-bottom: 1px solid #343a48; color: #e0e1eb; font-size: 1.5rem; line-height: 1.3; font-weight: 600; letter-spacing: 0; }
@@ -2542,8 +2548,7 @@ body.sb2-frontend .sidebar-search-wrap {
 body.sb2-frontend .tool-button,
 body.sb2-frontend .sidebar-mode-button,
 body.sb2-frontend .playlist-tab-select,
-body.sb2-frontend .playlist-tab-close,
-body.sb2-frontend .options-nav-item {
+body.sb2-frontend .playlist-tab-close {
   box-sizing: border-box;
   min-height: var(--sb-control-size);
   font-family: var(--mono-font-family);
@@ -2553,15 +2558,13 @@ body.sb2-frontend .options-nav-item {
 }
 body.sb2-frontend .tool-button,
 body.sb2-frontend .sidebar-mode-button,
-body.sb2-frontend .playlist-tab-close,
-body.sb2-frontend .options-nav-item {
+body.sb2-frontend .playlist-tab-close {
   border: 0;
   border-radius: var(--sb-button-radius);
   background: var(--sb-button-surface);
   color: var(--sb-button-ink);
 }
-body.sb2-frontend .tool-button:not(.glyph-button),
-body.sb2-frontend .options-nav-item { min-width: var(--sb-control-size); }
+body.sb2-frontend .tool-button:not(.glyph-button) { min-width: var(--sb-control-size); }
 body.sb2-frontend .tool-button:not(.glyph-button) { padding-inline: var(--sb-toolbar-gap); }
 body.sb2-frontend .tool-button.glyph-button,
 body.sb2-frontend .sidebar-mode-button,
@@ -2575,16 +2578,14 @@ body.sb2-frontend .options-path-control .tool-button {
 }
 body.sb2-frontend .tool-button .ui-icon,
 body.sb2-frontend .sidebar-mode-button .ui-icon,
-body.sb2-frontend .playlist-tab-close .ui-icon,
-body.sb2-frontend .options-nav-item .ui-icon {
+body.sb2-frontend .playlist-tab-close .ui-icon {
   width: var(--sb-control-icon-size);
   height: var(--sb-control-icon-size);
   flex: 0 0 var(--sb-control-icon-size);
 }
 body.sb2-frontend .tool-button:hover,
 body.sb2-frontend .sidebar-mode-button:hover,
-body.sb2-frontend .playlist-tab-close:hover,
-body.sb2-frontend .options-nav-item:hover {
+body.sb2-frontend .playlist-tab-close:hover {
   background: var(--sb-button-hover-surface);
   color: var(--sb-button-hover-ink);
 }
@@ -2600,15 +2601,6 @@ body.sb2-frontend .playlist-tab-select {
 }
 body.sb2-frontend .playlist-tab-select:hover { background: var(--sb-button-hover-surface); color: var(--sb-button-hover-ink); }
 body.sb2-frontend .playlist-tab-select.is-active { color: var(--sb-button-selected-ink); }
-body.sb2-frontend .options-nav-item { height: var(--sb-control-size); }
-body.sb2-frontend .options-nav-item.is-selected { background: var(--sb-button-selected-surface); color: var(--sb-button-selected-ink); }
-body.sb2-frontend .playlist-header-label {
-  border-radius: var(--sb-button-radius);
-  background: var(--sb-button-surface);
-  color: var(--sb-button-ink);
-  font-size: var(--sb-control-font-size);
-  line-height: 1;
-}
 body.sb2-frontend .playlist-header-table th:hover .playlist-header-label { background: var(--sb-button-hover-surface); color: var(--sb-button-hover-ink); }
 body.sb2-frontend button:not(.favorite-toggle):not(.tree-node):not(.database-game-row):not(.database-console-row):is(:active, [aria-pressed="true"], .is-selected) {
   background: var(--sb-button-selected-surface);

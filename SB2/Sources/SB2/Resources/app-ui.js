@@ -3200,7 +3200,7 @@ function renderPlaylistHeader() {
     th.title = canSortColumn ? `Sort by ${column.label}` : (column.id === "index" ? "Line number" : column.label);
 
     const label = document.createElement("span");
-    label.className = "playlist-header-label toolbar-control";
+    label.className = "playlist-header-label toolbar-heading toolbar-control";
     label.textContent = column.label;
     if (state.playlistSortEnabled && state.sortColumn === column.id) {
       label.textContent += state.sortDirection === "ascending" ? " ▲" : " ▼";
